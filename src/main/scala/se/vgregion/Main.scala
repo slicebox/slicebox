@@ -1,4 +1,4 @@
-package com.goticks
+package se.vgregion
 
 import akka.actor._
 import akka.io.IO
@@ -13,7 +13,7 @@ object Main extends App {
   val host = config.getString("http.host")
   val port = config.getInt("http.port")
 
-  implicit val system = ActorSystem("goticks")
+  implicit val system = ActorSystem("akka-dcm")
 
   val api = system.actorOf(Props(new RestInterface()), "httpInterface")
   IO(Http) ! Http.Bind(listener = api, interface = host, port = port)
