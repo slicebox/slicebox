@@ -6,6 +6,8 @@ import spray.json.DefaultJsonProtocol
 
 object FileSystemProtocol {
 
+  case class FileName(name: String)
+  
   // incoming
 
   case class MonitorDir(dir: String)
@@ -20,8 +22,6 @@ object FileSystemProtocol {
 
   case class Deleted(fileOrDir: File)
   
-  case class FileName(name: String)
-
   case class FileNames(files: List[FileName])
 
   // JSON
