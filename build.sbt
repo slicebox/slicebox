@@ -1,5 +1,3 @@
-import AssemblyKeys._
-import com.typesafe.sbt.SbtStartScript
 
 name := "akka-dcm"
 
@@ -8,6 +6,8 @@ version := "0.1-SNAPSHOT"
 organization := "se.vgregion"
 
 scalaVersion := "2.11.2"
+
+scalacOptions := Seq("-encoding", "UTF-8", "-Xlint","-deprecation", "-unchecked", "-feature")
 
 Revolver.settings
 
@@ -27,6 +27,8 @@ libraryDependencies ++= {
     "io.spray"          			%% "spray-json"      	% "1.3.1",
     "com.typesafe.akka" 			%% "akka-slf4j"      	% akkaVersion,
     "ch.qos.logback"    			%  "logback-classic" 	% "1.1.2",
+	"com.typesafe.slick" 			%% "slick" 				% "2.1.0",
+	"com.h2database" 				%  "h2" 				% "1.3.170",
     "com.typesafe.akka" 			%% "akka-testkit"    	% akkaVersion   	% "test",
     "org.scalatest"     			%% "scalatest"       	% "2.2.1"       	% "test"
   )
@@ -36,12 +38,4 @@ EclipseKeys.createSrc := EclipseCreateSrc.Default + EclipseCreateSrc.Resource
 
 EclipseKeys.withSource := true
 
-// Assembly settings
-mainClass in Global := Some("com.goticks.Main")
-
-jarName in assembly := "akka-dcm.jar"
-
-assemblySettings
-
-// StartScript settings
-seq(SbtStartScript.startScriptForClassesSettings: _*)
+mainClass in Compile := Some("se.vgregion.Main")

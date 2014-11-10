@@ -2,10 +2,8 @@ package se.vgregion
 
 import akka.actor._
 import akka.io.IO
-
 import spray.can.Http
 import spray.can.server._
-
 import com.typesafe.config.ConfigFactory
 
 object Main extends App {

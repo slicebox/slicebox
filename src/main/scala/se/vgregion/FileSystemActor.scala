@@ -2,6 +2,8 @@ package se.vgregion
 
 import akka.actor.Actor
 import akka.event.{LoggingReceive, Logging}
+import FileSystemProtocol._
+import java.nio.file.Paths
 
 class FileSystemActor extends Actor {
 	val log = Logging(context.system, this)
@@ -17,10 +19,18 @@ class FileSystemActor extends Actor {
 		watchThread.interrupt()
 	}
 
+  var files = List.empty[FileName]
+  
 	def receive = LoggingReceive {
-		case MonitorDir(path) =>
-			watchServiceTask watchRecursively path
+		case MonitorDir(dir) =>
+			watchServiceTask watchRecursively Paths.get(dir)
+      sender ! MonitoringDir
 		case Created(file) =>
+      files = files :+ FileName(file.getName)
 		case Deleted(fileOrDir) =>
+      files = files diff List(FileName(fileOrDir.getName))
+    case GetFileNames =>
+      sender ! FileNames(files)
+      
 	}
 }

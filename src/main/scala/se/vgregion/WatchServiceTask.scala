@@ -1,20 +1,30 @@
 package se.vgregion
 
-import akka.actor.ActorRef
 import java.nio.file._
 import java.nio.file.StandardWatchEventKinds._
 import java.nio.file.attribute.BasicFileAttributes
-import collection.JavaConversions._
+
+import scala.collection.JavaConversions._
+
 import com.typesafe.scalalogging.LazyLogging
+
+import FileSystemProtocol._
+import akka.actor.ActorRef
 
 class WatchServiceTask(notifyActor: ActorRef) extends Runnable with LazyLogging {
   private val watchService = FileSystems.getDefault.newWatchService()
 
-  def watchRecursively(root: Path) {
+  def watchRecursively(root: Path) = {
     watch(root)
     Files.walkFileTree(root, new SimpleFileVisitor[Path] {
       override def preVisitDirectory(dir: Path, attrs: BasicFileAttributes) = {
         watch(dir)
+        FileVisitResult.CONTINUE
+      }
+      override def visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult = {
+        super.visitFile(file, attrs)
+        println(s"Adding ${file.toFile().getName}")
+        notifyActor ! Created(file.toFile)
         FileVisitResult.CONTINUE
       }
     })
@@ -23,8 +33,7 @@ class WatchServiceTask(notifyActor: ActorRef) extends Runnable with LazyLogging 
   private def watch(path: Path) =
     path.register(watchService, ENTRY_CREATE, ENTRY_DELETE)
 
-  def run() {
-    import FileSystemChange._
+  def run() = {
     
     try {
       logger.debug("Waiting for file system events...")
@@ -36,7 +45,7 @@ class WatchServiceTask(notifyActor: ActorRef) extends Runnable with LazyLogging 
             val path = key.watchable().asInstanceOf[Path].resolve(relativePath)
             event.kind() match {
               case ENTRY_CREATE =>
-                if (path.toFile.isDirectory) {
+                if (Files.isDirectory(path)) {
                   watchRecursively(path)
                 }
                 notifyActor ! Created(path.toFile)
