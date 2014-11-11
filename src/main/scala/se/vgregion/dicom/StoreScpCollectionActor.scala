@@ -1,4 +1,4 @@
-package se.vgregion
+package se.vgregion.dicom
 
 import akka.actor.Actor
 import akka.event.{ LoggingReceive, Logging }

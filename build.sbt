@@ -38,4 +38,4 @@ EclipseKeys.createSrc := EclipseCreateSrc.Default + EclipseCreateSrc.Resource
 
 EclipseKeys.withSource := true
 
-mainClass in Compile := Some("se.vgregion.Main")
+mainClass in Compile := Some("se.vgregion.app.Main")

@@ -1,4 +1,4 @@
-package se.vgregion
+package se.vgregion.db
 
 object DbProtocol {
 

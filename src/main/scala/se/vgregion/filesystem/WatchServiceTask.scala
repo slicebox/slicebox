@@ -1,4 +1,4 @@
-package se.vgregion
+package se.vgregion.filesystem
 
 import java.nio.file._
 import java.nio.file.StandardWatchEventKinds._

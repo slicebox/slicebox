@@ -1,4 +1,4 @@
-package se.vgregion
+package se.vgregion.app
 
 import akka.actor._
 import akka.io.IO

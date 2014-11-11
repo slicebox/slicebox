@@ -1,4 +1,4 @@
-package se.vgregion
+package se.vgregion.dicom
 
 import java.io.File
 import java.io.IOException
@@ -14,6 +14,7 @@ import org.dcm4che3.net.Connection
 import org.dcm4che3.net.Device
 import org.dcm4che3.net.PDVInputStream
 import org.dcm4che3.net.Status
+import org.dcm4che3.net.TransferCapability
 import org.dcm4che3.net.pdu.PresentationContext
 import org.dcm4che3.net.service.BasicCEchoSCP
 import org.dcm4che3.net.service.BasicCStoreSCP
@@ -21,7 +22,6 @@ import org.dcm4che3.net.service.DicomServiceException
 import org.dcm4che3.net.service.DicomServiceRegistry
 import org.dcm4che3.util.SafeClose
 import com.typesafe.scalalogging.LazyLogging
-import org.dcm4che3.net.TransferCapability
 
 class StoreScp(val name: String, val aeTitle: String, val port: Int, val storageDir: File) extends LazyLogging {
 
@@ -63,7 +63,6 @@ class StoreScp(val name: String, val aeTitle: String, val port: Int, val storage
   
   private def storeTo(as: Association, fmi: Attributes, data: PDVInputStream, file: File) = {
     logger.info("{}: M-WRITE {}", as, file)
-    file.getParentFile().mkdirs()
     val out = new DicomOutputStream(file)
     try {
       out.writeFileMetaInformation(fmi)
@@ -102,26 +101,5 @@ class StoreScp(val name: String, val aeTitle: String, val port: Int, val storage
     serviceRegistry.addDicomService(cstoreSCP)
     serviceRegistry
   }
-
-  /**
-   * public static void main(String[] args) {
-   * try {
-   * ExecutorService executorService = Executors.newCachedThreadPool();
-   * ScheduledExecutorService scheduledExecutorService =
-   * Executors.newSingleThreadScheduledExecutor();
-   * main.device.setScheduledExecutor(scheduledExecutorService);
-   * main.device.setExecutor(executorService);
-   * main.device.bindConnections();
-   * } catch (ParseException e) {
-   * System.err.println("storescp: " + e.getMessage());
-   * System.err.println(rb.getString("try"));
-   * System.exit(2);
-   * } catch (Exception e) {
-   * System.err.println("storescp: " + e.getMessage());
-   * e.printStackTrace();
-   * System.exit(2);
-   * }
-   * }
-   */
 
 }

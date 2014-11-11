@@ -1,4 +1,4 @@
-package se.vgregion
+package se.vgregion.app
 
 import akka.actor._
 import spray.routing._
@@ -8,9 +8,8 @@ import spray.routing.RequestContext
 import akka.util.Timeout
 import scala.concurrent.duration._
 import scala.language.postfixOps
-import se.vgregion.StoreScpProtocol.AddStoreScp
-import se.vgregion.StoreScpProtocol.GetStoreScpDataCollection
-import se.vgregion.StoreScpProtocol.StoreScpDataCollection
+import se.vgregion.filesystem.FileSystemActor
+import se.vgregion.dicom.StoreScpCollectionActor
 
 class RestInterface extends HttpServiceActor
   with RestApi {
@@ -20,8 +19,8 @@ class RestInterface extends HttpServiceActor
 trait RestApi extends HttpService with ActorLogging { actor: Actor =>
   import context.dispatcher
 
-  import se.vgregion.FileSystemProtocol._
-  import StoreScpProtocol._
+  import se.vgregion.filesystem.FileSystemProtocol._
+  import se.vgregion.dicom.StoreScpProtocol._
   
   implicit val timeout = Timeout(10 seconds)
   import akka.pattern.ask
@@ -64,8 +63,8 @@ trait RestApi extends HttpService with ActorLogging { actor: Actor =>
 }
 
 class Responder(requestContext: RequestContext, fileSystemActor: ActorRef) extends Actor with ActorLogging {
-  import FileSystemProtocol._
-  import StoreScpProtocol._
+  import se.vgregion.filesystem.FileSystemProtocol._
+  import se.vgregion.dicom.StoreScpProtocol._
   
   import spray.httpx.SprayJsonSupport._
 

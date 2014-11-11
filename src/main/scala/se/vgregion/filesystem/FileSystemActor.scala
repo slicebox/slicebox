@@ -1,9 +1,10 @@
-package se.vgregion
+package se.vgregion.filesystem
 
 import akka.actor.Actor
 import akka.event.{LoggingReceive, Logging}
 import FileSystemProtocol._
 import java.nio.file.Paths
+import akka.actor.actorRef2Scala
 
 class FileSystemActor extends Actor {
 	val log = Logging(context.system, this)

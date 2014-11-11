@@ -1,10 +1,13 @@
-package se.vgregion
+package se.vgregion.dicom
 
-import akka.actor.Actor
-import akka.event.{LoggingReceive, Logging}
-import StoreScpProtocol._
-import java.util.concurrent.Executors
 import java.io.File
+import java.util.concurrent.Executors
+
+import StoreScpProtocol._
+import akka.actor.Actor
+import akka.actor.actorRef2Scala
+import akka.event.Logging
+import akka.event.LoggingReceive
 
 class StoreScpActor extends Actor {
 	val log = Logging(context.system, this)

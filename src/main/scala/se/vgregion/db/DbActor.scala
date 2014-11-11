@@ -1,8 +1,9 @@
-package se.vgregion
+package se.vgregion.db
 
 import akka.actor.Actor
 import DbProtocol._
 import scala.slick.driver.H2Driver.simple._
+
 
 class DbActor extends Actor {
 

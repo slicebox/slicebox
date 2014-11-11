@@ -1,4 +1,4 @@
-package se.vgregion
+package se.vgregion.dicom
 
 import java.nio.file.Path
 import java.io.File

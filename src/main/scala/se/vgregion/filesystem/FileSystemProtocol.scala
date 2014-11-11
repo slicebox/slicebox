@@ -1,4 +1,4 @@
-package se.vgregion
+package se.vgregion.filesystem
 
 import java.nio.file.Path
 import java.io.File
