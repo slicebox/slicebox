@@ -9,7 +9,7 @@ import akka.util.Timeout
 import scala.concurrent.duration._
 import scala.language.postfixOps
 import se.vgregion.filesystem.FileSystemActor
-import se.vgregion.dicom.StoreScpCollectionActor
+import se.vgregion.dicom.ScpCollectionActor
 
 class RestInterface extends HttpServiceActor
   with RestApi {
@@ -20,7 +20,7 @@ trait RestApi extends HttpService with ActorLogging { actor: Actor =>
   import context.dispatcher
 
   import se.vgregion.filesystem.FileSystemProtocol._
-  import se.vgregion.dicom.StoreScpProtocol._
+  import se.vgregion.dicom.ScpProtocol._
   
   implicit val timeout = Timeout(10 seconds)
   import akka.pattern.ask
@@ -28,11 +28,11 @@ trait RestApi extends HttpService with ActorLogging { actor: Actor =>
   import akka.pattern.pipe
 
   val fileSystemActor = context.actorOf(Props[FileSystemActor])
-  val storeScpCollectionActor = context.actorOf(Props[StoreScpCollectionActor])
+  val scpCollectionActor = context.actorOf(Props[ScpCollectionActor])
   
   // temporary lines
   fileSystemActor ! MonitorDir("C:/users/karl/Desktop/temp")  
-  storeScpCollectionActor ! AddStoreScp(StoreScpData("testSCP", "myAE", 11123))
+  scpCollectionActor ! AddScp(ScpData("testSCP", "myAE", 11123))
   
   def routes: Route =
 
@@ -53,7 +53,7 @@ trait RestApi extends HttpService with ActorLogging { actor: Actor =>
     path("scps") {
       get { requestContext =>
         val responder = createResponder(requestContext)
-        storeScpCollectionActor.ask(GetStoreScpDataCollection).pipeTo(responder)
+        scpCollectionActor.ask(GetScpDataCollection).pipeTo(responder)
       }
     }
   def createResponder(requestContext: RequestContext) = {
@@ -64,13 +64,13 @@ trait RestApi extends HttpService with ActorLogging { actor: Actor =>
 
 class Responder(requestContext: RequestContext, fileSystemActor: ActorRef) extends Actor with ActorLogging {
   import se.vgregion.filesystem.FileSystemProtocol._
-  import se.vgregion.dicom.StoreScpProtocol._
+  import se.vgregion.dicom.ScpProtocol._
   
   import spray.httpx.SprayJsonSupport._
 
   def receive = {
 
-    case StoreScpDataCollection(data) =>
+    case ScpDataCollection(data) =>
       requestContext.complete((StatusCodes.OK, data))
       self ! PoisonPill
       

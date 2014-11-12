@@ -3,13 +3,13 @@ package se.vgregion.dicom
 import java.io.File
 import java.util.concurrent.Executors
 
-import StoreScpProtocol._
+import ScpProtocol._
 import akka.actor.Actor
 import akka.actor.actorRef2Scala
 import akka.event.Logging
 import akka.event.LoggingReceive
 
-class StoreScpActor extends Actor {
+class ScpActor extends Actor {
 	val log = Logging(context.system, this)
   
   val scheduledExecutor = Executors.newSingleThreadScheduledExecutor()
@@ -19,11 +19,11 @@ class StoreScpActor extends Actor {
 	}
 
 	def receive = LoggingReceive {
-    case AddStoreScpWithExecutor(data, executor) =>
-      val storeScp = new StoreScp(data.name, data.aeTitle, data.port, new File("C:/users/karl/Desktop/temp"))
-      storeScp.device.setScheduledExecutor(scheduledExecutor)
-      storeScp.device.setExecutor(executor)
-      storeScp.device.bindConnections()
-      sender ! StoreScpAdded(data)
+    case AddScpWithExecutor(data, executor) =>
+      val scp = new Scp(data.name, data.aeTitle, data.port, new File("C:/users/karl/Desktop/temp"))
+      scp.device.setScheduledExecutor(scheduledExecutor)
+      scp.device.setExecutor(executor)
+      scp.device.bindConnections()
+      sender ! ScpAdded(data)
 	}
 }

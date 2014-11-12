@@ -23,17 +23,25 @@ import org.dcm4che3.net.service.DicomServiceRegistry
 import org.dcm4che3.util.SafeClose
 import com.typesafe.scalalogging.LazyLogging
 
-class StoreScp(val name: String, val aeTitle: String, val port: Int, val storageDir: File) extends LazyLogging {
+class Scp(val name: String, val aeTitle: String, val port: Int, val storageDir: File) extends LazyLogging {
 
-  private val PART_EXT = ".part"
-
-  val device = new Device("storescp")
-  
+  val device = new Device("storescp")  
   private val ae = new ApplicationEntity(aeTitle)
   private val conn = new Connection(name, null, port)
+
+  device.setDimseRQHandler(createServiceRegistry());
+  device.addConnection(conn);
+  device.addApplicationEntity(ae);
+
+  ae.setAssociationAcceptor(true);
+  ae.addConnection(conn);
+  ae.addTransferCapability(new TransferCapability(null, "*", TransferCapability.Role.SCP, "*"))
+  
   private val cstoreSCP = new BasicCStoreSCP("*") {
 
-    override protected def store(as: Association, pc: PresentationContext, rq: Attributes, data: PDVInputStream, rsp: Attributes) {
+    private val PART_EXT = ".part"
+  
+    override protected def store(as: Association, pc: PresentationContext, rq: Attributes, data: PDVInputStream, rsp: Attributes): Unit = {
       rsp.setInt(Tag.Status, VR.US, 0)
       if (storageDir == null)
         return
@@ -54,13 +62,6 @@ class StoreScp(val name: String, val aeTitle: String, val port: Int, val storage
 
   }
 
-  device.setDimseRQHandler(createServiceRegistry());
-  device.addConnection(conn);
-  device.addApplicationEntity(ae);
-  ae.setAssociationAcceptor(true);
-  ae.addConnection(conn);
-  ae.addTransferCapability(new TransferCapability(null, "*", TransferCapability.Role.SCP, "*"))
-  
   private def storeTo(as: Association, fmi: Attributes, data: PDVInputStream, file: File) = {
     logger.info("{}: M-WRITE {}", as, file)
     val out = new DicomOutputStream(file)
