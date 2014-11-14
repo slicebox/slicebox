@@ -10,6 +10,10 @@ import scala.concurrent.duration._
 import scala.language.postfixOps
 import se.vgregion.filesystem.FileSystemActor
 import se.vgregion.dicom.ScpCollectionActor
+import se.vgregion.db.DbActor
+import se.vgregion.db.SqlDbOps
+import com.typesafe.config.ConfigFactory
+import java.io.File
 
 class RestInterface extends HttpServiceActor
   with RestApi {
@@ -27,12 +31,21 @@ trait RestApi extends HttpService with ActorLogging { actor: Actor =>
 
   import akka.pattern.pipe
 
-  val fileSystemActor = context.actorOf(Props[FileSystemActor])
-  val scpCollectionActor = context.actorOf(Props[ScpCollectionActor])
+  val config = ConfigFactory.load()
+  val isProduction = config.getBoolean("application.production.mode")
+  val storageDirectory = new File(config.getString("scp.storage.directory"))
+  if (!storageDirectory.exists() || !storageDirectory.isDirectory()) {
+    System.err.println("Storage directory does not exist or is not a directory.")
+    self ! PoisonPill
+  }
   
-  // temporary lines
-  fileSystemActor ! MonitorDir("C:/users/karl/Desktop/temp")  
-  scpCollectionActor ! AddScp(ScpData("testSCP", "myAE", 11123))
+  val dbActor = context.actorOf(Props(classOf[DbActor], new SqlDbOps(isProduction)))
+  val fileSystemActor = context.actorOf(Props[FileSystemActor])
+  val scpCollectionActor = context.actorOf(Props(classOf[ScpCollectionActor], dbActor, storageDirectory))
+
+  // Add some initial values for easier development with in-mem database
+  InitialValues.initFileSystemData(fileSystemActor)
+  InitialValues.initScpData(scpCollectionActor)
   
   def routes: Route =
 

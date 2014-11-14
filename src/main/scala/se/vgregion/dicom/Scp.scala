@@ -29,14 +29,6 @@ class Scp(val name: String, val aeTitle: String, val port: Int, val storageDir: 
   private val ae = new ApplicationEntity(aeTitle)
   private val conn = new Connection(name, null, port)
 
-  device.setDimseRQHandler(createServiceRegistry());
-  device.addConnection(conn);
-  device.addApplicationEntity(ae);
-
-  ae.setAssociationAcceptor(true);
-  ae.addConnection(conn);
-  ae.addTransferCapability(new TransferCapability(null, "*", TransferCapability.Role.SCP, "*"))
-  
   private val cstoreSCP = new BasicCStoreSCP("*") {
 
     private val PART_EXT = ".part"
@@ -62,6 +54,14 @@ class Scp(val name: String, val aeTitle: String, val port: Int, val storageDir: 
 
   }
 
+  device.setDimseRQHandler(createServiceRegistry());
+  device.addConnection(conn);
+  device.addApplicationEntity(ae);
+
+  ae.setAssociationAcceptor(true);
+  ae.addConnection(conn);
+  ae.addTransferCapability(new TransferCapability(null, "*", TransferCapability.Role.SCP, "*"))
+  
   private def storeTo(as: Association, fmi: Attributes, data: PDVInputStream, file: File) = {
     logger.info("{}: M-WRITE {}", as, file)
     val out = new DicomOutputStream(file)

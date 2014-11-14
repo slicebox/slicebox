@@ -21,7 +21,7 @@ object ScpProtocol {
 
   case class ScpAdded(scpData: ScpData)
 
-  case class ScpDataCollection(scpDataCollection: List[ScpData])
+  case class ScpDataCollection(scpDataCollection: Seq[ScpData])
 
   //----------------------------------------------
   // JSON

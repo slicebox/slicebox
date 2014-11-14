@@ -9,7 +9,7 @@ import akka.actor.actorRef2Scala
 import akka.event.Logging
 import akka.event.LoggingReceive
 
-class ScpActor extends Actor {
+class ScpActor(storageDirectory: File) extends Actor {
 	val log = Logging(context.system, this)
   
   val scheduledExecutor = Executors.newSingleThreadScheduledExecutor()
@@ -20,7 +20,7 @@ class ScpActor extends Actor {
 
 	def receive = LoggingReceive {
     case AddScpWithExecutor(data, executor) =>
-      val scp = new Scp(data.name, data.aeTitle, data.port, new File("C:/users/karl/Desktop/temp"))
+      val scp = new Scp(data.name, data.aeTitle, data.port, storageDirectory)
       scp.device.setScheduledExecutor(scheduledExecutor)
       scp.device.setExecutor(executor)
       scp.device.bindConnections()

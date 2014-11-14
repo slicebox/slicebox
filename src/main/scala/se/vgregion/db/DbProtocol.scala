@@ -4,9 +4,9 @@ import se.vgregion.dicom.ScpProtocol.ScpData
 
 object DbProtocol {
 
-  case class InsertStoreScpData(scpData: ScpData)
+  case class InsertScpData(scpData: ScpData)
   
-  case object GetStoreScpDataEntries
+  case object GetScpDataEntries
   
   case class MetaData(patientName: String, patientId: String, accessionNumber: String)
   
