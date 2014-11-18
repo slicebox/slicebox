@@ -6,6 +6,8 @@ trait DbOps {
 
   def insertScpData(scpData: ScpData): Unit
   
+  def removeScpDataByName(name: String): Unit
+  
   def scpDataEntries: Seq[ScpData]
   
 }

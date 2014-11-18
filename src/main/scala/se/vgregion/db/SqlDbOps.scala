@@ -32,15 +32,14 @@ class SqlDbOps(isProduction: Boolean) extends DbOps {
       ScpData.unapply(scpData).map(data => Scpdata += ScpdataRow(scpData.name, scpData.aeTitle, scpData.port)))
   }
 
+  def removeScpDataByName(name: String) = {
+    db.withSession(implicit session => 
+      Scpdata.filter(_.name === name).delete
+      )  
+  }
+  
   def scpDataEntries: Seq[ScpData] =
     db.withSession(implicit session =>
       Scpdata.list.map(row => ScpData(row.name, row.aetitle, row.port)))
-
-  //  class ScpDataEntries(tag: Tag) extends Table[(String, String, Int)](tag, tableNameScpData) {
-  //    def name: Column[String] = column[String]("NAME", O.PrimaryKey)
-  //    def aeTitle: Column[String] = column[String]("AETITLE")
-  //    def port: Column[Int] = column[Int]("PORT")
-  //    def * : ProvenShape[(String, String, Int)] = (name, aeTitle, port)
-  //  }
 
 }

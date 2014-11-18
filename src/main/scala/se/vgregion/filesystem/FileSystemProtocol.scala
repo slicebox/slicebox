@@ -1,7 +1,6 @@
 package se.vgregion.filesystem
 
 import java.nio.file.Path
-import java.io.File
 import spray.json.DefaultJsonProtocol
 
 object FileSystemProtocol {
@@ -12,18 +11,16 @@ object FileSystemProtocol {
 
   case class MonitorDir(dir: String)
 
-  case object GetFileNames
-  
   // outgoing
 
-  case object MonitoringDir
+  case class MonitorDirFailed(reason: String)
   
-  case class Created(fileOrDir: File)
-
-  case class Deleted(fileOrDir: File)
+  case class MonitoringDir(dir: String)
   
-  case class FileNames(files: List[FileName])
+  case class Created(fileOrDir: Path)
 
+  case class Deleted(fileOrDir: Path)
+  
   // JSON
 
   object FileName extends DefaultJsonProtocol {
@@ -32,6 +29,10 @@ object FileSystemProtocol {
 
   object MonitorDir extends DefaultJsonProtocol {
     implicit val format = jsonFormat1(MonitorDir.apply)
+  }
+
+  object MonitoringDir extends DefaultJsonProtocol {
+    implicit val format = jsonFormat1(MonitoringDir.apply)
   }
 
 }

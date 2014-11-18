@@ -13,14 +13,26 @@ object ScpProtocol {
 
   case class AddScp(scpData: ScpData)
 
-  case object GetScpDataCollection
+  case class DeleteScp(name: String)
 
-  case class AddScpWithExecutor(scpData: ScpData, executor: Executor)
+  case object ShutdownScp
+  
+  case object GetScpDataCollection
 
   // outgoing
 
+  case object ScpShutdown
+  
+  case object ScpSetupFailed
+  
   case class ScpAdded(scpData: ScpData)
 
+  case class ScpAlreadyAdded(scpData: ScpData)
+  
+  case class ScpDeleted(name: String)
+  
+  case class ScpNotFound(name: String)
+  
   case class ScpDataCollection(scpDataCollection: Seq[ScpData])
 
   //----------------------------------------------

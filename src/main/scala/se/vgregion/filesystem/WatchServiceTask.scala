@@ -24,7 +24,7 @@ class WatchServiceTask(notifyActor: ActorRef) extends Runnable with LazyLogging 
       override def visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult = {
         super.visitFile(file, attrs)
         println(s"Adding ${file.toFile().getName}")
-        notifyActor ! Created(file.toFile)
+        notifyActor ! Created(file)
         FileVisitResult.CONTINUE
       }
     })
@@ -48,9 +48,9 @@ class WatchServiceTask(notifyActor: ActorRef) extends Runnable with LazyLogging 
                 if (Files.isDirectory(path)) {
                   watchRecursively(path)
                 }
-                notifyActor ! Created(path.toFile)
+                notifyActor ! Created(path)
               case ENTRY_DELETE =>
-                notifyActor ! Deleted(path.toFile)
+                notifyActor ! Deleted(path)
               case x =>
                 logger.warn(s"Unknown event $x")
             }
@@ -63,5 +63,7 @@ class WatchServiceTask(notifyActor: ActorRef) extends Runnable with LazyLogging 
     } finally {
       watchService.close()
     }
+    
   }
+  
 }

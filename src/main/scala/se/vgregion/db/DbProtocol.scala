@@ -6,6 +6,8 @@ object DbProtocol {
 
   case class InsertScpData(scpData: ScpData)
   
+  case class RemoveScpData(name: String)
+  
   case object GetScpDataEntries
   
   case class MetaData(patientName: String, patientId: String, accessionNumber: String)

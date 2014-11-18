@@ -9,8 +9,15 @@ import java.io.File
 import java.util.concurrent.ScheduledExecutorService
 import akka.actor.Props
 import akka.actor.ActorRef
+import akka.actor.PoisonPill
+import akka.pattern._
+import akka.util.Timeout
+import scala.concurrent.duration._
+import scala.language.postfixOps
+import akka.actor.Status.Success
+import akka.actor.Status.Failure
 
-class ScpCollectionActor(dbActor: ActorRef, storageDirectory: File) extends Actor {
+class ScpCollectionActor(dbActor: ActorRef, storageDirectory: String) extends Actor {
   val log = Logging(context.system, this)
 
   val executor = Executors.newCachedThreadPool()
@@ -20,11 +27,29 @@ class ScpCollectionActor(dbActor: ActorRef, storageDirectory: File) extends Acto
   }
 
   def receive = LoggingReceive {
-    case AddScp(scpData: ScpData) =>
-      val scpActor = context.actorOf(Props(classOf[ScpActor], storageDirectory))
-      scpActor ! AddScpWithExecutor(scpData, executor)
-    case ScpAdded(scpData) =>
-      dbActor ! InsertScpData(scpData)
+    case AddScp(scpData) =>
+      context.child(scpData.name) match {
+        case Some(actor) =>
+          sender ! ScpAlreadyAdded(scpData)
+        case None =>
+          try {
+            context.actorOf(Props(classOf[ScpActor], scpData, storageDirectory, executor), scpData.name)
+            dbActor ! InsertScpData(scpData)
+            sender ! ScpAdded(scpData)
+          } catch {
+            case _: Throwable => sender ! ScpSetupFailed
+          }
+      }
+    case DeleteScp(name) =>
+      context.child(name) match {
+        case Some(actor) =>
+          dbActor ! RemoveScpData(name)
+          log.info(s"Deleting actor $actor")
+          actor ! ShutdownScp
+          sender ! ScpDeleted(name)
+        case None =>
+          sender ! ScpNotFound(name)
+      }
     case GetScpDataCollection =>
       dbActor forward GetScpDataEntries
   }
