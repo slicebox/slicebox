@@ -1,0 +1,5 @@
+
+application.production.mode = false
+
+scp.storage.directory = "c:/users/karl/Desktop/temp"
+
