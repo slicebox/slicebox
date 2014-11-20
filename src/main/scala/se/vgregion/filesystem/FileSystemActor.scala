@@ -42,8 +42,10 @@ class FileSystemActor(metaDataActor: ActorRef) extends Actor {
         case e: Exception => sender ! MonitorDirFailed(e.getMessage)
       }
     case Created(path) =>
-      DicomUtil.readMetaData(path).foreach(metaData => metaDataActor ! AddMetaData(metaData))
+      if (Files.isRegularFile(path))
+        metaDataActor ! AddMetaData(path)
     case Deleted(path) =>
-      metaDataActor ! DeleteMetaData(null)
+      if (Files.isRegularFile(path))
+        metaDataActor ! DeleteMetaData(path)
   }
 }

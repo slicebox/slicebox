@@ -30,9 +30,9 @@ object DicomUtil {
     attributes.getString(Tag.PatientName),
     attributes.getString(Tag.PatientID),
     attributes.getString(Tag.StudyInstanceUID),
-    attributes.getDate(Tag.StudyDate),
+    attributes.getString(Tag.StudyDate),
     attributes.getString(Tag.SeriesInstanceUID),
-    attributes.getDate(Tag.SeriesDate),
+    attributes.getString(Tag.SeriesDate),
     attributes.getString(Tag.SOPInstanceUID),
     path.toAbsolutePath().toString()))
   

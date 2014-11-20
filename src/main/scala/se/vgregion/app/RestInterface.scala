@@ -32,6 +32,7 @@ trait RestApi extends HttpService with ActorLogging { actor: Actor =>
 
   import se.vgregion.filesystem.FileSystemProtocol._
   import se.vgregion.dicom.ScpProtocol._
+  import se.vgregion.dicom.MetaDataProtocol._
 
   implicit val timeout = Timeout(10 seconds)
   import akka.pattern.ask
@@ -107,6 +108,21 @@ trait RestApi extends HttpService with ActorLogging { actor: Actor =>
       }
     }
 
+  def metaDataRoutes: Route = {
+    pathPrefix("metadata") {
+      get {
+        path("list") {
+          onSuccess(metaDataActor.ask(GetMetaDataCollection)) {
+            _ match {
+              case MetaDataCollection(data) =>
+                complete((StatusCodes.OK, data))
+            }
+          }
+        }
+      }
+    }
+  }
+
   def stopRoute: Route =
     (post | parameter('method ! "post")) {
       path("stop") {
@@ -117,8 +133,8 @@ trait RestApi extends HttpService with ActorLogging { actor: Actor =>
         }
       }
     }
-  
+
   def routes: Route =
-    directoryRoutes ~ scpRoutes ~ stopRoute
+    directoryRoutes ~ scpRoutes ~ metaDataRoutes ~ stopRoute
 
 }
