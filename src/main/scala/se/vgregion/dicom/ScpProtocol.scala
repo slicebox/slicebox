@@ -7,7 +7,7 @@ import java.util.concurrent.Executor
 
 object ScpProtocol {
 
-  case class ScpData(name: String, aeTitle: String, port: Int)
+  case class ScpData(name: String, aeTitle: String, port: Int, directory: String)
 
   // incoming
 
@@ -40,7 +40,7 @@ object ScpProtocol {
   //----------------------------------------------
 
   object ScpData extends DefaultJsonProtocol {
-    implicit val format = jsonFormat3(ScpData.apply)
+    implicit val format = jsonFormat4(ScpData.apply)
   }
 
 }

@@ -17,7 +17,7 @@ import scala.language.postfixOps
 import akka.actor.Status.Success
 import akka.actor.Status.Failure
 
-class ScpCollectionActor(dbActor: ActorRef, storageDirectory: String) extends Actor {
+class ScpCollectionActor(dbActor: ActorRef) extends Actor {
   val log = Logging(context.system, this)
 
   val executor = Executors.newCachedThreadPool()
@@ -33,7 +33,7 @@ class ScpCollectionActor(dbActor: ActorRef, storageDirectory: String) extends Ac
           sender ! ScpAlreadyAdded(scpData)
         case None =>
           try {
-            context.actorOf(Props(classOf[ScpActor], scpData, storageDirectory, executor), scpData.name)
+            context.actorOf(Props(classOf[ScpActor], scpData, executor), scpData.name)
             dbActor ! InsertScpData(scpData)
             sender ! ScpAdded(scpData)
           } catch {

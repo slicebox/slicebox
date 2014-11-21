@@ -20,6 +20,8 @@ class MetaDataActor(dbActor: ActorRef) extends Actor {
       DicomUtil.readMetaData(path).foreach(metaData => dbActor ! RemoveMetaData(path.toAbsolutePath().toString()))
     case GetMetaDataCollection =>
       dbActor forward GetMetaDataEntries
+    case GetPatients =>
+      dbActor forward GetPatientEntries
   }
   
 }

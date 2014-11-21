@@ -11,7 +11,6 @@ import scala.language.postfixOps
 import se.vgregion.filesystem.FileSystemActor
 import se.vgregion.dicom.ScpCollectionActor
 import se.vgregion.db.DbActor
-import se.vgregion.db.SqlDbOps
 import com.typesafe.config.ConfigFactory
 import java.io.File
 import se.vgregion.filesystem.FileSystemProtocol.MonitorDir
@@ -21,47 +20,59 @@ import scala.util.Failure
 import scala.util.Success
 import spray.http.MediaTypes
 import se.vgregion.dicom.MetaDataActor
+import scala.slick.jdbc.JdbcBackend.Database
+import scala.slick.driver.H2Driver
+import se.vgregion.db.DAO
+import se.vgregion.db.DbProtocol.CreateTables
 
-class RestInterface extends HttpServiceActor
-  with RestApi {
+class RestInterface extends Actor with RestApi {
+
+  // the HttpService trait defines only one abstract member, which
+  // connects the services environment to the enclosing actor or test
+  def actorRefFactory = context
+
   def receive = runRoute(routes)
 }
 
-trait RestApi extends HttpService with ActorLogging { actor: Actor =>
-  import context.dispatcher
-
+trait RestApi extends HttpService {
   import se.vgregion.filesystem.FileSystemProtocol._
   import se.vgregion.dicom.ScpProtocol._
   import se.vgregion.dicom.MetaDataProtocol._
-
-  implicit val timeout = Timeout(10 seconds)
   import akka.pattern.ask
-
   import akka.pattern.pipe
 
-  val config = ConfigFactory.load()
-  val isProduction = config.getBoolean("application.production.mode")
-  val scpStorageDirectory = config.getString("scp.storage.directory")
+  // we use the enclosing ActorContext's or ActorSystem's dispatcher for our Futures and Scheduler
+  implicit def executionContext = actorRefFactory.dispatcher
 
-  val dbActor = context.actorOf(Props(classOf[DbActor], new SqlDbOps(isProduction)))
-  val metaDataActor = context.actorOf(Props(classOf[MetaDataActor], dbActor))
-  val fileSystemActor = context.actorOf(Props(classOf[FileSystemActor], metaDataActor))
-  val scpCollectionActor = context.actorOf(Props(classOf[ScpCollectionActor], dbActor, scpStorageDirectory))
+  implicit val timeout = Timeout(10 seconds)
+
+  val config = ConfigFactory.load()
+  val isProduction = config.getBoolean("production")
+
+  private val db =
+    if (isProduction)
+      Database.forURL("jdbc:h2:storage", driver = "org.h2.Driver")
+    else
+      Database.forURL("jdbc:h2:mem:storage;DB_CLOSE_DELAY=-1", driver = "org.h2.Driver")
+
+  val dbActor = actorRefFactory.actorOf(Props(classOf[DbActor], db, new DAO(H2Driver)))
+  val metaDataActor = actorRefFactory.actorOf(Props(classOf[MetaDataActor], dbActor))
+  val fileSystemActor = actorRefFactory.actorOf(Props(classOf[FileSystemActor], metaDataActor))
+  val scpCollectionActor = actorRefFactory.actorOf(Props(classOf[ScpCollectionActor], dbActor))
 
   if (!isProduction) {
-    // Add some initial values for easier development with in-mem database
-    //InitialValues.initFileSystemData(fileSystemActor)
-    //InitialValues.initScpData(scpCollectionActor)
+    InitialValues.createTables(dbActor)
+    InitialValues.initFileSystemData(config, fileSystemActor)
+    InitialValues.initScpData(config, scpCollectionActor, fileSystemActor)
   }
-  //fileSystemActor ! MonitorDir(scpStorageDirectory)
 
   def directoryRoutes: Route =
     path("monitordirectory") {
       put {
-        entity(as[MonitorDir]) { dir =>
-          onSuccess(fileSystemActor.ask(dir)) {
+        entity(as[MonitorDir]) { monitorDirectory =>
+          onSuccess(fileSystemActor.ask(monitorDirectory)) {
             _ match {
-              case MonitoringDir(dir) => complete(s"Now monitoring directory $dir")
+              case MonitoringDir(directory) => complete(s"Now monitoring directory $directory")
               case MonitorDirFailed(reason) => complete((StatusCodes.BadRequest, s"Monitoring directory failed: ${reason}"))
               case _ => complete(StatusCodes.BadRequest)
             }
@@ -124,10 +135,10 @@ trait RestApi extends HttpService with ActorLogging { actor: Actor =>
   }
 
   def stopRoute: Route =
-    (post | parameter('method ! "post")) {
-      path("stop") {
+    path("stop") {
+      (post | parameter('method ! "post")) {
         complete {
-          var system = context.system
+          var system = actorRefFactory.asInstanceOf[ActorContext].system
           system.scheduler.scheduleOnce(1.second)(system.shutdown())(system.dispatcher)
           "Shutting down in 1 second..."
         }

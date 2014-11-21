@@ -9,13 +9,13 @@ object FileSystemProtocol {
   
   // incoming
 
-  case class MonitorDir(dir: String)
+  case class MonitorDir(directory: String)
 
   // outgoing
 
   case class MonitorDirFailed(reason: String)
   
-  case class MonitoringDir(dir: String)
+  case class MonitoringDir(directory: String)
   
   case class Created(fileOrDir: Path)
 

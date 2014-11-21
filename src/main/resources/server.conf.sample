@@ -1,5 +1,17 @@
+production = false
+production = ${?PRODUCTION}
 
-application.production.mode = false
+default {
 
-scp.storage.directory = "c:/users/karl/Desktop/temp"
+	scp {
+		name = "TestSCP"
+		aeTitle = "AE1"
+		port = 11111
+		directory = "C:/users/karl/Desktop/temp"
+	}
 
+	monitor-directory {
+		directory = "C:/users/karl/Desktop/temp"
+	}
+	
+}

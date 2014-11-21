@@ -28,15 +28,15 @@ class FileSystemActor(metaDataActor: ActorRef) extends Actor {
   var watchedDirectories = List.empty[Path]
 
   def receive = LoggingReceive {
-    case MonitorDir(directoryName) =>
+    case MonitorDir(directory) =>
       try {
-        var directory = Paths.get(directoryName)
-        if (watchedDirectories.contains(directory))
-          sender ! MonitorDirFailed(s"Directory $directoryName already monitored")
+        val directoryPath = Paths.get(directory)
+        if (watchedDirectories.contains(directoryPath))
+          sender ! MonitorDirFailed(s"Directory $directory already monitored")
         else {
-          watchServiceTask watchRecursively directory
-          watchedDirectories = watchedDirectories :+ directory
-          sender ! MonitoringDir(directoryName)
+          watchServiceTask watchRecursively directoryPath
+          watchedDirectories = watchedDirectories :+ directoryPath
+          sender ! MonitoringDir(directory)
         }
       } catch {
         case e: Exception => sender ! MonitorDirFailed(e.getMessage)
