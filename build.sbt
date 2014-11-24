@@ -40,7 +40,8 @@ libraryDependencies ++= {
     "ch.qos.logback"    			%  "logback-classic" 	% "1.1.2",
 	"com.typesafe.slick" 			%% "slick" 				% "2.1.0",
 	"com.h2database" 				%  "h2" 				% "1.3.170",
-    "org.scalatest"     			%% "scalatest"       	% "2.2.1"       	% "test"
+    "org.scalatest"     			%% "scalatest"       	% "2.2.1"       	% "test",
+	"org.webjars" 					%  "bootstrap" 			% "3.3.1"
   )
 }
 
@@ -51,3 +52,9 @@ EclipseKeys.createSrc := EclipseCreateSrc.Default + EclipseCreateSrc.Resource
 EclipseKeys.withSource := true
 
 mainClass in Compile := Some("se.vgregion.app.Main")
+
+lazy val akkadcm = (project in file(".")).enablePlugins(SbtTwirl, SbtWeb)
+
+//unmanagedResourceDirectories in Compile <++= baseDirectory { base =>
+//    Seq( base / "src/main/public" )
+//}

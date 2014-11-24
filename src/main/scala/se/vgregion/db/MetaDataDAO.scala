@@ -39,8 +39,18 @@ class MetaDataDAO(val driver: JdbcProfile) {
     props.ddl.create
   }
 
-  def insert(metaData: MetaData)(implicit session: Session) =
-    props += MetaDataRow(-1, metaData.patientName, metaData.patientID, metaData.studyInstanceUID, metaData.studyDate, metaData.seriesInstanceUID, metaData.seriesDate, metaData.sopInstanceUID, metaData.fileName)
+  def insert(metaData: MetaData)(implicit session: Session) = {
+    props += MetaDataRow(
+      -1,
+      metaData.patientName,
+      metaData.patientID,
+      metaData.studyInstanceUID,
+      metaData.studyDate,
+      metaData.seriesInstanceUID,
+      metaData.seriesDate,
+      metaData.sopInstanceUID,
+      metaData.fileName)
+  }
 
   def list(implicit session: Session): List[MetaData] =
     props.list.map(row => MetaData(row.patientName, row.patientID, row.studyInstanceUID, row.studyDate, row.seriesInstanceUID, row.seriesDate, row.sopInstanceUID, row.fileName))

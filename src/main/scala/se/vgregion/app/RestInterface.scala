@@ -2,6 +2,7 @@ package se.vgregion.app
 
 import akka.actor._
 import spray.routing._
+import spray.http.MediaTypes
 import spray.http.StatusCodes
 import spray.httpx.SprayJsonSupport._
 import spray.routing.RequestContext
@@ -24,6 +25,7 @@ import scala.slick.jdbc.JdbcBackend.Database
 import scala.slick.driver.H2Driver
 import se.vgregion.db.DAO
 import se.vgregion.db.DbProtocol.CreateTables
+import spray.httpx.PlayTwirlSupport._
 
 class RestInterface extends Actor with RestApi {
 
@@ -61,10 +63,24 @@ trait RestApi extends HttpService {
   val scpCollectionActor = actorRefFactory.actorOf(Props(classOf[ScpCollectionActor], dbActor))
 
   if (!isProduction) {
-    InitialValues.createTables(dbActor)
-    InitialValues.initFileSystemData(config, fileSystemActor)
-    InitialValues.initScpData(config, scpCollectionActor, fileSystemActor)
+    setupDevelopmentEnvironment()
   }
+
+  def staticResourcesRoutes =
+    get {
+      pathPrefix("assets") {
+        path(Rest) { path =>
+          getFromFile("target/web/public/main/" + path)
+        }
+      }
+    }
+
+  def twirlRoutes =
+    get {
+      path("") {
+        complete(views.html.index())
+      }
+    }
 
   def directoryRoutes: Route =
     path("monitordirectory") {
@@ -106,13 +122,15 @@ trait RestApi extends HttpService {
           }
         }
       } ~ delete {
-        path(Segment) { name =>
-          onSuccess(scpCollectionActor.ask(DeleteScp(name))) {
-            _ match {
-              case ScpDeleted(name) =>
-                complete(s"Deleted SCP $name")
-              case ScpNotFound(name) =>
-                complete((StatusCodes.NotFound, s"No SCP found with name $name"))
+        pathEnd {
+          entity(as[DeleteScp]) { deleteScp =>
+            onSuccess(scpCollectionActor.ask(deleteScp)) {
+              _ match {
+                case ScpDeleted(name) =>
+                  complete(s"Deleted SCP $name")
+                case ScpNotFound(name) =>
+                  complete((StatusCodes.NotFound, s"No SCP found with name $name"))
+              }
             }
           }
         }
@@ -146,6 +164,12 @@ trait RestApi extends HttpService {
     }
 
   def routes: Route =
-    directoryRoutes ~ scpRoutes ~ metaDataRoutes ~ stopRoute
+    directoryRoutes ~ scpRoutes ~ metaDataRoutes ~ stopRoute ~ staticResourcesRoutes ~ twirlRoutes
+
+  def setupDevelopmentEnvironment() = {
+    InitialValues.createTables(dbActor)
+    InitialValues.initFileSystemData(config, fileSystemActor)
+    InitialValues.initScpData(config, scpCollectionActor, fileSystemActor)
+  }
 
 }
