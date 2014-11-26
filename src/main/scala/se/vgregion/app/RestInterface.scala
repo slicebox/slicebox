@@ -70,7 +70,7 @@ trait RestApi extends HttpService {
     get {
       pathPrefix("assets") {
         path(Rest) { path =>
-          getFromFile("target/web/public/main/" + path)
+          getFromResource("public/" + path)
         }
       }
     }
@@ -164,7 +164,9 @@ trait RestApi extends HttpService {
     }
 
   def routes: Route =
-    directoryRoutes ~ scpRoutes ~ metaDataRoutes ~ stopRoute ~ staticResourcesRoutes ~ twirlRoutes
+    twirlRoutes ~ staticResourcesRoutes ~ pathPrefix("api") {
+      directoryRoutes ~ scpRoutes ~ metaDataRoutes ~ stopRoute
+    }
 
   def setupDevelopmentEnvironment() = {
     InitialValues.createTables(dbActor)

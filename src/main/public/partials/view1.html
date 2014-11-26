@@ -1,0 +1,34 @@
+<div class="row">
+
+	<div class="col-md-12">	
+
+		<h3>Metadata</h3>
+		<table class="table table-striped">
+			<caption>List of metadata in database</caption>
+			<thead>
+				<tr>
+					<th>Patient Name</th>
+					<th>Patient Id</th>
+					<th>Study Date</th>
+					<th>Series Date</th>
+					<th>Study Instance UID</th>
+					<th>SOP Instance UID</th>
+					<th>Filename</th>
+				</tr>
+			</thead>
+			<tbody>
+				<tr ng-repeat="row in rows">
+					<td>{{row.patientName}}</td>
+					<td>{{row.patientID}}</td>
+					<td>{{row.studyDate}}</td>
+					<td>{{row.seriesDate}}</td>
+					<td>{{row.studyInstanceUID}}</td>
+					<td>{{row.sopInstanceUID}}</td>
+					<td>{{row.fileName}}</td>
+				</tr>
+			</tbody>
+		</table>
+
+	</div>
+
+</div>

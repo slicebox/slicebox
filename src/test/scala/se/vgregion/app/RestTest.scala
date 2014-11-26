@@ -22,13 +22,13 @@ class RestTest extends FlatSpec with Matchers with ScalatestRouteTest with RestA
   def actorRefFactory = system // connect the DSL to the test ActorSystem
 
   "The service" should "return 200 OK when asking for all metadata" in {
-    Get("/metadata/list") ~> routes ~> check {
+    Get("/api/metadata/list") ~> routes ~> check {
       status should be(OK)
     }
   }
 
-  it should "return a 404 NotFound error for requests to the root path" in {
-    Get() ~> sealRoute(routes) ~> check {
+  it should "return a 404 NotFound error for requests to the API root path" in {
+    Get("api") ~> sealRoute(routes) ~> check {
       status should be(NotFound)
     }
   }
@@ -42,7 +42,7 @@ class RestTest extends FlatSpec with Matchers with ScalatestRouteTest with RestA
       (value, ct, ctx) => ctx.marshalTo(HttpEntity(ct, s"""{ "directory": "${monitorDir.directory}" }"""))
     }
 
-    Put("/monitordirectory", monitorDir) ~> routes ~> check {
+    Put("/api/monitordirectory", monitorDir) ~> routes ~> check {
       responseAs[String] should be(s"Now monitoring directory ${monitorDir.directory}")
     }
 
@@ -57,11 +57,11 @@ class RestTest extends FlatSpec with Matchers with ScalatestRouteTest with RestA
       (value, ct, ctx) => ctx.marshalTo(HttpEntity(ct, s"""{ "directory": "${monitorDir.directory}" }"""))
     }
 
-    Put("/monitordirectory", monitorDir) ~> routes ~> check {
+    Put("/api/monitordirectory", monitorDir) ~> routes ~> check {
       responseAs[String] should be(s"Now monitoring directory ${monitorDir.directory}")
     }
 
-    Get("/metadata/list") ~> routes ~> check {
+    Get("/api/metadata/list") ~> routes ~> check {
       status should be(OK)
       responseAs[String] should be("[]")
     }
@@ -74,7 +74,7 @@ class RestTest extends FlatSpec with Matchers with ScalatestRouteTest with RestA
     // in the database
     Thread.sleep(500)
     
-    Get("/metadata/list") ~> routes ~> check {
+    Get("/api/metadata/list") ~> routes ~> check {
     	val response = responseAs[String] 
       status should be(OK)
       response should startWith ("[{")
@@ -99,7 +99,7 @@ class RestTest extends FlatSpec with Matchers with ScalatestRouteTest with RestA
        }"""))
     }
 
-    Put("/scp", scpData) ~> routes ~> check {
+    Put("/api/scp", scpData) ~> routes ~> check {
       responseAs[String] should be(s"Added SCP ${scpData.name}")
     }
 
@@ -112,7 +112,7 @@ class RestTest extends FlatSpec with Matchers with ScalatestRouteTest with RestA
        }"""))
     }
     
-    Delete("/scp", deleteScp) ~> routes ~> check {
+    Delete("/api/scp", deleteScp) ~> routes ~> check {
       responseAs[String] should be(s"Deleted SCP ${deleteScp.name}")      
     }
   }
