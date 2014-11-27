@@ -18,15 +18,15 @@ class DbActor(db: Database, dao: DAO) extends Actor {
       db.withSession { implicit session =>
         dao.scpDataDAO.insert(scpData)
       }
-    case InsertMetaData(metaData) =>
+    case InsertImage(image) =>
       db.withSession { implicit session =>
-        dao.metaDataDAO.insert(metaData)
+        dao.metaDataDAO.insert(image)
       }
     case RemoveScpData(name) =>
       db.withSession { implicit session =>
         dao.scpDataDAO.removeByName(name)
       }
-    case RemoveMetaData(fileName) =>
+    case RemoveImage(fileName) =>
       db.withSession { implicit session =>
         dao.metaDataDAO.removeByFileName(fileName)
       }
@@ -34,13 +34,25 @@ class DbActor(db: Database, dao: DAO) extends Actor {
       db.withSession { implicit session =>
         sender ! ScpDataCollection(dao.scpDataDAO.list)
       }
-    case GetMetaDataEntries =>
+    case GetImageEntries =>
       db.withSession { implicit session =>
-        sender ! MetaDataCollection(dao.metaDataDAO.list)
+        sender ! Images(dao.metaDataDAO.list)
       }
     case GetPatientEntries =>
       db.withSession { implicit session =>
         sender ! Patients(dao.metaDataDAO.listPatients)
+      }
+    case GetStudyEntries(patient) =>
+      db.withSession { implicit session =>
+        sender ! Studies(dao.metaDataDAO.listStudiesForPatient(patient))
+      }
+    case GetSeriesEntries(study) =>
+      db.withSession { implicit session =>
+        sender ! SeriesCollection(dao.metaDataDAO.listSeriesForStudy(study))
+      }
+    case GetImageEntries(series) =>
+      db.withSession { implicit session =>
+        sender ! Images(dao.metaDataDAO.listImagesForSeries(series))
       }
   }
 

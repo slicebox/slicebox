@@ -114,11 +114,8 @@ trait RestApi extends HttpService {
         }
       } ~ get {
         path("list") {
-          onSuccess(scpCollectionActor.ask(GetScpDataCollection)) {
-            _ match {
-              case ScpDataCollection(data) =>
-                complete((StatusCodes.OK, data))
-            }
+          complete {
+            scpCollectionActor.ask(GetScpDataCollection).mapTo[ScpDataCollection]
           }
         }
       } ~ delete {
@@ -141,10 +138,29 @@ trait RestApi extends HttpService {
     pathPrefix("metadata") {
       get {
         path("list") {
-          onSuccess(metaDataActor.ask(GetMetaDataCollection)) {
-            _ match {
-              case MetaDataCollection(data) =>
-                complete((StatusCodes.OK, data))
+          complete {
+            metaDataActor.ask(GetImages).mapTo[Images]
+          }
+        } ~ path("patients") {
+          complete {
+            metaDataActor.ask(GetPatients).mapTo[Patients]
+          }
+        } ~ path("studies") {
+          entity(as[Patient]) { patient =>
+            complete {
+              metaDataActor.ask(GetStudies(patient)).mapTo[Studies]
+            }
+          }
+        } ~ path("series") {
+          entity(as[Study]) { study =>
+            complete {
+              metaDataActor.ask(GetSeries(study)).mapTo[SeriesCollection]
+            }
+          }
+        } ~ path("images") {
+          entity(as[Series]) { series =>
+            complete {
+              metaDataActor.ask(GetImages(series)).mapTo[Images]
             }
           }
         }

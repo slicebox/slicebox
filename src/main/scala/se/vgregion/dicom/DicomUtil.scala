@@ -6,7 +6,7 @@ import org.dcm4che3.io.DicomInputStream.IncludeBulkData
 import org.dcm4che3.data.Tag
 import org.dcm4che3.util.SafeClose
 import java.nio.file.Path
-import se.vgregion.dicom.MetaDataProtocol.MetaData
+import se.vgregion.dicom.MetaDataProtocol._
 
 object DicomUtil {
 
@@ -25,14 +25,14 @@ object DicomUtil {
     }
   }
 
-  def readMetaData(path: Path): Option[MetaData] =
-    readDataSetWithoutPixelData(path).map(attributes => MetaData(
+  def readImage(path: Path): Option[Image] =
+    readDataSetWithoutPixelData(path).map(attributes => Image(Series(Study(Patient(
     attributes.getString(Tag.PatientName),
-    attributes.getString(Tag.PatientID),
-    attributes.getString(Tag.StudyInstanceUID),
+    attributes.getString(Tag.PatientID)),
     attributes.getString(Tag.StudyDate),
-    attributes.getString(Tag.SeriesInstanceUID),
+    attributes.getString(Tag.StudyInstanceUID)),
     attributes.getString(Tag.SeriesDate),
+    attributes.getString(Tag.SeriesInstanceUID)),
     attributes.getString(Tag.SOPInstanceUID),
     path.toAbsolutePath().toString()))
   

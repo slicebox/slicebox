@@ -1,7 +1,7 @@
 package se.vgregion.db
 
 import se.vgregion.dicom.ScpProtocol.ScpData
-import se.vgregion.dicom.MetaDataProtocol.MetaData
+import se.vgregion.dicom.MetaDataProtocol._
 
 object DbProtocol {
 
@@ -9,16 +9,21 @@ object DbProtocol {
   
   case class InsertScpData(scpData: ScpData)
   
-  case class InsertMetaData(metaData: MetaData)
+  case class InsertImage(image: Image)
   
   case class RemoveScpData(name: String)
  
-  case class RemoveMetaData(fileName: String)
+  case class RemoveImage(fileName: String)
   
   case object GetScpDataEntries
   
-  case object GetMetaDataEntries
+  case object GetImageEntries
   
   case object GetPatientEntries
+
+  case class GetStudyEntries(patient: Patient)
   
+  case class GetSeriesEntries(study: Study)
+  
+  case class GetImageEntries(series: Series)
 }

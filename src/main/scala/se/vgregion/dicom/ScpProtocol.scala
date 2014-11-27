@@ -43,6 +43,10 @@ object ScpProtocol {
     implicit val format = jsonFormat4(ScpData.apply)
   }
 
+  object ScpDataCollection extends DefaultJsonProtocol {
+    implicit val format = jsonFormat1(ScpDataCollection.apply)
+  }
+
   object DeleteScp extends DefaultJsonProtocol {
     implicit val format = jsonFormat1(DeleteScp.apply)
   }

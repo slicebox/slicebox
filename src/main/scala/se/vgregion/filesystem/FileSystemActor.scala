@@ -9,7 +9,6 @@ import java.nio.file.Files
 import akka.actor.ActorRef
 import se.vgregion.dicom.DicomUtil
 import se.vgregion.dicom.MetaDataProtocol._
-import se.vgregion.dicom.MetaDataProtocol.DeleteMetaData
 
 class FileSystemActor(metaDataActor: ActorRef) extends Actor {
   val log = Logging(context.system, this)
@@ -43,9 +42,9 @@ class FileSystemActor(metaDataActor: ActorRef) extends Actor {
       }
     case Created(path) =>
       if (Files.isRegularFile(path))
-        metaDataActor ! AddMetaData(path)
+        metaDataActor ! AddImage(path)
     case Deleted(path) =>
       if (Files.isRegularFile(path))
-        metaDataActor ! DeleteMetaData(path)
+        metaDataActor ! DeleteImage(path)
   }
 }
