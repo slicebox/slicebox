@@ -139,7 +139,7 @@ trait RestApi extends HttpService {
       get {
         path("list") {
           complete {
-            metaDataActor.ask(GetImages).mapTo[Images]
+            metaDataActor.ask(GetImageFiles).mapTo[ImageFiles]
           }
         } ~ path("patients") {
           complete {
@@ -163,10 +163,25 @@ trait RestApi extends HttpService {
               metaDataActor.ask(GetImages(series)).mapTo[Images]
             }
           }
+        } ~ path("imagefiles") {
+          entity(as[Image]) { image =>
+            complete {
+              metaDataActor.ask(GetImageFiles(image)).mapTo[ImageFiles]
+            }
+          }
         }
       }
     }
   }
+
+  def filesRoutes: Route =
+    pathPrefix("files") {
+      get {
+        path("image" / Segment) { sopInstanceUID =>
+          complete(sopInstanceUID)
+        }
+      }
+    }
 
   def stopRoute: Route =
     path("stop") {
@@ -181,7 +196,7 @@ trait RestApi extends HttpService {
 
   def routes: Route =
     twirlRoutes ~ staticResourcesRoutes ~ pathPrefix("api") {
-      directoryRoutes ~ scpRoutes ~ metaDataRoutes ~ stopRoute
+      directoryRoutes ~ scpRoutes ~ metaDataRoutes ~ filesRoutes ~ stopRoute
     }
 
   def setupDevelopmentEnvironment() = {

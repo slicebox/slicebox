@@ -13,11 +13,11 @@ class MetaDataActor(dbActor: ActorRef) extends Actor {
 
   def receive = LoggingReceive {
     case AddImage(path) =>
-      DicomUtil.readImage(path).foreach(image => dbActor ! InsertImage(image))
+      DicomUtil.readImage(path).foreach(imageFile => dbActor ! InsertImageFile(imageFile))
     case DeleteImage(path) =>
-      DicomUtil.readImage(path).foreach(image => dbActor ! RemoveImage(path.toAbsolutePath().toString()))
-    case GetImages =>
-      dbActor forward GetImageEntries
+      DicomUtil.readImage(path).foreach(imageFile => dbActor ! RemoveImageFile(path.toAbsolutePath().toString()))
+    case GetImageFiles =>
+      dbActor forward GetImageFileEntries
     case GetPatients =>
       dbActor forward GetPatientEntries
     case GetStudies(patient) =>
@@ -26,6 +26,8 @@ class MetaDataActor(dbActor: ActorRef) extends Actor {
       dbActor forward GetSeriesEntries(study)
     case GetImages(series) =>
       dbActor forward GetImageEntries(series)
+    case GetImageFiles(image) =>
+      dbActor forward GetImageFileEntries(image)
   }
   
 }

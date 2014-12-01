@@ -2,7 +2,7 @@ package se.vgregion.dicom
 
 import java.io.File
 import java.io.IOException
-import org.dcm4che3.data.Attributes
+import org.dcm4che3.data.{ Attributes => Dcm4CheAttributes }
 import org.dcm4che3.data.Tag
 import org.dcm4che3.data.VR
 import org.dcm4che3.io.DicomInputStream
@@ -33,7 +33,7 @@ class Scp(val name: String, val aeTitle: String, val port: Int, val storageDir: 
 
     private val PART_EXT = ".part"
   
-    override protected def store(as: Association, pc: PresentationContext, rq: Attributes, data: PDVInputStream, rsp: Attributes): Unit = {
+    override protected def store(as: Association, pc: PresentationContext, rq: Dcm4CheAttributes, data: PDVInputStream, rsp: Dcm4CheAttributes): Unit = {
       rsp.setInt(Tag.Status, VR.US, 0)
       if (storageDir == null)
         return
@@ -62,7 +62,7 @@ class Scp(val name: String, val aeTitle: String, val port: Int, val storageDir: 
   ae.addConnection(conn);
   ae.addTransferCapability(new TransferCapability(null, "*", TransferCapability.Role.SCP, "*"))
 
-  private def storeTo(as: Association, fmi: Attributes, data: PDVInputStream, file: File) = {
+  private def storeTo(as: Association, fmi: Dcm4CheAttributes, data: PDVInputStream, file: File) = {
     logger.info("{}: M-WRITE {}", as, file)
     val out = new DicomOutputStream(file)
     try {
@@ -80,7 +80,7 @@ class Scp(val name: String, val aeTitle: String, val port: Int, val storageDir: 
       throw new IOException("Failed to rename " + from + " to " + dest)
   }
 
-  private def parse(file: File): Attributes = {
+  private def parse(file: File): Dcm4CheAttributes = {
     val in = new DicomInputStream(file)
     try {
       in.setIncludeBulkData(IncludeBulkData.NO)

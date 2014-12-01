@@ -9,15 +9,15 @@ object DbProtocol {
   
   case class InsertScpData(scpData: ScpData)
   
-  case class InsertImage(image: Image)
+  case class InsertImageFile(imageFile: ImageFile)
   
   case class RemoveScpData(name: String)
  
-  case class RemoveImage(fileName: String)
+  case class RemoveImageFile(fileName: String)
   
   case object GetScpDataEntries
   
-  case object GetImageEntries
+  case object GetImageFileEntries
   
   case object GetPatientEntries
 
@@ -26,4 +26,7 @@ object DbProtocol {
   case class GetSeriesEntries(study: Study)
   
   case class GetImageEntries(series: Series)
+
+  case class GetImageFileEntries(image: Image)
+
 }
