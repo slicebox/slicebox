@@ -95,18 +95,18 @@ class MetaDataDAO(val driver: JdbcProfile) {
       fileName) <> (toRow.tupled, fromRow)
   }
 
-  val props = TableQuery[MetaDataTable]
+  val rows = TableQuery[MetaDataTable]
 
   def create(implicit session: Session) = {
-    props.ddl.create
+    rows.ddl.create
   }
 
-  def insert(imageFile: ImageFile)(implicit session: Session) = props += MetaDataRow(-1, imageFile)
+  def insert(imageFile: ImageFile)(implicit session: Session) = rows += MetaDataRow(-1, imageFile)
 
-  def list(implicit session: Session): List[ImageFile] = props.list.map(row => row.imageFile)
+  def list(implicit session: Session): List[ImageFile] = rows.list.map(row => row.imageFile)
 
   def removeByFileName(fileName: String)(implicit session: Session): Int =
-    props
+    rows
       .filter(_.fileName === fileName)
       .delete
 
@@ -116,7 +116,7 @@ class MetaDataDAO(val driver: JdbcProfile) {
       .distinctBy(patient => patient.patientName.value + patient.patientID.value)
 
   def listStudiesForPatient(patient: Patient)(implicit session: Session) =
-    props
+    rows
       .filter(_.patientName === patient.patientName.value)
       .filter(_.patientID === patient.patientID.value)
       .list
@@ -124,7 +124,7 @@ class MetaDataDAO(val driver: JdbcProfile) {
       .distinctBy(study => study.studyInstanceUID)
 
   def listSeriesForStudy(study: Study)(implicit session: Session) =
-    props
+    rows
       .filter(_.patientName === study.patient.patientName.value)
       .filter(_.patientID === study.patient.patientID.value)
       .filter(_.studyInstanceUID === study.studyInstanceUID.value)
@@ -133,7 +133,7 @@ class MetaDataDAO(val driver: JdbcProfile) {
       .distinctBy(series => series.seriesInstanceUID)
 
   def listImagesForSeries(series: Series)(implicit session: Session) =
-    props
+    rows
       .filter(_.patientName === series.study.patient.patientName.value)
       .filter(_.patientID === series.study.patient.patientID.value)
       .filter(_.studyInstanceUID === series.study.studyInstanceUID.value)
@@ -143,7 +143,7 @@ class MetaDataDAO(val driver: JdbcProfile) {
       .distinctBy(image => image.sopInstanceUID)
 
   def listImageFilesForImage(image: Image)(implicit session: Session) =
-    props
+    rows
       .filter(_.patientName === image.series.study.patient.patientName.value)
       .filter(_.patientID === image.series.study.patient.patientID.value)
       .filter(_.studyInstanceUID === image.series.study.studyInstanceUID.value)

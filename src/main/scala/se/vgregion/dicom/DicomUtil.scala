@@ -7,6 +7,8 @@ import org.dcm4che3.util.SafeClose
 import java.nio.file.Path
 import se.vgregion.dicom.MetaDataProtocol._
 import se.vgregion.dicom.Attributes._
+import org.dcm4che3.data.Sequence
+import scala.collection.JavaConverters._
 
 object DicomUtil {
 
@@ -52,8 +54,14 @@ object DicomUtil {
       BodyPartExamined(Option(attributes.getString(BodyPartExamined.tag)).getOrElse(""))),
 
       SOPInstanceUID(Option(attributes.getString(SOPInstanceUID.tag)).getOrElse("")),
-      ImageType(Option(attributes.getString(ImageType.tag)).getOrElse(""))),
+      ImageType(readSequence(attributes.getStrings(ImageType.tag)))),
 
       FileName(path.toAbsolutePath().toString())))
+
+  def readSequence(sequence: Array[String]): String =
+    if (sequence == null || sequence.length == 0)
+      ""
+    else
+      sequence.tail.foldLeft(sequence.head)((result, part) => result + "/" + part)
 
 }

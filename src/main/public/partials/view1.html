@@ -9,22 +9,50 @@
 				<tr>
 					<th>Patient Name</th>
 					<th>Patient Id</th>
-					<th>Study Date</th>
-					<th>Series Date</th>
+					<th>Patient Birth Date</th>
+					<th>Patient Sex</th>
 					<th>Study Instance UID</th>
+					<th>Study Description</th>
+					<th>Study Date</th>
+					<th>Study ID</th>
+					<th>AccessionNumber</th>
+					<th>Manufacturer</th>
+					<th>Station Name</th>
+					<th>Frame of Reference UID</th>
+					<th>Series Instance UID</th>
+					<th>Series Description</th>
+					<th>Series Date</th>
+					<th>Modality</th>
+					<th>Protocol Name</th>
+					<th>Body Part Examined</th>
 					<th>SOP Instance UID</th>
+					<th>Image Type</th>
 					<th>Filename</th>
 				</tr>
 			</thead>
 			<tbody>
 				<tr ng-repeat="row in rows">
-					<td>{{row.patientName}}</td>
-					<td>{{row.patientID}}</td>
-					<td>{{row.studyDate}}</td>
-					<td>{{row.seriesDate}}</td>
-					<td>{{row.studyInstanceUID}}</td>
-					<td>{{row.sopInstanceUID}}</td>
-					<td>{{row.fileName}}</td>
+					<td>{{row.image.series.study.patient.patientName.value}}</td>
+					<td>{{row.image.series.study.patient.patientID.value}}</td>
+					<td>{{row.image.series.study.patient.patientBirthDate.value}}</td>
+					<td>{{row.image.series.study.patient.patientSex.value}}</td>
+					<td>{{row.image.series.study.studyInstanceUID.value}}</td>
+					<td>{{row.image.series.study.studyDescription.value}}</td>
+					<td>{{row.image.series.study.studyDate.value}}</td>
+					<td>{{row.image.series.study.studyID.value}}</td>
+					<td>{{row.image.series.study.accessionNumber.value}}</td>
+					<td>{{row.image.series.equipment.manufacturer.value}}</td>
+					<td>{{row.image.series.equipment.stationName.value}}</td>
+					<td>{{row.image.series.frameOfReference.frameOfReferenceUID.value}}</td>
+					<td>{{row.image.series.seriesInstanceUID.value}}</td>
+					<td>{{row.image.series.seriesDescription.value}}</td>
+					<td>{{row.image.series.seriesDate.value}}</td>
+					<td>{{row.image.series.modality.value}}</td>
+					<td>{{row.image.series.protocolName.value}}</td>
+					<td>{{row.image.series.bodyPartExamined.value}}</td>
+					<td>{{row.image.sopInstanceUID.value}}</td>
+					<td>{{row.image.imageType.value}}</td>
+					<td>{{row.fileName.value}}</td>
 				</tr>
 			</tbody>
 		</table>

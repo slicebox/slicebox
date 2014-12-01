@@ -5,8 +5,6 @@ import spray.json.DefaultJsonProtocol
 
 object FileSystemProtocol {
 
-  case class FileName(name: String)
-  
   // incoming
 
   case class MonitorDir(directory: String)
@@ -22,10 +20,6 @@ object FileSystemProtocol {
   case class Deleted(fileOrDir: Path)
   
   // JSON
-
-  object FileName extends DefaultJsonProtocol {
-    implicit val format = jsonFormat1(FileName.apply)
-  }
 
   object MonitorDir extends DefaultJsonProtocol {
     implicit val format = jsonFormat1(MonitorDir.apply)

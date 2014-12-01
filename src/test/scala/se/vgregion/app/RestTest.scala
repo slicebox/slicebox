@@ -8,17 +8,16 @@ import spray.routing.HttpServiceActor
 import se.vgregion.filesystem.FileSystemProtocol._
 import se.vgregion.dicom.ScpProtocol._
 import spray.http.ContentTypes._
-import spray.httpx.marshalling.Marshaller
 import spray.http.HttpEntity
 import spray.http.HttpRequest
 import java.nio.file.Files
 import java.nio.file.FileSystems
 import java.util.UUID
-import java.util.UUID
 import java.nio.file.Paths
-import java.lang.ClassLoader
-import org.scalamock.scalatest.MockFactory
 import se.vgregion.dicom.MetaDataActor
+import se.vgregion.dicom.Attributes._
+import se.vgregion.dicom.MetaDataProtocol._
+import spray.httpx.SprayJsonSupport._
 
 class RestTest extends FlatSpec with Matchers with ScalatestRouteTest with RestApi {
   def actorRefFactory = system // connect the DSL to the test ActorSystem
@@ -40,10 +39,6 @@ class RestTest extends FlatSpec with Matchers with ScalatestRouteTest with RestA
     val tempDirName = tempDir.toString().replace("\\", "/")
     val monitorDir = MonitorDir(tempDirName)
 
-    implicit val monitorDirMarshaller = Marshaller.of[MonitorDir](`application/json`) {
-      (value, ct, ctx) => ctx.marshalTo(HttpEntity(ct, s"""{ "directory": "${monitorDir.directory}" }"""))
-    }
-
     Put("/api/monitordirectory", monitorDir) ~> routes ~> check {
       responseAs[String] should be(s"Now monitoring directory ${monitorDir.directory}")
     }
@@ -54,10 +49,6 @@ class RestTest extends FlatSpec with Matchers with ScalatestRouteTest with RestA
     val tempDir = Files.createTempDirectory("akka-dcm-temp-dir-")
     val tempDirName = tempDir.toString().replace("\\", "/")
     val monitorDir = MonitorDir(tempDirName)
-
-    implicit val monitorDirMarshaller = Marshaller.of[MonitorDir](`application/json`) {
-      (value, ct, ctx) => ctx.marshalTo(HttpEntity(ct, s"""{ "directory": "${monitorDir.directory}" }"""))
-    }
 
     Put("/api/monitordirectory", monitorDir) ~> routes ~> check {
       responseAs[String] should be(s"Now monitoring directory ${monitorDir.directory}")
@@ -90,31 +81,35 @@ class RestTest extends FlatSpec with Matchers with ScalatestRouteTest with RestA
 
     val scpData = ScpData("TestName", "TestAeTitle", 13579, tempDirName)
 
-    implicit val addScpMarshaller = Marshaller.of[ScpData](`application/json`) {
-      (value, ct, ctx) =>
-        ctx.marshalTo(HttpEntity(ct, s"""{ 
-        "name": "${scpData.name}",
-        "aeTitle": "${scpData.aeTitle}",
-        "port": ${scpData.port},
-        "directory": "${scpData.directory}"
-       }"""))
-    }
-
     Put("/api/scp", scpData) ~> routes ~> check {
       responseAs[String] should be(s"Added SCP ${scpData.name}")
     }
 
     val deleteScp = DeleteScp("TestName")
 
-    implicit val deleteScpMarshaller = Marshaller.of[DeleteScp](`application/json`) {
-      (value, ct, ctx) =>
-        ctx.marshalTo(HttpEntity(ct, s"""{ 
-        "name": "${deleteScp.name}"
-       }"""))
-    }
-
     Delete("/api/scp", deleteScp) ~> routes ~> check {
       responseAs[String] should be(s"Deleted SCP ${deleteScp.name}")
+    }
+  }
+
+  it should "respond with file data when asked to deliver a file" in {
+
+    val tempDir = Files.createTempDirectory("akka-dcm-temp-dir-")
+    val tempDirName = tempDir.toString().replace("\\", "/")
+    val monitorDir = MonitorDir(tempDirName)
+    val fileName = "anon270.dcm"
+    val dcmPath = Paths.get(getClass().getResource(fileName).toURI())
+    Files.copy(dcmPath, tempDir.resolve(fileName))
+
+    val pat = Patient(PatientName(""), PatientID(""), PatientBirthDate(""), PatientSex(""))
+    val study = Study(pat, StudyInstanceUID(""), StudyDescription(""), StudyDate(""), StudyID(""), AccessionNumber(""))
+    val series = Series(study, Equipment(Manufacturer(""), StationName("")), FrameOfReference(FrameOfReferenceUID("")), SeriesInstanceUID(""), SeriesDescription(""), SeriesDate(""), Modality(""), ProtocolName(""), BodyPartExamined(""))
+    val image = Image(series, SOPInstanceUID(""), ImageType(""))
+    val imageFile = ImageFile(image, FileName(tempDir.resolve(fileName).toString))
+
+    Get("/api/files/image", imageFile) ~> routes ~> check {
+      status should be(OK)
+      contentType should be(`application/octet-stream`)
     }
   }
 

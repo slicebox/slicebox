@@ -13,6 +13,6 @@ angular.module('akkaDcm.view1', ['ngRoute'])
   $scope.rows = [];
 
   $http.get('/api/metadata/list').success(function(data) {
-    $scope.rows = data;
+    $scope.rows = data.imageFiles;
   });
 });

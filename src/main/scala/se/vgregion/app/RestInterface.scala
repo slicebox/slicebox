@@ -177,8 +177,10 @@ trait RestApi extends HttpService {
   def filesRoutes: Route =
     pathPrefix("files") {
       get {
-        path("image" / Segment) { sopInstanceUID =>
-          complete(sopInstanceUID)
+        path("image") {
+          entity(as[ImageFile]) { imageFile =>
+            getFromFile(imageFile.fileName.value)
+          }
         }
       }
     }
