@@ -8,4 +8,6 @@ class DAO(val driver: JdbcProfile) {
   
   val scpDataDAO = new ScpDataDAO(driver)
   
+  val userDAO = new UserDAO(driver)
+  
 }

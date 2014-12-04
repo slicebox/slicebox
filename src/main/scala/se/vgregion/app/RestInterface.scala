@@ -11,21 +11,20 @@ import scala.concurrent.duration._
 import scala.language.postfixOps
 import se.vgregion.filesystem.FileSystemActor
 import se.vgregion.dicom.ScpCollectionActor
+import se.vgregion.dicom.MetaDataActor
 import se.vgregion.db.DbActor
 import com.typesafe.config.ConfigFactory
 import java.io.File
-import se.vgregion.filesystem.FileSystemProtocol.MonitorDir
 import spray.routing.PathMatchers._
 import scala.util.Right
 import scala.util.Failure
 import scala.util.Success
 import spray.http.MediaTypes
-import se.vgregion.dicom.MetaDataActor
 import scala.slick.jdbc.JdbcBackend.Database
 import scala.slick.driver.H2Driver
 import se.vgregion.db.DAO
-import se.vgregion.db.DbProtocol.CreateTables
 import spray.httpx.PlayTwirlSupport._
+import se.vgregion.db.DbUserRepository
 
 class RestInterface extends Actor with RestApi {
 
@@ -40,6 +39,7 @@ trait RestApi extends HttpService {
   import se.vgregion.filesystem.FileSystemProtocol._
   import se.vgregion.dicom.ScpProtocol._
   import se.vgregion.dicom.MetaDataProtocol._
+  import se.vgregion.db.DbProtocol._
   import akka.pattern.ask
   import akka.pattern.pipe
 
@@ -61,7 +61,8 @@ trait RestApi extends HttpService {
   val metaDataActor = actorRefFactory.actorOf(Props(classOf[MetaDataActor], dbActor))
   val fileSystemActor = actorRefFactory.actorOf(Props(classOf[FileSystemActor], metaDataActor))
   val scpCollectionActor = actorRefFactory.actorOf(Props(classOf[ScpCollectionActor], dbActor))
-
+  val userRepository = new DbUserRepository(dbActor)
+  val authenticator = new Authenticator(userRepository)
   if (!isProduction) {
     setupDevelopmentEnvironment()
   }
@@ -185,6 +186,40 @@ trait RestApi extends HttpService {
       }
     }
 
+  def userRoutes: Route =
+    pathPrefix("user") {
+      put {
+        pathEnd {
+          entity(as[FullUser]) { user =>
+            val apiUser = ApiUser(user.user, user.role).withPassword(user.password)
+            onSuccess(userRepository.addUser(apiUser)) {
+              _ match {
+                case Some(newUser) =>
+                  complete(s"Added user ${newUser.user}")
+                case None =>
+                  complete((StatusCodes.BadRequest, s"User ${user.user} already exists."))
+              }
+            }
+          }
+        }
+      }
+    } ~ pathPrefix("private") {
+      authenticate(authenticator.basicUserAuthenticator) { authInfo =>
+        path("test") {
+          get {
+            complete(s"Hi, ${authInfo.user.user}")
+          }
+        } ~ path("admin") {
+          authorize(authInfo.hasPermission(Administrator)) {
+            get {
+              complete(s"Admin: ${authInfo.user.user}")
+            }
+          }
+        }
+
+      }
+    }
+
   def stopRoute: Route =
     path("stop") {
       (post | parameter('method ! "post")) {
@@ -198,11 +233,12 @@ trait RestApi extends HttpService {
 
   def routes: Route =
     twirlRoutes ~ staticResourcesRoutes ~ pathPrefix("api") {
-      directoryRoutes ~ scpRoutes ~ metaDataRoutes ~ filesRoutes ~ stopRoute
+      directoryRoutes ~ scpRoutes ~ metaDataRoutes ~ filesRoutes ~ userRoutes ~ stopRoute
     }
 
   def setupDevelopmentEnvironment() = {
     InitialValues.createTables(dbActor)
+    InitialValues.addUsers(userRepository)
     InitialValues.initFileSystemData(config, fileSystemActor)
     InitialValues.initScpData(config, scpCollectionActor, fileSystemActor)
   }

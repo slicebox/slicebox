@@ -13,6 +13,7 @@ class DbActor(db: Database, dao: DAO) extends Actor {
       db.withSession { implicit session =>
         dao.scpDataDAO.create
         dao.metaDataDAO.create
+        dao.userDAO.create
       }
     case InsertScpData(scpData) =>
       db.withSession { implicit session =>
@@ -57,6 +58,14 @@ class DbActor(db: Database, dao: DAO) extends Actor {
     case GetImageFileEntries(image) =>
       db.withSession { implicit session =>
         sender ! ImageFiles(dao.metaDataDAO.listImageFilesForImage(image))
+      }
+    case GetUserByName(name) =>
+      db.withSession { implicit session =>
+        sender ! dao.userDAO.findByName(name)
+      }
+    case AddUser(apiUser) =>
+      db.withSession { implicit session =>
+        sender ! dao.userDAO.insert(apiUser)
       }
   }
 

@@ -2,6 +2,7 @@ package se.vgregion.db
 
 import se.vgregion.dicom.ScpProtocol.ScpData
 import se.vgregion.dicom.MetaDataProtocol._
+import se.vgregion.app.ApiUser
 
 object DbProtocol {
 
@@ -29,4 +30,9 @@ object DbProtocol {
 
   case class GetImageFileEntries(image: Image)
 
+  case class GetUserByName(name: String)
+  
+  case class AddUser(user: ApiUser)
+
+  case object UserAlreadyAdded
 }

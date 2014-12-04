@@ -1,6 +1,6 @@
 import com.typesafe.sbt.SbtNativePackager.packageArchetype
 
-name := "akka-dcm"
+name := "slicebox"
 
 version := "0.1"
 
@@ -16,7 +16,7 @@ packageArchetype.java_server
 
 maintainer in Windows := "Exini Diagnostics AB"
 
-packageSummary in Windows := "Reactive Dcm Node"
+packageSummary in Windows := "Reactive Dicom Node"
 
 packageDescription in Windows := "Longer message here..."
 
@@ -40,6 +40,7 @@ libraryDependencies ++= {
     "ch.qos.logback"    			%  "logback-classic" 				% "1.1.2",
 	"com.typesafe.slick" 			%% "slick" 							% "2.1.0",
 	"com.h2database" 				%  "h2" 							% "1.3.170",
+	"com.github.t3hnar" 			%% "scala-bcrypt" 					% "2.4",
     "org.scalatest"     			%% "scalatest"       				% "2.2.1"       	% "test",
 	"org.scalamock" 				%% "scalamock-scalatest-support" 	% "3.2" 			% "test",
 	"org.webjars" 					%  "bootstrap" 						% "3.3.1",
@@ -55,7 +56,7 @@ EclipseKeys.withSource := true
 
 mainClass in Compile := Some("se.vgregion.app.Main")
 
-lazy val akkadcm = (project in file(".")).enablePlugins(SbtTwirl, SbtWeb)
+lazy val slicebox = (project in file(".")).enablePlugins(SbtTwirl, SbtWeb)
 
 WebKeys.packagePrefix in Assets := "public/"
 

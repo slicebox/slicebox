@@ -8,6 +8,9 @@ import se.vgregion.db.DbProtocol._
 
 object InitialValues {
 
+  def addUsers(userRepository: UserRepository) = 
+    userRepository.addUser(ApiUser("test@example.com", Administrator).withPassword("test1234"))
+  
   def createTables(dbActor: ActorRef) = dbActor ! CreateTables
     
   def initFileSystemData(config: Config, fileSystemActor: ActorRef) = {
