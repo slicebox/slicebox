@@ -6,7 +6,7 @@ version := "0.1"
 
 organization := "se.vgregion"
 
-scalaVersion := "2.11.2"
+scalaVersion := "2.11.4"
 
 scalacOptions := Seq("-encoding", "UTF-8", "-Xlint","-deprecation", "-unchecked", "-feature")
 
@@ -26,7 +26,7 @@ resolvers ++= Seq("Typesafe Repository" at "http://repo.typesafe.com/typesafe/re
                   "Spray Nightlies"     at "http://nightlies.spray.io/")
 
 libraryDependencies ++= {
-  val akkaVersion       = "2.3.6"
+  val akkaVersion       = "2.3.7"
   val sprayVersion      = "1.3.2"
   Seq(
     "com.typesafe.scala-logging" 	%% "scala-logging" 					% "3.1.0",
@@ -57,6 +57,8 @@ EclipseKeys.withSource := true
 mainClass in Compile := Some("se.vgregion.app.Main")
 
 lazy val slicebox = (project in file(".")).enablePlugins(SbtTwirl, SbtWeb)
+
+updateOptions := updateOptions.value.withCachedResolution(true)
 
 WebKeys.packagePrefix in Assets := "public/"
 
