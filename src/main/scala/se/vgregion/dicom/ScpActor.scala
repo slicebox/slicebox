@@ -10,36 +10,40 @@ import akka.event.LoggingReceive
 import akka.actor.PoisonPill
 import java.util.concurrent.Executor
 import java.util.concurrent.ThreadFactory
+import java.nio.file.Path
+import akka.actor.ActorRef
+import akka.actor.Props
 
-class ScpActor(scpData: ScpData, executor: Executor) extends Actor {
+class ScpActor(scpData: ScpData, executor: Executor, dicomActor: ActorRef) extends Actor {
   val log = Logging(context.system, this)
 
   val scheduledExecutor = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
     override def newThread(runnable: Runnable): Thread = {
       val thread = Executors.defaultThreadFactory().newThread(runnable)
       thread.setDaemon(true)
-      return thread;
+      thread
     }
   })
 
-  val storageDirectoryFile = new File(scpData.directory)
-
-  if (!storageDirectoryFile.exists() || !storageDirectoryFile.isDirectory()) {
-    throw new Exception("SCP storage directory does not exist or is not a directory")
-  }
-
-  val scp = new Scp(scpData.name, scpData.aeTitle, scpData.port, storageDirectoryFile)
+  val scp = new Scp(scpData.name, scpData.aeTitle, scpData.port, dicomActor)
   scp.device.setScheduledExecutor(scheduledExecutor)
   scp.device.setExecutor(executor)
   scp.device.bindConnections()
 
+  override def postStop() {
+    scp.device.unbindConnections()
+    scheduledExecutor.shutdown()
+  }
+
   def receive = LoggingReceive {
     case ShutdownScp =>
       log.info(s"Shutting down SCP ${scpData.name}")
-      scp.device.unbindConnections()
-      scheduledExecutor.shutdown()
       sender ! ScpShutdown
       self ! PoisonPill
   }
 
+}
+
+object ScpActor {
+  def props(scpData: ScpData, executor: Executor, dicomActor: ActorRef): Props = Props(new ScpActor(scpData, executor, dicomActor))
 }

@@ -2,27 +2,16 @@ package se.vgregion.filesystem
 
 import akka.actor.Actor
 import akka.event.{ LoggingReceive, Logging }
-import FileSystemProtocol._
+import DirectoryWatchProtocol._
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.nio.file.Files
 import akka.actor.ActorRef
-import se.vgregion.dicom.DicomUtil
-import se.vgregion.dicom.MetaDataProtocol._
+import se.vgregion.dicom.DicomProtocol._
+import akka.actor.Props
 
-class FileSystemActor(metaDataActor: ActorRef) extends Actor {
+class DirectoryWatchCollectionActor(dicomActor: ActorRef) extends Actor {
   val log = Logging(context.system, this)
-  val watchServiceTask = new WatchServiceTask(self)
-  val watchThread = new Thread(watchServiceTask, "WatchService")
-
-  override def preStart() {
-    watchThread.setDaemon(true)
-    watchThread.start()
-  }
-
-  override def postStop() {
-    watchThread.interrupt()
-  }
 
   var watchedDirectories = List.empty[Path]
 
@@ -33,7 +22,7 @@ class FileSystemActor(metaDataActor: ActorRef) extends Actor {
         if (watchedDirectories.contains(directoryPath))
           sender ! MonitorDirFailed(s"Directory $directory already monitored")
         else {
-          watchServiceTask watchRecursively directoryPath
+          context.actorOf(DirectoryWatchActor.props(directoryPath, dicomActor), directoryPath.getFileName.toString)
           watchedDirectories = watchedDirectories :+ directoryPath
           sender ! MonitoringDir(directory)
         }
@@ -42,9 +31,12 @@ class FileSystemActor(metaDataActor: ActorRef) extends Actor {
       }
     case Created(path) =>
       if (Files.isRegularFile(path))
-        metaDataActor ! AddImage(path)
+        dicomActor ! AddDicomFile(path)
     case Deleted(path) =>
-      if (Files.isRegularFile(path))
-        metaDataActor ! DeleteImage(path)
+    // nothing at this time
   }
+}
+
+object DirectoryWatchCollectionActor {
+  def props(dicomActor: ActorRef): Props = Props(new DirectoryWatchCollectionActor(dicomActor))
 }

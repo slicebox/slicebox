@@ -8,17 +8,17 @@ import se.vgregion.app.Role
 class UserDAO(val driver: JdbcProfile) {
   import driver.simple._
 
-  case class UserRow(id: Long, user: ApiUser)
+  case class UserRow(key: Long, user: ApiUser)
 
-  val toRow = (id: Long, user: String, role: String, password: String) => UserRow(id, ApiUser(user, Role.valueOf(role), Some(password)))
-  val fromRow = (row: UserRow) => Option((row.id, row.user.user, row.user.role.toString, row.user.hashedPassword.getOrElse("")))
-  
+  val toRow = (key: Long, user: String, role: String, password: String) => UserRow(key, ApiUser(user, Role.valueOf(role), Some(password)))
+  val fromRow = (row: UserRow) => Option((row.key, row.user.user, row.user.role.toString, row.user.hashedPassword.getOrElse("")))
+
   class UserTable(tag: Tag) extends Table[UserRow](tag, "User") {
-    def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
+    def key = column[Long]("key", O.PrimaryKey, O.AutoInc)
     def user = column[String]("user")
     def role = column[String]("role")
     def password = column[String]("password")
-    def * = (id, user, role, password) <> (toRow.tupled, fromRow)
+    def * = (key, user, role, password) <> (toRow.tupled, fromRow)
   }
 
   val users = TableQuery[UserTable]
@@ -27,20 +27,32 @@ class UserDAO(val driver: JdbcProfile) {
     users.ddl.create
 
   def insert(apiUser: ApiUser)(implicit session: Session) =
-    findByName(apiUser.user) match {
+    findUserByName(apiUser.user) match {
       case Some(user) => None
       case None =>
         apiUser.hashedPassword.map(password => {
-            users += UserRow(-1, apiUser)
-            apiUser
+          users += UserRow(-1, apiUser)
+          apiUser
         })
     }
 
-  def findByName(name: String)(implicit session: Session) =
+  def delete(userName: String)(implicit session: Session) = {
+    val userOption = findUserByName(userName)
+    userOption.foreach(user => users.filter(_.user === userName).delete)
+    userOption
+  }
+
+  def findUserByName(name: String)(implicit session: Session) =
     users.filter(_.user === name).firstOption.map(row => row.user)
+
+  def findKeyByName(name: String)(implicit session: Session) =
+    users.filter(_.user === name).firstOption.map(row => row.key)
 
   def removeByName(name: String)(implicit session: Session) =
     users.filter(_.user === name).delete
+
+  def listUserNames(implicit session: Session): List[String] =
+    users.list.map(row => row.user.user)
 
   def list(implicit session: Session): List[ApiUser] =
     users.list.map(row => row.user)

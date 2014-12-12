@@ -14,7 +14,7 @@ object DbProtocol {
   
   case class RemoveScpData(name: String)
  
-  case class RemoveImageFile(fileName: String)
+  case class RemoveImage(image: Image)
   
   case object GetScpDataEntries
   
@@ -32,7 +32,12 @@ object DbProtocol {
 
   case class GetUserByName(name: String)
   
+  case object GetUserNames
+  
   case class AddUser(user: ApiUser)
 
+  case class DeleteUser(userName: String)
+
   case object UserAlreadyAdded
+
 }

@@ -16,8 +16,9 @@ import scala.concurrent.duration._
 import scala.language.postfixOps
 import akka.actor.Status.Success
 import akka.actor.Status.Failure
+import java.nio.file.Path
 
-class ScpCollectionActor(dbActor: ActorRef) extends Actor {
+class ScpCollectionActor(dbActor: ActorRef, dicomActor: ActorRef) extends Actor {
   val log = Logging(context.system, this)
 
   val executor = Executors.newCachedThreadPool()
@@ -33,7 +34,7 @@ class ScpCollectionActor(dbActor: ActorRef) extends Actor {
           sender ! ScpAlreadyAdded(scpData)
         case None =>
           try {
-            context.actorOf(Props(classOf[ScpActor], scpData, executor), scpData.name)
+            context.actorOf(Props(classOf[ScpActor], scpData, executor, dicomActor), scpData.name)
             dbActor ! InsertScpData(scpData)
             sender ! ScpAdded(scpData)
           } catch {
@@ -53,4 +54,8 @@ class ScpCollectionActor(dbActor: ActorRef) extends Actor {
     case GetScpDataCollection =>
       dbActor forward GetScpDataEntries
   }
+}
+
+object ScpCollectionActor {
+  def props(dbActor: ActorRef, dicomActor: ActorRef): Props = Props(new ScpCollectionActor(dbActor, dicomActor))
 }

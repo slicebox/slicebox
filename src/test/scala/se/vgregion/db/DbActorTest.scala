@@ -10,7 +10,7 @@ import org.scalatest.WordSpecLike
 import scala.slick.jdbc.JdbcBackend.Database
 import scala.slick.driver.H2Driver
 import se.vgregion.dicom.MetaDataProtocol._
-import se.vgregion.dicom.Attributes._
+import se.vgregion.dicom.DicomPropertyValue._
 import se.vgregion.db.DbProtocol._
 
 class DbActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
@@ -24,7 +24,7 @@ class DbActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSe
 
   private val db = Database.forURL("jdbc:h2:mem:dbtest;DB_CLOSE_DELAY=-1", driver = "org.h2.Driver")
   
-  val dbActor = system.actorOf(Props(classOf[DbActor], db, new DAO(H2Driver)))
+  val dbActor = system.actorOf(DbActor.props(db, new DAO(H2Driver)), "DbActor")
 
   val pat1 = Patient(PatientName("p1"), PatientID("s1"), PatientBirthDate("2000-01-01"), PatientSex("M"))
   val pat2 = Patient(PatientName("p2"), PatientID("s2"), PatientBirthDate("2000-01-01"), PatientSex("M"))

@@ -1,4 +1,6 @@
-'use strict';
+(function () {
+   'use strict';
+}());
 
 angular.module('akkaDcm.view2', ['ngRoute'])
 

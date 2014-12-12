@@ -3,7 +3,7 @@ package se.vgregion.filesystem
 import java.nio.file.Path
 import spray.json.DefaultJsonProtocol
 
-object FileSystemProtocol {
+object DirectoryWatchProtocol {
 
   // incoming
 

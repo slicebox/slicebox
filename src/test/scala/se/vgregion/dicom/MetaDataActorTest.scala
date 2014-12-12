@@ -8,7 +8,7 @@ import org.scalatest.WordSpecLike
 import org.scalatest.Matchers
 import org.scalatest.BeforeAndAfterAll
 import se.vgregion.dicom.MetaDataProtocol._
-import se.vgregion.dicom.Attributes._
+import se.vgregion.dicom.DicomPropertyValue._
 import se.vgregion.db.DbProtocol._
 
 case class SetImageFiles(imageFiles: Seq[ImageFile])
@@ -36,7 +36,7 @@ class MetaDataActorTest(_system: ActorSystem) extends TestKit(_system) with Impl
 
   val dbActor = system.actorOf(Props[MockDbActor])
   
-  val metaDataActor = system.actorOf(Props(classOf[MetaDataActor], dbActor))
+  val metaDataActor = system.actorOf(MetaDataActor.props(dbActor), "MetaDataActor")
 
   val pat1 = Patient(PatientName("p1"), PatientID("s1"), PatientBirthDate("2000-01-01"), PatientSex("M"))
   val pat2 = Patient(PatientName("p2"), PatientID("s2"), PatientBirthDate("2000-01-01"), PatientSex("M"))

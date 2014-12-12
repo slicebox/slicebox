@@ -5,13 +5,16 @@ import spray.routing._
 import spray.http.MediaTypes
 import spray.http.StatusCodes
 import spray.httpx.SprayJsonSupport._
+import spray.json._
+import spray.json.DefaultJsonProtocol._
 import spray.routing.RequestContext
 import akka.util.Timeout
 import scala.concurrent.duration._
 import scala.language.postfixOps
-import se.vgregion.filesystem.FileSystemActor
+import se.vgregion.filesystem.DirectoryWatchCollectionActor
 import se.vgregion.dicom.ScpCollectionActor
 import se.vgregion.dicom.MetaDataActor
+import se.vgregion.dicom.DicomActor
 import se.vgregion.db.DbActor
 import com.typesafe.config.ConfigFactory
 import java.io.File
@@ -25,6 +28,7 @@ import scala.slick.driver.H2Driver
 import se.vgregion.db.DAO
 import spray.httpx.PlayTwirlSupport._
 import se.vgregion.db.DbUserRepository
+import java.nio.file.Paths
 
 class RestInterface extends Actor with RestApi {
 
@@ -36,10 +40,11 @@ class RestInterface extends Actor with RestApi {
 }
 
 trait RestApi extends HttpService {
-  import se.vgregion.filesystem.FileSystemProtocol._
+  import se.vgregion.filesystem.DirectoryWatchProtocol._
   import se.vgregion.dicom.ScpProtocol._
   import se.vgregion.dicom.MetaDataProtocol._
   import se.vgregion.db.DbProtocol._
+  
   import akka.pattern.ask
   import akka.pattern.pipe
 
@@ -49,18 +54,21 @@ trait RestApi extends HttpService {
   implicit val timeout = Timeout(10 seconds)
 
   val config = ConfigFactory.load()
-  val isProduction = config.getBoolean("production")
-
+  val sliceboxConfig = config.getConfig("slicebox")
+  val isProduction = sliceboxConfig.getBoolean("production")
+  val storage = Paths.get(sliceboxConfig.getString("storage"))
+  
   private val db =
     if (isProduction)
       Database.forURL("jdbc:h2:storage", driver = "org.h2.Driver")
     else
       Database.forURL("jdbc:h2:mem:storage;DB_CLOSE_DELAY=-1", driver = "org.h2.Driver")
 
-  val dbActor = actorRefFactory.actorOf(Props(classOf[DbActor], db, new DAO(H2Driver)))
-  val metaDataActor = actorRefFactory.actorOf(Props(classOf[MetaDataActor], dbActor))
-  val fileSystemActor = actorRefFactory.actorOf(Props(classOf[FileSystemActor], metaDataActor))
-  val scpCollectionActor = actorRefFactory.actorOf(Props(classOf[ScpCollectionActor], dbActor))
+  val dbActor = actorRefFactory.actorOf(DbActor.props(db, new DAO(H2Driver)), "DbActor")
+  val metaDataActor = actorRefFactory.actorOf(MetaDataActor.props(dbActor), "MetaDataActor")
+  val dicomActor = actorRefFactory.actorOf(DicomActor.props(metaDataActor, storage), "DicomActor")
+  val directoryWatchCollectionActor = actorRefFactory.actorOf(DirectoryWatchCollectionActor.props(dicomActor), "DirectoryWatchCollectionActor")
+  val scpCollectionActor = actorRefFactory.actorOf(ScpCollectionActor.props(dbActor, dicomActor), "ScpCollectionActor")
   val userRepository = new DbUserRepository(dbActor)
   val authenticator = new Authenticator(userRepository)
   if (!isProduction) {
@@ -84,10 +92,10 @@ trait RestApi extends HttpService {
     }
 
   def directoryRoutes: Route =
-    path("monitordirectory") {
+    pathPrefix("directory") {
       put {
         entity(as[MonitorDir]) { monitorDirectory =>
-          onSuccess(fileSystemActor.ask(monitorDirectory)) {
+          onSuccess(directoryWatchCollectionActor.ask(monitorDirectory)) {
             _ match {
               case MonitoringDir(directory) => complete(s"Now monitoring directory $directory")
               case MonitorDirFailed(reason) => complete((StatusCodes.BadRequest, s"Monitoring directory failed: ${reason}"))
@@ -175,8 +183,8 @@ trait RestApi extends HttpService {
     }
   }
 
-  def filesRoutes: Route =
-    pathPrefix("files") {
+  def fileRoutes: Route =
+    pathPrefix("file") {
       get {
         path("image") {
           entity(as[ImageFile]) { imageFile =>
@@ -190,7 +198,7 @@ trait RestApi extends HttpService {
     pathPrefix("user") {
       put {
         pathEnd {
-          entity(as[FullUser]) { user =>
+          entity(as[ClearTextUser]) { user =>
             val apiUser = ApiUser(user.user, user.role).withPassword(user.password)
             onSuccess(userRepository.addUser(apiUser)) {
               _ match {
@@ -200,6 +208,25 @@ trait RestApi extends HttpService {
                   complete((StatusCodes.BadRequest, s"User ${user.user} already exists."))
               }
             }
+          }
+        }
+      } ~ delete {
+        pathEnd {
+          entity(as[String]) { userName =>
+            onSuccess(userRepository.deleteUser(userName)) {
+              _ match {
+                case Some(deletedUser) =>
+                  complete(s"Deleted user ${deletedUser.user}")
+                case None =>
+                  complete((StatusCodes.BadRequest, s"User ${userName} does not exist."))
+              }
+            }
+          }
+        }
+      } ~ get {
+        path("names") {
+          onSuccess(userRepository.listUserNames()) { userNames =>
+            complete(userNames.toJson.toString)
           }
         }
       }
@@ -233,14 +260,14 @@ trait RestApi extends HttpService {
 
   def routes: Route =
     twirlRoutes ~ staticResourcesRoutes ~ pathPrefix("api") {
-      directoryRoutes ~ scpRoutes ~ metaDataRoutes ~ filesRoutes ~ userRoutes ~ stopRoute
+      directoryRoutes ~ scpRoutes ~ metaDataRoutes ~ fileRoutes ~ userRoutes ~ stopRoute
     }
 
   def setupDevelopmentEnvironment() = {
     InitialValues.createTables(dbActor)
     InitialValues.addUsers(userRepository)
-    InitialValues.initFileSystemData(config, fileSystemActor)
-    InitialValues.initScpData(config, scpCollectionActor, fileSystemActor)
+    InitialValues.initFileSystemData(sliceboxConfig, directoryWatchCollectionActor)
+    InitialValues.initScpData(sliceboxConfig, scpCollectionActor, directoryWatchCollectionActor)
   }
 
 }

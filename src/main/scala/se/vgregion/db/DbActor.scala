@@ -5,6 +5,7 @@ import DbProtocol._
 import se.vgregion.dicom.ScpProtocol._
 import se.vgregion.dicom.MetaDataProtocol._
 import scala.slick.jdbc.JdbcBackend.Database
+import akka.actor.Props
 
 class DbActor(db: Database, dao: DAO) extends Actor {
 
@@ -27,9 +28,9 @@ class DbActor(db: Database, dao: DAO) extends Actor {
       db.withSession { implicit session =>
         dao.scpDataDAO.removeByName(name)
       }
-    case RemoveImageFile(fileName) =>
+    case RemoveImage(image) =>
       db.withSession { implicit session =>
-        dao.metaDataDAO.removeByFileName(fileName)
+        dao.metaDataDAO.deleteImage(image)
       }
     case GetScpDataEntries =>
       db.withSession { implicit session =>
@@ -37,36 +38,48 @@ class DbActor(db: Database, dao: DAO) extends Actor {
       }
     case GetImageFileEntries =>
       db.withSession { implicit session =>
-        sender ! ImageFiles(dao.metaDataDAO.list)
+        sender ! ImageFiles(dao.metaDataDAO.allImageFiles)
       }
     case GetPatientEntries =>
       db.withSession { implicit session =>
-        sender ! Patients(dao.metaDataDAO.listPatients)
+        sender ! Patients(dao.metaDataDAO.allPatients)
       }
     case GetStudyEntries(patient) =>
       db.withSession { implicit session =>
-        sender ! Studies(dao.metaDataDAO.listStudiesForPatient(patient))
+        sender ! Studies(dao.metaDataDAO.studiesForPatient(patient))
       }
     case GetSeriesEntries(study) =>
       db.withSession { implicit session =>
-        sender ! SeriesCollection(dao.metaDataDAO.listSeriesForStudy(study))
+        sender ! SeriesCollection(dao.metaDataDAO.seriesForStudy(study))
       }
     case GetImageEntries(series) =>
       db.withSession { implicit session =>
-        sender ! Images(dao.metaDataDAO.listImagesForSeries(series))
+        sender ! Images(dao.metaDataDAO.imagesForSeries(series))
       }
     case GetImageFileEntries(image) =>
       db.withSession { implicit session =>
-        sender ! ImageFiles(dao.metaDataDAO.listImageFilesForImage(image))
+        sender ! ImageFiles(dao.metaDataDAO.imageFilesForImage(image))
       }
     case GetUserByName(name) =>
       db.withSession { implicit session =>
-        sender ! dao.userDAO.findByName(name)
+        sender ! dao.userDAO.findUserByName(name)
+      }
+    case GetUserNames =>
+      db.withSession { implicit session =>
+        sender ! dao.userDAO.listUserNames
       }
     case AddUser(apiUser) =>
       db.withSession { implicit session =>
         sender ! dao.userDAO.insert(apiUser)
       }
+    case DeleteUser(userName) =>
+      db.withSession { implicit session =>
+        sender ! dao.userDAO.delete(userName)
+      }
   }
 
+}
+
+object DbActor {
+  def props(db: Database, dao: DAO): Props = Props(new DbActor(db, dao))
 }

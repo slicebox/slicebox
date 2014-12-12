@@ -22,8 +22,11 @@ import org.dcm4che3.net.service.DicomServiceException
 import org.dcm4che3.net.service.DicomServiceRegistry
 import org.dcm4che3.util.SafeClose
 import com.typesafe.scalalogging.LazyLogging
+import java.nio.file.Path
+import akka.actor.ActorRef
+import DicomProtocol._
 
-class Scp(val name: String, val aeTitle: String, val port: Int, val storageDir: File) extends LazyLogging {
+class Scp(val name: String, val aeTitle: String, val port: Int, dicomActor: ActorRef) extends LazyLogging {
 
   val device = new Device("storescp")  
   private val ae = new ApplicationEntity(aeTitle)
@@ -35,21 +38,13 @@ class Scp(val name: String, val aeTitle: String, val port: Int, val storageDir: 
   
     override protected def store(as: Association, pc: PresentationContext, rq: Dcm4CheAttributes, data: PDVInputStream, rsp: Dcm4CheAttributes): Unit = {
       rsp.setInt(Tag.Status, VR.US, 0)
-      if (storageDir == null)
-        return
 
       val cuid = rq.getString(Tag.AffectedSOPClassUID)
       val iuid = rq.getString(Tag.AffectedSOPInstanceUID)
       val tsuid = pc.getTransferSyntax()
-      val file = new File(storageDir, iuid + PART_EXT)
-      try {
-        storeTo(as, as.createFileMetaInformation(iuid, cuid, tsuid), data, file)
-        renameTo(as, file, new File(storageDir, iuid))
-      } catch {
-        case e: Throwable =>
-          deleteFile(as, file)
-          throw new DicomServiceException(Status.ProcessingFailure, e)
-      }
+      val metaInformation = as.createFileMetaInformation(iuid, cuid, tsuid)
+      val dataset = data.readDataset(tsuid)
+      dicomActor ! AddDicom(metaInformation, dataset)
     }
 
   }
@@ -61,40 +56,6 @@ class Scp(val name: String, val aeTitle: String, val port: Int, val storageDir: 
   ae.setAssociationAcceptor(true);
   ae.addConnection(conn);
   ae.addTransferCapability(new TransferCapability(null, "*", TransferCapability.Role.SCP, "*"))
-
-  private def storeTo(as: Association, fmi: Dcm4CheAttributes, data: PDVInputStream, file: File) = {
-    logger.info("{}: M-WRITE {}", as, file)
-    val out = new DicomOutputStream(file)
-    try {
-      out.writeFileMetaInformation(fmi)
-      data.copyTo(out)
-    } finally {
-      SafeClose.close(out)
-    }
-  }
-
-  private def renameTo(as: Association, from: File, dest: File): Unit = {
-    logger.info("{}: M-RENAME {}", Array[Object](as, from, dest))
-    dest.getParentFile().mkdirs()
-    if (!from.renameTo(dest))
-      throw new IOException("Failed to rename " + from + " to " + dest)
-  }
-
-  private def parse(file: File): Dcm4CheAttributes = {
-    val in = new DicomInputStream(file)
-    try {
-      in.setIncludeBulkData(IncludeBulkData.NO)
-      in.readDataset(-1, Tag.PixelData)
-    } finally {
-      SafeClose.close(in)
-    }
-  }
-
-  private def deleteFile(as: Association, file: File): Unit =
-    if (file.delete())
-      logger.info("{}: M-DELETE {}", as, file);
-    else
-      logger.warn("{}: M-DELETE {} failed!", as, file);
 
   private def createServiceRegistry(): DicomServiceRegistry = {
     val serviceRegistry = new DicomServiceRegistry()

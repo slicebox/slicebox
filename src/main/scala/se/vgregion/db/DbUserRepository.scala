@@ -19,4 +19,8 @@ class DbUserRepository(dbActor: ActorRef) extends UserRepository {
   
   def addUser(user: ApiUser): Future[Option[ApiUser]] = dbActor.ask(AddUser(user)).mapTo[Option[ApiUser]]    
   
+  def deleteUser(userName: String): Future[Option[ApiUser]] = dbActor.ask(DeleteUser(userName)).mapTo[Option[ApiUser]]    
+  
+  def listUserNames(): Future[List[String]] = dbActor.ask(GetUserNames).mapTo[List[String]]
+  
 }

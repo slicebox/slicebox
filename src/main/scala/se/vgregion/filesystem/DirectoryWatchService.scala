@@ -8,10 +8,10 @@ import scala.collection.JavaConversions._
 
 import com.typesafe.scalalogging.LazyLogging
 
-import FileSystemProtocol._
+import DirectoryWatchProtocol._
 import akka.actor.ActorRef
 
-class WatchServiceTask(notifyActor: ActorRef) extends Runnable with LazyLogging {
+class DirectoryWatchService(notifyActor: ActorRef) extends Runnable with LazyLogging {
   private val watchService = FileSystems.getDefault.newWatchService()
 
   def watchRecursively(root: Path) = {
