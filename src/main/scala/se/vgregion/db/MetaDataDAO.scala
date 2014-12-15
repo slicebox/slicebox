@@ -443,6 +443,55 @@ class MetaDataDAO(val driver: JdbcProfile) {
       .getOrElse(List())
   }
 
+  // *** Grouped and per owner listings ***
+
+  def studiesForPatient(patient: Patient, owner: Owner)(implicit session: Session): List[Study] = session.withTransaction {
+    keyForPatient(patient).map(patientKey =>
+      (for {
+        ss <- studies
+        sz <- seriez if ss.key === sz.studyKey
+        is <- images if sz.key === is.seriesKey
+        ifs <- imageFiles if is.key === ifs.imageKey
+      } yield (ss, sz, is, ifs))
+        .filter(_._4.owner === owner.value)
+        .filter(_._1.patientKey === patientKey)
+        .list.map(row => 
+          rowToStudy(patient, row._1))
+        .toSet.toList)
+      .getOrElse(List())
+  }
+
+  def seriesForStudy(study: Study, owner: Owner)(implicit session: Session): List[Series] = session.withTransaction {
+    keyForStudy(study).map(studyKey =>
+      (for {
+        sz <- seriez
+        is <- images if sz.key === is.seriesKey
+        ifs <- imageFiles if is.key === ifs.imageKey
+      } yield (sz, is, ifs))
+        .filter(_._3.owner === owner.value)
+        .filter(_._1.studyKey === studyKey)
+        .list.map(row =>
+          equipmentForSeriesKey(row._1.key).flatMap(equipment =>
+            frameOfReferenceForSeriesKey(row._1.key).map(frameOfReference =>
+              rowToSeries(study, equipment, frameOfReference, row._1)))).flatten
+        .toSet.toList)
+      .getOrElse(List())
+  }
+
+  def imagesForSeries(series: Series, owner: Owner)(implicit session: Session): List[Image] = session.withTransaction {
+    keyForSeries(series).map(seriesKey =>
+      (for {
+        is <- images
+        ifs <- imageFiles if is.key === ifs.imageKey
+      } yield (is, ifs))
+        .filter(_._2.owner === owner.value)
+        .filter(_._1.seriesKey === seriesKey)
+        .list.map(row =>
+          rowToImage(series, row._1))
+        .toSet.toList)
+    .getOrElse(List())
+  }
+
   def imageFilesForImage(image: Image, owner: Owner)(implicit session: Session): List[ImageFile] = session.withTransaction {
     keyForImage(image).map(imageKey =>
       imageFiles
