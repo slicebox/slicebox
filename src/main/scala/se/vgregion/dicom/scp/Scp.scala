@@ -1,4 +1,4 @@
-package se.vgregion.dicom
+package se.vgregion.dicom.scp
 
 import java.io.File
 import java.io.IOException
@@ -24,7 +24,7 @@ import org.dcm4che3.util.SafeClose
 import com.typesafe.scalalogging.LazyLogging
 import java.nio.file.Path
 import akka.actor.ActorRef
-import DicomProtocol._
+import se.vgregion.dicom.DicomProtocol._
 
 class Scp(val name: String, val aeTitle: String, val port: Int, dicomActor: ActorRef) extends LazyLogging {
 

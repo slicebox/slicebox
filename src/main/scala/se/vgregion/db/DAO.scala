@@ -6,7 +6,7 @@ class DAO(val driver: JdbcProfile) {
 	
 	val userDAO = new UserDAO(driver)
 
-  val metaDataDAO = new MetaDataDAO(driver, userDAO)
+  val metaDataDAO = new MetaDataDAO(driver)
   
   val scpDataDAO = new ScpDataDAO(driver)
   

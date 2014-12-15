@@ -2,7 +2,7 @@ package se.vgregion.db
 
 import akka.actor.Actor
 import DbProtocol._
-import se.vgregion.dicom.ScpProtocol._
+import se.vgregion.dicom.scp.ScpProtocol._
 import se.vgregion.dicom.MetaDataProtocol._
 import scala.slick.jdbc.JdbcBackend.Database
 import akka.actor.Props

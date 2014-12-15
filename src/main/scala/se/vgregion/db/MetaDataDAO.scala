@@ -1,13 +1,14 @@
 package se.vgregion.db
 
 import scala.slick.driver.JdbcProfile
-import se.vgregion.dicom.MetaDataProtocol._
 import scala.collection.breakOut
 import se.vgregion.lang.RichCollection.toRich
 import se.vgregion.dicom.DicomProperty
 import se.vgregion.dicom.DicomPropertyValue._
+import se.vgregion.dicom.DicomHierarchy._
+import se.vgregion.dicom.MetaDataProtocol._
 
-class MetaDataDAO(val driver: JdbcProfile, val userDAO: UserDAO) {
+class MetaDataDAO(val driver: JdbcProfile) {
   import driver.simple._
 
   // *** Patient *** 
@@ -148,42 +149,24 @@ class MetaDataDAO(val driver: JdbcProfile, val userDAO: UserDAO) {
 
   // *** Files ***
 
-  private case class ImageFileRow(key: Long, imageKey: Long, fileName: FileName)
+  private case class ImageFileRow(key: Long, imageKey: Long, fileName: FileName, owner: Owner)
 
-  private val toImageFileRow = (key: Long, imageKey: Long, fileName: String) => ImageFileRow(key, imageKey, FileName(fileName))
+  private val toImageFileRow = (key: Long, imageKey: Long, fileName: String, owner: String) => ImageFileRow(key, imageKey, FileName(fileName), Owner(owner))
 
-  private val fromImageFileRow = (d: ImageFileRow) => Option((d.key, d.imageKey, d.fileName.value))
+  private val fromImageFileRow = (d: ImageFileRow) => Option((d.key, d.imageKey, d.fileName.value, d.owner.value))
 
   private class ImageFiles(tag: Tag) extends Table[ImageFileRow](tag, "ImageFiles") {
     def key = column[Long]("key", O.PrimaryKey, O.AutoInc)
     def imageKey = column[Long]("imageKey")
     def fileName = column[String]("fileName")
-    def * = (key, imageKey, fileName) <> (toImageFileRow.tupled, fromImageFileRow)
+    def owner = column[String]("owner")
+    def * = (key, imageKey, fileName, owner) <> (toImageFileRow.tupled, fromImageFileRow)
 
     def imageFKey = foreignKey("imageFKey", imageKey, images)(_.key, onUpdate = ForeignKeyAction.Cascade, onDelete = ForeignKeyAction.Cascade)
     def userKeyJoin = images.filter(_.key === imageKey)
   }
 
   private val imageFiles = TableQuery[ImageFiles]
-
-  // *** File-users ***
-
-  //  private case class ImageFileUserRow(key: Long, imageFileKey: Long, userKey: Option[Long])
-  //
-  //  private class ImageFileUsers(tag: Tag) extends Table[ImageFileUserRow](tag, "ImageFileUsers") {
-  //    def key = column[Long]("key", O.PrimaryKey, O.AutoInc)
-  //    def imageFileKey = column[Long]("imageFileKey")
-  //    def userKey = column[Option[Long]]("userKey")
-  //    def * = (key, imageFileKey, userKey) <> (ImageFileUserRow.tupled, ImageFileUserRow.unapply _)
-  //
-  //    def imageFileFKey = foreignKey("imageFileFKey", imageFileKey, imageFiles)(_.key, onUpdate = ForeignKeyAction.Cascade, onDelete = ForeignKeyAction.Cascade)
-  //    def imageFileKeyJoin = imageFiles.filter(_.key === imageFileKey)
-  //
-  //    def userFKey = foreignKey("userFKey", userKey, userDAO.users)(_.key.?, onUpdate = ForeignKeyAction.Cascade, onDelete = ForeignKeyAction.Cascade)
-  //    def userKeyJoin = userDAO.users.filter(_.key === userKey)
-  //  }
-  //
-  //  private val imageFileUsers = TableQuery[ImageFileUsers]
 
   def create(implicit session: Session) = {
     (patients.ddl ++
@@ -193,7 +176,6 @@ class MetaDataDAO(val driver: JdbcProfile, val userDAO: UserDAO) {
       seriez.ddl ++
       images.ddl ++
       imageFiles.ddl).create
-    //     ++ imageFileUsers.ddl).create
   }
 
   // *** Db row to object conversions ***
@@ -204,7 +186,7 @@ class MetaDataDAO(val driver: JdbcProfile, val userDAO: UserDAO) {
   private def rowToFrameOfReference(row: FrameOfReferenceRow) = FrameOfReference(row.frameOfReferenceUID)
   private def rowToSeries(study: Study, equipment: Equipment, frameOfReference: FrameOfReference, row: SeriesRow) = Series(study, equipment, frameOfReference, row.seriesInstanceUID, row.seriesDescription, row.seriesDate, row.modality, row.protocolName, row.bodyPartExamined)
   private def rowToImage(series: Series, row: ImageRow) = Image(series, row.sopInstanceUID, row.imageType)
-  private def rowToImageFile(image: Image, row: ImageFileRow) = ImageFile(image, row.fileName)
+  private def rowToImageFile(image: Image, row: ImageFileRow) = ImageFile(image, row.fileName, row.owner)
 
   // *** Object to key and key for object
 
@@ -327,7 +309,7 @@ class MetaDataDAO(val driver: JdbcProfile, val userDAO: UserDAO) {
       .getOrElse {
         val imageKey = insert(imageFile.image)
         (imageFiles returning imageFiles.map(_.key)) +=
-          ImageFileRow(-1, imageKey, imageFile.fileName)
+          ImageFileRow(-1, imageKey, imageFile.fileName, imageFile.owner)
       }
   }
 
@@ -360,6 +342,68 @@ class MetaDataDAO(val driver: JdbcProfile, val userDAO: UserDAO) {
   def allImageFiles(implicit session: Session): List[ImageFile] = session.withTransaction {
     imageFiles.list.map(row =>
       imageForKey(row.imageKey).map(rowToImageFile(_, row))).flatten
+  }
+
+  // *** Per owner listings ***
+
+  def patientsForOwner(owner: Owner)(implicit session: Session): List[Patient] = session.withTransaction {
+    (for {
+      ps <- patients
+      ss <- studies if ps.key === ss.patientKey
+      sz <- seriez if ss.key === sz.studyKey
+      is <- images if sz.key === is.seriesKey
+      ifs <- imageFiles if is.key === ifs.imageKey
+    } yield (ps, ss, sz, is, ifs))
+      .filter(_._5.owner === owner.value)
+      .list.map(row =>
+        rowToPatient(row._1))
+      .toSet.toList
+  }
+
+  def studiesForOwner(owner: Owner)(implicit session: Session): List[Study] = session.withTransaction {
+    (for {
+      ss <- studies
+      sz <- seriez if ss.key === sz.studyKey
+      is <- images if sz.key === is.seriesKey
+      ifs <- imageFiles if is.key === ifs.imageKey
+    } yield (ss, sz, is, ifs))
+      .filter(_._4.owner === owner.value)
+      .list.map(row =>
+        patientForKey(row._1.patientKey).map(rowToStudy(_, row._1))).flatten
+      .toSet.toList
+  }
+
+  def seriesForOwner(owner: Owner)(implicit session: Session): List[Series] = session.withTransaction {
+    (for {
+      sz <- seriez
+      is <- images if sz.key === is.seriesKey
+      ifs <- imageFiles if is.key === ifs.imageKey
+    } yield (sz, is, ifs))
+      .filter(_._3.owner === owner.value)
+      .list.map(row =>
+        studyForKey(row._1.studyKey).flatMap(study =>
+          equipmentForSeriesKey(row._1.key).flatMap(equipment =>
+            frameOfReferenceForSeriesKey(row._1.key).map(frameOfReference =>
+              rowToSeries(study, equipment, frameOfReference, row._1))))).flatten
+      .toSet.toList
+  }
+
+  def imagesForOwner(owner: Owner)(implicit session: Session): List[Image] = session.withTransaction {
+    (for {
+      is <- images
+      ifs <- imageFiles if is.key === ifs.imageKey
+    } yield (is, ifs))
+      .filter(_._2.owner === owner.value)
+      .list.map(row =>
+        seriesForKey(row._1.seriesKey).map(rowToImage(_, row._1))).flatten
+      .toSet.toList
+  }
+
+  def imageFilesForOwner(owner: Owner)(implicit session: Session): List[ImageFile] = session.withTransaction {
+    imageFiles
+      .filter(_.owner === owner.value)
+      .list.map(row =>
+        imageForKey(row.imageKey).map(rowToImageFile(_, row))).flatten
   }
 
   // *** Grouped listings ***
@@ -395,6 +439,15 @@ class MetaDataDAO(val driver: JdbcProfile, val userDAO: UserDAO) {
     keyForImage(image).map(imageKey =>
       imageFiles
         .filter(_.imageKey === imageKey)
+        .list.map(rowToImageFile(image, _)))
+      .getOrElse(List())
+  }
+
+  def imageFilesForImage(image: Image, owner: Owner)(implicit session: Session): List[ImageFile] = session.withTransaction {
+    keyForImage(image).map(imageKey =>
+      imageFiles
+        .filter(_.imageKey === imageKey)
+        .filter(_.owner === owner.value)
         .list.map(rowToImageFile(image, _)))
       .getOrElse(List())
   }

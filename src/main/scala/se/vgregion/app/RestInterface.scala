@@ -11,8 +11,8 @@ import spray.routing.RequestContext
 import akka.util.Timeout
 import scala.concurrent.duration._
 import scala.language.postfixOps
-import se.vgregion.filesystem.DirectoryWatchCollectionActor
-import se.vgregion.dicom.ScpCollectionActor
+import se.vgregion.dicom.directory.DirectoryWatchCollectionActor
+import se.vgregion.dicom.scp.ScpCollectionActor
 import se.vgregion.dicom.MetaDataActor
 import se.vgregion.dicom.DicomActor
 import se.vgregion.db.DbActor
@@ -40,9 +40,10 @@ class RestInterface extends Actor with RestApi {
 }
 
 trait RestApi extends HttpService {
-  import se.vgregion.filesystem.DirectoryWatchProtocol._
-  import se.vgregion.dicom.ScpProtocol._
+  import se.vgregion.dicom.directory.DirectoryWatchProtocol._
+  import se.vgregion.dicom.scp.ScpProtocol._
   import se.vgregion.dicom.MetaDataProtocol._
+  import se.vgregion.dicom.DicomHierarchy._
   import se.vgregion.db.DbProtocol._
   
   import akka.pattern.ask

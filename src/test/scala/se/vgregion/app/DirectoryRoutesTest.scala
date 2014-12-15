@@ -3,7 +3,7 @@ package se.vgregion.app
 import org.scalatest._
 import spray.testkit.ScalatestRouteTest
 import spray.http.StatusCodes._
-import se.vgregion.filesystem.DirectoryWatchProtocol._
+import se.vgregion.dicom.directory.DirectoryWatchProtocol._
 import java.nio.file.Files
 import java.nio.file.Paths
 import spray.httpx.SprayJsonSupport._

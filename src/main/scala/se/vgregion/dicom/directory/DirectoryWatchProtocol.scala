@@ -1,4 +1,4 @@
-package se.vgregion.filesystem
+package se.vgregion.dicom.directory
 
 import java.nio.file.Path
 import spray.json.DefaultJsonProtocol

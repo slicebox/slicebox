@@ -7,8 +7,9 @@ import spray.http.ContentTypes._
 import java.nio.file.Files
 import java.nio.file.Paths
 import se.vgregion.dicom.DicomPropertyValue._
+import se.vgregion.dicom.DicomHierarchy._
 import se.vgregion.dicom.MetaDataProtocol._
-import se.vgregion.filesystem.DirectoryWatchProtocol._
+import se.vgregion.dicom.directory.DirectoryWatchProtocol._
 import spray.httpx.SprayJsonSupport._
 
 class FileRoutesTest extends FlatSpec with Matchers with ScalatestRouteTest with RestApi {
@@ -27,7 +28,7 @@ class FileRoutesTest extends FlatSpec with Matchers with ScalatestRouteTest with
     val study = Study(pat, StudyInstanceUID(""), StudyDescription(""), StudyDate(""), StudyID(""), AccessionNumber(""))
     val series = Series(study, Equipment(Manufacturer(""), StationName("")), FrameOfReference(FrameOfReferenceUID("")), SeriesInstanceUID(""), SeriesDescription(""), SeriesDate(""), Modality(""), ProtocolName(""), BodyPartExamined(""))
     val image = Image(series, SOPInstanceUID(""), ImageType(""))
-    val imageFile = ImageFile(image, FileName(tempDir.resolve(fileName).toString))
+    val imageFile = ImageFile(image, FileName(tempDir.resolve(fileName).toString), Owner("TestOwner"))
 
     Get("/api/file/image", imageFile) ~> routes ~> check {
       status should be(OK)

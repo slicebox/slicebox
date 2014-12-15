@@ -1,4 +1,4 @@
-package se.vgregion.filesystem
+package se.vgregion.dicom.directory
 
 import akka.actor.Actor
 import akka.event.{ LoggingReceive, Logging }

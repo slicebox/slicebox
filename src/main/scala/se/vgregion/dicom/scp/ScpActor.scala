@@ -1,4 +1,4 @@
-package se.vgregion.dicom
+package se.vgregion.dicom.scp
 
 import java.io.File
 import java.util.concurrent.Executors

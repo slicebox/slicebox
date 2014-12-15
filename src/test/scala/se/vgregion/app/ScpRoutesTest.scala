@@ -2,7 +2,7 @@ package se.vgregion.app
 
 import org.scalatest._
 import spray.testkit.ScalatestRouteTest
-import se.vgregion.dicom.ScpProtocol._
+import se.vgregion.dicom.scp.ScpProtocol._
 import spray.httpx.SprayJsonSupport._
 import java.nio.file.Files
 

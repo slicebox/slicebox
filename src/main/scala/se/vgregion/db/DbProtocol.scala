@@ -1,7 +1,8 @@
 package se.vgregion.db
 
-import se.vgregion.dicom.ScpProtocol.ScpData
+import se.vgregion.dicom.scp.ScpProtocol.ScpData
 import se.vgregion.dicom.MetaDataProtocol._
+import se.vgregion.dicom.DicomHierarchy._
 import se.vgregion.app.ApiUser
 
 object DbProtocol {

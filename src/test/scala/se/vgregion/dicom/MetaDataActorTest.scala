@@ -9,6 +9,7 @@ import org.scalatest.Matchers
 import org.scalatest.BeforeAndAfterAll
 import se.vgregion.dicom.MetaDataProtocol._
 import se.vgregion.dicom.DicomPropertyValue._
+import se.vgregion.dicom.DicomHierarchy._
 import se.vgregion.db.DbProtocol._
 
 case class SetImageFiles(imageFiles: Seq[ImageFile])
@@ -52,9 +53,9 @@ class MetaDataActorTest(_system: ActorSystem) extends TestKit(_system) with Impl
   val image2 = Image(series2, SOPInstanceUID("souid2"), ImageType("PRIMARY/RECON/TOMO"))
   val image3 = Image(series3, SOPInstanceUID("souid3"), ImageType("PRIMARY/RECON/TOMO"))
   
-  val imageFile1 = ImageFile(image1, FileName("file1"))
-  val imageFile2 = ImageFile(image2, FileName("file2"))
-  val imageFile3 = ImageFile(image3, FileName("file3"))
+  val imageFile1 = ImageFile(image1, FileName("file1"), Owner("Owner1"))
+  val imageFile2 = ImageFile(image2, FileName("file2"), Owner("Owner1"))
+  val imageFile3 = ImageFile(image3, FileName("file3"), Owner("Owner1"))
     
   "A MetaDataActor" must {
 

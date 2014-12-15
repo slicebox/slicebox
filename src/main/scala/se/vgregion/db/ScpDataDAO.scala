@@ -1,7 +1,7 @@
 package se.vgregion.db
 
 import scala.slick.driver.JdbcProfile
-import se.vgregion.dicom.ScpProtocol.ScpData
+import se.vgregion.dicom.scp.ScpProtocol.ScpData
 
 class ScpDataDAO(val driver: JdbcProfile) {
   import driver.simple._

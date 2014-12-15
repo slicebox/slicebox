@@ -6,6 +6,7 @@ import akka.event.Logging
 import akka.event.LoggingReceive
 import MetaDataProtocol._
 import se.vgregion.dicom.MetaDataProtocol._
+import se.vgregion.dicom.DicomHierarchy._
 import se.vgregion.db.DbProtocol._
 import DicomPropertyValue._
 import akka.actor.Props
@@ -15,9 +16,9 @@ class MetaDataActor(dbActor: ActorRef) extends Actor {
   val log = Logging(context.system, this)
 
   def receive = LoggingReceive {
-    case AddDataset(dataset, fileName) =>
+    case AddDataset(dataset, fileName, owner) =>
       val image = datasetToImage(dataset)
-      val imageFile = ImageFile(image, FileName(fileName))
+      val imageFile = ImageFile(image, FileName(fileName), Owner(owner))
       dbActor ! InsertImageFile(imageFile)
     case DeleteDataset(dataset) =>
       val image = datasetToImage(dataset)

@@ -1,8 +1,8 @@
 package se.vgregion.app
 
 import akka.actor.ActorRef
-import se.vgregion.filesystem.DirectoryWatchProtocol._
-import se.vgregion.dicom.ScpProtocol._
+import se.vgregion.dicom.directory.DirectoryWatchProtocol._
+import se.vgregion.dicom.scp.ScpProtocol._
 import com.typesafe.config.Config
 import se.vgregion.db.DbProtocol._
 

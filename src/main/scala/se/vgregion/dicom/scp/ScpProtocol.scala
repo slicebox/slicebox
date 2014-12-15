@@ -1,4 +1,4 @@
-package se.vgregion.dicom
+package se.vgregion.dicom.scp
 
 import java.nio.file.Path
 import java.io.File

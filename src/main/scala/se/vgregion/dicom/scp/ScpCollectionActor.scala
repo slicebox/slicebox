@@ -1,4 +1,4 @@
-package se.vgregion.dicom
+package se.vgregion.dicom.scp
 
 import akka.actor.Actor
 import akka.event.{ LoggingReceive, Logging }

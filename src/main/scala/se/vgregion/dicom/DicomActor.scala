@@ -35,12 +35,12 @@ class DicomActor(metaDataActor: ActorRef, storage: Path) extends Actor {
       loadDicom(path, true).foreach {
         case (metaInformation, dataset) =>
           val name = fileName(dataset)
-          metaDataActor ! AddDataset(dataset, name)
+          metaDataActor ! AddDataset(dataset, name, "DIRECTORY")
           writeToStorage(metaInformation, anonymizeDicom(dataset), storage.resolve(name))
       }
     case AddDicom(metaInformation, dataset) =>
       val name = fileName(dataset)
-      metaDataActor ! AddDataset(dataset, name)
+      metaDataActor ! AddDataset(dataset, name, "SCP")
       writeToStorage(metaInformation, anonymizeDicom(dataset), storage.resolve(name))
     case SynchronizeWithStorage =>
       val storageDatasets = listDatasets(storage)
