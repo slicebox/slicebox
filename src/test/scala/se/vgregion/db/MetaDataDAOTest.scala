@@ -300,4 +300,13 @@ class MetaDataDAOTest extends FlatSpec with Matchers {
     }
   }
 
+  it should "be possible to change the owner of an image file" in {
+    db.withSession { implicit session =>
+      val updated = dao.changeOwner(imageFile8, owner3)
+      println(updated)
+      val owner3Files = dao.imageFilesForOwner(owner3)
+      val imageFile8_updated = ImageFile(image8, FileName("file8"), owner3)
+      owner3Files should be (List(imageFile8_updated))
+    }
+  }
 }

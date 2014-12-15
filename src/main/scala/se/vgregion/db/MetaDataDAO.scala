@@ -501,6 +501,17 @@ class MetaDataDAO(val driver: JdbcProfile) {
       .getOrElse(List())
   }
 
+  // *** Owner change ***
+
+  def changeOwner(imageFile: ImageFile, newOwner: Owner)(implicit session: Session): Int = session.withTransaction {
+    keyForImageFile(imageFile).map(imageFileKey => 
+      imageFiles
+        .filter(_.key === imageFileKey)
+        .map(_.owner)
+        .update(newOwner.value))
+    .getOrElse(0)
+  }
+
   // *** Deletes ***
 
   def deletePatient(patient: Patient)(implicit session: Session): Option[Int] = session.withTransaction {
