@@ -1,23 +1,23 @@
-package se.vgregion.db
+package se.vgregion.dicom
 
-import akka.testkit.TestKit
-import akka.testkit.ImplicitSender
-import akka.actor.Props
+import scala.slick.driver.H2Driver
+import scala.slick.jdbc.JdbcBackend.Database
 import org.scalatest.BeforeAndAfterAll
-import akka.actor.ActorSystem
 import org.scalatest.Matchers
 import org.scalatest.WordSpecLike
-import scala.slick.jdbc.JdbcBackend.Database
-import scala.slick.driver.H2Driver
-import se.vgregion.dicom.MetaDataProtocol._
-import se.vgregion.dicom.DicomPropertyValue._
-import se.vgregion.dicom.DicomHierarchy._
-import se.vgregion.db.DbProtocol._
+import se.vgregion.app.DbProps
+import akka.actor.ActorSystem
+import akka.testkit.ImplicitSender
+import akka.testkit.TestKit
+import DicomDispatchProtocol._
+import DicomHierarchy._
+import DicomMetaDataProtocol._
+import DicomPropertyValue._
 
-class DbActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
+class DicomMetaDataDbActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
   with WordSpecLike with Matchers with BeforeAndAfterAll {
 
-  def this() = this(ActorSystem("DbDataTestSystem"))
+  def this() = this(ActorSystem("DicomMetaDataDbActorTestSystem"))
 
   override def afterAll {
     TestKit.shutdownActorSystem(system)
@@ -25,7 +25,9 @@ class DbActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSe
 
   private val db = Database.forURL("jdbc:h2:mem:dbtest;DB_CLOSE_DELAY=-1", driver = "org.h2.Driver")
   
-  val dbActor = system.actorOf(DbActor.props(db, new DAO(H2Driver)), "DbActor")
+  val dbProps = DbProps(db, H2Driver)
+  
+  val dbActor = system.actorOf(DicomMetaDataDbActor.props(dbProps), "DbActor")
 
   val pat1 = Patient(PatientName("p1"), PatientID("s1"), PatientBirthDate("2000-01-01"), PatientSex("M"))
   val pat2 = Patient(PatientName("p2"), PatientID("s2"), PatientBirthDate("2000-01-01"), PatientSex("M"))
@@ -45,52 +47,52 @@ class DbActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSe
   val imageFile2 = ImageFile(image2, FileName("file2"), Owner("Owner1"))
   val imageFile3 = ImageFile(image3, FileName("file3"), Owner("Owner1"))
   
-  dbActor ! CreateTables
+  dbActor ! Initialize
   
-  "A DbActor" must {
+  "A Dicom MetaData Db-Actor" must {
 
     "return an empty list when no metadata exists" in {
-      dbActor ! GetImageFileEntries
+      dbActor ! GetImageFiles
       expectMsg(ImageFiles(Seq.empty[ImageFile]))
     }
 
-    "return a list of size three when three entries are added" in {
-      dbActor ! InsertImageFile(imageFile1)
-      dbActor ! InsertImageFile(imageFile2)
-      dbActor ! InsertImageFile(imageFile3)
+    "return a list of size three when three s are added" in {
+      dbActor ! AddImageFile(imageFile1)
+      dbActor ! AddImageFile(imageFile2)
+      dbActor ! AddImageFile(imageFile3)
       expectNoMsg
-      dbActor ! GetImageFileEntries
+      dbActor ! GetImageFiles
       expectMsgPF() {
         case ImageFiles(imageFiles) if imageFiles.size == 3 => true
       }
     }
     
     "produce properly grouped entries" in {
-      dbActor ! GetPatientEntries
+      dbActor ! GetPatients
       expectMsg(Patients(Seq(pat1, pat2)))
 
-      dbActor ! GetStudyEntries(pat1)
+      dbActor ! GetStudies(pat1)
       expectMsg(Studies(Seq(study1)))      
-      dbActor ! GetStudyEntries(pat2)
+      dbActor ! GetStudies(pat2)
       expectMsg(Studies(Seq(study2)))
       
-      dbActor ! GetSeriesEntries(study1)
+      dbActor ! GetSeries(study1)
       expectMsg(SeriesCollection(Seq(series1, series3)))
-      dbActor ! GetSeriesEntries(study2)
+      dbActor ! GetSeries(study2)
       expectMsg(SeriesCollection(Seq(series2)))
       
-      dbActor ! GetImageEntries(series1)
+      dbActor ! GetImages(series1)
       expectMsg(Images(Seq(image1)))
-      dbActor ! GetImageEntries(series2)
+      dbActor ! GetImages(series2)
       expectMsg(Images(Seq(image2)))
-      dbActor ! GetImageEntries(series3)
+      dbActor ! GetImages(series3)
       expectMsg(Images(Seq(image3)))
       
-      dbActor ! GetImageFileEntries(image1)
+      dbActor ! GetImageFiles(image1)
       expectMsg(ImageFiles(Seq(imageFile1)))
-      dbActor ! GetImageFileEntries(image2)
+      dbActor ! GetImageFiles(image2)
       expectMsg(ImageFiles(Seq(imageFile2)))
-      dbActor ! GetImageFileEntries(image3)
+      dbActor ! GetImageFiles(image3)
       expectMsg(ImageFiles(Seq(imageFile3)))
     }
   }

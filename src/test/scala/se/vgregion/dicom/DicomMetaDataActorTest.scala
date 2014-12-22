@@ -1,32 +1,23 @@
 package se.vgregion.dicom
 
-import akka.actor.ActorSystem
-import akka.actor.Actor
-import akka.actor.Props
-import akka.testkit.{ TestKit, ImplicitSender }
-import org.scalatest.WordSpecLike
-import org.scalatest.Matchers
+import scala.slick.driver.H2Driver
+import scala.slick.jdbc.JdbcBackend.Database
+
 import org.scalatest.BeforeAndAfterAll
-import se.vgregion.dicom.MetaDataProtocol._
-import se.vgregion.dicom.DicomPropertyValue._
-import se.vgregion.dicom.DicomHierarchy._
-import se.vgregion.db.DbProtocol._
+import org.scalatest.Matchers
+import org.scalatest.WordSpecLike
 
-case class SetImageFiles(imageFiles: Seq[ImageFile])
+import se.vgregion.app.DbProps
+import DicomDispatchProtocol._
+import DicomHierarchy._
+import DicomMetaDataProtocol._
+import DicomPropertyValue._
 
-class MockDbActor extends Actor {
+import akka.actor.ActorSystem
+import akka.testkit.ImplicitSender
+import akka.testkit.TestKit
 
-  var images = Seq.empty[ImageFile]
-  
-  def receive = {
-    case SetImageFiles(data) =>
-      images = data
-    case GetImageFileEntries =>
-      sender ! ImageFiles(images)
-  }
-}
-
-class MetaDataActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
+class DicomMetaDataActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
   with WordSpecLike with Matchers with BeforeAndAfterAll {
 
   def this() = this(ActorSystem("MetaDataTestSystem"))
@@ -35,9 +26,10 @@ class MetaDataActorTest(_system: ActorSystem) extends TestKit(_system) with Impl
     TestKit.shutdownActorSystem(system)
   }
 
-  val dbActor = system.actorOf(Props[MockDbActor])
+  val db = Database.forURL("jdbc:h2:mem:dbtest2;DB_CLOSE_DELAY=-1", driver = "org.h2.Driver")
+  val dbProps = DbProps(db, H2Driver)
   
-  val metaDataActor = system.actorOf(MetaDataActor.props(dbActor), "MetaDataActor")
+  val metaDataActor = system.actorOf(DicomMetaDataActor.props(dbProps), "DicomMetaData")
 
   val pat1 = Patient(PatientName("p1"), PatientID("s1"), PatientBirthDate("2000-01-01"), PatientSex("M"))
   val pat2 = Patient(PatientName("p2"), PatientID("s2"), PatientBirthDate("2000-01-01"), PatientSex("M"))
@@ -65,11 +57,12 @@ class MetaDataActorTest(_system: ActorSystem) extends TestKit(_system) with Impl
     }
 
     "return a list of three objects when three entries exist" in {
-      val imageFiles = Seq(imageFile1, imageFile2, imageFile3)
-      dbActor ! SetImageFiles(imageFiles)
+      metaDataActor ! AddImageFile(imageFile1)
+      metaDataActor ! AddImageFile(imageFile2)
+      metaDataActor ! AddImageFile(imageFile3)
       metaDataActor ! GetImageFiles
       expectMsgPF() {
-        case ImageFiles(data) if data.size == 3 => true
+        case ImageFiles(Seq(imageFile1, imageFile2, imageFile3)) => true
       }
     }
 

@@ -1,14 +1,19 @@
 package se.vgregion.dicom.directory
 
-import java.nio.file._
+import java.nio.file.FileSystems
+import java.nio.file.FileVisitResult
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.SimpleFileVisitor
 import java.nio.file.StandardWatchEventKinds._
 import java.nio.file.attribute.BasicFileAttributes
 
-import scala.collection.JavaConversions._
+import scala.collection.JavaConversions.asScalaBuffer
 
 import com.typesafe.scalalogging.LazyLogging
 
-import DirectoryWatchProtocol._
+import DirectoryWatchProtocol.FileAddedToDirectory
+import DirectoryWatchProtocol.FileRemovedFromDirectory
 import akka.actor.ActorRef
 
 class DirectoryWatchService(notifyActor: ActorRef) extends Runnable with LazyLogging {
@@ -24,7 +29,7 @@ class DirectoryWatchService(notifyActor: ActorRef) extends Runnable with LazyLog
       override def visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult = {
         super.visitFile(file, attrs)
         println(s"Adding ${file.toFile().getName}")
-        notifyActor ! Created(file)
+        notifyActor ! FileAddedToDirectory(file)
         FileVisitResult.CONTINUE
       }
     })
@@ -48,9 +53,9 @@ class DirectoryWatchService(notifyActor: ActorRef) extends Runnable with LazyLog
                 if (Files.isDirectory(path)) {
                   watchRecursively(path)
                 }
-                notifyActor ! Created(path)
+                notifyActor ! FileAddedToDirectory(path)
               case ENTRY_DELETE =>
-                notifyActor ! Deleted(path)
+                notifyActor ! FileRemovedFromDirectory(path)
               case x =>
                 logger.warn(s"Unknown event $x")
             }
@@ -59,7 +64,7 @@ class DirectoryWatchService(notifyActor: ActorRef) extends Runnable with LazyLog
       }
     } catch {
       case e: InterruptedException =>
-        logger.info("Interrupting, bye!")
+        logger.info("Service interrupted, shutting down")
     } finally {
       watchService.close()
     }

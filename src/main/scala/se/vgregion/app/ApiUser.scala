@@ -1,8 +1,9 @@
 package se.vgregion.app
 
-import com.github.t3hnar.bcrypt._
 import org.mindrot.jbcrypt.BCrypt
-import spray.json.DefaultJsonProtocol
+
+import com.github.t3hnar.bcrypt.Password
+import com.github.t3hnar.bcrypt.generateSalt
 
 case class ClearTextUser(user: String, role: Role, password: String)
 
@@ -12,8 +13,4 @@ case class ApiUser(user: String, role: Role, hashedPassword: Option[String] = No
 
   def passwordMatches(password: String): Boolean = hashedPassword.exists(hp => BCrypt.checkpw(password, hp))
 
-}
-
-object ClearTextUser extends DefaultJsonProtocol {
-  implicit val format = DefaultJsonProtocol.jsonFormat3(ClearTextUser.apply)
 }

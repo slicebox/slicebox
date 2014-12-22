@@ -8,12 +8,12 @@
         </encoder>
     </appender>
 
-    <logger name="akka" level="INFO" />
-    <logger name="spray" level="INFO" />
+    <logger name="akka" level="DEBUG" />
+    <logger name="spray" level="DEBUG" />
+	<logger name="scala.slick" level="INFO" />
+    <logger name="se.vgregion" level="DEBUG" />
 
-    <logger name="se.vgregion" level="INFO" />
-
-    <root level="INFO">
+    <root level="DEBUG">
         <appender-ref ref="CONSOLE"/>
     </root>
 </configuration>

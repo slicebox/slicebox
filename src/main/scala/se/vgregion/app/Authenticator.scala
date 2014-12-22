@@ -1,10 +1,12 @@
 package se.vgregion.app
 
-import spray.routing.directives.AuthMagnet
 import scala.concurrent.ExecutionContext
+import scala.concurrent.Future
+
 import spray.routing.authentication.BasicAuth
 import spray.routing.authentication.UserPass
-import scala.concurrent.Future
+import spray.routing.directives.AuthMagnet
+import spray.routing.directives.AuthMagnet.fromContextAuthenticator
 
 class Authenticator(userRepository: UserRepository) {
 

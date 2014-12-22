@@ -1,19 +1,19 @@
-package se.vgregion.db
+package se.vgregion.dicom
 
-import org.scalatest._
-import scala.slick.jdbc.JdbcBackend.Database
 import scala.slick.driver.H2Driver
-import se.vgregion.dicom.DicomPropertyValue._
-import se.vgregion.dicom.DicomHierarchy._
-import se.vgregion.dicom.MetaDataProtocol._
-import se.vgregion.app.ApiUser
-import se.vgregion.app.Administrator
+import scala.slick.jdbc.JdbcBackend.Database
+import org.scalatest.FlatSpec
+import org.scalatest.Matchers
+import DicomDispatchProtocol._
+import DicomHierarchy._
+import DicomMetaDataProtocol._
+import DicomPropertyValue._
 
-class MetaDataDAOTest extends FlatSpec with Matchers {
+class DicomMetaDataDAOTest extends FlatSpec with Matchers {
 
   private val db = Database.forURL("jdbc:h2:mem:dbtest2;DB_CLOSE_DELAY=-1", driver = "org.h2.Driver")
 
-  val dao = new MetaDataDAO(H2Driver)
+  val dao = new DicomMetaDataDAO(H2Driver)
 
   db.withSession { implicit session =>
     dao.create

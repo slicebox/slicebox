@@ -1,32 +1,33 @@
 package se.vgregion.dicom.directory
 
 import java.nio.file.Path
-import spray.json.DefaultJsonProtocol
 
 object DirectoryWatchProtocol {
-
-  // incoming
-
-  case class MonitorDir(directory: String)
-
-  // outgoing
-
-  case class MonitorDirFailed(reason: String)
   
-  case class MonitoringDir(directory: String)
+  case class WatchDirectoryPath(path: Path)
   
-  case class Created(fileOrDir: Path)
-
-  case class Deleted(fileOrDir: Path)
+  case class UnWatchDirectoryPath(path: Path)
   
-  // JSON
+  case class FileAddedToDirectory(fileOrDir: Path)
 
-  object MonitorDir extends DefaultJsonProtocol {
-    implicit val format = jsonFormat1(MonitorDir.apply)
-  }
+  case class FileRemovedFromDirectory(fileOrDir: Path)
+  
+  case class AddDirectory(path: Path)
 
-  object MonitoringDir extends DefaultJsonProtocol {
-    implicit val format = jsonFormat1(MonitoringDir.apply)
-  }
-
+  case class DirectoryAdded(path: Path)
+  
+  case class DirectoryAlreadyAdded(path: Path)
+  
+  case class NotADirectory(path: Path)
+  
+  case class RemoveDirectory(path: Path)
+  
+  case class DirectoryRemoved(path: Path)
+  
+  case class WatchedDirectoryNotFound(path: Path)
+  
+  case object GetWatchedDirectories
+  
+  case class WatchedDirectories(names: Seq[Path])
+  
 }

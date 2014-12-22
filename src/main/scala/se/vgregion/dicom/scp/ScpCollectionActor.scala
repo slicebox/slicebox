@@ -1,24 +1,20 @@
 package se.vgregion.dicom.scp
 
-import akka.actor.Actor
-import akka.event.{ LoggingReceive, Logging }
-import ScpProtocol._
-import se.vgregion.db.DbProtocol._
 import java.util.concurrent.Executors
-import java.io.File
-import java.util.concurrent.ScheduledExecutorService
-import akka.actor.Props
-import akka.actor.ActorRef
-import akka.actor.PoisonPill
-import akka.pattern._
-import akka.util.Timeout
-import scala.concurrent.duration._
 import scala.language.postfixOps
-import akka.actor.Status.Success
-import akka.actor.Status.Failure
+import akka.actor.Actor
+import akka.actor.ActorRef
+import akka.actor.Props
+import akka.event.Logging
+import akka.event.LoggingReceive
+import se.vgregion.app.DbProps
+import se.vgregion.dicom.DicomDispatchProtocol._
 import java.nio.file.Path
+import se.vgregion.dicom.DicomDispatchActor
+import se.vgregion.util.PerEventCreator
+import akka.actor.PoisonPill
 
-class ScpCollectionActor(dbActor: ActorRef, dicomActor: ActorRef) extends Actor {
+class ScpCollectionActor(dbProps: DbProps, storage: Path) extends Actor with PerEventCreator {
   val log = Logging(context.system, this)
 
   val executor = Executors.newCachedThreadPool()
@@ -28,34 +24,35 @@ class ScpCollectionActor(dbActor: ActorRef, dicomActor: ActorRef) extends Actor 
   }
 
   def receive = LoggingReceive {
+    
     case AddScp(scpData) =>
       context.child(scpData.name) match {
         case Some(actor) =>
           sender ! ScpAlreadyAdded(scpData)
         case None =>
           try {
-            context.actorOf(Props(classOf[ScpActor], scpData, executor, dicomActor), scpData.name)
-            dbActor ! InsertScpData(scpData)
+            context.actorOf(ScpActor.props(scpData, executor), scpData.name)
             sender ! ScpAdded(scpData)
           } catch {
-            case _: Throwable => sender ! ScpSetupFailed
+            case e: Throwable => sender ! ScpSetupFailed(e.getMessage)
           }
       }
-    case DeleteScp(name) =>
-      context.child(name) match {
+      
+    case RemoveScp(scpData) =>
+      context.child(scpData.name) match {
         case Some(actor) =>
-          dbActor ! RemoveScpData(name)
-          log.info(s"Deleting actor $actor")
-          actor ! ShutdownScp
-          sender ! ScpDeleted(name)
+          actor ! PoisonPill
+          sender ! ScpRemoved(scpData)
         case None =>
-          sender ! ScpNotFound(name)
+          sender ! ScpNotFound(scpData)
       }
-    case GetScpDataCollection =>
-      dbActor forward GetScpDataEntries
+      
+    case msg: DatasetReceivedByScp =>
+       perEvent(DicomDispatchActor.props(null, self, storage, dbProps), msg)
+      
   }
 }
 
 object ScpCollectionActor {
-  def props(dbActor: ActorRef, dicomActor: ActorRef): Props = Props(new ScpCollectionActor(dbActor, dicomActor))
+  def props(dbProps: DbProps, storage: Path): Props = Props(new ScpCollectionActor(dbProps, storage))
 }

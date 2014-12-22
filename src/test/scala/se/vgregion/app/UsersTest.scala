@@ -1,14 +1,14 @@
 package se.vgregion.app
 
-import org.scalatest._
-import spray.testkit.ScalatestRouteTest
-import spray.http.StatusCodes._
-import spray.httpx.SprayJsonSupport._
-import spray.json.DefaultJsonProtocol._
-import spray.json._
+import org.scalatest.FlatSpec
+import org.scalatest.Matchers
+import org.json4s.native.Serialization
 
-class UsersTest extends FlatSpec with Matchers with ScalatestRouteTest with RestApi {
-  def actorRefFactory = system // connect the DSL to the test ActorSystem
+import spray.http.StatusCodes.BadRequest
+
+class UsersTest extends FlatSpec with Matchers with RoutesTestBase {
+
+  initialize()
 
   "The system" should "echo the new user when a new user is added" in {
     val user = ClearTextUser("name", Collaborator, "password")
@@ -42,11 +42,8 @@ class UsersTest extends FlatSpec with Matchers with ScalatestRouteTest with Rest
     val user2 = ClearTextUser("name2", Administrator, "password2")
     Put("/api/user", user2) ~> routes
     Get("/api/user/names") ~> routes ~> check {
-      responseAs[String] should be (List("name1", "name2").toJson.toString)
+      responseAs[String] should be (Serialization.write(List("name1", "name2")))
     }
   }
   
-  override def setupDevelopmentEnvironment() = {
-  }
-
 }

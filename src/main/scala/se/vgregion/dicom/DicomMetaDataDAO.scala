@@ -1,14 +1,14 @@
-package se.vgregion.db
+package se.vgregion.dicom
 
 import scala.slick.driver.JdbcProfile
-import scala.collection.breakOut
-import se.vgregion.lang.RichCollection.toRich
-import se.vgregion.dicom.DicomProperty
-import se.vgregion.dicom.DicomPropertyValue._
-import se.vgregion.dicom.DicomHierarchy._
-import se.vgregion.dicom.MetaDataProtocol._
 
-class MetaDataDAO(val driver: JdbcProfile) {
+import DicomDispatchProtocol.FileName
+import DicomDispatchProtocol.Owner
+import DicomMetaDataProtocol.ImageFile
+import DicomHierarchy._
+import DicomPropertyValue._
+
+class DicomMetaDataDAO(val driver: JdbcProfile) {
   import driver.simple._
 
   // *** Patient *** 
@@ -353,8 +353,8 @@ class MetaDataDAO(val driver: JdbcProfile) {
       sz <- seriez if ss.key === sz.studyKey
       is <- images if sz.key === is.seriesKey
       ifs <- imageFiles if is.key === ifs.imageKey
-    } yield (ps, ss, sz, is, ifs))
-      .filter(_._5.owner === owner.value)
+    } yield (ps, ifs))
+      .filter(_._2.owner === owner.value)
       .list.map(row =>
         rowToPatient(row._1))
       .toSet.toList
@@ -366,8 +366,8 @@ class MetaDataDAO(val driver: JdbcProfile) {
       sz <- seriez if ss.key === sz.studyKey
       is <- images if sz.key === is.seriesKey
       ifs <- imageFiles if is.key === ifs.imageKey
-    } yield (ss, sz, is, ifs))
-      .filter(_._4.owner === owner.value)
+    } yield (ss, ifs))
+      .filter(_._2.owner === owner.value)
       .list.map(row =>
         patientForKey(row._1.patientKey).map(rowToStudy(_, row._1))).flatten
       .toSet.toList
@@ -378,8 +378,8 @@ class MetaDataDAO(val driver: JdbcProfile) {
       sz <- seriez
       is <- images if sz.key === is.seriesKey
       ifs <- imageFiles if is.key === ifs.imageKey
-    } yield (sz, is, ifs))
-      .filter(_._3.owner === owner.value)
+    } yield (sz, ifs))
+      .filter(_._2.owner === owner.value)
       .list.map(row =>
         studyForKey(row._1.studyKey).flatMap(study =>
           equipmentForSeriesKey(row._1.key).flatMap(equipment =>
@@ -452,8 +452,8 @@ class MetaDataDAO(val driver: JdbcProfile) {
         sz <- seriez if ss.key === sz.studyKey
         is <- images if sz.key === is.seriesKey
         ifs <- imageFiles if is.key === ifs.imageKey
-      } yield (ss, sz, is, ifs))
-        .filter(_._4.owner === owner.value)
+      } yield (ss, ifs))
+        .filter(_._2.owner === owner.value)
         .filter(_._1.patientKey === patientKey)
         .list.map(row => 
           rowToStudy(patient, row._1))
@@ -467,8 +467,8 @@ class MetaDataDAO(val driver: JdbcProfile) {
         sz <- seriez
         is <- images if sz.key === is.seriesKey
         ifs <- imageFiles if is.key === ifs.imageKey
-      } yield (sz, is, ifs))
-        .filter(_._3.owner === owner.value)
+      } yield (sz, ifs))
+        .filter(_._2.owner === owner.value)
         .filter(_._1.studyKey === studyKey)
         .list.map(row =>
           equipmentForSeriesKey(row._1.key).flatMap(equipment =>
@@ -544,6 +544,38 @@ class MetaDataDAO(val driver: JdbcProfile) {
     if (imageFilesForImage(imageFile.image).isEmpty)
       deleteImage(imageFile.image)
     result
+  }
+
+  // *** Deletes per owner ***
+
+  def deletePatient(patient: Patient, owner: Owner)(implicit session: Session): Unit = session.withTransaction {
+    studiesForPatient(patient, owner) foreach (
+      deleteStudy(_, owner))
+  }
+
+  def deleteStudy(study: Study, owner: Owner)(implicit session: Session): Unit = session.withTransaction {
+    seriesForStudy(study, owner) foreach (
+      deleteSeries(_, owner))
+  }
+
+  def deleteSeries(series: Series, owner: Owner)(implicit session: Session): Unit = session.withTransaction {
+    imagesForSeries(series, owner) foreach (
+      deleteImage(_, owner))
+  }
+
+  def deleteImage(image: Image, owner: Owner)(implicit session: Session): Unit = session.withTransaction {
+    imageFilesForImage(image, owner) foreach (
+      deleteImageFile(_, owner))
+  }
+
+  def deleteImageFile(imageFile: ImageFile, owner: Owner)(implicit session: Session): Unit = session.withTransaction {
+    keyForImageFile(imageFile).map(imageFileKey => 
+      imageFiles
+      .filter(_.key === imageFileKey)
+      .filter(_.owner === owner.value)
+      .delete)
+    if (imageFilesForImage(imageFile.image).isEmpty)
+      deleteImage(imageFile.image)
   }
 
   // *** Counts (for testing) ***

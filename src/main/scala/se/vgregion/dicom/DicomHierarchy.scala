@@ -1,7 +1,5 @@
 package se.vgregion.dicom
 
-import spray.json.DefaultJsonProtocol
-
 object DicomHierarchy {
 	import DicomPropertyValue._
 
@@ -61,12 +59,5 @@ object DicomHierarchy {
       case _ => false
     }
   }
-
-  object Equipment extends DefaultJsonProtocol { implicit val format = DefaultJsonProtocol.jsonFormat2(Equipment.apply) }
-  object FrameOfReference extends DefaultJsonProtocol { implicit val format = DefaultJsonProtocol.jsonFormat1(FrameOfReference.apply) }
-  object Patient extends DefaultJsonProtocol { implicit val format = DefaultJsonProtocol.jsonFormat4(Patient.apply) }
-  object Study extends DefaultJsonProtocol { implicit val format = DefaultJsonProtocol.jsonFormat6(Study.apply) }
-  object Series extends DefaultJsonProtocol { implicit val format = DefaultJsonProtocol.jsonFormat9(Series.apply) }
-  object Image extends DefaultJsonProtocol { implicit val format = DefaultJsonProtocol.jsonFormat3(Image.apply) }
 
 }

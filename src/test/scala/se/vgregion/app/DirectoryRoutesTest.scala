@@ -1,39 +1,38 @@
 package se.vgregion.app
 
-import org.scalatest._
-import spray.testkit.ScalatestRouteTest
-import spray.http.StatusCodes._
-import se.vgregion.dicom.directory.DirectoryWatchProtocol._
 import java.nio.file.Files
 import java.nio.file.Paths
-import spray.httpx.SprayJsonSupport._
+import org.scalatest.FlatSpec
+import org.scalatest.Matchers
+import se.vgregion.dicom.DicomDispatchProtocol._
+import spray.http.StatusCodes.OK
+import se.vgregion.util.Message
 
-class DirectoryRoutesTest extends FlatSpec with Matchers with ScalatestRouteTest with RestApi {
-  def actorRefFactory = system // connect the DSL to the test ActorSystem
+class DirectoryRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
+
+  initialize()
 
   "The system" should "return a monitoring message when asked to monitor a new directory" in {
     val tempDir = Files.createTempDirectory("slicebox-temp-dir-")
-    val tempDirName = tempDir.toString().replace("\\", "/")
-    val monitorDir = MonitorDir(tempDirName)
+    val watchDir = WatchDirectory(tempDir.toString)
 
-    Put("/api/directory", monitorDir) ~> routes ~> check {
-      responseAs[String] should be(s"Now monitoring directory ${monitorDir.directory}")
+    Put("/api/directory", watchDir) ~> routes ~> check {
+      responseAs[Message].message should be(s"Now watching directory $tempDir")
     }
 
   }
 
   it should "return an empty list of images when monitoring an empty directory and return one image after a file has been copied to that directory" in {
     val tempDir = Files.createTempDirectory("slicebox-temp-dir-")
-    val tempDirName = tempDir.toString().replace("\\", "/")
-    val monitorDir = MonitorDir(tempDirName)
+    val watchDir = WatchDirectory(tempDir.toString)
 
-    Put("/api/directory", monitorDir) ~> routes ~> check {
-      responseAs[String] should be(s"Now monitoring directory ${monitorDir.directory}")
+    Put("/api/directory", watchDir) ~> routes ~> check {
+      responseAs[Message].message should be(s"Now watching directory $tempDir")
     }
 
-    Get("/api/metadata/list") ~> routes ~> check {
+    Get("/api/metadata/allimages") ~> routes ~> check {
       status should be(OK)
-      responseAs[String] indexOf ("[]") should be >= 0
+      responseAs[Images].images.size should be (0)
     }
 
     val fileName = "anon270.dcm"
@@ -44,15 +43,10 @@ class DirectoryRoutesTest extends FlatSpec with Matchers with ScalatestRouteTest
     // in the database
     Thread.sleep(500)
 
-    Get("/api/metadata/list") ~> routes ~> check {
-      val response = responseAs[String]
+    Get("/api/metadata/allimages") ~> routes ~> check {
       status should be(OK)
-      response indexOf ("[]") should be < 0
-      """"series"""".r.findAllMatchIn(response).length should be(1) // rough check for one element in list
+      responseAs[Images].images.size should be (1)
     }
   }
-
-  override def setupDevelopmentEnvironment() = {
- }
 
 }

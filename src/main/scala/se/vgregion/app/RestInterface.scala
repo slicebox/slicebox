@@ -1,34 +1,29 @@
 package se.vgregion.app
 
-import akka.actor._
-import spray.routing._
-import spray.http.MediaTypes
+import java.nio.file.Paths
+import scala.concurrent.duration.DurationInt
+import scala.slick.driver.H2Driver
+import scala.slick.jdbc.JdbcBackend.Database
+import akka.actor.Actor
+import akka.actor.ActorContext
+import akka.pattern.ask
 import spray.http.StatusCodes
-import spray.httpx.SprayJsonSupport._
-import spray.json._
-import spray.json.DefaultJsonProtocol._
-import spray.routing.RequestContext
-import akka.util.Timeout
-import scala.concurrent.duration._
-import scala.language.postfixOps
+import spray.httpx.Json4sSupport
+import spray.httpx.PlayTwirlSupport.twirlHtmlMarshaller
+import spray.httpx.marshalling.ToResponseMarshallable.isMarshallable
+import spray.routing.HttpService
+import spray.routing.Route
+import org.json4s.DefaultFormats
+import org.json4s.native.Serialization
+import com.typesafe.config.ConfigFactory
+import se.vgregion.dicom.DicomDispatchActor
+import se.vgregion.dicom.DicomDispatchProtocol._
+import se.vgregion.dicom.DicomHierarchy._
 import se.vgregion.dicom.directory.DirectoryWatchCollectionActor
 import se.vgregion.dicom.scp.ScpCollectionActor
-import se.vgregion.dicom.MetaDataActor
-import se.vgregion.dicom.DicomActor
-import se.vgregion.db.DbActor
-import com.typesafe.config.ConfigFactory
-import java.io.File
-import spray.routing.PathMatchers._
-import scala.util.Right
-import scala.util.Failure
-import scala.util.Success
-import spray.http.MediaTypes
-import scala.slick.jdbc.JdbcBackend.Database
-import scala.slick.driver.H2Driver
-import se.vgregion.db.DAO
-import spray.httpx.PlayTwirlSupport._
-import se.vgregion.db.DbUserRepository
-import java.nio.file.Paths
+import se.vgregion.util.PerRequestCreator
+import se.vgregion.util.RestMessage
+import scala.concurrent.Await
 
 class RestInterface extends Actor with RestApi {
 
@@ -37,44 +32,28 @@ class RestInterface extends Actor with RestApi {
   def actorRefFactory = context
 
   def receive = runRoute(routes)
+
 }
 
-trait RestApi extends HttpService {
-  import se.vgregion.dicom.directory.DirectoryWatchProtocol._
-  import se.vgregion.dicom.scp.ScpProtocol._
-  import se.vgregion.dicom.MetaDataProtocol._
-  import se.vgregion.dicom.DicomHierarchy._
-  import se.vgregion.db.DbProtocol._
-  
-  import akka.pattern.ask
-  import akka.pattern.pipe
+trait RestApi extends HttpService with Json4sSupport with PerRequestCreator {
 
-  // we use the enclosing ActorContext's or ActorSystem's dispatcher for our Futures and Scheduler
+  implicit val json4sFormats = DefaultFormats + new Role.RoleSerializer
+
   implicit def executionContext = actorRefFactory.dispatcher
-
-  implicit val timeout = Timeout(10 seconds)
 
   val config = ConfigFactory.load()
   val sliceboxConfig = config.getConfig("slicebox")
   val isProduction = sliceboxConfig.getBoolean("production")
   val storage = Paths.get(sliceboxConfig.getString("storage"))
-  
-  private val db =
-    if (isProduction)
-      Database.forURL("jdbc:h2:storage", driver = "org.h2.Driver")
-    else
-      Database.forURL("jdbc:h2:mem:storage;DB_CLOSE_DELAY=-1", driver = "org.h2.Driver")
 
-  val dbActor = actorRefFactory.actorOf(DbActor.props(db, new DAO(H2Driver)), "DbActor")
-  val metaDataActor = actorRefFactory.actorOf(MetaDataActor.props(dbActor), "MetaDataActor")
-  val dicomActor = actorRefFactory.actorOf(DicomActor.props(metaDataActor, storage), "DicomActor")
-  val directoryWatchCollectionActor = actorRefFactory.actorOf(DirectoryWatchCollectionActor.props(dicomActor), "DirectoryWatchCollectionActor")
-  val scpCollectionActor = actorRefFactory.actorOf(ScpCollectionActor.props(dbActor, dicomActor), "ScpCollectionActor")
-  val userRepository = new DbUserRepository(dbActor)
-  val authenticator = new Authenticator(userRepository)
-  if (!isProduction) {
-    setupDevelopmentEnvironment()
-  }
+  def db = Database.forURL("jdbc:h2:storage", driver = "org.h2.Driver")
+  val dbProps = DbProps(db, H2Driver)
+
+  val directoryService = actorRefFactory.actorOf(DirectoryWatchCollectionActor.props(dbProps, storage), "DirectoryService")
+  val scpService = actorRefFactory.actorOf(ScpCollectionActor.props(dbProps, storage), "ScpService")
+  val userService = new DbUserRepository(actorRefFactory, dbProps)
+
+  val authenticator = new Authenticator(userService)
 
   def staticResourcesRoutes =
     get {
@@ -95,14 +74,8 @@ trait RestApi extends HttpService {
   def directoryRoutes: Route =
     pathPrefix("directory") {
       put {
-        entity(as[MonitorDir]) { monitorDirectory =>
-          onSuccess(directoryWatchCollectionActor.ask(monitorDirectory)) {
-            _ match {
-              case MonitoringDir(directory) => complete(s"Now monitoring directory $directory")
-              case MonitorDirFailed(reason) => complete((StatusCodes.BadRequest, s"Monitoring directory failed: ${reason}"))
-              case _ => complete(StatusCodes.BadRequest)
-            }
-          }
+        entity(as[WatchDirectory]) { directory =>
+          dispatch(directory)
         }
       }
     }
@@ -112,33 +85,17 @@ trait RestApi extends HttpService {
       put {
         pathEnd {
           entity(as[ScpData]) { scpData =>
-            onSuccess(scpCollectionActor.ask(AddScp(scpData))) {
-              _ match {
-                case ScpAdded(scpData) =>
-                  complete((StatusCodes.OK, s"Added SCP ${scpData.name}"))
-                case ScpAlreadyAdded(scpData) =>
-                  complete((StatusCodes.BadRequest, s"An SCP with name ${scpData.name} is already running."))
-              }
-            }
+            dispatch(AddScp(scpData))
           }
         }
       } ~ get {
         path("list") {
-          complete {
-            scpCollectionActor.ask(GetScpDataCollection).mapTo[ScpDataCollection]
-          }
+          dispatch(GetScpDataCollection)
         }
       } ~ delete {
         pathEnd {
-          entity(as[DeleteScp]) { deleteScp =>
-            onSuccess(scpCollectionActor.ask(deleteScp)) {
-              _ match {
-                case ScpDeleted(name) =>
-                  complete(s"Deleted SCP $name")
-                case ScpNotFound(name) =>
-                  complete((StatusCodes.NotFound, s"No SCP found with name $name"))
-              }
-            }
+          entity(as[ScpData]) { scpData =>
+            dispatch(RemoveScp(scpData))
           }
         }
       }
@@ -147,53 +104,26 @@ trait RestApi extends HttpService {
   def metaDataRoutes: Route = {
     pathPrefix("metadata") {
       get {
-        path("list") {
-          complete {
-            metaDataActor.ask(GetImageFiles).mapTo[ImageFiles]
-          }
-        } ~ path("patients") {
-          complete {
-            metaDataActor.ask(GetPatients).mapTo[Patients]
-          }
+        path("patients") {
+          dispatch(GetPatients(None))
         } ~ path("studies") {
           entity(as[Patient]) { patient =>
-            complete {
-              metaDataActor.ask(GetStudies(patient)).mapTo[Studies]
-            }
+            dispatch(GetStudies(patient, None))
           }
         } ~ path("series") {
           entity(as[Study]) { study =>
-            complete {
-              metaDataActor.ask(GetSeries(study)).mapTo[SeriesCollection]
-            }
+            dispatch(GetSeries(study, None))
           }
         } ~ path("images") {
           entity(as[Series]) { series =>
-            complete {
-              metaDataActor.ask(GetImages(series)).mapTo[Images]
-            }
+            dispatch(GetImages(series, None))
           }
-        } ~ path("imagefiles") {
-          entity(as[Image]) { image =>
-            complete {
-              metaDataActor.ask(GetImageFiles(image)).mapTo[ImageFiles]
-            }
-          }
+        } ~ path("allimages") {
+          dispatch(GetAllImages(None))
         }
       }
     }
   }
-
-  def fileRoutes: Route =
-    pathPrefix("file") {
-      get {
-        path("image") {
-          entity(as[ImageFile]) { imageFile =>
-            getFromFile(imageFile.fileName.value)
-          }
-        }
-      }
-    }
 
   def userRoutes: Route =
     pathPrefix("user") {
@@ -201,20 +131,20 @@ trait RestApi extends HttpService {
         pathEnd {
           entity(as[ClearTextUser]) { user =>
             val apiUser = ApiUser(user.user, user.role).withPassword(user.password)
-            onSuccess(userRepository.addUser(apiUser)) {
-              _ match {
-                case Some(newUser) =>
-                  complete(s"Added user ${newUser.user}")
-                case None =>
-                  complete((StatusCodes.BadRequest, s"User ${user.user} already exists."))
-              }
+              onSuccess(userService.addUser(apiUser)) {
+                _ match {
+                  case Some(newUser) =>
+                    complete(s"Added user ${newUser.user}")
+                  case None =>
+                    complete((StatusCodes.BadRequest, s"User ${user.user} already exists."))
+                }
             }
           }
         }
       } ~ delete {
         pathEnd {
           entity(as[String]) { userName =>
-            onSuccess(userRepository.deleteUser(userName)) {
+            onSuccess(userService.deleteUser(userName)) {
               _ match {
                 case Some(deletedUser) =>
                   complete(s"Deleted user ${deletedUser.user}")
@@ -226,8 +156,8 @@ trait RestApi extends HttpService {
         }
       } ~ get {
         path("names") {
-          onSuccess(userRepository.listUserNames()) { userNames =>
-            complete(userNames.toJson.toString)
+          onSuccess(userService.listUserNames()) { userNames =>
+            complete(Serialization.write(userNames))
           }
         }
       }
@@ -248,7 +178,7 @@ trait RestApi extends HttpService {
       }
     }
 
-  def stopRoute: Route =
+  def systemRoutes: Route =
     path("stop") {
       (post | parameter('method ! "post")) {
         complete {
@@ -257,18 +187,22 @@ trait RestApi extends HttpService {
           "Shutting down in 1 second..."
         }
       }
+    } ~ path("initialize") {
+      (post | parameter('method ! "post")) {
+        val dispatchActor = actorRefFactory.actorOf(DicomDispatchActor.props(directoryService, scpService, storage, dbProps))
+        onSuccess(dispatchActor.ask(Initialize)(1.second).zip(userService.initialize())) {
+          case (a, b) => complete("System initialized")
+        }
+      }
     }
+
+  def dispatch(message: RestMessage): Route =
+    ctx => perRequest(ctx, DicomDispatchActor.props(directoryService, scpService, storage, dbProps), message)
 
   def routes: Route =
     twirlRoutes ~ staticResourcesRoutes ~ pathPrefix("api") {
-      directoryRoutes ~ scpRoutes ~ metaDataRoutes ~ fileRoutes ~ userRoutes ~ stopRoute
+      directoryRoutes ~ scpRoutes ~ metaDataRoutes ~ userRoutes ~ systemRoutes
     }
 
-  def setupDevelopmentEnvironment() = {
-    InitialValues.createTables(dbActor)
-    InitialValues.addUsers(userRepository)
-    InitialValues.initFileSystemData(sliceboxConfig, directoryWatchCollectionActor)
-    InitialValues.initScpData(sliceboxConfig, scpCollectionActor, directoryWatchCollectionActor)
-  }
-
 }
+

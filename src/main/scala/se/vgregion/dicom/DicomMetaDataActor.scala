@@ -1,40 +1,51 @@
 package se.vgregion.dicom
 
-import akka.actor.Actor
-import akka.actor.ActorRef
-import akka.event.Logging
-import akka.event.LoggingReceive
-import MetaDataProtocol._
-import se.vgregion.dicom.MetaDataProtocol._
-import se.vgregion.dicom.DicomHierarchy._
-import se.vgregion.db.DbProtocol._
-import DicomPropertyValue._
-import akka.actor.Props
 import org.dcm4che3.data.Attributes
 
-class MetaDataActor(dbActor: ActorRef) extends Actor {
+import akka.actor.Actor
+import akka.actor.Props
+import akka.actor.actorRef2Scala
+import akka.event.Logging
+import akka.event.LoggingReceive
+import se.vgregion.app._
+import DicomDispatchProtocol._
+import DicomHierarchy._
+import DicomMetaDataProtocol._
+import DicomPropertyValue._
+
+class DicomMetaDataActor(dbProps: DbProps) extends Actor {
   val log = Logging(context.system, this)
 
+  val metaDataDbActor = context.actorOf(DicomMetaDataDbActor.props(dbProps), "MetaDataDb")
+
   def receive = LoggingReceive {
-    case AddDataset(dataset, fileName, owner) =>
+
+  	case Initialize =>
+      metaDataDbActor forward Initialize
+      
+    case AddDataset(metaInformation, dataset, fileName, owner) =>
       val image = datasetToImage(dataset)
       val imageFile = ImageFile(image, FileName(fileName), Owner(owner))
-      dbActor ! InsertImageFile(imageFile)
-    case DeleteDataset(dataset) =>
-      val image = datasetToImage(dataset)
-      dbActor ! RemoveImage(image)
-    case GetImageFiles =>
-      dbActor forward GetImageFileEntries
-    case GetPatients =>
-      dbActor forward GetPatientEntries
-    case GetStudies(patient) =>
-      dbActor forward GetStudyEntries(patient)
-    case GetSeries(study) =>
-      dbActor forward GetSeriesEntries(study)
-    case GetImages(series) =>
-      dbActor forward GetImageEntries(series)
-    case GetImageFiles(image) =>
-      dbActor forward GetImageFileEntries(image)
+      metaDataDbActor ! AddImageFile(imageFile)
+
+    case ImageFileAdded(imageFile) =>
+      context.parent ! DatasetAdded(imageFile)
+
+    case msg: GetPatients =>
+      metaDataDbActor forward msg
+    case msg: GetStudies =>
+      metaDataDbActor forward msg
+    case msg: GetSeries =>
+      metaDataDbActor forward msg
+    case msg: GetImages =>
+      metaDataDbActor forward msg
+    case msg: GetImageFiles =>
+      metaDataDbActor forward msg
+    case msg: GetAllImages =>
+      metaDataDbActor forward msg
+    case msg: GetAllImageFiles =>
+      metaDataDbActor forward msg
+
   }
 
   def datasetToImage(dataset: Attributes): Image =
@@ -74,6 +85,6 @@ class MetaDataActor(dbActor: ActorRef) extends Actor {
 
 }
 
-object MetaDataActor {
-  def props(dbActor: ActorRef): Props = Props(new MetaDataActor(dbActor))
+object DicomMetaDataActor {
+  def props(dbProps: DbProps): Props = Props(new DicomMetaDataActor(dbProps))
 }

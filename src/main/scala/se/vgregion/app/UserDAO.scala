@@ -1,9 +1,6 @@
-package se.vgregion.db
+package se.vgregion.app
 
 import scala.slick.driver.JdbcProfile
-import se.vgregion.dicom.scp.ScpProtocol.ScpData
-import se.vgregion.app.ApiUser
-import se.vgregion.app.Role
 
 class UserDAO(val driver: JdbcProfile) {
   import driver.simple._
@@ -23,8 +20,9 @@ class UserDAO(val driver: JdbcProfile) {
 
   val users = TableQuery[UserTable]
 
-  def create(implicit session: Session) =
+  def create(implicit session: Session) = {
     users.ddl.create
+  }
 
   def insert(apiUser: ApiUser)(implicit session: Session) =
     findUserByName(apiUser.user) match {

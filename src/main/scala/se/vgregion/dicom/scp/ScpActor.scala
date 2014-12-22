@@ -1,20 +1,18 @@
 package se.vgregion.dicom.scp
 
-import java.io.File
+import java.util.concurrent.Executor
 import java.util.concurrent.Executors
-import ScpProtocol._
+import java.util.concurrent.ThreadFactory
+
 import akka.actor.Actor
-import akka.actor.actorRef2Scala
+import akka.actor.ActorRef
+import akka.actor.PoisonPill
+import akka.actor.Props
 import akka.event.Logging
 import akka.event.LoggingReceive
-import akka.actor.PoisonPill
-import java.util.concurrent.Executor
-import java.util.concurrent.ThreadFactory
-import java.nio.file.Path
-import akka.actor.ActorRef
-import akka.actor.Props
+import se.vgregion.dicom.DicomDispatchProtocol._
 
-class ScpActor(scpData: ScpData, executor: Executor, dicomActor: ActorRef) extends Actor {
+class ScpActor(scpData: ScpData, executor: Executor) extends Actor {
   val log = Logging(context.system, this)
 
   val scheduledExecutor = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
@@ -25,7 +23,7 @@ class ScpActor(scpData: ScpData, executor: Executor, dicomActor: ActorRef) exten
     }
   })
 
-  val scp = new Scp(scpData.name, scpData.aeTitle, scpData.port, dicomActor)
+  val scp = new Scp(scpData.name, scpData.aeTitle, scpData.port, self)
   scp.device.setScheduledExecutor(scheduledExecutor)
   scp.device.setExecutor(executor)
   scp.device.bindConnections()
@@ -36,14 +34,13 @@ class ScpActor(scpData: ScpData, executor: Executor, dicomActor: ActorRef) exten
   }
 
   def receive = LoggingReceive {
-    case ShutdownScp =>
-      log.info(s"Shutting down SCP ${scpData.name}")
-      sender ! ScpShutdown
-      self ! PoisonPill
+    case msg: DatasetReceivedByScp =>
+      context.parent ! msg
+
   }
 
 }
 
 object ScpActor {
-  def props(scpData: ScpData, executor: Executor, dicomActor: ActorRef): Props = Props(new ScpActor(scpData, executor, dicomActor))
+  def props(scpData: ScpData, executor: Executor): Props = Props(new ScpActor(scpData, executor))
 }
