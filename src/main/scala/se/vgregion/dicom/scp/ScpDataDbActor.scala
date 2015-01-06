@@ -5,6 +5,7 @@ import akka.actor.Props
 import akka.event.Logging
 import se.vgregion.app.DbProps
 import se.vgregion.dicom.DicomDispatchProtocol._
+import akka.event.LoggingReceive
 
 class ScpDataDbActor(dbProps: DbProps) extends Actor {
   val log = Logging(context.system, this)
@@ -12,7 +13,7 @@ class ScpDataDbActor(dbProps: DbProps) extends Actor {
   val db = dbProps.db
   val dao = new ScpDataDAO(dbProps.driver)
 
-  def receive = {
+  def receive = LoggingReceive {
     case Initialize =>
       db.withSession { implicit session =>
         dao.create

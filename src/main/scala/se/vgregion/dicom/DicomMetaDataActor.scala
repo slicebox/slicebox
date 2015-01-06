@@ -1,7 +1,6 @@
 package se.vgregion.dicom
 
 import org.dcm4che3.data.Attributes
-
 import akka.actor.Actor
 import akka.actor.Props
 import akka.actor.actorRef2Scala
@@ -12,6 +11,7 @@ import DicomDispatchProtocol._
 import DicomHierarchy._
 import DicomMetaDataProtocol._
 import DicomPropertyValue._
+import akka.actor.ActorRef
 
 class DicomMetaDataActor(dbProps: DbProps) extends Actor {
   val log = Logging(context.system, this)
@@ -27,9 +27,8 @@ class DicomMetaDataActor(dbProps: DbProps) extends Actor {
       val image = datasetToImage(dataset)
       val imageFile = ImageFile(image, FileName(fileName), Owner(owner))
       metaDataDbActor ! AddImageFile(imageFile)
+      context.become(waitingForDbActor(sender))
 
-    case ImageFileAdded(imageFile) =>
-      context.parent ! DatasetAdded(imageFile)
 
     case msg: GetPatients =>
       metaDataDbActor forward msg
@@ -48,6 +47,11 @@ class DicomMetaDataActor(dbProps: DbProps) extends Actor {
 
   }
 
+  def waitingForDbActor(client: ActorRef) = LoggingReceive {
+    case ImageFileAdded(imageFile) =>
+      client ! DatasetAdded(imageFile)    
+  }
+  
   def datasetToImage(dataset: Attributes): Image =
     Image(Series(Study(Patient(
 

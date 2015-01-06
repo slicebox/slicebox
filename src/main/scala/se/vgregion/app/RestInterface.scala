@@ -13,31 +13,36 @@ import spray.httpx.PlayTwirlSupport.twirlHtmlMarshaller
 import spray.httpx.marshalling.ToResponseMarshallable.isMarshallable
 import spray.routing.HttpService
 import spray.routing.Route
-import org.json4s.DefaultFormats
-import org.json4s.native.Serialization
 import com.typesafe.config.ConfigFactory
 import se.vgregion.dicom.DicomDispatchActor
 import se.vgregion.dicom.DicomDispatchProtocol._
 import se.vgregion.dicom.DicomHierarchy._
 import se.vgregion.dicom.directory.DirectoryWatchCollectionActor
 import se.vgregion.dicom.scp.ScpCollectionActor
-import se.vgregion.util.PerRequestCreator
-import se.vgregion.util.RestMessage
 import scala.concurrent.Await
+import spray.httpx.SprayJsonSupport._
+import spray.json._
+import akka.actor.Props
+import se.vgregion.util.PerRequest
+import spray.http.StatusCodes._
+import java.util.UUID
+import spray.http.Timedout
+import scala.util.Success
+import scala.util.Failure
 
 class RestInterface extends Actor with RestApi {
 
   // the HttpService trait defines only one abstract member, which
   // connects the services environment to the enclosing actor or test
   def actorRefFactory = context
-
+  
+  def dbUrl = "jdbc:h2:storage"
+  
   def receive = runRoute(routes)
 
 }
 
-trait RestApi extends HttpService with Json4sSupport with PerRequestCreator {
-
-  implicit val json4sFormats = DefaultFormats + new Role.RoleSerializer
+trait RestApi extends HttpService with JsonFormats {
 
   implicit def executionContext = actorRefFactory.dispatcher
 
@@ -46,12 +51,16 @@ trait RestApi extends HttpService with Json4sSupport with PerRequestCreator {
   val isProduction = sliceboxConfig.getBoolean("production")
   val storage = Paths.get(sliceboxConfig.getString("storage"))
 
-  def db = Database.forURL("jdbc:h2:storage", driver = "org.h2.Driver")
+  def dbUrl(): String
+  
+  def db = Database.forURL(dbUrl, driver = "org.h2.Driver")
   val dbProps = DbProps(db, H2Driver)
 
   val directoryService = actorRefFactory.actorOf(DirectoryWatchCollectionActor.props(dbProps, storage), "DirectoryService")
   val scpService = actorRefFactory.actorOf(ScpCollectionActor.props(dbProps, storage), "ScpService")
   val userService = new DbUserRepository(actorRefFactory, dbProps)
+
+  val dispatchProps = DicomDispatchActor.props(directoryService, scpService, storage, dbProps)
 
   val authenticator = new Authenticator(userService)
 
@@ -75,7 +84,13 @@ trait RestApi extends HttpService with Json4sSupport with PerRequestCreator {
     pathPrefix("directory") {
       put {
         entity(as[WatchDirectory]) { directory =>
-          dispatch(directory)
+          ctx =>
+            actorRefFactory.actorOf(Props(new PerRequest(ctx, dispatchActor, directory) {
+              def handleResponse = {
+                case DirectoryWatched(path) =>
+                  complete(OK, "Now watching directory " + path)
+              }
+            }))
         }
       }
     }
@@ -85,17 +100,34 @@ trait RestApi extends HttpService with Json4sSupport with PerRequestCreator {
       put {
         pathEnd {
           entity(as[ScpData]) { scpData =>
-            dispatch(AddScp(scpData))
+            ctx =>
+              actorRefFactory.actorOf(Props(new PerRequest(ctx, dispatchActor, AddScp(scpData)) {
+                def handleResponse = {
+                  case ScpAdded(scpData) =>
+                    complete(OK, "Added SCP " + scpData.name)
+                }
+              }))
           }
         }
       } ~ get {
-        path("list") {
-          dispatch(GetScpDataCollection)
+        path("list") { ctx =>
+          actorRefFactory.actorOf(Props(new PerRequest(ctx, dispatchActor, GetScpDataCollection) {
+            def handleResponse = {
+              case ScpDataCollection(list) =>
+                complete(OK, list)
+            }
+          }))
         }
       } ~ delete {
         pathEnd {
           entity(as[ScpData]) { scpData =>
-            dispatch(RemoveScp(scpData))
+            ctx =>
+              actorRefFactory.actorOf(Props(new PerRequest(ctx, dispatchActor, RemoveScp(scpData)) {
+                def handleResponse = {
+                  case ScpRemoved(scpData) =>
+                    complete(OK, "Removed SCP " + scpData.name)
+                }
+              }))
           }
         }
       }
@@ -105,21 +137,51 @@ trait RestApi extends HttpService with Json4sSupport with PerRequestCreator {
     pathPrefix("metadata") {
       get {
         path("patients") {
-          dispatch(GetPatients(None))
+          ctx =>
+            actorRefFactory.actorOf(Props(new PerRequest(ctx, dispatchActor, GetPatients(None)) {
+              def handleResponse = {
+                case Patients(patients) =>
+                  complete(OK, patients)
+              }
+            }))
         } ~ path("studies") {
           entity(as[Patient]) { patient =>
-            dispatch(GetStudies(patient, None))
+            ctx =>
+              actorRefFactory.actorOf(Props(new PerRequest(ctx, dispatchActor, GetStudies(patient, None)) {
+                def handleResponse = {
+                  case Studies(studies) =>
+                    complete(OK, studies)
+                }
+              }))
           }
         } ~ path("series") {
           entity(as[Study]) { study =>
-            dispatch(GetSeries(study, None))
+            ctx =>
+              actorRefFactory.actorOf(Props(new PerRequest(ctx, dispatchActor, GetSeries(study, None)) {
+                def handleResponse = {
+                  case SeriesCollection(series) =>
+                    complete(OK, series)
+                }
+              }))
           }
         } ~ path("images") {
           entity(as[Series]) { series =>
-            dispatch(GetImages(series, None))
+            ctx =>
+              actorRefFactory.actorOf(Props(new PerRequest(ctx, dispatchActor, GetImages(series, None)) {
+                def handleResponse = {
+                  case Images(images) =>
+                    complete(OK, images)
+                }
+              }))
           }
         } ~ path("allimages") {
-          dispatch(GetAllImages(None))
+          ctx =>
+            actorRefFactory.actorOf(Props(new PerRequest(ctx, dispatchActor, GetAllImages(None)) {
+              def handleResponse = {
+                case Images(images) =>
+                  complete(OK, images)
+              }
+            }))
         }
       }
     }
@@ -131,13 +193,13 @@ trait RestApi extends HttpService with Json4sSupport with PerRequestCreator {
         pathEnd {
           entity(as[ClearTextUser]) { user =>
             val apiUser = ApiUser(user.user, user.role).withPassword(user.password)
-              onSuccess(userService.addUser(apiUser)) {
-                _ match {
-                  case Some(newUser) =>
-                    complete(s"Added user ${newUser.user}")
-                  case None =>
-                    complete((StatusCodes.BadRequest, s"User ${user.user} already exists."))
-                }
+            onSuccess(userService.addUser(apiUser)) {
+              _ match {
+                case Some(newUser) =>
+                  complete(s"Added user ${newUser.user}")
+                case None =>
+                  complete((StatusCodes.BadRequest, s"User ${user.user} already exists."))
+              }
             }
           }
         }
@@ -157,7 +219,7 @@ trait RestApi extends HttpService with Json4sSupport with PerRequestCreator {
       } ~ get {
         path("names") {
           onSuccess(userService.listUserNames()) { userNames =>
-            complete(Serialization.write(userNames))
+            complete(userNames)
           }
         }
       }
@@ -189,20 +251,19 @@ trait RestApi extends HttpService with Json4sSupport with PerRequestCreator {
       }
     } ~ path("initialize") {
       (post | parameter('method ! "post")) {
-        val dispatchActor = actorRefFactory.actorOf(DicomDispatchActor.props(directoryService, scpService, storage, dbProps))
-        onSuccess(dispatchActor.ask(Initialize)(1.second).zip(userService.initialize())) {
-          case (a, b) => complete("System initialized")
+        onComplete(dispatchActor.ask(Initialize)(4.second).zip(userService.initialize())) {
+          case Success(value) => complete("System initialized")
+          case Failure(ex)    => complete((InternalServerError, s"System not initialized: ${ex.getMessage}"))
         }
       }
     }
-
-  def dispatch(message: RestMessage): Route =
-    ctx => perRequest(ctx, DicomDispatchActor.props(directoryService, scpService, storage, dbProps), message)
 
   def routes: Route =
     twirlRoutes ~ staticResourcesRoutes ~ pathPrefix("api") {
       directoryRoutes ~ scpRoutes ~ metaDataRoutes ~ userRoutes ~ systemRoutes
     }
+
+  private def dispatchActor = actorRefFactory.actorOf(dispatchProps, "dispatch-" + UUID.randomUUID())
 
 }
 

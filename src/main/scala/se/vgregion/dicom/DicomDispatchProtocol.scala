@@ -5,7 +5,6 @@ import org.dcm4che3.data.Attributes
 import DicomHierarchy._
 import DicomMetaDataProtocol.ImageFile
 import se.vgregion.app._
-import se.vgregion.util.RestMessage
 
 object DicomDispatchProtocol {
 
@@ -13,43 +12,43 @@ object DicomDispatchProtocol {
 
   // Rest messages
 
-  case object Initialize extends RestMessage
+  case object Initialize 
 
-  case class WatchDirectory(pathString: String) extends RestMessage
+  case class WatchDirectory(pathString: String) 
 
-  case class UnWatchDirectory(pathString: String) extends RestMessage
+  case class UnWatchDirectory(pathString: String) 
 
-  case class ScpData(name: String, aeTitle: String, port: Int) extends RestMessage
+  case class ScpData(name: String, aeTitle: String, port: Int) 
 
-  case class AddScp(scpData: ScpData) extends RestMessage
+  case class AddScp(scpData: ScpData) 
 
-  case class RemoveScp(scpData: ScpData) extends RestMessage
+  case class RemoveScp(scpData: ScpData) 
 
-  case object GetScpDataCollection extends RestMessage
+  case object GetScpDataCollection 
 
-  case class ScpDataCollection(scpDataCollection: Seq[ScpData]) extends RestMessage
+  case class ScpDataCollection(scpDataCollection: Seq[ScpData]) 
 
-  case class GetAllImages(owner: Option[Owner] = None) extends RestMessage
+  case class GetAllImages(owner: Option[Owner] = None) 
 
-  case class GetPatients(owner: Option[Owner] = None) extends RestMessage
+  case class GetPatients(owner: Option[Owner] = None) 
 
-  case class GetStudies(patient: Patient, owner: Option[Owner] = None) extends RestMessage
+  case class GetStudies(patient: Patient, owner: Option[Owner] = None) 
 
-  case class GetSeries(study: Study, owner: Option[Owner] = None) extends RestMessage
+  case class GetSeries(study: Study, owner: Option[Owner] = None) 
 
-  case class GetImages(series: Series, owner: Option[Owner] = None) extends RestMessage
+  case class GetImages(series: Series, owner: Option[Owner] = None) 
 
-  case class DeleteImage(image: Image, owner: Option[Owner] = None) extends RestMessage
+  case class DeleteImage(image: Image, owner: Option[Owner] = None) 
 
-  case class DeleteSeries(series: Series, owner: Option[Owner] = None) extends RestMessage
+  case class DeleteSeries(series: Series, owner: Option[Owner] = None) 
 
-  case class DeleteStudy(study: Study, owner: Option[Owner] = None) extends RestMessage
+  case class DeleteStudy(study: Study, owner: Option[Owner] = None) 
 
-  case class DeletePatient(patient: Patient, owner: Option[Owner] = None) extends RestMessage
+  case class DeletePatient(patient: Patient, owner: Option[Owner] = None) 
 
   // TODO case class AddDataset(dataset: Attributes, owner: Owner)
 
-  case class ChangeOwner(image: Image, newOwner: Owner) extends RestMessage
+  case class ChangeOwner(image: Image, newOwner: Owner) 
 
   // ***to API***
 
@@ -57,13 +56,13 @@ object DicomDispatchProtocol {
 
   case object InitializationFailed
 
-  case class Patients(patients: Seq[Patient]) extends RestMessage
+  case class Patients(patients: Seq[Patient]) 
 
-  case class Studies(studies: Seq[Study]) extends RestMessage
+  case class Studies(studies: Seq[Study]) 
 
-  case class SeriesCollection(series: Seq[Series]) extends RestMessage
+  case class SeriesCollection(series: Seq[Series]) 
 
-  case class Images(images: Seq[Image]) extends RestMessage
+  case class Images(images: Seq[Image]) 
 
   case class ImagesDeleted(images: Seq[Image])
 

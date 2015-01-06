@@ -12,9 +12,9 @@ angular.module('akkaDcm.view1', ['ngRoute'])
 }])
 
 .controller('View1Ctrl', function($scope, $http) {
-  $scope.rows = [];
+  $scope.images = [];
 
-  $http.get('/api/metadata/list').success(function(data) {
-    $scope.rows = data.imageFiles;
+  $http.get('/api/metadata/allimages').success(function(data) {
+    $scope.images = data;
   });
 });

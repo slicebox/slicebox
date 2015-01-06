@@ -1,9 +1,5 @@
 package se.vgregion.app
 
-import org.json4s.CustomSerializer
-import org.json4s.JsonAST.JObject
-import org.json4s.JsonAST.JString
-
 sealed trait Role
 
 case object Administrator extends Role
@@ -17,15 +13,5 @@ object Role {
     case "User"          => User
     case _               => Collaborator
   }
-
-  class RoleSerializer extends CustomSerializer[Role](format => (
-    {
-      case JString(s) => valueOf(s)
-      case _          => Collaborator
-    },
-    {
-      case role: Role =>
-        JString(role.toString)
-    }))
 
 }

@@ -11,7 +11,7 @@ import DicomPropertyValue._
 
 class DicomMetaDataDAOTest extends FlatSpec with Matchers {
 
-  private val db = Database.forURL("jdbc:h2:mem:dbtest2;DB_CLOSE_DELAY=-1", driver = "org.h2.Driver")
+  private val db = Database.forURL("jdbc:h2:mem:dicommetadatadaotest;DB_CLOSE_DELAY=-1", driver = "org.h2.Driver")
 
   val dao = new DicomMetaDataDAO(H2Driver)
 
@@ -303,7 +303,6 @@ class DicomMetaDataDAOTest extends FlatSpec with Matchers {
   it should "be possible to change the owner of an image file" in {
     db.withSession { implicit session =>
       val updated = dao.changeOwner(imageFile8, owner3)
-      println(updated)
       val owner3Files = dao.imageFilesForOwner(owner3)
       val imageFile8_updated = ImageFile(image8, FileName("file8"), owner3)
       owner3Files should be (List(imageFile8_updated))

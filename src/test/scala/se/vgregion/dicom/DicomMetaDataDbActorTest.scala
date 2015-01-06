@@ -23,12 +23,10 @@ class DicomMetaDataDbActorTest(_system: ActorSystem) extends TestKit(_system) wi
     TestKit.shutdownActorSystem(system)
   }
 
-  private val db = Database.forURL("jdbc:h2:mem:dbtest;DB_CLOSE_DELAY=-1", driver = "org.h2.Driver")
+  private val db = Database.forURL("jdbc:h2:mem:dicommetadatadbactortest;DB_CLOSE_DELAY=-1", driver = "org.h2.Driver")
   
   val dbProps = DbProps(db, H2Driver)
   
-  val dbActor = system.actorOf(DicomMetaDataDbActor.props(dbProps), "DbActor")
-
   val pat1 = Patient(PatientName("p1"), PatientID("s1"), PatientBirthDate("2000-01-01"), PatientSex("M"))
   val pat2 = Patient(PatientName("p2"), PatientID("s2"), PatientBirthDate("2000-01-01"), PatientSex("M"))
   
@@ -47,52 +45,61 @@ class DicomMetaDataDbActorTest(_system: ActorSystem) extends TestKit(_system) wi
   val imageFile2 = ImageFile(image2, FileName("file2"), Owner("Owner1"))
   val imageFile3 = ImageFile(image3, FileName("file3"), Owner("Owner1"))
   
-  dbActor ! Initialize
-  
   "A Dicom MetaData Db-Actor" must {
 
+    "return an initialized message when initialized" in {
+      val dbActor = system.actorOf(DicomMetaDataDbActor.props(dbProps))
+      dbActor ! Initialize
+      expectMsg(Initialized)
+    }
+
     "return an empty list when no metadata exists" in {
-      dbActor ! GetImageFiles
+      val dbActor = system.actorOf(DicomMetaDataDbActor.props(dbProps))
+      dbActor ! GetAllImageFiles(None)
       expectMsg(ImageFiles(Seq.empty[ImageFile]))
     }
 
-    "return a list of size three when three s are added" in {
+    "return a list of size three when three image files are added" in {
+      val dbActor = system.actorOf(DicomMetaDataDbActor.props(dbProps))
       dbActor ! AddImageFile(imageFile1)
+      expectMsg(ImageFileAdded(imageFile1))
       dbActor ! AddImageFile(imageFile2)
+      expectMsg(ImageFileAdded(imageFile2))
       dbActor ! AddImageFile(imageFile3)
-      expectNoMsg
-      dbActor ! GetImageFiles
+      expectMsg(ImageFileAdded(imageFile3))
+      dbActor ! GetAllImageFiles(None)
       expectMsgPF() {
         case ImageFiles(imageFiles) if imageFiles.size == 3 => true
       }
     }
     
     "produce properly grouped entries" in {
-      dbActor ! GetPatients
+      val dbActor = system.actorOf(DicomMetaDataDbActor.props(dbProps))
+      dbActor ! GetPatients(None)
       expectMsg(Patients(Seq(pat1, pat2)))
 
-      dbActor ! GetStudies(pat1)
+      dbActor ! GetStudies(pat1, None)
       expectMsg(Studies(Seq(study1)))      
-      dbActor ! GetStudies(pat2)
+      dbActor ! GetStudies(pat2, None)
       expectMsg(Studies(Seq(study2)))
       
-      dbActor ! GetSeries(study1)
+      dbActor ! GetSeries(study1, None)
       expectMsg(SeriesCollection(Seq(series1, series3)))
-      dbActor ! GetSeries(study2)
+      dbActor ! GetSeries(study2, None)
       expectMsg(SeriesCollection(Seq(series2)))
       
-      dbActor ! GetImages(series1)
+      dbActor ! GetImages(series1, None)
       expectMsg(Images(Seq(image1)))
-      dbActor ! GetImages(series2)
+      dbActor ! GetImages(series2, None)
       expectMsg(Images(Seq(image2)))
-      dbActor ! GetImages(series3)
+      dbActor ! GetImages(series3, None)
       expectMsg(Images(Seq(image3)))
       
-      dbActor ! GetImageFiles(image1)
+      dbActor ! GetImageFiles(image1, None)
       expectMsg(ImageFiles(Seq(imageFile1)))
-      dbActor ! GetImageFiles(image2)
+      dbActor ! GetImageFiles(image2, None)
       expectMsg(ImageFiles(Seq(imageFile2)))
-      dbActor ! GetImageFiles(image3)
+      dbActor ! GetImageFiles(image3, None)
       expectMsg(ImageFiles(Seq(imageFile3)))
     }
   }

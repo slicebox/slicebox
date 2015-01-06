@@ -2,12 +2,14 @@ package se.vgregion.app
 
 import org.scalatest.FlatSpec
 import org.scalatest.Matchers
-import org.json4s.native.Serialization
+import spray.httpx.SprayJsonSupport._
 
 import spray.http.StatusCodes.BadRequest
 
-class UsersTest extends FlatSpec with Matchers with RoutesTestBase {
+class UserRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
+  def dbUrl() = "jdbc:h2:mem:userroutestest;DB_CLOSE_DELAY=-1"
+  
   initialize()
 
   "The system" should "echo the new user when a new user is added" in {
@@ -42,7 +44,7 @@ class UsersTest extends FlatSpec with Matchers with RoutesTestBase {
     val user2 = ClearTextUser("name2", Administrator, "password2")
     Put("/api/user", user2) ~> routes
     Get("/api/user/names") ~> routes ~> check {
-      responseAs[String] should be (Serialization.write(List("name1", "name2")))
+      responseAs[List[String]] should be (List("name1", "name2"))
     }
   }
   

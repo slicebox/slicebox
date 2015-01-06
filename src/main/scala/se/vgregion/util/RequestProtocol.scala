@@ -1,10 +1,14 @@
 package se.vgregion.util
 
-trait RestMessage
+import spray.json._
 
-case class Message(message: String) extends RestMessage
+case class ClientError(message: String)
+case class ServerError(message: String)
 
-case class Validation(message: String)
+object ClientError extends DefaultJsonProtocol {
+  implicit val format = jsonFormat1(ClientError.apply)
+}
 
-case class Error(message: String)
-
+object ServerError extends DefaultJsonProtocol {
+  implicit val format = jsonFormat1(ServerError.apply)
+}

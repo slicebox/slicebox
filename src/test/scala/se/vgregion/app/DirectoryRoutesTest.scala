@@ -5,11 +5,14 @@ import java.nio.file.Paths
 import org.scalatest.FlatSpec
 import org.scalatest.Matchers
 import se.vgregion.dicom.DicomDispatchProtocol._
+import se.vgregion.dicom.DicomHierarchy.Image
 import spray.http.StatusCodes.OK
-import se.vgregion.util.Message
+import spray.httpx.SprayJsonSupport._
 
 class DirectoryRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
+  def dbUrl() = "jdbc:h2:mem:directoryroutestest;DB_CLOSE_DELAY=-1"
+  
   initialize()
 
   "The system" should "return a monitoring message when asked to monitor a new directory" in {
@@ -17,7 +20,7 @@ class DirectoryRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     val watchDir = WatchDirectory(tempDir.toString)
 
     Put("/api/directory", watchDir) ~> routes ~> check {
-      responseAs[Message].message should be(s"Now watching directory $tempDir")
+      responseAs[String] should be(s"Now watching directory $tempDir")
     }
 
   }
@@ -27,12 +30,12 @@ class DirectoryRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     val watchDir = WatchDirectory(tempDir.toString)
 
     Put("/api/directory", watchDir) ~> routes ~> check {
-      responseAs[Message].message should be(s"Now watching directory $tempDir")
+      responseAs[String] should be(s"Now watching directory $tempDir")
     }
 
     Get("/api/metadata/allimages") ~> routes ~> check {
       status should be(OK)
-      responseAs[Images].images.size should be (0)
+      responseAs[List[Image]].size should be (0)
     }
 
     val fileName = "anon270.dcm"
@@ -45,7 +48,7 @@ class DirectoryRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
     Get("/api/metadata/allimages") ~> routes ~> check {
       status should be(OK)
-      responseAs[Images].images.size should be (1)
+      responseAs[List[Image]].size should be (1)
     }
   }
 

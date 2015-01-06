@@ -5,6 +5,8 @@ import org.scalatest.Matchers
 
 class AppRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
+  def dbUrl() = "jdbc:h2:mem:approutestest;DB_CLOSE_DELAY=-1"
+  
   initialize()
 
   "The system" should "not handle requests to the root API path" in {

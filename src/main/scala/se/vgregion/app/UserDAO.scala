@@ -1,6 +1,8 @@
 package se.vgregion.app
 
 import scala.slick.driver.JdbcProfile
+import org.h2.jdbc.JdbcSQLException
+import scala.slick.jdbc.meta.MTable
 
 class UserDAO(val driver: JdbcProfile) {
   import driver.simple._
@@ -20,9 +22,10 @@ class UserDAO(val driver: JdbcProfile) {
 
   val users = TableQuery[UserTable]
 
-  def create(implicit session: Session) = {
-    users.ddl.create
-  }
+  def create(implicit session: Session) =
+    if (MTable.getTables("User").list.isEmpty) {
+      users.ddl.create
+    }
 
   def insert(apiUser: ApiUser)(implicit session: Session) =
     findUserByName(apiUser.user) match {

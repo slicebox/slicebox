@@ -5,10 +5,12 @@ import org.scalatest.FlatSpec
 import org.scalatest.Matchers
 import se.vgregion.dicom.DicomDispatchProtocol.RemoveScp
 import se.vgregion.dicom.DicomDispatchProtocol.ScpData
-import se.vgregion.util.Message
+import spray.httpx.SprayJsonSupport._
 
 class ScpRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
+  def dbUrl() = "jdbc:h2:mem:scproutestest;DB_CLOSE_DELAY=-1"
+  
   initialize()
 
   val scpData1 = ScpData("TestName", "TestAeTitle", 13579)
@@ -21,14 +23,14 @@ class ScpRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     val storage = tempDir
     
     Put("/api/scp", scpData1) ~> routes ~> check {
-      responseAs[Message].message should be("Added SCP " + scpData1.name)
+      responseAs[String] should be("Added SCP " + scpData1.name)
     }
 
   }
   
   it should "be possible to remove the SCP again" in {
     Delete("/api/scp", scpData1) ~> routes ~> check {
-      responseAs[Message].message should be("Removed SCP " + scpData1.name)
+      responseAs[String] should be("Removed SCP " + scpData1.name)
     }
   }
 

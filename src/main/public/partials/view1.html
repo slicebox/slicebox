@@ -27,32 +27,30 @@
 					<th>Body Part Examined</th>
 					<th>SOP Instance UID</th>
 					<th>Image Type</th>
-					<th>Filename</th>
 				</tr>
 			</thead>
 			<tbody>
-				<tr ng-repeat="row in rows">
-					<td>{{row.image.series.study.patient.patientName.value}}</td>
-					<td>{{row.image.series.study.patient.patientID.value}}</td>
-					<td>{{row.image.series.study.patient.patientBirthDate.value}}</td>
-					<td>{{row.image.series.study.patient.patientSex.value}}</td>
-					<td>{{row.image.series.study.studyInstanceUID.value}}</td>
-					<td>{{row.image.series.study.studyDescription.value}}</td>
-					<td>{{row.image.series.study.studyDate.value}}</td>
-					<td>{{row.image.series.study.studyID.value}}</td>
-					<td>{{row.image.series.study.accessionNumber.value}}</td>
-					<td>{{row.image.series.equipment.manufacturer.value}}</td>
-					<td>{{row.image.series.equipment.stationName.value}}</td>
-					<td>{{row.image.series.frameOfReference.frameOfReferenceUID.value}}</td>
-					<td>{{row.image.series.seriesInstanceUID.value}}</td>
-					<td>{{row.image.series.seriesDescription.value}}</td>
-					<td>{{row.image.series.seriesDate.value}}</td>
-					<td>{{row.image.series.modality.value}}</td>
-					<td>{{row.image.series.protocolName.value}}</td>
-					<td>{{row.image.series.bodyPartExamined.value}}</td>
-					<td>{{row.image.sopInstanceUID.value}}</td>
-					<td>{{row.image.imageType.value}}</td>
-					<td>{{row.fileName.value}}</td>
+				<tr ng-repeat="image in images">
+					<td>{{image.series.study.patient.patientName.value}}</td>
+					<td>{{image.series.study.patient.patientID.value}}</td>
+					<td>{{image.series.study.patient.patientBirthDate.value}}</td>
+					<td>{{image.series.study.patient.patientSex.value}}</td>
+					<td>{{image.series.study.studyInstanceUID.value}}</td>
+					<td>{{image.series.study.studyDescription.value}}</td>
+					<td>{{image.series.study.studyDate.value}}</td>
+					<td>{{image.series.study.studyID.value}}</td>
+					<td>{{image.series.study.accessionNumber.value}}</td>
+					<td>{{image.series.equipment.manufacturer.value}}</td>
+					<td>{{image.series.equipment.stationName.value}}</td>
+					<td>{{image.series.frameOfReference.frameOfReferenceUID.value}}</td>
+					<td>{{image.series.seriesInstanceUID.value}}</td>
+					<td>{{image.series.seriesDescription.value}}</td>
+					<td>{{image.series.seriesDate.value}}</td>
+					<td>{{image.series.modality.value}}</td>
+					<td>{{image.series.protocolName.value}}</td>
+					<td>{{image.series.bodyPartExamined.value}}</td>
+					<td>{{image.sopInstanceUID.value}}</td>
+					<td>{{image.imageType.value}}</td>
 				</tr>
 			</tbody>
 		</table>

@@ -3,6 +3,7 @@ package se.vgregion.dicom.directory
 import scala.slick.driver.JdbcProfile
 import java.nio.file.Path
 import java.nio.file.Paths
+import scala.slick.jdbc.meta.MTable
 
 class DirectoryWatchDAO(val driver: JdbcProfile) {
   import driver.simple._
@@ -18,7 +19,9 @@ class DirectoryWatchDAO(val driver: JdbcProfile) {
   val props = TableQuery[DirectoryWatchDataTable]
 
   def create(implicit session: Session) =
-    props.ddl.create
+    if (MTable.getTables("DirectoryWatchData").list.isEmpty) {
+      props.ddl.create
+    }
 
   def insert(path: Path)(implicit session: Session) =
     props += DirectoryWatchDataRow(-1, path.toAbsolutePath().toString())

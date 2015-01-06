@@ -21,10 +21,10 @@ trait PerEvent extends Actor {
   target ! message
 
   def receive = {
-    case EventInfoMessage(message) => log.info(message)
-    case EventWarningMessage(message)    => log.warning(message)
-    case EventErrorMessage(message)   => log.error(message)
-    case ReceiveTimeout   => log.error("Event timeout")
+    case EventInfoMessage(message)    => log.info(message); stop(self)
+    case EventWarningMessage(message) => log.warning(message); stop(self)
+    case EventErrorMessage(message)   => log.error(message); stop(self)
+    case ReceiveTimeout               => log.error("Event timeout"); stop(self)
   }
 
   override val supervisorStrategy =
@@ -37,7 +37,7 @@ trait PerEvent extends Actor {
 }
 
 object PerEvent {
-  
+
   case class WithActorRef(target: ActorRef, message: Any) extends PerEvent
 
   case class WithProps(props: Props, message: Any) extends PerEvent {

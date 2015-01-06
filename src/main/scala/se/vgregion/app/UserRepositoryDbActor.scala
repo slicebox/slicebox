@@ -14,10 +14,15 @@ class UserRepositoryDbActor(dbProps: DbProps) extends Actor {
   val db = dbProps.db
   val dao = new UserDAO(dbProps.driver)
 
+  var initialized = false
+
   def receive = LoggingReceive {
     case Initialize =>
-      db.withSession { implicit session =>
-        dao.create
+      if (!initialized) {
+        initialized = true
+        db.withSession { implicit session =>
+          dao.create
+        }
       }
       sender ! Initialized
 
@@ -37,10 +42,10 @@ class UserRepositoryDbActor(dbProps: DbProps) extends Actor {
       db.withSession { implicit session =>
         sender ! dao.delete(userName)
       }
-	}
-  
+  }
+
 }
 
 object UserRepositoryDbActor {
-	def props(dbProps: DbProps): Props = Props(new UserRepositoryDbActor(dbProps))
+  def props(dbProps: DbProps): Props = Props(new UserRepositoryDbActor(dbProps))
 }

@@ -3,12 +3,11 @@ package se.vgregion.app
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 import scala.language.postfixOps
-
 import akka.actor.ActorRefFactory
 import akka.pattern.ask
 import akka.util.Timeout
-
 import UserRepositoryDbProtocol._
+import se.vgregion.dicom.DicomDispatchProtocol.Initialized
 
 class DbUserRepository(actorFactory: ActorRefFactory, dbProps: DbProps) extends UserRepository {
 

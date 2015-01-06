@@ -1,12 +1,12 @@
 package se.vgregion.dicom
 
 import scala.slick.driver.JdbcProfile
-
 import DicomDispatchProtocol.FileName
 import DicomDispatchProtocol.Owner
 import DicomMetaDataProtocol.ImageFile
 import DicomHierarchy._
 import DicomPropertyValue._
+import scala.slick.jdbc.meta.MTable
 
 class DicomMetaDataDAO(val driver: JdbcProfile) {
   import driver.simple._
@@ -168,15 +168,15 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
 
   private val imageFiles = TableQuery[ImageFiles]
 
-  def create(implicit session: Session) = {
-    (patients.ddl ++
-      studies.ddl ++
-      equipments.ddl ++
-      frameOfReferences.ddl ++
-      seriez.ddl ++
-      images.ddl ++
-      imageFiles.ddl).create
-  }
+  def create(implicit session: Session) =
+    if (MTable.getTables("Patients").list.isEmpty)
+      (patients.ddl ++
+        studies.ddl ++
+        equipments.ddl ++
+        frameOfReferences.ddl ++
+        seriez.ddl ++
+        images.ddl ++
+        imageFiles.ddl).create
 
   // *** Db row to object conversions ***
 
@@ -455,7 +455,7 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
       } yield (ss, ifs))
         .filter(_._2.owner === owner.value)
         .filter(_._1.patientKey === patientKey)
-        .list.map(row => 
+        .list.map(row =>
           rowToStudy(patient, row._1))
         .toSet.toList)
       .getOrElse(List())
@@ -489,7 +489,7 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
         .list.map(row =>
           rowToImage(series, row._1))
         .toSet.toList)
-    .getOrElse(List())
+      .getOrElse(List())
   }
 
   def imageFilesForImage(image: Image, owner: Owner)(implicit session: Session): List[ImageFile] = session.withTransaction {
@@ -504,12 +504,12 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
   // *** Owner change ***
 
   def changeOwner(imageFile: ImageFile, newOwner: Owner)(implicit session: Session): Int = session.withTransaction {
-    keyForImageFile(imageFile).map(imageFileKey => 
+    keyForImageFile(imageFile).map(imageFileKey =>
       imageFiles
         .filter(_.key === imageFileKey)
         .map(_.owner)
         .update(newOwner.value))
-    .getOrElse(0)
+      .getOrElse(0)
   }
 
   // *** Deletes ***
@@ -569,11 +569,11 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
   }
 
   def deleteImageFile(imageFile: ImageFile, owner: Owner)(implicit session: Session): Unit = session.withTransaction {
-    keyForImageFile(imageFile).map(imageFileKey => 
+    keyForImageFile(imageFile).map(imageFileKey =>
       imageFiles
-      .filter(_.key === imageFileKey)
-      .filter(_.owner === owner.value)
-      .delete)
+        .filter(_.key === imageFileKey)
+        .filter(_.owner === owner.value)
+        .delete)
     if (imageFilesForImage(imageFile.image).isEmpty)
       deleteImage(imageFile.image)
   }

@@ -7,6 +7,7 @@ import se.vgregion.dicom.DicomDispatchProtocol._
 import DirectoryWatchProtocol._
 import java.nio.file.Files
 import se.vgregion.app.DbProps
+import akka.event.LoggingReceive
 
 class DirectoryWatchDbActor(dbProps: DbProps) extends Actor {
   val log = Logging(context.system, this)
@@ -14,7 +15,7 @@ class DirectoryWatchDbActor(dbProps: DbProps) extends Actor {
   val db = dbProps.db
   val dao = new DirectoryWatchDAO(dbProps.driver)
 
-  def receive = {
+  def receive = LoggingReceive {
 
     case Initialize =>
       db.withSession { implicit session =>

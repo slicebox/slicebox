@@ -2,6 +2,7 @@ package se.vgregion.dicom.scp
 
 import scala.slick.driver.JdbcProfile
 import se.vgregion.dicom.DicomDispatchProtocol.ScpData
+import scala.slick.jdbc.meta.MTable
 
 class ScpDataDAO(val driver: JdbcProfile) {
   import driver.simple._
@@ -19,8 +20,10 @@ class ScpDataDAO(val driver: JdbcProfile) {
   val props = TableQuery[ScpDataTable]
 
   def create(implicit session: Session) =
-    props.ddl.create
-
+    if (MTable.getTables("ScpData").list.isEmpty) {
+      props.ddl.create
+    }
+  
   def insert(scpData: ScpData)(implicit session: Session) =
     props += ScpDataRow(-1, scpData.name, scpData.aeTitle, scpData.port)
 
