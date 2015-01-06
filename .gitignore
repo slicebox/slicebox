@@ -8,3 +8,4 @@ project/target
 project/activator*
 /target
 /bin/
+/storage.h2.db
