@@ -189,7 +189,7 @@ trait RestApi extends HttpService with JsonFormats {
 
   def userRoutes: Route =
     pathPrefix("user") {
-      put {
+      post {
         pathEnd {
           entity(as[ClearTextUser]) { user =>
             val apiUser = ApiUser(user.user, user.role).withPassword(user.password)

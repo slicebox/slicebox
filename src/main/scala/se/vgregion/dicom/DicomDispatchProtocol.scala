@@ -75,6 +75,8 @@ object DicomDispatchProtocol {
   case class DirectoryUnwatched(path: Path)
 
   case class DirectoryWatchFailed(reason: String)
+  
+  case class DirectoryUnWatchFailed(reason: String)
 
   case class ScpAdded(scpData: ScpData)
 

@@ -18,7 +18,7 @@ class DicomMetaDataDAOTest extends FlatSpec with Matchers {
   db.withSession { implicit session =>
     dao.create
   }
-
+  
   val owner1 = Owner("Owner1")
   val owner2 = Owner("Owner2")
   val owner3 = Owner("Owner3")

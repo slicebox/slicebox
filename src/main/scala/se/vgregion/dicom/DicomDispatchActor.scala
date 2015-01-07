@@ -12,7 +12,6 @@ import akka.event.LoggingReceive
 import akka.util.Timeout
 import se.vgregion.app._
 import se.vgregion.dicom.DicomDispatchProtocol._
-import se.vgregion.dicom.directory.DirectoryWatchDbActor
 import se.vgregion.dicom.directory.DirectoryWatchProtocol._
 import se.vgregion.dicom.scp.ScpDataDbActor
 import se.vgregion.dicom.scp.ScpProtocol._
@@ -21,8 +20,6 @@ import akka.actor.ActorContext
 
 class DicomDispatchActor(directoryService: ActorRef, scpService: ActorRef, storage: Path, dbProps: DbProps) extends Actor {
   val log = Logging(context.system, this)
-
-  val directoryWatchDbActor = context.actorOf(DirectoryWatchDbActor.props(dbProps), name = "DirectoryWatchDb")
 
   val scpDataDbActor = context.actorOf(ScpDataDbActor.props(dbProps), name = "ScpDataDb")
 
@@ -35,17 +32,14 @@ class DicomDispatchActor(directoryService: ActorRef, scpService: ActorRef, stora
     case Initialize =>
       metaDataActor ! Initialize
       scpDataDbActor ! Initialize
-      directoryWatchDbActor ! Initialize
       fileStorageActor ! Initialize
       context.become(waitingForInitialized(sender))
 
     // to directory watches
     case WatchDirectory(pathName) =>
-      directoryWatchDbActor ! AddDirectory(Paths.get(pathName))
-      context.become(waitingForDirectoryDb(sender))
+      directoryService forward WatchDirectoryPath(Paths.get(pathName))
     case UnWatchDirectory(pathName) =>
-      directoryWatchDbActor ! RemoveDirectory(Paths.get(pathName))
-      context.become(waitingForDirectoryDb(sender))
+      directoryService forward UnWatchDirectoryPath(Paths.get(pathName))
 
     // from directory watches
     case FileAddedToWatchedDirectory(filePath) =>
@@ -93,8 +87,8 @@ class DicomDispatchActor(directoryService: ActorRef, scpService: ActorRef, stora
   def waitingForInitialized(client: ActorRef) = LoggingReceive {
     case Initialized =>
       nInitializedReceived += 1
-      if (nInitializedReceived == 4) {
-        directoryWatchDbActor ! GetWatchedDirectories        
+      if (nInitializedReceived == 3) {
+        directoryService ! GetWatchedDirectories        
         scpDataDbActor ! GetScpDataCollection
         context.become(waitingForDicomSourcesDuringInitialization(client))
       }
@@ -113,26 +107,6 @@ class DicomDispatchActor(directoryService: ActorRef, scpService: ActorRef, stora
       if (directoriesInitialized) client ! Initialized
   }
   
-  def waitingForDirectoryDb(client: ActorRef) = LoggingReceive {
-    case DirectoryAdded(path) =>
-      directoryService ! WatchDirectoryPath(path)
-      context.become(waitingForDirectoryService(client))
-    case DirectoryAlreadyAdded(path) =>
-      client ! ClientError("Directory already added: " + path)
-    case DirectoryRemoved(path) =>
-      directoryService ! UnWatchDirectoryPath(path)
-      context.become(waitingForDirectoryService(client))
-  }
-
-  def waitingForDirectoryService(client: ActorRef) = LoggingReceive {
-    case msg: DirectoryWatched =>
-      client ! msg
-    case msg: DirectoryUnwatched =>
-      client ! msg
-    case msg: DirectoryWatchFailed =>
-      client ! msg
-  }
-
   def waitingForScpDataDb(client: ActorRef) = LoggingReceive {
     case ScpAdded(scpData) =>
       scpService ! AddScp(scpData)

@@ -14,7 +14,7 @@ class UserRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
   "The system" should "echo the new user when a new user is added" in {
     val user = ClearTextUser("name", Collaborator, "password")
-    Put("/api/user", user) ~> routes ~> check {
+    Post("/api/user", user) ~> routes ~> check {
       responseAs[String] should be(s"Added user ${user.user}")
     }
   }
@@ -34,15 +34,15 @@ class UserRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   it should "return an error when trying to add an already present user" in {
     val user1 = ClearTextUser("name1", Collaborator, "password1")
     val user2 = ClearTextUser("name1", Administrator, "password2")
-    Put("/api/user", user1) ~> routes
-    Put("/api/user", user2) ~> routes ~> check {
+    Post("/api/user", user1) ~> routes
+    Post("/api/user", user2) ~> routes ~> check {
       status should be (BadRequest)
     }
   }
   
   it should "return a list of user names when asking for all user names" in {
     val user2 = ClearTextUser("name2", Administrator, "password2")
-    Put("/api/user", user2) ~> routes
+    Post("/api/user", user2) ~> routes
     Get("/api/user/names") ~> routes ~> check {
       responseAs[List[String]] should be (List("name1", "name2"))
     }

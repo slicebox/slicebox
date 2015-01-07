@@ -18,8 +18,6 @@ object DirectoryWatchProtocol {
   
   case class DirectoryAlreadyAdded(path: Path)
   
-  case class NotADirectory(path: Path)
-  
   case class RemoveDirectory(path: Path)
   
   case class DirectoryRemoved(path: Path)
