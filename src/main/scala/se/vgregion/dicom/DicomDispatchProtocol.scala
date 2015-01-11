@@ -14,19 +14,30 @@ object DicomDispatchProtocol {
 
   case object Initialize 
 
-  case class WatchDirectory(pathString: String) 
+  
+  sealed trait DirectoryMessage
+  
+  case class WatchDirectory(pathString: String) extends DirectoryMessage
 
-  case class UnWatchDirectory(pathString: String) 
+  case class UnWatchDirectory(pathString: String) extends DirectoryMessage
 
+  case object GetWatchedDirectories extends DirectoryMessage
+    
+  case class WatchedDirectories(names: Seq[Path])
+
+  
   case class ScpData(name: String, aeTitle: String, port: Int) 
 
-  case class AddScp(scpData: ScpData) 
+  sealed trait ScpMessage
+  
+  case class AddScp(scpData: ScpData) extends ScpMessage
 
-  case class RemoveScp(scpData: ScpData) 
+  case class RemoveScp(scpData: ScpData) extends ScpMessage 
 
-  case object GetScpDataCollection 
+  case object GetScpDataCollection extends ScpMessage 
 
   case class ScpDataCollection(scpDataCollection: Seq[ScpData]) 
+
 
   case class GetAllImages(owner: Option[Owner] = None) 
 
@@ -74,18 +85,12 @@ object DicomDispatchProtocol {
 
   case class DirectoryUnwatched(path: Path)
 
-  case class DirectoryWatchFailed(reason: String)
-  
-  case class DirectoryUnWatchFailed(reason: String)
-
   case class ScpAdded(scpData: ScpData)
 
   case class ScpRemoved(scpData: ScpData)
 
   case class ScpNotFound(scpData: ScpData)
 
-  case class ScpSetupFailed(reason: String)
-  
   // ***to scp***
 
   // Reused: AddScp, RemoveScp
@@ -93,8 +98,6 @@ object DicomDispatchProtocol {
   // ***from scp***
 
   // Reused: ScpAdded, ScpRemoved
-
-  case class ScpAlreadyAdded(scpData: ScpData)
 
   case class DatasetReceivedByScp(metaInformation: Attributes, dataset: Attributes)
 
@@ -107,6 +110,8 @@ object DicomDispatchProtocol {
   // Reused: DirectoryWatched, DirectoryUnwatched
 
   case class FileAddedToWatchedDirectory(filePath: Path)
+
+  case class FileRemovedFromWatchedDirectory(filePath: Path)
 
   // ***to metadata***
 

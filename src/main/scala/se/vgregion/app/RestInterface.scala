@@ -92,7 +92,27 @@ trait RestApi extends HttpService with JsonFormats {
               }
             }))
         }
+      } ~ delete {
+        entity(as[UnWatchDirectory]) { directory =>
+          ctx =>
+            actorRefFactory.actorOf(Props(new PerRequest(ctx, dispatchActor, directory) {
+              def handleResponse = {
+                case DirectoryUnwatched(path) =>
+                  complete(OK, "Stopped watching directory " + path)
+              }
+            }))
+        }
+      } ~ get {
+        path("list") { ctx =>
+          actorRefFactory.actorOf(Props(new PerRequest(ctx, dispatchActor, GetWatchedDirectories) {
+            def handleResponse = {
+              case WatchedDirectories(list) =>
+                complete(OK, list.map(_.toString))
+            }
+          }))
+        }
       }
+
     }
 
   def scpRoutes: Route =
@@ -109,15 +129,6 @@ trait RestApi extends HttpService with JsonFormats {
               }))
           }
         }
-      } ~ get {
-        path("list") { ctx =>
-          actorRefFactory.actorOf(Props(new PerRequest(ctx, dispatchActor, GetScpDataCollection) {
-            def handleResponse = {
-              case ScpDataCollection(list) =>
-                complete(OK, list)
-            }
-          }))
-        }
       } ~ delete {
         pathEnd {
           entity(as[ScpData]) { scpData =>
@@ -129,6 +140,15 @@ trait RestApi extends HttpService with JsonFormats {
                 }
               }))
           }
+        }
+      } ~ get {
+        path("list") { ctx =>
+          actorRefFactory.actorOf(Props(new PerRequest(ctx, dispatchActor, GetScpDataCollection) {
+            def handleResponse = {
+              case ScpDataCollection(list) =>
+                complete(OK, list)
+            }
+          }))
         }
       }
     }

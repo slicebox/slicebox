@@ -13,9 +13,16 @@ import java.nio.file.Path
 import se.vgregion.dicom.DicomDispatchActor
 import se.vgregion.util.PerEventCreator
 import akka.actor.PoisonPill
+import se.vgregion.util.ClientError
+import se.vgregion.util.ServerError
 
 class ScpCollectionActor(dbProps: DbProps, storage: Path) extends Actor with PerEventCreator {
   val log = Logging(context.system, this)
+
+  val db = dbProps.db
+  val dao = new ScpDataDAO(dbProps.driver)
+
+  setupDb()
 
   val executor = Executors.newCachedThreadPool()
 
@@ -24,33 +31,76 @@ class ScpCollectionActor(dbProps: DbProps, storage: Path) extends Actor with Per
   }
 
   def receive = LoggingReceive {
-    
-    case AddScp(scpData) =>
-      context.child(scpData.name) match {
-        case Some(actor) =>
-          sender ! ScpAlreadyAdded(scpData)
-        case None =>
-          try {
-            context.actorOf(ScpActor.props(scpData, executor), scpData.name)
-            sender ! ScpAdded(scpData)
-          } catch {
-            case e: Throwable => sender ! ScpSetupFailed(e.getMessage)
-          }
-      }
-      
-    case RemoveScp(scpData) =>
-      context.child(scpData.name) match {
-        case Some(actor) =>
-          actor ! PoisonPill
-          sender ! ScpRemoved(scpData)
-        case None =>
-          sender ! ScpNotFound(scpData)
-      }
-      
+
+    case msg: ScpMessage => msg match {
+
+      case AddScp(scpData) =>
+        val id = scpDataToId(scpData)
+        context.child(id) match {
+          case Some(actor) =>
+            sender ! ClientError("Could not create SCP: SCP already added: " + id)
+          case None =>
+            try {
+
+              addScp(scpData)
+
+              context.actorOf(ScpActor.props(scpData, executor), id)
+
+              sender ! ScpAdded(scpData)
+
+            } catch {
+              case e: Throwable => sender ! ServerError("Could not create SCP: " + e.getMessage)
+            }
+        }
+
+      case RemoveScp(scpData) =>
+        val id = scpDataToId(scpData)
+        context.child(id) match {
+          case Some(actor) =>
+
+            removeScp(scpData)
+
+            actor ! PoisonPill
+
+            sender ! ScpRemoved(scpData)
+
+          case None =>
+            sender ! ClientError("SCP does not exist: " + id)
+        }
+
+      case GetScpDataCollection =>
+        val scps = getScps()
+        sender ! ScpDataCollection(scps)
+
+    }
+
     case msg: DatasetReceivedByScp =>
-       perEvent(DicomDispatchActor.props(null, self, storage, dbProps), msg)
-      
+      perEvent(DicomDispatchActor.props(null, self, storage, dbProps), msg)
+
   }
+
+  def scpDataToId(scpData: ScpData) = scpData.name
+
+  def addScp(scpData: ScpData) =
+    db.withSession { implicit session =>
+      dao.insert(scpData)
+    }
+
+  def removeScp(scpData: ScpData) =
+    db.withSession { implicit session =>
+      dao.removeByName(scpData.name)
+    }
+
+  def getScps() =
+    db.withSession { implicit session =>
+      dao.list
+    }
+
+  def setupDb() =
+    db.withSession { implicit session =>
+      dao.create
+    }
+
 }
 
 object ScpCollectionActor {

@@ -2,14 +2,13 @@ package se.vgregion.dicom.directory
 
 import java.nio.file.Files
 import java.nio.file.Path
-
 import akka.actor.Actor
 import akka.actor.ActorRef
 import akka.actor.Props
 import akka.event.Logging
 import akka.event.LoggingReceive
 import se.vgregion.dicom.DicomDispatchProtocol.FileAddedToWatchedDirectory
-import DirectoryWatchProtocol._
+import se.vgregion.dicom.DicomDispatchProtocol.FileRemovedFromWatchedDirectory
 
 class DirectoryWatchActor(directory: Path) extends Actor {
   val log = Logging(context.system, this)
@@ -27,10 +26,10 @@ class DirectoryWatchActor(directory: Path) extends Actor {
   }
 
   def receive = LoggingReceive {
-    case FileAddedToDirectory(path) =>
+    case FileAddedToWatchedDirectory(path) =>
       if (Files.isRegularFile(path))
         context.parent ! FileAddedToWatchedDirectory(path)
-    case FileRemovedFromDirectory(path) =>
+    case FileRemovedFromWatchedDirectory(path) =>
       // nothing at this time
   }
 }

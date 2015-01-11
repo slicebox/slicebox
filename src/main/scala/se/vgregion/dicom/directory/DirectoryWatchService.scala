@@ -7,14 +7,11 @@ import java.nio.file.Path
 import java.nio.file.SimpleFileVisitor
 import java.nio.file.StandardWatchEventKinds._
 import java.nio.file.attribute.BasicFileAttributes
-
 import scala.collection.JavaConversions.asScalaBuffer
-
 import com.typesafe.scalalogging.LazyLogging
-
-import DirectoryWatchProtocol.FileAddedToDirectory
-import DirectoryWatchProtocol.FileRemovedFromDirectory
 import akka.actor.ActorRef
+import se.vgregion.dicom.DicomDispatchProtocol.FileAddedToWatchedDirectory
+import se.vgregion.dicom.DicomDispatchProtocol.FileRemovedFromWatchedDirectory
 
 class DirectoryWatchService(notifyActor: ActorRef) extends Runnable with LazyLogging {
   private val watchService = FileSystems.getDefault.newWatchService()
@@ -29,7 +26,7 @@ class DirectoryWatchService(notifyActor: ActorRef) extends Runnable with LazyLog
       override def visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult = {
         super.visitFile(file, attrs)
         println(s"Adding ${file.toFile().getName}")
-        notifyActor ! FileAddedToDirectory(file)
+        notifyActor ! FileAddedToWatchedDirectory(file)
         FileVisitResult.CONTINUE
       }
     })
@@ -53,9 +50,9 @@ class DirectoryWatchService(notifyActor: ActorRef) extends Runnable with LazyLog
                 if (Files.isDirectory(path)) {
                   watchRecursively(path)
                 }
-                notifyActor ! FileAddedToDirectory(path)
+                notifyActor ! FileAddedToWatchedDirectory(path)
               case ENTRY_DELETE =>
-                notifyActor ! FileRemovedFromDirectory(path)
+                notifyActor ! FileRemovedFromWatchedDirectory(path)
               case x =>
                 logger.warn(s"Unknown event $x")
             }

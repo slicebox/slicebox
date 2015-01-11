@@ -7,10 +7,12 @@ import se.vgregion.dicom.DicomDispatchProtocol.AddScp
 import se.vgregion.dicom.DicomHierarchy._
 import se.vgregion.dicom.DicomPropertyValue._
 import se.vgregion.dicom.DicomDispatchProtocol.Images
+import se.vgregion.dicom.DicomDispatchProtocol.UnWatchDirectory
 
 trait JsonFormats extends DefaultJsonProtocol {
 
   implicit val watchDirectoryFormat = jsonFormat1(WatchDirectory)
+  implicit val unWatchDirectoryFormat = jsonFormat1(UnWatchDirectory)
 
   implicit val scpDataFormat = jsonFormat3(ScpData)
 

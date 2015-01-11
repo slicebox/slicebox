@@ -12,16 +12,11 @@ import akka.event.LoggingReceive
 import akka.util.Timeout
 import se.vgregion.app._
 import se.vgregion.dicom.DicomDispatchProtocol._
-import se.vgregion.dicom.directory.DirectoryWatchProtocol._
-import se.vgregion.dicom.scp.ScpDataDbActor
-import se.vgregion.dicom.scp.ScpProtocol._
 import se.vgregion.util._
 import akka.actor.ActorContext
 
 class DicomDispatchActor(directoryService: ActorRef, scpService: ActorRef, storage: Path, dbProps: DbProps) extends Actor {
   val log = Logging(context.system, this)
-
-  val scpDataDbActor = context.actorOf(ScpDataDbActor.props(dbProps), name = "ScpDataDb")
 
   val metaDataActor = context.actorOf(DicomMetaDataActor.props(dbProps), name = "MetaData")
 
@@ -31,15 +26,12 @@ class DicomDispatchActor(directoryService: ActorRef, scpService: ActorRef, stora
 
     case Initialize =>
       metaDataActor ! Initialize
-      scpDataDbActor ! Initialize
       fileStorageActor ! Initialize
       context.become(waitingForInitialized(sender))
 
     // to directory watches
-    case WatchDirectory(pathName) =>
-      directoryService forward WatchDirectoryPath(Paths.get(pathName))
-    case UnWatchDirectory(pathName) =>
-      directoryService forward UnWatchDirectoryPath(Paths.get(pathName))
+    case msg: DirectoryMessage =>
+      directoryService forward msg
 
     // from directory watches
     case FileAddedToWatchedDirectory(filePath) =>
@@ -47,14 +39,8 @@ class DicomDispatchActor(directoryService: ActorRef, scpService: ActorRef, stora
       context.become(waitingForFileStorage(sender))
 
     // to scp
-    case msg: AddScp =>
-      scpDataDbActor ! msg
-      context.become(waitingForScpDataDb(sender))
-    case msg: RemoveScp =>
-      scpDataDbActor ! msg
-      context.become(waitingForScpDataDb(sender))
-    case GetScpDataCollection =>
-      scpDataDbActor forward GetScpDataCollection
+    case msg: ScpMessage =>
+      scpService forward msg
 
     // from scp
     case DatasetReceivedByScp(metaInformation, dataset) =>
@@ -87,9 +73,9 @@ class DicomDispatchActor(directoryService: ActorRef, scpService: ActorRef, stora
   def waitingForInitialized(client: ActorRef) = LoggingReceive {
     case Initialized =>
       nInitializedReceived += 1
-      if (nInitializedReceived == 3) {
+      if (nInitializedReceived == 2) {
         directoryService ! GetWatchedDirectories        
-        scpDataDbActor ! GetScpDataCollection
+        scpService ! GetScpDataCollection
         context.become(waitingForDicomSourcesDuringInitialization(client))
       }
   }
@@ -98,7 +84,7 @@ class DicomDispatchActor(directoryService: ActorRef, scpService: ActorRef, stora
   var scpsInitialized = false
   def waitingForDicomSourcesDuringInitialization(client: ActorRef) = LoggingReceive {
     case WatchedDirectories(paths) =>
-      paths foreach (directoryService ! WatchDirectoryPath(_))
+      paths foreach (path => directoryService ! WatchDirectory(path.toString))
       directoriesInitialized = true
       if (scpsInitialized) client ! Initialized
     case ScpDataCollection(scpDatas) =>
@@ -107,28 +93,6 @@ class DicomDispatchActor(directoryService: ActorRef, scpService: ActorRef, stora
       if (directoriesInitialized) client ! Initialized
   }
   
-  def waitingForScpDataDb(client: ActorRef) = LoggingReceive {
-    case ScpAdded(scpData) =>
-      scpService ! AddScp(scpData)
-      context.become(waitingForScpService(client))
-    case ScpRemoved(scpData) =>
-      scpService ! RemoveScp(scpData)
-      context.become(waitingForScpService(client))
-  }
-
-  def waitingForScpService(client: ActorRef) = LoggingReceive {
-    case msg: ScpAdded =>
-      client ! msg
-    case ScpAlreadyAdded(scpData) =>
-      client ! ClientError(s"An SCP with name ${scpData.name} already exists")
-    case ScpSetupFailed(reason) =>
-      client ! ClientError("SCP could not be started: " + reason)
-    case msg: ScpRemoved =>
-      client ! msg
-    case ScpNotFound(scpData) =>
-      client ! ClientError(s"An SCP with name ${scpData.name} does not exist")
-  }
-
   def waitingForFileStorage(client: ActorRef) = LoggingReceive {
     case FileStored(filePath, metaInformation, dataset) =>
       metaDataActor ! AddDataset(metaInformation, dataset, filePath.getFileName.toString, owner = "")
