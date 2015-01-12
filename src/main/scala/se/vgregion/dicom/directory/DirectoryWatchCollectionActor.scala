@@ -26,7 +26,7 @@ class DirectoryWatchCollectionActor(dbProps: DbProps, storage: Path) extends Act
 
   def receive = LoggingReceive {
 
-    case msg: DirectoryMessage => msg match {
+    case msg: DirectoryRequest => msg match {
 
       case WatchDirectory(pathString) =>
         val path = Paths.get(pathString)

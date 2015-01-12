@@ -15,51 +15,53 @@ object DicomDispatchProtocol {
   case object Initialize 
 
   
-  sealed trait DirectoryMessage
+  sealed trait DirectoryRequest
   
-  case class WatchDirectory(pathString: String) extends DirectoryMessage
+  case class WatchDirectory(pathString: String) extends DirectoryRequest
 
-  case class UnWatchDirectory(pathString: String) extends DirectoryMessage
+  case class UnWatchDirectory(pathString: String) extends DirectoryRequest
 
-  case object GetWatchedDirectories extends DirectoryMessage
+  case object GetWatchedDirectories extends DirectoryRequest
     
   case class WatchedDirectories(names: Seq[Path])
 
   
   case class ScpData(name: String, aeTitle: String, port: Int) 
 
-  sealed trait ScpMessage
+  sealed trait ScpRequest
   
-  case class AddScp(scpData: ScpData) extends ScpMessage
+  case class AddScp(scpData: ScpData) extends ScpRequest
 
-  case class RemoveScp(scpData: ScpData) extends ScpMessage 
+  case class RemoveScp(scpData: ScpData) extends ScpRequest 
 
-  case object GetScpDataCollection extends ScpMessage 
+  case object GetScpDataCollection extends ScpRequest 
 
   case class ScpDataCollection(scpDataCollection: Seq[ScpData]) 
 
 
-  case class GetAllImages(owner: Option[Owner] = None) 
+  sealed trait MetaDataRequest
+  
+  case class GetAllImages(owner: Option[Owner] = None) extends MetaDataRequest
 
-  case class GetPatients(owner: Option[Owner] = None) 
+  case class GetPatients(owner: Option[Owner] = None) extends MetaDataRequest
 
-  case class GetStudies(patient: Patient, owner: Option[Owner] = None) 
+  case class GetStudies(patient: Patient, owner: Option[Owner] = None) extends MetaDataRequest
 
-  case class GetSeries(study: Study, owner: Option[Owner] = None) 
+  case class GetSeries(study: Study, owner: Option[Owner] = None) extends MetaDataRequest
 
-  case class GetImages(series: Series, owner: Option[Owner] = None) 
+  case class GetImages(series: Series, owner: Option[Owner] = None) extends MetaDataRequest
 
-  case class DeleteImage(image: Image, owner: Option[Owner] = None) 
+  case class DeleteImage(image: Image, owner: Option[Owner] = None) extends MetaDataRequest
 
-  case class DeleteSeries(series: Series, owner: Option[Owner] = None) 
+  case class DeleteSeries(series: Series, owner: Option[Owner] = None) extends MetaDataRequest
 
-  case class DeleteStudy(study: Study, owner: Option[Owner] = None) 
+  case class DeleteStudy(study: Study, owner: Option[Owner] = None) extends MetaDataRequest
 
-  case class DeletePatient(patient: Patient, owner: Option[Owner] = None) 
+  case class DeletePatient(patient: Patient, owner: Option[Owner] = None) extends MetaDataRequest
 
   // TODO case class AddDataset(dataset: Attributes, owner: Owner)
 
-  case class ChangeOwner(image: Image, newOwner: Owner) 
+  case class ChangeOwner(image: Image, previousOwner: Owner, newOwner: Owner) extends MetaDataRequest
 
   // ***to API***
 

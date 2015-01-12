@@ -20,38 +20,28 @@ class DicomMetaDataActor(dbProps: DbProps) extends Actor {
 
   def receive = LoggingReceive {
 
-  	case Initialize =>
+    case Initialize =>
       metaDataDbActor forward Initialize
-      
+
     case AddDataset(metaInformation, dataset, fileName, owner) =>
       val image = datasetToImage(dataset)
       val imageFile = ImageFile(image, FileName(fileName), Owner(owner))
       metaDataDbActor ! AddImageFile(imageFile)
       context.become(waitingForDbActor(sender))
 
+    case msg: MetaDataRequest =>
+      metaDataDbActor forward msg
 
-    case msg: GetPatients =>
-      metaDataDbActor forward msg
-    case msg: GetStudies =>
-      metaDataDbActor forward msg
-    case msg: GetSeries =>
-      metaDataDbActor forward msg
-    case msg: GetImages =>
-      metaDataDbActor forward msg
-    case msg: GetImageFiles =>
-      metaDataDbActor forward msg
-    case msg: GetAllImages =>
-      metaDataDbActor forward msg
     case msg: GetAllImageFiles =>
       metaDataDbActor forward msg
-
+      
   }
 
   def waitingForDbActor(client: ActorRef) = LoggingReceive {
     case ImageFileAdded(imageFile) =>
-      client ! DatasetAdded(imageFile)    
+      client ! DatasetAdded(imageFile)
   }
-  
+
   def datasetToImage(dataset: Attributes): Image =
     Image(Series(Study(Patient(
 

@@ -32,7 +32,7 @@ class ScpCollectionActor(dbProps: DbProps, storage: Path) extends Actor with Per
 
   def receive = LoggingReceive {
 
-    case msg: ScpMessage => msg match {
+    case msg: ScpRequest => msg match {
 
       case AddScp(scpData) =>
         val id = scpDataToId(scpData)

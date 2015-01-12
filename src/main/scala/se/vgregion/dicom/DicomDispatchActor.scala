@@ -30,7 +30,7 @@ class DicomDispatchActor(directoryService: ActorRef, scpService: ActorRef, stora
       context.become(waitingForInitialized(sender))
 
     // to directory watches
-    case msg: DirectoryMessage =>
+    case msg: DirectoryRequest =>
       directoryService forward msg
 
     // from directory watches
@@ -39,7 +39,7 @@ class DicomDispatchActor(directoryService: ActorRef, scpService: ActorRef, stora
       context.become(waitingForFileStorage(sender))
 
     // to scp
-    case msg: ScpMessage =>
+    case msg: ScpRequest =>
       scpService forward msg
 
     // from scp
@@ -47,25 +47,7 @@ class DicomDispatchActor(directoryService: ActorRef, scpService: ActorRef, stora
       fileStorageActor ! StoreDataset(metaInformation, dataset)
       context.become(waitingForFileStorage(sender))
 
-    case msg: GetAllImages =>
-      metaDataActor forward msg
-    case msg: GetImages =>
-      metaDataActor forward msg
-    case msg: GetPatients =>
-      metaDataActor forward msg
-    case msg: GetStudies =>
-      metaDataActor forward msg
-    case msg: GetSeries =>
-      metaDataActor forward msg
-    case msg: DeleteImage =>
-      metaDataActor forward msg
-    case msg: DeleteSeries =>
-      metaDataActor forward msg
-    case msg: DeleteStudy =>
-      metaDataActor forward msg
-    case msg: DeletePatient =>
-      metaDataActor forward msg
-    case msg: ChangeOwner =>
+    case msg: MetaDataRequest =>
       metaDataActor forward msg
   }
 
