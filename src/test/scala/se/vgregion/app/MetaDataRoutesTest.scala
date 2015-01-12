@@ -12,8 +12,6 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
   def dbUrl() = "jdbc:h2:mem:metadataroutestest;DB_CLOSE_DELAY=-1"
   
-  initialize()
-  
   "The service" should "return 200 OK and return an empty list of images when asking for all images" in {
     Get("/api/metadata/allimages") ~> routes ~> check {
       status should be(OK)

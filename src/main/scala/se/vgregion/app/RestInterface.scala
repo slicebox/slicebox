@@ -269,13 +269,6 @@ trait RestApi extends HttpService with JsonFormats {
           "Shutting down in 1 second..."
         }
       }
-    } ~ path("initialize") {
-      (post | parameter('method ! "post")) {
-        onComplete(dispatchActor.ask(Initialize)(4.second).zip(userService.initialize())) {
-          case Success(value) => complete("System initialized")
-          case Failure(ex)    => complete((InternalServerError, s"System not initialized: ${ex.getMessage}"))
-        }
-      }
     }
 
   def routes: Route =

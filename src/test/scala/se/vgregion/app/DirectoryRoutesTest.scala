@@ -13,8 +13,6 @@ class DirectoryRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
   def dbUrl() = "jdbc:h2:mem:directoryroutestest;DB_CLOSE_DELAY=-1"
   
-  initialize()
-
   val tempDir = Files.createTempDirectory("slicebox-temp-dir-")
   val watchDir = WatchDirectory(tempDir.toString)
 
@@ -36,7 +34,7 @@ class DirectoryRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
     // just sleep for a tiny bit and let the OS find out there was a new file in the monitored directory. It will be picked up and put
     // in the database
-    Thread.sleep(2500)
+    Thread.sleep(2000)
 
     Get("/api/metadata/allimages") ~> routes ~> check {
       status should be(OK)

@@ -23,6 +23,7 @@ class DirectoryWatchCollectionActor(dbProps: DbProps, storage: Path) extends Act
   val dao = new DirectoryWatchDAO(dbProps.driver)
 
   setupDb()
+  setupWatches()
 
   def receive = LoggingReceive {
 
@@ -87,6 +88,12 @@ class DirectoryWatchCollectionActor(dbProps: DbProps, storage: Path) extends Act
   def setupDb() =
     db.withSession { implicit session =>
       dao.create
+    }
+
+  def setupWatches() =
+    db.withTransaction { implicit session =>
+      val watchPaths = dao.list
+      watchPaths foreach (path => context.actorOf(DirectoryWatchActor.props(path), pathToId(path)))
     }
 
   def addDirectory(path: Path) =

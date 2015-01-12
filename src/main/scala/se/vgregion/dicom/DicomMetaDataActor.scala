@@ -20,9 +20,6 @@ class DicomMetaDataActor(dbProps: DbProps) extends Actor {
 
   def receive = LoggingReceive {
 
-    case Initialize =>
-      metaDataDbActor forward Initialize
-
     case AddDataset(metaInformation, dataset, fileName, owner) =>
       val image = datasetToImage(dataset)
       val imageFile = ImageFile(image, FileName(fileName), Owner(owner))

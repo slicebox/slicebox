@@ -40,12 +40,6 @@ class DicomMetaDataActorTest(_system: ActorSystem) extends TestKit(_system) with
 
   "A MetaDataActor" must {
 
-    "return an initialized message when initialized" in {
-      val metaDataActor = system.actorOf(DicomMetaDataActor.props(dbProps))
-      metaDataActor ! Initialize
-      expectMsg(Initialized)
-    }
-
     "return an empty list when no metadata exists" in {
       val metaDataActor = system.actorOf(DicomMetaDataActor.props(dbProps))
       metaDataActor ! GetAllImageFiles(None)

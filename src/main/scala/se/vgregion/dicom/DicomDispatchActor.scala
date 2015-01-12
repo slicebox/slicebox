@@ -24,11 +24,6 @@ class DicomDispatchActor(directoryService: ActorRef, scpService: ActorRef, stora
 
   def receive = LoggingReceive {
 
-    case Initialize =>
-      metaDataActor ! Initialize
-      fileStorageActor ! Initialize
-      context.become(waitingForInitialized(sender))
-
     // to directory watches
     case msg: DirectoryRequest =>
       directoryService forward msg
@@ -51,30 +46,6 @@ class DicomDispatchActor(directoryService: ActorRef, scpService: ActorRef, stora
       metaDataActor forward msg
   }
 
-  var nInitializedReceived = 0 // improve?
-  def waitingForInitialized(client: ActorRef) = LoggingReceive {
-    case Initialized =>
-      nInitializedReceived += 1
-      if (nInitializedReceived == 2) {
-        directoryService ! GetWatchedDirectories        
-        scpService ! GetScpDataCollection
-        context.become(waitingForDicomSourcesDuringInitialization(client))
-      }
-  }
-
-  var directoriesInitialized = false
-  var scpsInitialized = false
-  def waitingForDicomSourcesDuringInitialization(client: ActorRef) = LoggingReceive {
-    case WatchedDirectories(paths) =>
-      paths foreach (path => directoryService ! WatchDirectory(path.toString))
-      directoriesInitialized = true
-      if (scpsInitialized) client ! Initialized
-    case ScpDataCollection(scpDatas) =>
-      scpDatas foreach (scpService ! AddScp(_))
-      scpsInitialized = true
-      if (directoriesInitialized) client ! Initialized
-  }
-  
   def waitingForFileStorage(client: ActorRef) = LoggingReceive {
     case FileStored(filePath, metaInformation, dataset) =>
       metaDataActor ! AddDataset(metaInformation, dataset, filePath.getFileName.toString, owner = "")

@@ -23,7 +23,8 @@ class ScpCollectionActor(dbProps: DbProps, storage: Path) extends Actor with Per
   val dao = new ScpDataDAO(dbProps.driver)
 
   setupDb()
-
+  setupScps()
+  
   val executor = Executors.newCachedThreadPool()
 
   override def postStop() {
@@ -99,6 +100,12 @@ class ScpCollectionActor(dbProps: DbProps, storage: Path) extends Actor with Per
   def setupDb() =
     db.withSession { implicit session =>
       dao.create
+    }
+
+  def setupScps() = 
+    db.withTransaction { implicit session =>
+      val scps = dao.list
+      scps foreach (scpData => context.actorOf(ScpActor.props(scpData, executor), scpDataToId(scpData)))
     }
 
 }

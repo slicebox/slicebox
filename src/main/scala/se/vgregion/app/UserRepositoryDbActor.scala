@@ -14,17 +14,9 @@ class UserRepositoryDbActor(dbProps: DbProps) extends Actor {
   val db = dbProps.db
   val dao = new UserDAO(dbProps.driver)
 
-  var initialized = false
+  setupDb()
 
   def receive = LoggingReceive {
-    case Initialize =>
-      if (!initialized) {
-        initialized = true
-        db.withSession { implicit session =>
-          dao.create
-        }
-      }
-      sender ! Initialized
 
     case GetUserByName(name) =>
       db.withSession { implicit session =>
@@ -44,6 +36,11 @@ class UserRepositoryDbActor(dbProps: DbProps) extends Actor {
       }
   }
 
+  def setupDb() =
+    db.withSession { implicit session =>
+      dao.create
+    }
+  
 }
 
 object UserRepositoryDbActor {

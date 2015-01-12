@@ -16,13 +16,9 @@ class DicomMetaDataDbActor(dbProps: DbProps) extends Actor {
   val db = dbProps.db
   val dao = new DicomMetaDataDAO(dbProps.driver)
 
+  setupDb()
+  
   def receive = LoggingReceive {
-
-    case Initialize =>
-      db.withSession { implicit session =>
-        dao.create
-      }
-      sender ! Initialized
 
     case AddImageFile(imageFile) =>
       db.withSession { implicit session =>
@@ -107,6 +103,11 @@ class DicomMetaDataDbActor(dbProps: DbProps) extends Actor {
 
     }
   }
+
+  def setupDb() =
+    db.withSession { implicit session =>
+      dao.create
+    }
 
 }
 

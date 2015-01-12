@@ -10,8 +10,6 @@ class UserRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
   def dbUrl() = "jdbc:h2:mem:userroutestest;DB_CLOSE_DELAY=-1"
   
-  initialize()
-
   "The system" should "echo the new user when a new user is added" in {
     val user = ClearTextUser("name", Collaborator, "password")
     Post("/api/user", user) ~> routes ~> check {

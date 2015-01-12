@@ -24,11 +24,10 @@ import se.vgregion.dicom.DicomDispatchProtocol._
 class DicomFileStorageActor(storage: Path) extends Actor {
   val log = Logging(context.system, this)
 
-  def receive = LoggingReceive {
+  if (!Files.exists(storage) || !Files.isDirectory(storage))
+    Files.createDirectories(storage)
 
-    case Initialize =>
-      Files.createDirectories(storage)
-      sender ! Initialized
+  def receive = LoggingReceive {
 
     case StoreFile(path) =>
       loadDicom(path, true).foreach {

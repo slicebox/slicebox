@@ -11,10 +11,6 @@ trait RoutesTestBase extends ScalatestRouteTest with RestApi { this: Suite =>
 
   def actorRefFactory = system
 
-  def initialize() = Post("/api/initialize") ~> routes ~> check {
-    assert(status == OK)
-  }
-
   def addUser(name: String, password: String, role: Role) = {
     val user = ClearTextUser(name, role, password)
     Put("/api/user", user)

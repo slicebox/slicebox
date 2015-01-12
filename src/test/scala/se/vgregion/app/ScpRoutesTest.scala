@@ -11,8 +11,6 @@ class ScpRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
   def dbUrl() = "jdbc:h2:mem:scproutestest;DB_CLOSE_DELAY=-1"
   
-  initialize()
-
   val scpData1 = ScpData("TestName", "TestAeTitle", 13579)
   
   "The system" should "return a success message when asked to start a new SCP" in {
