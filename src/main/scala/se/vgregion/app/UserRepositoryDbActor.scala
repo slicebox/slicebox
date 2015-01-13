@@ -6,7 +6,6 @@ import akka.actor.Actor
 import akka.actor.Props
 import akka.event.Logging
 import akka.event.LoggingReceive
-import se.vgregion.dicom.DicomDispatchProtocol.Initialized
 
 class UserRepositoryDbActor(dbProps: DbProps) extends Actor {
   val log = Logging(context.system, this)

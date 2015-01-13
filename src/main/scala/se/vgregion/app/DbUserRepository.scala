@@ -7,15 +7,12 @@ import akka.actor.ActorRefFactory
 import akka.pattern.ask
 import akka.util.Timeout
 import UserRepositoryDbProtocol._
-import se.vgregion.dicom.DicomDispatchProtocol.Initialized
 
 class DbUserRepository(actorFactory: ActorRefFactory, dbProps: DbProps) extends UserRepository {
 
   val dbActor = actorFactory.actorOf(UserRepositoryDbActor.props(dbProps), "userRepositoryDb")
 
   implicit val timeout = Timeout(10 seconds)
-
-  def initialize(): Future[Any] = dbActor.ask(Initialize)
 
   def userByName(name: String): Future[Option[ApiUser]] = dbActor.ask(GetUserByName(name)).mapTo[Option[ApiUser]]
 

@@ -8,7 +8,6 @@ import org.scalatest.WordSpecLike
 import se.vgregion.app.DbProps
 import DicomDispatchProtocol._
 import DicomHierarchy._
-import DicomMetaDataProtocol._
 import DicomPropertyValue._
 import akka.actor.ActorSystem
 import akka.testkit.ImplicitSender

@@ -3,18 +3,23 @@ package se.vgregion.dicom
 import java.nio.file.Path
 import org.dcm4che3.data.Attributes
 import DicomHierarchy._
-import DicomMetaDataProtocol.ImageFile
-import se.vgregion.app._
 
 object DicomDispatchProtocol {
 
+  // domain objects
+  
   case class Owner(value: String) extends AnyVal
 
-  // Rest messages
+  case class ScpData(name: String, aeTitle: String, port: Int) 
 
-  case object Initialize 
+  case class FileName(value: String) extends AnyVal
 
-  
+  case class ImageFile(image: Image, fileName: FileName, owner: Owner)
+
+
+  // messages
+
+    
   sealed trait DirectoryRequest
   
   case class WatchDirectory(pathString: String) extends DirectoryRequest
@@ -26,8 +31,7 @@ object DicomDispatchProtocol {
   case class WatchedDirectories(names: Seq[Path])
 
   
-  case class ScpData(name: String, aeTitle: String, port: Int) 
-
+  
   sealed trait ScpRequest
   
   case class AddScp(scpData: ScpData) extends ScpRequest
@@ -59,15 +63,15 @@ object DicomDispatchProtocol {
 
   case class DeletePatient(patient: Patient, owner: Option[Owner] = None) extends MetaDataRequest
 
+  case class GetAllImageFiles(owner: Option[Owner] = None)
+
+  case class GetImageFiles(image: Image, owner: Option[Owner] = None)
+
   // TODO case class AddDataset(dataset: Attributes, owner: Owner)
 
   case class ChangeOwner(image: Image, previousOwner: Owner, newOwner: Owner) extends MetaDataRequest
 
   // ***to API***
-
-  case object Initialized
-
-  case object InitializationFailed
 
   case class Patients(patients: Seq[Patient]) 
 
@@ -93,23 +97,12 @@ object DicomDispatchProtocol {
 
   case class ScpNotFound(scpData: ScpData)
 
-  // ***to scp***
-
-  // Reused: AddScp, RemoveScp
 
   // ***from scp***
 
-  // Reused: ScpAdded, ScpRemoved
-
   case class DatasetReceivedByScp(metaInformation: Attributes, dataset: Attributes)
 
-  // ***to directory watch***
-
-  // Reused: WatchDirectory, UnwatchedDirectory
-
   // ***from direcory watch***
-
-  // Reused: DirectoryWatched, DirectoryUnwatched
 
   case class FileAddedToWatchedDirectory(filePath: Path)
 
@@ -117,22 +110,26 @@ object DicomDispatchProtocol {
 
   // ***to metadata***
 
-  // Resued: GetImages, GetPatients, GetStudies, GetSeries, GetImages, DeleteImage, DeleteSeries, DeleteStudy, DeletePatient, AddImage, ChangeOwner
-
-  case class FileName(value: String) extends AnyVal
-
   case class AddDataset(metaInformation: Attributes, dataset: Attributes, fileName: String, owner: String)
 
   // ***from metadata***
 
-  // Reused: Patients, Studies, SeriesCollection, Images, ImageFiles, ImageAdded, OwnerChanged
-
+  case class ImageFiles(imageFiles: Seq[ImageFile])
+  
   case class DatasetAdded(imageFile: ImageFile)
 
   case class DatasetNotAdded(reason: String)
 
   case class ImageFilesDeleted(imageFiles: Seq[ImageFile])
 
+  case class ImageDeleted(image: Image)
+  
+  case class SeriesDeleted(series: Series)
+  
+  case class StudyDeleted(study: Study)
+  
+  case class PatientDeleted(patient: Patient)
+  
   // ***to storage***
 
   case class StoreFile(filePath: Path)

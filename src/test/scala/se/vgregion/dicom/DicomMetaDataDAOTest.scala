@@ -6,7 +6,6 @@ import org.scalatest.FlatSpec
 import org.scalatest.Matchers
 import DicomDispatchProtocol._
 import DicomHierarchy._
-import DicomMetaDataProtocol._
 import DicomPropertyValue._
 
 class DicomMetaDataDAOTest extends FlatSpec with Matchers {

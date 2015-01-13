@@ -3,7 +3,7 @@ package se.vgregion.dicom
 import scala.slick.driver.JdbcProfile
 import DicomDispatchProtocol.FileName
 import DicomDispatchProtocol.Owner
-import DicomMetaDataProtocol.ImageFile
+import DicomDispatchProtocol.ImageFile
 import DicomHierarchy._
 import DicomPropertyValue._
 import scala.slick.jdbc.meta.MTable
