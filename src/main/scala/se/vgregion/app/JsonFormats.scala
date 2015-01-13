@@ -4,6 +4,7 @@ import spray.json._
 import se.vgregion.dicom.DicomPropertyValue._
 import se.vgregion.dicom.DicomHierarchy._
 import se.vgregion.dicom.DicomProtocol._
+import se.vgregion.box.BoxConfig
 
 trait JsonFormats extends DefaultJsonProtocol {
 
@@ -12,6 +13,8 @@ trait JsonFormats extends DefaultJsonProtocol {
 
   implicit val scpDataFormat = jsonFormat3(ScpData)
 
+  implicit val boxConfigFormat = jsonFormat2(BoxConfig)
+  
   implicit val addScpDataFormat = jsonFormat1(AddScp)
   
   implicit object RoleFormat extends JsonFormat[Role] {

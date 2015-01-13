@@ -7,6 +7,8 @@ import scala.slick.jdbc.JdbcBackend.Database
 import akka.actor.Actor
 import akka.actor.ActorContext
 import akka.pattern.ask
+import akka.util.Timeout
+import scala.concurrent.Await
 import spray.http.StatusCodes
 import spray.httpx.Json4sSupport
 import spray.httpx.PlayTwirlSupport.twirlHtmlMarshaller
@@ -19,7 +21,8 @@ import se.vgregion.dicom.DicomProtocol._
 import se.vgregion.dicom.DicomHierarchy._
 import se.vgregion.dicom.directory.DirectoryWatchServiceActor
 import se.vgregion.dicom.scp.ScpServiceActor
-import scala.concurrent.Await
+import se.vgregion.box.BoxProtocol._
+import se.vgregion.box.BoxServiceActor
 import spray.httpx.SprayJsonSupport._
 import spray.json._
 import akka.actor.Props
@@ -29,15 +32,16 @@ import java.util.UUID
 import spray.http.Timedout
 import scala.util.Success
 import scala.util.Failure
+import se.vgregion.box.BoxConfig
 
 class RestInterface extends Actor with RestApi {
 
   // the HttpService trait defines only one abstract member, which
   // connects the services environment to the enclosing actor or test
   def actorRefFactory = context
-  
+
   def dbUrl = "jdbc:h2:storage"
-  
+
   def receive = runRoute(routes)
 
 }
@@ -46,18 +50,21 @@ trait RestApi extends HttpService with JsonFormats {
 
   implicit def executionContext = actorRefFactory.dispatcher
 
+  implicit val timeout = Timeout(10.seconds)
+
   val config = ConfigFactory.load()
   val sliceboxConfig = config.getConfig("slicebox")
   val storage = Paths.get(sliceboxConfig.getString("storage"))
 
   def dbUrl(): String
-  
+
   def db = Database.forURL(dbUrl, driver = "org.h2.Driver")
   val dbProps = DbProps(db, H2Driver)
 
   val directoryService = actorRefFactory.actorOf(DirectoryWatchServiceActor.props(dbProps, storage), "DirectoryService")
   val scpService = actorRefFactory.actorOf(ScpServiceActor.props(dbProps, storage), "ScpService")
   val userService = new DbUserRepository(actorRefFactory, dbProps)
+  val boxService = actorRefFactory.actorOf(BoxServiceActor.props(dbProps), "BoxService")
 
   val dispatchProps = DicomDispatchActor.props(directoryService, scpService, storage, dbProps)
 
@@ -81,7 +88,7 @@ trait RestApi extends HttpService with JsonFormats {
 
   def directoryRoutes: Route =
     pathPrefix("directory") {
-      put {
+      post {
         entity(as[WatchDirectory]) { directory =>
           ctx =>
             actorRefFactory.actorOf(Props(new PerRequest(ctx, dispatchActor, directory) {
@@ -116,7 +123,7 @@ trait RestApi extends HttpService with JsonFormats {
 
   def scpRoutes: Route =
     pathPrefix("scp") {
-      put {
+      post {
         pathEnd {
           entity(as[ScpData]) { scpData =>
             ctx =>
@@ -206,6 +213,36 @@ trait RestApi extends HttpService with JsonFormats {
     }
   }
 
+  def boxRoutes: Route =
+    pathPrefix("box") {
+      get {
+        path("list") {
+          onSuccess(boxService.ask(GetBoxes)) {
+            case Boxes(configs) =>
+              complete((OK, configs))
+          }
+        }
+      } ~ post {
+        pathEnd {
+          entity(as[BoxConfig]) { config =>
+            onSuccess(boxService.ask(AddBox(config))) {
+              case BoxAdded(config) =>
+                complete((OK, "Added box " + config.name))
+            }
+          }
+        }
+      } ~ delete {
+        pathEnd {
+          entity(as[BoxConfig]) { config =>
+            onSuccess(boxService.ask(RemoveBox(config))) {
+              case BoxRemoved(config) =>
+                complete((OK, "Removed box " + config.name))
+            }
+          }
+        }
+      }
+    }
+
   def userRoutes: Route =
     pathPrefix("user") {
       post {
@@ -272,7 +309,7 @@ trait RestApi extends HttpService with JsonFormats {
 
   def routes: Route =
     twirlRoutes ~ staticResourcesRoutes ~ pathPrefix("api") {
-      directoryRoutes ~ scpRoutes ~ metaDataRoutes ~ userRoutes ~ systemRoutes
+      directoryRoutes ~ scpRoutes ~ metaDataRoutes ~ boxRoutes ~ userRoutes ~ systemRoutes
     }
 
   private def dispatchActor = actorRefFactory.actorOf(dispatchProps, "dispatch-" + UUID.randomUUID())
