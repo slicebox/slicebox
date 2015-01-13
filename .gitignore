@@ -8,5 +8,6 @@ project/target
 project/activator*
 /target
 /bin/
+/storage
 /storage.h2.db
 /storage.trace.db
