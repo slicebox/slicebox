@@ -72,9 +72,9 @@ trait RestApi extends HttpService with JsonFormats {
       }
     }
 
-  def twirlRoutes =
+  def angularRoutes =
     get {
-      path("") {
+      pathPrefix("") {
         complete(views.html.index())
       }
     }
@@ -271,9 +271,9 @@ trait RestApi extends HttpService with JsonFormats {
     }
 
   def routes: Route =
-    twirlRoutes ~ staticResourcesRoutes ~ pathPrefix("api") {
+    pathPrefix("api") {
       directoryRoutes ~ scpRoutes ~ metaDataRoutes ~ userRoutes ~ systemRoutes
-    }
+    } ~ staticResourcesRoutes ~ angularRoutes
 
   private def dispatchActor = actorRefFactory.actorOf(dispatchProps, "dispatch-" + UUID.randomUUID())
 
