@@ -2,7 +2,7 @@ package se.vgregion.dicom.directory
 
 import scala.language.postfixOps
 import se.vgregion.app.DbProps
-import se.vgregion.dicom.DicomDispatchProtocol._
+import se.vgregion.dicom.DicomProtocol._
 import akka.actor.Actor
 import akka.actor.Props
 import akka.event.Logging
@@ -16,7 +16,7 @@ import se.vgregion.util.ClientError
 import se.vgregion.util.ServerError
 import java.nio.file.Paths
 
-class DirectoryWatchCollectionActor(dbProps: DbProps, storage: Path) extends Actor with PerEventCreator {
+class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor with PerEventCreator {
   val log = Logging(context.system, this)
 
   val db = dbProps.db
@@ -113,6 +113,6 @@ class DirectoryWatchCollectionActor(dbProps: DbProps, storage: Path) extends Act
 
 }
 
-object DirectoryWatchCollectionActor {
-  def props(dbProps: DbProps, storage: Path): Props = Props(new DirectoryWatchCollectionActor(dbProps, storage))
+object DirectoryWatchServiceActor {
+  def props(dbProps: DbProps, storage: Path): Props = Props(new DirectoryWatchServiceActor(dbProps, storage))
 }

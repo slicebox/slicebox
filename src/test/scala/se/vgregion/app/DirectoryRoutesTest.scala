@@ -4,7 +4,7 @@ import java.nio.file.Files
 import java.nio.file.Paths
 import org.scalatest.FlatSpec
 import org.scalatest.Matchers
-import se.vgregion.dicom.DicomDispatchProtocol._
+import se.vgregion.dicom.DicomProtocol._
 import se.vgregion.dicom.DicomHierarchy.Image
 import spray.http.StatusCodes.OK
 import spray.httpx.SprayJsonSupport._
@@ -35,6 +35,8 @@ class DirectoryRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     // just sleep for a tiny bit and let the OS find out there was a new file in the monitored directory. It will be picked up and put
     // in the database
     Thread.sleep(2000)
+
+    println("Temp dir is " + tempDir + ", number of files is " + Files.list(tempDir).count())
 
     Get("/api/metadata/allimages") ~> routes ~> check {
       status should be(OK)

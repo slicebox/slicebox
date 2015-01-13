@@ -11,7 +11,7 @@ import akka.event.Logging
 import akka.event.LoggingReceive
 import akka.util.Timeout
 import se.vgregion.app._
-import se.vgregion.dicom.DicomDispatchProtocol._
+import se.vgregion.dicom.DicomProtocol._
 import se.vgregion.util._
 import akka.actor.ActorContext
 

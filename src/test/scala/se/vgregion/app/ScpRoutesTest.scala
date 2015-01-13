@@ -3,8 +3,8 @@ package se.vgregion.app
 import java.nio.file.Files
 import org.scalatest.FlatSpec
 import org.scalatest.Matchers
-import se.vgregion.dicom.DicomDispatchProtocol.RemoveScp
-import se.vgregion.dicom.DicomDispatchProtocol.ScpData
+import se.vgregion.dicom.DicomProtocol.RemoveScp
+import se.vgregion.dicom.DicomProtocol.ScpData
 import spray.httpx.SprayJsonSupport._
 
 class ScpRoutesTest extends FlatSpec with Matchers with RoutesTestBase {

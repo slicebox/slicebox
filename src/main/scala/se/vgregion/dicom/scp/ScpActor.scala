@@ -10,7 +10,7 @@ import akka.actor.PoisonPill
 import akka.actor.Props
 import akka.event.Logging
 import akka.event.LoggingReceive
-import se.vgregion.dicom.DicomDispatchProtocol._
+import se.vgregion.dicom.DicomProtocol._
 
 class ScpActor(scpData: ScpData, executor: Executor) extends Actor {
   val log = Logging(context.system, this)

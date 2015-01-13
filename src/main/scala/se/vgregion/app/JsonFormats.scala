@@ -1,13 +1,9 @@
 package se.vgregion.app
 
 import spray.json._
-import se.vgregion.dicom.DicomDispatchProtocol.WatchDirectory
-import se.vgregion.dicom.DicomDispatchProtocol.ScpData
-import se.vgregion.dicom.DicomDispatchProtocol.AddScp
-import se.vgregion.dicom.DicomHierarchy._
 import se.vgregion.dicom.DicomPropertyValue._
-import se.vgregion.dicom.DicomDispatchProtocol.Images
-import se.vgregion.dicom.DicomDispatchProtocol.UnWatchDirectory
+import se.vgregion.dicom.DicomHierarchy._
+import se.vgregion.dicom.DicomProtocol._
 
 trait JsonFormats extends DefaultJsonProtocol {
 

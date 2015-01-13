@@ -4,7 +4,7 @@ import java.nio.file.Path
 import org.dcm4che3.data.Attributes
 import DicomHierarchy._
 
-object DicomDispatchProtocol {
+object DicomProtocol {
 
   // domain objects
   

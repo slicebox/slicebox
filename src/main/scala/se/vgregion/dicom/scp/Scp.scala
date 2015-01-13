@@ -18,7 +18,7 @@ import com.typesafe.scalalogging.LazyLogging
 
 import akka.actor.ActorRef
 import akka.actor.actorRef2Scala
-import se.vgregion.dicom.DicomDispatchProtocol.DatasetReceivedByScp
+import se.vgregion.dicom.DicomProtocol.DatasetReceivedByScp
 
 class Scp(val name: String, val aeTitle: String, val port: Int, notifyActor: ActorRef) extends LazyLogging {
 

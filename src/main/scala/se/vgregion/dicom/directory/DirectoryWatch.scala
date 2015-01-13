@@ -10,10 +10,10 @@ import java.nio.file.attribute.BasicFileAttributes
 import scala.collection.JavaConversions.asScalaBuffer
 import com.typesafe.scalalogging.LazyLogging
 import akka.actor.ActorRef
-import se.vgregion.dicom.DicomDispatchProtocol.FileAddedToWatchedDirectory
-import se.vgregion.dicom.DicomDispatchProtocol.FileRemovedFromWatchedDirectory
+import se.vgregion.dicom.DicomProtocol.FileAddedToWatchedDirectory
+import se.vgregion.dicom.DicomProtocol.FileRemovedFromWatchedDirectory
 
-class DirectoryWatchService(notifyActor: ActorRef) extends Runnable with LazyLogging {
+class DirectoryWatch(notifyActor: ActorRef) extends Runnable with LazyLogging {
   private val watchService = FileSystems.getDefault.newWatchService()
 
   def watchRecursively(root: Path) = {

@@ -7,7 +7,7 @@ import akka.actor.actorRef2Scala
 import akka.event.Logging
 import akka.event.LoggingReceive
 import se.vgregion.app._
-import DicomDispatchProtocol._
+import DicomProtocol._
 import DicomHierarchy._
 import DicomPropertyValue._
 import akka.actor.ActorRef

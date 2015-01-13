@@ -8,7 +8,7 @@ import akka.actor.Props
 import akka.event.Logging
 import akka.event.LoggingReceive
 import se.vgregion.app.DbProps
-import se.vgregion.dicom.DicomDispatchProtocol._
+import se.vgregion.dicom.DicomProtocol._
 import java.nio.file.Path
 import se.vgregion.dicom.DicomDispatchActor
 import se.vgregion.util.PerEventCreator
@@ -16,7 +16,7 @@ import akka.actor.PoisonPill
 import se.vgregion.util.ClientError
 import se.vgregion.util.ServerError
 
-class ScpCollectionActor(dbProps: DbProps, storage: Path) extends Actor with PerEventCreator {
+class ScpServiceActor(dbProps: DbProps, storage: Path) extends Actor with PerEventCreator {
   val log = Logging(context.system, this)
 
   val db = dbProps.db
@@ -110,6 +110,6 @@ class ScpCollectionActor(dbProps: DbProps, storage: Path) extends Actor with Per
 
 }
 
-object ScpCollectionActor {
-  def props(dbProps: DbProps, storage: Path): Props = Props(new ScpCollectionActor(dbProps, storage))
+object ScpServiceActor {
+  def props(dbProps: DbProps, storage: Path): Props = Props(new ScpServiceActor(dbProps, storage))
 }

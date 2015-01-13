@@ -6,7 +6,7 @@ import org.scalatest.BeforeAndAfterAll
 import org.scalatest.Matchers
 import org.scalatest.WordSpecLike
 import se.vgregion.app.DbProps
-import DicomDispatchProtocol._
+import DicomProtocol._
 import DicomHierarchy._
 import DicomPropertyValue._
 import akka.actor.ActorSystem

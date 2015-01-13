@@ -4,9 +4,9 @@ import scala.slick.driver.H2Driver
 import scala.slick.jdbc.JdbcBackend.Database
 import org.scalatest.FlatSpec
 import org.scalatest.Matchers
-import DicomDispatchProtocol._
-import DicomHierarchy._
 import DicomPropertyValue._
+import DicomHierarchy._
+import DicomProtocol._
 
 class DicomMetaDataDAOTest extends FlatSpec with Matchers {
 

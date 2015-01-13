@@ -1,7 +1,7 @@
 package se.vgregion.dicom.scp
 
 import scala.slick.driver.JdbcProfile
-import se.vgregion.dicom.DicomDispatchProtocol.ScpData
+import se.vgregion.dicom.DicomProtocol.ScpData
 import scala.slick.jdbc.meta.MTable
 
 class ScpDataDAO(val driver: JdbcProfile) {

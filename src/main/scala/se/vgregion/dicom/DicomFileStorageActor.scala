@@ -19,7 +19,7 @@ import akka.actor.Props
 import akka.actor.actorRef2Scala
 import akka.event.Logging
 import akka.event.LoggingReceive
-import se.vgregion.dicom.DicomDispatchProtocol._
+import se.vgregion.dicom.DicomProtocol._
 
 class DicomFileStorageActor(storage: Path) extends Actor {
   val log = Logging(context.system, this)

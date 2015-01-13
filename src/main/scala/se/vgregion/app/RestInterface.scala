@@ -15,10 +15,10 @@ import spray.routing.HttpService
 import spray.routing.Route
 import com.typesafe.config.ConfigFactory
 import se.vgregion.dicom.DicomDispatchActor
-import se.vgregion.dicom.DicomDispatchProtocol._
+import se.vgregion.dicom.DicomProtocol._
 import se.vgregion.dicom.DicomHierarchy._
-import se.vgregion.dicom.directory.DirectoryWatchCollectionActor
-import se.vgregion.dicom.scp.ScpCollectionActor
+import se.vgregion.dicom.directory.DirectoryWatchServiceActor
+import se.vgregion.dicom.scp.ScpServiceActor
 import scala.concurrent.Await
 import spray.httpx.SprayJsonSupport._
 import spray.json._
@@ -56,8 +56,8 @@ trait RestApi extends HttpService with JsonFormats {
   def db = Database.forURL(dbUrl, driver = "org.h2.Driver")
   val dbProps = DbProps(db, H2Driver)
 
-  val directoryService = actorRefFactory.actorOf(DirectoryWatchCollectionActor.props(dbProps, storage), "DirectoryService")
-  val scpService = actorRefFactory.actorOf(ScpCollectionActor.props(dbProps, storage), "ScpService")
+  val directoryService = actorRefFactory.actorOf(DirectoryWatchServiceActor.props(dbProps, storage), "DirectoryService")
+  val scpService = actorRefFactory.actorOf(ScpServiceActor.props(dbProps, storage), "ScpService")
   val userService = new DbUserRepository(actorRefFactory, dbProps)
 
   val dispatchProps = DicomDispatchActor.props(directoryService, scpService, storage, dbProps)
