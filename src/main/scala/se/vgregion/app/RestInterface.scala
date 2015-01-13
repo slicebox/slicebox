@@ -48,7 +48,6 @@ trait RestApi extends HttpService with JsonFormats {
 
   val config = ConfigFactory.load()
   val sliceboxConfig = config.getConfig("slicebox")
-  val isProduction = sliceboxConfig.getBoolean("production")
   val storage = Paths.get(sliceboxConfig.getString("storage"))
 
   def dbUrl(): String
