@@ -8,7 +8,7 @@ import akka.actor.Props
 import akka.actor.PoisonPill
 import java.util.UUID
 
-class BoxServiceActor(dbProps: DbProps) extends Actor {
+class BoxServiceActor(dbProps: DbProps, host: String, port: Int) extends Actor {
 
   val db = dbProps.db
   val dao = new BoxDAO(dbProps.driver)
@@ -18,11 +18,13 @@ class BoxServiceActor(dbProps: DbProps) extends Actor {
   def receive = LoggingReceive {
     case msg: BoxRequest => msg match {
 
-      case CreateConfig(name) =>
+      case CreateBox(name) =>
+        
         val token = UUID.randomUUID().toString()
-        addToken(token)
-        // skapa fullständing url
-        sender ! ConfigCreated(name, token)
+        val url = s"http://$host/$port/api/box/$token"
+        val config = BoxConfig(name, url)
+        addConfig(config, false)
+        sender ! BoxCreated(config)
         
       case AddBox(config) =>
 
@@ -30,7 +32,7 @@ class BoxServiceActor(dbProps: DbProps) extends Actor {
           case Some(actor) =>
             sender ! BoxAdded(config)
           case None =>
-            addConfig(config)
+            addConfig(config, true)
             context.actorOf(BoxActor.props(config), config.name)
             sender ! BoxAdded(config)
         }
@@ -47,6 +49,7 @@ class BoxServiceActor(dbProps: DbProps) extends Actor {
         }
 
       case GetBoxes =>
+        
         val boxes = getConfigs()
         sender ! Boxes(boxes)
 
@@ -58,9 +61,9 @@ class BoxServiceActor(dbProps: DbProps) extends Actor {
       dao.create
     }
 
-  def addConfig(config: BoxConfig) =
+  def addConfig(config: BoxConfig, active: Boolean) =
     db.withSession { implicit session =>
-      dao.insertConfig(config)
+      dao.insertConfig(config, active)
     }
 
   def removeConfig(config: BoxConfig) =
@@ -73,12 +76,8 @@ class BoxServiceActor(dbProps: DbProps) extends Actor {
       dao.listConfigs
     }
 
-  def addToken(token: String) =
-    db.withSession { implicit session =>
-      dao.insertToken(token)
-    }
 }
 
 object BoxServiceActor {
-  def props(dbProps: DbProps): Props = Props(new BoxServiceActor(dbProps))
+  def props(dbProps: DbProps, host: String, port: Int): Props = Props(new BoxServiceActor(dbProps, host, port))
 }

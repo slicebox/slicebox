@@ -2,6 +2,10 @@ package se.vgregion.box
 
 object BoxProtocol {
 
+  case class BoxConfig(name: String, url: String)
+    
+  case class BoxName(name: String)
+  
   sealed trait BoxRequest
   
   case class AddBox(config: BoxConfig) extends BoxRequest
@@ -10,7 +14,7 @@ object BoxProtocol {
   
   case object GetBoxes extends BoxRequest
   
-  case class CreateConfig(name: String) extends BoxRequest
+  case class CreateBox(name: String) extends BoxRequest
   
   case class BoxAdded(config: BoxConfig)
   
@@ -18,6 +22,6 @@ object BoxProtocol {
   
   case class Boxes(configs: Seq[BoxConfig])
   
-  case class ConfigCreated(name: String, token: String)
+  case class BoxCreated(config: BoxConfig)
   
 }

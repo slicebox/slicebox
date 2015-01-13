@@ -1,38 +1,33 @@
 package se.vgregion.app
 
 import java.nio.file.Paths
+import java.util.UUID
+
 import scala.concurrent.duration.DurationInt
 import scala.slick.driver.H2Driver
 import scala.slick.jdbc.JdbcBackend.Database
+
 import akka.actor.Actor
 import akka.actor.ActorContext
+import akka.actor.Props
 import akka.pattern.ask
 import akka.util.Timeout
-import scala.concurrent.Await
-import spray.http.StatusCodes
-import spray.httpx.Json4sSupport
+
+import spray.http.StatusCodes._
 import spray.httpx.PlayTwirlSupport.twirlHtmlMarshaller
-import spray.httpx.marshalling.ToResponseMarshallable.isMarshallable
-import spray.routing.HttpService
-import spray.routing.Route
+import spray.httpx.SprayJsonSupport._
+import spray.routing._
+
 import com.typesafe.config.ConfigFactory
-import se.vgregion.dicom.DicomDispatchActor
-import se.vgregion.dicom.DicomProtocol._
-import se.vgregion.dicom.DicomHierarchy._
-import se.vgregion.dicom.directory.DirectoryWatchServiceActor
-import se.vgregion.dicom.scp.ScpServiceActor
+
 import se.vgregion.box.BoxProtocol._
 import se.vgregion.box.BoxServiceActor
-import spray.httpx.SprayJsonSupport._
-import spray.json._
-import akka.actor.Props
+import se.vgregion.dicom.DicomDispatchActor
+import se.vgregion.dicom.DicomHierarchy._
+import se.vgregion.dicom.DicomProtocol._
+import se.vgregion.dicom.directory.DirectoryWatchServiceActor
+import se.vgregion.dicom.scp.ScpServiceActor
 import se.vgregion.util.PerRequest
-import spray.http.StatusCodes._
-import java.util.UUID
-import spray.http.Timedout
-import scala.util.Success
-import scala.util.Failure
-import se.vgregion.box.BoxConfig
 
 class RestInterface extends Actor with RestApi {
 
@@ -64,7 +59,7 @@ trait RestApi extends HttpService with JsonFormats {
   val directoryService = actorRefFactory.actorOf(DirectoryWatchServiceActor.props(dbProps, storage), "DirectoryService")
   val scpService = actorRefFactory.actorOf(ScpServiceActor.props(dbProps, storage), "ScpService")
   val userService = new DbUserRepository(actorRefFactory, dbProps)
-  val boxService = actorRefFactory.actorOf(BoxServiceActor.props(dbProps), "BoxService")
+  val boxService = actorRefFactory.actorOf(BoxServiceActor.props(dbProps, config.getString("http.host"), config.getInt("http.port")), "BoxService")
 
   val dispatchProps = DicomDispatchActor.props(directoryService, scpService, storage, dbProps)
 
@@ -223,11 +218,18 @@ trait RestApi extends HttpService with JsonFormats {
           }
         }
       } ~ post {
-        pathEnd {
+        path("add") {
           entity(as[BoxConfig]) { config =>
             onSuccess(boxService.ask(AddBox(config))) {
               case BoxAdded(config) =>
                 complete((OK, "Added box " + config.name))
+            }
+          }
+        } ~ path("create") {
+          entity(as[BoxName]) { boxName =>
+            onSuccess(boxService.ask(CreateBox(boxName.name))) {
+              case BoxCreated(config) =>
+                complete((OK, "Created box " + config.name))
             }
           }
         }
@@ -254,7 +256,7 @@ trait RestApi extends HttpService with JsonFormats {
                 case Some(newUser) =>
                   complete(s"Added user ${newUser.user}")
                 case None =>
-                  complete((StatusCodes.BadRequest, s"User ${user.user} already exists."))
+                  complete((BadRequest, s"User ${user.user} already exists."))
               }
             }
           }
@@ -267,7 +269,7 @@ trait RestApi extends HttpService with JsonFormats {
                 case Some(deletedUser) =>
                   complete(s"Deleted user ${deletedUser.user}")
                 case None =>
-                  complete((StatusCodes.BadRequest, s"User ${userName} does not exist."))
+                  complete((BadRequest, s"User ${userName} does not exist."))
               }
             }
           }

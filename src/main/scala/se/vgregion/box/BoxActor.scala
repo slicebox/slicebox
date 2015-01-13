@@ -6,6 +6,7 @@ import spray.client.pipelining._
 import scala.concurrent.duration.DurationInt
 import akka.event.Logging
 import akka.actor.Props
+import BoxProtocol._
 
 class BoxActor(config: BoxConfig) extends Actor {
   val log = Logging(context.system, this)
