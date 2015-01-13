@@ -3,10 +3,10 @@
 }());
 
 // Declare app level module which depends on views, and components
-angular.module('akkaDcm', [
+angular.module('slicebox', [
   'ngRoute',
-  'akkaDcm.view1',
-  'akkaDcm.view2'
+  'slicebox.view1',
+  'slicebox.view2'
 ]).
 config(['$routeProvider', function($routeProvider) {
   $routeProvider.otherwise({redirectTo: '/view1'});

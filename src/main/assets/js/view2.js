@@ -2,7 +2,7 @@
    'use strict';
 }());
 
-angular.module('akkaDcm.view2', ['ngRoute'])
+angular.module('slicebox.view2', ['ngRoute'])
 
 .config(['$routeProvider', function($routeProvider) {
   $routeProvider.when('/view2', {
