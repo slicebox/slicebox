@@ -60,5 +60,7 @@
 	updateOptions := updateOptions.value.withCachedResolution(true)
 
 	WebKeys.packagePrefix in Assets := "public/"
+	
+	includeFilter in (Assets, LessKeys.less) := "*.less"
 
 	(managedClasspath in Runtime) += (packageBin in Assets).value
