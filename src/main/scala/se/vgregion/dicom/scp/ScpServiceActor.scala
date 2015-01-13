@@ -39,7 +39,7 @@ class ScpServiceActor(dbProps: DbProps, storage: Path) extends Actor with PerEve
         val id = scpDataToId(scpData)
         context.child(id) match {
           case Some(actor) =>
-            sender ! ClientError("Could not create SCP: SCP already added: " + id)
+            sender ! ScpAdded(scpData)
           case None =>
             try {
 
@@ -66,7 +66,7 @@ class ScpServiceActor(dbProps: DbProps, storage: Path) extends Actor with PerEve
             sender ! ScpRemoved(scpData)
 
           case None =>
-            sender ! ClientError("SCP does not exist: " + id)
+            sender ! ScpRemoved(scpData)
         }
 
       case GetScpDataCollection =>

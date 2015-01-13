@@ -15,6 +15,7 @@ import java.nio.file.Files
 import se.vgregion.util.ClientError
 import se.vgregion.util.ServerError
 import java.nio.file.Paths
+import java.nio.file.FileSystems
 
 class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor with PerEventCreator {
   val log = Logging(context.system, this)
@@ -34,7 +35,7 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor 
         val id = pathToId(path)
         context.child(id) match {
           case Some(actor) =>
-            sender ! ClientError("Could not create directory watch: Directory already watched: " + id)
+            sender ! DirectoryWatched(path)
           case None =>
             try {
 
@@ -69,7 +70,7 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor 
               case e: Exception => sender ! ServerError("Could not remove directory watch: " + e.getMessage)
             }
           case None =>
-            sender ! ClientError("Not a watched directory: " + id)
+            sender ! DirectoryUnwatched(path)
         }
 
       case GetWatchedDirectories =>
@@ -83,7 +84,10 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor 
 
   }
 
-  def pathToId(path: Path) = path.getFileName.toString
+  def pathToId(path: Path) =
+    path.toAbsolutePath().toString
+      .replace("-", "--") // Replace '-' in directory names to avoid conflict with directory separator in next replace below
+      .replace(FileSystems.getDefault.getSeparator, "-")
 
   def setupDb() =
     db.withSession { implicit session =>
