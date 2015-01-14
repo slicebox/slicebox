@@ -60,6 +60,23 @@ class DicomMetaDataActorTest(_system: ActorSystem) extends TestKit(_system) with
         case ImageFiles(list) if (list.size == 1) => true
       }
     }
+    
+    "return a notification that the dataset has been added when adding an elready added dataset" in {
+      val metaDataActor = system.actorOf(DicomMetaDataActor.props(dbProps))
+      metaDataActor ! AddDataset(dcm._1, dcm._2, fileName, "testOwner")
+      expectMsgPF() {
+        case DatasetAdded(imageFile) => true      
+      }
+    }
+    
+    "return a list of one object when asking for all image files even though a dataset has been added twice" in {
+      val metaDataActor = system.actorOf(DicomMetaDataActor.props(dbProps))
+      metaDataActor ! GetAllImageFiles(None)
+      expectMsgPF() {
+        case ImageFiles(list) if (list.size == 1) => true
+      }
+    }
+    
   }
 
   def loadDicom(path: Path, withPixelData: Boolean): Option[(Attributes, Attributes)] = {

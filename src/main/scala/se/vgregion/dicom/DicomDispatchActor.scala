@@ -2,18 +2,21 @@ package se.vgregion.dicom
 
 import java.nio.file.Path
 import java.nio.file.Paths
-import scala.concurrent.duration.DurationInt
+
 import scala.language.postfixOps
+
 import akka.actor.Actor
 import akka.actor.ActorRef
 import akka.actor.Props
+import akka.actor.actorRef2Scala
 import akka.event.Logging
 import akka.event.LoggingReceive
-import akka.util.Timeout
-import se.vgregion.app._
+
+import se.vgregion.app.DbProps
 import se.vgregion.dicom.DicomProtocol._
-import se.vgregion.util._
-import akka.actor.ActorContext
+import se.vgregion.util.EventErrorMessage
+import se.vgregion.util.EventInfoMessage
+import se.vgregion.util.EventWarningMessage
 
 class DicomDispatchActor(directoryService: ActorRef, scpService: ActorRef, storage: Path, dbProps: DbProps) extends Actor {
   val log = Logging(context.system, this)
@@ -50,10 +53,6 @@ class DicomDispatchActor(directoryService: ActorRef, scpService: ActorRef, stora
     case FileStored(filePath, metaInformation, dataset) =>
       metaDataActor ! AddDataset(metaInformation, dataset, filePath.getFileName.toString, owner = "")
       context.become(waitingForMetaData(client))
-    case FileNotStored(reason) =>
-      client ! EventErrorMessage("Could not add file to storage: " + reason)
-    case FileNotDeleted(reason) =>
-      client ! EventWarningMessage("Could not delete file from storage: " + reason)
     case FileDeleted(filePath) =>
       client ! EventInfoMessage("Deleted file: " + filePath.getFileName.toString)
   }
@@ -64,9 +63,6 @@ class DicomDispatchActor(directoryService: ActorRef, scpService: ActorRef, stora
       client ! EventInfoMessage("Added imageFile: " + imageFile)
     case ImageFilesDeleted(imageFiles) =>
       imageFiles.map(imageFile => Paths.get(imageFile.fileName.value)) foreach (path => fileStorageActor ! DeleteFile(path))
-    // apiActor ! ImagesDeleted(imageFiles.map(imageFile => imageFile.image))
-    case DatasetNotAdded(reason) =>
-      client ! EventErrorMessage("Could not add dataset metadata: " + reason)
   }
 }
 

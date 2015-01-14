@@ -2,24 +2,19 @@ package se.vgregion.app
 
 import java.nio.file.Paths
 import java.util.UUID
-
 import scala.concurrent.duration.DurationInt
 import scala.slick.driver.H2Driver
 import scala.slick.jdbc.JdbcBackend.Database
-
 import akka.actor.Actor
 import akka.actor.ActorContext
 import akka.actor.Props
 import akka.pattern.ask
 import akka.util.Timeout
-
 import spray.http.StatusCodes._
 import spray.httpx.PlayTwirlSupport.twirlHtmlMarshaller
 import spray.httpx.SprayJsonSupport._
 import spray.routing._
-
 import com.typesafe.config.ConfigFactory
-
 import se.vgregion.box.BoxProtocol._
 import se.vgregion.box.BoxServiceActor
 import se.vgregion.dicom.DicomDispatchActor
@@ -28,14 +23,23 @@ import se.vgregion.dicom.DicomProtocol._
 import se.vgregion.dicom.directory.DirectoryWatchServiceActor
 import se.vgregion.dicom.scp.ScpServiceActor
 import se.vgregion.util.PerRequest
+import java.nio.file.Path
+import java.nio.file.Files
 
 class RestInterface extends Actor with RestApi {
 
-  // the HttpService trait defines only one abstract member, which
-  // connects the services environment to the enclosing actor or test
   def actorRefFactory = context
 
   def dbUrl = "jdbc:h2:storage"
+
+  def createStorageDirectory = {
+    val storagePath = Paths.get(sliceboxConfig.getString("storage"))
+    if (!Files.exists(storagePath))
+      Files.createDirectories(storagePath)
+    if (!Files.isDirectory(storage))
+      throw new IllegalArgumentException("Storage directory is not a directory.")
+    storagePath
+  }
 
   def receive = runRoute(routes)
 
@@ -49,12 +53,14 @@ trait RestApi extends HttpService with JsonFormats {
 
   val config = ConfigFactory.load()
   val sliceboxConfig = config.getConfig("slicebox")
-  val storage = Paths.get(sliceboxConfig.getString("storage"))
 
+  def createStorageDirectory(): Path
   def dbUrl(): String
 
   def db = Database.forURL(dbUrl, driver = "org.h2.Driver")
   val dbProps = DbProps(db, H2Driver)
+
+  val storage = createStorageDirectory()
 
   val directoryService = actorRefFactory.actorOf(DirectoryWatchServiceActor.props(dbProps, storage), "DirectoryService")
   val scpService = actorRefFactory.actorOf(ScpServiceActor.props(dbProps, storage), "ScpService")

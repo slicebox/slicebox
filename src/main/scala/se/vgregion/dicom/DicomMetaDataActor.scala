@@ -3,7 +3,6 @@ package se.vgregion.dicom
 import org.dcm4che3.data.Attributes
 import akka.actor.Actor
 import akka.actor.Props
-import akka.actor.actorRef2Scala
 import akka.event.Logging
 import akka.event.LoggingReceive
 import se.vgregion.app._

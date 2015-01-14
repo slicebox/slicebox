@@ -95,8 +95,6 @@ object DicomProtocol {
 
   case class ScpRemoved(scpData: ScpData)
 
-  case class ScpNotFound(scpData: ScpData)
-
 
   // ***from scp***
 
@@ -117,8 +115,6 @@ object DicomProtocol {
   case class ImageFiles(imageFiles: Seq[ImageFile])
   
   case class DatasetAdded(imageFile: ImageFile)
-
-  case class DatasetNotAdded(reason: String)
 
   case class ImageFilesDeleted(imageFiles: Seq[ImageFile])
 
@@ -142,10 +138,6 @@ object DicomProtocol {
 
   case class FileStored(filePath: Path, metaInformation: Attributes, dataset: Attributes)
 
-  case class FileNotStored(reason: String)
-
   case class FileDeleted(filePath: Path)
-
-  case class FileNotDeleted(reason: String)
 
 }

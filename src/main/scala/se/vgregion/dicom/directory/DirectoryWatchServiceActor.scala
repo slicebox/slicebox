@@ -1,21 +1,22 @@
 package se.vgregion.dicom.directory
 
+import java.nio.file.FileSystems
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.Paths
+
 import scala.language.postfixOps
-import se.vgregion.app.DbProps
-import se.vgregion.dicom.DicomProtocol._
+
 import akka.actor.Actor
+import akka.actor.PoisonPill
 import akka.actor.Props
 import akka.event.Logging
 import akka.event.LoggingReceive
-import akka.actor.PoisonPill
-import se.vgregion.util.PerEventCreator
+
+import se.vgregion.app.DbProps
 import se.vgregion.dicom.DicomDispatchActor
-import java.nio.file.Path
-import java.nio.file.Files
-import se.vgregion.util.ClientError
-import se.vgregion.util.ServerError
-import java.nio.file.Paths
-import java.nio.file.FileSystems
+import se.vgregion.dicom.DicomProtocol._
+import se.vgregion.util.PerEventCreator
 
 class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor with PerEventCreator {
   val log = Logging(context.system, this)
@@ -37,20 +38,14 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor 
           case Some(actor) =>
             sender ! DirectoryWatched(path)
           case None =>
-            try {
+            if (!Files.isDirectory(path))
+              throw new IllegalArgumentException("Could not create directory watch: Not a directory: " + id)
 
-              if (!Files.isDirectory(path))
-                sender ! ClientError("Could not create directory watch: Not a directory: " + id)
+            addDirectory(path)
 
-              addDirectory(path)
+            context.actorOf(DirectoryWatchActor.props(path), id)
 
-              context.actorOf(DirectoryWatchActor.props(path), id)
-
-              sender ! DirectoryWatched(path)
-
-            } catch {
-              case e: Exception => sender ! ServerError("Could not create directory watch: " + e.getMessage)
-            }
+            sender ! DirectoryWatched(path)
         }
 
       case UnWatchDirectory(pathString) =>
@@ -58,17 +53,13 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor 
         val id = pathToId(path)
         context.child(id) match {
           case Some(ref) =>
-            try {
 
-              removeDirectory(path)
+            removeDirectory(path)
 
-              ref ! PoisonPill
+            ref ! PoisonPill
 
-              sender ! DirectoryUnwatched(path)
+            sender ! DirectoryUnwatched(path)
 
-            } catch {
-              case e: Exception => sender ! ServerError("Could not remove directory watch: " + e.getMessage)
-            }
           case None =>
             sender ! DirectoryUnwatched(path)
         }

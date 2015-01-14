@@ -24,40 +24,25 @@ import se.vgregion.dicom.DicomProtocol._
 class DicomFileStorageActor(storage: Path) extends Actor {
   val log = Logging(context.system, this)
 
-  if (!Files.exists(storage) || !Files.isDirectory(storage))
-    Files.createDirectories(storage)
-
   def receive = LoggingReceive {
 
     case StoreFile(path) =>
       loadDicom(path, true).foreach {
         case (metaInformation, dataset) =>
-          val name = fileName(dataset)
+          val name = fileName(metaInformation, dataset)
           val storedPath = storage.resolve(name)
-          try {
-            writeToStorage(metaInformation, anonymizeDicom(dataset), storedPath)
-            sender ! FileStored(storedPath, metaInformation, dataset)
-          } catch {
-            case e: Throwable => sender ! FileNotStored(e.getMessage)
-          }
+          writeToStorage(metaInformation, anonymizeDicom(dataset), storedPath)
+          sender ! FileStored(storedPath, metaInformation, dataset)
       }
 
     case StoreDataset(metaInformation, dataset) =>
-      val name = fileName(dataset)
+      val name = fileName(metaInformation, dataset)
       val storedPath = storage.resolve(name)
-      try {
-        writeToStorage(metaInformation, anonymizeDicom(dataset), storedPath)
-      } catch {
-        case e: Throwable => sender ! FileNotStored(e.getMessage)
-      }
+      writeToStorage(metaInformation, anonymizeDicom(dataset), storedPath)
       sender ! FileStored(storedPath, metaInformation, dataset)
 
     case DeleteFile(filePath) =>
-      try {
-        deleteFromStorage(filePath)
-      } catch {
-        case e: Throwable => sender ! FileNotDeleted(e.getMessage)
-      }
+      deleteFromStorage(filePath)
       sender ! FileDeleted(filePath)
   }
 
@@ -99,7 +84,7 @@ class DicomFileStorageActor(storage: Path) extends Actor {
     return cloneDataset(dataset)
   }
 
-  def fileName(dataset: Attributes): String = UUID.randomUUID().toString()
+  def fileName(metaInformation: Attributes, dataset: Attributes): String = dataset.getString(Tag.SOPInstanceUID)
 
   def writeToStorage(metaInformation: Attributes, dataset: Attributes, filePath: Path): Unit = {
     val out = new DicomOutputStream(Files.newOutputStream(filePath), UID.ExplicitVRLittleEndian)

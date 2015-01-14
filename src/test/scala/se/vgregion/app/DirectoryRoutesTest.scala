@@ -13,7 +13,7 @@ class DirectoryRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
   def dbUrl() = "jdbc:h2:mem:directoryroutestest;DB_CLOSE_DELAY=-1"
   
-  val tempDir = Files.createTempDirectory("slicebox-temp-dir-")
+  val tempDir = Files.createTempDirectory("slicebox-watch-dir-")
   val watchDir = WatchDirectory(tempDir.toString)
 
   "The system" should "return a monitoring message when asked to monitor a new directory" in {
@@ -34,7 +34,7 @@ class DirectoryRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
     // just sleep for a tiny bit and let the OS find out there was a new file in the monitored directory. It will be picked up and put
     // in the database
-    Thread.sleep(2000)
+    Thread.sleep(1000)
 
     println("Temp dir is " + tempDir + ", number of files is " + Files.list(tempDir).count())
 

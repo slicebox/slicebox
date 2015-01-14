@@ -27,7 +27,6 @@ abstract class PerRequest(val r: RequestContext, val target: ActorRef, val messa
   def handleResponse: PartialFunction[Any, Unit]
   
   def handleError: PartialFunction[Any, Unit] = LoggingReceive {
-    case v: ClientError    => complete(BadRequest, v)
     case ReceiveTimeout   => complete(GatewayTimeout, ServerError("Request timeout"))
     case msg: Any         => complete(InternalServerError, ServerError("Unhandled internal message: " + msg))
   }
@@ -46,6 +45,9 @@ abstract class PerRequest(val r: RequestContext, val target: ActorRef, val messa
 
   override val supervisorStrategy =
     OneForOneStrategy() {
+      case e: IllegalArgumentException => 
+        complete(BadRequest, ClientError(e.getMessage))
+        Stop
       case e => {
         complete(InternalServerError, ServerError(e.getMessage))
         Stop

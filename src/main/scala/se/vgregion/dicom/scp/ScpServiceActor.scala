@@ -1,20 +1,20 @@
 package se.vgregion.dicom.scp
 
+import java.nio.file.Path
 import java.util.concurrent.Executors
+
 import scala.language.postfixOps
+
 import akka.actor.Actor
-import akka.actor.ActorRef
+import akka.actor.PoisonPill
 import akka.actor.Props
 import akka.event.Logging
 import akka.event.LoggingReceive
+
 import se.vgregion.app.DbProps
-import se.vgregion.dicom.DicomProtocol._
-import java.nio.file.Path
 import se.vgregion.dicom.DicomDispatchActor
+import se.vgregion.dicom.DicomProtocol._
 import se.vgregion.util.PerEventCreator
-import akka.actor.PoisonPill
-import se.vgregion.util.ClientError
-import se.vgregion.util.ServerError
 
 class ScpServiceActor(dbProps: DbProps, storage: Path) extends Actor with PerEventCreator {
   val log = Logging(context.system, this)
@@ -24,7 +24,7 @@ class ScpServiceActor(dbProps: DbProps, storage: Path) extends Actor with PerEve
 
   setupDb()
   setupScps()
-  
+
   val executor = Executors.newCachedThreadPool()
 
   override def postStop() {
@@ -41,17 +41,13 @@ class ScpServiceActor(dbProps: DbProps, storage: Path) extends Actor with PerEve
           case Some(actor) =>
             sender ! ScpAdded(scpData)
           case None =>
-            try {
 
-              addScp(scpData)
+            addScp(scpData)
 
-              context.actorOf(ScpActor.props(scpData, executor), id)
+            context.actorOf(ScpActor.props(scpData, executor), id)
 
-              sender ! ScpAdded(scpData)
+            sender ! ScpAdded(scpData)
 
-            } catch {
-              case e: Throwable => sender ! ServerError("Could not create SCP: " + e.getMessage)
-            }
         }
 
       case RemoveScp(scpData) =>
@@ -102,7 +98,7 @@ class ScpServiceActor(dbProps: DbProps, storage: Path) extends Actor with PerEve
       dao.create
     }
 
-  def setupScps() = 
+  def setupScps() =
     db.withTransaction { implicit session =>
       val scps = dao.list
       scps foreach (scpData => context.actorOf(ScpActor.props(scpData, executor), scpDataToId(scpData)))

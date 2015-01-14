@@ -14,12 +14,7 @@ class ScpRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   val scpData1 = ScpData("TestName", "TestAeTitle", 13579)
   
   "The system" should "return a success message when asked to start a new SCP" in {
-    val tempDir = Files.createTempDirectory("akka-dcm-temp-dir-")
-    val tempDirName = tempDir.toString().replace("\\", "/")
 
-    // TODO
-    val storage = tempDir
-    
     Post("/api/scp", scpData1) ~> routes ~> check {
       responseAs[String] should be("Added SCP " + scpData1.name)
     }
