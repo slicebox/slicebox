@@ -20,7 +20,7 @@ class ScpRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     // TODO
     val storage = tempDir
     
-    Put("/api/scp", scpData1) ~> routes ~> check {
+    Post("/api/scp", scpData1) ~> routes ~> check {
       responseAs[String] should be("Added SCP " + scpData1.name)
     }
 

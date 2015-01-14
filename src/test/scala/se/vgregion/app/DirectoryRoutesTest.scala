@@ -17,7 +17,7 @@ class DirectoryRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   val watchDir = WatchDirectory(tempDir.toString)
 
   "The system" should "return a monitoring message when asked to monitor a new directory" in {
-    Put("/api/directory", watchDir) ~> routes ~> check {
+    Post("/api/directory", watchDir) ~> routes ~> check {
       responseAs[String] should be(s"Now watching directory $tempDir")
     }
   }
