@@ -5,6 +5,8 @@
 // Declare app level module which depends on views, and components
 angular.module('slicebox', [
     'ngRoute',
+    'ui.bootstrap',
+    'slicebox.directives',
     'slicebox.home',
     'slicebox.adminWatchDirectories'
 ]).

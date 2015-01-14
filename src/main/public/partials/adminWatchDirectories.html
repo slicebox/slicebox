@@ -1,5 +1,18 @@
 <div class="row">
 	<div class="col-md-12">
-		<h1>Admin Watch Directories</h1>
+        <div class="panel panel-default">
+            <div class="panel-heading">Watch Directories</div>
+
+            <div class="panel-body">
+                <sbx-grid
+                    load-page="loadWatchDirectoriesPage(startIndex, count, orderByProperty, orderByDirection)"
+                    page-size="20"
+                    object-actions="objectActions">
+
+                    <sbx-grid-column property="name" title="Name">
+                    </sbx-grid-column>
+                </sbx-grid>
+            </div>
+        </div>
 	</div>
 </div>
