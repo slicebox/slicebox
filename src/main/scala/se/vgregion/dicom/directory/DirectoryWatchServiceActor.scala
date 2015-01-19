@@ -71,7 +71,7 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor 
     }
 
     case msg: FileAddedToWatchedDirectory =>
-      perEvent(DicomDispatchActor.props(self, null, storage, dbProps), msg)
+      context.parent ! msg
 
   }
 

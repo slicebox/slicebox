@@ -22,7 +22,6 @@ import se.vgregion.dicom.DicomHierarchy._
 import se.vgregion.dicom.DicomProtocol._
 import se.vgregion.dicom.directory.DirectoryWatchServiceActor
 import se.vgregion.dicom.scp.ScpServiceActor
-import se.vgregion.util.PerRequest
 import java.nio.file.Path
 import java.nio.file.Files
 
@@ -62,12 +61,9 @@ trait RestApi extends HttpService with JsonFormats {
 
   val storage = createStorageDirectory()
 
-  val directoryService = actorRefFactory.actorOf(DirectoryWatchServiceActor.props(dbProps, storage), "DirectoryService")
-  val scpService = actorRefFactory.actorOf(ScpServiceActor.props(dbProps, storage), "ScpService")
   val userService = new DbUserRepository(actorRefFactory, dbProps)
   val boxService = actorRefFactory.actorOf(BoxServiceActor.props(dbProps, config.getString("http.host"), config.getInt("http.port")), "BoxService")
-
-  val dispatchProps = DicomDispatchActor.props(directoryService, scpService, storage, dbProps)
+  val dicomService = actorRefFactory.actorOf(DicomDispatchActor.props(storage, dbProps), "DicomDispatch")
 
   val authenticator = new Authenticator(userService)
 
@@ -91,32 +87,24 @@ trait RestApi extends HttpService with JsonFormats {
     pathPrefix("directory") {
       post {
         entity(as[WatchDirectory]) { directory =>
-          ctx =>
-            actorRefFactory.actorOf(Props(new PerRequest(ctx, dispatchActor, directory) {
-              def handleResponse = {
-                case DirectoryWatched(path) =>
-                  complete(OK, "Now watching directory " + path)
-              }
-            }))
+          onSuccess(dicomService.ask(directory)) {
+            case DirectoryWatched(path) =>
+              complete("Now watching directory " + path)
+          }
         }
       } ~ delete {
         entity(as[UnWatchDirectory]) { directory =>
-          ctx =>
-            actorRefFactory.actorOf(Props(new PerRequest(ctx, dispatchActor, directory) {
-              def handleResponse = {
-                case DirectoryUnwatched(path) =>
-                  complete(OK, "Stopped watching directory " + path)
-              }
-            }))
+          onSuccess(dicomService.ask(directory)) {
+            case DirectoryUnwatched(path) =>
+              complete("Stopped watching directory " + path)
+          }
         }
       } ~ get {
-        path("list") { ctx =>
-          actorRefFactory.actorOf(Props(new PerRequest(ctx, dispatchActor, GetWatchedDirectories) {
-            def handleResponse = {
-              case WatchedDirectories(list) =>
-                complete(OK, list.map(_.toString))
-            }
-          }))
+        path("list") {
+          onSuccess(dicomService.ask(GetWatchedDirectories)) {
+            case WatchedDirectories(list) =>
+              complete(list.map(_.toString))
+          }
         }
       }
 
@@ -127,35 +115,27 @@ trait RestApi extends HttpService with JsonFormats {
       post {
         pathEnd {
           entity(as[ScpData]) { scpData =>
-            ctx =>
-              actorRefFactory.actorOf(Props(new PerRequest(ctx, dispatchActor, AddScp(scpData)) {
-                def handleResponse = {
-                  case ScpAdded(scpData) =>
-                    complete(OK, "Added SCP " + scpData.name)
-                }
-              }))
+            onSuccess(dicomService.ask(AddScp(scpData))) {
+              case ScpAdded(scpData) =>
+                complete("Added SCP " + scpData.name)
+            }
           }
         }
       } ~ delete {
         pathEnd {
           entity(as[ScpData]) { scpData =>
-            ctx =>
-              actorRefFactory.actorOf(Props(new PerRequest(ctx, dispatchActor, RemoveScp(scpData)) {
-                def handleResponse = {
-                  case ScpRemoved(scpData) =>
-                    complete(OK, "Removed SCP " + scpData.name)
-                }
-              }))
+            onSuccess(dicomService.ask(RemoveScp(scpData))) {
+              case ScpRemoved(scpData) =>
+                complete("Removed SCP " + scpData.name)
+            }
           }
         }
       } ~ get {
-        path("list") { ctx =>
-          actorRefFactory.actorOf(Props(new PerRequest(ctx, dispatchActor, GetScpDataCollection) {
-            def handleResponse = {
-              case ScpDataCollection(list) =>
-                complete(OK, list)
-            }
-          }))
+        path("list") {
+          onSuccess(dicomService.ask(GetScpDataCollection)) {
+            case ScpDataCollection(list) =>
+              complete(list)
+          }
         }
       }
     }
@@ -164,51 +144,36 @@ trait RestApi extends HttpService with JsonFormats {
     pathPrefix("metadata") {
       get {
         path("patients") {
-          ctx =>
-            actorRefFactory.actorOf(Props(new PerRequest(ctx, dispatchActor, GetPatients(None)) {
-              def handleResponse = {
-                case Patients(patients) =>
-                  complete(OK, patients)
-              }
-            }))
+          onSuccess(dicomService.ask(GetPatients(None))) {
+            case Patients(patients) =>
+              complete(patients)
+          }
         } ~ path("studies") {
           entity(as[Patient]) { patient =>
-            ctx =>
-              actorRefFactory.actorOf(Props(new PerRequest(ctx, dispatchActor, GetStudies(patient, None)) {
-                def handleResponse = {
-                  case Studies(studies) =>
-                    complete(OK, studies)
-                }
-              }))
+            onSuccess(dicomService.ask(GetStudies(patient, None))) {
+              case Studies(studies) =>
+                complete(studies)
+            }
           }
         } ~ path("series") {
           entity(as[Study]) { study =>
-            ctx =>
-              actorRefFactory.actorOf(Props(new PerRequest(ctx, dispatchActor, GetSeries(study, None)) {
-                def handleResponse = {
-                  case SeriesCollection(series) =>
-                    complete(OK, series)
-                }
-              }))
+            onSuccess(dicomService.ask(GetSeries(study, None))) {
+              case SeriesCollection(series) =>
+                complete(series)
+            }
           }
         } ~ path("images") {
           entity(as[Series]) { series =>
-            ctx =>
-              actorRefFactory.actorOf(Props(new PerRequest(ctx, dispatchActor, GetImages(series, None)) {
-                def handleResponse = {
-                  case Images(images) =>
-                    complete(OK, images)
-                }
-              }))
+            onSuccess(dicomService.ask(GetImages(series, None))) {
+              case Images(images) =>
+                complete(images)
+            }
           }
         } ~ path("allimages") {
-          ctx =>
-            actorRefFactory.actorOf(Props(new PerRequest(ctx, dispatchActor, GetAllImages(None)) {
-              def handleResponse = {
-                case Images(images) =>
-                  complete(OK, images)
-              }
-            }))
+          onSuccess(dicomService.ask(GetAllImages(None))) {
+            case Images(images) =>
+              complete(images)
+          }
         }
       }
     }
@@ -319,8 +284,6 @@ trait RestApi extends HttpService with JsonFormats {
     twirlRoutes ~ staticResourcesRoutes ~ pathPrefix("api") {
       directoryRoutes ~ scpRoutes ~ metaDataRoutes ~ boxRoutes ~ userRoutes ~ systemRoutes
     }
-
-  private def dispatchActor = actorRefFactory.actorOf(dispatchProps, "dispatch-" + UUID.randomUUID())
 
 }
 

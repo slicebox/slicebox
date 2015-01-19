@@ -72,7 +72,7 @@ class ScpServiceActor(dbProps: DbProps, storage: Path) extends Actor with PerEve
     }
 
     case msg: DatasetReceivedByScp =>
-      perEvent(DicomDispatchActor.props(null, self, storage, dbProps), msg)
+      context.parent ! msg
 
   }
 

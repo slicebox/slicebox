@@ -199,18 +199,16 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
       .filter(_.patientID === patient.patientID.value)
       .list.map(_.key).headOption
 
-  private def studyForKey(key: Long)(implicit session: Session): Option[Study] = session.withTransaction {
+  private def studyForKey(key: Long)(implicit session: Session): Option[Study] =
     studies.filter(_.key === key).list.flatMap(row =>
       patientForKey(row.patientKey).map(rowToStudy(_, row))).headOption
-  }
 
-  private def keyForStudy(study: Study)(implicit session: Session): Option[Long] = session.withTransaction {
+  private def keyForStudy(study: Study)(implicit session: Session): Option[Long] =
     keyForPatient(study.patient).flatMap(patientKey =>
       studies
         .filter(_.patientKey === patientKey)
         .filter(_.studyInstanceUID === study.studyInstanceUID.value)
         .list.map(_.key).headOption)
-  }
 
   private def equipmentForSeriesKey(seriesKey: Long)(implicit session: Session): Option[Equipment] =
     equipments.filter(_.seriesKey === seriesKey).list.map(rowToEquipment(_)).headOption
@@ -218,64 +216,56 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
   private def frameOfReferenceForSeriesKey(seriesKey: Long)(implicit session: Session): Option[FrameOfReference] =
     frameOfReferences.filter(_.seriesKey === seriesKey).list.map(rowToFrameOfReference(_)).headOption
 
-  private def seriesForKey(key: Long)(implicit session: Session): Option[Series] = session.withTransaction {
+  private def seriesForKey(key: Long)(implicit session: Session): Option[Series] =
     seriez.filter(_.key === key).list.flatMap(row =>
       studyForKey(row.studyKey).flatMap(study =>
         equipmentForSeriesKey(key).flatMap(equipment =>
           frameOfReferenceForSeriesKey(key).map(frameOfReference =>
             rowToSeries(study, equipment, frameOfReference, row))))).headOption
-  }
 
-  private def keyForSeries(series: Series)(implicit session: Session): Option[Long] = session.withTransaction {
+  private def keyForSeries(series: Series)(implicit session: Session): Option[Long] =
     keyForStudy(series.study).flatMap(studyKey =>
       seriez
         .filter(_.studyKey === studyKey)
         .filter(_.seriesInstanceUID === series.seriesInstanceUID.value)
         .list.map(_.key).headOption)
-  }
 
-  private def imageForKey(key: Long)(implicit session: Session): Option[Image] = session.withTransaction {
+  private def imageForKey(key: Long)(implicit session: Session): Option[Image] =
     images.filter(_.key === key).list.flatMap(row =>
       seriesForKey(row.seriesKey).map(rowToImage(_, row))).headOption
-  }
 
-  private def keyForImage(image: Image)(implicit session: Session): Option[Long] = session.withTransaction {
+  private def keyForImage(image: Image)(implicit session: Session): Option[Long] =
     keyForSeries(image.series).flatMap(seriesKey =>
       images
         .filter(_.seriesKey === seriesKey)
         .filter(_.sopInstanceUID === image.sopInstanceUID.value)
         .list.map(_.key).headOption)
-  }
 
-  private def imageFileForKey(key: Long)(implicit session: Session): Option[ImageFile] = session.withTransaction {
+  private def imageFileForKey(key: Long)(implicit session: Session): Option[ImageFile] =
     imageFiles.filter(_.key === key).list.flatMap(row =>
       imageForKey(row.imageKey).map(rowToImageFile(_, row))).headOption
-  }
 
-  private def keyForImageFile(imageFile: ImageFile)(implicit session: Session): Option[Long] = session.withTransaction {
+  private def keyForImageFile(imageFile: ImageFile)(implicit session: Session): Option[Long] =
     keyForImage(imageFile.image).flatMap(imageKey =>
       imageFiles
         .filter(_.imageKey === imageKey)
         .list.map(_.key).headOption)
-  }
 
   // *** Inserts ***
 
-  private def insert(patient: Patient)(implicit session: Session): Long = session.withTransaction {
+  private def insert(patient: Patient)(implicit session: Session): Long =
     keyForPatient(patient)
       .getOrElse(
         (patients returning patients.map(_.key)) +=
           PatientRow(-1, patient.patientName, patient.patientID, patient.patientBirthDate, patient.patientSex))
-  }
 
-  private def insert(study: Study)(implicit session: Session): Long = session.withTransaction {
+  private def insert(study: Study)(implicit session: Session): Long =
     keyForStudy(study)
       .getOrElse {
         val patientKey = insert(study.patient)
         (studies returning studies.map(_.key)) +=
           StudyRow(-1, patientKey, study.studyInstanceUID, study.studyDescription, study.studyDate, study.studyID, study.accessionNumber)
       }
-  }
 
   private def insert(equipment: Equipment, seriesKey: Long)(implicit session: Session): Int =
     equipments += EquipmentRow(-1, seriesKey, equipment.manufacturer, equipment.stationName)
@@ -283,7 +273,7 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
   private def insert(frameOfReference: FrameOfReference, seriesKey: Long)(implicit session: Session): Int =
     frameOfReferences += FrameOfReferenceRow(-1, seriesKey, frameOfReference.frameOfReferenceUID)
 
-  private def insert(series: Series)(implicit session: Session): Long = session.withTransaction {
+  private def insert(series: Series)(implicit session: Session): Long =
     keyForSeries(series)
       .getOrElse {
         val studyKey = insert(series.study)
@@ -293,60 +283,53 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
         insert(series.frameOfReference, seriesKey)
         seriesKey
       }
-  }
 
-  private def insert(image: Image)(implicit session: Session): Long = session.withTransaction {
+  private def insert(image: Image)(implicit session: Session): Long =
     keyForImage(image)
       .getOrElse {
         val seriesKey = insert(image.series)
         (images returning images.map(_.key)) +=
           ImageRow(-1, seriesKey, image.sopInstanceUID, image.imageType)
       }
-  }
 
-  def insert(imageFile: ImageFile)(implicit session: Session): Long = session.withTransaction {
+  def insert(imageFile: ImageFile)(implicit session: Session): Long =
     keyForImageFile(imageFile)
       .getOrElse {
         val imageKey = insert(imageFile.image)
         (imageFiles returning imageFiles.map(_.key)) +=
           ImageFileRow(-1, imageKey, imageFile.fileName, imageFile.owner)
       }
-  }
 
   // *** Listing all patients, studies etc ***
 
   def allPatients(implicit session: Session): List[Patient] = patients.list.map(rowToPatient(_))
 
-  def allStudies(implicit session: Session): List[Study] = session.withTransaction {
+  def allStudies(implicit session: Session): List[Study] =
     studies.list.map(row =>
       patientForKey(row.patientKey).map(rowToStudy(_, row))).flatten
-  }
 
   def allEquipments(implicit session: Session): List[Equipment] = equipments.list.map(rowToEquipment(_))
 
   def allFrameOfReferences(implicit session: Session): List[FrameOfReference] = frameOfReferences.list.map(rowToFrameOfReference(_))
 
-  def allSeries(implicit session: Session): List[Series] = session.withTransaction {
+  def allSeries(implicit session: Session): List[Series] =
     seriez.list.map(row =>
       studyForKey(row.studyKey).flatMap(study =>
         equipmentForSeriesKey(row.key).flatMap(equipment =>
           frameOfReferenceForSeriesKey(row.key).map(frameOfReference =>
             rowToSeries(study, equipment, frameOfReference, row))))).flatten
-  }
 
-  def allImages(implicit session: Session): List[Image] = session.withTransaction {
+  def allImages(implicit session: Session): List[Image] =
     images.list.map(row =>
       seriesForKey(row.seriesKey).map(rowToImage(_, row))).flatten
-  }
 
-  def allImageFiles(implicit session: Session): List[ImageFile] = session.withTransaction {
+  def allImageFiles(implicit session: Session): List[ImageFile] =
     imageFiles.list.map(row =>
       imageForKey(row.imageKey).map(rowToImageFile(_, row))).flatten
-  }
 
   // *** Per owner listings ***
 
-  def patientsForOwner(owner: Owner)(implicit session: Session): List[Patient] = session.withTransaction {
+  def patientsForOwner(owner: Owner)(implicit session: Session): List[Patient] =
     (for {
       ps <- patients
       ss <- studies if ps.key === ss.patientKey
@@ -358,9 +341,8 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
       .list.map(row =>
         rowToPatient(row._1))
       .toSet.toList
-  }
 
-  def studiesForOwner(owner: Owner)(implicit session: Session): List[Study] = session.withTransaction {
+  def studiesForOwner(owner: Owner)(implicit session: Session): List[Study] =
     (for {
       ss <- studies
       sz <- seriez if ss.key === sz.studyKey
@@ -371,9 +353,8 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
       .list.map(row =>
         patientForKey(row._1.patientKey).map(rowToStudy(_, row._1))).flatten
       .toSet.toList
-  }
 
-  def seriesForOwner(owner: Owner)(implicit session: Session): List[Series] = session.withTransaction {
+  def seriesForOwner(owner: Owner)(implicit session: Session): List[Series] =
     (for {
       sz <- seriez
       is <- images if sz.key === is.seriesKey
@@ -386,9 +367,8 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
             frameOfReferenceForSeriesKey(row._1.key).map(frameOfReference =>
               rowToSeries(study, equipment, frameOfReference, row._1))))).flatten
       .toSet.toList
-  }
 
-  def imagesForOwner(owner: Owner)(implicit session: Session): List[Image] = session.withTransaction {
+  def imagesForOwner(owner: Owner)(implicit session: Session): List[Image] =
     (for {
       is <- images
       ifs <- imageFiles if is.key === ifs.imageKey
@@ -397,26 +377,23 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
       .list.map(row =>
         seriesForKey(row._1.seriesKey).map(rowToImage(_, row._1))).flatten
       .toSet.toList
-  }
 
-  def imageFilesForOwner(owner: Owner)(implicit session: Session): List[ImageFile] = session.withTransaction {
+  def imageFilesForOwner(owner: Owner)(implicit session: Session): List[ImageFile] =
     imageFiles
       .filter(_.owner === owner.value)
       .list.map(row =>
         imageForKey(row.imageKey).map(rowToImageFile(_, row))).flatten
-  }
 
   // *** Grouped listings ***
 
-  def studiesForPatient(patient: Patient)(implicit session: Session): List[Study] = session.withTransaction {
+  def studiesForPatient(patient: Patient)(implicit session: Session): List[Study] =
     keyForPatient(patient).map(patientKey =>
       studies
         .filter(_.patientKey === patientKey)
         .list.map(rowToStudy(patient, _)))
       .getOrElse(List())
-  }
 
-  def seriesForStudy(study: Study)(implicit session: Session): List[Series] = session.withTransaction {
+  def seriesForStudy(study: Study)(implicit session: Session): List[Series] =
     keyForStudy(study).map(studyKey =>
       seriez
         .filter(_.studyKey === studyKey)
@@ -425,27 +402,39 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
             frameOfReferenceForSeriesKey(row.key).map(frameOfReference =>
               rowToSeries(study, equipment, frameOfReference, row)))).flatten)
       .getOrElse(List())
-  }
 
-  def imagesForSeries(series: Series)(implicit session: Session): List[Image] = session.withTransaction {
+  def imagesForSeries(series: Series)(implicit session: Session): List[Image] =
     keyForSeries(series).map(seriesKey =>
       images
         .filter(_.seriesKey === seriesKey)
         .list.map(rowToImage(series, _)))
       .getOrElse(List())
-  }
 
-  def imageFilesForImage(image: Image)(implicit session: Session): List[ImageFile] = session.withTransaction {
+  def imageFilesForImage(image: Image)(implicit session: Session): List[ImageFile] =
     keyForImage(image).map(imageKey =>
       imageFiles
         .filter(_.imageKey === imageKey)
         .list.map(rowToImageFile(image, _)))
       .getOrElse(List())
-  }
+
+  def imageFilesForSeries(series: Series)(implicit session: Session): List[ImageFile] =
+    imagesForSeries(series)
+      .map(image => imageFilesForImage(image)).flatten
+
+  def imageFilesForStudy(study: Study)(implicit session: Session): List[ImageFile] =
+    seriesForStudy(study)
+      .map(series => imagesForSeries(series)
+        .map(image => imageFilesForImage(image)).flatten).flatten
+
+  def imageFilesForPatient(patient: Patient)(implicit session: Session): List[ImageFile] =
+    studiesForPatient(patient)
+      .map(study => seriesForStudy(study)
+        .map(series => imagesForSeries(series)
+          .map(image => imageFilesForImage(image)).flatten).flatten).flatten
 
   // *** Grouped and per owner listings ***
 
-  def studiesForPatient(patient: Patient, owner: Owner)(implicit session: Session): List[Study] = session.withTransaction {
+  def studiesForPatient(patient: Patient, owner: Owner)(implicit session: Session): List[Study] =
     keyForPatient(patient).map(patientKey =>
       (for {
         ss <- studies
@@ -459,9 +448,8 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
           rowToStudy(patient, row._1))
         .toSet.toList)
       .getOrElse(List())
-  }
 
-  def seriesForStudy(study: Study, owner: Owner)(implicit session: Session): List[Series] = session.withTransaction {
+  def seriesForStudy(study: Study, owner: Owner)(implicit session: Session): List[Series] =
     keyForStudy(study).map(studyKey =>
       (for {
         sz <- seriez
@@ -476,9 +464,8 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
               rowToSeries(study, equipment, frameOfReference, row._1)))).flatten
         .toSet.toList)
       .getOrElse(List())
-  }
 
-  def imagesForSeries(series: Series, owner: Owner)(implicit session: Session): List[Image] = session.withTransaction {
+  def imagesForSeries(series: Series, owner: Owner)(implicit session: Session): List[Image] =
     keyForSeries(series).map(seriesKey =>
       (for {
         is <- images
@@ -490,57 +477,80 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
           rowToImage(series, row._1))
         .toSet.toList)
       .getOrElse(List())
-  }
 
-  def imageFilesForImage(image: Image, owner: Owner)(implicit session: Session): List[ImageFile] = session.withTransaction {
+  def imageFilesForImage(image: Image, owner: Owner)(implicit session: Session): List[ImageFile] =
     keyForImage(image).map(imageKey =>
       imageFiles
         .filter(_.imageKey === imageKey)
         .filter(_.owner === owner.value)
         .list.map(rowToImageFile(image, _)))
       .getOrElse(List())
-  }
 
+  def imageFilesForSeries(series: Series, owner: Owner)(implicit session: Session): List[ImageFile] =
+    imagesForSeries(series, owner)
+      .map(image => imageFilesForImage(image, owner)).flatten
+
+  def imageFilesForStudy(study: Study, owner: Owner)(implicit session: Session): List[ImageFile] =
+    seriesForStudy(study, owner)
+      .map(series => imagesForSeries(series, owner)
+        .map(image => imageFilesForImage(image, owner)).flatten).flatten
+
+  def imageFilesForPatient(patient: Patient, owner: Owner)(implicit session: Session): List[ImageFile] =
+    studiesForPatient(patient, owner)
+      .map(study => seriesForStudy(study, owner)
+        .map(series => imagesForSeries(series, owner)
+          .map(image => imageFilesForImage(image, owner)).flatten).flatten).flatten
+          
   // *** Owner change ***
 
-  def changeOwner(imageFile: ImageFile, newOwner: Owner)(implicit session: Session): Int = session.withTransaction {
+  def changeOwner(imageFile: ImageFile, newOwner: Owner)(implicit session: Session): Int =
     keyForImageFile(imageFile).map(imageFileKey =>
       imageFiles
         .filter(_.key === imageFileKey)
         .map(_.owner)
         .update(newOwner.value))
       .getOrElse(0)
-  }
 
   // *** Deletes ***
 
-  def deletePatient(patient: Patient)(implicit session: Session): Option[Int] = session.withTransaction {
-    keyForPatient(patient).map(patientKey => patients.filter(_.key === patientKey).delete)
+  def deletePatient(patient: Patient)(implicit session: Session): Option[Int] = {
+    val result = keyForPatient(patient).map(patientKey => patients
+      .filter(_.key === patientKey)
+      .delete)
+    result
   }
 
-  def deleteStudy(study: Study)(implicit session: Session): Option[Int] = session.withTransaction {
-    val result = keyForStudy(study).map(studyKey => studies.filter(_.key === studyKey).delete)
+  def deleteStudy(study: Study)(implicit session: Session): Option[Int] = {
+    val result = keyForStudy(study).map(studyKey => studies
+      .filter(_.key === studyKey)
+      .delete)
     if (studiesForPatient(study.patient).isEmpty)
       deletePatient(study.patient)
     result
   }
 
-  def deleteSeries(series: Series)(implicit session: Session): Option[Int] = session.withTransaction {
-    val result = keyForSeries(series).map(seriesKey => seriez.filter(_.key === seriesKey).delete)
+  def deleteSeries(series: Series)(implicit session: Session): Option[Int] = {
+    val result = keyForSeries(series).map(seriesKey => seriez
+      .filter(_.key === seriesKey)
+      .delete)
     if (seriesForStudy(series.study).isEmpty)
       deleteStudy(series.study)
     result
   }
 
-  def deleteImage(image: Image)(implicit session: Session): Option[Int] = session.withTransaction {
-    val result = keyForImage(image).map(imageKey => images.filter(_.key === imageKey).delete)
+  def deleteImage(image: Image)(implicit session: Session): Option[Int] = {
+    val result = keyForImage(image).map(imageKey => images
+      .filter(_.key === imageKey)
+      .delete)
     if (imagesForSeries(image.series).isEmpty)
       deleteSeries(image.series)
     result
   }
 
-  def deleteImageFile(imageFile: ImageFile)(implicit session: Session): Option[Int] = session.withTransaction {
-    val result = keyForImageFile(imageFile).map(imageFileKey => imageFiles.filter(_.key === imageFileKey).delete)
+  def deleteImageFile(imageFile: ImageFile)(implicit session: Session): Option[Int] = {
+    val result = keyForImageFile(imageFile).map(imageFileKey => imageFiles
+      .filter(_.key === imageFileKey)
+      .delete)
     if (imageFilesForImage(imageFile.image).isEmpty)
       deleteImage(imageFile.image)
     result
@@ -548,34 +558,31 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
 
   // *** Deletes per owner ***
 
-  def deletePatient(patient: Patient, owner: Owner)(implicit session: Session): Unit = session.withTransaction {
-    studiesForPatient(patient, owner) foreach (
-      deleteStudy(_, owner))
-  }
+  def deletePatient(patient: Patient, owner: Owner)(implicit session: Session): List[Option[Int]] =
+    studiesForPatient(patient, owner).map(study =>
+      deleteStudy(study, owner)).flatten
 
-  def deleteStudy(study: Study, owner: Owner)(implicit session: Session): Unit = session.withTransaction {
-    seriesForStudy(study, owner) foreach (
-      deleteSeries(_, owner))
-  }
+  def deleteStudy(study: Study, owner: Owner)(implicit session: Session): List[Option[Int]] =
+    seriesForStudy(study, owner).map(series =>
+      deleteSeries(series, owner)).flatten
 
-  def deleteSeries(series: Series, owner: Owner)(implicit session: Session): Unit = session.withTransaction {
-    imagesForSeries(series, owner) foreach (
-      deleteImage(_, owner))
-  }
+  def deleteSeries(series: Series, owner: Owner)(implicit session: Session): List[Option[Int]] =
+    imagesForSeries(series, owner).map(image =>
+      deleteImage(image, owner)).flatten
 
-  def deleteImage(image: Image, owner: Owner)(implicit session: Session): Unit = session.withTransaction {
-    imageFilesForImage(image, owner) foreach (
-      deleteImageFile(_, owner))
-  }
+  def deleteImage(image: Image, owner: Owner)(implicit session: Session): List[Option[Int]] =
+    imageFilesForImage(image, owner).map(imageFile =>
+      deleteImageFile(imageFile, owner))
 
-  def deleteImageFile(imageFile: ImageFile, owner: Owner)(implicit session: Session): Unit = session.withTransaction {
-    keyForImageFile(imageFile).map(imageFileKey =>
+  def deleteImageFile(imageFile: ImageFile, owner: Owner)(implicit session: Session): Option[Int] = {
+    val result = keyForImageFile(imageFile).map(imageFileKey =>
       imageFiles
         .filter(_.key === imageFileKey)
         .filter(_.owner === owner.value)
         .delete)
     if (imageFilesForImage(imageFile.image).isEmpty)
       deleteImage(imageFile.image)
+    result
   }
 
   // *** Counts (for testing) ***

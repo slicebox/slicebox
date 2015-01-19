@@ -41,9 +41,9 @@ class DicomFileStorageActor(storage: Path) extends Actor {
       writeToStorage(metaInformation, anonymizeDicom(dataset), storedPath)
       sender ! FileStored(storedPath, metaInformation, dataset)
 
-    case DeleteFile(filePath) =>
-      deleteFromStorage(filePath)
-      sender ! FileDeleted(filePath)
+    case DeleteFiles(filePaths) =>
+      filePaths.foreach(filePath => deleteFromStorage(filePath))
+      sender ! FilesDeleted(filePaths)
   }
 
   def listDatasets(root: Path): List[Attributes] = {

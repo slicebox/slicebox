@@ -2,25 +2,29 @@ package se.vgregion.dicom
 
 import java.nio.file.Path
 import java.nio.file.Paths
-
 import scala.language.postfixOps
-
 import akka.actor.Actor
 import akka.actor.ActorRef
 import akka.actor.Props
 import akka.actor.actorRef2Scala
+import akka.actor.Stash
 import akka.event.Logging
 import akka.event.LoggingReceive
-
 import se.vgregion.app.DbProps
 import se.vgregion.dicom.DicomProtocol._
 import se.vgregion.util.EventErrorMessage
 import se.vgregion.util.EventInfoMessage
 import se.vgregion.util.EventWarningMessage
+import se.vgregion.dicom.directory.DirectoryWatchServiceActor
+import se.vgregion.dicom.scp.ScpServiceActor
 
-class DicomDispatchActor(directoryService: ActorRef, scpService: ActorRef, storage: Path, dbProps: DbProps) extends Actor {
+class DicomDispatchActor(storage: Path, dbProps: DbProps) extends Actor with Stash {
   val log = Logging(context.system, this)
 
+  val directoryService = context.actorOf(DirectoryWatchServiceActor.props(dbProps, storage), "DirectoryService")
+  
+  val scpService = context.actorOf(ScpServiceActor.props(dbProps, storage), "ScpService")
+  
   val metaDataActor = context.actorOf(DicomMetaDataActor.props(dbProps), name = "MetaData")
 
   val fileStorageActor = context.actorOf(DicomFileStorageActor.props(storage), name = "FileStorage")
@@ -45,27 +49,58 @@ class DicomDispatchActor(directoryService: ActorRef, scpService: ActorRef, stora
       fileStorageActor ! StoreDataset(metaInformation, dataset)
       context.become(waitingForFileStorage(sender))
 
-    case msg: MetaDataRequest =>
+    case msg: MetaDataQuery =>
       metaDataActor forward msg
+      
+    case msg: MetaDataUpdate => msg match {
+      case msg: ChangeOwner =>
+        metaDataActor forward msg
+        
+      case msg: DeleteImage =>
+        metaDataActor ! msg
+        context.become(waitingForMetaData(sender))
+        
+      case msg: DeleteSeries =>
+        metaDataActor ! msg
+        context.become(waitingForMetaData(sender))
+
+      case msg: DeleteStudy =>
+        metaDataActor ! msg
+        context.become(waitingForMetaData(sender))
+
+      case msg: DeletePatient =>
+        metaDataActor ! msg
+        context.become(waitingForMetaData(sender))
+    }
+    
   }
 
-  def waitingForFileStorage(client: ActorRef) = LoggingReceive {
+  def waitingForFileStorage(client: ActorRef): Receive = LoggingReceive {
     case FileStored(filePath, metaInformation, dataset) =>
       metaDataActor ! AddDataset(metaInformation, dataset, filePath.getFileName.toString, owner = "")
+      context.unbecome()
       context.become(waitingForMetaData(client))
-    case FileDeleted(filePath) =>
-      client ! EventInfoMessage("Deleted file: " + filePath.getFileName.toString)
+    case FilesDeleted(filePaths) =>
+      filePaths.foreach(path => log.info("Deleted file " + path))
+      unstashAll()
+      context.unbecome()
+    case other => stash()
   }
 
-  def waitingForMetaData(client: ActorRef) = LoggingReceive {
-    // from metadata
+  def waitingForMetaData(client: ActorRef): Receive = LoggingReceive {
     case DatasetAdded(imageFile) =>
-      client ! EventInfoMessage("Added imageFile: " + imageFile)
+      log.info("Added image file: " + imageFile)
+      unstashAll()
+      context.unbecome()
     case ImageFilesDeleted(imageFiles) =>
-      imageFiles.map(imageFile => Paths.get(imageFile.fileName.value)) foreach (path => fileStorageActor ! DeleteFile(path))
+      val paths = imageFiles.map(imageFile => Paths.get(imageFile.fileName.value))
+      fileStorageActor ! DeleteFiles(paths)
+      context.unbecome()
+      context.become(waitingForFileStorage(client))
+    case other => stash()
   }
 }
 
 object DicomDispatchActor {
-  def props(directoryService: ActorRef, scpService: ActorRef, storage: Path, dbProps: DbProps): Props = Props(new DicomDispatchActor(directoryService, scpService, storage, dbProps))
+  def props(storage: Path, dbProps: DbProps): Props = Props(new DicomDispatchActor(storage, dbProps))
 }

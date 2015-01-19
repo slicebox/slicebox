@@ -31,43 +31,7 @@ class DicomMetaDataActor(dbProps: DbProps) extends Actor {
         sender ! owner.map(o => ImageFiles(dao.imageFilesForImage(image, o))).getOrElse(ImageFiles(dao.imageFilesForImage(image)))
       }
 
-    case msg: MetaDataRequest => msg match {
-      case DeleteImage(image, owner) =>
-        db.withSession { implicit session =>
-          owner match {
-            case Some(o) => dao.deleteImage(image, o)
-            case _       => dao.deleteImage(image)
-          }
-        }
-        sender ! ImageDeleted(image)
-
-      case DeleteSeries(series, owner) =>
-        db.withSession { implicit session =>
-          owner match {
-            case Some(o) => dao.deleteSeries(series, o)
-            case _       => dao.deleteSeries(series)
-          }
-        }
-        sender ! SeriesDeleted(series)
-
-      case DeleteStudy(study, owner) =>
-        db.withSession { implicit session =>
-          owner match {
-            case Some(o) => dao.deleteStudy(study, o)
-            case _       => dao.deleteStudy(study)
-          }
-        }
-        sender ! StudyDeleted(study)
-
-      case DeletePatient(patient, owner) =>
-        db.withSession { implicit session =>
-          owner match {
-            case Some(o) => dao.deletePatient(patient, o)
-            case _       => dao.deletePatient(patient)
-          }
-        }
-        sender ! PatientDeleted(patient)
-
+    case msg: MetaDataQuery => msg match {
       case GetAllImages(owner) =>
         db.withSession { implicit session =>
           sender ! owner.map(o => Images(dao.imagesForOwner(o))).getOrElse(Images(dao.allImages))
@@ -90,12 +54,76 @@ class DicomMetaDataActor(dbProps: DbProps) extends Actor {
           sender ! owner.map(o => Images(dao.imagesForSeries(series, o))).getOrElse(Images(dao.imagesForSeries(series)))
         }
 
+    }
+
+    case msg: MetaDataUpdate => msg match {
+
       case ChangeOwner(image: Image, previousOwner: Owner, newOwner: Owner) =>
         db.withTransaction { implicit session =>
           dao.imageFilesForImage(image, previousOwner).foreach(imageFile =>
             dao.changeOwner(imageFile, newOwner))
+          sender ! OwnerChanged(image, previousOwner, newOwner)
         }
 
+      case DeleteImage(image, owner) =>
+        db.withSession { implicit session =>
+          val files = owner match {
+            case Some(o) =>
+              val f = dao.imageFilesForImage(image, o)
+              dao.deleteImage(image, o)
+              f
+            case _ =>
+              val f = dao.imageFilesForImage(image)
+              dao.deleteImage(image)
+              f
+          }
+          sender ! ImageFilesDeleted(files)
+        }
+
+      case DeleteSeries(series, owner) =>
+        db.withSession { implicit session =>
+          val files = owner match {
+            case Some(o) =>
+              val f = dao.imageFilesForSeries(series, o)
+              dao.deleteSeries(series, o)
+              f
+            case _ =>
+              val f = dao.imageFilesForSeries(series)
+              dao.deleteSeries(series)
+              f
+          }
+          sender ! ImageFilesDeleted(files)
+        }
+
+      case DeleteStudy(study, owner) =>
+        db.withSession { implicit session =>
+          val files = owner match {
+            case Some(o) =>
+              val f = dao.imageFilesForStudy(study, o)
+              dao.deleteStudy(study, o)
+              f
+            case _ =>
+              val f = dao.imageFilesForStudy(study)
+              dao.deleteStudy(study)
+              f
+          }
+          sender ! ImageFilesDeleted(files)
+        }
+
+      case DeletePatient(patient, owner) =>
+        db.withSession { implicit session =>
+          val files = owner match {
+            case Some(o) =>
+              val f = dao.imageFilesForPatient(patient, o)
+              dao.deletePatient(patient, o)
+              f
+            case _ =>
+              val f = dao.imageFilesForPatient(patient)
+              dao.deletePatient(patient)
+              f
+          }
+          sender ! ImageFilesDeleted(files)
+        }
     }
 
     case AddDataset(metaInformation, dataset, fileName, owner) =>

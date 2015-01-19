@@ -81,11 +81,11 @@ class DicomMetaDataDAOTest extends FlatSpec with Matchers {
     db.withSession { implicit session =>
       dao.deleteImageFile(imageFile1)
       dao.allImageFiles.size should be(0)
-      dao.patientCount should be(0)
-      dao.studyCount should be(0)
-      dao.seriesCount should be(0)
-      dao.imageCount should be(0)
       dao.imageFileCount should be(0)
+      dao.imageCount should be(0)
+      dao.seriesCount should be(0)
+      dao.studyCount should be(0)
+      dao.patientCount should be(0)
       dao.equipmentCount should be(0)
       dao.frameOfReferenceCount should be(0)
     }
