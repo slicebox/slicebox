@@ -14,9 +14,8 @@ import akka.event.LoggingReceive
 import se.vgregion.app.DbProps
 import se.vgregion.dicom.DicomDispatchActor
 import se.vgregion.dicom.DicomProtocol._
-import se.vgregion.util.PerEventCreator
 
-class ScpServiceActor(dbProps: DbProps, storage: Path) extends Actor with PerEventCreator {
+class ScpServiceActor(dbProps: DbProps, storage: Path) extends Actor {
   val log = Logging(context.system, this)
 
   val db = dbProps.db

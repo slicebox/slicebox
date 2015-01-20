@@ -1,29 +1,32 @@
 package se.vgregion.app
 
+import java.nio.file.Files
+import java.nio.file.Path
 import java.nio.file.Paths
-import java.util.UUID
+
 import scala.concurrent.duration.DurationInt
 import scala.slick.driver.H2Driver
 import scala.slick.jdbc.JdbcBackend.Database
+
 import akka.actor.Actor
 import akka.actor.ActorContext
-import akka.actor.Props
 import akka.pattern.ask
 import akka.util.Timeout
-import spray.http.StatusCodes._
+
+import spray.http.StatusCodes.BadRequest
+import spray.http.StatusCodes.OK
 import spray.httpx.PlayTwirlSupport.twirlHtmlMarshaller
 import spray.httpx.SprayJsonSupport._
+import spray.httpx.marshalling.ToResponseMarshallable.isMarshallable
 import spray.routing._
+
 import com.typesafe.config.ConfigFactory
+
 import se.vgregion.box.BoxProtocol._
 import se.vgregion.box.BoxServiceActor
 import se.vgregion.dicom.DicomDispatchActor
 import se.vgregion.dicom.DicomHierarchy._
 import se.vgregion.dicom.DicomProtocol._
-import se.vgregion.dicom.directory.DirectoryWatchServiceActor
-import se.vgregion.dicom.scp.ScpServiceActor
-import java.nio.file.Path
-import java.nio.file.Files
 
 class RestInterface extends Actor with RestApi {
 
@@ -66,6 +69,12 @@ trait RestApi extends HttpService with JsonFormats {
   val dicomService = actorRefFactory.actorOf(DicomDispatchActor.props(storage, dbProps), "DicomDispatch")
 
   val authenticator = new Authenticator(userService)
+
+  implicit def sliceboxExceptionHandler =
+    ExceptionHandler {
+      case e: IllegalArgumentException =>
+        complete((BadRequest, "Illegal arguments: " + e.getMessage()))
+    }
 
   def staticResourcesRoutes =
     get {
@@ -144,33 +153,33 @@ trait RestApi extends HttpService with JsonFormats {
     pathPrefix("metadata") {
       get {
         path("patients") {
-          onSuccess(dicomService.ask(GetPatients(None))) {
+          onSuccess(dicomService.ask(GetPatients)) {
             case Patients(patients) =>
               complete(patients)
           }
         } ~ path("studies") {
           entity(as[Patient]) { patient =>
-            onSuccess(dicomService.ask(GetStudies(patient, None))) {
+            onSuccess(dicomService.ask(GetStudies(patient))) {
               case Studies(studies) =>
                 complete(studies)
             }
           }
         } ~ path("series") {
           entity(as[Study]) { study =>
-            onSuccess(dicomService.ask(GetSeries(study, None))) {
+            onSuccess(dicomService.ask(GetSeries(study))) {
               case SeriesCollection(series) =>
                 complete(series)
             }
           }
         } ~ path("images") {
           entity(as[Series]) { series =>
-            onSuccess(dicomService.ask(GetImages(series, None))) {
+            onSuccess(dicomService.ask(GetImages(series))) {
               case Images(images) =>
                 complete(images)
             }
           }
         } ~ path("allimages") {
-          onSuccess(dicomService.ask(GetAllImages(None))) {
+          onSuccess(dicomService.ask(GetAllImages)) {
             case Images(images) =>
               complete(images)
           }

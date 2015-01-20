@@ -11,9 +11,9 @@ import scala.collection.JavaConversions.asScalaBuffer
 import com.typesafe.scalalogging.LazyLogging
 import akka.actor.ActorRef
 import se.vgregion.dicom.DicomProtocol.FileAddedToWatchedDirectory
-import se.vgregion.dicom.DicomProtocol.FileRemovedFromWatchedDirectory
 
 class DirectoryWatch(notifyActor: ActorRef) extends Runnable with LazyLogging {
+
   private val watchService = FileSystems.getDefault.newWatchService()
 
   def watchRecursively(root: Path) = {
@@ -25,7 +25,6 @@ class DirectoryWatch(notifyActor: ActorRef) extends Runnable with LazyLogging {
       }
       override def visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult = {
         super.visitFile(file, attrs)
-        println(s"Adding ${file.toFile().getName}")
         notifyActor ! FileAddedToWatchedDirectory(file)
         FileVisitResult.CONTINUE
       }
@@ -33,12 +32,12 @@ class DirectoryWatch(notifyActor: ActorRef) extends Runnable with LazyLogging {
   }
 
   private def watch(path: Path) =
-    path.register(watchService, ENTRY_CREATE, ENTRY_DELETE)
+    path.register(watchService, ENTRY_CREATE)
 
   def run() = {
-    
+
     try {
-      logger.debug("Waiting for file system events...")
+      logger.debug("Directory watcher waiting for file system events")
       while (!Thread.currentThread().isInterrupted) {
         val key = watchService.take()
         key.pollEvents() foreach {
@@ -46,14 +45,16 @@ class DirectoryWatch(notifyActor: ActorRef) extends Runnable with LazyLogging {
             val relativePath = event.context().asInstanceOf[Path]
             val path = key.watchable().asInstanceOf[Path].resolve(relativePath)
             event.kind() match {
+
               case ENTRY_CREATE =>
-                if (Files.isDirectory(path)) {
+
+                if (Files.isDirectory(path))
                   watchRecursively(path)
-                }
-                notifyActor ! FileAddedToWatchedDirectory(path)
-              case ENTRY_DELETE =>
-                notifyActor ! FileRemovedFromWatchedDirectory(path)
+                else
+                  notifyActor ! FileAddedToWatchedDirectory(path)
+
               case x =>
+
                 logger.warn(s"Unknown event $x")
             }
         }
@@ -61,11 +62,11 @@ class DirectoryWatch(notifyActor: ActorRef) extends Runnable with LazyLogging {
       }
     } catch {
       case e: InterruptedException =>
-        logger.info("Service interrupted, shutting down")
+        logger.debug("Directory watcher interrupted, shutting down")
     } finally {
       watchService.close()
     }
-    
+
   }
-  
+
 }

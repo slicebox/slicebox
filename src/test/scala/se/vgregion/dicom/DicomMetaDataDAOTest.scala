@@ -18,10 +18,6 @@ class DicomMetaDataDAOTest extends FlatSpec with Matchers {
     dao.create
   }
   
-  val owner1 = Owner("Owner1")
-  val owner2 = Owner("Owner2")
-  val owner3 = Owner("Owner3")
-
   val pat1 = Patient(PatientName("p1"), PatientID("s1"), PatientBirthDate("2000-01-01"), PatientSex("M"))
   val study1 = Study(pat1, StudyInstanceUID("stuid1"), StudyDescription("stdesc1"), StudyDate("19990101"), StudyID("stid1"), AccessionNumber("acc1"))
   val study2 = Study(pat1, StudyInstanceUID("stuid2"), StudyDescription("stdesc2"), StudyDate("19990102"), StudyID("stid2"), AccessionNumber("acc2"))
@@ -37,21 +33,21 @@ class DicomMetaDataDAOTest extends FlatSpec with Matchers {
   val image6 = Image(series2, SOPInstanceUID("souid6"), ImageType("PRIMARY/RECON/TOMO"))
   val image7 = Image(series3, SOPInstanceUID("souid7"), ImageType("PRIMARY/RECON/TOMO"))
   val image8 = Image(series4, SOPInstanceUID("souid8"), ImageType("PRIMARY/RECON/TOMO"))
-  val imageFile1 = ImageFile(image1, FileName("file1"), owner1)
-  val imageFile2 = ImageFile(image2, FileName("file2"), owner2)
-  val imageFile3 = ImageFile(image3, FileName("file3"), owner1)
-  val imageFile4 = ImageFile(image4, FileName("file4"), owner2)
-  val imageFile5 = ImageFile(image5, FileName("file5"), owner1)
-  val imageFile6 = ImageFile(image6, FileName("file6"), owner2)
-  val imageFile7 = ImageFile(image7, FileName("file7"), owner1)
-  val imageFile8 = ImageFile(image8, FileName("file8"), owner2)
+  val imageFile1 = ImageFile(image1, FileName("file1"))
+  val imageFile2 = ImageFile(image2, FileName("file2"))
+  val imageFile3 = ImageFile(image3, FileName("file3"))
+  val imageFile4 = ImageFile(image4, FileName("file4"))
+  val imageFile5 = ImageFile(image5, FileName("file5"))
+  val imageFile6 = ImageFile(image6, FileName("file6"))
+  val imageFile7 = ImageFile(image7, FileName("file7"))
+  val imageFile8 = ImageFile(image8, FileName("file8"))
 
   val pat1_copy = Patient(PatientName("p1"), PatientID("s1"), PatientBirthDate("1000-01-01"), PatientSex("F"))
   val study3 = Study(pat1_copy, StudyInstanceUID("stuid3"), StudyDescription("stdesc3"), StudyDate("19990103"), StudyID("stid3"), AccessionNumber("acc3"))
   // the following series has a copied SeriesInstanceUID but unique parent study so should no be treated as copy
   val series1_copy = Series(study3, Equipment(Manufacturer("manu1"), StationName("station1")), FrameOfReference(FrameOfReferenceUID("frid1")), SeriesInstanceUID("souid1"), SeriesDescription("sedesc1"), SeriesDate("19990101"), Modality("NM"), ProtocolName("prot1"), BodyPartExamined("bodypart1"))
   val image9 = Image(series1_copy, SOPInstanceUID("souid9"), ImageType("PRIMARY/RECON/TOMO"))
-  val imageFile9 = ImageFile(image9, FileName("file9"), owner1)
+  val imageFile9 = ImageFile(image9, FileName("file9"))
 
   "The meta data db" should "be emtpy before anything has been added" in {
     db.withSession { implicit session =>
@@ -196,52 +192,6 @@ class DicomMetaDataDAOTest extends FlatSpec with Matchers {
     }
   }
 
-  it should "return the correct number of files, images, series, studies and patients grouped by owner" in {
-    db.withSession { implicit session =>
-      dao.insert(imageFile1)
-      dao.insert(imageFile2)
-      dao.insert(imageFile3)
-
-      dao.studyCount should be (2)
-
-      val owner1Files = dao.imageFilesForOwner(owner1)
-      val owner2Files = dao.imageFilesForOwner(owner2)
-      val owner3Files = dao.imageFilesForOwner(owner3)
-      dao.imageFileCount should be (3)
-      owner1Files.map(_.fileName.value) should be (List("file1", "file3"))
-      owner2Files.map(_.fileName.value) should be (List("file2"))
-      owner3Files.map(_.fileName.value) should be (List())
-
-      val owner1Images = dao.imagesForOwner(owner1)
-      val owner2Images = dao.imagesForOwner(owner2)
-      val owner3Images = dao.imagesForOwner(owner3)
-      owner1Images.map(_.sopInstanceUID.value) should be (List("souid1", "souid3"))
-      owner2Images.map(_.sopInstanceUID.value) should be (List("souid2"))
-      owner3Images.map(_.sopInstanceUID.value) should be (List())
-
-      val owner1Series = dao.seriesForOwner(owner1)
-      val owner2Series = dao.seriesForOwner(owner2)
-      val owner3Series = dao.seriesForOwner(owner3)
-      owner1Series.map(_.seriesInstanceUID.value) should be (List("seuid1", "seuid3"))
-      owner2Series.map(_.seriesInstanceUID.value) should be (List("seuid2"))
-      owner3Series.map(_.seriesInstanceUID.value) should be (List())
-
-      val owner1Studies = dao.studiesForOwner(owner1)
-      val owner2Studies = dao.studiesForOwner(owner2)
-      val owner3Studies = dao.studiesForOwner(owner3)
-      owner1Studies.map(_.studyInstanceUID.value) should be (List("stuid1"))
-      owner2Studies.map(_.studyInstanceUID.value) should be (List("stuid2"))
-      owner3Studies.map(_.studyInstanceUID.value) should be (List())
-
-      val owner1Pats = dao.patientsForOwner(owner1)
-      val owner2Pats = dao.patientsForOwner(owner2)
-      val owner3Pats = dao.patientsForOwner(owner3)
-      owner1Pats.map(_.patientName.value) should be (List("p1"))
-      owner2Pats.map(_.patientName.value) should be (List("p1"))
-      owner3Pats.map(_.patientName.value) should be (List())
-    }
-  }
-
   it should "be empty once again (2) after the single existing patient has been deleted" in {
     db.withSession { implicit session =>
       dao.deletePatient(pat1)
@@ -250,61 +200,4 @@ class DicomMetaDataDAOTest extends FlatSpec with Matchers {
     }
   }
 
-  it should "contain the correct number of entries on each level when inserting a binary tree-like file structure, grouped by owner" in {
-    db.withSession { implicit session =>
-      dao.insert(imageFile1)
-      dao.insert(imageFile2)
-      dao.insert(imageFile3)
-      dao.insert(imageFile4)
-      dao.insert(imageFile5)
-      dao.insert(imageFile6)
-      dao.insert(imageFile7)
-      dao.insert(imageFile8)
-
-      dao.patientsForOwner(owner1).map(p => 
-        p.patientName.value) should be (List("p1"))
-      dao.patientsForOwner(owner2).map(p => 
-        p.patientName.value) should be (List("p1"))
-
-      dao.studiesForPatient(pat1, owner1).map(s => 
-        s.studyInstanceUID.value) should be (List("stuid1"))
-      dao.studiesForPatient(pat1, owner2).map(s => 
-        s.studyInstanceUID.value) should be (List("stuid2"))
-
-      dao.seriesForStudy(study1, owner1).map(s => 
-        s.seriesInstanceUID.value) should be (List("seuid1", "seuid3"))
-      dao.seriesForStudy(study1, owner2).map(s => 
-        s.seriesInstanceUID.value) should be (List())
-      dao.seriesForStudy(study2, owner1).map(s => 
-        s.seriesInstanceUID.value) should be (List())
-      dao.seriesForStudy(study2, owner2).map(s => 
-        s.seriesInstanceUID.value) should be (List("seuid2", "seuid4"))
-
-      dao.imagesForSeries(series1, owner1).map(s => 
-        s.sopInstanceUID.value) should be (List("souid1", "souid5"))
-      dao.imagesForSeries(series1, owner2).map(s => 
-        s.sopInstanceUID.value) should be (List())
-      dao.imagesForSeries(series2, owner1).map(s => 
-        s.sopInstanceUID.value) should be (List())
-      dao.imagesForSeries(series2, owner2).map(s => 
-        s.sopInstanceUID.value) should be (List("souid2", "souid6"))
-      dao.imagesForSeries(series3, owner1).map(s => 
-        s.sopInstanceUID.value) should be (List("souid3", "souid7"))
-      dao.imagesForSeries(series3, owner2).map(s => 
-        s.sopInstanceUID.value) should be (List())
-      dao.imagesForSeries(series4, owner1).map(s => 
-        s.sopInstanceUID.value) should be (List())
-      dao.imagesForSeries(series4, owner2).map(s => 
-        s.sopInstanceUID.value) should be (List("souid4", "souid8"))
-    }
-  }
-
-  it should "be possible to change the owner of an image file" in {
-    db.withSession { implicit session =>
-      val updated = dao.changeOwner(imageFile8, owner3)
-      val owner3Files = dao.imageFilesForOwner(owner3)
-      val imageFile8_updated = ImageFile(image8, FileName("file8"), owner3)
-      owner3Files should be (List(imageFile8_updated))
-    }
-  }
 }

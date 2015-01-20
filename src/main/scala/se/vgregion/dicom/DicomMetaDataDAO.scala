@@ -2,7 +2,6 @@ package se.vgregion.dicom
 
 import scala.slick.driver.JdbcProfile
 import DicomProtocol.FileName
-import DicomProtocol.Owner
 import DicomProtocol.ImageFile
 import DicomHierarchy._
 import DicomPropertyValue._
@@ -149,18 +148,17 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
 
   // *** Files ***
 
-  private case class ImageFileRow(key: Long, imageKey: Long, fileName: FileName, owner: Owner)
+  private case class ImageFileRow(key: Long, imageKey: Long, fileName: FileName)
 
-  private val toImageFileRow = (key: Long, imageKey: Long, fileName: String, owner: String) => ImageFileRow(key, imageKey, FileName(fileName), Owner(owner))
+  private val toImageFileRow = (key: Long, imageKey: Long, fileName: String) => ImageFileRow(key, imageKey, FileName(fileName))
 
-  private val fromImageFileRow = (d: ImageFileRow) => Option((d.key, d.imageKey, d.fileName.value, d.owner.value))
+  private val fromImageFileRow = (d: ImageFileRow) => Option((d.key, d.imageKey, d.fileName.value))
 
   private class ImageFiles(tag: Tag) extends Table[ImageFileRow](tag, "ImageFiles") {
     def key = column[Long]("key", O.PrimaryKey, O.AutoInc)
     def imageKey = column[Long]("imageKey")
     def fileName = column[String]("fileName")
-    def owner = column[String]("owner")
-    def * = (key, imageKey, fileName, owner) <> (toImageFileRow.tupled, fromImageFileRow)
+    def * = (key, imageKey, fileName) <> (toImageFileRow.tupled, fromImageFileRow)
 
     def imageFKey = foreignKey("imageFKey", imageKey, images)(_.key, onUpdate = ForeignKeyAction.Cascade, onDelete = ForeignKeyAction.Cascade)
     def userKeyJoin = images.filter(_.key === imageKey)
@@ -186,7 +184,7 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
   private def rowToFrameOfReference(row: FrameOfReferenceRow) = FrameOfReference(row.frameOfReferenceUID)
   private def rowToSeries(study: Study, equipment: Equipment, frameOfReference: FrameOfReference, row: SeriesRow) = Series(study, equipment, frameOfReference, row.seriesInstanceUID, row.seriesDescription, row.seriesDate, row.modality, row.protocolName, row.bodyPartExamined)
   private def rowToImage(series: Series, row: ImageRow) = Image(series, row.sopInstanceUID, row.imageType)
-  private def rowToImageFile(image: Image, row: ImageFileRow) = ImageFile(image, row.fileName, row.owner)
+  private def rowToImageFile(image: Image, row: ImageFileRow) = ImageFile(image, row.fileName)
 
   // *** Object to key and key for object
 
@@ -297,7 +295,7 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
       .getOrElse {
         val imageKey = insert(imageFile.image)
         (imageFiles returning imageFiles.map(_.key)) +=
-          ImageFileRow(-1, imageKey, imageFile.fileName, imageFile.owner)
+          ImageFileRow(-1, imageKey, imageFile.fileName)
       }
 
   // *** Listing all patients, studies etc ***
@@ -326,63 +324,6 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
   def allImageFiles(implicit session: Session): List[ImageFile] =
     imageFiles.list.map(row =>
       imageForKey(row.imageKey).map(rowToImageFile(_, row))).flatten
-
-  // *** Per owner listings ***
-
-  def patientsForOwner(owner: Owner)(implicit session: Session): List[Patient] =
-    (for {
-      ps <- patients
-      ss <- studies if ps.key === ss.patientKey
-      sz <- seriez if ss.key === sz.studyKey
-      is <- images if sz.key === is.seriesKey
-      ifs <- imageFiles if is.key === ifs.imageKey
-    } yield (ps, ifs))
-      .filter(_._2.owner === owner.value)
-      .list.map(row =>
-        rowToPatient(row._1))
-      .toSet.toList
-
-  def studiesForOwner(owner: Owner)(implicit session: Session): List[Study] =
-    (for {
-      ss <- studies
-      sz <- seriez if ss.key === sz.studyKey
-      is <- images if sz.key === is.seriesKey
-      ifs <- imageFiles if is.key === ifs.imageKey
-    } yield (ss, ifs))
-      .filter(_._2.owner === owner.value)
-      .list.map(row =>
-        patientForKey(row._1.patientKey).map(rowToStudy(_, row._1))).flatten
-      .toSet.toList
-
-  def seriesForOwner(owner: Owner)(implicit session: Session): List[Series] =
-    (for {
-      sz <- seriez
-      is <- images if sz.key === is.seriesKey
-      ifs <- imageFiles if is.key === ifs.imageKey
-    } yield (sz, ifs))
-      .filter(_._2.owner === owner.value)
-      .list.map(row =>
-        studyForKey(row._1.studyKey).flatMap(study =>
-          equipmentForSeriesKey(row._1.key).flatMap(equipment =>
-            frameOfReferenceForSeriesKey(row._1.key).map(frameOfReference =>
-              rowToSeries(study, equipment, frameOfReference, row._1))))).flatten
-      .toSet.toList
-
-  def imagesForOwner(owner: Owner)(implicit session: Session): List[Image] =
-    (for {
-      is <- images
-      ifs <- imageFiles if is.key === ifs.imageKey
-    } yield (is, ifs))
-      .filter(_._2.owner === owner.value)
-      .list.map(row =>
-        seriesForKey(row._1.seriesKey).map(rowToImage(_, row._1))).flatten
-      .toSet.toList
-
-  def imageFilesForOwner(owner: Owner)(implicit session: Session): List[ImageFile] =
-    imageFiles
-      .filter(_.owner === owner.value)
-      .list.map(row =>
-        imageForKey(row.imageKey).map(rowToImageFile(_, row))).flatten
 
   // *** Grouped listings ***
 
@@ -432,85 +373,6 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
         .map(series => imagesForSeries(series)
           .map(image => imageFilesForImage(image)).flatten).flatten).flatten
 
-  // *** Grouped and per owner listings ***
-
-  def studiesForPatient(patient: Patient, owner: Owner)(implicit session: Session): List[Study] =
-    keyForPatient(patient).map(patientKey =>
-      (for {
-        ss <- studies
-        sz <- seriez if ss.key === sz.studyKey
-        is <- images if sz.key === is.seriesKey
-        ifs <- imageFiles if is.key === ifs.imageKey
-      } yield (ss, ifs))
-        .filter(_._2.owner === owner.value)
-        .filter(_._1.patientKey === patientKey)
-        .list.map(row =>
-          rowToStudy(patient, row._1))
-        .toSet.toList)
-      .getOrElse(List())
-
-  def seriesForStudy(study: Study, owner: Owner)(implicit session: Session): List[Series] =
-    keyForStudy(study).map(studyKey =>
-      (for {
-        sz <- seriez
-        is <- images if sz.key === is.seriesKey
-        ifs <- imageFiles if is.key === ifs.imageKey
-      } yield (sz, ifs))
-        .filter(_._2.owner === owner.value)
-        .filter(_._1.studyKey === studyKey)
-        .list.map(row =>
-          equipmentForSeriesKey(row._1.key).flatMap(equipment =>
-            frameOfReferenceForSeriesKey(row._1.key).map(frameOfReference =>
-              rowToSeries(study, equipment, frameOfReference, row._1)))).flatten
-        .toSet.toList)
-      .getOrElse(List())
-
-  def imagesForSeries(series: Series, owner: Owner)(implicit session: Session): List[Image] =
-    keyForSeries(series).map(seriesKey =>
-      (for {
-        is <- images
-        ifs <- imageFiles if is.key === ifs.imageKey
-      } yield (is, ifs))
-        .filter(_._2.owner === owner.value)
-        .filter(_._1.seriesKey === seriesKey)
-        .list.map(row =>
-          rowToImage(series, row._1))
-        .toSet.toList)
-      .getOrElse(List())
-
-  def imageFilesForImage(image: Image, owner: Owner)(implicit session: Session): List[ImageFile] =
-    keyForImage(image).map(imageKey =>
-      imageFiles
-        .filter(_.imageKey === imageKey)
-        .filter(_.owner === owner.value)
-        .list.map(rowToImageFile(image, _)))
-      .getOrElse(List())
-
-  def imageFilesForSeries(series: Series, owner: Owner)(implicit session: Session): List[ImageFile] =
-    imagesForSeries(series, owner)
-      .map(image => imageFilesForImage(image, owner)).flatten
-
-  def imageFilesForStudy(study: Study, owner: Owner)(implicit session: Session): List[ImageFile] =
-    seriesForStudy(study, owner)
-      .map(series => imagesForSeries(series, owner)
-        .map(image => imageFilesForImage(image, owner)).flatten).flatten
-
-  def imageFilesForPatient(patient: Patient, owner: Owner)(implicit session: Session): List[ImageFile] =
-    studiesForPatient(patient, owner)
-      .map(study => seriesForStudy(study, owner)
-        .map(series => imagesForSeries(series, owner)
-          .map(image => imageFilesForImage(image, owner)).flatten).flatten).flatten
-          
-  // *** Owner change ***
-
-  def changeOwner(imageFile: ImageFile, newOwner: Owner)(implicit session: Session): Int =
-    keyForImageFile(imageFile).map(imageFileKey =>
-      imageFiles
-        .filter(_.key === imageFileKey)
-        .map(_.owner)
-        .update(newOwner.value))
-      .getOrElse(0)
-
   // *** Deletes ***
 
   def deletePatient(patient: Patient)(implicit session: Session): Option[Int] = {
@@ -551,35 +413,6 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
     val result = keyForImageFile(imageFile).map(imageFileKey => imageFiles
       .filter(_.key === imageFileKey)
       .delete)
-    if (imageFilesForImage(imageFile.image).isEmpty)
-      deleteImage(imageFile.image)
-    result
-  }
-
-  // *** Deletes per owner ***
-
-  def deletePatient(patient: Patient, owner: Owner)(implicit session: Session): List[Option[Int]] =
-    studiesForPatient(patient, owner).map(study =>
-      deleteStudy(study, owner)).flatten
-
-  def deleteStudy(study: Study, owner: Owner)(implicit session: Session): List[Option[Int]] =
-    seriesForStudy(study, owner).map(series =>
-      deleteSeries(series, owner)).flatten
-
-  def deleteSeries(series: Series, owner: Owner)(implicit session: Session): List[Option[Int]] =
-    imagesForSeries(series, owner).map(image =>
-      deleteImage(image, owner)).flatten
-
-  def deleteImage(image: Image, owner: Owner)(implicit session: Session): List[Option[Int]] =
-    imageFilesForImage(image, owner).map(imageFile =>
-      deleteImageFile(imageFile, owner))
-
-  def deleteImageFile(imageFile: ImageFile, owner: Owner)(implicit session: Session): Option[Int] = {
-    val result = keyForImageFile(imageFile).map(imageFileKey =>
-      imageFiles
-        .filter(_.key === imageFileKey)
-        .filter(_.owner === owner.value)
-        .delete)
     if (imageFilesForImage(imageFile.image).isEmpty)
       deleteImage(imageFile.image)
     result

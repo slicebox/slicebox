@@ -11,7 +11,13 @@ import java.nio.file.Files
 trait RoutesTestBase extends ScalatestRouteTest with RestApi { this: Suite =>
 
   def actorRefFactory = system
-
+  
+  /*
+   * Both test trait RouteTest and RestApi defines an implicit execution context (named executor and executionContext respectively). 
+   * Make sure they point to the test one to avoid ambiguous implicits.
+   */
+  override def executionContext = executor
+  
   def createStorageDirectory = Files.createTempDirectory("slicebox-test-storage-")
     
   def addUser(name: String, password: String, role: Role) = {

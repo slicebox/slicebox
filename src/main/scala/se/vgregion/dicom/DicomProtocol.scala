@@ -8,13 +8,11 @@ object DicomProtocol {
 
   // domain objects
   
-  case class Owner(value: String) extends AnyVal
-
   case class ScpData(name: String, aeTitle: String, port: Int) 
 
-  case class FileName(value: String) extends AnyVal
+  case class FileName(value: String)
 
-  case class ImageFile(image: Image, fileName: FileName, owner: Owner)
+  case class ImageFile(image: Image, fileName: FileName)
 
 
   // messages
@@ -45,35 +43,33 @@ object DicomProtocol {
 
   sealed trait MetaDataQuery
   
-  case class GetAllImages(owner: Option[Owner] = None) extends MetaDataQuery
+  case object GetAllImages extends MetaDataQuery
 
-  case class GetPatients(owner: Option[Owner] = None) extends MetaDataQuery
+  case object GetPatients extends MetaDataQuery
 
-  case class GetStudies(patient: Patient, owner: Option[Owner] = None) extends MetaDataQuery
+  case class GetStudies(patient: Patient) extends MetaDataQuery
 
-  case class GetSeries(study: Study, owner: Option[Owner] = None) extends MetaDataQuery
+  case class GetSeries(study: Study) extends MetaDataQuery
 
-  case class GetImages(series: Series, owner: Option[Owner] = None) extends MetaDataQuery
+  case class GetImages(series: Series) extends MetaDataQuery
 
   
   sealed trait MetaDataUpdate
   
-  case class DeleteImage(image: Image, owner: Option[Owner] = None) extends MetaDataUpdate
+  case class DeleteImage(image: Image) extends MetaDataUpdate
 
-  case class DeleteSeries(series: Series, owner: Option[Owner] = None) extends MetaDataUpdate
+  case class DeleteSeries(series: Series) extends MetaDataUpdate
 
-  case class DeleteStudy(study: Study, owner: Option[Owner] = None) extends MetaDataUpdate
+  case class DeleteStudy(study: Study) extends MetaDataUpdate
 
-  case class DeletePatient(patient: Patient, owner: Option[Owner] = None) extends MetaDataUpdate
+  case class DeletePatient(patient: Patient) extends MetaDataUpdate
   
-  case class ChangeOwner(image: Image, previousOwner: Owner, newOwner: Owner) extends MetaDataUpdate
-
   
-  case class GetAllImageFiles(owner: Option[Owner] = None)
+  case object GetAllImageFiles
 
-  case class GetImageFiles(image: Image, owner: Option[Owner] = None)
+  case class GetImageFiles(image: Image)
 
-  // TODO case class AddDataset(dataset: Attributes, owner: Owner)
+  case class AddDataset(dataset: Attributes)
 
   // ***to API***
 
@@ -87,9 +83,7 @@ object DicomProtocol {
 
   case class ImagesDeleted(images: Seq[Image])
 
-  // TODO case class ImageAdded(image: Image)
-
-  case class OwnerChanged(image: Image, previousOwner: Owner, newOwner: Owner)
+  case class ImageAdded(image: Image)
 
   case class DirectoryWatched(path: Path)
 
@@ -102,19 +96,19 @@ object DicomProtocol {
 
   // ***from scp***
 
-  case class DatasetReceivedByScp(metaInformation: Attributes, dataset: Attributes)
+  case class DatasetReceivedByScp(dataset: Attributes)
 
   // ***from direcory watch***
 
   case class FileAddedToWatchedDirectory(filePath: Path)
 
-  case class FileRemovedFromWatchedDirectory(filePath: Path)
+  // ***to storage***
 
-  // ***to metadata***
+  case class StoreFile(filePath: Path)
 
-  case class AddDataset(metaInformation: Attributes, dataset: Attributes, fileName: String, owner: String)
-
-  // ***from metadata***
+  case class StoreDataset(dataset: Attributes)
+  
+  // ***from storage***
 
   case class ImageFiles(imageFiles: Seq[ImageFile])
   
@@ -122,17 +116,4 @@ object DicomProtocol {
 
   case class ImageFilesDeleted(imageFiles: Seq[ImageFile])
 
-  // ***to storage***
-
-  case class StoreFile(filePath: Path)
-
-  case class StoreDataset(metaInformation: Attributes, dataset: Attributes)
-
-  case class DeleteFiles(filePaths: Seq[Path])
-  
-  // ***from storage***
-
-  case class FileStored(filePath: Path, metaInformation: Attributes, dataset: Attributes)
-
-  case class FilesDeleted(filePaths: Seq[Path])
 }

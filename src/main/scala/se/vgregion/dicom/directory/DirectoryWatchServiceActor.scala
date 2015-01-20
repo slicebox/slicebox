@@ -4,21 +4,18 @@ import java.nio.file.FileSystems
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
-
 import scala.language.postfixOps
-
 import akka.actor.Actor
 import akka.actor.PoisonPill
 import akka.actor.Props
 import akka.event.Logging
 import akka.event.LoggingReceive
-
 import se.vgregion.app.DbProps
 import se.vgregion.dicom.DicomDispatchActor
 import se.vgregion.dicom.DicomProtocol._
-import se.vgregion.util.PerEventCreator
+import akka.actor.Status.Failure
 
-class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor with PerEventCreator {
+class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor {
   val log = Logging(context.system, this)
 
   val db = dbProps.db
@@ -36,16 +33,27 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor 
         val id = pathToId(path)
         context.child(id) match {
           case Some(actor) =>
+            
             sender ! DirectoryWatched(path)
+         
           case None =>
-            if (!Files.isDirectory(path))
-              throw new IllegalArgumentException("Could not create directory watch: Not a directory: " + id)
+            
+            if (!Files.isDirectory(path)) {
 
-            addDirectory(path)
+              sender ! Failure(new IllegalArgumentException("Could not create directory watch: Not a directory: " + pathString))
 
-            context.actorOf(DirectoryWatchActor.props(path), id)
+            } else if (Files.isSameFile(path, storage)) {
+              
+              sender ! Failure(new IllegalArgumentException("The storage directory may not be watched."))              
+              
+            } else {
 
-            sender ! DirectoryWatched(path)
+              addDirectory(path)
+
+              context.actorOf(DirectoryWatchActor.props(path), id)
+
+              sender ! DirectoryWatched(path)
+            }
         }
 
       case UnWatchDirectory(pathString) =>
