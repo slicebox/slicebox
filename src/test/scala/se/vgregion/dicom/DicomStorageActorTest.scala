@@ -20,15 +20,12 @@ import java.io.BufferedInputStream
 import java.nio.file.Files
 import org.dcm4che3.io.DicomInputStream.IncludeBulkData
 import org.dcm4che3.data.Tag
+import se.vgregion.util.TestUtil
 
 class DicomStorageActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
   with WordSpecLike with Matchers with BeforeAndAfterAll {
 
   def this() = this(ActorSystem("StorageTestSystem"))
-
-  override def afterAll {
-    TestKit.shutdownActorSystem(system)
-  }
 
   val db = Database.forURL("jdbc:h2:mem:dicomstorageactortest;DB_CLOSE_DELAY=-1", driver = "org.h2.Driver")
   val dbProps = DbProps(db, H2Driver)
@@ -40,6 +37,11 @@ class DicomStorageActorTest(_system: ActorSystem) extends TestKit(_system) with 
   val storage = Files.createTempDirectory("slicebox-test-storage-")
 
   val storageActor = system.actorOf(DicomStorageActor.props(dbProps, storage))
+
+  override def afterAll {
+    TestKit.shutdownActorSystem(system)
+    TestUtil.deleteFolder(storage)
+  }
 
   "A DicomStorageActor" must {
 

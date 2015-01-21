@@ -2,13 +2,18 @@ package se.vgregion.app
 
 import java.nio.file.Files
 import java.nio.file.Paths
+
+import spray.http.StatusCodes.BadRequest
+import spray.http.StatusCodes.OK
+import spray.httpx.SprayJsonSupport.sprayJsonMarshaller
+import spray.httpx.SprayJsonSupport.sprayJsonUnmarshaller
+
 import org.scalatest.FlatSpec
 import org.scalatest.Matchers
-import se.vgregion.dicom.DicomProtocol._
+
 import se.vgregion.dicom.DicomHierarchy.Image
-import spray.http.StatusCodes.OK
-import spray.http.StatusCodes.BadRequest
-import spray.httpx.SprayJsonSupport._
+import se.vgregion.dicom.DicomProtocol.WatchDirectory
+import se.vgregion.util.TestUtil
 
 class DirectoryRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
@@ -19,6 +24,12 @@ class DirectoryRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   val tempFile = Files.createTempFile("slicebox-temp-file-", ".tmp")
   val watchFile = WatchDirectory(tempFile.toString)
   val watchStorage = WatchDirectory(storage.toString)
+
+  override def afterAll {
+    super.afterAll();
+    TestUtil.deleteFolder(tempDir)
+    Files.delete(tempFile)
+  }
 
   "The system" should "return a monitoring message when asked to watch a new directory" in {
     Post("/api/directory", watchDir) ~> routes ~> check {
@@ -48,7 +59,7 @@ class DirectoryRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     val dcmPath = Paths.get(getClass().getResource(fileName).toURI())
     Files.copy(dcmPath, tempDir.resolve(fileName))
 
-    // just sleep for a tiny bit and let the OS find out there was a new file in the watched directory. It will be picked up and put in the database
+    // sleep for a while and let the OS find out there was a new file in the watched directory. It will be picked up by slicebox
     Thread.sleep(1000)
 
     Get("/api/metadata/allimages") ~> routes ~> check {

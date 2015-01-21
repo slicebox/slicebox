@@ -42,8 +42,12 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor {
 
     case StoreFile(path) =>
       val dataset = loadDicom(path, true)
-      storeDataset(dataset)
-      log.info("Stored file: " + path)
+      if (checkSopClass(dataset)) {
+        storeDataset(dataset)
+        log.info("Stored file: " + path)
+      } else {
+        log.info(s"Received file with unsupported SOP Class UID ${dataset.getString(Tag.SOPClassUID)}, skipping")
+      }
 
     case StoreDataset(dataset) =>
       storeDataset(dataset)
@@ -124,6 +128,12 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor {
 
   }
 
+  def checkSopClass(dataset: Attributes) =
+    SopClasses.sopClasses
+      .filter(_.included)
+      .map(_.sopClassUID)
+      .contains(dataset.getString(Tag.SOPClassUID))
+
   def storeDataset(dataset: Attributes): ImageFile = {
     val name = fileName(dataset)
     val storedPath = storage.resolve(name)
@@ -138,14 +148,18 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor {
 
   def loadDicom(path: Path, withPixelData: Boolean): Attributes = {
     val dis = new DicomInputStream(new BufferedInputStream(Files.newInputStream(path)))
-    val dataset =
-      if (withPixelData)
-        dis.readDataset(-1, -1)
-      else {
-        dis.setIncludeBulkData(IncludeBulkData.NO)
-        dis.readDataset(-1, Tag.PixelData);
-      }
-    dataset
+    try {
+      val dataset =
+        if (withPixelData)
+          dis.readDataset(-1, -1)
+        else {
+          dis.setIncludeBulkData(IncludeBulkData.NO)
+          dis.readDataset(-1, Tag.PixelData);
+        }
+      dataset
+    } finally {
+      SafeClose.close(dis)
+    }
   }
 
   def cloneDataset(dataset: Attributes): Attributes = new Attributes(dataset)

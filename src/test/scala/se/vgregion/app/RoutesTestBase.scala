@@ -7,8 +7,10 @@ import akka.actor.Actor
 import spray.httpx.SprayJsonSupport._
 import spray.http.StatusCodes.OK
 import java.nio.file.Files
+import org.scalatest.BeforeAndAfterAll
+import se.vgregion.util.TestUtil
 
-trait RoutesTestBase extends ScalatestRouteTest with RestApi { this: Suite =>
+trait RoutesTestBase extends ScalatestRouteTest with RestApi  with BeforeAndAfterAll { this: Suite =>
 
   def actorRefFactory = system
   
@@ -23,6 +25,10 @@ trait RoutesTestBase extends ScalatestRouteTest with RestApi { this: Suite =>
   def addUser(name: String, password: String, role: Role) = {
     val user = ClearTextUser(name, role, password)
     Put("/api/user", user)
+  }
+
+  override def afterAll {
+    TestUtil.deleteFolder(storage)
   }
 
 }
