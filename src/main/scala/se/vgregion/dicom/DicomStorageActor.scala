@@ -158,8 +158,12 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor {
     val anonymousDate = new Date(0)
     val anonymousPregnancyStatus = 4
 
+    val uuid = UUID.randomUUID().toString()
+
     val patientName = dataset.getString(Tag.PatientName)
     val patientId = dataset.getString(Tag.PatientID)
+    val sex = dataset.getString(Tag.PatientSex)
+    val age = dataset.getString(Tag.PatientAge)
 
     val modified = cloneDataset(dataset)
 
@@ -180,8 +184,18 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor {
     setStringTag(modified, Tag.PatientReligiousPreference, VR.LO, anonymousString)
     setStringTag(modified, Tag.DeviceSerialNumber, VR.LO, anonymousString)
     setStringTag(modified, Tag.ProtocolName, VR.LO, anonymousString)
+    setStringTag(modified, Tag.AccessionNumber, VR.SH, s"R$uuid")
+    setStringTag(modified, Tag.PatientName, VR.SH, s"$anonymousString $sex $age")
+    setStringTag(modified, Tag.PatientID, VR.LO, s"anon$uuid")
+    setStringTag(modified, Tag.StudyID, VR.SH, s"E$uuid")
+    setStringTag(modified, Tag.PerformedProcedureStepID, VR.SH, s"E$uuid")
+    setStringTag(modified, Tag.RequestedProcedureID, VR.SH, s"E$uuid")
     setDateTag(modified, Tag.PatientBirthDate, VR.DA, anonymousDate)
     setIntTag(modified, Tag.PregnancyStatus, VR.US, anonymousPregnancyStatus)
+    // TODO generate UID tags from dicom root
+    // setStringTag(modified, Tag.StudyInstanceUID, VR.UI, "")
+    // setStringTag(modified, Tag.SeriesInstanceUID, VR.UI, "")
+    // setStringTag(modified, Tag.SOPInstanceUID, VR.UI, "")
 
     // remove tags
     removeTag(modified, Tag.InstitutionAddress)
