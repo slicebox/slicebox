@@ -68,6 +68,21 @@ class DirectoryRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
   }
 
+  it should "not pick up a secondary capture file (unsupported SOP Class)" in {
+
+    val fileName = "cat.dcm"
+    val dcmPath = Paths.get(getClass().getResource(fileName).toURI())
+    Files.copy(dcmPath, tempDir.resolve(fileName))
+
+    // sleep for a while and let the OS find out there was a new file in the watched directory. It will be picked up by slicebox
+    Thread.sleep(1000)
+
+    Get("/api/metadata/allimages") ~> routes ~> check {
+      status should be(OK)
+      responseAs[List[Image]].size should be(1)
+    }
+  }
+
   it should "return a list of one directory when listing watched directories" in {
     Get("/api/directory/list") ~> routes ~> check {
       responseAs[List[String]].size should be(1)
