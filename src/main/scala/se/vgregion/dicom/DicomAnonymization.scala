@@ -11,10 +11,7 @@ import org.dcm4che3.data.Attributes.Visitor
 object DicomAnonymization {
 
   val emptyString = ""
-  val anonymousString = "anonymous"
-  val unknownString = "unknown"
   val anonymousDate = new Date(0)
-  val anonymousPregnancyStatus = 4
 
   def anonymizeDataset(dataset: Attributes): Attributes = {
 
@@ -22,13 +19,6 @@ object DicomAnonymization {
     val patientID = dataset.getString(Tag.PatientID)
     val sex = dataset.getString(Tag.PatientSex)
     val age = dataset.getString(Tag.PatientAge)
-    val studyInstanceUID = dataset.getString(Tag.StudyInstanceUID)
-    val seriesInstanceUID = dataset.getString(Tag.SeriesInstanceUID)
-    val sopInstanceUID = dataset.getString(Tag.SOPInstanceUID)
-    val accessionNumber = dataset.getString(Tag.AccessionNumber)
-    val studyID = dataset.getString(Tag.StudyID)
-    val performedProcedureStepID = dataset.getString(Tag.PerformedProcedureStepID)
-    val requestedProcedureID = dataset.getString(Tag.RequestedProcedureID)
 
     val modified = cloneDataset(dataset)
 
@@ -36,50 +26,50 @@ object DicomAnonymization {
 
     setStringTag(dataset, Tag.PatientIdentityRemoved, VR.CS, "YES")
 
-    setStringTag(modified, Tag.AccessionNumber, VR.SH, createUidOrLeaveEmpty(accessionNumber))
-    removeTag(dataset, Tag.AcquisitionComments)
-    removeTag(dataset, Tag.AcquisitionContextSequence)
-    removeTag(dataset, Tag.AcquisitionDeviceProcessingDescription)
-    removeTag(dataset, Tag.AcquisitionProtocolDescription)
-    removeTag(dataset, Tag.ActualHumanPerformersSequence)
-    removeTag(dataset, Tag.AdditionalPatientHistory)
-    removeTag(dataset, Tag.AddressTrial)
-    removeTag(dataset, Tag.AdmissionID)
-    removeTag(dataset, Tag.AdmittingDiagnosesCodeSequence)
-    removeTag(dataset, Tag.AdmittingDiagnosesDescription)
-    setUidTagOrLeaveEmpty(dataset, modified, Tag.ConcatenationUID)
-    removeTag(dataset, Tag.Allergies)
-    removeTag(dataset, Tag.Arbitrary)
-    removeTag(dataset, Tag.AuthorObserverSequence)
-    removeTag(dataset, Tag.BranchOfService)
-    removeTag(dataset, Tag.CommentsOnThePerformedProcedureStep)
-    removeTag(dataset, Tag.ConfidentialityConstraintOnPatientDataDescription)
-    setStringTag(modified, Tag.ContentCreatorName, VR.PN, anonymizeOrLeaveEmpty(dataset.getString(Tag.ContentCreatorName)))
-    removeTag(dataset, Tag.ContentCreatorIdentificationCodeSequence)
-    removeTag(dataset, Tag.ContentSequence)
-    setUidTagOrLeaveEmpty(dataset, modified, Tag.ContextGroupExtensionCreatorUID)
-    setStringTag(dataset, Tag.ContrastBolusAgent, VR.LO, emptyString)
-    removeTag(dataset, Tag.ContributionDescription)
-    removeTag(dataset, Tag.CountryOfResidence)
-    setUidTagOrLeaveEmpty(dataset, modified, Tag.CreatorVersionUID)
-    removeTag(dataset, Tag.CurrentObserverTrial)
-    removeTag(dataset, Tag.CurrentPatientLocation)
-    removeTag(dataset, Tag.CurveData)
-    removeTag(dataset, Tag.CustodialOrganizationSequence)
-    removeTag(dataset, Tag.DataSetTrailingPadding)
-    removeTag(dataset, Tag.DerivationDescription)
-    removeTag(dataset, Tag.DigitalSignatureUID)
-    removeTag(dataset, Tag.DigitalSignaturesSequence)
-    setUidTagOrLeaveEmpty(dataset, modified, Tag.DimensionOrganizationUID)
-    removeTag(dataset, Tag.DischargeDiagnosisDescription)
-    removeTag(dataset, Tag.DistributionAddress)
-    removeTag(dataset, Tag.DistributionName)
-    setUidTagOrLeaveEmpty(dataset, modified, Tag.DoseReferenceUID)
-    setUidTagsOrLeaveEmpty(dataset, modified, Tag.FailedSOPInstanceUIDList)
-    setUidTagOrLeaveEmpty(dataset, modified, Tag.FiducialUID)
-    setStringTag(dataset, Tag.FillerOrderNumberImagingServiceRequest, VR.LO, emptyString)
-    removeTag(dataset, Tag.FrameComments)
-    setUidTagOrLeaveEmpty(dataset, modified, Tag.FrameOfReferenceUID)
+    setStringTag(modified, Tag.AccessionNumber, VR.SH, createUidOrLeaveEmpty(dataset.getString(Tag.AccessionNumber)))
+    removeTag(modified, Tag.AcquisitionComments)
+    removeTag(modified, Tag.AcquisitionContextSequence)
+    removeTag(modified, Tag.AcquisitionDeviceProcessingDescription)
+    removeTag(modified, Tag.AcquisitionProtocolDescription)
+    removeTag(modified, Tag.ActualHumanPerformersSequence)
+    removeTag(modified, Tag.AdditionalPatientHistory)
+    removeTag(modified, Tag.AddressTrial)
+    removeTag(modified, Tag.AdmissionID)
+    removeTag(modified, Tag.AdmittingDiagnosesCodeSequence)
+    removeTag(modified, Tag.AdmittingDiagnosesDescription)
+    setUidTagOrLeaveEmpty(modified, dataset, Tag.ConcatenationUID)
+    removeTag(modified, Tag.Allergies)
+    removeTag(modified, Tag.Arbitrary)
+    removeTag(modified, Tag.AuthorObserverSequence)
+    removeTag(modified, Tag.BranchOfService)
+    removeTag(modified, Tag.CommentsOnThePerformedProcedureStep)
+    removeTag(modified, Tag.ConfidentialityConstraintOnPatientDataDescription)
+    setStringTag(modified, Tag.ContentCreatorName, VR.PN, emptyString)
+    removeTag(modified, Tag.ContentCreatorIdentificationCodeSequence)
+    removeTag(modified, Tag.ContentSequence)
+    setUidTagOrLeaveEmpty(modified, dataset, Tag.ContextGroupExtensionCreatorUID)
+    setStringTag(modified, Tag.ContrastBolusAgent, VR.LO, emptyString)
+    removeTag(modified, Tag.ContributionDescription)
+    removeTag(modified, Tag.CountryOfResidence)
+    setUidTagOrLeaveEmpty(modified, dataset, Tag.CreatorVersionUID)
+    removeTag(modified, Tag.CurrentObserverTrial)
+    removeTag(modified, Tag.CurrentPatientLocation)
+    removeTag(modified, Tag.CurveData)
+    removeTag(modified, Tag.CustodialOrganizationSequence)
+    removeTag(modified, Tag.DataSetTrailingPadding)
+    removeTag(modified, Tag.DerivationDescription)
+    removeTag(modified, Tag.DigitalSignatureUID)
+    removeTag(modified, Tag.DigitalSignaturesSequence)
+    setUidTagOrLeaveEmpty(modified, dataset, Tag.DimensionOrganizationUID)
+    removeTag(modified, Tag.DischargeDiagnosisDescription)
+    removeTag(modified, Tag.DistributionAddress)
+    removeTag(modified, Tag.DistributionName)
+    setUidTagOrLeaveEmpty(modified, dataset, Tag.DoseReferenceUID)
+    removeTag(modified, Tag.FailedSOPInstanceUIDList)
+    setUidTagOrLeaveEmpty(modified, dataset, Tag.FiducialUID)
+    setStringTag(modified, Tag.FillerOrderNumberImagingServiceRequest, VR.LO, emptyString)
+    removeTag(modified, Tag.FrameComments)
+    setUidTagOrLeaveEmpty(modified, dataset, Tag.FrameOfReferenceUID)
     removeTag(modified, Tag.GraphicAnnotationSequence) // type D
     removeTag(modified, Tag.HumanPerformerName)
     removeTag(modified, Tag.HumanPerformerOrganization)
@@ -90,7 +80,7 @@ object DicomAnonymization {
     removeTag(modified, Tag.ImagingServiceRequestComments)
     removeTag(modified, Tag.Impressions)
     removeTag(modified, Tag.InstanceCoercionDateTime)
-    setUidTagOrLeaveEmpty(dataset, modified, Tag.InstanceCreatorUID)
+    setUidTagOrLeaveEmpty(modified, dataset, Tag.InstanceCreatorUID)
     removeTag(modified, Tag.InstitutionAddress)
     removeTag(modified, Tag.InstitutionCodeSequence)
     removeTag(modified, Tag.InstitutionName)
@@ -104,13 +94,13 @@ object DicomAnonymization {
     removeTag(modified, Tag.InterpretationRecorder)
     removeTag(modified, Tag.InterpretationText)
     removeTag(modified, Tag.InterpretationTranscriber)
-    setUidTagOrLeaveEmpty(dataset, modified, Tag.IrradiationEventUID)
+    setUidTagOrLeaveEmpty(modified, dataset, Tag.IrradiationEventUID)
     removeTag(modified, Tag.IssuerOfAdmissionID)
     removeTag(modified, Tag.IssuerOfPatientID)
     removeTag(modified, Tag.IssuerOfServiceEpisodeID)
-    setUidTagOrLeaveEmpty(dataset, modified, Tag.LargePaletteColorLookupTableUID)
+    setUidTagOrLeaveEmpty(modified, dataset, Tag.LargePaletteColorLookupTableUID)
     removeTag(modified, Tag.MAC)
-    setUidTagOrLeaveEmpty(dataset, modified, Tag.MediaStorageSOPInstanceUID)
+    setUidTagOrLeaveEmpty(modified, dataset, Tag.MediaStorageSOPInstanceUID)
     removeTag(modified, Tag.MedicalAlerts)
     removeTag(modified, Tag.MedicalRecordLocator)
     removeTag(modified, Tag.MilitaryRank)
@@ -120,8 +110,8 @@ object DicomAnonymization {
     removeTag(modified, Tag.ModifyingDeviceManufacturer)
     removeTag(modified, Tag.NameOfPhysiciansReadingStudy)
     removeTag(modified, Tag.NamesOfIntendedRecipientsOfResults)
-    setUidTagOrLeaveEmpty(dataset, modified, Tag.ObservationSubjectUIDTrial)
-    setUidTagOrLeaveEmpty(dataset, modified, Tag.ObservationUID)
+    setUidTagOrLeaveEmpty(modified, dataset, Tag.ObservationSubjectUIDTrial)
+    setUidTagOrLeaveEmpty(modified, dataset, Tag.ObservationUID)
     removeTag(modified, Tag.Occupation)
     removeTag(modified, Tag.OperatorIdentificationSequence)
     removeTag(modified, Tag.OperatorsName)
@@ -134,7 +124,7 @@ object DicomAnonymization {
     removeTag(modified, Tag.OtherPatientNames)
     removeTag(modified, Tag.OverlayComments)
     removeTag(modified, Tag.OverlayData)
-    setUidTagOrLeaveEmpty(dataset, modified, Tag.PaletteColorLookupTableUID)
+    setUidTagOrLeaveEmpty(modified, dataset, Tag.PaletteColorLookupTableUID)
     removeTag(modified, Tag.ParticipantSequence)
     removeTag(modified, Tag.PatientAddress)
     removeTag(modified, Tag.PatientComments)
@@ -171,31 +161,31 @@ object DicomAnonymization {
     removeTag(modified, Tag.ReasonForTheImagingServiceRequest)
     removeTag(modified, Tag.ReasonForStudy)
     removeTag(modified, Tag.ReferencedDigitalSignatureSequence)
-    setUidTagOrLeaveEmpty(dataset, modified, Tag.ReferencedFrameOfReferenceUID)
-    setUidTagOrLeaveEmpty(dataset, modified, Tag.ReferencedGeneralPurposeScheduledProcedureStepTransactionUID)
+    setUidTagOrLeaveEmpty(modified, dataset, Tag.ReferencedFrameOfReferenceUID)
+    setUidTagOrLeaveEmpty(modified, dataset, Tag.ReferencedGeneralPurposeScheduledProcedureStepTransactionUID)
     removeTag(modified, Tag.ReferencedImageSequence) // Keep in UID option but removed here
-    setUidTagOrLeaveEmpty(dataset, modified, Tag.ReferencedObservationUIDTrial)
+    setUidTagOrLeaveEmpty(modified, dataset, Tag.ReferencedObservationUIDTrial)
     removeTag(modified, Tag.ReferencedPatientAliasSequence)
     removeTag(modified, Tag.ReferencedPatientPhotoSequence)
     removeTag(modified, Tag.ReferencedPatientSequence)
     removeTag(modified, Tag.ReferencedPerformedProcedureStepSequence) // Keep in UID option but removed here
     removeTag(modified, Tag.ReferencedSOPInstanceMACSequence)
-    setUidTagOrLeaveEmpty(dataset, modified, Tag.ReferencedSOPInstanceUID)
-    setUidTagOrLeaveEmpty(dataset, modified, Tag.ReferencedSOPInstanceUIDInFile)
+    setUidTagOrLeaveEmpty(modified, dataset, Tag.ReferencedSOPInstanceUID)
+    setUidTagOrLeaveEmpty(modified, dataset, Tag.ReferencedSOPInstanceUIDInFile)
     removeTag(modified, Tag.ReferencedStudySequence) // Keep in UID option but removed here
     removeTag(modified, Tag.ReferringPhysicianAddress)
     removeTag(modified, Tag.ReferringPhysicianIdentificationSequence)
     setStringTag(modified, Tag.ReferringPhysicianName, VR.PN, emptyString)
     removeTag(modified, Tag.ReferringPhysicianTelephoneNumbers)
     removeTag(modified, Tag.RegionOfResidence)
-    setUidTagOrLeaveEmpty(dataset, modified, Tag.RelatedFrameOfReferenceUID)
+    setUidTagOrLeaveEmpty(modified, dataset, Tag.RelatedFrameOfReferenceUID)
     removeTag(modified, Tag.RequestAttributesSequence)
     removeTag(modified, Tag.RequestedContrastAgent)
     removeTag(modified, Tag.RequestedProcedureComments)
     removeTag(modified, Tag.RequestedProcedureDescription)
     removeTag(modified, Tag.RequestedProcedureID)
     removeTag(modified, Tag.RequestedProcedureLocation)
-    setUidTagOrLeaveEmpty(dataset, modified, Tag.RequestedSOPInstanceUID)
+    setUidTagOrLeaveEmpty(modified, dataset, Tag.RequestedSOPInstanceUID)
     removeTag(modified, Tag.RequestingPhysician)
     removeTag(modified, Tag.RequestingService)
     removeTag(modified, Tag.ResponsibleOrganization)
@@ -210,31 +200,31 @@ object DicomAnonymization {
     removeTag(modified, Tag.ScheduledPerformingPhysicianName)
     removeTag(modified, Tag.ScheduledProcedureStepDescription)
     removeTag(modified, Tag.SeriesDescription)
-    setUidTagOrLeaveEmpty(dataset, modified, Tag.SeriesInstanceUID)
+    setUidTagOrLeaveEmpty(modified, dataset, Tag.SeriesInstanceUID)
     removeTag(modified, Tag.ServiceEpisodeDescription)
     removeTag(modified, Tag.ServiceEpisodeID)
-    setUidTagOrLeaveEmpty(dataset, modified, Tag.SOPInstanceUID)
+    setUidTagOrLeaveEmpty(modified, dataset, Tag.SOPInstanceUID)
     removeTag(modified, Tag.SourceImageSequence) // Keep in UID option but removed here
     removeTag(modified, Tag.SpecialNeeds)
-    setUidTagOrLeaveEmpty(dataset, modified, Tag.StorageMediaFileSetUID)
+    setUidTagOrLeaveEmpty(modified, dataset, Tag.StorageMediaFileSetUID)
     removeTag(modified, Tag.StudyComments)
     removeTag(modified, Tag.StudyDescription)
     setStringTag(modified, Tag.StudyID, VR.SH, emptyString)
     removeTag(modified, Tag.StudyIDIssuer)
-    setUidTagOrLeaveEmpty(dataset, modified, Tag.StudyInstanceUID)
-    setUidTagOrLeaveEmpty(dataset, modified, Tag.SynchronizationFrameOfReferenceUID)
-    setUidTagOrLeaveEmpty(dataset, modified, Tag.TargetUID)
+    setUidTagOrLeaveEmpty(modified, dataset, Tag.StudyInstanceUID)
+    setUidTagOrLeaveEmpty(modified, dataset, Tag.SynchronizationFrameOfReferenceUID)
+    setUidTagOrLeaveEmpty(modified, dataset, Tag.TargetUID)
     removeTag(modified, Tag.TelephoneNumberTrial)
-    setUidTagOrLeaveEmpty(dataset, modified, Tag.TemplateExtensionCreatorUID)
-    setUidTagOrLeaveEmpty(dataset, modified, Tag.TemplateExtensionOrganizationUID)
+    setUidTagOrLeaveEmpty(modified, dataset, Tag.TemplateExtensionCreatorUID)
+    setUidTagOrLeaveEmpty(modified, dataset, Tag.TemplateExtensionOrganizationUID)
     removeTag(modified, Tag.TextComments)
     removeTag(modified, Tag.TextString)
     removeTag(modified, Tag.TopicAuthor)
     removeTag(modified, Tag.TopicKeywords)
     removeTag(modified, Tag.TopicSubject)
     removeTag(modified, Tag.TopicTitle)
-    setUidTagOrLeaveEmpty(dataset, modified, Tag.TransactionUID)
-    setUidTagOrLeaveEmpty(dataset, modified, Tag.UID)
+    setUidTagOrLeaveEmpty(modified, dataset, Tag.TransactionUID)
+    setUidTagOrLeaveEmpty(modified, dataset, Tag.UID)
     removeTag(modified, Tag.VerbalSourceTrial)
     removeTag(modified, Tag.VerbalSourceIdentifierCodeSequenceTrial)
     removeTag(modified, Tag.VerifyingObserverIdentificationCodeSequence) // type Z
@@ -249,12 +239,12 @@ object DicomAnonymization {
     modified.accept(new Visitor() {
       def visit(attrs: Attributes, tag: Int, vr: VR, value: Object): Boolean = {
 
-        if (TagUtils.isPrivateTag(tag))
+        if (TagUtils.isPrivateGroup(tag))
           toRemove = toRemove :+ tag
 
         if (value.isInstanceOf[String]) {
           val stringValue = value.asInstanceOf[String]
-          if (stringValue.contains(patientName) || stringValue.contains(patientID))
+          if (patientName != null && stringValue.contains(patientName) || patientID != null && stringValue.contains(patientID))
             toRemove = toRemove :+ tag
         }
 
@@ -269,19 +259,12 @@ object DicomAnonymization {
 
   def cloneDataset(dataset: Attributes): Attributes = new Attributes(dataset)
 
-  def setStringTag(dataset: Attributes, tag: Int, vr: VR, values: String*): Unit =
-    if (values == null)
-      dataset.setString(tag, vr, null)
-    else
-      dataset.setString(tag, vr, values: _*)
-
+  def setStringTag(dataset: Attributes, tag: Int, vr: VR, value: String): Unit = dataset.setString(tag, vr, value)
   def setDateTag(dataset: Attributes, tag: Int, vr: VR, value: Date): Unit = dataset.setDate(tag, vr, value)
   def removeTag(dataset: Attributes, tag: Int): Unit = dataset.remove(tag)
 
-  def setUidTagOrLeaveEmpty(dataset: Attributes, modified: Attributes, tag: Int) =
+  def setUidTagOrLeaveEmpty(modified: Attributes, dataset: Attributes, tag: Int) =
     setStringTag(modified, tag, VR.UI, createUidOrLeaveEmpty(dataset.getString(tag)))
-  def setUidTagsOrLeaveEmpty(dataset: Attributes, modified: Attributes, tag: Int) =
-    setStringTag(modified, tag, VR.UI, createUidsOrLeaveEmpty(dataset.getStrings(tag): _*): _*)
 
   def createUidsOrLeaveEmpty(baseValues: String*): Array[String] =
     if (baseValues == null)
@@ -290,8 +273,6 @@ object DicomAnonymization {
       baseValues.map(createUidOrLeaveEmpty(_)).toArray
 
   def createUidOrLeaveEmpty(baseValue: String): String = leaveEmpty(baseValue).getOrElse(createUid(baseValue))
-
-  def anonymizeOrLeaveEmpty(baseValue: String): String = leaveEmpty(baseValue).getOrElse(anonymousString)
 
   def leaveEmpty(baseValue: String): Option[String] =
     if (baseValue == null)
@@ -310,6 +291,6 @@ object DicomAnonymization {
   def createAnonymousPatientName(sex: String, age: String) = {
     val sexString = if (sex == null || sex.isEmpty) "<unknown sex>" else sex
     val ageString = if (age == null || age.isEmpty) "<unknown age>" else age
-    s"$anonymousString $sex $age"
+    s"Anonymous $sex $age"
   }
 }
