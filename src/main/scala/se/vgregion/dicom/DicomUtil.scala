@@ -41,6 +41,8 @@ object DicomUtil {
           dis.readDataset(-1, Tag.PixelData);
         }
       dataset
+    } catch {
+      case _: Exception => null
     } finally {
       SafeClose.close(dis)
     }

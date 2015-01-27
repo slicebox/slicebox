@@ -104,9 +104,7 @@ object DicomProtocol {
 
   // ***to storage***
 
-  case class StoreFile(filePath: Path)
-
-  case class StoreDataset(dataset: Attributes)
+  case class DatasetReceived(dataset: Attributes)
   
   // ***from storage***
 

@@ -3,16 +3,13 @@ package se.vgregion.dicom
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
-
 import akka.actor.Actor
 import akka.actor.Props
 import akka.actor.actorRef2Scala
 import akka.event.Logging
 import akka.event.LoggingReceive
-
 import org.dcm4che3.data.Attributes
 import org.dcm4che3.data.Tag
-
 import se.vgregion.app.DbProps
 import se.vgregion.dicom.DicomProtocol.AddDataset
 import se.vgregion.dicom.DicomProtocol.DeleteImage
@@ -36,10 +33,7 @@ import se.vgregion.dicom.DicomProtocol.MetaDataQuery
 import se.vgregion.dicom.DicomProtocol.MetaDataUpdate
 import se.vgregion.dicom.DicomProtocol.Patients
 import se.vgregion.dicom.DicomProtocol.SeriesCollection
-import se.vgregion.dicom.DicomProtocol.StoreDataset
-import se.vgregion.dicom.DicomProtocol.StoreFile
 import se.vgregion.dicom.DicomProtocol.Studies
-
 import DicomHierarchy.Equipment
 import DicomHierarchy.FrameOfReference
 import DicomHierarchy.Image
@@ -67,6 +61,7 @@ import DicomPropertyValue.StudyDescription
 import DicomPropertyValue.StudyID
 import DicomPropertyValue.StudyInstanceUID
 import DicomUtil._
+import se.vgregion.dicom.DicomProtocol.DatasetReceived
 
 class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor {
   val log = Logging(context.system, this)
@@ -76,19 +71,15 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor {
 
   setupDb()
 
+  override def preStart {
+    context.system.eventStream.subscribe(context.self, classOf[DatasetReceived])
+  }
+
   def receive = LoggingReceive {
 
-    case StoreFile(path) =>
-      val dataset = loadDataset(path, true)
-      if (checkSopClass(dataset)) {
-        storeDataset(dataset)
-        log.info("Stored file: " + path)
-      } else {
-        log.info(s"Received file with unsupported SOP Class UID ${dataset.getString(Tag.SOPClassUID)}, skipping")
-      }
-
-    case StoreDataset(dataset) =>
+    case DatasetReceived(dataset) =>
       storeDataset(dataset)
+      log.info("Stored dataset: " + dataset.getString(Tag.SOPInstanceUID))
 
     case AddDataset(dataset) =>
       val imageFile = storeDataset(dataset)

@@ -34,9 +34,8 @@ class ScpActor(scpData: ScpData, executor: Executor) extends Actor {
   }
 
   def receive = LoggingReceive {
-    case msg: DatasetReceivedByScp =>
-      context.parent ! msg
-
+    case DatasetReceivedByScp(dataset) =>
+      context.system.eventStream.publish(DatasetReceived(dataset))
   }
 
 }

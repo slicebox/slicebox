@@ -10,7 +10,10 @@ import akka.event.Logging
 import akka.event.LoggingReceive
 
 import se.vgregion.app.DbProps
-import se.vgregion.dicom.DicomProtocol._
+import se.vgregion.dicom.DicomProtocol.DirectoryRequest
+import se.vgregion.dicom.DicomProtocol.MetaDataQuery
+import se.vgregion.dicom.DicomProtocol.MetaDataUpdate
+import se.vgregion.dicom.DicomProtocol.ScpRequest
 import se.vgregion.dicom.directory.DirectoryWatchServiceActor
 import se.vgregion.dicom.scp.ScpServiceActor
 
@@ -36,12 +39,6 @@ class DicomDispatchActor(storage: Path, dbProps: DbProps) extends Actor {
 
     case msg: MetaDataUpdate =>
       storageActor forward msg
-
-    case FileAddedToWatchedDirectory(filePath) =>
-      storageActor ! StoreFile(filePath)
-
-    case DatasetReceivedByScp(dataset) =>
-      storageActor ! StoreDataset(dataset)
 
   }
 

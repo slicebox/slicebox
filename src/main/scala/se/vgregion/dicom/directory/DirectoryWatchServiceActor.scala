@@ -78,9 +78,6 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor 
 
     }
 
-    case msg: FileAddedToWatchedDirectory =>
-      context.parent ! msg
-
   }
 
   def pathToId(path: Path) =
