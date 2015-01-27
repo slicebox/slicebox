@@ -1,0 +1,33 @@
+<div ng-if="uiState.errorMessage" class="row">
+    <div class="col-md-12">
+        <alert type="danger" close="closeErrorMessageAlert()">{{uiState.errorMessage}}</alert>
+    </div>
+</div>
+
+<div class="row">
+	<div class="col-md-12">
+        <div class="panel panel-default">
+            <div class="panel-heading">Watch Directories</div>
+
+            <div class="panel-body">
+                <sbx-grid
+                    load-page="loadWatchDirectoriesPage(startIndex, count, orderByProperty, orderByDirection)"
+                    converter="convertWatchDirectoriesPageData(pageData)"
+                    page-size="20"
+                    object-actions="objectActions"
+                    callbacks="callbacks.directoriesTable"
+                    empty-message="No watch directories added">
+
+                    <sbx-grid-column property="path" title="Path">
+                    </sbx-grid-column>
+                </sbx-grid>
+
+                <button class="btn btn-default" type="button"
+                    ng-click="addDirectoryButtonClicked()"
+                    ng-disabled="uiState.addDirectoryInProgress">
+                    Add Directory
+                </button>
+            </div>
+        </div>
+	</div>
+</div>

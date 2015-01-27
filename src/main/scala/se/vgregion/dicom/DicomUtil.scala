@@ -31,8 +31,10 @@ object DicomUtil {
   }
 
   def loadDataset(path: Path, withPixelData: Boolean): Attributes = {
-    val dis = new DicomInputStream(new BufferedInputStream(Files.newInputStream(path)))
+    var dis: DicomInputStream = null
     try {
+      dis = new DicomInputStream(new BufferedInputStream(Files.newInputStream(path)))
+      
       val dataset =
         if (withPixelData)
           dis.readDataset(-1, -1)

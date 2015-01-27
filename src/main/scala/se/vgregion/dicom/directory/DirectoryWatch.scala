@@ -42,6 +42,8 @@ class DirectoryWatch(notifyActor: ActorRef) extends Runnable with LazyLogging {
         val key = watchService.take()
         key.pollEvents() foreach {
           event =>
+            logger.debug(s"Recevied event: $event")
+            
             val relativePath = event.context().asInstanceOf[Path]
             val path = key.watchable().asInstanceOf[Path].resolve(relativePath)
             event.kind() match {

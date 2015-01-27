@@ -38,7 +38,7 @@ class RestInterface extends Actor with RestApi {
     val storagePath = Paths.get(sliceboxConfig.getString("storage"))
     if (!Files.exists(storagePath))
       Files.createDirectories(storagePath)
-    if (!Files.isDirectory(storage))
+    if (!Files.isDirectory(storagePath))
       throw new IllegalArgumentException("Storage directory is not a directory.")
     storagePath
   }
@@ -85,9 +85,9 @@ trait RestApi extends HttpService with JsonFormats {
       }
     }
 
-  def twirlRoutes =
+  def angularRoutes =
     get {
-      path("") {
+      pathPrefix("") {
         complete(views.html.index())
       }
     }
@@ -101,22 +101,23 @@ trait RestApi extends HttpService with JsonFormats {
               complete("Now watching directory " + path)
           }
         }
-      } ~ delete {
-        entity(as[UnWatchDirectory]) { directory =>
-          onSuccess(dicomService.ask(directory)) {
-            case DirectoryUnwatched(path) =>
-              complete("Stopped watching directory " + path)
+      } ~ path(LongNumber) { watchDirectoryId =>
+        pathEnd {
+          delete {
+            onSuccess(dicomService.ask(UnWatchDirectory(watchDirectoryId))) {
+              case DirectoryUnwatched(path) =>
+                complete("Stopped watching directory " + path)
+            }
           }
         }
       } ~ get {
         path("list") {
           onSuccess(dicomService.ask(GetWatchedDirectories)) {
             case WatchedDirectories(list) =>
-              complete(list.map(_.toString))
+              complete(list)
           }
         }
       }
-
     }
 
   def scpRoutes: Route =
@@ -290,9 +291,9 @@ trait RestApi extends HttpService with JsonFormats {
     }
 
   def routes: Route =
-    twirlRoutes ~ staticResourcesRoutes ~ pathPrefix("api") {
+    pathPrefix("api") {
       directoryRoutes ~ scpRoutes ~ metaDataRoutes ~ boxRoutes ~ userRoutes ~ systemRoutes
-    }
+    } ~ staticResourcesRoutes ~ angularRoutes
 
 }
 

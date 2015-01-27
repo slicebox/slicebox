@@ -1,0 +1,93 @@
+.sbxGridHeader {
+    padding: 0px;
+    padding-bottom: 5px;
+    background-color: rgb(255, 255, 255);
+}
+
+.sbxGridHeader button,
+.sbxGridHeader button:hover,
+.sbxGridHeader button:focus,
+.sbxGridHeader button:active,
+.sbxGridHeader button:disabled {
+    background-color: rgba(0, 0, 0, 0);
+    border: 0px;
+    color: rgb(103, 106, 108);
+}
+
+.sbxGrid th a {
+    color: rgb(103, 106, 108);
+}
+
+.sbxGrid .tableWrapper {
+    border-color: rgb(231, 231, 231);
+    border-style: solid;
+    border-width: 1px;
+    overflow: auto;
+    margin-bottom: 5px;
+}
+
+.sbxGrid .tableWrapper .empty-message {
+    padding: 20px;
+    text-align: center;
+    font-style: italic;
+    color: gray;
+}
+
+.sbxGrid .columns-configuration {
+    margin-left: 10px;
+}
+
+.sbxGrid .columns-configuration ul {
+    min-width: 200px;
+}
+
+.sbxGrid .columns-configuration li {
+    padding-left: 30px;
+}
+
+.sbxGrid .columns-configuration ul>li>label {
+    font-weight: normal;
+}
+
+.sbxGrid table {
+    border-width: 0px;
+    margin-bottom: 0px;
+}
+
+.sbxGrid table thead tr th:first-child {
+    border-left-width: 0px;
+}
+
+.sbxGrid table thead tr th:last-child {
+    border-right-width: 0px;
+}
+
+.sbxGrid table tbody tr td:first-child {
+    border-left-width: 0px;
+}
+
+.sbxGrid table tbody tr td:last-child {
+    border-right-width: 0px;
+}
+
+.sbxGrid table tbody tr:last-child td {
+    border-bottom-width: 0px;
+}
+
+.sbxGrid .pager {
+    margin: 0px;
+}
+
+.sbxGrid .pager a {
+    border-color: rgb(221, 221, 221);
+    color: rgb(103, 106, 108);
+    border-radius: 3px;
+}
+
+.popover-buttons-container {
+    margin-top: 10px;
+}
+
+.sbxGrid .table-hover>tbody>tr:hover>td.edit-column {
+    background-color: #e6f3ff;
+}

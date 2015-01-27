@@ -13,6 +13,8 @@ object DicomProtocol {
   case class FileName(value: String)
 
   case class ImageFile(image: Image, fileName: FileName)
+  
+  case class WatchedDirectory(id: Long, path: String)
 
 
   // messages
@@ -22,11 +24,11 @@ object DicomProtocol {
   
   case class WatchDirectory(pathString: String) extends DirectoryRequest
 
-  case class UnWatchDirectory(pathString: String) extends DirectoryRequest
+  case class UnWatchDirectory(id: Long) extends DirectoryRequest
 
   case object GetWatchedDirectories extends DirectoryRequest
     
-  case class WatchedDirectories(names: Seq[Path])
+  case class WatchedDirectories(names: Seq[WatchedDirectory])
 
   
   
@@ -87,7 +89,7 @@ object DicomProtocol {
 
   case class DirectoryWatched(path: Path)
 
-  case class DirectoryUnwatched(path: Path)
+  case class DirectoryUnwatched(id: Long)
 
   case class ScpAdded(scpData: ScpData)
 

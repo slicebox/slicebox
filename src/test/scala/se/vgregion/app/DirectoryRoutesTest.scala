@@ -12,7 +12,7 @@ import org.scalatest.FlatSpec
 import org.scalatest.Matchers
 
 import se.vgregion.dicom.DicomHierarchy.Image
-import se.vgregion.dicom.DicomProtocol.WatchDirectory
+import se.vgregion.dicom.DicomProtocol._
 import se.vgregion.util.TestUtil
 
 class DirectoryRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
@@ -61,6 +61,8 @@ class DirectoryRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
     // sleep for a while and let the OS find out there was a new file in the watched directory. It will be picked up by slicebox
     Thread.sleep(1000)
+    
+    println(s"Number of files: ${tempDir.toFile().listFiles().length}");
 
     Get("/api/metadata/allimages") ~> routes ~> check {
       status should be(OK)
@@ -85,13 +87,14 @@ class DirectoryRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
   it should "return a list of one directory when listing watched directories" in {
     Get("/api/directory/list") ~> routes ~> check {
-      responseAs[List[String]].size should be(1)
+      responseAs[List[WatchedDirectory]].size should be (1)
     }
   }
 
   it should "be possible to remove a watched directory" in {
-    Delete("/api/directory", watchDir) ~> routes ~> check {
-      responseAs[String] should be(s"Stopped watching directory $tempDir")
+    // TODO: this doesn't test that the watched directory is actually removed from db and that actor is stopped, it only tests that the request can be handled
+    Delete("/api/directory/1", watchDir) ~> routes ~> check {
+      responseAs[String] should be ("Stopped watching directory 1")
     }
   }
 }
