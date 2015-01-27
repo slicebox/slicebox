@@ -10,6 +10,7 @@ trait JsonFormats extends DefaultJsonProtocol {
 
   implicit val watchDirectoryFormat = jsonFormat1(WatchDirectory)
   implicit val unWatchDirectoryFormat = jsonFormat1(UnWatchDirectory)
+  implicit val watchedDirectoryFormat = jsonFormat2(WatchedDirectory)
 
   implicit val scpDataFormat = jsonFormat3(ScpData)
 

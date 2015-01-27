@@ -44,7 +44,7 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor 
 
               addDirectory(path)
 
-              context.actorOf(DirectoryWatchActor.props(path), id)
+              context.actorOf(DirectoryWatchActor.props(pathString), id)
 
               sender ! DirectoryWatched(path)
 
@@ -53,26 +53,32 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor 
             }
         }
 
-      case UnWatchDirectory(pathString) =>
-        val path = Paths.get(pathString)
-        val id = pathToId(path)
-        context.child(id) match {
-          case Some(ref) =>
-            try {
-
+      case UnWatchDirectory(watchDirectoryId) =>
+        db.withSession { implicit session =>
+          dao.getById(watchDirectoryId) } match {
+            case Some(watchDirectory) =>
+              val path = Paths.get(watchDirectory.path)
               removeDirectory(path)
-
-              ref ! PoisonPill
-
-              sender ! DirectoryUnwatched(path)
-
-            } catch {
-              case e: Exception => sender ! ServerError("Could not remove directory watch: " + e.getMessage)
-            }
-          case None =>
-            sender ! DirectoryUnwatched(path)
+              
+              val id = pathToId(path)
+              context.child(id) match {
+                case Some(ref) =>
+                  try {
+                    ref ! PoisonPill
+      
+                    sender ! DirectoryUnwatched(watchDirectoryId)
+      
+                  } catch {
+                    case e: Exception => sender ! ServerError("Could not remove directory watch: " + e.getMessage)
+                  }
+                case None =>
+                  sender ! DirectoryUnwatched(watchDirectoryId)
+              }
+              
+            case None =>
+              sender ! DirectoryUnwatched(watchDirectoryId)
         }
-
+        
       case GetWatchedDirectories =>
         val directories = getDirectories()
         sender ! WatchedDirectories(directories)
@@ -86,6 +92,7 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor 
 
   def pathToId(path: Path) =
     path.toAbsolutePath().toString
+      .replace(" ", "_") // Spaces are not allowed in actor ids
       .replace("-", "--") // Replace '-' in directory names to avoid conflict with directory separator in next replace below
       .replace(FileSystems.getDefault.getSeparator, "-")
 
@@ -97,7 +104,7 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor 
   def setupWatches() =
     db.withTransaction { implicit session =>
       val watchPaths = dao.list
-      watchPaths foreach (path => context.actorOf(DirectoryWatchActor.props(path), pathToId(path)))
+      watchPaths foreach (watchedDirectory => context.actorOf(DirectoryWatchActor.props(watchedDirectory.path), pathToId(Paths.get(watchedDirectory.path))))
     }
 
   def addDirectory(path: Path) =

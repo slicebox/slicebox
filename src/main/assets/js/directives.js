@@ -355,9 +355,9 @@ angular.module('slicebox.directives', [])
                 //     // Retry on error
                 //     loadColumnVisibilityPreference();
                 // });
-}
+            }
 
-function saveColumnsVisibilityPreference() {
+            function saveColumnsVisibilityPreference() {
                 // TODO: save preference
 
                 // var visibleColumnProperties = [];

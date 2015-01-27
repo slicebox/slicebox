@@ -9,8 +9,9 @@ import akka.event.Logging
 import akka.event.LoggingReceive
 import se.vgregion.dicom.DicomProtocol.FileAddedToWatchedDirectory
 import se.vgregion.dicom.DicomProtocol.FileRemovedFromWatchedDirectory
+import java.nio.file.Paths
 
-class DirectoryWatchActor(directory: Path) extends Actor {
+class DirectoryWatchActor(directoryPath: String) extends Actor {
   val log = Logging(context.system, this)
   val watchServiceTask = new DirectoryWatch(self)
   val watchThread = new Thread(watchServiceTask, "WatchService")
@@ -18,7 +19,7 @@ class DirectoryWatchActor(directory: Path) extends Actor {
   override def preStart() {
     watchThread.setDaemon(true)
     watchThread.start()
-    watchServiceTask watchRecursively directory
+    watchServiceTask watchRecursively Paths.get(directoryPath)
   }
 
   override def postStop() {
@@ -35,5 +36,5 @@ class DirectoryWatchActor(directory: Path) extends Actor {
 }
 
 object DirectoryWatchActor {
-  def props(directory: Path): Props = Props(new DirectoryWatchActor(directory))
+  def props(directoryPath: String): Props = Props(new DirectoryWatchActor(directoryPath))
 }

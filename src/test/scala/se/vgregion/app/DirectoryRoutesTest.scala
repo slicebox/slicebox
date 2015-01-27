@@ -46,13 +46,14 @@ class DirectoryRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   
   it should "return a list of one directory when listing watched directories" in {
     Get("/api/directory/list") ~> routes ~> check {
-      responseAs[List[String]].size should be (1)
+      responseAs[List[WatchedDirectory]].size should be (1)
     }
   }
 
   it should "be possible to remove a watched directory" in {
-    Delete("/api/directory", watchDir) ~> routes ~> check {
-      responseAs[String] should be (s"Stopped watching directory $tempDir")
+    // TODO: this doesn't test that the wather is actually removed from db and that actor i stopped, it only tests that the request can be handled
+    Delete("/api/directory/1", watchDir) ~> routes ~> check {
+      responseAs[String] should be ("Stopped watching directory 1")
     }
   }
 }
