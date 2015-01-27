@@ -73,15 +73,15 @@ object DicomUtil {
       BodyPartExamined(valueOrEmpty(dataset, DicomProperty.BodyPartExamined.dicomTag))),
 
       SOPInstanceUID(valueOrEmpty(dataset, DicomProperty.SOPInstanceUID.dicomTag)),
-      ImageType(readSequence(dataset.getStrings(DicomProperty.ImageType.dicomTag))))
+      ImageType(readMultiple(dataset.getStrings(DicomProperty.ImageType.dicomTag))))
 
   private def valueOrEmpty(dataset: Attributes, tag: Int) = Option(dataset.getString(tag)).getOrElse("")
 
-  def readSequence(sequence: Array[String]): String =
-    if (sequence == null || sequence.length == 0)
+  def readMultiple(values: Array[String]): String =
+    if (values == null || values.length == 0)
       ""
     else
-      sequence.tail.foldLeft(sequence.head)((result, part) => result + "/" + part)
+      values.tail.foldLeft(values.head)((result, part) => result + "/" + part)
 
   def checkSopClass(dataset: Attributes) =
     SopClasses.sopClasses
