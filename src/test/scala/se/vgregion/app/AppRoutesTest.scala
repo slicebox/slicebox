@@ -13,8 +13,6 @@ class AppRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
   def dbUrl() = "jdbc:h2:mem:approutestest;DB_CLOSE_DELAY=-1"
 
-  val hej = implicitly[ExecutionContext]
-  
   def testRoute =
     path("castexception") {
       onSuccess(Future.failed[String](new IllegalArgumentException("Oups"))) { extraction =>
@@ -22,17 +20,11 @@ class AppRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       }
     }
 
-  override def routes = super.routes ~ testRoute
+  override def routes = testRoute ~ super.routes
 
-  "The system" should "not handle requests to the root API path" in {
-    Get("/api/") ~> routes ~> check {
-      handled should be(false)
-    }
-  }
-  
-  it should "respond with BadRequest when a route throws an IllegalArgumentException" in {
+  "The system" should "respond with BadRequest when a route throws an IllegalArgumentException" in {
     Get("/castexception") ~> routes ~> check {
-      status should be (BadRequest)
+    	status should be (BadRequest)
       responseAs[String] should be ("Illegal arguments: Oups")
     }    
   }
