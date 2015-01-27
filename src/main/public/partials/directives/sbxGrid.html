@@ -89,7 +89,7 @@
 
                 <td ng-repeat="columnDefinition in columnDefinitions track by columnDefinition.property"
                     ng-show="columnConfigurations[columnDefinition.property].visible">
-                    {{filteredCellValues[$index][columnDefinition.property]}}
+                    {{filteredCellValues[$parent.$index][columnDefinition.property]}}
                 </td>
             </tr>
         </tbody>

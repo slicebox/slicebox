@@ -306,8 +306,6 @@ angular.module('slicebox.directives', [])
             }
 
             function doOnColumnsChanged() {
-                var loadValidValuesResult = null;
-
                 $scope.columnMetaDatas = {};
 
                 angular.forEach($scope.columnDefinitions, function(columnDefinition) {
@@ -428,47 +426,47 @@ angular.module('slicebox.directives', [])
             $scope.objectList = convertPageData(pageData);
 
             if ($scope.objectList.length > $scope.currentPageSize) {
-                    // Remove the extra object from the end of the list
-                    $scope.objectList.splice(-1, 1);
-                    $scope.morePagesExists = true;
-                } else {
-                    $scope.morePagesExists = false;
-                }
-
-                validateAndUpdateSelectedObject();
-                validateAndUpdateObjectActionSelections();
-
-                if ($scope.objectList.length === 0) {
-                    // Avoid empty pages
-                    $scope.loadPreviousPage();
-                }
-
-                calculateFilteredCellValues();
+                // Remove the extra object from the end of the list
+                $scope.objectList.splice(-1, 1);
+                $scope.morePagesExists = true;
+            } else {
+                $scope.morePagesExists = false;
             }
 
-            function convertPageData(pageData) {
-                var result = null;
+            validateAndUpdateSelectedObject();
+            validateAndUpdateObjectActionSelections();
 
-                if (angular.isDefined($attrs.converter)) {
-                    result = $scope.converter({pageData: pageData});
-                    if (!angular.isArray(result)) {
-                        throwError('PageDataError', 'Converter must return an array');
-                    }
-                } else if (angular.isArray(pageData)) {
-                    result = pageData;
-                } else {
-                    throwError('PageDataError', 'Unknown format for page data. Consider setting a converter.\n' + angular.toJson(pageData));
-                }
-
-                return result;
+            if ($scope.objectList.length === 0) {
+                // Avoid empty pages
+                $scope.loadPreviousPage();
             }
 
-            function calculateFilteredCellValues() {
-                $scope.filteredCellValues = [];
+            calculateFilteredCellValues();
+        }
 
-                if (!$scope.objectList ||
-                    $scope.objectList.length === 0) {
-                    return;
+        function convertPageData(pageData) {
+            var result = null;
+
+            if (angular.isDefined($attrs.converter)) {
+                result = $scope.converter({pageData: pageData});
+                if (!angular.isArray(result)) {
+                    throwError('PageDataError', 'Converter must return an array');
+                }
+            } else if (angular.isArray(pageData)) {
+                result = pageData;
+            } else {
+                throwError('PageDataError', 'Unknown format for page data. Consider setting a converter.\n' + angular.toJson(pageData));
+            }
+
+            return result;
+        }
+
+        function calculateFilteredCellValues() {
+            $scope.filteredCellValues = [];
+
+            if (!$scope.objectList ||
+                $scope.objectList.length === 0) {
+                return;
             }
 
             angular.forEach($scope.objectList, function(rowObject) {
