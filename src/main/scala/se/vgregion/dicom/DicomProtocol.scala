@@ -6,15 +6,25 @@ import DicomHierarchy._
 
 object DicomProtocol {
 
+  import se.vgregion.model.Entity
+  
   // domain objects
   
-  case class ScpData(name: String, aeTitle: String, port: Int) 
+  case class ScpData(id: Long, name: String, aeTitle: String, port: Int) extends Entity
 
   case class FileName(value: String)
 
-  case class ImageFile(image: Image, fileName: FileName)
+  case class ImageFile(
+    id: Long, imageId: Long,
+    fileName: FileName) extends Entity {
+    
+    override def equals(o: Any): Boolean = o match {
+      case that: ImageFile => that.fileName == fileName
+      case _ => false
+    }
+  }
   
-  case class WatchedDirectory(id: Long, path: String)
+  case class WatchedDirectory(id: Long, path: String) extends Entity
 
 
   // messages
@@ -36,7 +46,7 @@ object DicomProtocol {
   
   case class AddScp(scpData: ScpData) extends ScpRequest
 
-  case class RemoveScp(scpData: ScpData) extends ScpRequest 
+  case class RemoveScp(id: Long) extends ScpRequest 
 
   case object GetScpDataCollection extends ScpRequest 
 
@@ -49,27 +59,27 @@ object DicomProtocol {
 
   case object GetPatients extends MetaDataQuery
 
-  case class GetStudies(patient: Patient) extends MetaDataQuery
+  case class GetStudies(patientId: Long) extends MetaDataQuery
 
-  case class GetSeries(study: Study) extends MetaDataQuery
+  case class GetSeries(studyId: Long) extends MetaDataQuery
 
-  case class GetImages(series: Series) extends MetaDataQuery
+  case class GetImages(seriesId: Long) extends MetaDataQuery
 
   
   sealed trait MetaDataUpdate
   
-  case class DeleteImage(image: Image) extends MetaDataUpdate
+  case class DeleteImage(imageId: Long) extends MetaDataUpdate
 
-  case class DeleteSeries(series: Series) extends MetaDataUpdate
+  case class DeleteSeries(seriesId: Long) extends MetaDataUpdate
 
-  case class DeleteStudy(study: Study) extends MetaDataUpdate
+  case class DeleteStudy(studyId: Long) extends MetaDataUpdate
 
-  case class DeletePatient(patient: Patient) extends MetaDataUpdate
+  case class DeletePatient(patientId: Long) extends MetaDataUpdate
   
   
   case object GetAllImageFiles
 
-  case class GetImageFiles(image: Image)
+  case class GetImageFiles(imageId: Long)
 
   case class AddDataset(dataset: Attributes)
 
@@ -93,7 +103,7 @@ object DicomProtocol {
 
   case class ScpAdded(scpData: ScpData)
 
-  case class ScpRemoved(scpData: ScpData)
+  case class ScpRemoved(scpDataId: Long)
 
 
   // ***from scp***

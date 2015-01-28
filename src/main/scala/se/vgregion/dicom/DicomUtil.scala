@@ -50,32 +50,52 @@ object DicomUtil {
     }
   }
 
-  def datasetToImage(dataset: Attributes): Image =
-    Image(Series(Study(Patient(
-
+  def datasetToPatient(dataset: Attributes): Patient =
+    Patient(
+      -1,
       PatientName(valueOrEmpty(dataset, DicomProperty.PatientName.dicomTag)),
       PatientID(valueOrEmpty(dataset, DicomProperty.PatientID.dicomTag)),
       PatientBirthDate(valueOrEmpty(dataset, DicomProperty.PatientBirthDate.dicomTag)),
-      PatientSex(valueOrEmpty(dataset, DicomProperty.PatientSex.dicomTag))),
+      PatientSex(valueOrEmpty(dataset, DicomProperty.PatientSex.dicomTag)))
 
+  def datasetToStudy(dataset: Attributes): Study =
+    Study(
+      -1,
+      -1,
       StudyInstanceUID(valueOrEmpty(dataset, DicomProperty.StudyInstanceUID.dicomTag)),
       StudyDescription(valueOrEmpty(dataset, DicomProperty.StudyDescription.dicomTag)),
       StudyDate(valueOrEmpty(dataset, DicomProperty.StudyDate.dicomTag)),
       StudyID(valueOrEmpty(dataset, DicomProperty.StudyID.dicomTag)),
-      AccessionNumber(valueOrEmpty(dataset, DicomProperty.AccessionNumber.dicomTag))),
-
-      Equipment(
-        Manufacturer(valueOrEmpty(dataset, DicomProperty.Manufacturer.dicomTag)),
-        StationName(valueOrEmpty(dataset, DicomProperty.StationName.dicomTag))),
-      FrameOfReference(
-        FrameOfReferenceUID(valueOrEmpty(dataset, DicomProperty.FrameOfReferenceUID.dicomTag))),
+      AccessionNumber(valueOrEmpty(dataset, DicomProperty.AccessionNumber.dicomTag)))
+      
+  def datasetToEquipment(dataset: Attributes): Equipment =
+    Equipment(
+      -1,
+      Manufacturer(valueOrEmpty(dataset, DicomProperty.Manufacturer.dicomTag)),
+      StationName(valueOrEmpty(dataset, DicomProperty.StationName.dicomTag)))
+      
+  def datasetToFrameOfReference(dataset: Attributes): FrameOfReference =
+    FrameOfReference(
+      -1,
+      FrameOfReferenceUID(valueOrEmpty(dataset, DicomProperty.FrameOfReferenceUID.dicomTag)))
+      
+  def datasetToSeries(dataset: Attributes): Series =
+    Series(
+      -1,
+      -1,
+      -1,
+      -1,
       SeriesInstanceUID(valueOrEmpty(dataset, DicomProperty.SeriesInstanceUID.dicomTag)),
       SeriesDescription(valueOrEmpty(dataset, DicomProperty.SeriesDescription.dicomTag)),
       SeriesDate(valueOrEmpty(dataset, DicomProperty.SeriesDate.dicomTag)),
       Modality(valueOrEmpty(dataset, DicomProperty.Modality.dicomTag)),
       ProtocolName(valueOrEmpty(dataset, DicomProperty.ProtocolName.dicomTag)),
-      BodyPartExamined(valueOrEmpty(dataset, DicomProperty.BodyPartExamined.dicomTag))),
-
+      BodyPartExamined(valueOrEmpty(dataset, DicomProperty.BodyPartExamined.dicomTag)))
+      
+  def datasetToImage(dataset: Attributes): Image =
+    Image(
+      -1,
+      -1,
       SOPInstanceUID(valueOrEmpty(dataset, DicomProperty.SOPInstanceUID.dicomTag)),
       ImageType(readMultiple(dataset.getStrings(DicomProperty.ImageType.dicomTag))))
 
