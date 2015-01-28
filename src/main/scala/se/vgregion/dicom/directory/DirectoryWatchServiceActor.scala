@@ -30,8 +30,8 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor 
 
       case WatchDirectory(pathString) =>
         val path = Paths.get(pathString)
-        val id = pathToId(path)
-        context.child(id) match {
+        val childActorId = pathToId(path)
+        context.child(childActorId) match {
           case Some(actor) =>
             
             sender ! DirectoryWatched(path)
@@ -50,38 +50,41 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor 
 
               println(s"Started watching directory $path")
               
-              addDirectory(path)
+              addDirectory(pathString)
 
-              context.actorOf(DirectoryWatchActor.props(pathString), id)
+              context.actorOf(DirectoryWatchActor.props(pathString), childActorId)
 
               sender ! DirectoryWatched(path)
             }
         }
 
-      case UnWatchDirectory(watchDirectoryId) =>
+      case UnWatchDirectory(watchedDirectoryId) =>
         db.withSession { implicit session =>
-          dao.getById(watchDirectoryId)
+          dao.watchedDirectoryForId(watchedDirectoryId)
         } match {
-          case Some(watchDirectory) =>
-            val path = Paths.get(watchDirectory.path)
-            removeDirectory(path)
+          case Some(watchedDirectory) =>
+            db.withSession { implicit session =>
+              dao.deleteWatchedDirectoryWithId(watchedDirectoryId)
+            }
+            
+            val path = Paths.get(watchedDirectory.path)
 
             val id = pathToId(path)
             context.child(id) match {
               case Some(ref) =>
                 ref ! PoisonPill
 
-                sender ! DirectoryUnwatched(watchDirectoryId)
+                sender ! DirectoryUnwatched(watchedDirectoryId)
               case None =>
-                sender ! DirectoryUnwatched(watchDirectoryId)
+                sender ! DirectoryUnwatched(watchedDirectoryId)
             }
 
           case None =>
-            sender ! DirectoryUnwatched(watchDirectoryId)
+            sender ! DirectoryUnwatched(watchedDirectoryId)
         }
         
       case GetWatchedDirectories =>
-        val directories = getDirectories()
+        val directories = getWatchedDirectories()
         sender ! WatchedDirectories(directories)
 
     }
@@ -101,23 +104,18 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor 
 
   def setupWatches() =
     db.withTransaction { implicit session =>
-      val watchPaths = dao.list
-      watchPaths foreach (watchedDirectory => context.actorOf(DirectoryWatchActor.props(watchedDirectory.path), pathToId(Paths.get(watchedDirectory.path))))
+      val watchedDirectories = dao.allWatchedDirectories
+      watchedDirectories foreach (watchedDirectory => context.actorOf(DirectoryWatchActor.props(watchedDirectory.path), pathToId(Paths.get(watchedDirectory.path))))
     }
 
-  def addDirectory(path: Path) =
+  def addDirectory(pathString: String): WatchedDirectory =
     db.withSession { implicit session =>
-      dao.insert(path)
+      dao.insert(WatchedDirectory(-1, pathString))
     }
 
-  def removeDirectory(path: Path) =
+  def getWatchedDirectories() =
     db.withSession { implicit session =>
-      dao.remove(path)
-    }
-
-  def getDirectories() =
-    db.withSession { implicit session =>
-      dao.list
+      dao.allWatchedDirectories
     }
 
 }

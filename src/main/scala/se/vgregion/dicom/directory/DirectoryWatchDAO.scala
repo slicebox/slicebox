@@ -9,33 +9,35 @@ import se.vgregion.dicom.DicomProtocol._
 class DirectoryWatchDAO(val driver: JdbcProfile) {
   import driver.simple._
 
-  case class DirectoryWatchDataRow(key: Long, pathName: String)
-
-  class DirectoryWatchDataTable(tag: Tag) extends Table[DirectoryWatchDataRow](tag, "DirectoryWatchData") {
-    def key = column[Long]("key", O.PrimaryKey, O.AutoInc)
-    def pathName = column[String]("pathName")
-    def * = (key, pathName) <> (DirectoryWatchDataRow.tupled, DirectoryWatchDataRow.unapply)
+  class DirectoryWatchDataTable(tag: Tag) extends Table[WatchedDirectory](tag, "DirectoryWatchData") {
+    def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
+    def path = column[String]("path")
+    def * = (id, path) <> (WatchedDirectory.tupled, WatchedDirectory.unapply)
   }
 
-  val directories = TableQuery[DirectoryWatchDataTable]
+  val watchedDirectoriesQuery = TableQuery[DirectoryWatchDataTable]
 
   def create(implicit session: Session) =
     if (MTable.getTables("DirectoryWatchData").list.isEmpty) {
-      directories.ddl.create
+      watchedDirectoriesQuery.ddl.create
     }
+  
+  def insert(watchedDirectory: WatchedDirectory)(implicit session: Session): WatchedDirectory = {
+    val generatedId = (watchedDirectoriesQuery returning watchedDirectoriesQuery.map(_.id)) += watchedDirectory
+    watchedDirectory.copy(id = generatedId)
+  }
 
-  def insert(path: Path)(implicit session: Session) =
-    directories += DirectoryWatchDataRow(-1, path.toAbsolutePath().toString())
-
-  def remove(path: Path)(implicit session: Session) =
-    directories.filter(_.pathName === path.toAbsolutePath().toString()).delete
-
-  def list(implicit session: Session): List[WatchedDirectory] =
-    directories.list.map(rowToWatchedDirectory)
+  def deleteWatchedDirectoryWithId(watchedDirectoryId: Long)(implicit session: Session): Int = {
+    watchedDirectoriesQuery
+      .filter(_.id === watchedDirectoryId)
+      .delete
+  }
+  
+  def allWatchedDirectories(implicit session: Session): List[WatchedDirectory] = watchedDirectoriesQuery.list
     
-  def getById(id: Long)(implicit session: Session): Option[WatchedDirectory] =
-    directories.filter(_.key === id).list.map(rowToWatchedDirectory).headOption
+  def watchedDirectoryForId(id: Long)(implicit session: Session): Option[WatchedDirectory] =
+    watchedDirectoriesQuery.filter(_.id === id).list.headOption
     
-  private def rowToWatchedDirectory(row: DirectoryWatchDataRow) = WatchedDirectory(row.key, row.pathName)
+  private def toWatchedDirectory(watchedDirectory: WatchedDirectory) = WatchedDirectory(watchedDirectory.id, watchedDirectory.path)
 
 }
