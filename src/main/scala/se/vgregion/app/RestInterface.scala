@@ -55,11 +55,14 @@ trait RestApi extends HttpService with JsonFormats {
 
   val config = ConfigFactory.load()
   val sliceboxConfig = config.getConfig("slicebox")
-
+  
   def createStorageDirectory(): Path
   def dbUrl(): String
 
-  def db = Database.forURL(dbUrl, driver = "org.h2.Driver")
+  def db = Database.forURL(dbUrl,
+      user = sliceboxConfig.getString("db.user"),
+      password = sliceboxConfig.getString("db.password"), 
+      driver = "org.h2.Driver")
   val dbProps = DbProps(db, H2Driver)
 
   val storage = createStorageDirectory()
