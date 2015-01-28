@@ -108,8 +108,8 @@ trait RestApi extends HttpService with JsonFormats {
         pathEnd {
           delete {
             onSuccess(dicomService.ask(UnWatchDirectory(watchDirectoryId))) {
-              case DirectoryUnwatched(path) =>
-                complete("Stopped watching directory " + path)
+              case DirectoryUnwatched(watchedDirectoryId) =>
+                complete("Stopped watching directory " + watchedDirectoryId)
             }
           }
         }
@@ -134,12 +134,14 @@ trait RestApi extends HttpService with JsonFormats {
             }
           }
         }
-      } ~ delete {
+      } ~ path(LongNumber) { scpDataId =>
         pathEnd {
-          entity(as[ScpData]) { scpData =>
-            onSuccess(dicomService.ask(RemoveScp(scpData))) {
-              case ScpRemoved(scpData) =>
-                complete("Removed SCP " + scpData.name)
+          delete {
+            pathEnd {
+              onSuccess(dicomService.ask(RemoveScp(scpDataId))) {
+                case ScpRemoved(scpDataId) =>
+                  complete("Removed SCP " + scpDataId)
+              }
             }
           }
         }
@@ -162,22 +164,22 @@ trait RestApi extends HttpService with JsonFormats {
               complete(patients)
           }
         } ~ path("studies") {
-          entity(as[Patient]) { patient =>
-            onSuccess(dicomService.ask(GetStudies(patient))) {
+          parameters('patientId.as[Long]) { patientId =>
+            onSuccess(dicomService.ask(GetStudies(patientId))) {
               case Studies(studies) =>
                 complete(studies)
             }
           }
         } ~ path("series") {
-          entity(as[Study]) { study =>
-            onSuccess(dicomService.ask(GetSeries(study))) {
+          parameters('studyId.as[Long]) { studyId =>
+            onSuccess(dicomService.ask(GetSeries(studyId))) {
               case SeriesCollection(series) =>
                 complete(series)
             }
           }
         } ~ path("images") {
-          entity(as[Series]) { series =>
-            onSuccess(dicomService.ask(GetImages(series))) {
+          parameters('seriesId.as[Long]) { seriesId =>
+            onSuccess(dicomService.ask(GetImages(seriesId))) {
               case Images(images) =>
                 complete(images)
             }

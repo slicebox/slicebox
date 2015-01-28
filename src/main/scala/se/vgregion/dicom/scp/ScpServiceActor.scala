@@ -49,19 +49,31 @@ class ScpServiceActor(dbProps: DbProps, storage: Path) extends Actor {
 
         }
 
-      case RemoveScp(scpData) =>
-        val id = scpDataToId(scpData)
-        context.child(id) match {
-          case Some(actor) =>
+      case RemoveScp(scpDataId) =>
+        db.withSession { implicit session =>
+          dao.scpDataForId(scpDataId)
+        } match {
+          case Some(scpData) =>
+            db.withSession { implicit session =>
+              dao.deleteScpDataWithId(scpDataId)
+            }
 
-            removeScp(scpData)
+            val id = scpDataToId(scpData)
+            context.child(id) match {
+              case Some(actor) =>
 
-            actor ! PoisonPill
+                removeScp(scpData)
 
-            sender ! ScpRemoved(scpData)
+                actor ! PoisonPill
+
+                sender ! ScpRemoved(scpDataId)
+
+              case None =>
+                sender ! ScpRemoved(scpDataId)
+            }
 
           case None =>
-            sender ! ScpRemoved(scpData)
+            sender ! ScpRemoved(scpDataId)
         }
 
       case GetScpDataCollection =>
@@ -84,12 +96,12 @@ class ScpServiceActor(dbProps: DbProps, storage: Path) extends Actor {
 
   def removeScp(scpData: ScpData) =
     db.withSession { implicit session =>
-      dao.removeByName(scpData.name)
+      dao.deleteScpDataWithId(scpData.id)
     }
 
   def getScps() =
     db.withSession { implicit session =>
-      dao.list
+      dao.allScpDatas
     }
 
   def setupDb() =
@@ -99,7 +111,7 @@ class ScpServiceActor(dbProps: DbProps, storage: Path) extends Actor {
 
   def setupScps() =
     db.withTransaction { implicit session =>
-      val scps = dao.list
+      val scps = dao.allScpDatas
       scps foreach (scpData => context.actorOf(ScpActor.props(scpData, executor), scpDataToId(scpData)))
     }
 

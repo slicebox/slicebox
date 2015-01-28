@@ -12,420 +12,354 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
 
   // *** Patient *** 
 
-  private case class PatientRow(key: Long, patientName: PatientName, patientID: PatientID, patientBirthDate: PatientBirthDate, patientSex: PatientSex)
+  private val toPatient = (id: Long, patientName: String, patientID: String, patientBirthDate: String, patientSex: String) =>
+    Patient(id, PatientName(patientName), PatientID(patientID), PatientBirthDate(patientBirthDate), PatientSex(patientSex))
 
-  private val toPatientRow = (key: Long, patientName: String, patientID: String, patientBirthDate: String, patientSex: String) =>
-    PatientRow(key, PatientName(patientName), PatientID(patientID), PatientBirthDate(patientBirthDate), PatientSex(patientSex))
+  private val fromPatient = (patient: Patient) => Option((patient.id, patient.patientName.value, patient.patientID.value, patient.patientBirthDate.value, patient.patientSex.value))
 
-  private val fromPatientRow = (d: PatientRow) => Option((d.key, d.patientName.value, d.patientID.value, d.patientBirthDate.value, d.patientSex.value))
-
-  private class Patients(tag: Tag) extends Table[PatientRow](tag, "Patients") {
-    def key = column[Long]("key", O.PrimaryKey, O.AutoInc)
+  private class Patients(tag: Tag) extends Table[Patient](tag, "Patients") {
+    def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def patientName = column[String](DicomProperty.PatientName.name)
     def patientID = column[String](DicomProperty.PatientID.name)
     def patientBirthDate = column[String](DicomProperty.PatientBirthDate.name)
     def patientSex = column[String](DicomProperty.PatientSex.name)
-    def * = (key, patientName, patientID, patientBirthDate, patientSex) <> (toPatientRow.tupled, fromPatientRow)
+    def * = (id, patientName, patientID, patientBirthDate, patientSex) <> (toPatient.tupled, fromPatient)
   }
 
-  private val patients = TableQuery[Patients]
+  private val patientsQuery = TableQuery[Patients]
 
+  private val fromStudy = (study: Study) => Option((study.id, study.patientId, study.studyInstanceUID.value, study.studyDescription.value, study.studyDate.value, study.studyID.value, study.accessionNumber.value))
+  
   // *** Study *** //
 
-  private case class StudyRow(key: Long, patientKey: Long, studyInstanceUID: StudyInstanceUID, studyDescription: StudyDescription, studyDate: StudyDate, studyID: StudyID, accessionNumber: AccessionNumber)
+  private val toStudy = (id: Long, patientId: Long, studyInstanceUID: String, studyDescription: String, studyDate: String, studyID: String, accessionNumber: String) =>
+    Study(id, patientId, StudyInstanceUID(studyInstanceUID), StudyDescription(studyDescription), StudyDate(studyDate), StudyID(studyID), AccessionNumber(accessionNumber))
 
-  private val toStudyRow = (key: Long, patientKey: Long, studyInstanceUID: String, studyDescription: String, studyDate: String, studyID: String, accessionNumber: String) =>
-    StudyRow(key, patientKey, StudyInstanceUID(studyInstanceUID), StudyDescription(studyDescription), StudyDate(studyDate), StudyID(studyID), AccessionNumber(accessionNumber))
-
-  private val fromStudyRow = (d: StudyRow) => Option((d.key, d.patientKey, d.studyInstanceUID.value, d.studyDescription.value, d.studyDate.value, d.studyID.value, d.accessionNumber.value))
-
-  private class Studies(tag: Tag) extends Table[StudyRow](tag, "Studies") {
-    def key = column[Long]("key", O.PrimaryKey, O.AutoInc)
-    def patientKey = column[Long]("patientKey")
+  private class Studies(tag: Tag) extends Table[Study](tag, "Studies") {
+    def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
+    def patientId = column[Long]("patientId")
     def studyInstanceUID = column[String](DicomProperty.StudyInstanceUID.name)
     def studyDescription = column[String](DicomProperty.StudyDescription.name)
     def studyDate = column[String](DicomProperty.StudyDate.name)
     def studyID = column[String](DicomProperty.StudyID.name)
     def accessionNumber = column[String](DicomProperty.AccessionNumber.name)
-    def * = (key, patientKey, studyInstanceUID, studyDescription, studyDate, studyID, accessionNumber) <> (toStudyRow.tupled, fromStudyRow)
+    def * = (id, patientId, studyInstanceUID, studyDescription, studyDate, studyID, accessionNumber) <> (toStudy.tupled, fromStudy)
 
-    def patientFKey = foreignKey("patientFKey", patientKey, patients)(_.key, onUpdate = ForeignKeyAction.Cascade, onDelete = ForeignKeyAction.Cascade)
-    def patientKeyJoin = patients.filter(_.key === patientKey)
+    def patientFKey = foreignKey("patientFKey", patientId, patientsQuery)(_.id, onUpdate = ForeignKeyAction.Cascade, onDelete = ForeignKeyAction.Cascade)
+    def patientIdJoin = patientsQuery.filter(_.id === patientId)
   }
 
-  private val studies = TableQuery[Studies]
+  private val studiesQuery = TableQuery[Studies]
+  
+  // *** Equipment ***
+
+  private val toEquipment = (id: Long, manufacturer: String, stationName: String) =>
+    Equipment(id, Manufacturer(manufacturer), StationName(stationName))
+
+  private val fromEquipment = (equipment: Equipment) => Option((equipment.id, equipment.manufacturer.value, equipment.stationName.value))
+
+  private class Equipments(tag: Tag) extends Table[Equipment](tag, "Equipments") {
+    def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
+    def manufacturer = column[String](DicomProperty.Manufacturer.name)
+    def stationName = column[String](DicomProperty.StationName.name)
+    def * = (id, manufacturer, stationName) <> (toEquipment.tupled, fromEquipment)
+  }
+
+  private val equipmentsQuery = TableQuery[Equipments]
+
+  // *** Frame of Reference ***
+
+  private val toFrameOfReference = (id: Long, frameOfReferenceUID: String) =>
+    FrameOfReference(id, FrameOfReferenceUID(frameOfReferenceUID))
+
+  private val fromFrameOfReference = (frameOfReference: FrameOfReference) => Option((frameOfReference.id, frameOfReference.frameOfReferenceUID.value))
+
+  private class FrameOfReferences(tag: Tag) extends Table[FrameOfReference](tag, "FrameOfReferences") {
+    def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
+    def frameOfReferenceUID = column[String](DicomProperty.FrameOfReferenceUID.name)
+    def * = (id, frameOfReferenceUID) <> (toFrameOfReference.tupled, fromFrameOfReference)
+  }
+
+  private val frameOfReferencesQuery = TableQuery[FrameOfReferences]
 
   // *** Series ***
 
-  private case class SeriesRow(key: Long, studyKey: Long, seriesInstanceUID: SeriesInstanceUID, seriesDescription: SeriesDescription, seriesDate: SeriesDate, modality: Modality, protocolName: ProtocolName, bodyPartExamined: BodyPartExamined)
+  private val toSeries = (id: Long, studyId: Long, equipmentId: Long, frameOfReferenceId: Long, seriesInstanceUID: String, seriesDescription: String, seriesDate: String, modality: String, protocolName: String, bodyPartExamined: String) =>
+    Series(id, studyId, equipmentId, frameOfReferenceId, SeriesInstanceUID(seriesInstanceUID), SeriesDescription(seriesDescription), SeriesDate(seriesDate), Modality(modality), ProtocolName(protocolName), BodyPartExamined(bodyPartExamined))
 
-  private val toSeriesRow = (key: Long, studyKey: Long, seriesInstanceUID: String, seriesDescription: String, seriesDate: String, modality: String, protocolName: String, bodyPartExamined: String) =>
-    SeriesRow(key, studyKey, SeriesInstanceUID(seriesInstanceUID), SeriesDescription(seriesDescription), SeriesDate(seriesDate), Modality(modality), ProtocolName(protocolName), BodyPartExamined(bodyPartExamined))
+  private val fromSeries = (series: Series) => Option((series.id, series.studyId, series.equipmentId, series.frameOfReferenceId, series.seriesInstanceUID.value, series.seriesDescription.value, series.seriesDate.value, series.modality.value, series.protocolName.value, series.bodyPartExamined.value))
 
-  private val fromSeriesRow = (d: SeriesRow) => Option((d.key, d.studyKey, d.seriesInstanceUID.value, d.seriesDescription.value, d.seriesDate.value, d.modality.value, d.protocolName.value, d.bodyPartExamined.value))
-
-  private class SeriesTable(tag: Tag) extends Table[SeriesRow](tag, "Series") {
-    def key = column[Long]("key", O.PrimaryKey, O.AutoInc)
-    def studyKey = column[Long]("studyKey")
+  private class SeriesTable(tag: Tag) extends Table[Series](tag, "Series") {
+    def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
+    def studyId = column[Long]("studyId")
+    def equipmentId = column[Long]("equipmentId")
+    def frameOfReferenceId = column[Long]("frameOfReferenceId")
     def seriesInstanceUID = column[String](DicomProperty.SeriesInstanceUID.name)
     def seriesDescription = column[String](DicomProperty.SeriesDescription.name)
     def seriesDate = column[String](DicomProperty.SeriesDate.name)
     def modality = column[String](DicomProperty.Modality.name)
     def protocolName = column[String](DicomProperty.ProtocolName.name)
     def bodyPartExamined = column[String](DicomProperty.BodyPartExamined.name)
-    def * = (key, studyKey, seriesInstanceUID, seriesDescription, seriesDate, modality, protocolName, bodyPartExamined) <> (toSeriesRow.tupled, fromSeriesRow)
+    def * = (id, studyId, equipmentId, frameOfReferenceId, seriesInstanceUID, seriesDescription, seriesDate, modality, protocolName, bodyPartExamined) <> (toSeries.tupled, fromSeries)
 
-    def studyFKey = foreignKey("studyFKey", studyKey, studies)(_.key, onUpdate = ForeignKeyAction.Cascade, onDelete = ForeignKeyAction.Cascade)
-    def studyKeyJoin = studies.filter(_.key === studyKey)
+    def studyFKey = foreignKey("studyFKey", studyId, studiesQuery)(_.id, onUpdate = ForeignKeyAction.Cascade, onDelete = ForeignKeyAction.Cascade)
+    def equipmentFKey = foreignKey("equipmentFKey", equipmentId, equipmentsQuery)(_.id, onUpdate = ForeignKeyAction.Cascade, onDelete = ForeignKeyAction.Cascade)
+    def frameOfReferenceFKey = foreignKey("frameOfReferenceFKey", frameOfReferenceId, frameOfReferencesQuery)(_.id, onUpdate = ForeignKeyAction.Cascade, onDelete = ForeignKeyAction.Cascade)
+    def studyIdJoin = studiesQuery.filter(_.id === studyId)
   }
 
-  private val seriez = TableQuery[SeriesTable]
-
-  // *** Equipment ***
-
-  private case class EquipmentRow(key: Long, seriesKey: Long, manufacturer: Manufacturer, stationName: StationName)
-
-  private val toEquipmentRow = (key: Long, seriesKey: Long, manufacturer: String, stationName: String) =>
-    EquipmentRow(key, seriesKey, Manufacturer(manufacturer), StationName(stationName))
-
-  private val fromEquipmentRow = (d: EquipmentRow) => Option((d.key, d.seriesKey, d.manufacturer.value, d.stationName.value))
-
-  private class Equipments(tag: Tag) extends Table[EquipmentRow](tag, "Equipments") {
-    def key = column[Long]("key", O.PrimaryKey, O.AutoInc)
-    def seriesKey = column[Long]("seriesKey")
-    def manufacturer = column[String](DicomProperty.Manufacturer.name)
-    def stationName = column[String](DicomProperty.StationName.name)
-    def * = (key, seriesKey, manufacturer, stationName) <> (toEquipmentRow.tupled, fromEquipmentRow)
-
-    def seriesFKey = foreignKey("equipmentSeriesFKey", seriesKey, seriez)(_.key, onUpdate = ForeignKeyAction.Cascade, onDelete = ForeignKeyAction.Cascade)
-    def seriesKeyJoin = seriez.filter(_.key === seriesKey)
-  }
-
-  private val equipments = TableQuery[Equipments]
-
-  // *** Frame of Reference ***
-
-  private case class FrameOfReferenceRow(key: Long, seriesKey: Long, frameOfReferenceUID: FrameOfReferenceUID)
-
-  private val toFrameOfReferenceRow = (key: Long, seriesKey: Long, frameOfReferenceUID: String) =>
-    FrameOfReferenceRow(key, seriesKey, FrameOfReferenceUID(frameOfReferenceUID))
-
-  private val fromFrameOfReferenceRow = (d: FrameOfReferenceRow) => Option((d.key, d.seriesKey, d.frameOfReferenceUID.value))
-
-  private class FrameOfReferences(tag: Tag) extends Table[FrameOfReferenceRow](tag, "FrameOfReferences") {
-    def key = column[Long]("key", O.PrimaryKey, O.AutoInc)
-    def seriesKey = column[Long]("seriesKey")
-    def frameOfReferenceUID = column[String](DicomProperty.FrameOfReferenceUID.name)
-    def * = (key, seriesKey, frameOfReferenceUID) <> (toFrameOfReferenceRow.tupled, fromFrameOfReferenceRow)
-
-    def seriesFKey = foreignKey("frameOfReferenceSeriesFKey", seriesKey, seriez)(_.key, onUpdate = ForeignKeyAction.Cascade, onDelete = ForeignKeyAction.Cascade)
-    def seriesKeyJoin = seriez.filter(_.key === seriesKey)
-  }
-
-  private val frameOfReferences = TableQuery[FrameOfReferences]
+  private val seriesQuery = TableQuery[SeriesTable]
 
   // *** Image ***
 
-  private case class ImageRow(key: Long, seriesKey: Long, sopInstanceUID: SOPInstanceUID, imageType: ImageType)
+  private val toImage = (id: Long, seriesId: Long, sopInstanceUID: String, imageType: String) =>
+    Image(id, seriesId, SOPInstanceUID(sopInstanceUID), ImageType(imageType))
 
-  private val toImageRow = (key: Long, seriesKey: Long, sopInstanceUID: String, imageType: String) =>
-    ImageRow(key, seriesKey, SOPInstanceUID(sopInstanceUID), ImageType(imageType))
+  private val fromImage = (image: Image) => Option((image.id, image.seriesId, image.sopInstanceUID.value, image.imageType.value))
 
-  private val fromImageRow = (d: ImageRow) => Option((d.key, d.seriesKey, d.sopInstanceUID.value, d.imageType.value))
-
-  private class Images(tag: Tag) extends Table[ImageRow](tag, "Images") {
-    def key = column[Long]("key", O.PrimaryKey, O.AutoInc)
-    def seriesKey = column[Long]("seriesKey")
+  private class Images(tag: Tag) extends Table[Image](tag, "Images") {
+    def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
+    def seriesId = column[Long]("seriesId")
     def sopInstanceUID = column[String](DicomProperty.SOPInstanceUID.name)
     def imageType = column[String](DicomProperty.ImageType.name)
-    def * = (key, seriesKey, sopInstanceUID, imageType) <> (toImageRow.tupled, fromImageRow)
+    def * = (id, seriesId, sopInstanceUID, imageType) <> (toImage.tupled, fromImage)
 
-    def seriesFKey = foreignKey("seriesFKey", seriesKey, seriez)(_.key, onUpdate = ForeignKeyAction.Cascade, onDelete = ForeignKeyAction.Cascade)
-    def seriesKeyJoin = seriez.filter(_.key === seriesKey)
+    def seriesFKey = foreignKey("seriesFKey", seriesId, seriesQuery)(_.id, onUpdate = ForeignKeyAction.Cascade, onDelete = ForeignKeyAction.Cascade)
+    def seriesIdJoin = seriesQuery.filter(_.id === seriesId)
   }
 
-  private val images = TableQuery[Images]
+  private val imagesQuery = TableQuery[Images]
 
   // *** Files ***
 
-  private case class ImageFileRow(key: Long, imageKey: Long, fileName: FileName)
+  private val toImageFile = (id: Long, imageId: Long, fileName: String) => ImageFile(id, imageId, FileName(fileName))
 
-  private val toImageFileRow = (key: Long, imageKey: Long, fileName: String) => ImageFileRow(key, imageKey, FileName(fileName))
+  private val fromImageFile = (imageFile: ImageFile) => Option((imageFile.id, imageFile.imageId, imageFile.fileName.value))
 
-  private val fromImageFileRow = (d: ImageFileRow) => Option((d.key, d.imageKey, d.fileName.value))
-
-  private class ImageFiles(tag: Tag) extends Table[ImageFileRow](tag, "ImageFiles") {
-    def key = column[Long]("key", O.PrimaryKey, O.AutoInc)
-    def imageKey = column[Long]("imageKey")
+  private class ImageFiles(tag: Tag) extends Table[ImageFile](tag, "ImageFiles") {
+    def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
+    def imageId = column[Long]("imageId")
     def fileName = column[String]("fileName")
-    def * = (key, imageKey, fileName) <> (toImageFileRow.tupled, fromImageFileRow)
+    def * = (id, imageId, fileName) <> (toImageFile.tupled, fromImageFile)
 
-    def imageFKey = foreignKey("imageFKey", imageKey, images)(_.key, onUpdate = ForeignKeyAction.Cascade, onDelete = ForeignKeyAction.Cascade)
-    def userKeyJoin = images.filter(_.key === imageKey)
+    def imageFKey = foreignKey("imageFKey", imageId, imagesQuery)(_.id, onUpdate = ForeignKeyAction.Cascade, onDelete = ForeignKeyAction.Cascade)
+    def imageIdJoin = imagesQuery.filter(_.id === imageId)
   }
 
-  private val imageFiles = TableQuery[ImageFiles]
+  private val imageFilesQuery = TableQuery[ImageFiles]
 
   def create(implicit session: Session) =
     if (MTable.getTables("Patients").list.isEmpty)
-      (patients.ddl ++
-        studies.ddl ++
-        equipments.ddl ++
-        frameOfReferences.ddl ++
-        seriez.ddl ++
-        images.ddl ++
-        imageFiles.ddl).create
+      (patientsQuery.ddl ++
+        studiesQuery.ddl ++
+        equipmentsQuery.ddl ++
+        frameOfReferencesQuery.ddl ++
+        seriesQuery.ddl ++
+        imagesQuery.ddl ++
+        imageFilesQuery.ddl).create
 
-  // *** Db row to object conversions ***
+  // *** Get entities by id
 
-  private def rowToPatient(row: PatientRow) = Patient(row.patientName, row.patientID, row.patientBirthDate, row.patientSex)
-  private def rowToStudy(patient: Patient, row: StudyRow) = Study(patient, row.studyInstanceUID, row.studyDescription, row.studyDate, row.studyID, row.accessionNumber)
-  private def rowToEquipment(row: EquipmentRow) = Equipment(row.manufacturer, row.stationName)
-  private def rowToFrameOfReference(row: FrameOfReferenceRow) = FrameOfReference(row.frameOfReferenceUID)
-  private def rowToSeries(study: Study, equipment: Equipment, frameOfReference: FrameOfReference, row: SeriesRow) = Series(study, equipment, frameOfReference, row.seriesInstanceUID, row.seriesDescription, row.seriesDate, row.modality, row.protocolName, row.bodyPartExamined)
-  private def rowToImage(series: Series, row: ImageRow) = Image(series, row.sopInstanceUID, row.imageType)
-  private def rowToImageFile(image: Image, row: ImageFileRow) = ImageFile(image, row.fileName)
+  def patientForId(id: Long)(implicit session: Session): Option[Patient] =
+    patientsQuery.filter(_.id === id).list.headOption
 
-  // *** Object to key and key for object
+  def studyForId(id: Long)(implicit session: Session): Option[Study] =
+    studiesQuery.filter(_.id === id).list.headOption
+    
+  def seriesForId(id: Long)(implicit session: Session): Option[Series] =
+    seriesQuery.filter(_.id === id).list.headOption
 
-  private def patientForKey(key: Long)(implicit session: Session): Option[Patient] =
-    patients.filter(_.key === key).list.map(rowToPatient(_)).headOption
+  def equipmentForId(id: Long)(implicit session: Session): Option[Equipment] =
+    equipmentsQuery.filter(_.id === id).list.headOption
 
-  private def keyForPatient(patient: Patient)(implicit session: Session): Option[Long] =
-    patients
-      .filter(_.patientName === patient.patientName.value)
-      .filter(_.patientID === patient.patientID.value)
-      .list.map(_.key).headOption
-
-  private def studyForKey(key: Long)(implicit session: Session): Option[Study] =
-    studies.filter(_.key === key).list.flatMap(row =>
-      patientForKey(row.patientKey).map(rowToStudy(_, row))).headOption
-
-  private def keyForStudy(study: Study)(implicit session: Session): Option[Long] =
-    keyForPatient(study.patient).flatMap(patientKey =>
-      studies
-        .filter(_.patientKey === patientKey)
-        .filter(_.studyInstanceUID === study.studyInstanceUID.value)
-        .list.map(_.key).headOption)
-
-  private def equipmentForSeriesKey(seriesKey: Long)(implicit session: Session): Option[Equipment] =
-    equipments.filter(_.seriesKey === seriesKey).list.map(rowToEquipment(_)).headOption
-
-  private def frameOfReferenceForSeriesKey(seriesKey: Long)(implicit session: Session): Option[FrameOfReference] =
-    frameOfReferences.filter(_.seriesKey === seriesKey).list.map(rowToFrameOfReference(_)).headOption
-
-  private def seriesForKey(key: Long)(implicit session: Session): Option[Series] =
-    seriez.filter(_.key === key).list.flatMap(row =>
-      studyForKey(row.studyKey).flatMap(study =>
-        equipmentForSeriesKey(key).flatMap(equipment =>
-          frameOfReferenceForSeriesKey(key).map(frameOfReference =>
-            rowToSeries(study, equipment, frameOfReference, row))))).headOption
-
-  private def keyForSeries(series: Series)(implicit session: Session): Option[Long] =
-    keyForStudy(series.study).flatMap(studyKey =>
-      seriez
-        .filter(_.studyKey === studyKey)
-        .filter(_.seriesInstanceUID === series.seriesInstanceUID.value)
-        .list.map(_.key).headOption)
-
-  private def imageForKey(key: Long)(implicit session: Session): Option[Image] =
-    images.filter(_.key === key).list.flatMap(row =>
-      seriesForKey(row.seriesKey).map(rowToImage(_, row))).headOption
-
-  private def keyForImage(image: Image)(implicit session: Session): Option[Long] =
-    keyForSeries(image.series).flatMap(seriesKey =>
-      images
-        .filter(_.seriesKey === seriesKey)
-        .filter(_.sopInstanceUID === image.sopInstanceUID.value)
-        .list.map(_.key).headOption)
-
-  private def imageFileForKey(key: Long)(implicit session: Session): Option[ImageFile] =
-    imageFiles.filter(_.key === key).list.flatMap(row =>
-      imageForKey(row.imageKey).map(rowToImageFile(_, row))).headOption
-
-  private def keyForImageFile(imageFile: ImageFile)(implicit session: Session): Option[Long] =
-    keyForImage(imageFile.image).flatMap(imageKey =>
-      imageFiles
-        .filter(_.imageKey === imageKey)
-        .list.map(_.key).headOption)
+  def frameOfReferenceForId(id: Long)(implicit session: Session): Option[FrameOfReference] =
+    frameOfReferencesQuery.filter(_.id === id).list.headOption
+    
+  def imageForId(id: Long)(implicit session: Session): Option[Image] =
+    imagesQuery.filter(_.id === id).list.headOption
+    
+  def imageFileForId(id: Long)(implicit session: Session): Option[ImageFile] =
+    imageFilesQuery.filter(_.id === id).list.headOption
 
   // *** Inserts ***
 
-  private def insert(patient: Patient)(implicit session: Session): Long =
-    keyForPatient(patient)
-      .getOrElse(
-        (patients returning patients.map(_.key)) +=
-          PatientRow(-1, patient.patientName, patient.patientID, patient.patientBirthDate, patient.patientSex))
-
-  private def insert(study: Study)(implicit session: Session): Long =
-    keyForStudy(study)
-      .getOrElse {
-        val patientKey = insert(study.patient)
-        (studies returning studies.map(_.key)) +=
-          StudyRow(-1, patientKey, study.studyInstanceUID, study.studyDescription, study.studyDate, study.studyID, study.accessionNumber)
-      }
-
-  private def insert(equipment: Equipment, seriesKey: Long)(implicit session: Session): Int =
-    equipments += EquipmentRow(-1, seriesKey, equipment.manufacturer, equipment.stationName)
-
-  private def insert(frameOfReference: FrameOfReference, seriesKey: Long)(implicit session: Session): Int =
-    frameOfReferences += FrameOfReferenceRow(-1, seriesKey, frameOfReference.frameOfReferenceUID)
-
-  private def insert(series: Series)(implicit session: Session): Long =
-    keyForSeries(series)
-      .getOrElse {
-        val studyKey = insert(series.study)
-        val seriesKey = (seriez returning seriez.map(_.key)) +=
-          SeriesRow(-1, studyKey, series.seriesInstanceUID, series.seriesDescription, series.seriesDate, series.modality, series.protocolName, series.bodyPartExamined)
-        insert(series.equipment, seriesKey)
-        insert(series.frameOfReference, seriesKey)
-        seriesKey
-      }
-
-  private def insert(image: Image)(implicit session: Session): Long =
-    keyForImage(image)
-      .getOrElse {
-        val seriesKey = insert(image.series)
-        (images returning images.map(_.key)) +=
-          ImageRow(-1, seriesKey, image.sopInstanceUID, image.imageType)
-      }
-
-  def insert(imageFile: ImageFile)(implicit session: Session): Long =
-    keyForImageFile(imageFile)
-      .getOrElse {
-        val imageKey = insert(imageFile.image)
-        (imageFiles returning imageFiles.map(_.key)) +=
-          ImageFileRow(-1, imageKey, imageFile.fileName)
-      }
+  def insert(patient: Patient)(implicit session: Session): Patient = {
+    val generatedId = (patientsQuery returning patientsQuery.map(_.id)) += patient
+    patient.copy(id = generatedId)
+  }
+  
+  def insert(study: Study)(implicit session: Session): Study = {
+    val generatedId = (studiesQuery returning studiesQuery.map(_.id)) += study
+    study.copy(id = generatedId)
+  }
+  
+  def insert(series: Series)(implicit session: Session): Series = {
+    val generatedId = (seriesQuery returning seriesQuery.map(_.id)) += series
+    series.copy(id = generatedId)
+  }
+  
+  def insert(frameOfReference: FrameOfReference)(implicit session: Session): FrameOfReference = {
+    val generatedId = (frameOfReferencesQuery returning frameOfReferencesQuery.map(_.id)) += frameOfReference
+    frameOfReference.copy(id = generatedId)
+  }
+  
+  def insert(equipment: Equipment)(implicit session: Session): Equipment = {
+    val generatedId = (equipmentsQuery returning equipmentsQuery.map(_.id)) += equipment
+    equipment.copy(id = generatedId)
+  }
+  
+  def insert(image: Image)(implicit session: Session): Image = {
+    val generatedId = (imagesQuery returning imagesQuery.map(_.id)) += image
+    image.copy(id = generatedId)
+  }
+  
+  def insert(imageFile: ImageFile)(implicit session: Session): ImageFile = {
+    val generatedId = (imageFilesQuery returning imageFilesQuery.map(_.id)) += imageFile
+    imageFile.copy(id = generatedId)
+  }
 
   // *** Listing all patients, studies etc ***
 
-  def allPatients(implicit session: Session): List[Patient] = patients.list.map(rowToPatient(_))
+  def allPatients(implicit session: Session): List[Patient] = patientsQuery.list
+  
+  def allStudies(implicit session: Session): List[Study] = studiesQuery.list
+  
+  def allSeries(implicit session: Session): List[Series] = seriesQuery.list
 
-  def allStudies(implicit session: Session): List[Study] =
-    studies.list.map(row =>
-      patientForKey(row.patientKey).map(rowToStudy(_, row))).flatten
+  def allEquipments(implicit session: Session): List[Equipment] = equipmentsQuery.list
 
-  def allEquipments(implicit session: Session): List[Equipment] = equipments.list.map(rowToEquipment(_))
+  def allFrameOfReferences(implicit session: Session): List[FrameOfReference] = frameOfReferencesQuery.list
 
-  def allFrameOfReferences(implicit session: Session): List[FrameOfReference] = frameOfReferences.list.map(rowToFrameOfReference(_))
+  def allImages(implicit session: Session): List[Image] = imagesQuery.list
 
-  def allSeries(implicit session: Session): List[Series] =
-    seriez.list.map(row =>
-      studyForKey(row.studyKey).flatMap(study =>
-        equipmentForSeriesKey(row.key).flatMap(equipment =>
-          frameOfReferenceForSeriesKey(row.key).map(frameOfReference =>
-            rowToSeries(study, equipment, frameOfReference, row))))).flatten
-
-  def allImages(implicit session: Session): List[Image] =
-    images.list.map(row =>
-      seriesForKey(row.seriesKey).map(rowToImage(_, row))).flatten
-
-  def allImageFiles(implicit session: Session): List[ImageFile] =
-    imageFiles.list.map(row =>
-      imageForKey(row.imageKey).map(rowToImageFile(_, row))).flatten
+  def allImageFiles(implicit session: Session): List[ImageFile] = imageFilesQuery.list
 
   // *** Grouped listings ***
 
-  def studiesForPatient(patient: Patient)(implicit session: Session): List[Study] =
-    keyForPatient(patient).map(patientKey =>
-      studies
-        .filter(_.patientKey === patientKey)
-        .list.map(rowToStudy(patient, _)))
-      .getOrElse(List())
+  def studiesForPatientId(patientId: Long)(implicit session: Session): List[Study] =
+    studiesQuery
+      .filter(_.patientId === patientId)
+      .list
 
-  def seriesForStudy(study: Study)(implicit session: Session): List[Series] =
-    keyForStudy(study).map(studyKey =>
-      seriez
-        .filter(_.studyKey === studyKey)
-        .list.map(row =>
-          equipmentForSeriesKey(row.key).flatMap(equipment =>
-            frameOfReferenceForSeriesKey(row.key).map(frameOfReference =>
-              rowToSeries(study, equipment, frameOfReference, row)))).flatten)
-      .getOrElse(List())
+  def seriesForStudyId(studyId: Long)(implicit session: Session): List[Series] =
+      seriesQuery
+        .filter(_.studyId === studyId)
+        .list
 
-  def imagesForSeries(series: Series)(implicit session: Session): List[Image] =
-    keyForSeries(series).map(seriesKey =>
-      images
-        .filter(_.seriesKey === seriesKey)
-        .list.map(rowToImage(series, _)))
-      .getOrElse(List())
+  def imagesForSeriesId(seriesId: Long)(implicit session: Session): List[Image] =
+      imagesQuery
+        .filter(_.seriesId === seriesId)
+        .list
 
-  def imageFilesForImage(image: Image)(implicit session: Session): List[ImageFile] =
-    keyForImage(image).map(imageKey =>
-      imageFiles
-        .filter(_.imageKey === imageKey)
-        .list.map(rowToImageFile(image, _)))
-      .getOrElse(List())
+  def imageFilesForImageId(imageId: Long)(implicit session: Session): List[ImageFile] =
+      imageFilesQuery
+        .filter(_.imageId === imageId)
+        .list
 
-  def imageFilesForSeries(series: Series)(implicit session: Session): List[ImageFile] =
-    imagesForSeries(series)
-      .map(image => imageFilesForImage(image)).flatten
+  def imageFilesForSeriesId(seriesId: Long)(implicit session: Session): List[ImageFile] =
+    imagesForSeriesId(seriesId)
+      .map(image => imageFilesForImageId(image.id)).flatten
 
-  def imageFilesForStudy(study: Study)(implicit session: Session): List[ImageFile] =
-    seriesForStudy(study)
-      .map(series => imagesForSeries(series)
-        .map(image => imageFilesForImage(image)).flatten).flatten
+  def imageFilesForStudyId(studyId: Long)(implicit session: Session): List[ImageFile] =
+    seriesForStudyId(studyId)
+      .map(series => imagesForSeriesId(series.id)
+        .map(image => imageFilesForImageId(image.id)).flatten).flatten
 
-  def imageFilesForPatient(patient: Patient)(implicit session: Session): List[ImageFile] =
-    studiesForPatient(patient)
-      .map(study => seriesForStudy(study)
-        .map(series => imagesForSeries(series)
-          .map(image => imageFilesForImage(image)).flatten).flatten).flatten
+  def imageFilesForPatientId(patientId: Long)(implicit session: Session): List[ImageFile] =
+    studiesForPatientId(patientId)
+      .map(study => seriesForStudyId(study.id)
+        .map(series => imagesForSeriesId(series.id)
+          .map(image => imageFilesForImageId(image.id)).flatten).flatten).flatten
+          
+  def existingPatient(patient: Patient)(implicit session: Session): Option[Patient] =
+    patientsQuery
+      .filter(_.patientName === patient.patientName.value)
+      .filter(_.patientID === patient.patientID.value)
+      .list.headOption
+      
+  def existingStudy(study: Study)(implicit session: Session): Option[Study] =
+    studiesQuery
+      .filter(_.studyInstanceUID === study.studyInstanceUID.value)
+      .list.headOption
+      
+  def existingEquipment(equipment: Equipment)(implicit session: Session): Option[Equipment] =
+    equipmentsQuery
+      .filter(_.manufacturer === equipment.manufacturer.value)
+      .filter(_.stationName === equipment.stationName.value)
+      .list.headOption
+      
+  def existingFrameOfReference(frameOfReference: FrameOfReference)(implicit session: Session): Option[FrameOfReference] =
+    frameOfReferencesQuery
+      .filter(_.frameOfReferenceUID === frameOfReference.frameOfReferenceUID.value)
+      .list.headOption
 
+  def existingSeries(series: Series)(implicit session: Session): Option[Series] =
+    seriesQuery
+      .filter(_.seriesInstanceUID === series.seriesInstanceUID.value)
+      .list.headOption
+      
+  def existingImage(image: Image)(implicit session: Session): Option[Image] =
+    imagesQuery
+      .filter(_.sopInstanceUID === image.sopInstanceUID.value)
+      .list.headOption
+      
+  def existingImageFile(imageFile: ImageFile)(implicit session: Session): Option[ImageFile] =
+    imageFilesQuery
+      .filter(_.fileName === imageFile.fileName.value)
+      .list.headOption
+      
   // *** Deletes ***
 
-  def deletePatient(patient: Patient)(implicit session: Session): Option[Int] = {
-    val result = keyForPatient(patient).map(patientKey => patients
-      .filter(_.key === patientKey)
-      .delete)
-    result
+  def deletePatientWithId(patientId: Long)(implicit session: Session): Int = {
+    patientsQuery
+      .filter(_.id === patientId)
+      .delete
   }
-
-  def deleteStudy(study: Study)(implicit session: Session): Option[Int] = {
-    val result = keyForStudy(study).map(studyKey => studies
-      .filter(_.key === studyKey)
-      .delete)
-    if (studiesForPatient(study.patient).isEmpty)
-      deletePatient(study.patient)
-    result
+  
+  def deleteStudyWithId(studyId: Long)(implicit session: Session): Int = {
+    studiesQuery
+      .filter(_.id === studyId)
+      .delete
   }
-
-  def deleteSeries(series: Series)(implicit session: Session): Option[Int] = {
-    val result = keyForSeries(series).map(seriesKey => seriez
-      .filter(_.key === seriesKey)
-      .delete)
-    if (seriesForStudy(series.study).isEmpty)
-      deleteStudy(series.study)
-    result
+  
+  def deleteSeriesWithId(seriesId: Long)(implicit session: Session): Int = {
+    seriesQuery
+      .filter(_.id === seriesId)
+      .delete
   }
-
-  def deleteImage(image: Image)(implicit session: Session): Option[Int] = {
-    val result = keyForImage(image).map(imageKey => images
-      .filter(_.key === imageKey)
-      .delete)
-    if (imagesForSeries(image.series).isEmpty)
-      deleteSeries(image.series)
-    result
+  
+  def deleteFrameOfReferenceWithId(frameOfReferenceId: Long)(implicit session: Session): Int = {
+    frameOfReferencesQuery
+      .filter(_.id === frameOfReferenceId)
+      .delete
   }
-
-  def deleteImageFile(imageFile: ImageFile)(implicit session: Session): Option[Int] = {
-    val result = keyForImageFile(imageFile).map(imageFileKey => imageFiles
-      .filter(_.key === imageFileKey)
-      .delete)
-    if (imageFilesForImage(imageFile.image).isEmpty)
-      deleteImage(imageFile.image)
-    result
+  
+  def deleteEquipemntWithId(equipmentId: Long)(implicit session: Session): Int = {
+    equipmentsQuery
+      .filter(_.id === equipmentId)
+      .delete
+  }
+  
+  def deleteImageWithId(imageId: Long)(implicit session: Session): Int = {
+    imagesQuery
+      .filter(_.id === imageId)
+      .delete
+  }
+  
+  def deleteImageFileWithId(imageFileId: Long)(implicit session: Session): Int = {
+    imageFilesQuery
+      .filter(_.id === imageFileId)
+      .delete
   }
 
   // *** Counts (for testing) ***
 
-  def patientCount(implicit session: Session): Int = patients.length.run
-  def studyCount(implicit session: Session): Int = studies.length.run
-  def seriesCount(implicit session: Session): Int = seriez.length.run
-  def imageCount(implicit session: Session): Int = images.length.run
-  def imageFileCount(implicit session: Session): Int = imageFiles.length.run
-  def equipmentCount(implicit session: Session): Int = equipments.length.run
-  def frameOfReferenceCount(implicit session: Session): Int = frameOfReferences.length.run
+  def patientCount(implicit session: Session): Int = patientsQuery.length.run
+  def studyCount(implicit session: Session): Int = studiesQuery.length.run
+  def seriesCount(implicit session: Session): Int = seriesQuery.length.run
+  def imageCount(implicit session: Session): Int = imagesQuery.length.run
+  def imageFileCount(implicit session: Session): Int = imageFilesQuery.length.run
+  def equipmentCount(implicit session: Session): Int = equipmentsQuery.length.run
+  def frameOfReferenceCount(implicit session: Session): Int = frameOfReferencesQuery.length.run
 
 }
