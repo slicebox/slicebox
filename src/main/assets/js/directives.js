@@ -107,7 +107,7 @@ angular.module('slicebox.directives', [])
             $scope.selectedObject = null;
             $scope.orderByProperty = null;
             $scope.orderByDirection = null;
-            $scope.objectIdsSelectedForAction = {};
+            $scope.objectsSelectedForAction = [];
             $scope.uiState = {
                 objectActionsDropdownOpen: false,
                 selectAllChecked: false,
@@ -249,29 +249,34 @@ angular.module('slicebox.directives', [])
             };
 
             $scope.selectAllChanged = function() {
-                $scope.objectIdsSelectedForAction = {};
+                $scope.objectsSelectedForAction = [];
 
                 if ($scope.uiState.selectAllChecked) {
                     for (i = 0, length = $scope.objectList.length; i < length; i++) {
-                        $scope.objectIdsSelectedForAction[$scope.objectList[i].id] = true;
+                        $scope.objectsSelectedForAction.push($scope.objectList[i]);
                     }
                 }
             };
 
-            $scope.rowSelectionCheckboxChanged = function() {
+            $scope.rowSelectionCheckboxClicked = function(rowObject) {
+                var rowObjectIndex = $scope.objectsSelectedForAction.indexOf(rowObject);
+                if (rowObjectIndex == -1) {
+                    $scope.objectsSelectedForAction.push(rowObject);
+                } else {
+                    $scope.objectsSelectedForAction.splice(rowObjectIndex, 1);
+                }
+
                 validateAndUpdateObjectActionSelections();
             };
 
-            $scope.objectActionsEnabled = function() {
-                var enabled = false;
+            $scope.rowObjectSelected = function(rowObject) {
+                var rowObjectIndex = $scope.objectsSelectedForAction.indexOf(rowObject);
 
-                angular.forEach($scope.objectIdsSelectedForAction, function(selected, objectId) {
-                    if (selected) {
-                        enabled = true;
-                    }
-                });
-                
-                return enabled;
+                return rowObjectIndex >= 0;
+            };
+
+            $scope.objectActionsEnabled = function() {
+                return $scope.objectsSelectedForAction.length > 0;
             };
 
             $scope.performObjectAction = function(objectAction) {
@@ -391,272 +396,271 @@ angular.module('slicebox.directives', [])
                 if ($scope.uiState.filterColumn &&
                     $scope.uiState.filterValue && $scope.uiState.filterValue.length > 0) {
                     loadPageFunctionParameters.filterProperty = $scope.uiState.filterColumn.property;
-                loadPageFunctionParameters.filterValue = $scope.uiState.filterValue;
+                    loadPageFunctionParameters.filterValue = $scope.uiState.filterValue;
+                }
+
+                var loadPageResponse = ($scope.loadPage || angular.noop)(loadPageFunctionParameters);
+
+                $q.when(loadPageResponse).then(function(response) {
+                    if (angular.isArray(response)) {
+                        handleLoadedPageData(response);
+                    } else {
+                            // Assume response is a http response and extract data
+                            handleLoadedPageData(response.data);
+                        }
+                        
+                        deferred.resolve();
+                    });
+
+                return deferred.promise;
             }
 
-            var loadPageResponse = ($scope.loadPage || angular.noop)(loadPageFunctionParameters);
+            function pageSizeAsNumber() {
+                var pageSizeNumber = null;
 
-            $q.when(loadPageResponse).then(function(response) {
-                if (angular.isArray(response)) {
-                    handleLoadedPageData(response);
+                if (angular.isDefined($scope.pageSize)) {
+                    pageSizeNumber = parseInt($scope.pageSize);
                 } else {
-                        // Assume response is a http response and extract data
-                        handleLoadedPageData(response.data);
+                    pageSizeNumber = 0;
+                }
+
+                return pageSizeNumber;
+            }
+
+            function handleLoadedPageData(pageData) {
+                $scope.objectList = convertPageData(pageData);
+
+                if ($scope.objectList.length > $scope.currentPageSize) {
+                    // Remove the extra object from the end of the list
+                    $scope.objectList.splice(-1, 1);
+                    $scope.morePagesExists = true;
+                } else {
+                    $scope.morePagesExists = false;
+                }
+
+                validateAndUpdateSelectedObject();
+                validateAndUpdateObjectActionSelections();
+
+                if ($scope.objectList.length === 0) {
+                    // Avoid empty pages
+                    $scope.loadPreviousPage();
+                }
+
+                calculateFilteredCellValues();
+            }
+
+            function convertPageData(pageData) {
+                var result = null;
+
+                if (angular.isDefined($attrs.converter)) {
+                    result = $scope.converter({pageData: pageData});
+                    if (!angular.isArray(result)) {
+                        throwError('PageDataError', 'Converter must return an array');
                     }
-                    
-                    deferred.resolve();
+                } else if (angular.isArray(pageData)) {
+                    result = pageData;
+                } else {
+                    throwError('PageDataError', 'Unknown format for page data. Consider setting a converter.\n' + angular.toJson(pageData));
+                }
+
+                return result;
+            }
+
+            function calculateFilteredCellValues() {
+                $scope.filteredCellValues = [];
+
+                if (!$scope.objectList ||
+                    $scope.objectList.length === 0) {
+                    return;
+                }
+
+                angular.forEach($scope.objectList, function(rowObject) {
+                    $scope.filteredCellValues.push({});
                 });
 
-            return deferred.promise;
-        }
-
-        function pageSizeAsNumber() {
-            var pageSizeNumber = null;
-
-            if (angular.isDefined($scope.pageSize)) {
-                pageSizeNumber = parseInt($scope.pageSize);
-            } else {
-                pageSizeNumber = 0;
+                angular.forEach($scope.columnDefinitions, function(columnDefinition) {
+                    calculateFilteredCellValuesForColumn(columnDefinition);
+                });
             }
 
-            return pageSizeNumber;
-        }
-
-        function handleLoadedPageData(pageData) {
-            $scope.objectList = convertPageData(pageData);
-
-            if ($scope.objectList.length > $scope.currentPageSize) {
-                // Remove the extra object from the end of the list
-                $scope.objectList.splice(-1, 1);
-                $scope.morePagesExists = true;
-            } else {
-                $scope.morePagesExists = false;
+            function calculateFilteredCellValuesForColumn(columnDefinition) {
+                angular.forEach($scope.objectList, function(rowObject, index) {
+                    $scope.filteredCellValues[index][columnDefinition.property] = calculateFilteredCellValueForRowObjectAndColumn(rowObject, columnDefinition);
+                });
             }
 
-            validateAndUpdateSelectedObject();
-            validateAndUpdateObjectActionSelections();
-
-            if ($scope.objectList.length === 0) {
-                // Avoid empty pages
-                $scope.loadPreviousPage();
-            }
-
-            calculateFilteredCellValues();
-        }
-
-        function convertPageData(pageData) {
-            var result = null;
-
-            if (angular.isDefined($attrs.converter)) {
-                result = $scope.converter({pageData: pageData});
-                if (!angular.isArray(result)) {
-                    throwError('PageDataError', 'Converter must return an array');
+            function calculateFilteredCellValueForRowObjectAndColumn(rowObject, columnDefinition) {
+                var cellValue = rowObject[columnDefinition.property];
+                if (columnDefinition.property.indexOf('[') !== -1) {
+                    cellValue = eval('rowObject.' + columnDefinition.property);
                 }
-            } else if (angular.isArray(pageData)) {
-                result = pageData;
-            } else {
-                throwError('PageDataError', 'Unknown format for page data. Consider setting a converter.\n' + angular.toJson(pageData));
-            }
+                var filter = columnDefinition.filter;
 
-            return result;
-        }
-
-        function calculateFilteredCellValues() {
-            $scope.filteredCellValues = [];
-
-            if (!$scope.objectList ||
-                $scope.objectList.length === 0) {
-                return;
-            }
-
-            angular.forEach($scope.objectList, function(rowObject) {
-                $scope.filteredCellValues.push({});
-            });
-
-            angular.forEach($scope.columnDefinitions, function(columnDefinition) {
-                calculateFilteredCellValuesForColumn(columnDefinition);
-            });
-        }
-
-        function calculateFilteredCellValuesForColumn(columnDefinition) {
-            angular.forEach($scope.objectList, function(rowObject, index) {
-                $scope.filteredCellValues[index][columnDefinition.property] = calculateFilteredCellValueForRowObjectAndColumn(rowObject, columnDefinition);
-            });
-        }
-
-        function calculateFilteredCellValueForRowObjectAndColumn(rowObject, columnDefinition) {
-            var cellValue = rowObject[columnDefinition.property];
-            if (columnDefinition.property.indexOf('[') !== -1) {
-                cellValue = eval('rowObject.' + columnDefinition.property);
-            }
-            var filter = columnDefinition.filter;
-
-            if (!filter) {
-                return cellValue;
-            }
-
-            if (!angular.isString(filter)) {
-                throwError('TypeError', 'Invalid filter value, must be a string: ' + angular.toJson(filter));
-                return cellValue;
-            }
-
-            var filterSeparatorIndex = filter.indexOf(':');
-            var filterName = filter;
-            var filterParams = null;
-
-            if (filterSeparatorIndex != -1) {
-                filterName = filter.substring(0, filterSeparatorIndex).trim();
-                filterParams = filter.substring(filterSeparatorIndex + 1).trim();
-            }
-
-            if (filterParams) {
-                return $filter(filterName)(cellValue, filterParams);
-            } else {
-                return $filter(filterName)(cellValue);
-            }
-        }
-
-        function validateAndUpdateSelectedObject() {
-            if (!$scope.selectedObject) {
-                return;
-            }
-
-            var newSelectedObject = findObjectInArray($scope.selectedObject, $scope.objectList);
-            if (newSelectedObject) {
-                $scope.selectedObject = newSelectedObject;
-            } else {
-                selectObject(null);
-            }
-        }
-
-        function validateAndUpdateObjectActionSelections() {
-            var selectionCount = 0;
-            var updatedObjectIdsSelectedForAction = angular.copy($scope.objectIdsSelectedForAction);
-
-            angular.forEach($scope.objectIdsSelectedForAction, function(selected, objectId) {
-                var existingObject = findObjectByPropertyInArray('id', objectId, $scope.objectList);
-                if (!existingObject) {
-                    delete updatedObjectIdsSelectedForAction[objectId];
-                } else if (selected) {
-                    ++selectionCount;
+                if (!filter) {
+                    return cellValue;
                 }
-            });
 
-            $scope.objectIdsSelectedForAction = updatedObjectIdsSelectedForAction;
+                if (!angular.isString(filter)) {
+                    throwError('TypeError', 'Invalid filter value, must be a string: ' + angular.toJson(filter));
+                    return cellValue;
+                }
 
-            if (selectionCount === 0 || selectionCount < $scope.objectList.length) {
-                $scope.uiState.selectAllChecked = false;
-            } else if (selectionCount == $scope.objectList.length) {
-                $scope.uiState.selectAllChecked = true;
+                var filterSeparatorIndex = filter.indexOf(':');
+                var filterName = filter;
+                var filterParams = null;
+
+                if (filterSeparatorIndex != -1) {
+                    filterName = filter.substring(0, filterSeparatorIndex).trim();
+                    filterParams = filter.substring(filterSeparatorIndex + 1).trim();
+                }
+
+                if (filterParams) {
+                    return $filter(filterName)(cellValue, filterParams);
+                } else {
+                    return $filter(filterName)(cellValue);
+                }
             }
-        }
 
-        function selectionEnabled() {
-            return angular.isDefined($attrs.objectSelected);
-        }
+            function validateAndUpdateSelectedObject() {
+                if (!$scope.selectedObject) {
+                    return;
+                }
 
-        function selectObject(object) {
-            if ($scope.selectedObject === object) {
-                return;
+                var newSelectedObject = findObjectInArray($scope.selectedObject, $scope.objectList);
+                if (newSelectedObject) {
+                    $scope.selectedObject = newSelectedObject;
+                } else {
+                    selectObject(null);
+                }
             }
 
-            $scope.objectSelectedCallback({object: object});
+            function validateAndUpdateObjectActionSelections() {
+                var updatedObjectsSelectedForAction = [];
+                var selectionCount = 0;
 
-            $scope.selectedObject = object;
-        }
+                angular.forEach($scope.objectList, function(object) {
+                    if (findSelectedActionObjectWithId(object.id) !== null) {
+                        updatedObjectsSelectedForAction.push(object);
+                        ++selectionCount;
+                    }
+                });
 
-        function selectedActionObjects() {
-            var selectedObjects = [];
+                $scope.objectsSelectedForAction = updatedObjectsSelectedForAction;
 
-            angular.forEach($scope.objectIdsSelectedForAction, function(selected, objectId) {
-                if (selected) {
-                    var selectedObject = findObjectByPropertyInArray('id', objectId, $scope.objectList);
-                    if (selectedObject) {
-                        selectedObjects.push(selectedObject);
+                if (selectionCount === 0 || selectionCount < $scope.objectList.length) {
+                    $scope.uiState.selectAllChecked = false;
+                } else if (selectionCount == $scope.objectList.length) {
+                    $scope.uiState.selectAllChecked = true;
+                }
+            }
+
+            function findSelectedActionObjectWithId(objectId) {
+                var matchingObject = null;
+
+                angular.forEach($scope.objectsSelectedForAction, function(object) {
+                    if (object.id === objectId) {
+                        matchingObject = object;
+                    }
+                });
+
+                return matchingObject;
+            }
+
+            function selectionEnabled() {
+                return angular.isDefined($attrs.objectSelected);
+            }
+
+            function selectObject(object) {
+                if ($scope.selectedObject === object) {
+                    return;
+                }
+
+                $scope.objectSelectedCallback({object: object});
+
+                $scope.selectedObject = object;
+            }
+
+            function selectedActionObjects() {
+                return $scope.objectsSelectedForAction;
+            }
+
+            function typeOfObject(object) {
+                if (angular.isDate(object)) {
+                    return 'date';
+                }
+                if (angular.isNumber(object)) {
+                    return 'number';
+                }
+                if (angular.isArray(object)) {
+                    return 'array';
+                }
+                if (angular.isString(object)) {
+                    return 'text';
+                }
+                if (angular.isObject(object)) {
+                    return 'object';
+                }
+            }
+
+            function findObjectInArray(object, objectsArray) {
+                for (i = 0, length = objectsArray.length; i < length; i++) {
+                    var eachObject = objectsArray[i];
+
+                    if (eachObject === object) {
+                        return eachObject;
+                    }
+
+                    if (angular.isDefined(eachObject.id) &&
+                        angular.isDefined(object.id) &&
+                        eachObject.id === object.id) {
+                        return eachObject;
                     }
                 }
-            });
 
-            return selectedObjects;
-        }
+                return null;
+            }
 
-        function typeOfObject(object) {
-            if (angular.isDate(object)) {
-                return 'date';
-            }
-            if (angular.isNumber(object)) {
-                return 'number';
-            }
-            if (angular.isArray(object)) {
-                return 'array';
-            }
-            if (angular.isString(object)) {
-                return 'text';
-            }
-            if (angular.isObject(object)) {
-                return 'object';
-            }
-        }
+            function findObjectByPropertyInArray(objectPropertyName, objectPropertyValue, objectsArray) {
+                for (i = 0, length = objectsArray.length; i < length; i++) {
+                    var eachObject = objectsArray[i];
 
-        function findObjectInArray(object, objectsArray) {
-            for (i = 0, length = objectsArray.length; i < length; i++) {
-                var eachObject = objectsArray[i];
-
-                if (eachObject === object) {
-                    return eachObject;
+                    if (angular.isDefined(eachObject[objectPropertyName]) &&
+                        eachObject[objectPropertyName] === objectPropertyValue) {
+                        return eachObject;
+                    }
                 }
 
-                if (angular.isDefined(eachObject.id) &&
-                    angular.isDefined(object.id) &&
-                    eachObject.id === object.id) {
-                    return eachObject;
+                return null;
+            }
+
+            function throwError(name, message) {
+                throw {
+                    name: name,
+                    message: message
+                };
+            }
+
+            function reset() {
+                $scope.currentPage = 0;
+                return loadPageData();
+            }
+
+            function clearSelection() {
+                $scope.selectedObject = null;
+            }
+
+            function filterColumnForFilterValue(filterValue) {
+                var separatorIndex = filterValue.indexOf(':');
+                if (separatorIndex == -1) {
+                    return null;
+                }
+
+                var filterPropertyTitle = filterValue.substring(0, separatorIndex).trim();
+
+                return findObjectByPropertyInArray('title', filterPropertyTitle, $scope.columnDefinitions);
             }
         }
-
-        return null;
-    }
-
-    function findObjectByPropertyInArray(objectPropertyName, objectPropertyValue, objectsArray) {
-        for (i = 0, length = objectsArray.length; i < length; i++) {
-            var eachObject = objectsArray[i];
-
-            if (angular.isDefined(eachObject[objectPropertyName]) &&
-                eachObject[objectPropertyName] === objectPropertyValue) {
-                return eachObject;
-        }
-    }
-
-    return null;
-}            
-
-function throwError(name, message) {
-    throw {
-        name: name,
-        message: message
     };
-}
-
-function reset() {
-    $scope.currentPage = 0;
-    return loadPageData();
-}
-
-function clearSelection() {
-    $scope.selectedObject = null;
-}
-
-function filterColumnForFilterValue(filterValue) {
-    var separatorIndex = filterValue.indexOf(':');
-    if (separatorIndex == -1) {
-        return null;
-    }
-
-    var filterPropertyTitle = filterValue.substring(0, separatorIndex).trim();
-
-    return findObjectByPropertyInArray('title', filterPropertyTitle, $scope.columnDefinitions);
-}
-}
-};
 
 })
 

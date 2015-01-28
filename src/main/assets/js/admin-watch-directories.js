@@ -33,14 +33,6 @@ angular.module('slicebox.adminWatchDirectories', ['ngRoute'])
         return $http.get('/api/directory/list');
     };
 
-    $scope.convertWatchDirectoriesPageData = function(paths) {
-        angular.forEach(paths, function(path) {
-            path.id = "" + path.id; // Must convert id to string for object actions to work
-        });
-
-        return paths;
-    };    
-
     $scope.addDirectoryButtonClicked = function() {
         var modalInstance = $modal.open({
                 templateUrl: '/assets/partials/addWatchDirectoryModalContent.html',

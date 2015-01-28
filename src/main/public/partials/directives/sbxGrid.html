@@ -82,9 +82,8 @@
                 <td ng-if="objectActions.length > 0">
                     <input type="checkbox"
                         ng-if="rowHasActions(rowObject)"
-                        ng-click="$event.stopPropagation()"
-                        ng-model="objectIdsSelectedForAction[rowObject.id]"
-                        ng-change="rowSelectionCheckboxChanged()"></input>
+                        ng-click="rowSelectionCheckboxClicked(rowObject); $event.stopPropagation()"
+                        ng-checked="rowObjectSelected(rowObject)"></input>
                 </td>
 
                 <td ng-repeat="columnDefinition in columnDefinitions track by columnDefinition.property"
