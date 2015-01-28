@@ -1,5 +1,34 @@
+<div ng-if="uiState.errorMessage" class="row">
+    <div class="col-md-12">
+        <alert type="danger" close="closeErrorMessageAlert()">{{uiState.errorMessage}}</alert>
+    </div>
+</div>
+
 <div class="row">
-	<div class="col-md-12">
-		<h1>Home</h1>
-	</div>
+    <div class="col-md-6">
+        <div class="panel panel-default">
+            <div class="panel-heading">Patients</div>
+
+            <div class="panel-body">
+                <sbx-grid
+                    load-page="loadPatients(startIndex, count, orderByProperty, orderByDirection)"
+                    page-size="10000000"
+                    callbacks="callbacks.patientsTable"
+                    empty-message="No patients found">
+
+                    <sbx-grid-column property="patientName['value']" title="Name">
+                    </sbx-grid-column>
+
+                    <sbx-grid-column property="patientBirthDate['value']" title="Birth Date">
+                    </sbx-grid-column>
+
+                    <sbx-grid-column property="patientSex['value']" title="Sex">
+                    </sbx-grid-column>
+                </sbx-grid>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+    </div>
 </div>
