@@ -160,25 +160,25 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
 
   // *** Get entities by id
 
-  def patientForId(id: Long)(implicit session: Session): Option[Patient] =
+  def patientById(id: Long)(implicit session: Session): Option[Patient] =
     patientsQuery.filter(_.id === id).list.headOption
 
-  def studyForId(id: Long)(implicit session: Session): Option[Study] =
+  def studyBtId(id: Long)(implicit session: Session): Option[Study] =
     studiesQuery.filter(_.id === id).list.headOption
     
-  def seriesForId(id: Long)(implicit session: Session): Option[Series] =
+  def seriesById(id: Long)(implicit session: Session): Option[Series] =
     seriesQuery.filter(_.id === id).list.headOption
 
-  def equipmentForId(id: Long)(implicit session: Session): Option[Equipment] =
+  def equipmentById(id: Long)(implicit session: Session): Option[Equipment] =
     equipmentsQuery.filter(_.id === id).list.headOption
 
-  def frameOfReferenceForId(id: Long)(implicit session: Session): Option[FrameOfReference] =
+  def frameOfReferenceById(id: Long)(implicit session: Session): Option[FrameOfReference] =
     frameOfReferencesQuery.filter(_.id === id).list.headOption
     
-  def imageForId(id: Long)(implicit session: Session): Option[Image] =
+  def imageById(id: Long)(implicit session: Session): Option[Image] =
     imagesQuery.filter(_.id === id).list.headOption
     
-  def imageFileForId(id: Long)(implicit session: Session): Option[ImageFile] =
+  def imageFileById(id: Long)(implicit session: Session): Option[ImageFile] =
     imageFilesQuery.filter(_.id === id).list.headOption
 
   // *** Inserts ***
@@ -220,146 +220,136 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
 
   // *** Listing all patients, studies etc ***
 
-  def allPatients(implicit session: Session): List[Patient] = patientsQuery.list
+  def patients(implicit session: Session): List[Patient] = patientsQuery.list
   
-  def allStudies(implicit session: Session): List[Study] = studiesQuery.list
+  def studies(implicit session: Session): List[Study] = studiesQuery.list
   
-  def allSeries(implicit session: Session): List[Series] = seriesQuery.list
+  def series(implicit session: Session): List[Series] = seriesQuery.list
 
-  def allEquipments(implicit session: Session): List[Equipment] = equipmentsQuery.list
+  def equipments(implicit session: Session): List[Equipment] = equipmentsQuery.list
 
-  def allFrameOfReferences(implicit session: Session): List[FrameOfReference] = frameOfReferencesQuery.list
+  def frameOfReferences(implicit session: Session): List[FrameOfReference] = frameOfReferencesQuery.list
 
-  def allImages(implicit session: Session): List[Image] = imagesQuery.list
+  def images(implicit session: Session): List[Image] = imagesQuery.list
 
-  def allImageFiles(implicit session: Session): List[ImageFile] = imageFilesQuery.list
+  def imageFiles(implicit session: Session): List[ImageFile] = imageFilesQuery.list
 
   // *** Grouped listings ***
 
-  def studiesForPatientId(patientId: Long)(implicit session: Session): List[Study] =
+  def studiesForPatient(patientId: Long)(implicit session: Session): List[Study] =
     studiesQuery
       .filter(_.patientId === patientId)
       .list
 
-  def seriesForStudyId(studyId: Long)(implicit session: Session): List[Series] =
+  def seriesForStudy(studyId: Long)(implicit session: Session): List[Series] =
       seriesQuery
         .filter(_.studyId === studyId)
         .list
 
-  def imagesForSeriesId(seriesId: Long)(implicit session: Session): List[Image] =
+  def imagesForSeries(seriesId: Long)(implicit session: Session): List[Image] =
       imagesQuery
         .filter(_.seriesId === seriesId)
         .list
 
-  def imageFilesForImageId(imageId: Long)(implicit session: Session): List[ImageFile] =
+  def imageFilesForImage(imageId: Long)(implicit session: Session): List[ImageFile] =
       imageFilesQuery
         .filter(_.imageId === imageId)
         .list
 
-  def imageFilesForSeriesId(seriesId: Long)(implicit session: Session): List[ImageFile] =
-    imagesForSeriesId(seriesId)
-      .map(image => imageFilesForImageId(image.id)).flatten
+  def imageFilesForSeries(seriesId: Long)(implicit session: Session): List[ImageFile] =
+    imagesForSeries(seriesId)
+      .map(image => imageFilesForImage(image.id)).flatten
 
-  def imageFilesForStudyId(studyId: Long)(implicit session: Session): List[ImageFile] =
-    seriesForStudyId(studyId)
-      .map(series => imagesForSeriesId(series.id)
-        .map(image => imageFilesForImageId(image.id)).flatten).flatten
+  def imageFilesForStudy(studyId: Long)(implicit session: Session): List[ImageFile] =
+    seriesForStudy(studyId)
+      .map(series => imagesForSeries(series.id)
+        .map(image => imageFilesForImage(image.id)).flatten).flatten
 
-  def imageFilesForPatientId(patientId: Long)(implicit session: Session): List[ImageFile] =
-    studiesForPatientId(patientId)
-      .map(study => seriesForStudyId(study.id)
-        .map(series => imagesForSeriesId(series.id)
-          .map(image => imageFilesForImageId(image.id)).flatten).flatten).flatten
+  def imageFilesForPatient(patientId: Long)(implicit session: Session): List[ImageFile] =
+    studiesForPatient(patientId)
+      .map(study => seriesForStudy(study.id)
+        .map(series => imagesForSeries(series.id)
+          .map(image => imageFilesForImage(image.id)).flatten).flatten).flatten
           
-  def existingPatient(patient: Patient)(implicit session: Session): Option[Patient] =
+  def patientByNameAndID(patient: Patient)(implicit session: Session): Option[Patient] =
     patientsQuery
       .filter(_.patientName === patient.patientName.value)
       .filter(_.patientID === patient.patientID.value)
       .list.headOption
       
-  def existingStudy(study: Study)(implicit session: Session): Option[Study] =
+  def studyByUid(study: Study)(implicit session: Session): Option[Study] =
     studiesQuery
       .filter(_.studyInstanceUID === study.studyInstanceUID.value)
       .list.headOption
       
-  def existingEquipment(equipment: Equipment)(implicit session: Session): Option[Equipment] =
+  def equipmentByManufacturerAndStationName(equipment: Equipment)(implicit session: Session): Option[Equipment] =
     equipmentsQuery
       .filter(_.manufacturer === equipment.manufacturer.value)
       .filter(_.stationName === equipment.stationName.value)
       .list.headOption
       
-  def existingFrameOfReference(frameOfReference: FrameOfReference)(implicit session: Session): Option[FrameOfReference] =
+  def frameOfReferenceByUid(frameOfReference: FrameOfReference)(implicit session: Session): Option[FrameOfReference] =
     frameOfReferencesQuery
       .filter(_.frameOfReferenceUID === frameOfReference.frameOfReferenceUID.value)
       .list.headOption
 
-  def existingSeries(series: Series)(implicit session: Session): Option[Series] =
+  def seriesByUid(series: Series)(implicit session: Session): Option[Series] =
     seriesQuery
       .filter(_.seriesInstanceUID === series.seriesInstanceUID.value)
       .list.headOption
       
-  def existingImage(image: Image)(implicit session: Session): Option[Image] =
+  def imageByUid(image: Image)(implicit session: Session): Option[Image] =
     imagesQuery
       .filter(_.sopInstanceUID === image.sopInstanceUID.value)
       .list.headOption
       
-  def existingImageFile(imageFile: ImageFile)(implicit session: Session): Option[ImageFile] =
+  def imageFileByFileName(imageFile: ImageFile)(implicit session: Session): Option[ImageFile] =
     imageFilesQuery
       .filter(_.fileName === imageFile.fileName.value)
       .list.headOption
       
   // *** Deletes ***
 
-  def deletePatientWithId(patientId: Long)(implicit session: Session): Int = {
+  def deletePatient(patientId: Long)(implicit session: Session): Int = {
     patientsQuery
       .filter(_.id === patientId)
       .delete
   }
   
-  def deleteStudyWithId(studyId: Long)(implicit session: Session): Int = {
+  def deleteStudy(studyId: Long)(implicit session: Session): Int = {
     studiesQuery
       .filter(_.id === studyId)
       .delete
   }
   
-  def deleteSeriesWithId(seriesId: Long)(implicit session: Session): Int = {
+  def deleteSeries(seriesId: Long)(implicit session: Session): Int = {
     seriesQuery
       .filter(_.id === seriesId)
       .delete
   }
   
-  def deleteFrameOfReferenceWithId(frameOfReferenceId: Long)(implicit session: Session): Int = {
+  def deleteFrameOfReference(frameOfReferenceId: Long)(implicit session: Session): Int = {
     frameOfReferencesQuery
       .filter(_.id === frameOfReferenceId)
       .delete
   }
   
-  def deleteEquipemntWithId(equipmentId: Long)(implicit session: Session): Int = {
+  def deleteEquipment(equipmentId: Long)(implicit session: Session): Int = {
     equipmentsQuery
       .filter(_.id === equipmentId)
       .delete
   }
   
-  def deleteImageWithId(imageId: Long)(implicit session: Session): Int = {
+  def deleteImage(imageId: Long)(implicit session: Session): Int = {
     imagesQuery
       .filter(_.id === imageId)
       .delete
   }
   
-  def deleteImageFileWithId(imageFileId: Long)(implicit session: Session): Int = {
+  def deleteImageFile(imageFileId: Long)(implicit session: Session): Int = {
     imageFilesQuery
       .filter(_.id === imageFileId)
       .delete
   }
-
-  // *** Counts (for testing) ***
-
-  def patientCount(implicit session: Session): Int = patientsQuery.length.run
-  def studyCount(implicit session: Session): Int = studiesQuery.length.run
-  def seriesCount(implicit session: Session): Int = seriesQuery.length.run
-  def imageCount(implicit session: Session): Int = imagesQuery.length.run
-  def imageFileCount(implicit session: Session): Int = imageFilesQuery.length.run
-  def equipmentCount(implicit session: Session): Int = equipmentsQuery.length.run
-  def frameOfReferenceCount(implicit session: Session): Int = frameOfReferencesQuery.length.run
 
 }
