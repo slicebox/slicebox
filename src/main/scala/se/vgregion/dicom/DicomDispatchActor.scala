@@ -1,14 +1,11 @@
 package se.vgregion.dicom
 
 import java.nio.file.Path
-
 import scala.language.postfixOps
-
 import akka.actor.Actor
 import akka.actor.Props
 import akka.event.Logging
 import akka.event.LoggingReceive
-
 import se.vgregion.app.DbProps
 import se.vgregion.dicom.DicomProtocol.DirectoryRequest
 import se.vgregion.dicom.DicomProtocol.MetaDataQuery
@@ -16,6 +13,8 @@ import se.vgregion.dicom.DicomProtocol.MetaDataUpdate
 import se.vgregion.dicom.DicomProtocol.ScpRequest
 import se.vgregion.dicom.directory.DirectoryWatchServiceActor
 import se.vgregion.dicom.scp.ScpServiceActor
+import se.vgregion.dicom.DicomProtocol.AddDataset
+import se.vgregion.dicom.DicomProtocol.GetImageFiles
 
 class DicomDispatchActor(storage: Path, dbProps: DbProps) extends Actor {
   val log = Logging(context.system, this)
@@ -40,6 +39,12 @@ class DicomDispatchActor(storage: Path, dbProps: DbProps) extends Actor {
     case msg: MetaDataUpdate =>
       storageActor forward msg
 
+    case msg: AddDataset =>
+      storageActor forward msg
+      
+    case msg: GetImageFiles =>
+      storageActor forward msg
+      
   }
 
 }

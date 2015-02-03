@@ -15,7 +15,7 @@ object DicomProtocol {
   case class FileName(value: String)
 
   case class ImageFile(
-    id: Long, imageId: Long,
+    id: Long,
     fileName: FileName) extends Entity {
     
     override def equals(o: Any): Boolean = o match {

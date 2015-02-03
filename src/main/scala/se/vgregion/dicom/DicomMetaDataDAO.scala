@@ -132,18 +132,17 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
 
   // *** Files ***
 
-  private val toImageFile = (id: Long, imageId: Long, fileName: String) => ImageFile(id, imageId, FileName(fileName))
+  private val toImageFile = (imageId: Long, fileName: String) => ImageFile(imageId, FileName(fileName))
 
-  private val fromImageFile = (imageFile: ImageFile) => Option((imageFile.id, imageFile.imageId, imageFile.fileName.value))
+  private val fromImageFile = (imageFile: ImageFile) => Option((imageFile.id, imageFile.fileName.value))
 
   private class ImageFiles(tag: Tag) extends Table[ImageFile](tag, "ImageFiles") {
-    def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
-    def imageId = column[Long]("imageId")
+    def id = column[Long]("id", O.PrimaryKey)
     def fileName = column[String]("fileName")
-    def * = (id, imageId, fileName) <> (toImageFile.tupled, fromImageFile)
+    def * = (id, fileName) <> (toImageFile.tupled, fromImageFile)
 
-    def imageFKey = foreignKey("imageFKey", imageId, imagesQuery)(_.id, onUpdate = ForeignKeyAction.Cascade, onDelete = ForeignKeyAction.Cascade)
-    def imageIdJoin = imagesQuery.filter(_.id === imageId)
+    def imageFKey = foreignKey("imageFKey", id, imagesQuery)(_.id, onUpdate = ForeignKeyAction.Cascade, onDelete = ForeignKeyAction.Cascade)
+    def imageIdJoin = imagesQuery.filter(_.id === id)
   }
 
   private val imageFilesQuery = TableQuery[ImageFiles]
@@ -178,8 +177,8 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
   def imageById(id: Long)(implicit session: Session): Option[Image] =
     imagesQuery.filter(_.id === id).list.headOption
     
-  def imageFileById(id: Long)(implicit session: Session): Option[ImageFile] =
-    imageFilesQuery.filter(_.id === id).list.headOption
+  def imageFileById(imageId: Long)(implicit session: Session): Option[ImageFile] =
+    imageFilesQuery.filter(_.id === imageId).list.headOption
 
   // *** Inserts ***
 
@@ -214,8 +213,8 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
   }
   
   def insert(imageFile: ImageFile)(implicit session: Session): ImageFile = {
-    val generatedId = (imageFilesQuery returning imageFilesQuery.map(_.id)) += imageFile
-    imageFile.copy(id = generatedId)
+    imageFilesQuery += imageFile
+    imageFile
   }
 
   // *** Listing all patients, studies etc ***
@@ -251,25 +250,25 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
         .filter(_.seriesId === seriesId)
         .list
 
-  def imageFilesForImage(imageId: Long)(implicit session: Session): List[ImageFile] =
+  def imageFileForImage(imageId: Long)(implicit session: Session): Option[ImageFile] =
       imageFilesQuery
-        .filter(_.imageId === imageId)
-        .list
+        .filter(_.id === imageId)
+        .list.headOption
 
   def imageFilesForSeries(seriesId: Long)(implicit session: Session): List[ImageFile] =
     imagesForSeries(seriesId)
-      .map(image => imageFilesForImage(image.id)).flatten
+      .map(image => imageFileForImage(image.id)).flatten
 
   def imageFilesForStudy(studyId: Long)(implicit session: Session): List[ImageFile] =
     seriesForStudy(studyId)
       .map(series => imagesForSeries(series.id)
-        .map(image => imageFilesForImage(image.id)).flatten).flatten
+        .map(image => imageFileForImage(image.id)).flatten).flatten
 
   def imageFilesForPatient(patientId: Long)(implicit session: Session): List[ImageFile] =
     studiesForPatient(patientId)
       .map(study => seriesForStudy(study.id)
         .map(series => imagesForSeries(series.id)
-          .map(image => imageFilesForImage(image.id)).flatten).flatten).flatten
+          .map(image => imageFileForImage(image.id)).flatten).flatten).flatten
           
   def patientByNameAndID(patient: Patient)(implicit session: Session): Option[Patient] =
     patientsQuery
@@ -346,9 +345,9 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
       .delete
   }
   
-  def deleteImageFile(imageFileId: Long)(implicit session: Session): Int = {
+  def deleteImageFile(imageId: Long)(implicit session: Session): Int = {
     imageFilesQuery
-      .filter(_.id === imageFileId)
+      .filter(_.id === imageId)
       .delete
   }
 

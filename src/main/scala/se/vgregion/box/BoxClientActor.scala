@@ -8,7 +8,7 @@ import akka.event.Logging
 import akka.actor.Props
 import BoxProtocol._
 
-class BoxActor(config: BoxConfig) extends Actor {
+class BoxClientActor(config: BoxClientConfig) extends Actor {
   val log = Logging(context.system, this)
 
   implicit val system = context.system
@@ -28,6 +28,6 @@ class BoxActor(config: BoxConfig) extends Actor {
   }
 }
 
-object BoxActor {
-  def props(config: BoxConfig): Props = Props(new BoxActor(config))
+object BoxClientActor {
+  def props(config: BoxClientConfig): Props = Props(new BoxClientActor(config))
 }

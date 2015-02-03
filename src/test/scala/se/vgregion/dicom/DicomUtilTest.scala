@@ -69,37 +69,19 @@ class DicomUtilTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     val dataset2 = loadDataset(savePath, false)
     dataset1 should equal (dataset2)
   }
-  
-//  val pat1 = Patient(PatientName("p1"), PatientID("s1"), PatientBirthDate("2000-01-01"), PatientSex("M"))
-//  val study1 = Study(pat1, StudyInstanceUID("stuid1"), StudyDescription("stdesc1"), StudyDate("19990101"), StudyID("stid1"), AccessionNumber("acc1"))
-//  val series1 = Series(study1, Equipment(Manufacturer("manu1"), StationName("station1")), FrameOfReference(FrameOfReferenceUID("frid1")), SeriesInstanceUID("seuid1"), SeriesDescription("sedesc1"), SeriesDate("19990101"), Modality("NM"), ProtocolName("prot1"), BodyPartExamined("bodypart1"))
-//  val image1 = Image(series1, SOPInstanceUID("souid1"), ImageType("PRIMARY/RECON/TOMO"))
-//  
-//  "creating an Image from a dataset" should "be equal to the Image the dataset was constructed from" in {
-//    val dataset = new Attributes()
-//    dataset.setString(Tag.PatientName, VR.LO, pat1.patientName.value)
-//    dataset.setString(Tag.PatientID, VR.LO, pat1.patientID.value)
-//    dataset.setString(Tag.PatientBirthDate, VR.LO, pat1.patientBirthDate.value)
-//    dataset.setString(Tag.PatientSex, VR.LO, pat1.patientSex.value)
-//    dataset.setString(Tag.StudyInstanceUID, VR.LO, study1.studyInstanceUID.value)
-//    dataset.setString(Tag.StudyDescription, VR.LO, study1.studyDescription.value)
-//    dataset.setString(Tag.StudyDate, VR.LO, study1.studyDate.value)
-//    dataset.setString(Tag.StudyID, VR.LO, study1.studyID.value)
-//    dataset.setString(Tag.AccessionNumber, VR.LO, study1.accessionNumber.value)
-//    dataset.setString(Tag.Manufacturer, VR.LO, series1.equipment.manufacturer.value)
-//    dataset.setString(Tag.StationName, VR.LO, series1.equipment.stationName.value)
-//    dataset.setString(Tag.FrameOfReferenceUID, VR.LO, series1.frameOfReference.frameOfReferenceUID.value)
-//    dataset.setString(Tag.SeriesInstanceUID, VR.LO, series1.seriesInstanceUID.value)
-//    dataset.setString(Tag.SeriesDescription, VR.LO, series1.seriesDescription.value)
-//    dataset.setString(Tag.SeriesDate, VR.LO, series1.seriesDate.value)
-//    dataset.setString(Tag.Modality, VR.LO, series1.modality.value)
-//    dataset.setString(Tag.BodyPartExamined, VR.LO, series1.bodyPartExamined.value)
-//    dataset.setString(Tag.SOPInstanceUID, VR.LO, image1.sopInstanceUID.value)
-//    dataset.setString(Tag.ImageType, VR.LO, image1.imageType.value)
-//    val image2 = datasetToImage(dataset)
-//    image1 should equal (image2)
-//  }
-  
+
+  it should "work also in combination with anonymization and loading pixel data" in {
+    val fileName = "anon270.dcm"
+    val dcmPath = Paths.get(classOf[DirectoryRoutesTest].getResource(fileName).toURI())
+    val dataset = loadDataset(dcmPath, true)
+    val anonymized1 = DicomAnonymization.anonymizeDataset(dataset)
+    val savePath = tempDir.resolve("anonymized.dcm")
+    val saveResult = saveDataset(anonymized1, savePath)
+    saveResult should be (true)
+    val anonymized2 = loadDataset(savePath, true)
+    anonymized2 should equal (anonymized1)
+    
+  }
   override def afterAll() {
     TestUtil.deleteFolder(tempDir)
   }

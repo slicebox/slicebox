@@ -1,41 +1,55 @@
 package se.vgregion.app
 
-import java.nio.file.Files
+import spray.httpx.SprayJsonSupport.sprayJsonMarshaller
+import spray.httpx.SprayJsonSupport.sprayJsonUnmarshaller
+
 import org.scalatest.FlatSpec
 import org.scalatest.Matchers
-import spray.httpx.SprayJsonSupport._
-import se.vgregion.box.BoxProtocol.BoxConfig
-import se.vgregion.box.BoxProtocol.Boxes
-import se.vgregion.box.BoxProtocol.BoxName
+
+import se.vgregion.box.BoxProtocol._
 
 class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
   def dbUrl() = "jdbc:h2:mem:boxroutestest;DB_CLOSE_DELAY=-1"
-  
-  val boxConfig1 = BoxConfig("addedBox", "url")
-  
-  "The system" should "return a success message when asked to add a box" in {
-    Post("/api/box/add", boxConfig1) ~> routes ~> check {
-      responseAs[String] should be("Added box " + boxConfig1.name)
+
+  val client1 = BoxClientConfig(-1, "client1", "url")
+
+  "The system" should "return a success message when asked to create a server" in {
+    Post("/api/box/server", CreateBoxServer("server1")) ~> routes ~> check {
+      responseAs[String] should be("Created box server server1")
+    }
+  }
+
+  it should "return a success message when asked to add a client" in {
+    Post("/api/box/client", client1) ~> routes ~> check {
+      responseAs[String] should be("Added box client " + client1.name)
+    }
+  }
+
+  it should "return a list of one server when listing servers" in {
+    Get("/api/box/server/list") ~> routes ~> check {
+      val servers = responseAs[List[BoxServerConfig]]
+      servers.size should be(1)
+    }
+  }
+
+  it should "return a list of one client when listing clients" in {
+    Get("/api/box/client/list") ~> routes ~> check {
+      responseAs[List[BoxClientConfig]].size should be(1)
+    }
+  }
+
+  it should "support removing a server" in {
+    Delete("/api/box/server/1") ~> routes ~> check {
+      responseAs[String] should be("Removed box server with id 1")
     }
   }
   
-  it should "return a list of one box when listing boxes" in {
-    Get("/api/box/list") ~> routes ~> check {
-      responseAs[List[BoxConfig]].size should be (1)
+  it should "support removing a client" in {
+    Delete("/api/box/client/1") ~> routes ~> check {
+      responseAs[String] should be("Removed box client with id 1")
     }
   }
-  
-  it should "be possible to create a new box config" in {
-    Post("/api/box/create", BoxName("box2")) ~> routes ~> check {
-      responseAs[String] should be("Created box box2")
-    }    
-  }
-  
-  it should "be possible to remove the box again" in {
-    Delete("/api/box", boxConfig1) ~> routes ~> check {
-      responseAs[String] should be("Removed box " + boxConfig1.name)
-    }
-  }
+
 
 }

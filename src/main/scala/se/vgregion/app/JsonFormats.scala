@@ -15,8 +15,10 @@ trait JsonFormats extends DefaultJsonProtocol {
 
   implicit val scpDataFormat = jsonFormat4(ScpData)
 
-  implicit val boxConfigFormat = jsonFormat2(BoxConfig)
-  implicit val boxNameFormat = jsonFormat1(BoxName)
+  implicit val boxServerNameFormat = jsonFormat1(BoxServerName)
+  implicit val boxServerFormat = jsonFormat4(BoxServerConfig)
+  implicit val boxClientFormat = jsonFormat3(BoxClientConfig)
+  implicit val createServerFormat = jsonFormat1(CreateBoxServer)
   
   implicit val addScpDataFormat = jsonFormat1(AddScp)
   

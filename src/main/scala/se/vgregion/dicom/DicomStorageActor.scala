@@ -89,7 +89,7 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor {
 
       case DeleteImage(imageId) =>
         db.withSession { implicit session =>
-          val imageFiles = dao.imageFilesForImage(imageId)
+          val imageFiles = dao.imageFileForImage(imageId).toList
           dao.deleteImage(imageId)
           deleteFromStorage(imageFiles)
           sender ! ImageFilesDeleted(imageFiles)
@@ -127,7 +127,7 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor {
 
     case GetImageFiles(imageId) =>
       db.withSession { implicit session =>
-        sender ! ImageFiles(dao.imageFilesForImage(imageId))
+        sender ! ImageFiles(dao.imageFileForImage(imageId).toList)
       }
 
     case msg: MetaDataQuery => msg match {
@@ -189,14 +189,14 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor {
       val dbImage = dao.imageByUid(image)
         .getOrElse(dao.insert(image.copy(seriesId = dbSeries.id)))
       
-      val imageFile = ImageFile(-1, dbImage.id, FileName(name))
+      val imageFile = ImageFile(dbImage.id, FileName(name))
       val dbImageFile = dao.imageFileByFileName(imageFile)
         .getOrElse(dao.insert(imageFile))
       
       val anonymizedDataset = DicomAnonymization.anonymizeDataset(dataset)
       saveDataset(anonymizedDataset, storedPath)
       
-      image
+      dbImage
     }
   }
 
