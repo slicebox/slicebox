@@ -98,7 +98,7 @@ angular.module('slicebox.directives', [])
                     }
                 },
                 rowSelected: {
-                    'bg-info': true
+                    'row-selected': true
                 }
             };
 
@@ -216,7 +216,11 @@ angular.module('slicebox.directives', [])
             };
 
             $scope.rowClicked = function(rowObject) {
-                selectObject(rowObject);
+                if ($scope.selectedObject === rowObject) {
+                    selectObject(null);
+                } else {
+                    selectObject(rowObject);
+                }
             };
 
             $scope.sortingEnabled = function() {
