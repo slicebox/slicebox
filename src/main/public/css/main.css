@@ -1,3 +1,9 @@
 /* main css stylesheet */
 
-body { padding-top: 70px; }
+body {
+    padding-top: 70px;
+}
+
+/*.home-left-column {
+    margin-left: 15px;
+}*/

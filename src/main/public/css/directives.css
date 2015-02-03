@@ -54,6 +54,10 @@
     margin-bottom: 0px;
 }
 
+.sbxGrid table tr.row-selected {
+    background-color: rgb(210,225,250)
+}
+
 .sbxGrid table thead tr th:first-child {
     border-left-width: 0px;
 }
