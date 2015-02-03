@@ -14,8 +14,9 @@ import se.vgregion.app.DbProps
 import se.vgregion.dicom.DicomDispatchActor
 import se.vgregion.dicom.DicomProtocol._
 import akka.actor.Status.Failure
+import se.vgregion.util.ExceptionCatching
 
-class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor {
+class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor with ExceptionCatching {
   val log = Logging(context.system, this)
 
   val db = dbProps.db
@@ -33,19 +34,19 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor 
         val childActorId = pathToId(path)
         context.child(childActorId) match {
           case Some(actor) =>
-            
+
             sender ! DirectoryWatched(path)
-         
+
           case None =>
-            
+
             if (!Files.isDirectory(path)) {
 
               sender ! Failure(new IllegalArgumentException("Could not create directory watch: Not a directory: " + pathString))
 
             } else if (Files.isSameFile(path, storage)) {
-              
-              sender ! Failure(new IllegalArgumentException("The storage directory may not be watched."))              
-              
+
+              sender ! Failure(new IllegalArgumentException("The storage directory may not be watched."))
+
             } else {
 
               addDirectory(pathString)
@@ -57,14 +58,12 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor 
         }
 
       case UnWatchDirectory(watchedDirectoryId) =>
-        db.withSession { implicit session =>
-          dao.watchedDirectoryForId(watchedDirectoryId)
-        } match {
+        watchedDirectoryForId(watchedDirectoryId) match {
           case Some(watchedDirectory) =>
             db.withSession { implicit session =>
               dao.deleteWatchedDirectoryWithId(watchedDirectoryId)
             }
-            
+
             val path = Paths.get(watchedDirectory.path)
 
             val id = pathToId(path)
@@ -80,7 +79,7 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor 
           case None =>
             sender ! DirectoryUnwatched(watchedDirectoryId)
         }
-        
+
       case GetWatchedDirectories =>
         val directories = getWatchedDirectories()
         sender ! WatchedDirectories(directories)
@@ -109,6 +108,11 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor 
   def addDirectory(pathString: String): WatchedDirectory =
     db.withSession { implicit session =>
       dao.insert(WatchedDirectory(-1, pathString))
+    }
+
+  def watchedDirectoryForId(watchedDirectoryId: Long) =
+    db.withSession { implicit session =>
+      dao.watchedDirectoryForId(watchedDirectoryId)
     }
 
   def getWatchedDirectories() =

@@ -8,62 +8,101 @@ import BoxProtocol._
 class BoxDAO(val driver: JdbcProfile) {
   import driver.simple._
 
-  val toServer = (id: Long, name: String, token: String, url: String) => BoxServerConfig(id, name, token, url)
-  val fromServer = (server: BoxServerConfig) => Option((server.id, server.name, server.token, server.url))
+  val toBox = (id: Long, name: String, token: String, baseUrl: String, sendMethod: String) => Box(id, name, token, baseUrl, BoxSendMethod.withName(sendMethod))
+  val fromBox = (box: Box) => Option((box.id, box.name, box.token, box.baseUrl, box.sendMethod.toString))
 
-  class ServerTable(tag: Tag) extends Table[BoxServerConfig](tag, "BoxServer") {
+  class BoxTable(tag: Tag) extends Table[Box](tag, "Box") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def name = column[String]("name")
     def token = column[String]("token")
-    def url = column[String]("url")
-    def * = (id, name, token, url) <> (toServer.tupled, fromServer)
+    def baseUrl = column[String]("baseurl")
+    def sendMethod = column[String]("sendmethod")
+    def idxUniqueNAme = index("idx_unique_name", name, unique = true)
+    def * = (id, name, token, baseUrl, sendMethod) <> (toBox.tupled, fromBox)
   }
 
-  val serverQuery = TableQuery[ServerTable]
+  val boxQuery = TableQuery[BoxTable]
 
-  val toClient = (id: Long, name: String, url: String) => BoxClientConfig(id, name, url)
-  val fromClient = (config: BoxClientConfig) => Option((config.id, config.name, config.url))
+  val toOutboxEntry = (id: Long, remoteBoxId: Long, transactionId: Long, sequenceNumber: Long, totalImageCount: Long, imageId: Long, failed: Boolean) =>
+    OutboxEntry(id, remoteBoxId, sequenceNumber, totalImageCount, imageId, transactionId, failed)
+  val fromOutboxEntry = (entry: OutboxEntry) => Option((entry.id, entry.remoteBoxId, entry.transactionId, entry.sequenceNumber, entry.totalImageCount, entry.imageId, entry.failed))
 
-  class ClientTable(tag: Tag) extends Table[BoxClientConfig](tag, "BoxClient") {
+  class OutboxTable(tag: Tag) extends Table[OutboxEntry](tag, "Outbox") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
-    def name = column[String]("name")
-    def url = column[String]("url")
-    def * = (id, name, url) <> (toClient.tupled, fromClient)
+    def remoteBoxId = column[Long]("remoteboxid")
+    def transactionId = column[Long]("transactionid")
+    def sequenceNumber = column[Long]("sequencenumber")
+    def totalImageCount = column[Long]("totalimagecount")
+    def imageId = column[Long]("imageid")
+    def failed = column[Boolean]("failed")
+    def * = (id, remoteBoxId, transactionId, sequenceNumber, totalImageCount, imageId, failed) <> (toOutboxEntry.tupled, fromOutboxEntry)
   }
 
-  val clientQuery = TableQuery[ClientTable]
+  val outboxQuery = TableQuery[OutboxTable]
+  
+  val toInboxEntry = (id: Long, remoteBoxId: Long, transactionId: Long, receivedImageCount: Long, totalImageCount: Long) =>
+    InboxEntry(id, remoteBoxId, transactionId, receivedImageCount, totalImageCount)
+  val fromInboxEntry = (entry: InboxEntry) => Option((entry.id, entry.remoteBoxId, entry.transactionId, entry.receivedImageCount, entry.totalImageCount))
 
-  def create(implicit session: Session) =
-    if (MTable.getTables("BoxServer").list.isEmpty) {
-      (clientQuery.ddl ++ serverQuery.ddl).create
+  class InboxTable(tag: Tag) extends Table[InboxEntry](tag, "Inbox") {
+    def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
+    def remoteBoxId = column[Long]("remoteboxid")
+    def transactionId = column[Long]("transactionid")
+    def receivedImageCount = column[Long]("receivedimagecount")
+    def totalImageCount = column[Long]("totalimagecount")
+    def * = (id, remoteBoxId, transactionId, receivedImageCount, totalImageCount) <> (toInboxEntry.tupled, fromInboxEntry)
+  }
+
+  val inboxQuery = TableQuery[InboxTable]
+  
+  def create(implicit session: Session): Unit =
+    if (MTable.getTables("Box").list.isEmpty) {
+      (boxQuery.ddl ++ outboxQuery.ddl ++ inboxQuery.ddl).create
     }
 
-  def insertServer(server: BoxServerConfig)(implicit session: Session) = {
-    val generatedId = (serverQuery returning serverQuery.map(_.id)) += server
-    server.copy(id = generatedId)
+  def insertBox(box: Box)(implicit session: Session): Box = {
+    val generatedId = (boxQuery returning boxQuery.map(_.id)) += box
+    box.copy(id = generatedId)
   }
 
-  def insertClient(client: BoxClientConfig)(implicit session: Session) = {
-    val generatedId = (clientQuery returning clientQuery.map(_.id)) += client
-    client.copy(id = generatedId)
+  def insertOutboxEntry(entry: OutboxEntry)(implicit session: Session): OutboxEntry = {
+    val generatedId = (outboxQuery returning outboxQuery.map(_.id)) += entry
+    entry.copy(id = generatedId)
   }
 
-  def serverById(serverId: Long)(implicit session: Session): Option[BoxServerConfig] = 
-    serverQuery.filter(_.id === serverId).list.headOption
+  def insertInboxEntry(entry: InboxEntry)(implicit session: Session): InboxEntry = {
+    val generatedId = (inboxQuery returning inboxQuery.map(_.id)) += entry
+    entry.copy(id = generatedId)
+  }
+
+  def boxById(boxId: Long)(implicit session: Session): Option[Box] =
+    boxQuery.filter(_.id === boxId).list.headOption
+
+  def pushBoxByBaseUrl(baseUrl: String)(implicit session: Session): Option[Box] =
+    boxQuery
+      .filter(_.sendMethod === BoxSendMethod.PUSH.toString)
+      .filter(_.baseUrl === baseUrl)
+      .list.headOption
+
+  def updateInboxEntry(entry: InboxEntry)(implicit session: Session): Unit = 
+    inboxQuery.filter(_.id === entry.id).update(entry)
+
+  def nextOutboxEntryForRemoteBoxId(remoteBoxId: Long)(implicit session: Session): Option[OutboxEntry] = 
+    outboxQuery.filter(_.remoteBoxId === remoteBoxId).sortBy(_.sequenceNumber.asc).list.headOption
     
-  def clientById(clientId: Long)(implicit session: Session): Option[BoxClientConfig] = 
-    clientQuery.filter(_.id === clientId).list.headOption
-    
-  def removeServer(serverId: Long)(implicit session: Session) =
-    serverQuery.filter(_.id === serverId).delete
+  def removeBox(boxId: Long)(implicit session: Session): Unit =
+    boxQuery.filter(_.id === boxId).delete
 
-  def removeClient(clientId: Long)(implicit session: Session) =
-    clientQuery.filter(_.id === clientId).delete
+  def removeOutboxEntry(entryId: Long)(implicit session: Session): Unit =
+    outboxQuery.filter(_.id === entryId).delete
 
-  def listServers(implicit session: Session): List[BoxServerConfig] =
-    serverQuery.list
+  def listBoxes(implicit session: Session): List[Box] =
+    boxQuery.list
 
-  def listClients(implicit session: Session): List[BoxClientConfig] =
-    clientQuery.list
+  def listOutboxEntries(implicit session: Session): List[OutboxEntry] =
+    outboxQuery.list
+
+  def listInboxEntries(implicit session: Session): List[InboxEntry] =
+    inboxQuery.list
 
 }

@@ -13,6 +13,7 @@ import akka.util.Timeout
 import spray.http.StatusCodes.Forbidden
 import spray.http.StatusCodes.BadRequest
 import spray.http.StatusCodes.OK
+import spray.http.StatusCodes.NoContent
 import spray.httpx.PlayTwirlSupport.twirlHtmlMarshaller
 import spray.httpx.SprayJsonSupport._
 import spray.httpx.marshalling.ToResponseMarshallable.isMarshallable
@@ -233,57 +234,37 @@ trait RestApi extends HttpService with JsonFormats {
 
   def boxRoutes: Route =
     pathPrefix("box") {
-      pathPrefix("server") {
-        path("list") {
-          get {
-            onSuccess(boxService.ask(GetBoxServers)) {
-              case BoxServers(servers) =>
-                complete(servers)
-            }
+      pathEnd {
+        get {
+          onSuccess(boxService.ask(GetBoxes)) {
+            case Boxes(boxes) =>
+              complete(boxes)
           }
-        } ~ pathEnd {
-          post {
-            entity(as[BoxServerName]) { boxName =>
-              onSuccess(boxService.ask(CreateBoxServer(boxName.name))) {
-                case BoxServerCreated(server) =>
-                  complete(s"Created box server ${server.name}")
-              }
-            }
-          }
-        } ~ path(LongNumber) { serverId =>
-          delete {
-            pathEnd {
-              onSuccess(boxService.ask(RemoveBoxServer(serverId))) {
-                case BoxServerRemoved(serverId) =>
-                  complete(s"Removed box server with id $serverId")
-              }
+        }
+      } ~ path("generatebaseurl") {
+        post {
+          entity(as[RemoteBoxName]) { remoteBoxName =>
+            onSuccess(boxService.ask(GenerateBoxBaseUrl(remoteBoxName.value))) {
+              case BoxBaseUrlGenerated(baseUrl) =>
+                complete(BoxBaseUrl(baseUrl))
             }
           }
         }
-      } ~ pathPrefix("client") {
-        path("list") {
-          get {
-            onSuccess(boxService.ask(GetBoxClients)) {
-              case BoxClients(clients) =>
-                complete(clients)
+      } ~ path("addremotebox") {
+        post {
+          entity(as[RemoteBox]) { remoteBox =>
+            onSuccess(boxService.ask(AddRemoteBox(remoteBox))) {
+              case RemoteBoxAdded(box) =>
+                complete(box)
             }
           }
-        } ~ pathEnd {
-          post {
-            entity(as[BoxClientConfig]) { client =>
-              onSuccess(boxService.ask(AddBoxClient(client))) {
-                case BoxClientAdded(client) =>
-                  complete(s"Added box client ${client.name}")
-              }
-            }
-          }
-        } ~ path(LongNumber) { clientId =>
-          delete {
-            pathEnd {
-              onSuccess(boxService.ask(RemoveBoxClient(clientId))) {
-                case BoxClientRemoved(clientId) =>
-                  complete(s"Removed box client with id $clientId")
-              }
+        }
+      } ~ path(LongNumber) { boxId =>
+        delete {
+          pathEnd {
+            onSuccess(boxService.ask(RemoveBox(boxId))) {
+              case BoxRemoved(boxId) =>
+                complete((NoContent, s"Removed box server with id boxId"))
             }
           }
         }

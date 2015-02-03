@@ -7,54 +7,69 @@ import se.vgregion.box.BoxProtocol._
 import akka.actor.Props
 import akka.actor.PoisonPill
 import java.util.UUID
-import scala.util.Failure
+import akka.actor.Status.Failure
+import se.vgregion.util.ExceptionCatching
 
-class BoxServiceActor(dbProps: DbProps, host: String, port: Int) extends Actor {
+class BoxServiceActor(dbProps: DbProps, host: String, port: Int) extends Actor with ExceptionCatching {
 
   val db = dbProps.db
   val dao = new BoxDAO(dbProps.driver)
 
   setupDb()
+  setupBoxes()
 
   def receive = LoggingReceive {
     case msg: BoxRequest => msg match {
 
-      case CreateBoxServer(name) =>
-
+      case GenerateBoxBaseUrl(remoteBoxName) =>
         val token = UUID.randomUUID().toString()
-        val url = s"http://$host/$port/api/box/$token"
-        val server = BoxServerConfig(-1, name, token, url)
-        addServer(server)
-        sender ! BoxServerCreated(server)
-
-      case AddBoxClient(client) =>
-        // TODO sanitize name when used as actor name
-        context.child(client.name) match {
-          case Some(actor) =>
-            sender ! BoxClientAdded(client)
-          case None =>
-            addClient(client)
-            context.actorOf(BoxClientActor.props(client), client.name)
-            sender ! BoxClientAdded(client)
+        val baseUrl = s"http://$host/$port/api/box/$token"
+        val box = Box(-1, remoteBoxName, token, baseUrl, BoxSendMethod.POLL)
+        catchAndReport {
+          addBoxToDb(box)
         }
+        sender ! BoxBaseUrlGenerated(baseUrl)
 
-      case RemoveBoxServer(serverId) =>
-        removeServer(serverId)
-        sender ! BoxServerRemoved(serverId)
+      case AddRemoteBox(remoteBox) =>
+        val box = pushBoxByBaseUrl(remoteBox.baseUrl) match {
+          case Some(box) =>
+            // already in the db, do nothing
+            box
+          case None =>
+            val token = baseUrlToToken(remoteBox.baseUrl)
+            val box = Box(-1, remoteBox.name, token, remoteBox.baseUrl, BoxSendMethod.PUSH)
+            catchAndReport {
+              addBoxToDb(box)
+            }
+            box
+        }
+        context.child(BoxSendMethod.PUSH + box.id.toString) match {
+          case Some(actor) =>
+          // do nothing
+          case None =>
+            startPushActor(box)
+        }
+        context.child(BoxSendMethod.POLL + box.id.toString) match {
+          case Some(actor) =>
+          // do nothing
+          case None =>
+            startPollActor(box)
+        }
+        sender ! RemoteBoxAdded(box)
 
-      case RemoveBoxClient(clientId) =>
+      case RemoveBox(boxId) =>
+        boxById(boxId).foreach(box => {
+          context.child(BoxSendMethod.PUSH + boxId.toString)
+            .foreach(_ ! PoisonPill)
+          context.child(BoxSendMethod.POLL + boxId.toString)
+            .foreach(_ ! PoisonPill)
+        })
+        removeBoxFromDb(boxId)
+        sender ! BoxRemoved(boxId)
 
-        clientById(clientId).foreach(client => context.child(client.name).foreach(_ ! PoisonPill))
-        removeClient(clientId)
-        sender ! BoxClientRemoved(clientId)
-
-      case GetBoxClients =>
-        val clients = getClients()
-        sender ! BoxClients(clients)
-
-      case GetBoxServers =>
-        val servers = getServers()
-        sender ! BoxServers(servers)
+      case GetBoxes =>
+        val boxes = getBoxesFromDb()
+        sender ! Boxes(boxes)
 
       case ValidateToken(token) =>
         if (tokenIsValid(token))
@@ -69,44 +84,48 @@ class BoxServiceActor(dbProps: DbProps, host: String, port: Int) extends Actor {
       dao.create
     }
 
-  def addServer(config: BoxServerConfig): BoxServerConfig =
+  def baseUrlToToken(url: String) = {
+    val trimmedUrl = url.trim.stripSuffix("/")
+    trimmedUrl.substring(trimmedUrl.lastIndexOf("/"))
+  }
+
+  def setupBoxes() =
+    getBoxesFromDb foreach (box => box.sendMethod match {
+      case BoxSendMethod.POLL =>
+        startPollActor(box)
+      case BoxSendMethod.PUSH =>
+        startPushActor(box)
+    })
+
+  def startPushActor(box: Box) =
+    context.actorOf(BoxPushActor.props(box), box.id.toString)
+
+  def startPollActor(box: Box) =
+    context.actorOf(BoxPollActor.props(box), box.id.toString)
+
+  def addBoxToDb(box: Box): Box =
     db.withSession { implicit session =>
-      dao.insertServer(config)
+      dao.insertBox(box)
     }
 
-  def addClient(config: BoxClientConfig): BoxClientConfig =
+  def boxById(boxId: Long): Option[Box] =
     db.withSession { implicit session =>
-      dao.insertClient(config)
+      dao.boxById(boxId)
     }
 
-  def serverById(boxServerId: Long): Option[BoxServerConfig] =
+  def pushBoxByBaseUrl(baseUrl: String): Option[Box] =
     db.withSession { implicit session =>
-      dao.serverById(boxServerId)
+      dao.pushBoxByBaseUrl(baseUrl)
     }
 
-  def clientById(boxClientId: Long): Option[BoxClientConfig] =
+  def removeBoxFromDb(boxId: Long) =
     db.withSession { implicit session =>
-      dao.clientById(boxClientId)
+      dao.removeBox(boxId)
     }
 
-  def removeServer(boxServerId: Long) =
+  def getBoxesFromDb(): Seq[Box] =
     db.withSession { implicit session =>
-      dao.removeServer(boxServerId)
-    }
-
-  def removeClient(boxClientId: Long) =
-    db.withSession { implicit session =>
-      dao.removeClient(boxClientId)
-    }
-
-  def getClients(): Seq[BoxClientConfig] =
-    db.withSession { implicit session =>
-      dao.listClients
-    }
-
-  def getServers(): Seq[BoxServerConfig] =
-    db.withSession { implicit session =>
-      dao.listServers
+      dao.listBoxes
     }
 
   def tokenIsValid(token: String): Boolean =

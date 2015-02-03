@@ -8,7 +8,7 @@ import akka.event.Logging
 import akka.actor.Props
 import BoxProtocol._
 
-class BoxClientActor(config: BoxClientConfig) extends Actor {
+class BoxPollActor(box: Box) extends Actor {
   val log = Logging(context.system, this)
 
   implicit val system = context.system
@@ -20,7 +20,7 @@ class BoxClientActor(config: BoxClientConfig) extends Actor {
 
   system.scheduler.schedule(1.second, 5.seconds) {
     ip.map(yourIp =>
-      log.info("Hello from box " + config.name + ", your ip is " + yourIp.entity.asString))
+      log.info("Hello from box " + box.name + ", your ip is " + yourIp.entity.asString))
   }
 
   def receive = LoggingReceive {
@@ -28,6 +28,6 @@ class BoxClientActor(config: BoxClientConfig) extends Actor {
   }
 }
 
-object BoxClientActor {
-  def props(config: BoxClientConfig): Props = Props(new BoxClientActor(config))
+object BoxPollActor {
+  def props(box: Box): Props = Props(new BoxPollActor(box))
 }

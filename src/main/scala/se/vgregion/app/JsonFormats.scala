@@ -15,61 +15,73 @@ trait JsonFormats extends DefaultJsonProtocol {
 
   implicit val scpDataFormat = jsonFormat4(ScpData)
 
-  implicit val boxServerNameFormat = jsonFormat1(BoxServerName)
-  implicit val boxServerFormat = jsonFormat4(BoxServerConfig)
-  implicit val boxClientFormat = jsonFormat3(BoxClientConfig)
-  implicit val createServerFormat = jsonFormat1(CreateBoxServer)
-  
+  implicit val remoteBoxFormat = jsonFormat2(RemoteBox)
+  implicit val remoteBoxNameFormat = jsonFormat1(RemoteBoxName)
+  implicit val boxBaseUrlFormat = jsonFormat1(BoxBaseUrl)
+
+  implicit object BoxSendMethodFormat extends JsonFormat[BoxSendMethod] {
+    def write(obj: BoxSendMethod) = JsString(obj.toString)
+
+    def read(json: JsValue): BoxSendMethod = json match {
+      case JsString(string) => BoxSendMethod.withName(string)
+      case _                => deserializationError("Enumeration expected")
+    }
+  }
+
+  implicit val boxFormat = jsonFormat5(Box)
+
+  implicit val generateBoxBaseUrlFormat = jsonFormat1(GenerateBoxBaseUrl)
+
   implicit val addScpDataFormat = jsonFormat1(AddScp)
-  
+
   implicit object RoleFormat extends JsonFormat[Role] {
     def write(obj: Role) = JsString(obj.toString)
 
     def read(json: JsValue): Role = json match {
       case JsString(string) => Role.valueOf(string)
-      case _ => Collaborator
+      case _                => Collaborator
     }
   }
-  
+
   implicit val clearTextUserFormat = jsonFormat3(ClearTextUser)
-  
+
   implicit val patientNameFormat = jsonFormat1(PatientName)
   implicit val patientIdFormat = jsonFormat1(PatientID)
   implicit val patientBirthDateFormat = jsonFormat1(PatientBirthDate)
   implicit val patientSexFormat = jsonFormat1(PatientSex)
 
   implicit val patientFormat = jsonFormat5(Patient)
-  
+
   implicit val studyInstanceUidFormat = jsonFormat1(StudyInstanceUID)
   implicit val studyDescriptionFormat = jsonFormat1(StudyDescription)
   implicit val studyDateFormat = jsonFormat1(StudyDate)
   implicit val studyIdFormat = jsonFormat1(StudyID)
   implicit val accessionNumberFormat = jsonFormat1(AccessionNumber)
-  
+
   implicit val studyFormat = jsonFormat7(Study)
-  
+
   implicit val manufacturerFormat = jsonFormat1(Manufacturer)
   implicit val stationNameFormat = jsonFormat1(StationName)
-  
+
   implicit val equipmentFormat = jsonFormat3(Equipment)
-  
+
   implicit val frameOfReferenceUidFormat = jsonFormat1(FrameOfReferenceUID)
-  
+
   implicit val frameOfReferenceFormat = jsonFormat2(FrameOfReference)
-  
+
   implicit val seriesInstanceUidFormat = jsonFormat1(SeriesInstanceUID)
   implicit val seriesDescriptionFormat = jsonFormat1(SeriesDescription)
   implicit val seriesDateFormat = jsonFormat1(SeriesDate)
   implicit val modalityFormat = jsonFormat1(Modality)
   implicit val protocolNameFormat = jsonFormat1(ProtocolName)
   implicit val bodyPartExaminedFormat = jsonFormat1(BodyPartExamined)
-  
+
   implicit val seriesFormat = jsonFormat10(Series)
-  
+
   implicit val sopInstanceUidFormat = jsonFormat1(SOPInstanceUID)
   implicit val imageTypeFormat = jsonFormat1(ImageType)
-  
+
   implicit val imageFormat = jsonFormat4(Image)
-  
+
   implicit val imagesFormat = jsonFormat1(Images)
 }
