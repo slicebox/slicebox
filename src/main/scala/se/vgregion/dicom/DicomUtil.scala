@@ -12,13 +12,19 @@ import java.io.BufferedInputStream
 import java.nio.file.Path
 import org.dcm4che3.data.UID
 import org.dcm4che3.io.DicomInputStream.IncludeBulkData
+import java.io.InputStream
+import java.io.ByteArrayInputStream
+import java.io.OutputStream
 
 object DicomUtil {
 
   val defaultTransferSyntax = UID.ExplicitVRLittleEndian
 
-  def saveDataset(dataset: Attributes, filePath: Path): Boolean = {
-    val dos = new DicomOutputStream(Files.newOutputStream(filePath), defaultTransferSyntax)
+  def saveDataset(dataset: Attributes, filePath: Path): Boolean = 
+    saveDataset(dataset, Files.newOutputStream(filePath))
+    
+  def saveDataset(dataset: Attributes, outputStream: OutputStream): Boolean = {
+    val dos = new DicomOutputStream(outputStream, defaultTransferSyntax)
     val metaInformation = dataset.createFileMetaInformation(defaultTransferSyntax)
     try {
       dos.writeDataset(metaInformation, dataset)
@@ -30,11 +36,17 @@ object DicomUtil {
     }
   }
 
-  def loadDataset(path: Path, withPixelData: Boolean): Attributes = {
+  def loadDataset(path: Path, withPixelData: Boolean): Attributes =
+    loadDataset(new BufferedInputStream(Files.newInputStream(path)), withPixelData)
+
+  def loadDataset(byteArray: Array[Byte], withPixelData: Boolean): Attributes =
+    loadDataset(new BufferedInputStream(new ByteArrayInputStream(byteArray)), withPixelData)
+
+  def loadDataset(inputStream: InputStream, withPixelData: Boolean): Attributes = {
     var dis: DicomInputStream = null
     try {
-      dis = new DicomInputStream(new BufferedInputStream(Files.newInputStream(path)))
-      
+      dis = new DicomInputStream(inputStream)
+
       val dataset =
         if (withPixelData)
           dis.readDataset(-1, -1)
@@ -67,18 +79,18 @@ object DicomUtil {
       StudyDate(valueOrEmpty(dataset, DicomProperty.StudyDate.dicomTag)),
       StudyID(valueOrEmpty(dataset, DicomProperty.StudyID.dicomTag)),
       AccessionNumber(valueOrEmpty(dataset, DicomProperty.AccessionNumber.dicomTag)))
-      
+
   def datasetToEquipment(dataset: Attributes): Equipment =
     Equipment(
       -1,
       Manufacturer(valueOrEmpty(dataset, DicomProperty.Manufacturer.dicomTag)),
       StationName(valueOrEmpty(dataset, DicomProperty.StationName.dicomTag)))
-      
+
   def datasetToFrameOfReference(dataset: Attributes): FrameOfReference =
     FrameOfReference(
       -1,
       FrameOfReferenceUID(valueOrEmpty(dataset, DicomProperty.FrameOfReferenceUID.dicomTag)))
-      
+
   def datasetToSeries(dataset: Attributes): Series =
     Series(
       -1,
@@ -91,7 +103,7 @@ object DicomUtil {
       Modality(valueOrEmpty(dataset, DicomProperty.Modality.dicomTag)),
       ProtocolName(valueOrEmpty(dataset, DicomProperty.ProtocolName.dicomTag)),
       BodyPartExamined(valueOrEmpty(dataset, DicomProperty.BodyPartExamined.dicomTag)))
-      
+
   def datasetToImage(dataset: Attributes): Image =
     Image(
       -1,

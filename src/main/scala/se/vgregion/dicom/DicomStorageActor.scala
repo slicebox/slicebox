@@ -89,32 +89,32 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor {
 
       case DeleteImage(imageId) =>
         db.withSession { implicit session =>
-          val imageFiles = dao.imageFilesForImageId(imageId)
-          dao.deleteImageWithId(imageId)
+          val imageFiles = dao.imageFileForImage(imageId).toList
+          dao.deleteImage(imageId)
           deleteFromStorage(imageFiles)
           sender ! ImageFilesDeleted(imageFiles)
         }
 
       case DeleteSeries(seriesId) =>
         db.withSession { implicit session =>
-          val imageFiles = dao.imageFilesForSeriesId(seriesId)
-          dao.deleteSeriesWithId(seriesId)
+          val imageFiles = dao.imageFilesForSeries(seriesId)
+          dao.deleteSeries(seriesId)
           deleteFromStorage(imageFiles)
           sender ! ImageFilesDeleted(imageFiles)
         }
 
       case DeleteStudy(studyId) =>
         db.withSession { implicit session =>
-          val imageFiles = dao.imageFilesForStudyId(studyId)
-          dao.deleteStudyWithId(studyId)
+          val imageFiles = dao.imageFilesForStudy(studyId)
+          dao.deleteStudy(studyId)
           deleteFromStorage(imageFiles)
           sender ! ImageFilesDeleted(imageFiles)
         }
 
       case DeletePatient(patientId) =>
         db.withSession { implicit session =>
-          val imageFiles = dao.imageFilesForPatientId(patientId)
-          dao.deletePatientWithId(patientId)
+          val imageFiles = dao.imageFilesForPatient(patientId)
+          dao.deletePatient(patientId)
           deleteFromStorage(imageFiles)
           sender ! ImageFilesDeleted(imageFiles)
         }
@@ -122,35 +122,35 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor {
 
     case GetAllImageFiles =>
       db.withSession { implicit session =>
-        sender ! ImageFiles(dao.allImageFiles)
+        sender ! ImageFiles(dao.imageFiles)
       }
 
     case GetImageFiles(imageId) =>
       db.withSession { implicit session =>
-        sender ! ImageFiles(dao.imageFilesForImageId(imageId))
+        sender ! ImageFiles(dao.imageFileForImage(imageId).toList)
       }
 
     case msg: MetaDataQuery => msg match {
       case GetAllImages =>
         db.withSession { implicit session =>
-          sender ! Images(dao.allImages)
+          sender ! Images(dao.images)
         }
 
       case GetPatients =>
         db.withSession { implicit session =>
-          sender ! Patients(dao.allPatients)
+          sender ! Patients(dao.patients)
         }
       case GetStudies(patientId) =>
         db.withSession { implicit session =>
-          sender ! Studies(dao.studiesForPatientId(patientId))
+          sender ! Studies(dao.studiesForPatient(patientId))
         }
       case GetSeries(studyId) =>
         db.withSession { implicit session =>
-          sender ! SeriesCollection(dao.seriesForStudyId(studyId))
+          sender ! SeriesCollection(dao.seriesForStudy(studyId))
         }
       case GetImages(seriesId) =>
         db.withSession { implicit session =>
-          sender ! Images(dao.imagesForSeriesId(seriesId))
+          sender ! Images(dao.imagesForSeries(seriesId))
         }
 
     }
@@ -163,40 +163,40 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor {
     
     db.withSession { implicit session =>
       val patient = datasetToPatient(dataset)
-      val dbPatient = dao.existingPatient(patient)
+      val dbPatient = dao.patientByNameAndID(patient)
         .getOrElse(dao.insert(patient))
       
       val study = datasetToStudy(dataset)
-      val dbStudy = dao.existingStudy(study)
+      val dbStudy = dao.studyByUid(study)
         .getOrElse(dao.insert(study.copy(patientId = dbPatient.id)))
         
       val equipment = datasetToEquipment(dataset)
-      val dbEquipment = dao.existingEquipment(equipment)
+      val dbEquipment = dao.equipmentByManufacturerAndStationName(equipment)
         .getOrElse(dao.insert(equipment))
       
       val frameOfReference = datasetToFrameOfReference(dataset)
-      val dbFrameOfReference = dao.existingFrameOfReference(frameOfReference)
+      val dbFrameOfReference = dao.frameOfReferenceByUid(frameOfReference)
         .getOrElse(dao.insert(frameOfReference))
 
       val series = datasetToSeries(dataset)
-      val dbSeries = dao.existingSeries(series)
+      val dbSeries = dao.seriesByUid(series)
         .getOrElse(dao.insert(series.copy(
           studyId = dbStudy.id,
           equipmentId = dbEquipment.id,
           frameOfReferenceId = dbFrameOfReference.id)))
           
       val image = datasetToImage(dataset)
-      val dbImage = dao.existingImage(image)
+      val dbImage = dao.imageByUid(image)
         .getOrElse(dao.insert(image.copy(seriesId = dbSeries.id)))
       
-      val imageFile = ImageFile(-1, dbImage.id, FileName(name))
-      val dbImageFile = dao.existingImageFile(imageFile)
+      val imageFile = ImageFile(dbImage.id, FileName(name))
+      val dbImageFile = dao.imageFileByFileName(imageFile)
         .getOrElse(dao.insert(imageFile))
       
       val anonymizedDataset = DicomAnonymization.anonymizeDataset(dataset)
       saveDataset(anonymizedDataset, storedPath)
       
-      image
+      dbImage
     }
   }
 

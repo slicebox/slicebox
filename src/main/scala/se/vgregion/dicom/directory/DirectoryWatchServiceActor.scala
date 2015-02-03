@@ -48,8 +48,6 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor 
               
             } else {
 
-              println(s"Started watching directory $path")
-              
               addDirectory(pathString)
 
               context.actorOf(DirectoryWatchActor.props(pathString), childActorId)

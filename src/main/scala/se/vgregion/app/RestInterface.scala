@@ -3,30 +3,32 @@ package se.vgregion.app
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
-
 import scala.concurrent.duration.DurationInt
 import scala.slick.driver.H2Driver
 import scala.slick.jdbc.JdbcBackend.Database
-
 import akka.actor.Actor
 import akka.actor.ActorContext
 import akka.pattern.ask
 import akka.util.Timeout
-
+import spray.http.StatusCodes.Forbidden
 import spray.http.StatusCodes.BadRequest
 import spray.http.StatusCodes.OK
 import spray.httpx.PlayTwirlSupport.twirlHtmlMarshaller
 import spray.httpx.SprayJsonSupport._
 import spray.httpx.marshalling.ToResponseMarshallable.isMarshallable
 import spray.routing._
-
 import com.typesafe.config.ConfigFactory
-
 import se.vgregion.box.BoxProtocol._
 import se.vgregion.box.BoxServiceActor
 import se.vgregion.dicom.DicomDispatchActor
 import se.vgregion.dicom.DicomHierarchy._
 import se.vgregion.dicom.DicomProtocol._
+import spray.http.MultipartFormData
+import se.vgregion.dicom.DicomUtil
+import spray.http.FormFile
+import spray.http.HttpEntity
+import spray.http.HttpData
+import spray.http.ContentTypes
 
 class RestInterface extends Actor with RestApi {
 
@@ -55,14 +57,14 @@ trait RestApi extends HttpService with JsonFormats {
 
   val config = ConfigFactory.load()
   val sliceboxConfig = config.getConfig("slicebox")
-  
+
   def createStorageDirectory(): Path
   def dbUrl(): String
 
   def db = Database.forURL(dbUrl,
-      user = sliceboxConfig.getString("db.user"),
-      password = sliceboxConfig.getString("db.password"), 
-      driver = "org.h2.Driver")
+    user = sliceboxConfig.getString("db.user"),
+    password = sliceboxConfig.getString("db.password"),
+    driver = "org.h2.Driver")
   val dbProps = DbProps(db, H2Driver)
 
   val storage = createStorageDirectory()
@@ -194,47 +196,145 @@ trait RestApi extends HttpService with JsonFormats {
     }
   }
 
-  def boxRoutes: Route =
-    pathPrefix("box") {
-      get {
-        path("list") {
-          onSuccess(boxService.ask(GetBoxes)) {
-            case Boxes(configs) =>
-              complete((OK, configs))
-          }
-        }
-      } ~ post {
-        path("add") {
-          entity(as[BoxConfig]) { config =>
-            onSuccess(boxService.ask(AddBox(config))) {
-              case BoxAdded(config) =>
-                complete((OK, "Added box " + config.name))
-            }
-          }
-        } ~ path("create") {
-          entity(as[BoxName]) { boxName =>
-            onSuccess(boxService.ask(CreateBox(boxName.name))) {
-              case BoxCreated(config) =>
-                complete((OK, "Created box " + config.name))
-            }
-          }
-        }
-      } ~ delete {
+  def datasetRoutes: Route =
+    pathPrefix("dataset") {
+      post {
         pathEnd {
-          entity(as[BoxConfig]) { config =>
-            onSuccess(boxService.ask(RemoveBox(config))) {
-              case BoxRemoved(config) =>
-                complete((OK, "Removed box " + config.name))
+          // TODO allow with token
+          formField('file.as[FormFile]) { file =>
+            val dataset = DicomUtil.loadDataset(file.entity.data.toByteArray, true)
+            onSuccess(dicomService.ask(AddDataset(dataset))) {
+              case ImageAdded(image) =>
+                complete("Dataset received, added image with id " + image.id)
             }
+          }
+        }
+      } ~ get {
+        path(LongNumber) { imageId =>
+
+          onSuccess(dicomService.ask(GetImageFiles(imageId))) {
+            case ImageFiles(imageFiles) =>
+              imageFiles.headOption match {
+                case Some(imageFile) =>
+                  val file = storage.resolve(imageFile.fileName.value).toFile
+                  if (file.isFile && file.canRead)
+                    detach() {
+                      complete(HttpEntity(ContentTypes.`application/octet-stream`, HttpData(file)))
+                    }
+                  else
+                    complete((BadRequest, "Dataset could not be read"))
+                case None =>
+                  complete((BadRequest, "Dataset not found"))
+              }
           }
         }
       }
     }
 
+  def boxRoutes: Route =
+    pathPrefix("box") {
+      pathPrefix("server") {
+        path("list") {
+          get {
+            onSuccess(boxService.ask(GetBoxServers)) {
+              case BoxServers(servers) =>
+                complete(servers)
+            }
+          }
+        } ~ pathEnd {
+          post {
+            entity(as[BoxServerName]) { boxName =>
+              onSuccess(boxService.ask(CreateBoxServer(boxName.name))) {
+                case BoxServerCreated(server) =>
+                  complete(s"Created box server ${server.name}")
+              }
+            }
+          }
+        } ~ path(LongNumber) { serverId =>
+          delete {
+            pathEnd {
+              onSuccess(boxService.ask(RemoveBoxServer(serverId))) {
+                case BoxServerRemoved(serverId) =>
+                  complete(s"Removed box server with id $serverId")
+              }
+            }
+          }
+        }
+      } ~ pathPrefix("client") {
+        path("list") {
+          get {
+            onSuccess(boxService.ask(GetBoxClients)) {
+              case BoxClients(clients) =>
+                complete(clients)
+            }
+          }
+        } ~ pathEnd {
+          post {
+            entity(as[BoxClientConfig]) { client =>
+              onSuccess(boxService.ask(AddBoxClient(client))) {
+                case BoxClientAdded(client) =>
+                  complete(s"Added box client ${client.name}")
+              }
+            }
+          }
+        } ~ path(LongNumber) { clientId =>
+          delete {
+            pathEnd {
+              onSuccess(boxService.ask(RemoveBoxClient(clientId))) {
+                case BoxClientRemoved(clientId) =>
+                  complete(s"Removed box client with id $clientId")
+              }
+            }
+          }
+        }
+      } ~ tokenRoutes
+    }
+
+  def tokenRoutes: Route =
+    pathPrefix(Segment) { token =>
+      onSuccess(boxService.ask(ValidateToken(token))) {
+        case InvalidToken(token) =>
+          complete((Forbidden, "Invalid token"))
+        case ValidToken(token) =>
+          pathPrefix("dataset") {
+            pathEnd {
+              post {
+                // TODO allow with token
+                formField('file.as[FormFile]) { file =>
+                  val dataset = DicomUtil.loadDataset(file.entity.data.toByteArray, true)
+                  onSuccess(dicomService.ask(AddDataset(dataset))) {
+                    case ImageAdded(image) =>
+                      complete("Dataset received, added image with id " + image.id)
+                  }
+                }
+              }
+            } ~ path(LongNumber) { imageId =>
+              get {
+                onSuccess(dicomService.ask(GetImageFiles(imageId))) {
+                  case ImageFiles(imageFiles) =>
+                    imageFiles.headOption match {
+                      case Some(imageFile) =>
+                        val file = storage.resolve(imageFile.fileName.value).toFile
+                        if (file.isFile && file.canRead)
+                          detach() {
+                            complete(HttpEntity(ContentTypes.`application/octet-stream`, HttpData(file)))
+                          }
+                        else
+                          complete((BadRequest, "Dataset could not be read"))
+                      case None =>
+                        complete((BadRequest, "Dataset not found"))
+                    }
+                }
+              }
+            }
+          }
+      }
+    }
+
   def userRoutes: Route =
     pathPrefix("user") {
-      post {
-        pathEnd {
+      pathEnd {
+        post {
           entity(as[ClearTextUser]) { user =>
             val apiUser = ApiUser(user.user, user.role).withPassword(user.password)
             onSuccess(userService.addUser(apiUser)) {
@@ -246,9 +346,7 @@ trait RestApi extends HttpService with JsonFormats {
               }
             }
           }
-        }
-      } ~ delete {
-        pathEnd {
+        } ~ delete {
           entity(as[String]) { userName =>
             onSuccess(userService.deleteUser(userName)) {
               _ match {
@@ -260,8 +358,8 @@ trait RestApi extends HttpService with JsonFormats {
             }
           }
         }
-      } ~ get {
-        path("names") {
+      } ~ path("names") {
+        get {
           onSuccess(userService.listUserNames()) { userNames =>
             complete(userNames)
           }
@@ -297,7 +395,7 @@ trait RestApi extends HttpService with JsonFormats {
 
   def routes: Route =
     pathPrefix("api") {
-      directoryRoutes ~ scpRoutes ~ metaDataRoutes ~ boxRoutes ~ userRoutes ~ systemRoutes
+      directoryRoutes ~ scpRoutes ~ metaDataRoutes ~ datasetRoutes ~ boxRoutes ~ userRoutes ~ systemRoutes
     } ~ staticResourcesRoutes ~ angularRoutes
 
 }

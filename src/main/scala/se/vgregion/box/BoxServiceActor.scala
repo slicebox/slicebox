@@ -7,6 +7,7 @@ import se.vgregion.box.BoxProtocol._
 import akka.actor.Props
 import akka.actor.PoisonPill
 import java.util.UUID
+import scala.util.Failure
 
 class BoxServiceActor(dbProps: DbProps, host: String, port: Int) extends Actor {
 
@@ -18,41 +19,48 @@ class BoxServiceActor(dbProps: DbProps, host: String, port: Int) extends Actor {
   def receive = LoggingReceive {
     case msg: BoxRequest => msg match {
 
-      case CreateBox(name) =>
-        
+      case CreateBoxServer(name) =>
+
         val token = UUID.randomUUID().toString()
         val url = s"http://$host/$port/api/box/$token"
-        val config = BoxConfig(name, url)
-        addConfig(config, false)
-        sender ! BoxCreated(config)
-        
-      case AddBox(config) =>
+        val server = BoxServerConfig(-1, name, token, url)
+        addServer(server)
+        sender ! BoxServerCreated(server)
 
-        context.child(config.name) match {
+      case AddBoxClient(client) =>
+        // TODO sanitize name when used as actor name
+        context.child(client.name) match {
           case Some(actor) =>
-            sender ! BoxAdded(config)
+            sender ! BoxClientAdded(client)
           case None =>
-            addConfig(config, true)
-            context.actorOf(BoxActor.props(config), config.name)
-            sender ! BoxAdded(config)
+            addClient(client)
+            context.actorOf(BoxClientActor.props(client), client.name)
+            sender ! BoxClientAdded(client)
         }
 
-      case RemoveBox(config) =>
+      case RemoveBoxServer(serverId) =>
+        removeServer(serverId)
+        sender ! BoxServerRemoved(serverId)
 
-        context.child(config.name) match {
-          case Some(actor) =>
-            removeConfig(config)
-            actor ! PoisonPill
-            sender ! BoxRemoved(config)
-          case None =>
-            sender ! BoxRemoved(config)
-        }
+      case RemoveBoxClient(clientId) =>
 
-      case GetBoxes =>
-        
-        val boxes = getConfigs()
-        sender ! Boxes(boxes)
+        clientById(clientId).foreach(client => context.child(client.name).foreach(_ ! PoisonPill))
+        removeClient(clientId)
+        sender ! BoxClientRemoved(clientId)
 
+      case GetBoxClients =>
+        val clients = getClients()
+        sender ! BoxClients(clients)
+
+      case GetBoxServers =>
+        val servers = getServers()
+        sender ! BoxServers(servers)
+
+      case ValidateToken(token) =>
+        if (tokenIsValid(token))
+          sender ! ValidToken(token)
+        else
+          sender ! InvalidToken(token)
     }
   }
 
@@ -61,21 +69,50 @@ class BoxServiceActor(dbProps: DbProps, host: String, port: Int) extends Actor {
       dao.create
     }
 
-  def addConfig(config: BoxConfig, active: Boolean) =
+  def addServer(config: BoxServerConfig): BoxServerConfig =
     db.withSession { implicit session =>
-      dao.insertConfig(config, active)
+      dao.insertServer(config)
     }
 
-  def removeConfig(config: BoxConfig) =
+  def addClient(config: BoxClientConfig): BoxClientConfig =
     db.withSession { implicit session =>
-      dao.removeConfig(config)
+      dao.insertClient(config)
     }
 
-  def getConfigs() =
+  def serverById(boxServerId: Long): Option[BoxServerConfig] =
     db.withSession { implicit session =>
-      dao.listConfigs
+      dao.serverById(boxServerId)
     }
 
+  def clientById(boxClientId: Long): Option[BoxClientConfig] =
+    db.withSession { implicit session =>
+      dao.clientById(boxClientId)
+    }
+
+  def removeServer(boxServerId: Long) =
+    db.withSession { implicit session =>
+      dao.removeServer(boxServerId)
+    }
+
+  def removeClient(boxClientId: Long) =
+    db.withSession { implicit session =>
+      dao.removeClient(boxClientId)
+    }
+
+  def getClients(): Seq[BoxClientConfig] =
+    db.withSession { implicit session =>
+      dao.listClients
+    }
+
+  def getServers(): Seq[BoxServerConfig] =
+    db.withSession { implicit session =>
+      dao.listServers
+    }
+
+  def tokenIsValid(token: String): Boolean =
+    db.withSession { implicit session =>
+      true // TODO
+    }
 }
 
 object BoxServiceActor {
