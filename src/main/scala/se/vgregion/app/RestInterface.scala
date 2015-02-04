@@ -54,7 +54,7 @@ trait RestApi extends HttpService with JsonFormats {
 
   implicit def executionContext = actorRefFactory.dispatcher
 
-  implicit val timeout = Timeout(10.seconds)
+  implicit val timeout = Timeout(60.seconds)
 
   val config = ConfigFactory.load()
   val sliceboxConfig = config.getConfig("slicebox")
@@ -71,7 +71,7 @@ trait RestApi extends HttpService with JsonFormats {
   val storage = createStorageDirectory()
 
   val userService = new DbUserRepository(actorRefFactory, dbProps)
-  val boxService = actorRefFactory.actorOf(BoxServiceActor.props(dbProps, config.getString("http.host"), config.getInt("http.port")), "BoxService")
+  val boxService = actorRefFactory.actorOf(BoxServiceActor.props(dbProps, storage, config.getString("http.host"), config.getInt("http.port")), "BoxService")
   val dicomService = actorRefFactory.actorOf(DicomDispatchActor.props(storage, dbProps), "DicomDispatch")
 
   val authenticator = new Authenticator(userService)

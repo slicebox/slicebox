@@ -24,7 +24,7 @@ class BoxDAO(val driver: JdbcProfile) {
   val boxQuery = TableQuery[BoxTable]
 
   val toOutboxEntry = (id: Long, remoteBoxId: Long, transactionId: Long, sequenceNumber: Long, totalImageCount: Long, imageId: Long, failed: Boolean) =>
-    OutboxEntry(id, remoteBoxId, sequenceNumber, totalImageCount, imageId, transactionId, failed)
+    OutboxEntry(id, remoteBoxId, transactionId, sequenceNumber, totalImageCount, imageId, failed)
   val fromOutboxEntry = (entry: OutboxEntry) => Option((entry.id, entry.remoteBoxId, entry.transactionId, entry.sequenceNumber, entry.totalImageCount, entry.imageId, entry.failed))
 
   class OutboxTable(tag: Tag) extends Table[OutboxEntry](tag, "Outbox") {
@@ -88,7 +88,17 @@ class BoxDAO(val driver: JdbcProfile) {
     inboxQuery.filter(_.id === entry.id).update(entry)
 
   def nextOutboxEntryForRemoteBoxId(remoteBoxId: Long)(implicit session: Session): Option[OutboxEntry] = 
-    outboxQuery.filter(_.remoteBoxId === remoteBoxId).sortBy(_.sequenceNumber.asc).list.headOption
+    outboxQuery
+    .filter(_.remoteBoxId === remoteBoxId)
+    .filter(_.failed === false)
+    .sortBy(_.sequenceNumber.asc)
+    .list.headOption
+    
+  def markOutboxTransactionAsFailed(transactionId: Long)(implicit session: Session): Unit =
+    outboxQuery
+      .filter(_.transactionId === transactionId)
+      .map(_.failed)
+      .update(true)
     
   def removeBox(boxId: Long)(implicit session: Session): Unit =
     boxQuery.filter(_.id === boxId).delete

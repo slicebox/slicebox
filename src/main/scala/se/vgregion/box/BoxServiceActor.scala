@@ -9,8 +9,9 @@ import akka.actor.PoisonPill
 import java.util.UUID
 import akka.actor.Status.Failure
 import se.vgregion.util.ExceptionCatching
+import java.nio.file.Path
 
-class BoxServiceActor(dbProps: DbProps, host: String, port: Int) extends Actor with ExceptionCatching {
+class BoxServiceActor(dbProps: DbProps, storage: Path, host: String, port: Int) extends Actor with ExceptionCatching {
 
   val db = dbProps.db
   val dao = new BoxDAO(dbProps.driver)
@@ -98,7 +99,7 @@ class BoxServiceActor(dbProps: DbProps, host: String, port: Int) extends Actor w
     })
 
   def startPushActor(box: Box) =
-    context.actorOf(BoxPushActor.props(box), box.id.toString)
+    context.actorOf(BoxPushActor.props(box, dbProps, storage), box.id.toString)
 
   def startPollActor(box: Box) =
     context.actorOf(BoxPollActor.props(box), box.id.toString)
@@ -135,5 +136,5 @@ class BoxServiceActor(dbProps: DbProps, host: String, port: Int) extends Actor w
 }
 
 object BoxServiceActor {
-  def props(dbProps: DbProps, host: String, port: Int): Props = Props(new BoxServiceActor(dbProps, host, port))
+  def props(dbProps: DbProps, storage: Path, host: String, port: Int): Props = Props(new BoxServiceActor(dbProps, storage, host, port))
 }
