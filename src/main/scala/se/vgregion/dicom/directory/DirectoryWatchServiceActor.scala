@@ -27,65 +27,64 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor 
 
   def receive = LoggingReceive {
 
-    case msg: DirectoryRequest => msg match {
+    case msg: DirectoryRequest =>
+      catchAndReport {
 
-      case WatchDirectory(pathString) =>
-        val path = Paths.get(pathString)
-        val childActorId = pathToId(path)
-        context.child(childActorId) match {
-          case Some(actor) =>
+        msg match {
 
-            sender ! DirectoryWatched(path)
+          case WatchDirectory(pathString) =>
+            val path = Paths.get(pathString)
+            val childActorId = pathToId(path)
+            context.child(childActorId) match {
+              case Some(actor) =>
 
-          case None =>
+                sender ! DirectoryWatched(path)
 
-            if (!Files.isDirectory(path)) {
+              case None =>
 
-              sender ! Failure(new IllegalArgumentException("Could not create directory watch: Not a directory: " + pathString))
+                if (!Files.isDirectory(path))
+                  throw new IllegalArgumentException("Could not create directory watch: Not a directory: " + pathString)
 
-            } else if (Files.isSameFile(path, storage)) {
+                if (Files.isSameFile(path, storage))
+                  throw new IllegalArgumentException("The storage directory may not be watched.")
 
-              sender ! Failure(new IllegalArgumentException("The storage directory may not be watched."))
+                addDirectory(pathString)
 
-            } else {
+                context.actorOf(DirectoryWatchActor.props(pathString), childActorId)
 
-              addDirectory(pathString)
-
-              context.actorOf(DirectoryWatchActor.props(pathString), childActorId)
-
-              sender ! DirectoryWatched(path)
-            }
-        }
-
-      case UnWatchDirectory(watchedDirectoryId) =>
-        watchedDirectoryForId(watchedDirectoryId) match {
-          case Some(watchedDirectory) =>
-            db.withSession { implicit session =>
-              dao.deleteWatchedDirectoryWithId(watchedDirectoryId)
+                sender ! DirectoryWatched(path)
             }
 
-            val path = Paths.get(watchedDirectory.path)
+          case UnWatchDirectory(watchedDirectoryId) =>
+            watchedDirectoryForId(watchedDirectoryId) match {
+              case Some(watchedDirectory) =>
+                db.withSession { implicit session =>
+                  dao.deleteWatchedDirectoryWithId(watchedDirectoryId)
+                }
 
-            val id = pathToId(path)
-            context.child(id) match {
-              case Some(ref) =>
-                ref ! PoisonPill
+                val path = Paths.get(watchedDirectory.path)
 
-                sender ! DirectoryUnwatched(watchedDirectoryId)
+                val id = pathToId(path)
+                context.child(id) match {
+                  case Some(ref) =>
+                    ref ! PoisonPill
+
+                    sender ! DirectoryUnwatched(watchedDirectoryId)
+                  case None =>
+                    sender ! DirectoryUnwatched(watchedDirectoryId)
+                }
+
               case None =>
                 sender ! DirectoryUnwatched(watchedDirectoryId)
             }
 
-          case None =>
-            sender ! DirectoryUnwatched(watchedDirectoryId)
+          case GetWatchedDirectories =>
+            val directories = getWatchedDirectories()
+            sender ! WatchedDirectories(directories)
+
         }
-
-      case GetWatchedDirectories =>
-        val directories = getWatchedDirectories()
-        sender ! WatchedDirectories(directories)
-
-    }
-
+      }
+      
   }
 
   def pathToId(path: Path) =

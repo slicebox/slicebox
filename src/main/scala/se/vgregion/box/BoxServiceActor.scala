@@ -23,86 +23,98 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, host: String, port: Int) 
     case msg: BoxRequest => msg match {
 
       case GenerateBoxBaseUrl(remoteBoxName) =>
-        val token = UUID.randomUUID().toString()
-        val baseUrl = s"http://$host/$port/api/box/$token"
-        val box = Box(-1, remoteBoxName, token, baseUrl, BoxSendMethod.POLL)
         catchAndReport {
+          val token = UUID.randomUUID().toString()
+          val baseUrl = s"http://$host/$port/api/box/$token"
+          val box = Box(-1, remoteBoxName, token, baseUrl, BoxSendMethod.POLL)
           addBoxToDb(box)
+          sender ! BoxBaseUrlGenerated(baseUrl)
         }
-        sender ! BoxBaseUrlGenerated(baseUrl)
 
       case AddRemoteBox(remoteBox) =>
-        val box = pushBoxByBaseUrl(remoteBox.baseUrl) match {
-          case Some(box) =>
-            // already in the db, do nothing
-            box
-          case None =>
+        catchAndReport {
+          val box = pushBoxByBaseUrl(remoteBox.baseUrl) getOrElse {
             val token = baseUrlToToken(remoteBox.baseUrl)
             val box = Box(-1, remoteBox.name, token, remoteBox.baseUrl, BoxSendMethod.PUSH)
-            catchAndReport {
-              addBoxToDb(box)
-            }
-            box
+            addBoxToDb(box)
+          }
+          maybeStartPushActor(box)
+          maybeStartPollActor(box)
+          sender ! RemoteBoxAdded(box)
         }
-        context.child(BoxSendMethod.PUSH + box.id.toString) match {
-          case Some(actor) =>
-          // do nothing
-          case None =>
-            startPushActor(box)
-        }
-        context.child(BoxSendMethod.POLL + box.id.toString) match {
-          case Some(actor) =>
-          // do nothing
-          case None =>
-            startPollActor(box)
-        }
-        sender ! RemoteBoxAdded(box)
 
       case RemoveBox(boxId) =>
-        boxById(boxId).foreach(box => {
-          context.child(BoxSendMethod.PUSH + boxId.toString)
-            .foreach(_ ! PoisonPill)
-          context.child(BoxSendMethod.POLL + boxId.toString)
-            .foreach(_ ! PoisonPill)
-        })
-        removeBoxFromDb(boxId)
-        sender ! BoxRemoved(boxId)
+        catchAndReport {
+          boxById(boxId).foreach(box => {
+            context.child(pushActorName(box))
+              .foreach(_ ! PoisonPill)
+            context.child(pollActorName(box))
+              .foreach(_ ! PoisonPill)
+          })
+          removeBoxFromDb(boxId)
+          sender ! BoxRemoved(boxId)
+        }
 
       case GetBoxes =>
-        val boxes = getBoxesFromDb()
-        sender ! Boxes(boxes)
+        catchAndReport {
+          val boxes = getBoxesFromDb()
+          sender ! Boxes(boxes)
+        }
 
       case ValidateToken(token) =>
-        if (tokenIsValid(token))
-          sender ! ValidToken(token)
-        else
-          sender ! InvalidToken(token)
+        catchAndReport {
+          if (tokenIsValid(token))
+            sender ! ValidToken(token)
+          else
+            sender ! InvalidToken(token)
+        }
     }
   }
 
-  def setupDb() =
+  def setupDb(): Unit =
     db.withSession { implicit session =>
       dao.create
     }
 
-  def baseUrlToToken(url: String) = {
-    val trimmedUrl = url.trim.stripSuffix("/")
-    trimmedUrl.substring(trimmedUrl.lastIndexOf("/"))
-  }
+  def teardownDb(): Unit =
+    db.withSession { implicit session =>
+      dao.drop
+    }
 
-  def setupBoxes() =
+  def baseUrlToToken(url: String): String =
+    try {
+      val trimmedUrl = url.trim.stripSuffix("/")
+      val token = trimmedUrl.substring(trimmedUrl.lastIndexOf("/") + 1)
+      // see if the UUID class accepts the string as a valid token, throw exception if not
+      UUID.fromString(token)
+      token
+    } catch {
+      case e: Exception => throw new IllegalArgumentException("Malformed box base url: " + url, e)
+    }
+
+  def setupBoxes(): Unit =
     getBoxesFromDb foreach (box => box.sendMethod match {
       case BoxSendMethod.POLL =>
-        startPollActor(box)
+        maybeStartPollActor(box)
       case BoxSendMethod.PUSH =>
-        startPushActor(box)
+        maybeStartPushActor(box)
     })
 
-  def startPushActor(box: Box) =
-    context.actorOf(BoxPushActor.props(box, dbProps, storage), box.id.toString)
+  def maybeStartPushActor(box: Box): Unit = {
+    val actorName = pushActorName(box)
+    if (context.child(actorName).isEmpty)
+      context.actorOf(BoxPushActor.props(box, dbProps, storage), actorName)
+  }
 
-  def startPollActor(box: Box) =
-    context.actorOf(BoxPollActor.props(box), box.id.toString)
+  def maybeStartPollActor(box: Box): Unit = {
+    val actorName = pollActorName(box)
+    if (context.child(actorName).isEmpty)
+      context.actorOf(BoxPollActor.props(box), actorName)
+  }
+
+  def pushActorName(box: Box): String = BoxSendMethod.PUSH + "-" + box.id.toString
+
+  def pollActorName(box: Box): String = BoxSendMethod.POLL + "-" + box.id.toString
 
   def addBoxToDb(box: Box): Box =
     db.withSession { implicit session =>

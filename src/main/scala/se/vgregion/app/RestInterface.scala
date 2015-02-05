@@ -264,7 +264,7 @@ trait RestApi extends HttpService with JsonFormats {
           pathEnd {
             onSuccess(boxService.ask(RemoveBox(boxId))) {
               case BoxRemoved(boxId) =>
-                complete((NoContent, s"Removed box server with id boxId"))
+                complete(NoContent)
             }
           }
         }

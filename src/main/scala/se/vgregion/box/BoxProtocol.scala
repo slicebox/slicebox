@@ -5,7 +5,12 @@ import org.dcm4che3.data.Attributes
 
 object BoxProtocol {
 
-  sealed trait BoxSendMethod
+  sealed trait BoxSendMethod {
+    override def toString(): String = this match {
+      case BoxSendMethod.PUSH => "PUSH"
+      case BoxSendMethod.POLL => "POLL"
+    }
+  }
 
   object BoxSendMethod {
     case object PUSH extends BoxSendMethod
@@ -14,7 +19,7 @@ object BoxProtocol {
     def withName(string: String) = string match {
       case "PUSH" => PUSH
       case "POLL" => POLL
-    }
+    }    
   }
 
   case class RemoteBox(name: String, baseUrl: String)

@@ -39,7 +39,7 @@ class BoxDAO(val driver: JdbcProfile) {
   }
 
   val outboxQuery = TableQuery[OutboxTable]
-  
+
   val toInboxEntry = (id: Long, remoteBoxId: Long, transactionId: Long, receivedImageCount: Long, totalImageCount: Long) =>
     InboxEntry(id, remoteBoxId, transactionId, receivedImageCount, totalImageCount)
   val fromInboxEntry = (entry: InboxEntry) => Option((entry.id, entry.remoteBoxId, entry.transactionId, entry.receivedImageCount, entry.totalImageCount))
@@ -54,11 +54,14 @@ class BoxDAO(val driver: JdbcProfile) {
   }
 
   val inboxQuery = TableQuery[InboxTable]
-  
+
   def create(implicit session: Session): Unit =
     if (MTable.getTables("Box").list.isEmpty) {
       (boxQuery.ddl ++ outboxQuery.ddl ++ inboxQuery.ddl).create
     }
+
+  def drop(implicit session: Session): Unit =
+    (boxQuery.ddl ++ outboxQuery.ddl ++ inboxQuery.ddl).drop
 
   def insertBox(box: Box)(implicit session: Session): Box = {
     val generatedId = (boxQuery returning boxQuery.map(_.id)) += box
@@ -84,22 +87,22 @@ class BoxDAO(val driver: JdbcProfile) {
       .filter(_.baseUrl === baseUrl)
       .list.headOption
 
-  def updateInboxEntry(entry: InboxEntry)(implicit session: Session): Unit = 
+  def updateInboxEntry(entry: InboxEntry)(implicit session: Session): Unit =
     inboxQuery.filter(_.id === entry.id).update(entry)
 
-  def nextOutboxEntryForRemoteBoxId(remoteBoxId: Long)(implicit session: Session): Option[OutboxEntry] = 
+  def nextOutboxEntryForRemoteBoxId(remoteBoxId: Long)(implicit session: Session): Option[OutboxEntry] =
     outboxQuery
-    .filter(_.remoteBoxId === remoteBoxId)
-    .filter(_.failed === false)
-    .sortBy(_.sequenceNumber.asc)
-    .list.headOption
-    
+      .filter(_.remoteBoxId === remoteBoxId)
+      .filter(_.failed === false)
+      .sortBy(_.sequenceNumber.asc)
+      .list.headOption
+
   def markOutboxTransactionAsFailed(transactionId: Long)(implicit session: Session): Unit =
     outboxQuery
       .filter(_.transactionId === transactionId)
       .map(_.failed)
       .update(true)
-    
+
   def removeBox(boxId: Long)(implicit session: Session): Unit =
     boxQuery.filter(_.id === boxId).delete
 

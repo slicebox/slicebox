@@ -22,7 +22,7 @@ import spray.http.StatusCode
 class BoxPushActor(box: Box, dbProps: DbProps, storage: Path, pollInterval: FiniteDuration = 5.seconds) extends Actor {
   val log = Logging(context.system, this)
   
-  case class PollOutbox()
+  case object PollOutbox
   case class FileSent(outboxEntry: OutboxEntry)
   case class FileSendFailed(outboxEntry: OutboxEntry, e: Exception)
 
