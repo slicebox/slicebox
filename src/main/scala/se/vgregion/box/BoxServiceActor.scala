@@ -20,55 +20,54 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, host: String, port: Int) 
   setupBoxes()
 
   def receive = LoggingReceive {
-    case msg: BoxRequest => msg match {
 
-      case GenerateBoxBaseUrl(remoteBoxName) =>
-        catchAndReport {
-          val token = UUID.randomUUID().toString()
-          val baseUrl = s"http://$host/$port/api/box/$token"
-          val box = Box(-1, remoteBoxName, token, baseUrl, BoxSendMethod.POLL)
-          addBoxToDb(box)
-          sender ! BoxBaseUrlGenerated(baseUrl)
-        }
+    case msg: BoxRequest =>
 
-      case AddRemoteBox(remoteBox) =>
-        catchAndReport {
-          val box = pushBoxByBaseUrl(remoteBox.baseUrl) getOrElse {
-            val token = baseUrlToToken(remoteBox.baseUrl)
-            val box = Box(-1, remoteBox.name, token, remoteBox.baseUrl, BoxSendMethod.PUSH)
+      catchAndReport {
+
+        msg match {
+
+          case GenerateBoxBaseUrl(remoteBoxName) =>
+            val token = UUID.randomUUID().toString()
+            val baseUrl = s"http://$host/$port/api/box/$token"
+            val box = Box(-1, remoteBoxName, token, baseUrl, BoxSendMethod.POLL)
             addBoxToDb(box)
-          }
-          maybeStartPushActor(box)
-          maybeStartPollActor(box)
-          sender ! RemoteBoxAdded(box)
-        }
+            sender ! BoxBaseUrlGenerated(baseUrl)
 
-      case RemoveBox(boxId) =>
-        catchAndReport {
-          boxById(boxId).foreach(box => {
-            context.child(pushActorName(box))
-              .foreach(_ ! PoisonPill)
-            context.child(pollActorName(box))
-              .foreach(_ ! PoisonPill)
-          })
-          removeBoxFromDb(boxId)
-          sender ! BoxRemoved(boxId)
-        }
+          case AddRemoteBox(remoteBox) =>
+            val box = pushBoxByBaseUrl(remoteBox.baseUrl) getOrElse {
+              val token = baseUrlToToken(remoteBox.baseUrl)
+              val box = Box(-1, remoteBox.name, token, remoteBox.baseUrl, BoxSendMethod.PUSH)
+              addBoxToDb(box)
+            }
+            maybeStartPushActor(box)
+            maybeStartPollActor(box)
+            sender ! RemoteBoxAdded(box)
 
-      case GetBoxes =>
-        catchAndReport {
-          val boxes = getBoxesFromDb()
-          sender ! Boxes(boxes)
-        }
+          case RemoveBox(boxId) =>
+            boxById(boxId).foreach(box => {
+              context.child(pushActorName(box))
+                .foreach(_ ! PoisonPill)
+              context.child(pollActorName(box))
+                .foreach(_ ! PoisonPill)
+            })
+            removeBoxFromDb(boxId)
+            sender ! BoxRemoved(boxId)
 
-      case ValidateToken(token) =>
-        catchAndReport {
-          if (tokenIsValid(token))
-            sender ! ValidToken(token)
-          else
-            sender ! InvalidToken(token)
+          case GetBoxes =>
+            val boxes = getBoxesFromDb()
+            sender ! Boxes(boxes)
+
+          case ValidateToken(token) =>
+            if (tokenIsValid(token))
+              sender ! ValidToken(token)
+            else
+              sender ! InvalidToken(token)
+              
         }
-    }
+        
+      }
+      
   }
 
   def setupDb(): Unit =

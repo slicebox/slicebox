@@ -21,7 +21,7 @@ import spray.http.StatusCode
 
 class BoxPushActor(box: Box, dbProps: DbProps, storage: Path, pollInterval: FiniteDuration = 5.seconds) extends Actor {
   val log = Logging(context.system, this)
-  
+
   case object PollOutbox
   case class FileSent(outboxEntry: OutboxEntry)
   case class FileSendFailed(outboxEntry: OutboxEntry, e: Exception)
@@ -50,36 +50,35 @@ class BoxPushActor(box: Box, dbProps: DbProps, storage: Path, pollInterval: Fini
   }
 
   def waitForFileSentState: PartialFunction[Any, Unit] = LoggingReceive {
-    case FileSent(outboxEntry) => handleFileSentForOutboxEntry(outboxEntry)
-    
+    case FileSent(outboxEntry)                  => handleFileSentForOutboxEntry(outboxEntry)
+
     case FileSendFailed(outboxEntry, exception) => handleFileSendFailedForOutboxEntry(outboxEntry, exception)
   }
 
-  def processNextOutboxEntry(): Unit = {
+  def processNextOutboxEntry(): Unit =
     nextOutboxEntry match {
-      case Some(entry) => {
+      case Some(entry) =>
         sendFileForOutboxEntry(entry)
         context.become(waitForFileSentState)
-      }
-      
-      case None => context.unbecome
+
+      case None =>
+        context.unbecome
     }
-  }
-  
+
   def nextOutboxEntry: Option[OutboxEntry] =
     db.withSession { implicit session =>
       boxDao.nextOutboxEntryForRemoteBoxId(box.id)
     }
-  
-  def sendFileForOutboxEntry(outboxEntry: OutboxEntry) = {
+
+  def sendFileForOutboxEntry(outboxEntry: OutboxEntry) =
     fileNameForImageId(outboxEntry.imageId) match {
-      case Some(fileName) => sendFileWithName(outboxEntry, fileName)
+      case Some(fileName) =>
+        sendFileWithName(outboxEntry, fileName)
       case None =>
         handleFileSendFailedForOutboxEntry(outboxEntry, new IllegalStateException(s"Can't process outbox entry (${outboxEntry.id}) because no image with id ${outboxEntry.imageId} was found"))
     }
-  }
-  
-  def fileNameForImageId(imageId: Long) : Option[String] =
+
+  def fileNameForImageId(imageId: Long): Option[String] =
     db.withSession { implicit session =>
       dicomMetaDataDao.imageFileById(imageId).map(_.fileName.value)
     }
@@ -101,17 +100,17 @@ class BoxPushActor(box: Box, dbProps: DbProps, storage: Path, pollInterval: Fini
 
   def handleFileSentForOutboxEntry(outboxEntry: OutboxEntry) = {
     log.info(s"File sent for outbox entry ${outboxEntry.id}")
-    
+
     db.withSession { implicit session =>
       boxDao.removeOutboxEntry(outboxEntry.id)
     }
 
     processNextOutboxEntry
   }
-  
+
   def handleFileSendFailedForOutboxEntry(outboxEntry: OutboxEntry, exception: Exception) = {
     log.error(exception, s"Failed to send file to box: ${outboxEntry.id}")
-    
+
     db.withSession { implicit session =>
       boxDao.markOutboxTransactionAsFailed(outboxEntry.transactionId)
     }

@@ -22,6 +22,7 @@ object BoxProtocol {
     }    
   }
 
+  
   case class RemoteBox(name: String, baseUrl: String)
 
   case class RemoteBoxName(value: String)
