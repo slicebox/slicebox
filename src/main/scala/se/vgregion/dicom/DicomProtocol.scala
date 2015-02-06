@@ -82,6 +82,8 @@ object DicomProtocol {
   case class GetImageFiles(imageId: Long)
 
   case class AddDataset(dataset: Attributes)
+  
+  case class AddAnonymizedDataset(anonymizedDataset: Attributes)
 
   // ***to API***
 

@@ -9,10 +9,16 @@ import spray.http.StatusCodes.BadRequest
 import spray.http.StatusCodes.NoContent
 import se.vgregion.box.BoxProtocol._
 import java.util.UUID
+import spray.http.HttpData
+import java.nio.file.Paths
 
 class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
   def dbUrl() = "jdbc:h2:mem:boxroutestest;DB_CLOSE_DELAY=-1"
+  
+  val testBox = Box(1, "Test Box", "abc123", "localhost", BoxSendMethod.POLL)
+  
+  val testTransactionId = 987
 
   "The system" should "return a success message when asked to generate a new base url" in {
     Post("/api/box/generatebaseurl", RemoteBoxName("hosp")) ~> routes ~> check {
@@ -49,6 +55,17 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   it should "support removing a box" in {
     Delete("/api/box/1") ~> routes ~> check {
       status should be (NoContent)
+    }
+  }
+
+
+  "The system" should "be able to receive a pushed image" in {
+    val fileName = "anon270.dcm"
+    val dcmPath = Paths.get(getClass().getResource(fileName).toURI())
+    val dcmFile = dcmPath.toFile
+    
+    Post(s"/api/box/${testBox.token}/image/$testTransactionId/1/1", HttpData(dcmFile)) ~> routes ~> check {
+      status should be(NoContent)
     }
   }
 

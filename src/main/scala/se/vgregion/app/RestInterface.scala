@@ -273,13 +273,15 @@ trait RestApi extends HttpService with JsonFormats {
 
   def tokenRoutes: Route =
     pathPrefix(Segment) { token =>
-      onSuccess(boxService.ask(ValidateToken(token))) {
-        case InvalidToken(token) =>
-          complete((Forbidden, "Invalid token"))
-        case ValidToken(token) =>
-          pathPrefix("dataset") {
-            pathEnd {
-              post {
+      System.out.println("Received token request: " + token)
+      
+      pathPrefix("dataset") {
+        pathEnd {
+          post {
+            onSuccess(boxService.ask(ValidateToken(token))) {
+              case InvalidToken(token) =>
+                complete((Forbidden, "Invalid token"))
+              case ValidToken(token) => {
                 // TODO allow with token
                 formField('file.as[FormFile]) { file =>
                   val dataset = DicomUtil.loadDataset(file.entity.data.toByteArray, true)
@@ -289,26 +291,58 @@ trait RestApi extends HttpService with JsonFormats {
                   }
                 }
               }
-            } ~ path(LongNumber) { imageId =>
-              get {
-                onSuccess(dicomService.ask(GetImageFiles(imageId))) {
-                  case ImageFiles(imageFiles) =>
-                    imageFiles.headOption match {
-                      case Some(imageFile) =>
-                        val file = storage.resolve(imageFile.fileName.value).toFile
-                        if (file.isFile && file.canRead)
-                          detach() {
-                            complete(HttpEntity(ContentTypes.`application/octet-stream`, HttpData(file)))
-                          }
-                        else
-                          complete((BadRequest, "Dataset could not be read"))
-                      case None =>
-                        complete((BadRequest, "Dataset not found"))
-                    }
+            }
+          }
+        } ~ path(LongNumber) { imageId =>
+          pathEnd {
+            get {
+              onSuccess(boxService.ask(ValidateToken(token))) {
+                case InvalidToken(token) =>
+                  complete((Forbidden, "Invalid token"))
+                case ValidToken(token) => {
+                  onSuccess(dicomService.ask(GetImageFiles(imageId))) {
+                    case ImageFiles(imageFiles) =>
+                      imageFiles.headOption match {
+                        case Some(imageFile) =>
+                          val file = storage.resolve(imageFile.fileName.value).toFile
+                          if (file.isFile && file.canRead)
+                            detach() {
+                              complete(HttpEntity(ContentTypes.`application/octet-stream`, HttpData(file)))
+                            }
+                          else
+                            complete((BadRequest, "Dataset could not be read"))
+                        case None =>
+                          complete((BadRequest, "Dataset not found"))
+                      }
+                  }
                 }
               }
             }
           }
+        }
+      } ~ pathPrefix("image") {
+        path(LongNumber / LongNumber / LongNumber) { (transactionId, sequenceNumber, totalImageCount) =>
+          pathEnd {
+            post {
+              onSuccess(boxService.ask(ValidateToken(token))) {
+                case InvalidToken(token) =>
+                  complete((Forbidden, "Invalid token"))
+                case ValidToken(token) => {
+                  entity(as[Array[Byte]]) { fileData =>
+                    val dataset = DicomUtil.loadDataset(fileData, true)
+                    onSuccess(dicomService.ask(AddAnonymizedDataset(dataset))) {
+                      case ImageAdded(image) =>
+                        onSuccess(boxService.ask(UpdateInbox(token, transactionId, sequenceNumber, totalImageCount))) {
+                          case InboxUpdated(token: String, transactionId: Long, sequenceNumber: Long, totalImageCount: Long) =>
+                            complete(NoContent)
+                        }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     }
 

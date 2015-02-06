@@ -68,6 +68,12 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, host: String, port: Int) 
           else
             sender ! InvalidToken(token)
         }
+          
+      case UpdateInbox(token, transactionId, sequenceNumber, totalImageCount) =>
+        catchAndReport {
+          // TODO: temp implementation
+          sender ! InboxUpdated(token, transactionId, sequenceNumber, totalImageCount)
+        }
     }
   }
 
