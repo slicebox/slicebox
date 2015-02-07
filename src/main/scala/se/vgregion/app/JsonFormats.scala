@@ -19,6 +19,8 @@ trait JsonFormats extends DefaultJsonProtocol {
   implicit val remoteBoxNameFormat = jsonFormat1(RemoteBoxName)
   implicit val boxBaseUrlFormat = jsonFormat1(BoxBaseUrl)
 
+  implicit val updateInboxFormat = jsonFormat4(UpdateInbox)
+  
   implicit object BoxSendMethodFormat extends JsonFormat[BoxSendMethod] {
     def write(obj: BoxSendMethod) = JsString(obj.toString)
 

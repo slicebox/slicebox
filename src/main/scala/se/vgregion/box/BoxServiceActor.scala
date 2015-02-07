@@ -63,11 +63,15 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, host: String, port: Int) 
               sender ! ValidToken(token)
             else
               sender ! InvalidToken(token)
-              
+
+          case UpdateInbox(token, transactionId, sequenceNumber, totalImageCount) =>
+            // TODO: temp implementation
+            sender ! InboxUpdated(token, transactionId, sequenceNumber, totalImageCount)
+            
         }
-        
+
       }
-      
+
   }
 
   def setupDb(): Unit =

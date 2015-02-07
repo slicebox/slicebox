@@ -12,6 +12,7 @@ import org.dcm4che3.data.Attributes
 import org.dcm4che3.data.Tag
 import se.vgregion.app.DbProps
 import se.vgregion.dicom.DicomProtocol.AddDataset
+import se.vgregion.dicom.DicomProtocol.AddAnonymizedDataset
 import se.vgregion.dicom.DicomProtocol.DeleteImage
 import se.vgregion.dicom.DicomProtocol.DeletePatient
 import se.vgregion.dicom.DicomProtocol.DeleteSeries
@@ -79,58 +80,61 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
   def receive = LoggingReceive {
 
     case DatasetReceived(dataset) =>
-      storeDataset(dataset)
+      storeDataset(dataset, false)
       log.info("Stored dataset: " + dataset.getString(Tag.SOPInstanceUID))
 
     case AddDataset(dataset) =>
       catchAndReport {
-        val image = storeDataset(dataset)
+        val image = storeDataset(dataset, false)
         sender ! ImageAdded(image)
       }
 
-    case msg: MetaDataUpdate => msg match {
+    case AddAnonymizedDataset(anonymizedDataset) =>
+      catchAndReport {
+        val image = storeDataset(anonymizedDataset, true)
+        sender ! ImageAdded(image)
+      }
 
-      case DeleteImage(imageId) =>
-        catchAndReport {
-          db.withSession { implicit session =>
-            val imageFiles = dao.imageFileForImage(imageId).toList
-            dao.deleteImage(imageId)
-            deleteFromStorage(imageFiles)
-            sender ! ImageFilesDeleted(imageFiles)
-          }
+    case msg: MetaDataUpdate =>
+
+      catchAndReport {
+
+        msg match {
+
+          case DeleteImage(imageId) =>
+            db.withSession { implicit session =>
+              val imageFiles = dao.imageFileForImage(imageId).toList
+              dao.deleteImage(imageId)
+              deleteFromStorage(imageFiles)
+              sender ! ImageFilesDeleted(imageFiles)
+            }
+
+          case DeleteSeries(seriesId) =>
+            db.withSession { implicit session =>
+              val imageFiles = dao.imageFilesForSeries(seriesId)
+              dao.deleteSeries(seriesId)
+              deleteFromStorage(imageFiles)
+              sender ! ImageFilesDeleted(imageFiles)
+            }
+
+          case DeleteStudy(studyId) =>
+            db.withSession { implicit session =>
+              val imageFiles = dao.imageFilesForStudy(studyId)
+              dao.deleteStudy(studyId)
+              deleteFromStorage(imageFiles)
+              sender ! ImageFilesDeleted(imageFiles)
+            }
+
+          case DeletePatient(patientId) =>
+            db.withSession { implicit session =>
+              val imageFiles = dao.imageFilesForPatient(patientId)
+              dao.deletePatient(patientId)
+              deleteFromStorage(imageFiles)
+              sender ! ImageFilesDeleted(imageFiles)
+            }
+
         }
-
-      case DeleteSeries(seriesId) =>
-        catchAndReport {
-          db.withSession { implicit session =>
-            val imageFiles = dao.imageFilesForSeries(seriesId)
-            dao.deleteSeries(seriesId)
-            deleteFromStorage(imageFiles)
-            sender ! ImageFilesDeleted(imageFiles)
-          }
-        }
-
-      case DeleteStudy(studyId) =>
-        catchAndReport {
-          db.withSession { implicit session =>
-            val imageFiles = dao.imageFilesForStudy(studyId)
-            dao.deleteStudy(studyId)
-            deleteFromStorage(imageFiles)
-            sender ! ImageFilesDeleted(imageFiles)
-          }
-        }
-
-      case DeletePatient(patientId) =>
-        catchAndReport {
-          db.withSession { implicit session =>
-            val imageFiles = dao.imageFilesForPatient(patientId)
-            dao.deletePatient(patientId)
-            deleteFromStorage(imageFiles)
-            sender ! ImageFilesDeleted(imageFiles)
-          }
-        }
-
-    }
+      }
 
     case GetAllImageFiles =>
       catchAndReport {
@@ -186,7 +190,7 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
 
   }
 
-  def storeDataset(dataset: Attributes): Image = {
+  def storeDataset(dataset: Attributes, isAnonymized: Boolean): Image = {
     val name = fileName(dataset)
     val storedPath = storage.resolve(name)
 
@@ -222,8 +226,12 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
       val dbImageFile = dao.imageFileByFileName(imageFile)
         .getOrElse(dao.insert(imageFile))
 
-      val anonymizedDataset = DicomAnonymization.anonymizeDataset(dataset)
-      saveDataset(anonymizedDataset, storedPath)
+      if (isAnonymized)
+        saveDataset(dataset, storedPath)
+      else {
+        val anonymizedDataset = DicomAnonymization.anonymizeDataset(dataset)
+        saveDataset(anonymizedDataset, storedPath)
+      }
 
       dbImage
     }

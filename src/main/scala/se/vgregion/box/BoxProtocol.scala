@@ -34,7 +34,7 @@ object BoxProtocol {
   case class OutboxEntry(id: Long, remoteBoxId: Long, transactionId: Long, sequenceNumber: Long, totalImageCount: Long, imageId: Long, failed: Boolean) extends Entity
 
   case class InboxEntry(id: Long, remoteBoxId: Long, transactionId: Long, receivedImageCount: Long, totalImageCount: Long) extends Entity
-
+  
   case class PushImageData(transactionId: Long, sequenceNumber: Long, totalImageCount: Long, dataset: Attributes)
   
   sealed trait BoxRequest
@@ -48,6 +48,8 @@ object BoxProtocol {
   case object GetBoxes extends BoxRequest
 
   case class ValidateToken(token: String) extends BoxRequest
+  
+  case class UpdateInbox(token: String, transactionId: Long, sequenceNumber: Long, totalImageCount: Long) extends BoxRequest
 
   case class RemoteBoxAdded(box: Box)
 
@@ -60,5 +62,7 @@ object BoxProtocol {
   case class ValidToken(token: String)
 
   case class InvalidToken(token: String)
+  
+  case class InboxUpdated(token: String, transactionId: Long, sequenceNumber: Long, totalImageCount: Long)
 
 }
