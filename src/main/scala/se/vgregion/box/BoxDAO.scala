@@ -87,6 +87,12 @@ class BoxDAO(val driver: JdbcProfile) {
       .filter(_.baseUrl === baseUrl)
       .list.headOption
 
+  def pollBoxByToken(token: String)(implicit session: Session): Option[Box] =
+    boxQuery
+      .filter(_.sendMethod === BoxSendMethod.POLL.toString)
+      .filter(_.token === token)
+      .list.headOption
+
   def updateInboxEntry(entry: InboxEntry)(implicit session: Session): Unit =
     inboxQuery.filter(_.id === entry.id).update(entry)
 

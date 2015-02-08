@@ -146,7 +146,9 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, host: String, port: Int) 
 
   def tokenIsValid(token: String): Boolean =
     db.withSession { implicit session =>
-      true // TODO
+      println(dao.listBoxes)
+      println(token)
+      dao.pollBoxByToken(token).isDefined
     }
 }
 

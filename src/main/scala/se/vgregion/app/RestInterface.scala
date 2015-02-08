@@ -273,27 +273,9 @@ trait RestApi extends HttpService with JsonFormats {
 
   def tokenRoutes: Route =
     pathPrefix(Segment) { token =>
-      // System.out.println("Received token request: " + token)
 
       pathPrefix("dataset") {
-        pathEnd {
-          post {
-            onSuccess(boxService.ask(ValidateToken(token))) {
-              case InvalidToken(token) =>
-                complete((Forbidden, "Invalid token"))
-              case ValidToken(token) => {
-                // TODO allow with token
-                formField('file.as[FormFile]) { file =>
-                  val dataset = DicomUtil.loadDataset(file.entity.data.toByteArray, true)
-                  onSuccess(dicomService.ask(AddDataset(dataset))) {
-                    case ImageAdded(image) =>
-                      complete("Dataset received, added image with id " + image.id)
-                  }
-                }
-              }
-            }
-          }
-        } ~ path(LongNumber) { imageId =>
+        path(LongNumber) { imageId =>
           pathEnd {
             get {
               onSuccess(boxService.ask(ValidateToken(token))) {
@@ -339,6 +321,7 @@ trait RestApi extends HttpService with JsonFormats {
           }
         }
       }
+
     }
 
   def userRoutes: Route =

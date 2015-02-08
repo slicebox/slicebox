@@ -26,10 +26,6 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
   def dbUrl() = "jdbc:h2:mem:boxroutestest;DB_CLOSE_DELAY=-1"
 
-  val testBox = Box(1, "Test Box", "abc123", "localhost", BoxSendMethod.POLL)
-
-  val testTransactionId = 987
-
   "The system" should "return a success message when asked to generate a new base url" in {
     Post("/api/box/generatebaseurl", RemoteBoxName("hosp")) ~> routes ~> check {
       status should be(OK)
@@ -66,21 +62,43 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     Delete("/api/box/1") ~> routes ~> check {
       status should be(NoContent)
     }
+    Delete("/api/box/2") ~> routes ~> check {
+      status should be(NoContent)
+    }
   }
 
   it should "be able to receive a pushed image" in {
+
+    // first, add a box on the poll (university) side
+    val uniUrl =
+      Post("/api/box/generatebaseurl", RemoteBoxName("hosp")) ~> routes ~> check {
+        status should be(OK)
+        responseAs[BoxBaseUrl]
+      }
+
+    // get the token from the url
+    val token = uniUrl.value.substring(uniUrl.value.lastIndexOf("/") + 1)
+
+    // then, push an image from the hospital to the uni box we just set up
     val fileName = "anon270.dcm"
     val dcmPath = Paths.get(getClass().getResource(fileName).toURI())
     val dcmFile = dcmPath.toFile
-    val update = UpdateInbox(testBox.token, testTransactionId, 1, 1)
+
+    val testTransactionId = 987
+    val sequenceNumber = 1
+    val totalImageCount = 1
+    
+    val update = UpdateInbox(token, testTransactionId, sequenceNumber, totalImageCount)
+    
     marshal(update) match {
       case Right(entity) =>
         val mfd = MultipartFormData(Seq(BodyPart(dcmFile, "file"), BodyPart(entity, "update")))
-        Post(s"/api/box/${testBox.token}/image", mfd) ~> routes ~> check {
+        Post(s"/api/box/$token/image", mfd) ~> routes ~> check {
           status should be(NoContent)
         }
-      case _ => fail
+      case Left(e) => fail(e)
     }
+    
   }
 
 }
