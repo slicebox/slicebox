@@ -310,7 +310,7 @@ trait RestApi extends HttpService with JsonFormats {
             case ValidToken(token) =>
               formFields('file.as[FormFile], 'update.as[UpdateInbox]) { (file, updateInbox) =>
                 val dataset = DicomUtil.loadDataset(file.entity.data.toByteArray, true)
-                onSuccess(dicomService.ask(AddAnonymizedDataset(dataset))) {
+                onSuccess(dicomService.ask(AddDataset(dataset))) {
                   case ImageAdded(image) =>
                     onSuccess(boxService.ask(updateInbox)) {
                       case msg: InboxUpdated =>

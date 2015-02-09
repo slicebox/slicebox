@@ -45,6 +45,7 @@ class DicomAnonymizationTest extends FlatSpec with Matchers {
   
   it should "create a new UID for tags with a present UID, and leave the tag empty for empty tags" in {
     val dataset = new Attributes()
+    dataset.setString(Tag.PatientIdentityRemoved, VR.CS, "NO")
     val anonymized1 = anonymizeDataset(dataset)
     dataset.setString(Tag.StudyInstanceUID, VR.UI, "")
     val anonymized2 = anonymizeDataset(dataset)

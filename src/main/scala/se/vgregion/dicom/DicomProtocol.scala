@@ -83,8 +83,6 @@ object DicomProtocol {
 
   case class AddDataset(dataset: Attributes)
   
-  case class AddAnonymizedDataset(anonymizedDataset: Attributes)
-
   // ***to API***
 
   case class Patients(patients: Seq[Patient]) 

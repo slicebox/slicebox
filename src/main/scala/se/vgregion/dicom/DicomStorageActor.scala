@@ -12,7 +12,6 @@ import org.dcm4che3.data.Attributes
 import org.dcm4che3.data.Tag
 import se.vgregion.app.DbProps
 import se.vgregion.dicom.DicomProtocol.AddDataset
-import se.vgregion.dicom.DicomProtocol.AddAnonymizedDataset
 import se.vgregion.dicom.DicomProtocol.DeleteImage
 import se.vgregion.dicom.DicomProtocol.DeletePatient
 import se.vgregion.dicom.DicomProtocol.DeleteSeries
@@ -80,18 +79,12 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
   def receive = LoggingReceive {
 
     case DatasetReceived(dataset) =>
-      storeDataset(dataset, false)
+      storeDataset(dataset)
       log.info("Stored dataset: " + dataset.getString(Tag.SOPInstanceUID))
 
     case AddDataset(dataset) =>
       catchAndReport {
-        val image = storeDataset(dataset, false)
-        sender ! ImageAdded(image)
-      }
-
-    case AddAnonymizedDataset(anonymizedDataset) =>
-      catchAndReport {
-        val image = storeDataset(anonymizedDataset, true)
+        val image = storeDataset(dataset)
         sender ! ImageAdded(image)
       }
 
@@ -190,7 +183,7 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
 
   }
 
-  def storeDataset(dataset: Attributes, isAnonymized: Boolean): Image = {
+  def storeDataset(dataset: Attributes): Image = {
     val name = fileName(dataset)
     val storedPath = storage.resolve(name)
 
@@ -226,12 +219,8 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
       val dbImageFile = dao.imageFileByFileName(imageFile)
         .getOrElse(dao.insert(imageFile))
 
-      if (isAnonymized)
-        saveDataset(dataset, storedPath)
-      else {
-        val anonymizedDataset = DicomAnonymization.anonymizeDataset(dataset)
-        saveDataset(anonymizedDataset, storedPath)
-      }
+      val anonymizedDataset = DicomAnonymization.anonymizeDataset(dataset)
+      saveDataset(anonymizedDataset, storedPath)
 
       dbImage
     }
