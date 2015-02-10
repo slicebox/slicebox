@@ -122,7 +122,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
     }
   }
 
-  "A BoxServiceActor" should {
+  "A BoxPushActor" should {
 
     "remove processed outbox entry" in {
       mockSendFileHttpResponse = fileSendOKRespone

@@ -108,6 +108,14 @@ class BoxDAO(val driver: JdbcProfile) {
       .filter(_.transactionId === transactionId)
       .map(_.failed)
       .update(true)
+      
+  def inboxEntryByTransactionId(transactionId: Long)(implicit session: Session): Option[InboxEntry] =
+    inboxQuery
+      .filter(_.transactionId === transactionId)
+      .list.headOption
+      
+  def removeInboxEntry(entryId: Long)(implicit session: Session): Unit =
+    inboxQuery.filter(_.id === entryId).delete
 
   def removeBox(boxId: Long)(implicit session: Session): Unit =
     boxQuery.filter(_.id === boxId).delete
@@ -123,5 +131,4 @@ class BoxDAO(val driver: JdbcProfile) {
 
   def listInboxEntries(implicit session: Session): List[InboxEntry] =
     inboxQuery.list
-
 }
