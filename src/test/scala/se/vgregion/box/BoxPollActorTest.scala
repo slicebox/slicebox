@@ -55,12 +55,12 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
   val notFoundRespone = HttpResponse(NotFound)
   var responseCounter = -1
   var mockHttpResponses: ArrayBuffer[HttpResponse] = ArrayBuffer()
-  val capturedFileSendRequests: ArrayBuffer[HttpRequest] = ArrayBuffer()
+  val capturedRequests: ArrayBuffer[HttpRequest] = ArrayBuffer()
   
   val pollBoxActorRef = _system.actorOf(Props(new BoxPollActor(remoteBox, dbProps, 1000.millis) {
     override def sendRequestToRemoteBoxPipeline = {
       (req: HttpRequest) => {
-        capturedFileSendRequests += req
+        capturedRequests += req
         responseCounter = responseCounter + 1
         Future {
           if (responseCounter < mockHttpResponses.size) mockHttpResponses(responseCounter)
@@ -72,7 +72,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
   
   override def beforeEach() {
-    capturedFileSendRequests.clear()
+    capturedRequests.clear()
     
     mockHttpResponses.clear()
     responseCounter = -1
@@ -80,6 +80,10 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
     db.withSession { implicit session =>
       boxDao.listBoxes.foreach(box => {
         boxDao.removeBox(box.id)
+      })
+      
+      boxDao.listInboxEntries.foreach(inboxEntry => {
+        boxDao.removeInboxEntry(inboxEntry.id)
       })
       
       boxDao.listOutboxEntries.foreach(outboxEntry => {
@@ -100,8 +104,8 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       
       Thread.sleep(500)
       
-      capturedFileSendRequests.size should be(1)
-      capturedFileSendRequests(0).uri.toString() should be(s"$remoteBoxBaseUrl/outbox/poll")
+      capturedRequests.size should be(1)
+      capturedRequests(0).uri.toString() should be(s"$remoteBoxBaseUrl/outbox/poll")
     }
     
     "call correct URL for getting remote outbox file" in {
@@ -115,8 +119,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       }
       
       Thread.sleep(900)
-      capturedFileSendRequests.size should be(2)
-      capturedFileSendRequests(1).uri.toString() should be(s"$remoteBoxBaseUrl/outbox?transactionId=$transactionId&sequenceNumber=1")
+      capturedRequests(1).uri.toString() should be(s"$remoteBoxBaseUrl/outbox?transactionId=$transactionId&sequenceNumber=1")
     }
     
     "handle remote outbox file" in {
@@ -134,8 +137,9 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       val dcmFile = dcmPath.toFile
       
       mockHttpResponses += HttpResponse(StatusCodes.OK, HttpEntity(ContentTypes.`application/octet-stream`, HttpData(dcmFile)))
+      mockHttpResponses += HttpResponse(StatusCodes.OK)
       
-      Thread.sleep(200)
+      Thread.sleep(1000)
       
       // Check that inbox entry has been created
       db.withSession { implicit session =>
@@ -149,17 +153,23 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
           inboxEntry.totalImageCount should be(2)
         })
       }
+      
+      // Check that done message is sent
+      Thread.sleep(200)
+      
+      capturedRequests.size should be(3)
+      capturedRequests(2).uri.toString() should be(s"$remoteBoxBaseUrl/outbox/done")
     }
     
     "go back to polling state when poll request returns 404" in {
       mockHttpResponses += notFoundRespone
       
-      Thread.sleep(2000)
+      Thread.sleep(1500)
       
       // TODO: not very robust way to test this
-      capturedFileSendRequests.size should be(2)
-      capturedFileSendRequests(0).uri.toString() should be(s"$remoteBoxBaseUrl/outbox/poll")
-      capturedFileSendRequests(1).uri.toString() should be(s"$remoteBoxBaseUrl/outbox/poll")
+      capturedRequests.size should be(2)
+      capturedRequests(0).uri.toString() should be(s"$remoteBoxBaseUrl/outbox/poll")
+      capturedRequests(1).uri.toString() should be(s"$remoteBoxBaseUrl/outbox/poll")
     }
   }
 }

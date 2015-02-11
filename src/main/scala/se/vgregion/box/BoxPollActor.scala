@@ -15,9 +15,12 @@ import spray.http.HttpResponse
 import se.vgregion.app.JsonFormats
 import spray.httpx.SprayJsonSupport.sprayJsonUnmarshaller
 import spray.httpx.unmarshalling.FromResponseUnmarshaller
+import spray.httpx.marshalling._
+import spray.httpx.SprayJsonSupport.sprayJsonMarshaller
 import spray.http.StatusCodes
 import se.vgregion.dicom.DicomUtil
 
+// TODO: we need a timeout that performs unbecome to make sure we are not stuck in a substate forever
 class BoxPollActor(box: Box, dbProps: DbProps, pollInterval: FiniteDuration = 5.seconds) extends Actor with JsonFormats {
   val log = Logging(context.system, this)
 
@@ -51,6 +54,14 @@ class BoxPollActor(box: Box, dbProps: DbProps, pollInterval: FiniteDuration = 5.
   def getRemoteOutboxFile(remoteOutboxEntry: OutboxEntry): Future[HttpResponse] = {
     sendRequestToRemoteBoxPipeline(Get(s"${box.baseUrl}/outbox?transactionId=${remoteOutboxEntry.transactionId}&sequenceNumber=${remoteOutboxEntry.sequenceNumber}"))
   }
+  
+  // We don't need to wait for done message to be sent since it is not critical that it is received by the remote box
+  def sendRemoteOutboxFileCompleted(remoteOutboxEntry: OutboxEntry): Unit = {
+    marshal(remoteOutboxEntry) match {
+      case Right(entity) => sendRequestToRemoteBoxPipeline(Post(s"${box.baseUrl}/outbox/done", entity))
+      case Left(e) => log.error(e, s"Failed to send done message to remote box (${box.name},${remoteOutboxEntry.transactionId},${remoteOutboxEntry.sequenceNumber})")
+    }
+  }
 
   system.scheduler.schedule(100.millis, pollInterval) {
     self ! PollRemoteBox
@@ -82,6 +93,7 @@ class BoxPollActor(box: Box, dbProps: DbProps, pollInterval: FiniteDuration = 5.
   def waitForFileFetchedState: PartialFunction[Any, Unit] = LoggingReceive {
     case RemoteOutboxFileFetched(remoteOutboxEntry) => {
       updateInbox(box.id, remoteOutboxEntry.transactionId, remoteOutboxEntry.sequenceNumber, remoteOutboxEntry.totalImageCount)
+      sendRemoteOutboxFileCompleted(remoteOutboxEntry)
       context.unbecome
     }
 
