@@ -112,7 +112,7 @@ class BoxPushActor(box: Box, dbProps: DbProps, storage: Path, pollInterval: Fini
     log.error(exception, s"Failed to send file to box: ${outboxEntry.id}")
 
     db.withSession { implicit session =>
-      boxDao.markOutboxTransactionAsFailed(outboxEntry.transactionId)
+      boxDao.markOutboxTransactionAsFailed(box.id, outboxEntry.transactionId)
     }
 
     processNextOutboxEntry

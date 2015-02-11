@@ -206,6 +206,25 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       }
     }
     
+    "does not mark wrong outbox entry as failed when transaction id is not unique" in {
+      mockSendFileHttpResponse = fileSendFailedRespone
+      
+      db.withSession { implicit session =>
+        boxDao.insertOutboxEntry(OutboxEntry(1, testBox.id, testTransactionId, 1, 1, imageFile1.id, false))
+        val secondOutboxEntry = boxDao.insertOutboxEntry(OutboxEntry(1, 999, testTransactionId, 1, 1, imageFile1.id, false))
+      
+        // Sleep for a while so that the BoxPushActor has time to poll database
+        Thread.sleep(1000)
+       
+        val outboxEntries = boxDao.listOutboxEntries
+        outboxEntries.size should be(2)
+        outboxEntries.foreach(outboxEntry => {
+          if (outboxEntry.id == secondOutboxEntry.id)
+            outboxEntry.failed should be(false)
+        })
+      }
+    }
+    
     "process other transactions when file send fails" in {
       mockSendFileHttpResponse = fileSendFailedRespone
       

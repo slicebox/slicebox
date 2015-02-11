@@ -50,6 +50,8 @@ object BoxProtocol {
   case class ValidateToken(token: String) extends BoxRequest
   
   case class UpdateInbox(token: String, transactionId: Long, sequenceNumber: Long, totalImageCount: Long) extends BoxRequest
+  
+  case class PollOutbox(token: String) extends BoxRequest
 
   case class RemoteBoxAdded(box: Box)
 
@@ -64,5 +66,7 @@ object BoxProtocol {
   case class InvalidToken(token: String)
   
   case class InboxUpdated(token: String, transactionId: Long, sequenceNumber: Long, totalImageCount: Long)
+  
+  case object OutboxEmpty
 
 }

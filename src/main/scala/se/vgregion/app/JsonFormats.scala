@@ -32,6 +32,8 @@ trait JsonFormats extends DefaultJsonProtocol {
 
   implicit val boxFormat = jsonFormat5(Box)
 
+  implicit val outboxEntryFormat = jsonFormat7(OutboxEntry)
+  
   implicit val generateBoxBaseUrlFormat = jsonFormat1(GenerateBoxBaseUrl)
 
   implicit val addScpDataFormat = jsonFormat1(AddScp)

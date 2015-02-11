@@ -66,22 +66,23 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, host: String, port: Int) 
 
           case UpdateInbox(token, transactionId, sequenceNumber, totalImageCount) =>
             pollBoxByToken(token).foreach(box => {
-              inboxEntryByTransactionId(transactionId) match {
-                case Some(inboxEntry) => {
-                  val updatedInboxEntry = inboxEntry.copy(receivedImageCount = sequenceNumber, totalImageCount = totalImageCount)
-                  updateInboxEntryInDb(updatedInboxEntry)
-                }
-                case None => {
-                  val inboxEntry = InboxEntry(-1, box.id, transactionId, sequenceNumber, totalImageCount)
-                  addInboxEntryToDb(inboxEntry)
-                }
-              }
+              updateInbox(box.id, transactionId, sequenceNumber, totalImageCount)
             })
             
             // TODO: what should we do if no box was found for token?
             
             sender ! InboxUpdated(token, transactionId, sequenceNumber, totalImageCount)
             
+          case PollOutbox(token) =>
+            pollBoxByToken(token).foreach(box => {
+              nextOutboxEntry(box.id) match {
+                case Some(outboxEntry) => sender ! outboxEntry
+        
+                case None => sender ! OutboxEmpty
+              }
+            })
+            
+            // TODO: what should we do if no box was found for token?
         }
 
       }
@@ -127,7 +128,7 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, host: String, port: Int) 
   def maybeStartPollActor(box: Box): Unit = {
     val actorName = pollActorName(box)
     if (context.child(actorName).isEmpty)
-      context.actorOf(BoxPollActor.props(box), actorName)
+      context.actorOf(BoxPollActor.props(box, dbProps), actorName)
   }
 
   def pushActorName(box: Box): String = BoxSendMethod.PUSH + "-" + box.id.toString
@@ -171,19 +172,14 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, host: String, port: Int) 
       dao.pollBoxByToken(token).isDefined
     }
   
-  def addInboxEntryToDb(inboxEntry: InboxEntry): InboxEntry =
+  def nextOutboxEntry(boxId: Long): Option[OutboxEntry] =
     db.withSession { implicit session =>
-      dao.insertInboxEntry(inboxEntry)
+      dao.nextOutboxEntryForRemoteBoxId(boxId)
     }
   
-  def inboxEntryByTransactionId(transactionId: Long): Option[InboxEntry] =
+  def updateInbox(remoteBoxId: Long, transactionId: Long, sequenceNumber: Long, totalImageCount: Long): Unit =
     db.withSession { implicit session =>
-      dao.inboxEntryByTransactionId(transactionId)
-    }
-  
-  def updateInboxEntryInDb(inboxEntry: InboxEntry): Unit =
-    db.withSession { implicit session =>
-      dao.updateInboxEntry(inboxEntry)
+      dao.updateInbox(remoteBoxId, transactionId, sequenceNumber, totalImageCount)
     }
 }
 

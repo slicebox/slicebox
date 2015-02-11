@@ -101,5 +101,33 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
         })
       }
     }
+    
+    "returns OuboxEmpty for poll message when outbox is empty" in {
+      db.withSession { implicit session =>
+        val remoteBox = boxDao.insertBox(Box(-1, "some remote box", "abc", "https://someurl.com", BoxSendMethod.POLL))
+        
+        boxServiceActorRef ! PollOutbox(remoteBox.token)
+        
+        expectMsg(OutboxEmpty)
+      }
+    }
+
+    "returns first outbox entry when receiving poll message" in {
+      db.withSession { implicit session =>
+        val remoteBox = boxDao.insertBox(Box(-1, "some remote box", "abc", "https://someurl.com", BoxSendMethod.POLL))
+        boxDao.insertOutboxEntry(OutboxEntry(-1, remoteBox.id, 987, 1, 2, 123, false))
+        
+        boxServiceActorRef ! PollOutbox(remoteBox.token)
+        
+        expectMsgPF() {
+          case OutboxEntry(id, remoteBoxId, transactionId, sequenceNumber, totalImageCount, imageId, failed) =>
+            remoteBoxId should be(remoteBox.id)
+            transactionId should be(987)
+            sequenceNumber should be(1)
+            totalImageCount should be(2)
+            imageId should be(123)
+        }
+      }
+    }
   }
 }

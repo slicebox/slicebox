@@ -103,14 +103,29 @@ class BoxDAO(val driver: JdbcProfile) {
       .sortBy(_.sequenceNumber.asc)
       .list.headOption
 
-  def markOutboxTransactionAsFailed(transactionId: Long)(implicit session: Session): Unit =
+  def markOutboxTransactionAsFailed(remoteBoxId: Long, transactionId: Long)(implicit session: Session): Unit =
     outboxQuery
+      .filter(_.remoteBoxId === remoteBoxId)
       .filter(_.transactionId === transactionId)
       .map(_.failed)
       .update(true)
       
-  def inboxEntryByTransactionId(transactionId: Long)(implicit session: Session): Option[InboxEntry] =
+  def updateInbox(remoteBoxId: Long, transactionId: Long, sequenceNumber: Long, totalImageCount: Long)(implicit session: Session): Unit = {
+    inboxEntryByTransactionId(remoteBoxId, transactionId) match {
+      case Some(inboxEntry) => {
+        val updatedInboxEntry = inboxEntry.copy(receivedImageCount = sequenceNumber, totalImageCount = totalImageCount)
+        updateInboxEntry(updatedInboxEntry)
+      }
+      case None => {
+        val inboxEntry = InboxEntry(-1, remoteBoxId, transactionId, sequenceNumber, totalImageCount)
+        insertInboxEntry(inboxEntry)
+      }
+    }
+  }
+      
+  def inboxEntryByTransactionId(remoteBoxId: Long, transactionId: Long)(implicit session: Session): Option[InboxEntry] =
     inboxQuery
+      .filter(_.remoteBoxId === remoteBoxId)
       .filter(_.transactionId === transactionId)
       .list.headOption
       
