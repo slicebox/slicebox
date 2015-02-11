@@ -68,8 +68,9 @@ class BoxPollActor(box: Box, dbProps: DbProps, pollInterval: FiniteDuration = 5.
     
     case RemoteOutboxEntryFound(remoteOutboxEntry) => {
       log.debug(s"Received outbox entry ${remoteOutboxEntry}")
-      fetchFileForRemoteOutboxEntry(remoteOutboxEntry)
+      
       context.become(waitForFileFetchedState)
+      fetchFileForRemoteOutboxEntry(remoteOutboxEntry)
     }
 
     case PollRemoteBoxFailed(exception) => {
@@ -91,6 +92,8 @@ class BoxPollActor(box: Box, dbProps: DbProps, pollInterval: FiniteDuration = 5.
   }
   
   def pollRemoteBox(): Unit = {
+    context.become(waitForPollRemoteOutboxState)
+    
     sendPollRequestToRemoteBox
       .map(outboxEntryMaybe =>
         outboxEntryMaybe match {
@@ -102,8 +105,6 @@ class BoxPollActor(box: Box, dbProps: DbProps, pollInterval: FiniteDuration = 5.
         case exception: Exception =>
           self ! PollRemoteBoxFailed(exception)
       }
-    
-    context.become(waitForPollRemoteOutboxState)
   }
     
   def fetchFileForRemoteOutboxEntry(remoteOutboxEntry: OutboxEntry): Unit = {
