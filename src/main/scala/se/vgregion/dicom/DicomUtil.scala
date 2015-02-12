@@ -15,14 +15,17 @@ import org.dcm4che3.io.DicomInputStream.IncludeBulkData
 import java.io.InputStream
 import java.io.ByteArrayInputStream
 import java.io.OutputStream
+import java.awt.image.BufferedImage
+import javax.imageio.ImageIO
+import org.dcm4che3.imageio.plugins.dcm.DicomImageReadParam
 
 object DicomUtil {
 
   val defaultTransferSyntax = UID.ExplicitVRLittleEndian
 
-  def saveDataset(dataset: Attributes, filePath: Path): Boolean = 
+  def saveDataset(dataset: Attributes, filePath: Path): Boolean =
     saveDataset(dataset, Files.newOutputStream(filePath))
-    
+
   def saveDataset(dataset: Attributes, outputStream: OutputStream): Boolean = {
     val dos = new DicomOutputStream(outputStream, defaultTransferSyntax)
     val metaInformation = dataset.createFileMetaInformation(defaultTransferSyntax)
@@ -125,4 +128,14 @@ object DicomUtil {
       .map(_.sopClassUID)
       .contains(dataset.getString(Tag.SOPClassUID))
 
+  def fileToBufferedImages(path: Path): Seq[BufferedImage] = {
+    val iter = ImageIO.getImageReadersByFormatName("DICOM")
+    val reader = iter.next();
+    val iis = ImageIO.createImageInputStream(path.toFile);
+    reader.setInput(iis, false);
+    val param = reader.getDefaultReadParam().asInstanceOf[DicomImageReadParam];
+    val bufferedImage = reader.read(0, param);
+    iis.close();
+    Seq(bufferedImage);
+  }
 }
