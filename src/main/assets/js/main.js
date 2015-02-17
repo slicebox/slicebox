@@ -8,7 +8,8 @@ angular.module('slicebox', [
     'ui.bootstrap',
     'slicebox.directives',
     'slicebox.home',
-    'slicebox.adminWatchDirectories'
+    'slicebox.adminWatchDirectories',
+    'slicebox.adminBoxes'
 ]).
 
 config(function($locationProvider, $routeProvider) {
