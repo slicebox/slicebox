@@ -129,6 +129,13 @@ class BoxDAO(val driver: JdbcProfile) {
       .filter(_.transactionId === transactionId)
       .list.headOption
       
+  def outboxEntryByTransactionIdAndSequenceNumber(remoteBoxId: Long, transactionId: Long, sequenceNumber: Long)(implicit session: Session): Option[OutboxEntry] =
+    outboxQuery
+      .filter(_.remoteBoxId === remoteBoxId)
+      .filter(_.transactionId === transactionId)
+      .filter(_.sequenceNumber === sequenceNumber)
+      .list.headOption
+      
   def removeInboxEntry(entryId: Long)(implicit session: Session): Unit =
     inboxQuery.filter(_.id === entryId).delete
 

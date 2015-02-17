@@ -28,6 +28,8 @@ object BoxProtocol {
   case class RemoteBoxName(value: String)
 
   case class BoxBaseUrl(value: String)
+  
+  case class ImageId(value: Long)
 
   case class Box(id: Long, name: String, token: String, baseUrl: String, sendMethod: BoxSendMethod) extends Entity
 
@@ -52,6 +54,12 @@ object BoxProtocol {
   case class UpdateInbox(token: String, transactionId: Long, sequenceNumber: Long, totalImageCount: Long) extends BoxRequest
   
   case class PollOutbox(token: String) extends BoxRequest
+  
+  case class SendImageToRemoteBox(remoteBoxId: Long, imageId: Long) extends BoxRequest
+  
+  case class GetOutboxEntry(token: String, transactionId: Long, sequenceNumber: Long) extends BoxRequest
+  
+  case class DeleteOutboxEntry(token: String, transactionId: Long, sequenceNumber: Long) extends BoxRequest
 
   case class RemoteBoxAdded(box: Box)
 
@@ -68,5 +76,11 @@ object BoxProtocol {
   case class InboxUpdated(token: String, transactionId: Long, sequenceNumber: Long, totalImageCount: Long)
   
   case object OutboxEmpty
+  
+  case class ImageSent(remoteBoxId: Long, imageId: Long)
+  
+  case object OutboxEntryNotFound
+  
+  case object OutboxEntryDeleted
 
 }

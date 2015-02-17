@@ -77,12 +77,34 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, host: String, port: Int) 
             pollBoxByToken(token).foreach(box => {
               nextOutboxEntry(box.id) match {
                 case Some(outboxEntry) => sender ! outboxEntry
-        
-                case None => sender ! OutboxEmpty
+                case None              => sender ! OutboxEmpty
               }
             })
             
             // TODO: what should we do if no box was found for token?
+            
+          case SendImageToRemoteBox(remoteBoxId, imageId) =>
+            addOutboxEntry(remoteBoxId, imageId)
+            sender ! ImageSent(remoteBoxId, imageId)
+            
+          case GetOutboxEntry(token, transactionId, sequenceNumber) =>
+            pollBoxByToken(token).foreach(box => {
+              outboxEntryByTransactionIdAndSequenceNumber(box.id, transactionId, sequenceNumber) match {
+                case Some(outboxEntry) => sender ! outboxEntry
+                case None              => sender ! OutboxEntryNotFound
+              }
+            })
+            
+          case DeleteOutboxEntry(token, transactionId, sequenceNumber) =>
+            pollBoxByToken(token).foreach(box => {
+              outboxEntryByTransactionIdAndSequenceNumber(box.id, transactionId, sequenceNumber) match {
+                case Some(outboxEntry) =>
+                  removeOutboxEntryFromDb(outboxEntry)
+                  sender ! OutboxEntryDeleted
+                case None =>
+                  sender ! OutboxEntryDeleted
+              }
+            })
         }
 
       }
@@ -180,6 +202,26 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, host: String, port: Int) 
   def updateInbox(remoteBoxId: Long, transactionId: Long, sequenceNumber: Long, totalImageCount: Long): Unit =
     db.withSession { implicit session =>
       dao.updateInbox(remoteBoxId, transactionId, sequenceNumber, totalImageCount)
+    }
+  
+  def addOutboxEntry(remoteBoxId: Long, imageId: Long): Unit = {
+    val transactionId = generateTransactionId()
+    db.withSession { implicit session =>
+      dao.insertOutboxEntry(OutboxEntry(-1, remoteBoxId, transactionId, 1, 1, imageId, false))
+    }
+  }
+  
+  def generateTransactionId(): Long =
+    UUID.randomUUID().getLeastSignificantBits()
+    
+  def outboxEntryByTransactionIdAndSequenceNumber(remoteBoxId: Long, transactionId: Long, sequenceNumber: Long): Option[OutboxEntry] =
+    db.withSession { implicit session =>
+      dao.outboxEntryByTransactionIdAndSequenceNumber(remoteBoxId, transactionId, sequenceNumber)
+    }
+  
+  def removeOutboxEntryFromDb(outboxEntry: OutboxEntry) =
+    db.withSession { implicit session =>
+      dao.removeOutboxEntry(outboxEntry.id)
     }
 }
 

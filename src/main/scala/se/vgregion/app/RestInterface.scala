@@ -6,30 +6,26 @@ import java.nio.file.Paths
 import scala.concurrent.duration.DurationInt
 import scala.slick.driver.H2Driver
 import scala.slick.jdbc.JdbcBackend.Database
+import com.typesafe.config.ConfigFactory
 import akka.actor.Actor
 import akka.actor.ActorContext
 import akka.pattern.ask
 import akka.util.Timeout
-import spray.http.StatusCodes.Forbidden
-import spray.http.StatusCodes.BadRequest
-import spray.http.StatusCodes.OK
-import spray.http.StatusCodes.NoContent
-import spray.httpx.PlayTwirlSupport.twirlHtmlMarshaller
-import spray.httpx.SprayJsonSupport._
-import spray.httpx.marshalling.ToResponseMarshallable.isMarshallable
-import spray.routing._
-import com.typesafe.config.ConfigFactory
 import se.vgregion.box.BoxProtocol._
 import se.vgregion.box.BoxServiceActor
 import se.vgregion.dicom.DicomDispatchActor
 import se.vgregion.dicom.DicomHierarchy._
 import se.vgregion.dicom.DicomProtocol._
-import spray.http.MultipartFormData
 import se.vgregion.dicom.DicomUtil
-import spray.http.FormFile
-import spray.http.HttpEntity
-import spray.http.HttpData
 import spray.http.ContentTypes
+import spray.http.FormFile
+import spray.http.HttpData
+import spray.http.HttpEntity
+import spray.http.StatusCodes._
+import spray.httpx.PlayTwirlSupport.twirlHtmlMarshaller
+import spray.httpx.SprayJsonSupport._
+import spray.httpx.marshalling.ToResponseMarshallable.isMarshallable
+import spray.routing._
 
 class RestInterface extends Actor with RestApi {
 
@@ -268,6 +264,18 @@ trait RestApi extends HttpService with JsonFormats {
             }
           }
         }
+      } ~ pathPrefix(LongNumber) { remoteBoxId =>
+        path("sendimage") {
+          pathEnd {
+            post {
+              entity(as[ImageId]) { imageId =>
+                onSuccess(boxService.ask(SendImageToRemoteBox(remoteBoxId, imageId.value))) {
+                  case ImageSent(remoteBoxId, imageId) => complete(NoContent)
+                }
+              }
+            }
+          }
+        }
       } ~ tokenRoutes
     }
 
@@ -318,6 +326,65 @@ trait RestApi extends HttpService with JsonFormats {
                     }
                 }
               }
+          }
+        }
+      } ~ pathPrefix("outbox") {
+        path("poll") {
+          pathEnd {
+            get {
+              onSuccess(boxService.ask(ValidateToken(token))) {
+                case InvalidToken(token) =>
+                  complete((Forbidden, "Invalid token"))
+                case ValidToken(token) =>
+                  onSuccess(boxService.ask(PollOutbox(token))) {
+                    case outboxEntry: OutboxEntry =>
+                      complete(outboxEntry)
+                    case OutboxEmpty =>
+                      complete(NotFound)
+                  }
+              }
+            }
+          }
+        } ~ path("done") {
+          pathEnd {
+            post {
+              onSuccess(boxService.ask(ValidateToken(token))) {
+                case InvalidToken(token) =>
+                  complete((Forbidden, "Invalid token"))
+                case ValidToken(token) =>
+                  entity(as[OutboxEntry]) { outboxEntry =>
+                    onSuccess(boxService.ask(DeleteOutboxEntry(token, outboxEntry.transactionId, outboxEntry.sequenceNumber))) {
+                      case OutboxEntryDeleted => complete(NoContent)
+                    }
+                  }
+              }
+            }
+          }
+        } ~ pathEnd {
+          get {
+            parameters('transactionId.as[Long], 'sequenceNumber.as[Long]) { (transactionId, sequenceNumber) =>
+              onSuccess(boxService.ask(GetOutboxEntry(token, transactionId, sequenceNumber))) {
+                case outboxEntry: OutboxEntry =>
+                  onSuccess(dicomService.ask(GetImageFiles(outboxEntry.imageId))) {
+                    // TODO: this is duplicate code
+                    case ImageFiles(imageFiles) =>
+                      imageFiles.headOption match {
+                        case Some(imageFile) =>
+                          val file = storage.resolve(imageFile.fileName.value).toFile
+                          if (file.isFile && file.canRead)
+                            detach() {
+                              complete(HttpEntity(ContentTypes.`application/octet-stream`, HttpData(file)))
+                            }
+                          else
+                            complete((BadRequest, "Dataset could not be read"))
+                        case None =>
+                          complete((BadRequest, "Dataset not found"))
+                      }
+                  }
+                case OutboxEntryNotFound =>
+                  complete(NotFound)
+              }
+            }
           }
         }
       }
