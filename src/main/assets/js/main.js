@@ -9,6 +9,7 @@ angular.module('slicebox', [
     'slicebox.directives',
     'slicebox.home',
     'slicebox.inbox',
+    'slicebox.outbox',
     'slicebox.adminWatchDirectories',
     'slicebox.adminBoxes'
 ]).

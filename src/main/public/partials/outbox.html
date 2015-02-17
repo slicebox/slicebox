@@ -1,0 +1,35 @@
+<div ng-if="uiState.errorMessage" class="row">
+    <div class="col-md-12">
+        <alert type="danger" close="closeErrorMessageAlert()">{{uiState.errorMessage}}</alert>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="panel panel-default">
+            <div class="panel-heading">Outbox</div>
+
+            <div class="panel-body">
+                <sbx-grid
+                    load-page="loadOutboxPage(startIndex, count, orderByProperty, orderByDirection)"
+                    page-size="20"
+                    object-actions="objectActions"
+                    callbacks="callbacks.outboxTable"
+                    empty-message="Outbox is empty">
+
+                    <sbx-grid-column property="remoteBoxName" title="Remote Box Name">
+                    </sbx-grid-column>
+
+                    <sbx-grid-column property="sequenceNumber" title="Sequence Number">
+                    </sbx-grid-column>
+
+                    <sbx-grid-column property="totalImageCount" title="Total Image Count">
+                    </sbx-grid-column>
+
+                    <sbx-grid-column property="failed" title="Failed">
+                    </sbx-grid-column>
+                </sbx-grid>
+            </div>
+        </div>
+    </div>
+</div>

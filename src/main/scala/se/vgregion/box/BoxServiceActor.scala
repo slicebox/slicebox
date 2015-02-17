@@ -106,7 +106,7 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, host: String, port: Int) 
               }
             })
             
-          case GetInboxEntries =>
+          case GetInbox =>
             val inboxEntries = getInboxFromDb().map { inboxEntry =>
               boxById(inboxEntry.remoteBoxId) match {
                 case Some(box) => InboxEntryInfo(box.name, inboxEntry.transactionId, inboxEntry.receivedImageCount, inboxEntry.totalImageCount)
@@ -114,6 +114,15 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, host: String, port: Int) 
               }
             }
             sender ! Inbox(inboxEntries)
+            
+          case GetOutbox =>
+            val outboxEntries = getOutboxFromDb().map { outboxEntry =>
+              boxById(outboxEntry.remoteBoxId) match {
+                case Some(box) => OutboxEntryInfo(box.name, outboxEntry.transactionId, outboxEntry.sequenceNumber, outboxEntry.totalImageCount, outboxEntry.imageId, outboxEntry.failed)
+                case None      => OutboxEntryInfo("" + outboxEntry.remoteBoxId, outboxEntry.transactionId, outboxEntry.sequenceNumber, outboxEntry.totalImageCount, outboxEntry.imageId, outboxEntry.failed)
+              }
+            }
+            sender ! Outbox(outboxEntries)
         }
 
       }
@@ -236,6 +245,11 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, host: String, port: Int) 
   def getInboxFromDb() =
     db.withSession { implicit session =>
       dao.listInboxEntries
+    }
+  
+  def getOutboxFromDb() =
+    db.withSession { implicit session =>
+      dao.listOutboxEntries
     }
 }
 

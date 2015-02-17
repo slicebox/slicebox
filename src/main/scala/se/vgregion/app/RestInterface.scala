@@ -395,8 +395,20 @@ trait RestApi extends HttpService with JsonFormats {
     pathPrefix("inbox") {
       pathEnd {
         get {
-          onSuccess(boxService.ask(GetInboxEntries)) {
+          onSuccess(boxService.ask(GetInbox)) {
             case Inbox(entries) =>
+              complete(entries)
+          }
+        }
+      }
+  }
+  
+  def outboxRoutes: Route =
+    pathPrefix("outbox") {
+      pathEnd {
+        get {
+          onSuccess(boxService.ask(GetOutbox)) {
+            case Outbox(entries) =>
               complete(entries)
           }
         }
@@ -467,7 +479,7 @@ trait RestApi extends HttpService with JsonFormats {
 
   def routes: Route =
     pathPrefix("api") {
-      directoryRoutes ~ scpRoutes ~ metaDataRoutes ~ datasetRoutes ~ boxRoutes ~ userRoutes ~ inboxRoutes ~ systemRoutes
+      directoryRoutes ~ scpRoutes ~ metaDataRoutes ~ datasetRoutes ~ boxRoutes ~ userRoutes ~ inboxRoutes ~ outboxRoutes ~ systemRoutes
     } ~ staticResourcesRoutes ~ angularRoutes
 
 }
