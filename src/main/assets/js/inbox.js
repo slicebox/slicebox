@@ -11,7 +11,7 @@ angular.module('slicebox.inbox', ['ngRoute'])
   });
 })
 
-.controller('InboxCtrl', function($scope, $http, $modal, $q) {
+.controller('InboxCtrl', function($scope, $http, $modal, $q, $interval) {
     // Initialization
     // $scope.objectActions =
     //     [
@@ -26,6 +26,16 @@ angular.module('slicebox.inbox', ['ngRoute'])
     $scope.uiState = {
         errorMessage: null
     };
+
+    var timer = $interval(function() {
+        if (angular.isDefined($scope.callbacks.inboxTable)) {
+            $scope.callbacks.inboxTable.reloadPage();
+        }
+    }, 1000);
+
+    $scope.$on('$destroy', function() {
+        $interval.cancel(timer);
+    });
   
     // Scope functions
     $scope.loadInboxPage = function(startIndex, count, orderByProperty, orderByDirection) {

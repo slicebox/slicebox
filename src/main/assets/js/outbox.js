@@ -11,7 +11,7 @@ angular.module('slicebox.outbox', ['ngRoute'])
   });
 })
 
-.controller('OutboxCtrl', function($scope, $http, $modal, $q) {
+.controller('OutboxCtrl', function($scope, $http, $modal, $q, $interval) {
     // Initialization
     // $scope.objectActions =
     //     [
@@ -26,6 +26,16 @@ angular.module('slicebox.outbox', ['ngRoute'])
     $scope.uiState = {
         errorMessage: null
     };
+
+    var timer = $interval(function() {
+        if (angular.isDefined($scope.callbacks.outboxTable)) {
+            $scope.callbacks.outboxTable.reloadPage();
+        }
+    }, 1000);
+
+    $scope.$on('$destroy', function() {
+        $interval.cancel(timer);
+    });
   
     // Scope functions
     $scope.loadOutboxPage = function(startIndex, count, orderByProperty, orderByDirection) {
