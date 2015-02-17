@@ -8,6 +8,7 @@ angular.module('slicebox', [
     'ui.bootstrap',
     'slicebox.directives',
     'slicebox.home',
+    'slicebox.inbox',
     'slicebox.adminWatchDirectories',
     'slicebox.adminBoxes'
 ]).

@@ -390,6 +390,18 @@ trait RestApi extends HttpService with JsonFormats {
       }
 
     }
+  
+  def inboxRoutes: Route =
+    pathPrefix("inbox") {
+      pathEnd {
+        get {
+          onSuccess(boxService.ask(GetInboxEntries)) {
+            case Inbox(entries) =>
+              complete(entries)
+          }
+        }
+      }
+  }
 
   def userRoutes: Route =
     pathPrefix("user") {
@@ -455,7 +467,7 @@ trait RestApi extends HttpService with JsonFormats {
 
   def routes: Route =
     pathPrefix("api") {
-      directoryRoutes ~ scpRoutes ~ metaDataRoutes ~ datasetRoutes ~ boxRoutes ~ userRoutes ~ systemRoutes
+      directoryRoutes ~ scpRoutes ~ metaDataRoutes ~ datasetRoutes ~ boxRoutes ~ userRoutes ~ inboxRoutes ~ systemRoutes
     } ~ staticResourcesRoutes ~ angularRoutes
 
 }
