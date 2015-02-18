@@ -10,6 +10,7 @@ import java.util.UUID
 import akka.actor.Status.Failure
 import se.vgregion.util.ExceptionCatching
 import java.nio.file.Path
+import scala.math.abs
 
 class BoxServiceActor(dbProps: DbProps, storage: Path, host: String, port: Int) extends Actor with ExceptionCatching {
 
@@ -99,7 +100,7 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, host: String, port: Int) 
             pollBoxByToken(token).foreach(box => {
               outboxEntryByTransactionIdAndSequenceNumber(box.id, transactionId, sequenceNumber) match {
                 case Some(outboxEntry) =>
-                  removeOutboxEntryFromDb(outboxEntry)
+                  removeOutboxEntryFromDb(outboxEntry.id)
                   sender ! OutboxEntryDeleted
                 case None =>
                   sender ! OutboxEntryDeleted
@@ -118,11 +119,15 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, host: String, port: Int) 
           case GetOutbox =>
             val outboxEntries = getOutboxFromDb().map { outboxEntry =>
               boxById(outboxEntry.remoteBoxId) match {
-                case Some(box) => OutboxEntryInfo(box.name, outboxEntry.transactionId, outboxEntry.sequenceNumber, outboxEntry.totalImageCount, outboxEntry.imageId, outboxEntry.failed)
-                case None      => OutboxEntryInfo("" + outboxEntry.remoteBoxId, outboxEntry.transactionId, outboxEntry.sequenceNumber, outboxEntry.totalImageCount, outboxEntry.imageId, outboxEntry.failed)
+                case Some(box) => OutboxEntryInfo(outboxEntry.id, box.name, outboxEntry.transactionId, outboxEntry.sequenceNumber, outboxEntry.totalImageCount, outboxEntry.imageId, outboxEntry.failed)
+                case None      => OutboxEntryInfo(outboxEntry.id, "" + outboxEntry.remoteBoxId, outboxEntry.transactionId, outboxEntry.sequenceNumber, outboxEntry.totalImageCount, outboxEntry.imageId, outboxEntry.failed)
               }
             }
             sender ! Outbox(outboxEntries)
+            
+          case RemoveOutboxEntry(outboxEntryId) =>
+            removeOutboxEntryFromDb(outboxEntryId)
+            sender ! OutboxEntryRemoved(outboxEntryId)
         }
 
       }
@@ -230,16 +235,18 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, host: String, port: Int) 
   }
   
   def generateTransactionId(): Long =
-    UUID.randomUUID().getLeastSignificantBits()
+    // Must be a positive number for the generated id to work in URLs which is very strange
+    // Maybe switch to using Strings as transaction id?
+    abs(UUID.randomUUID().getMostSignificantBits())
     
   def outboxEntryByTransactionIdAndSequenceNumber(remoteBoxId: Long, transactionId: Long, sequenceNumber: Long): Option[OutboxEntry] =
     db.withSession { implicit session =>
       dao.outboxEntryByTransactionIdAndSequenceNumber(remoteBoxId, transactionId, sequenceNumber)
     }
   
-  def removeOutboxEntryFromDb(outboxEntry: OutboxEntry) =
+  def removeOutboxEntryFromDb(outboxEntryId: Long) =
     db.withSession { implicit session =>
-      dao.removeOutboxEntry(outboxEntry.id)
+      dao.removeOutboxEntry(outboxEntryId)
     }
   
   def getInboxFromDb() =

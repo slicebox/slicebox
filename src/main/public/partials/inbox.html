@@ -13,6 +13,7 @@
                 <sbx-grid
                     load-page="loadInboxPage(startIndex, count, orderByProperty, orderByDirection)"
                     page-size="20"
+                    converter="converter(pageData)"
                     object-actions="objectActions"
                     callbacks="callbacks.inboxTable"
                     empty-message="Inbox is empty">
@@ -20,10 +21,10 @@
                     <sbx-grid-column property="remoteBoxName" title="Remote Box Name">
                     </sbx-grid-column>
 
-                    <sbx-grid-column property="receivedImageCount" title="Progress">
-                        <sbx-grid-cell>
-                            <span>{{rowObject.receivedImageCount}} / {{rowObject.totalImageCount}}</span>
-                        </sbx-grid-cell>
+                    <sbx-grid-column property="receivedImageCount" title="Received Images">
+                    </sbx-grid-column>
+
+                    <sbx-grid-column property="totalImageCount" title="Total Images">
                     </sbx-grid-column>
                 </sbx-grid>
             </div>

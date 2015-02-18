@@ -26,6 +26,7 @@ import spray.httpx.PlayTwirlSupport.twirlHtmlMarshaller
 import spray.httpx.SprayJsonSupport._
 import spray.httpx.marshalling.ToResponseMarshallable.isMarshallable
 import spray.routing._
+import spray.httpx.unmarshalling.BasicUnmarshallers.ByteArrayUnmarshaller
 
 class RestInterface extends Actor with RestApi {
 
@@ -188,6 +189,13 @@ trait RestApi extends HttpService with JsonFormats {
             case Images(images) =>
               complete(images)
           }
+        } ~ path("imagefiles") {
+          parameters('seriesId.as[Long]) { seriesId =>
+            onSuccess(dicomService.ask(GetImageFilesForSeries(seriesId))) {
+              case ImageFiles(imageFiles) =>
+                complete(imageFiles)
+            }
+          }
         }
       }
     }
@@ -310,22 +318,26 @@ trait RestApi extends HttpService with JsonFormats {
             }
           }
         }
-      } ~ path("image") {
-        post {
-          onSuccess(boxService.ask(ValidateToken(token))) {
-            case InvalidToken(token) =>
-              complete((Forbidden, "Invalid token"))
-            case ValidToken(token) =>
-              formFields('file.as[FormFile], 'update.as[UpdateInbox]) { (file, updateInbox) =>
-                val dataset = DicomUtil.loadDataset(file.entity.data.toByteArray, true)
-                onSuccess(dicomService.ask(AddDataset(dataset))) {
-                  case ImageAdded(image) =>
-                    onSuccess(boxService.ask(updateInbox)) {
-                      case msg: InboxUpdated =>
-                        complete(NoContent)
+      } ~ pathPrefix("image") {
+        path(LongNumber / LongNumber / LongNumber) { (transactionId, sequenceNumber, totalImageCount) =>
+          pathEnd {
+            post {
+              onSuccess(boxService.ask(ValidateToken(token))) {
+                case InvalidToken(token) =>
+                  complete((Forbidden, "Invalid token"))
+                case ValidToken(token) =>
+                  entity(as[Array[Byte]]) { imageData =>
+                    val dataset = DicomUtil.loadDataset(imageData, true)
+                    onSuccess(dicomService.ask(AddDataset(dataset))) {
+                      case ImageAdded(image) =>
+                        onSuccess(boxService.ask(UpdateInbox(token, transactionId, sequenceNumber, totalImageCount))) {
+                          case msg: InboxUpdated =>
+                            complete(NoContent)
+                        }
                     }
-                }
+                  }
               }
+            }
           }
         }
       } ~ pathPrefix("outbox") {
@@ -401,7 +413,7 @@ trait RestApi extends HttpService with JsonFormats {
           }
         }
       }
-  }
+    }
   
   def outboxRoutes: Route =
     pathPrefix("outbox") {
@@ -412,8 +424,17 @@ trait RestApi extends HttpService with JsonFormats {
               complete(entries)
           }
         }
+      }  ~ path(LongNumber) { outboxEntryId =>
+        pathEnd {
+          delete {
+            onSuccess(boxService.ask(RemoveOutboxEntry(outboxEntryId))) {
+              case OutboxEntryRemoved(outboxEntryId) =>
+                complete(NoContent)
+            }
+          }
+        }
       }
-  }
+    }
 
   def userRoutes: Route =
     pathPrefix("user") {

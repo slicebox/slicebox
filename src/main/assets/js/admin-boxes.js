@@ -32,6 +32,37 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
         return $http.get('/api/box');
     };
 
+    $scope.connectButtonClicked = function() {
+        var modalInstance = $modal.open({
+                templateUrl: '/assets/partials/enterBoxNameModalContent.html',
+                controller: 'ConnectModalCtrl'
+            });
+
+        modalInstance.result.then(function(remoteBoxName) {
+            $scope.uiState.errorMessage = null;
+            $scope.uiState.connectInProgress = true;
+
+            var connectPromise = $http.post('/api/box/addremotebox',
+                {
+                    name: remoteBoxName,
+                    baseUrl: $scope.remoteBoxBaseURL
+                });
+
+            connectPromise.success(function(data) {
+                $scope.remoteBoxBaseURL = null;
+            });
+
+            connectPromise.error(function(data) {
+                $scope.uiState.errorMessage = data;
+            });
+
+            connectPromise.finally(function() {
+                $scope.uiState.connectInProgress = false;
+                $scope.callbacks.boxesTable.reloadPage();
+            });
+        });
+    };
+
     $scope.generateURLButtonClicked = function() {
         var modalInstance = $modal.open({
                 templateUrl: '/assets/partials/generateURLModalContent.html',
@@ -39,7 +70,7 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
                 size: 'lg'
             });
 
-        modalInstance.result.then(function (remoteBoxName) {
+        modalInstance.result.then(function(remoteBoxName) {
             $scope.uiState.errorMessage = null;
             $scope.uiState.generateURLInProgress = true;
 
@@ -50,7 +81,7 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
             });
 
             generateURLPromise.error(function(data) {
-                $scope.uiState.errorMessage = data.message;
+                $scope.uiState.errorMessage = data;
             });
 
             generateURLPromise.finally(function() {
@@ -107,6 +138,19 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
 
     // Scope functions
     $scope.closeButtonClicked = function() {
+        $modalInstance.dismiss();
+    };
+})
+
+.controller('ConnectModalCtrl', function($scope, $modalInstance) {
+    // Initialization
+
+    // Scope functions
+    $scope.connectButtonClicked = function() {
+        $modalInstance.close($scope.remoteBoxName);
+    };
+
+    $scope.cancelButtonClicked = function() {
         $modalInstance.dismiss();
     };
 });

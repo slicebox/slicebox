@@ -1,0 +1,31 @@
+<div class="modal-header">
+    <h3 class="modal-title">Send {{imageFiles.length}} Image Files</h3>
+</div>
+
+<div class="modal-body">
+
+    <alert ng-repeat="errorMessage in uiState.errorMessages"
+        type="danger"
+        close="closeErrorMessageAlert($index)">
+        {{errorMessage}}
+    </alert>
+
+
+    <h4>Select Receiver</h4>
+
+    <sbx-grid
+        load-page="loadBoxesPage(startIndex, count, orderByProperty, orderByDirection)"
+        page-size="100000"
+        object-selected="boxSelected(object)"
+        empty-message="No boxes found">
+
+        <sbx-grid-column property="name" title="Name">
+        </sbx-grid-column>
+    </sbx-grid>
+
+</div>
+
+<div class="modal-footer">
+    <button class="btn btn-primary" ng-click="sendButtonClicked()" ng-disabled="!uiState.selectedReceiver || uiState.sendInProgress">Send</button>
+    <button class="btn btn-default" ng-click="cancelButtonClicked()">Cancel</button>
+</div>

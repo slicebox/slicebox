@@ -11,29 +11,7 @@ import akka.event.LoggingReceive
 import org.dcm4che3.data.Attributes
 import org.dcm4che3.data.Tag
 import se.vgregion.app.DbProps
-import se.vgregion.dicom.DicomProtocol.AddDataset
-import se.vgregion.dicom.DicomProtocol.DeleteImage
-import se.vgregion.dicom.DicomProtocol.DeletePatient
-import se.vgregion.dicom.DicomProtocol.DeleteSeries
-import se.vgregion.dicom.DicomProtocol.DeleteStudy
-import se.vgregion.dicom.DicomProtocol.FileName
-import se.vgregion.dicom.DicomProtocol.GetAllImageFiles
-import se.vgregion.dicom.DicomProtocol.GetAllImages
-import se.vgregion.dicom.DicomProtocol.GetImageFiles
-import se.vgregion.dicom.DicomProtocol.GetImages
-import se.vgregion.dicom.DicomProtocol.GetPatients
-import se.vgregion.dicom.DicomProtocol.GetSeries
-import se.vgregion.dicom.DicomProtocol.GetStudies
-import se.vgregion.dicom.DicomProtocol.ImageAdded
-import se.vgregion.dicom.DicomProtocol.ImageFile
-import se.vgregion.dicom.DicomProtocol.ImageFiles
-import se.vgregion.dicom.DicomProtocol.ImageFilesDeleted
-import se.vgregion.dicom.DicomProtocol.Images
-import se.vgregion.dicom.DicomProtocol.MetaDataQuery
-import se.vgregion.dicom.DicomProtocol.MetaDataUpdate
-import se.vgregion.dicom.DicomProtocol.Patients
-import se.vgregion.dicom.DicomProtocol.SeriesCollection
-import se.vgregion.dicom.DicomProtocol.Studies
+import se.vgregion.dicom.DicomProtocol._
 import DicomHierarchy.Equipment
 import DicomHierarchy.FrameOfReference
 import DicomHierarchy.Image
@@ -140,6 +118,13 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
       catchAndReport {
         db.withSession { implicit session =>
           sender ! ImageFiles(dao.imageFileForImage(imageId).toList)
+        }
+      }
+      
+    case GetImageFilesForSeries(seriesId) =>
+      catchAndReport {
+        db.withSession { implicit session =>
+          sender ! ImageFiles(dao.imageFilesForSeries(seriesId).toList)
         }
       }
 

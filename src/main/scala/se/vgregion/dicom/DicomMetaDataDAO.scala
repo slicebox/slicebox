@@ -132,7 +132,7 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
 
   // *** Files ***
 
-  private val toImageFile = (imageId: Long, fileName: String) => ImageFile(imageId, FileName(fileName))
+  private val toImageFile = (id: Long, fileName: String) => ImageFile(id, FileName(fileName))
 
   private val fromImageFile = (imageFile: ImageFile) => Option((imageFile.id, imageFile.fileName.value))
 

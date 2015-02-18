@@ -41,4 +41,8 @@ angular.module('slicebox.inbox', ['ngRoute'])
     $scope.loadInboxPage = function(startIndex, count, orderByProperty, orderByDirection) {
         return $http.get('/api/inbox');
     };
+
+    $scope.converter = function(inbox) {
+        return inbox;
+    };
 });

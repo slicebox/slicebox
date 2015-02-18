@@ -13,13 +13,13 @@ angular.module('slicebox.outbox', ['ngRoute'])
 
 .controller('OutboxCtrl', function($scope, $http, $modal, $q, $interval) {
     // Initialization
-    // $scope.objectActions =
-    //     [
-    //         {
-    //             name: 'Remove',
-    //             action: removeBoxes
-    //         }
-    //     ];
+    $scope.objectActions =
+        [
+            {
+                name: 'Remove',
+                action: removeOutboxEntries
+            }
+        ];
 
     $scope.callbacks = {};
 
@@ -41,4 +41,26 @@ angular.module('slicebox.outbox', ['ngRoute'])
     $scope.loadOutboxPage = function(startIndex, count, orderByProperty, orderByDirection) {
         return $http.get('/api/outbox');
     };
+
+    // Private functions
+    function removeOutboxEntries(outboxEntries) {
+        var deletePromises = [];
+        var deletePromise;
+        var deleteAllPromies;
+
+        $scope.uiState.errorMessage = null;
+
+        angular.forEach(outboxEntries, function(outboxEntry) {
+            deletePromise = $http.delete('/api/outbox/' + outboxEntry.id);
+            deletePromises.push(deletePromise);
+        });
+
+        deleteAllPromies = $q.all(deletePromises);
+
+        deleteAllPromies.then(null, function(response) {
+            $scope.uiState.errorMessage = response.data;
+        });
+
+        return deleteAllPromies;
+    }
 });

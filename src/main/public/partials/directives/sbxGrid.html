@@ -86,7 +86,8 @@
                         ng-checked="rowObjectSelected(rowObject)"></input>
                 </td>
 
-                <td ng-repeat="columnDefinition in columnDefinitions track by columnDefinition.property"
+                <td sbx-grid-internal-td
+                    ng-repeat="columnDefinition in columnDefinitions track by columnDefinition.property"
                     ng-show="columnConfigurations[columnDefinition.property].visible">
                     {{filteredCellValues[$parent.$index][columnDefinition.property]}}
                 </td>

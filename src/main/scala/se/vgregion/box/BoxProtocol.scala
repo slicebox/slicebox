@@ -35,7 +35,7 @@ object BoxProtocol {
 
   case class OutboxEntry(id: Long, remoteBoxId: Long, transactionId: Long, sequenceNumber: Long, totalImageCount: Long, imageId: Long, failed: Boolean) extends Entity
 
-  case class OutboxEntryInfo(remoteBoxName: String, transactionId: Long, sequenceNumber: Long, totalImageCount: Long, imageId: Long, failed: Boolean)
+  case class OutboxEntryInfo(id: Long, remoteBoxName: String, transactionId: Long, sequenceNumber: Long, totalImageCount: Long, imageId: Long, failed: Boolean)
   
   case class InboxEntry(id: Long, remoteBoxId: Long, transactionId: Long, receivedImageCount: Long, totalImageCount: Long) extends Entity
   
@@ -68,6 +68,10 @@ object BoxProtocol {
   case object GetInbox extends BoxRequest
   
   case object GetOutbox extends BoxRequest
+  
+  case class RemoveOutboxEntry(outboxEntryId: Long) extends BoxRequest
+  
+  case class OutboxEntryRemoved(outboxEntryId: Long)
 
   case class RemoteBoxAdded(box: Box)
 

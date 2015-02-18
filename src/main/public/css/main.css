@@ -4,6 +4,6 @@ body {
     padding-top: 70px;
 }
 
-/*.home-left-column {
-    margin-left: 15px;
-}*/
+.admin-boxes .connection-url {
+    margin-bottom: 20px
+}

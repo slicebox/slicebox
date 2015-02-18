@@ -4,17 +4,21 @@
     </div>
 </div>
 
-<div class="row">
+<div class="row admin-boxes">
     <div class="col-md-12">
         <div class="panel panel-default">
             <div class="panel-heading">Boxes</div>
 
             <div class="panel-body">
-                <div class="input-group">
+                <div class="input-group connection-url">
                     <input type="text" ng-model="remoteBoxBaseURL" class="form-control" placeholder="Enter box URL to connect"></input>
 
                     <span class="input-group-btn">
-                        <button class="btn btn-primary" ng-click="connectButtonClicked()">Connect</button>
+                        <button class="btn btn-primary"
+                            ng-disabled="!remoteBoxBaseURL || uiState.connectInProgress"
+                            ng-click="connectButtonClicked()">
+                            Connect
+                        </button>
                     </span>
                 </div>
 

@@ -17,7 +17,7 @@ class BoxDAO(val driver: JdbcProfile) {
     def token = column[String]("token")
     def baseUrl = column[String]("baseurl")
     def sendMethod = column[String]("sendmethod")
-    def idxUniqueNAme = index("idx_unique_name", name, unique = true)
+    def idxUniqueName = index("idx_unique_name", name, unique = true)
     def * = (id, name, token, baseUrl, sendMethod) <> (toBox.tupled, fromBox)
   }
 
@@ -27,6 +27,7 @@ class BoxDAO(val driver: JdbcProfile) {
     OutboxEntry(id, remoteBoxId, transactionId, sequenceNumber, totalImageCount, imageId, failed)
   val fromOutboxEntry = (entry: OutboxEntry) => Option((entry.id, entry.remoteBoxId, entry.transactionId, entry.sequenceNumber, entry.totalImageCount, entry.imageId, entry.failed))
 
+  // TODO: should probably add unique index on (remoteBoxId,transactionId)
   class OutboxTable(tag: Tag) extends Table[OutboxEntry](tag, "Outbox") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def remoteBoxId = column[Long]("remoteboxid")

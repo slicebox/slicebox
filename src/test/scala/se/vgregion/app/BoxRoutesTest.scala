@@ -15,6 +15,8 @@ import java.io.File
 import se.vgregion.dicom.DicomUtil
 import spray.http.ContentTypes
 import spray.httpx.unmarshalling.BasicUnmarshallers.ByteArrayUnmarshaller
+import spray.http.HttpData
+import scala.math.abs
 
 class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
@@ -78,21 +80,13 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     val dcmPath = Paths.get(getClass().getResource(fileName).toURI())
     val dcmFile = dcmPath.toFile
 
-    val testTransactionId = 987
-    val sequenceNumber = 1
-    val totalImageCount = 1
+    val testTransactionId = abs(UUID.randomUUID().getMostSignificantBits())
+    val sequenceNumber = 1L
+    val totalImageCount = 1L
     
-    val update = UpdateInbox(token, testTransactionId, sequenceNumber, totalImageCount)
-    
-    marshal(update) match {
-      case Right(entity) =>
-        val mfd = MultipartFormData(Seq(BodyPart(dcmFile, "file"), BodyPart(entity, "update")))
-        Post(s"/api/box/$token/image", mfd) ~> routes ~> check {
-          status should be(NoContent)
-        }
-      case Left(e) => fail(e)
+    Post(s"/api/box/$token/image/$testTransactionId/$sequenceNumber/$totalImageCount", HttpData(dcmFile)) ~> routes ~> check {
+      status should be(NoContent)
     }
-    
   }
   
   it should "return not found when polling empty outbox" in {

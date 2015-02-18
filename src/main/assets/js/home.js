@@ -11,8 +11,16 @@ angular.module('slicebox.home', ['ngRoute'])
   });
 })
 
-.controller('HomeCtrl', function($scope, $http) {
+.controller('HomeCtrl', function($scope, $http, $modal) {
     // Initialization
+    $scope.fileImageActions =
+        [
+            {
+                name: 'Send',
+                action: sendImageFiles
+            }
+        ];
+
     $scope.callbacks = {};
 
     $scope.uiState = {
@@ -73,6 +81,21 @@ angular.module('slicebox.home', ['ngRoute'])
 
     $scope.seriesSelected = function(series) {
         $scope.uiState.selectedSeries = series;
+        $scope.callbacks.imageFilesTable.reset();
+    };
+
+    $scope.loadImageFiles = function(startIndex, count, orderByProperty, orderByDirection) {
+        if ($scope.uiState.selectedSeries === null) {
+            return [];
+        }
+
+        var loadImageFilesPromise = $http.get('/api/metadata/imagefiles?seriesId=' + $scope.uiState.selectedSeries.id);
+
+        loadImageFilesPromise.error(function(error) {
+            appendErrorMessage('Failed to load image files: ' + error);
+        });
+
+        return loadImageFilesPromise;
     };
 
     $scope.closeErrorMessageAlert = function() {
@@ -87,4 +110,74 @@ angular.module('slicebox.home', ['ngRoute'])
             $scope.uiState.errorMessage = $scope.uiState.errorMessage + '\n' + errorMessage;
         }
     }
+
+    function sendImageFiles(imageFiles) {
+        var modalInstance = $modal.open({
+                templateUrl: '/assets/partials/sendImageFilesModalContent.html',
+                controller: 'SendImageFilesModalCtrl',
+                resolve: {
+                    imageFiles: function () {
+                        return imageFiles;
+                    }
+                }
+            });
+    }
+})
+
+.controller('SendImageFilesModalCtrl', function($scope, $modalInstance, $http, $q, imageFiles) {
+    // Initialization
+    $scope.uiState = {
+        errorMessages: [],
+        selectedReceiver: null
+    };
+
+    $scope.imageFiles = imageFiles;
+
+    // Scope functions
+    $scope.loadBoxesPage = function(startIndex, count, orderByProperty, orderByDirection) {
+        return $http.get('/api/box');
+    };
+
+    $scope.boxSelected = function(box) {
+        $scope.uiState.selectedReceiver = box;
+    };
+
+    $scope.closeErrorMessageAlert = function(errorIndex) {
+        $scope.uiState.errorMessages.splice(errorIndex, 1);
+    };
+
+    $scope.sendButtonClicked = function() {
+        var sendPromises = [];
+        var sendPromise;
+        var sendAllPromise;
+
+        $scope.uiState.sendInProgress = true;
+
+        angular.forEach($scope.imageFiles, function(imageFile) {
+            sendPromise = $http.post('/api/box/' + $scope.uiState.selectedReceiver.id + '/sendimage',
+                {
+                    value: imageFile.id
+                });
+
+            sendPromise.error(function(data) {
+                $scope.uiState.errorMessages.push(data);
+            });
+
+            sendPromises.push(sendPromise);
+        });
+
+        sendAllPromise = $q.all(sendPromises);
+
+        sendAllPromise.then(function() {
+            $modalInstance.close();
+        });
+
+        sendAllPromise.finally(function() {
+            $scope.uiState.sendInProgress = false;
+        });
+    };
+
+    $scope.cancelButtonClicked = function() {
+        $modalInstance.dismiss();
+    };
 });

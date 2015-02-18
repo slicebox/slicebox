@@ -64,6 +64,8 @@ object DicomProtocol {
   case class GetSeries(studyId: Long) extends MetaDataQuery
 
   case class GetImages(seriesId: Long) extends MetaDataQuery
+  
+  case class GetImageFilesForSeries(seriesId: Long) extends MetaDataQuery
 
   
   sealed trait MetaDataUpdate
