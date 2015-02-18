@@ -8,8 +8,8 @@ import BoxProtocol._
 class BoxDAO(val driver: JdbcProfile) {
   import driver.simple._
 
-  val toBox = (id: Long, name: String, token: String, baseUrl: String, sendMethod: String) => Box(id, name, token, baseUrl, BoxSendMethod.withName(sendMethod))
-  val fromBox = (box: Box) => Option((box.id, box.name, box.token, box.baseUrl, box.sendMethod.toString))
+  val toBox = (id: Long, name: String, token: String, baseUrl: String, sendMethod: String, online: Boolean) => Box(id, name, token, baseUrl, BoxSendMethod.withName(sendMethod), online)
+  val fromBox = (box: Box) => Option((box.id, box.name, box.token, box.baseUrl, box.sendMethod.toString, box.online))
 
   class BoxTable(tag: Tag) extends Table[Box](tag, "Box") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
@@ -17,8 +17,9 @@ class BoxDAO(val driver: JdbcProfile) {
     def token = column[String]("token")
     def baseUrl = column[String]("baseurl")
     def sendMethod = column[String]("sendmethod")
+    def online = column[Boolean]("online")
     def idxUniqueName = index("idx_unique_name", name, unique = true)
-    def * = (id, name, token, baseUrl, sendMethod) <> (toBox.tupled, fromBox)
+    def * = (id, name, token, baseUrl, sendMethod, online) <> (toBox.tupled, fromBox)
   }
 
   val boxQuery = TableQuery[BoxTable]
@@ -93,6 +94,12 @@ class BoxDAO(val driver: JdbcProfile) {
       .filter(_.sendMethod === BoxSendMethod.POLL.toString)
       .filter(_.token === token)
       .list.headOption
+      
+  def updateBoxOnlineStatus(boxId: Long, online: Boolean)(implicit session: Session): Unit =
+    boxQuery
+      .filter(_.id === boxId)
+      .map(_.online)
+      .update(online)
 
   def updateInboxEntry(entry: InboxEntry)(implicit session: Session): Unit =
     inboxQuery.filter(_.id === entry.id).update(entry)

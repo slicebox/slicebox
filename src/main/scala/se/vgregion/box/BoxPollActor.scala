@@ -112,13 +112,17 @@ class BoxPollActor(
     context.become(waitForPollRemoteOutboxState)
 
     sendPollRequestToRemoteBox
-      .map(outboxEntryMaybe =>
+      .map(outboxEntryMaybe => {
+        updateBoxOnlineStatus(true)
+        
         outboxEntryMaybe match {
           case Some(outboxEntry) => self ! RemoteOutboxEntryFound(outboxEntry)
           case None              => self ! RemoteOutboxEmpty
-        })
+        }
+      })
       .recover {
         case exception: Exception =>
+          updateBoxOnlineStatus(false)
           self ! PollRemoteBoxFailed(exception)
       }
   }
@@ -142,6 +146,10 @@ class BoxPollActor(
       boxDao.updateInbox(remoteBoxId, transactionId, sequenceNumber, totalImageCount)
     }
   
+  def updateBoxOnlineStatus(online: Boolean): Unit =
+    db.withSession { implicit session =>
+      boxDao.updateBoxOnlineStatus(box.id, online)
+    }
 }
 
 object BoxPollActor {

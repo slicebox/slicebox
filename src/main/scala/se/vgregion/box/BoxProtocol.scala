@@ -31,7 +31,7 @@ object BoxProtocol {
   
   case class ImageId(value: Long)
 
-  case class Box(id: Long, name: String, token: String, baseUrl: String, sendMethod: BoxSendMethod) extends Entity
+  case class Box(id: Long, name: String, token: String, baseUrl: String, sendMethod: BoxSendMethod, online: Boolean) extends Entity
 
   case class OutboxEntry(id: Long, remoteBoxId: Long, transactionId: Long, sequenceNumber: Long, totalImageCount: Long, imageId: Long, failed: Boolean) extends Entity
 
