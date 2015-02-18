@@ -41,9 +41,12 @@ class BoxPushActor(box: Box, dbProps: DbProps, storage: Path, pollInterval: Fini
     sendFilePipeline(Post(s"${box.baseUrl}/image/${outboxEntry.transactionId}/${outboxEntry.sequenceNumber}/${outboxEntry.totalImageCount}", HttpData(file)))
   }
 
-  system.scheduler.schedule(100.millis, pollInterval) {
+  val poller = system.scheduler.schedule(100.millis, pollInterval) {
     self ! PollOutbox
   }
+  
+  override def postStop() =
+    poller.cancel()
 
   def receive = LoggingReceive {
     case PollOutbox => processNextOutboxEntry

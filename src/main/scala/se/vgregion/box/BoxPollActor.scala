@@ -60,12 +60,15 @@ class BoxPollActor(
       case Left(e)       => log.error(e, s"Failed to send done message to remote box (${box.name},${remoteOutboxEntry.transactionId},${remoteOutboxEntry.sequenceNumber})")
     }
 
-  system.scheduler.schedule(pollStartDelay, pollInterval) {
+  val poller = system.scheduler.schedule(pollStartDelay, pollInterval) {
     self ! PollRemoteBox
   }
 
   context.setReceiveTimeout(receiveTimeout)
 
+  override def postStop() =
+    poller.cancel()
+  
   def receive = LoggingReceive {
     case PollRemoteBox => pollRemoteBox
   }
