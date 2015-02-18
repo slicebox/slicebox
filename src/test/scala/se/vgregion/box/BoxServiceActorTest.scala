@@ -59,7 +59,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
     "create inbox entry for first file in transaction" in {
       db.withSession { implicit session =>
       
-        val remoteBox = boxDao.insertBox(Box(-1, "some remote box", "abc", "https://someurl.com", BoxSendMethod.POLL))
+        val remoteBox = boxDao.insertBox(Box(-1, "some remote box", "abc", "https://someurl.com", BoxSendMethod.POLL, false))
         
         boxServiceActorRef ! UpdateInbox(remoteBox.token, 123, 1, 2)
         
@@ -81,7 +81,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
     "inbox entry is updated for next file in transaction" in {
       db.withSession { implicit session =>
       
-        val remoteBox = boxDao.insertBox(Box(-1, "some remote box", "abc", "https://someurl.com", BoxSendMethod.POLL))
+        val remoteBox = boxDao.insertBox(Box(-1, "some remote box", "abc", "https://someurl.com", BoxSendMethod.POLL, false))
         
         boxServiceActorRef ! UpdateInbox(remoteBox.token, 123, 1, 3)
         expectMsg(InboxUpdated(remoteBox.token, 123, 1, 3))
@@ -104,7 +104,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
     
     "returns OuboxEmpty for poll message when outbox is empty" in {
       db.withSession { implicit session =>
-        val remoteBox = boxDao.insertBox(Box(-1, "some remote box", "abc", "https://someurl.com", BoxSendMethod.POLL))
+        val remoteBox = boxDao.insertBox(Box(-1, "some remote box", "abc", "https://someurl.com", BoxSendMethod.POLL, false))
         
         boxServiceActorRef ! PollOutbox(remoteBox.token)
         
@@ -114,7 +114,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
 
     "returns first outbox entry when receiving poll message" in {
       db.withSession { implicit session =>
-        val remoteBox = boxDao.insertBox(Box(-1, "some remote box", "abc", "https://someurl.com", BoxSendMethod.POLL))
+        val remoteBox = boxDao.insertBox(Box(-1, "some remote box", "abc", "https://someurl.com", BoxSendMethod.POLL, false))
         boxDao.insertOutboxEntry(OutboxEntry(-1, remoteBox.id, 987, 1, 2, 123, false))
         
         boxServiceActorRef ! PollOutbox(remoteBox.token)

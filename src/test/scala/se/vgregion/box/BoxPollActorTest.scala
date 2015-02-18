@@ -50,7 +50,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
   val remoteBoxBaseUrl = "https://someurl.com"
   var remoteBox: Box = null
   db.withSession { implicit session =>
-    remoteBox = boxDao.insertBox(Box(-1, "some remote box", "abc", remoteBoxBaseUrl, BoxSendMethod.PUSH))
+    remoteBox = boxDao.insertBox(Box(-1, "some remote box", "abc", remoteBoxBaseUrl, BoxSendMethod.PUSH, false))
   }
 
   val notFoundResponse = HttpResponse(NotFound)

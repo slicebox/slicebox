@@ -44,7 +44,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
     dicomMetaDataDao.create
   }
   
-  val testBox = Box(1, "Test Box", "abc123", "testbox.com", BoxSendMethod.PUSH)
+  val testBox = Box(1, "Test Box", "abc123", "testbox.com", BoxSendMethod.PUSH, false)
   
   val testTransactionId = 888
   val testTransactionId2 = 999
