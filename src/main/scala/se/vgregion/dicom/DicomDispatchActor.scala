@@ -15,6 +15,7 @@ import se.vgregion.dicom.directory.DirectoryWatchServiceActor
 import se.vgregion.dicom.scp.ScpServiceActor
 import se.vgregion.dicom.DicomProtocol.AddDataset
 import se.vgregion.dicom.DicomProtocol.GetImageFiles
+import se.vgregion.dicom.DicomProtocol.GetImageFilesForSeries
 
 class DicomDispatchActor(storage: Path, dbProps: DbProps) extends Actor {
   val log = Logging(context.system, this)
@@ -44,7 +45,9 @@ class DicomDispatchActor(storage: Path, dbProps: DbProps) extends Actor {
       
     case msg: GetImageFiles =>
       storageActor forward msg
-      
+
+    case msg: GetImageFilesForSeries =>
+      storageActor forward msg
   }
 
 }
