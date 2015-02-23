@@ -40,7 +40,7 @@ trait JsonFormats extends DefaultJsonProtocol {
   
   implicit val generateBoxBaseUrlFormat = jsonFormat1(GenerateBoxBaseUrl)
 
-  implicit val addScpDataFormat = jsonFormat1(AddScp)
+  implicit val addScpDataFormat = jsonFormat3(AddScp)
 
   implicit object RoleFormat extends JsonFormat[Role] {
     def write(obj: Role) = JsString(obj.toString)

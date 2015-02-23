@@ -19,10 +19,10 @@ class ScpServiceActor(dbProps: DbProps, storage: Path) extends Actor with Except
   val db = dbProps.db
   val dao = new ScpDataDAO(dbProps.driver)
 
+  val executor = Executors.newCachedThreadPool()
+  
   setupDb()
   setupScps()
-
-  val executor = Executors.newCachedThreadPool()
 
   override def postStop() {
     executor.shutdown()
@@ -36,18 +36,18 @@ class ScpServiceActor(dbProps: DbProps, storage: Path) extends Actor with Except
       
         msg match {
 
-          case AddScp(scpData) =>
-            val id = scpDataToId(scpData)
+          case AddScp(name, aeTitle, port) =>
+            val id = scpDataToId(name, aeTitle, port)
             context.child(id) match {
               case Some(actor) =>
-                sender ! ScpAdded(scpData)
+                sender ! ScpAdded(name)
               case None =>
 
-                addScp(scpData)
+                addScp(name, aeTitle, port)
 
-                context.actorOf(ScpActor.props(scpData, executor), id)
+                context.actorOf(ScpActor.props(name, aeTitle, port, executor), id)
 
-                sender ! ScpAdded(scpData)
+                sender ! ScpAdded(name)
 
             }
 
@@ -60,7 +60,7 @@ class ScpServiceActor(dbProps: DbProps, storage: Path) extends Actor with Except
                   dao.deleteScpDataWithId(scpDataId)
                 }
 
-                val id = scpDataToId(scpData)
+                val id = scpDataToId(scpData.name, scpData.aeTitle, scpData.port)
                 context.child(id) match {
                   case Some(actor) =>
 
@@ -90,11 +90,11 @@ class ScpServiceActor(dbProps: DbProps, storage: Path) extends Actor with Except
 
   }
 
-  def scpDataToId(scpData: ScpData) = scpData.name
+  def scpDataToId(name: String, aeTitle: String, port: Int) = name
 
-  def addScp(scpData: ScpData) =
+  def addScp(name: String, aeTitle: String, port: Int) =
     db.withSession { implicit session =>
-      dao.insert(scpData)
+      dao.insert(name, aeTitle, port)
     }
 
   def removeScp(scpData: ScpData) =
@@ -115,7 +115,7 @@ class ScpServiceActor(dbProps: DbProps, storage: Path) extends Actor with Except
   def setupScps() =
     db.withTransaction { implicit session =>
       val scps = dao.allScpDatas
-      scps foreach (scpData => context.actorOf(ScpActor.props(scpData, executor), scpDataToId(scpData)))
+      scps foreach (scpData => context.actorOf(ScpActor.props(scpData.name, scpData.aeTitle, scpData.port, executor), scpDataToId(scpData.name, scpData.aeTitle, scpData.port)))
     }
 
 }

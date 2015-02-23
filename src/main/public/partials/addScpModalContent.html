@@ -1,0 +1,18 @@
+<div class="modal-header">
+    <h3 class="modal-title">Add Dicom SCP</h3>
+</div>
+<div class="modal-body">
+    <div class="form-group">
+        <input type="text" ng-model="name" class="form-control" placeholder="Name"></input>
+    </div>
+    <div class="form-group">
+        <input type="text" ng-model="aeTitle" class="form-control" placeholder="AE-Title"></input>
+    </div>
+    <div class="form-group">
+        <input type="number" ng-model="port" class="form-control" placeholder="Port"></input>
+    </div>
+</div>
+<div class="modal-footer">
+    <button class="btn btn-primary" ng-click="addButtonClicked()" ng-disabled="!(name && aeTitle && port)">Add</button>
+    <button class="btn btn-default" ng-click="cancelButtonClicked()">Cancel</button>
+</div>

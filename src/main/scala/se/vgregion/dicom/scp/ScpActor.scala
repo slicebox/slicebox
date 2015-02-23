@@ -12,7 +12,7 @@ import akka.event.Logging
 import akka.event.LoggingReceive
 import se.vgregion.dicom.DicomProtocol._
 
-class ScpActor(scpData: ScpData, executor: Executor) extends Actor {
+class ScpActor(name: String, aeTitle: String, port: Int, executor: Executor) extends Actor {
   val log = Logging(context.system, this)
 
   val scheduledExecutor = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
@@ -23,14 +23,16 @@ class ScpActor(scpData: ScpData, executor: Executor) extends Actor {
     }
   })
 
-  val scp = new Scp(scpData.name, scpData.aeTitle, scpData.port, self)
+  val scp = new Scp(name, aeTitle, port, self)
   scp.device.setScheduledExecutor(scheduledExecutor)
   scp.device.setExecutor(executor)
   scp.device.bindConnections()
+  log.info(s"Started SCP $name with AE title $aeTitle on port $port")
 
   override def postStop() {
     scp.device.unbindConnections()
     scheduledExecutor.shutdown()
+    log.info(s"Stopped SCP $name")
   }
 
   def receive = LoggingReceive {
@@ -41,5 +43,5 @@ class ScpActor(scpData: ScpData, executor: Executor) extends Actor {
 }
 
 object ScpActor {
-  def props(scpData: ScpData, executor: Executor): Props = Props(new ScpActor(scpData, executor))
+  def props(name: String, aeTitle: String, port: Int, executor: Executor): Props = Props(new ScpActor(name, aeTitle, port, executor))
 }

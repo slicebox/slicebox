@@ -127,8 +127,8 @@ trait RestApi extends HttpService with JsonFormats {
     pathPrefix("scp") {
       post {
         pathEnd {
-          entity(as[ScpData]) { scpData =>
-            onSuccess(dicomService.ask(AddScp(scpData))) {
+          entity(as[AddScp]) { addScp =>
+            onSuccess(dicomService.ask(addScp)) {
               case ScpAdded(scpData) =>
                 complete("Added SCP " + scpData.name)
             }

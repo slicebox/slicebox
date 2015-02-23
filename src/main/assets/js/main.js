@@ -10,6 +10,7 @@ angular.module('slicebox', [
     'slicebox.home',
     'slicebox.inbox',
     'slicebox.outbox',
+    'slicebox.adminScps',
     'slicebox.adminWatchDirectories',
     'slicebox.adminBoxes'
 ]).
