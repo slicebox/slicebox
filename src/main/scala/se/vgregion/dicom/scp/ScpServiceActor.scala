@@ -37,15 +37,16 @@ class ScpServiceActor(dbProps: DbProps, storage: Path) extends Actor with Except
         msg match {
 
           case AddScp(name, aeTitle, port) =>
-            val id = scpDataToId(name, aeTitle, port)
+            val scpData = ScpData(-1, name, aeTitle, port)
+            val id = scpDataToId(scpData)
             context.child(id) match {
               case Some(actor) =>
                 sender ! ScpAdded(name)
               case None =>
 
-                addScp(name, aeTitle, port)
+                addScp(scpData)
 
-                context.actorOf(ScpActor.props(name, aeTitle, port, executor), id)
+                context.actorOf(ScpActor.props(scpData, executor), id)
 
                 sender ! ScpAdded(name)
 
@@ -60,7 +61,7 @@ class ScpServiceActor(dbProps: DbProps, storage: Path) extends Actor with Except
                   dao.deleteScpDataWithId(scpDataId)
                 }
 
-                val id = scpDataToId(scpData.name, scpData.aeTitle, scpData.port)
+                val id = scpDataToId(scpData)
                 context.child(id) match {
                   case Some(actor) =>
 
@@ -90,11 +91,11 @@ class ScpServiceActor(dbProps: DbProps, storage: Path) extends Actor with Except
 
   }
 
-  def scpDataToId(name: String, aeTitle: String, port: Int) = name
+  def scpDataToId(scpData: ScpData) = scpData.name
 
-  def addScp(name: String, aeTitle: String, port: Int) =
+  def addScp(scpData: ScpData) =
     db.withSession { implicit session =>
-      dao.insert(name, aeTitle, port)
+      dao.insert(scpData)
     }
 
   def removeScp(scpData: ScpData) =
@@ -115,7 +116,7 @@ class ScpServiceActor(dbProps: DbProps, storage: Path) extends Actor with Except
   def setupScps() =
     db.withTransaction { implicit session =>
       val scps = dao.allScpDatas
-      scps foreach (scpData => context.actorOf(ScpActor.props(scpData.name, scpData.aeTitle, scpData.port, executor), scpDataToId(scpData.name, scpData.aeTitle, scpData.port)))
+      scps foreach (scpData => context.actorOf(ScpActor.props(scpData, executor), scpDataToId(scpData)))
     }
 
 }

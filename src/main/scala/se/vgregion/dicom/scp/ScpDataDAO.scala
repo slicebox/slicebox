@@ -23,8 +23,7 @@ class ScpDataDAO(val driver: JdbcProfile) {
     }
   
   
-  def insert(name: String, aeTitle: String, port: Int)(implicit session: Session): ScpData = {
-    val scpData = ScpData(-1, name, aeTitle, port)
+  def insert(scpData: ScpData)(implicit session: Session): ScpData = {
     val generatedId = (scpDataQuery returning scpDataQuery.map(_.id)) += scpData
     scpData.copy(id = generatedId)
   }
