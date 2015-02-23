@@ -11,3 +11,4 @@ project/activator*
 /storage
 /storage.h2.db
 /storage.trace.db
+/storage.lock.db
