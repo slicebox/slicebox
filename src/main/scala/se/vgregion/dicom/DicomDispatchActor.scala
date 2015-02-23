@@ -14,7 +14,7 @@ import se.vgregion.dicom.DicomProtocol.ScpRequest
 import se.vgregion.dicom.directory.DirectoryWatchServiceActor
 import se.vgregion.dicom.scp.ScpServiceActor
 import se.vgregion.dicom.DicomProtocol.AddDataset
-import se.vgregion.dicom.DicomProtocol.GetImageFiles
+import se.vgregion.dicom.DicomProtocol.GetImageFile
 import se.vgregion.dicom.DicomProtocol.GetImageFilesForSeries
 
 class DicomDispatchActor(storage: Path, dbProps: DbProps) extends Actor {
@@ -43,7 +43,7 @@ class DicomDispatchActor(storage: Path, dbProps: DbProps) extends Actor {
     case msg: AddDataset =>
       storageActor forward msg
       
-    case msg: GetImageFiles =>
+    case msg: GetImageFile =>
       storageActor forward msg
 
     case msg: GetImageFilesForSeries =>

@@ -30,7 +30,7 @@ angular.module('slicebox.adminScps', ['ngRoute'])
   
     // Scope functions
     $scope.loadScpsPage = function(startIndex, count, orderByProperty, orderByDirection) {
-        return $http.get('/api/scp/list');
+        return $http.get('/api/scps');
     };
 
     $scope.addScpButtonClicked = function() {
@@ -44,7 +44,7 @@ angular.module('slicebox.adminScps', ['ngRoute'])
             $scope.uiState.errorMessage = null;
             $scope.uiState.addDirectoryInProgress = true;
 
-            var addScpPromise = $http.post('/api/scp', scp);
+            var addScpPromise = $http.post('/api/scps', scp);
             addScpPromise.error(function(data) {
                 $scope.uiState.errorMessage = data;
             });
@@ -68,7 +68,7 @@ angular.module('slicebox.adminScps', ['ngRoute'])
         $scope.uiState.errorMessage = null;
 
         angular.forEach(scpObjects, function(scpObject) {
-            removePromise = $http.delete('/api/scp/' + scpObject.id);
+            removePromise = $http.delete('/api/scps/' + scpObject.id);
             removePromises.push(removePromise);
         });
 

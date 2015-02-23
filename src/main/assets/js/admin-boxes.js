@@ -29,7 +29,7 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
   
     // Scope functions
     $scope.loadBoxesPage = function(startIndex, count, orderByProperty, orderByDirection) {
-        return $http.get('/api/box');
+        return $http.get('/api/boxes');
     };
 
     $scope.connectButtonClicked = function() {
@@ -42,7 +42,7 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
             $scope.uiState.errorMessage = null;
             $scope.uiState.connectInProgress = true;
 
-            var connectPromise = $http.post('/api/box/addremotebox',
+            var connectPromise = $http.post('/api/boxes/addremotebox',
                 {
                     name: remoteBoxName,
                     baseUrl: $scope.remoteBoxBaseURL
@@ -74,7 +74,7 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
             $scope.uiState.errorMessage = null;
             $scope.uiState.generateURLInProgress = true;
 
-            var generateURLPromise = $http.post('/api/box/generatebaseurl', {value: remoteBoxName});
+            var generateURLPromise = $http.post('/api/boxes/generatebaseurl', {value: remoteBoxName});
 
             generateURLPromise.success(function(data) {
                 showBaseURLDialog(data.value);
@@ -99,7 +99,7 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
         $scope.uiState.errorMessage = null;
 
         angular.forEach(boxes, function(box) {
-            deletePromise = $http.delete('/api/box/' + box.id);
+            deletePromise = $http.delete('/api/boxes/' + box.id);
             deletePromises.push(deletePromise);
         });
 

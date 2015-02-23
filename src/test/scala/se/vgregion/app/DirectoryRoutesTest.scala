@@ -32,19 +32,19 @@ class DirectoryRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   }
 
   "The system" should "return a monitoring message when asked to watch a new directory" in {
-    Post("/api/directory", watchDir) ~> routes ~> check {
+    Post("/api/directorywatches", watchDir) ~> routes ~> check {
       responseAs[String] should be(s"Now watching directory $tempDir")
     }
   }
 
   it should "respond with BadRequest when asking to watch a path which is not a directory" in {
-    Post("/api/directory", watchFile) ~> routes ~> check {
+    Post("/api/directorywatches", watchFile) ~> routes ~> check {
       status should be(BadRequest)
     }
   }
 
   it should "respond with BadRequest when asking to watch the storage directory" in {
-    Post("/api/directory", watchStorage) ~> routes ~> check {
+    Post("/api/directorywatches", watchStorage) ~> routes ~> check {
       status should be(BadRequest)
     }
   }
@@ -86,14 +86,14 @@ class DirectoryRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   }
 
   it should "return a list of one directory when listing watched directories" in {
-    Get("/api/directory/list") ~> routes ~> check {
+    Get("/api/directorywatches") ~> routes ~> check {
       responseAs[List[WatchedDirectory]].size should be (1)
     }
   }
 
   it should "be possible to remove a watched directory" in {
     // TODO: this doesn't test that the watched directory is actually removed from db and that actor is stopped, it only tests that the request can be handled
-    Delete("/api/directory/1", watchDir) ~> routes ~> check {
+    Delete("/api/directorywatches/1", watchDir) ~> routes ~> check {
       responseAs[String] should be ("Stopped watching directory 1")
     }
   }

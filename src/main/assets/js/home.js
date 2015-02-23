@@ -135,7 +135,7 @@ angular.module('slicebox.home', ['ngRoute'])
 
     // Scope functions
     $scope.loadBoxesPage = function(startIndex, count, orderByProperty, orderByDirection) {
-        return $http.get('/api/box');
+        return $http.get('/api/boxes');
     };
 
     $scope.boxSelected = function(box) {
@@ -154,7 +154,7 @@ angular.module('slicebox.home', ['ngRoute'])
         $scope.uiState.sendInProgress = true;
 
         angular.forEach($scope.imageFiles, function(imageFile) {
-            sendPromise = $http.post('/api/box/' + $scope.uiState.selectedReceiver.id + '/sendimage',
+            sendPromise = $http.post('/api/boxes/' + $scope.uiState.selectedReceiver.id + '/sendimage',
                 {
                     value: imageFile.id
                 });

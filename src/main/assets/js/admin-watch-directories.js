@@ -30,7 +30,7 @@ angular.module('slicebox.adminWatchDirectories', ['ngRoute'])
   
     // Scope functions
     $scope.loadWatchDirectoriesPage = function(startIndex, count, orderByProperty, orderByDirection) {
-        return $http.get('/api/directory/list');
+        return $http.get('/api/directorywatches');
     };
 
     $scope.addDirectoryButtonClicked = function() {
@@ -44,7 +44,7 @@ angular.module('slicebox.adminWatchDirectories', ['ngRoute'])
             $scope.uiState.errorMessage = null;
             $scope.uiState.addDirectoryInProgress = true;
 
-            var addDirectoryPromise = $http.post('/api/directory', {pathString: path});
+            var addDirectoryPromise = $http.post('/api/directorywatches', {pathString: path});
             addDirectoryPromise.error(function(data) {
                 $scope.uiState.errorMessage = data;
             });
@@ -68,7 +68,7 @@ angular.module('slicebox.adminWatchDirectories', ['ngRoute'])
         $scope.uiState.errorMessage = null;
 
         angular.forEach(pathObjects, function(pathObject) {
-            unwatchPromise = $http.delete('/api/directory/' + pathObject.id);
+            unwatchPromise = $http.delete('/api/directorywatches/' + pathObject.id);
             unwatchPromises.push(unwatchPromise);
         });
 

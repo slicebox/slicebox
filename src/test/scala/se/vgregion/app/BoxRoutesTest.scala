@@ -23,14 +23,14 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   def dbUrl() = "jdbc:h2:mem:boxroutestest;DB_CLOSE_DELAY=-1"
 
   "The system" should "return a success message when asked to generate a new base url" in {
-    Post("/api/box/generatebaseurl", RemoteBoxName("hosp")) ~> routes ~> check {
+    Post("/api/boxes/generatebaseurl", RemoteBoxName("hosp")) ~> routes ~> check {
       status should be(OK)
       responseAs[BoxBaseUrl].value.isEmpty should be(false)
     }
   }
 
   it should "return a success message when asked to add a remote box" in {
-    Post("/api/box/addremotebox", RemoteBox("uni", "http://uni.edu/box/" + UUID.randomUUID())) ~> routes ~> check {
+    Post("/api/boxes/addremotebox", RemoteBox("uni", "http://uni.edu/box/" + UUID.randomUUID())) ~> routes ~> check {
       status should be(OK)
       val box = responseAs[Box]
       box.sendMethod should be(BoxSendMethod.PUSH)
@@ -39,26 +39,26 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   }
 
   it should "return a bad request message when asked to add a remote box with a malformed base url" in {
-    Post("/api/box/addremotebox", RemoteBox("uni2", "")) ~> routes ~> check {
+    Post("/api/boxes/addremotebox", RemoteBox("uni2", "")) ~> routes ~> check {
       status should be(BadRequest)
     }
-    Post("/api/box/addremotebox", RemoteBox("uni2", "malformed/url")) ~> routes ~> check {
+    Post("/api/boxes/addremotebox", RemoteBox("uni2", "malformed/url")) ~> routes ~> check {
       status should be(BadRequest)
     }
   }
 
   it should "return a list of two boxes when listing boxes" in {
-    Get("/api/box") ~> routes ~> check {
+    Get("/api/boxes") ~> routes ~> check {
       val boxes = responseAs[List[Box]]
       boxes.size should be(2)
     }
   }
 
   it should "support removing a box" in {
-    Delete("/api/box/1") ~> routes ~> check {
+    Delete("/api/boxes/1") ~> routes ~> check {
       status should be(NoContent)
     }
-    Delete("/api/box/2") ~> routes ~> check {
+    Delete("/api/boxes/2") ~> routes ~> check {
       status should be(NoContent)
     }
   }
@@ -67,7 +67,7 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
     // first, add a box on the poll (university) side
     val uniUrl =
-      Post("/api/box/generatebaseurl", RemoteBoxName("hosp")) ~> routes ~> check {
+      Post("/api/boxes/generatebaseurl", RemoteBoxName("hosp")) ~> routes ~> check {
         status should be(OK)
         responseAs[BoxBaseUrl]
       }
@@ -84,7 +84,7 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     val sequenceNumber = 1L
     val totalImageCount = 1L
     
-    Post(s"/api/box/$token/image/$testTransactionId/$sequenceNumber/$totalImageCount", HttpData(dcmFile)) ~> routes ~> check {
+    Post(s"/api/boxes/$token/image/$testTransactionId/$sequenceNumber/$totalImageCount", HttpData(dcmFile)) ~> routes ~> check {
       status should be(NoContent)
     }
   }
@@ -92,7 +92,7 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   it should "return not found when polling empty outbox" in {
     // first, add a box on the poll (university) side
     val uniUrl =
-      Post("/api/box/generatebaseurl", RemoteBoxName("hosp2")) ~> routes ~> check {
+      Post("/api/boxes/generatebaseurl", RemoteBoxName("hosp2")) ~> routes ~> check {
         status should be(OK)
         responseAs[BoxBaseUrl]
       }
@@ -100,7 +100,7 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     // get the token from the url
     val token = uniUrl.value.substring(uniUrl.value.lastIndexOf("/") + 1)
     
-    Get(s"/api/box/$token/outbox/poll") ~> routes ~> check {
+    Get(s"/api/boxes/$token/outbox/poll") ~> routes ~> check {
       status should be(NotFound)
     }
   }
@@ -108,7 +108,7 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   it should "return OutboxEntry when polling non empty outbox" in {
     // first, add a box on the poll (university) side
     val uniUrl =
-      Post("/api/box/generatebaseurl", RemoteBoxName("hosp3")) ~> routes ~> check {
+      Post("/api/boxes/generatebaseurl", RemoteBoxName("hosp3")) ~> routes ~> check {
         status should be(OK)
         responseAs[BoxBaseUrl]
       }
@@ -118,19 +118,19 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     
     // find the newly added box
     val remoteBox =
-      Get("/api/box") ~> routes ~> check {
+      Get("/api/boxes") ~> routes ~> check {
         val boxes = responseAs[List[Box]]
         boxes.filter(_.token == token).toList(0)
       }
     
     // send image which adds outbox entry
     val imageId = 987
-    Post(s"/api/box/${remoteBox.id}/sendimage", ImageId(imageId)) ~> routes ~> check {
+    Post(s"/api/boxes/${remoteBox.id}/sendimage", ImageId(imageId)) ~> routes ~> check {
       status should be(NoContent)
     }
 
     // poll outbox
-    Get(s"/api/box/$token/outbox/poll") ~> routes ~> check {
+    Get(s"/api/boxes/$token/outbox/poll") ~> routes ~> check {
       status should be(OK)
       
       val outboxEntry = responseAs[OutboxEntry]
@@ -153,7 +153,7 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     
     // first, add a box on the poll (university) side
     val uniUrl =
-      Post("/api/box/generatebaseurl", RemoteBoxName("hosp4")) ~> routes ~> check {
+      Post("/api/boxes/generatebaseurl", RemoteBoxName("hosp4")) ~> routes ~> check {
         status should be(OK)
         responseAs[BoxBaseUrl]
       }
@@ -163,27 +163,27 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     
     // find the newly added box
     val remoteBox =
-      Get("/api/box") ~> routes ~> check {
+      Get("/api/boxes") ~> routes ~> check {
         val boxes = responseAs[List[Box]]
         boxes.filter(_.token == token).toList(0)
       }
       
     // send image which adds outbox entry
     val imageId = 1
-    Post(s"/api/box/${remoteBox.id}/sendimage", ImageId(imageId)) ~> routes ~> check {
+    Post(s"/api/boxes/${remoteBox.id}/sendimage", ImageId(imageId)) ~> routes ~> check {
       status should be(NoContent)
     }
     
     // poll outbox
     val outboxEntry =
-      Get(s"/api/box/$token/outbox/poll") ~> routes ~> check {
+      Get(s"/api/boxes/$token/outbox/poll") ~> routes ~> check {
         status should be(OK)
         
         responseAs[OutboxEntry]
       }
     
     // get image
-    Get(s"/api/box/$token/outbox?transactionId=${outboxEntry.transactionId}&sequenceNumber=1") ~> routes ~> check {
+    Get(s"/api/boxes/$token/outbox?transactionId=${outboxEntry.transactionId}&sequenceNumber=1") ~> routes ~> check {
       status should be(OK)
       
       contentType should be (ContentTypes.`application/octet-stream`)  
@@ -202,7 +202,7 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     
     // first, add a box on the poll (university) side
     val uniUrl =
-      Post("/api/box/generatebaseurl", RemoteBoxName("hosp5")) ~> routes ~> check {
+      Post("/api/boxes/generatebaseurl", RemoteBoxName("hosp5")) ~> routes ~> check {
         status should be(OK)
         responseAs[BoxBaseUrl]
       }
@@ -212,32 +212,32 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     
     // find the newly added box
     val remoteBox =
-      Get("/api/box") ~> routes ~> check {
+      Get("/api/boxes") ~> routes ~> check {
         val boxes = responseAs[List[Box]]
         boxes.filter(_.token == token).toList(0)
       }
       
     // send image which adds outbox entry
     val imageId = 1
-    Post(s"/api/box/${remoteBox.id}/sendimage", ImageId(imageId)) ~> routes ~> check {
+    Post(s"/api/boxes/${remoteBox.id}/sendimage", ImageId(imageId)) ~> routes ~> check {
       status should be(NoContent)
     }
     
     // poll outbox
     val outboxEntry =
-      Get(s"/api/box/$token/outbox/poll") ~> routes ~> check {
+      Get(s"/api/boxes/$token/outbox/poll") ~> routes ~> check {
         status should be(OK)
         
         responseAs[OutboxEntry]
       }
       
     // send done
-    Post(s"/api/box/$token/outbox/done", outboxEntry) ~> routes ~> check {
+    Post(s"/api/boxes/$token/outbox/done", outboxEntry) ~> routes ~> check {
       status should be(NoContent)
     }
     
     // poll outbox to check that outbox is empty
-    Get(s"/api/box/$token/outbox/poll") ~> routes ~> check {
+    Get(s"/api/boxes/$token/outbox/poll") ~> routes ~> check {
       status should be(NotFound)
     }
   }

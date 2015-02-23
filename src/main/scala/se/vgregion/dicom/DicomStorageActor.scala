@@ -126,10 +126,15 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
         }
       }
 
-    case GetImageFiles(imageId) =>
+    case GetImageFile(imageId) =>
       catchAndReport {
         db.withSession { implicit session =>
-          sender ! ImageFiles(dao.imageFileForImage(imageId).toList)
+          dao.imageFileForImage(imageId) match {
+            case Some(imageFile) =>
+              sender ! imageFile
+            case None =>
+              throw new IllegalArgumentException(s"No file found for image $imageId")
+          }
         }
       }
 

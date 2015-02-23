@@ -38,7 +38,7 @@ object DicomProtocol {
 
   case object GetWatchedDirectories extends DirectoryRequest
     
-  case class WatchedDirectories(names: Seq[WatchedDirectory])
+  case class WatchedDirectories(directories: Seq[WatchedDirectory])
 
   
   
@@ -48,9 +48,9 @@ object DicomProtocol {
 
   case class RemoveScp(id: Long) extends ScpRequest 
 
-  case object GetScpDataCollection extends ScpRequest 
+  case object GetScps extends ScpRequest 
 
-  case class ScpDataCollection(scpDataCollection: Seq[ScpData]) 
+  case class Scps(scps: Seq[ScpData]) 
 
 
   sealed trait MetaDataQuery
@@ -79,7 +79,7 @@ object DicomProtocol {
   
   case object GetAllImageFiles
 
-  case class GetImageFiles(imageId: Long)
+  case class GetImageFile(imageId: Long)
 
   case class GetImageFilesForSeries(seriesId: Long)
   
@@ -125,7 +125,7 @@ object DicomProtocol {
   // ***from storage***
 
   case class ImageFiles(imageFiles: Seq[ImageFile])
-  
+    
   case class ImageFilesDeleted(imageFiles: Seq[ImageFile])
 
 }

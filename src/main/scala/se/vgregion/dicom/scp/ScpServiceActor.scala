@@ -79,9 +79,9 @@ class ScpServiceActor(dbProps: DbProps, storage: Path) extends Actor with Except
                 sender ! ScpRemoved(scpDataId)
             }
 
-          case GetScpDataCollection =>
+          case GetScps =>
             val scps = getScps()
-            sender ! ScpDataCollection(scps)
+            sender ! Scps(scps)
 
         }
       }

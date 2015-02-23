@@ -96,37 +96,40 @@ trait RestApi extends HttpService with JsonFormats {
     }
 
   def directoryRoutes: Route =
-    pathPrefix("directory") {
-      post {
-        entity(as[WatchDirectory]) { directory =>
-          onSuccess(dicomService.ask(directory)) {
-            case DirectoryWatched(path) =>
-              complete("Now watching directory " + path)
+    pathPrefix("directorywatches") {
+      pathEnd {
+        get {
+          onSuccess(dicomService.ask(GetWatchedDirectories)) {
+            case WatchedDirectories(directories) =>
+              complete(directories)
           }
-        }
-      } ~ path(LongNumber) { watchDirectoryId =>
-        pathEnd {
-          delete {
-            onSuccess(dicomService.ask(UnWatchDirectory(watchDirectoryId))) {
-              case DirectoryUnwatched(watchedDirectoryId) =>
-                complete("Stopped watching directory " + watchedDirectoryId)
+        } ~ post {
+          entity(as[WatchDirectory]) { directory =>
+            onSuccess(dicomService.ask(directory)) {
+              case DirectoryWatched(path) =>
+                complete("Now watching directory " + path)
             }
           }
         }
-      } ~ get {
-        path("list") {
-          onSuccess(dicomService.ask(GetWatchedDirectories)) {
-            case WatchedDirectories(list) =>
-              complete(list)
+      } ~ path(LongNumber) { watchDirectoryId =>
+        delete {
+          onSuccess(dicomService.ask(UnWatchDirectory(watchDirectoryId))) {
+            case DirectoryUnwatched(watchedDirectoryId) =>
+              complete("Stopped watching directory " + watchedDirectoryId)
           }
         }
       }
     }
 
   def scpRoutes: Route =
-    pathPrefix("scp") {
-      post {
-        pathEnd {
+    pathPrefix("scps") {
+      pathEnd {
+        get {
+          onSuccess(dicomService.ask(GetScps)) {
+            case Scps(scps) =>
+              complete(scps)
+          }
+        } ~ post {
           entity(as[AddScp]) { addScp =>
             onSuccess(dicomService.ask(addScp)) {
               case ScpAdded(scpData) =>
@@ -135,21 +138,10 @@ trait RestApi extends HttpService with JsonFormats {
           }
         }
       } ~ path(LongNumber) { scpDataId =>
-        pathEnd {
-          delete {
-            pathEnd {
-              onSuccess(dicomService.ask(RemoveScp(scpDataId))) {
-                case ScpRemoved(scpDataId) =>
-                  complete("Removed SCP " + scpDataId)
-              }
-            }
-          }
-        }
-      } ~ get {
-        path("list") {
-          onSuccess(dicomService.ask(GetScpDataCollection)) {
-            case ScpDataCollection(list) =>
-              complete(list)
+        delete {
+          onSuccess(dicomService.ask(RemoveScp(scpDataId))) {
+            case ScpRemoved(scpDataId) =>
+              complete("Removed SCP " + scpDataId)
           }
         }
       }
@@ -202,10 +194,9 @@ trait RestApi extends HttpService with JsonFormats {
   }
 
   def datasetRoutes: Route =
-    pathPrefix("dataset") {
-      post {
-        pathEnd {
-          // TODO allow with token
+    pathPrefix("datasets") {
+      pathEnd {
+        post {
           formField('file.as[FormFile]) { file =>
             val dataset = DicomUtil.loadDataset(file.entity.data.toByteArray, true)
             onSuccess(dicomService.ask(AddDataset(dataset))) {
@@ -214,30 +205,24 @@ trait RestApi extends HttpService with JsonFormats {
             }
           }
         }
-      } ~ get {
-        path(LongNumber) { imageId =>
-
-          onSuccess(dicomService.ask(GetImageFiles(imageId))) {
-            case ImageFiles(imageFiles) =>
-              imageFiles.headOption match {
-                case Some(imageFile) =>
-                  val file = storage.resolve(imageFile.fileName.value).toFile
-                  if (file.isFile && file.canRead)
-                    detach() {
-                      complete(HttpEntity(ContentTypes.`application/octet-stream`, HttpData(file)))
-                    }
-                  else
-                    complete((BadRequest, "Dataset could not be read"))
-                case None =>
-                  complete((BadRequest, "Dataset not found"))
-              }
+      } ~ path(LongNumber) { imageId =>
+        get {
+          onSuccess(dicomService.ask(GetImageFile(imageId))) {
+            case imageFile: ImageFile =>
+              val file = storage.resolve(imageFile.fileName.value).toFile
+              if (file.isFile && file.canRead)
+                detach() {
+                  complete(HttpEntity(ContentTypes.`application/octet-stream`, HttpData(file)))
+                }
+              else
+                complete((BadRequest, "Dataset could not be read"))
           }
         }
       }
     }
 
   def boxRoutes: Route =
-    pathPrefix("box") {
+    pathPrefix("boxes") {
       pathEnd {
         get {
           onSuccess(boxService.ask(GetBoxes)) {
@@ -290,86 +275,52 @@ trait RestApi extends HttpService with JsonFormats {
   def tokenRoutes: Route =
     pathPrefix(Segment) { token =>
 
-      pathPrefix("dataset") {
-        path(LongNumber) { imageId =>
-          pathEnd {
-            get {
-              onSuccess(boxService.ask(ValidateToken(token))) {
-                case InvalidToken(token) =>
-                  complete((Forbidden, "Invalid token"))
-                case ValidToken(token) => {
-                  onSuccess(dicomService.ask(GetImageFiles(imageId))) {
-                    case ImageFiles(imageFiles) =>
-                      imageFiles.headOption match {
-                        case Some(imageFile) =>
-                          val file = storage.resolve(imageFile.fileName.value).toFile
-                          if (file.isFile && file.canRead)
-                            detach() {
-                              complete(HttpEntity(ContentTypes.`application/octet-stream`, HttpData(file)))
-                            }
-                          else
-                            complete((BadRequest, "Dataset could not be read"))
-                        case None =>
-                          complete((BadRequest, "Dataset not found"))
+      pathPrefix("image") {
+        path(LongNumber / LongNumber / LongNumber) { (transactionId, sequenceNumber, totalImageCount) =>
+          post {
+            onSuccess(boxService.ask(ValidateToken(token))) {
+              case InvalidToken(token) =>
+                complete((Forbidden, "Invalid token"))
+              case ValidToken(token) =>
+                entity(as[Array[Byte]]) { imageData =>
+                  val dataset = DicomUtil.loadDataset(imageData, true)
+                  onSuccess(dicomService.ask(AddDataset(dataset))) {
+                    case ImageAdded(image) =>
+                      onSuccess(boxService.ask(UpdateInbox(token, transactionId, sequenceNumber, totalImageCount))) {
+                        case msg: InboxUpdated =>
+                          complete(NoContent)
                       }
                   }
                 }
-              }
-            }
-          }
-        }
-      } ~ pathPrefix("image") {
-        path(LongNumber / LongNumber / LongNumber) { (transactionId, sequenceNumber, totalImageCount) =>
-          pathEnd {
-            post {
-              onSuccess(boxService.ask(ValidateToken(token))) {
-                case InvalidToken(token) =>
-                  complete((Forbidden, "Invalid token"))
-                case ValidToken(token) =>
-                  entity(as[Array[Byte]]) { imageData =>
-                    val dataset = DicomUtil.loadDataset(imageData, true)
-                    onSuccess(dicomService.ask(AddDataset(dataset))) {
-                      case ImageAdded(image) =>
-                        onSuccess(boxService.ask(UpdateInbox(token, transactionId, sequenceNumber, totalImageCount))) {
-                          case msg: InboxUpdated =>
-                            complete(NoContent)
-                        }
-                    }
-                  }
-              }
             }
           }
         }
       } ~ pathPrefix("outbox") {
         path("poll") {
-          pathEnd {
-            get {
-              onSuccess(boxService.ask(ValidateToken(token))) {
-                case InvalidToken(token) =>
-                  complete((Forbidden, "Invalid token"))
-                case ValidToken(token) =>
-                  onSuccess(boxService.ask(PollOutbox(token))) {
-                    case outboxEntry: OutboxEntry =>
-                      complete(outboxEntry)
-                    case OutboxEmpty =>
-                      complete(NotFound)
-                  }
-              }
+          get {
+            onSuccess(boxService.ask(ValidateToken(token))) {
+              case InvalidToken(token) =>
+                complete((Forbidden, "Invalid token"))
+              case ValidToken(token) =>
+                onSuccess(boxService.ask(PollOutbox(token))) {
+                  case outboxEntry: OutboxEntry =>
+                    complete(outboxEntry)
+                  case OutboxEmpty =>
+                    complete(NotFound)
+                }
             }
           }
         } ~ path("done") {
-          pathEnd {
-            post {
-              onSuccess(boxService.ask(ValidateToken(token))) {
-                case InvalidToken(token) =>
-                  complete((Forbidden, "Invalid token"))
-                case ValidToken(token) =>
-                  entity(as[OutboxEntry]) { outboxEntry =>
-                    onSuccess(boxService.ask(DeleteOutboxEntry(token, outboxEntry.transactionId, outboxEntry.sequenceNumber))) {
-                      case OutboxEntryDeleted => complete(NoContent)
-                    }
+          post {
+            onSuccess(boxService.ask(ValidateToken(token))) {
+              case InvalidToken(token) =>
+                complete((Forbidden, "Invalid token"))
+              case ValidToken(token) =>
+                entity(as[OutboxEntry]) { outboxEntry =>
+                  onSuccess(boxService.ask(DeleteOutboxEntry(token, outboxEntry.transactionId, outboxEntry.sequenceNumber))) {
+                    case OutboxEntryDeleted => complete(NoContent)
                   }
-              }
+                }
             }
           }
         } ~ pathEnd {
@@ -377,21 +328,15 @@ trait RestApi extends HttpService with JsonFormats {
             parameters('transactionId.as[Long], 'sequenceNumber.as[Long]) { (transactionId, sequenceNumber) =>
               onSuccess(boxService.ask(GetOutboxEntry(token, transactionId, sequenceNumber))) {
                 case outboxEntry: OutboxEntry =>
-                  onSuccess(dicomService.ask(GetImageFiles(outboxEntry.imageId))) {
-                    // TODO: this is duplicate code
-                    case ImageFiles(imageFiles) =>
-                      imageFiles.headOption match {
-                        case Some(imageFile) =>
-                          val file = storage.resolve(imageFile.fileName.value).toFile
-                          if (file.isFile && file.canRead)
-                            detach() {
-                              complete(HttpEntity(ContentTypes.`application/octet-stream`, HttpData(file)))
-                            }
-                          else
-                            complete((BadRequest, "Dataset could not be read"))
-                        case None =>
-                          complete((BadRequest, "Dataset not found"))
-                      }
+                  onSuccess(dicomService.ask(GetImageFile(outboxEntry.imageId))) {
+                    case imageFile: ImageFile =>
+                      val file = storage.resolve(imageFile.fileName.value).toFile
+                      if (file.isFile && file.canRead)
+                        detach() {
+                          complete(HttpEntity(ContentTypes.`application/octet-stream`, HttpData(file)))
+                        }
+                      else
+                        complete((BadRequest, "Dataset could not be read"))
                   }
                 case OutboxEntryNotFound =>
                   complete(NotFound)
@@ -402,7 +347,7 @@ trait RestApi extends HttpService with JsonFormats {
       }
 
     }
-  
+
   def inboxRoutes: Route =
     pathPrefix("inbox") {
       pathEnd {
@@ -414,7 +359,7 @@ trait RestApi extends HttpService with JsonFormats {
         }
       }
     }
-  
+
   def outboxRoutes: Route =
     pathPrefix("outbox") {
       pathEnd {
@@ -424,13 +369,11 @@ trait RestApi extends HttpService with JsonFormats {
               complete(entries)
           }
         }
-      }  ~ path(LongNumber) { outboxEntryId =>
-        pathEnd {
-          delete {
-            onSuccess(boxService.ask(RemoveOutboxEntry(outboxEntryId))) {
-              case OutboxEntryRemoved(outboxEntryId) =>
-                complete(NoContent)
-            }
+      } ~ path(LongNumber) { outboxEntryId =>
+        delete {
+          onSuccess(boxService.ask(RemoveOutboxEntry(outboxEntryId))) {
+            case OutboxEntryRemoved(outboxEntryId) =>
+              complete(NoContent)
           }
         }
       }

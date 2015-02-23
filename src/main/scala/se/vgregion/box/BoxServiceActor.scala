@@ -30,7 +30,7 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, host: String, port: Int) 
 
           case GenerateBoxBaseUrl(remoteBoxName) =>
             val token = UUID.randomUUID().toString()
-            val baseUrl = s"http://$host:$port/api/box/$token"
+            val baseUrl = s"http://$host:$port/api/boxes/$token"
             val box = Box(-1, remoteBoxName, token, baseUrl, BoxSendMethod.POLL, false)
             addBoxToDb(box)
             sender ! BoxBaseUrlGenerated(baseUrl)

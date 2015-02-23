@@ -17,13 +17,13 @@ class DatasetRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     val fileName = "anon270.dcm"
     val file = new File(getClass().getResource(fileName).toURI())
     val mfd = MultipartFormData(Seq(BodyPart(file, "file")))
-    Post("/api/dataset", mfd) ~> routes ~> check {
+    Post("/api/datasets", mfd) ~> routes ~> check {
       responseAs[String] should be("Dataset received, added image with id 1")
     }
   }
 
   it should "allow fetching the dataset again" in {
-    Get("/api/dataset/1") ~> routes ~> check {
+    Get("/api/datasets/1") ~> routes ~> check {
       contentType should be (ContentTypes.`application/octet-stream`)      
       val dataset = DicomUtil.loadDataset(responseAs[Array[Byte]], true)
       dataset should not be (null)
@@ -31,7 +31,7 @@ class DatasetRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   }
   
   it should "return a BadRequest when requesting a dataset that does not exist" in {
-    Get("/api/dataset/2") ~> routes ~> check {
+    Get("/api/datasets/2") ~> routes ~> check {
       status should be (BadRequest)
     }
   }
