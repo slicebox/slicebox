@@ -52,12 +52,24 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
 
   override def preStart {
     context.system.eventStream.subscribe(context.self, classOf[DatasetReceived])
+    context.system.eventStream.subscribe(context.self, classOf[FileReceived])
   }
 
   def receive = LoggingReceive {
 
+    case FileReceived(path) =>
+      val dataset = loadDataset(path, true)
+      if (dataset != null)
+        if (checkSopClass(dataset)) {
+          val image = storeDataset(dataset)
+          log.info("Stored dataset: " + dataset.getString(Tag.SOPInstanceUID))
+        } else
+          log.info(s"Received file with unsupported SOP Class UID ${dataset.getString(Tag.SOPClassUID)}, skipping")
+      else
+        log.info(s"File $path is not a DICOM file")
+
     case DatasetReceived(dataset) =>
-      storeDataset(dataset)
+      val image = storeDataset(dataset)
       log.info("Stored dataset: " + dataset.getString(Tag.SOPInstanceUID))
 
     case AddDataset(dataset) =>
@@ -120,7 +132,7 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
           sender ! ImageFiles(dao.imageFileForImage(imageId).toList)
         }
       }
-      
+
     case GetImageFilesForSeries(seriesId) =>
       catchAndReport {
         db.withSession { implicit session =>
@@ -128,42 +140,33 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
         }
       }
 
-    case msg: MetaDataQuery => msg match {
-      case GetAllImages =>
-        catchAndReport {
+    case msg: MetaDataQuery => catchAndReport {
+      msg match {
+        case GetAllImages =>
           db.withSession { implicit session =>
             sender ! Images(dao.images)
           }
-        }
 
-      case GetPatients =>
-        catchAndReport {
+        case GetPatients =>
           db.withSession { implicit session =>
             sender ! Patients(dao.patients)
           }
-        }
 
-      case GetStudies(patientId) =>
-        catchAndReport {
+        case GetStudies(patientId) =>
           db.withSession { implicit session =>
             sender ! Studies(dao.studiesForPatient(patientId))
           }
-        }
 
-      case GetSeries(studyId) =>
-        catchAndReport {
+        case GetSeries(studyId) =>
           db.withSession { implicit session =>
             sender ! SeriesCollection(dao.seriesForStudy(studyId))
           }
-        }
 
-      case GetImages(seriesId) =>
-        catchAndReport {
+        case GetImages(seriesId) =>
           db.withSession { implicit session =>
             sender ! Images(dao.imagesForSeries(seriesId))
           }
-        }
-
+      }
     }
 
   }

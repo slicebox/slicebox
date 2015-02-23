@@ -8,10 +8,10 @@ import akka.actor.Props
 import akka.event.Logging
 import akka.event.LoggingReceive
 import se.vgregion.dicom.DicomUtil._
-import se.vgregion.dicom.DicomProtocol.DatasetReceived
 import se.vgregion.dicom.DicomProtocol.FileAddedToWatchedDirectory
 import org.dcm4che3.data.Tag
 import java.nio.file.Paths
+import se.vgregion.dicom.DicomProtocol.FileReceived
 
 class DirectoryWatchActor(directoryPath: String) extends Actor {
   val log = Logging(context.system, this)
@@ -32,17 +32,10 @@ class DirectoryWatchActor(directoryPath: String) extends Actor {
 
   def receive = LoggingReceive {
     case FileAddedToWatchedDirectory(path) =>
-      if (Files.isRegularFile(path)) {
-        val dataset = loadDataset(path, true)
-        if (dataset != null)
-          if (checkSopClass(dataset))
-            context.system.eventStream.publish(DatasetReceived(dataset))
-          else
-            log.info(s"Received file with unsupported SOP Class UID ${dataset.getString(Tag.SOPClassUID)}, skipping")
-        else
-          log.info(s"File $path is not a DICOM file")
-      }
+      if (Files.isRegularFile(path))
+        context.system.eventStream.publish(FileReceived(path))
   }
+
 }
 
 object DirectoryWatchActor {

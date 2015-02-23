@@ -27,9 +27,10 @@ object DicomUtil {
     saveDataset(dataset, Files.newOutputStream(filePath))
 
   def saveDataset(dataset: Attributes, outputStream: OutputStream): Boolean = {
-    val dos = new DicomOutputStream(outputStream, defaultTransferSyntax)
-    val metaInformation = dataset.createFileMetaInformation(defaultTransferSyntax)
+    var dos: DicomOutputStream = null
     try {
+    	dos = new DicomOutputStream(outputStream, defaultTransferSyntax)
+    	val metaInformation = dataset.createFileMetaInformation(defaultTransferSyntax)
       dos.writeDataset(metaInformation, dataset)
       true
     } catch {

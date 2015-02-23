@@ -65,8 +65,6 @@ object DicomProtocol {
 
   case class GetImages(seriesId: Long) extends MetaDataQuery
   
-  case class GetImageFilesForSeries(seriesId: Long) extends MetaDataQuery
-
   
   sealed trait MetaDataUpdate
   
@@ -83,6 +81,8 @@ object DicomProtocol {
 
   case class GetImageFiles(imageId: Long)
 
+  case class GetImageFilesForSeries(seriesId: Long)
+  
   case class AddDataset(dataset: Attributes)
   
   // ***to API***
@@ -120,12 +120,12 @@ object DicomProtocol {
 
   case class DatasetReceived(dataset: Attributes)
   
+  case class FileReceived(path: Path)
+  
   // ***from storage***
 
   case class ImageFiles(imageFiles: Seq[ImageFile])
   
-  case class DatasetAdded(imageFile: ImageFile)
-
   case class ImageFilesDeleted(imageFiles: Seq[ImageFile])
 
 }
