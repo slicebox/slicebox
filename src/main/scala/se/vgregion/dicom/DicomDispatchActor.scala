@@ -23,7 +23,7 @@ class DicomDispatchActor(storage: Path, dbProps: DbProps) extends Actor {
 
   val scpService = context.actorOf(ScpServiceActor.props(dbProps, storage), "ScpService")
 
-  val storageActor = context.actorOf(DicomStorageActor.props(dbProps, storage), name = "Storage")
+  val storageActor = context.actorOf(DicomStorageActor.props(dbProps, storage).withDispatcher("akka.prio-dispatcher"), name = "Storage")
 
   def receive = LoggingReceive {
 
