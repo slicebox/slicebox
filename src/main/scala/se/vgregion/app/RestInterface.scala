@@ -250,15 +250,11 @@ trait RestApi extends HttpService with JsonFormats {
               complete(NoContent)
           }
         }
-      } ~ pathPrefix(LongNumber) { remoteBoxId =>
-        path("sendimages") {
-          pathEnd {
-            post {
-              entity(as[Seq[Long]]) { imageIds =>
-                onSuccess(boxService.ask(SendImagesToRemoteBox(remoteBoxId, imageIds))) {
-                  case ImagesSent(remoteBoxId, imageIds) => complete(NoContent)
-                }
-              }
+      } ~ path(LongNumber / "sendimages") { remoteBoxId =>
+        post {
+          entity(as[Seq[Long]]) { imageIds =>
+            onSuccess(boxService.ask(SendImagesToRemoteBox(remoteBoxId, imageIds))) {
+              case ImagesSent(remoteBoxId, imageIds) => complete(NoContent)
             }
           }
         }
