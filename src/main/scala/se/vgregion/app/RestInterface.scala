@@ -250,21 +250,17 @@ trait RestApi extends HttpService with JsonFormats {
         }
       } ~ path(LongNumber) { boxId =>
         delete {
-          pathEnd {
-            onSuccess(boxService.ask(RemoveBox(boxId))) {
-              case BoxRemoved(boxId) =>
-                complete(NoContent)
-            }
+          onSuccess(boxService.ask(RemoveBox(boxId))) {
+            case BoxRemoved(boxId) =>
+              complete(NoContent)
           }
         }
       } ~ pathPrefix(LongNumber) { remoteBoxId =>
         path("sendimage") {
-          pathEnd {
-            post {
-              entity(as[ImageId]) { imageId =>
-                onSuccess(boxService.ask(SendImageToRemoteBox(remoteBoxId, imageId.value))) {
-                  case ImageSent(remoteBoxId, imageId) => complete(NoContent)
-                }
+          post {
+            entity(as[ImageId]) { imageId =>
+              onSuccess(boxService.ask(SendImageToRemoteBox(remoteBoxId, imageId.value))) {
+                case ImageSent(remoteBoxId, imageId) => complete(NoContent)
               }
             }
           }
@@ -275,13 +271,14 @@ trait RestApi extends HttpService with JsonFormats {
   def tokenRoutes: Route =
     pathPrefix(Segment) { token =>
 
-      pathPrefix("image") {
-        path(LongNumber / LongNumber / LongNumber) { (transactionId, sequenceNumber, totalImageCount) =>
-          post {
-            onSuccess(boxService.ask(ValidateToken(token))) {
-              case InvalidToken(token) =>
-                complete((Forbidden, "Invalid token"))
-              case ValidToken(token) =>
+      onSuccess(boxService.ask(ValidateToken(token))) {
+        case InvalidToken(token) =>
+          complete((Forbidden, "Invalid token"))
+        case ValidToken(token) =>
+
+          pathPrefix("image") {
+            path(LongNumber / LongNumber / LongNumber) { (transactionId, sequenceNumber, totalImageCount) =>
+              post {
                 entity(as[Array[Byte]]) { imageData =>
                   val dataset = DicomUtil.loadDataset(imageData, true)
                   onSuccess(dicomService.ask(AddDataset(dataset))) {
@@ -292,60 +289,49 @@ trait RestApi extends HttpService with JsonFormats {
                       }
                   }
                 }
+              }
             }
-          }
-        }
-      } ~ pathPrefix("outbox") {
-        path("poll") {
-          get {
-            onSuccess(boxService.ask(ValidateToken(token))) {
-              case InvalidToken(token) =>
-                complete((Forbidden, "Invalid token"))
-              case ValidToken(token) =>
+          } ~ pathPrefix("outbox") {
+            path("poll") {
+              get {
                 onSuccess(boxService.ask(PollOutbox(token))) {
                   case outboxEntry: OutboxEntry =>
                     complete(outboxEntry)
                   case OutboxEmpty =>
                     complete(NotFound)
                 }
-            }
-          }
-        } ~ path("done") {
-          post {
-            onSuccess(boxService.ask(ValidateToken(token))) {
-              case InvalidToken(token) =>
-                complete((Forbidden, "Invalid token"))
-              case ValidToken(token) =>
+              }
+            } ~ path("done") {
+              post {
                 entity(as[OutboxEntry]) { outboxEntry =>
                   onSuccess(boxService.ask(DeleteOutboxEntry(token, outboxEntry.transactionId, outboxEntry.sequenceNumber))) {
                     case OutboxEntryDeleted => complete(NoContent)
                   }
                 }
-            }
-          }
-        } ~ pathEnd {
-          get {
-            parameters('transactionId.as[Long], 'sequenceNumber.as[Long]) { (transactionId, sequenceNumber) =>
-              onSuccess(boxService.ask(GetOutboxEntry(token, transactionId, sequenceNumber))) {
-                case outboxEntry: OutboxEntry =>
-                  onSuccess(dicomService.ask(GetImageFile(outboxEntry.imageId))) {
-                    case imageFile: ImageFile =>
-                      val file = storage.resolve(imageFile.fileName.value).toFile
-                      if (file.isFile && file.canRead)
-                        detach() {
-                          complete(HttpEntity(ContentTypes.`application/octet-stream`, HttpData(file)))
-                        }
-                      else
-                        complete((BadRequest, "Dataset could not be read"))
+              }
+            } ~ pathEnd {
+              get {
+                parameters('transactionId.as[Long], 'sequenceNumber.as[Long]) { (transactionId, sequenceNumber) =>
+                  onSuccess(boxService.ask(GetOutboxEntry(token, transactionId, sequenceNumber))) {
+                    case outboxEntry: OutboxEntry =>
+                      onSuccess(dicomService.ask(GetImageFile(outboxEntry.imageId))) {
+                        case imageFile: ImageFile =>
+                          val file = storage.resolve(imageFile.fileName.value).toFile
+                          if (file.isFile && file.canRead)
+                            detach() {
+                              complete(HttpEntity(ContentTypes.`application/octet-stream`, HttpData(file)))
+                            }
+                          else
+                            complete((BadRequest, "Dataset could not be read"))
+                      }
+                    case OutboxEntryNotFound =>
+                      complete(NotFound)
                   }
-                case OutboxEntryNotFound =>
-                  complete(NotFound)
+                }
               }
             }
           }
-        }
       }
-
     }
 
   def inboxRoutes: Route =
