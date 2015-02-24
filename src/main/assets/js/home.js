@@ -11,8 +11,16 @@ angular.module('slicebox.home', ['ngRoute'])
   });
 })
 
-.controller('HomeCtrl', function($scope, $http, $modal) {
+.controller('HomeCtrl', function($scope, $http, $modal, $q) {
     // Initialization
+    $scope.patientActions =
+        [
+            {
+                name: 'Remove',
+                action: deletePatients
+            }
+        ];
+
     $scope.fileImageActions =
         [
             {
@@ -109,6 +117,22 @@ angular.module('slicebox.home', ['ngRoute'])
         } else {
             $scope.uiState.errorMessage = $scope.uiState.errorMessage + '\n' + errorMessage;
         }
+    }
+
+    function deletePatients(patients) {
+        var deletePromises = [];
+        var deletePromise;
+
+        angular.forEach(patients, function(patient) {
+            deletePromise = $http.delete('/api/metadata/patients/' + patient.id);
+            deletePromises.push(deletePromise);
+
+            deletePromise.error(function(error) {
+                appendErrorMessage('Failed to delete patient: ' + error);
+            });
+        });
+
+        return $q.all(deletePromises);
     }
 
     function sendImageFiles(imageFiles) {

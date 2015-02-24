@@ -101,7 +101,7 @@ object DicomProtocol {
 
   case class DirectoryUnwatched(id: Long)
 
-  case class ScpAdded(name: String)
+  case class ScpAdded(scpData: ScpData)
 
   case class ScpRemoved(scpDataId: Long)
 

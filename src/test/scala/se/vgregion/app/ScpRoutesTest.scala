@@ -3,9 +3,9 @@ package se.vgregion.app
 import java.nio.file.Files
 import org.scalatest.FlatSpec
 import org.scalatest.Matchers
-import se.vgregion.dicom.DicomProtocol.RemoveScp
-import se.vgregion.dicom.DicomProtocol.AddScp
+import se.vgregion.dicom.DicomProtocol._
 import spray.httpx.SprayJsonSupport._
+import spray.http.StatusCodes._
 
 class ScpRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
@@ -13,13 +13,14 @@ class ScpRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   
   "The system" should "return a success message when asked to start a new SCP" in {
     Post("/api/scps", AddScp("TestName", "TestAeTitle", 13579)) ~> routes ~> check {
-      responseAs[String] should be("Added SCP TestName")
+      val scpData = responseAs[ScpData]
+      scpData.name should be("TestName")
     }
   }
   
   it should "be possible to remove the SCP again" in {
     Delete("/api/scps/1") ~> routes ~> check {
-      responseAs[String] should be("Removed SCP 1")
+      status should be(NoContent)
     }
   }
 

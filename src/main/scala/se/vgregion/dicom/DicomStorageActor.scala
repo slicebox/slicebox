@@ -217,7 +217,7 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
   def fileName(dataset: Attributes): String = dataset.getString(Tag.SOPInstanceUID)
 
   def deleteFromStorage(imageFiles: Seq[ImageFile]): Unit = imageFiles foreach (deleteFromStorage(_))
-  def deleteFromStorage(imageFile: ImageFile): Unit = deleteFromStorage(Paths.get(imageFile.fileName.value))
+  def deleteFromStorage(imageFile: ImageFile): Unit = deleteFromStorage(storage.resolve(imageFile.fileName.value))
   def deleteFromStorage(filePath: Path): Unit = {
     Files.delete(filePath)
     log.info("Deleted file " + filePath)

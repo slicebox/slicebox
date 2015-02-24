@@ -41,14 +41,14 @@ class ScpServiceActor(dbProps: DbProps, storage: Path) extends Actor with Except
             val id = scpDataToId(scpData)
             context.child(id) match {
               case Some(actor) =>
-                sender ! ScpAdded(name)
+                sender ! ScpAdded(scpData)
               case None =>
 
                 addScp(scpData)
 
                 context.actorOf(ScpActor.props(scpData, executor), id)
 
-                sender ! ScpAdded(name)
+                sender ! ScpAdded(scpData)
 
             }
 

@@ -133,7 +133,7 @@ trait RestApi extends HttpService with JsonFormats {
           entity(as[AddScp]) { addScp =>
             onSuccess(dicomService.ask(addScp)) {
               case ScpAdded(scpData) =>
-                complete("Added SCP " + scpData.name)
+                complete(scpData)
             }
           }
         }
@@ -141,7 +141,7 @@ trait RestApi extends HttpService with JsonFormats {
         delete {
           onSuccess(dicomService.ask(RemoveScp(scpDataId))) {
             case ScpRemoved(scpDataId) =>
-              complete("Removed SCP " + scpDataId)
+              complete(NoContent)
           }
         }
       }
@@ -149,36 +149,53 @@ trait RestApi extends HttpService with JsonFormats {
 
   def metaDataRoutes: Route = {
     pathPrefix("metadata") {
-      get {
-        path("patients") {
-          parameters('startindex.as[Long] ? 0, 'count.as[Long] ? 20) { (startIndex, count) =>
-            onSuccess(dicomService.ask(GetPatients(startIndex, count))) {
-              case Patients(patients) =>
-                complete(patients)
+      pathPrefix("patients") {
+        pathEnd {
+          get {
+            parameters('startindex.as[Long] ? 0, 'count.as[Long] ? 20) { (startIndex, count) =>
+              onSuccess(dicomService.ask(GetPatients(startIndex, count))) {
+                case Patients(patients) =>
+                  complete(patients)
+              }
             }
           }
-        } ~ path("studies") {
+        }  ~ path(LongNumber) { patientId =>
+          delete {
+            onSuccess(dicomService.ask(DeletePatient(patientId))) {
+              case ImageFilesDeleted(_) =>
+                complete(NoContent)
+            }
+          }
+        }
+      } ~ path("studies") {
+        get {
           parameters('startindex.as[Long] ? 0, 'count.as[Long] ? 20, 'patientId.as[Long]) { (startIndex, count, patientId) =>
             onSuccess(dicomService.ask(GetStudies(startIndex, count, patientId))) {
               case Studies(studies) =>
                 complete(studies)
             }
           }
-        } ~ path("series") {
+        }
+      } ~ path("series") {
+        get {
           parameters('startindex.as[Long] ? 0, 'count.as[Long] ? 20, 'studyId.as[Long]) { (startIndex, count, studyId) =>
             onSuccess(dicomService.ask(GetSeries(startIndex, count, studyId))) {
               case SeriesCollection(series) =>
                 complete(series)
             }
           }
-        } ~ path("images") {
+        }
+      } ~ path("images") {
+        get {
           parameters('seriesId.as[Long]) { seriesId =>
             onSuccess(dicomService.ask(GetImages(seriesId))) {
               case Images(images) =>
                 complete(images)
             }
           }
-        } ~ path("imagefiles") {
+        }
+      } ~ path("imagefiles") {
+        get {
           parameters('seriesId.as[Long]) { seriesId =>
             onSuccess(dicomService.ask(GetImageFilesForSeries(seriesId))) {
               case ImageFiles(imageFiles) =>

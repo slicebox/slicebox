@@ -12,8 +12,9 @@
             <div class="panel-body">
                 <sbx-grid
                     load-page="loadPatients(startIndex, count, orderByProperty, orderByDirection)"
-                    page-size="20"
-                    page-sizes="[10, 20, 50, 100]"
+                    page-size="10"
+                    page-sizes="[5, 10, 20, 50, 100]"
+                    object-actions="patientActions"
                     object-selected="patientSelected(object)"
                     callbacks="callbacks.patientsTable"
                     empty-message="No patients found">
@@ -36,8 +37,8 @@
             <div class="panel-body">
                 <sbx-grid
                     load-page="loadStudies(startIndex, count, orderByProperty, orderByDirection)"
-                    page-size="20"
-                    page-sizes="[10, 20, 50, 100]"
+                    page-size="10"
+                    page-sizes="[5, 10, 20, 50, 100]"
                     object-selected="studySelected(object)"
                     callbacks="callbacks.studiesTable"
                     empty-message="No studies found">
@@ -54,8 +55,8 @@
             <div class="panel-body">
                 <sbx-grid
                     load-page="loadSeries(startIndex, count, orderByProperty, orderByDirection)"
-                    page-size="20"
-                    page-sizes="[10, 20, 50, 100]"
+                    page-size="10"
+                    page-sizes="[5, 10, 20, 50, 100]"
                     object-selected="seriesSelected(object)"
                     callbacks="callbacks.seriesTable"
                     empty-message="No series found">
