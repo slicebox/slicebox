@@ -193,15 +193,15 @@ trait RestApi extends HttpService with JsonFormats {
     }
   }
 
-  def datasetRoutes: Route =
-    pathPrefix("datasets") {
+  def imageRoutes: Route =
+    pathPrefix("images") {
       pathEnd {
         post {
           formField('file.as[FormFile]) { file =>
             val dataset = DicomUtil.loadDataset(file.entity.data.toByteArray, true)
             onSuccess(dicomService.ask(AddDataset(dataset))) {
               case ImageAdded(image) =>
-                complete("Dataset received, added image with id " + image.id)
+                complete(image)
             }
           }
         }
@@ -431,7 +431,7 @@ trait RestApi extends HttpService with JsonFormats {
 
   def routes: Route =
     pathPrefix("api") {
-      directoryRoutes ~ scpRoutes ~ metaDataRoutes ~ datasetRoutes ~ boxRoutes ~ userRoutes ~ inboxRoutes ~ outboxRoutes ~ systemRoutes
+      directoryRoutes ~ scpRoutes ~ metaDataRoutes ~ imageRoutes ~ boxRoutes ~ userRoutes ~ inboxRoutes ~ outboxRoutes ~ systemRoutes
     } ~ staticResourcesRoutes ~ angularRoutes
 
 }
