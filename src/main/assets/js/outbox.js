@@ -11,13 +11,13 @@ angular.module('slicebox.outbox', ['ngRoute'])
   });
 })
 
-.controller('OutboxCtrl', function($scope, $http, $modal, $q, $interval) {
+.controller('OutboxCtrl', function($scope, $http, $modal, $q, $interval, openConfirmationDeleteModal) {
     // Initialization
     $scope.objectActions =
         [
             {
-                name: 'Remove',
-                action: removeOutboxEntries
+                name: 'Delete',
+                action: confirmDeleteOutboxEntries
             }
         ];
 
@@ -43,7 +43,15 @@ angular.module('slicebox.outbox', ['ngRoute'])
     };
 
     // Private functions
-    function removeOutboxEntries(outboxEntries) {
+    function confirmDeleteOutboxEntries(outboxEntries) {
+        var deleteConfirmationText = 'Permanently delete ' + outboxEntries.length + ' outbox entries?';
+
+        return openConfirmationDeleteModal('Delete Outbox Entries', deleteConfirmationText, function() {
+            return deleteOutboxEntries(outboxEntries);
+        });
+    }
+
+    function deleteOutboxEntries(outboxEntries) {
         var deletePromises = [];
         var deletePromise;
         var deleteAllPromies;
