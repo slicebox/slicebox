@@ -32,24 +32,14 @@ angular.module('slicebox.utils', [])
         deleteInProgress: false
     };
 
-    $scope.closeErrorMessageAlert = function() {
-        $scope.uiState.errorMessage = null;
-    };
-
     $scope.deleteButtonClicked = function () {
         var deletePromise = deleteCallback();
 
-        $scope.uiState.errorMessage = null;
         $scope.uiState.deleteInProgress = true;
-
-        deletePromise.then(function() {
-            $modalInstance.close();
-        }, function(error) {
-            $scope.uiState.errorMessage = error;
-        });
 
         deletePromise.finally(function() {
             $scope.uiState.deleteInProgress = false;
+            $modalInstance.close();
         });
     };    
 

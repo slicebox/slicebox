@@ -16,8 +16,24 @@ angular.module('slicebox.home', ['ngRoute'])
     $scope.patientActions =
         [
             {
-                name: 'Remove',
+                name: 'Delete',
                 action: confirmDeletePatients
+            }
+        ];
+
+    $scope.studyActions =
+        [
+            {
+                name: 'Delete',
+                action: confirmDeleteStudies
+            }
+        ];
+
+    $scope.seriesActions =
+        [
+            {
+                name: 'Delete',
+                action: confirmDeleteSeries
             }
         ];
 
@@ -137,6 +153,54 @@ angular.module('slicebox.home', ['ngRoute'])
 
             deletePromise.error(function(error) {
                 appendErrorMessage('Failed to delete patient: ' + error);
+            });
+        });
+
+        return $q.all(deletePromises);
+    }
+
+    function confirmDeleteStudies(studies) {
+        var deleteConfirmationText = 'Permanently delete ' + studies.length + ' studies?';
+
+        return openConfirmationDeleteModal('Delete Studies', deleteConfirmationText, function() {
+            return deleteStudies(studies);
+        });
+    }
+
+    function deleteStudies(studies) {
+        var deletePromises = [];
+        var deletePromise;
+
+        angular.forEach(studies, function(study) {
+            deletePromise = $http.delete('/api/metadata/studies/' + study.id);
+            deletePromises.push(deletePromise);
+
+            deletePromise.error(function(error) {
+                appendErrorMessage('Failed to delete study: ' + error);
+            });
+        });
+
+        return $q.all(deletePromises);
+    }
+
+    function confirmDeleteSeries(series) {
+        var deleteConfirmationText = 'Permanently delete ' + series.length + ' series?';
+
+        return openConfirmationDeleteModal('Delete Series', deleteConfirmationText, function() {
+            return deleteSeries(series);
+        });
+    }
+
+    function deleteSeries(series) {
+        var deletePromises = [];
+        var deletePromise;
+
+        angular.forEach(series, function(theSeries) {
+            deletePromise = $http.delete('/api/metadata/series/' + theSeries.id);
+            deletePromises.push(deletePromise);
+
+            deletePromise.error(function(error) {
+                appendErrorMessage('Failed to delete series: ' + error);
             });
         });
 
