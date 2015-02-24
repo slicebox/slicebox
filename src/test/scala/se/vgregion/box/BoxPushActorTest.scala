@@ -50,8 +50,8 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
   val testTransactionId2 = 999
   
   val pat1 = Patient(-1, PatientName("p1"), PatientID("s1"), PatientBirthDate("2000-01-01"), PatientSex("M"))
-  val study1 = Study(-1, -1, StudyInstanceUID("stuid1"), StudyDescription("stdesc1"), StudyDate("19990101"), StudyID("stid1"), AccessionNumber("acc1"))
-  val study2 = Study(-1, -1, StudyInstanceUID("stuid2"), StudyDescription("stdesc2"), StudyDate("19990102"), StudyID("stid2"), AccessionNumber("acc2"))
+  val study1 = Study(-1, -1, StudyInstanceUID("stuid1"), StudyDescription("stdesc1"), StudyDate("19990101"), StudyID("stid1"), AccessionNumber("acc1"), PatientAge("12Y"))
+  val study2 = Study(-1, -1, StudyInstanceUID("stuid2"), StudyDescription("stdesc2"), StudyDate("19990102"), StudyID("stid2"), AccessionNumber("acc2"), PatientAge("14Y"))
   val equipment1 = Equipment(-1, Manufacturer("manu1"), StationName("station1"))
   val equipment2 = Equipment(-1, Manufacturer("manu2"), StationName("station2"))
   val equipment3 = Equipment(-1, Manufacturer("manu3"), StationName("station3"))
