@@ -6,6 +6,7 @@
 angular.module('slicebox', [
     'ngRoute',
     'ui.bootstrap',
+    'slicebox.utils',
     'slicebox.directives',
     'slicebox.home',
     'slicebox.inbox',

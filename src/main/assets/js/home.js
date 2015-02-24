@@ -11,13 +11,13 @@ angular.module('slicebox.home', ['ngRoute'])
   });
 })
 
-.controller('HomeCtrl', function($scope, $http, $modal, $q) {
+.controller('HomeCtrl', function($scope, $http, $modal, $q, openConfirmationDeleteModal) {
     // Initialization
     $scope.patientActions =
         [
             {
                 name: 'Remove',
-                action: deletePatients
+                action: confirmDeletePatients
             }
         ];
 
@@ -117,6 +117,14 @@ angular.module('slicebox.home', ['ngRoute'])
         } else {
             $scope.uiState.errorMessage = $scope.uiState.errorMessage + '\n' + errorMessage;
         }
+    }
+
+    function confirmDeletePatients(patients) {
+        var deleteConfirmationText = 'Permanently delete ' + patients.length + ' patients?';
+
+        return openConfirmationDeleteModal('Delete Patients', deleteConfirmationText, function() {
+            return deletePatients(patients);
+        });
     }
 
     function deletePatients(patients) {

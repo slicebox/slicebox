@@ -1,0 +1,19 @@
+<div class="modal-header">
+    <h3 class="modal-title">{{title}}</h3>
+</div>
+
+<div class="modal-body">
+
+    <alert ng-if="uiState.errorMessage"
+        type="danger"
+        close="closeErrorMessageAlert()">
+        {{uiState.errorMessage}}
+    </alert>
+
+    <p>{{message}}</p>
+</div>
+
+<div class="modal-footer">
+    <button class="btn btn-danger" ng-click="deleteButtonClicked()" ng-disabled="uiState.deleteInProgress">Delete</button>
+    <button class="btn btn-default" ng-click="cancelButtonClicked()">Cancel</button>
+</div>
