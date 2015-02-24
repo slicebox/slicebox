@@ -11,13 +11,13 @@ angular.module('slicebox.adminScps', ['ngRoute'])
     });
 })
 
-.controller('AdminScpsCtrl', function($scope, $http, $modal, $q, $log) {
+.controller('AdminScpsCtrl', function($scope, $http, $modal, $q, $log, openConfirmationDeleteModal) {
     // Initialization
     $scope.objectActions =
         [
             {
-                name: 'Remove',
-                action: removeObjects
+                name: 'Delete',
+                action: confirmDeleteScps
             }
         ];
 
@@ -61,7 +61,15 @@ angular.module('slicebox.adminScps', ['ngRoute'])
     };
 
     // Private functions
-    function removeObjects(scpObjects) {
+    function confirmDeleteScps(scpObjects) {
+        var deleteConfirmationText = 'Permanently delete ' + scpObjects.length + ' SCPs?';
+
+        return openConfirmationDeleteModal('Delete SCPs', deleteConfirmationText, function() {
+            return deleteScps(scpObjects);
+        });
+    }
+
+    function deleteScps(scpObjects) {
         var removePromises = [];
         var removePromise;
 

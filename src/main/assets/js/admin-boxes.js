@@ -11,13 +11,13 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
   });
 })
 
-.controller('AdminBoxesCtrl', function($scope, $http, $modal, $q) {
+.controller('AdminBoxesCtrl', function($scope, $http, $modal, $q, openConfirmationDeleteModal) {
     // Initialization
     $scope.objectActions =
         [
             {
-                name: 'Remove',
-                action: removeBoxes
+                name: 'Delete',
+                action: confirmDeleteBoxes
             }
         ];
 
@@ -92,7 +92,15 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
     };
 
     // Private functions
-    function removeBoxes(boxes) {
+    function confirmDeleteBoxes(boxes) {
+        var deleteConfirmationText = 'Permanently delete ' + boxes.length + ' boxes?';
+
+        return openConfirmationDeleteModal('Delete Boxes', deleteConfirmationText, function() {
+            return deleteBoxes(boxes);
+        });
+    }
+
+    function deleteBoxes(boxes) {
         var deletePromises = [];
         var deletePromise;
 

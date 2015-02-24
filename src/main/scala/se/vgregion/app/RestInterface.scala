@@ -167,21 +167,39 @@ trait RestApi extends HttpService with JsonFormats {
             }
           }
         }
-      } ~ path("studies") {
-        get {
-          parameters('startindex.as[Long] ? 0, 'count.as[Long] ? 20, 'patientId.as[Long]) { (startIndex, count, patientId) =>
-            onSuccess(dicomService.ask(GetStudies(startIndex, count, patientId))) {
-              case Studies(studies) =>
-                complete(studies)
+      } ~ pathPrefix("studies") {
+        pathEnd {
+          get {
+            parameters('startindex.as[Long] ? 0, 'count.as[Long] ? 20, 'patientId.as[Long]) { (startIndex, count, patientId) =>
+              onSuccess(dicomService.ask(GetStudies(startIndex, count, patientId))) {
+                case Studies(studies) =>
+                  complete(studies)
+              }
+            }
+          }
+        } ~ path(LongNumber) { studyId =>
+          delete {
+            onSuccess(dicomService.ask(DeleteStudy(studyId))) {
+              case ImageFilesDeleted(_) =>
+                complete(NoContent)
             }
           }
         }
-      } ~ path("series") {
-        get {
-          parameters('startindex.as[Long] ? 0, 'count.as[Long] ? 20, 'studyId.as[Long]) { (startIndex, count, studyId) =>
-            onSuccess(dicomService.ask(GetSeries(startIndex, count, studyId))) {
-              case SeriesCollection(series) =>
-                complete(series)
+      } ~ pathPrefix("series") {
+        pathEnd {
+          get {
+            parameters('startindex.as[Long] ? 0, 'count.as[Long] ? 20, 'studyId.as[Long]) { (startIndex, count, studyId) =>
+              onSuccess(dicomService.ask(GetSeries(startIndex, count, studyId))) {
+                case SeriesCollection(series) =>
+                  complete(series)
+              }
+            }
+          }
+        } ~ path(LongNumber) { seriesId =>
+          delete {
+            onSuccess(dicomService.ask(DeleteSeries(seriesId))) {
+              case ImageFilesDeleted(_) =>
+                complete(NoContent)
             }
           }
         }

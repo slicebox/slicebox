@@ -11,13 +11,13 @@ angular.module('slicebox.adminWatchDirectories', ['ngRoute'])
     });
 })
 
-.controller('AdminWatchDirectoriesCtrl', function($scope, $http, $modal, $q, $log) {
+.controller('AdminWatchDirectoriesCtrl', function($scope, $http, $modal, $q, $log, openConfirmationDeleteModal) {
     // Initialization
     $scope.objectActions =
         [
             {
                 name: 'Remove',
-                action: removeObjects
+                action: confirmRemoveWatchDirectories
             }
         ];
 
@@ -61,7 +61,15 @@ angular.module('slicebox.adminWatchDirectories', ['ngRoute'])
     };
 
     // Private functions
-    function removeObjects(pathObjects) {
+    function confirmRemoveWatchDirectories(pathObjects) {
+        var removeConfirmationText = 'Remove ' + pathObjects.length + ' watch directories?';
+
+        return openConfirmationDeleteModal('Remove Watch Directories', removeConfirmationText, function() {
+            return removeWatchDirectories(pathObjects);
+        });
+    }
+
+    function removeWatchDirectories(pathObjects) {
         var unwatchPromises = [];
         var unwatchPromise;
 
