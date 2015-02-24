@@ -11,7 +11,7 @@ import spray.httpx.SprayJsonSupport.sprayJsonUnmarshaller
 import org.scalatest.FlatSpec
 import org.scalatest.Matchers
 
-import se.vgregion.dicom.DicomHierarchy.Image
+import se.vgregion.dicom.DicomHierarchy._
 import se.vgregion.dicom.DicomProtocol._
 import se.vgregion.util.TestUtil
 
@@ -49,10 +49,10 @@ class DirectoryRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
   }
 
-  it should "return an empty list of images when watching an empty directory and return one image after a file has been copied to that directory" in {
-    Get("/api/metadata/allimages") ~> routes ~> check {
+  it should "return an empty list of patients when watching an empty directory and return one patient after a file has been copied to that directory" in {
+    Get("/api/metadata/patients") ~> routes ~> check {
       status should be(OK)
-      responseAs[List[Image]].size should be(0)
+      responseAs[List[Patient]].size should be(0)
     }
 
     val fileName = "anon270.dcm"
@@ -64,9 +64,9 @@ class DirectoryRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     
     println(s"Number of files: ${tempDir.toFile().listFiles().length}");
 
-    Get("/api/metadata/allimages") ~> routes ~> check {
+    Get("/api/metadata/patients") ~> routes ~> check {
       status should be(OK)
-      responseAs[List[Image]].size should be(1)
+      responseAs[List[Patient]].size should be(1)
     }
   }
 
@@ -79,9 +79,9 @@ class DirectoryRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     // sleep for a while and let the OS find out there was a new file in the watched directory. It will be picked up by slicebox
     Thread.sleep(1000)
 
-    Get("/api/metadata/allimages") ~> routes ~> check {
+    Get("/api/metadata/patients") ~> routes ~> check {
       status should be(OK)
-      responseAs[List[Image]].size should be(1)
+      responseAs[List[Patient]].size should be(1)
     }
   }
 

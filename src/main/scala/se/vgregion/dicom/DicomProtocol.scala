@@ -54,8 +54,6 @@ object DicomProtocol {
 
 
   sealed trait MetaDataQuery
-  
-  case object GetAllImages extends MetaDataQuery
 
   case object GetPatients extends MetaDataQuery
 

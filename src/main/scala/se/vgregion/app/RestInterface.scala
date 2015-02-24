@@ -176,11 +176,6 @@ trait RestApi extends HttpService with JsonFormats {
                 complete(images)
             }
           }
-        } ~ path("allimages") {
-          onSuccess(dicomService.ask(GetAllImages)) {
-            case Images(images) =>
-              complete(images)
-          }
         } ~ path("imagefiles") {
           parameters('seriesId.as[Long]) { seriesId =>
             onSuccess(dicomService.ask(GetImageFilesForSeries(seriesId))) {
