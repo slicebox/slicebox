@@ -125,7 +125,7 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     
     // send image which adds outbox entry
     val imageId = 987
-    Post(s"/api/boxes/${remoteBox.id}/sendimage", ImageId(imageId)) ~> routes ~> check {
+    Post(s"/api/boxes/${remoteBox.id}/sendimages", Array(imageId)) ~> routes ~> check {
       status should be(NoContent)
     }
 
@@ -170,7 +170,7 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       
     // send image which adds outbox entry
     val imageId = 1
-    Post(s"/api/boxes/${remoteBox.id}/sendimage", ImageId(imageId)) ~> routes ~> check {
+    Post(s"/api/boxes/${remoteBox.id}/sendimages", Array(imageId)) ~> routes ~> check {
       status should be(NoContent)
     }
     
@@ -219,7 +219,7 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       
     // send image which adds outbox entry
     val imageId = 1
-    Post(s"/api/boxes/${remoteBox.id}/sendimage", ImageId(imageId)) ~> routes ~> check {
+    Post(s"/api/boxes/${remoteBox.id}/sendimages", Array(imageId)) ~> routes ~> check {
       status should be(NoContent)
     }
     

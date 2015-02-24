@@ -147,32 +147,26 @@ angular.module('slicebox.home', ['ngRoute'])
     };
 
     $scope.sendButtonClicked = function() {
-        var sendPromises = [];
+        var imageIds = [];
         var sendPromise;
-        var sendAllPromise;
 
         $scope.uiState.sendInProgress = true;
 
         angular.forEach($scope.imageFiles, function(imageFile) {
-            sendPromise = $http.post('/api/boxes/' + $scope.uiState.selectedReceiver.id + '/sendimage',
-                {
-                    value: imageFile.id
-                });
-
-            sendPromise.error(function(data) {
-                $scope.uiState.errorMessages.push(data);
-            });
-
-            sendPromises.push(sendPromise);
+            imageIds.push(imageFile.id);
         });
 
-        sendAllPromise = $q.all(sendPromises);
+        sendPromise = $http.post('/api/boxes/' + $scope.uiState.selectedReceiver.id + '/sendimages', imageIds);
 
-        sendAllPromise.then(function() {
+        sendPromise.error(function(data) {
+            $scope.uiState.errorMessages.push(data);
+        });
+
+        sendPromise.then(function() {
             $modalInstance.close();
         });
 
-        sendAllPromise.finally(function() {
+        sendPromise.finally(function() {
             $scope.uiState.sendInProgress = false;
         });
     };

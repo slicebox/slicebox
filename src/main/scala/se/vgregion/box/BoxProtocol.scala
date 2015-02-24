@@ -30,6 +30,8 @@ object BoxProtocol {
   case class BoxBaseUrl(value: String)
   
   case class ImageId(value: Long)
+  
+  case class ImageIds(imageIds: Seq[Long])
 
   case class Box(id: Long, name: String, token: String, baseUrl: String, sendMethod: BoxSendMethod, online: Boolean) extends Entity
 
@@ -59,7 +61,7 @@ object BoxProtocol {
   
   case class PollOutbox(token: String) extends BoxRequest
   
-  case class SendImageToRemoteBox(remoteBoxId: Long, imageId: Long) extends BoxRequest
+  case class SendImagesToRemoteBox(remoteBoxId: Long, imageIds: Seq[Long]) extends BoxRequest
   
   case class GetOutboxEntry(token: String, transactionId: Long, sequenceNumber: Long) extends BoxRequest
   
@@ -89,7 +91,7 @@ object BoxProtocol {
   
   case object OutboxEmpty
   
-  case class ImageSent(remoteBoxId: Long, imageId: Long)
+  case class ImagesSent(remoteBoxId: Long, imageIds: Seq[Long])
   
   case object OutboxEntryNotFound
   

@@ -84,9 +84,9 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, host: String, port: Int) 
             
             // TODO: what should we do if no box was found for token?
             
-          case SendImageToRemoteBox(remoteBoxId, imageId) =>
-            addOutboxEntry(remoteBoxId, imageId)
-            sender ! ImageSent(remoteBoxId, imageId)
+          case SendImagesToRemoteBox(remoteBoxId, imageIds) =>
+            addOutboxEntries(remoteBoxId, imageIds)
+            sender ! ImagesSent(remoteBoxId, imageIds)
             
           case GetOutboxEntry(token, transactionId, sequenceNumber) =>
             pollBoxByToken(token).foreach(box => {
@@ -227,10 +227,15 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, host: String, port: Int) 
       dao.updateInbox(remoteBoxId, transactionId, sequenceNumber, totalImageCount)
     }
   
-  def addOutboxEntry(remoteBoxId: Long, imageId: Long): Unit = {
+  def addOutboxEntries(remoteBoxId: Long, imageIds: Seq[Long]): Unit = {
     val transactionId = generateTransactionId()
+    val totalImageCount = imageIds.length
+    
     db.withSession { implicit session =>
-      dao.insertOutboxEntry(OutboxEntry(-1, remoteBoxId, transactionId, 1, 1, imageId, false))
+      var sequenceNumber: Long = 0
+      for (sequenceNumber <- 1 to totalImageCount) {
+        dao.insertOutboxEntry(OutboxEntry(-1, remoteBoxId, transactionId, sequenceNumber, totalImageCount, imageIds(sequenceNumber - 1), false))
+      }
     }
   }
   

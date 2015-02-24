@@ -55,7 +55,7 @@ trait RestApi extends HttpService with JsonFormats {
 
   val config = ConfigFactory.load()
   val sliceboxConfig = config.getConfig("slicebox")
-
+  
   def createStorageDirectory(): Path
   def dbUrl(): String
 
@@ -256,11 +256,13 @@ trait RestApi extends HttpService with JsonFormats {
           }
         }
       } ~ pathPrefix(LongNumber) { remoteBoxId =>
-        path("sendimage") {
-          post {
-            entity(as[ImageId]) { imageId =>
-              onSuccess(boxService.ask(SendImageToRemoteBox(remoteBoxId, imageId.value))) {
-                case ImageSent(remoteBoxId, imageId) => complete(NoContent)
+        path("sendimages") {
+          pathEnd {
+            post {
+              entity(as[Seq[Long]]) { imageIds =>
+                onSuccess(boxService.ask(SendImagesToRemoteBox(remoteBoxId, imageIds))) {
+                  case ImagesSent(remoteBoxId, imageIds) => complete(NoContent)
+                }
               }
             }
           }
