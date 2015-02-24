@@ -207,8 +207,7 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
       val dbImageFile = dao.imageFileByFileName(imageFile)
         .getOrElse(dao.insert(imageFile))
 
-      val anonymizedDataset = DicomAnonymization.anonymizeDataset(dataset)
-      saveDataset(anonymizedDataset, storedPath)
+      saveDataset(dataset, storedPath)
 
       dbImage
     }

@@ -18,6 +18,9 @@ import spray.http.HttpResponse
 import se.vgregion.app.DbProps
 import se.vgregion.dicom.DicomMetaDataDAO
 import spray.http.StatusCode
+import se.vgregion.dicom.DicomUtil._
+import se.vgregion.dicom.DicomAnonymization._
+import java.io.ByteArrayOutputStream
 
 class BoxPushActor(box: Box, dbProps: DbProps, storage: Path, pollInterval: FiniteDuration = 5.seconds) extends Actor {
   val log = Logging(context.system, this)
@@ -36,9 +39,9 @@ class BoxPushActor(box: Box, dbProps: DbProps, storage: Path, pollInterval: Fini
   def sendFilePipeline = sendReceive
 
   def pushImagePipeline(outboxEntry: OutboxEntry, fileName: String): Future[HttpResponse] = {
-    val file = storage.resolve(fileName).toFile
-    //if (file.isFile && file.canRead)
-    sendFilePipeline(Post(s"${box.baseUrl}/image/${outboxEntry.transactionId}/${outboxEntry.sequenceNumber}/${outboxEntry.totalImageCount}", HttpData(file)))
+    val path = storage.resolve(fileName)
+    val bytes = toAnonymizedByteArray(path)
+    sendFilePipeline(Post(s"${box.baseUrl}/image/${outboxEntry.transactionId}/${outboxEntry.sequenceNumber}/${outboxEntry.totalImageCount}", HttpData(bytes)))
   }
 
   val poller = system.scheduler.schedule(100.millis, pollInterval) {

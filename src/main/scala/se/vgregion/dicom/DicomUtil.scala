@@ -18,6 +18,8 @@ import java.io.OutputStream
 import java.awt.image.BufferedImage
 import javax.imageio.ImageIO
 import org.dcm4che3.imageio.plugins.dcm.DicomImageReadParam
+import se.vgregion.dicom.DicomAnonymization._
+import java.io.ByteArrayOutputStream
 
 object DicomUtil {
 
@@ -66,6 +68,14 @@ object DicomUtil {
     }
   }
 
+  def toAnonymizedByteArray(path: Path): Array[Byte] = {
+    val dataset = loadDataset(path, true)
+    val anonymizedDataset = anonymizeDataset(dataset)
+    val bos = new ByteArrayOutputStream
+    saveDataset(anonymizedDataset, bos)
+    bos.toByteArray()    
+  }
+    
   def datasetToPatient(dataset: Attributes): Patient =
     Patient(
       -1,

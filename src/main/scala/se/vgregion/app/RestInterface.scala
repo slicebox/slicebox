@@ -55,7 +55,7 @@ trait RestApi extends HttpService with JsonFormats {
 
   val config = ConfigFactory.load()
   val sliceboxConfig = config.getConfig("slicebox")
-  
+
   def createStorageDirectory(): Path
   def dbUrl(): String
 
@@ -159,7 +159,7 @@ trait RestApi extends HttpService with JsonFormats {
               }
             }
           }
-        }  ~ path(LongNumber) { patientId =>
+        } ~ path(LongNumber) { patientId =>
           delete {
             onSuccess(dicomService.ask(DeletePatient(patientId))) {
               case ImageFilesDeleted(_) =>
@@ -328,13 +328,11 @@ trait RestApi extends HttpService with JsonFormats {
                     case outboxEntry: OutboxEntry =>
                       onSuccess(dicomService.ask(GetImageFile(outboxEntry.imageId))) {
                         case imageFile: ImageFile =>
-                          val file = storage.resolve(imageFile.fileName.value).toFile
-                          if (file.isFile && file.canRead)
-                            detach() {
-                              complete(HttpEntity(ContentTypes.`application/octet-stream`, HttpData(file)))
-                            }
-                          else
-                            complete((BadRequest, "Dataset could not be read"))
+                          val path = storage.resolve(imageFile.fileName.value)
+                          val bytes = DicomUtil.toAnonymizedByteArray(path)
+                          detach() {
+                            complete(HttpEntity(ContentTypes.`application/octet-stream`, HttpData(bytes)))
+                          }
                       }
                     case OutboxEntryNotFound =>
                       complete(NotFound)
