@@ -32,8 +32,8 @@
                 </ul>
             </div>
 
-            <div ng-if="pageSizes !== undefined && pageSizes.length > 1" class="btn-group" dropdown is-open="uiState.pageSizeOpen">
-                <span>Page Size:&nbsp;&nbsp;<button type="button" class="btn btn-primary dropdown-toggle">
+            <div ng-if="pageSizes !== undefined && pageSizes.length > 1" class="btn-group dropdown" dropdown is-open="uiState.pageSizeOpen">
+                <span>Page Size:&nbsp;&nbsp;<button type="button" class="btn btn-primary dropdown-toggle" dropdown-toggle>
                     {{currentPageSize}} <span class="caret"></span></button>
                 </span>
                 <ul class="dropdown-menu" role="menu">

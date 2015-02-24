@@ -32,7 +32,7 @@ angular.module('slicebox.home', ['ngRoute'])
 
     // Scope functions
     $scope.loadPatients = function(startIndex, count, orderByProperty, orderByDirection) {
-        var loadPatientsPromise = $http.get('/api/metadata/patients');
+        var loadPatientsPromise = $http.get('/api/metadata/patients?startindex=' + startIndex + '&count=' + count);
 
         loadPatientsPromise.error(function(error) {
             appendErrorMessage('Failed to load patients: ' + error);
@@ -51,7 +51,7 @@ angular.module('slicebox.home', ['ngRoute'])
             return [];
         }
 
-        var loadStudiesPromise = $http.get('/api/metadata/studies?patientId=' + $scope.uiState.selectedPatient.id);
+        var loadStudiesPromise = $http.get('/api/metadata/studies?startindex=' + startIndex + '&count=' + count + '&patientId=' + $scope.uiState.selectedPatient.id);
 
         loadStudiesPromise.error(function(error) {
             appendErrorMessage('Failed to load studies: ' + error);
@@ -70,7 +70,7 @@ angular.module('slicebox.home', ['ngRoute'])
             return [];
         }
 
-        var loadSeriesPromise = $http.get('/api/metadata/series?studyId=' + $scope.uiState.selectedStudy.id);
+        var loadSeriesPromise = $http.get('/api/metadata/series?startindex=' + startIndex + '&count=' + count + '&studyId=' + $scope.uiState.selectedStudy.id);
 
         loadSeriesPromise.error(function(error) {
             appendErrorMessage('Failed to load series: ' + error);

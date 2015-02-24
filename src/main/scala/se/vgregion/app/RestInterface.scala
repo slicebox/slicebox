@@ -151,20 +151,22 @@ trait RestApi extends HttpService with JsonFormats {
     pathPrefix("metadata") {
       get {
         path("patients") {
-          onSuccess(dicomService.ask(GetPatients)) {
-            case Patients(patients) =>
-              complete(patients)
+          parameters('startindex.as[Long] ? 0, 'count.as[Long] ? 20) { (startIndex, count) =>
+            onSuccess(dicomService.ask(GetPatients(startIndex, count))) {
+              case Patients(patients) =>
+                complete(patients)
+            }
           }
         } ~ path("studies") {
-          parameters('patientId.as[Long]) { patientId =>
-            onSuccess(dicomService.ask(GetStudies(patientId))) {
+          parameters('startindex.as[Long] ? 0, 'count.as[Long] ? 20, 'patientId.as[Long]) { (startIndex, count, patientId) =>
+            onSuccess(dicomService.ask(GetStudies(startIndex, count, patientId))) {
               case Studies(studies) =>
                 complete(studies)
             }
           }
         } ~ path("series") {
-          parameters('studyId.as[Long]) { studyId =>
-            onSuccess(dicomService.ask(GetSeries(studyId))) {
+          parameters('startindex.as[Long] ? 0, 'count.as[Long] ? 20, 'studyId.as[Long]) { (startIndex, count, studyId) =>
+            onSuccess(dicomService.ask(GetSeries(startIndex, count, studyId))) {
               case SeriesCollection(series) =>
                 complete(series)
             }
