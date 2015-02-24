@@ -8,30 +8,36 @@ import org.scalatest.Matchers
 import spray.http.ContentTypes
 import se.vgregion.dicom.DicomUtil
 import spray.http.StatusCodes._
+import se.vgregion.dicom.DicomHierarchy._
+import spray.httpx.SprayJsonSupport.sprayJsonMarshaller
+import spray.httpx.SprayJsonSupport.sprayJsonUnmarshaller
+import spray.httpx.unmarshalling.BasicUnmarshallers.ByteArrayUnmarshaller
 
-class DatasetRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
+class ImageRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
   def dbUrl() = "jdbc:h2:mem:datasetroutestest;DB_CLOSE_DELAY=-1"
 
-  "The system" should "return a success message when adding a dataset" in {
+  "The system" should "return a success message when adding an image" in {
     val fileName = "anon270.dcm"
     val file = new File(getClass().getResource(fileName).toURI())
     val mfd = MultipartFormData(Seq(BodyPart(file, "file")))
-    Post("/api/datasets", mfd) ~> routes ~> check {
-      responseAs[String] should be("Dataset received, added image with id 1")
+    Post("/api/images", mfd) ~> routes ~> check {
+      status should be(OK)
+      val image = responseAs[Image]
+      image.id should be(1)
     }
   }
 
-  it should "allow fetching the dataset again" in {
-    Get("/api/datasets/1") ~> routes ~> check {
+  it should "allow fetching the image again" in {
+    Get("/api/images/1") ~> routes ~> check {
       contentType should be (ContentTypes.`application/octet-stream`)      
       val dataset = DicomUtil.loadDataset(responseAs[Array[Byte]], true)
       dataset should not be (null)
     }
   }
   
-  it should "return a BadRequest when requesting a dataset that does not exist" in {
-    Get("/api/datasets/2") ~> routes ~> check {
+  it should "return a BadRequest when requesting an image that does not exist" in {
+    Get("/api/images/2") ~> routes ~> check {
       status should be (BadRequest)
     }
   }

@@ -54,14 +54,12 @@ object DicomProtocol {
 
 
   sealed trait MetaDataQuery
-  
-  case object GetAllImages extends MetaDataQuery
 
-  case object GetPatients extends MetaDataQuery
+  case class GetPatients(startIndex: Long, count: Long) extends MetaDataQuery
 
-  case class GetStudies(patientId: Long) extends MetaDataQuery
+  case class GetStudies(startIndex: Long, count: Long, patientId: Long) extends MetaDataQuery
 
-  case class GetSeries(studyId: Long) extends MetaDataQuery
+  case class GetSeries(startIndex: Long, count: Long, studyId: Long) extends MetaDataQuery
 
   case class GetImages(seriesId: Long) extends MetaDataQuery
   

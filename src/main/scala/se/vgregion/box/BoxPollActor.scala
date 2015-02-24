@@ -99,7 +99,7 @@ class BoxPollActor(
       sendRemoteOutboxFileCompleted(remoteOutboxEntry)
       context.unbecome
 
-    case PollRemoteBoxFailed(exception) =>
+    case FetchFileFailed(exception) =>
       log.error(exception, "Failed to fetch remote outbox file")
       context.unbecome
 

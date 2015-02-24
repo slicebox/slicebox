@@ -55,7 +55,7 @@ trait RestApi extends HttpService with JsonFormats {
 
   val config = ConfigFactory.load()
   val sliceboxConfig = config.getConfig("slicebox")
-
+  
   def createStorageDirectory(): Path
   def dbUrl(): String
 
@@ -151,20 +151,22 @@ trait RestApi extends HttpService with JsonFormats {
     pathPrefix("metadata") {
       get {
         path("patients") {
-          onSuccess(dicomService.ask(GetPatients)) {
-            case Patients(patients) =>
-              complete(patients)
+          parameters('startindex.as[Long] ? 0, 'count.as[Long] ? 20) { (startIndex, count) =>
+            onSuccess(dicomService.ask(GetPatients(startIndex, count))) {
+              case Patients(patients) =>
+                complete(patients)
+            }
           }
         } ~ path("studies") {
-          parameters('patientId.as[Long]) { patientId =>
-            onSuccess(dicomService.ask(GetStudies(patientId))) {
+          parameters('startindex.as[Long] ? 0, 'count.as[Long] ? 20, 'patientId.as[Long]) { (startIndex, count, patientId) =>
+            onSuccess(dicomService.ask(GetStudies(startIndex, count, patientId))) {
               case Studies(studies) =>
                 complete(studies)
             }
           }
         } ~ path("series") {
-          parameters('studyId.as[Long]) { studyId =>
-            onSuccess(dicomService.ask(GetSeries(studyId))) {
+          parameters('startindex.as[Long] ? 0, 'count.as[Long] ? 20, 'studyId.as[Long]) { (startIndex, count, studyId) =>
+            onSuccess(dicomService.ask(GetSeries(startIndex, count, studyId))) {
               case SeriesCollection(series) =>
                 complete(series)
             }
@@ -175,11 +177,6 @@ trait RestApi extends HttpService with JsonFormats {
               case Images(images) =>
                 complete(images)
             }
-          }
-        } ~ path("allimages") {
-          onSuccess(dicomService.ask(GetAllImages)) {
-            case Images(images) =>
-              complete(images)
           }
         } ~ path("imagefiles") {
           parameters('seriesId.as[Long]) { seriesId =>
@@ -193,15 +190,15 @@ trait RestApi extends HttpService with JsonFormats {
     }
   }
 
-  def datasetRoutes: Route =
-    pathPrefix("datasets") {
+  def imageRoutes: Route =
+    pathPrefix("images") {
       pathEnd {
         post {
           formField('file.as[FormFile]) { file =>
             val dataset = DicomUtil.loadDataset(file.entity.data.toByteArray, true)
             onSuccess(dicomService.ask(AddDataset(dataset))) {
               case ImageAdded(image) =>
-                complete("Dataset received, added image with id " + image.id)
+                complete(image)
             }
           }
         }
@@ -255,13 +252,11 @@ trait RestApi extends HttpService with JsonFormats {
               complete(NoContent)
           }
         }
-      } ~ pathPrefix(LongNumber) { remoteBoxId =>
-        path("sendimage") {
-          post {
-            entity(as[ImageId]) { imageId =>
-              onSuccess(boxService.ask(SendImageToRemoteBox(remoteBoxId, imageId.value))) {
-                case ImageSent(remoteBoxId, imageId) => complete(NoContent)
-              }
+      } ~ path(LongNumber / "sendimages") { remoteBoxId =>
+        post {
+          entity(as[Seq[Long]]) { imageIds =>
+            onSuccess(boxService.ask(SendImagesToRemoteBox(remoteBoxId, imageIds))) {
+              case ImagesSent(remoteBoxId, imageIds) => complete(NoContent)
             }
           }
         }
@@ -429,7 +424,7 @@ trait RestApi extends HttpService with JsonFormats {
 
   def routes: Route =
     pathPrefix("api") {
-      directoryRoutes ~ scpRoutes ~ metaDataRoutes ~ datasetRoutes ~ boxRoutes ~ userRoutes ~ inboxRoutes ~ outboxRoutes ~ systemRoutes
+      directoryRoutes ~ scpRoutes ~ metaDataRoutes ~ imageRoutes ~ boxRoutes ~ userRoutes ~ inboxRoutes ~ outboxRoutes ~ systemRoutes
     } ~ staticResourcesRoutes ~ angularRoutes
 
 }

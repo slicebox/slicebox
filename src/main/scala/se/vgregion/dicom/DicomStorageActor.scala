@@ -147,24 +147,19 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
 
     case msg: MetaDataQuery => catchAndReport {
       msg match {
-        case GetAllImages =>
+        case GetPatients(startIndex, count) =>
           db.withSession { implicit session =>
-            sender ! Images(dao.images)
+            sender ! Patients(dao.patients(startIndex, count))
           }
 
-        case GetPatients =>
+        case GetStudies(startIndex, count, patientId) =>
           db.withSession { implicit session =>
-            sender ! Patients(dao.patients)
+            sender ! Studies(dao.studiesForPatient(startIndex, count, patientId))
           }
 
-        case GetStudies(patientId) =>
+        case GetSeries(startIndex, count, studyId) =>
           db.withSession { implicit session =>
-            sender ! Studies(dao.studiesForPatient(patientId))
-          }
-
-        case GetSeries(studyId) =>
-          db.withSession { implicit session =>
-            sender ! SeriesCollection(dao.seriesForStudy(studyId))
+            sender ! SeriesCollection(dao.seriesForStudy(startIndex, count, studyId))
           }
 
         case GetImages(seriesId) =>

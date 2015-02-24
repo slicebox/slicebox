@@ -220,7 +220,11 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
 
   // *** Listing all patients, studies etc ***
 
-  def patients(implicit session: Session): List[Patient] = patientsQuery.list
+  def patients(startIndex: Long, count: Long)(implicit session: Session): List[Patient] =
+    patientsQuery
+    .drop(startIndex)
+    .take(count)
+    .list
   
   def studies(implicit session: Session): List[Study] = studiesQuery.list
   
@@ -236,14 +240,18 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
 
   // *** Grouped listings ***
 
-  def studiesForPatient(patientId: Long)(implicit session: Session): List[Study] =
+  def studiesForPatient(startIndex: Long, count: Long, patientId: Long)(implicit session: Session): List[Study] =
     studiesQuery
       .filter(_.patientId === patientId)
+      .drop(startIndex)
+      .take(count)
       .list
 
-  def seriesForStudy(studyId: Long)(implicit session: Session): List[Series] =
+  def seriesForStudy(startIndex: Long, count: Long, studyId: Long)(implicit session: Session): List[Series] =
       seriesQuery
         .filter(_.studyId === studyId)
+        .drop(startIndex)
+        .take(count)
         .list
 
   def imagesForSeries(seriesId: Long)(implicit session: Session): List[Image] =
@@ -261,13 +269,13 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
       .map(image => imageFileForImage(image.id)).flatten
 
   def imageFilesForStudy(studyId: Long)(implicit session: Session): List[ImageFile] =
-    seriesForStudy(studyId)
+    seriesForStudy(0, Integer.MAX_VALUE, studyId)
       .map(series => imagesForSeries(series.id)
         .map(image => imageFileForImage(image.id)).flatten).flatten
 
   def imageFilesForPatient(patientId: Long)(implicit session: Session): List[ImageFile] =
-    studiesForPatient(patientId)
-      .map(study => seriesForStudy(study.id)
+    studiesForPatient(0, Integer.MAX_VALUE, patientId)
+      .map(study => seriesForStudy(0, Integer.MAX_VALUE, study.id)
         .map(series => imagesForSeries(series.id)
           .map(image => imageFileForImage(image.id)).flatten).flatten).flatten
           
