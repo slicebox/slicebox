@@ -82,7 +82,8 @@ object DicomUtil {
       StudyDescription(valueOrEmpty(dataset, DicomProperty.StudyDescription.dicomTag)),
       StudyDate(valueOrEmpty(dataset, DicomProperty.StudyDate.dicomTag)),
       StudyID(valueOrEmpty(dataset, DicomProperty.StudyID.dicomTag)),
-      AccessionNumber(valueOrEmpty(dataset, DicomProperty.AccessionNumber.dicomTag)))
+      AccessionNumber(valueOrEmpty(dataset, DicomProperty.AccessionNumber.dicomTag)),
+      PatientAge(valueOrEmpty(dataset, DicomProperty.PatientAge.dicomTag)))
 
   def datasetToEquipment(dataset: Attributes): Equipment =
     Equipment(

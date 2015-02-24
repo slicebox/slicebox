@@ -24,7 +24,8 @@ object DicomHierarchy {
     studyDescription: StudyDescription,
     studyDate: StudyDate,
     studyID: StudyID,
-    accessionNumber: AccessionNumber) extends Entity {
+    accessionNumber: AccessionNumber,
+    patientAge: PatientAge) extends Entity {
     
     override def equals(o: Any): Boolean = o match {
       case that: Study => that.studyInstanceUID == studyInstanceUID

@@ -28,12 +28,12 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
 
   private val patientsQuery = TableQuery[Patients]
 
-  private val fromStudy = (study: Study) => Option((study.id, study.patientId, study.studyInstanceUID.value, study.studyDescription.value, study.studyDate.value, study.studyID.value, study.accessionNumber.value))
+  private val fromStudy = (study: Study) => Option((study.id, study.patientId, study.studyInstanceUID.value, study.studyDescription.value, study.studyDate.value, study.studyID.value, study.accessionNumber.value, study.patientAge.value))
   
   // *** Study *** //
 
-  private val toStudy = (id: Long, patientId: Long, studyInstanceUID: String, studyDescription: String, studyDate: String, studyID: String, accessionNumber: String) =>
-    Study(id, patientId, StudyInstanceUID(studyInstanceUID), StudyDescription(studyDescription), StudyDate(studyDate), StudyID(studyID), AccessionNumber(accessionNumber))
+  private val toStudy = (id: Long, patientId: Long, studyInstanceUID: String, studyDescription: String, studyDate: String, studyID: String, accessionNumber: String, patientAge: String) =>
+    Study(id, patientId, StudyInstanceUID(studyInstanceUID), StudyDescription(studyDescription), StudyDate(studyDate), StudyID(studyID), AccessionNumber(accessionNumber), PatientAge(patientAge))
 
   private class Studies(tag: Tag) extends Table[Study](tag, "Studies") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
@@ -43,7 +43,8 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
     def studyDate = column[String](DicomProperty.StudyDate.name)
     def studyID = column[String](DicomProperty.StudyID.name)
     def accessionNumber = column[String](DicomProperty.AccessionNumber.name)
-    def * = (id, patientId, studyInstanceUID, studyDescription, studyDate, studyID, accessionNumber) <> (toStudy.tupled, fromStudy)
+    def patientAge = column[String](DicomProperty.PatientAge.name)
+    def * = (id, patientId, studyInstanceUID, studyDescription, studyDate, studyID, accessionNumber, patientAge) <> (toStudy.tupled, fromStudy)
 
     def patientFKey = foreignKey("patientFKey", patientId, patientsQuery)(_.id, onUpdate = ForeignKeyAction.Cascade, onDelete = ForeignKeyAction.Cascade)
     def patientIdJoin = patientsQuery.filter(_.id === patientId)

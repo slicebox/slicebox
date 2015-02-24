@@ -15,7 +15,8 @@ object DicomProperty {
   object StudyDate extends DicomProperty("StudyDate", Tag.StudyDate) 
   object StudyID extends DicomProperty("StudyID", Tag.StudyID) 
   object AccessionNumber extends DicomProperty("AccessionNumber", Tag.AccessionNumber) 
-
+  object PatientAge extends DicomProperty("PatientAge", Tag.PatientAge)
+  
   object SeriesInstanceUID extends DicomProperty("SeriesInstanceUID", Tag.SeriesInstanceUID) 
   object SeriesNumber extends DicomProperty("SeriesNumber", Tag.SeriesNumber) 
   object SeriesDescription extends DicomProperty("SeriesDescription", Tag.SeriesDescription) 

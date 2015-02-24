@@ -17,7 +17,8 @@ object DicomPropertyValue {
   case class StudyDate(value: String) extends DicomPropertyValue { def property = DicomProperty.StudyDate }
   case class StudyID(value: String) extends DicomPropertyValue { def property = DicomProperty.StudyID }
   case class AccessionNumber(value: String) extends DicomPropertyValue { def property = DicomProperty.AccessionNumber }
-
+  case class PatientAge(value: String) extends DicomPropertyValue { def property = DicomProperty.PatientAge }
+  
   case class SeriesInstanceUID(value: String) extends DicomPropertyValue { def property = DicomProperty.SeriesInstanceUID }
   case class SeriesNumber(value: String) extends DicomPropertyValue { def property = DicomProperty.SeriesNumber }
   case class SeriesDescription(value: String) extends DicomPropertyValue { def property = DicomProperty.SeriesDescription }

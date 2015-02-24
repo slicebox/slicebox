@@ -65,8 +65,9 @@ trait JsonFormats extends DefaultJsonProtocol {
   implicit val studyDateFormat = jsonFormat1(StudyDate)
   implicit val studyIdFormat = jsonFormat1(StudyID)
   implicit val accessionNumberFormat = jsonFormat1(AccessionNumber)
+  implicit val patientAgeFormat = jsonFormat1(PatientAge)
 
-  implicit val studyFormat = jsonFormat7(Study)
+  implicit val studyFormat = jsonFormat8(Study)
 
   implicit val manufacturerFormat = jsonFormat1(Manufacturer)
   implicit val stationNameFormat = jsonFormat1(StationName)
