@@ -57,6 +57,7 @@ angular.module('slicebox.directives', [])
             objectSelectedCallback: '&objectSelected',
             objectActions: '=',
             sorting: '=',
+            filter: '=',
             configurationKey: '@',
             callbacks: '=',
             rowCSSClassesCallback: '&rowCssClasses',
@@ -113,7 +114,8 @@ angular.module('slicebox.directives', [])
                 selectAllChecked: false,
                 configurationDropdownOpen: false,
                 pageSizeOpen: false,
-                emptyMessage: 'Empty'
+                emptyMessage: 'Empty',
+                filter: ''
             };
             $scope.visibleColumnsPreferenceValue = undefined;
 
@@ -231,6 +233,14 @@ angular.module('slicebox.directives', [])
                 }
 
                 return sortingEnabled;
+            };
+
+            $scope.filterEnabled = function() {
+                return $scope.filter;
+            };
+
+            $scope.filterChanged = function() {
+                loadPageData();
             };
 
             $scope.columnClicked = function(columnDefinition) {
@@ -397,10 +407,8 @@ angular.module('slicebox.directives', [])
                     orderByDirection: $scope.orderByDirection
                 };
 
-                if ($scope.uiState.filterColumn &&
-                    $scope.uiState.filterValue && $scope.uiState.filterValue.length > 0) {
-                    loadPageFunctionParameters.filterProperty = $scope.uiState.filterColumn.property;
-                    loadPageFunctionParameters.filterValue = $scope.uiState.filterValue;
+                if ($scope.uiState.filter && $scope.uiState.filter.length > 0) {
+                    loadPageFunctionParameters.filter = $scope.uiState.filter;
                 }
 
                 var loadPageResponse = ($scope.loadPage || angular.noop)(loadPageFunctionParameters);
@@ -651,17 +659,6 @@ angular.module('slicebox.directives', [])
 
             function clearSelection() {
                 $scope.selectedObject = null;
-            }
-
-            function filterColumnForFilterValue(filterValue) {
-                var separatorIndex = filterValue.indexOf(':');
-                if (separatorIndex == -1) {
-                    return null;
-                }
-
-                var filterPropertyTitle = filterValue.substring(0, separatorIndex).trim();
-
-                return findObjectByPropertyInArray('title', filterPropertyTitle, $scope.columnDefinitions);
             }
         }
     };

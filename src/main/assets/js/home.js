@@ -55,7 +55,7 @@ angular.module('slicebox.home', ['ngRoute'])
     };
 
     // Scope functions
-    $scope.loadPatients = function(startIndex, count, orderByProperty, orderByDirection) {
+    $scope.loadPatients = function(startIndex, count, orderByProperty, orderByDirection, filter) {
         var loadPatientsUrl = '/api/metadata/patients?startindex=' + startIndex + '&count=' + count;
         if (orderByProperty) {
             var orderByPropertyName = orderByProperty.substring(0, orderByProperty.indexOf('['));
@@ -66,6 +66,10 @@ angular.module('slicebox.home', ['ngRoute'])
             } else {
                 loadPatientsUrl = loadPatientsUrl + '&orderascending=false';
             }
+        }
+
+        if (filter) {
+            loadPatientsUrl = loadPatientsUrl + '&filter=' + encodeURIComponent(filter);
         }
 
         var loadPatientsPromise = $http.get(loadPatientsUrl);

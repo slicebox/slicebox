@@ -230,17 +230,26 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
 
   // *** Listing all patients, studies etc ***
 
-  def patients(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean)(implicit session: Session): List[Patient] = {
-    val query = orderBy match {
-      case Some(orderByColumn) =>
-        if (orderAscending)
-          patientsQuery.sortBy(_.columnByName(orderByColumn).asc)
-        else
-          patientsQuery.sortBy(_.columnByName(orderByColumn).desc)
+  def patients(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String])(implicit session: Session): List[Patient] = {
+    val filterQuery = filter match {
+      case Some(filterValue) =>
+        patientsQuery.filter(_.patientName.toLowerCase like s"%$filterValue%".toLowerCase) union
+        patientsQuery.filter(_.patientID.toLowerCase like s"%$filterValue%".toLowerCase) union
+        patientsQuery.filter(_.patientBirthDate.toLowerCase like s"%$filterValue%".toLowerCase) union
+        patientsQuery.filter(_.patientSex.toLowerCase like s"%$filterValue%".toLowerCase)
       case None => patientsQuery
     }
+    
+    val orderByQuery = orderBy match {
+      case Some(orderByColumn) =>
+        if (orderAscending)
+          filterQuery.sortBy(_.columnByName(orderByColumn).asc)
+        else
+          filterQuery.sortBy(_.columnByName(orderByColumn).desc)
+      case None => filterQuery
+    }
 
-    query
+    orderByQuery
       .drop(startIndex)
       .take(count)
       .list

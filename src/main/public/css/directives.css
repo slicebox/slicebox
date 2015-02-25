@@ -14,6 +14,10 @@
     color: rgb(103, 106, 108);
 }
 
+.sbxGridHeader .filter {
+    margin-right: 10px
+}
+
 .sbxGrid th a {
     color: rgb(103, 106, 108);
 }

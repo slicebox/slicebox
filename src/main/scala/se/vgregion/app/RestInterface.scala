@@ -152,8 +152,13 @@ trait RestApi extends HttpService with JsonFormats {
       pathPrefix("patients") {
         pathEnd {
           get {
-            parameters('startindex.as[Long] ? 0, 'count.as[Long] ? 20, 'orderby.as[String].?, 'orderascending.as[Boolean] ? true) { (startIndex, count, orderBy, orderAscending) =>
-              onSuccess(dicomService.ask(GetPatients(startIndex, count, orderBy, orderAscending))) {
+            parameters('startindex.as[Long] ? 0,
+                       'count.as[Long] ? 20,
+                       'orderby.as[String].?,
+                       'orderascending.as[Boolean] ? true,
+                       'filter.as[String].?) { (startIndex, count, orderBy, orderAscending, filter) =>
+                         
+              onSuccess(dicomService.ask(GetPatients(startIndex, count, orderBy, orderAscending, filter))) {
                 case Patients(patients) =>
                   complete(patients)
               }

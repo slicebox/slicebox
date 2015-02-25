@@ -17,6 +17,11 @@
         </div>
 
         <div class="pull-right">
+            <div ng-if="filterEnabled()" class="input-group pull-left filter">
+                <input type="text" placeholder="Filter" class="form-control"
+                    ng-model="uiState.filter" ng-change="filterChanged()"></input>
+            </div>
+
             <div ng-if="columnConfigurationEnabled()" class="btn-group pull-right columns-configuration" dropdown is-open="uiState.configurationDropdownOpen">
                 <button type="button" class="btn btn-sm btn-default dropdown-toggle pull-left">
                     <span class="fa fa-wrench"></span>

@@ -55,7 +55,7 @@ object DicomProtocol {
 
   sealed trait MetaDataQuery
 
-  case class GetPatients(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean) extends MetaDataQuery
+  case class GetPatients(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String]) extends MetaDataQuery
 
   case class GetStudies(startIndex: Long, count: Long, patientId: Long) extends MetaDataQuery
 

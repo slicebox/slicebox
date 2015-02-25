@@ -11,9 +11,10 @@
 
             <div class="panel-body">
                 <sbx-grid
-                    load-page="loadPatients(startIndex, count, orderByProperty, orderByDirection)"
+                    load-page="loadPatients(startIndex, count, orderByProperty, orderByDirection, filter)"
                     page-size="10"
                     page-sizes="[5, 10, 20, 50, 100]"
+                    filter="true"
                     object-actions="patientActions"
                     object-selected="patientSelected(object)"
                     callbacks="callbacks.patientsTable"

@@ -77,7 +77,7 @@ class DicomMetaDataDAOTest extends FlatSpec with Matchers {
       dao.equipments.size should be(1)
       dao.frameOfReferences.size should be(1)
       dao.studies.size should be(1)
-      dao.patients(0, 20, None, false).size should be(1)
+      dao.patients(0, 20, None, false, None).size should be(1)
 
       dbPat.id should be >= (0L)
       dbStudy.id should be >= (0L)
@@ -96,7 +96,7 @@ class DicomMetaDataDAOTest extends FlatSpec with Matchers {
         dao.images.size should be(0)
         dao.series.size should be(0)
         dao.studies.size should be(0)
-        dao.patients(0, 20, None, false).size should be(0)
+        dao.patients(0, 20, None, false, None).size should be(0)
         dao.equipments.size should be(1)
         dao.frameOfReferences.size should be(1)
         dao.frameOfReferenceByUid(for1).foreach(dbFor => {
@@ -150,7 +150,7 @@ class DicomMetaDataDAOTest extends FlatSpec with Matchers {
       dao.insert(imageFile7.copy(id = dbImage7.id))
       dao.insert(imageFile8.copy(id = dbImage8.id))
 
-      dao.patients(0, 20, None, false).size should be(1)
+      dao.patients(0, 20, None, false, None).size should be(1)
       dao.studiesForPatient(0, 20, dbPat.id).size should be(2)
       dao.equipments.size should be(3)
       dao.frameOfReferences.size should be(2)
