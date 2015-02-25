@@ -16,6 +16,7 @@ import se.vgregion.box.BoxServiceActor
 import se.vgregion.dicom.DicomDispatchActor
 import se.vgregion.dicom.DicomHierarchy._
 import se.vgregion.dicom.DicomProtocol._
+import se.vgregion.log.LogProtocol._
 import se.vgregion.dicom.DicomUtil
 import spray.http.ContentTypes
 import spray.http.FormFile
@@ -27,6 +28,7 @@ import spray.httpx.SprayJsonSupport._
 import spray.httpx.marshalling.ToResponseMarshallable.isMarshallable
 import spray.routing._
 import spray.httpx.unmarshalling.BasicUnmarshallers.ByteArrayUnmarshaller
+import se.vgregion.log.LogServiceActor
 
 class RestInterface extends Actor with RestApi {
 
@@ -70,7 +72,8 @@ trait RestApi extends HttpService with JsonFormats {
   val userService = new DbUserRepository(actorRefFactory, dbProps)
   val boxService = actorRefFactory.actorOf(BoxServiceActor.props(dbProps, storage, config.getString("http.host"), config.getInt("http.port")), "BoxService")
   val dicomService = actorRefFactory.actorOf(DicomDispatchActor.props(storage, dbProps), "DicomDispatch")
-
+  val logService = actorRefFactory.actorOf(LogServiceActor.props(dbProps), "LogService")
+  
   val authenticator = new Authenticator(userService)
 
   implicit def sliceboxExceptionHandler =
@@ -427,6 +430,20 @@ trait RestApi extends HttpService with JsonFormats {
         }
       }
     }
+  
+  def logRoutes: Route =
+    pathPrefix("log") {
+      pathEnd {
+        get {
+          parameters('startindex.as[Long] ? 0, 'count.as[Long] ? 20) { (startIndex, count) =>
+            onSuccess(logService.ask(GetLogEntries(startIndex, count))) {
+              case LogEntries(logEntries) =>
+                complete(logEntries)
+            }
+          }
+        }
+      }
+    }
 
   def userRoutes: Route =
     pathPrefix("user") {
@@ -492,7 +509,7 @@ trait RestApi extends HttpService with JsonFormats {
 
   def routes: Route =
     pathPrefix("api") {
-      directoryRoutes ~ scpRoutes ~ metaDataRoutes ~ imageRoutes ~ boxRoutes ~ userRoutes ~ inboxRoutes ~ outboxRoutes ~ systemRoutes
+      directoryRoutes ~ scpRoutes ~ metaDataRoutes ~ imageRoutes ~ boxRoutes ~ userRoutes ~ inboxRoutes ~ outboxRoutes ~ logRoutes ~ systemRoutes
     } ~ staticResourcesRoutes ~ angularRoutes
 
 }

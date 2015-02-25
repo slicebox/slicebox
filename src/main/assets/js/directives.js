@@ -674,7 +674,8 @@ angular.module('slicebox.directives', [])
         scope: {
             property: '@',
             type: '=',
-            title: '@'
+            title: '@',
+            filter: '@'
         },
         controller: function($scope, $element, $attrs) {
             this.setRenderer = function(rendererTranscludeFn, rendererScope) {

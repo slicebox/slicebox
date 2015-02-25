@@ -16,10 +16,12 @@ import spray.httpx.unmarshalling.FromResponseUnmarshaller
 import se.vgregion.app.DbProps
 import se.vgregion.app.JsonFormats
 import se.vgregion.dicom.DicomProtocol.DatasetReceived
+import se.vgregion.log.LogProtocol._
 import se.vgregion.dicom.DicomUtil
 import BoxProtocol.Box
 import BoxProtocol.OutboxEntry
 import akka.actor.ReceiveTimeout
+import java.util.Date
 
 class BoxPollActor(
   box: Box,
@@ -141,10 +143,14 @@ class BoxPollActor(
           self ! FetchFileFailed(exception)
       }
 
-  def updateInbox(remoteBoxId: Long, transactionId: Long, sequenceNumber: Long, totalImageCount: Long): Unit =
+  def updateInbox(remoteBoxId: Long, transactionId: Long, sequenceNumber: Long, totalImageCount: Long): Unit = {
     db.withSession { implicit session =>
       boxDao.updateInbox(remoteBoxId, transactionId, sequenceNumber, totalImageCount)
     }
+    
+    if (sequenceNumber == totalImageCount)
+      context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Receive completed.")))
+  }
   
   def updateBoxOnlineStatus(online: Boolean): Unit =
     db.withSession { implicit session =>
