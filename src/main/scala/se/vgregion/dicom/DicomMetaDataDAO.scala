@@ -293,9 +293,15 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
         .filter(_.id === imageId)
         .list.headOption
 
-  def imageFilesForSeries(seriesId: Long)(implicit session: Session): List[ImageFile] =
-    imagesForSeries(seriesId)
-      .map(image => imageFileForImage(image.id)).flatten
+  def imageFilesForSeries(seriesIds: Seq[Long])(implicit session: Session): List[ImageFile] =
+    seriesIds.flatMap(imagesForSeries(_))
+      .map(image => imageFileForImage(image.id)).flatten.toList
+      
+  def imageFilesForStudies(studyIds: Seq[Long])(implicit session: Session): List[ImageFile] =
+    studyIds.flatMap(imageFilesForStudy(_)).toList
+    
+  def imageFilesForPatients(patientIds: Seq[Long])(implicit session: Session): List[ImageFile] =
+    patientIds.flatMap(imageFilesForPatient(_)).toList
 
   def imageFilesForStudy(studyId: Long)(implicit session: Session): List[ImageFile] =
     seriesForStudy(0, Integer.MAX_VALUE, studyId)

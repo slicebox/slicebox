@@ -94,7 +94,7 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
 
           case DeleteSeries(seriesId) =>
             db.withSession { implicit session =>
-              val imageFiles = dao.imageFilesForSeries(seriesId)
+              val imageFiles = dao.imageFilesForSeries(Seq(seriesId))
               dao.deleteSeries(seriesId)
               deleteFromStorage(imageFiles)
               sender ! ImageFilesDeleted(imageFiles)
@@ -138,13 +138,6 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
         }
       }
 
-    case GetImageFilesForSeries(seriesId) =>
-      catchAndReport {
-        db.withSession { implicit session =>
-          sender ! ImageFiles(dao.imageFilesForSeries(seriesId).toList)
-        }
-      }
-
     case msg: MetaDataQuery => catchAndReport {
       msg match {
         case GetPatients(startIndex, count, orderBy, orderAscending, filter) =>
@@ -165,6 +158,21 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
         case GetImages(seriesId) =>
           db.withSession { implicit session =>
             sender ! Images(dao.imagesForSeries(seriesId))
+          }
+          
+        case GetImageFilesForSeries(seriesIds) =>
+          db.withSession { implicit session =>
+            sender ! ImageFiles(dao.imageFilesForSeries(seriesIds))
+          }
+          
+        case GetImageFilesForStudies(studyIds) =>
+          db.withSession { implicit session =>
+            sender ! ImageFiles(dao.imageFilesForStudies(studyIds))
+          }
+          
+        case GetImageFilesForPatients(patientIds) =>
+          db.withSession { implicit session =>
+            sender ! ImageFiles(dao.imageFilesForPatients(patientIds))
           }
       }
     }

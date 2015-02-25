@@ -220,7 +220,7 @@ trait RestApi extends HttpService with JsonFormats {
       } ~ path("imagefiles") {
         get {
           parameters('seriesId.as[Long]) { seriesId =>
-            onSuccess(dicomService.ask(GetImageFilesForSeries(seriesId))) {
+            onSuccess(dicomService.ask(GetImageFilesForSeries(Seq(seriesId)))) {
               case ImageFiles(imageFiles) =>
                 complete(imageFiles)
             }
@@ -290,6 +290,36 @@ trait RestApi extends HttpService with JsonFormats {
           onSuccess(boxService.ask(RemoveBox(boxId))) {
             case BoxRemoved(boxId) =>
               complete(NoContent)
+          }
+        }
+      } ~ path(LongNumber / "sendpatients") { remoteBoxId =>
+        post {
+          entity(as[Seq[Long]]) { patientIds =>
+            onSuccess(dicomService.ask(GetImageFilesForPatients(patientIds))) {
+              case ImageFiles(imageFiles) => onSuccess(boxService.ask(SendImagesToRemoteBox(remoteBoxId, imageFiles.map(_.id)))) {
+                  case ImagesSent(remoteBoxId, imageIds) => complete(NoContent)
+                }
+            }
+          }
+        }
+      } ~ path(LongNumber / "sendstudies") { remoteBoxId =>
+        post {
+          entity(as[Seq[Long]]) { studyIds =>
+            onSuccess(dicomService.ask(GetImageFilesForStudies(studyIds))) {
+              case ImageFiles(imageFiles) => onSuccess(boxService.ask(SendImagesToRemoteBox(remoteBoxId, imageFiles.map(_.id)))) {
+                  case ImagesSent(remoteBoxId, imageIds) => complete(NoContent)
+                }
+            }
+          }
+        }
+      } ~ path(LongNumber / "sendseries") { remoteBoxId =>
+        post {
+          entity(as[Seq[Long]]) { seriesIds =>
+            onSuccess(dicomService.ask(GetImageFilesForSeries(seriesIds))) {
+              case ImageFiles(imageFiles) => onSuccess(boxService.ask(SendImagesToRemoteBox(remoteBoxId, imageFiles.map(_.id)))) {
+                  case ImagesSent(remoteBoxId, imageIds) => complete(NoContent)
+                }
+            }
           }
         }
       } ~ path(LongNumber / "sendimages") { remoteBoxId =>

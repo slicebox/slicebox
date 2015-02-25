@@ -16,6 +16,10 @@ angular.module('slicebox.home', ['ngRoute'])
     $scope.patientActions =
         [
             {
+                name: 'Send',
+                action: confirmSendPatients
+            },
+            {
                 name: 'Delete',
                 action: confirmDeletePatients
             }
@@ -24,6 +28,10 @@ angular.module('slicebox.home', ['ngRoute'])
     $scope.studyActions =
         [
             {
+                name: 'Send',
+                action: confirmSendStudies
+            },
+            {
                 name: 'Delete',
                 action: confirmDeleteStudies
             }
@@ -31,6 +39,10 @@ angular.module('slicebox.home', ['ngRoute'])
 
     $scope.seriesActions =
         [
+            {
+                name: 'Send',
+                action: confirmSendSeries
+            },
             {
                 name: 'Delete',
                 action: confirmDeleteSeries
@@ -41,7 +53,7 @@ angular.module('slicebox.home', ['ngRoute'])
         [
             {
                 name: 'Send',
-                action: sendImageFiles
+                action: confirmSendImageFiles
             }
         ];
 
@@ -223,27 +235,123 @@ angular.module('slicebox.home', ['ngRoute'])
         return $q.all(deletePromises);
     }
 
-    function sendImageFiles(imageFiles) {
+    function confirmSendImageFiles(imageFiles) {
         var modalInstance = $modal.open({
                 templateUrl: '/assets/partials/sendImageFilesModalContent.html',
                 controller: 'SendImageFilesModalCtrl',
                 resolve: {
-                    imageFiles: function () {
-                        return imageFiles;
+                    title: function() {
+                        return 'Send ' + imageFiles.length + ' Image Files';
+                    },
+                    sendCallback: function() {
+                        return function(remoteBoxId) {
+                            return sendImageFiles(remoteBoxId, imageFiles);
+                        };
                     }
                 }
             });
     }
+
+    function sendImageFiles(remoteBoxId, imageFiles) {
+        var imageIds = [];
+
+        angular.forEach(imageFiles, function(imageFile) {
+            imageIds.push(imageFile.id);
+        });
+
+        return $http.post('/api/boxes/' + remoteBoxId + '/sendimages', imageIds);
+    }
+
+    function confirmSendSeries(series) {
+        var modalInstance = $modal.open({
+                templateUrl: '/assets/partials/sendImageFilesModalContent.html',
+                controller: 'SendImageFilesModalCtrl',
+                resolve: {
+                    title: function() {
+                        return 'Send ' + series.length + ' Series';
+                    },
+                    sendCallback: function() {
+                        return function(remoteBoxId) {
+                            return sendSeries(remoteBoxId, series);
+                        };
+                    }
+                }
+            });
+    }
+
+    function sendSeries(remoteBoxId, series) {
+        var seriesIds = [];
+
+        angular.forEach(series, function(theSeries) {
+            seriesIds.push(theSeries.id);
+        });
+
+        return $http.post('/api/boxes/' + remoteBoxId + '/sendseries', seriesIds);
+    }
+
+    function confirmSendStudies(studies) {
+        var modalInstance = $modal.open({
+                templateUrl: '/assets/partials/sendImageFilesModalContent.html',
+                controller: 'SendImageFilesModalCtrl',
+                resolve: {
+                    title: function() {
+                        return 'Send ' + studies.length + ' Studies';
+                    },
+                    sendCallback: function() {
+                        return function(remoteBoxId) {
+                            return sendStudies(remoteBoxId, studies);
+                        };
+                    }
+                }
+            });
+    }
+    
+    function sendStudies(remoteBoxId, studies) {
+        var studyIds = [];
+
+        angular.forEach(studies, function(study) {
+            studyIds.push(study.id);
+        });
+
+        return $http.post('/api/boxes/' + remoteBoxId + '/sendstudies', studyIds);
+    }
+
+    function confirmSendPatients(patients) {
+        var modalInstance = $modal.open({
+                templateUrl: '/assets/partials/sendImageFilesModalContent.html',
+                controller: 'SendImageFilesModalCtrl',
+                resolve: {
+                    title: function() {
+                        return 'Send ' + patients.length + ' Patients';
+                    },
+                    sendCallback: function() {
+                        return function(remoteBoxId) {
+                            return sendPatients(remoteBoxId, patients);
+                        };
+                    }
+                }
+            });
+    }
+    
+    function sendPatients(remoteBoxId, patients) {
+        var patientIds = [];
+
+        angular.forEach(patients, function(patient) {
+            patientIds.push(patient.id);
+        });
+
+        return $http.post('/api/boxes/' + remoteBoxId + '/sendpatients', patientIds);
+    }
 })
 
-.controller('SendImageFilesModalCtrl', function($scope, $modalInstance, $http, $q, imageFiles) {
+.controller('SendImageFilesModalCtrl', function($scope, $modalInstance, $http, $q, title, sendCallback) {
     // Initialization
+    $scope.title = title;
+
     $scope.uiState = {
         errorMessages: [],
         selectedReceiver: null
     };
-
-    $scope.imageFiles = imageFiles;
 
     // Scope functions
     $scope.loadBoxesPage = function(startIndex, count, orderByProperty, orderByDirection) {
@@ -259,16 +367,9 @@ angular.module('slicebox.home', ['ngRoute'])
     };
 
     $scope.sendButtonClicked = function() {
-        var imageIds = [];
-        var sendPromise;
+        var sendPromise = sendCallback($scope.uiState.selectedReceiver.id);
 
         $scope.uiState.sendInProgress = true;
-
-        angular.forEach($scope.imageFiles, function(imageFile) {
-            imageIds.push(imageFile.id);
-        });
-
-        sendPromise = $http.post('/api/boxes/' + $scope.uiState.selectedReceiver.id + '/sendimages', imageIds);
 
         sendPromise.error(function(data) {
             $scope.uiState.errorMessages.push(data);

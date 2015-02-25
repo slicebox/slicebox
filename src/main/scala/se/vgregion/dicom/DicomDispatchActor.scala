@@ -45,9 +45,6 @@ class DicomDispatchActor(storage: Path, dbProps: DbProps) extends Actor {
       
     case msg: GetImageFile =>
       storageActor forward msg
-
-    case msg: GetImageFilesForSeries =>
-      storageActor forward msg
   }
 
 }

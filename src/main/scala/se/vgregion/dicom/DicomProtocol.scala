@@ -63,6 +63,12 @@ object DicomProtocol {
 
   case class GetImages(seriesId: Long) extends MetaDataQuery
   
+  case class GetImageFilesForPatients(patientIds: Seq[Long]) extends MetaDataQuery
+  
+  case class GetImageFilesForStudies(studyIds: Seq[Long]) extends MetaDataQuery
+  
+  case class GetImageFilesForSeries(seriesIds: Seq[Long]) extends MetaDataQuery
+  
   
   sealed trait MetaDataUpdate
   
@@ -78,8 +84,6 @@ object DicomProtocol {
   case object GetAllImageFiles
 
   case class GetImageFile(imageId: Long)
-
-  case class GetImageFilesForSeries(seriesId: Long)
   
   case class AddDataset(dataset: Attributes)
   
