@@ -42,6 +42,7 @@
                     load-page="loadStudies(startIndex, count, orderByProperty, orderByDirection)"
                     page-size="10"
                     page-sizes="[5, 10, 20, 50, 100]"
+                    sorting="false"
                     object-actions="studyActions"
                     object-selected="studySelected(object)"
                     callbacks="callbacks.studiesTable"
@@ -73,6 +74,7 @@
                     load-page="loadSeries(startIndex, count, orderByProperty, orderByDirection)"
                     page-size="10"
                     page-sizes="[5, 10, 20, 50, 100]"
+                    sorting="false"
                     object-actions="seriesActions"
                     object-selected="seriesSelected(object)"
                     callbacks="callbacks.seriesTable"
@@ -103,6 +105,7 @@
                 <sbx-grid
                     load-page="loadImageFiles(startIndex, count, orderByProperty, orderByDirection)"
                     page-size="10000000"
+                    sorting="false"
                     object-actions="fileImageActions"
                     callbacks="callbacks.imageFilesTable"
                     empty-message="No image files found">

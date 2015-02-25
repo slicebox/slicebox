@@ -56,7 +56,19 @@ angular.module('slicebox.home', ['ngRoute'])
 
     // Scope functions
     $scope.loadPatients = function(startIndex, count, orderByProperty, orderByDirection) {
-        var loadPatientsPromise = $http.get('/api/metadata/patients?startindex=' + startIndex + '&count=' + count);
+        var loadPatientsUrl = '/api/metadata/patients?startindex=' + startIndex + '&count=' + count;
+        if (orderByProperty) {
+            var orderByPropertyName = orderByProperty.substring(0, orderByProperty.indexOf('['));
+            loadPatientsUrl = loadPatientsUrl + '&orderby=' + orderByPropertyName;
+            
+            if (orderByDirection === 'ASCENDING') {
+                loadPatientsUrl = loadPatientsUrl + '&orderascending=true';
+            } else {
+                loadPatientsUrl = loadPatientsUrl + '&orderascending=false';
+            }
+        }
+
+        var loadPatientsPromise = $http.get(loadPatientsUrl);
 
         loadPatientsPromise.error(function(error) {
             appendErrorMessage('Failed to load patients: ' + error);

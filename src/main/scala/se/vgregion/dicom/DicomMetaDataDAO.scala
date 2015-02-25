@@ -24,6 +24,16 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
     def patientBirthDate = column[String](DicomProperty.PatientBirthDate.name)
     def patientSex = column[String](DicomProperty.PatientSex.name)
     def * = (id, patientName, patientID, patientBirthDate, patientSex) <> (toPatient.tupled, fromPatient)
+    
+    def columnByName(columnName: String) =
+      columnName match {
+        case "id"               => id
+        case "patientName"      => patientName
+        case "patientID"        => patientID
+        case "patientBirthDate" => patientBirthDate
+        case "patientSex"       => patientSex
+        case _ => throw new IllegalArgumentException(s"Patients: unknown column: $columnName")
+      }
   }
 
   private val patientsQuery = TableQuery[Patients]
@@ -220,11 +230,21 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
 
   // *** Listing all patients, studies etc ***
 
-  def patients(startIndex: Long, count: Long)(implicit session: Session): List[Patient] =
-    patientsQuery
-    .drop(startIndex)
-    .take(count)
-    .list
+  def patients(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean)(implicit session: Session): List[Patient] = {
+    val query = orderBy match {
+      case Some(orderByColumn) =>
+        if (orderAscending)
+          patientsQuery.sortBy(_.columnByName(orderByColumn).asc)
+        else
+          patientsQuery.sortBy(_.columnByName(orderByColumn).desc)
+      case None => patientsQuery
+    }
+
+    query
+      .drop(startIndex)
+      .take(count)
+      .list
+  }
   
   def studies(implicit session: Session): List[Study] = studiesQuery.list
   
