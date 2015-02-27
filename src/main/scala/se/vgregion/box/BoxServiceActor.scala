@@ -4,6 +4,7 @@ import se.vgregion.app.DbProps
 import akka.actor.Actor
 import akka.event.LoggingReceive
 import se.vgregion.box.BoxProtocol._
+import se.vgregion.log.LogProtocol._
 import akka.actor.Props
 import akka.actor.PoisonPill
 import java.util.UUID
@@ -11,6 +12,7 @@ import akka.actor.Status.Failure
 import se.vgregion.util.ExceptionCatching
 import java.nio.file.Path
 import scala.math.abs
+import java.util.Date
 
 class BoxServiceActor(dbProps: DbProps, storage: Path, host: String, port: Int) extends Actor with ExceptionCatching {
 
@@ -101,6 +103,10 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, host: String, port: Int) 
               outboxEntryByTransactionIdAndSequenceNumber(box.id, transactionId, sequenceNumber) match {
                 case Some(outboxEntry) =>
                   removeOutboxEntryFromDb(outboxEntry.id)
+                  
+                  if (outboxEntry.sequenceNumber == outboxEntry.totalImageCount)
+                    context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Send completed.")))
+                  
                   sender ! OutboxEntryDeleted
                 case None =>
                   sender ! OutboxEntryDeleted
@@ -222,10 +228,14 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, host: String, port: Int) 
       dao.nextOutboxEntryForRemoteBoxId(boxId)
     }
   
-  def updateInbox(remoteBoxId: Long, transactionId: Long, sequenceNumber: Long, totalImageCount: Long): Unit =
+  def updateInbox(remoteBoxId: Long, transactionId: Long, sequenceNumber: Long, totalImageCount: Long): Unit = {
     db.withSession { implicit session =>
       dao.updateInbox(remoteBoxId, transactionId, sequenceNumber, totalImageCount)
     }
+    
+    if (sequenceNumber == totalImageCount)
+      context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Receive completed.")))
+  }
   
   def addOutboxEntries(remoteBoxId: Long, imageIds: Seq[Long]): Unit = {
     val transactionId = generateTransactionId()

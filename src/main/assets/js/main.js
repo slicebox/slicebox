@@ -11,6 +11,7 @@ angular.module('slicebox', [
     'slicebox.home',
     'slicebox.inbox',
     'slicebox.outbox',
+    'slicebox.log',
     'slicebox.adminScps',
     'slicebox.adminWatchDirectories',
     'slicebox.adminBoxes'

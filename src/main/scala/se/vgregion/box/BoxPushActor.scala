@@ -21,6 +21,8 @@ import spray.http.StatusCode
 import se.vgregion.dicom.DicomUtil._
 import se.vgregion.dicom.DicomAnonymization._
 import java.io.ByteArrayOutputStream
+import se.vgregion.log.LogProtocol._
+import java.util.Date
 
 class BoxPushActor(box: Box, dbProps: DbProps, storage: Path, pollInterval: FiniteDuration = 5.seconds) extends Actor {
   val log = Logging(context.system, this)
@@ -110,6 +112,9 @@ class BoxPushActor(box: Box, dbProps: DbProps, storage: Path, pollInterval: Fini
     db.withSession { implicit session =>
       boxDao.removeOutboxEntry(outboxEntry.id)
     }
+    
+    if (outboxEntry.sequenceNumber == outboxEntry.totalImageCount)
+      context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Send completed.")))
 
     processNextOutboxEntry
   }

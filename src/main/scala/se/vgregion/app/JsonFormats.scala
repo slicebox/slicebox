@@ -7,6 +7,7 @@ import se.vgregion.dicom.DicomPropertyValue
 import se.vgregion.dicom.DicomHierarchy._
 import se.vgregion.dicom.DicomProtocol._
 import se.vgregion.box.BoxProtocol._
+import se.vgregion.log.LogProtocol._
 
 trait JsonFormats extends DefaultJsonProtocol {
 
@@ -99,4 +100,16 @@ trait JsonFormats extends DefaultJsonProtocol {
   implicit val imageAttributeFormat = jsonFormat9(ImageAttribute)
   
   implicit val imagesFormat = jsonFormat1(Images)
+  
+  
+  implicit object LogEntryTypeFormat extends JsonFormat[LogEntryType] {
+    def write(obj: LogEntryType) = JsString(obj.toString)
+
+    def read(json: JsValue): LogEntryType = json match {
+      case JsString(string) => LogEntryType.withName(string)
+      case _                => deserializationError("Enumeration expected")
+    }
+  }
+  
+  implicit val logEntryFormat = jsonFormat4(LogEntry)
 }
