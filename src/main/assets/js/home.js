@@ -134,6 +134,7 @@ angular.module('slicebox.home', ['ngRoute'])
     $scope.seriesSelected = function(series) {
         $scope.uiState.selectedSeries = series;
         $scope.callbacks.imageFilesTable.reset();
+        $scope.callbacks.imageAttributesTable.reset();
     };
 
     $scope.loadImageFiles = function(startIndex, count, orderByProperty, orderByDirection) {
@@ -148,6 +149,20 @@ angular.module('slicebox.home', ['ngRoute'])
         });
 
         return loadImageFilesPromise;
+    };
+
+    $scope.loadImageAttributes = function(startIndex, count) {
+        if ($scope.uiState.selectedSeries === null) {
+            return [];
+        }
+
+        var loadImageAttributesPromise = $http.get('/api/images/' + $scope.uiState.selectedSeries.id + '/attributes');
+
+        loadImageAttributesPromise.error(function(error) {
+            appendErrorMessage('Failed to load image attributes: ' + error);
+        });
+
+        return loadImageAttributesPromise;
     };
 
     $scope.closeErrorMessageAlert = function() {

@@ -26,7 +26,17 @@ object DicomProtocol {
   
   case class WatchedDirectory(id: Long, path: String) extends Entity
 
-
+  case class ImageAttribute(
+      group: String, 
+      element: String, 
+      vr: String, 
+      length: Int, 
+      multiplicity: Int, 
+      depth: Int, 
+      path: String, 
+      name: String, 
+      value: String)
+  
   // messages
 
     
@@ -85,6 +95,8 @@ object DicomProtocol {
 
   case class GetImageFile(imageId: Long)
   
+  case class GetImageAttributes(imageId: Long)
+  
   case class AddDataset(dataset: Attributes)
   
   // ***to API***
@@ -128,6 +140,8 @@ object DicomProtocol {
 
   case class ImageFiles(imageFiles: Seq[ImageFile])
     
+  case class ImageAttributes(attributes: Seq[ImageAttribute])
+
   case class ImageFilesDeleted(imageFiles: Seq[ImageFile])
 
 }

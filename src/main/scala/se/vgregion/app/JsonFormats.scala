@@ -1,6 +1,7 @@
 package se.vgregion.app
 
 import spray.json._
+import se.vgregion.dicom.DicomProperty
 import se.vgregion.dicom.DicomPropertyValue._
 import se.vgregion.dicom.DicomPropertyValue
 import se.vgregion.dicom.DicomHierarchy._
@@ -20,10 +21,10 @@ trait JsonFormats extends DefaultJsonProtocol {
   implicit val boxBaseUrlFormat = jsonFormat1(BoxBaseUrl)
 
   implicit val updateInboxFormat = jsonFormat4(UpdateInbox)
-  
+
   implicit val imageIdFormat = jsonFormat1(ImageId)
   implicit val imageIdsFormat = jsonFormat1(ImageIds)
-  
+
   implicit object BoxSendMethodFormat extends JsonFormat[BoxSendMethod] {
     def write(obj: BoxSendMethod) = JsString(obj.toString)
 
@@ -38,7 +39,7 @@ trait JsonFormats extends DefaultJsonProtocol {
   implicit val outboxEntryFormat = jsonFormat7(OutboxEntry)
   implicit val outboxEntryInfoFormat = jsonFormat7(OutboxEntryInfo)
   implicit val inboxEntryInfoFormat = jsonFormat4(InboxEntryInfo)
-  
+
   implicit val generateBoxBaseUrlFormat = jsonFormat1(GenerateBoxBaseUrl)
 
   implicit val addScpDataFormat = jsonFormat3(AddScp)
@@ -92,9 +93,10 @@ trait JsonFormats extends DefaultJsonProtocol {
   implicit val imageTypeFormat = jsonFormat1(ImageType)
 
   implicit val imageFormat = jsonFormat4(Image)
-  
+
   implicit val fileNameFormat = jsonFormat1(FileName)
   implicit val imageFileFormat = jsonFormat2(ImageFile)
-
+  implicit val imageAttributeFormat = jsonFormat9(ImageAttribute)
+  
   implicit val imagesFormat = jsonFormat1(Images)
 }

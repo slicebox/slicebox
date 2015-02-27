@@ -10,37 +10,18 @@ import akka.event.Logging
 import akka.event.LoggingReceive
 import org.dcm4che3.data.Attributes
 import org.dcm4che3.data.Tag
+import org.dcm4che3.data.VR
 import se.vgregion.app.DbProps
 import se.vgregion.dicom.DicomProtocol._
-import DicomHierarchy.Equipment
-import DicomHierarchy.FrameOfReference
-import DicomHierarchy.Image
-import DicomHierarchy.Patient
-import DicomHierarchy.Series
-import DicomHierarchy.Study
-import DicomPropertyValue.AccessionNumber
-import DicomPropertyValue.BodyPartExamined
-import DicomPropertyValue.FrameOfReferenceUID
-import DicomPropertyValue.ImageType
-import DicomPropertyValue.Manufacturer
-import DicomPropertyValue.Modality
-import DicomPropertyValue.PatientBirthDate
-import DicomPropertyValue.PatientID
-import DicomPropertyValue.PatientName
-import DicomPropertyValue.PatientSex
-import DicomPropertyValue.ProtocolName
-import DicomPropertyValue.SOPInstanceUID
-import DicomPropertyValue.SeriesDate
-import DicomPropertyValue.SeriesDescription
-import DicomPropertyValue.SeriesInstanceUID
-import DicomPropertyValue.StationName
-import DicomPropertyValue.StudyDate
-import DicomPropertyValue.StudyDescription
-import DicomPropertyValue.StudyID
-import DicomPropertyValue.StudyInstanceUID
+import DicomHierarchy._
+import DicomPropertyValue._
 import DicomUtil._
 import se.vgregion.dicom.DicomProtocol.DatasetReceived
 import se.vgregion.util.ExceptionCatching
+import org.dcm4che3.data.Attributes.Visitor
+import scala.collection.mutable.ListBuffer
+import org.dcm4che3.data.Keyword
+import org.dcm4che3.util.TagUtils
 
 class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with ExceptionCatching {
   val log = Logging(context.system, this)
@@ -138,6 +119,18 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
         }
       }
 
+    case GetImageAttributes(imageId) =>
+      catchAndReport {
+        db.withSession { implicit session =>
+          dao.imageFileForImage(imageId) match {
+            case Some(imageFile) =>
+              sender ! readImageAttributes(imageFile.fileName.value)
+            case None =>
+              throw new IllegalArgumentException(s"No file found for image $imageId")
+          }
+        }
+      }
+
     case msg: MetaDataQuery => catchAndReport {
       msg match {
         case GetPatients(startIndex, count, orderBy, orderAscending, filter) =>
@@ -159,17 +152,17 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
           db.withSession { implicit session =>
             sender ! Images(dao.imagesForSeries(seriesId))
           }
-          
+
         case GetImageFilesForSeries(seriesIds) =>
           db.withSession { implicit session =>
             sender ! ImageFiles(dao.imageFilesForSeries(seriesIds))
           }
-          
+
         case GetImageFilesForStudies(studyIds) =>
           db.withSession { implicit session =>
             sender ! ImageFiles(dao.imageFilesForStudies(studyIds))
           }
-          
+
         case GetImageFilesForPatients(patientIds) =>
           db.withSession { implicit session =>
             sender ! ImageFiles(dao.imageFilesForPatients(patientIds))
@@ -229,6 +222,56 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
     Files.delete(filePath)
     log.info("Deleted file " + filePath)
   }
+
+  def readImageAttributes(fileName: String): ImageAttributes = {
+    val filePath = storage.resolve(fileName)
+    val dataset = loadDataset(filePath, false)
+    ImageAttributes(readImageAttributes(dataset, 0, ""))
+  }
+
+  def readImageAttributes(dataset: Attributes, depth: Int, path: String): List[ImageAttribute] = {
+    val attributesBuffer = ListBuffer.empty[ImageAttribute]
+    if (dataset != null) {
+      dataset.accept(new Visitor() {
+        override def visit(attrs: Attributes, tag: Int, vr: VR, value: AnyRef): Boolean = {
+          val group = TagUtils.toHexString(TagUtils.groupNumber(tag)).substring(4)
+          val element = TagUtils.toHexString(TagUtils.elementNumber(tag)).substring(4)
+          val name = Keyword.valueOf(tag)
+          val vrName = vr.name
+          val length = lengthOf(attrs.getBytes(tag))
+          val multiplicity = multiplicityOf(attrs.getStrings(tag))
+          val content = toSingleString(attrs.getStrings(tag))
+          attributesBuffer += ImageAttribute(group, element, vrName, length, multiplicity, depth, path, name, content)
+          if (vr == VR.SQ) {
+            val nextPath = if (path.isEmpty()) name else path + '/' + name
+            attributesBuffer ++= readImageAttributes(attrs.getNestedDataset(tag), depth + 1, nextPath)
+          }
+          true
+        }
+      }, false)
+    }
+    attributesBuffer.toList
+  }
+
+  def lengthOf(bytes: Array[Byte]) =
+    if (bytes == null)
+      0
+    else
+      bytes.length
+
+  def multiplicityOf(strings: Array[String]) =
+    if (strings == null)
+      0
+    else
+      strings.length
+
+  def toSingleString(strings: Array[String]) =
+    if (strings == null || strings.length == 0)
+      ""
+    else if (strings.length == 1)
+      strings(0)
+    else
+      "[" + strings.tail.foldLeft(strings.head)((single, s) => single + "," + s) + "]"
 
   def setupDb() =
     db.withSession { implicit session =>

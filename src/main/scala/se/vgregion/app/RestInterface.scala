@@ -255,6 +255,13 @@ trait RestApi extends HttpService with JsonFormats {
                 complete((BadRequest, "Dataset could not be read"))
           }
         }
+      } ~ path(LongNumber / "attributes") { imageId =>
+        get {
+          onSuccess(dicomService.ask(GetImageAttributes(imageId))) {
+            case ImageAttributes(attributes) =>
+              complete(attributes)
+          }
+        }
       }
     }
 
