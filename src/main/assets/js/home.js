@@ -63,7 +63,14 @@ angular.module('slicebox.home', ['ngRoute'])
         errorMessage: null,
         selectedPatient: null,
         selectedStudy: null,
-        selectedSeries: null
+        selectedSeries: null,
+        seriesDetails: {
+            imageUrls: [],
+            imageHeight: 50,
+            isWindowManual: false,
+            windowMin: undefined,
+            windowMax: undefined
+        }
     };
 
     // Scope functions
@@ -133,22 +140,11 @@ angular.module('slicebox.home', ['ngRoute'])
 
     $scope.seriesSelected = function(series) {
         $scope.uiState.selectedSeries = series;
-        $scope.callbacks.imageFilesTable.reset();
         $scope.callbacks.imageAttributesTable.reset();
-    };
-
-    $scope.loadImageFiles = function(startIndex, count, orderByProperty, orderByDirection) {
-        if ($scope.uiState.selectedSeries === null) {
-            return [];
-        }
-
-        var loadImageFilesPromise = $http.get('/api/metadata/imagefiles?seriesId=' + $scope.uiState.selectedSeries.id);
-
-        loadImageFilesPromise.error(function(error) {
-            appendErrorMessage('Failed to load image files: ' + error);
-        });
-
-        return loadImageFilesPromise;
+        $scope.uiState.seriesDetails.imageUrls = [];
+        $scope.uiState.seriesDetails.windowMin = undefined;
+        $scope.uiState.seriesDetails.windowMax = undefined;
+        $scope.updateImageUrls();
     };
 
     $scope.loadImageAttributes = function(startIndex, count) {
@@ -156,13 +152,67 @@ angular.module('slicebox.home', ['ngRoute'])
             return [];
         }
 
-        var loadImageAttributesPromise = $http.get('/api/images/' + $scope.uiState.selectedSeries.id + '/attributes');
+        var imagesPromise = $http.get('/api/metadata/images?seriesId=' + $scope.uiState.selectedSeries.id);
 
-        loadImageAttributesPromise.error(function(error) {
+        imagesPromise.error(function(reason) {
+            appendErrorMessage('Failed to load images for series: ' + error);            
+        });
+
+        var attributesPromise = imagesPromise.then(function(images) {
+            if (images.data.length > 0) {
+                return $http.get('/api/images/' + images.data[0].id + '/attributes');
+            } else {
+                return [];
+            }
+        }, function(error) {
             appendErrorMessage('Failed to load image attributes: ' + error);
         });
 
-        return loadImageAttributesPromise;
+        return attributesPromise;
+    };
+
+    $scope.updateImageUrls = function() {
+        $scope.uiState.seriesDetails.imageUrls = [];
+
+        if ($scope.uiState.selectedSeries !== null) {
+
+            $http.get('/api/metadata/images?seriesId=' + $scope.uiState.selectedSeries.id).success(function(images) {
+
+                $scope.uiState.seriesDetails.imageUrls = [];
+
+                angular.forEach(images, function(image) {
+
+                    $http.get('/api/images/' + image.id + '/imageinformation').success(function(info) {
+                        // window min and max are defined by the first image of the series
+                        if (!$scope.uiState.seriesDetails.windowMin) {
+                            $scope.uiState.seriesDetails.windowMin = info.minimumPixelValue;
+                        }
+                        if (!$scope.uiState.seriesDetails.windowMax) {
+                            $scope.uiState.seriesDetails.windowMax = info.maximumPixelValue;
+                        }
+                        for (var i = 0; i < info.numberOfFrames; i++) {
+                            var url = '/api/images/' + image.id + '/png?framenumber=' + (i + 1);
+                            if ($scope.uiState.seriesDetails.isWindowManual) {
+                                url = url + 
+                                    '&windowmin=' + $scope.uiState.seriesDetails.windowMin + 
+                                    '&windowmax=' + $scope.uiState.seriesDetails.windowMax;
+                            }
+                            if (!isNaN(parseInt($scope.uiState.seriesDetails.imageHeight))) {
+                                url = url + 
+                                    '&imageheight=' + $scope.uiState.seriesDetails.imageHeight;
+                            }
+                            $scope.uiState.seriesDetails.imageUrls.push(url);
+                        }
+                    }).error(function(error) {
+                        appendErrorMessage('Failed to load image information: ' + error);            
+                    });
+
+                });
+            }).error(function(reason) {
+                appendErrorMessage('Failed to load images for series: ' + reason);                        
+            });
+
+        }
     };
 
     $scope.closeErrorMessageAlert = function() {
@@ -357,6 +407,7 @@ angular.module('slicebox.home', ['ngRoute'])
 
         return $http.post('/api/boxes/' + remoteBoxId + '/sendpatients', patientIds);
     }
+
 })
 
 .controller('SendImageFilesModalCtrl', function($scope, $modalInstance, $http, $q, title, sendCallback) {

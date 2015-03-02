@@ -101,6 +101,7 @@ trait JsonFormats extends DefaultJsonProtocol {
   
   implicit val imagesFormat = jsonFormat1(Images)
   
+  implicit val numberOfImageFramesFormat = jsonFormat3(ImageInformation)
   
   implicit object LogEntryTypeFormat extends JsonFormat[LogEntryType] {
     def write(obj: LogEntryType) = JsString(obj.toString)

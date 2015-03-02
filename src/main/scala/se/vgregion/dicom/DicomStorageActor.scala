@@ -3,25 +3,34 @@ package se.vgregion.dicom
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
+import scala.collection.mutable.ListBuffer
+import scala.concurrent.Future
 import akka.actor.Actor
 import akka.actor.Props
 import akka.actor.actorRef2Scala
 import akka.event.Logging
 import akka.event.LoggingReceive
+import akka.pattern.pipe
 import org.dcm4che3.data.Attributes
+import org.dcm4che3.data.Attributes.Visitor
 import org.dcm4che3.data.Tag
 import org.dcm4che3.data.VR
+import org.dcm4che3.imageio.plugins.dcm.DicomImageReadParam
+import org.dcm4che3.data.Keyword
+import org.dcm4che3.util.TagUtils
 import se.vgregion.app.DbProps
-import se.vgregion.dicom.DicomProtocol._
+import se.vgregion.dicom.DicomProtocol.DatasetReceived
+import se.vgregion.util.ExceptionCatching
+import java.awt.image.BufferedImage
+import java.awt.Color
+import java.awt.RenderingHints
+import javax.imageio.ImageIO
+import java.io.ByteArrayOutputStream
+import java.io.File
+import DicomProtocol._
 import DicomHierarchy._
 import DicomPropertyValue._
 import DicomUtil._
-import se.vgregion.dicom.DicomProtocol.DatasetReceived
-import se.vgregion.util.ExceptionCatching
-import org.dcm4che3.data.Attributes.Visitor
-import scala.collection.mutable.ListBuffer
-import org.dcm4che3.data.Keyword
-import org.dcm4che3.util.TagUtils
 
 class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with ExceptionCatching {
   val log = Logging(context.system, this)
@@ -31,6 +40,8 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
 
   setupDb()
 
+  implicit val ec = context.dispatcher
+  
   override def preStart {
     context.system.eventStream.subscribe(context.self, classOf[DatasetReceived])
     context.system.eventStream.subscribe(context.self, classOf[FileReceived])
@@ -59,77 +70,81 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
         sender ! ImageAdded(image)
       }
 
-    case msg: MetaDataUpdate =>
+    case msg: MetaDataUpdate => catchAndReport {
+      msg match {
 
-      catchAndReport {
-
-        msg match {
-
-          case DeleteImage(imageId) =>
-            db.withSession { implicit session =>
-              val imageFiles = dao.imageFileForImage(imageId).toList
-              dao.deleteImage(imageId)
-              deleteFromStorage(imageFiles)
-              sender ! ImageFilesDeleted(imageFiles)
-            }
-
-          case DeleteSeries(seriesId) =>
-            db.withSession { implicit session =>
-              val imageFiles = dao.imageFilesForSeries(Seq(seriesId))
-              dao.deleteSeries(seriesId)
-              deleteFromStorage(imageFiles)
-              sender ! ImageFilesDeleted(imageFiles)
-            }
-
-          case DeleteStudy(studyId) =>
-            db.withSession { implicit session =>
-              val imageFiles = dao.imageFilesForStudy(studyId)
-              dao.deleteStudy(studyId)
-              deleteFromStorage(imageFiles)
-              sender ! ImageFilesDeleted(imageFiles)
-            }
-
-          case DeletePatient(patientId) =>
-            db.withSession { implicit session =>
-              val imageFiles = dao.imageFilesForPatient(patientId)
-              dao.deletePatient(patientId)
-              deleteFromStorage(imageFiles)
-              sender ! ImageFilesDeleted(imageFiles)
-            }
-
-        }
-      }
-
-    case GetAllImageFiles =>
-      catchAndReport {
-        db.withSession { implicit session =>
-          sender ! ImageFiles(dao.imageFiles)
-        }
-      }
-
-    case GetImageFile(imageId) =>
-      catchAndReport {
-        db.withSession { implicit session =>
-          dao.imageFileForImage(imageId) match {
-            case Some(imageFile) =>
-              sender ! imageFile
-            case None =>
-              throw new IllegalArgumentException(s"No file found for image $imageId")
+        case DeleteImage(imageId) =>
+          db.withSession { implicit session =>
+            val imageFiles = dao.imageFileForImage(imageId).toList
+            dao.deleteImage(imageId)
+            deleteFromStorage(imageFiles)
+            sender ! ImageFilesDeleted(imageFiles)
           }
-        }
-      }
 
-    case GetImageAttributes(imageId) =>
-      catchAndReport {
-        db.withSession { implicit session =>
-          dao.imageFileForImage(imageId) match {
-            case Some(imageFile) =>
-              sender ! readImageAttributes(imageFile.fileName.value)
-            case None =>
-              throw new IllegalArgumentException(s"No file found for image $imageId")
+        case DeleteSeries(seriesId) =>
+          db.withSession { implicit session =>
+            val imageFiles = dao.imageFilesForSeries(Seq(seriesId))
+            dao.deleteSeries(seriesId)
+            deleteFromStorage(imageFiles)
+            sender ! ImageFilesDeleted(imageFiles)
           }
-        }
+
+        case DeleteStudy(studyId) =>
+          db.withSession { implicit session =>
+            val imageFiles = dao.imageFilesForStudy(studyId)
+            dao.deleteStudy(studyId)
+            deleteFromStorage(imageFiles)
+            sender ! ImageFilesDeleted(imageFiles)
+          }
+
+        case DeletePatient(patientId) =>
+          db.withSession { implicit session =>
+            val imageFiles = dao.imageFilesForPatient(patientId)
+            dao.deletePatient(patientId)
+            deleteFromStorage(imageFiles)
+            sender ! ImageFilesDeleted(imageFiles)
+          }
+
       }
+    }
+
+    case msg: ImageRequest => catchAndReport {
+      msg match {
+
+        case GetImageAttributes(imageId) =>
+          db.withSession { implicit session =>
+            dao.imageFileForImage(imageId) match {
+              case Some(imageFile) =>
+                sender ! readImageAttributes(imageFile.fileName.value)
+              case None =>
+                throw new IllegalArgumentException(s"No file found for image $imageId")
+            }
+          }
+
+        case GetImageInformation(imageId) =>
+          db.withSession { implicit session =>
+            dao.imageFileForImage(imageId) match {
+              case Some(imageFile) =>
+                sender ! readImageInformation(imageFile.fileName.value)
+              case None =>
+                throw new IllegalArgumentException(s"No file found for image $imageId")
+            }
+          }
+
+        case GetImageFrame(imageId, frameNumber, windowMin, windowMax, imageHeight) =>
+          db.withSession { implicit session =>
+            dao.imageFileForImage(imageId) match {
+              case Some(imageFile) =>
+                Future {
+                  readImageFrame(imageFile.fileName.value, frameNumber, windowMin, windowMax, imageHeight)
+                }.pipeTo(sender)
+              case None =>
+                throw new IllegalArgumentException(s"No file found for image $imageId")
+            }
+          }
+
+      }
+    }
 
     case msg: MetaDataQuery => catchAndReport {
       msg match {
@@ -151,6 +166,16 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
         case GetImages(seriesId) =>
           db.withSession { implicit session =>
             sender ! Images(dao.imagesForSeries(seriesId))
+          }
+
+        case GetImageFile(imageId) =>
+          db.withSession { implicit session =>
+            dao.imageFileForImage(imageId) match {
+              case Some(imageFile) =>
+                sender ! imageFile
+              case None =>
+                throw new IllegalArgumentException(s"No file found for image $imageId")
+            }
           }
 
         case GetImageFilesForSeries(seriesIds) =>
@@ -272,6 +297,50 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
       strings(0)
     else
       "[" + strings.tail.foldLeft(strings.head)((single, s) => single + "," + s) + "]"
+
+  def readImageInformation(fileName: String): ImageInformation = {
+    val path = storage.resolve(fileName)
+    val dataset = loadDataset(path, false)
+    ImageInformation(
+      dataset.getInt(Tag.NumberOfFrames, 1),
+      dataset.getInt(Tag.SmallestImagePixelValue, 0),
+      dataset.getInt(Tag.LargestImagePixelValue, 0))
+  }
+
+  def readImageFrame(fileName: String, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int): ImageFrame = {
+    val file = storage.resolve(fileName).toFile
+    val iis = ImageIO.createImageInputStream(file)
+    try {
+      val imageReader = ImageIO.getImageReadersByFormatName("DICOM").next
+      imageReader.setInput(iis)
+      val param = imageReader.getDefaultReadParam().asInstanceOf[DicomImageReadParam]
+      if (windowMin < windowMax) {
+        param.setWindowCenter((windowMax - windowMin) / 2)
+        param.setWindowWidth(windowMax - windowMin)
+      }
+      val bi = scaleImage(imageReader.read(frameNumber - 1, param), imageHeight)
+      val baos = new ByteArrayOutputStream
+      ImageIO.write(bi, "png", baos)
+      baos.close()
+      ImageFrame(baos.toByteArray)
+    } finally {
+      iis.close()
+    }
+  }
+
+  def scaleImage(image: BufferedImage, imageHeight: Int): BufferedImage = {
+    val ratio = imageHeight / image.getHeight.asInstanceOf[Double]
+    if (ratio != 0.0 && ratio != 1.0) {
+      val imageWidth = (image.getWidth * ratio).asInstanceOf[Int]
+      val resized = new BufferedImage(imageWidth, imageHeight, image.getType)
+      val g = resized.createGraphics()
+      g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+      g.drawImage(image, 0, 0, imageWidth, imageHeight, 0, 0, image.getWidth, image.getHeight, null);
+      g.dispose()
+      resized
+    } else
+      image
+  }
 
   def setupDb() =
     db.withSession { implicit session =>

@@ -3,7 +3,7 @@
         <alert type="danger" close="closeErrorMessageAlert()">{{uiState.errorMessage}}</alert>
     </div>
 </div>
-
+    
 <div class="row">
     <div class="col-md-6 home-left-column">
         <div class="panel panel-default">
@@ -101,26 +101,45 @@
     </div>
 
     <div class="col-md-6">
-        <tabset>
-            <tab heading="Image Files">
-                <sbx-grid
-                    load-page="loadImageFiles(startIndex, count, orderByProperty, orderByDirection)"
-                    page-size="10000000"
-                    sorting="false"
-                    object-actions="fileImageActions"
-                    callbacks="callbacks.imageFilesTable"
-                    empty-message="No image files found">
+        <tabset>            
+            <tab heading="Images">
 
-                    <sbx-grid-column property="id" title="Id">
-                    </sbx-grid-column>
+                <hr>
 
-                    <sbx-grid-column property="fileName['value']" title="File Name">
-                    </sbx-grid-column>
-                </sbx-grid>
+                <form class="form-inline">
+                    <div class="btn-group" dropdown>
+                        <button type="button" class="btn btn-default dropdown-toggle" dropdown-toggle>Size <span class="caret"></span></button>
+                        <ul class="dropdown-menu" role="menu">
+                            <li><a ng-click="uiState.seriesDetails.imageHeight = 50; updateImageUrls()" href="#">50</a></li>
+                            <li><a ng-click="uiState.seriesDetails.imageHeight = 100; updateImageUrls()" href="#">100</a></li>
+                            <li><a ng-click="uiState.seriesDetails.imageHeight = 150; updateImageUrls()" href="#">150</a></li>
+                            <li class="divider"></li>
+                            <li><a ng-click="uiState.seriesDetails.imageHeight = 0; updateImageUrls()" href="#">Original</a></li>
+                        </ul>
+                    </div>
+                    &nbsp;&nbsp;&nbsp;&nbsp;
+                    <div class="checkbox">
+                        <label>
+                            <input id="manual" type="checkbox" ng-model="uiState.seriesDetails.isWindowManual" ng-change="updateImageUrls()"> Window (min/max)
+                        </label>
+                    </div>
+                    &nbsp;
+                    <div class="form-group">
+                        <input type="number" class="form-control" id="min" placeholder="0" ng-model="uiState.seriesDetails.windowMin" ng-disabled="!uiState.seriesDetails.isWindowManual" ng-change="updateImageUrls()">
+                    </div>
+                    <div class="form-group">
+                        <input type="number" class="form-control" id="max" placeholder="0" ng-model="uiState.seriesDetails.windowMax" ng-disabled="!uiState.seriesDetails.isWindowManual" ng-change="updateImageUrls()">
+                    </div>                
+                </form>
+
+                <hr>
+
+                <div class="clearfix">
+                    <img ng-repeat="url in uiState.seriesDetails.imageUrls track by $index" class="frame-image" ng-src="{{url}}" alt=""></img>
+                </div>
             </tab>
-            
-            <tab heading="Images">Images</tab>
-            
+
+
             <tab heading="DICOM Tags">
                 <sbx-grid
                     load-page="loadImageAttributes(0, 1000000000)"

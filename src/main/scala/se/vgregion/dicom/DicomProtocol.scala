@@ -37,6 +37,11 @@ object DicomProtocol {
       name: String, 
       value: String)
   
+  case class ImageInformation(
+      numberOfFrames: Int,
+      minimumPixelValue: Int,
+      maximumPixelValue: Int)
+      
   // messages
 
     
@@ -73,6 +78,8 @@ object DicomProtocol {
 
   case class GetImages(seriesId: Long) extends MetaDataQuery
   
+  case class GetImageFile(imageId: Long) extends MetaDataQuery
+  
   case class GetImageFilesForPatients(patientIds: Seq[Long]) extends MetaDataQuery
   
   case class GetImageFilesForStudies(studyIds: Seq[Long]) extends MetaDataQuery
@@ -91,11 +98,14 @@ object DicomProtocol {
   case class DeletePatient(patientId: Long) extends MetaDataUpdate
   
   
-  case object GetAllImageFiles
-
-  case class GetImageFile(imageId: Long)
+  sealed trait ImageRequest
   
-  case class GetImageAttributes(imageId: Long)
+  case class GetImageAttributes(imageId: Long) extends ImageRequest
+  
+  case class GetImageInformation(imageId: Long) extends ImageRequest
+  
+  case class GetImageFrame(imageId: Long, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int) extends ImageRequest
+  
   
   case class AddDataset(dataset: Attributes)
   
@@ -142,6 +152,8 @@ object DicomProtocol {
     
   case class ImageAttributes(attributes: Seq[ImageAttribute])
 
+  case class ImageFrame(bytes: Array[Byte])
+  
   case class ImageFilesDeleted(imageFiles: Seq[ImageFile])
 
 }

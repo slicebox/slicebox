@@ -29,6 +29,7 @@ import spray.httpx.marshalling.ToResponseMarshallable.isMarshallable
 import spray.routing._
 import spray.httpx.unmarshalling.BasicUnmarshallers.ByteArrayUnmarshaller
 import se.vgregion.log.LogServiceActor
+import spray.http.MediaTypes
 
 class RestInterface extends Actor with RestApi {
 
@@ -53,7 +54,7 @@ trait RestApi extends HttpService with JsonFormats {
 
   implicit def executionContext = actorRefFactory.dispatcher
 
-  implicit val timeout = Timeout(60.seconds)
+  implicit val timeout = Timeout(200.seconds)
 
   val config = ConfigFactory.load()
   val sliceboxConfig = config.getConfig("slicebox")
@@ -73,7 +74,7 @@ trait RestApi extends HttpService with JsonFormats {
   val boxService = actorRefFactory.actorOf(BoxServiceActor.props(dbProps, storage, config.getString("http.host"), config.getInt("http.port")), "BoxService")
   val dicomService = actorRefFactory.actorOf(DicomDispatchActor.props(storage, dbProps), "DicomDispatch")
   val logService = actorRefFactory.actorOf(LogServiceActor.props(dbProps), "LogService")
-  
+
   val authenticator = new Authenticator(userService)
 
   implicit def sliceboxExceptionHandler =
@@ -156,16 +157,16 @@ trait RestApi extends HttpService with JsonFormats {
         pathEnd {
           get {
             parameters('startindex.as[Long] ? 0,
-                       'count.as[Long] ? 20,
-                       'orderby.as[String].?,
-                       'orderascending.as[Boolean] ? true,
-                       'filter.as[String].?) { (startIndex, count, orderBy, orderAscending, filter) =>
-                         
-              onSuccess(dicomService.ask(GetPatients(startIndex, count, orderBy, orderAscending, filter))) {
-                case Patients(patients) =>
-                  complete(patients)
+              'count.as[Long] ? 20,
+              'orderby.as[String].?,
+              'orderascending.as[Boolean] ? true,
+              'filter.as[String].?) { (startIndex, count, orderBy, orderAscending, filter) =>
+
+                onSuccess(dicomService.ask(GetPatients(startIndex, count, orderBy, orderAscending, filter))) {
+                  case Patients(patients) =>
+                    complete(patients)
+                }
               }
-            }
           }
         } ~ path(LongNumber) { patientId =>
           delete {
@@ -220,15 +221,6 @@ trait RestApi extends HttpService with JsonFormats {
             }
           }
         }
-      } ~ path("imagefiles") {
-        get {
-          parameters('seriesId.as[Long]) { seriesId =>
-            onSuccess(dicomService.ask(GetImageFilesForSeries(Seq(seriesId)))) {
-              case ImageFiles(imageFiles) =>
-                complete(imageFiles)
-            }
-          }
-        }
       }
     }
   }
@@ -263,6 +255,22 @@ trait RestApi extends HttpService with JsonFormats {
           onSuccess(dicomService.ask(GetImageAttributes(imageId))) {
             case ImageAttributes(attributes) =>
               complete(attributes)
+          }
+        }
+      } ~ path(LongNumber / "imageinformation") { imageId =>
+        get {
+          onSuccess(dicomService.ask(GetImageInformation(imageId))) {
+            case info: ImageInformation =>
+              complete(info)
+          }
+        }
+      } ~ path(LongNumber / "png") { imageId =>
+        parameters('framenumber.as[Int] ? 1, 'windowmin.as[Int] ? 0, 'windowmax.as[Int] ? 0, 'imageheight.as[Int] ? 0) { (frameNumber, min, max, height) =>
+          get {
+            onSuccess(dicomService.ask(GetImageFrame(imageId, frameNumber, min, max, height))) {
+              case ImageFrame(bytes) =>
+                complete(HttpEntity(MediaTypes.`image/png`, HttpData(bytes)))
+            }
           }
         }
       }
@@ -307,8 +315,8 @@ trait RestApi extends HttpService with JsonFormats {
           entity(as[Seq[Long]]) { patientIds =>
             onSuccess(dicomService.ask(GetImageFilesForPatients(patientIds))) {
               case ImageFiles(imageFiles) => onSuccess(boxService.ask(SendImagesToRemoteBox(remoteBoxId, imageFiles.map(_.id)))) {
-                  case ImagesSent(remoteBoxId, imageIds) => complete(NoContent)
-                }
+                case ImagesSent(remoteBoxId, imageIds) => complete(NoContent)
+              }
             }
           }
         }
@@ -317,8 +325,8 @@ trait RestApi extends HttpService with JsonFormats {
           entity(as[Seq[Long]]) { studyIds =>
             onSuccess(dicomService.ask(GetImageFilesForStudies(studyIds))) {
               case ImageFiles(imageFiles) => onSuccess(boxService.ask(SendImagesToRemoteBox(remoteBoxId, imageFiles.map(_.id)))) {
-                  case ImagesSent(remoteBoxId, imageIds) => complete(NoContent)
-                }
+                case ImagesSent(remoteBoxId, imageIds) => complete(NoContent)
+              }
             }
           }
         }
@@ -327,8 +335,8 @@ trait RestApi extends HttpService with JsonFormats {
           entity(as[Seq[Long]]) { seriesIds =>
             onSuccess(dicomService.ask(GetImageFilesForSeries(seriesIds))) {
               case ImageFiles(imageFiles) => onSuccess(boxService.ask(SendImagesToRemoteBox(remoteBoxId, imageFiles.map(_.id)))) {
-                  case ImagesSent(remoteBoxId, imageIds) => complete(NoContent)
-                }
+                case ImagesSent(remoteBoxId, imageIds) => complete(NoContent)
+              }
             }
           }
         }
@@ -437,7 +445,7 @@ trait RestApi extends HttpService with JsonFormats {
         }
       }
     }
-  
+
   def logRoutes: Route =
     pathPrefix("log") {
       pathEnd {
