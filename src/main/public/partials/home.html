@@ -6,98 +6,173 @@
     
 <div class="row">
     <div class="col-md-6 home-left-column">
-        <div class="panel panel-default">
-            <div class="panel-heading">Patients</div>
+        <tabset>            
+            <tab heading="Patient-Study-Series">
 
-            <div class="panel-body">
-                <sbx-grid
-                    load-page="loadPatients(startIndex, count, orderByProperty, orderByDirection, filter)"
-                    page-size="10"
-                    page-sizes="[5, 10, 20, 50, 100]"
-                    filter="true"
-                    object-actions="patientActions"
-                    object-selected="patientSelected(object)"
-                    callbacks="callbacks.patientsTable"
-                    empty-message="No patients found">
+                <div class="panel panel-default">
+                    <div class="panel-heading">Patients</div>
 
-                    <sbx-grid-column property="patientName['value']" title="Name">
-                    </sbx-grid-column>
+                    <div class="panel-body">
+                        <sbx-grid
+                            load-page="loadPatients(startIndex, count, orderByProperty, orderByDirection, filter)"
+                            page-size="10"
+                            page-sizes="[5, 10, 20, 50, 100]"
+                            filter="true"
+                            object-actions="patientActions"
+                            object-selected="patientSelected(object)"
+                            callbacks="callbacks.patientsTable"
+                            empty-message="No patients found">
 
-                    <sbx-grid-column property="patientID['value']" title="Id">
-                    </sbx-grid-column>
+                            <sbx-grid-column property="patientName['value']" title="Name">
+                            </sbx-grid-column>
 
-                    <sbx-grid-column property="patientBirthDate['value']" title="Birth Date">
-                    </sbx-grid-column>
+                            <sbx-grid-column property="patientID['value']" title="Id">
+                            </sbx-grid-column>
 
-                    <sbx-grid-column property="patientSex['value']" title="Sex">
-                    </sbx-grid-column>
-                </sbx-grid>
-            </div>
-        </div>
+                            <sbx-grid-column property="patientBirthDate['value']" title="Birth Date">
+                            </sbx-grid-column>
 
-        <div class="panel panel-default">
-            <div class="panel-heading">Studies</div>
+                            <sbx-grid-column property="patientSex['value']" title="Sex">
+                            </sbx-grid-column>
+                        </sbx-grid>
+                    </div>
+                </div>
 
-            <div class="panel-body">
-                <sbx-grid
-                    load-page="loadStudies(startIndex, count, orderByProperty, orderByDirection)"
-                    page-size="10"
-                    page-sizes="[5, 10, 20, 50, 100]"
-                    sorting="false"
-                    object-actions="studyActions"
-                    object-selected="studySelected(object)"
-                    callbacks="callbacks.studiesTable"
-                    empty-message="No studies found">
+                <div class="panel panel-default">
+                    <div class="panel-heading">Studies</div>
 
-                    <sbx-grid-column property="studyDescription['value']" title="Description">
-                    </sbx-grid-column>
+                    <div class="panel-body">
+                        <sbx-grid
+                            load-page="loadStudies(startIndex, count, orderByProperty, orderByDirection)"
+                            page-size="10"
+                            page-sizes="[5, 10, 20, 50, 100]"
+                            sorting="false"
+                            object-actions="studyActions"
+                            object-selected="studySelected(object)"
+                            callbacks="callbacks.studiesTable"
+                            empty-message="No studies found">
 
-                    <sbx-grid-column property="studyDate['value']" title="Date">
-                    </sbx-grid-column>
+                            <sbx-grid-column property="studyDescription['value']" title="Description">
+                            </sbx-grid-column>
 
-                    <sbx-grid-column property="studyID['value']" title="Id">
-                    </sbx-grid-column>
+                            <sbx-grid-column property="studyDate['value']" title="Date">
+                            </sbx-grid-column>
 
-                    <sbx-grid-column property="accessionNumber['value']" title="Accession Number">
-                    </sbx-grid-column>
+                            <sbx-grid-column property="studyID['value']" title="Id">
+                            </sbx-grid-column>
 
-                    <sbx-grid-column property="patientAge['value']" title="Patient Age">
-                    </sbx-grid-column>
-                </sbx-grid>
-            </div>
-        </div>
+                            <sbx-grid-column property="accessionNumber['value']" title="Accession Number">
+                            </sbx-grid-column>
 
-        <div class="panel panel-default">
-            <div class="panel-heading">Series</div>
+                            <sbx-grid-column property="patientAge['value']" title="Patient Age">
+                            </sbx-grid-column>
+                        </sbx-grid>
+                    </div>
+                </div>
 
-            <div class="panel-body">
-                <sbx-grid
-                    load-page="loadSeries(startIndex, count, orderByProperty, orderByDirection)"
-                    page-size="10"
-                    page-sizes="[5, 10, 20, 50, 100]"
-                    sorting="false"
-                    object-actions="seriesActions"
-                    object-selected="seriesSelected(object)"
-                    callbacks="callbacks.seriesTable"
-                    empty-message="No series found">
+                <div class="panel panel-default">
+                    <div class="panel-heading">Series</div>
 
-                    <sbx-grid-column property="seriesDescription['value']" title="Description">
-                    </sbx-grid-column>
+                    <div class="panel-body">
+                        <sbx-grid
+                            load-page="loadSeries(startIndex, count, orderByProperty, orderByDirection)"
+                            page-size="10"
+                            page-sizes="[5, 10, 20, 50, 100]"
+                            sorting="false"
+                            object-actions="seriesActions"
+                            object-selected="seriesSelected(object)"
+                            callbacks="callbacks.seriesTable"
+                            empty-message="No series found">
 
-                    <sbx-grid-column property="seriesDate['value']" title="Date">
-                    </sbx-grid-column>
+                            <sbx-grid-column property="seriesDescription['value']" title="Description">
+                            </sbx-grid-column>
 
-                    <sbx-grid-column property="modality['value']" title="Modality">
-                    </sbx-grid-column>
+                            <sbx-grid-column property="seriesDate['value']" title="Date">
+                            </sbx-grid-column>
 
-                    <sbx-grid-column property="protocolName['value']" title="Protocol Name">
-                    </sbx-grid-column>
+                            <sbx-grid-column property="modality['value']" title="Modality">
+                            </sbx-grid-column>
 
-                    <sbx-grid-column property="bodyPartExamined['value']" title="Body Part Examined">
-                    </sbx-grid-column>
-                </sbx-grid>
-            </div>
-        </div>
+                            <sbx-grid-column property="protocolName['value']" title="Protocol Name">
+                            </sbx-grid-column>
+
+                            <sbx-grid-column property="bodyPartExamined['value']" title="Body Part Examined">
+                            </sbx-grid-column>
+                        </sbx-grid>
+                    </div>
+                </div>
+
+            </tab>
+
+            <tab heading="Series">
+
+                <div class="panel panel-default">
+                    <div class="panel-heading">Series</div>
+
+                    <div class="panel-body">
+                        <sbx-grid
+                            load-page="loadFlatSeries(startIndex, count, orderByProperty, orderByDirection, filter)"
+                            page-size="10"
+                            page-sizes="[5, 10, 20, 50, 100]"
+                            filter="true"
+                            object-actions="seriesActions"
+                            object-selected="flatSeriesSelected(object)"
+                            callbacks="callbacks.flatSeriesTable"
+                            empty-message="No series found">
+
+                            <sbx-grid-column property="patient.patientName['value']" title="Name">
+                            </sbx-grid-column>
+
+                            <sbx-grid-column property="patient.patientID['value']" title="Id">
+                            </sbx-grid-column>
+
+                            <sbx-grid-column property="patient.patientBirthDate['value']" title="Birth Date">
+                            </sbx-grid-column>
+
+                            <sbx-grid-column property="patient.patientSex['value']" title="Sex">
+                            </sbx-grid-column>
+
+                            <sbx-grid-column property="study.patientAge['value']" title="Patient Age">
+                            </sbx-grid-column>
+
+                            <sbx-grid-column property="study.studyDescription['value']" title="Study Description">
+                            </sbx-grid-column>
+
+                            <sbx-grid-column property="study.studyDate['value']" title="Study Date">
+                            </sbx-grid-column>
+
+                            <sbx-grid-column property="study.studyID['value']" title="Study Id">
+                            </sbx-grid-column>
+
+                            <sbx-grid-column property="study.accessionNumber['value']" title="Accession Number">
+                            </sbx-grid-column>
+
+                            <sbx-grid-column property="equipment.manufacturer['value']" title="Station Manufacturer">
+                            </sbx-grid-column>
+
+                            <sbx-grid-column property="equipment.stationName['value']" title="Station Name">
+                            </sbx-grid-column>
+
+                            <sbx-grid-column property="series.seriesDescription['value']" title="Series Description">
+                            </sbx-grid-column>
+
+                            <sbx-grid-column property="series.seriesDate['value']" title="Series Date">
+                            </sbx-grid-column>
+
+                            <sbx-grid-column property="series.modality['value']" title="Modality">
+                            </sbx-grid-column>
+
+                            <sbx-grid-column property="series.protocolName['value']" title="Protocol Name">
+                            </sbx-grid-column>
+
+                            <sbx-grid-column property="series.bodyPartExamined['value']" title="Body Part Examined">
+                            </sbx-grid-column>
+                        </sbx-grid>
+                    </div>
+                </div>
+
+            </tab>
+        </tabset>
     </div>
 
     <div class="col-md-6">

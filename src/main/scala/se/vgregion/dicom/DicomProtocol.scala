@@ -77,6 +77,8 @@ object DicomProtocol {
 
   case class GetSeries(startIndex: Long, count: Long, studyId: Long) extends MetaDataQuery
 
+  case class GetFlatSeries(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String]) extends MetaDataQuery
+
   case class GetImages(seriesId: Long) extends MetaDataQuery
   
   case class GetImageFile(imageId: Long) extends MetaDataQuery
@@ -117,6 +119,8 @@ object DicomProtocol {
   case class Studies(studies: Seq[Study]) 
 
   case class SeriesCollection(series: Seq[Series]) 
+
+  case class FlatSeriesCollection(series: Seq[FlatSeries]) 
 
   case class Images(images: Seq[Image]) 
 

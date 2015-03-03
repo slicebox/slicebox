@@ -194,6 +194,12 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
           db.withSession { implicit session =>
             sender ! ImageFiles(dao.imageFilesForPatients(patientIds))
           }
+          
+        case GetFlatSeries(startIndex, count, orderBy, orderAscending, filter) =>
+          db.withSession { implicit session =>
+            sender ! FlatSeriesCollection(dao.flatSeries(startIndex, count, orderBy, orderAscending, filter))
+          }
+          
       }
     }
 

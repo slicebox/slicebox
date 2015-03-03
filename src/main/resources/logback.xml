@@ -11,6 +11,7 @@
     <logger name="akka" level="DEBUG" />
     <logger name="spray" level="DEBUG" />
 	<logger name="scala.slick" level="INFO" />
+	<logger name="scala.slick.jdbc.JdbcBackend.statement" level="DEBUG" />
 	<logger name="org.dcm4che3" level="ERROR" />
     <logger name="se.vgregion" level="DEBUG" />
 

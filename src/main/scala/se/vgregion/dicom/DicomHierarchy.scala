@@ -82,4 +82,17 @@ object DicomHierarchy {
     }
   }
 
+  case class FlatSeries(
+      id: Long,
+      patient: Patient,
+		  study: Study,
+      equipment: Equipment,
+      frameOfReference: FrameOfReference,
+      series: Series) extends Entity {
+    override def equals(o: Any): Boolean = o match {
+      case that: FlatSeries => that.series.seriesInstanceUID == series.seriesInstanceUID
+      case _ => false
+    }    
+  }
+  
 }

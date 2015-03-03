@@ -1,6 +1,8 @@
 package se.vgregion.dicom
 
 import scala.slick.driver.JdbcProfile
+import scala.slick.jdbc.{ GetResult, StaticQuery => Q }
+import Q.interpolation
 import DicomProtocol.FileName
 import DicomProtocol.ImageFile
 import DicomHierarchy._
@@ -24,22 +26,12 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
     def patientBirthDate = column[String](DicomProperty.PatientBirthDate.name)
     def patientSex = column[String](DicomProperty.PatientSex.name)
     def * = (id, patientName, patientID, patientBirthDate, patientSex) <> (toPatient.tupled, fromPatient)
-    
-    def columnByName(columnName: String) =
-      columnName match {
-        case "id"               => id
-        case "patientName"      => patientName
-        case "patientID"        => patientID
-        case "patientBirthDate" => patientBirthDate
-        case "patientSex"       => patientSex
-        case _ => throw new IllegalArgumentException(s"Patients: unknown column: $columnName")
-      }
   }
 
   private val patientsQuery = TableQuery[Patients]
 
   private val fromStudy = (study: Study) => Option((study.id, study.patientId, study.studyInstanceUID.value, study.studyDescription.value, study.studyDate.value, study.studyID.value, study.accessionNumber.value, study.patientAge.value))
-  
+
   // *** Study *** //
 
   private val toStudy = (id: Long, patientId: Long, studyInstanceUID: String, studyDescription: String, studyDate: String, studyID: String, accessionNumber: String, patientAge: String) =>
@@ -61,7 +53,7 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
   }
 
   private val studiesQuery = TableQuery[Studies]
-  
+
   // *** Equipment ***
 
   private val toEquipment = (id: Long, manufacturer: String, stationName: String) =>
@@ -175,7 +167,7 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
 
   def studyBtId(id: Long)(implicit session: Session): Option[Study] =
     studiesQuery.filter(_.id === id).list.headOption
-    
+
   def seriesById(id: Long)(implicit session: Session): Option[Series] =
     seriesQuery.filter(_.id === id).list.headOption
 
@@ -184,10 +176,10 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
 
   def frameOfReferenceById(id: Long)(implicit session: Session): Option[FrameOfReference] =
     frameOfReferencesQuery.filter(_.id === id).list.headOption
-    
+
   def imageById(id: Long)(implicit session: Session): Option[Image] =
     imagesQuery.filter(_.id === id).list.headOption
-    
+
   def imageFileById(imageId: Long)(implicit session: Session): Option[ImageFile] =
     imageFilesQuery.filter(_.id === imageId).list.headOption
 
@@ -197,32 +189,32 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
     val generatedId = (patientsQuery returning patientsQuery.map(_.id)) += patient
     patient.copy(id = generatedId)
   }
-  
+
   def insert(study: Study)(implicit session: Session): Study = {
     val generatedId = (studiesQuery returning studiesQuery.map(_.id)) += study
     study.copy(id = generatedId)
   }
-  
+
   def insert(series: Series)(implicit session: Session): Series = {
     val generatedId = (seriesQuery returning seriesQuery.map(_.id)) += series
     series.copy(id = generatedId)
   }
-  
+
   def insert(frameOfReference: FrameOfReference)(implicit session: Session): FrameOfReference = {
     val generatedId = (frameOfReferencesQuery returning frameOfReferencesQuery.map(_.id)) += frameOfReference
     frameOfReference.copy(id = generatedId)
   }
-  
+
   def insert(equipment: Equipment)(implicit session: Session): Equipment = {
     val generatedId = (equipmentsQuery returning equipmentsQuery.map(_.id)) += equipment
     equipment.copy(id = generatedId)
   }
-  
+
   def insert(image: Image)(implicit session: Session): Image = {
     val generatedId = (imagesQuery returning imagesQuery.map(_.id)) += image
     image.copy(id = generatedId)
   }
-  
+
   def insert(imageFile: ImageFile)(implicit session: Session): ImageFile = {
     imageFilesQuery += imageFile
     imageFile
@@ -231,32 +223,31 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
   // *** Listing all patients, studies etc ***
 
   def patients(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String])(implicit session: Session): List[Patient] = {
-    val filterQuery = filter match {
-      case Some(filterValue) =>
-        patientsQuery.filter(_.patientName.toLowerCase like s"%$filterValue%".toLowerCase) union
-        patientsQuery.filter(_.patientID.toLowerCase like s"%$filterValue%".toLowerCase) union
-        patientsQuery.filter(_.patientBirthDate.toLowerCase like s"%$filterValue%".toLowerCase) union
-        patientsQuery.filter(_.patientSex.toLowerCase like s"%$filterValue%".toLowerCase)
-      case None => patientsQuery
-    }
-    
-    val orderByQuery = orderBy match {
-      case Some(orderByColumn) =>
-        if (orderAscending)
-          filterQuery.sortBy(_.columnByName(orderByColumn).asc)
-        else
-          filterQuery.sortBy(_.columnByName(orderByColumn).desc)
-      case None => filterQuery
-    }
 
-    orderByQuery
-      .drop(startIndex)
-      .take(count)
-      .list
+    implicit val getPatientsResult = GetResult(r =>
+      Patient(r.nextLong, PatientName(r.nextString), PatientID(r.nextString), PatientBirthDate(r.nextString), PatientSex(r.nextString)))
+
+    var query = """select * from "Patients""""
+
+    filter.foreach(filterValue => {
+      val filterValueLike = s"'%$filterValue%'".toLowerCase
+      query += s""" where 
+        lcase("PatientName") like $filterValueLike or 
+          lcase("PatientID") like $filterValueLike or 
+            lcase("PatientBirthDate") like $filterValueLike or 
+              lcase("PatientSex") like $filterValueLike"""
+    })
+
+    orderBy.foreach(orderByValue =>
+      query += s""" order by "$orderByValue" ${if (orderAscending) "asc" else "desc"}""")
+
+    query += s""" limit $count offset $startIndex"""
+
+    Q.queryNA(query).list
   }
-  
+
   def studies(implicit session: Session): List[Study] = studiesQuery.list
-  
+
   def series(implicit session: Session): List[Series] = seriesQuery.list
 
   def equipments(implicit session: Session): List[Equipment] = equipmentsQuery.list
@@ -266,6 +257,57 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
   def images(implicit session: Session): List[Image] = imagesQuery.list
 
   def imageFiles(implicit session: Session): List[ImageFile] = imageFilesQuery.list
+
+  def flatSeries(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String])(implicit session: Session): List[FlatSeries] = {
+
+    implicit val getFlatSeriesResult = GetResult(r =>
+      FlatSeries(r.nextLong,
+        Patient(r.nextLong, PatientName(r.nextString), PatientID(r.nextString), PatientBirthDate(r.nextString), PatientSex(r.nextString)),
+        Study(r.nextLong, r.nextLong, StudyInstanceUID(r.nextString), StudyDescription(r.nextString), StudyDate(r.nextString), StudyID(r.nextString), AccessionNumber(r.nextString), PatientAge(r.nextString)),
+        Equipment(r.nextLong, Manufacturer(r.nextString), StationName(r.nextString)),
+        FrameOfReference(r.nextLong, FrameOfReferenceUID(r.nextString)),
+        Series(r.nextLong, r.nextLong, r.nextLong, r.nextLong, SeriesInstanceUID(r.nextString), SeriesDescription(r.nextString), SeriesDate(r.nextString), Modality(r.nextString), ProtocolName(r.nextString), BodyPartExamined(r.nextString))))
+
+    var query = """select "Series"."id", 
+      "Patients"."id", "Patients"."PatientName", "Patients"."PatientID", "Patients"."PatientBirthDate","Patients"."PatientSex", 
+      "Studies"."id", "Studies"."patientId", "Studies"."StudyInstanceUID", "Studies"."StudyDescription", "Studies"."StudyDate", "Studies"."StudyID", "Studies"."AccessionNumber", "Studies"."PatientAge",
+      "Equipments"."id", "Equipments"."Manufacturer", "Equipments"."StationName",
+      "FrameOfReferences"."id", "FrameOfReferences"."FrameOfReferenceUID",
+      "Series"."id", "Series"."studyId", "Series"."equipmentId", "Series"."frameOfReferenceId", "Series"."SeriesInstanceUID", "Series"."SeriesDescription", "Series"."SeriesDate", "Series"."Modality", "Series"."ProtocolName", "Series"."BodyPartExamined"
+       from "Series" 
+       inner join "Studies" on "Series"."studyId" = "Studies"."id" 
+       inner join "Equipments" on "Series"."equipmentId" = "Equipments"."id"
+       inner join "FrameOfReferences" on "Series"."frameOfReferenceId" = "FrameOfReferences"."id"
+       inner join "Patients" on "Studies"."patientId" = "Patients"."id""""
+
+    filter.foreach(filterValue => {
+      val filterValueLike = s"'%$filterValue%'".toLowerCase
+      query += s""" where 
+        lcase("PatientName") like $filterValueLike or 
+        lcase("PatientID") like $filterValueLike or 
+        lcase("PatientBirthDate") like $filterValueLike or 
+        lcase("PatientSex") like $filterValueLike or
+          lcase("StudyDescription") like $filterValueLike or
+          lcase("StudyDate") like $filterValueLike or
+          lcase("StudyID") like $filterValueLike or
+          lcase("AccessionNumber") like $filterValueLike or
+          lcase("PatientAge") like $filterValueLike or
+            lcase("Manufacturer") like $filterValueLike or
+            lcase("StationName") like $filterValueLike or
+              lcase("SeriesDescription") like $filterValueLike or
+              lcase("SeriesDate") like $filterValueLike or
+              lcase("Modality") like $filterValueLike or
+              lcase("ProtocolName") like $filterValueLike or
+              lcase("BodyPartExamined") like $filterValueLike"""
+    })
+
+    orderBy.foreach(orderByValue =>
+      query += s""" order by "$orderByValue" ${if (orderAscending) "asc" else "desc"}""")
+
+    query += s""" limit $count offset $startIndex"""
+
+    Q.queryNA(query).list
+  }
 
   // *** Grouped listings ***
 
@@ -277,29 +319,29 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
       .list
 
   def seriesForStudy(startIndex: Long, count: Long, studyId: Long)(implicit session: Session): List[Series] =
-      seriesQuery
-        .filter(_.studyId === studyId)
-        .drop(startIndex)
-        .take(count)
-        .list
+    seriesQuery
+      .filter(_.studyId === studyId)
+      .drop(startIndex)
+      .take(count)
+      .list
 
   def imagesForSeries(seriesId: Long)(implicit session: Session): List[Image] =
-      imagesQuery
-        .filter(_.seriesId === seriesId)
-        .list
+    imagesQuery
+      .filter(_.seriesId === seriesId)
+      .list
 
   def imageFileForImage(imageId: Long)(implicit session: Session): Option[ImageFile] =
-      imageFilesQuery
-        .filter(_.id === imageId)
-        .list.headOption
+    imageFilesQuery
+      .filter(_.id === imageId)
+      .list.headOption
 
   def imageFilesForSeries(seriesIds: Seq[Long])(implicit session: Session): List[ImageFile] =
     seriesIds.flatMap(imagesForSeries(_))
       .map(image => imageFileForImage(image.id)).flatten.toList
-      
+
   def imageFilesForStudies(studyIds: Seq[Long])(implicit session: Session): List[ImageFile] =
     studyIds.flatMap(imageFilesForStudy(_)).toList
-    
+
   def imageFilesForPatients(patientIds: Seq[Long])(implicit session: Session): List[ImageFile] =
     patientIds.flatMap(imageFilesForPatient(_)).toList
 
@@ -313,24 +355,24 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
       .map(study => seriesForStudy(0, Integer.MAX_VALUE, study.id)
         .map(series => imagesForSeries(series.id)
           .map(image => imageFileForImage(image.id)).flatten).flatten).flatten
-          
+
   def patientByNameAndID(patient: Patient)(implicit session: Session): Option[Patient] =
     patientsQuery
       .filter(_.patientName === patient.patientName.value)
       .filter(_.patientID === patient.patientID.value)
       .list.headOption
-      
+
   def studyByUid(study: Study)(implicit session: Session): Option[Study] =
     studiesQuery
       .filter(_.studyInstanceUID === study.studyInstanceUID.value)
       .list.headOption
-      
+
   def equipmentByManufacturerAndStationName(equipment: Equipment)(implicit session: Session): Option[Equipment] =
     equipmentsQuery
       .filter(_.manufacturer === equipment.manufacturer.value)
       .filter(_.stationName === equipment.stationName.value)
       .list.headOption
-      
+
   def frameOfReferenceByUid(frameOfReference: FrameOfReference)(implicit session: Session): Option[FrameOfReference] =
     frameOfReferencesQuery
       .filter(_.frameOfReferenceUID === frameOfReference.frameOfReferenceUID.value)
@@ -340,17 +382,17 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
     seriesQuery
       .filter(_.seriesInstanceUID === series.seriesInstanceUID.value)
       .list.headOption
-      
+
   def imageByUid(image: Image)(implicit session: Session): Option[Image] =
     imagesQuery
       .filter(_.sopInstanceUID === image.sopInstanceUID.value)
       .list.headOption
-      
+
   def imageFileByFileName(imageFile: ImageFile)(implicit session: Session): Option[ImageFile] =
     imageFilesQuery
       .filter(_.fileName === imageFile.fileName.value)
       .list.headOption
-      
+
   // *** Deletes ***
 
   def deletePatient(patientId: Long)(implicit session: Session): Int = {
@@ -358,37 +400,37 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
       .filter(_.id === patientId)
       .delete
   }
-  
+
   def deleteStudy(studyId: Long)(implicit session: Session): Int = {
     studiesQuery
       .filter(_.id === studyId)
       .delete
   }
-  
+
   def deleteSeries(seriesId: Long)(implicit session: Session): Int = {
     seriesQuery
       .filter(_.id === seriesId)
       .delete
   }
-  
+
   def deleteFrameOfReference(frameOfReferenceId: Long)(implicit session: Session): Int = {
     frameOfReferencesQuery
       .filter(_.id === frameOfReferenceId)
       .delete
   }
-  
+
   def deleteEquipment(equipmentId: Long)(implicit session: Session): Int = {
     equipmentsQuery
       .filter(_.id === equipmentId)
       .delete
   }
-  
+
   def deleteImage(imageId: Long)(implicit session: Session): Int = {
     imagesQuery
       .filter(_.id === imageId)
       .delete
   }
-  
+
   def deleteImageFile(imageId: Long)(implicit session: Session): Int = {
     imageFilesQuery
       .filter(_.id === imageId)

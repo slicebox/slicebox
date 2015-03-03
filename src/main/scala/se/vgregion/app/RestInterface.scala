@@ -54,7 +54,7 @@ trait RestApi extends HttpService with JsonFormats {
 
   implicit def executionContext = actorRefFactory.dispatcher
 
-  implicit val timeout = Timeout(200.seconds)
+  implicit val timeout = Timeout(70.seconds)
 
   val config = ConfigFactory.load()
   val sliceboxConfig = config.getConfig("slicebox")
@@ -156,7 +156,8 @@ trait RestApi extends HttpService with JsonFormats {
       pathPrefix("patients") {
         pathEnd {
           get {
-            parameters('startindex.as[Long] ? 0,
+            parameters(
+              'startindex.as[Long] ? 0,
               'count.as[Long] ? 20,
               'orderby.as[String].?,
               'orderascending.as[Boolean] ? true,
@@ -179,12 +180,15 @@ trait RestApi extends HttpService with JsonFormats {
       } ~ pathPrefix("studies") {
         pathEnd {
           get {
-            parameters('startindex.as[Long] ? 0, 'count.as[Long] ? 20, 'patientId.as[Long]) { (startIndex, count, patientId) =>
-              onSuccess(dicomService.ask(GetStudies(startIndex, count, patientId))) {
-                case Studies(studies) =>
-                  complete(studies)
+            parameters(
+              'startindex.as[Long] ? 0,
+              'count.as[Long] ? 20,
+              'patientId.as[Long]) { (startIndex, count, patientId) =>
+                onSuccess(dicomService.ask(GetStudies(startIndex, count, patientId))) {
+                  case Studies(studies) =>
+                    complete(studies)
+                }
               }
-            }
           }
         } ~ path(LongNumber) { studyId =>
           delete {
@@ -197,12 +201,27 @@ trait RestApi extends HttpService with JsonFormats {
       } ~ pathPrefix("series") {
         pathEnd {
           get {
-            parameters('startindex.as[Long] ? 0, 'count.as[Long] ? 20, 'studyId.as[Long]) { (startIndex, count, studyId) =>
-              onSuccess(dicomService.ask(GetSeries(startIndex, count, studyId))) {
-                case SeriesCollection(series) =>
-                  complete(series)
+            parameters(
+              'startindex.as[Long] ? 0,
+              'count.as[Long] ? 20,
+              'studyId.as[Long]) { (startIndex, count, studyId) =>
+                onSuccess(dicomService.ask(GetSeries(startIndex, count, studyId))) {
+                  case SeriesCollection(series) =>
+                    complete(series)
+                }
               }
-            }
+          } ~ get {
+            parameters(
+              'startindex.as[Long] ? 0,
+              'count.as[Long] ? 20,
+              'orderby.as[String].?,
+              'orderascending.as[Boolean] ? true,
+              'filter.as[String].?) { (startIndex, count, orderBy, orderAscending, filter) =>
+                onSuccess(dicomService.ask(GetFlatSeries(startIndex, count, orderBy, orderAscending, filter))) {
+                  case FlatSeriesCollection(flatSeries) =>
+                    complete(flatSeries)
+                }
+              }
           }
         } ~ path(LongNumber) { seriesId =>
           delete {

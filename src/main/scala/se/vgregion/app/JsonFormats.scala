@@ -89,6 +89,7 @@ trait JsonFormats extends DefaultJsonProtocol {
   implicit val bodyPartExaminedFormat = jsonFormat1(BodyPartExamined)
 
   implicit val seriesFormat = jsonFormat10(Series)
+  implicit val flatSeriesFormat = jsonFormat6(FlatSeries)
 
   implicit val sopInstanceUidFormat = jsonFormat1(SOPInstanceUID)
   implicit val imageTypeFormat = jsonFormat1(ImageType)

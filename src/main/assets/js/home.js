@@ -77,7 +77,7 @@ angular.module('slicebox.home', ['ngRoute'])
     $scope.loadPatients = function(startIndex, count, orderByProperty, orderByDirection, filter) {
         var loadPatientsUrl = '/api/metadata/patients?startindex=' + startIndex + '&count=' + count;
         if (orderByProperty) {
-            var orderByPropertyName = orderByProperty.substring(0, orderByProperty.indexOf('['));
+            var orderByPropertyName = capitalizeFirst(orderByProperty.substring(0, orderByProperty.indexOf('[')));
             loadPatientsUrl = loadPatientsUrl + '&orderby=' + orderByPropertyName;
             
             if (orderByDirection === 'ASCENDING') {
@@ -138,8 +138,47 @@ angular.module('slicebox.home', ['ngRoute'])
         return loadSeriesPromise;
     };
 
+    $scope.loadFlatSeries = function(startIndex, count, orderByProperty, orderByDirection, filter) {
+        var loadFlatSeriesUrl = '/api/metadata/series?startindex=' + startIndex + '&count=' + count;
+        if (orderByProperty) {
+            var orderByPropertyName = capitalizeFirst(orderByProperty.substring(orderByProperty.indexOf('.') + 1, orderByProperty.indexOf('[')));
+            loadFlatSeriesUrl = loadFlatSeriesUrl + '&orderby=' + orderByPropertyName;
+            
+            if (orderByDirection === 'ASCENDING') {
+                loadFlatSeriesUrl = loadFlatSeriesUrl + '&orderascending=true';
+            } else {
+                loadFlatSeriesUrl = loadFlatSeriesUrl + '&orderascending=false';
+            }
+        }
+
+        if (filter) {
+            loadFlatSeriesUrl = loadFlatSeriesUrl + '&filter=' + encodeURIComponent(filter);
+        }
+
+        var loadFlatSeriesPromise = $http.get(loadFlatSeriesUrl);
+
+        loadFlatSeriesPromise.error(function(error) {
+            appendErrorMessage('Failed to load series: ' + error);
+        });
+
+        return loadFlatSeriesPromise;
+    };
+
     $scope.seriesSelected = function(series) {
         $scope.uiState.selectedSeries = series;
+        $scope.callbacks.imageAttributesTable.reset();
+        $scope.uiState.seriesDetails.imageUrls = [];
+        $scope.uiState.seriesDetails.windowMin = undefined;
+        $scope.uiState.seriesDetails.windowMax = undefined;
+        $scope.updateImageUrls();
+    };
+
+    $scope.flatSeriesSelected = function(flatSeries) {
+        if (flatSeries === null) {           
+            $scope.uiState.selectedSeries = null;
+        } else {
+            $scope.uiState.selectedSeries = flatSeries.series;            
+        }
         $scope.callbacks.imageAttributesTable.reset();
         $scope.uiState.seriesDetails.imageUrls = [];
         $scope.uiState.seriesDetails.windowMin = undefined;
@@ -220,6 +259,11 @@ angular.module('slicebox.home', ['ngRoute'])
     };
 
     // Private functions
+
+    function capitalizeFirst(string) {
+        return string.charAt(0).toUpperCase() + string.substring(1);        
+    }
+
     function appendErrorMessage(errorMessage) {
         if ($scope.uiState.errorMessage === null) {
             $scope.uiState.errorMessage = errorMessage;
