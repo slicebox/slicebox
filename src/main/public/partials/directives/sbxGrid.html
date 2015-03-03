@@ -11,7 +11,9 @@
 
             <ul class="dropdown-menu" role="menu">
                 <li ng-repeat="objectAction in objectActions">
-                    <a href="" ng-click="performObjectAction(objectAction)">{{objectAction.name}}</a>
+                    <a href=""
+                        ng-class="{ 'disabled-link': !objectActionEnabled(objectAction) }"
+                        ng-click="performObjectAction($event, objectAction)">{{objectAction.name}}</a>
                 </li>
             </ul>
         </div>

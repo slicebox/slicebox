@@ -18,6 +18,15 @@
     margin-right: 10px
 }
 
+.sbxGridHeader .dropdown-menu a.disabled-link,
+.sbxGridHeader .dropdown-menu a.disabled-link:visited ,
+.sbxGridHeader .dropdown-menu a.disabled-link:active,
+.sbxGridHeader .dropdown-menu a.disabled-link:hover {
+    opacity: 0.5;
+    background-color: rgba(0, 0, 0, 0);
+    cursor: default;
+}
+
 .sbxGrid th a {
     color: rgb(103, 106, 108);
 }
