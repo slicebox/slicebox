@@ -8,7 +8,7 @@
 
 	scalaVersion := "2.11.4"
 
-	scalacOptions := Seq("-encoding", "UTF-8", "-Xlint","-deprecation", "-unchecked", "-feature")
+	scalacOptions := Seq("-encoding", "UTF-8", "-Xlint","-deprecation", "-unchecked", "-feature", "-target:jvm-1.8")
 
 	Revolver.settings
 
