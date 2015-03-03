@@ -135,7 +135,7 @@
                 <hr>
 
                 <div class="clearfix">
-                    <img ng-repeat="url in uiState.seriesDetails.imageUrls track by $index" class="frame-image" ng-src="{{url}}" alt=""></img>
+                    <img ng-repeat="imageUrl in uiState.seriesDetails.imageUrls | orderBy:'frameIndex'" class="frame-image" ng-src="{{imageUrl.url}}" alt=""></img>
                 </div>
             </tab>
 

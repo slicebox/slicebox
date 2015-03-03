@@ -201,7 +201,7 @@ angular.module('slicebox.home', ['ngRoute'])
                                 url = url + 
                                     '&imageheight=' + $scope.uiState.seriesDetails.imageHeight;
                             }
-                            $scope.uiState.seriesDetails.imageUrls.push(url);
+                            $scope.uiState.seriesDetails.imageUrls.push({ url: url, frameIndex: info.frameIndex });
                         }
                     }).error(function(error) {
                         appendErrorMessage('Failed to load image information: ' + error);            

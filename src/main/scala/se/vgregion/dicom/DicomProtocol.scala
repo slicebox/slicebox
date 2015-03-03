@@ -39,6 +39,7 @@ object DicomProtocol {
   
   case class ImageInformation(
       numberOfFrames: Int,
+      frameIndex: Int,
       minimumPixelValue: Int,
       maximumPixelValue: Int)
       

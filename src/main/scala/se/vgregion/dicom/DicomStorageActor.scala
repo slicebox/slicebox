@@ -303,8 +303,12 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
   def readImageInformation(fileName: String): ImageInformation = {
     val path = storage.resolve(fileName)
     val dataset = loadDataset(path, false)
+    val instanceNumber = dataset.getInt(Tag.InstanceNumber, 1)
+    val imageIndex = dataset.getInt(Tag.ImageIndex, 1)
+    val frameIndex = if (instanceNumber > imageIndex) instanceNumber else imageIndex
     ImageInformation(
       dataset.getInt(Tag.NumberOfFrames, 1),
+      frameIndex,
       dataset.getInt(Tag.SmallestImagePixelValue, 0),
       dataset.getInt(Tag.LargestImagePixelValue, 0))
   }
