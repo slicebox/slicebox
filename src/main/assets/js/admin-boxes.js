@@ -145,6 +145,12 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
     $scope.baseURL = baseURL;
 
     // Scope functions
+    $scope.mailBody = function() {
+        var bodyText = 'Box connection URL:\n\n' + baseURL;
+
+        return encodeURIComponent(bodyText);
+    };
+
     $scope.closeButtonClicked = function() {
         $modalInstance.dismiss();
     };
