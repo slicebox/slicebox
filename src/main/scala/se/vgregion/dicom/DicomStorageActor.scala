@@ -31,6 +31,8 @@ import DicomProtocol._
 import DicomHierarchy._
 import DicomPropertyValue._
 import DicomUtil._
+import akka.dispatch.ExecutionContexts
+import java.util.concurrent.Executors
 
 class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with ExceptionCatching {
   val log = Logging(context.system, this)
@@ -40,7 +42,7 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
 
   setupDb()
 
-  implicit val ec = context.dispatcher
+  implicit val ec = ExecutionContexts.fromExecutor(Executors.newWorkStealingPool())
   
   override def preStart {
     context.system.eventStream.subscribe(context.self, classOf[DatasetReceived])
