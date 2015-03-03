@@ -69,9 +69,13 @@ trait RestApi extends HttpService with JsonFormats {
   val dbProps = DbProps(db, H2Driver)
 
   val storage = createStorageDirectory()
+  
+  val host = config.getString("http.host")
+  val port = config.getInt("http.port")
+  val apiBaseURL = s"http://$host:$port/api"
 
   val userService = new DbUserRepository(actorRefFactory, dbProps)
-  val boxService = actorRefFactory.actorOf(BoxServiceActor.props(dbProps, storage, config.getString("http.host"), config.getInt("http.port")), "BoxService")
+  val boxService = actorRefFactory.actorOf(BoxServiceActor.props(dbProps, storage, apiBaseURL), "BoxService")
   val dicomService = actorRefFactory.actorOf(DicomDispatchActor.props(storage, dbProps), "DicomDispatch")
   val logService = actorRefFactory.actorOf(LogServiceActor.props(dbProps), "LogService")
 
@@ -244,6 +248,23 @@ trait RestApi extends HttpService with JsonFormats {
     }
   }
 
+  def seriesRoutes: Route =
+    pathPrefix("series") {
+      path("datasets") {
+        get {
+          parameters('seriesId.as[Long]) { seriesId =>
+            onSuccess(dicomService.ask(GetImages(seriesId))) {
+              case Images(images) =>
+                val imageURLs =
+                  images.map(image => SeriesDataset(image.id, s"$apiBaseURL/images/${image.id}"))
+                  
+                complete(imageURLs)
+            }
+          }
+        }
+      }
+    }
+  
   def imageRoutes: Route =
     pathPrefix("images") {
       pathEnd {
@@ -543,7 +564,7 @@ trait RestApi extends HttpService with JsonFormats {
 
   def routes: Route =
     pathPrefix("api") {
-      directoryRoutes ~ scpRoutes ~ metaDataRoutes ~ imageRoutes ~ boxRoutes ~ userRoutes ~ inboxRoutes ~ outboxRoutes ~ logRoutes ~ systemRoutes
+      directoryRoutes ~ scpRoutes ~ metaDataRoutes ~ imageRoutes ~ seriesRoutes ~ boxRoutes ~ userRoutes ~ inboxRoutes ~ outboxRoutes ~ logRoutes ~ systemRoutes
     } ~ staticResourcesRoutes ~ angularRoutes
 
 }

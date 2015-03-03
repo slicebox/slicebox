@@ -14,7 +14,7 @@ import java.nio.file.Path
 import scala.math.abs
 import java.util.Date
 
-class BoxServiceActor(dbProps: DbProps, storage: Path, host: String, port: Int) extends Actor with ExceptionCatching {
+class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) extends Actor with ExceptionCatching {
 
   val db = dbProps.db
   val dao = new BoxDAO(dbProps.driver)
@@ -32,7 +32,7 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, host: String, port: Int) 
 
           case GenerateBoxBaseUrl(remoteBoxName) =>
             val token = UUID.randomUUID().toString()
-            val baseUrl = s"http://$host:$port/api/boxes/$token"
+            val baseUrl = s"$apiBaseURL/boxes/$token"
             val box = Box(-1, remoteBoxName, token, baseUrl, BoxSendMethod.POLL, false)
             addBoxToDb(box)
             sender ! BoxBaseUrlGenerated(baseUrl)
@@ -276,5 +276,5 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, host: String, port: Int) 
 }
 
 object BoxServiceActor {
-  def props(dbProps: DbProps, storage: Path, host: String, port: Int): Props = Props(new BoxServiceActor(dbProps, storage, host, port))
+  def props(dbProps: DbProps, storage: Path, apiBaseURL: String): Props = Props(new BoxServiceActor(dbProps, storage, apiBaseURL))
 }

@@ -65,7 +65,7 @@ angular.module('slicebox.home', ['ngRoute'])
         selectedStudy: null,
         selectedSeries: null,
         seriesDetails: {
-            imageUrls: [],
+            pngImageUrls: [],
             imageHeight: 50,
             isWindowManual: false,
             windowMin: undefined,
@@ -167,10 +167,12 @@ angular.module('slicebox.home', ['ngRoute'])
     $scope.seriesSelected = function(series) {
         $scope.uiState.selectedSeries = series;
         $scope.callbacks.imageAttributesTable.reset();
-        $scope.uiState.seriesDetails.imageUrls = [];
+        $scope.callbacks.datasetsTable.reset();
+
+        $scope.uiState.seriesDetails.pngImageUrls = [];
         $scope.uiState.seriesDetails.windowMin = undefined;
         $scope.uiState.seriesDetails.windowMax = undefined;
-        $scope.updateImageUrls();
+        $scope.updatePNGImageUrls();
     };
 
     $scope.flatSeriesSelected = function(flatSeries) {
@@ -210,14 +212,13 @@ angular.module('slicebox.home', ['ngRoute'])
         return attributesPromise;
     };
 
-    $scope.updateImageUrls = function() {
-        $scope.uiState.seriesDetails.imageUrls = [];
+    $scope.updatePNGImageUrls = function() {
+        $scope.uiState.seriesDetails.pngImageUrls = [];
 
         if ($scope.uiState.selectedSeries !== null) {
-
             $http.get('/api/metadata/images?seriesId=' + $scope.uiState.selectedSeries.id).success(function(images) {
 
-                $scope.uiState.seriesDetails.imageUrls = [];
+                $scope.uiState.seriesDetails.pngImageUrls = [];
 
                 angular.forEach(images, function(image) {
 
@@ -240,7 +241,7 @@ angular.module('slicebox.home', ['ngRoute'])
                                 url = url + 
                                     '&imageheight=' + $scope.uiState.seriesDetails.imageHeight;
                             }
-                            $scope.uiState.seriesDetails.imageUrls.push({ url: url, frameIndex: info.frameIndex });
+                            $scope.uiState.seriesDetails.pngImageUrls.push({ url: url, frameIndex: info.frameIndex });
                         }
                     }).error(function(error) {
                         appendErrorMessage('Failed to load image information: ' + error);            
@@ -252,6 +253,20 @@ angular.module('slicebox.home', ['ngRoute'])
             });
 
         }
+    };
+
+    $scope.loadSelectedSeriesDatasets = function() {
+        if ($scope.uiState.selectedSeries === null) {
+            return [];
+        }
+
+        var loadDatasetsPromise = $http.get('/api/series/datasets?seriesId=' + $scope.uiState.selectedSeries.id);
+
+        loadDatasetsPromise.error(function(error) {
+            appendErrorMessage('Failed to load datasets: ' + error);
+        });
+
+        return loadDatasetsPromise;
     };
 
     $scope.closeErrorMessageAlert = function() {

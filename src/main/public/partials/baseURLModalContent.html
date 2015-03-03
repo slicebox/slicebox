@@ -4,7 +4,13 @@
 
 <div class="modal-body">
 
-    {{baseURL}}
+    <p>
+        Click the URL below to email it to a Slicebox user.
+    </p>
+
+    <a href="mailto:?Subject=Connect%20to%20my%20Slicebox!&Body={{mailBody()}}">
+        {{baseURL}}
+    </a>
 
 </div>
 

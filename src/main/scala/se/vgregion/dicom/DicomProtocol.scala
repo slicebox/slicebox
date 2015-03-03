@@ -160,5 +160,9 @@ object DicomProtocol {
   case class ImageFrame(bytes: Array[Byte])
   
   case class ImageFilesDeleted(imageFiles: Seq[ImageFile])
+  
+  // Series
+  
+  case class SeriesDataset(id: Long, url: String)
 
 }

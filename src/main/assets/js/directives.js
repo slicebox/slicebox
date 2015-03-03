@@ -293,7 +293,24 @@ angular.module('slicebox.directives', [])
                 return $scope.objectsSelectedForAction.length > 0;
             };
 
-            $scope.performObjectAction = function(objectAction) {
+            $scope.objectActionEnabled = function(objectAction) {
+                if (!$scope.objectActionsEnabled()) {
+                    return false;
+                }
+
+                if (angular.isDefined(objectAction.requiredSelectionCount)) {
+                    return (objectAction.requiredSelectionCount === selectedActionObjects().length);
+                }
+
+                return true;
+            };            
+
+            $scope.performObjectAction = function($event, objectAction) {
+                if (!$scope.objectActionEnabled(objectAction)) {
+                    $event.stopPropagation();
+                    return;
+                }
+
                 if (angular.isFunction(objectAction.action)) {
                     var objectActionResult = objectAction.action(selectedActionObjects());
 
