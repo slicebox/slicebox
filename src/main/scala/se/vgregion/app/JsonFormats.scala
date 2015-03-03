@@ -113,4 +113,6 @@ trait JsonFormats extends DefaultJsonProtocol {
   }
   
   implicit val logEntryFormat = jsonFormat4(LogEntry)
+  
+  implicit val seriesDatasetFormat = jsonFormat2(SeriesDataset)
 }

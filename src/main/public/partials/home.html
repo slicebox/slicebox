@@ -110,32 +110,32 @@
                     <div class="btn-group" dropdown>
                         <button type="button" class="btn btn-default dropdown-toggle" dropdown-toggle>Size <span class="caret"></span></button>
                         <ul class="dropdown-menu" role="menu">
-                            <li><a ng-click="uiState.seriesDetails.imageHeight = 50; updateImageUrls()" href="#">50</a></li>
-                            <li><a ng-click="uiState.seriesDetails.imageHeight = 100; updateImageUrls()" href="#">100</a></li>
-                            <li><a ng-click="uiState.seriesDetails.imageHeight = 150; updateImageUrls()" href="#">150</a></li>
+                            <li><a ng-click="uiState.seriesDetails.imageHeight = 50; updatePNGImageUrls()" href="#">50</a></li>
+                            <li><a ng-click="uiState.seriesDetails.imageHeight = 100; updatePNGImageUrls()" href="#">100</a></li>
+                            <li><a ng-click="uiState.seriesDetails.imageHeight = 150; updatePNGImageUrls()" href="#">150</a></li>
                             <li class="divider"></li>
-                            <li><a ng-click="uiState.seriesDetails.imageHeight = 0; updateImageUrls()" href="#">Original</a></li>
+                            <li><a ng-click="uiState.seriesDetails.imageHeight = 0; updatePNGImageUrls()" href="#">Original</a></li>
                         </ul>
                     </div>
                     &nbsp;&nbsp;&nbsp;&nbsp;
                     <div class="checkbox">
                         <label>
-                            <input id="manual" type="checkbox" ng-model="uiState.seriesDetails.isWindowManual" ng-change="updateImageUrls()"> Window (min/max)
+                            <input id="manual" type="checkbox" ng-model="uiState.seriesDetails.isWindowManual" ng-change="updatePNGImageUrls()"> Window (min/max)
                         </label>
                     </div>
                     &nbsp;
                     <div class="form-group">
-                        <input type="number" class="form-control" id="min" placeholder="0" ng-model="uiState.seriesDetails.windowMin" ng-disabled="!uiState.seriesDetails.isWindowManual" ng-blur="updateImageUrls()">
+                        <input type="number" class="form-control" id="min" placeholder="0" ng-model="uiState.seriesDetails.windowMin" ng-disabled="!uiState.seriesDetails.isWindowManual" ng-blur="updatePNGImageUrls()">
                     </div>
                     <div class="form-group">
-                        <input type="number" class="form-control" id="max" placeholder="0" ng-model="uiState.seriesDetails.windowMax" ng-disabled="!uiState.seriesDetails.isWindowManual" ng-blur="updateImageUrls()">
+                        <input type="number" class="form-control" id="max" placeholder="0" ng-model="uiState.seriesDetails.windowMax" ng-disabled="!uiState.seriesDetails.isWindowManual" ng-blur="updatePNGImageUrls()">
                     </div>                
                 </form>
 
                 <hr>
 
                 <div class="clearfix">
-                    <img ng-repeat="imageUrl in uiState.seriesDetails.imageUrls | orderBy:'frameIndex'" class="frame-image" ng-src="{{imageUrl.url}}" alt=""></img>
+                    <img ng-repeat="imageUrl in uiState.seriesDetails.pngImageUrls | orderBy:'frameIndex'" class="frame-image" ng-src="{{imageUrl.url}}" alt=""></img>
                 </div>
             </tab>
 
@@ -170,6 +170,19 @@
                     </sbx-grid-column>
 
                 </sbx-grid>            
+            </tab>
+
+            <tab heading="Datasets">
+                <sbx-grid
+                    load-page="loadSelectedSeriesDatasets()"
+                    page-size="1000000000"
+                    sorting="false"
+                    callbacks="callbacks.datasetsTable"
+                    empty-message="No datasets found">
+
+                    <sbx-grid-column property="url" title="URL">
+                    </sbx-grid-column>
+                </sbx-grid>
             </tab>
         </tabset>
     </div>
