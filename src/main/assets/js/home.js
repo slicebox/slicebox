@@ -169,7 +169,6 @@ angular.module('slicebox.home', ['ngRoute'])
         $scope.callbacks.imageAttributesTable.reset();
         $scope.callbacks.datasetsTable.reset();
 
-        $scope.uiState.seriesDetails.pngImageUrls = [];
         $scope.uiState.seriesDetails.windowMin = undefined;
         $scope.uiState.seriesDetails.windowMax = undefined;
         $scope.updatePNGImageUrls();
@@ -182,10 +181,11 @@ angular.module('slicebox.home', ['ngRoute'])
             $scope.uiState.selectedSeries = flatSeries.series;            
         }
         $scope.callbacks.imageAttributesTable.reset();
-        $scope.uiState.seriesDetails.imageUrls = [];
+        $scope.callbacks.datasetsTable.reset();
+        
         $scope.uiState.seriesDetails.windowMin = undefined;
         $scope.uiState.seriesDetails.windowMax = undefined;
-        $scope.updateImageUrls();
+        $scope.updatePNGImageUrls();
     };
 
     $scope.loadImageAttributes = function(startIndex, count) {

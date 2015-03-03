@@ -64,7 +64,7 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
 
     case DatasetReceived(dataset) =>
       val image = storeDataset(dataset)
-      log.info("Stored dataset: " + dataset.getString(Tag.SOPInstanceUID))
+      log.debug("Stored dataset: " + dataset.getString(Tag.SOPInstanceUID))
 
     case AddDataset(dataset) =>
       catchAndReport {
