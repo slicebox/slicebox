@@ -38,7 +38,11 @@
                     <sbx-grid-column property="baseUrl" title="Base URL">
                     </sbx-grid-column>
 
-                    <sbx-grid-column property="online" title="Online">
+                    <sbx-grid-column property="online" title="Status">
+                        <sbx-grid-cell>
+                            <span ng-if="rawPropertyValue" class="label label-success">ONLINE</span>
+                            <span ng-if="!rawPropertyValue" class="label label-danger">OFFLINE</span>
+                        </sbx-grid-cell>
                     </sbx-grid-column>
 
                     <sbx-grid-column property="sendMethod" title="Send Method (DEBUG)">

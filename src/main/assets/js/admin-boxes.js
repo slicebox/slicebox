@@ -11,7 +11,7 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
   });
 })
 
-.controller('AdminBoxesCtrl', function($scope, $http, $modal, $q, openConfirmationDeleteModal) {
+.controller('AdminBoxesCtrl', function($scope, $http, $modal, $q, $interval, openConfirmationDeleteModal) {
     // Initialization
     $scope.objectActions =
         [
@@ -26,6 +26,16 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
     $scope.uiState = {
         errorMessage: null
     };
+
+    var timer = $interval(function() {
+        if (angular.isDefined($scope.callbacks.boxesTable)) {
+            $scope.callbacks.boxesTable.reloadPage();
+        }
+    }, 1000);
+
+    $scope.$on('$destroy', function() {
+        $interval.cancel(timer);
+    });
   
     // Scope functions
     $scope.loadBoxesPage = function(startIndex, count, orderByProperty, orderByDirection) {

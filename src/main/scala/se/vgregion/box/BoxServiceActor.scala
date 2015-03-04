@@ -13,17 +13,38 @@ import se.vgregion.util.ExceptionCatching
 import java.nio.file.Path
 import scala.math.abs
 import java.util.Date
+import scala.concurrent.duration.DurationInt
+import scala.concurrent.duration.FiniteDuration
 
 class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) extends Actor with ExceptionCatching {
 
+  case object UpdatePollBoxesOnlineStatus
+  
   val db = dbProps.db
   val dao = new BoxDAO(dbProps.driver)
+  
+  implicit val system = context.system
+  implicit val ec = context.dispatcher
+  
+  val pollBoxOnlineStatusTimeoutMillis: Long = 15000
+  val pollBoxesLastPollTimestamp = scala.collection.mutable.HashMap.empty[Long,Date]
+  
 
   setupDb()
   setupBoxes()
+  
+  val pollBoxesOnlineStatusSchedule = system.scheduler.schedule(100.milliseconds, 5.seconds) {
+    self ! UpdatePollBoxesOnlineStatus
+  }
+  
+  override def postStop() =
+    pollBoxesOnlineStatusSchedule.cancel()
 
   def receive = LoggingReceive {
 
+    case UpdatePollBoxesOnlineStatus =>
+      updatePollBoxesOnlineStatus()
+    
     case msg: BoxRequest =>
 
       catchAndReport {
@@ -78,6 +99,8 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
             
           case PollOutbox(token) =>
             pollBoxByToken(token).foreach(box => {
+              pollBoxesLastPollTimestamp(box.id) = new Date()
+              
               nextOutboxEntry(box.id) match {
                 case Some(outboxEntry) => sender ! outboxEntry
                 case None              => sender ! OutboxEmpty
@@ -167,7 +190,8 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
         maybeStartPushActor(box)
         maybeStartPollActor(box)
       }
-      case BoxSendMethod.POLL => // No action needed
+      case BoxSendMethod.POLL =>
+        pollBoxesLastPollTimestamp(box.id) = new Date(0)
     })
 
   def maybeStartPushActor(box: Box): Unit = {
@@ -237,6 +261,21 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
       context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Receive completed.")))
   }
   
+  def updatePollBoxesOnlineStatus(): Unit = {
+    val now = new Date()
+    
+    pollBoxesLastPollTimestamp.foreach {
+      case(boxId, lastPollTime) =>
+        val online =
+          if (now.getTime - lastPollTime.getTime < pollBoxOnlineStatusTimeoutMillis)
+            true
+          else
+            false
+            
+        updateBoxOnlineStatusInDb(boxId, online)
+    }
+  }
+  
   def addOutboxEntries(remoteBoxId: Long, imageIds: Seq[Long]): Unit = {
     val transactionId = generateTransactionId()
     val totalImageCount = imageIds.length
@@ -272,6 +311,11 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
   def getOutboxFromDb() =
     db.withSession { implicit session =>
       dao.listOutboxEntries
+    }
+  
+  def updateBoxOnlineStatusInDb(boxId: Long, online: Boolean): Unit =
+    db.withSession { implicit session =>
+      dao.updateBoxOnlineStatus(boxId, online)
     }
 }
 
