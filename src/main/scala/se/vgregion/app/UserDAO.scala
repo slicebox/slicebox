@@ -3,59 +3,60 @@ package se.vgregion.app
 import scala.slick.driver.JdbcProfile
 import org.h2.jdbc.JdbcSQLException
 import scala.slick.jdbc.meta.MTable
+import se.vgregion.app.UserRepositoryDbProtocol._
 
 class UserDAO(val driver: JdbcProfile) {
   import driver.simple._
 
-  case class UserRow(key: Long, user: ApiUser)
+  val toUser = (id: Long, user: String, role: String, password: String) => ApiUser(id, user, UserRole.withName(role), Some(password))
+  val fromUser = (user: ApiUser) => Option((user.id, user.user, user.role.toString, user.hashedPassword.getOrElse("")))
 
-  val toRow = (key: Long, user: String, role: String, password: String) => UserRow(key, ApiUser(user, Role.valueOf(role), Some(password)))
-  val fromRow = (row: UserRow) => Option((row.key, row.user.user, row.user.role.toString, row.user.hashedPassword.getOrElse("")))
-
-  class UserTable(tag: Tag) extends Table[UserRow](tag, "User") {
-    def key = column[Long]("key", O.PrimaryKey, O.AutoInc)
+  class UserTable(tag: Tag) extends Table[ApiUser](tag, "User") {
+    def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def user = column[String]("user")
     def role = column[String]("role")
     def password = column[String]("password")
-    def * = (key, user, role, password) <> (toRow.tupled, fromRow)
+    def idxUniqueUser = index("idx_unique_user", user, unique = true)
+    def * = (id, user, role, password) <> (toUser.tupled, fromUser)
   }
 
-  val users = TableQuery[UserTable]
+  val userQuery = TableQuery[UserTable]
 
   def create(implicit session: Session) =
     if (MTable.getTables("User").list.isEmpty) {
-      users.ddl.create
+      userQuery.ddl.create
     }
+  
+  def drop(implicit session: Session): Unit =
+    (userQuery.ddl).drop
 
-  def insert(apiUser: ApiUser)(implicit session: Session) =
-    findUserByName(apiUser.user) match {
-      case Some(user) => None
-      case None =>
-        apiUser.hashedPassword.map(password => {
-          users += UserRow(-1, apiUser)
-          apiUser
-        })
-    }
-
-  def delete(userName: String)(implicit session: Session) = {
-    val userOption = findUserByName(userName)
-    userOption.foreach(user => users.filter(_.user === userName).delete)
-    userOption
+  def insert(user: ApiUser)(implicit session: Session) = {
+    val generatedId = (userQuery returning userQuery.map(_.id)) += user
+    user.copy(id = generatedId)
   }
+  
+  def userById(userId: Long)(implicit session: Session): Option[ApiUser] =
+    userQuery.filter(_.id === userId).list.headOption
+    
+  def userByName(user: String)(implicit session: Session): Option[ApiUser] =
+    userQuery.filter(_.user === user).list.headOption
+    
+  def removeUser(userId: Long)(implicit session: Session): Unit =
+    userQuery.filter(_.id === userId).delete
 
-  def findUserByName(name: String)(implicit session: Session) =
-    users.filter(_.user === name).firstOption.map(row => row.user)
+//  def findUserByName(name: String)(implicit session: Session) =
+//    userQuery.filter(_.user === name).firstOption.map(row => row.user)
+//
+//  def findKeyByName(name: String)(implicit session: Session) =
+//    userQuery.filter(_.user === name).firstOption.map(row => row.key)
+//
+//  def removeByName(name: String)(implicit session: Session) =
+//    userQuery.filter(_.user === name).delete
+//
+//  def listUserNames(implicit session: Session): List[String] =
+//    userQuery.list.map(row => row.user.user)
 
-  def findKeyByName(name: String)(implicit session: Session) =
-    users.filter(_.user === name).firstOption.map(row => row.key)
-
-  def removeByName(name: String)(implicit session: Session) =
-    users.filter(_.user === name).delete
-
-  def listUserNames(implicit session: Session): List[String] =
-    users.list.map(row => row.user.user)
-
-  def list(implicit session: Session): List[ApiUser] =
-    users.list.map(row => row.user)
+  def listUsers(implicit session: Session): List[ApiUser] =
+    userQuery.list
 
 }

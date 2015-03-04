@@ -1,0 +1,30 @@
+<div class="modal-header">
+    <h3 class="modal-title">Add User</h3>
+</div>
+
+<form name="userForm">
+    <div class="modal-body">
+        <div class="form-group">
+            <label for="userName" class="control-label">User Name</label>
+            <input name="userName" ng-model="userName" type="text" class="form-control" id="userName" required />
+        </div>
+
+        <div class="form-group">
+            <label for="password" class="control-label">Password</label>
+            <input name="password" ng-model="password" type="text" class="form-control" id="password" required />
+        </div>
+
+        <div class="form-group">
+            <label for="role" class="control-label" id="role">Role</label>
+            <select name="role" ng-model="role">
+                <option value="USER">User</option>
+                <option value="ADMINISTRATOR">Administrator</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="modal-footer">
+        <button type="submit" class="btn btn-primary" ng-click="addButtonClicked()" ng-disabled="userForm.$invalid">Add</button>
+        <button class="btn btn-default" ng-click="cancelButtonClicked()">Cancel</button>
+    </div>
+</form>

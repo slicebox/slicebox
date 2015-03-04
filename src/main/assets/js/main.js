@@ -14,7 +14,8 @@ angular.module('slicebox', [
     'slicebox.log',
     'slicebox.adminScps',
     'slicebox.adminWatchDirectories',
-    'slicebox.adminBoxes'
+    'slicebox.adminBoxes',
+    'slicebox.adminUsers'
 ]).
 
 config(function($locationProvider, $routeProvider) {

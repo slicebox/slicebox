@@ -8,6 +8,7 @@ import se.vgregion.dicom.DicomHierarchy._
 import se.vgregion.dicom.DicomProtocol._
 import se.vgregion.box.BoxProtocol._
 import se.vgregion.log.LogProtocol._
+import se.vgregion.app.UserRepositoryDbProtocol._
 
 trait JsonFormats extends DefaultJsonProtocol {
 
@@ -45,16 +46,17 @@ trait JsonFormats extends DefaultJsonProtocol {
 
   implicit val addScpDataFormat = jsonFormat3(AddScp)
 
-  implicit object RoleFormat extends JsonFormat[Role] {
-    def write(obj: Role) = JsString(obj.toString)
+  implicit object RoleFormat extends JsonFormat[UserRole] {
+    def write(obj: UserRole) = JsString(obj.toString)
 
-    def read(json: JsValue): Role = json match {
-      case JsString(string) => Role.valueOf(string)
-      case _                => Collaborator
+    def read(json: JsValue): UserRole = json match {
+      case JsString(string) => UserRole.withName(string)
+      case _                => deserializationError("Enumeration expected")
     }
   }
 
   implicit val clearTextUserFormat = jsonFormat3(ClearTextUser)
+  implicit val apiUserFormat = jsonFormat4(ApiUser)
 
   implicit val patientNameFormat = jsonFormat1(PatientName)
   implicit val patientIdFormat = jsonFormat1(PatientID)

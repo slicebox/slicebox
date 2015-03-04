@@ -17,6 +17,7 @@ import se.vgregion.dicom.DicomDispatchActor
 import se.vgregion.dicom.DicomHierarchy._
 import se.vgregion.dicom.DicomProtocol._
 import se.vgregion.log.LogProtocol._
+import se.vgregion.app.UserRepositoryDbProtocol._
 import se.vgregion.dicom.DicomUtil
 import spray.http.ContentTypes
 import spray.http.FormFile
@@ -74,7 +75,7 @@ trait RestApi extends HttpService with JsonFormats {
   val port = config.getInt("http.port")
   val apiBaseURL = s"http://$host:$port/api"
 
-  val userService = new DbUserRepository(actorRefFactory, dbProps)
+  val userService = actorRefFactory.actorOf(UserRepositoryDbActor.props(dbProps), "UserService")
   val boxService = actorRefFactory.actorOf(BoxServiceActor.props(dbProps, storage, apiBaseURL), "BoxService")
   val dicomService = actorRefFactory.actorOf(DicomDispatchActor.props(storage, dbProps), "DicomDispatch")
   val logService = actorRefFactory.actorOf(LogServiceActor.props(dbProps), "LogService")
@@ -501,36 +502,29 @@ trait RestApi extends HttpService with JsonFormats {
     }
 
   def userRoutes: Route =
-    pathPrefix("user") {
+    pathPrefix("users") {
       pathEnd {
         post {
           entity(as[ClearTextUser]) { user =>
-            val apiUser = ApiUser(user.user, user.role).withPassword(user.password)
-            onSuccess(userService.addUser(apiUser)) {
-              _ match {
-                case Some(newUser) =>
-                  complete(s"Added user ${newUser.user}")
-                case None =>
-                  complete((BadRequest, s"User ${user.user} already exists."))
-              }
-            }
-          }
-        } ~ delete {
-          entity(as[String]) { userName =>
-            onSuccess(userService.deleteUser(userName)) {
-              _ match {
-                case Some(deletedUser) =>
-                  complete(s"Deleted user ${deletedUser.user}")
-                case None =>
-                  complete((BadRequest, s"User ${userName} does not exist."))
-              }
+            val apiUser = ApiUser(-1, user.user, user.role).withPassword(user.password)
+            onSuccess(userService.ask(AddUser(apiUser))) {
+              case UserAdded(user) =>
+                complete(user)
             }
           }
         }
-      } ~ path("names") {
+      } ~ pathEnd {
         get {
-          onSuccess(userService.listUserNames()) { userNames =>
-            complete(userNames)
+          onSuccess(userService.ask(GetUsers)) {
+            case Users(users) =>
+              complete(users)
+          }
+        }
+      } ~ path(LongNumber) { userId =>
+        delete {
+          onSuccess(userService.ask(DeleteUser(userId))) {
+            case UserDeleted(userId) =>
+              complete(NoContent)
           }
         }
       }
@@ -541,7 +535,7 @@ trait RestApi extends HttpService with JsonFormats {
             complete(s"Hi, ${authInfo.user.user}")
           }
         } ~ path("admin") {
-          authorize(authInfo.hasPermission(Administrator)) {
+          authorize(authInfo.hasPermission(UserRole.ADMINISTRATOR)) {
             get {
               complete(s"Admin: ${authInfo.user.user}")
             }

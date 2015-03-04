@@ -1,0 +1,36 @@
+<div ng-if="uiState.errorMessage" class="row">
+    <div class="col-md-12">
+        <alert type="danger" close="closeErrorMessageAlert()">{{uiState.errorMessage}}</alert>
+    </div>
+</div>
+
+<div class="row admin-boxes">
+    <div class="col-md-12">
+        <div class="panel panel-default">
+            <div class="panel-heading">Users</div>
+
+            <div class="panel-body">
+                <sbx-grid
+                    load-page="loadUsersPage(startIndex, count, orderByProperty, orderByDirection)"
+                    page-size="20"
+                    page-sizes="[20, 50, 100]"
+                    object-actions="objectActions"
+                    callbacks="callbacks.usersTable"
+                    empty-message="No users exist">
+
+                    <sbx-grid-column property="user" title="Name">
+                    </sbx-grid-column>
+
+                    <sbx-grid-column property="role" title="Role">
+                    </sbx-grid-column>
+                </sbx-grid>
+
+                <button class="btn btn-default" type="button"
+                    ng-click="addUserButtonClicked()"
+                    ng-disabled="uiState.addUserInProgress">
+                    Add User
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

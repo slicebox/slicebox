@@ -6,8 +6,9 @@ import akka.actor.Actor
 import akka.actor.Props
 import akka.event.Logging
 import akka.event.LoggingReceive
+import se.vgregion.util.ExceptionCatching
 
-class UserRepositoryDbActor(dbProps: DbProps) extends Actor {
+class UserRepositoryDbActor(dbProps: DbProps) extends Actor with ExceptionCatching {
   val log = Logging(context.system, this)
 
   val db = dbProps.db
@@ -17,21 +18,37 @@ class UserRepositoryDbActor(dbProps: DbProps) extends Actor {
 
   def receive = LoggingReceive {
 
-    case GetUserByName(name) =>
-      db.withSession { implicit session =>
-        sender ! dao.findUserByName(name)
-      }
-    case GetUserNames =>
-      db.withSession { implicit session =>
-        sender ! dao.listUserNames
-      }
-    case AddUser(apiUser) =>
-      db.withSession { implicit session =>
-        sender ! dao.insert(apiUser)
-      }
-    case DeleteUser(userName) =>
-      db.withSession { implicit session =>
-        sender ! dao.delete(userName)
+    case msg: UserRequest =>
+      catchAndReport {
+        
+        msg match {
+        
+          case AddUser(apiUser) =>
+            db.withSession { implicit session =>
+              sender ! UserAdded(dao.insert(apiUser))
+            }
+            
+          case GetUser(userId) =>
+            db.withSession { implicit session =>
+              dao.userById(userId)
+            }
+            
+          case GetUserByName(user) =>
+            db.withSession { implicit session =>
+              dao.userByName(user)
+            }
+            
+          case GetUsers=>
+            db.withSession { implicit session =>
+              sender ! Users(dao.listUsers)
+            }
+            
+          case DeleteUser(userId) =>
+            db.withSession { implicit session =>
+              dao.removeUser(userId)
+              sender ! UserDeleted(userId)
+            }
+        }
       }
   }
 

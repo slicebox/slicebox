@@ -12,6 +12,8 @@ import org.scalatest.Suite
 
 import se.vgregion.util.TestUtil
 
+import UserRepositoryDbProtocol._
+
 trait RoutesTestBase extends ScalatestRouteTest with RestApi with BeforeAndAfterAll { this: Suite =>
 
   implicit val routeTestTimeout = RouteTestTimeout(5.second)
@@ -26,7 +28,7 @@ trait RoutesTestBase extends ScalatestRouteTest with RestApi with BeforeAndAfter
 
   def createStorageDirectory = Files.createTempDirectory("slicebox-test-storage-")
 
-  def addUser(name: String, password: String, role: Role) = {
+  def addUser(name: String, password: String, role: UserRole) = {
     val user = ClearTextUser(name, role, password)
     Put("/api/user", user)
   }
@@ -34,5 +36,8 @@ trait RoutesTestBase extends ScalatestRouteTest with RestApi with BeforeAndAfter
   override def afterAll {
     TestUtil.deleteFolder(storage)
   }
+  
+  // TODO: add test user
+  // TODO: help methods for HTTP calls that adds autherization
 
 }
