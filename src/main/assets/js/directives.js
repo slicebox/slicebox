@@ -719,4 +719,54 @@ angular.module('slicebox.directives', [])
         }        
     };
     
+})
+
+.directive('sbxGridCell', function() {
+    
+    return {
+        require: '^sbxGridColumn',
+        restrict: 'E',
+        transclude: true,
+        link: function($scope, $element, $attrs, sbxGridColumnController, $transclude) {
+            sbxGridColumnController.setRenderer($transclude, $scope);
+        }
+        
+    };
+    
+})
+
+.directive('sbxGridInternalTd', function() {
+    
+    return {
+        restrict: 'A',
+        priority: 500, // Must be below ngRepeat priority
+        link: function($scope, $element, $attrs) {
+            var property = $scope.columnDefinition.property;
+            var rendererTranscludeFn = $scope.columnDefinition.rendererTranscludeFn;
+            var rendererScope = $scope.columnDefinition.rendererScope;
+            var rawPropertyValue = null;
+
+            if (angular.isFunction(rendererTranscludeFn)) {
+                // Remove default rendering
+                $element.html('');
+
+                rendererScope = rendererScope.$new();
+                rendererScope.rowObject = $scope.rowObject;
+
+                rawPropertyValue = $scope.rowObject[$scope.columnDefinition.property];
+                if ($scope.columnDefinition.property.indexOf('[') !== -1) {
+                    rawPropertyValue = eval('$scope.rowObject.' + $scope.columnDefinition.property);
+                }
+
+                rendererScope.rawPropertyValue = rawPropertyValue;
+                rendererScope.filteredPropertyValue = $scope.filteredCellValues[$scope.$parent.$index][$scope.columnDefinition.property];
+
+                rendererTranscludeFn(rendererScope, function(rendererElement) {
+                    $element.append(rendererElement);
+                });
+            }
+        }
+        
+    };
+    
 });
