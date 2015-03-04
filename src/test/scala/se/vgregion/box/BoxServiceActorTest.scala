@@ -31,7 +31,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
     boxDao.create
   }
   
-  val boxServiceActorRef = _system.actorOf(Props(new BoxServiceActor(dbProps, storage, "testhost", 1234)))
+  val boxServiceActorRef = _system.actorOf(Props(new BoxServiceActor(dbProps, storage, "http://testhost:1234")))
   
   override def beforeEach() {
     db.withSession { implicit session =>

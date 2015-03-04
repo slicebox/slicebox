@@ -2,7 +2,6 @@ package se.vgregion.dicom
 
 import scala.slick.driver.JdbcProfile
 import scala.slick.jdbc.{ GetResult, StaticQuery => Q }
-import Q.interpolation
 import DicomProtocol.FileName
 import DicomProtocol.ImageFile
 import DicomHierarchy._
