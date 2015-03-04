@@ -12,7 +12,8 @@
             <div class="panel-body">
                 <sbx-grid
                     load-page="loadOutboxPage(startIndex, count, orderByProperty, orderByDirection)"
-                    page-size="20"
+                    converter="convertOutboxPageData(pageData)"
+                    page-size="10000000"
                     object-actions="objectActions"
                     callbacks="callbacks.outboxTable"
                     empty-message="Outbox is empty">
@@ -20,10 +21,15 @@
                     <sbx-grid-column property="remoteBoxName" title="Remote Box Name">
                     </sbx-grid-column>
 
-                    <sbx-grid-column property="sequenceNumber" title="Sequence Number">
-                    </sbx-grid-column>
-
-                    <sbx-grid-column property="totalImageCount" title="Total Image Count">
+                    <sbx-grid-column property="sequenceNumber" title="Progress">
+                        <sbx-grid-cell>
+                            <progressbar
+                                type="success"
+                                max="rowObject.totalImageCount"
+                                value="rowObject.totalImageCount - rowObject.imagesLeft">
+                                {{rowObject.totalImageCount - rowObject.imagesLeft}} / {{rowObject.totalImageCount}}
+                            </progressbar>
+                        </sbx-grid-cell>
                     </sbx-grid-column>
 
                     <sbx-grid-column property="failed" title="Failed">

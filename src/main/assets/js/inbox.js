@@ -38,6 +38,10 @@ angular.module('slicebox.inbox', ['ngRoute'])
     });
   
     // Scope functions
+    $scope.closeErrorMessageAlert = function() {
+        $scope.uiState.errorMessage = null;
+    };
+    
     $scope.loadInboxPage = function(startIndex, count, orderByProperty, orderByDirection) {
         return $http.get('/api/inbox');
     };

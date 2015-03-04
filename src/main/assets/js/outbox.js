@@ -38,8 +38,42 @@ angular.module('slicebox.outbox', ['ngRoute'])
     });
   
     // Scope functions
+    $scope.closeErrorMessageAlert = function() {
+        $scope.uiState.errorMessage = null;
+    };
+
     $scope.loadOutboxPage = function(startIndex, count, orderByProperty, orderByDirection) {
         return $http.get('/api/outbox');
+    };
+
+    $scope.convertOutboxPageData = function(outboxEntries) {
+        var outboxDataCollector = {};
+        var outboxTransactionData;
+        var imagesLeft;
+        var pageData = [];
+
+        angular.forEach(outboxEntries, function(outboxEntry) {
+            outboxTransactionData = outboxDataCollector[outboxEntry.transactionId];
+            if (angular.isUndefined(outboxTransactionData)) {
+                outboxTransactionData =
+                    {
+                        remoteBoxName: outboxEntry.remoteBoxName,
+                        totalImageCount: outboxEntry.totalImageCount,
+                        failed: outboxEntry.failed,
+                        imagesLeft: 0
+                    };
+
+                outboxDataCollector[outboxEntry.transactionId] = outboxTransactionData;
+            }
+
+            outboxTransactionData.imagesLeft = outboxTransactionData.imagesLeft + 1;
+        });
+
+        angular.forEach(outboxDataCollector, function(outboxTransactionData) {
+            pageData.push(outboxTransactionData);
+        });
+
+        return pageData;
     };
 
     // Private functions

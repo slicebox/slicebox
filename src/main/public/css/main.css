@@ -15,3 +15,7 @@ body {
     margin-right: 5px;
     margin-bottom: 5px;
 }
+
+td div.progress {
+    margin: 0;
+}
