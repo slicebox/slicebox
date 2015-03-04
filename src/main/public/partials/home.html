@@ -181,6 +181,7 @@
 
                 <hr>
 
+
                 <form class="form-inline">
                     <div class="btn-group" dropdown>
                         <button type="button" class="btn btn-default dropdown-toggle" dropdown-toggle>Size <span class="caret"></span></button>
@@ -208,6 +209,8 @@
                 </form>
 
                 <hr>
+
+                <i ng-if="uiState.loadPngImagesInProgress" class="fa fa-spinner fa-2x fa-spin"></i>
 
                 <div class="clearfix">
                     <img ng-repeat="imageUrl in uiState.seriesDetails.pngImageUrls | orderBy:'frameIndex'" class="frame-image" ng-src="{{imageUrl.url}}" alt=""></img>

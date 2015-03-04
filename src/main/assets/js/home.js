@@ -64,6 +64,7 @@ angular.module('slicebox.home', ['ngRoute'])
         selectedPatient: null,
         selectedStudy: null,
         selectedSeries: null,
+        loadPngImagesInProgress: false,
         seriesDetails: {
             pngImageUrls: [],
             imageHeight: 50,
@@ -213,43 +214,61 @@ angular.module('slicebox.home', ['ngRoute'])
     };
 
     $scope.updatePNGImageUrls = function() {
+        var loadImageInformationPromises = [];
+        var loadImageInformationPromise = null;
+
         $scope.uiState.seriesDetails.pngImageUrls = [];
 
         if ($scope.uiState.selectedSeries !== null) {
+            $scope.uiState.loadPngImagesInProgress = true;
+
             $http.get('/api/metadata/images?seriesId=' + $scope.uiState.selectedSeries.id).success(function(images) {
 
                 $scope.uiState.seriesDetails.pngImageUrls = [];
 
                 angular.forEach(images, function(image) {
 
-                    $http.get('/api/images/' + image.id + '/imageinformation').success(function(info) {
-                        // window min and max are defined by the first image of the series
-                        if (!$scope.uiState.seriesDetails.windowMin) {
-                            $scope.uiState.seriesDetails.windowMin = info.minimumPixelValue;
-                        }
-                        if (!$scope.uiState.seriesDetails.windowMax) {
-                            $scope.uiState.seriesDetails.windowMax = info.maximumPixelValue;
-                        }
-                        for (var i = 0; i < info.numberOfFrames; i++) {
-                            var url = '/api/images/' + image.id + '/png?framenumber=' + (i + 1);
-                            if ($scope.uiState.seriesDetails.isWindowManual) {
-                                url = url + 
-                                    '&windowmin=' + $scope.uiState.seriesDetails.windowMin + 
-                                    '&windowmax=' + $scope.uiState.seriesDetails.windowMax;
+                    loadImageInformationPromise =
+                        $http.get('/api/images/' + image.id + '/imageinformation').success(function(info) {
+                            // window min and max are defined by the first image of the series
+                            if (!$scope.uiState.seriesDetails.windowMin) {
+                                $scope.uiState.seriesDetails.windowMin = info.minimumPixelValue;
                             }
-                            if (!isNaN(parseInt($scope.uiState.seriesDetails.imageHeight))) {
-                                url = url + 
-                                    '&imageheight=' + $scope.uiState.seriesDetails.imageHeight;
+                            if (!$scope.uiState.seriesDetails.windowMax) {
+                                $scope.uiState.seriesDetails.windowMax = info.maximumPixelValue;
                             }
-                            $scope.uiState.seriesDetails.pngImageUrls.push({ url: url, frameIndex: info.frameIndex });
-                        }
-                    }).error(function(error) {
-                        appendErrorMessage('Failed to load image information: ' + error);            
-                    });
+                            for (var i = 0; i < info.numberOfFrames; i++) {
+                                var url = '/api/images/' + image.id + '/png?framenumber=' + (i + 1);
+                                if ($scope.uiState.seriesDetails.isWindowManual) {
+                                    url = url + 
+                                        '&windowmin=' + $scope.uiState.seriesDetails.windowMin + 
+                                        '&windowmax=' + $scope.uiState.seriesDetails.windowMax;
+                                }
+                                if (!isNaN(parseInt($scope.uiState.seriesDetails.imageHeight))) {
+                                    url = url + 
+                                        '&imageheight=' + $scope.uiState.seriesDetails.imageHeight;
+                                }
+                                $scope.uiState.seriesDetails.pngImageUrls.push({ url: url, frameIndex: info.frameIndex });
+                            }
+                        });
+
+                    loadImageInformationPromise.error(function(error) {
+                            appendErrorMessage('Failed to load image information: ' + error);            
+                        });
+
+                    loadImageInformationPromises.push(loadImageInformationPromise);
 
                 });
+
+                $q.all(loadImageInformationPromises)
+                    .finally(function() {
+                        $scope.uiState.loadPngImagesInProgress = false;
+                    });
+                
             }).error(function(reason) {
-                appendErrorMessage('Failed to load images for series: ' + reason);                        
+                appendErrorMessage('Failed to load images for series: ' + reason);          
+
+                $scope.uiState.loadPngImagesInProgress = false;              
             });
 
         }
