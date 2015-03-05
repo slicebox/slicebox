@@ -9,6 +9,7 @@ import se.vgregion.dicom.DicomProtocol._
 import se.vgregion.box.BoxProtocol._
 import se.vgregion.log.LogProtocol._
 import se.vgregion.app.UserProtocol._
+import spray.routing.authentication.UserPass
 
 trait JsonFormats extends DefaultJsonProtocol {
 
@@ -57,7 +58,9 @@ trait JsonFormats extends DefaultJsonProtocol {
 
   implicit val clearTextUserFormat = jsonFormat3(ClearTextUser)
   implicit val apiUserFormat = jsonFormat4(ApiUser)
-
+  implicit val userPassFormat = jsonFormat2(UserPass)
+  implicit val loginResultFormat = jsonFormat2(LoginResult)
+  
   implicit val patientNameFormat = jsonFormat1(PatientName)
   implicit val patientIdFormat = jsonFormat1(PatientID)
   implicit val patientBirthDateFormat = jsonFormat1(PatientBirthDate)

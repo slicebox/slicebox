@@ -30,6 +30,7 @@ import spray.routing._
 import spray.httpx.unmarshalling.BasicUnmarshallers.ByteArrayUnmarshaller
 import se.vgregion.log.LogServiceActor
 import spray.http.MediaTypes
+import spray.routing.authentication.UserPass
 
 class RestInterface extends Actor with RestApi {
 
@@ -106,10 +107,8 @@ trait RestApi extends HttpService with JsonFormats {
     }
 
   def angularRoutes =
-    get {
-      pathPrefix("") {
-        getFromResource("public/index.html")
-      }
+    pathPrefix("") {
+      getFromResource("public/index.html")
     }
 
   def directoryRoutes: Route =
@@ -546,9 +545,9 @@ trait RestApi extends HttpService with JsonFormats {
     }
 
   def systemRoutes(authInfo: AuthInfo): Route =
-    authorize(authInfo.hasPermission(UserRole.ADMINISTRATOR)) {
-      path("stop") {
-        (post | parameter('method ! "post")) {
+    path("stop") {
+      (post | parameter('method ! "post")) {
+        authorize(authInfo.hasPermission(UserRole.ADMINISTRATOR)) {
           complete {
             var system = actorRefFactory.asInstanceOf[ActorContext].system
             system.scheduler.scheduleOnce(1.second)(system.shutdown())(system.dispatcher)
@@ -558,9 +557,23 @@ trait RestApi extends HttpService with JsonFormats {
       }
     }
 
+  def loginRoute: Route =
+    path("login") {
+      post {
+        entity(as[UserPass]) { userPass =>
+          onSuccess(userService.ask(GetUserByName(userPass.user)).mapTo[Option[ApiUser]]) {
+            case Some(repoUser) if (repoUser.passwordMatches(userPass.pass)) =>
+              complete(LoginResult(true, s"User ${userPass.user} logged in"))
+            case _ =>
+              complete(LoginResult(false, "Incorrect user or password"))
+          }
+        }
+      }
+    }
+
   def routes: Route =
     pathPrefix("api") {
-      handleRejections(authRejectionHandler) {
+      loginRoute ~ handleRejections(authRejectionHandler) {
         authenticate(authenticator.basicUserAuthenticator) { authInfo =>
           authorize(authInfo.hasPermission(UserRole.USER)) {
             directoryRoutes ~

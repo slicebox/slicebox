@@ -34,6 +34,8 @@ object UserProtocol {
   
   }
   
+  case class LoginResult(success: Boolean, message: String)
+  
   sealed trait UserRequest
   
   case class AddUser(user: ApiUser) extends UserRequest

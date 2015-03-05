@@ -5,9 +5,11 @@
 // Declare app level module which depends on views, and components
 angular.module('slicebox', [
     'ngRoute',
+    'ngCookies',
     'ui.bootstrap',
     'slicebox.utils',
     'slicebox.directives',
+    'slicebox.login',
     'slicebox.home',
     'slicebox.inbox',
     'slicebox.outbox',
@@ -16,17 +18,22 @@ angular.module('slicebox', [
     'slicebox.adminWatchDirectories',
     'slicebox.adminBoxes',
     'slicebox.adminUsers'
-]).
+])
 
-config(function($locationProvider, $routeProvider) {
+.config(function($locationProvider, $routeProvider) {
     $locationProvider.html5Mode(true);
     $routeProvider.otherwise({redirectTo: '/'});
 })
 
-.controller('SliceboxCtrl', function($scope, $location) {
+.controller('SliceboxCtrl', function($scope, $location, authenticationService) {
 
     $scope.uiState = {
         errorMessages: []
+    };
+
+    $scope.logout = function() {
+        authenticationService.clearCredentials();
+        $location.url("/login");
     };
 
     $scope.isCurrentPath = function(path) { 
@@ -40,8 +47,24 @@ config(function($locationProvider, $routeProvider) {
     $scope.closeErrorMessageAlert = function(errorIndex) {
         $scope.uiState.errorMessages.splice(errorIndex, 1);
     };
+
     $scope.appendErrorMessage = function(errorMessage) {
         $scope.uiState.errorMessages.push(errorMessage);
     };
 
+})
+
+.run(function ($rootScope, $location, $cookieStore, $http) {
+    // keep user logged in after page refresh
+    $rootScope.globals = $cookieStore.get('globals') || {};
+    if ($rootScope.globals.currentUser) {
+        $http.defaults.headers.common['Authorization'] = 'Basic ' + $rootScope.globals.currentUser.authdata; // jshint ignore:line
+    }
+
+    $rootScope.$on('$locationChangeStart', function (event, next, current) {
+        // redirect to login page if not logged in
+        if ($location.path() !== '/login' && !$rootScope.globals.currentUser) {
+            $location.path('/login');
+        }
+    });
 });

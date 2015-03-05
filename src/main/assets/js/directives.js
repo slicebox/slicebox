@@ -8,7 +8,9 @@ angular.module('slicebox.directives', [])
     return {
         restrict: 'E',
         replace: true,
-        template: '<button type="button" ng-click="buttonClicked()" ng-disabled="buttonDisabled || disabled">{{buttonTitle}} <img src="/assets/images/spinner.gif" ng-if="disabled && showSpinner" /></button>',
+        template: '<button type="button" ng-click="buttonClicked()" ng-disabled="buttonDisabled || disabled">' + 
+                    '{{buttonTitle}} <i ng-if="disabled && showSpinner" class="fa fa-spinner fa-2x fa-spin">' + 
+                    '</button>',
         scope: {
             action: '&',
             buttonTitle: '@',
