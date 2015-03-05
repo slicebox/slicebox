@@ -17,14 +17,13 @@ import se.vgregion.dicom.DicomDispatchActor
 import se.vgregion.dicom.DicomHierarchy._
 import se.vgregion.dicom.DicomProtocol._
 import se.vgregion.log.LogProtocol._
-import se.vgregion.app.UserRepositoryDbProtocol._
+import se.vgregion.app.UserProtocol._
 import se.vgregion.dicom.DicomUtil
 import spray.http.ContentTypes
 import spray.http.FormFile
 import spray.http.HttpData
 import spray.http.HttpEntity
 import spray.http.StatusCodes._
-import spray.httpx.PlayTwirlSupport.twirlHtmlMarshaller
 import spray.httpx.SprayJsonSupport._
 import spray.httpx.marshalling.ToResponseMarshallable.isMarshallable
 import spray.routing._
@@ -70,23 +69,32 @@ trait RestApi extends HttpService with JsonFormats {
   val dbProps = DbProps(db, H2Driver)
 
   val storage = createStorageDirectory()
-  
+
   val host = config.getString("http.host")
   val port = config.getInt("http.port")
   val apiBaseURL = s"http://$host:$port/api"
+  val superUser = sliceboxConfig.getString("superuser.user")
+  val superPassword = sliceboxConfig.getString("superuser.password")
 
-  val userService = actorRefFactory.actorOf(UserRepositoryDbActor.props(dbProps), "UserService")
+  val userService = actorRefFactory.actorOf(UserServiceActor.props(dbProps, superUser, superPassword), "UserService")
   val boxService = actorRefFactory.actorOf(BoxServiceActor.props(dbProps, storage, apiBaseURL), "BoxService")
   val dicomService = actorRefFactory.actorOf(DicomDispatchActor.props(storage, dbProps), "DicomDispatch")
   val logService = actorRefFactory.actorOf(LogServiceActor.props(dbProps), "LogService")
 
   val authenticator = new Authenticator(userService)
 
-  implicit def sliceboxExceptionHandler =
+  implicit def knownExceptionHandler =
     ExceptionHandler {
       case e: IllegalArgumentException =>
         complete((BadRequest, "Illegal arguments: " + e.getMessage()))
     }
+
+  val authRejectionHandler = RejectionHandler {
+    case AuthenticationFailedRejection(cause, challengeHeaders) :: _ =>
+      complete((Unauthorized, "Must be logged in"))
+    case AuthorizationFailedRejection :: _ =>
+      complete((Forbidden, "User does not have the priviliges to access the resource"))
+  }
 
   def staticResourcesRoutes =
     get {
@@ -100,7 +108,7 @@ trait RestApi extends HttpService with JsonFormats {
   def angularRoutes =
     get {
       pathPrefix("") {
-        complete(views.html.index())
+        getFromResource("public/index.html")
       }
     }
 
@@ -130,7 +138,7 @@ trait RestApi extends HttpService with JsonFormats {
       }
     }
 
-  def scpRoutes: Route =
+  def scpRoutes(authInfo: AuthInfo): Route =
     pathPrefix("scps") {
       pathEnd {
         get {
@@ -139,18 +147,22 @@ trait RestApi extends HttpService with JsonFormats {
               complete(scps)
           }
         } ~ post {
-          entity(as[AddScp]) { addScp =>
-            onSuccess(dicomService.ask(addScp)) {
-              case ScpAdded(scpData) =>
-                complete(scpData)
+          authorize(authInfo.hasPermission(UserRole.ADMINISTRATOR)) {
+            entity(as[AddScp]) { addScp =>
+              onSuccess(dicomService.ask(addScp)) {
+                case ScpAdded(scpData) =>
+                  complete(scpData)
+              }
             }
           }
         }
       } ~ path(LongNumber) { scpDataId =>
         delete {
-          onSuccess(dicomService.ask(RemoveScp(scpDataId))) {
-            case ScpRemoved(scpDataId) =>
-              complete(NoContent)
+          authorize(authInfo.hasPermission(UserRole.ADMINISTRATOR)) {
+            onSuccess(dicomService.ask(RemoveScp(scpDataId))) {
+              case ScpRemoved(scpDataId) =>
+                complete(NoContent)
+            }
           }
         }
       }
@@ -258,14 +270,13 @@ trait RestApi extends HttpService with JsonFormats {
               case Images(images) =>
                 val imageURLs =
                   images.map(image => SeriesDataset(image.id, s"$apiBaseURL/images/${image.id}"))
-                  
                 complete(imageURLs)
             }
           }
         }
       }
     }
-  
+
   def imageRoutes: Route =
     pathPrefix("images") {
       pathEnd {
@@ -317,7 +328,7 @@ trait RestApi extends HttpService with JsonFormats {
       }
     }
 
-  def boxRoutes: Route =
+  def boxRoutes(authInfo: AuthInfo): Route =
     pathPrefix("boxes") {
       pathEnd {
         get {
@@ -326,29 +337,31 @@ trait RestApi extends HttpService with JsonFormats {
               complete(boxes)
           }
         }
-      } ~ path("generatebaseurl") {
-        post {
-          entity(as[RemoteBoxName]) { remoteBoxName =>
-            onSuccess(boxService.ask(GenerateBoxBaseUrl(remoteBoxName.value))) {
-              case BoxBaseUrlGenerated(baseUrl) =>
-                complete(BoxBaseUrl(baseUrl))
+      } ~ authorize(authInfo.hasPermission(UserRole.ADMINISTRATOR)) {
+        path("generatebaseurl") {
+          post {
+            entity(as[RemoteBoxName]) { remoteBoxName =>
+              onSuccess(boxService.ask(GenerateBoxBaseUrl(remoteBoxName.value))) {
+                case BoxBaseUrlGenerated(baseUrl) =>
+                  complete(BoxBaseUrl(baseUrl))
+              }
             }
           }
-        }
-      } ~ path("addremotebox") {
-        post {
-          entity(as[RemoteBox]) { remoteBox =>
-            onSuccess(boxService.ask(AddRemoteBox(remoteBox))) {
-              case RemoteBoxAdded(box) =>
-                complete(box)
+        } ~ path("addremotebox") {
+          post {
+            entity(as[RemoteBox]) { remoteBox =>
+              onSuccess(boxService.ask(AddRemoteBox(remoteBox))) {
+                case RemoteBoxAdded(box) =>
+                  complete(box)
+              }
             }
           }
-        }
-      } ~ path(LongNumber) { boxId =>
-        delete {
-          onSuccess(boxService.ask(RemoveBox(boxId))) {
-            case BoxRemoved(boxId) =>
-              complete(NoContent)
+        } ~ path(LongNumber) { boxId =>
+          delete {
+            onSuccess(boxService.ask(RemoveBox(boxId))) {
+              case BoxRemoved(boxId) =>
+                complete(NoContent)
+            }
           }
         }
       } ~ path(LongNumber / "sendpatients") { remoteBoxId =>
@@ -501,64 +514,69 @@ trait RestApi extends HttpService with JsonFormats {
       }
     }
 
-  def userRoutes: Route =
+  def userRoutes(authInfo: AuthInfo): Route =
     pathPrefix("users") {
       pathEnd {
-        post {
-          entity(as[ClearTextUser]) { user =>
-            val apiUser = ApiUser(-1, user.user, user.role).withPassword(user.password)
-            onSuccess(userService.ask(AddUser(apiUser))) {
-              case UserAdded(user) =>
-                complete(user)
-            }
-          }
-        }
-      } ~ pathEnd {
         get {
           onSuccess(userService.ask(GetUsers)) {
             case Users(users) =>
               complete(users)
           }
-        }
-      } ~ path(LongNumber) { userId =>
-        delete {
-          onSuccess(userService.ask(DeleteUser(userId))) {
-            case UserDeleted(userId) =>
-              complete(NoContent)
-          }
-        }
-      }
-    } ~ pathPrefix("private") {
-      authenticate(authenticator.basicUserAuthenticator) { authInfo =>
-        path("test") {
-          get {
-            complete(s"Hi, ${authInfo.user.user}")
-          }
-        } ~ path("admin") {
+        } ~ post {
           authorize(authInfo.hasPermission(UserRole.ADMINISTRATOR)) {
-            get {
-              complete(s"Admin: ${authInfo.user.user}")
+            entity(as[ClearTextUser]) { user =>
+              val apiUser = ApiUser(-1, user.user, user.role).withPassword(user.password)
+              onSuccess(userService.ask(AddUser(apiUser))) {
+                case UserAdded(user) =>
+                  complete(user)
+              }
             }
           }
         }
-
+      } ~ path(LongNumber) { userId =>
+        delete {
+          authorize(authInfo.hasPermission(UserRole.ADMINISTRATOR)) {
+            onSuccess(userService.ask(DeleteUser(userId))) {
+              case UserDeleted(userId) =>
+                complete(NoContent)
+            }
+          }
+        }
       }
     }
 
-  def systemRoutes: Route =
-    path("stop") {
-      (post | parameter('method ! "post")) {
-        complete {
-          var system = actorRefFactory.asInstanceOf[ActorContext].system
-          system.scheduler.scheduleOnce(1.second)(system.shutdown())(system.dispatcher)
-          "Shutting down in 1 second..."
+  def systemRoutes(authInfo: AuthInfo): Route =
+    authorize(authInfo.hasPermission(UserRole.ADMINISTRATOR)) {
+      path("stop") {
+        (post | parameter('method ! "post")) {
+          complete {
+            var system = actorRefFactory.asInstanceOf[ActorContext].system
+            system.scheduler.scheduleOnce(1.second)(system.shutdown())(system.dispatcher)
+            "Shutting down in 1 second..."
+          }
         }
       }
     }
 
   def routes: Route =
     pathPrefix("api") {
-      directoryRoutes ~ scpRoutes ~ metaDataRoutes ~ imageRoutes ~ seriesRoutes ~ boxRoutes ~ userRoutes ~ inboxRoutes ~ outboxRoutes ~ logRoutes ~ systemRoutes
+      handleRejections(authRejectionHandler) {
+        authenticate(authenticator.basicUserAuthenticator) { authInfo =>
+          authorize(authInfo.hasPermission(UserRole.USER)) {
+            directoryRoutes ~
+              scpRoutes(authInfo) ~
+              metaDataRoutes ~
+              imageRoutes ~
+              seriesRoutes ~
+              boxRoutes(authInfo) ~
+              userRoutes(authInfo) ~
+              inboxRoutes ~
+              outboxRoutes ~
+              logRoutes ~
+              systemRoutes(authInfo)
+          }
+        }
+      }
     } ~ staticResourcesRoutes ~ angularRoutes
 
 }

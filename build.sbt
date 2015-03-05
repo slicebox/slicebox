@@ -58,7 +58,7 @@
 
 	mainClass in Compile := Some("se.vgregion.app.Main")
 
-	lazy val slicebox = (project in file(".")).enablePlugins(SbtTwirl, SbtWeb)
+	lazy val slicebox = (project in file(".")).enablePlugins(SbtWeb)
 
 	updateOptions := updateOptions.value.withCachedResolution(true)
 

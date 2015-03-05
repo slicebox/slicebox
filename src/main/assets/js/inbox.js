@@ -12,20 +12,8 @@ angular.module('slicebox.inbox', ['ngRoute'])
 })
 
 .controller('InboxCtrl', function($scope, $http, $modal, $q, $interval) {
-    // Initialization
-    // $scope.objectActions =
-    //     [
-    //         {
-    //             name: 'Remove',
-    //             action: removeBoxes
-    //         }
-    //     ];
 
     $scope.callbacks = {};
-
-    $scope.uiState = {
-        errorMessage: null
-    };
 
     var timer = $interval(function() {
         if (angular.isDefined($scope.callbacks.inboxTable)) {
@@ -37,11 +25,6 @@ angular.module('slicebox.inbox', ['ngRoute'])
         $interval.cancel(timer);
     });
   
-    // Scope functions
-    $scope.closeErrorMessageAlert = function() {
-        $scope.uiState.errorMessage = null;
-    };
-    
     $scope.loadInboxPage = function(startIndex, count, orderByProperty, orderByDirection) {
         return $http.get('/api/inbox');
     };

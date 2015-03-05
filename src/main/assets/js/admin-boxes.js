@@ -23,10 +23,6 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
 
     $scope.callbacks = {};
 
-    $scope.uiState = {
-        errorMessage: null
-    };
-
     var timer = $interval(function() {
         if (angular.isDefined($scope.callbacks.boxesTable)) {
             $scope.callbacks.boxesTable.reloadPage();
@@ -49,7 +45,6 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
             });
 
         modalInstance.result.then(function(remoteBoxName) {
-            $scope.uiState.errorMessage = null;
             $scope.uiState.connectInProgress = true;
 
             var connectPromise = $http.post('/api/boxes/addremotebox',
@@ -63,7 +58,7 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
             });
 
             connectPromise.error(function(data) {
-                $scope.uiState.errorMessage = data;
+                $scope.appendErrorMessage(data);
             });
 
             connectPromise.finally(function() {
@@ -81,7 +76,6 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
             });
 
         modalInstance.result.then(function(remoteBoxName) {
-            $scope.uiState.errorMessage = null;
             $scope.uiState.generateURLInProgress = true;
 
             var generateURLPromise = $http.post('/api/boxes/generatebaseurl', {value: remoteBoxName});
@@ -91,7 +85,7 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
             });
 
             generateURLPromise.error(function(data) {
-                $scope.uiState.errorMessage = data;
+                $scope.appendErrorMessage(data);
             });
 
             generateURLPromise.finally(function() {
@@ -113,8 +107,6 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
     function deleteBoxes(boxes) {
         var deletePromises = [];
         var deletePromise;
-
-        $scope.uiState.errorMessage = null;
 
         angular.forEach(boxes, function(box) {
             deletePromise = $http.delete('/api/boxes/' + box.id);

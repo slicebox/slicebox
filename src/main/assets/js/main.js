@@ -25,12 +25,23 @@ config(function($locationProvider, $routeProvider) {
 
 .controller('SliceboxCtrl', function($scope, $location) {
 
+    $scope.uiState = {
+        errorMessages: []
+    };
+
     $scope.isCurrentPath = function(path) { 
         return $location.path() === path;
     };
 
     $scope.currentPathStartsWith = function(path) { 
         return $location.path().indexOf(path) === 0;
+    };
+
+    $scope.closeErrorMessageAlert = function(errorIndex) {
+        $scope.uiState.errorMessages.splice(errorIndex, 1);
+    };
+    $scope.appendErrorMessage = function(errorMessage) {
+        $scope.uiState.errorMessages.push(errorMessage);
     };
 
 });

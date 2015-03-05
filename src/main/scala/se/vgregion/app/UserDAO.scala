@@ -3,7 +3,7 @@ package se.vgregion.app
 import scala.slick.driver.JdbcProfile
 import org.h2.jdbc.JdbcSQLException
 import scala.slick.jdbc.meta.MTable
-import se.vgregion.app.UserRepositoryDbProtocol._
+import se.vgregion.app.UserProtocol._
 
 class UserDAO(val driver: JdbcProfile) {
   import driver.simple._

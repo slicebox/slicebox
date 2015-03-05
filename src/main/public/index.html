@@ -1,5 +1,3 @@
-@()
-
 <!DOCTYPE html>
 <!--[if lt IE 7]>      <html lang="en" ng-app=""slicebox"" class="no-js lt-ie9 lt-ie8 lt-ie7"> <![endif]-->
 <!--[if IE 7]>         <html lang="en" ng-app=""slicebox"" class="no-js lt-ie9 lt-ie8"> <![endif]-->
@@ -53,13 +51,7 @@
 		  <p class="browsehappy">You are using an <strong>outdated</strong> browser. Please <a href="http://browsehappy.com/">upgrade your browser</a> to improve your experience.</p>
 		<![endif]-->
 
-		<!-- div class="row">
-			<ul class="menu">
-				<li><a href="#/view1">view1</a></li>
-				<li><a href="#/view2">view2</a></li>
-			</ul>
-		  
-		</div -->
+	<alert ng-repeat="errorMessage in uiState.errorMessages track by $index" type="danger" close="closeErrorMessageAlert($index)">{{errorMessage}}</alert>
 
 		<div ng-view></div>
 

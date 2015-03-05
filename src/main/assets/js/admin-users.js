@@ -23,15 +23,7 @@ angular.module('slicebox.adminUsers', ['ngRoute'])
 
     $scope.callbacks = {};
 
-    $scope.uiState = {
-        errorMessage: null
-    };
-  
     // Scope functions
-    $scope.closeErrorMessageAlert = function() {
-        $scope.uiState.errorMessage = null;
-    };
-
     $scope.loadUsersPage = function(startIndex, count, orderByProperty, orderByDirection) {
         return $http.get('/api/users');
     };
@@ -43,13 +35,12 @@ angular.module('slicebox.adminUsers', ['ngRoute'])
             });
 
         modalInstance.result.then(function(user) {
-            $scope.uiState.errorMessage = null;
             $scope.uiState.addUserInProgress = true;
 
             var addUserPromise = $http.post('/api/users', user);
 
             addUserPromise.error(function(data) {
-                $scope.uiState.errorMessage = data;
+                $scope.appendErrorMessage(data);
             });
 
             addUserPromise.finally(function() {
@@ -71,8 +62,6 @@ angular.module('slicebox.adminUsers', ['ngRoute'])
     function deleteUsers(users) {
         var deletePromises = [];
         var deletePromise;
-
-        $scope.uiState.errorMessage = null;
 
         angular.forEach(users, function(user) {
             deletePromise = $http.delete('/api/users/' + user.id);

@@ -5,7 +5,7 @@ import com.github.t3hnar.bcrypt.Password
 import com.github.t3hnar.bcrypt.generateSalt
 import se.vgregion.model.Entity
 
-object UserRepositoryDbProtocol {
+object UserProtocol {
   
   sealed trait UserRole {
     override def toString(): String = this match {

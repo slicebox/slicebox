@@ -8,7 +8,7 @@ import se.vgregion.dicom.DicomHierarchy._
 import se.vgregion.dicom.DicomProtocol._
 import se.vgregion.box.BoxProtocol._
 import se.vgregion.log.LogProtocol._
-import se.vgregion.app.UserRepositoryDbProtocol._
+import se.vgregion.app.UserProtocol._
 
 trait JsonFormats extends DefaultJsonProtocol {
 

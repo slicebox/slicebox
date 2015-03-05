@@ -23,10 +23,6 @@ angular.module('slicebox.outbox', ['ngRoute'])
 
     $scope.callbacks = {};
 
-    $scope.uiState = {
-        errorMessage: null
-    };
-
     var timer = $interval(function() {
         if (angular.isDefined($scope.callbacks.outboxTable)) {
             $scope.callbacks.outboxTable.reloadPage();
@@ -38,10 +34,6 @@ angular.module('slicebox.outbox', ['ngRoute'])
     });
   
     // Scope functions
-    $scope.closeErrorMessageAlert = function() {
-        $scope.uiState.errorMessage = null;
-    };
-
     $scope.loadOutboxPage = function(startIndex, count, orderByProperty, orderByDirection) {
         return $http.get('/api/outbox');
     };
@@ -90,8 +82,6 @@ angular.module('slicebox.outbox', ['ngRoute'])
         var deletePromise;
         var deleteAllPromies;
 
-        $scope.uiState.errorMessage = null;
-
         angular.forEach(outboxEntries, function(outboxEntry) {
             deletePromise = $http.delete('/api/outbox/' + outboxEntry.id);
             deletePromises.push(deletePromise);
@@ -100,7 +90,7 @@ angular.module('slicebox.outbox', ['ngRoute'])
         deleteAllPromies = $q.all(deletePromises);
 
         deleteAllPromies.then(null, function(response) {
-            $scope.uiState.errorMessage = response.data;
+            $scope.appendErrorMessage(response.data);
         });
 
         return deleteAllPromies;

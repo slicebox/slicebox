@@ -21,7 +21,7 @@ class ImageRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     val fileName = "anon270.dcm"
     val file = new File(getClass().getResource(fileName).toURI())
     val mfd = MultipartFormData(Seq(BodyPart(file, "file")))
-    Post("/api/images", mfd) ~> routes ~> check {
+    PostAsUser("/api/images", mfd) ~> routes ~> check {
       status should be(OK)
       val image = responseAs[Image]
       image.id should be(1)
@@ -29,7 +29,7 @@ class ImageRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   }
 
   it should "allow fetching the image again" in {
-    Get("/api/images/1") ~> routes ~> check {
+    GetAsUser("/api/images/1") ~> routes ~> check {
       contentType should be (ContentTypes.`application/octet-stream`)      
       val dataset = DicomUtil.loadDataset(responseAs[Array[Byte]], true)
       dataset should not be (null)
@@ -37,7 +37,7 @@ class ImageRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   }
   
   it should "return a BadRequest when requesting an image that does not exist" in {
-    Get("/api/images/2") ~> routes ~> check {
+    GetAsUser("/api/images/2") ~> routes ~> check {
       status should be (BadRequest)
     }
   }

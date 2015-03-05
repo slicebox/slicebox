@@ -32,25 +32,25 @@ class DirectoryRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   }
 
   "The system" should "return a monitoring message when asked to watch a new directory" in {
-    Post("/api/directorywatches", watchDir) ~> routes ~> check {
+    PostAsAdmin("/api/directorywatches", watchDir) ~> routes ~> check {
       responseAs[String] should be(s"Now watching directory $tempDir")
     }
   }
 
   it should "respond with BadRequest when asking to watch a path which is not a directory" in {
-    Post("/api/directorywatches", watchFile) ~> routes ~> check {
+    PostAsAdmin("/api/directorywatches", watchFile) ~> routes ~> check {
       status should be(BadRequest)
     }
   }
 
   it should "respond with BadRequest when asking to watch the storage directory" in {
-    Post("/api/directorywatches", watchStorage) ~> routes ~> check {
+    PostAsAdmin("/api/directorywatches", watchStorage) ~> routes ~> check {
       status should be(BadRequest)
     }
   }
 
   it should "return an empty list of patients when watching an empty directory and return one patient after a file has been copied to that directory" in {
-    Get("/api/metadata/patients") ~> routes ~> check {
+    GetAsUser("/api/metadata/patients") ~> routes ~> check {
       status should be(OK)
       responseAs[List[Patient]].size should be(0)
     }
@@ -64,7 +64,7 @@ class DirectoryRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     
     println(s"Number of files: ${tempDir.toFile().listFiles().length}");
 
-    Get("/api/metadata/patients") ~> routes ~> check {
+    GetAsUser("/api/metadata/patients") ~> routes ~> check {
       status should be(OK)
       responseAs[List[Patient]].size should be(1)
     }
@@ -79,21 +79,21 @@ class DirectoryRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     // sleep for a while and let the OS find out there was a new file in the watched directory. It will be picked up by slicebox
     Thread.sleep(1000)
 
-    Get("/api/metadata/patients") ~> routes ~> check {
+    GetAsUser("/api/metadata/patients") ~> routes ~> check {
       status should be(OK)
       responseAs[List[Patient]].size should be(1)
     }
   }
 
   it should "return a list of one directory when listing watched directories" in {
-    Get("/api/directorywatches") ~> routes ~> check {
+    GetAsUser("/api/directorywatches") ~> routes ~> check {
       responseAs[List[WatchedDirectory]].size should be (1)
     }
   }
 
   it should "be possible to remove a watched directory" in {
     // TODO: this doesn't test that the watched directory is actually removed from db and that actor is stopped, it only tests that the request can be handled
-    Delete("/api/directorywatches/1", watchDir) ~> routes ~> check {
+    DeleteAsAdmin("/api/directorywatches/1") ~> routes ~> check {
       responseAs[String] should be ("Stopped watching directory 1")
     }
   }

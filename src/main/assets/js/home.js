@@ -59,19 +59,16 @@ angular.module('slicebox.home', ['ngRoute'])
 
     $scope.callbacks = {};
 
-    $scope.uiState = {
-        errorMessage: null,
-        selectedPatient: null,
-        selectedStudy: null,
-        selectedSeries: null,
-        loadPngImagesInProgress: false,
-        seriesDetails: {
-            pngImageUrls: [],
-            imageHeight: 50,
-            isWindowManual: false,
-            windowMin: undefined,
-            windowMax: undefined
-        }
+    $scope.uiState.selectedPatient = null;
+    $scope.uiState.selectedStudy = null;
+    $scope.uiState.selectedSeries = null;
+    $scope.uiState.loadPngImagesInProgress = false;
+    $scope.uiState.seriesDetails = {
+        pngImageUrls: [],
+        imageHeight: 50,
+        isWindowManual: false,
+        windowMin: undefined,
+        windowMax: undefined
     };
 
     // Scope functions
@@ -95,7 +92,7 @@ angular.module('slicebox.home', ['ngRoute'])
         var loadPatientsPromise = $http.get(loadPatientsUrl);
 
         loadPatientsPromise.error(function(error) {
-            appendErrorMessage('Failed to load patients: ' + error);
+            $scope.appendErrorMessage('Failed to load patients: ' + error);
         });
 
         return loadPatientsPromise;
@@ -114,7 +111,7 @@ angular.module('slicebox.home', ['ngRoute'])
         var loadStudiesPromise = $http.get('/api/metadata/studies?startindex=' + startIndex + '&count=' + count + '&patientId=' + $scope.uiState.selectedPatient.id);
 
         loadStudiesPromise.error(function(error) {
-            appendErrorMessage('Failed to load studies: ' + error);
+            $scope.appendErrorMessage('Failed to load studies: ' + error);
         });
 
         return loadStudiesPromise;
@@ -133,7 +130,7 @@ angular.module('slicebox.home', ['ngRoute'])
         var loadSeriesPromise = $http.get('/api/metadata/series?startindex=' + startIndex + '&count=' + count + '&studyId=' + $scope.uiState.selectedStudy.id);
 
         loadSeriesPromise.error(function(error) {
-            appendErrorMessage('Failed to load series: ' + error);
+            $scope.appendErrorMessage('Failed to load series: ' + error);
         });
 
         return loadSeriesPromise;
@@ -159,7 +156,7 @@ angular.module('slicebox.home', ['ngRoute'])
         var loadFlatSeriesPromise = $http.get(loadFlatSeriesUrl);
 
         loadFlatSeriesPromise.error(function(error) {
-            appendErrorMessage('Failed to load series: ' + error);
+            $scope.appendErrorMessage('Failed to load series: ' + error);
         });
 
         return loadFlatSeriesPromise;
@@ -197,7 +194,7 @@ angular.module('slicebox.home', ['ngRoute'])
         var imagesPromise = $http.get('/api/metadata/images?seriesId=' + $scope.uiState.selectedSeries.id);
 
         imagesPromise.error(function(reason) {
-            appendErrorMessage('Failed to load images for series: ' + error);            
+            $scope.appendErrorMessage('Failed to load images for series: ' + error);            
         });
 
         var attributesPromise = imagesPromise.then(function(images) {
@@ -207,7 +204,7 @@ angular.module('slicebox.home', ['ngRoute'])
                 return [];
             }
         }, function(error) {
-            appendErrorMessage('Failed to load image attributes: ' + error);
+            $scope.appendErrorMessage('Failed to load image attributes: ' + error);
         });
 
         return attributesPromise;
@@ -253,7 +250,7 @@ angular.module('slicebox.home', ['ngRoute'])
                         });
 
                     loadImageInformationPromise.error(function(error) {
-                            appendErrorMessage('Failed to load image information: ' + error);            
+                            $scope.appendErrorMessage('Failed to load image information: ' + error);            
                         });
 
                     loadImageInformationPromises.push(loadImageInformationPromise);
@@ -266,7 +263,7 @@ angular.module('slicebox.home', ['ngRoute'])
                     });
                 
             }).error(function(reason) {
-                appendErrorMessage('Failed to load images for series: ' + reason);          
+                $scope.appendErrorMessage('Failed to load images for series: ' + reason);          
 
                 $scope.uiState.loadPngImagesInProgress = false;              
             });
@@ -282,28 +279,16 @@ angular.module('slicebox.home', ['ngRoute'])
         var loadDatasetsPromise = $http.get('/api/series/datasets?seriesId=' + $scope.uiState.selectedSeries.id);
 
         loadDatasetsPromise.error(function(error) {
-            appendErrorMessage('Failed to load datasets: ' + error);
+            $scope.appendErrorMessage('Failed to load datasets: ' + error);
         });
 
         return loadDatasetsPromise;
-    };
-
-    $scope.closeErrorMessageAlert = function() {
-        $scope.uiState.errorMessage = null;
     };
 
     // Private functions
 
     function capitalizeFirst(string) {
         return string.charAt(0).toUpperCase() + string.substring(1);        
-    }
-
-    function appendErrorMessage(errorMessage) {
-        if ($scope.uiState.errorMessage === null) {
-            $scope.uiState.errorMessage = errorMessage;
-        } else {
-            $scope.uiState.errorMessage = $scope.uiState.errorMessage + '\n' + errorMessage;
-        }
     }
 
     function confirmDeletePatients(patients) {
@@ -323,7 +308,7 @@ angular.module('slicebox.home', ['ngRoute'])
             deletePromises.push(deletePromise);
 
             deletePromise.error(function(error) {
-                appendErrorMessage('Failed to delete patient: ' + error);
+                $scope.appendErrorMessage('Failed to delete patient: ' + error);
             });
         });
 
@@ -347,7 +332,7 @@ angular.module('slicebox.home', ['ngRoute'])
             deletePromises.push(deletePromise);
 
             deletePromise.error(function(error) {
-                appendErrorMessage('Failed to delete study: ' + error);
+                $scope.appendErrorMessage('Failed to delete study: ' + error);
             });
         });
 
@@ -371,7 +356,7 @@ angular.module('slicebox.home', ['ngRoute'])
             deletePromises.push(deletePromise);
 
             deletePromise.error(function(error) {
-                appendErrorMessage('Failed to delete series: ' + error);
+                $scope.appendErrorMessage('Failed to delete series: ' + error);
             });
         });
 
@@ -504,10 +489,6 @@ angular.module('slicebox.home', ['ngRoute'])
 
     $scope.boxSelected = function(box) {
         $scope.uiState.selectedReceiver = box;
-    };
-
-    $scope.closeErrorMessageAlert = function(errorIndex) {
-        $scope.uiState.errorMessages.splice(errorIndex, 1);
     };
 
     $scope.sendButtonClicked = function() {

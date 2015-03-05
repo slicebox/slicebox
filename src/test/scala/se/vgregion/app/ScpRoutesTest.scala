@@ -12,14 +12,14 @@ class ScpRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   def dbUrl() = "jdbc:h2:mem:scproutestest;DB_CLOSE_DELAY=-1"
   
   "The system" should "return a success message when asked to start a new SCP" in {
-    Post("/api/scps", AddScp("TestName", "TestAeTitle", 13579)) ~> routes ~> check {
+    PostAsAdmin("/api/scps", AddScp("TestName", "TestAeTitle", 13579)) ~> routes ~> check {
       val scpData = responseAs[ScpData]
       scpData.name should be("TestName")
     }
   }
   
   it should "be possible to remove the SCP again" in {
-    Delete("/api/scps/1") ~> routes ~> check {
+    DeleteAsAdmin("/api/scps/1") ~> routes ~> check {
       status should be(NoContent)
     }
   }

@@ -1,22 +1,24 @@
 package se.vgregion.app
 
 import java.nio.file.Files
-
 import scala.concurrent.duration.DurationInt
-
 import spray.httpx.SprayJsonSupport.sprayJsonMarshaller
 import spray.testkit.ScalatestRouteTest
-
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.Suite
-
 import se.vgregion.util.TestUtil
-
-import UserRepositoryDbProtocol._
+import UserProtocol._
+import spray.http.BasicHttpCredentials
+import spray.http.StatusCodes.OK
+import spray.http.HttpRequest
+import spray.httpx.marshalling.Marshaller
 
 trait RoutesTestBase extends ScalatestRouteTest with RestApi with BeforeAndAfterAll { this: Suite =>
 
   implicit val routeTestTimeout = RouteTestTimeout(5.second)
+
+  val adminCredentials = BasicHttpCredentials(superUser, superPassword)
+  val userCredentials = BasicHttpCredentials("user", "userpassword")
 
   def actorRefFactory = system
 
@@ -30,14 +32,26 @@ trait RoutesTestBase extends ScalatestRouteTest with RestApi with BeforeAndAfter
 
   def addUser(name: String, password: String, role: UserRole) = {
     val user = ClearTextUser(name, role, password)
-    Put("/api/user", user)
+    PostAsAdmin("/api/users", user) ~> routes ~> check {
+      status === (OK)
+    }
   }
 
   override def afterAll {
     TestUtil.deleteFolder(storage)
   }
-  
-  // TODO: add test user
-  // TODO: help methods for HTTP calls that adds autherization
+
+  override def beforeAll {
+    addUser(userCredentials.username, userCredentials.password, UserRole.USER)
+  }
+
+  def GetAsAdmin(url: String): HttpRequest = Get(url) ~> addCredentials(adminCredentials)
+  def GetAsUser(url: String): HttpRequest = Get(url) ~> addCredentials(userCredentials)
+  def DeleteAsAdmin(url: String): HttpRequest = Delete(url) ~> addCredentials(adminCredentials)
+  def DeleteAsUser(url: String): HttpRequest = Delete(url) ~> addCredentials(userCredentials)
+  def PutAsAdmin[E: Marshaller](url: String, e: E): HttpRequest = Put(url, e) ~> addCredentials(adminCredentials)
+  def PutAsUser[E: Marshaller](url: String, e: E): HttpRequest = Put(url, e) ~> addCredentials(userCredentials)
+  def PostAsAdmin[E: Marshaller](url: String, e: E): HttpRequest = Post(url, e) ~> addCredentials(adminCredentials)
+  def PostAsUser[E: Marshaller](url: String, e: E): HttpRequest = Post(url, e) ~> addCredentials(userCredentials)
 
 }

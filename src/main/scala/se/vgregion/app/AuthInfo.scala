@@ -1,7 +1,7 @@
 package se.vgregion.app
 
-import UserRepositoryDbProtocol._
-import UserRepositoryDbProtocol.UserRole._
+import UserProtocol._
+import UserProtocol.UserRole._
 
 class AuthInfo(val user: ApiUser) {
   def hasPermission(role: UserRole): Boolean = (user.role, role) match {

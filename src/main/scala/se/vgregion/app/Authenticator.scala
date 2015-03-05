@@ -5,7 +5,7 @@ import spray.routing.authentication.BasicAuth
 import spray.routing.authentication.UserPass
 import spray.routing.directives.AuthMagnet
 import spray.routing.directives.AuthMagnet.fromContextAuthenticator
-import se.vgregion.app.UserRepositoryDbProtocol._
+import se.vgregion.app.UserProtocol._
 import akka.actor.ActorRef
 import akka.util.Timeout
 import scala.concurrent.duration.DurationInt
@@ -33,6 +33,6 @@ class Authenticator(userService: ActorRef) {
 
     def authenticator(userPass: Option[UserPass]): Future[Option[AuthInfo]] = validateUser(userPass)
 
-    BasicAuth(authenticator _, realm = "Slicebox API")
+    BasicAuth(authenticator _, realm = "Slicebox")
   }
 }
