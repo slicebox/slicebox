@@ -541,6 +541,15 @@ trait RestApi extends HttpService with JsonFormats {
             }
           }
         }
+      } ~ path("generateauthtokens") {
+        parameter('n.?(1)) { n =>
+          post {
+            onSuccess(userService.ask(GenerateAuthTokens(authInfo.user, n)).mapTo[List[AuthToken]]) {
+              case authTokens =>
+                complete(authTokens)
+            }
+          }
+        }
       }
     }
 
@@ -574,19 +583,21 @@ trait RestApi extends HttpService with JsonFormats {
   def routes: Route =
     pathPrefix("api") {
       loginRoute ~ handleRejections(authRejectionHandler) {
-        authenticate(authenticator.basicUserAuthenticator) { authInfo =>
-          authorize(authInfo.hasPermission(UserRole.USER)) {
-            directoryRoutes ~
-              scpRoutes(authInfo) ~
-              metaDataRoutes ~
-              imageRoutes ~
-              seriesRoutes ~
-              boxRoutes(authInfo) ~
-              userRoutes(authInfo) ~
-              inboxRoutes ~
-              outboxRoutes ~
-              logRoutes ~
-              systemRoutes(authInfo)
+        parameter('authtoken.?) { authToken =>
+          authenticate(authenticator.basicUserAuthenticator(authToken)) { authInfo =>
+            authorize(authInfo.hasPermission(UserRole.USER)) {
+              directoryRoutes ~
+                scpRoutes(authInfo) ~
+                metaDataRoutes ~
+                imageRoutes ~
+                seriesRoutes ~
+                boxRoutes(authInfo) ~
+                userRoutes(authInfo) ~
+                inboxRoutes ~
+                outboxRoutes ~
+                logRoutes ~
+                systemRoutes(authInfo)
+            }
           }
         }
       }

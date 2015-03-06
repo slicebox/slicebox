@@ -7,12 +7,16 @@ import akka.actor.Props
 import akka.event.Logging
 import akka.event.LoggingReceive
 import se.vgregion.util.ExceptionCatching
+import scala.collection.mutable.Map
+import java.util.UUID
 
 class UserServiceActor(dbProps: DbProps, superUser: String, superPassword: String) extends Actor with ExceptionCatching {
   val log = Logging(context.system, this)
 
   val db = dbProps.db
   val dao = new UserDAO(dbProps.driver)
+
+  val authTokens = Map.empty[AuthToken, ApiUser]
 
   setupDb()
   addSuperUser()
@@ -49,6 +53,14 @@ class UserServiceActor(dbProps: DbProps, superUser: String, superPassword: Strin
               dao.removeUser(userId)
               sender ! UserDeleted(userId)
             }
+
+          case GetUserByAuthToken(token) =>
+            sender ! authTokens.remove(token)
+
+          case GenerateAuthTokens(user, numberOfTokens) =>
+            val generatedTokens = cleanupAndGenerateNewTokens(user, numberOfTokens)
+            sender ! generatedTokens
+
         }
       }
   }
@@ -65,6 +77,17 @@ class UserServiceActor(dbProps: DbProps, superUser: String, superPassword: Strin
           ApiUser(-1, superUser, UserRole.ADMINISTRATOR).withPassword(superPassword)))
     }
 
+  def cleanupAndGenerateNewTokens(user: ApiUser, numberOfTokens: Int): List[AuthToken] = {
+    val previousTokenKeysForUser = authTokens.filter(_._2 == user).map(_._1)
+    previousTokenKeysForUser.foreach(authTokens.remove(_))
+
+    (1 to numberOfTokens).map(i => {
+      val authToken = AuthToken(UUID.randomUUID.toString)
+      authTokens += authToken -> user
+      authToken
+    }).toList
+  }
+  
 }
 
 object UserServiceActor {

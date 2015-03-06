@@ -3,7 +3,7 @@ package se.vgregion.app
 import UserProtocol._
 import UserProtocol.UserRole._
 
-class AuthInfo(val user: ApiUser) {
+case class AuthInfo(val user: ApiUser) {
   def hasPermission(role: UserRole): Boolean = (user.role, role) match {
     case (ADMINISTRATOR, _) => true
     case (USER, USER) => true

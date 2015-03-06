@@ -34,6 +34,8 @@ object UserProtocol {
   
   }
   
+  case class AuthToken(token: String)
+  
   case class LoginResult(success: Boolean, message: String)
   
   sealed trait UserRequest
@@ -46,7 +48,9 @@ object UserProtocol {
   
   case class GetUser(userId: Long) extends UserRequest
   case class GetUserByName(user: String) extends UserRequest
-
+  case class GetUserByAuthToken(authToken: AuthToken) extends UserRequest
+  case class GenerateAuthTokens(user: ApiUser, numberOfTokens: Int) extends UserRequest
+    
   case class DeleteUser(userId: Long) extends UserRequest
   case class UserDeleted(userId: Long)
 }

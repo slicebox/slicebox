@@ -67,6 +67,7 @@ angular.module('slicebox.home', ['ngRoute'])
         pngImageUrls: [],
         imageHeight: 50,
         isWindowManual: false,
+        numberOfFrames: 1,
         windowMin: undefined,
         windowMax: undefined
     };
@@ -211,9 +212,6 @@ angular.module('slicebox.home', ['ngRoute'])
     };
 
     $scope.updatePNGImageUrls = function() {
-        var loadImageInformationPromises = [];
-        var loadImageInformationPromise = null;
-
         $scope.uiState.seriesDetails.pngImageUrls = [];
 
         if ($scope.uiState.selectedSeries !== null) {
@@ -223,48 +221,45 @@ angular.module('slicebox.home', ['ngRoute'])
 
                 $scope.uiState.seriesDetails.pngImageUrls = [];
 
-                angular.forEach(images, function(image) {
-
-                    loadImageInformationPromise =
-                        $http.get('/api/images/' + image.id + '/imageinformation').success(function(info) {
-                            // window min and max are defined by the first image of the series
-                            if (!$scope.uiState.seriesDetails.windowMin) {
-                                $scope.uiState.seriesDetails.windowMin = info.minimumPixelValue;
-                            }
-                            if (!$scope.uiState.seriesDetails.windowMax) {
-                                $scope.uiState.seriesDetails.windowMax = info.maximumPixelValue;
-                            }
-                            for (var i = 0; i < info.numberOfFrames; i++) {
-                                var url = '/api/images/' + image.id + '/png?framenumber=' + (i + 1);
-                                if ($scope.uiState.seriesDetails.isWindowManual) {
-                                    url = url + 
-                                        '&windowmin=' + $scope.uiState.seriesDetails.windowMin + 
-                                        '&windowmax=' + $scope.uiState.seriesDetails.windowMax;
+                // assume all images have the same number of frames etc so we get the image information for the first image only
+                if (images.length > 0) {
+                    $http.get('/api/images/' + images[0].id + '/imageinformation').success(function(info) {
+                        $scope.uiState.seriesDetails.windowMin = info.minimumPixelValue;
+                        $scope.uiState.seriesDetails.windowMax = info.maximumPixelValue;
+                        $scope.uiState.numberOfFrames = info.numberOfFrames;
+                        var n = info.numberOfFrames * images.length;
+                        $http.post('/api/users/generateauthtokens?n=' + n).success(function(tokens) {
+                            $scope.uiState.loadPngImagesInProgress = false;
+                            var tokenIndex = 0;
+                            angular.forEach(images, function(image) {
+                                for (var i = 0; i < info.numberOfFrames; i++) {
+                                    var url = '/api/images/' + image.id + '/png'+ '?authtoken=' + tokens[tokenIndex].token + '&framenumber=' + (i + 1);
+                                    if ($scope.uiState.seriesDetails.isWindowManual) {
+                                        url = url + 
+                                            '&windowmin=' + $scope.uiState.seriesDetails.windowMin + 
+                                            '&windowmax=' + $scope.uiState.seriesDetails.windowMax;
+                                    }
+                                    if (!isNaN(parseInt($scope.uiState.seriesDetails.imageHeight))) {
+                                        url = url + 
+                                            '&imageheight=' + $scope.uiState.seriesDetails.imageHeight;
+                                    }
+                                    $scope.uiState.seriesDetails.pngImageUrls.push({ url: url, frameIndex: info.frameIndex });
+                                    tokenIndex += 1;
                                 }
-                                if (!isNaN(parseInt($scope.uiState.seriesDetails.imageHeight))) {
-                                    url = url + 
-                                        '&imageheight=' + $scope.uiState.seriesDetails.imageHeight;
-                                }
-                                $scope.uiState.seriesDetails.pngImageUrls.push({ url: url, frameIndex: info.frameIndex });
-                            }
+                            });
+                        }).error(function(error) {
+                            $scope.appendErrorMessage('Failed to generate authentication tokens: ' + error);            
+                            $scope.uiState.loadPngImagesInProgress = false;                                                                  
                         });
-
-                    loadImageInformationPromise.error(function(error) {
-                            $scope.appendErrorMessage('Failed to load image information: ' + error);            
-                        });
-
-                    loadImageInformationPromises.push(loadImageInformationPromise);
-
-                });
-
-                $q.all(loadImageInformationPromises)
-                    .finally(function() {
-                        $scope.uiState.loadPngImagesInProgress = false;
+                    }).error(function(error) {
+                        $scope.appendErrorMessage('Failed to load image information: ' + error);            
+                        $scope.uiState.loadPngImagesInProgress = false;                                      
                     });
-                
+
+                }
+
             }).error(function(reason) {
                 $scope.appendErrorMessage('Failed to load images for series: ' + reason);          
-
                 $scope.uiState.loadPngImagesInProgress = false;              
             });
 
