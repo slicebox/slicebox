@@ -64,7 +64,9 @@ angular.module('slicebox.adminUsers', ['ngRoute'])
         var deletePromise;
 
         angular.forEach(users, function(user) {
-            deletePromise = $http.delete('/api/users/' + user.id);
+            deletePromise = $http.delete('/api/users/' + user.id).error(function (error) {
+                $scope.appendErrorMessage(error);
+            });
             deletePromises.push(deletePromise);
         });
 

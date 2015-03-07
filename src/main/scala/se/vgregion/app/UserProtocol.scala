@@ -9,16 +9,19 @@ object UserProtocol {
   
   sealed trait UserRole {
     override def toString(): String = this match {
+      case UserRole.SUPERUSER => "SUPERUSER"
       case UserRole.ADMINISTRATOR => "ADMINISTRATOR"
       case UserRole.USER => "USER"
     }
   }
 
   object UserRole {
+    case object SUPERUSER extends UserRole
     case object ADMINISTRATOR extends UserRole
     case object USER extends UserRole
 
     def withName(string: String) = string match {
+      case "SUPERUSER" => SUPERUSER
       case "ADMINISTRATOR" => ADMINISTRATOR
       case "USER" => USER
     }    

@@ -53,7 +53,7 @@ angular.module('slicebox.utils', [])
  
         service.login = function (username, password, callback) {
  
-            $http.post('/api/login', { user: username, pass: password })
+            $http.post('/login', { user: username, pass: password })
                 .success(function (response) {
                     callback(response);
                 });

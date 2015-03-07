@@ -29,6 +29,9 @@ class UserServiceActor(dbProps: DbProps, superUser: String, superPassword: Strin
         msg match {
 
           case AddUser(apiUser) =>
+            if (apiUser.role == UserRole.SUPERUSER)
+              throw new IllegalArgumentException("Superusers may not be added")
+            
             db.withSession { implicit session =>
               sender ! UserAdded(dao.userByName(apiUser.user).getOrElse(dao.insert(apiUser)))
             }
@@ -50,6 +53,10 @@ class UserServiceActor(dbProps: DbProps, superUser: String, superPassword: Strin
 
           case DeleteUser(userId) =>
             db.withSession { implicit session =>
+              dao.userById(userId)
+                .filter(_.role == UserRole.SUPERUSER)
+                .foreach(superuser => throw new IllegalArgumentException("Superuser may not be deleted"))
+       
               dao.removeUser(userId)
               sender ! UserDeleted(userId)
             }
@@ -74,7 +81,7 @@ class UserServiceActor(dbProps: DbProps, superUser: String, superPassword: Strin
     db.withSession { implicit session =>
       dao.userByName(superUser)
         .getOrElse(dao.insert(
-          ApiUser(-1, superUser, UserRole.ADMINISTRATOR).withPassword(superPassword)))
+          ApiUser(-1, superUser, UserRole.SUPERUSER).withPassword(superPassword)))
     }
 
   def cleanupAndGenerateNewTokens(user: ApiUser, numberOfTokens: Int): List[AuthToken] = {
@@ -87,7 +94,7 @@ class UserServiceActor(dbProps: DbProps, superUser: String, superPassword: Strin
       authToken
     }).toList
   }
-  
+
 }
 
 object UserServiceActor {
