@@ -90,30 +90,21 @@ trait RestApi extends HttpService with JsonFormats {
         complete((BadRequest, "Illegal arguments: " + e.getMessage()))
     }
 
-  val authRejectionHandler = RejectionHandler {
-    case AuthenticationFailedRejection(cause, challengeHeaders) :: _ =>
-      complete((Unauthorized, "Must be logged in"))
-    case AuthorizationFailedRejection :: _ =>
-      complete((Forbidden, "User does not have the priviliges to access the resource"))
-  }
-
-  def staticResourcesRoutes =
+  def staticResourcesRoute =
     get {
-      pathPrefix("assets") {
-        path(Rest) { path =>
-          getFromResource("public/" + path)
-        }
+      path(Rest) { path =>
+        getFromResource("public/" + path)
       }
     }
 
-  def angularRoutes =
-    pathPrefix("") {
+  def angularRoute =
+    get {
       getFromResource("public/index.html")
     }
 
   def directoryRoutes: Route =
     pathPrefix("directorywatches") {
-      pathEnd {
+      pathEndOrSingleSlash {
         get {
           onSuccess(dicomService.ask(GetWatchedDirectories)) {
             case WatchedDirectories(directories) =>
@@ -139,7 +130,7 @@ trait RestApi extends HttpService with JsonFormats {
 
   def scpRoutes(authInfo: AuthInfo): Route =
     pathPrefix("scps") {
-      pathEnd {
+      pathEndOrSingleSlash {
         get {
           onSuccess(dicomService.ask(GetScps)) {
             case Scps(scps) =>
@@ -170,7 +161,7 @@ trait RestApi extends HttpService with JsonFormats {
   def metaDataRoutes: Route = {
     pathPrefix("metadata") {
       pathPrefix("patients") {
-        pathEnd {
+        pathEndOrSingleSlash {
           get {
             parameters(
               'startindex.as[Long] ? 0,
@@ -194,7 +185,7 @@ trait RestApi extends HttpService with JsonFormats {
           }
         }
       } ~ pathPrefix("studies") {
-        pathEnd {
+        pathEndOrSingleSlash {
           get {
             parameters(
               'startindex.as[Long] ? 0,
@@ -215,7 +206,7 @@ trait RestApi extends HttpService with JsonFormats {
           }
         }
       } ~ pathPrefix("series") {
-        pathEnd {
+        pathEndOrSingleSlash {
           get {
             parameters(
               'startindex.as[Long] ? 0,
@@ -278,7 +269,7 @@ trait RestApi extends HttpService with JsonFormats {
 
   def imageRoutes: Route =
     pathPrefix("images") {
-      pathEnd {
+      pathEndOrSingleSlash {
         post {
           formField('file.as[FormFile]) { file =>
             val dataset = DicomUtil.loadDataset(file.entity.data.toByteArray, true)
@@ -329,7 +320,7 @@ trait RestApi extends HttpService with JsonFormats {
 
   def boxRoutes(authInfo: AuthInfo): Route =
     pathPrefix("boxes") {
-      pathEnd {
+      pathEndOrSingleSlash {
         get {
           onSuccess(boxService.ask(GetBoxes)) {
             case Boxes(boxes) =>
@@ -445,7 +436,7 @@ trait RestApi extends HttpService with JsonFormats {
                   }
                 }
               }
-            } ~ pathEnd {
+            } ~ pathEndOrSingleSlash {
               get {
                 parameters('transactionId.as[Long], 'sequenceNumber.as[Long]) { (transactionId, sequenceNumber) =>
                   onSuccess(boxService.ask(GetOutboxEntry(token, transactionId, sequenceNumber))) {
@@ -470,7 +461,7 @@ trait RestApi extends HttpService with JsonFormats {
 
   def inboxRoutes: Route =
     pathPrefix("inbox") {
-      pathEnd {
+      pathEndOrSingleSlash {
         get {
           onSuccess(boxService.ask(GetInbox)) {
             case Inbox(entries) =>
@@ -482,7 +473,7 @@ trait RestApi extends HttpService with JsonFormats {
 
   def outboxRoutes: Route =
     pathPrefix("outbox") {
-      pathEnd {
+      pathEndOrSingleSlash {
         get {
           onSuccess(boxService.ask(GetOutbox)) {
             case Outbox(entries) =>
@@ -501,7 +492,7 @@ trait RestApi extends HttpService with JsonFormats {
 
   def logRoutes: Route =
     pathPrefix("log") {
-      pathEnd {
+      pathEndOrSingleSlash {
         get {
           parameters('startindex.as[Long] ? 0, 'count.as[Long] ? 20) { (startIndex, count) =>
             onSuccess(logService.ask(GetLogEntries(startIndex, count))) {
@@ -515,7 +506,7 @@ trait RestApi extends HttpService with JsonFormats {
 
   def userRoutes(authInfo: AuthInfo): Route =
     pathPrefix("users") {
-      pathEnd {
+      pathEndOrSingleSlash {
         get {
           onSuccess(userService.ask(GetUsers)) {
             case Users(users) =>
@@ -582,7 +573,7 @@ trait RestApi extends HttpService with JsonFormats {
 
   def routes: Route =
     pathPrefix("api") {
-      loginRoute ~ handleRejections(authRejectionHandler) {
+      loginRoute ~
         parameter('authtoken.?) { authToken =>
           authenticate(authenticator.basicUserAuthenticator(authToken)) { authInfo =>
             authorize(authInfo.hasPermission(UserRole.USER)) {
@@ -600,8 +591,13 @@ trait RestApi extends HttpService with JsonFormats {
             }
           }
         }
+    } ~ pathPrefixTest(!"api") {
+      pathPrefix("assets") {
+        staticResourcesRoute
+      } ~ pathPrefixTest(!"assets") {
+        angularRoute
       }
-    } ~ staticResourcesRoutes ~ angularRoutes
+    }
 
 }
 
