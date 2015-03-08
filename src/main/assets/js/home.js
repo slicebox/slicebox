@@ -109,7 +109,7 @@ angular.module('slicebox.home', ['ngRoute'])
             return [];
         }
 
-        var loadStudiesPromise = $http.get('/api/metadata/studies?startindex=' + startIndex + '&count=' + count + '&patientId=' + $scope.uiState.selectedPatient.id);
+        var loadStudiesPromise = $http.get('/api/metadata/studies?startindex=' + startIndex + '&count=' + count + '&patientid=' + $scope.uiState.selectedPatient.id);
 
         loadStudiesPromise.error(function(error) {
             $scope.appendErrorMessage('Failed to load studies: ' + error);
@@ -128,7 +128,7 @@ angular.module('slicebox.home', ['ngRoute'])
             return [];
         }
 
-        var loadSeriesPromise = $http.get('/api/metadata/series?startindex=' + startIndex + '&count=' + count + '&studyId=' + $scope.uiState.selectedStudy.id);
+        var loadSeriesPromise = $http.get('/api/metadata/series?startindex=' + startIndex + '&count=' + count + '&studyid=' + $scope.uiState.selectedStudy.id);
 
         loadSeriesPromise.error(function(error) {
             $scope.appendErrorMessage('Failed to load series: ' + error);
@@ -192,7 +192,7 @@ angular.module('slicebox.home', ['ngRoute'])
             return [];
         }
 
-        var imagesPromise = $http.get('/api/metadata/images?seriesId=' + $scope.uiState.selectedSeries.id);
+        var imagesPromise = $http.get('/api/metadata/images?seriesid=' + $scope.uiState.selectedSeries.id);
 
         imagesPromise.error(function(reason) {
             $scope.appendErrorMessage('Failed to load images for series: ' + error);            
@@ -217,7 +217,7 @@ angular.module('slicebox.home', ['ngRoute'])
         if ($scope.uiState.selectedSeries !== null) {
             $scope.uiState.loadPngImagesInProgress = true;
 
-            $http.get('/api/metadata/images?seriesId=' + $scope.uiState.selectedSeries.id).success(function(images) {
+            $http.get('/api/metadata/images?seriesid=' + $scope.uiState.selectedSeries.id).success(function(images) {
 
                 $scope.uiState.seriesDetails.pngImageUrls = [];
 
@@ -271,7 +271,7 @@ angular.module('slicebox.home', ['ngRoute'])
             return [];
         }
 
-        var loadDatasetsPromise = $http.get('/api/series/datasets?seriesId=' + $scope.uiState.selectedSeries.id);
+        var loadDatasetsPromise = $http.get('/api/series/datasets?seriesid=' + $scope.uiState.selectedSeries.id);
 
         loadDatasetsPromise.error(function(error) {
             $scope.appendErrorMessage('Failed to load datasets: ' + error);

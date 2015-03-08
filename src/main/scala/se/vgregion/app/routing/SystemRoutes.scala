@@ -14,7 +14,7 @@ trait SystemRoutes { this: RestApi =>
 
   def systemRoutes(authInfo: AuthInfo): Route =
     path("stop") {
-      (post | parameter('method ! "post")) {
+      post {
         authorize(authInfo.hasPermission(UserRole.ADMINISTRATOR)) {
           complete {
             val system = actorRefFactory.asInstanceOf[ActorContext].system

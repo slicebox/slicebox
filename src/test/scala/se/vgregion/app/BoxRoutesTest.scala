@@ -17,6 +17,9 @@ import spray.http.ContentTypes
 import spray.httpx.unmarshalling.BasicUnmarshallers.ByteArrayUnmarshaller
 import spray.http.HttpData
 import scala.math.abs
+import spray.http.HttpEntity
+import spray.http.FormFile
+import spray.http.HttpEntity.NonEmpty
 
 class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
@@ -30,7 +33,7 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   }
 
   it should "return a success message when asked to add a remote box" in {
-    PostAsAdmin("/api/boxes/addremotebox", RemoteBox("uni", "http://uni.edu/box/" + UUID.randomUUID())) ~> routes ~> check {
+    PostAsAdmin("/api/boxes/addremotebox", RemoteBox("uni", "http://some.url/api/box/" + UUID.randomUUID())) ~> routes ~> check {
       status should be(OK)
       val box = responseAs[Box]
       box.sendMethod should be(BoxSendMethod.PUSH)
@@ -78,13 +81,14 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     // then, push an image from the hospital to the uni box we just set up
     val fileName = "anon270.dcm"
     val dcmPath = Paths.get(getClass().getResource(fileName).toURI())
-    val dcmFile = dcmPath.toFile
+    val bytes = DicomUtil.toAnonymizedByteArray(dcmPath)
 
     val testTransactionId = abs(UUID.randomUUID().getMostSignificantBits())
     val sequenceNumber = 1L
     val totalImageCount = 1L
     
-    PostAsUser(s"/api/boxes/$token/image/$testTransactionId/$sequenceNumber/$totalImageCount", HttpData(dcmFile)) ~> routes ~> check {
+    Post(s"/api/box/$token/image?transactionid=$testTransactionId&sequencenumber=$sequenceNumber&totalimagecount=$totalImageCount", HttpData(bytes)) ~> routes ~> check {
+      println(responseAs[String])
       status should be(NoContent)
     }
   }
@@ -100,7 +104,7 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     // get the token from the url
     val token = uniUrl.value.substring(uniUrl.value.lastIndexOf("/") + 1)
     
-    GetAsUser(s"/api/boxes/$token/outbox/poll") ~> routes ~> check {
+    Get(s"/api/box/$token/outbox/poll") ~> routes ~> check {
       status should be(NotFound)
     }
   }
@@ -130,7 +134,7 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
 
     // poll outbox
-    GetAsUser(s"/api/boxes/$token/outbox/poll") ~> routes ~> check {
+    Get(s"/api/box/$token/outbox/poll") ~> routes ~> check {
       status should be(OK)
       
       val outboxEntry = responseAs[OutboxEntry]
@@ -149,7 +153,7 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     val fileName = "anon270.dcm"
     val file = new File(getClass().getResource(fileName).toURI())
     val mfd = MultipartFormData(Seq(BodyPart(file, "file")))
-    PostAsUser("/api/dataset", mfd)
+    PostAsUser("/api/images", mfd)
     
     // first, add a box on the poll (university) side
     val uniUrl =
@@ -176,14 +180,14 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     
     // poll outbox
     val outboxEntry =
-      GetAsUser(s"/api/boxes/$token/outbox/poll") ~> routes ~> check {
+      Get(s"/api/box/$token/outbox/poll") ~> routes ~> check {
         status should be(OK)
         
         responseAs[OutboxEntry]
       }
     
     // get image
-    GetAsUser(s"/api/boxes/$token/outbox?transactionId=${outboxEntry.transactionId}&sequenceNumber=1") ~> routes ~> check {
+    Get(s"/api/box/$token/outbox?transactionid=${outboxEntry.transactionId}&sequencenumber=1") ~> routes ~> check {
       status should be(OK)
       
       contentType should be (ContentTypes.`application/octet-stream`)  
@@ -198,7 +202,7 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     val fileName = "anon270.dcm"
     val file = new File(getClass().getResource(fileName).toURI())
     val mfd = MultipartFormData(Seq(BodyPart(file, "file")))
-    PostAsAdmin("/api/dataset", mfd)
+    PostAsUser("/api/images", mfd)
     
     // first, add a box on the poll (university) side
     val uniUrl =
@@ -225,19 +229,19 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     
     // poll outbox
     val outboxEntry =
-      GetAsUser(s"/api/boxes/$token/outbox/poll") ~> routes ~> check {
+      Get(s"/api/box/$token/outbox/poll") ~> routes ~> check {
         status should be(OK)
         
         responseAs[OutboxEntry]
       }
       
     // send done
-    PostAsUser(s"/api/boxes/$token/outbox/done", outboxEntry) ~> routes ~> check {
+    Post(s"/api/box/$token/outbox/done", outboxEntry) ~> routes ~> check {
       status should be(NoContent)
     }
     
     // poll outbox to check that outbox is empty
-    GetAsUser(s"/api/boxes/$token/outbox/poll") ~> routes ~> check {
+    Get(s"/api/box/$token/outbox/poll") ~> routes ~> check {
       status should be(NotFound)
     }
   }

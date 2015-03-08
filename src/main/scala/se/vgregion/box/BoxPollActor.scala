@@ -53,7 +53,7 @@ class BoxPollActor(
     pollRemoteBoxOutboxPipeline(Get(s"${box.baseUrl}/outbox/poll"))
 
   def getRemoteOutboxFile(remoteOutboxEntry: OutboxEntry): Future[HttpResponse] =
-    sendRequestToRemoteBoxPipeline(Get(s"${box.baseUrl}/outbox?transactionId=${remoteOutboxEntry.transactionId}&sequenceNumber=${remoteOutboxEntry.sequenceNumber}"))
+    sendRequestToRemoteBoxPipeline(Get(s"${box.baseUrl}/outbox?transactionid=${remoteOutboxEntry.transactionId}&sequencenumber=${remoteOutboxEntry.sequenceNumber}"))
 
   // We don't need to wait for done message to be sent since it is not critical that it is received by the remote box
   def sendRemoteOutboxFileCompleted(remoteOutboxEntry: OutboxEntry): Unit =

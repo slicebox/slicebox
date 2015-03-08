@@ -14,7 +14,7 @@ trait SeriesRoutes { this: RestApi =>
     pathPrefix("series") {
       path("datasets") {
         get {
-          parameters('seriesId.as[Long]) { seriesId =>
+          parameters('seriesid.as[Long]) { seriesId =>
             onSuccess(dicomService.ask(GetImages(seriesId))) {
               case Images(images) =>
                 val imageURLs =

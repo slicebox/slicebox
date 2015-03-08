@@ -53,7 +53,7 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
 
           case GenerateBoxBaseUrl(remoteBoxName) =>
             val token = UUID.randomUUID().toString()
-            val baseUrl = s"$apiBaseURL/boxes/$token"
+            val baseUrl = s"$apiBaseURL/box/$token"
             val box = Box(-1, remoteBoxName, token, baseUrl, BoxSendMethod.POLL, false)
             addBoxToDb(box)
             sender ! BoxBaseUrlGenerated(baseUrl)
@@ -242,8 +242,6 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
 
   def tokenIsValid(token: String): Boolean =
     db.withSession { implicit session =>
-      println(dao.listBoxes)
-      println(token)
       dao.pollBoxByToken(token).isDefined
     }
   

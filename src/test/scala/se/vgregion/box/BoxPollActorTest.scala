@@ -129,7 +129,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
       Thread.sleep(500)
 
-      capturedRequests(1).uri.toString() should be(s"$remoteBoxBaseUrl/outbox?transactionId=$transactionId&sequenceNumber=1")
+      capturedRequests(1).uri.toString() should be(s"$remoteBoxBaseUrl/outbox?transactionid=$transactionId&sequencenumber=1")
     }
 
     "handle remote outbox file" in {

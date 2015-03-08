@@ -43,7 +43,7 @@ class BoxPushActor(box: Box, dbProps: DbProps, storage: Path, pollInterval: Fini
   def pushImagePipeline(outboxEntry: OutboxEntry, fileName: String): Future[HttpResponse] = {
     val path = storage.resolve(fileName)
     val bytes = toAnonymizedByteArray(path)
-    sendFilePipeline(Post(s"${box.baseUrl}/image/${outboxEntry.transactionId}/${outboxEntry.sequenceNumber}/${outboxEntry.totalImageCount}", HttpData(bytes)))
+    sendFilePipeline(Post(s"${box.baseUrl}/image?transactionid=${outboxEntry.transactionId}&sequencenumber=${outboxEntry.sequenceNumber}&totalimagecount=${outboxEntry.totalImageCount}", HttpData(bytes)))
   }
 
   val poller = system.scheduler.schedule(100.millis, pollInterval) {

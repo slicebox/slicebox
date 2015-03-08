@@ -1,7 +1,7 @@
 package se.vgregion.app.routing
 
-import spray.routing.Route
-import spray.http.StatusCodes.BadRequest
+import spray.routing._
+import spray.http.StatusCodes._
 import se.vgregion.app.RestApi
 import se.vgregion.app.UserProtocol.UserRole
 import spray.routing.ExceptionHandler
@@ -12,36 +12,35 @@ trait SliceboxRoutes extends DirectoryRoutes
   with ImageRoutes
   with SeriesRoutes
   with BoxRoutes
+  with RemoteBoxRoutes
   with UserRoutes
   with LogRoutes
   with SystemRoutes
   with UiRoutes { this: RestApi =>
 
-  implicit def knownExceptionHandler =
+  implicit val knownExceptionHandler =
     ExceptionHandler {
       case e: IllegalArgumentException =>
-        complete((BadRequest,  e.getMessage()))
+        complete((BadRequest, e.getMessage()))
     }
 
   def routes: Route =
     pathPrefix("api") {
       parameter('authtoken.?) { authToken =>
         authenticate(authenticator.basicUserAuthenticator(authToken)) { authInfo =>
-          authorize(authInfo.hasPermission(UserRole.USER)) {
-            directoryRoutes ~
-              scpRoutes(authInfo) ~
-              metaDataRoutes ~
-              imageRoutes ~
-              seriesRoutes ~
-              boxRoutes(authInfo) ~
-              userRoutes(authInfo) ~
-              inboxRoutes ~
-              outboxRoutes ~
-              logRoutes ~
-              systemRoutes(authInfo)
-          }
+          directoryRoutes ~
+            scpRoutes(authInfo) ~
+            metaDataRoutes ~
+            imageRoutes ~
+            seriesRoutes ~
+            boxRoutes(authInfo) ~
+            userRoutes(authInfo) ~
+            inboxRoutes ~
+            outboxRoutes ~
+            logRoutes ~
+            systemRoutes(authInfo)
         }
-      }
+      } ~ remoteBoxRoutes
     } ~ pathPrefixTest(!"api") {
       pathPrefix("assets") {
         staticResourcesRoute

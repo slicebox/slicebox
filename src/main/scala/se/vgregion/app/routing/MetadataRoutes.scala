@@ -43,7 +43,7 @@ trait MetadataRoutes { this: RestApi =>
             parameters(
               'startindex.as[Long] ? 0,
               'count.as[Long] ? 20,
-              'patientId.as[Long]) { (startIndex, count, patientId) =>
+              'patientid.as[Long]) { (startIndex, count, patientId) =>
                 onSuccess(dicomService.ask(GetStudies(startIndex, count, patientId))) {
                   case Studies(studies) =>
                     complete(studies)
@@ -64,7 +64,7 @@ trait MetadataRoutes { this: RestApi =>
             parameters(
               'startindex.as[Long] ? 0,
               'count.as[Long] ? 20,
-              'studyId.as[Long]) { (startIndex, count, studyId) =>
+              'studyid.as[Long]) { (startIndex, count, studyId) =>
                 onSuccess(dicomService.ask(GetSeries(startIndex, count, studyId))) {
                   case SeriesCollection(series) =>
                     complete(series)
@@ -93,7 +93,7 @@ trait MetadataRoutes { this: RestApi =>
         }
       } ~ path("images") {
         get {
-          parameters('seriesId.as[Long]) { seriesId =>
+          parameters('seriesid.as[Long]) { seriesId =>
             onSuccess(dicomService.ask(GetImages(seriesId))) {
               case Images(images) =>
                 complete(images)

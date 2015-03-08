@@ -73,6 +73,7 @@ object DicomUtil {
     val anonymizedDataset = anonymizeDataset(dataset)
     val bos = new ByteArrayOutputStream
     saveDataset(anonymizedDataset, bos)
+    bos.close()
     bos.toByteArray()    
   }
     
