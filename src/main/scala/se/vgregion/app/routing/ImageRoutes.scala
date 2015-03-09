@@ -8,7 +8,6 @@ import spray.http.HttpData
 import spray.http.HttpEntity
 import spray.http.MediaTypes
 import spray.http.StatusCodes.BadRequest
-import spray.httpx.SprayJsonSupport._
 import spray.routing._
 
 import se.vgregion.app.RestApi
@@ -25,6 +24,14 @@ trait ImageRoutes { this: RestApi =>
             val dataset = DicomUtil.loadDataset(file.entity.data.toByteArray, true)
             onSuccess(dicomService.ask(AddDataset(dataset))) {
               case ImageAdded(image) =>
+                import spray.httpx.SprayJsonSupport._
+                complete(image)
+            }
+          } ~ entity(as[Array[Byte]]) { bytes =>
+            val dataset = DicomUtil.loadDataset(bytes, true)
+            onSuccess(dicomService.ask(AddDataset(dataset))) {
+              case ImageAdded(image) =>
+                import spray.httpx.SprayJsonSupport._
                 complete(image)
             }
           }
@@ -46,6 +53,7 @@ trait ImageRoutes { this: RestApi =>
         get {
           onSuccess(dicomService.ask(GetImageAttributes(imageId))) {
             case ImageAttributes(attributes) =>
+              import spray.httpx.SprayJsonSupport._
               complete(attributes)
           }
         }
@@ -53,11 +61,16 @@ trait ImageRoutes { this: RestApi =>
         get {
           onSuccess(dicomService.ask(GetImageInformation(imageId))) {
             case info: ImageInformation =>
+              import spray.httpx.SprayJsonSupport._
               complete(info)
           }
         }
       } ~ path(LongNumber / "png") { imageId =>
-        parameters('framenumber.as[Int] ? 1, 'windowmin.as[Int] ? 0, 'windowmax.as[Int] ? 0, 'imageheight.as[Int] ? 0) { (frameNumber, min, max, height) =>
+        parameters(
+            'framenumber.as[Int] ? 1, 
+            'windowmin.as[Int] ? 0, 
+            'windowmax.as[Int] ? 0, 
+            'imageheight.as[Int] ? 0) { (frameNumber, min, max, height) =>
           get {
             onSuccess(dicomService.ask(GetImageFrame(imageId, frameNumber, min, max, height))) {
               case ImageFrame(bytes) =>
@@ -67,5 +80,5 @@ trait ImageRoutes { this: RestApi =>
         }
       }
     }
-  
+
 }

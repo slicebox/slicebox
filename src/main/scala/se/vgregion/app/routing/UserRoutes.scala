@@ -43,9 +43,11 @@ trait UserRoutes { this: RestApi =>
       } ~ path("generateauthtokens") {
         parameter('n.?(1)) { n =>
           post {
-            onSuccess(userService.ask(GenerateAuthTokens(authInfo.user, n)).mapTo[List[AuthToken]]) {
-              case authTokens =>
-                complete(authTokens)
+            authenticate(authenticator.basicUserAuthenticator(None)) { authInfo2 => // may not generate tokens using token authentication
+              onSuccess(userService.ask(GenerateAuthTokens(authInfo.user, n)).mapTo[List[AuthToken]]) {
+                case authTokens =>
+                  complete(authTokens)
+              }
             }
           }
         }

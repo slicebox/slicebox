@@ -44,6 +44,9 @@ class ScpServiceActor(dbProps: DbProps, storage: Path) extends Actor with Except
                 sender ! ScpAdded(scpData)
               case None =>
 
+                if (port < 0 || port > 65535)
+                  throw new IllegalArgumentException("Port must be a value between 0 and 65535")
+                
                 addScp(scpData)
 
                 context.actorOf(ScpActor.props(scpData, executor), id)

@@ -48,6 +48,10 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor 
                 if (Files.isSameFile(path, storage))
                   throw new IllegalArgumentException("The storage directory may not be watched.")
 
+                getWatchedDirectories.map(dir => Paths.get(dir.path)).foreach(other =>
+                  if (path.startsWith(other) || other.startsWith(path))
+                    throw new IllegalArgumentException("Directory intersects existing directory " + other))
+
                 addDirectory(pathString)
 
                 context.actorOf(DirectoryWatchActor.props(pathString), childActorId)
@@ -58,9 +62,7 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor 
           case UnWatchDirectory(watchedDirectoryId) =>
             watchedDirectoryForId(watchedDirectoryId) match {
               case Some(watchedDirectory) =>
-                db.withSession { implicit session =>
-                  dao.deleteWatchedDirectoryWithId(watchedDirectoryId)
-                }
+                deleteDirectory(watchedDirectoryId)
 
                 val path = Paths.get(watchedDirectory.path)
 
@@ -84,7 +86,7 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor 
 
         }
       }
-      
+
   }
 
   def pathToId(path: Path) =
@@ -101,12 +103,23 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor 
   def setupWatches() =
     db.withTransaction { implicit session =>
       val watchedDirectories = dao.allWatchedDirectories
-      watchedDirectories foreach (watchedDirectory => context.actorOf(DirectoryWatchActor.props(watchedDirectory.path), pathToId(Paths.get(watchedDirectory.path))))
+      watchedDirectories foreach (watchedDirectory => {
+        val path = Paths.get(watchedDirectory.path)
+        if (Files.isDirectory(path))
+          context.actorOf(DirectoryWatchActor.props(watchedDirectory.path), pathToId(Paths.get(watchedDirectory.path)))
+        else
+          deleteDirectory(watchedDirectory.id)
+      })
     }
 
   def addDirectory(pathString: String): WatchedDirectory =
     db.withSession { implicit session =>
       dao.insert(WatchedDirectory(-1, pathString))
+    }
+
+  def deleteDirectory(id: Long) =
+    db.withSession { implicit session =>
+      dao.deleteWatchedDirectoryWithId(id)
     }
 
   def watchedDirectoryForId(watchedDirectoryId: Long) =

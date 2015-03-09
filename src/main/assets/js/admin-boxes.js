@@ -27,7 +27,7 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
         if (angular.isDefined($scope.callbacks.boxesTable)) {
             $scope.callbacks.boxesTable.reloadPage();
         }
-    }, 1000);
+    }, 5000);
 
     $scope.$on('$destroy', function() {
         $interval.cancel(timer);

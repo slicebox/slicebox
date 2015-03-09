@@ -19,7 +19,7 @@ angular.module('slicebox.inbox', ['ngRoute'])
         if (angular.isDefined($scope.callbacks.inboxTable)) {
             $scope.callbacks.inboxTable.reloadPage();
         }
-    }, 1000);
+    }, 5000);
 
     $scope.$on('$destroy', function() {
         $interval.cancel(timer);

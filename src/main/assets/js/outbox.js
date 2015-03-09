@@ -27,7 +27,7 @@ angular.module('slicebox.outbox', ['ngRoute'])
         if (angular.isDefined($scope.callbacks.outboxTable)) {
             $scope.callbacks.outboxTable.reloadPage();
         }
-    }, 1000);
+    }, 5000);
 
     $scope.$on('$destroy', function() {
         $interval.cancel(timer);
@@ -49,6 +49,7 @@ angular.module('slicebox.outbox', ['ngRoute'])
             if (angular.isUndefined(outboxTransactionData)) {
                 outboxTransactionData =
                     {
+                        id: outboxEntry.id, 
                         remoteBoxName: outboxEntry.remoteBoxName,
                         totalImageCount: outboxEntry.totalImageCount,
                         failed: outboxEntry.failed,
