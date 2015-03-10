@@ -3,8 +3,7 @@ package se.vgregion.app
 import java.nio.file.Files
 import java.nio.file.Paths
 
-import spray.http.StatusCodes.BadRequest
-import spray.http.StatusCodes.OK
+import spray.http.StatusCodes._
 import spray.httpx.SprayJsonSupport.sprayJsonMarshaller
 import spray.httpx.SprayJsonSupport.sprayJsonUnmarshaller
 
@@ -31,9 +30,10 @@ class DirectoryRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     Files.delete(tempFile)
   }
 
-  "The system" should "return a monitoring message when asked to watch a new directory" in {
+  "The system" should "return 201 Created and the watched directory when asking to watch a new directory" in {
     PostAsAdmin("/api/directorywatches", watchDir) ~> routes ~> check {
-      responseAs[String] should be(s"Now watching directory $tempDir")
+      status should be (Created)
+      responseAs[WatchedDirectory] should not be (null)
     }
   }
 
@@ -94,7 +94,7 @@ class DirectoryRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   it should "be possible to remove a watched directory" in {
     // TODO: this doesn't test that the watched directory is actually removed from db and that actor is stopped, it only tests that the request can be handled
     DeleteAsAdmin("/api/directorywatches/1") ~> routes ~> check {
-      responseAs[String] should be ("Stopped watching directory 1")
+      status should be (NoContent)
     }
   }
 }

@@ -60,12 +60,13 @@ angular.module('slicebox.utils', [])
  
         };
   
-        service.setCredentials = function (username, password) {
+        service.setCredentials = function (username, password, role) {
             var authdata = base64.encode(username + ':' + password);
   
             $rootScope.globals = {
                 currentUser: {
                     username: username,
+                    role: role,
                     authdata: authdata
                 }
             };

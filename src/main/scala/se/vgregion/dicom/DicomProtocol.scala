@@ -128,11 +128,7 @@ object DicomProtocol {
 
   case class ImageAdded(image: Image)
 
-  case class DirectoryWatched(path: Path)
-
   case class DirectoryUnwatched(id: Long)
-
-  case class ScpAdded(scpData: ScpData)
 
   case class ScpRemoved(scpDataId: Long)
 

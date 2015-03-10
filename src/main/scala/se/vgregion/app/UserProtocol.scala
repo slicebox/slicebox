@@ -39,7 +39,7 @@ object UserProtocol {
   
   case class AuthToken(token: String)
   
-  case class LoginResult(success: Boolean, message: String)
+  case class LoginResult(success: Boolean, role: UserRole, message: String)
   
   sealed trait UserRequest
   

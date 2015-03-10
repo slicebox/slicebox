@@ -37,5 +37,11 @@ class ScpDataDAO(val driver: JdbcProfile) {
   def scpDataForId(id: Long)(implicit session: Session): Option[ScpData] =
     scpDataQuery.filter(_.id === id).list.headOption
   
+  def scpDataForName(name: String)(implicit session: Session): Option[ScpData] =
+    scpDataQuery.filter(_.name === name).list.headOption
+  
+  def scpDataForPort(port: Int)(implicit session: Session): Option[ScpData] =
+    scpDataQuery.filter(_.port === port).list.headOption
+  
   def allScpDatas(implicit session: Session): List[ScpData] = scpDataQuery.list
 }

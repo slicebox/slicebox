@@ -53,7 +53,7 @@ class UserRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   
   it should "not be possible to generate tokens using token authentication" in {
     val tokens = Post("/api/users/generateauthtokens?n=1") ~> addCredentials(userCredentials) ~> routes ~> check {
-      status should be (OK)
+      status should be (Created)
       responseAs[List[AuthToken]]
     }
     

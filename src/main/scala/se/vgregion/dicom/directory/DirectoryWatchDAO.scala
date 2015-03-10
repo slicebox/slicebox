@@ -38,6 +38,9 @@ class DirectoryWatchDAO(val driver: JdbcProfile) {
   def watchedDirectoryForId(id: Long)(implicit session: Session): Option[WatchedDirectory] =
     watchedDirectoriesQuery.filter(_.id === id).list.headOption
     
+  def watchedDirectoryForPath(path: String)(implicit session: Session): Option[WatchedDirectory] =
+    watchedDirectoriesQuery.filter(_.path === path).list.headOption
+    
   private def toWatchedDirectory(watchedDirectory: WatchedDirectory) = WatchedDirectory(watchedDirectory.id, watchedDirectory.path)
 
 }

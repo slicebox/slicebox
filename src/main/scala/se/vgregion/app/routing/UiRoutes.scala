@@ -29,9 +29,9 @@ trait UiRoutes { this: RestApi =>
         entity(as[UserPass]) { userPass =>
           onSuccess(userService.ask(GetUserByName(userPass.user)).mapTo[Option[ApiUser]]) {
             case Some(repoUser) if (repoUser.passwordMatches(userPass.pass)) =>
-              complete(LoginResult(true, s"User ${userPass.user} logged in"))
+              complete(LoginResult(true, repoUser.role, s"User ${userPass.user} logged in"))
             case _ =>
-              complete(LoginResult(false, "Incorrect username or password"))
+              complete(LoginResult(false, UserRole.USER, "Incorrect username or password"))
           }
         }
       }

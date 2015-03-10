@@ -24,11 +24,11 @@ trait SliceboxRoutes extends DirectoryRoutes
         complete((BadRequest, e.getMessage()))
     }
 
-  def routes: Route =
+  def sliceboxRoutes: Route =
     pathPrefix("api") {
       parameter('authtoken.?) { authToken =>
         authenticate(authenticator.basicUserAuthenticator(authToken)) { authInfo =>
-          directoryRoutes ~
+          directoryRoutes(authInfo) ~
             scpRoutes(authInfo) ~
             metaDataRoutes ~
             imageRoutes ~

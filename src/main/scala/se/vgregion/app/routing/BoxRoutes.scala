@@ -33,7 +33,7 @@ trait BoxRoutes { this: RestApi =>
             entity(as[RemoteBoxName]) { remoteBoxName =>
               onSuccess(boxService.ask(GenerateBoxBaseUrl(remoteBoxName.value))) {
                 case BoxBaseUrlGenerated(baseUrl) =>
-                  complete(BoxBaseUrl(baseUrl))
+                  complete((Created, BoxBaseUrl(baseUrl)))
               }
             }
           }
@@ -42,7 +42,7 @@ trait BoxRoutes { this: RestApi =>
             entity(as[RemoteBox]) { remoteBox =>
               onSuccess(boxService.ask(AddRemoteBox(remoteBox))) {
                 case RemoteBoxAdded(box) =>
-                  complete(box)
+                  complete((Created, box))
               }
             }
           }

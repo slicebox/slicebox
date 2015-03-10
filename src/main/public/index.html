@@ -25,13 +25,13 @@
 				<a class="navbar-brand" href="/">Slicebox</a>
 			</div>
 		
-			<div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+			<div ng-if="uiState.showMenu" class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
 				<ul class="nav navbar-nav">
 					<li ng-class="{ active: isCurrentPath('/')}"><a href="/">Home</a></li>
 					<li ng-class="{ active: isCurrentPath('/inbox')}"><a href="/inbox">Inbox</a></li>
 					<li ng-class="{ active: isCurrentPath('/outbox')}"><a href="/outbox">Outbox</a></li>
 					<li ng-class="{ active: isCurrentPath('/log')}"><a href="/log">Event Log</a></li>
-					<li ng-class="{ active: currentPathStartsWith('/admin')}" class="dropdown">
+					<li ng-if="uiState.isAdmin" ng-class="{ active: currentPathStartsWith('/admin')}" class="dropdown">
 						<a href="" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">Admin <span class="caret"></span></a>
 
 	          			<ul class="dropdown-menu" role="menu">

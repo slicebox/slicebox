@@ -1,5 +1,3 @@
-	import com.typesafe.sbt.SbtNativePackager.packageArchetype
-
 	name := "slicebox"
 
 	version := "0.1"
@@ -9,10 +7,6 @@
 	scalaVersion := "2.11.4"
 
 	scalacOptions := Seq("-encoding", "UTF-8", "-Xlint","-deprecation", "-unchecked", "-feature", "-target:jvm-1.8")
-
-	Revolver.settings
-
-	packageArchetype.java_server
 
 	maintainer in Windows := "Exini Diagnostics AB"
 
@@ -58,7 +52,7 @@
 
 	mainClass in Compile := Some("se.vgregion.app.Main")
 
-	lazy val slicebox = (project in file(".")).enablePlugins(SbtWeb)
+	lazy val slicebox = (project in file(".")).enablePlugins(SbtWeb, JavaServerAppPackaging)
 
 	updateOptions := updateOptions.value.withCachedResolution(true)
 

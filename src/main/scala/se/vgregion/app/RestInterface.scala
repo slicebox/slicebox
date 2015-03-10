@@ -74,5 +74,6 @@ trait RestApi extends HttpService with SliceboxRoutes with JsonFormats {
 
   val authenticator = new Authenticator(userService)
 
+  def routes = sliceboxRoutes
 }
 

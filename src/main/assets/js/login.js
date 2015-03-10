@@ -15,13 +15,16 @@ angular.module('slicebox.login', ['ngRoute'])
 
     // reset login status
     authenticationService.clearCredentials();
-
+    $scope.uiState.showMenu = false;
+    
     $scope.login = function () {
         $scope.uiState.loginInProgress = true;
         authenticationService.login($scope.username, $scope.password, function(response) {
             if(response.success) {
                 $scope.uiState.loginInProgress = false;
-                authenticationService.setCredentials($scope.username, $scope.password);
+                $scope.uiState.showMenu = true;
+                $scope.uiState.isAdmin = response.role !== 'USER';
+                authenticationService.setCredentials($scope.username, $scope.password, response.role);
                 $location.path('/');
             } else {
                 $scope.appendErrorMessage(response.message);

@@ -20,7 +20,7 @@ class ScpServiceActor(dbProps: DbProps, storage: Path) extends Actor with Except
   val dao = new ScpDataDAO(dbProps.driver)
 
   val executor = Executors.newCachedThreadPool()
-  
+
   setupDb()
   setupScps()
 
@@ -33,54 +33,37 @@ class ScpServiceActor(dbProps: DbProps, storage: Path) extends Actor with Except
     case msg: ScpRequest =>
 
       catchAndReport {
-      
+
         msg match {
 
           case AddScp(name, aeTitle, port) =>
-            val scpData = ScpData(-1, name, aeTitle, port)
-            val id = scpDataToId(scpData)
-            context.child(id) match {
-              case Some(actor) =>
-                sender ! ScpAdded(scpData)
+            scpForName(name) match {
+              case Some(scpData) =>
+
+                sender ! scpData
+
               case None =>
+                val scpData = ScpData(-1, name, aeTitle, port)
 
                 if (port < 0 || port > 65535)
                   throw new IllegalArgumentException("Port must be a value between 0 and 65535")
-                
+
+                if (scpForPort(port).isDefined)
+                  throw new IllegalArgumentException(s"Port $port is already in use")
+
                 addScp(scpData)
 
-                context.actorOf(ScpActor.props(scpData, executor), id)
+                context.child(scpData.id.toString).getOrElse(
+                  context.actorOf(ScpActor.props(scpData, executor), scpData.id.toString))
 
-                sender ! ScpAdded(scpData)
+                sender ! scpData
 
             }
 
           case RemoveScp(scpDataId) =>
-            db.withSession { implicit session =>
-              dao.scpDataForId(scpDataId)
-            } match {
-              case Some(scpData) =>
-                db.withSession { implicit session =>
-                  dao.deleteScpDataWithId(scpDataId)
-                }
-
-                val id = scpDataToId(scpData)
-                context.child(id) match {
-                  case Some(actor) =>
-
-                    removeScp(scpData)
-
-                    actor ! PoisonPill
-
-                    sender ! ScpRemoved(scpDataId)
-
-                  case None =>
-                    sender ! ScpRemoved(scpDataId)
-                }
-
-              case None =>
-                sender ! ScpRemoved(scpDataId)
-            }
+            scpForId(scpDataId).foreach(scpData => deleteScpWithId(scpDataId))
+            context.child(scpDataId.toString).foreach(_ ! PoisonPill)
+            sender ! ScpRemoved(scpDataId)
 
           case GetScps =>
             val scps = getScps()
@@ -94,16 +77,29 @@ class ScpServiceActor(dbProps: DbProps, storage: Path) extends Actor with Except
 
   }
 
-  def scpDataToId(scpData: ScpData) = scpData.name
-
   def addScp(scpData: ScpData) =
     db.withSession { implicit session =>
       dao.insert(scpData)
     }
 
-  def removeScp(scpData: ScpData) =
+  def scpForId(id: Long) =
     db.withSession { implicit session =>
-      dao.deleteScpDataWithId(scpData.id)
+      dao.scpDataForId(id)
+    }
+
+  def scpForName(name: String) =
+    db.withSession { implicit session =>
+      dao.scpDataForName(name)
+    }
+
+  def scpForPort(port: Int) =
+    db.withSession { implicit session =>
+      dao.scpDataForPort(port)
+    }
+
+  def deleteScpWithId(id: Long) =
+    db.withSession { implicit session =>
+      dao.deleteScpDataWithId(id)
     }
 
   def getScps() =
@@ -119,7 +115,7 @@ class ScpServiceActor(dbProps: DbProps, storage: Path) extends Actor with Except
   def setupScps() =
     db.withTransaction { implicit session =>
       val scps = dao.allScpDatas
-      scps foreach (scpData => context.actorOf(ScpActor.props(scpData, executor), scpDataToId(scpData)))
+      scps foreach (scpData => context.actorOf(ScpActor.props(scpData, executor), scpData.id.toString))
     }
 
 }

@@ -27,14 +27,14 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
   "The system" should "return a success message when asked to generate a new base url" in {
     PostAsAdmin("/api/boxes/generatebaseurl", RemoteBoxName("hosp")) ~> routes ~> check {
-      status should be(OK)
+      status should be (Created)
       responseAs[BoxBaseUrl].value.isEmpty should be(false)
     }
   }
 
   it should "return a success message when asked to add a remote box" in {
     PostAsAdmin("/api/boxes/addremotebox", RemoteBox("uni", "http://some.url/api/box/" + UUID.randomUUID())) ~> routes ~> check {
-      status should be(OK)
+      status should be (Created)
       val box = responseAs[Box]
       box.sendMethod should be(BoxSendMethod.PUSH)
       box.name should be("uni")
@@ -71,7 +71,7 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     // first, add a box on the poll (university) side
     val uniUrl =
       PostAsAdmin("/api/boxes/generatebaseurl", RemoteBoxName("hosp")) ~> routes ~> check {
-        status should be(OK)
+        status should be (Created)
         responseAs[BoxBaseUrl]
       }
 
@@ -97,7 +97,7 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     // first, add a box on the poll (university) side
     val uniUrl =
       PostAsAdmin("/api/boxes/generatebaseurl", RemoteBoxName("hosp2")) ~> routes ~> check {
-        status should be(OK)
+        status should be (Created)
         responseAs[BoxBaseUrl]
       }
 
@@ -113,7 +113,7 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     // first, add a box on the poll (university) side
     val uniUrl =
       PostAsAdmin("/api/boxes/generatebaseurl", RemoteBoxName("hosp3")) ~> routes ~> check {
-        status should be(OK)
+        status should be (Created)
         responseAs[BoxBaseUrl]
       }
 
@@ -158,7 +158,7 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     // first, add a box on the poll (university) side
     val uniUrl =
       PostAsAdmin("/api/boxes/generatebaseurl", RemoteBoxName("hosp4")) ~> routes ~> check {
-        status should be(OK)
+        status should be (Created)
         responseAs[BoxBaseUrl]
       }
 
@@ -207,7 +207,7 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     // first, add a box on the poll (university) side
     val uniUrl =
       PostAsAdmin("/api/boxes/generatebaseurl", RemoteBoxName("hosp5")) ~> routes ~> check {
-        status should be(OK)
+        status should be (Created)
         responseAs[BoxBaseUrl]
       }
 

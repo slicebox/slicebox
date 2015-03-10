@@ -25,14 +25,18 @@ angular.module('slicebox', [
     $routeProvider.otherwise({redirectTo: '/'});
 })
 
-.controller('SliceboxCtrl', function($scope, $location, authenticationService) {
+.controller('SliceboxCtrl', function($scope, $rootScope, $location, authenticationService) {
 
     $scope.uiState = {
-        errorMessages: []
+        errorMessages: [],
+        showMenu: true,
+        isAdmin: angular.isDefined($rootScope.globals.currentUser) && 
+                 $rootScope.globals.currentUser.role !== 'USER'
     };
 
     $scope.logout = function() {
         authenticationService.clearCredentials();
+        $scope.uiState.isAdmin = false;
         $location.url("/login");
     };
 
@@ -64,6 +68,7 @@ angular.module('slicebox', [
     $rootScope.$on('$locationChangeStart', function (event, next, current) {
         // redirect to login page if not logged in
         if ($location.path() !== '/login' && !$rootScope.globals.currentUser) {
+            $scope.uiState.showMenu = false;
             $location.path('/login');
         }
     });

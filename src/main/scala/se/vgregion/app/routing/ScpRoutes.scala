@@ -3,6 +3,7 @@ package se.vgregion.app.routing
 import akka.pattern.ask
 
 import spray.http.StatusCodes.NoContent
+import spray.http.StatusCodes.Created
 import spray.httpx.SprayJsonSupport._
 import spray.routing._
 
@@ -25,8 +26,8 @@ def scpRoutes(authInfo: AuthInfo): Route =
           authorize(authInfo.hasPermission(UserRole.ADMINISTRATOR)) {
             entity(as[AddScp]) { addScp =>
               onSuccess(dicomService.ask(addScp)) {
-                case ScpAdded(scpData) =>
-                  complete(scpData)
+                case scpData: ScpData =>
+                  complete((Created, scpData))
               }
             }
           }

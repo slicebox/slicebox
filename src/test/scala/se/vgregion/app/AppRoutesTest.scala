@@ -51,7 +51,7 @@ class AppRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   
   it should "respond with OK when using a valid auth token and no credentials" in {
     val tokens = Post("/api/users/generateauthtokens?n=1") ~> addCredentials(userCredentials) ~> routes ~> check {
-      status should be (OK)
+      status should be (Created)
       responseAs[List[AuthToken]]
     }
     
@@ -68,7 +68,7 @@ class AppRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   
   it should "respond with OK when using a valid auth token and valid credentials" in {
     val tokens = Post("/api/users/generateauthtokens?n=1") ~> addCredentials(userCredentials) ~> routes ~> check {
-      status should be (OK)
+      status should be (Created)
       responseAs[List[AuthToken]]
     }
     
@@ -79,7 +79,7 @@ class AppRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   
   it should "respond with OK when using a valid auth token and invalid credentials" in {
     val tokens = Post("/api/users/generateauthtokens?n=1") ~> addCredentials(userCredentials) ~> routes ~> check {
-      status should be (OK)
+      status should be (Created)
       responseAs[List[AuthToken]]
     }
     

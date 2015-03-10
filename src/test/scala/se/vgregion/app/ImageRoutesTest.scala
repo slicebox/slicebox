@@ -22,7 +22,7 @@ class ImageRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     val file = new File(getClass().getResource(fileName).toURI())
     val mfd = MultipartFormData(Seq(BodyPart(file, "file")))
     PostAsUser("/api/images", mfd) ~> routes ~> check {
-      status should be(OK)
+      status should be (Created)
       val image = responseAs[Image]
       image.id should be(1)
     }

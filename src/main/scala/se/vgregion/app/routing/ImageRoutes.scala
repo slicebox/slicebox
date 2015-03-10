@@ -8,6 +8,7 @@ import spray.http.HttpData
 import spray.http.HttpEntity
 import spray.http.MediaTypes
 import spray.http.StatusCodes.BadRequest
+import spray.http.StatusCodes.Created
 import spray.routing._
 
 import se.vgregion.app.RestApi
@@ -25,14 +26,14 @@ trait ImageRoutes { this: RestApi =>
             onSuccess(dicomService.ask(AddDataset(dataset))) {
               case ImageAdded(image) =>
                 import spray.httpx.SprayJsonSupport._
-                complete(image)
+                complete((Created, image))
             }
           } ~ entity(as[Array[Byte]]) { bytes =>
             val dataset = DicomUtil.loadDataset(bytes, true)
             onSuccess(dicomService.ask(AddDataset(dataset))) {
               case ImageAdded(image) =>
                 import spray.httpx.SprayJsonSupport._
-                complete(image)
+                complete((Created, image))
             }
           }
         }

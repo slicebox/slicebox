@@ -33,14 +33,14 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor 
         msg match {
 
           case WatchDirectory(pathString) =>
-            val path = Paths.get(pathString)
-            val childActorId = pathToId(path)
-            context.child(childActorId) match {
-              case Some(actor) =>
+            watchedDirectoryForPath(pathString) match {
+              case Some(watchedDirectory) =>
 
-                sender ! DirectoryWatched(path)
+                sender ! watchedDirectory
 
               case None =>
+
+                val path = Paths.get(pathString)
 
                 if (!Files.isDirectory(path))
                   throw new IllegalArgumentException("Could not create directory watch: Not a directory: " + pathString)
@@ -52,33 +52,18 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor 
                   if (path.startsWith(other) || other.startsWith(path))
                     throw new IllegalArgumentException("Directory intersects existing directory " + other))
 
-                addDirectory(pathString)
+                val watchedDirectory = addDirectory(pathString)
 
-                context.actorOf(DirectoryWatchActor.props(pathString), childActorId)
+                context.child(watchedDirectory.id.toString).getOrElse(
+                  context.actorOf(DirectoryWatchActor.props(pathString), watchedDirectory.id.toString))
 
-                sender ! DirectoryWatched(path)
+                sender ! watchedDirectory
             }
 
           case UnWatchDirectory(watchedDirectoryId) =>
-            watchedDirectoryForId(watchedDirectoryId) match {
-              case Some(watchedDirectory) =>
-                deleteDirectory(watchedDirectoryId)
-
-                val path = Paths.get(watchedDirectory.path)
-
-                val id = pathToId(path)
-                context.child(id) match {
-                  case Some(ref) =>
-                    ref ! PoisonPill
-
-                    sender ! DirectoryUnwatched(watchedDirectoryId)
-                  case None =>
-                    sender ! DirectoryUnwatched(watchedDirectoryId)
-                }
-
-              case None =>
-                sender ! DirectoryUnwatched(watchedDirectoryId)
-            }
+            watchedDirectoryForId(watchedDirectoryId).foreach(dir => deleteDirectory(watchedDirectoryId))
+            context.child(watchedDirectoryId.toString).foreach(_ ! PoisonPill)
+            sender ! DirectoryUnwatched(watchedDirectoryId)
 
           case GetWatchedDirectories =>
             val directories = getWatchedDirectories()
@@ -88,12 +73,6 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor 
       }
 
   }
-
-  def pathToId(path: Path) =
-    path.toAbsolutePath().toString
-      .replace(" ", "_") // Spaces are not allowed in actor ids
-      .replace("-", "--") // Replace '-' in directory names to avoid conflict with directory separator in next replace below
-      .replace(FileSystems.getDefault.getSeparator, "-")
 
   def setupDb() =
     db.withSession { implicit session =>
@@ -106,7 +85,7 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor 
       watchedDirectories foreach (watchedDirectory => {
         val path = Paths.get(watchedDirectory.path)
         if (Files.isDirectory(path))
-          context.actorOf(DirectoryWatchActor.props(watchedDirectory.path), pathToId(Paths.get(watchedDirectory.path)))
+          context.actorOf(DirectoryWatchActor.props(watchedDirectory.path), watchedDirectory.id.toString)
         else
           deleteDirectory(watchedDirectory.id)
       })
@@ -125,6 +104,11 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor 
   def watchedDirectoryForId(watchedDirectoryId: Long) =
     db.withSession { implicit session =>
       dao.watchedDirectoryForId(watchedDirectoryId)
+    }
+
+  def watchedDirectoryForPath(path: String) =
+    db.withSession { implicit session =>
+      dao.watchedDirectoryForPath(path)
     }
 
   def getWatchedDirectories() =

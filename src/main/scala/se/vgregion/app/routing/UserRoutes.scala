@@ -2,6 +2,7 @@ package se.vgregion.app.routing
 
 import akka.pattern.ask
 
+import spray.http.StatusCodes.Created
 import spray.http.StatusCodes.NoContent
 import spray.httpx.SprayJsonSupport._
 import spray.routing._
@@ -26,7 +27,7 @@ trait UserRoutes { this: RestApi =>
               val apiUser = ApiUser(-1, user.user, user.role).withPassword(user.password)
               onSuccess(userService.ask(AddUser(apiUser))) {
                 case UserAdded(user) =>
-                  complete(user)
+                  complete((Created, user))
               }
             }
           }
@@ -46,7 +47,7 @@ trait UserRoutes { this: RestApi =>
             authenticate(authenticator.basicUserAuthenticator(None)) { authInfo2 => // may not generate tokens using token authentication
               onSuccess(userService.ask(GenerateAuthTokens(authInfo.user, n)).mapTo[List[AuthToken]]) {
                 case authTokens =>
-                  complete(authTokens)
+                  complete((Created, authTokens))
               }
             }
           }
