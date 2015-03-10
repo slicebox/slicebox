@@ -8,11 +8,26 @@
 
 	scalacOptions := Seq("-encoding", "UTF-8", "-Xlint","-deprecation", "-unchecked", "-feature", "-target:jvm-1.8")
 
+	Revolver.settings
+
+	maintainer in Linux := "Exini Diagnostics AB"
+
 	maintainer in Windows := "Exini Diagnostics AB"
 
-	packageSummary in Windows := "Reactive Dicom Node"
+	packageSummary in Linux := "Slicebox DICOM sharing service"
 
-	packageDescription in Windows := "Longer message here..."
+	packageSummary in Windows := "Slicebox DICOM sharing service"
+
+	packageDescription in Linux := "Slicebox is a service for sharing medical image data with collaborators while protecting patient information"
+
+	packageDescription in Windows := "Slicebox is a service for sharing medical image data with collaborators while protecting patient information"
+
+	mappings in Universal <+= (packageBin in Compile, sourceDirectory ) map { (_, src) =>
+    // we are using the reference.conf as default application.conf
+    // the user can override settings here
+    val conf = src / "main" / "resources" / "slicebox.conf"
+    conf -> "conf/slicebox.conf"
+	}
 
 	resolvers ++= Seq("Typesafe Repository" at "http://repo.typesafe.com/typesafe/releases/",
 	                  "Sonatype snapshots"  at "http://oss.sonatype.org/content/repositories/snapshots/",

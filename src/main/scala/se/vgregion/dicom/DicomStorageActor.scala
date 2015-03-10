@@ -43,7 +43,7 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
   setupDb()
 
   implicit val ec = ExecutionContexts.fromExecutor(Executors.newWorkStealingPool())
-  
+
   override def preStart {
     context.system.eventStream.subscribe(context.self, classOf[DatasetReceived])
     context.system.eventStream.subscribe(context.self, classOf[FileReceived])
@@ -68,6 +68,8 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
 
     case AddDataset(dataset) =>
       catchAndReport {
+        if (dataset == null)
+          throw new IllegalArgumentException("Invalid dataset")
         val image = storeDataset(dataset)
         sender ! ImageAdded(image)
       }
@@ -194,12 +196,12 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
           db.withSession { implicit session =>
             sender ! ImageFiles(dao.imageFilesForPatients(patientIds))
           }
-          
+
         case GetFlatSeries(startIndex, count, orderBy, orderAscending, filter) =>
           db.withSession { implicit session =>
             sender ! FlatSeriesCollection(dao.flatSeries(startIndex, count, orderBy, orderAscending, filter))
           }
-          
+
       }
     }
 
@@ -330,7 +332,11 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
         param.setWindowCenter((windowMax - windowMin) / 2)
         param.setWindowWidth(windowMax - windowMin)
       }
-      val bi = scaleImage(imageReader.read(frameNumber - 1, param), imageHeight)
+      val bi = try {
+        scaleImage(imageReader.read(frameNumber - 1, param), imageHeight)
+      } catch {
+        case e: Exception => throw new IllegalArgumentException(e.getMessage)
+      }
       val baos = new ByteArrayOutputStream
       ImageIO.write(bi, "png", baos)
       baos.close()

@@ -188,6 +188,17 @@
                         </ul>
                     </div>
                     &nbsp;&nbsp;&nbsp;&nbsp;
+                    <div class="btn-group" dropdown>
+                        <button type="button" class="btn btn-default dropdown-toggle" dropdown-toggle>Images <span class="caret"></span></button>
+                        <ul class="dropdown-menu" role="menu">
+                            <li><a ng-click="uiState.seriesDetails.images = 1; updatePNGImageUrls()" href="#">1</a></li>
+                            <li><a ng-click="uiState.seriesDetails.images = 5; updatePNGImageUrls()" href="#">5</a></li>
+                            <li><a ng-click="uiState.seriesDetails.images = 10; updatePNGImageUrls()" href="#">10</a></li>
+                            <li class="divider"></li>
+                            <li><a ng-click="uiState.seriesDetails.images = 10000; updatePNGImageUrls()" href="#">All</a></li>
+                        </ul>
+                    </div>
+                    &nbsp;&nbsp;&nbsp;&nbsp;
                     <div class="checkbox">
                         <label>
                             <input id="manual" type="checkbox" ng-model="uiState.seriesDetails.isWindowManual" ng-change="updatePNGImageUrls()"> Window (min/max)

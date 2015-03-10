@@ -66,6 +66,7 @@ angular.module('slicebox.home', ['ngRoute'])
     $scope.uiState.seriesDetails = {
         pngImageUrls: [],
         imageHeight: 50,
+        images: 1,
         isWindowManual: false,
         numberOfFrames: 1,
         windowMin: undefined,
@@ -224,15 +225,20 @@ angular.module('slicebox.home', ['ngRoute'])
                 // assume all images have the same number of frames etc so we get the image information for the first image only
                 if (images.length > 0) {
                     $http.get('/api/images/' + images[0].id + '/imageinformation').success(function(info) {
-                        $scope.uiState.seriesDetails.windowMin = info.minimumPixelValue;
-                        $scope.uiState.seriesDetails.windowMax = info.maximumPixelValue;
+                        if (!$scope.uiState.seriesDetails.isWindowManual || $scope.uiState.seriesDetails.windowMin === undefined || $scope.uiState.seriesDetails.windowMax === undefined) {
+                            $scope.uiState.seriesDetails.windowMin = info.minimumPixelValue;
+                            $scope.uiState.seriesDetails.windowMax = info.maximumPixelValue;
+                        }
                         $scope.uiState.numberOfFrames = info.numberOfFrames;
-                        var n = info.numberOfFrames * images.length;
+                        var n = Math.min($scope.uiState.seriesDetails.images, info.numberOfFrames * images.length);
                         $http.post('/api/users/generateauthtokens?n=' + n).success(function(tokens) {
                             $scope.uiState.loadPngImagesInProgress = false;
                             var tokenIndex = 0;
-                            angular.forEach(images, function(image) {
-                                for (var i = 0; i < info.numberOfFrames; i++) {
+                            var nImages = Math.max(1, Math.min(images.length, Math.ceil(n / info.numberOfFrames)));
+                            for (var j = 0; j < nImages; j++) {
+                                var image = images[j];
+                                var nFrames = Math.min(n - j*info.numberOfFrames, info.numberOfFrames);
+                                for (var i = 0; i < nFrames; i++) {
                                     var url = '/api/images/' + image.id + '/png'+ '?authtoken=' + tokens[tokenIndex].token + '&framenumber=' + (i + 1);
                                     if ($scope.uiState.seriesDetails.isWindowManual) {
                                         url = url + 
@@ -246,7 +252,7 @@ angular.module('slicebox.home', ['ngRoute'])
                                     $scope.uiState.seriesDetails.pngImageUrls.push({ url: url, frameIndex: info.frameIndex });
                                     tokenIndex += 1;
                                 }
-                            });
+                            }
                         }).error(function(error) {
                             $scope.appendErrorMessage('Failed to generate authentication tokens: ' + error);            
                             $scope.uiState.loadPngImagesInProgress = false;                                                                  

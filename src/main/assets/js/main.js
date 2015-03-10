@@ -37,6 +37,7 @@ angular.module('slicebox', [
     $scope.logout = function() {
         authenticationService.clearCredentials();
         $scope.uiState.isAdmin = false;
+        $scope.uiState.showMenu = false;
         $location.url("/login");
     };
 
@@ -68,7 +69,6 @@ angular.module('slicebox', [
     $rootScope.$on('$locationChangeStart', function (event, next, current) {
         // redirect to login page if not logged in
         if ($location.path() !== '/login' && !$rootScope.globals.currentUser) {
-            $scope.uiState.showMenu = false;
             $location.path('/login');
         }
     });
