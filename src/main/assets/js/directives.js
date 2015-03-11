@@ -746,24 +746,29 @@ angular.module('slicebox.directives', [])
             var property = $scope.columnDefinition.property;
             var rendererTranscludeFn = $scope.columnDefinition.rendererTranscludeFn;
             var rendererScope = $scope.columnDefinition.rendererScope;
+            var rendererChildScope = null;
             var rawPropertyValue = null;
 
             if (angular.isFunction(rendererTranscludeFn)) {
                 // Remove default rendering
-                $element.html('');
+                $element.empty();
 
-                rendererScope = rendererScope.$new();
-                rendererScope.rowObject = $scope.rowObject;
+                rendererChildScope = rendererScope.$new();
+                rendererChildScope.rowObject = $scope.rowObject;
+
+                $scope.$on('$destroy', function() {
+                    rendererChildScope.$destroy();
+                });
 
                 rawPropertyValue = $scope.rowObject[$scope.columnDefinition.property];
                 if ($scope.columnDefinition.property.indexOf('[') !== -1) {
                     rawPropertyValue = eval('$scope.rowObject.' + $scope.columnDefinition.property);
                 }
 
-                rendererScope.rawPropertyValue = rawPropertyValue;
-                rendererScope.filteredPropertyValue = $scope.filteredCellValues[$scope.$parent.$index][$scope.columnDefinition.property];
+                rendererChildScope.rawPropertyValue = rawPropertyValue;
+                rendererChildScope.filteredPropertyValue = $scope.filteredCellValues[$scope.$parent.$index][$scope.columnDefinition.property];
 
-                rendererTranscludeFn(rendererScope, function(rendererElement) {
+                rendererTranscludeFn(rendererChildScope, function(rendererElement) {
                     $element.append(rendererElement);
                 });
             }
