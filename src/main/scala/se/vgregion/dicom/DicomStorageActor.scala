@@ -119,7 +119,7 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
           db.withSession { implicit session =>
             dao.imageFileForImage(imageId) match {
               case Some(imageFile) =>
-                sender ! readImageAttributes(imageFile.fileName.value)
+                readImageAttributes(imageFile.fileName.value).pipeTo(sender)
               case None =>
                 throw new IllegalArgumentException(s"No file found for image $imageId")
             }
@@ -258,10 +258,12 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
     log.info("Deleted file " + filePath)
   }
 
-  def readImageAttributes(fileName: String): ImageAttributes = {
+  def readImageAttributes(fileName: String): Future[ImageAttributes] = {
     val filePath = storage.resolve(fileName)
     val dataset = loadDataset(filePath, false)
-    ImageAttributes(readImageAttributes(dataset, 0, ""))
+    Future {
+      ImageAttributes(readImageAttributes(dataset, 0, ""))
+    }
   }
 
   def readImageAttributes(dataset: Attributes, depth: Int, path: String): List[ImageAttribute] = {
@@ -269,17 +271,22 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
     if (dataset != null) {
       dataset.accept(new Visitor() {
         override def visit(attrs: Attributes, tag: Int, vr: VR, value: AnyRef): Boolean = {
-          val group = TagUtils.toHexString(TagUtils.groupNumber(tag)).substring(4)
-          val element = TagUtils.toHexString(TagUtils.elementNumber(tag)).substring(4)
-          val name = Keyword.valueOf(tag)
-          val vrName = vr.name
-          val length = lengthOf(attrs.getBytes(tag))
-          val multiplicity = multiplicityOf(attrs.getStrings(tag))
-          val content = toSingleString(attrs.getStrings(tag))
-          attributesBuffer += ImageAttribute(group, element, vrName, length, multiplicity, depth, path, name, content)
-          if (vr == VR.SQ) {
-            val nextPath = if (path.isEmpty()) name else path + '/' + name
-            attributesBuffer ++= readImageAttributes(attrs.getNestedDataset(tag), depth + 1, nextPath)
+          val strings = attrs.getStrings(tag)
+          if (strings != null && !strings.isEmpty) {
+            val multiplicity = multiplicityOf(strings)
+            if (multiplicity <= 256) {
+              val length = lengthOf(attrs.getBytes(tag))
+              val group = TagUtils.toHexString(TagUtils.groupNumber(tag)).substring(4)
+              val element = TagUtils.toHexString(TagUtils.elementNumber(tag)).substring(4)
+              val name = Keyword.valueOf(tag)
+              val vrName = vr.name
+              val content = toSingleString(strings)
+              attributesBuffer += ImageAttribute(group, element, vrName, length, multiplicity, depth, path, name, content)
+              if (vr == VR.SQ) {
+                val nextPath = if (path.isEmpty()) name else path + '/' + name
+                attributesBuffer ++= readImageAttributes(attrs.getNestedDataset(tag), depth + 1, nextPath)
+              }
+            }
           }
           true
         }
