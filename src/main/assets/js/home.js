@@ -220,8 +220,6 @@ angular.module('slicebox.home', ['ngRoute'])
 
             $http.get('/api/metadata/images?seriesid=' + $scope.uiState.selectedSeries.id).success(function(images) {
 
-                $scope.uiState.seriesDetails.pngImageUrls = [];
-
                 // assume all images have the same number of frames etc so we get the image information for the first image only
                 if (images.length > 0) {
                     $http.get('/api/images/' + images[0].id + '/imageinformation').success(function(info) {
@@ -232,6 +230,7 @@ angular.module('slicebox.home', ['ngRoute'])
                         $scope.uiState.numberOfFrames = info.numberOfFrames;
                         var n = Math.min($scope.uiState.seriesDetails.images, info.numberOfFrames * images.length);
                         $http.post('/api/users/generateauthtokens?n=' + n).success(function(tokens) {
+                            $scope.uiState.seriesDetails.pngImageUrls = [];
                             $scope.uiState.loadPngImagesInProgress = false;
                             var tokenIndex = 0;
                             var nImages = Math.max(1, Math.min(images.length, Math.ceil(n / info.numberOfFrames)));

@@ -120,7 +120,7 @@ class BoxPushActor(box: Box, dbProps: DbProps, storage: Path, pollInterval: Fini
   }
 
   def handleFileSendFailedForOutboxEntry(outboxEntry: OutboxEntry, exception: Exception) = {
-    log.error(exception, s"Failed to send file to box: ${outboxEntry.id}")
+    log.error(s"Failed to send file to box ${outboxEntry.id}: " + exception.getMessage)
 
     db.withSession { implicit session =>
       boxDao.markOutboxTransactionAsFailed(box.id, outboxEntry.transactionId)

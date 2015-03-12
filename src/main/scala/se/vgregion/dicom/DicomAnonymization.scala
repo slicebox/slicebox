@@ -11,7 +11,6 @@ import org.dcm4che3.data.Attributes.Visitor
 object DicomAnonymization {
 
   val emptyString = ""
-  val anonymousDate = new Date(0)
 
   def anonymizeDataset(dataset: Attributes): Attributes = {
 
@@ -27,7 +26,7 @@ object DicomAnonymization {
       val patientID = dataset.getString(Tag.PatientID)
       val sex = dataset.getString(Tag.PatientSex)
       val age = dataset.getString(Tag.PatientAge)
-      
+
       val modified = cloneDataset(dataset)
 
       // this section from standard PS3.15 Table E.1-1
@@ -139,7 +138,7 @@ object DicomAnonymization {
       setStringTag(modified, Tag.PatientID, VR.LO, createUid(patientID))
       removeTag(modified, Tag.PatientState)
       removeTag(modified, Tag.PatientTransportArrangements)
-      setDateTag(modified, Tag.PatientBirthDate, VR.DA, anonymousDate)
+      removeTag(modified, Tag.PatientBirthDate)
       removeTag(modified, Tag.PatientBirthName)
       removeTag(modified, Tag.PatientBirthTime)
       removeTag(modified, Tag.PatientInstitutionResidence)
@@ -211,7 +210,7 @@ object DicomAnonymization {
       setUidTagOrLeaveEmpty(modified, Tag.SeriesInstanceUID)
       removeTag(modified, Tag.ServiceEpisodeDescription)
       removeTag(modified, Tag.ServiceEpisodeID)
-      setUidTagOrLeaveEmpty(modified, Tag.SOPInstanceUID)
+      setUidTag(modified, Tag.SOPInstanceUID)
       removeTag(modified, Tag.SourceImageSequence) // Keep in UID option but removed here
       removeTag(modified, Tag.SpecialNeeds)
       setUidTagOrLeaveEmpty(modified, Tag.StorageMediaFileSetUID)
@@ -241,7 +240,7 @@ object DicomAnonymization {
       removeTag(modified, Tag.VerifyingOrganization)
       removeTag(modified, Tag.VisitComments)
 
-      // remove private tags and for good measure any tags containing either the patient name or id
+      // remove private tags and all overlay data tags
       var toRemove = Seq.empty[Int]
 
       modified.accept(new Visitor() {
@@ -250,11 +249,9 @@ object DicomAnonymization {
           if (TagUtils.isPrivateGroup(tag))
             toRemove = toRemove :+ tag
 
-          if (value.isInstanceOf[String]) {
-            val stringValue = value.asInstanceOf[String]
-            if (patientName != null && stringValue.contains(patientName) || patientID != null && stringValue.contains(patientID))
-              toRemove = toRemove :+ tag
-          }
+          val gn = TagUtils.groupNumber(tag)
+          if (gn >= 0x6000 && gn < 0x6100)
+            toRemove = toRemove :+ tag
 
           true
         }
@@ -272,6 +269,9 @@ object DicomAnonymization {
   def setStringTag(dataset: Attributes, tag: Int, vr: VR, value: String): Unit = dataset.setString(tag, vr, value)
   def setDateTag(dataset: Attributes, tag: Int, vr: VR, value: Date): Unit = dataset.setDate(tag, vr, value)
   def removeTag(dataset: Attributes, tag: Int): Unit = dataset.remove(tag)
+
+  def setUidTag(dataset: Attributes, tag: Int) =
+    setStringTag(dataset, tag, VR.UI, createUid(dataset.getString(tag)))
 
   def setUidTagOrLeaveEmpty(dataset: Attributes, tag: Int) =
     setStringTag(dataset, tag, VR.UI, createUidOrLeaveEmpty(dataset.getString(tag)))
@@ -301,6 +301,6 @@ object DicomAnonymization {
   def createAnonymousPatientName(sex: String, age: String) = {
     val sexString = if (sex == null || sex.isEmpty) "<unknown sex>" else sex
     val ageString = if (age == null || age.isEmpty) "<unknown age>" else age
-    s"Anonymous $sex $age"
+    s"Anonymous $sexString $ageString"
   }
 }

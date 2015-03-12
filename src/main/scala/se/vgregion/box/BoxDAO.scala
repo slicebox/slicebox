@@ -153,6 +153,9 @@ class BoxDAO(val driver: JdbcProfile) {
   def removeOutboxEntry(entryId: Long)(implicit session: Session): Unit =
     outboxQuery.filter(_.id === entryId).delete
 
+  def removeOutboxEntries(entryIds: Seq[Long])(implicit session: Session): Unit =
+    outboxQuery.filter(_.id inSet entryIds).delete
+    
   def listBoxes(implicit session: Session): List[Box] =
     boxQuery.list
 

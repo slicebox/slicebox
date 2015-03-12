@@ -44,21 +44,25 @@ angular.module('slicebox.outbox', ['ngRoute'])
         var imagesLeft;
         var pageData = [];
 
+        var id = 1;
         angular.forEach(outboxEntries, function(outboxEntry) {
             outboxTransactionData = outboxDataCollector[outboxEntry.transactionId];
             if (angular.isUndefined(outboxTransactionData)) {
                 outboxTransactionData =
                     {
-                        id: outboxEntry.id, 
+                        id: id, 
                         remoteBoxName: outboxEntry.remoteBoxName,
                         totalImageCount: outboxEntry.totalImageCount,
                         failed: outboxEntry.failed,
+                        outboxEntryIds: [],
                         imagesLeft: 0
                     };
 
                 outboxDataCollector[outboxEntry.transactionId] = outboxTransactionData;
+                id = id + 1;
             }
 
+            outboxTransactionData.outboxEntryIds.push(outboxEntry.id);
             outboxTransactionData.imagesLeft = outboxTransactionData.imagesLeft + 1;
         });
 
@@ -70,22 +74,24 @@ angular.module('slicebox.outbox', ['ngRoute'])
     };
 
     // Private functions
-    function confirmDeleteOutboxEntries(outboxEntries) {
-        var deleteConfirmationText = 'Permanently delete ' + outboxEntries.length + ' outbox entries?';
+    function confirmDeleteOutboxEntries(outboxTransactionDataObjects) {
+        var deleteConfirmationText = 'Permanently delete ' + outboxTransactionDataObjects.length + ' transactions?';
 
-        return openConfirmationDeleteModal('Delete Outbox Entries', deleteConfirmationText, function() {
-            return deleteOutboxEntries(outboxEntries);
+        return openConfirmationDeleteModal('Delete Transactions', deleteConfirmationText, function() {
+            return deleteOutboxEntries(outboxTransactionDataObjects);
         });
     }
 
-    function deleteOutboxEntries(outboxEntries) {
+    function deleteOutboxEntries(outboxTransactionDataObjects) {
         var deletePromises = [];
         var deletePromise;
         var deleteAllPromies;
 
-        angular.forEach(outboxEntries, function(outboxEntry) {
-            deletePromise = $http.delete('/api/outbox/' + outboxEntry.id);
-            deletePromises.push(deletePromise);
+        angular.forEach(outboxTransactionDataObjects, function(outboxTransactionData) {
+            for (var i = 0; i < outboxTransactionData.outboxEntryIds.length; i++) {
+                deletePromise = $http.delete('/api/outbox/' + outboxTransactionData.outboxEntryIds[i]);
+                deletePromises.push(deletePromise);
+            }
         });
 
         deleteAllPromies = $q.all(deletePromises);

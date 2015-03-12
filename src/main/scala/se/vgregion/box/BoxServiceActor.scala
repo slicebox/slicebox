@@ -89,9 +89,8 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
               sender ! InvalidToken(token)
 
           case UpdateInbox(token, transactionId, sequenceNumber, totalImageCount) =>
-            pollBoxByToken(token).foreach(box => {
-              updateInbox(box.id, transactionId, sequenceNumber, totalImageCount)
-            })
+            pollBoxByToken(token).foreach(box =>
+              updateInbox(box.id, transactionId, sequenceNumber, totalImageCount))
             
             // TODO: what should we do if no box was found for token?
             
@@ -146,10 +145,13 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
             sender ! Inbox(inboxEntries)
             
           case GetOutbox =>
+            val idToBox = getBoxesFromDb().map(box => box.id -> box).toMap
             val outboxEntries = getOutboxFromDb().map { outboxEntry =>
-              boxById(outboxEntry.remoteBoxId) match {
-                case Some(box) => OutboxEntryInfo(outboxEntry.id, box.name, outboxEntry.transactionId, outboxEntry.sequenceNumber, outboxEntry.totalImageCount, outboxEntry.imageId, outboxEntry.failed)
-                case None      => OutboxEntryInfo(outboxEntry.id, "" + outboxEntry.remoteBoxId, outboxEntry.transactionId, outboxEntry.sequenceNumber, outboxEntry.totalImageCount, outboxEntry.imageId, outboxEntry.failed)
+              idToBox.get(outboxEntry.remoteBoxId) match {
+                case Some(box) => 
+                  OutboxEntryInfo(outboxEntry.id, box.name, outboxEntry.transactionId, outboxEntry.sequenceNumber, outboxEntry.totalImageCount, outboxEntry.imageId, outboxEntry.failed)
+                case None      => 
+                  OutboxEntryInfo(outboxEntry.id, "" + outboxEntry.remoteBoxId, outboxEntry.transactionId, outboxEntry.sequenceNumber, outboxEntry.totalImageCount, outboxEntry.imageId, outboxEntry.failed)
               }
             }
             sender ! Outbox(outboxEntries)

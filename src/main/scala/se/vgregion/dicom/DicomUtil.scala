@@ -36,7 +36,8 @@ object DicomUtil {
       dos.writeDataset(metaInformation, dataset)
       true
     } catch {
-      case _: Exception => false
+      case e: Exception => 
+        false
     } finally {
       SafeClose.close(dos)
     }

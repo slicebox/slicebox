@@ -21,14 +21,17 @@ class Authenticator(userService: ActorRef) {
   def basicUserAuthenticator(optionalAuthToken: Option[String])(implicit ec: ExecutionContext): AuthMagnet[AuthInfo] = {
 
     def validateUser(optionalUserPass: Option[UserPass]): Future[Option[AuthInfo]] = {
-      optionalAuthToken.map(authToken =>
-        userService.ask(GetUserByAuthToken(AuthToken(authToken))).mapTo[Option[ApiUser]].map(_.map(AuthInfo(_))))
-        .orElse(optionalUserPass.map(userPass => {
-          userService.ask(GetUserByName(userPass.user)).mapTo[Option[ApiUser]].map {
-            case Some(repoUser) if (repoUser.passwordMatches(userPass.pass)) => Some(new AuthInfo(repoUser))
-            case _ => None
-          }
-        })).getOrElse(Future.successful(None))
+      val optionalFutureAuthInfo =
+        if (optionalAuthToken.isDefined)
+          optionalAuthToken.map(authToken =>
+            userService.ask(GetUserByAuthToken(AuthToken(authToken))).mapTo[Option[ApiUser]].map(_.map(AuthInfo(_))))
+        else
+          optionalUserPass.map(userPass =>
+            userService.ask(GetUserByName(userPass.user)).mapTo[Option[ApiUser]].map {
+              case Some(repoUser) if (repoUser.passwordMatches(userPass.pass)) => Some(new AuthInfo(repoUser))
+              case _ => None
+            })
+      optionalFutureAuthInfo.getOrElse(Future.successful(None))
     }
 
     def authenticator(userPass: Option[UserPass]): Future[Option[AuthInfo]] = validateUser(userPass)

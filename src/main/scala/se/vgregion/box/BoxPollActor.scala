@@ -87,7 +87,7 @@ class BoxPollActor(
       fetchFileForRemoteOutboxEntry(remoteOutboxEntry)
 
     case PollRemoteBoxFailed(exception) =>
-      log.error(exception, "Failed to poll remote outbox")
+      log.error("Failed to poll remote outbox: " + exception.getMessage)
       context.unbecome
 
     case ReceiveTimeout =>
@@ -102,7 +102,7 @@ class BoxPollActor(
       context.unbecome
 
     case FetchFileFailed(exception) =>
-      log.error(exception, "Failed to fetch remote outbox file")
+      log.error("Failed to fetch remote outbox file: " + exception.getMessage)
       context.unbecome
 
     case ReceiveTimeout =>
