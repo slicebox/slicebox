@@ -1,0 +1,6 @@
+storage = "storage"
+  
+superuser {
+	user = "admin"
+	password = "admin"
+}

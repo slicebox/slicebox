@@ -3,24 +3,20 @@ package se.vgregion.app
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
-
 import scala.concurrent.duration.DurationInt
 import scala.slick.driver.H2Driver
 import scala.slick.jdbc.JdbcBackend.Database
-
 import akka.actor.Actor
 import akka.util.Timeout
-
 import spray.http.StatusCodes.BadRequest
 import spray.routing.ExceptionHandler
 import spray.routing.HttpService
-
 import com.typesafe.config.ConfigFactory
-
 import se.vgregion.app.routing.SliceboxRoutes
 import se.vgregion.box.BoxServiceActor
 import se.vgregion.dicom.DicomDispatchActor
 import se.vgregion.log.LogServiceActor
+import com.mchange.v2.c3p0.ComboPooledDataSource
 
 class RestInterface extends Actor with RestApi {
 
@@ -53,10 +49,13 @@ trait RestApi extends HttpService with SliceboxRoutes with JsonFormats {
   def createStorageDirectory(): Path
   def dbUrl(): String
 
-  def db = Database.forURL(dbUrl,
-    user = sliceboxConfig.getString("db.user"),
-    password = sliceboxConfig.getString("db.password"),
-    driver = "org.h2.Driver")
+  def db = {
+    val ds = new ComboPooledDataSource
+    ds.setDriverClass("org.h2.Driver")
+    ds.setJdbcUrl(dbUrl)
+    Database.forDataSource(ds)
+  }
+  
   val dbProps = DbProps(db, H2Driver)
 
   val storage = createStorageDirectory()

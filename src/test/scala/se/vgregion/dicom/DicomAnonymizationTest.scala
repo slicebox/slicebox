@@ -14,11 +14,8 @@ import se.vgregion.app.DirectoryRoutesTest
 import se.vgregion.dicom.DicomHierarchy._
 import se.vgregion.dicom.DicomPropertyValue._
 import java.util.Date
-import java.text.SimpleDateFormat
 
 class DicomAnonymizationTest extends FlatSpec with Matchers {
-
-  val dateformat = new SimpleDateFormat("yyyy-MM-dd")
 
   "The anonnymization procedure" should "replace an existing accession number with a named based UID" in {
     val dataset = new Attributes()
@@ -72,27 +69,12 @@ class DicomAnonymizationTest extends FlatSpec with Matchers {
     val anonymized = anonymizeDataset(dataset)
     anonymized.getString(privateTag) should be (null)
   }
-  
-  it should "remove patient name and/or patient ID present in other tags" in {
-    val dataset = new Attributes()
-    val patientName = "John Doe"
-    val patientID = "123456-7890"
-    dataset.setString(Tag.PatientName, VR.PN, patientName)
-    dataset.setString(Tag.PatientID, VR.LO, patientID)
-    dataset.setString(Tag.PatientAge, VR.LO, s"Patient: $patientName, $patientID")
-    dataset.setString(Tag.PatientSex, VR.LO, s"Patient with ID $patientID is 30 years old")
-    dataset.setString(Tag.PregnancyStatus, VR.LO, "Pregnant")
-    val anonymized = anonymizeDataset(dataset)
-    anonymized.getString(Tag.PatientAge) should be (null)        
-    anonymized.getString(Tag.PatientSex) should be (null)        
-    anonymized.getString(Tag.PregnancyStatus) should not be (null)        
-  }
 
-  it should "replace birth date with a dummy date" in {
+  it should "remove birth date" in {
     val dataset = new Attributes()
     dataset.setDate(Tag.PatientBirthDate, VR.DA, new Date(123456789876L))
     val anonymized = anonymizeDataset(dataset)
-    dateformat.format(anonymized.getDate(Tag.PatientBirthDate)) should equal (dateformat.format(anonymousDate))    
+    anonymized.getDate(Tag.PatientBirthDate) should equal (null)    
   }
   
   it should "create a legible anonymous patient name" in {
