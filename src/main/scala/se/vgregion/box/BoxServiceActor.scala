@@ -109,8 +109,15 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
             // TODO: what should we do if no box was found for token?
             
           case SendImagesToRemoteBox(remoteBoxId, imageIds) =>
-            addOutboxEntries(remoteBoxId, imageIds)
-            sender ! ImagesSent(remoteBoxId, imageIds)
+            boxById(remoteBoxId) match {
+                case Some(box) =>
+                  addOutboxEntries(remoteBoxId, imageIds)
+                  sender ! ImagesSent(remoteBoxId, imageIds)
+                case None      =>
+                  sender ! BoxNotFound
+              }
+            
+            
             
           case GetOutboxEntry(token, transactionId, sequenceNumber) =>
             pollBoxByToken(token).foreach(box => {

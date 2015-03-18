@@ -100,5 +100,7 @@ object BoxProtocol {
   case class Inbox(entries: Seq[InboxEntryInfo])
   
   case class Outbox(entries: Seq[OutboxEntryInfo])
+  
+  case object BoxNotFound
 
 }

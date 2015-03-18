@@ -49,11 +49,83 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       status should be(BadRequest)
     }
   }
-
+  
   it should "return a list of two boxes when listing boxes" in {
     GetAsUser("/api/boxes") ~> routes ~> check {
       val boxes = responseAs[List[Box]]
       boxes.size should be(2)
+    }
+  }
+  
+  it should "return a no content message when asked to send patients" in {
+    PostAsAdmin("/api/boxes/1/sendpatients", Seq(1)) ~> routes ~> check {
+      status should be(NoContent)
+    }
+  }
+  
+  it should "return a no content message when asked to send patients with empty patient ids list" in {
+    PostAsAdmin("/api/boxes/1/sendpatients", Seq[Long]()) ~> routes ~> check {
+      status should be(NoContent)
+    }
+  }
+  
+  it should "return a not found message when asked to send patients with unknown box id" in {
+    PostAsAdmin("/api/boxes/999/sendpatients", Seq(1)) ~> routes ~> check {
+      status should be(NotFound)
+    }
+  }
+  
+  it should "return a no content message when asked to send studies" in {
+    PostAsAdmin("/api/boxes/1/sendstudies", Seq(1)) ~> routes ~> check {
+      status should be(NoContent)
+    }
+  }
+  
+  it should "return a no content message when asked to send studies with empty study ids list" in {
+    PostAsAdmin("/api/boxes/1/sendstudies", Seq[Long]()) ~> routes ~> check {
+      status should be(NoContent)
+    }
+  }
+  
+  it should "return a not found message when asked to send studies with unknown box id" in {
+    PostAsAdmin("/api/boxes/999/sendstudies", Seq(1)) ~> routes ~> check {
+      status should be(NotFound)
+    }
+  }
+  
+  it should "return a no content message when asked to send series" in {
+    PostAsAdmin("/api/boxes/1/sendseries", Seq(1)) ~> routes ~> check {
+      status should be(NoContent)
+    }
+  }
+  
+  it should "return a no content message when asked to send series with empty series ids list" in {
+    PostAsAdmin("/api/boxes/1/sendseries", Seq[Long]()) ~> routes ~> check {
+      status should be(NoContent)
+    }
+  }
+  
+  it should "return a not found message when asked to send series with unknown box id" in {
+    PostAsAdmin("/api/boxes/999/sendseries", Seq(1)) ~> routes ~> check {
+      status should be(NotFound)
+    }
+  }
+  
+  it should "return a no content message when asked to send images" in {
+    PostAsAdmin("/api/boxes/1/sendimages", Seq(1)) ~> routes ~> check {
+      status should be(NoContent)
+    }
+  }
+  
+  it should "return a no content message when asked to send images with empty image ids list" in {
+    PostAsAdmin("/api/boxes/1/sendimages", Seq[Long]()) ~> routes ~> check {
+      status should be(NoContent)
+    }
+  }
+  
+  it should "return a not found message when asked to send images with unknown box id" in {
+    PostAsAdmin("/api/boxes/999/sendimages", Seq(1)) ~> routes ~> check {
+      status should be(NotFound)
     }
   }
 
@@ -62,6 +134,12 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       status should be(NoContent)
     }
     DeleteAsAdmin("/api/boxes/2") ~> routes ~> check {
+      status should be(NoContent)
+    }
+  }
+  
+  it should "return a no content message when asked to remove a box that does not exist" in {
+    DeleteAsAdmin("/api/boxes/999") ~> routes ~> check {
       status should be(NoContent)
     }
   }
@@ -90,6 +168,12 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     Post(s"/api/box/$token/image?transactionid=$testTransactionId&sequencenumber=$sequenceNumber&totalimagecount=$totalImageCount", HttpData(bytes)) ~> routes ~> check {
       println(responseAs[String])
       status should be(NoContent)
+    }
+  }
+  
+  it should "return unauthorized when polling outbox with unvalid token" in {
+    Get(s"/api/box/abc/outbox/poll") ~> routes ~> check {
+      status should be(Unauthorized)
     }
   }
   

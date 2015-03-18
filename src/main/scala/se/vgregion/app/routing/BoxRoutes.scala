@@ -60,6 +60,7 @@ trait BoxRoutes { this: RestApi =>
             onSuccess(dicomService.ask(GetImageFilesForPatients(patientIds))) {
               case ImageFiles(imageFiles) => onSuccess(boxService.ask(SendImagesToRemoteBox(remoteBoxId, imageFiles.map(_.id)))) {
                 case ImagesSent(remoteBoxId, imageIds) => complete(NoContent)
+                case BoxNotFound                       => complete(NotFound)
               }
             }
           }
@@ -70,6 +71,7 @@ trait BoxRoutes { this: RestApi =>
             onSuccess(dicomService.ask(GetImageFilesForStudies(studyIds))) {
               case ImageFiles(imageFiles) => onSuccess(boxService.ask(SendImagesToRemoteBox(remoteBoxId, imageFiles.map(_.id)))) {
                 case ImagesSent(remoteBoxId, imageIds) => complete(NoContent)
+                case BoxNotFound                       => complete(NotFound)
               }
             }
           }
@@ -80,6 +82,7 @@ trait BoxRoutes { this: RestApi =>
             onSuccess(dicomService.ask(GetImageFilesForSeries(seriesIds))) {
               case ImageFiles(imageFiles) => onSuccess(boxService.ask(SendImagesToRemoteBox(remoteBoxId, imageFiles.map(_.id)))) {
                 case ImagesSent(remoteBoxId, imageIds) => complete(NoContent)
+                case BoxNotFound                       => complete(NotFound)
               }
             }
           }
@@ -89,6 +92,7 @@ trait BoxRoutes { this: RestApi =>
           entity(as[Seq[Long]]) { imageIds =>
             onSuccess(boxService.ask(SendImagesToRemoteBox(remoteBoxId, imageIds))) {
               case ImagesSent(remoteBoxId, imageIds) => complete(NoContent)
+              case BoxNotFound                       => complete(NotFound)
             }
           }
         }
