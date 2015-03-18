@@ -38,60 +38,14 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
         return $http.get('/api/boxes');
     };
 
-    $scope.connectButtonClicked = function() {
+    $scope.addBoxButtonClicked = function() {
         var modalInstance = $modal.open({
-                templateUrl: '/assets/partials/enterBoxNameModalContent.html',
-                controller: 'ConnectModalCtrl'
+                templateUrl: '/assets/partials/addBoxModalContent.html',
+                controller: 'AddBoxModalCtrl'
             });
 
-        modalInstance.result.then(function(remoteBoxName) {
-            $scope.uiState.connectInProgress = true;
-
-            var connectPromise = $http.post('/api/boxes/addremotebox',
-                {
-                    name: remoteBoxName,
-                    baseUrl: $scope.remoteBoxBaseURL
-                });
-
-            connectPromise.success(function(data) {
-                $scope.remoteBoxBaseURL = null;
-            });
-
-            connectPromise.error(function(data) {
-                $scope.appendErrorMessage(data);
-            });
-
-            connectPromise.finally(function() {
-                $scope.uiState.connectInProgress = false;
-                $scope.callbacks.boxesTable.reloadPage();
-            });
-        });
-    };
-
-    $scope.generateURLButtonClicked = function() {
-        var modalInstance = $modal.open({
-                templateUrl: '/assets/partials/generateURLModalContent.html',
-                controller: 'GenerateURLModalCtrl',
-                size: 'lg'
-            });
-
-        modalInstance.result.then(function(remoteBoxName) {
-            $scope.uiState.generateURLInProgress = true;
-
-            var generateURLPromise = $http.post('/api/boxes/generatebaseurl', {value: remoteBoxName});
-
-            generateURLPromise.success(function(data) {
-                showBaseURLDialog(data.value);
-            });
-
-            generateURLPromise.error(function(data) {
-                $scope.appendErrorMessage(data);
-            });
-
-            generateURLPromise.finally(function() {
-                $scope.uiState.generateURLInProgress = false;
-                $scope.callbacks.boxesTable.reloadPage();
-            });
+        modalInstance.result.then(function() {
+            $scope.callbacks.boxesTable.reloadPage();
         });
     };
 
@@ -115,7 +69,77 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
 
         return $q.all(deletePromises);
     }
+})
 
+.controller('AddBoxModalCtrl', function($scope, $modal, $modalInstance, $http) {
+    // Initialization
+    $scope.uiState = {
+        addChoice: 'generateURL',
+        addInProgress: false,
+        errorMessage: null
+    };
+
+    // Scope functions
+    $scope.radioButtonChanged = function() {
+        $scope.addBoxForm.$setPristine();
+    };
+
+    $scope.generateURLButtonClicked = function() {
+        if ($scope.addBoxForm.$invalid) {
+            return;
+        }
+
+        $scope.uiState.addInProgress = true;
+        $scope.uiState.errorMessage = null;
+
+        var generateURLPromise = $http.post('/api/boxes/generatebaseurl', {value: $scope.uiState.remoteBoxName});
+
+        generateURLPromise.success(function(data) {
+            showBaseURLDialog(data.value);
+            $modalInstance.close();
+        });
+
+        generateURLPromise.error(function(data) {
+            $scope.uiState.errorMessage = data;
+        });
+
+        generateURLPromise.finally(function() {
+            $scope.uiState.addInProgress = false;
+        });
+    };
+
+    $scope.connectButtonClicked = function() {
+        if ($scope.addBoxForm.$invalid) {
+            return;
+        }
+
+        $scope.uiState.addInProgress = true;
+        $scope.uiState.errorMessage = null;
+
+        var connectPromise = $http.post('/api/boxes/addremotebox',
+            {
+                name: $scope.uiState.remoteBoxName,
+                baseUrl: $scope.uiState.connectionURL
+            });
+
+        connectPromise.success(function(data) {
+            $modalInstance.close();
+        });
+
+        connectPromise.error(function(data) {
+            $scope.uiState.errorMessage = data;
+        });
+
+        connectPromise.finally(function() {
+            $scope.uiState.addInProgress = false;
+        });
+    };
+
+    $scope.cancelButtonClicked = function() {
+        $modalInstance.dismiss();
+    };
+
+    // Private functions
     function showBaseURLDialog(baseURL) {
         var modalInstance = $modal.open({
                 templateUrl: '/assets/partials/baseURLModalContent.html',
@@ -130,18 +154,6 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
     }
 })
 
-.controller('GenerateURLModalCtrl', function($scope, $modalInstance) {
-
-    // Scope functions
-    $scope.generateButtonClicked = function() {
-        $modalInstance.close($scope.remoteBoxName);
-    };
-
-    $scope.cancelButtonClicked = function() {
-        $modalInstance.dismiss();
-    };
-})
-
 .controller('BaseURLModalCtrl', function($scope, $modalInstance, baseURL) {
     // Initialization
     $scope.baseURL = baseURL;
@@ -154,19 +166,6 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
     };
 
     $scope.closeButtonClicked = function() {
-        $modalInstance.dismiss();
-    };
-})
-
-.controller('ConnectModalCtrl', function($scope, $modalInstance) {
-    // Initialization
-
-    // Scope functions
-    $scope.connectButtonClicked = function() {
-        $modalInstance.close($scope.remoteBoxName);
-    };
-
-    $scope.cancelButtonClicked = function() {
         $modalInstance.dismiss();
     };
 });

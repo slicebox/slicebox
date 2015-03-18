@@ -4,18 +4,6 @@
             <div class="panel-heading">Boxes</div>
 
             <div class="panel-body">
-                <div class="input-group connection-url">
-                    <input type="text" ng-model="remoteBoxBaseURL" class="form-control" placeholder="Enter box URL to connect"></input>
-
-                    <span class="input-group-btn">
-                        <button class="btn btn-primary"
-                            ng-disabled="!remoteBoxBaseURL || uiState.connectInProgress"
-                            ng-click="connectButtonClicked()">
-                            Connect
-                        </button>
-                    </span>
-                </div>
-
                 <sbx-grid
                     load-page="loadBoxesPage(startIndex, count, orderByProperty, orderByDirection)"
                     page-size="20"
@@ -38,15 +26,10 @@
                             <span ng-if="!rawPropertyValue" class="label label-danger">OFFLINE</span>
                         </sbx-grid-cell>
                     </sbx-grid-column>
-
-                    <sbx-grid-column property="sendMethod" title="Send Method (DEBUG)">
-                    </sbx-grid-column>
                 </sbx-grid>
 
-                <button class="btn btn-default" type="button"
-                    ng-click="generateURLButtonClicked()"
-                    ng-disabled="uiState.generateURLInProgress">
-                    Generate Connection URL
+                <button class="btn btn-default" type="button" ng-click="addBoxButtonClicked()">
+                    Add Box
                 </button>
             </div>
         </div>

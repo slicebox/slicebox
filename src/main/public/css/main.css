@@ -20,6 +20,6 @@ td div.progress {
     margin: 0;
 }
 
-/*.login {
-	margin-top: 100px;
-}*/
+.add-box form {
+	margin-top: 20px;
+}

@@ -1,0 +1,76 @@
+<div class="modal-header">
+    <h3 class="modal-title">Add Box</h3>
+</div>
+<div class="modal-body add-box">
+	<alert ng-if="uiState.errorMessage" type="danger">
+		{{uiState.errorMessage}}
+	</alert>
+
+    <div class="radio">
+	 	<label>
+		    <input type="radio" ng-model="uiState.addChoice" value="generateURL" ng-change="radioButtonChanged()">
+		    	This is a public accessible server and I would like to create a new Slicebox URL to send to a collaborator.
+		    </input>
+		 </label>
+	</div>
+
+	<div class="radio">
+	  	<label>
+	    	<input type="radio" ng-model="uiState.addChoice" value="connect" ng-change="radioButtonChanged()">
+	    		I have received a Slicebox URL from a collaborator and would lite to connect.
+	    	</input>
+	  	</label>
+	</div>
+
+	<form name="addBoxForm" novalidate>
+		<div class="form-group"
+			ng-class="{ 'has-error': addBoxForm.remoteBoxName.$error.required && addBoxForm.$submitted }">
+
+			<input type="text"
+				ng-model="uiState.remoteBoxName"
+				ng-disabled="uiState.addInProgress"
+				name="remoteBoxName"
+				class="form-control"
+				placeholder="Remote Slicebox name"
+				required></input>
+
+			<div ng-if="addBoxForm.$submitted">
+                <span class="help-block" ng-if="addBoxForm.remoteBoxName.$error.required">Remote Slicebox name can not be empty</span>
+            </div>
+		</div>
+		<div class="form-group" ng-if="uiState.addChoice == 'connect'"
+			ng-class="{ 'has-error': addBoxForm.connectionURL.$error.required && addBoxForm.$submitted }">
+
+			<input type="text"
+				ng-model="uiState.connectionURL"
+				ng-disabled="uiState.addInProgress"
+				name="connectionURL"
+				class="form-control"
+				placeholder="Connection URL"
+				required></input>
+
+			<div ng-if="addBoxForm.$submitted">
+                <span class="help-block" ng-if="addBoxForm.connectionURL.$error.required">Connection URL can not be empty</span>
+            </div>
+		</div>
+		<div class="form-group" ng-if="uiState.addChoice == 'connect'">
+			<button type="submit"
+				class="btn btn-primary"
+				ng-click="connectButtonClicked()"
+				ng-disabled="uiState.addInProgress">
+				Connect
+			</button>
+		</div>
+		<div class="form-group" ng-if="uiState.addChoice == 'generateURL'">
+			<button type="submit"
+				class="btn btn-primary"
+				ng-click="generateURLButtonClicked()"
+				ng-disabled="uiState.addInProgress">
+				Generate URL
+			</button>
+		</div>
+	</form>
+</div>
+<div class="modal-footer">
+    <button class="btn btn-default" ng-click="cancelButtonClicked()">Cancel</button>
+</div>
