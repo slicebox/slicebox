@@ -75,7 +75,6 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
     // Initialization
     $scope.uiState = {
         addChoice: 'generateURL',
-        addInProgress: false,
         errorMessage: null
     };
 
@@ -89,7 +88,6 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
             return;
         }
 
-        $scope.uiState.addInProgress = true;
         $scope.uiState.errorMessage = null;
 
         var generateURLPromise = $http.post('/api/boxes/generatebaseurl', {value: $scope.uiState.remoteBoxName});
@@ -103,9 +101,7 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
             $scope.uiState.errorMessage = data;
         });
 
-        generateURLPromise.finally(function() {
-            $scope.uiState.addInProgress = false;
-        });
+        return generateURLPromise;
     };
 
     $scope.connectButtonClicked = function() {
@@ -113,7 +109,6 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
             return;
         }
 
-        $scope.uiState.addInProgress = true;
         $scope.uiState.errorMessage = null;
 
         var connectPromise = $http.post('/api/boxes/addremotebox',
@@ -130,9 +125,7 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
             $scope.uiState.errorMessage = data;
         });
 
-        connectPromise.finally(function() {
-            $scope.uiState.addInProgress = false;
-        });
+        return connectPromise;
     };
 
     $scope.cancelButtonClicked = function() {

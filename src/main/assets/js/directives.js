@@ -8,15 +8,20 @@ angular.module('slicebox.directives', [])
     return {
         restrict: 'E',
         replace: true,
-        template: '<button type="button" ng-click="buttonClicked()" ng-disabled="buttonDisabled || disabled">' + 
-                    '{{buttonTitle}} <i ng-if="disabled && showSpinner" class="fa fa-spinner fa-2x fa-spin">' + 
+        template: '<button type="{{buttonType}}" ng-click="buttonClicked()" ng-disabled="buttonDisabled || disabled">' + 
+                    '{{buttonTitle}} <i ng-if="disabled && showSpinner" class="fa fa-lg fa-spinner fa-spin">' + 
                     '</button>',
         scope: {
             action: '&',
+            buttonType: '@',
             buttonTitle: '@',
             buttonDisabled: '='
         },
         link: function($scope, $element, $attrs) {
+
+            if (angular.isUndefined($attrs.buttonType)) {
+                $scope.buttonType = 'button';
+            }
 
             var spinnerTimeoutPromise;
 
@@ -27,7 +32,7 @@ angular.module('slicebox.directives', [])
 
                 spinnerTimeoutPromise = $timeout(function() {
                    $scope.showSpinner = true;
-               }, 1000);
+                }, 1000);
 
                 var action = $scope.action();
                 $q.when(action).finally(function() {

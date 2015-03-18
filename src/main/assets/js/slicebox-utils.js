@@ -28,19 +28,14 @@ angular.module('slicebox.utils', [])
     $scope.title = title;
     $scope.message = message;
 
-    $scope.uiState = {
-        deleteInProgress: false
-    };
-
     $scope.deleteButtonClicked = function () {
         var deletePromise = deleteCallback();
 
-        $scope.uiState.deleteInProgress = true;
-
         deletePromise.finally(function() {
-            $scope.uiState.deleteInProgress = false;
             $modalInstance.close();
         });
+
+        return deletePromise;
     };    
 
     $scope.cancelButtonClicked = function () {

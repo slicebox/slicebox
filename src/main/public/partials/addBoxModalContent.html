@@ -54,20 +54,16 @@
             </div>
 		</div>
 		<div class="form-group" ng-if="uiState.addChoice == 'connect'">
-			<button type="submit"
-				class="btn btn-primary"
-				ng-click="connectButtonClicked()"
-				ng-disabled="uiState.addInProgress">
-				Connect
-			</button>
+			<sbx-button class="btn btn-primary"
+				button-type="submit"
+				button-title="Connect"
+				action="connectButtonClicked()"></sbx-button>
 		</div>
 		<div class="form-group" ng-if="uiState.addChoice == 'generateURL'">
-			<button type="submit"
-				class="btn btn-primary"
-				ng-click="generateURLButtonClicked()"
-				ng-disabled="uiState.addInProgress">
-				Generate URL
-			</button>
+			<sbx-button class="btn btn-primary"
+				button-type="submit"
+				button-title="Generate Connection URL"
+				action="generateURLButtonClicked()"></sbx-button>
 		</div>
 	</form>
 </div>
