@@ -1,26 +1,57 @@
-<div class="row">
-    <div class="col-md-12">
-        <h2>Login</h2>
+<div class="row login">
+
+<div class="col-md-offset-1 col-md-5">
+    <div class="jumbotron">
+        <h1>Welcome to Slicebox!</h1>
+        <p>
+            Lorem ipsum dolor sit amet, eu iriure tincidunt quo, nobis intellegebat usu an. Numquam pericula suscipiantur id sit, ex vis congue comprehensam, nonumy saperet est et. Usu justo expetendis et. Sit ne munere omnesque consequat. Ex est legere consulatu.
+        </p>
+        <h3>Mea at sint</h3>
+        <p>
+            Te vim simul dolor. Sed no dicunt corpora, at tantas latine vel. Sea graeco audiam id. Ei graeco denique appareat sed.
+        </p>
     </div>
 </div>
 
-<div class="row">
+<div class="col-md-5">
+    <div class="panel panel-primary">
+        <div class="panel-heading">
+            <h3 class="panel-title">Login</h3>
+        </div>
+        
+        <div class="panel-body">
+            <form name="form" ng-submit="login()" role="form">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <div class="input-group">
+                        <div class="input-group-addon">
+                            <i class="fa fa-user fa-fw"></i>
+                        </div>
 
-<form name="form" ng-submit="login()" role="form">
-    <div class="form-group">
-        <label for="username">Username</label>
-        <input type="text" name="username" id="username" class="form-control" ng-model="username" required />
-        <span ng-show="form.username.$dirty && form.username.$error.required" class="help-block">Username is required</span>
+                        <input type="text" name="username" id="username" class="form-control" ng-model="username" required />
+                        <span ng-show="form.username.$dirty && form.username.$error.required" class="help-block">Username is required</span>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <div class="input-group">
+                        <div class="input-group-addon">
+                            <i class="fa fa-key fa-fw"></i>
+                        </div>
+
+                        <input type="password" name="password" id="password" class="form-control" ng-model="password" required />
+                        <span ng-show="form.password.$dirty && form.password.$error.required" class="help-block">Password is required</span>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" ng-disabled="form.$invalid || uiState.loginInProgress" class="btn btn-primary pull-right">Login</button>
+                    <i ng-if="uiState.loginInProgress" class="fa fa-spinner fa-2x fa-spin pull-right"></i>
+                </div>
+            </form>
+        </div>
+    
     </div>
-    <div class="form-group">
-        <label for="password">Password</label>
-        <input type="password" name="password" id="password" class="form-control" ng-model="password" required />
-        <span ng-show="form.password.$dirty && form.password.$error.required" class="help-block">Password is required</span>
-    </div>
-    <div class="form-actions">
-        <button type="submit" ng-disabled="form.$invalid || uiState.loginInProgress" class="btn btn-primary">Login</button>
-        <i ng-if="uiState.loginInProgress" class="fa fa-spinner fa-2x fa-spin"></i>
-    </div>
-</form>
+
+</div>
 
 </div>

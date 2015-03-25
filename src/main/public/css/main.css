@@ -19,3 +19,7 @@ body {
 td div.progress {
     margin: 0;
 }
+
+.add-box form {
+	margin-top: 20px;
+}
