@@ -54,7 +54,8 @@
 			"io.spray" 										%% "spray-testkit" 								% sprayVersion 		% "test",
 	    "com.typesafe.akka" 					%% "akka-testkit"    							% akkaVersion   	% "test",
 			"org.webjars" 								%  "angularjs" 										% "1.3.3",
-			"org.webjars"									%	 "angular-material" 						% "0.8.3"
+			"org.webjars"									%	 "angular-material" 						% "0.8.3",
+			"org.webjars" 								%  "font-awesome" 								% "4.2.0"
 	  )
 	}
 

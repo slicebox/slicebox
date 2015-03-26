@@ -68,7 +68,7 @@ angular.module('slicebox.home', ['ngRoute'])
         leftColumnSelectedTabIndex: 0,
         rightColumnSelectedTabIndex: 0,
         pngImageUrls: [],
-        imageHeight: 50,
+        imageHeight: 0,
         images: 1,
         isWindowManual: false,
         numberOfFrames: 1,
@@ -274,6 +274,7 @@ angular.module('slicebox.home', ['ngRoute'])
                                     tokenIndex += 1;
                                 }
                             }
+                            $scope.uiState.loadPngImagesInProgress = false;                            
                         }).error(function(error) {
                             $scope.appendErrorMessage('Failed to generate authentication tokens: ' + error);            
                             $scope.uiState.loadPngImagesInProgress = false;                                                                  

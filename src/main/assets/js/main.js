@@ -21,14 +21,17 @@ angular.module('slicebox', [
     'slicebox.adminUsers'
 ])
 
-.config(function($locationProvider, $routeProvider, $mdThemingProvider) {
+.config(function($locationProvider, $routeProvider, $mdThemingProvider, $animateProvider) {
     $locationProvider.html5Mode(true);
     $routeProvider.otherwise({redirectTo: '/'});
 
     $mdThemingProvider.theme('default')
         .primaryPalette('blue-grey')
-        .accentPalette('amber')
+        .accentPalette('deep-purple')
         .warnPalette('deep-orange');
+
+    // prevent ng-animate on spinners, causes weird behaviour with ng-if/ng-show
+    $animateProvider.classNameFilter(/^((?!(fa-spinner)).)*$/);
 })
 
 .controller('SliceboxCtrl', function($scope, $rootScope, $location, $mdSidenav, authenticationService) {

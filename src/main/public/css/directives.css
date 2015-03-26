@@ -1,10 +1,21 @@
 .sbx-grid {
-3
+}
+
+.sbx-grid input.filter {
+    border: 0;
+    border-bottom: solid 1px gray;
+    outline: none; /* prevents textbox highlight in chrome */
+    margin-bottom: 2px;
 }
 
 .sbx-grid table {
     border-collapse: collapse;
     width: 100%;
+}
+
+.sbx-grid .table-wrapper {
+    overflow-x: auto;
+    overflow-y: hidden; 
 }
 
 .sbx-grid th.column-header {
