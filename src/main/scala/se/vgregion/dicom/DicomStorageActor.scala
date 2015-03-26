@@ -7,7 +7,6 @@ import scala.collection.mutable.ListBuffer
 import scala.concurrent.Future
 import akka.actor.Actor
 import akka.actor.Props
-import akka.actor.actorRef2Scala
 import akka.event.Logging
 import akka.event.LoggingReceive
 import akka.pattern.pipe
@@ -119,7 +118,10 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
           db.withSession { implicit session =>
             dao.imageFileForImage(imageId) match {
               case Some(imageFile) =>
-                readImageAttributes(imageFile.fileName.value).pipeTo(sender)
+                val recipient = sender
+                Future {
+                  readImageAttributes(imageFile.fileName.value)
+                }.pipeTo(sender)
               case None =>
                 throw new IllegalArgumentException(s"No file found for image $imageId")
             }
@@ -129,7 +131,9 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
           db.withSession { implicit session =>
             dao.imageFileForImage(imageId) match {
               case Some(imageFile) =>
-                sender ! readImageInformation(imageFile.fileName.value)
+                Future {
+                  readImageInformation(imageFile.fileName.value)
+                }.pipeTo(sender)
               case None =>
                 throw new IllegalArgumentException(s"No file found for image $imageId")
             }
@@ -258,12 +262,10 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
     log.info("Deleted file " + filePath)
   }
 
-  def readImageAttributes(fileName: String): Future[ImageAttributes] = {
+  def readImageAttributes(fileName: String): ImageAttributes = {
     val filePath = storage.resolve(fileName)
     val dataset = loadDataset(filePath, false)
-    Future {
-      ImageAttributes(readImageAttributes(dataset, 0, ""))
-    }
+    ImageAttributes(readImageAttributes(dataset, 0, ""))
   }
 
   def readImageAttributes(dataset: Attributes, depth: Int, path: String): List[ImageAttribute] = {
@@ -271,22 +273,24 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
     if (dataset != null) {
       dataset.accept(new Visitor() {
         override def visit(attrs: Attributes, tag: Int, vr: VR, value: AnyRef): Boolean = {
-          val strings = attrs.getStrings(tag)
-          if (strings != null && !strings.isEmpty) {
-            val multiplicity = multiplicityOf(strings)
-            if (multiplicity <= 256) {
-              val length = lengthOf(attrs.getBytes(tag))
-              val group = TagUtils.toHexString(TagUtils.groupNumber(tag)).substring(4)
-              val element = TagUtils.toHexString(TagUtils.elementNumber(tag)).substring(4)
-              val name = Keyword.valueOf(tag)
-              val vrName = vr.name
-              val content = toSingleString(strings)
-              attributesBuffer += ImageAttribute(group, element, vrName, length, multiplicity, depth, path, name, content)
-              if (vr == VR.SQ) {
-                val nextPath = if (path.isEmpty()) name else path + '/' + name
-                attributesBuffer ++= readImageAttributes(attrs.getNestedDataset(tag), depth + 1, nextPath)
-              }
-            }
+          val length = lengthOf(attrs.getBytes(tag))
+          val group = TagUtils.toHexString(TagUtils.groupNumber(tag)).substring(4)
+          val element = TagUtils.toHexString(TagUtils.elementNumber(tag)).substring(4)
+          val name = Keyword.valueOf(tag)
+          val vrName = vr.name
+          val (content, multiplicity) = vr match {
+            case VR.OW | VR.OF | VR.OB =>
+              (s"< Binary data ($length bytes) >", 1)
+            case _ =>
+              val rawStrings = getStrings(attrs, tag)
+              val truncatedStrings = if (rawStrings.length > 32) rawStrings.slice(0, 32) :+ " ..." else rawStrings 
+              val strings = truncatedStrings.map(s => if (s.length() > 1024) s.substring(0, 1024) + " ..." else s)
+              (toSingleString(strings), strings.length)
+          }
+          attributesBuffer += ImageAttribute(group, element, vrName, length, multiplicity, depth, path, name, content)
+          if (vr == VR.SQ) {
+            val nextPath = if (path.isEmpty()) name else path + '/' + name
+            attributesBuffer ++= readImageAttributes(attrs.getNestedDataset(tag), depth + 1, nextPath)
           }
           true
         }
@@ -301,16 +305,13 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
     else
       bytes.length
 
-  def multiplicityOf(strings: Array[String]) =
-    if (strings == null)
-      0
-    else
-      strings.length
+  def getStrings(attrs: Attributes, tag: Int) = {
+    val s = attrs.getStrings(tag)
+    if (s == null || s.isEmpty) Array("") else s
+  }
 
   def toSingleString(strings: Array[String]) =
-    if (strings == null || strings.length == 0)
-      ""
-    else if (strings.length == 1)
+    if (strings.length == 1)
       strings(0)
     else
       "[" + strings.tail.foldLeft(strings.head)((single, s) => single + "," + s) + "]"

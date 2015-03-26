@@ -223,12 +223,12 @@ angular.module('slicebox.home', ['ngRoute'])
 
         var attributesPromise = imagesPromise.then(function(images) {
             if (images.data.length > 0) {
-                return $http.get('/api/images/' + images.data[0].id + '/attributes');
+                return $http.get('/api/images/' + images.data[0].id + '/attributes').error(function(error) {
+                    $scope.appendErrorMessage('Failed to load image attributes: ' + error);
+                });
             } else {
                 return [];
             }
-        }, function(error) {
-            $scope.appendErrorMessage('Failed to load image attributes: ' + error);
         });
 
         return attributesPromise;
