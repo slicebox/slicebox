@@ -8,7 +8,6 @@ angular.module('slicebox', [
     'ngCookies',
     'ngAnimate',
     'ngMaterial',
-    'ui.bootstrap',
     'slicebox.utils',
     'slicebox.directives',
     'slicebox.login',
