@@ -1,9 +1,8 @@
 <span ng-hide="true" ng-transclude></span>
 
-<div class="sbxGrid">
+<div class="sbx-grid">
     <!-- HEADER START -->
-    <div class="sbxGridHeader clearfix">
-        <!-- Selected objects actions dropdown -->
+    <!-- <div class="sbxGridHeader clearfix">
         <div ng-if="objectActions.length > 0" class="btn-group pull-left dropdown" dropdown is-open="uiState.objectActionsDropdownOpen">
             <button ng-disabled="objectActionsEnabled() == false" dropdown-toggle type="button" class="btn btn-sm btn-default dropdown-toggle">
                 <span class="fa fa-cog"></span>
@@ -50,77 +49,81 @@
                 </ul>
             </div>
         </div>
+    </div> -->
+
+    <div class="header">
+        <md-select ng-change="objectActionSelected()" ng-model="uiState.selectedObjectAction" ng-if="objectActions.length > 0" ng-disabled="objectActionsEnabled() == false">
+            <md-select-label><span class="fa fa-cog"></span></md-select-label>
+            <md-option class="sbx-grid-object-action-option" ng-repeat="objectAction in objectActions" ng-value="objectAction">{{objectAction.name}}</md-option>
+        </md-select>
     </div>
     <!-- HEADER END -->
 
     <!-- CONTENT TABLE START -->
-    <div class="tableWrapper">
+    <md-content class="table-wrapper">
 
-    <table class="table table-bordered table-hover" ng-cloak>
-        <col width="20px" ng-if="objectActions.length > 0" />
+        <table ng-cloak class="ng-cloak">
+            <col width="20px" ng-if="objectActions.length > 0" />
 
-        <col ng-repeat="columnDefinition in columnDefinitions track by columnDefinition.property"
-            ng-show="columnConfigurations[columnDefinition.property].visible" />
+            <col ng-repeat="columnDefinition in columnDefinitions track by columnDefinition.property"
+                ng-show="columnConfigurations[columnDefinition.property].visible" />
 
-        <thead>
-            <tr>
-                <th ng-if="objectActions.length > 0">
-                    <input type="checkbox"
-                        ng-model="uiState.selectAllChecked"
-                        ng-change="selectAllChanged()"></input>
-                </th>
-                
-                <th ng-repeat="columnDefinition in columnDefinitions track by columnDefinition.property"
-                    ng-click="columnClicked(columnDefinition)"
-                    ng-show="columnConfigurations[columnDefinition.property].visible"
-                    class="text-nowrap">
-                    {{columnDefinition.title}}
+            <thead>
+                <tr>
+                    <th ng-if="objectActions.length > 0" class="column-header">
+                        <md-checkbox ng-model="uiState.selectAllChecked"
+                            ng-change="selectAllChanged()"></md-checkbox>
+                    </th>
+                    
+                    <th ng-repeat="columnDefinition in columnDefinitions track by columnDefinition.property"
+                        ng-click="columnClicked(columnDefinition)"
+                        ng-show="columnConfigurations[columnDefinition.property].visible"
+                        class="column-header">
+                        {{columnDefinition.title}}
 
-                    <i ng-class="columnHeaderOrderByClass(columnDefinition)"></i>
-                </th>
-            </tr>
-        </thead>
-        
-        <tbody ng-style="tableBodyStyle()">
-            <tr ng-repeat="rowObject in objectList"
-                ng-click="rowClicked(rowObject)"
-                ng-class="rowCSSClasses(rowObject)">
+                        <i ng-class="columnHeaderOrderByClass(columnDefinition)"></i>
+                    </th>
+                </tr>
+            </thead>
+            
+            <tbody ng-style="tableBodyStyle()">
+                <tr ng-repeat="rowObject in objectList"
+                    ng-click="rowClicked(rowObject)"
+                    ng-class="rowCSSClasses(rowObject)">
 
-                <td ng-if="objectActions.length > 0">
-                    <input type="checkbox"
-                        ng-if="rowHasActions(rowObject)"
-                        ng-click="rowSelectionCheckboxClicked(rowObject); $event.stopPropagation()"
-                        ng-checked="rowObjectSelected(rowObject)"></input>
-                </td>
+                    <td ng-if="objectActions.length > 0" class="table-cell">
+                        <md-checkbox
+                            ng-if="rowHasActions(rowObject)"
+                            ng-model="objectActionSelection[$index]"
+                            ng-click="$event.stopPropagation()"></md-checkbox>
+                    </td>
 
-                <td sbx-grid-internal-td
-                    ng-repeat="columnDefinition in columnDefinitions track by columnDefinition.property"
-                    ng-show="columnConfigurations[columnDefinition.property].visible">
-                    {{filteredCellValues[$parent.$index][columnDefinition.property]}}
-                </td>
-            </tr>
-        </tbody>
-    </table>
+                    <td sbx-grid-internal-td
+                        ng-repeat="columnDefinition in columnDefinitions track by columnDefinition.property"
+                        ng-show="columnConfigurations[columnDefinition.property].visible"
+                        class="table-cell">
+                        {{filteredCellValues[$parent.$index][columnDefinition.property]}}
+                    </td>
+                </tr>
+            </tbody>
+        </table>
 
-    <div class="empty-message" ng-if="objectList && objectList.length == 0">{{uiState.emptyMessage}}</div>
+        <div class="empty-message" ng-if="objectList && objectList.length == 0">{{uiState.emptyMessage}}</div>
 
-    </div>
+    </md-content>
     <!-- CONTENT TABLE END -->
 
     <!-- PAGER START -->
-    <ul class="pager">
-        <li class="previous"
-            ng-if="currentPage > 0"
-            ng-click="loadPreviousPage()">
+    <div layout="row" class="pager">
+        <div>
+            <md-button class="md-primary" ng-if="currentPage > 0" ng-click="loadPreviousPage()">&larr; Previous</md-button>
+        </div>
 
-            <a href="#">&larr; Previous</a>
-        </li>
-        <li class="next"
-            ng-if="morePagesExists"
-            ng-click="loadNextPage()">
+        <div flex></div>
 
-            <a href="#">Next &rarr;</a>
-        </li>
-    </ul>
+        <div>
+            <md-button class="md-primary" ng-if="morePagesExists" ng-click="loadNextPage()">Next &rarr;</md-button>
+        </div>
+    </div>
     <!-- PAGER END -->
 </div>

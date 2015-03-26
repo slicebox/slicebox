@@ -1,31 +1,38 @@
-<div class="modal-header">
-    <h3 class="modal-title">{{title}}</h3>
-</div>
+<md-dialog aria-label="{{title}}">
+    <md-content class="sticky-container">
+        <md-subheader class="md-sticky-no-effect">{{title}}</md-subheader>
+        <div class="dialog-content">
 
-<div class="modal-body">
+            <md-card ng-repeat="errorMessage in uiState.errorMessages track by $index">
+                <md-toolbar class="md-warn" layout="row" layout-align="start center">
+                        <div layout-padding layout-fill>
+                            {{errorMessage}}
+                        </div>
+                        <div layout-padding>
+                            <md-button md-no-ink ng-click="closeErrorMessageAlert($index)">
+                                <i class="fa fa-times"></i>
+                            </md-button>
+                        </div>
+                </md-toolbar>
+            </md-card>
 
-    <alert ng-repeat="errorMessage in uiState.errorMessages"
-        type="danger"
-        close="closeErrorMessageAlert($index)">
-        {{errorMessage}}
-    </alert>
+           <h4>Select Receiver</h4>
 
+            <sbx-grid
+                load-page="loadBoxesPage(startIndex, count, orderByProperty, orderByDirection)"
+                page-size="100000"
+                object-selected="boxSelected(object)"
+                empty-message="No boxes found">
 
-    <h4>Select Receiver</h4>
+                <sbx-grid-column property="name" title="Name">
+                </sbx-grid-column>
+            </sbx-grid>
+        </div>
+    </md-content>
 
-    <sbx-grid
-        load-page="loadBoxesPage(startIndex, count, orderByProperty, orderByDirection)"
-        page-size="100000"
-        object-selected="boxSelected(object)"
-        empty-message="No boxes found">
-
-        <sbx-grid-column property="name" title="Name">
-        </sbx-grid-column>
-    </sbx-grid>
-
-</div>
-
-<div class="modal-footer">
-    <button class="btn btn-primary" ng-click="sendButtonClicked()" ng-disabled="!uiState.selectedReceiver || uiState.sendInProgress">Send</button>
-    <button class="btn btn-default" ng-click="cancelButtonClicked()">Cancel</button>
-</div>
+    <div class="md-actions" layout="row">
+        <span flex></span>
+        <md-button ng-click="cancelButtonClicked()">Cancel</md-button>
+        <sbx-button button-class="md-primary" button-title="Send" action="sendButtonClicked()" button-disabled="!uiState.selectedReceiver"></sbx-button>
+    </div>
+</md-dialog>

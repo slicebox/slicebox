@@ -11,7 +11,7 @@ angular.module('slicebox.home', ['ngRoute'])
   });
 })
 
-.controller('HomeCtrl', function($scope, $http, $modal, $q, openConfirmationDeleteModal) {
+.controller('HomeCtrl', function($scope, $http, $mdDialog, $q, openConfirmationDeleteModal) {
     // Initialization
     $scope.patientActions =
         [
@@ -59,11 +59,14 @@ angular.module('slicebox.home', ['ngRoute'])
 
     $scope.callbacks = {};
 
+    $scope.uiState = {};
     $scope.uiState.selectedPatient = null;
     $scope.uiState.selectedStudy = null;
     $scope.uiState.selectedSeries = null;
     $scope.uiState.loadPngImagesInProgress = false;
     $scope.uiState.seriesDetails = {
+        leftColumnSelectedTabIndex: 0,
+        rightColumnSelectedTabIndex: 0,
         pngImageUrls: [],
         imageHeight: 50,
         images: 1,
@@ -72,6 +75,7 @@ angular.module('slicebox.home', ['ngRoute'])
         windowMin: undefined,
         windowMax: undefined
     };
+
 
     // Scope functions
     $scope.loadPatients = function(startIndex, count, orderByProperty, orderByDirection, filter) {
@@ -99,6 +103,12 @@ angular.module('slicebox.home', ['ngRoute'])
 
         return loadPatientsPromise;
     };
+
+    // TODO: remove
+    $scope.loadPatients(0, 10).success(function(patients) {
+        $scope.uiState.patients = patients;
+    });
+
 
     $scope.patientSelected = function(patient) {
         $scope.uiState.selectedPatient = patient;
@@ -166,8 +176,14 @@ angular.module('slicebox.home', ['ngRoute'])
 
     $scope.seriesSelected = function(series) {
         $scope.uiState.selectedSeries = series;
-        $scope.callbacks.imageAttributesTable.reset();
-        $scope.callbacks.datasetsTable.reset();
+        
+        if ($scope.callbacks.imageAttributesTable) {
+            $scope.callbacks.imageAttributesTable.reset();
+        }
+
+        if ($scope.callbacks.datasetsTable) {
+            $scope.callbacks.datasetsTable.reset();
+        }
 
         $scope.uiState.seriesDetails.windowMin = undefined;
         $scope.uiState.seriesDetails.windowMax = undefined;
@@ -180,9 +196,15 @@ angular.module('slicebox.home', ['ngRoute'])
         } else {
             $scope.uiState.selectedSeries = flatSeries.series;            
         }
-        $scope.callbacks.imageAttributesTable.reset();
-        $scope.callbacks.datasetsTable.reset();
-        
+
+        if ($scope.callbacks.imageAttributesTable) {
+            $scope.callbacks.imageAttributesTable.reset();
+        }
+
+        if ($scope.callbacks.datasetsTable) {
+            $scope.callbacks.datasetsTable.reset();
+        }
+
         $scope.uiState.seriesDetails.windowMin = undefined;
         $scope.uiState.seriesDetails.windowMax = undefined;
         $scope.updatePNGImageUrls();
@@ -391,18 +413,14 @@ angular.module('slicebox.home', ['ngRoute'])
     }
 
     function confirmSendSeries(series) {
-        var modalInstance = $modal.open({
+        return $mdDialog.show({
                 templateUrl: '/assets/partials/sendImageFilesModalContent.html',
                 controller: 'SendImageFilesModalCtrl',
-                resolve: {
-                    title: function() {
-                        return 'Send ' + series.length + ' Series';
-                    },
-                    sendCallback: function() {
-                        return function(remoteBoxId) {
+                locals: {
+                    title: 'Send ' + series.length + ' Series',
+                    sendCallback: function(remoteBoxId) {
                             return sendSeries(remoteBoxId, series);
-                        };
-                    }
+                        }
                 }
             });
     }
@@ -418,18 +436,14 @@ angular.module('slicebox.home', ['ngRoute'])
     }
 
     function confirmSendStudies(studies) {
-        var modalInstance = $modal.open({
+        return $mdDialog.show({
                 templateUrl: '/assets/partials/sendImageFilesModalContent.html',
                 controller: 'SendImageFilesModalCtrl',
-                resolve: {
-                    title: function() {
-                        return 'Send ' + studies.length + ' Studies';
-                    },
-                    sendCallback: function() {
-                        return function(remoteBoxId) {
+                locals: {
+                    title: 'Send ' + studies.length + ' Studies',
+                    sendCallback: function(remoteBoxId) {
                             return sendStudies(remoteBoxId, studies);
-                        };
-                    }
+                        }
                 }
             });
     }
@@ -445,18 +459,14 @@ angular.module('slicebox.home', ['ngRoute'])
     }
 
     function confirmSendPatients(patients) {
-        var modalInstance = $modal.open({
+        return $mdDialog.show({
                 templateUrl: '/assets/partials/sendImageFilesModalContent.html',
                 controller: 'SendImageFilesModalCtrl',
-                resolve: {
-                    title: function() {
-                        return 'Send ' + patients.length + ' Patients';
-                    },
-                    sendCallback: function() {
-                        return function(remoteBoxId) {
+                locals: {
+                    title: 'Send ' + patients.length + ' Patients',
+                    sendCallback: function(remoteBoxId) {
                             return sendPatients(remoteBoxId, patients);
-                        };
-                    }
+                        }
                 }
             });
     }
@@ -473,7 +483,7 @@ angular.module('slicebox.home', ['ngRoute'])
 
 })
 
-.controller('SendImageFilesModalCtrl', function($scope, $modalInstance, $http, $q, title, sendCallback) {
+.controller('SendImageFilesModalCtrl', function($scope, $mdDialog, $http, $q, title, sendCallback) {
     // Initialization
     $scope.title = title;
 
@@ -501,7 +511,7 @@ angular.module('slicebox.home', ['ngRoute'])
         });
 
         sendPromise.then(function() {
-            $modalInstance.close();
+            $mdDialog.hide();
         });
 
         sendPromise.finally(function() {
@@ -510,6 +520,10 @@ angular.module('slicebox.home', ['ngRoute'])
     };
 
     $scope.cancelButtonClicked = function() {
-        $modalInstance.dismiss();
+        $mdDialog.cancel();
+    };
+
+    $scope.closeErrorMessageAlert = function(errorIndex) {
+        $scope.uiState.errorMessages.splice(errorIndex, 1);
     };
 });

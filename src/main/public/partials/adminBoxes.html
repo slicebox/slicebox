@@ -1,37 +1,49 @@
-<div class="row admin-boxes">
-    <div class="col-md-12">
-        <div class="panel panel-default">
-            <div class="panel-heading">Boxes</div>
+<div layout="column" layout-margin class="admin-boxes">
+    <sbx-grid
+        load-page="loadBoxesPage(startIndex, count, orderByProperty, orderByDirection)"
+        page-size="20"
+        object-actions="objectActions"
+        callbacks="callbacks.boxesTable"
+        empty-message="No boxes added">
 
-            <div class="panel-body">
-                <sbx-grid
-                    load-page="loadBoxesPage(startIndex, count, orderByProperty, orderByDirection)"
-                    page-size="20"
-                    object-actions="objectActions"
-                    callbacks="callbacks.boxesTable"
-                    empty-message="No boxes added">
+        <sbx-grid-column property="name" title="Name">
+        </sbx-grid-column>
 
-                    <sbx-grid-column property="name" title="Name">
-                    </sbx-grid-column>
+        <sbx-grid-column property="token" title="Token">
+        </sbx-grid-column>
 
-                    <sbx-grid-column property="token" title="Token">
-                    </sbx-grid-column>
+        <sbx-grid-column property="baseUrl" title="Connection URL">
+        </sbx-grid-column>
 
-                    <sbx-grid-column property="baseUrl" title="Connection URL">
-                    </sbx-grid-column>
+        <sbx-grid-column property="online" title="Status">
+            <sbx-grid-cell>
+                <md-card class="status" ng-if="rawPropertyValue">
+                    <md-toolbar class="md-primary" layout="row" layout-align="center center">
+                        <span flex></span>
+                        <div>
+                            ONLINE
+                        </div>
+                        <span flex></span>
+                    </md-toolbar>
+                </md-card>
 
-                    <sbx-grid-column property="online" title="Status">
-                        <sbx-grid-cell>
-                            <span ng-if="rawPropertyValue" class="label label-success">ONLINE</span>
-                            <span ng-if="!rawPropertyValue" class="label label-danger">OFFLINE</span>
-                        </sbx-grid-cell>
-                    </sbx-grid-column>
-                </sbx-grid>
+                <md-card class="status" ng-if="!rawPropertyValue">
+                    <md-toolbar class="md-warn" layout="row" layout-align="center center">
+                        <span flex></span>
+                        <div>
+                            OFFLINE
+                        </div>
+                        <span flex></span>
+                    </md-toolbar>
+                </md-card>
+            </sbx-grid-cell>
+        </sbx-grid-column>
+    </sbx-grid>
 
-                <button class="btn btn-default" type="button" ng-click="addBoxButtonClicked()">
-                    Add Box
-                </button>
-            </div>
-        </div>
+    <div layout="row" class="button-row">
+        <md-button class="md-primary md-raised" ng-click="addBoxButtonClicked()">
+            Add Box
+        </md-button>
+        <div flex></div>
     </div>
 </div>

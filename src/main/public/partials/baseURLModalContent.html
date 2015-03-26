@@ -1,19 +1,19 @@
-<div class="modal-header">
-    <h3 class="modal-title">Box Connection URL</h3>
-</div>
+<md-dialog aria-label="Box Connection URL">
+  	<md-content class="sticky-container">
+    	<md-subheader class="md-sticky-no-effect">Box Connection URL</md-subheader>
+    	<div class="dialog-content">
+    		<p>
+		        Click the URL below to email it to a Slicebox user.
+		    </p>
 
-<div class="modal-body">
+		    <a href="mailto:?Subject=Connect%20to%20my%20Slicebox!&Body={{mailBody()}}">
+		        {{baseURL}}
+		    </a>
+    	</div>
+    </md-content>
 
-    <p>
-        Click the URL below to email it to a Slicebox user.
-    </p>
-
-    <a href="mailto:?Subject=Connect%20to%20my%20Slicebox!&Body={{mailBody()}}">
-        {{baseURL}}
-    </a>
-
-</div>
-
-<div class="modal-footer">
-    <button class="btn btn-default" ng-click="closeButtonClicked()">Close</button>
-</div>
+    <div class="md-actions" layout="row">
+    	<span flex></span>
+    	<md-button ng-click="closeButtonClicked()">Close</md-button>
+    </div>
+</md-dialog>

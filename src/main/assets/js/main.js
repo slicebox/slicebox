@@ -6,6 +6,8 @@
 angular.module('slicebox', [
     'ngRoute',
     'ngCookies',
+    'ngAnimate',
+    'ngMaterial',
     'ui.bootstrap',
     'slicebox.utils',
     'slicebox.directives',
@@ -20,12 +22,17 @@ angular.module('slicebox', [
     'slicebox.adminUsers'
 ])
 
-.config(function($locationProvider, $routeProvider) {
+.config(function($locationProvider, $routeProvider, $mdThemingProvider) {
     $locationProvider.html5Mode(true);
     $routeProvider.otherwise({redirectTo: '/'});
+
+    $mdThemingProvider.theme('default')
+        .primaryPalette('blue-grey')
+        .accentPalette('amber')
+        .warnPalette('deep-orange');
 })
 
-.controller('SliceboxCtrl', function($scope, $rootScope, $location, authenticationService) {
+.controller('SliceboxCtrl', function($scope, $rootScope, $location, $mdSidenav, authenticationService) {
 
     $scope.uiState = {
         errorMessages: [],
@@ -34,11 +41,19 @@ angular.module('slicebox', [
                  $rootScope.globals.currentUser.role !== 'USER'
     };
 
+    $scope.toggleLeftNav = function() {
+        $mdSidenav('leftNav').toggle();
+    };
+
     $scope.logout = function() {
         authenticationService.clearCredentials();
         $scope.uiState.isAdmin = false;
         $scope.uiState.showMenu = false;
         $location.url("/login");
+    };
+
+    $scope.userSignedIn = function() {
+        return authenticationService.userSignedIn();
     };
 
     $scope.isCurrentPath = function(path) { 

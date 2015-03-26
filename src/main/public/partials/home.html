@@ -1,4 +1,311 @@
-<div class="row">
+<div layout="row" layout-margin class="home">
+    <div layout="column" flex="40" class="left-column">
+        <md-tabs md-selected="uiState.leftColumnSelectedTabIndex">
+            <md-tab id="patient-study-series" aria-controls="patient-study-series-content">
+                Patient-Study-Series
+            </md-tab>
+            <md-tab id="series" aria-controls="series-content">
+                Series
+            </md-tab>
+        </md-tabs>
+
+        <ng-switch on="uiState.leftColumnSelectedTabIndex" class="tabpanel-container">
+            <div role="tabpanel"
+                id="patient-study-series-content"
+                aria-labelledby="patient-study-series"
+                ng-switch-when="0"
+                class="tab-content">
+
+                <section>
+                    <h4>Patients</h4>
+                    <md-content>
+                        <sbx-grid
+                            load-page="loadPatients(startIndex, count, orderByProperty, orderByDirection, filter)"
+                            page-size="10"
+                            page-sizes="[5, 10, 20, 50, 100]"
+                            filter="true"
+                            object-actions="patientActions"
+                            object-selected="patientSelected(object)"
+                            callbacks="callbacks.patientsTable"
+                            empty-message="No patients found">
+
+                            <sbx-grid-column property="patientName['value']" title="Name">
+                            </sbx-grid-column>
+
+                            <sbx-grid-column property="patientID['value']" title="Id">
+                            </sbx-grid-column>
+
+                            <sbx-grid-column property="patientBirthDate['value']" title="Birth Date">
+                            </sbx-grid-column>
+
+                            <sbx-grid-column property="patientSex['value']" title="Sex">
+                            </sbx-grid-column>
+                        </sbx-grid>
+                    </md-content>
+                </section>
+
+                <section>
+                    <h4>Studies</h4>
+                    <md-content>
+                        <sbx-grid
+                            load-page="loadStudies(startIndex, count, orderByProperty, orderByDirection)"
+                            page-size="10"
+                            page-sizes="[5, 10, 20, 50, 100]"
+                            sorting="false"
+                            object-actions="studyActions"
+                            object-selected="studySelected(object)"
+                            callbacks="callbacks.studiesTable"
+                            empty-message="No studies found">
+
+                            <sbx-grid-column property="studyDescription['value']" title="Description">
+                            </sbx-grid-column>
+
+                            <sbx-grid-column property="studyDate['value']" title="Date">
+                            </sbx-grid-column>
+
+                            <sbx-grid-column property="studyID['value']" title="Id">
+                            </sbx-grid-column>
+
+                            <sbx-grid-column property="accessionNumber['value']" title="Accession Number">
+                            </sbx-grid-column>
+
+                            <sbx-grid-column property="patientAge['value']" title="Patient Age">
+                            </sbx-grid-column>
+                        </sbx-grid>
+                    </md-content>
+                </section>
+
+                <section>
+                    <h4>Series</h4>
+                    <md-content>
+                        <sbx-grid
+                            load-page="loadSeries(startIndex, count, orderByProperty, orderByDirection)"
+                            page-size="10"
+                            page-sizes="[5, 10, 20, 50, 100]"
+                            sorting="false"
+                            object-actions="seriesActions"
+                            object-selected="seriesSelected(object)"
+                            callbacks="callbacks.seriesTable"
+                            empty-message="No series found">
+
+                            <sbx-grid-column property="seriesDescription['value']" title="Description">
+                            </sbx-grid-column>
+
+                            <sbx-grid-column property="seriesDate['value']" title="Date">
+                            </sbx-grid-column>
+
+                            <sbx-grid-column property="modality['value']" title="Modality">
+                            </sbx-grid-column>
+
+                            <sbx-grid-column property="protocolName['value']" title="Protocol Name">
+                            </sbx-grid-column>
+
+                            <sbx-grid-column property="bodyPartExamined['value']" title="Body Part Examined">
+                            </sbx-grid-column>
+                        </sbx-grid>
+                    </md-content>
+                </section>
+            </div>
+
+            <div role="tabpanel"
+                id="series-content"
+                aria-labelledby="series"
+                ng-switch-when="1"
+                class="tab-content">
+
+                <md-content>
+                    <sbx-grid
+                        load-page="loadFlatSeries(startIndex, count, orderByProperty, orderByDirection, filter)"
+                        page-size="10"
+                        page-sizes="[5, 10, 20, 50, 100]"
+                        filter="true"
+                        object-actions="seriesActions"
+                        object-selected="flatSeriesSelected(object)"
+                        callbacks="callbacks.flatSeriesTable"
+                        empty-message="No series found">
+
+                        <sbx-grid-column property="patient.patientName['value']" title="Name">
+                        </sbx-grid-column>
+
+                        <sbx-grid-column property="patient.patientID['value']" title="Id">
+                        </sbx-grid-column>
+
+                        <sbx-grid-column property="patient.patientBirthDate['value']" title="Birth Date">
+                        </sbx-grid-column>
+
+                        <sbx-grid-column property="patient.patientSex['value']" title="Sex">
+                        </sbx-grid-column>
+
+                        <sbx-grid-column property="study.patientAge['value']" title="Patient Age">
+                        </sbx-grid-column>
+
+                        <sbx-grid-column property="study.studyDescription['value']" title="Study Description">
+                        </sbx-grid-column>
+
+                        <sbx-grid-column property="study.studyDate['value']" title="Study Date">
+                        </sbx-grid-column>
+
+                        <sbx-grid-column property="study.studyID['value']" title="Study Id">
+                        </sbx-grid-column>
+
+                        <sbx-grid-column property="study.accessionNumber['value']" title="Accession Number">
+                        </sbx-grid-column>
+
+                        <sbx-grid-column property="equipment.manufacturer['value']" title="Station Manufacturer">
+                        </sbx-grid-column>
+
+                        <sbx-grid-column property="equipment.stationName['value']" title="Station Name">
+                        </sbx-grid-column>
+
+                        <sbx-grid-column property="series.seriesDescription['value']" title="Series Description">
+                        </sbx-grid-column>
+
+                        <sbx-grid-column property="series.seriesDate['value']" title="Series Date">
+                        </sbx-grid-column>
+
+                        <sbx-grid-column property="series.modality['value']" title="Modality">
+                        </sbx-grid-column>
+
+                        <sbx-grid-column property="series.protocolName['value']" title="Protocol Name">
+                        </sbx-grid-column>
+
+                        <sbx-grid-column property="series.bodyPartExamined['value']" title="Body Part Examined">
+                        </sbx-grid-column>
+                    </sbx-grid>
+                </md-content>
+            </div>
+        </ng-switch>
+        
+    </div>
+
+    <div layout="column" flex="59" class="right-column">
+        <md-tabs md-selected="uiState.rightColumnSelectedTabIndex">
+            <md-tab id="images" aria-controls="images-content">
+                Images
+            </md-tab>
+            <md-tab id="dicom-tags" aria-controls="dicom-tags-content">
+                DICOM Tags
+            </md-tab>
+            <md-tab id="datasets" aria-controls="datasets-content">
+                Datasets
+            </md-tab>
+        </md-tabs>
+
+        <ng-switch on="uiState.rightColumnSelectedTabIndex" class="tabpanel-container">
+            <div role="tabpanel"
+                id="images-content"
+                aria-labelledby="images"
+                ng-switch-when="0"
+                class="tab-content">
+
+                <form layout="row" layout-align="start end" ng-submit="updatePNGImageUrls()" class="image-options">
+                    <div>
+                        <label>Size</label>
+                        <md-select ng-change="updatePNGImageUrls()" placeholder="Size" ng-model="uiState.seriesDetails.imageHeight">
+                            <md-option value="50">50</md-option>
+                            <md-option value="100">100</md-option>
+                            <md-option value="150">150</md-option>
+                            <md-option value="0">Original</md-option>
+                        </md-select>
+                    </div>
+                    
+                    <div>
+                        <label>Images</label>
+                        <md-select ng-change="updatePNGImageUrls()" placeholder="Images" ng-model="uiState.seriesDetails.images">
+                            <md-option value="1">1</md-option>
+                            <md-option value="5">5</md-option>
+                            <md-option value="10">10</md-option>
+                            <md-option value="10000">All</md-option>
+                        </md-select>
+                    </div>
+
+                    <div flex layout="row" layout-align="start end">
+                        <md-checkbox ng-change="updatePNGImageUrls()" ng-model="uiState.seriesDetails.isWindowManual">Window (min/max)</md-checkbox>
+
+                        <md-input-container>
+                            <label>Min</label>
+                            <input type="number" ng-model="uiState.seriesDetails.windowMin" ng-disabled="!uiState.seriesDetails.isWindowManual">
+                        </md-input-container>
+
+                        <md-input-container>
+                            <label>Max</label>
+                            <input type="number" ng-model="uiState.seriesDetails.windowMax" ng-disabled="!uiState.seriesDetails.isWindowManual">
+                        </md-input-container>
+                    </div>
+
+                    <input type="submit" ng-hide="true">
+                </form>
+
+                <md-divider></md-divider>
+
+                <md-content>
+                    <i ng-if="uiState.loadPngImagesInProgress" class="fa fa-spinner fa-2x fa-spin"></i>
+
+                    <div class="clearfix">
+                        <img ng-repeat="imageUrl in uiState.seriesDetails.pngImageUrls | orderBy:'frameIndex'" class="frame-image" ng-src="{{imageUrl.url}}" alt=""></img>
+                    </div>
+                </md-content>
+            </div>
+
+            <div role="tabpanel"
+                id="dicom-tags-content"
+                aria-labelledby="dicom-tags"
+                ng-switch-when="1"
+                class="tab-content">
+
+                <sbx-grid
+                    load-page="loadImageAttributes(0, 1000000000)"
+                    page-size="1000000000"
+                    sorting="false"
+                    callbacks="callbacks.imageAttributesTable"
+                    empty-message="No image atributes found">
+
+                    <sbx-grid-column property="group" title="Group">
+                    </sbx-grid-column>
+
+                    <sbx-grid-column property="element" title="Element">
+                    </sbx-grid-column>
+
+                    <sbx-grid-column property="vr" title="VR">
+                    </sbx-grid-column>
+
+                    <sbx-grid-column property="length" title="Length">
+                    </sbx-grid-column>
+
+                    <sbx-grid-column property="name" title="Name">
+                    </sbx-grid-column>
+
+                    <sbx-grid-column property="value" title="Value">
+                    </sbx-grid-column>
+
+                    <sbx-grid-column property="path" title="Path">
+                    </sbx-grid-column>
+
+                </sbx-grid> 
+            </div>
+
+            <div role="tabpanel"
+                id="datasets-content"
+                aria-labelledby="datasets"
+                ng-switch-when="2"
+                class="tab-content">
+
+                <sbx-grid
+                    load-page="loadSelectedSeriesDatasets()"
+                    page-size="1000000000"
+                    sorting="false"
+                    callbacks="callbacks.datasetsTable"
+                    empty-message="No datasets found">
+
+                    <sbx-grid-column property="url" title="URL">
+                    </sbx-grid-column>
+                </sbx-grid>
+            </div>
+        </ng-switch>
+    </div>
+</div>
+
+<!-- <div class="row">
     <div class="col-md-6 home-left-column">
         <tabset>            
             <tab heading="Patient-Study-Series">
@@ -269,4 +576,4 @@
             </tab>
         </tabset>
     </div>
-</div>
+</div> -->

@@ -1,12 +1,96 @@
 /* main css stylesheet */
 
-body {
-    padding-top: 70px;
+.slicebox .top-bar .md-button {
+	margin-right: 10px;
 }
 
-.admin-boxes .connection-url {
-    margin-bottom: 20px
+.slicebox .top-bar .md-button:focus {
+	background-color: rgba(0, 0, 0, 0);
 }
+
+.left-nav ul {
+	list-style: none;
+	padding: 0;
+	margin: 0;
+}
+
+.left-nav ul li {
+	margin: 0;
+	padding: 0;
+}
+
+.left-nav ul li .md-button {
+	display: block;
+	border-radius: 0;
+	cursor: pointer;
+	line-height: 40px;
+	margin: 0;
+	padding: 0 16px 0 16px;
+	text-align: left;
+	color: rgb(100, 100, 100);
+}
+
+.left-nav ul li .active {
+	background-color: rgba(158,158,158,0.2);
+}
+
+.login .intro {
+	margin-right: 60px;
+}
+
+
+.home .left-column {
+	margin-left: 20px;
+	margin-right: 60px;
+}
+
+.home .left-column section > h4 {
+	margin-bottom: 5px;
+	color: rgb(100, 100, 100);
+}
+
+.home .left-column section:first-child > h4 {
+	margin-top: 0;
+}
+
+.home .tab-content {
+	padding-top: 20px;
+}
+
+.home form.image-options {
+	margin-top: -20px;
+}
+
+.home form.image-options md-select,
+.home form.image-options md-checkbox,
+.home form.image-options md-input-container {
+	margin: 0;
+	margin-right: 5px;
+	margin-left: 5px;
+}
+
+.home form.image-options md-checkbox {
+	margin-right: 20px;
+	margin-left: 20px;
+}
+
+.home md-divider {
+	margin-top: 10px;
+	margin-bottom: 10px;
+}
+
+.home form.image-options md-checkbox {
+	margin-bottom: 3px;
+	margin-left: 20px;
+}
+
+.home form.image-options md-input-container {
+	padding: 0;
+}
+
+/*.admin-boxes .connection-url {
+    margin-bottom: 20px
+}*/
 
 .frame-image {
     max-width: 100%;
@@ -22,4 +106,58 @@ td div.progress {
 
 .add-box form {
 	margin-top: 20px;
+}
+
+.inbox {
+	margin: 20px;
+}
+
+.outbox {
+	margin: 20px;
+}
+
+.admin-boxes {
+	margin: 20px;
+}
+
+.dialog-content.add-box md-radio-group:focus {
+	border: 0;
+}
+
+.admin-boxes md-card.status {
+	box-shadow: 0 0 0 #000000;
+	margin: 0;
+}
+
+.admin-boxes md-card.status md-toolbar {
+	min-height: 0;
+	padding: 5px;
+}
+
+.admin-boxes .button-row {
+	margin-top: 10px;
+}
+
+.admin-scps {
+	margin: 20px;
+}
+
+.admin-scps .button-row {
+	margin-top: 10px;
+}
+
+.add-scp input {
+	min-width: 400px;
+}
+
+.admin-users {
+	margin: 20px;
+}
+
+.admin-users .button-row {
+	margin-top: 10px;
+}
+
+.add-user input {
+	min-width: 400px;
 }

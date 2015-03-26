@@ -56,7 +56,8 @@
 			"org.webjars" 								%  "bootstrap" 										% "3.3.1",
 			"org.webjars" 								%  "angularjs" 										% "1.3.3",
 		"org.webjars" % "angular-ui-bootstrap" % "0.12.0",
-		"org.webjars" % "font-awesome" % "4.2.0"
+		"org.webjars" % "font-awesome" % "4.2.0",
+		"org.webjars" % "angular-material" % "0.8.3"
 	  )
 	}
 

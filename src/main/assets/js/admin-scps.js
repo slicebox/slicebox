@@ -11,7 +11,7 @@ angular.module('slicebox.adminScps', ['ngRoute'])
     });
 })
 
-.controller('AdminScpsCtrl', function($scope, $http, $modal, $q, $log, openConfirmationDeleteModal) {
+.controller('AdminScpsCtrl', function($scope, $http, $mdDialog, $q, $log, openConfirmationDeleteModal) {
     // Initialization
     $scope.objectActions =
         [
@@ -31,13 +31,12 @@ angular.module('slicebox.adminScps', ['ngRoute'])
     };
 
     $scope.addScpButtonClicked = function() {
-        var modalInstance = $modal.open({
+        var dialogPromise = $mdDialog.show({
                 templateUrl: '/assets/partials/addScpModalContent.html',
-                controller: 'AddScpModalCtrl',
-                size: 'lg'
+                controller: 'AddScpModalCtrl'
             });
 
-        modalInstance.result.then(function (scp) {
+        dialogPromise.then(function (scp) {
             $scope.uiState.addDirectoryInProgress = true;
 
             var addScpPromise = $http.post('/api/scps', scp);
@@ -74,14 +73,14 @@ angular.module('slicebox.adminScps', ['ngRoute'])
     }
 })
 
-.controller('AddScpModalCtrl', function($scope, $modalInstance) {
+.controller('AddScpModalCtrl', function($scope, $mdDialog) {
 
     // Scope functions
     $scope.addButtonClicked = function() {
-        $modalInstance.close({ name: $scope.name, aeTitle: $scope.aeTitle, port: $scope.port });
+        $mdDialog.hide({ name: $scope.name, aeTitle: $scope.aeTitle, port: $scope.port });
     };
 
     $scope.cancelButtonClicked = function() {
-        $modalInstance.dismiss();
+        $mdDialog.cancel();
     };
 });

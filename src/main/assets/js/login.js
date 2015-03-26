@@ -18,6 +18,10 @@ angular.module('slicebox.login', ['ngRoute'])
     $scope.uiState.showMenu = false;
     
     $scope.login = function () {
+        if ($scope.loginForm.$invalid) {
+            return;
+        }
+
         $scope.uiState.loginInProgress = true;
         authenticationService.login($scope.username, $scope.password, function(response) {
             if(response.success) {

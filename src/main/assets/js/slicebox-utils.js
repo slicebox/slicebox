@@ -1,30 +1,22 @@
 angular.module('slicebox.utils', [])
 
-.factory('openConfirmationDeleteModal', function($modal) {
+.factory('openConfirmationDeleteModal', function($mdDialog) {
 
     return function(title, message, deleteCallback) {
 
-        var modalInstance = $modal.open({
+        return $mdDialog.show({
                 templateUrl: '/assets/partials/confirmDeleteModalContent.html',
                 controller: 'SbxConfirmDeleteModalController',
-                resolve: {
-                        title: function() {
-                            return title;
-                        },
-                        message: function() {
-                            return message;
-                        },
-                        deleteCallback: function() {
-                            return deleteCallback;
-                        }
+                locals: {
+                        title: title,
+                        message: message,
+                        deleteCallback: deleteCallback
                     }
             });
-
-        return modalInstance.result;
     };
 })
 
-.controller('SbxConfirmDeleteModalController', function ($scope, $q, $modalInstance, title, message, deleteCallback) {
+.controller('SbxConfirmDeleteModalController', function ($scope, $q, $mdDialog, title, message, deleteCallback) {
     $scope.title = title;
     $scope.message = message;
 
@@ -32,14 +24,14 @@ angular.module('slicebox.utils', [])
         var deletePromise = deleteCallback();
 
         deletePromise.finally(function() {
-            $modalInstance.close();
+            $mdDialog.hide();
         });
 
         return deletePromise;
     };    
 
     $scope.cancelButtonClicked = function () {
-        $modalInstance.close();
+        $mdDialog.cancel();
     };
 })
 
@@ -74,6 +66,10 @@ angular.module('slicebox.utils', [])
             $rootScope.globals = {};
             $cookieStore.remove('globals');
             $http.defaults.headers.common.Authorization = 'Basic ';
+        };
+
+        service.userSignedIn = function() {
+            return $rootScope.globals.currentUser;
         };
   
         return service;

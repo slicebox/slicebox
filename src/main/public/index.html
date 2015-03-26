@@ -11,60 +11,99 @@
 	<title>SliceBox</title>
 	<meta name="description" content="">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
+	
 	<link href="/assets/lib/font-awesome/css/font-awesome.css" rel="stylesheet" media="screen">
-	<link href="/assets/css/bootstrap-theme.css" rel="stylesheet" media="screen">
+	<!-- <link href="/assets/css/bootstrap-theme.css" rel="stylesheet" media="screen"> -->
+
+	<link href="/assets/lib/angular-material/angular-material.css" rel="stylesheet" media="screen">
+
 	<link href="/assets/css/directives.css" rel="stylesheet" media="screen">
 	<link href="/assets/css/main.css" rel="stylesheet" media="screen">
 
 	<base href="/"></base>
 </head>
-<body ng-controller="SliceboxCtrl">
-	<nav class="navbar navbar-default navbar-fixed-top">
-		<div class="container-fluid">
-			<div class="navbar-header">
-				<a class="navbar-brand" href="/">Slicebox</a>
-			</div>
-		
-			<div ng-if="uiState.showMenu" class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
-				<ul class="nav navbar-nav">
-					<li ng-class="{ active: isCurrentPath('/')}"><a href="/">Home</a></li>
-					<li ng-class="{ active: isCurrentPath('/inbox')}"><a href="/inbox">Inbox</a></li>
-					<li ng-class="{ active: isCurrentPath('/outbox')}"><a href="/outbox">Outbox</a></li>
-					<li ng-class="{ active: isCurrentPath('/log')}"><a href="/log">Event Log</a></li>
-					<li ng-if="uiState.isAdmin" ng-class="{ active: currentPathStartsWith('/admin')}" class="dropdown">
-						<a href="" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">Admin <span class="caret"></span></a>
+<body layout="column" ng-controller="SliceboxCtrl" class="slicebox">
 
-	          			<ul class="dropdown-menu" role="menu">
-	            			<li><a href="/admin/scps">Dicom SCPs</a></li>
-	            			<li><a href="/admin/watchDirectories">Dicom Directories</a></li>
-	            			<li><a href="/admin/boxes">Boxes</a></li>
-	            			<li><a href="/admin/users">Users</a></li>
-	          			</ul>
+	<md-toolbar layout="row" class="top-bar">
+		<div class="md-toolbar-tools">
+			<md-button ng-click="toggleLeftNav()">
+				<i class="fa fa-bars fa-lg"></i>
+			</md-button>
+			
+			<span>Slicebox</span>
+			<span flex></span>
+			<md-button ng-if="userSignedIn()" href="" ng-click="logout()">
+				<i class="fa fa-sign-out fa-lg"></i>
+				<md-tooltip>
+  					Logout
+				</md-tooltip>
+			</md-button>
+		</div>
+	</md-toolbar>
+
+	<md-card ng-repeat="errorMessage in uiState.errorMessages track by $index">
+		<md-toolbar class="md-warn" layout="row" layout-align="start center">
+			<div layout-padding layout-fill>
+				{{errorMessage}}
+			</div>
+			<div layout-padding>
+				<md-button md-no-ink ng-click="closeErrorMessageAlert($index)">
+					<i class="fa fa-times"></i>
+				</md-button>
+			</div>
+		</md-toolbar>
+	</md-card>
+
+	<section layout="row" flex class="left-nav">
+		<md-sidenav ng-if="userSignedIn()" md-component-id="leftNav" class="md-sidenav-left md-whiteframe-z2">
+			<md-toolbar layout="row" class="top-bar">
+				<div class="md-toolbar-tools">
+					<span>Slicebox</span>
+					<span flex></span>
+				</div>
+			</md-toolbar>
+			<md-content>
+				<ul>
+					<li>
+						<md-button ng-click="toggleLeftNav()" ng-class="{ active: isCurrentPath('/')}" href="/">Home</md-button>
+					</li>
+
+					<li>
+						<md-button ng-click="toggleLeftNav()" ng-class="{ active: isCurrentPath('/inbox')}" href="/inbox">Inbox</md-button>
+					</li>
+
+					<li>
+						<md-button ng-click="toggleLeftNav()" ng-class="{ active: isCurrentPath('/outbox')}" href="/outbox">Outbox</md-button>
+					</li>
+
+					<li>
+						<md-button ng-click="toggleLeftNav()" ng-class="{ active: isCurrentPath('/admin/boxes')}" href="/admin/boxes">Admin > Boxes</md-button>
+					</li>
+
+					<li>
+						<md-button ng-click="toggleLeftNav()" ng-class="{ active: isCurrentPath('/admin/scps')}" href="/admin/scps">Admin > SCPs</md-button>
+					</li>
+
+					<li>
+						<md-button ng-click="toggleLeftNav()" ng-class="{ active: isCurrentPath('/admin/users')}" href="/admin/users">Admin > Users</md-button>
 					</li>
 				</ul>
-				<ul class="nav navbar-nav navbar-right">
-					<li><a href="" ng-click="logout()">Logout</a></a></li>
-				</ul>
-			</div>
-		</div>
-	</nav>
+			</md-content>
+		</md-sidenav>
 
-	<div class="container-fluid">
-		<!--[if lt IE 7]>
-		  <p class="browsehappy">You are using an <strong>outdated</strong> browser. Please <a href="http://browsehappy.com/">upgrade your browser</a> to improve your experience.</p>
-		<![endif]-->
+		<md-content flex ng-view>
+		</md-content>
+	</section>
 
-	<alert ng-repeat="errorMessage in uiState.errorMessages track by $index" type="danger" close="closeErrorMessageAlert($index)">{{errorMessage}}</alert>
-
-		<div ng-view></div>
-
-	</div>
 
 	<script type="text/javascript" src="/assets/lib/jquery/jquery.js"></script>
 	<script type="text/javascript" src="/assets/lib/bootstrap/js/bootstrap.js"></script>
 	<script type="text/javascript" src="/assets/lib/angularjs/angular.js"></script>
+	<script type="text/javascript" src="/assets/lib/angularjs/angular-animate.js"></script>
+	<script type="text/javascript" src="/assets/lib/angularjs/angular-aria.js"></script>
 	<script type="text/javascript" src="/assets/lib/angularjs/angular-cookies.js"></script>
 	<script type="text/javascript" src="/assets/lib/angularjs/angular-route.js"></script>
+	<script type="text/javascript" src="/assets/lib/angular-material/angular-material.js"></script>
 	<script type="text/javascript" src="/assets/lib/angular-ui-bootstrap/ui-bootstrap-tpls.js"></script>
 	<script type="text/javascript" src="/assets/js/directives.js"></script>
 	<script type="text/javascript" src="/assets/js/slicebox-utils.js"></script>

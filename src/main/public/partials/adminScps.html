@@ -1,30 +1,23 @@
-<div class="row">
-	<div class="col-md-12">
-        <div class="panel panel-default">
-            <div class="panel-heading">Dicom SCPs</div>
+<div layout="column" layout-margin class="admin-scps">
+    <sbx-grid
+        load-page="loadScpsPage(startIndex, count, orderByProperty, orderByDirection)"
+        page-size="20"
+        object-actions="objectActions"
+        callbacks="callbacks.scpsTable"
+        empty-message="No SCPs added">
 
-            <div class="panel-body">
-                <sbx-grid
-                    load-page="loadScpsPage(startIndex, count, orderByProperty, orderByDirection)"
-                    page-size="20"
-                    object-actions="objectActions"
-                    callbacks="callbacks.scpsTable"
-                    empty-message="No SCPs added">
+        <sbx-grid-column property="name" title="Name">
+        </sbx-grid-column>
+        <sbx-grid-column property="aeTitle" title="AE Title">
+        </sbx-grid-column>
+        <sbx-grid-column property="port" title="Port">
+        </sbx-grid-column>
+    </sbx-grid>
 
-                    <sbx-grid-column property="name" title="Name">
-                    </sbx-grid-column>
-                    <sbx-grid-column property="aeTitle" title="AE Title">
-                    </sbx-grid-column>
-                    <sbx-grid-column property="port" title="Port">
-                    </sbx-grid-column>
-                </sbx-grid>
-
-                <button class="btn btn-default" type="button"
-                    ng-click="addScpButtonClicked()"
-                    ng-disabled="uiState.addScpInProgress">
-                    Add SCP
-                </button>
-            </div>
-        </div>
-	</div>
+    <div layout="row" class="button-row">
+        <md-button class="md-primary md-raised" ng-click="addScpButtonClicked()" ng-disabled="uiState.addScpInProgress">
+            Add SCP
+        </md-button>
+        <div flex></div>
+    </div>
 </div>

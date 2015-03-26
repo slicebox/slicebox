@@ -7,15 +7,15 @@ angular.module('slicebox.directives', [])
 	
     return {
         restrict: 'E',
-        replace: true,
-        template: '<button type="{{buttonType}}" ng-click="buttonClicked()" ng-disabled="buttonDisabled || disabled">' + 
+        template: '<md-button type="{{buttonType}}" ng-class="buttonClass" ng-click="buttonClicked()" ng-disabled="buttonDisabled || disabled">' + 
                     '{{buttonTitle}} <i ng-if="disabled && showSpinner" class="fa fa-lg fa-spinner fa-spin">' + 
-                    '</button>',
+                    '</md-button>',
         scope: {
             action: '&',
             buttonType: '@',
             buttonTitle: '@',
-            buttonDisabled: '='
+            buttonDisabled: '=',
+            buttonClass: '@'
         },
         link: function($scope, $element, $attrs) {
 
@@ -50,7 +50,7 @@ angular.module('slicebox.directives', [])
  * In order for selection check boxes and object actions to work, all objects in the
  * list must have an id property. 
  */
- .directive('sbxGrid', function($filter, $q, $timeout, $log) {
+ .directive('sbxGrid', function($filter, $q, $timeout, $mdBottomSheet, $log) {
 
     return {
         restrict: 'E',
@@ -115,14 +115,15 @@ angular.module('slicebox.directives', [])
             $scope.selectedObject = null;
             $scope.orderByProperty = null;
             $scope.orderByDirection = null;
-            $scope.objectsSelectedForAction = [];
+            $scope.objectActionSelection = [];
             $scope.uiState = {
                 objectActionsDropdownOpen: false,
                 selectAllChecked: false,
                 configurationDropdownOpen: false,
                 pageSizeOpen: false,
                 emptyMessage: 'Empty',
-                filter: ''
+                filter: '',
+                selectedObjectAction: undefined
             };
             $scope.visibleColumnsPreferenceValue = undefined;
 
@@ -151,6 +152,10 @@ angular.module('slicebox.directives', [])
 
             $scope.$watchCollection('visibleColumnsPreferenceValue', function() {
                 updateColumnsVisibility();
+            });
+
+            $scope.$watchCollection('objectActionSelection', function() {
+                updateSelectAllObjectActionChecked();
             });
 
             // Scope functions
@@ -270,34 +275,19 @@ angular.module('slicebox.directives', [])
             };
 
             $scope.selectAllChanged = function() {
-                $scope.objectsSelectedForAction = [];
-
-                if ($scope.uiState.selectAllChecked) {
-                    for (i = 0, length = $scope.objectList.length; i < length; i++) {
-                        $scope.objectsSelectedForAction.push($scope.objectList[i]);
-                    }
+                for (var i = 0; i < $scope.objectActionSelection.length; i++) {
+                    $scope.objectActionSelection[i] = $scope.uiState.selectAllChecked;
                 }
-            };
-
-            $scope.rowSelectionCheckboxClicked = function(rowObject) {
-                var rowObjectIndex = $scope.objectsSelectedForAction.indexOf(rowObject);
-                if (rowObjectIndex == -1) {
-                    $scope.objectsSelectedForAction.push(rowObject);
-                } else {
-                    $scope.objectsSelectedForAction.splice(rowObjectIndex, 1);
-                }
-
-                validateAndUpdateObjectActionSelections();
-            };
-
-            $scope.rowObjectSelected = function(rowObject) {
-                var rowObjectIndex = $scope.objectsSelectedForAction.indexOf(rowObject);
-
-                return rowObjectIndex >= 0;
             };
 
             $scope.objectActionsEnabled = function() {
-                return $scope.objectsSelectedForAction.length > 0;
+                for (var i = 0; i < $scope.objectActionSelection.length; i++) {
+                    if ($scope.objectActionSelection[i] === true) {
+                        return true;
+                    }
+                }
+
+                return false;
             };
 
             $scope.objectActionEnabled = function(objectAction) {
@@ -310,26 +300,28 @@ angular.module('slicebox.directives', [])
                 }
 
                 return true;
-            };            
-
-            $scope.performObjectAction = function($event, objectAction) {
-                if (!$scope.objectActionEnabled(objectAction)) {
-                    $event.stopPropagation();
-                    return;
-                }
-
-                if (angular.isFunction(objectAction.action)) {
-                    var objectActionResult = objectAction.action(selectedActionObjects());
-
-                    $q.when(objectActionResult).finally(function() {
-                        loadPageData();
-                    });
-                } else {
-                    throwError('TypeError', 'An object action must define an action function: ' + angular.toJson(objectAction));
-                }
-
-                $scope.uiState.objectActionsDropdownOpen = false;
             };
+
+            $scope.objectActionSelected = function() {
+                var objectAction = $scope.uiState.selectedObjectAction;
+                $scope.uiState.selectedObjectAction = undefined;
+
+                performObjectAction(objectAction);
+            };
+
+            // $scope.objectActionsButtonClicked = function($event) {
+            //     $mdBottomSheet.show({
+            //         templateUrl: '/assets/partials/directives/sbxGridObjectActionsBottomSheetTemplate.html',
+            //         controller: 'SbxGridObjectActionsBottomSheetCtrl',
+            //         parent: $element,
+            //         targetEvent: $event,
+            //         locals: {
+            //             objectActions: $scope.objectActions
+            //         }
+            //     }).then(function(selectedObjectAction) {
+            //         performObjectAction(selectedObjectAction);
+            //     });
+            // };
 
             $scope.columnConfigurationEnabled = function() {
                 return angular.isDefined($attrs.configurationKey);
@@ -475,7 +467,8 @@ angular.module('slicebox.directives', [])
                 }
 
                 validateAndUpdateSelectedObject();
-                validateAndUpdateObjectActionSelections();
+
+                $scope.objectActionSelection = new Array($scope.objectList.length);
 
                 if ($scope.objectList.length === 0) {
                     // Avoid empty pages
@@ -570,36 +563,16 @@ angular.module('slicebox.directives', [])
                 }
             }
 
-            function validateAndUpdateObjectActionSelections() {
-                var updatedObjectsSelectedForAction = [];
-                var selectionCount = 0;
+            function updateSelectAllObjectActionChecked() {
+                var allSelected = ($scope.objectActionSelection.length > 0);
 
-                angular.forEach($scope.objectList, function(object) {
-                    if (findSelectedActionObjectWithId(object.id) !== null) {
-                        updatedObjectsSelectedForAction.push(object);
-                        ++selectionCount;
+                for (var i = 0; i < $scope.objectActionSelection.length; i++) {
+                    if (!$scope.objectActionSelection[i]) {
+                        allSelected = false;
                     }
-                });
-
-                $scope.objectsSelectedForAction = updatedObjectsSelectedForAction;
-
-                if (selectionCount === 0 || selectionCount < $scope.objectList.length) {
-                    $scope.uiState.selectAllChecked = false;
-                } else if (selectionCount == $scope.objectList.length) {
-                    $scope.uiState.selectAllChecked = true;
                 }
-            }
 
-            function findSelectedActionObjectWithId(objectId) {
-                var matchingObject = null;
-
-                angular.forEach($scope.objectsSelectedForAction, function(object) {
-                    if (object.id === objectId) {
-                        matchingObject = object;
-                    }
-                });
-
-                return matchingObject;
+                $scope.uiState.selectAllChecked = allSelected;
             }
 
             function selectionEnabled() {
@@ -617,7 +590,15 @@ angular.module('slicebox.directives', [])
             }
 
             function selectedActionObjects() {
-                return $scope.objectsSelectedForAction;
+                var selectedObjects = [];
+
+                for (var i = 0; i < $scope.objectActionSelection.length; i++) {
+                    if ($scope.objectActionSelection[i]) {
+                        selectedObjects.push($scope.objectList[i]);
+                    }
+                }
+
+                return selectedObjects;
             }
 
             function typeOfObject(object) {
@@ -684,9 +665,37 @@ angular.module('slicebox.directives', [])
             function clearSelection() {
                 $scope.selectedObject = null;
             }
+
+            function performObjectAction(objectAction) {
+                if (!$scope.objectActionEnabled(objectAction)) {
+                    $event.stopPropagation();
+                    return;
+                }
+
+                if (angular.isFunction(objectAction.action)) {
+                    var objectActionResult = objectAction.action(selectedActionObjects());
+
+                    $q.when(objectActionResult).finally(function() {
+                        loadPageData();
+                    });
+                } else {
+                    throwError('TypeError', 'An object action must define an action function: ' + angular.toJson(objectAction));
+                }
+
+                $scope.uiState.objectActionsDropdownOpen = false;
+            }
         }
     };
 
+})
+
+.controller('SbxGridObjectActionsBottomSheetCtrl', function($scope, $mdBottomSheet, objectActions) {
+    $scope.objectActions = objectActions;
+
+    $scope.objectActionClicked = function(objectActionIndex) {
+        var clickedObjectAction = $scope.objectActions[objectActionIndex];
+        $mdBottomSheet.hide(clickedObjectAction);
+    };
 })
 
 .directive('sbxGridColumn', function($q, $log) {

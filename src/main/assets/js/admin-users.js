@@ -11,7 +11,7 @@ angular.module('slicebox.adminUsers', ['ngRoute'])
   });
 })
 
-.controller('AdminUsersCtrl', function($scope, $http, $modal, $q, openConfirmationDeleteModal) {
+.controller('AdminUsersCtrl', function($scope, $http, $mdDialog, $q, openConfirmationDeleteModal) {
     // Initialization
     $scope.objectActions =
         [
@@ -29,12 +29,12 @@ angular.module('slicebox.adminUsers', ['ngRoute'])
     };
 
     $scope.addUserButtonClicked = function() {
-        var modalInstance = $modal.open({
+        var dialogPromise = $mdDialog.show({
                 templateUrl: '/assets/partials/addUserModalContent.html',
                 controller: 'AddUserModalCtrl'
             });
 
-        modalInstance.result.then(function(user) {
+        dialogPromise.then(function(user) {
             $scope.uiState.addUserInProgress = true;
 
             var addUserPromise = $http.post('/api/users', user);
@@ -74,16 +74,16 @@ angular.module('slicebox.adminUsers', ['ngRoute'])
     }
 })
 
-.controller('AddUserModalCtrl', function($scope, $modalInstance) {
+.controller('AddUserModalCtrl', function($scope, $mdDialog) {
     // Initialization
     $scope.role = 'USER';
 
     // Scope functions
     $scope.addButtonClicked = function() {
-        $modalInstance.close({ user: $scope.userName, password: $scope.password, role: $scope.role});
+        $mdDialog.hide({ user: $scope.userName, password: $scope.password, role: $scope.role});
     };
 
     $scope.cancelButtonClicked = function() {
-        $modalInstance.dismiss();
+        $mdDialog.cancel();
     };
 });

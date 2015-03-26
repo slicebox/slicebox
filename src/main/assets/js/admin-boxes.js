@@ -11,7 +11,7 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
   });
 })
 
-.controller('AdminBoxesCtrl', function($scope, $http, $modal, $q, $interval, openConfirmationDeleteModal) {
+.controller('AdminBoxesCtrl', function($scope, $http, $mdDialog, $q, $interval, openConfirmationDeleteModal) {
     // Initialization
     $scope.objectActions =
         [
@@ -39,14 +39,12 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
     };
 
     $scope.addBoxButtonClicked = function() {
-        var modalInstance = $modal.open({
+        $mdDialog.show({
                 templateUrl: '/assets/partials/addBoxModalContent.html',
                 controller: 'AddBoxModalCtrl'
+            }).then(function() {
+                $scope.callbacks.boxesTable.reloadPage();
             });
-
-        modalInstance.result.then(function() {
-            $scope.callbacks.boxesTable.reloadPage();
-        });
     };
 
     // Private functions
@@ -71,7 +69,7 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
     }
 })
 
-.controller('AddBoxModalCtrl', function($scope, $modal, $modalInstance, $http) {
+.controller('AddBoxModalCtrl', function($scope, $mdDialog, $http) {
     // Initialization
     $scope.uiState = {
         addChoice: 'generateURL',
@@ -94,7 +92,7 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
 
         generateURLPromise.success(function(data) {
             showBaseURLDialog(data.value);
-            $modalInstance.close();
+            $mdDialog.hide();
         });
 
         generateURLPromise.error(function(data) {
@@ -118,7 +116,7 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
             });
 
         connectPromise.success(function(data) {
-            $modalInstance.close();
+            $mdDialog.hide();
         });
 
         connectPromise.error(function(data) {
@@ -129,25 +127,22 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
     };
 
     $scope.cancelButtonClicked = function() {
-        $modalInstance.dismiss();
+        $mdDialog.cancel();
     };
 
     // Private functions
     function showBaseURLDialog(baseURL) {
-        var modalInstance = $modal.open({
+        $mdDialog.show({
                 templateUrl: '/assets/partials/baseURLModalContent.html',
                 controller: 'BaseURLModalCtrl',
-                size: 'lg',
-                resolve: {
-                    baseURL: function () {
-                        return baseURL;
-                    }
+                locals: {
+                    baseURL: baseURL
                 }
             });
     }
 })
 
-.controller('BaseURLModalCtrl', function($scope, $modalInstance, baseURL) {
+.controller('BaseURLModalCtrl', function($scope, $mdDialog, baseURL) {
     // Initialization
     $scope.baseURL = baseURL;
 
@@ -159,6 +154,6 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
     };
 
     $scope.closeButtonClicked = function() {
-        $modalInstance.dismiss();
+        $mdDialog.cancel();
     };
 });

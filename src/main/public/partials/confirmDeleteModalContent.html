@@ -1,12 +1,14 @@
-<div class="modal-header">
-    <h3 class="modal-title">{{title}}</h3>
-</div>
+<md-dialog aria-label="{{title}}">
+  	<md-content class="sticky-container">
+    	<md-subheader class="md-sticky-no-effect">{{title}}</md-subheader>
+    	<div class="dialog-content">
+    		<p>{{message}}</p>
+    	</div>
+    </md-content>
 
-<div class="modal-body">
-    <p>{{message}}</p>
-</div>
-
-<div class="modal-footer">
-	<sbx-button class="btn btn-danger" button-title="Delete" action="deleteButtonClicked()"></sbx-button>
-    <button class="btn btn-default" ng-click="cancelButtonClicked()">Cancel</button>
-</div>
+    <div class="md-actions" layout="row">
+    	<span flex></span>
+    	<md-button ng-click="cancelButtonClicked()">Cancel</md-button>
+    	<sbx-button button-class="md-warn" button-title="Delete" action="deleteButtonClicked()"></sbx-button>
+    </div>
+</md-dialog>

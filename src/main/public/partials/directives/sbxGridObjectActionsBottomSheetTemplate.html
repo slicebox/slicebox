@@ -1,0 +1,10 @@
+<md-bottom-sheet class="md-list md-has-header">
+	<md-subheader>Actions</md-subheader>
+  	<md-list>
+    	<md-item ng-repeat="objectAction in objectActions">
+      		<md-button aria-label="{{objectAction.name}}" ng-click="objectActionClicked($index)">
+	        	<span class="md-inline-list-icon-label">{{ objectAction.name }}</span>
+      		</md-button>
+   		</md-item>
+  	</md-list>
+</md-bottom-sheet>
