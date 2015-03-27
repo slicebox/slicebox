@@ -30,6 +30,9 @@
                             empty-message="No patients found">
 
                             <sbx-grid-column property="patientName['value']" title="Name">
+                                <sbx-grid-cell>
+                                    {{rowObject.patientName.value | prettyPatientName}}
+                                </sbx-grid-cell>
                             </sbx-grid-column>
 
                             <sbx-grid-column property="patientID['value']" title="Id">
@@ -125,6 +128,9 @@
                         empty-message="No series found">
 
                         <sbx-grid-column property="patient.patientName['value']" title="Name">
+                            <sbx-grid-cell>
+                                {{rowObject.patient.patientName.value | prettyPatientName}}
+                            </sbx-grid-cell>
                         </sbx-grid-column>
 
                         <sbx-grid-column property="patient.patientID['value']" title="Id">

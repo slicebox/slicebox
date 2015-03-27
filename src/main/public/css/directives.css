@@ -71,10 +71,6 @@ md-select-menu.md-default-theme md-option.sbx-grid-object-action-option:focus {
     border: 0;
 }
 
-.sbx-grid .header .md-select-label .md-select-icon {
-    display: none;
-}
-
 .sbx-grid th.column-header md-checkbox,
 .sbx-grid td.table-cell md-checkbox {
     margin: 0;

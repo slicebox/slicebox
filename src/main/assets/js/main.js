@@ -26,12 +26,20 @@ angular.module('slicebox', [
     $routeProvider.otherwise({redirectTo: '/'});
 
     $mdThemingProvider.theme('default')
-        .primaryPalette('blue-grey')
-        .accentPalette('deep-purple')
-        .warnPalette('deep-orange');
+        .primaryPalette('green', {
+            'default': '700',
+        })
+        .accentPalette('pink')
+        .warnPalette('red');
 
     // prevent ng-animate on spinners, causes weird behaviour with ng-if/ng-show
     $animateProvider.classNameFilter(/^((?!(fa-spinner)).)*$/);
+})
+
+.filter('prettyPatientName', function () {
+    return function (text) {
+        return text ? text.replace(new RegExp('\\^', 'g'), ' ') : '';
+    };
 })
 
 .controller('SliceboxCtrl', function($scope, $rootScope, $location, $mdSidenav, authenticationService) {
