@@ -11,7 +11,7 @@ angular.module('slicebox.inbox', ['ngRoute'])
   });
 })
 
-.controller('InboxCtrl', function($scope, $http, $modal, $q, $interval) {
+.controller('InboxCtrl', function($scope, $http, $q, $interval) {
 
     $scope.callbacks = {};
 

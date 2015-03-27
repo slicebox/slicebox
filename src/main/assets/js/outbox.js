@@ -11,7 +11,7 @@ angular.module('slicebox.outbox', ['ngRoute'])
   });
 })
 
-.controller('OutboxCtrl', function($scope, $http, $modal, $q, $interval, openConfirmationDeleteModal) {
+.controller('OutboxCtrl', function($scope, $http, $q, $interval, openConfirmationDeleteModal) {
     // Initialization
     $scope.objectActions =
         [
