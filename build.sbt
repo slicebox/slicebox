@@ -34,7 +34,7 @@
 
 	libraryDependencies ++= {
 		val akkaVersion				= "2.3.9"
-		val sprayVersion			= "1.3.2"
+		val sprayVersion			= "1.3.3"
 		Seq(
 			"com.typesafe.scala-logging" 	%% "scala-logging"								% "3.1.0",
 			"com.typesafe.akka" 					%% "akka-actor"										% akkaVersion,
@@ -45,7 +45,7 @@
 			"com.typesafe.akka" 					%% "akka-slf4j"										% akkaVersion,
 			"ch.qos.logback"							%  "logback-classic" 							% "1.1.2",
 			"com.typesafe.slick" 					%% "slick"												% "2.1.0",
-			"com.h2database" 							%  "h2"														% "1.4.186",
+			"com.h2database" 							%  "h2"														% "1.3.170",
 			"com.mchange"									%  "c3p0"													% "0.9.5",
 			"com.github.t3hnar" 					%% "scala-bcrypt"									% "2.4",
 			"org.scalatest"								%% "scalatest"										% "2.2.4"					% "test",
