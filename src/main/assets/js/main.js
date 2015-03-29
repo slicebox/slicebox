@@ -47,6 +47,7 @@ angular.module('slicebox', [
     $scope.uiState = {
         errorMessages: [],
         showMenu: true,
+        location: "",
         isAdmin: angular.isDefined($rootScope.globals.currentUser) && 
                  $rootScope.globals.currentUser.role !== 'USER'
     };
