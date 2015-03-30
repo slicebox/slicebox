@@ -41,7 +41,11 @@ angular.module('slicebox.adminScps', ['ngRoute'])
 
             var addScpPromise = $http.post('/api/scps', scp);
             addScpPromise.error(function(data) {
-                $scope.appendErrorMessage(data);
+                $scope.showErrorMessage(data);
+            });
+
+            addScpPromise.success(function() {
+                $scope.showInfoMessage("SCP added");                
             });
 
             addScpPromise.finally(function() {

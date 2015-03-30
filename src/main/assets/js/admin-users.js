@@ -40,11 +40,12 @@ angular.module('slicebox.adminUsers', ['ngRoute'])
             var addUserPromise = $http.post('/api/users', user);
 
             addUserPromise.error(function(data) {
-                $scope.appendErrorMessage(data);
+                $scope.showErrorMessage(data);
             });
 
             addUserPromise.finally(function() {
                 $scope.uiState.addUserInProgress = false;
+                $scope.showInfoMessage("User added");
                 $scope.callbacks.usersTable.reloadPage();
             });
         });
@@ -65,7 +66,7 @@ angular.module('slicebox.adminUsers', ['ngRoute'])
 
         angular.forEach(users, function(user) {
             deletePromise = $http.delete('/api/users/' + user.id).error(function (error) {
-                $scope.appendErrorMessage(error);
+                $scope.showErrorMessage(error);
             });
             deletePromises.push(deletePromise);
         });

@@ -43,6 +43,7 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
                 templateUrl: '/assets/partials/addBoxModalContent.html',
                 controller: 'AddBoxModalCtrl'
             }).then(function() {
+                $scope.showInfoMessage("Box added");
                 $scope.callbacks.boxesTable.reloadPage();
             });
     };

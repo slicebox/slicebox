@@ -31,7 +31,7 @@ angular.module('slicebox.login', ['ngRoute'])
                 authenticationService.setCredentials($scope.username, $scope.password, response.role);
                 $location.path('/');
             } else {
-                $scope.appendErrorMessage(response.message);
+                $scope.showErrorMessage(response.message);
                 $scope.uiState.loginInProgress = false;
             }
         });

@@ -32,6 +32,9 @@ angular.module('slicebox', [
         .accentPalette('pink')
         .warnPalette('red');
 
+    $mdThemingProvider.theme('redTheme')
+        .primaryPalette('red');
+
     // prevent ng-animate on spinners, causes weird behaviour with ng-if/ng-show
     $animateProvider.classNameFilter(/^((?!(fa-spinner)).)*$/);
 })
@@ -42,14 +45,10 @@ angular.module('slicebox', [
     };
 })
 
-.controller('SliceboxCtrl', function($scope, $rootScope, $location, $mdSidenav, authenticationService) {
+.controller('SliceboxCtrl', function($scope, $rootScope, $location, $mdSidenav, $mdToast, authenticationService) {
 
     $scope.uiState = {
-        errorMessages: [],
-        showMenu: true,
-        location: "",
-        isAdmin: angular.isDefined($rootScope.globals.currentUser) && 
-                 $rootScope.globals.currentUser.role !== 'USER'
+        showMenu: true
     };
 
     $scope.toggleLeftNav = function() {
@@ -58,7 +57,6 @@ angular.module('slicebox', [
 
     $scope.logout = function() {
         authenticationService.clearCredentials();
-        $scope.uiState.isAdmin = false;
         $scope.uiState.showMenu = false;
         $location.url("/login");
     };
@@ -75,14 +73,25 @@ angular.module('slicebox', [
         return $location.path().indexOf(path) === 0;
     };
 
-    $scope.closeErrorMessageAlert = function(errorIndex) {
-        $scope.uiState.errorMessages.splice(errorIndex, 1);
+    $scope.showErrorMessage = function(errorMessage) {
+        var toast = $mdToast.simple()
+            .content(errorMessage)
+            .action('Dismiss')
+            .highlightAction(true)
+            .hideDelay(30000)
+            .theme('redTheme')
+            .position("bottom right");
+        $mdToast.show(toast);
     };
 
-    $scope.appendErrorMessage = function(errorMessage) {
-        $scope.uiState.errorMessages.push(errorMessage);
+    $scope.showInfoMessage = function(infoMessage) {
+        var toast = {
+            parent: angular.element(document.getElementById("content")),
+            template: '<md-toast>' + infoMessage + '</md-toast>',
+            position: 'top right'
+        };
+        $mdToast.show(toast);
     };
-
 })
 
 .run(function ($rootScope, $location, $cookieStore, $http) {

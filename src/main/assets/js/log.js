@@ -20,7 +20,7 @@ angular.module('slicebox.log', ['ngRoute'])
         var loadLogPromise = $http.get('/api/log?startindex=' + startIndex + '&count=' + count);
 
         loadLogPromise.error(function(error) {
-            $scope.appendErrorMessage('Failed to load log: ' + error);
+            $scope.showErrorMessage('Failed to load log: ' + error);
         });
 
         return loadLogPromise;

@@ -41,7 +41,11 @@ angular.module('slicebox.adminWatchDirectories', ['ngRoute'])
 
             var addDirectoryPromise = $http.post('/api/directorywatches', {pathString: path});
             addDirectoryPromise.error(function(data) {
-                $scope.appendErrorMessage(data);
+                $scope.showErrorMessage(data);
+            });
+
+            addDirectoryPromise.success(function() {
+                $scope.showInfoMessage("Directory watch added");                
             });
 
             addDirectoryPromise.finally(function() {

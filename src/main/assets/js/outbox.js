@@ -97,7 +97,7 @@ angular.module('slicebox.outbox', ['ngRoute'])
         deleteAllPromies = $q.all(deletePromises);
 
         deleteAllPromies.then(null, function(response) {
-            $scope.appendErrorMessage(response.data);
+            $scope.showErrorMessage(response.data);
         });
 
         return deleteAllPromies;
