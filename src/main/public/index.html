@@ -24,15 +24,11 @@
 
 	<md-toolbar layout="row" class="top-bar">
 		<div class="md-toolbar-tools">
-			<md-button ng-click="toggleLeftNav()">
+			<md-button ng-click="toggleLeftNav()" hide-gt-md>
 				<i class="fa fa-bars fa-lg"></i>
 			</md-button>
 			
 			<span>Slicebox</span>
-			<span flex="5"></span>
-			<h2 class="md-toolbar-item md-breadcrumb">
-        <span hide-sm hide-md>Box Admin</span>
-      </h2>
 			<span flex></span>
 			<md-button ng-if="userSignedIn()" href="" ng-click="logout()">
 				<i class="fa fa-sign-out fa-lg"></i>
@@ -57,14 +53,11 @@
 	</md-card>
 
 	<section layout="row" flex class="left-nav">
-		<md-sidenav ng-if="userSignedIn()" md-component-id="leftNav" class="md-sidenav-left md-whiteframe-z2">
-			<md-toolbar layout="row" class="top-bar">
-				<div class="md-toolbar-tools">
-					<span>Slicebox</span>
-					<span flex></span>
-				</div>
+		<md-sidenav ng-if="userSignedIn()" md-component-id="leftNav" class="md-sidenav-left md-whiteframe-z2" md-is-locked-open="$mdMedia('gt-md')">
+			<md-toolbar hide-gt-md>
+				<h1 class="md-toolbar-tools">Slicebox</h1>
 			</md-toolbar>
-			<md-content>
+			<md-content>	
 				<ul>
 					<li>
 						<md-button ng-click="toggleLeftNav()" ng-class="{ active: isCurrentPath('/')}" href="/">Home</md-button>
@@ -78,17 +71,30 @@
 						<md-button ng-click="toggleLeftNav()" ng-class="{ active: isCurrentPath('/outbox')}" href="/outbox">Outbox</md-button>
 					</li>
 
-					<li>
-						<md-button ng-click="toggleLeftNav()" ng-class="{ active: isCurrentPath('/admin/boxes')}" href="/admin/boxes">Admin > Boxes</md-button>
+					<li ng-if="userSignedIn() && userSignedIn().role !== 'USER'" class="admin-section">
+						<h4>
+							ADMIN
+						</h4>
+						<menu-link section="section"></menu-link>
+
+						<menu-toggle section="section"></menu-toggle>
+
+						<ul>
+							<li>
+								<md-button ng-click="toggleLeftNav()" ng-class="{ active: isCurrentPath('/admin/boxes')}" href="/admin/boxes">Boxes</md-button>
+							</li>
+							<li>
+								<md-button ng-click="toggleLeftNav()" ng-class="{ active: isCurrentPath('/admin/watchdirectories')}" href="/admin/watchdirectories">Directories</md-button>
+							</li>
+							<li>
+								<md-button ng-click="toggleLeftNav()" ng-class="{ active: isCurrentPath('/admin/scps')}" href="/admin/scps">SCPs</md-button>
+							</li>
+							<li>
+								<md-button ng-click="toggleLeftNav()" ng-class="{ active: isCurrentPath('/admin/users')}" href="/admin/users">Users</md-button>
+							</li>
+						</ul>
 					</li>
 
-					<li>
-						<md-button ng-click="toggleLeftNav()" ng-class="{ active: isCurrentPath('/admin/scps')}" href="/admin/scps">Admin > SCPs</md-button>
-					</li>
-
-					<li>
-						<md-button ng-click="toggleLeftNav()" ng-class="{ active: isCurrentPath('/admin/users')}" href="/admin/users">Admin > Users</md-button>
-					</li>
 				</ul>
 			</md-content>
 		</md-sidenav>

@@ -1,26 +1,19 @@
-<div class="row">
-	<div class="col-md-12">
-        <div class="panel panel-default">
-            <div class="panel-heading">Watch Directories</div>
+<div layout="column" layout-margin class="admin-watchdirectories">
+    <sbx-grid
+        load-page="loadWatchDirectoriesPage(startIndex, count, orderByProperty, orderByDirection)"
+        page-size="20"
+        object-actions="objectActions"
+        callbacks="callbacks.directoriesTable"
+        empty-message="No watch directories added">
 
-            <div class="panel-body">
-                <sbx-grid
-                    load-page="loadWatchDirectoriesPage(startIndex, count, orderByProperty, orderByDirection)"
-                    page-size="20"
-                    object-actions="objectActions"
-                    callbacks="callbacks.directoriesTable"
-                    empty-message="No watch directories added">
+        <sbx-grid-column property="path" title="Path">
+        </sbx-grid-column>
+    </sbx-grid>
 
-                    <sbx-grid-column property="path" title="Path">
-                    </sbx-grid-column>
-                </sbx-grid>
-
-                <button class="btn btn-default" type="button"
-                    ng-click="addDirectoryButtonClicked()"
-                    ng-disabled="uiState.addDirectoryInProgress">
-                    Add Directory
-                </button>
-            </div>
-        </div>
+    <div layout="row" class="button-row">
+        <md-button class="md-primary md-raised" ng-click="addDirectoryButtonClicked()" ng-disabled="uiState.addDirectoryInProgress">
+            Add Directory
+        </md-button>
+        <div flex></div>
 	</div>
 </div>

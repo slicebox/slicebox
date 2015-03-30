@@ -1,12 +1,22 @@
-<div class="modal-header">
-    <h3 class="modal-title">Add Watch Directory</h3>
-</div>
-<div class="modal-body">
-    <div class="form-group">
-        <input type="text" ng-model="path" class="form-control" placeholder="Directory path"></input>
-    </div>
-</div>
-<div class="modal-footer">
-    <button class="btn btn-primary" ng-click="addButtonClicked()" ng-disabled="!path">Add</button>
-    <button class="btn btn-default" ng-click="cancelButtonClicked()">Cancel</button>
-</div>
+<md-dialog aria-label="Add Watch Directory" class="add-watchdirectory">
+
+    <form name="watchdirectoryForm">
+
+        <md-content class="sticky-container">
+            <md-subheader class="md-sticky-no-effect">Add Watch Directory</md-subheader>
+            <div class="dialog-content">
+                <md-input-container>
+                    <label>Directory path</label>
+                    <input name="path" ng-model="path" type="text" id="path" required />
+                </md-input-container>
+            </div>
+        </md-content>
+
+        <div class="md-actions" layout="row">
+            <span flex></span>
+            <md-button ng-click="cancelButtonClicked()">Cancel</md-button>
+            <md-button type="submit" class="md-primary" ng-click="addButtonClicked()" ng-disabled="userForm.$invalid">Add</md-button>
+        </div>
+
+    </form>
+</md-dialog>

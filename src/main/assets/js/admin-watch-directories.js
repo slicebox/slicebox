@@ -5,13 +5,13 @@
 angular.module('slicebox.adminWatchDirectories', ['ngRoute'])
 
 .config(function($routeProvider) {
-    $routeProvider.when('/admin/watchDirectories', {
+    $routeProvider.when('/admin/watchdirectories', {
         templateUrl: '/assets/partials/adminWatchDirectories.html',
         controller: 'AdminWatchDirectoriesCtrl'
     });
 })
 
-.controller('AdminWatchDirectoriesCtrl', function($scope, $http, $modal, $q, $log, openConfirmationDeleteModal) {
+.controller('AdminWatchDirectoriesCtrl', function($scope, $http, $mdDialog, $q, $log, openConfirmationDeleteModal) {
     // Initialization
     $scope.objectActions =
         [
@@ -31,13 +31,12 @@ angular.module('slicebox.adminWatchDirectories', ['ngRoute'])
     };
 
     $scope.addDirectoryButtonClicked = function() {
-        var modalInstance = $modal.open({
+        var dialogPromise = $mdDialog.show({
                 templateUrl: '/assets/partials/addWatchDirectoryModalContent.html',
-                controller: 'AddWatchDirectoryModalCtrl',
-                size: 'lg'
+                controller: 'AddWatchDirectoryModalCtrl'
             });
 
-        modalInstance.result.then(function (path) {
+        dialogPromise.then(function (path) {
             $scope.uiState.addDirectoryInProgress = true;
 
             var addDirectoryPromise = $http.post('/api/directorywatches', {pathString: path});
@@ -74,14 +73,14 @@ angular.module('slicebox.adminWatchDirectories', ['ngRoute'])
     }
 })
 
-.controller('AddWatchDirectoryModalCtrl', function($scope, $modalInstance) {
+.controller('AddWatchDirectoryModalCtrl', function($scope, $mdDialog) {
 
     // Scope functions
     $scope.addButtonClicked = function() {
-        $modalInstance.close($scope.path);
+        $mdDialog.hide($scope.path);
     };
 
     $scope.cancelButtonClicked = function() {
-        $modalInstance.dismiss();
+        $mdDialog.cancel();
     };
 });

@@ -30,6 +30,17 @@
 	color: rgb(100, 100, 100);
 }
 
+.left-nav ul li h4 {
+	margin: 32px 0 8px 0;
+	padding: 0 16px 0 16px;
+	text-align: left;
+	color: rgb(100, 100, 100);
+}
+
+.left-nav ul li ul li .md-button {
+	padding: 0 16px 0 32px;
+}
+
 .left-nav ul li .active {
 	background-color: rgba(158,158,158,0.2);
 }
@@ -143,6 +154,14 @@ td div.progress {
 }
 
 .admin-scps .button-row {
+	margin-top: 10px;
+}
+
+.admin-watchdirectories {
+	margin: 20px;
+}
+
+.admin-watchdirectories .button-row {
 	margin-top: 10px;
 }
 

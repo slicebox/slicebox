@@ -60,7 +60,6 @@ angular.module('slicebox.directives', [])
             loadPage: '&',
             converter: '&',
             pageSize: '=',
-            pageSizes: '=',
             objectSelectedCallback: '&objectSelected',
             objectActions: '=',
             sorting: '=',
