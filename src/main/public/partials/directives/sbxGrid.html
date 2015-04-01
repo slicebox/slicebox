@@ -20,8 +20,7 @@
         <table ng-cloak class="ng-cloak">
             <col width="20px" ng-if="objectActions.length > 0" />
 
-            <col ng-repeat="columnDefinition in columnDefinitions track by columnDefinition.property"
-                ng-show="columnConfigurations[columnDefinition.property].visible" />
+            <col ng-repeat="columnDefinition in columnDefinitions track by columnDefinition.property" />
 
             <thead>
                 <tr>
@@ -32,7 +31,6 @@
                     
                     <th ng-repeat="columnDefinition in columnDefinitions track by columnDefinition.property"
                         ng-click="columnClicked(columnDefinition)"
-                        ng-show="columnConfigurations[columnDefinition.property].visible"
                         class="column-header">
                         {{columnDefinition.title}}
 
@@ -55,7 +53,6 @@
 
                     <td sbx-grid-internal-td
                         ng-repeat="columnDefinition in columnDefinitions track by columnDefinition.property"
-                        ng-show="columnConfigurations[columnDefinition.property].visible"
                         class="table-cell">
                         {{filteredCellValues[$parent.$index][columnDefinition.property]}}
                     </td>

@@ -50,7 +50,7 @@ angular.module('slicebox.directives', [])
  * In order for selection check boxes and object actions to work, all objects in the
  * list must have an id property. 
  */
- .directive('sbxGrid', function($filter, $q, $timeout, $mdBottomSheet, $log) {
+ .directive('sbxGrid', function($filter, $q, $timeout, $log) {
 
     return {
         restrict: 'E',
@@ -64,7 +64,6 @@ angular.module('slicebox.directives', [])
             objectActions: '=',
             sorting: '=',
             filter: '=',
-            configurationKey: '@',
             callbacks: '=',
             rowCSSClassesCallback: '&rowCssClasses',
             rowObjectActionsCallback: '&rowObjectActions',
@@ -72,18 +71,14 @@ angular.module('slicebox.directives', [])
         },
         controller: function($scope, $element, $attrs) {
             $scope.columnDefinitions = [];
-            $scope.columnConfigurations = {};
 
             this.addColumn = function(columnDefinition) {
                 $scope.columnDefinitions.push(columnDefinition);
-                $scope.columnConfigurations[columnDefinition.property] = {};
             };
         },
         link: function($scope, $element, $attrs) {
 
             // Initialization
-            var ColumnsVisibilityPreferenceKey = $scope.configurationKey + '-columnsVisibility';
-            var saveColumnsVisibilityPreferencePromise = $q.when(null);
 
             $scope.cssClasses = {
                 empty: {},
@@ -118,13 +113,11 @@ angular.module('slicebox.directives', [])
             $scope.uiState = {
                 objectActionsDropdownOpen: false,
                 selectAllChecked: false,
-                configurationDropdownOpen: false,
                 pageSizeOpen: false,
                 emptyMessage: 'Empty',
                 filter: '',
                 selectedObjectAction: undefined
             };
-            $scope.visibleColumnsPreferenceValue = undefined;
 
             if (angular.isDefined($attrs.callbacks)) {
                 $scope.callbacks = {
@@ -139,18 +132,12 @@ angular.module('slicebox.directives', [])
                 $scope.uiState.emptyMessage = $scope.emptyMessage;
             }
 
-            loadColumnVisibilityPreference();
-
             $scope.$watchCollection('columnDefinitions', function() {
                 doOnColumnsChanged();
             });            
 
             $scope.$watch('pageSize', function() {
                 loadPageData();
-            });
-
-            $scope.$watchCollection('visibleColumnsPreferenceValue', function() {
-                updateColumnsVisibility();
             });
 
             $scope.$watchCollection('objectActionSelection', function() {
@@ -200,14 +187,6 @@ angular.module('slicebox.directives', [])
                 }
 
                 return $scope.rowObjectActionsCallback({rowObject: rowObject}).length > 0;
-            };
-
-            $scope.columnVisibilityCheckboxChanged = function() {
-                saveColumnsVisibilityPreferencePromise.finally(
-                    // Wait for previous preference save to finish to avoid out of order saves
-                    function() {
-                        saveColumnsVisibilityPreference();
-                    });
             };
 
             $scope.loadNextPage = function() {
@@ -308,24 +287,6 @@ angular.module('slicebox.directives', [])
                 performObjectAction(objectAction);
             };
 
-            // $scope.objectActionsButtonClicked = function($event) {
-            //     $mdBottomSheet.show({
-            //         templateUrl: '/assets/partials/directives/sbxGridObjectActionsBottomSheetTemplate.html',
-            //         controller: 'SbxGridObjectActionsBottomSheetCtrl',
-            //         parent: $element,
-            //         targetEvent: $event,
-            //         locals: {
-            //             objectActions: $scope.objectActions
-            //         }
-            //     }).then(function(selectedObjectAction) {
-            //         performObjectAction(selectedObjectAction);
-            //     });
-            // };
-
-            $scope.columnConfigurationEnabled = function() {
-                return angular.isDefined($attrs.configurationKey);
-            };
-
             $scope.pageSizeChanged = function(size) {
                 $scope.currentPageSize = size;
                 $scope.uiState.pageSizeOpen = false;
@@ -333,18 +294,7 @@ angular.module('slicebox.directives', [])
             };
 
             // Private functions
-            function updateColumnsVisibility() {
-                angular.forEach($scope.columnDefinitions, function(columnDefinition) {
-                    updateVisibilityForColumn(columnDefinition);
-                });
-            }
-
             function doOnColumnsChanged() {
-                $scope.columnMetaDatas = {};
-
-                angular.forEach($scope.columnDefinitions, function(columnDefinition) {
-                    updateVisibilityForColumn(columnDefinition);
-                });
 
                 calculateFilteredCellValues();
 
@@ -356,52 +306,6 @@ angular.module('slicebox.directives', [])
                         $scope.objectList = savedObjectList;
                     }
                 });
-            }
-
-            function updateVisibilityForColumn(columnDefinition) {
-                // if (angular.isUndefined($scope.visibleColumnsPreferenceValue)) {
-                //     // Visibility user preference not loaded yet
-                //     return;
-                // }
-
-                $scope.columnConfigurations[columnDefinition.property].visible =
-                ($scope.visibleColumnsPreferenceValue === null ||
-                    $scope.visibleColumnsPreferenceValue.indexOf(columnDefinition.property) != -1);
-            }
-
-            function loadColumnVisibilityPreference() {
-                // TODO: load preference
-
-                if (angular.isUndefined($attrs.configurationKey)) {
-                    $scope.visibleColumnsPreferenceValue = null;
-                    return;
-                }
-
-                // exiniUserPreferences.loadUserPreference(ColumnsVisibilityPreferenceKey).then(function(preferenceValue) {
-                //     if (angular.isDefined(preferenceValue)) {
-                //         $scope.visibleColumnsPreferenceValue = preferenceValue;
-                //     } else {
-                //         $scope.visibleColumnsPreferenceValue = null;
-                //     }
-                // }, function() {
-                //     // Retry on error
-                //     loadColumnVisibilityPreference();
-                // });
-            }
-
-            function saveColumnsVisibilityPreference() {
-                // TODO: save preference
-
-                // var visibleColumnProperties = [];
-
-                // angular.forEach($scope.columnConfigurations, function(configuration, columnProperty) {
-                //     if (configuration && configuration.visible) {
-                //         visibleColumnProperties.push(columnProperty);
-                //     }
-                // });
-
-                // saveColumnsVisibilityPreferencePromise =
-                //     exiniUserPreferences.saveUserPreference(ColumnsVisibilityPreferenceKey, visibleColumnProperties);
             }
 
             function loadPageData() {
@@ -686,15 +590,6 @@ angular.module('slicebox.directives', [])
         }
     };
 
-})
-
-.controller('SbxGridObjectActionsBottomSheetCtrl', function($scope, $mdBottomSheet, objectActions) {
-    $scope.objectActions = objectActions;
-
-    $scope.objectActionClicked = function(objectActionIndex) {
-        var clickedObjectAction = $scope.objectActions[objectActionIndex];
-        $mdBottomSheet.hide(clickedObjectAction);
-    };
 })
 
 .directive('sbxGridColumn', function($q, $log) {
