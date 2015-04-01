@@ -71,13 +71,13 @@ angular.module('slicebox.home', ['ngRoute'])
         imageHeight: 0,
         images: 1,
         isWindowManual: false,
-        numberOfFrames: 1,
         windowMin: undefined,
         windowMax: undefined
     };
 
 
     // Scope functions
+
     $scope.loadPatients = function(startIndex, count, orderByProperty, orderByDirection, filter) {
         var loadPatientsUrl = '/api/metadata/patients?startindex=' + startIndex + '&count=' + count;
         if (orderByProperty) {
@@ -104,15 +104,14 @@ angular.module('slicebox.home', ['ngRoute'])
         return loadPatientsPromise;
     };
 
-    // TODO: remove
-    $scope.loadPatients(0, 10).success(function(patients) {
-        $scope.uiState.patients = patients;
-    });
-
-
     $scope.patientSelected = function(patient) {
-        $scope.uiState.selectedPatient = patient;
-        $scope.callbacks.studiesTable.reset();
+        if (patient !== $scope.uiState.selectedPatient) {
+            $scope.studySelected(null);
+            $scope.uiState.selectedPatient = patient;
+            if ($scope.callbacks.studiesTable) { 
+                $scope.callbacks.studiesTable.reset();
+            }
+        }
     };
 
     $scope.loadStudies = function(startIndex, count, orderByProperty, orderByDirection) {
@@ -130,8 +129,13 @@ angular.module('slicebox.home', ['ngRoute'])
     };
 
     $scope.studySelected = function(study) {
-        $scope.uiState.selectedStudy = study;
-        $scope.callbacks.seriesTable.reset();
+        if (study !== $scope.uiState.selectedStudy) {
+            $scope.seriesSelected(null);
+            $scope.uiState.selectedStudy = study;
+            if ($scope.callbacks.imageAttributesTable) { 
+                $scope.callbacks.imageAttributesTable.reset();
+            }
+        }
     };
 
     $scope.loadSeries = function(startIndex, count, orderByProperty, orderByDirection) {
@@ -175,39 +179,31 @@ angular.module('slicebox.home', ['ngRoute'])
     };
 
     $scope.seriesSelected = function(series) {
-        $scope.uiState.selectedSeries = series;
-        
-        if ($scope.callbacks.imageAttributesTable) {
-            $scope.callbacks.imageAttributesTable.reset();
-        }
+        if (series !== $scope.uiState.selectedSeries) {
+            $scope.uiState.selectedSeries = series;
 
-        if ($scope.callbacks.datasetsTable) {
-            $scope.callbacks.datasetsTable.reset();
-        }
+            resetSeriesDetails();
 
-        $scope.uiState.seriesDetails.windowMin = undefined;
-        $scope.uiState.seriesDetails.windowMax = undefined;
-        $scope.updatePNGImageUrls();
+            if ($scope.callbacks.imageAttributesTable) { 
+                $scope.callbacks.imageAttributesTable.reset(); 
+            }
+            if ($scope.callbacks.datasetsTable) { 
+                $scope.callbacks.datasetsTable.reset();
+            }
+
+            $scope.updatePNGImageUrls();
+        }
     };
 
     $scope.flatSeriesSelected = function(flatSeries) {
-        if (flatSeries === null) {           
-            $scope.uiState.selectedSeries = null;
+
+        if (flatSeries === null) {
+            $scope.patientSelected(null);
         } else {
-            $scope.uiState.selectedSeries = flatSeries.series;            
+            $scope.patientSelected(flatSeries.patient);
+            $scope.studySelected(flatSeries.study);
+            $scope.seriesSelected(flatSeries.series);
         }
-
-        if ($scope.callbacks.imageAttributesTable) {
-            $scope.callbacks.imageAttributesTable.reset();
-        }
-
-        if ($scope.callbacks.datasetsTable) {
-            $scope.callbacks.datasetsTable.reset();
-        }
-
-        $scope.uiState.seriesDetails.windowMin = undefined;
-        $scope.uiState.seriesDetails.windowMax = undefined;
-        $scope.updatePNGImageUrls();
     };
 
     $scope.loadImageAttributes = function(startIndex, count) {
@@ -249,7 +245,6 @@ angular.module('slicebox.home', ['ngRoute'])
                             $scope.uiState.seriesDetails.windowMin = info.minimumPixelValue;
                             $scope.uiState.seriesDetails.windowMax = info.maximumPixelValue;
                         }
-                        $scope.uiState.numberOfFrames = info.numberOfFrames;
                         var n = Math.min($scope.uiState.seriesDetails.images, info.numberOfFrames * images.length);
                         $http.post('/api/users/generateauthtokens?n=' + n).success(function(tokens) {
                             $scope.uiState.seriesDetails.pngImageUrls = [];
@@ -309,6 +304,13 @@ angular.module('slicebox.home', ['ngRoute'])
     };
 
     // Private functions
+
+    function resetSeriesDetails() {
+        $scope.uiState.seriesDetails.pngImageUrls = [];
+        $scope.uiState.seriesDetails.pngImageUrls = [];
+        $scope.uiState.seriesDetails.windowMin = undefined;
+        $scope.uiState.seriesDetails.windowMax = undefined;
+    }
 
     function capitalizeFirst(string) {
         return string.charAt(0).toUpperCase() + string.substring(1);        

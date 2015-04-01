@@ -47,7 +47,7 @@
                     </md-content>
                 </section>
 
-                <section>
+                <section ng-if="uiState.selectedPatient !== null">
                     <h4>Studies</h4>
                     <md-content>
                         <sbx-grid
@@ -78,7 +78,7 @@
                     </md-content>
                 </section>
 
-                <section>
+                <section ng-if="uiState.selectedStudy !== null">
                     <h4>Series</h4>
                     <md-content>
                         <sbx-grid
