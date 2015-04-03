@@ -1,0 +1,98 @@
+<div layout="column" layout-margin>
+
+    <div layout="row" layout-margin>
+        <div flex ng-controller="InboxCtrl" class="inbox">
+            <md-card>
+                <md-card-content>
+                    <h4 class="md-flex">Inbox</h4>
+                    <md-content class="md-padding" style="height: 300px">
+                        <sbx-grid
+                            load-page="loadInboxPage(startIndex, count, orderByProperty, orderByDirection)"
+                            page-size="20"
+                            object-actions="objectActions"
+                            callbacks="callbacks.inboxTable"
+                            empty-message="Inbox is empty">
+
+                            <sbx-grid-column property="remoteBoxName" title="Remote Box Name">
+                            </sbx-grid-column>
+
+                            <sbx-grid-column property="receivedImageCount" title="Received Images">
+                            </sbx-grid-column>
+
+                            <sbx-grid-column property="totalImageCount" title="Total Images">
+                            </sbx-grid-column>
+                        </sbx-grid>
+                    </md-content>
+                </md-card-content>
+            </md-card>
+        </div>
+
+        <div flex ng-controller="OutboxCtrl" class="outbox">
+            <md-card>
+                <md-card-content>
+                    <h4 class="md-flex">Outbox</h4>
+                    <md-content class="md-padding" style="height: 300px">
+                        <sbx-grid
+                            load-page="loadOutboxPage(startIndex, count, orderByProperty, orderByDirection)"
+                            converter="convertOutboxPageData(pageData)"
+                            page-size="10000000"
+                            object-actions="objectActions"
+                            callbacks="callbacks.outboxTable"
+                            empty-message="Outbox is empty">
+
+                            <sbx-grid-column property="remoteBoxName" title="Remote Box Name">
+                            </sbx-grid-column>
+
+                            <sbx-grid-column property="sequenceNumber" title="Progress">
+                                <sbx-grid-cell>
+                                    <progressbar
+                                        type="success"
+                                        max="rowObject.totalImageCount"
+                                        value="rowObject.totalImageCount - rowObject.imagesLeft">
+                                        {{rowObject.totalImageCount - rowObject.imagesLeft}} / {{rowObject.totalImageCount}}
+                                    </progressbar>
+                                </sbx-grid-cell>
+                            </sbx-grid-column>
+
+                            <sbx-grid-column property="failed" title="Failed">
+                            </sbx-grid-column>
+                        </sbx-grid>
+                    </md-content>
+                </md-card-content>
+            </md-card>
+        </div>
+    </div>
+
+    <div layout="row" layout-margin>
+        <div flex ng-controller="LogCtrl" class="log">
+            <md-card>
+                <md-card-content>
+                    <h4 class="md-flex">Box Log</h4>
+                    <md-content class="md-padding">
+                        <sbx-grid
+                            load-page="loadLogPage(startIndex, count)"
+                            page-size="20"
+                            page-sizes="[10, 20, 50, 100]"
+                            sorting="false"
+                            callbacks="callbacks.logTable"
+                            empty-message="Event log is empty">
+
+                            <sbx-grid-column property="created" title="Created" filter="date: yyyy-MM-dd HH:mm:ss.sss">
+                            </sbx-grid-column>
+
+                            <sbx-grid-column property="entryType" title="Type">
+                            </sbx-grid-column>
+
+                            <sbx-grid-column property="subject" title="Subject">
+                            </sbx-grid-column>
+
+                            <sbx-grid-column property="message" title="Message">
+                            </sbx-grid-column>
+                        </sbx-grid>
+                    </md-content>
+                </md-card-content>
+            </md-card>
+        </div>
+    </div>
+
+</div>
