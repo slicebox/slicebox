@@ -26,12 +26,14 @@ import java.awt.RenderingHints
 import javax.imageio.ImageIO
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.util.Date
 import DicomProtocol._
 import DicomHierarchy._
 import DicomPropertyValue._
 import DicomUtil._
 import akka.dispatch.ExecutionContexts
 import java.util.concurrent.Executors
+import se.vgregion.log.LogProtocol._
 
 class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with ExceptionCatching {
   val log = Logging(context.system, this)
@@ -55,15 +57,19 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
       if (dataset != null)
         if (checkSopClass(dataset)) {
           val image = storeDataset(dataset)
-          log.info("Stored dataset: " + dataset.getString(Tag.SOPInstanceUID))
-        } else
+          log.debug("Stored dataset: " + dataset.getString(Tag.SOPInstanceUID))
+          context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Storage", s"Stored file ${path.toString} as ${dataset.getString(Tag.SOPInstanceUID)}")))
+        } else {
           log.info(s"Received file with unsupported SOP Class UID ${dataset.getString(Tag.SOPClassUID)}, skipping")
+          context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Storage", s"Received file ${path.toString} with unsupported SOP Class UID ${dataset.getString(Tag.SOPClassUID)}, skipping")))
+        }
       else
         log.info(s"File $path is not a DICOM file")
 
     case DatasetReceived(dataset) =>
       val image = storeDataset(dataset)
       log.debug("Stored dataset: " + dataset.getString(Tag.SOPInstanceUID))
+      context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Storage", "Stored dataset: " + dataset.getString(Tag.SOPInstanceUID))))
 
     case AddDataset(dataset) =>
       catchAndReport {
@@ -283,7 +289,7 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
               (s"< Binary data ($length bytes) >", 1)
             case _ =>
               val rawStrings = getStrings(attrs, tag)
-              val truncatedStrings = if (rawStrings.length > 32) rawStrings.slice(0, 32) :+ " ..." else rawStrings 
+              val truncatedStrings = if (rawStrings.length > 32) rawStrings.slice(0, 32) :+ " ..." else rawStrings
               val strings = truncatedStrings.map(s => if (s.length() > 1024) s.substring(0, 1024) + " ..." else s)
               (toSingleString(strings), strings.length)
           }
