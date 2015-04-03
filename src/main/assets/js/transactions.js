@@ -126,10 +126,20 @@ angular.module('slicebox.transactions', ['ngRoute'])
     }
 })
 
-.controller('LogCtrl', function($scope, $http) {
+.controller('BoxLogCtrl', function($scope, $http, $interval) {
     // Initialization
     $scope.callbacks = {};
 
+    var timer = $interval(function() {
+        if (angular.isDefined($scope.callbacks.logTable)) {
+            $scope.callbacks.logTable.reloadPage();
+        }
+    }, 5000);
+
+    $scope.$on('$destroy', function() {
+        $interval.cancel(timer);
+    });
+  
     // Scope functions
     $scope.loadLogPage = function(startIndex, count) {
         var loadLogPromise = $http.get('/api/log?startindex=' + startIndex + '&count=' + count + '&subject=Box');
