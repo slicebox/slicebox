@@ -28,11 +28,19 @@ object LogProtocol {
     }    
   }
   
-  case class LogEntry(id: Long, created: Long, entryType: LogEntryType, message: String) extends Entity
+  case class LogEntry(id: Long, created: Long, entryType: LogEntryType, subject: String, message: String) extends Entity
   
   // Messages
   case class AddLogEntry(logEntry: LogEntry)
+  
   case class GetLogEntries(startIndex: Long, count: Long)
+  case class GetLogEntriesBySubject(subject: String, startIndex: Long, count: Long)
+  case class GetLogEntriesByType(entryType: LogEntryType, startIndex: Long, count: Long)
+  case class GetLogEntriesBySubjectAndType(subject: String, entryType: LogEntryType, startIndex: Long, count: Long)
+
+  case class RemoveLogEntry(logId: Long)
   
   case class LogEntries(logEntries: Seq[LogEntry])
+  
+  case class LogEntryRemoved(logId: Long)
 }

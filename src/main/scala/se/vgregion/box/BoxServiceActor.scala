@@ -134,7 +134,7 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
                   removeOutboxEntryFromDb(outboxEntry.id)
                   
                   if (outboxEntry.sequenceNumber == outboxEntry.totalImageCount)
-                    context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Send completed.")))
+                    context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Box", "Send completed.")))
                   
                   sender ! OutboxEntryDeleted
                 case None =>
@@ -265,7 +265,7 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
     }
     
     if (sequenceNumber == totalImageCount)
-      context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Receive completed.")))
+      context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Box", "Receive completed.")))
   }
   
   def updatePollBoxesOnlineStatus(): Unit = {

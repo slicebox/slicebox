@@ -149,7 +149,7 @@ class BoxPollActor(
     }
     
     if (sequenceNumber == totalImageCount)
-      context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Receive completed.")))
+      context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Box", "Receive completed.")))
   }
   
   def updateBoxOnlineStatus(online: Boolean): Unit =

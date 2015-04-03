@@ -114,7 +114,7 @@ class BoxPushActor(box: Box, dbProps: DbProps, storage: Path, pollInterval: Fini
     }
     
     if (outboxEntry.sequenceNumber == outboxEntry.totalImageCount)
-      context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Send completed.")))
+      context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Box", "Send completed.")))
 
     processNextOutboxEntry
   }
