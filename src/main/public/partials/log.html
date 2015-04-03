@@ -1,27 +1,22 @@
-<div class="row">
-    <div class="col-md-12">
-        <div class="panel panel-default">
-            <div class="panel-heading">Event Log</div>
+<div layout="column" layout-margin class="outbox">
+    <sbx-grid
+        load-page="loadLogPage(startIndex, count)"
+        page-size="20"
+        page-sizes="[10, 20, 50, 100]"
+        sorting="false"
+        callbacks="callbacks.logTable"
+        empty-message="Event log is empty">
 
-            <div class="panel-body">
-                <sbx-grid
-                    load-page="loadLogPage(startIndex, count)"
-                    page-size="20"
-                    page-sizes="[10, 20, 50, 100]"
-                    sorting="false"
-                    callbacks="callbacks.logTable"
-                    empty-message="Event log is empty">
+        <sbx-grid-column property="created" title="Created" filter="date: yyyy-MM-dd HH:mm:ss.sss">
+        </sbx-grid-column>
 
-                    <sbx-grid-column property="created" title="Created" filter="date: yyyy-MM-dd HH:mm:ss.sss">
-                    </sbx-grid-column>
+        <sbx-grid-column property="entryType" title="Type">
+        </sbx-grid-column>
 
-                    <sbx-grid-column property="entryType" title="Type">
-                    </sbx-grid-column>
+        <sbx-grid-column property="subject" title="Subject">
+        </sbx-grid-column>
 
-                    <sbx-grid-column property="message" title="Message">
-                    </sbx-grid-column>
-                </sbx-grid>
-            </div>
-        </div>
-    </div>
+        <sbx-grid-column property="message" title="Message">
+        </sbx-grid-column>
+    </sbx-grid>
 </div>

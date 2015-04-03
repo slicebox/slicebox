@@ -58,6 +58,10 @@
 						<md-button ng-click="toggleLeftNav()" ng-class="{ active: isCurrentPath('/outbox')}" href="/outbox">Outbox</md-button>
 					</li>
 
+					<li>
+						<md-button ng-click="toggleLeftNav()" ng-class="{ active: isCurrentPath('/log')}" href="/log">Log</md-button>
+					</li>
+
 					<li ng-if="userSignedIn() && userSignedIn().role !== 'USER'" class="admin-section">
 						<h4>
 							ADMIN
