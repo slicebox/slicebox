@@ -126,8 +126,16 @@ angular.module('slicebox.transactions', ['ngRoute'])
     }
 })
 
-.controller('BoxLogCtrl', function($scope, $http, $interval) {
+.controller('BoxLogCtrl', function($scope, $http, $interval, $q, openConfirmationDeleteModal) {
     // Initialization
+    $scope.actions =
+        [
+            {
+                name: 'Delete',
+                action: confirmDeleteLogs
+            }
+        ];
+
     $scope.callbacks = {};
 
     var timer = $interval(function() {
@@ -150,5 +158,30 @@ angular.module('slicebox.transactions', ['ngRoute'])
 
         return loadLogPromise;
     };
+
+    // private functions
+    function confirmDeleteLogs(logs) {
+        var deleteConfirmationText = 'Permanently delete ' + logs.length + ' log messages?';
+
+        return openConfirmationDeleteModal('Delete Log Messages', deleteConfirmationText, function() {
+            return deleteLogs(logs);
+        });
+    }
+
+    function deleteLogs(logs) {
+        var deletePromises = [];
+        var deletePromise;
+
+        angular.forEach(logs, function(log) {
+            deletePromise = $http.delete('/api/log/' + log.id);
+            deletePromises.push(deletePromise);
+
+            deletePromise.error(function(error) {
+                $scope.showErrorMessage('Failed to delete log message: ' + error);
+            });
+        });
+
+        return $q.all(deletePromises);
+    }
 
 });
