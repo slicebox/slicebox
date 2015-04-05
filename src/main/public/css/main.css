@@ -55,13 +55,10 @@
 	margin-right: 60px;
 }
 
-.home .left-column section > h4 {
+.home .left-column md-card h4 {
+	margin-top: 0;
 	margin-bottom: 5px;
 	color: rgb(100, 100, 100);
-}
-
-.home .left-column section:first-child > h4 {
-	margin-top: 0;
 }
 
 .home .tab-content {
