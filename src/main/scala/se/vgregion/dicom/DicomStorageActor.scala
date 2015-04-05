@@ -56,9 +56,11 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
       val dataset = loadDataset(path, true)
       if (dataset != null)
         if (checkSopClass(dataset)) {
-          val image = storeDataset(dataset)
-          log.debug("Stored dataset: " + dataset.getString(Tag.SOPInstanceUID))
-          context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Storage", s"Stored file ${path.toString} as ${dataset.getString(Tag.SOPInstanceUID)}")))
+          val (image, overwrite) = storeDataset(dataset)
+          if (!overwrite) {
+            log.debug("Stored dataset: " + dataset.getString(Tag.SOPInstanceUID))
+            context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Storage", s"Stored file ${path.toString} as ${dataset.getString(Tag.SOPInstanceUID)}")))
+          }
         } else {
           log.info(s"Received file with unsupported SOP Class UID ${dataset.getString(Tag.SOPClassUID)}, skipping")
           context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Storage", s"Received file ${path.toString} with unsupported SOP Class UID ${dataset.getString(Tag.SOPClassUID)}, skipping")))
@@ -67,15 +69,17 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
         log.info(s"File $path is not a DICOM file")
 
     case DatasetReceived(dataset) =>
-      val image = storeDataset(dataset)
-      log.debug("Stored dataset: " + dataset.getString(Tag.SOPInstanceUID))
-      context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Storage", "Stored dataset: " + dataset.getString(Tag.SOPInstanceUID))))
+      val (image, overwrite) = storeDataset(dataset)
+      if (overwrite) {
+        log.debug("Stored dataset: " + dataset.getString(Tag.SOPInstanceUID))
+        context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Storage", "Stored dataset: " + dataset.getString(Tag.SOPInstanceUID))))
+      }
 
     case AddDataset(dataset) =>
       catchAndReport {
         if (dataset == null)
           throw new IllegalArgumentException("Invalid dataset")
-        val image = storeDataset(dataset)
+        val (image, overwrite) = storeDataset(dataset)
         sender ! ImageAdded(image)
       }
 
@@ -217,9 +221,11 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
 
   }
 
-  def storeDataset(dataset: Attributes): Image = {
+  def storeDataset(dataset: Attributes): (Image, Boolean) = {
     val name = fileName(dataset)
     val storedPath = storage.resolve(name)
+
+    val overwrite = Files.exists(storedPath)
 
     db.withSession { implicit session =>
       val patient = datasetToPatient(dataset)
@@ -255,7 +261,7 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
 
       saveDataset(dataset, storedPath)
 
-      dbImage
+      (dbImage, overwrite)
     }
   }
 
