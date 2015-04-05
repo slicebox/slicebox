@@ -313,6 +313,8 @@ angular.module('slicebox.directives', [])
                     return $q.when([]);
                 }
 
+                var selectedObjectsBeforeLoadPage = selectedActionObjects();
+
                 var deferred = $q.defer();
 
                 var startIndex = $scope.currentPage * $scope.currentPageSize;
@@ -334,10 +336,10 @@ angular.module('slicebox.directives', [])
 
                 $q.when(loadPageResponse).then(function(response) {
                     if (angular.isArray(response)) {
-                        handleLoadedPageData(response);
+                        handleLoadedPageData(response, selectedObjectsBeforeLoadPage);
                     } else {
                             // Assume response is a http response and extract data
-                            handleLoadedPageData(response.data);
+                            handleLoadedPageData(response.data, selectedObjectsBeforeLoadPage);
                         }
                         
                         deferred.resolve();
@@ -358,7 +360,7 @@ angular.module('slicebox.directives', [])
                 return pageSizeNumber;
             }
 
-            function handleLoadedPageData(pageData) {
+            function handleLoadedPageData(pageData, selectedObjectsBeforeLoadPage) {
                 $scope.objectList = convertPageData(pageData);
 
                 if ($scope.objectList.length > $scope.currentPageSize) {
@@ -371,7 +373,7 @@ angular.module('slicebox.directives', [])
 
                 validateAndUpdateSelectedObject();
 
-                $scope.objectActionSelection = new Array($scope.objectList.length);
+                validateAndUpdateObjectActionSelection(selectedObjectsBeforeLoadPage);
 
                 if ($scope.objectList.length === 0) {
                     // Avoid empty pages
@@ -464,6 +466,24 @@ angular.module('slicebox.directives', [])
                 } else {
                     selectObject(null);
                 }
+            }
+
+            function validateAndUpdateObjectActionSelection(selectedObjectsBeforeLoadPage) {
+                $scope.objectActionSelection = new Array($scope.objectList.length);
+
+                if (selectedObjectsBeforeLoadPage.length === 0) {
+                    return;
+                }
+
+                angular.forEach(selectedObjectsBeforeLoadPage, function(selectedObjectBeforeLoadPage) {
+                    var newSelectedObject = findObjectInArray(selectedObjectBeforeLoadPage, $scope.objectList);
+                    if (newSelectedObject) {
+                        var index = $scope.objectList.indexOf(newSelectedObject);
+                        if (index >= 0) {
+                            $scope.objectActionSelection[index] = true;
+                        }
+                    }
+                });
             }
 
             function updateSelectAllObjectActionChecked() {
