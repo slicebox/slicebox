@@ -18,6 +18,7 @@ trait JsonFormats extends DefaultJsonProtocol {
   implicit val watchedDirectoryFormat = jsonFormat2(WatchedDirectory)
 
   implicit val scpDataFormat = jsonFormat4(ScpData)
+  implicit val scuDataFormat = jsonFormat5(ScuData)
 
   implicit val remoteBoxFormat = jsonFormat2(RemoteBox)
   implicit val remoteBoxNameFormat = jsonFormat1(RemoteBoxName)
@@ -46,6 +47,7 @@ trait JsonFormats extends DefaultJsonProtocol {
   implicit val generateBoxBaseUrlFormat = jsonFormat1(GenerateBoxBaseUrl)
 
   implicit val addScpDataFormat = jsonFormat3(AddScp)
+  implicit val addScuDataFormat = jsonFormat4(AddScu)
 
   implicit object RoleFormat extends JsonFormat[UserRole] {
     def write(obj: UserRole) = JsString(obj.toString)

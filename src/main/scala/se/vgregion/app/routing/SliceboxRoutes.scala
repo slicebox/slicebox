@@ -8,6 +8,7 @@ import spray.routing.ExceptionHandler
 
 trait SliceboxRoutes extends DirectoryRoutes
   with ScpRoutes
+  with ScuRoutes
   with MetadataRoutes
   with ImageRoutes
   with SeriesRoutes
@@ -30,6 +31,7 @@ trait SliceboxRoutes extends DirectoryRoutes
         authenticate(authenticator.basicUserAuthenticator(authToken)) { authInfo =>
           directoryRoutes(authInfo) ~
             scpRoutes(authInfo) ~
+            scuRoutes(authInfo) ~
             metaDataRoutes ~
             imageRoutes ~
             seriesRoutes ~

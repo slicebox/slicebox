@@ -13,7 +13,7 @@ import se.vgregion.dicom.DicomDispatchActor
 import se.vgregion.dicom.DicomProtocol._
 import se.vgregion.util.ExceptionCatching
 
-class ScpServiceActor(dbProps: DbProps, storage: Path) extends Actor with ExceptionCatching {
+class ScpServiceActor(dbProps: DbProps) extends Actor with ExceptionCatching {
   val log = Logging(context.system, this)
 
   val db = dbProps.db
@@ -121,5 +121,5 @@ class ScpServiceActor(dbProps: DbProps, storage: Path) extends Actor with Except
 }
 
 object ScpServiceActor {
-  def props(dbProps: DbProps, storage: Path): Props = Props(new ScpServiceActor(dbProps, storage))
+  def props(dbProps: DbProps): Props = Props(new ScpServiceActor(dbProps))
 }

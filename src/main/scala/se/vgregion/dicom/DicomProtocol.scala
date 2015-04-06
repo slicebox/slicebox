@@ -12,6 +12,8 @@ object DicomProtocol {
   
   case class ScpData(id: Long, name: String, aeTitle: String, port: Int) extends Entity
 
+  case class ScuData(id: Long, name: String, aeTitle: String, host: String, port: Int) extends Entity
+
   case class FileName(value: String)
 
   case class ImageFile(
@@ -68,6 +70,18 @@ object DicomProtocol {
 
   case class Scps(scps: Seq[ScpData]) 
 
+
+  sealed trait ScuRequest
+  
+  case class AddScu(name: String, aeTitle: String, host: String, port: Int) extends ScuRequest
+
+  case class RemoveScu(id: Long) extends ScuRequest 
+
+  case object GetScus extends ScuRequest 
+
+  case class Scus(scps: Seq[ScuData]) 
+
+  case class SendSeries(seriesId: Long)
 
   sealed trait MetaDataQuery
 
@@ -131,6 +145,8 @@ object DicomProtocol {
   case class DirectoryUnwatched(id: Long)
 
   case class ScpRemoved(scpDataId: Long)
+
+  case class ScuRemoved(scuDataId: Long)
 
 
   // ***from scp***

@@ -9,6 +9,7 @@ import akka.event.LoggingReceive
 import se.vgregion.app.DbProps
 import se.vgregion.dicom.directory.DirectoryWatchServiceActor
 import se.vgregion.dicom.scp.ScpServiceActor
+import se.vgregion.dicom.scu.ScuServiceActor
 import se.vgregion.dicom.DicomProtocol._
 
 class DicomDispatchActor(storage: Path, dbProps: DbProps) extends Actor {
@@ -16,7 +17,9 @@ class DicomDispatchActor(storage: Path, dbProps: DbProps) extends Actor {
 
   val directoryService = context.actorOf(DirectoryWatchServiceActor.props(dbProps, storage), "DirectoryService")
 
-  val scpService = context.actorOf(ScpServiceActor.props(dbProps, storage), "ScpService")
+  val scpService = context.actorOf(ScuServiceActor.props(dbProps), "ScpService")
+
+  val scuService = context.actorOf(ScuServiceActor.props(dbProps), "ScuService")
 
   val storageActor = context.actorOf(DicomStorageActor.props(dbProps, storage).withDispatcher("akka.prio-dispatcher"), name = "Storage")
 
@@ -27,6 +30,9 @@ class DicomDispatchActor(storage: Path, dbProps: DbProps) extends Actor {
 
     case msg: ScpRequest =>
       scpService forward msg
+
+    case msg: ScuRequest =>
+      scuService forward msg
 
     case msg: MetaDataQuery =>
       storageActor forward msg
