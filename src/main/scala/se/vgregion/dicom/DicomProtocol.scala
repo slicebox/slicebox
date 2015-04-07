@@ -79,9 +79,9 @@ object DicomProtocol {
 
   case object GetScus extends ScuRequest 
 
+  case class SendSeries(seriesId: Long, scuId: Long) extends ScuRequest
+  
   case class Scus(scps: Seq[ScuData]) 
-
-  case class SendSeries(seriesId: Long)
 
   sealed trait MetaDataQuery
 

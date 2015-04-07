@@ -338,6 +338,10 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
     seriesIds.flatMap(imagesForSeries(_))
       .map(image => imageFileForImage(image.id)).flatten.toList
 
+  def imageFilesForSeries(seriesId: Long)(implicit session: Session): List[ImageFile] =
+    imagesForSeries(seriesId)
+      .map(image => imageFileForImage(image.id)).flatten.toList
+
   def imageFilesForStudies(studyIds: Seq[Long])(implicit session: Session): List[ImageFile] =
     studyIds.flatMap(imageFilesForStudy(_)).toList
 

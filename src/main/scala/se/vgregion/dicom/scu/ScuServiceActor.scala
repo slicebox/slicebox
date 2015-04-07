@@ -9,6 +9,7 @@ import akka.actor.Props
 import akka.event.Logging
 import akka.event.LoggingReceive
 import se.vgregion.app.DbProps
+import se.vgregion.dicom.DicomMetaDataDAO
 import se.vgregion.dicom.DicomDispatchActor
 import se.vgregion.dicom.DicomProtocol._
 import se.vgregion.util.ExceptionCatching
@@ -18,6 +19,7 @@ class ScuServiceActor(dbProps: DbProps) extends Actor with ExceptionCatching {
 
   val db = dbProps.db
   val dao = new ScuDataDAO(dbProps.driver)
+  val metaDataDao = new DicomMetaDataDAO(dbProps.driver)
 
   val executor = Executors.newCachedThreadPool()
 
@@ -64,6 +66,10 @@ class ScuServiceActor(dbProps: DbProps) extends Actor with ExceptionCatching {
             val scus = getScus()
             sender ! Scus(scus)
 
+          case SendSeries(seriesId, scuId) =>
+            scuForId(scuId).map(scu => {
+              val imageFiles = imageFilesForSeries(seriesId)
+            }).orElse(throw new IllegalArgumentException(s"SCU with id $scuId not found"))
         }
       }
 
@@ -104,6 +110,11 @@ class ScuServiceActor(dbProps: DbProps) extends Actor with ExceptionCatching {
       dao.create
     }
 
+  def imageFilesForSeries(seriesId: Long) =
+    db.withSession { implicit session =>
+      metaDataDao.imageFilesForSeries(seriesId)
+    }
+  
 }
 
 object ScuServiceActor {
