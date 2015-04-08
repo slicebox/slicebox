@@ -8,6 +8,15 @@
 	background-color: rgba(0, 0, 0, 0);
 }
 
+.slicebox .slicebox-logo-image {
+	margin-right: 6px;
+	margin-bottom: 14px;
+}
+
+.slicebox .slicebox-logo-text {
+	font-weight: 300;
+}
+
 .left-nav ul {
 	list-style: none;
 	padding: 0;
@@ -28,6 +37,7 @@
 	padding: 0 16px 0 16px;
 	text-align: left;
 	color: rgb(100, 100, 100);
+	font-size: 0.85em;
 }
 
 .left-nav ul li h4 {
@@ -35,6 +45,7 @@
 	padding: 0 16px 0 16px;
 	text-align: left;
 	color: rgb(100, 100, 100);
+	font-weight: normal;
 }
 
 .left-nav ul li ul li .md-button {
