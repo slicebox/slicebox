@@ -10,16 +10,12 @@ import java.io.InputStreamReader
 import java.io.OutputStreamWriter
 import java.security.GeneralSecurityException
 import java.text.MessageFormat
-import java.util.List
 import java.util.Properties
 import java.util.ResourceBundle
-import java.util.Set
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
-
 import javax.xml.parsers.ParserConfigurationException
-
 import org.dcm4che3.data.Tag
 import org.dcm4che3.data.UID
 import org.dcm4che3.data.Attributes
@@ -42,15 +38,17 @@ import org.dcm4che3.util.SafeClose
 import org.dcm4che3.util.StringUtils
 import org.dcm4che3.util.TagUtils
 import org.xml.sax.SAXException
-import org.dcm4che3.net.pdu.CommonExtendedNegotiation;
-import scala.collection.JavaConversions
+import org.dcm4che3.net.pdu.CommonExtendedNegotiation
+import scala.collection.JavaConversions._
+import java.nio.file.Path
+import se.vgregion.dicom.DicomProtocol.ScuData
 
 class RelatedGeneralSOPClasses {
 
   val commonExtNegs = scala.collection.mutable.Map.empty[String, CommonExtendedNegotiation]
 
   def init(props: Properties): Unit =
-    for (cuid <- JavaConversions.asScalaSet(props.stringPropertyNames()))
+    for (cuid <- props.stringPropertyNames())
       commonExtNegs.put(cuid, new CommonExtendedNegotiation(cuid, UID.StorageServiceClass, StringUtils.split(props.getProperty(cuid), ','): _*))
 
   def getCommonExtendedNegotiation(cuid: String): CommonExtendedNegotiation = {
@@ -61,6 +59,8 @@ class RelatedGeneralSOPClasses {
       new CommonExtendedNegotiation(cuid, UID.StorageServiceClass)
   }
 }
+
+case class FileInfo(iuid: String, cuid: String, ts: String, endFmi: Long, file: File)
 
 class Scu(ae: ApplicationEntity) {
   val remote = new Connection()
@@ -78,7 +78,6 @@ class Scu(ae: ApplicationEntity) {
   var as: Association = null
 
   var totalSize: Long = 0
-  var filesScanned: Int = 0
   var filesSent: Int = 0
 
   val rspHandlerFactory = new RSPHandlerFactory() {
@@ -93,61 +92,54 @@ class Scu(ae: ApplicationEntity) {
       }
   }
 
-  def sendFiles() = {
-    val fileInfos = new BufferedReader(new InputStreamReader(new FileInputStream(tmpFile)))
+  def addFile(f: File): Option[FileInfo] = {
+    var in: DicomInputStream = null
     try {
-      var finished = false
-      while (as.isReadyForDataTransfer() && !finished) {
-        val line = fileInfos.readLine()
-        if (line != null) {
-          val ss = StringUtils.split(line, '\t')
-          send(new File(ss(4)), ss(3).toLong, ss(1), ss(0), ss(2)) // path=f.getPath(), ?, cuid=Tag.MediaStorageSOPClassUID, iuid=Tag.MediaStorageSOPInstanceUID, ts=Tag.TransferSyntaxUID
-        } else
-          finished = true
+      in = new DicomInputStream(f)
+      in.setIncludeBulkData(IncludeBulkData.NO)
+      var fmi = in.readFileMetaInformation()
+      val dsPos = in.getPosition()
+      val ds = in.readDataset(-1, Tag.PixelData)
+      if (fmi == null || !fmi.containsValue(Tag.TransferSyntaxUID)
+        || !fmi.containsValue(Tag.MediaStorageSOPClassUID)
+        || !fmi.containsValue(Tag.MediaStorageSOPInstanceUID))
+        fmi = ds.createFileMetaInformation(in.getTransferSyntax())
+
+      val cuid = fmi.getString(Tag.MediaStorageSOPClassUID)
+      val iuid = fmi.getString(Tag.MediaStorageSOPInstanceUID)
+      val ts = fmi.getString(Tag.TransferSyntaxUID)
+      if (cuid == null || iuid == null)
+        return None
+
+      val fileInfo = FileInfo(iuid, cuid, ts, dsPos, f)
+
+      if (rq.containsPresentationContextFor(cuid, ts))
+        return Some(fileInfo)
+
+      if (!rq.containsPresentationContextFor(cuid)) {
+        if (relExtNeg)
+          rq.addCommonExtendedNegotiation(relSOPClasses.getCommonExtendedNegotiation(cuid))
+        if (!ts.equals(UID.ExplicitVRLittleEndian))
+          rq.addPresentationContext(new PresentationContext(rq.getNumberOfPresentationContexts() * 2 + 1, cuid, UID.ExplicitVRLittleEndian))
+        if (!ts.equals(UID.ImplicitVRLittleEndian))
+          rq.addPresentationContext(new PresentationContext(rq.getNumberOfPresentationContexts() * 2 + 1, cuid, UID.ImplicitVRLittleEndian))
       }
-      as.waitForOutstandingRSP()
+      rq.addPresentationContext(new PresentationContext(rq
+        .getNumberOfPresentationContexts() * 2 + 1, cuid, ts))
+      Some(fileInfo)
+    } catch {
+      case e: Exception => None
     } finally {
-      SafeClose.close(fileInfos)
+      SafeClose.close(in);
     }
+
   }
 
-  def addFile(fileInfos: BufferedWriter, f: File, endFmi: Long, fmi: Attributes, ds: Attributes): Boolean = {
-    val cuid = fmi.getString(Tag.MediaStorageSOPClassUID)
-    val iuid = fmi.getString(Tag.MediaStorageSOPInstanceUID)
-    val ts = fmi.getString(Tag.TransferSyntaxUID)
-    if (cuid == null || iuid == null)
-      return false
-
-    fileInfos.write(iuid)
-    fileInfos.write('\t')
-    fileInfos.write(cuid)
-    fileInfos.write('\t')
-    fileInfos.write(ts)
-    fileInfos.write('\t')
-    fileInfos.write(endFmi.toString)
-    fileInfos.write('\t')
-    fileInfos.write(f.getPath())
-    fileInfos.newLine()
-
-    if (rq.containsPresentationContextFor(cuid, ts))
-      return true
-
-    if (!rq.containsPresentationContextFor(cuid)) {
-      if (relExtNeg)
-        rq.addCommonExtendedNegotiation(relSOPClasses
-          .getCommonExtendedNegotiation(cuid))
-      if (!ts.equals(UID.ExplicitVRLittleEndian))
-        rq.addPresentationContext(new PresentationContext(rq
-          .getNumberOfPresentationContexts() * 2 + 1, cuid,
-          UID.ExplicitVRLittleEndian))
-      if (!ts.equals(UID.ImplicitVRLittleEndian))
-        rq.addPresentationContext(new PresentationContext(rq
-          .getNumberOfPresentationContexts() * 2 + 1, cuid,
-          UID.ImplicitVRLittleEndian))
-    }
-    rq.addPresentationContext(new PresentationContext(rq
-      .getNumberOfPresentationContexts() * 2 + 1, cuid, ts))
-    true
+  def sendFiles(fileInfos: List[FileInfo]) = {
+    fileInfos.foreach(fileInfo =>
+      if (as.isReadyForDataTransfer)
+        send(fileInfo.file, fileInfo.endFmi, fileInfo.cuid, fileInfo.iuid, fileInfo.ts))
+    as.waitForOutstandingRSP()
   }
 
   def send(f: File, fmiEndPos: Long, cuid: String, iuid: String, filets: String): Unit = {
@@ -210,9 +202,9 @@ class Scu(ae: ApplicationEntity) {
   }
 }
 
-object Scp {
+object Scu {
 
-  def main(): Unit = {
+  def sendFiles(scuData: ScuData, files: List[Path]): Unit = {
     val device = new Device("storescu")
     val conn = new Connection()
     device.addConnection(conn)
@@ -220,31 +212,19 @@ object Scp {
     device.addApplicationEntity(ae)
     ae.addConnection(conn)
     val main = new Scu(ae)
-    //configureTmpFile(main, cl)
-    //CLIUtils.configureConnect(main.remote, main.rq, cl)
-    //CLIUtils.configureBind(conn, ae, cl)
-    //CLIUtils.configure(conn, cl)
-    //configureRelatedSOPClass(main, cl)
-    // main.setAttributes(new Attributes())
-    //CLIUtils.addAttributes(main.attrs, cl.getOptionValues("s"))
-    //main.setUIDSuffix(cl.getOptionValue("uid-suffix"))
-    //main.setPriority(CLIUtils.priorityOf(cl))
-    //List<String> argList = cl.getArgList()
 
-    // main.scanFiles(argList) // TODO
-    val n = main.filesScanned
-    if (n == 0)
+    val fileInfos = files.map(_.toFile).map(main.addFile(_)).flatten
+
+    if (fileInfos.isEmpty)
       return
 
-    val executorService = Executors
-      .newSingleThreadExecutor()
-    val scheduledExecutorService = Executors
-      .newSingleThreadScheduledExecutor()
+    val executorService = Executors.newSingleThreadExecutor()
+    val scheduledExecutorService = Executors.newSingleThreadScheduledExecutor()
     device.setExecutor(executorService)
     device.setScheduledExecutor(scheduledExecutorService)
     try {
       main.open()
-      main.sendFiles()
+      main.sendFiles(fileInfos)
     } finally {
       main.close()
       executorService.shutdown()

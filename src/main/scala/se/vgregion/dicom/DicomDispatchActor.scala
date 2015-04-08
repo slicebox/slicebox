@@ -17,9 +17,9 @@ class DicomDispatchActor(storage: Path, dbProps: DbProps) extends Actor {
 
   val directoryService = context.actorOf(DirectoryWatchServiceActor.props(dbProps, storage), "DirectoryService")
 
-  val scpService = context.actorOf(ScuServiceActor.props(dbProps), "ScpService")
+  val scpService = context.actorOf(ScpServiceActor.props(dbProps), "ScpService")
 
-  val scuService = context.actorOf(ScuServiceActor.props(dbProps), "ScuService")
+  val scuService = context.actorOf(ScuServiceActor.props(dbProps, storage), "ScuService")
 
   val storageActor = context.actorOf(DicomStorageActor.props(dbProps, storage).withDispatcher("akka.prio-dispatcher"), name = "Storage")
 

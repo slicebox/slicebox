@@ -79,7 +79,7 @@ object DicomProtocol {
 
   case object GetScus extends ScuRequest 
 
-  case class SendSeries(seriesId: Long, scuId: Long) extends ScuRequest
+  case class SendSeriesToScp(seriesId: Long, scuId: Long) extends ScuRequest
   
   case class Scus(scps: Seq[ScuData]) 
 
@@ -148,6 +148,8 @@ object DicomProtocol {
 
   case class ScuRemoved(scuDataId: Long)
 
+  case class ImagesSentToScp(scuId: Long, imageIds: Seq[Long])
+  
 
   // ***from scp***
 

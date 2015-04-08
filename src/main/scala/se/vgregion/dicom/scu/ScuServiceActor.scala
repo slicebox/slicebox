@@ -1,33 +1,30 @@
 package se.vgregion.dicom.scu
 
 import java.nio.file.Path
-import java.util.concurrent.Executors
 import scala.language.postfixOps
+import scala.concurrent.Future
 import akka.actor.Actor
 import akka.actor.PoisonPill
 import akka.actor.Props
 import akka.event.Logging
 import akka.event.LoggingReceive
+import akka.pattern.pipe
 import se.vgregion.app.DbProps
 import se.vgregion.dicom.DicomMetaDataDAO
 import se.vgregion.dicom.DicomDispatchActor
 import se.vgregion.dicom.DicomProtocol._
 import se.vgregion.util.ExceptionCatching
 
-class ScuServiceActor(dbProps: DbProps) extends Actor with ExceptionCatching {
+class ScuServiceActor(dbProps: DbProps, storage: Path) extends Actor with ExceptionCatching {
   val log = Logging(context.system, this)
 
   val db = dbProps.db
   val dao = new ScuDataDAO(dbProps.driver)
   val metaDataDao = new DicomMetaDataDAO(dbProps.driver)
 
-  val executor = Executors.newCachedThreadPool()
+  implicit val ec = context.dispatcher
 
   setupDb()
-
-  override def postStop() {
-    executor.shutdown()
-  }
 
   def receive = LoggingReceive {
 
@@ -66,9 +63,14 @@ class ScuServiceActor(dbProps: DbProps) extends Actor with ExceptionCatching {
             val scus = getScus()
             sender ! Scus(scus)
 
-          case SendSeries(seriesId, scuId) =>
+          case SendSeriesToScp(seriesId, scuId) =>
             scuForId(scuId).map(scu => {
               val imageFiles = imageFilesForSeries(seriesId)
+              Future {
+                Scu.sendFiles(scu, imageFiles.map(imageFile => storage.resolve(imageFile.fileName.value)))
+              }
+                .map(r => ImagesSentToScp(scuId, imageFiles.map(_.id)))
+                .pipeTo(sender)
             }).orElse(throw new IllegalArgumentException(s"SCU with id $scuId not found"))
         }
       }
@@ -114,9 +116,9 @@ class ScuServiceActor(dbProps: DbProps) extends Actor with ExceptionCatching {
     db.withSession { implicit session =>
       metaDataDao.imageFilesForSeries(seriesId)
     }
-  
+
 }
 
 object ScuServiceActor {
-  def props(dbProps: DbProps): Props = Props(new ScuServiceActor(dbProps))
+  def props(dbProps: DbProps, storage: Path): Props = Props(new ScuServiceActor(dbProps, storage))
 }
