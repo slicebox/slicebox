@@ -46,9 +46,10 @@
 			<md-button ng-click="toggleLeftNav()" hide-gt-md>
 				<i class="fa fa-bars fa-lg"></i>
 			</md-button>
-			
-			<div ng-if="angular.isDefined(userSignedIn())">
-				<img class="slicebox-logo-image" src="/assets/images/logo_white-transparent-35x35.png"/><h5 class="slicebox-logo-text">Slicebox</h5>
+
+			<div ng-if="userSignedIn()" layout="row" layout-align="start center">
+				<img src="/assets/images/logo_white.svg" class="toolbar-logo-image"/>
+				<h4 class="toolbar-logo-text">Slicebox</h4>
 			</div>
 			<span flex></span>
 			<md-button ng-if="userSignedIn()" href="" ng-click="logout()">
@@ -63,7 +64,10 @@
 	<section layout="row" flex class="left-nav">
 		<md-sidenav ng-if="userSignedIn()" md-component-id="leftNav" class="md-sidenav-left md-whiteframe-z2" md-is-locked-open="$mdMedia('gt-md')">
 			<md-toolbar hide-gt-md>
-				<h1 class="md-toolbar-tools">Slicebox</h1>
+				<div layout="row" layout-align="start center">
+					<img src="/assets/images/logo_white.svg" class="toolbar-logo-image"/>
+					<h4 class="toolbar-logo-text">Slicebox</h4>
+				</div>
 			</md-toolbar>
 			<md-content>	
 				<ul>
