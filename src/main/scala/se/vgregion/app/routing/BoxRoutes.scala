@@ -87,15 +87,6 @@ trait BoxRoutes { this: RestApi =>
             }
           }
         }
-      } ~ path(LongNumber / "sendimages") { remoteBoxId =>
-        post {
-          entity(as[Seq[Long]]) { imageIds =>
-            onSuccess(boxService.ask(SendImagesToRemoteBox(remoteBoxId, imageIds))) {
-              case ImagesSent(remoteBoxId, imageIds) => complete(NoContent)
-              case BoxNotFound                       => complete(NotFound)
-            }
-          }
-        }
       }
     }
 

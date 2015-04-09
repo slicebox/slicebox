@@ -68,9 +68,7 @@ class ScuServiceActor(dbProps: DbProps, storage: Path) extends Actor with Except
               val imageFiles = imageFilesForSeries(seriesId)
               Future {
                 Scu.sendFiles(scu, imageFiles.map(imageFile => storage.resolve(imageFile.fileName.value)))
-              }
-                .map(r => ImagesSentToScp(scuId, imageFiles.map(_.id)))
-                .pipeTo(sender)
+              }.map(r => ImagesSentToScp(scuId, imageFiles.map(_.id))).pipeTo(sender)
             }).orElse(throw new IllegalArgumentException(s"SCU with id $scuId not found"))
         }
       }

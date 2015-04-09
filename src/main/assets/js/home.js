@@ -44,16 +44,13 @@ angular.module('slicebox.home', ['ngRoute'])
                 action: confirmSendSeries
             },
             {
+                name: 'Send to SCP',
+                requiredSelectionCount: 1,
+                action: confirmSendSeriesToScp
+            },   
+            {
                 name: 'Delete',
                 action: confirmDeleteSeries
-            }
-        ];
-
-    $scope.fileImageActions =
-        [
-            {
-                name: 'Send',
-                action: confirmSendImageFiles
             }
         ];
 
@@ -388,42 +385,19 @@ angular.module('slicebox.home', ['ngRoute'])
         return $q.all(deletePromises);
     }
 
-    function confirmSendImageFiles(imageFiles) {
-        var modalInstance = $modal.open({
-                templateUrl: '/assets/partials/sendImageFilesModalContent.html',
-                controller: 'SendImageFilesModalCtrl',
-                resolve: {
-                    title: function() {
-                        return 'Send ' + imageFiles.length + ' Image Files';
-                    },
-                    sendCallback: function() {
-                        return function(remoteBoxId) {
-                            return sendImageFiles(remoteBoxId, imageFiles);
-                        };
-                    }
-                }
-            });
-    }
-
-    function sendImageFiles(remoteBoxId, imageFiles) {
-        var imageIds = [];
-
-        angular.forEach(imageFiles, function(imageFile) {
-            imageIds.push(imageFile.id);
-        });
-
-        return $http.post('/api/boxes/' + remoteBoxId + '/sendimages', imageIds);
-    }
-
     function confirmSendSeries(series) {
         return $mdDialog.show({
                 templateUrl: '/assets/partials/sendImageFilesModalContent.html',
                 controller: 'SendImageFilesModalCtrl',
+                scope: $scope.$new(),
                 locals: {
                     title: 'Send ' + series.length + ' Series',
+                    receiversCallback: function(startIndex, count, orderByProperty, orderByDirection) {
+                        return $http.get('/api/boxes');
+                    },
                     sendCallback: function(remoteBoxId) {
-                            return sendSeries(remoteBoxId, series);
-                        }
+                        return sendSeries(remoteBoxId, series);
+                    }
                 }
             });
     }
@@ -438,12 +412,37 @@ angular.module('slicebox.home', ['ngRoute'])
         return $http.post('/api/boxes/' + remoteBoxId + '/sendseries', seriesIds);
     }
 
+    function confirmSendSeriesToScp(series) {
+        return $mdDialog.show({
+                templateUrl: '/assets/partials/sendImageFilesModalContent.html',
+                controller: 'SendImageFilesModalCtrl',
+                scope: $scope.$new(),
+                locals: {
+                    title: 'Send ' + series.length + ' Series',
+                    receiversCallback: function(startIndex, count, orderByProperty, orderByDirection) {
+                        return $http.get('/api/scus');
+                    },
+                    sendCallback: function(scuId) {
+                            return sendSeriesToScp(scuId, series);
+                        }
+                }
+            });
+    }
+
+    function sendSeriesToScp(scuId, series) {
+        return $http.post('/api/scus/' + scuId + '/sendseries/' + series[0].id);
+    }
+
     function confirmSendStudies(studies) {
         return $mdDialog.show({
                 templateUrl: '/assets/partials/sendImageFilesModalContent.html',
                 controller: 'SendImageFilesModalCtrl',
+                scope: $scope.$new(),
                 locals: {
                     title: 'Send ' + studies.length + ' Studies',
+                    receiversCallback: function(startIndex, count, orderByProperty, orderByDirection) {
+                        return $http.get('/api/boxes');
+                    },
                     sendCallback: function(remoteBoxId) {
                             return sendStudies(remoteBoxId, studies);
                         }
@@ -465,8 +464,12 @@ angular.module('slicebox.home', ['ngRoute'])
         return $mdDialog.show({
                 templateUrl: '/assets/partials/sendImageFilesModalContent.html',
                 controller: 'SendImageFilesModalCtrl',
+                scope: $scope.$new(),
                 locals: {
                     title: 'Send ' + patients.length + ' Patients',
+                    receiversCallback: function(startIndex, count, orderByProperty, orderByDirection) {
+                        return $http.get('/api/boxes');
+                    },
                     sendCallback: function(remoteBoxId) {
                             return sendPatients(remoteBoxId, patients);
                         }
@@ -486,22 +489,16 @@ angular.module('slicebox.home', ['ngRoute'])
 
 })
 
-.controller('SendImageFilesModalCtrl', function($scope, $mdDialog, $http, $q, title, sendCallback) {
+.controller('SendImageFilesModalCtrl', function($scope, $mdDialog, $http, $q, title, receiversCallback, sendCallback) {
     // Initialization
     $scope.title = title;
+    $scope.loadReceivers = receiversCallback;
 
-    $scope.uiState = {
-        errorMessages: [],
-        selectedReceiver: null
-    };
+    $scope.uiState.selectedReceiver = null;
 
     // Scope functions
-    $scope.loadBoxesPage = function(startIndex, count, orderByProperty, orderByDirection) {
-        return $http.get('/api/boxes');
-    };
-
-    $scope.boxSelected = function(box) {
-        $scope.uiState.selectedReceiver = box;
+    $scope.receiverSelected = function(receiver) {
+        $scope.uiState.selectedReceiver = receiver;
     };
 
     $scope.sendButtonClicked = function() {
@@ -510,7 +507,7 @@ angular.module('slicebox.home', ['ngRoute'])
         $scope.uiState.sendInProgress = true;
 
         sendPromise.error(function(data) {
-            $scope.uiState.errorMessages.push(data);
+            $scope.showErrorMessage('Failed to send: ' + data);
         });
 
         sendPromise.then(function() {
@@ -526,7 +523,4 @@ angular.module('slicebox.home', ['ngRoute'])
         $mdDialog.cancel();
     };
 
-    $scope.closeErrorMessageAlert = function(errorIndex) {
-        $scope.uiState.errorMessages.splice(errorIndex, 1);
-    };
 });

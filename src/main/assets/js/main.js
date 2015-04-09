@@ -15,6 +15,7 @@ angular.module('slicebox', [
     'slicebox.transactions',
     'slicebox.log',
     'slicebox.adminScps',
+    'slicebox.adminScus',
     'slicebox.adminWatchDirectories',
     'slicebox.adminBoxes',
     'slicebox.adminUsers'

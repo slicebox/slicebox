@@ -117,24 +117,6 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
   }
 
-  it should "return a no content message when asked to send images" in {
-    PostAsAdmin("/api/boxes/1/sendimages", Seq(1)) ~> routes ~> check {
-      status should be(NoContent)
-    }
-  }
-
-  it should "return a no content message when asked to send images with empty image ids list" in {
-    PostAsAdmin("/api/boxes/1/sendimages", Seq[Long]()) ~> routes ~> check {
-      status should be(NoContent)
-    }
-  }
-
-  it should "return a not found message when asked to send images with unknown box id" in {
-    PostAsAdmin("/api/boxes/999/sendimages", Seq(1)) ~> sealRoute(routes) ~> check {
-      status should be(NotFound)
-    }
-  }
-
   it should "support removing a box" in {
     DeleteAsAdmin("/api/boxes/1") ~> routes ~> check {
       status should be(NoContent)
@@ -216,9 +198,9 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
         boxes.filter(_.token == token).toList(0)
       }
 
-    // send image which adds outbox entry
-    val imageId = 987
-    PostAsUser(s"/api/boxes/${remoteBox.id}/sendimages", Array(imageId)) ~> routes ~> check {
+    // send series which adds outbox entry
+    val seriesId = 1
+    PostAsUser(s"/api/boxes/${remoteBox.id}/sendseries", Array(seriesId)) ~> routes ~> check {
       status should be(NoContent)
     }
 
@@ -229,7 +211,6 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       val outboxEntry = responseAs[OutboxEntry]
 
       outboxEntry.remoteBoxId should be(remoteBox.id)
-      outboxEntry.imageId should be(imageId)
       outboxEntry.sequenceNumber should be(1)
       outboxEntry.totalImageCount should be(1)
       outboxEntry.failed should be(false)
@@ -268,9 +249,9 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
         boxes.filter(_.token == token).toList(0)
       }
 
-    // send image which adds outbox entry
-    val imageId = 1
-    PostAsUser(s"/api/boxes/${remoteBox.id}/sendimages", Array(imageId)) ~> routes ~> check {
+    // send series which adds outbox entry
+    val seriesId = 1
+    PostAsUser(s"/api/boxes/${remoteBox.id}/sendseries", Array(seriesId)) ~> routes ~> check {
       status should be(NoContent)
     }
 
@@ -317,9 +298,9 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
         boxes.filter(_.token == token).toList(0)
       }
 
-    // send image which adds outbox entry
-    val imageId = 1
-    PostAsUser(s"/api/boxes/${remoteBox.id}/sendimages", Array(imageId)) ~> routes ~> check {
+    // send series which adds outbox entry
+    val seriesId = 1
+    PostAsUser(s"/api/boxes/${remoteBox.id}/sendseries", Array(seriesId)) ~> routes ~> check {
       status should be(NoContent)
     }
 

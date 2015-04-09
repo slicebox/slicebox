@@ -65,31 +65,29 @@ case class FileInfo(iuid: String, cuid: String, ts: String, endFmi: Long, file: 
 class Scu(ae: ApplicationEntity) {
   val remote = new Connection()
   val rq = new AAssociateRQ()
-  rq.addPresentationContext(new PresentationContext(1, UID.VerificationSOPClass, UID.ImplicitVRLittleEndian))
+  
+  val relSOPClasses = new RelatedGeneralSOPClasses()
 
+  val relExtNeg: Boolean = false
+  val priority: Int = 0
+  var as: Association = null
+  
+  rq.addPresentationContext(new PresentationContext(1, UID.VerificationSOPClass, UID.ImplicitVRLittleEndian))
+  
   trait RSPHandlerFactory {
     def createDimseRSPHandler(f: File): DimseRSPHandler
   }
 
-  val relSOPClasses = new RelatedGeneralSOPClasses()
-
-  var relExtNeg: Boolean = false
-  var priority: Int = 0
-  var as: Association = null
-
-  var totalSize: Long = 0
-  var filesSent: Int = 0
-
   val rspHandlerFactory = new RSPHandlerFactory() {
-
-    override def createDimseRSPHandler(f: File): DimseRSPHandler =
-      new DimseRSPHandler(as.nextMessageID()) {
-
-        override def onDimseRSP(as: Association, cmd: Attributes, data: Attributes): Unit = {
-          super.onDimseRSP(as, cmd, data)
-          Scu.this.onCStoreRSP(cmd, f)
-        }
-      }
+	  
+	  override def createDimseRSPHandler(f: File): DimseRSPHandler =
+			  new DimseRSPHandler(as.nextMessageID()) {
+		  
+		  override def onDimseRSP(as: Association, cmd: Attributes, data: Attributes): Unit = {
+				  super.onDimseRSP(as, cmd, data)
+				  Scu.this.onCStoreRSP(cmd, f)
+		  }
+	  }
   }
 
   def addFile(f: File): Option[FileInfo] = {
@@ -183,18 +181,13 @@ class Scu(ae: ApplicationEntity) {
     val status = cmd.getInt(Tag.Status, -1)
     val hej = status match {
       case Status.Success =>
-        filesSent += 1
-        totalSize += f.length()
       case Status.CoercionOfDataElements =>
       case Status.ElementsDiscarded      =>
       case Status.DataSetDoesNotMatchSOPClassWarning =>
-        filesSent += 1
-        totalSize += f.length()
         System.err.println(MessageFormat.format("warning",
           TagUtils.shortToHexString(status), f))
         System.err.println(cmd)
       case _ =>
-        print('E')
         System.err.println(MessageFormat.format("error",
           TagUtils.shortToHexString(status), f))
         System.err.println(cmd)
@@ -222,6 +215,7 @@ object Scu {
     val scheduledExecutorService = Executors.newSingleThreadScheduledExecutor()
     device.setExecutor(executorService)
     device.setScheduledExecutor(scheduledExecutorService)
+    
     try {
       main.open()
       main.sendFiles(fileInfos)

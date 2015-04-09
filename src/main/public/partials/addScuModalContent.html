@@ -1,6 +1,6 @@
-<md-dialog aria-label="Add Dicom SCP" class="add-scp">
+<md-dialog aria-label="Add Dicom SCU" class="add-scu">
     <md-content class="sticky-container">
-        <md-subheader class="md-sticky-no-effect">Add Dicom SCP</md-subheader>
+        <md-subheader class="md-sticky-no-effect">Add Dicom SCU</md-subheader>
         <div class="dialog-content">
             <md-input-container>
                 <label>Name</label>
@@ -13,6 +13,11 @@
             </md-input-container>
 
             <md-input-container>
+                <label>Host</label>
+                <input type="text" ng-model="host">
+            </md-input-container>
+
+            <md-input-container>
                 <label>Port</label>
                 <input type="number" ng-model="port">
             </md-input-container>            
@@ -22,6 +27,6 @@
     <div class="md-actions" layout="row">
         <span flex></span>
         <md-button ng-click="cancelButtonClicked()">Cancel</md-button>
-        <sbx-button button-class="md-primary" button-title="Add" action="addButtonClicked()" ng-disabled="!(name && aeTitle && port)"></sbx-button>
+        <sbx-button button-class="md-primary" button-title="Add" action="addButtonClicked()" ng-disabled="!(name && aeTitle && host && port)"></sbx-button>
     </div>
 </md-dialog>

@@ -3,7 +3,6 @@ package se.vgregion.dicom.scp
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
 import java.util.concurrent.ThreadFactory
-
 import akka.actor.Actor
 import akka.actor.ActorRef
 import akka.actor.PoisonPill
@@ -11,6 +10,8 @@ import akka.actor.Props
 import akka.event.Logging
 import akka.event.LoggingReceive
 import se.vgregion.dicom.DicomProtocol._
+import se.vgregion.log.LogProtocol._
+import java.util.Date
 
 class ScpActor(scpData: ScpData, executor: Executor) extends Actor {
   val log = Logging(context.system, this)
@@ -27,12 +28,12 @@ class ScpActor(scpData: ScpData, executor: Executor) extends Actor {
   scp.device.setScheduledExecutor(scheduledExecutor)
   scp.device.setExecutor(executor)
   scp.device.bindConnections()
-  log.info(s"Started SCP ${scpData.name} with AE title ${scpData.aeTitle} on port ${scpData.port}")
+  context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "SCP", s"Started SCP ${scpData.name} with AE title ${scpData.aeTitle} on port ${scpData.port}")))
 
   override def postStop() {
     scp.device.unbindConnections()
     scheduledExecutor.shutdown()
-    log.info(s"Stopped SCP ${scpData.name}")
+    context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "SCP", s"Stopped SCP ${scpData.name}")))
   }
 
   def receive = LoggingReceive {

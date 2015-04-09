@@ -14,7 +14,7 @@ import se.vgregion.dicom.DicomProtocol._
 
 trait ScuRoutes { this: RestApi =>
 
-def scuRoutes(authInfo: AuthInfo): Route =
+  def scuRoutes(authInfo: AuthInfo): Route =
     pathPrefix("scus") {
       pathEndOrSingleSlash {
         get {
@@ -32,12 +32,20 @@ def scuRoutes(authInfo: AuthInfo): Route =
             }
           }
         }
-      } ~ path(LongNumber) { scuDataId =>
-        delete {
-          authorize(authInfo.hasPermission(UserRole.ADMINISTRATOR)) {
-            onSuccess(dicomService.ask(RemoveScu(scuDataId))) {
-              case ScuRemoved(scuDataId) =>
-                complete(NoContent)
+      } ~ pathPrefix(LongNumber) { scuDataId =>
+        pathEndOrSingleSlash {
+          delete {
+            authorize(authInfo.hasPermission(UserRole.ADMINISTRATOR)) {
+              onSuccess(dicomService.ask(RemoveScu(scuDataId))) {
+                case ScuRemoved(scuDataId) =>
+                  complete(NoContent)
+              }
+            }
+          }
+        } ~ path("sendseries" / LongNumber) { seriesId =>
+          post {
+            onSuccess(dicomService.ask(SendSeriesToScp(seriesId, scuDataId))) {
+              case ImagesSentToScp(scuDataId, imageIds) => complete(NoContent)
             }
           }
         }
