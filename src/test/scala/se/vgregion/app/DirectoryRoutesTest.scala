@@ -62,8 +62,6 @@ class DirectoryRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     // sleep for a while and let the OS find out there was a new file in the watched directory. It will be picked up by slicebox
     Thread.sleep(1000)
     
-    println(s"Number of files: ${tempDir.toFile().listFiles().length}");
-
     GetAsUser("/api/metadata/patients") ~> routes ~> check {
       status should be(OK)
       responseAs[List[Patient]].size should be(1)
