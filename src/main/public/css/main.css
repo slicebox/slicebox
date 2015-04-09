@@ -8,6 +8,37 @@
 	background-color: rgba(0, 0, 0, 0);
 }
 
+.slicebox .toolbar-logo-text {
+	font-weight: 300;
+}
+
+.slicebox .toolbar-logo-image {
+	width: 35px;
+	height: 35px;
+	margin-bottom: 12px; 
+	margin-right: 3px;
+	margin-left: 5px;
+}
+
+.slicebox .login-logo-text {
+	font-size: 3.4em; 
+	color: #37474F;	
+	font-weight: 300;
+	margin-bottom: 0px;
+}
+
+.slicebox .login-logo-subtext {
+	color: #37474F;
+	font-weight: 300;
+	font-style: italic;
+}
+
+.slicebox .login-logo-image {
+	height: 100px;
+	width: 100px;
+	margin-bottom: 5px;
+}
+
 .left-nav ul {
 	list-style: none;
 	padding: 0;
@@ -28,6 +59,7 @@
 	padding: 0 16px 0 16px;
 	text-align: left;
 	color: rgb(100, 100, 100);
+	font-size: 0.9em;
 }
 
 .left-nav ul li h4 {
@@ -35,6 +67,7 @@
 	padding: 0 16px 0 16px;
 	text-align: left;
 	color: rgb(100, 100, 100);
+	font-weight: normal;
 }
 
 .left-nav ul li ul li .md-button {

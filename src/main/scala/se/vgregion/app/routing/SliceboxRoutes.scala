@@ -47,7 +47,7 @@ trait SliceboxRoutes extends DirectoryRoutes
       pathPrefix("assets") {
         staticResourcesRoute
       } ~ pathPrefixTest(!"assets") {
-        loginRoute ~ angularRoute
+        loginRoute ~ faviconRoutes ~ angularRoute
       }
     }
 

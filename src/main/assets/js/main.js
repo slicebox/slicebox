@@ -25,8 +25,8 @@ angular.module('slicebox', [
     $routeProvider.otherwise({redirectTo: '/'});
 
     $mdThemingProvider.theme('default')
-        .primaryPalette('green', {
-            'default': '700',
+        .primaryPalette('blue-grey', {
+            'default': '600',
         })
         .accentPalette('pink')
         .warnPalette('red');
