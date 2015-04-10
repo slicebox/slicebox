@@ -62,32 +62,36 @@ class RelatedGeneralSOPClasses {
 
 case class FileInfo(iuid: String, cuid: String, ts: String, endFmi: Long, file: File)
 
-class Scu(ae: ApplicationEntity) {
+class Scu(ae: ApplicationEntity, scuData: ScuData) {
   val remote = new Connection()
   val rq = new AAssociateRQ()
-  
+
   val relSOPClasses = new RelatedGeneralSOPClasses()
 
   val relExtNeg: Boolean = false
   val priority: Int = 0
   var as: Association = null
-  
+
   rq.addPresentationContext(new PresentationContext(1, UID.VerificationSOPClass, UID.ImplicitVRLittleEndian))
-  
+  rq.setCalledAET(scuData.aeTitle);
+
+  remote.setHostname(scuData.host)
+  remote.setPort(scuData.port)
+
   trait RSPHandlerFactory {
     def createDimseRSPHandler(f: File): DimseRSPHandler
   }
 
   val rspHandlerFactory = new RSPHandlerFactory() {
-	  
-	  override def createDimseRSPHandler(f: File): DimseRSPHandler =
-			  new DimseRSPHandler(as.nextMessageID()) {
-		  
-		  override def onDimseRSP(as: Association, cmd: Attributes, data: Attributes): Unit = {
-				  super.onDimseRSP(as, cmd, data)
-				  Scu.this.onCStoreRSP(cmd, f)
-		  }
-	  }
+
+    override def createDimseRSPHandler(f: File): DimseRSPHandler =
+      new DimseRSPHandler(as.nextMessageID()) {
+
+        override def onDimseRSP(as: Association, cmd: Attributes, data: Attributes): Unit = {
+          super.onDimseRSP(as, cmd, data)
+          Scu.this.onCStoreRSP(cmd, f)
+        }
+      }
   }
 
   def addFile(f: File): Option[FileInfo] = {
@@ -180,7 +184,7 @@ class Scu(ae: ApplicationEntity) {
   def onCStoreRSP(cmd: Attributes, f: File): Unit = {
     val status = cmd.getInt(Tag.Status, -1)
     val hej = status match {
-      case Status.Success =>
+      case Status.Success                =>
       case Status.CoercionOfDataElements =>
       case Status.ElementsDiscarded      =>
       case Status.DataSetDoesNotMatchSOPClassWarning =>
@@ -198,15 +202,16 @@ class Scu(ae: ApplicationEntity) {
 object Scu {
 
   def sendFiles(scuData: ScuData, files: List[Path]): Unit = {
-    val device = new Device("storescu")
-    val conn = new Connection()
-    device.addConnection(conn)
-    val ae = new ApplicationEntity("STORESCU")
+    val device = new Device("slicebox-scu")
+    val connection = new Connection()
+    device.addConnection(connection)
+    val ae = new ApplicationEntity("SLICEBOX-SCU")
     device.addApplicationEntity(ae)
-    ae.addConnection(conn)
-    val main = new Scu(ae)
+    ae.addConnection(connection)
 
-    val fileInfos = files.map(_.toFile).map(main.addFile(_)).flatten
+    val scu = new Scu(ae, scuData)
+
+    val fileInfos = files.map(_.toFile).map(scu.addFile(_)).flatten
 
     if (fileInfos.isEmpty)
       return
@@ -215,14 +220,14 @@ object Scu {
     val scheduledExecutorService = Executors.newSingleThreadScheduledExecutor()
     device.setExecutor(executorService)
     device.setScheduledExecutor(scheduledExecutorService)
-    
+
     try {
-      main.open()
-      main.sendFiles(fileInfos)
+      scu.open
+      scu.sendFiles(fileInfos)
     } finally {
-      main.close()
-      executorService.shutdown()
-      scheduledExecutorService.shutdown()
+      scu.close
+      executorService.shutdown
+      scheduledExecutorService.shutdown
     }
   }
 
