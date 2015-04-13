@@ -179,11 +179,11 @@ td div.progress {
 	margin-top: 10px;
 }
 
-.admin-scps {
+.admin-pacs {
 	margin: 20px;
 }
 
-.admin-scps .button-row {
+.admin-pacs .button-row {
 	margin-top: 10px;
 }
 
@@ -195,7 +195,7 @@ td div.progress {
 	margin-top: 10px;
 }
 
-.add-scp input {
+.add-scpscu input {
 	min-width: 400px;
 }
 

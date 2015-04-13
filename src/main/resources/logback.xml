@@ -3,14 +3,14 @@
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <target>System.out</target>
         <encoder>
-            <!--<pattern>%date{MM/dd HH:mm:ss} %-6level[%logger{0}]: %msg%n</pattern>-->
-            <pattern>%-6level[%logger{0}]: %msg%n</pattern>
+            <pattern>%date{HH:mm:ss:sss} %-6level: %msg%n</pattern>
+            <!--<pattern>%-6level[%logger{0}]: %msg%n</pattern>-->
         </encoder>
     </appender>
 
     <!-- <logger name="akka" level="DEBUG" />  -->
-    <logger name="spray" level="INFO" />
-	<logger name="scala.slick" level="INFO" />
+    <logger name="spray" level="ERROR" />
+	<logger name="scala.slick" level="ERROR" />
     <logger name="com.mchange" level="ERROR" />
 	<!-- <logger name="scala.slick.jdbc.JdbcBackend.statement" level="DEBUG" /> -->
 	<logger name="org.dcm4che3" level="ERROR" />

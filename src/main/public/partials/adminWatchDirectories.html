@@ -1,19 +1,23 @@
-<div layout="column" layout-margin class="admin-watchdirectories">
-    <sbx-grid
-        load-page="loadWatchDirectoriesPage(startIndex, count, orderByProperty, orderByDirection)"
-        page-size="20"
-        object-actions="objectActions"
-        callbacks="callbacks.directoriesTable"
-        empty-message="No watch directories added">
+<div layout="column" layout-margin>
+    <div class="admin-watchdirectories">
+        <h4>Watch local file system directories</h4>
+        <h5>Files and folders dropped in theses locations will be picked up by Slicebox</h5>
+        <sbx-grid
+            load-page="loadWatchDirectoriesPage(startIndex, count, orderByProperty, orderByDirection)"
+            page-size="20"
+            object-actions="objectActions"
+            callbacks="callbacks.directoriesTable"
+            empty-message="No watch directories added">
 
-        <sbx-grid-column property="path" title="Path">
-        </sbx-grid-column>
-    </sbx-grid>
+            <sbx-grid-column property="path" title="Path">
+            </sbx-grid-column>
+        </sbx-grid>
 
-    <div layout="row" class="button-row">
-        <md-button class="md-primary md-raised" ng-click="addDirectoryButtonClicked()" ng-disabled="uiState.addDirectoryInProgress">
-            Add Directory
-        </md-button>
-        <div flex></div>
-	</div>
+        <div layout="row" class="button-row">
+            <md-button class="md-primary md-raised" ng-click="addDirectoryButtonClicked()" ng-disabled="uiState.addDirectoryInProgress">
+                Add Directory
+            </md-button>
+            <div flex></div>
+    	</div>
+    </div>
 </div>
