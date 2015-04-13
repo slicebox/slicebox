@@ -14,7 +14,7 @@ angular.module('slicebox.transactions', ['ngRoute'])
 .controller('TransactionsCtrl', function($scope) {
 })
 
-.controller('InboxCtrl', function($scope, $http, $q, $interval) {
+.controller('InboxCtrl', function($scope, $http, $interval) {
 
     $scope.callbacks = {};
 
@@ -39,7 +39,7 @@ angular.module('slicebox.transactions', ['ngRoute'])
         [
             {
                 name: 'Delete',
-                action: confirmDeleteOutboxEntries
+                action: confirmDeleteEntities
             }
         ];
 
@@ -95,44 +95,47 @@ angular.module('slicebox.transactions', ['ngRoute'])
         return pageData;
     };
 
-    // Private functions
-    function confirmDeleteOutboxEntries(outboxTransactionDataObjects) {
-        var deleteConfirmationText = 'Permanently delete ' + outboxTransactionDataObjects.length + ' transactions?';
+    // private functions
+    function confirmDeleteEntities(entities) {
+        var deleteConfirmationText = 'Permanently delete ' + entities.length + ' transaction(s)?';
 
-        return openConfirmationDeleteModal('Delete Transactions', deleteConfirmationText, function() {
-            return deleteOutboxEntries(outboxTransactionDataObjects);
+        return openConfirmationDeleteModal('Delete transaction(s)', deleteConfirmationText, function() {
+            return deleteEntities(entities);
         });
     }
 
-    function deleteOutboxEntries(outboxTransactionDataObjects) {
+    function deleteEntities(entities) {
         var deletePromises = [];
         var deletePromise;
-        var deleteAllPromies;
+        var deleteAllPromises;
 
-        angular.forEach(outboxTransactionDataObjects, function(outboxTransactionData) {
-            for (var i = 0; i < outboxTransactionData.outboxEntryIds.length; i++) {
-                deletePromise = $http.delete('/api/outbox/' + outboxTransactionData.outboxEntryIds[i]);
+        angular.forEach(entities, function(entity) {
+            for (var i = 0; i < entity.outboxEntryIds.length; i++) {
+                deletePromise = $http.delete('/api/outbox/' + entity.outboxEntryIds[i]);
                 deletePromises.push(deletePromise);
             }
         });
 
-        deleteAllPromies = $q.all(deletePromises);
+        deleteAllPromises = $q.all(deletePromises);
 
-        deleteAllPromies.then(null, function(response) {
+        deleteAllPromises.then(function() {
+            $scope.showInfoMessage(entities.length + " transaction(s) deleted");
+        }, function(response) {
             $scope.showErrorMessage(response.data);
         });
 
-        return deleteAllPromies;
+        return deleteAllPromises;
     }
+
 })
 
-.controller('BoxLogCtrl', function($scope, $http, $interval, $q, openConfirmationDeleteModal) {
+.controller('BoxLogCtrl', function($scope, $http, $interval) {
     // Initialization
     $scope.actions =
         [
             {
                 name: 'Delete',
-                action: confirmDeleteLogs
+                action: $scope.confirmDeleteEntitiesFunction('/api/log/', 'log message(s)')
             }
         ];
 
@@ -150,38 +153,7 @@ angular.module('slicebox.transactions', ['ngRoute'])
   
     // Scope functions
     $scope.loadLogPage = function(startIndex, count) {
-        var loadLogPromise = $http.get('/api/log?startindex=' + startIndex + '&count=' + count + '&subject=Box');
-
-        loadLogPromise.error(function(error) {
-            $scope.showErrorMessage('Failed to load log: ' + error);
-        });
-
-        return loadLogPromise;
+        return $http.get('/api/log?startindex=' + startIndex + '&count=' + count + '&subject=Box');
     };
-
-    // private functions
-    function confirmDeleteLogs(logs) {
-        var deleteConfirmationText = 'Permanently delete ' + logs.length + ' log messages?';
-
-        return openConfirmationDeleteModal('Delete Log Messages', deleteConfirmationText, function() {
-            return deleteLogs(logs);
-        });
-    }
-
-    function deleteLogs(logs) {
-        var deletePromises = [];
-        var deletePromise;
-
-        angular.forEach(logs, function(log) {
-            deletePromise = $http.delete('/api/log/' + log.id);
-            deletePromises.push(deletePromise);
-
-            deletePromise.error(function(error) {
-                $scope.showErrorMessage('Failed to delete log message: ' + error);
-            });
-        });
-
-        return $q.all(deletePromises);
-    }
 
 });

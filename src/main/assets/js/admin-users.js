@@ -11,13 +11,13 @@ angular.module('slicebox.adminUsers', ['ngRoute'])
   });
 })
 
-.controller('AdminUsersCtrl', function($scope, $http, $mdDialog, $q, openConfirmationDeleteModal) {
+.controller('AdminUsersCtrl', function($scope, $http) {
     // Initialization
     $scope.objectActions =
         [
             {
                 name: 'Delete',
-                action: confirmDeleteUsers
+                action: $scope.confirmDeleteEntitiesFunction('/api/users/', 'user(s)')
             }
         ];
 
@@ -29,50 +29,8 @@ angular.module('slicebox.adminUsers', ['ngRoute'])
     };
 
     $scope.addUserButtonClicked = function() {
-        var dialogPromise = $mdDialog.show({
-                templateUrl: '/assets/partials/addUserModalContent.html',
-                controller: 'AddUserModalCtrl'
-            });
-
-        dialogPromise.then(function(user) {
-            $scope.uiState.addUserInProgress = true;
-
-            var addUserPromise = $http.post('/api/users', user);
-
-            addUserPromise.error(function(data) {
-                $scope.showErrorMessage(data);
-            });
-
-            addUserPromise.finally(function() {
-                $scope.uiState.addUserInProgress = false;
-                $scope.showInfoMessage("User added");
-                $scope.callbacks.usersTable.reloadPage();
-            });
-        });
+        $scope.addEntityButtonClicked('addUserModalContent.html', 'AddUserModalCtrl', '/api/users', 'User', $scope.callbacks.usersTable);
     };
-
-    // Private functions
-    function confirmDeleteUsers(users) {
-        var deleteConfirmationText = 'Permanently delete ' + users.length + ' users?';
-
-        return openConfirmationDeleteModal('Delete Users', deleteConfirmationText, function() {
-            return deleteUsers(users);
-        });
-    }
-
-    function deleteUsers(users) {
-        var deletePromises = [];
-        var deletePromise;
-
-        angular.forEach(users, function(user) {
-            deletePromise = $http.delete('/api/users/' + user.id).error(function (error) {
-                $scope.showErrorMessage(error);
-            });
-            deletePromises.push(deletePromise);
-        });
-
-        return $q.all(deletePromises);
-    }
 })
 
 .controller('AddUserModalCtrl', function($scope, $mdDialog) {

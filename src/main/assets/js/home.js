@@ -11,7 +11,7 @@ angular.module('slicebox.home', ['ngRoute'])
   });
 })
 
-.controller('HomeCtrl', function($scope, $http, $mdDialog, $q, openConfirmationDeleteModal) {
+.controller('HomeCtrl', function($scope, $http, $mdDialog) {
     // Initialization
     $scope.patientActions =
         [
@@ -21,7 +21,7 @@ angular.module('slicebox.home', ['ngRoute'])
             },
             {
                 name: 'Delete',
-                action: confirmDeletePatients
+                action: $scope.confirmDeleteEntitiesFunction('/api/metadata/patients/', 'patient(s)')
             }
         ];
 
@@ -33,7 +33,7 @@ angular.module('slicebox.home', ['ngRoute'])
             },
             {
                 name: 'Delete',
-                action: confirmDeleteStudies
+                action: $scope.confirmDeleteEntitiesFunction('/api/metadata/studies/', 'study(s)')
             }
         ];
 
@@ -50,7 +50,7 @@ angular.module('slicebox.home', ['ngRoute'])
             },   
             {
                 name: 'Delete',
-                action: confirmDeleteSeries
+                action: $scope.confirmDeleteEntitiesFunction('/api/metadata/series/', 'series')
             }
         ];
 
@@ -313,185 +313,62 @@ angular.module('slicebox.home', ['ngRoute'])
         return string.charAt(0).toUpperCase() + string.substring(1);        
     }
 
-    function confirmDeletePatients(patients) {
-        var deleteConfirmationText = 'Permanently delete ' + patients.length + ' patients?';
-
-        return openConfirmationDeleteModal('Delete Patients', deleteConfirmationText, function() {
-            return deletePatients(patients);
-        });
+    function confirmSend(entities, entitiesText, receiversUrl, sendFunction) {
+        return $mdDialog.show({
+                templateUrl: '/assets/partials/sendImageFilesModalContent.html',
+                controller: 'SendImageFilesModalCtrl',
+                scope: $scope.$new(),
+                locals: {
+                    text: entities.length + ' ' + entitiesText,
+                    receiversCallback: function(startIndex, count, orderByProperty, orderByDirection) {
+                        return $http.get(receiversUrl);
+                    },
+                    sendCallback: function(receiverId) {
+                        return sendFunction(receiverId, entities);
+                    }
+                }
+            });        
     }
 
-    function deletePatients(patients) {
-        var deletePromises = [];
-        var deletePromise;
+    function boxSendFunction(sendCommand) {
+        return function(receiverId, entities) {
+            var entityIds = [];
 
-        angular.forEach(patients, function(patient) {
-            deletePromise = $http.delete('/api/metadata/patients/' + patient.id);
-            deletePromises.push(deletePromise);
-
-            deletePromise.error(function(error) {
-                $scope.showErrorMessage('Failed to delete patient: ' + error);
+            angular.forEach(entities, function(entity) {
+                entityIds.push(entity.id);
             });
-        });
 
-        return $q.all(deletePromises);
+            return $http.post('/api/boxes/' + receiverId + '/' + sendCommand, entityIds);        
+        };
     }
 
-    function confirmDeleteStudies(studies) {
-        var deleteConfirmationText = 'Permanently delete ' + studies.length + ' studies?';
-
-        return openConfirmationDeleteModal('Delete Studies', deleteConfirmationText, function() {
-            return deleteStudies(studies);
-        });
-    }
-
-    function deleteStudies(studies) {
-        var deletePromises = [];
-        var deletePromise;
-
-        angular.forEach(studies, function(study) {
-            deletePromise = $http.delete('/api/metadata/studies/' + study.id);
-            deletePromises.push(deletePromise);
-
-            deletePromise.error(function(error) {
-                $scope.showErrorMessage('Failed to delete study: ' + error);
-            });
-        });
-
-        return $q.all(deletePromises);
-    }
-
-    function confirmDeleteSeries(series) {
-        var deleteConfirmationText = 'Permanently delete ' + series.length + ' series?';
-
-        return openConfirmationDeleteModal('Delete Series', deleteConfirmationText, function() {
-            return deleteSeries(series);
-        });
-    }
-
-    function deleteSeries(series) {
-        var deletePromises = [];
-        var deletePromise;
-
-        angular.forEach(series, function(theSeries) {
-            deletePromise = $http.delete('/api/metadata/series/' + theSeries.id);
-            deletePromises.push(deletePromise);
-
-            deletePromise.error(function(error) {
-                $scope.showErrorMessage('Failed to delete series: ' + error);
-            });
-        });
-
-        return $q.all(deletePromises);
+    function scuSendFunction() {
+        return function(receiverId, entities) {
+            return $http.post('/api/scus/' + receiverId + '/sendseries/' + entities[0].id);
+        };
     }
 
     function confirmSendSeries(series) {
-        return $mdDialog.show({
-                templateUrl: '/assets/partials/sendImageFilesModalContent.html',
-                controller: 'SendImageFilesModalCtrl',
-                scope: $scope.$new(),
-                locals: {
-                    title: 'Send ' + series.length + ' Series',
-                    receiversCallback: function(startIndex, count, orderByProperty, orderByDirection) {
-                        return $http.get('/api/boxes');
-                    },
-                    sendCallback: function(remoteBoxId) {
-                        return sendSeries(remoteBoxId, series);
-                    }
-                }
-            });
-    }
-
-    function sendSeries(remoteBoxId, series) {
-        var seriesIds = [];
-
-        angular.forEach(series, function(theSeries) {
-            seriesIds.push(theSeries.id);
-        });
-
-        return $http.post('/api/boxes/' + remoteBoxId + '/sendseries', seriesIds);
-    }
-
-    function confirmSendSeriesToScp(series) {
-        return $mdDialog.show({
-                templateUrl: '/assets/partials/sendImageFilesModalContent.html',
-                controller: 'SendImageFilesModalCtrl',
-                scope: $scope.$new(),
-                locals: {
-                    title: 'Send ' + series.length + ' Series',
-                    receiversCallback: function(startIndex, count, orderByProperty, orderByDirection) {
-                        return $http.get('/api/scus');
-                    },
-                    sendCallback: function(scuId) {
-                            return sendSeriesToScp(scuId, series);
-                        }
-                }
-            });
-    }
-
-    function sendSeriesToScp(scuId, series) {
-        return $http.post('/api/scus/' + scuId + '/sendseries/' + series[0].id);
+        return confirmSend(series, 'series', '/api/boxes', boxSendFunction('sendseries'));
     }
 
     function confirmSendStudies(studies) {
-        return $mdDialog.show({
-                templateUrl: '/assets/partials/sendImageFilesModalContent.html',
-                controller: 'SendImageFilesModalCtrl',
-                scope: $scope.$new(),
-                locals: {
-                    title: 'Send ' + studies.length + ' Studies',
-                    receiversCallback: function(startIndex, count, orderByProperty, orderByDirection) {
-                        return $http.get('/api/boxes');
-                    },
-                    sendCallback: function(remoteBoxId) {
-                            return sendStudies(remoteBoxId, studies);
-                        }
-                }
-            });
-    }
-    
-    function sendStudies(remoteBoxId, studies) {
-        var studyIds = [];
-
-        angular.forEach(studies, function(study) {
-            studyIds.push(study.id);
-        });
-
-        return $http.post('/api/boxes/' + remoteBoxId + '/sendstudies', studyIds);
+        return confirmSend(studies, 'study(s)', '/api/boxes', boxSendFunction('sendstudies'));
     }
 
     function confirmSendPatients(patients) {
-        return $mdDialog.show({
-                templateUrl: '/assets/partials/sendImageFilesModalContent.html',
-                controller: 'SendImageFilesModalCtrl',
-                scope: $scope.$new(),
-                locals: {
-                    title: 'Send ' + patients.length + ' Patients',
-                    receiversCallback: function(startIndex, count, orderByProperty, orderByDirection) {
-                        return $http.get('/api/boxes');
-                    },
-                    sendCallback: function(remoteBoxId) {
-                            return sendPatients(remoteBoxId, patients);
-                        }
-                }
-            });
+        return confirmSend(patients, 'patient(s)', '/api/boxes', boxSendFunction('sendpatients'));
     }
-    
-    function sendPatients(remoteBoxId, patients) {
-        var patientIds = [];
 
-        angular.forEach(patients, function(patient) {
-            patientIds.push(patient.id);
-        });
-
-        return $http.post('/api/boxes/' + remoteBoxId + '/sendpatients', patientIds);
+    function confirmSendSeriesToScp(series) {
+        return confirmSend(series, 'series', '/api/scus', scuSendFunction());
     }
 
 })
 
-.controller('SendImageFilesModalCtrl', function($scope, $mdDialog, $http, $q, title, receiversCallback, sendCallback) {
+.controller('SendImageFilesModalCtrl', function($scope, $mdDialog, $http, text, receiversCallback, sendCallback) {
     // Initialization
-    $scope.title = title;
+    $scope.title = 'Send ' + text + '?';
     $scope.loadReceivers = receiversCallback;
 
     $scope.uiState.selectedReceiver = null;
@@ -506,12 +383,11 @@ angular.module('slicebox.home', ['ngRoute'])
 
         $scope.uiState.sendInProgress = true;
 
-        sendPromise.error(function(data) {
-            $scope.showErrorMessage('Failed to send: ' + data);
-        });
-
         sendPromise.then(function() {
             $mdDialog.hide();
+            $scope.showInfoMessage(text + " added to outbox");
+        }, function(data) {
+            $scope.showErrorMessage('Failed to send: ' + data);
         });
 
         sendPromise.finally(function() {

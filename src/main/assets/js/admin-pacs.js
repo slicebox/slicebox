@@ -11,16 +11,16 @@ angular.module('slicebox.adminPacs', ['ngRoute'])
     });
 })
 
-.controller('AdminPacsCtrl', function($scope, $http, $mdDialog, $q, $log, openConfirmationDeleteModal) {
+.controller('AdminPacsCtrl', function() {
 })
 
-.controller('AdminScpsCtrl', function($scope, $http, $mdDialog, $q, $log, openConfirmationDeleteModal) {
+.controller('AdminScpsCtrl', function($scope, $http) {
     // Initialization
     $scope.objectActions =
         [
             {
                 name: 'Delete',
-                action: confirmDeleteScps
+                action: $scope.confirmDeleteEntitiesFunction('/api/scps/', 'SCP(s)')
             }
         ];
 
@@ -34,50 +34,9 @@ angular.module('slicebox.adminPacs', ['ngRoute'])
     };
 
     $scope.addScpButtonClicked = function() {
-        var dialogPromise = $mdDialog.show({
-                templateUrl: '/assets/partials/addScpModalContent.html',
-                controller: 'AddScpModalCtrl'
-            });
-
-        dialogPromise.then(function (scp) {
-            $scope.uiState.addDirectoryInProgress = true;
-
-            var addScpPromise = $http.post('/api/scps', scp);
-            addScpPromise.error(function(data) {
-                $scope.showErrorMessage(data);
-            });
-
-            addScpPromise.success(function() {
-                $scope.showInfoMessage("SCP added");                
-            });
-
-            addScpPromise.finally(function() {
-                $scope.uiState.addScpInProgress = false;
-                $scope.callbacks.scpsTable.reloadPage();
-            });
-        });
+        $scope.addEntityButtonClicked('addScpModalContent.html', 'AddScpModalCtrl', '/api/scps', 'SCP', $scope.callbacks.scpsTable);
     };
 
-    // Private functions
-    function confirmDeleteScps(scpObjects) {
-        var deleteConfirmationText = 'Permanently delete ' + scpObjects.length + ' SCPs?';
-
-        return openConfirmationDeleteModal('Delete SCPs', deleteConfirmationText, function() {
-            return deleteScps(scpObjects);
-        });
-    }
-
-    function deleteScps(scpObjects) {
-        var removePromises = [];
-        var removePromise;
-
-        angular.forEach(scpObjects, function(scpObject) {
-            removePromise = $http.delete('/api/scps/' + scpObject.id);
-            removePromises.push(removePromise);
-        });
-
-        return $q.all(removePromises);
-    }
 })
 
 .controller('AddScpModalCtrl', function($scope, $mdDialog) {
@@ -92,13 +51,13 @@ angular.module('slicebox.adminPacs', ['ngRoute'])
     };
 })
 
-.controller('AdminScusCtrl', function($scope, $http, $mdDialog, $q, $log, openConfirmationDeleteModal) {
+.controller('AdminScusCtrl', function($scope, $http) {
     // Initialization
     $scope.objectActions =
         [
             {
                 name: 'Delete',
-                action: confirmDeleteScus
+                action: $scope.confirmDeleteEntitiesFunction('/api/scus/', 'SCU(s)')
             }
         ];
 
@@ -112,50 +71,9 @@ angular.module('slicebox.adminPacs', ['ngRoute'])
     };
 
     $scope.addScuButtonClicked = function() {
-        var dialogPromise = $mdDialog.show({
-                templateUrl: '/assets/partials/addScuModalContent.html',
-                controller: 'AddScuModalCtrl'
-            });
-
-        dialogPromise.then(function (scu) {
-            $scope.uiState.addDirectoryInProgress = true;
-
-            var addScuPromise = $http.post('/api/scus', scu);
-            addScuPromise.error(function(data) {
-                $scope.showErrorMessage(data);
-            });
-
-            addScuPromise.success(function() {
-                $scope.showInfoMessage("SCU added");                
-            });
-
-            addScuPromise.finally(function() {
-                $scope.uiState.addScuInProgress = false;
-                $scope.callbacks.scusTable.reloadPage();
-            });
-        });
+        $scope.addEntityButtonClicked('addScuModalContent.html', 'AddScuModalCtrl', '/api/scus', 'SCU', $scope.callbacks.scusTable);
     };
 
-    // Private functions
-    function confirmDeleteScus(scuObjects) {
-        var deleteConfirmationText = 'Permanently delete ' + scuObjects.length + ' SCUs?';
-
-        return openConfirmationDeleteModal('Delete SCUs', deleteConfirmationText, function() {
-            return deleteScus(scuObjects);
-        });
-    }
-
-    function deleteScus(scuObjects) {
-        var removePromises = [];
-        var removePromise;
-
-        angular.forEach(scuObjects, function(scuObject) {
-            removePromise = $http.delete('/api/scus/' + scuObject.id);
-            removePromises.push(removePromise);
-        });
-
-        return $q.all(removePromises);
-    }
 })
 
 .controller('AddScuModalCtrl', function($scope, $mdDialog) {
