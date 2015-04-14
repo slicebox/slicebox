@@ -11,13 +11,13 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
   });
 })
 
-.controller('AdminBoxesCtrl', function($scope, $http, $mdDialog, $q, $interval, openConfirmationDeleteModal) {
+.controller('AdminBoxesCtrl', function($scope, $http, $interval) {
     // Initialization
     $scope.objectActions =
         [
             {
                 name: 'Delete',
-                action: confirmDeleteBoxes
+                action: $scope.confirmDeleteEntitiesFunction('/api/boxes/', 'box(es)')
             }
         ];
 
@@ -39,35 +39,8 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
     };
 
     $scope.addBoxButtonClicked = function() {
-        $mdDialog.show({
-                templateUrl: '/assets/partials/addBoxModalContent.html',
-                controller: 'AddBoxModalCtrl'
-            }).then(function() {
-                $scope.showInfoMessage("Box added");
-                $scope.callbacks.boxesTable.reloadPage();
-            });
+        $scope.addEntityButtonClicked('addBoxModalContent.html', 'AddBoxModalCtrl', '/api/boxes', 'Box', $scope.callbacks.boxesTable);
     };
-
-    // Private functions
-    function confirmDeleteBoxes(boxes) {
-        var deleteConfirmationText = 'Permanently delete ' + boxes.length + ' boxes?';
-
-        return openConfirmationDeleteModal('Delete Boxes', deleteConfirmationText, function() {
-            return deleteBoxes(boxes);
-        });
-    }
-
-    function deleteBoxes(boxes) {
-        var deletePromises = [];
-        var deletePromise;
-
-        angular.forEach(boxes, function(box) {
-            deletePromise = $http.delete('/api/boxes/' + box.id);
-            deletePromises.push(deletePromise);
-        });
-
-        return $q.all(deletePromises);
-    }
 })
 
 .controller('AddBoxModalCtrl', function($scope, $mdDialog, $http) {

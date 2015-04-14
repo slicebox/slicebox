@@ -107,7 +107,7 @@ class BoxPushActor(box: Box, dbProps: DbProps, storage: Path, pollInterval: Fini
   }
 
   def handleFileSentForOutboxEntry(outboxEntry: OutboxEntry) = {
-    log.info(s"File sent for outbox entry ${outboxEntry.id}")
+    log.debug(s"File sent for outbox entry ${outboxEntry.id}")
 
     db.withSession { implicit session =>
       boxDao.removeOutboxEntry(outboxEntry.id)
