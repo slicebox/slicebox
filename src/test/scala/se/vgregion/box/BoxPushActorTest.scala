@@ -56,7 +56,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
   val equipment1 = Equipment(-1, Manufacturer("manu1"), StationName("station1"))
   val for1 = FrameOfReference(-1, FrameOfReferenceUID("frid1"))
   val series1 = Series(-1, -1, -1, -1, SeriesInstanceUID("seuid1"), SeriesDescription("sedesc1"), SeriesDate("19990101"), Modality("NM"), ProtocolName("prot1"), BodyPartExamined("bodypart1"))
-  val image1 = Image(-1, -1, SOPInstanceUID("souid1"), ImageType("PRIMARY/RECON/TOMO"))
+  val image1 = Image(-1, -1, SOPInstanceUID("souid1"), ImageType("PRIMARY/RECON/TOMO"), InstanceNumber("1"))
   var imageFile1 = ImageFile(-1, FileName("file1"))
   var imageFile2 = ImageFile(-1, FileName("file2"))
 
