@@ -29,6 +29,7 @@ object DicomPropertyValue {
 
   case class SOPInstanceUID(value: String) extends DicomPropertyValue { def property = DicomProperty.SOPInstanceUID }
   case class ImageType(value: String) extends DicomPropertyValue { def property = DicomProperty.ImageType }
+  case class InstanceNumber(value: String) extends DicomPropertyValue { def property = DicomProperty.InstanceNumber }
 
   case class Manufacturer(value: String) extends DicomPropertyValue { def property = DicomProperty.Manufacturer }
   case class StationName(value: String) extends DicomPropertyValue { def property = DicomProperty.StationName }

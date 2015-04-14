@@ -75,7 +75,8 @@ object DicomHierarchy {
     id: Long,
     seriesId: Long,
     sopInstanceUID: SOPInstanceUID,
-    imageType: ImageType) extends Entity {
+    imageType: ImageType,
+    instanceNumber: InstanceNumber) extends Entity {
     override def equals(o: Any): Boolean = o match {
       case that: Image => that.sopInstanceUID == sopInstanceUID
       case _ => false

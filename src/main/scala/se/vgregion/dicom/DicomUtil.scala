@@ -126,7 +126,8 @@ object DicomUtil {
       -1,
       -1,
       SOPInstanceUID(valueOrEmpty(dataset, DicomProperty.SOPInstanceUID.dicomTag)),
-      ImageType(readMultiple(dataset.getStrings(DicomProperty.ImageType.dicomTag))))
+      ImageType(readMultiple(dataset.getStrings(DicomProperty.ImageType.dicomTag))),
+      InstanceNumber(valueOrEmpty(dataset, DicomProperty.InstanceNumber.dicomTag)))
 
   private def valueOrEmpty(dataset: Attributes, tag: Int) = Option(dataset.getString(tag)).getOrElse("")
 

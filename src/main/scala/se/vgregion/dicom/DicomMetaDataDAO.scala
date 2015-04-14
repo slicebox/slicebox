@@ -114,17 +114,18 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
 
   // *** Image ***
 
-  private val toImage = (id: Long, seriesId: Long, sopInstanceUID: String, imageType: String) =>
-    Image(id, seriesId, SOPInstanceUID(sopInstanceUID), ImageType(imageType))
+  private val toImage = (id: Long, seriesId: Long, sopInstanceUID: String, imageType: String, instanceNumber: String) =>
+    Image(id, seriesId, SOPInstanceUID(sopInstanceUID), ImageType(imageType), InstanceNumber(instanceNumber))
 
-  private val fromImage = (image: Image) => Option((image.id, image.seriesId, image.sopInstanceUID.value, image.imageType.value))
+  private val fromImage = (image: Image) => Option((image.id, image.seriesId, image.sopInstanceUID.value, image.imageType.value, image.instanceNumber.value))
 
   private class Images(tag: Tag) extends Table[Image](tag, "Images") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def seriesId = column[Long]("seriesId")
     def sopInstanceUID = column[String](DicomProperty.SOPInstanceUID.name)
     def imageType = column[String](DicomProperty.ImageType.name)
-    def * = (id, seriesId, sopInstanceUID, imageType) <> (toImage.tupled, fromImage)
+    def instanceNumber = column[String](DicomProperty.InstanceNumber.name)
+    def * = (id, seriesId, sopInstanceUID, imageType, instanceNumber) <> (toImage.tupled, fromImage)
 
     def seriesFKey = foreignKey("seriesFKey", seriesId, seriesQuery)(_.id, onUpdate = ForeignKeyAction.Cascade, onDelete = ForeignKeyAction.Cascade)
     def seriesIdJoin = seriesQuery.filter(_.id === seriesId)

@@ -56,4 +56,7 @@ object UserProtocol {
     
   case class DeleteUser(userId: Long) extends UserRequest
   case class UserDeleted(userId: Long)
+  
+  case object CleanupTokens
+  
 }

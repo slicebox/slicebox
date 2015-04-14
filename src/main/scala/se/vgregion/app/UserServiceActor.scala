@@ -8,6 +8,8 @@ import akka.event.Logging
 import akka.event.LoggingReceive
 import se.vgregion.util.ExceptionCatching
 import scala.collection.mutable.Map
+import scala.concurrent.duration.DurationInt
+import scala.concurrent.duration.FiniteDuration
 import java.util.UUID
 
 class UserServiceActor(dbProps: DbProps, superUser: String, superPassword: String) extends Actor with ExceptionCatching {
@@ -16,11 +18,21 @@ class UserServiceActor(dbProps: DbProps, superUser: String, superPassword: Strin
   val db = dbProps.db
   val dao = new UserDAO(dbProps.driver)
 
-  val authTokens = Map.empty[AuthToken, ApiUser]
+  val authTokens = Map.empty[AuthToken, Tuple2[ApiUser, Long]]
 
   setupDb()
   addSuperUser()
 
+  implicit val system = context.system
+  implicit val ec = context.dispatcher
+
+  val authTokenCleaner = system.scheduler.schedule(12.hours, 12.hours) {
+    self ! CleanupTokens
+  }
+
+  override def postStop() =
+    authTokenCleaner.cancel()
+    
   def receive = LoggingReceive {
 
     case msg: UserRequest =>
@@ -62,14 +74,17 @@ class UserServiceActor(dbProps: DbProps, superUser: String, superPassword: Strin
             }
 
           case GetUserByAuthToken(token) =>
-            sender ! authTokens.remove(token)
+            sender ! authTokens.remove(token).map(_._1)
 
           case GenerateAuthTokens(user, numberOfTokens) =>
-            val generatedTokens = cleanupAndGenerateNewTokens(user, numberOfTokens)
+            val generatedTokens = generateNewTokens(user, numberOfTokens)
             sender ! generatedTokens
 
         }
       }
+      
+    case CleanupTokens => 
+      cleanupTokens()
   }
 
   def setupDb() =
@@ -84,17 +99,23 @@ class UserServiceActor(dbProps: DbProps, superUser: String, superPassword: Strin
           ApiUser(-1, superUser, UserRole.SUPERUSER).withPassword(superPassword)))
     }
 
-  def cleanupAndGenerateNewTokens(user: ApiUser, numberOfTokens: Int): List[AuthToken] = {
-    val previousTokenKeysForUser = authTokens.filter(_._2 == user).map(_._1)
-    previousTokenKeysForUser.foreach(authTokens.remove(_))
-
+  def generateNewTokens(user: ApiUser, numberOfTokens: Int): List[AuthToken] = {
     (1 to numberOfTokens).map(i => {
       val authToken = AuthToken(UUID.randomUUID.toString)
-      authTokens += authToken -> user
+      authTokens += authToken -> ((user, System.currentTimeMillis))
       authToken
     }).toList
   }
 
+  def cleanupTokens(): Unit = {
+    val timeNow = System.currentTimeMillis
+    val expiredKeys = authTokens.filter {
+      case (key, value) => (timeNow - value._2) > 24.hours.toMillis
+    }.map {
+      case (key, value) => key
+    }
+    authTokens --= expiredKeys
+  }
 }
 
 object UserServiceActor {

@@ -27,6 +27,7 @@ object DicomProperty {
 
   object SOPInstanceUID extends DicomProperty("SOPInstanceUID", Tag.SOPInstanceUID) 
   object ImageType extends DicomProperty("ImageType", Tag.ImageType) 
+  object InstanceNumber extends DicomProperty("InstanceNumber", Tag.InstanceNumber) 
 
   object Manufacturer extends DicomProperty("Manufacturer", Tag.Manufacturer) 
   object StationName extends DicomProperty("StationName", Tag.StationName) 
