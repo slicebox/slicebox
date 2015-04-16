@@ -19,24 +19,23 @@ import scala.concurrent.duration.FiniteDuration
 class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) extends Actor with ExceptionCatching {
 
   case object UpdatePollBoxesOnlineStatus
-  
+
   val db = dbProps.db
   val dao = new BoxDAO(dbProps.driver)
-  
+
   implicit val system = context.system
   implicit val ec = context.dispatcher
-  
+
   val pollBoxOnlineStatusTimeoutMillis: Long = 15000
-  val pollBoxesLastPollTimestamp = scala.collection.mutable.HashMap.empty[Long,Date]
-  
+  val pollBoxesLastPollTimestamp = collection.mutable.Map.empty[Long, Date]
 
   setupDb()
   setupBoxes()
-  
+
   val pollBoxesOnlineStatusSchedule = system.scheduler.schedule(100.milliseconds, 5.seconds) {
     self ! UpdatePollBoxesOnlineStatus
   }
-  
+
   override def postStop() =
     pollBoxesOnlineStatusSchedule.cancel()
 
@@ -44,7 +43,7 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
 
     case UpdatePollBoxesOnlineStatus =>
       updatePollBoxesOnlineStatus()
-    
+
     case msg: BoxRequest =>
 
       catchAndReport {
@@ -91,34 +90,34 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
           case UpdateInbox(token, transactionId, sequenceNumber, totalImageCount) =>
             pollBoxByToken(token).foreach(box =>
               updateInbox(box.id, transactionId, sequenceNumber, totalImageCount))
-            
+
             // TODO: what should we do if no box was found for token?
-            
+
             sender ! InboxUpdated(token, transactionId, sequenceNumber, totalImageCount)
-            
+
           case PollOutbox(token) =>
             pollBoxByToken(token).foreach(box => {
               pollBoxesLastPollTimestamp(box.id) = new Date()
-              
+
               nextOutboxEntry(box.id) match {
                 case Some(outboxEntry) => sender ! outboxEntry
                 case None              => sender ! OutboxEmpty
               }
             })
-            
-            // TODO: what should we do if no box was found for token?
-            
-          case SendImagesToRemoteBox(remoteBoxId, imageIds) =>
+
+          // TODO: what should we do if no box was found for token?
+
+          case SendImagesToRemoteBox(remoteBoxId, boxSendData) =>
             boxById(remoteBoxId) match {
-                case Some(box) =>
-                  addOutboxEntries(remoteBoxId, imageIds)
-                  sender ! ImagesSent(remoteBoxId, imageIds)
-                case None      =>
-                  sender ! BoxNotFound
-              }
-            
-            
-            
+              case Some(box) =>
+                val transactionId = generateTransactionId()
+                addOutboxEntries(remoteBoxId, transactionId, boxSendData.entityIds)
+                addAttributeValueMappings(transactionId, boxSendData.attributeValueMappings)
+                sender ! ImagesSent(remoteBoxId, boxSendData.entityIds)
+              case None =>
+                sender ! BoxNotFound
+            }
+
           case GetOutboxEntry(token, transactionId, sequenceNumber) =>
             pollBoxByToken(token).foreach(box => {
               outboxEntryByTransactionIdAndSequenceNumber(box.id, transactionId, sequenceNumber) match {
@@ -126,22 +125,24 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
                 case None              => sender ! OutboxEntryNotFound
               }
             })
-            
+
           case DeleteOutboxEntry(token, transactionId, sequenceNumber) =>
             pollBoxByToken(token).foreach(box => {
               outboxEntryByTransactionIdAndSequenceNumber(box.id, transactionId, sequenceNumber) match {
                 case Some(outboxEntry) =>
                   removeOutboxEntryFromDb(outboxEntry.id)
-                  
-                  if (outboxEntry.sequenceNumber == outboxEntry.totalImageCount)
+
+                  if (outboxEntry.sequenceNumber == outboxEntry.totalImageCount) {
+                    removeAttributeValueMappingsForTransactionId(outboxEntry.transactionId)
                     context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Box", "Send completed.")))
-                  
+                  }
+
                   sender ! OutboxEntryDeleted
                 case None =>
                   sender ! OutboxEntryDeleted
               }
             })
-            
+
           case GetInbox =>
             val inboxEntries = getInboxFromDb().map { inboxEntry =>
               boxById(inboxEntry.remoteBoxId) match {
@@ -150,22 +151,29 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
               }
             }
             sender ! Inbox(inboxEntries)
-            
+
           case GetOutbox =>
             val idToBox = getBoxesFromDb().map(box => box.id -> box).toMap
             val outboxEntries = getOutboxFromDb().map { outboxEntry =>
               idToBox.get(outboxEntry.remoteBoxId) match {
-                case Some(box) => 
+                case Some(box) =>
                   OutboxEntryInfo(outboxEntry.id, box.name, outboxEntry.transactionId, outboxEntry.sequenceNumber, outboxEntry.totalImageCount, outboxEntry.imageId, outboxEntry.failed)
-                case None      => 
+                case None =>
                   OutboxEntryInfo(outboxEntry.id, "" + outboxEntry.remoteBoxId, outboxEntry.transactionId, outboxEntry.sequenceNumber, outboxEntry.totalImageCount, outboxEntry.imageId, outboxEntry.failed)
               }
             }
             sender ! Outbox(outboxEntries)
-            
+
           case RemoveOutboxEntry(outboxEntryId) =>
+            outboxEntryById(outboxEntryId)
+              .filter(outboxEntry => outboxEntry.sequenceNumber == outboxEntry.totalImageCount)
+              .foreach(outboxEntry =>
+                removeAttributeValueMappingsForTransactionId(outboxEntry.transactionId))
             removeOutboxEntryFromDb(outboxEntryId)
             sender ! OutboxEntryRemoved(outboxEntryId)
+            
+          case GetAttributeValueMappings(transactionId) =>
+            sender ! attributeValueMappingsForTransactionId(transactionId)
         }
 
       }
@@ -228,7 +236,7 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
     db.withSession { implicit session =>
       dao.boxById(boxId)
     }
-  
+
   def pollBoxByToken(token: String): Option[Box] =
     db.withSession { implicit session =>
       dao.pollBoxByToken(token)
@@ -253,77 +261,99 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
     db.withSession { implicit session =>
       dao.pollBoxByToken(token).isDefined
     }
-  
+
   def nextOutboxEntry(boxId: Long): Option[OutboxEntry] =
     db.withSession { implicit session =>
       dao.nextOutboxEntryForRemoteBoxId(boxId)
     }
-  
+
   def updateInbox(remoteBoxId: Long, transactionId: Long, sequenceNumber: Long, totalImageCount: Long): Unit = {
     db.withSession { implicit session =>
       dao.updateInbox(remoteBoxId, transactionId, sequenceNumber, totalImageCount)
     }
-    
+
     if (sequenceNumber == totalImageCount)
       context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Box", "Receive completed.")))
   }
-  
+
   def updatePollBoxesOnlineStatus(): Unit = {
     val now = new Date()
-    
+
     pollBoxesLastPollTimestamp.foreach {
-      case(boxId, lastPollTime) =>
+      case (boxId, lastPollTime) =>
         val online =
           if (now.getTime - lastPollTime.getTime < pollBoxOnlineStatusTimeoutMillis)
             true
           else
             false
-            
+
         updateBoxOnlineStatusInDb(boxId, online)
     }
   }
-  
-  def addOutboxEntries(remoteBoxId: Long, imageIds: Seq[Long]): Unit = {
-    val transactionId = generateTransactionId()
+
+  def generateTransactionId(): Long =
+    // Must be a positive number for the generated id to work in URLs which is very strange
+    // Maybe switch to using Strings as transaction id?
+    abs(UUID.randomUUID().getMostSignificantBits())
+
+  def addOutboxEntries(remoteBoxId: Long, transactionId: Long, imageIds: Seq[Long]): Unit = {
     val totalImageCount = imageIds.length
-    
+
     db.withSession { implicit session =>
-      var sequenceNumber: Long = 0
       for (sequenceNumber <- 1 to totalImageCount) {
         dao.insertOutboxEntry(OutboxEntry(-1, remoteBoxId, transactionId, sequenceNumber, totalImageCount, imageIds(sequenceNumber - 1), false))
       }
     }
   }
-  
-  def generateTransactionId(): Long =
-    // Must be a positive number for the generated id to work in URLs which is very strange
-    // Maybe switch to using Strings as transaction id?
-    abs(UUID.randomUUID().getMostSignificantBits())
-    
+
+  def addAttributeValueMappings(transactionId: Long, attributeValueMappings: Seq[AttributeValueMapping]) =
+    db.withSession { implicit session =>
+      attributeValueMappings.foreach(mapping =>
+        dao.insertAttributeValueMapping(
+          AttributeValueMappingEntry(-1, transactionId, mapping.tag, mapping.matchValue, mapping.mappedValue)))
+    }
+
+  def outboxEntryById(outboxEntryId: Long): Option[OutboxEntry] =
+    db.withSession { implicit session =>
+      dao.outboxEntryById(outboxEntryId)
+    }
+
   def outboxEntryByTransactionIdAndSequenceNumber(remoteBoxId: Long, transactionId: Long, sequenceNumber: Long): Option[OutboxEntry] =
     db.withSession { implicit session =>
       dao.outboxEntryByTransactionIdAndSequenceNumber(remoteBoxId, transactionId, sequenceNumber)
     }
-  
+
   def removeOutboxEntryFromDb(outboxEntryId: Long) =
     db.withSession { implicit session =>
       dao.removeOutboxEntry(outboxEntryId)
     }
-  
+
   def getInboxFromDb() =
     db.withSession { implicit session =>
       dao.listInboxEntries
     }
-  
+
   def getOutboxFromDb() =
     db.withSession { implicit session =>
       dao.listOutboxEntries
     }
-  
+
   def updateBoxOnlineStatusInDb(boxId: Long, online: Boolean): Unit =
     db.withSession { implicit session =>
       dao.updateBoxOnlineStatus(boxId, online)
     }
+
+  def attributeValueMappingsForTransactionId(transactionId: Long): Seq[AttributeValueMappingEntry] =
+    db.withSession { implicit session =>
+      dao.attributeValueMappingsByTransactionId(transactionId)
+    }
+
+  def removeAttributeValueMappingsForTransactionId(transactionId: Long) = {
+    db.withSession { implicit session =>
+      dao.removeAttributeValueMappingsByTransactionId(transactionId)
+    }
+  }
+
 }
 
 object BoxServiceActor {

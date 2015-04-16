@@ -41,6 +41,9 @@ object BoxProtocol {
   
   case class InboxEntry(id: Long, remoteBoxId: Long, transactionId: Long, receivedImageCount: Long, totalImageCount: Long) extends Entity
   
+  case class AttributeValueMapping(tag: Int, matchValue: String, mappedValue: String)
+  case class AttributeValueMappingEntry(id: Long, transactionId: Long, tag: Int, matchValue: String, mappedValue: String) extends Entity
+  
   case class InboxEntryInfo(remoteBoxName: String, transactionId: Long, receivedImageCount: Long, totalImageCount: Long)
   
   case class PushImageData(transactionId: Long, sequenceNumber: Long, totalImageCount: Long, dataset: Attributes)
@@ -61,9 +64,13 @@ object BoxProtocol {
   
   case class PollOutbox(token: String) extends BoxRequest
   
-  case class SendImagesToRemoteBox(remoteBoxId: Long, imageIds: Seq[Long]) extends BoxRequest
+  case class BoxSendData(entityIds: Seq[Long], attributeValueMappings: Seq[AttributeValueMapping])
+  
+  case class SendImagesToRemoteBox(remoteBoxId: Long, sendImagesData: BoxSendData) extends BoxRequest
   
   case class GetOutboxEntry(token: String, transactionId: Long, sequenceNumber: Long) extends BoxRequest
+  
+  case class GetAttributeValueMappings(transactionId: Long) extends BoxRequest
   
   case class DeleteOutboxEntry(token: String, transactionId: Long, sequenceNumber: Long) extends BoxRequest
   

@@ -1,19 +1,18 @@
 package se.vgregion.app.routing
 
 import akka.pattern.ask
-
 import spray.http.ContentTypes
 import spray.http.HttpData
 import spray.http.HttpEntity
 import spray.http.StatusCodes._
 import spray.routing._
-
 import se.vgregion.app.AuthInfo
 import se.vgregion.app.RestApi
 import se.vgregion.app.UserProtocol.UserRole
 import se.vgregion.box.BoxProtocol._
 import se.vgregion.dicom.DicomProtocol._
 import se.vgregion.dicom.DicomUtil
+import se.vgregion.dicom.DicomAnonymization
 
 trait RemoteBoxRoutes { this: RestApi =>
 
@@ -66,12 +65,18 @@ trait RemoteBoxRoutes { this: RestApi =>
                   parameters('transactionid.as[Long], 'sequencenumber.as[Long]) { (transactionId, sequenceNumber) =>
                     onSuccess(boxService.ask(GetOutboxEntry(token, transactionId, sequenceNumber))) {
                       case outboxEntry: OutboxEntry =>
-                        onSuccess(dicomService.ask(GetImageFile(outboxEntry.imageId))) {
-                          case imageFile: ImageFile =>
-                            val path = storage.resolve(imageFile.fileName.value)
-                            val bytes = DicomUtil.toAnonymizedByteArray(path)
-                            detach() {
-                              complete(HttpEntity(ContentTypes.`application/octet-stream`, HttpData(bytes)))
+                        onSuccess(boxService.ask(GetAttributeValueMappings(transactionId)).mapTo[Seq[AttributeValueMappingEntry]]) {
+                          case attributeValueMappings =>
+                            onSuccess(dicomService.ask(GetImageFile(outboxEntry.imageId))) {
+                              case imageFile: ImageFile =>
+                                detach() {
+                                  val path = storage.resolve(imageFile.fileName.value)
+                                  val dataset = DicomUtil.loadDataset(path, true)
+                                  val anonymizedDataset = DicomAnonymization.anonymizeDataset(dataset)
+                                  DicomUtil.mapAttributes(dataset, anonymizedDataset, attributeValueMappings)
+                                  val bytes = DicomUtil.toByteArray(anonymizedDataset)
+                                  complete(HttpEntity(ContentTypes.`application/octet-stream`, HttpData(bytes)))
+                                }
                             }
                         }
                       case OutboxEntryNotFound =>

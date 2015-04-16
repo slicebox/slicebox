@@ -57,9 +57,24 @@ class BoxDAO(val driver: JdbcProfile) {
 
   val inboxQuery = TableQuery[InboxTable]
 
+  val toAttributeValueMapping = (id: Long, transactionId: Long, tag: Int, matchValue: String, mappedValue: String) =>
+    AttributeValueMappingEntry(id, transactionId, tag, matchValue, mappedValue)
+  val fromAttributeValueMapping = (entry: AttributeValueMappingEntry) => Option((entry.id, entry.transactionId, entry.tag, entry.matchValue, entry.mappedValue))
+
+  class AttributeValueMappingTable(tag: Tag) extends Table[AttributeValueMappingEntry](tag, "AttributeValueMapping") {
+    def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
+    def transactionId = column[Long]("transactionid")
+    def dicomTag = column[Int]("tag")
+    def matchValue = column[String]("matchvalue")
+    def mappedValue = column[String]("mappedvalue")
+    def * = (id, transactionId, dicomTag, matchValue, mappedValue) <> (toAttributeValueMapping.tupled, fromAttributeValueMapping)
+  }
+
+  val attributeValueMappingQuery = TableQuery[AttributeValueMappingTable]
+
   def create(implicit session: Session): Unit =
     if (MTable.getTables("Box").list.isEmpty) {
-      (boxQuery.ddl ++ outboxQuery.ddl ++ inboxQuery.ddl).create
+      (boxQuery.ddl ++ outboxQuery.ddl ++ inboxQuery.ddl ++ attributeValueMappingQuery.ddl).create
     }
 
   def drop(implicit session: Session): Unit =
@@ -137,6 +152,11 @@ class BoxDAO(val driver: JdbcProfile) {
       .filter(_.transactionId === transactionId)
       .list.headOption
       
+  def outboxEntryById(outboxEntryId: Long)(implicit session: Session): Option[OutboxEntry] =
+    outboxQuery
+      .filter(_.id === outboxEntryId)
+      .list.headOption
+      
   def outboxEntryByTransactionIdAndSequenceNumber(remoteBoxId: Long, transactionId: Long, sequenceNumber: Long)(implicit session: Session): Option[OutboxEntry] =
     outboxQuery
       .filter(_.remoteBoxId === remoteBoxId)
@@ -164,4 +184,22 @@ class BoxDAO(val driver: JdbcProfile) {
 
   def listInboxEntries(implicit session: Session): List[InboxEntry] =
     inboxQuery.list
+    
+  def listAttributeValueMappingEntries(implicit session: Session): List[AttributeValueMappingEntry] =
+    attributeValueMappingQuery.list
+    
+  def insertAttributeValueMapping(entry: AttributeValueMappingEntry)(implicit session: Session): AttributeValueMappingEntry = {
+    val generatedId = (attributeValueMappingQuery returning attributeValueMappingQuery.map(_.id)) += entry
+    entry.copy(id = generatedId)
+  }
+  
+  def attributeValueMappingsByTransactionId(transactionId: Long)(implicit session: Session): List[AttributeValueMappingEntry] =
+    attributeValueMappingQuery.filter(_.transactionId === transactionId).list
+    
+  def removeAttributeValueMappingEntry(attributeValueMappingId: Long)(implicit session: Session): Unit =
+    attributeValueMappingQuery.filter(_.id === attributeValueMappingId).delete
+    
+  def removeAttributeValueMappingsByTransactionId(transactionId: Long)(implicit session: Session): Unit =
+    attributeValueMappingQuery.filter(_.transactionId === transactionId).delete
+    
 }

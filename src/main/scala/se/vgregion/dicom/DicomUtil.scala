@@ -20,6 +20,10 @@ import javax.imageio.ImageIO
 import org.dcm4che3.imageio.plugins.dcm.DicomImageReadParam
 import se.vgregion.dicom.DicomAnonymization._
 import java.io.ByteArrayOutputStream
+import se.vgregion.box.BoxProtocol.AttributeValueMapping
+import org.dcm4che3.data.Attributes.Visitor
+import org.dcm4che3.data.VR
+import se.vgregion.box.BoxProtocol.AttributeValueMappingEntry
 
 object DicomUtil {
 
@@ -31,12 +35,12 @@ object DicomUtil {
   def saveDataset(dataset: Attributes, outputStream: OutputStream): Boolean = {
     var dos: DicomOutputStream = null
     try {
-    	dos = new DicomOutputStream(outputStream, defaultTransferSyntax)
-    	val metaInformation = dataset.createFileMetaInformation(defaultTransferSyntax)
+      dos = new DicomOutputStream(outputStream, defaultTransferSyntax)
+      val metaInformation = dataset.createFileMetaInformation(defaultTransferSyntax)
       dos.writeDataset(metaInformation, dataset)
       true
     } catch {
-      case e: Exception => 
+      case e: Exception =>
         false
     } finally {
       SafeClose.close(dos)
@@ -72,12 +76,16 @@ object DicomUtil {
   def toAnonymizedByteArray(path: Path): Array[Byte] = {
     val dataset = loadDataset(path, true)
     val anonymizedDataset = anonymizeDataset(dataset)
-    val bos = new ByteArrayOutputStream
-    saveDataset(anonymizedDataset, bos)
-    bos.close()
-    bos.toByteArray()    
+    toByteArray(anonymizedDataset)
   }
-    
+
+  def toByteArray(dataset: Attributes): Array[Byte] = {
+    val bos = new ByteArrayOutputStream
+    saveDataset(dataset, bos)
+    bos.close()
+    bos.toByteArray()
+  }
+
   def datasetToPatient(dataset: Attributes): Patient =
     Patient(
       -1,
@@ -153,4 +161,17 @@ object DicomUtil {
     iis.close();
     Seq(bufferedImage);
   }
+
+  def mapAttributes(source: Attributes, target: Attributes, attributeValueMappings: Seq[AttributeValueMappingEntry]): Unit =
+    attributeValueMappings.foreach(mapping => {
+      val tag = mapping.tag
+      val matchValue = mapping.matchValue
+      val mappedValue = mapping.mappedValue
+      val tagValue = source.getString(tag, "")
+      val matchValueIsEmpty = matchValue == null || matchValue.isEmpty
+      val vr = if (source.contains(tag)) source.getVR(tag) else VR.SH
+      if (matchValueIsEmpty && tagValue.isEmpty || matchValue == tagValue)
+        target.setString(tag, vr, mappedValue)
+    })
+
 }

@@ -59,7 +59,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
   val capturedRequests: ArrayBuffer[HttpRequest] = ArrayBuffer()
   var withSlowResponse = false
 
-  val pollBoxActorRef = _system.actorOf(Props(new BoxPollActor(remoteBox, dbProps, 1.hour, 1.hour, 500.millis) {
+  val pollBoxActorRef = _system.actorOf(Props(new BoxPollActor(remoteBox, dbProps, 1.hour, 500.millis) {
     override def sendRequestToRemoteBoxPipeline = {
       (req: HttpRequest) =>
         {

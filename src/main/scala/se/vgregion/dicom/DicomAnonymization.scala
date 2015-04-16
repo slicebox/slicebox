@@ -7,12 +7,13 @@ import org.dcm4che3.data.Tag
 import java.util.Date
 import org.dcm4che3.util.TagUtils
 import org.dcm4che3.data.Attributes.Visitor
+import se.vgregion.box.BoxProtocol.AttributeValueMapping
 
 object DicomAnonymization {
 
   val emptyString = ""
 
-  def anonymizeDataset(dataset: Attributes): Attributes = {
+  def anonymizeDataset(dataset: Attributes, attributeValueMappings: AttributeValueMapping*): Attributes = {
 
     val patientIdentityRemoved = dataset.getString(Tag.PatientIdentityRemoved)
 
@@ -144,7 +145,7 @@ object DicomAnonymization {
       removeTag(modified, Tag.PatientInstitutionResidence)
       removeTag(modified, Tag.PatientInsurancePlanCodeSequence)
       removeTag(modified, Tag.PatientMotherBirthName)
-      setStringTag(modified, Tag.PatientName, VR.SH, createAnonymousPatientName(sex, age))
+      setStringTag(modified, Tag.PatientName, VR.PN, createAnonymousPatientName(sex, age))
       removeTag(modified, Tag.PatientPrimaryLanguageCodeSequence)
       removeTag(modified, Tag.PatientPrimaryLanguageModifierCodeSequence)
       removeTag(modified, Tag.PatientReligiousPreference)
@@ -303,4 +304,5 @@ object DicomAnonymization {
     val ageString = if (age == null || age.isEmpty) "<unknown age>" else age
     s"Anonymous $sexString $ageString"
   }
+
 }

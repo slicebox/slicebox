@@ -23,12 +23,10 @@ import BoxProtocol.OutboxEntry
 import akka.actor.ReceiveTimeout
 import java.util.Date
 
-class BoxPollActor(
-  box: Box,
-  dbProps: DbProps,
-  pollStartDelay: FiniteDuration = 100.millis,
-  pollInterval: FiniteDuration = 5.seconds,
-  receiveTimeout: FiniteDuration = 1.minute) extends Actor with JsonFormats {
+class BoxPollActor(box: Box,
+                   dbProps: DbProps,
+                   pollInterval: FiniteDuration = 5.seconds,
+                   receiveTimeout: FiniteDuration = 1.minute) extends Actor with JsonFormats {
 
   import BoxPollActor._
 
@@ -62,7 +60,7 @@ class BoxPollActor(
       case Left(e)       => log.error(e, s"Failed to send done message to remote box (${box.name},${remoteOutboxEntry.transactionId},${remoteOutboxEntry.sequenceNumber})")
     }
 
-  val poller = system.scheduler.schedule(pollStartDelay, pollInterval) {
+  val poller = system.scheduler.schedule(pollInterval, pollInterval) {
     self ! PollRemoteBox
   }
 
@@ -70,7 +68,7 @@ class BoxPollActor(
 
   override def postStop() =
     poller.cancel()
-  
+
   def receive = LoggingReceive {
     case PollRemoteBox => pollRemoteBox
   }
@@ -116,7 +114,7 @@ class BoxPollActor(
     sendPollRequestToRemoteBox
       .map(outboxEntryMaybe => {
         updateBoxOnlineStatus(true)
-        
+
         outboxEntryMaybe match {
           case Some(outboxEntry) => self ! RemoteOutboxEntryFound(outboxEntry)
           case None              => self ! RemoteOutboxEmpty
@@ -147,11 +145,11 @@ class BoxPollActor(
     db.withSession { implicit session =>
       boxDao.updateInbox(remoteBoxId, transactionId, sequenceNumber, totalImageCount)
     }
-    
+
     if (sequenceNumber == totalImageCount)
       context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Box", "Receive completed.")))
   }
-  
+
   def updateBoxOnlineStatus(online: Boolean): Unit =
     db.withSession { implicit session =>
       boxDao.updateBoxOnlineStatus(box.id, online)
