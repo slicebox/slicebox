@@ -57,9 +57,11 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
   val for1 = FrameOfReference(-1, FrameOfReferenceUID("frid1"))
   val series1 = Series(-1, -1, -1, -1, SeriesInstanceUID("seuid1"), SeriesDescription("sedesc1"), SeriesDate("19990101"), Modality("NM"), ProtocolName("prot1"), BodyPartExamined("bodypart1"))
   val image1 = Image(-1, -1, SOPInstanceUID("souid1"), ImageType("PRIMARY/RECON/TOMO"), InstanceNumber("1"))
-  val image2 = Image(-1, -1, SOPInstanceUID("souid1"), ImageType("PRIMARY/RECON/TOMO"), InstanceNumber("1"))
+  val image2 = Image(-1, -1, SOPInstanceUID("souid2"), ImageType("PRIMARY/RECON/TOMO"), InstanceNumber("1"))
+  val image3 = Image(-1, -1, SOPInstanceUID("souid3"), ImageType("PRIMARY/RECON/TOMO"), InstanceNumber("1"))
   var imageFile1 = ImageFile(-1, FileName("file1"))
   var imageFile2 = ImageFile(-1, FileName("file2"))
+  var imageFile3 = ImageFile(-1, FileName("file3"))
 
   db.withSession { implicit session =>
     val dbPat = dicomMetaDataDao.insert(pat1)
@@ -69,12 +71,18 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
     val dbSeries = dicomMetaDataDao.insert(series1.copy(studyId = dbStudy.id, equipmentId = dbEquipment.id, frameOfReferenceId = dbFor.id))
     val dbImage1 = dicomMetaDataDao.insert(image1.copy(seriesId = dbSeries.id))
     val dbImage2 = dicomMetaDataDao.insert(image2.copy(seriesId = dbSeries.id))
+    val dbImage3 = dicomMetaDataDao.insert(image3.copy(seriesId = dbSeries.id))
     imageFile1 = dicomMetaDataDao.insert(imageFile1.copy(id = dbImage1.id))
     imageFile2 = dicomMetaDataDao.insert(imageFile2.copy(id = dbImage2.id))
+    imageFile3 = dicomMetaDataDao.insert(imageFile3.copy(id = dbImage3.id))
   }
 
-  val capturedFileSendRequests: ArrayBuffer[HttpRequest] = ArrayBuffer()
-
+  val capturedFileSendRequests = ArrayBuffer.empty[HttpRequest]
+  val sendFailedResponseSequenceNumbers  = ArrayBuffer.empty[Int]
+  
+  val okResponse = HttpResponse()
+  val failResponse = HttpResponse(InternalServerError)
+  
   val boxPushActorRef = _system.actorOf(Props(new BoxPushActor(testBox, dbProps, storage, 500.millis) {
 
     override def sendFilePipeline = {
@@ -82,7 +90,10 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
         {
           capturedFileSendRequests += req
           Future {
-            HttpResponse()
+            if (sendFailedResponseSequenceNumbers.contains(capturedFileSendRequests.size))
+              failResponse
+            else
+              okResponse
           }
         }
     }
@@ -158,7 +169,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
     "mark outbox entry as failed when file send fails" in {
 
       db.withSession { implicit session =>
-        val invalidImageId = 999
+        val invalidImageId = 666
         boxDao.insertOutboxEntry(OutboxEntry(1, testBox.id, testTransactionId, 1, 1, invalidImageId, false))
 
         // Sleep for a while so that the BoxPushActor has time to poll database
@@ -175,12 +186,12 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
     "mark all outbox entries for transaction as failed when file send fails" in {
 
       db.withSession { implicit session =>
-        val invalidImageId = 998
+        val invalidImageId = 666
         boxDao.insertOutboxEntry(OutboxEntry(1, testBox.id, testTransactionId, 1, 1, invalidImageId, false))
         boxDao.insertOutboxEntry(OutboxEntry(1, testBox.id, testTransactionId, 2, 2, invalidImageId, false))
 
         // Sleep for a while so that the BoxPushActor has time to poll database
-        Thread.sleep(1000)
+        Thread.sleep(1500)
 
         val outboxEntries = boxDao.listOutboxEntries
         outboxEntries.size should be(2)
@@ -193,12 +204,12 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
     "not mark wrong outbox entry as failed when transaction id is not unique" in {
 
       db.withSession { implicit session =>
-        val invalidImageId = 998
+        val invalidImageId = 666
         boxDao.insertOutboxEntry(OutboxEntry(1, testBox.id, testTransactionId, 1, 1, invalidImageId, false))
         val secondOutboxEntry = boxDao.insertOutboxEntry(OutboxEntry(1, 999, testTransactionId, 1, 1, imageFile1.id, false))
 
         // Sleep for a while so that the BoxPushActor has time to poll database
-        Thread.sleep(1000)
+        Thread.sleep(1500)
 
         val outboxEntries = boxDao.listOutboxEntries
         outboxEntries.size should be(2)
@@ -212,7 +223,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
     "process other transactions when file send fails" in {
 
       db.withSession { implicit session =>
-      val invalidImageId = 998
+      val invalidImageId = 666
         boxDao.insertOutboxEntry(OutboxEntry(1, testBox.id, testTransactionId, 1, 1, invalidImageId, false))
 
         // Sleep for a while so that the BoxPushActor has time to poll database
@@ -233,8 +244,36 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       }
     }
 
-    "remove associated attribute value mappings once all outbox entries have been processed" in {
+    "outbox processing is paused when remote server is not working, and resumed once remote server is back up" in {
 
+      db.withSession { implicit session =>
+        boxDao.insertOutboxEntry(OutboxEntry(1, testBox.id, testTransactionId, 1, 3, imageFile1.id, false))
+        boxDao.insertOutboxEntry(OutboxEntry(2, testBox.id, testTransactionId, 2, 3, imageFile2.id, false))
+        boxDao.insertOutboxEntry(OutboxEntry(3, testBox.id, testTransactionId, 3, 3, imageFile3.id, false))
+
+        val n = capturedFileSendRequests.size
+        sendFailedResponseSequenceNumbers ++= Seq(n + 2, n + 3, n + 4, n + 5, n + 6)
+
+        // wait for poll, start sending files
+        Thread.sleep(600) 
+        
+        boxDao.listOutboxEntries.size should be (2)
+
+        // remote server is now down
+        
+        // let two or three poll events happen, nothing gets sent
+        Thread.sleep(1100) 
+        
+        boxDao.listOutboxEntries.size should be (2)
+        
+        // server back up
+        sendFailedResponseSequenceNumbers.clear
+        
+        // wait for poll, send remaining files
+        Thread.sleep(1000) 
+        
+        boxDao.listOutboxEntries.size should be (0)
+      }
     }
   }
 }

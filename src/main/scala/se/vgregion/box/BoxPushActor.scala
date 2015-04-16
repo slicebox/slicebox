@@ -70,7 +70,6 @@ class BoxPushActor(box: Box,
   def processNextOutboxEntry(): Unit =
     nextOutboxEntry match {
       case Some(entry) =>
-        println("becoooming")
         context.become(waitForFileSentState)
         sendFileForOutboxEntry(entry)
 
@@ -157,7 +156,7 @@ class BoxPushActor(box: Box,
       boxDao.markOutboxTransactionAsFailed(box.id, outboxEntry.transactionId)
     }
 
-    processNextOutboxEntry
+    context.unbecome
   }
 
   def removeAttributeValueMappingsForTransactionId(transactionId: Long) = {
