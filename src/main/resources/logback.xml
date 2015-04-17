@@ -8,15 +8,15 @@
         </encoder>
     </appender>
 
-    <logger name="akka" level="DEBUG" />
+    <logger name="akka" level="ERROR" />
     <logger name="spray" level="ERROR" />
 	<logger name="scala.slick" level="ERROR" />
     <logger name="com.mchange" level="ERROR" />
 	<!-- <logger name="scala.slick.jdbc.JdbcBackend.statement" level="DEBUG" /> -->
 	<logger name="org.dcm4che3" level="ERROR" />
-    <logger name="se.vgregion" level="DEBUG" />
+    <logger name="se.vgregion" level="WARN" />
 
-    <root level="DEBUG">
+    <root level="WARN">
         <appender-ref ref="CONSOLE"/>
     </root>
 </configuration>

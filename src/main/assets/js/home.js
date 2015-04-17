@@ -332,7 +332,7 @@ angular.module('slicebox.home', ['ngRoute'])
                 entityIds.push(entity.id);
             });
 
-            return $http.post('/api/boxes/' + receiverId + '/' + sendCommand, entityIds);        
+            return $http.post('/api/boxes/' + receiverId + '/' + sendCommand, { entityIds: entityIds, attributeValueMappings: [] } );        
         };
     }
 

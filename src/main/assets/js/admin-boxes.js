@@ -11,7 +11,7 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
   });
 })
 
-.controller('AdminBoxesCtrl', function($scope, $http, $interval) {
+.controller('AdminBoxesCtrl', function($scope, $http, $interval, $mdDialog) {
     // Initialization
     $scope.objectActions =
         [
@@ -39,16 +39,19 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
     };
 
     $scope.addBoxButtonClicked = function() {
-        $scope.addEntityButtonClicked('addBoxModalContent.html', 'AddBoxModalCtrl', '/api/boxes', 'Box', $scope.callbacks.boxesTable);
+        var dialogPromise = $mdDialog.show({
+            templateUrl: '/assets/partials/addBoxModalContent.html',
+            controller: 'AddBoxModalCtrl',
+            scope: $scope.$new()
+        });
+        dialogPromise.then(function (response) {
+            $scope.showInfoMessage("Box added");                
+            $scope.callbacks.boxesTable.reloadPage();
+        });
     };
 })
 
 .controller('AddBoxModalCtrl', function($scope, $mdDialog, $http) {
-    // Initialization
-    $scope.uiState = {
-        addChoice: 'generateURL',
-        errorMessage: null
-    };
 
     // Scope functions
     $scope.radioButtonChanged = function() {
@@ -60,8 +63,6 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
             return;
         }
 
-        $scope.uiState.errorMessage = null;
-
         var generateURLPromise = $http.post('/api/boxes/generatebaseurl', {value: $scope.uiState.remoteBoxName});
 
         generateURLPromise.success(function(data) {
@@ -70,7 +71,7 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
         });
 
         generateURLPromise.error(function(data) {
-            $scope.uiState.errorMessage = data;
+            $scope.showErrorMessage(data);                
         });
 
         return generateURLPromise;
@@ -94,7 +95,7 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
         });
 
         connectPromise.error(function(data) {
-            $scope.uiState.errorMessage = data;
+            $scope.showErrorMessage(data);
         });
 
         return connectPromise;
