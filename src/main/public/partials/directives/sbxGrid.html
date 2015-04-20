@@ -20,16 +20,16 @@
         <table ng-cloak class="ng-cloak">
             <col width="20px" ng-if="objectActions.length > 0" />
 
-            <col ng-repeat="columnDefinition in columnDefinitions track by columnDefinition.property" />
+            <col ng-repeat="columnDefinition in columnDefinitions track by $index" />
 
             <thead>
                 <tr>
                     <th ng-if="objectActions.length > 0" class="column-header">
                         <md-checkbox ng-model="uiState.selectAllChecked"    
-                            ng-change="selectAllChanged()"></md-checkbox>
+                            ng-change="selectAllChanged()" aria-label="Select"></md-checkbox>
                     </th>
                     
-                    <th ng-repeat="columnDefinition in columnDefinitions track by columnDefinition.property"
+                    <th ng-repeat="columnDefinition in columnDefinitions track by $index"
                         ng-click="columnClicked(columnDefinition)"
                         class="column-header">
                         {{columnDefinition.title}}
@@ -40,7 +40,7 @@
             </thead>
             
             <tbody ng-style="tableBodyStyle()">
-                <tr ng-repeat="rowObject in objectList"
+                <tr ng-repeat="rowObject in objectList track by $index"
                     ng-click="rowClicked(rowObject)"
                     ng-class="rowCSSClasses(rowObject)">
 
@@ -48,11 +48,11 @@
                         <md-checkbox
                             ng-if="rowHasActions(rowObject)"
                             ng-model="objectActionSelection[$index]"
-                            ng-click="$event.stopPropagation()"></md-checkbox>
+                            ng-click="$event.stopPropagation()" aria-label="Select"></md-checkbox>
                     </td>
 
                     <td sbx-grid-internal-td
-                        ng-repeat="columnDefinition in columnDefinitions track by columnDefinition.property"
+                        ng-repeat="columnDefinition in columnDefinitions track by $index"
                         class="table-cell">
                         {{filteredCellValues[$parent.$index][columnDefinition.property]}}
                     </td>

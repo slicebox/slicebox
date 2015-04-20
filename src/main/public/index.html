@@ -43,7 +43,7 @@
 
 	<md-toolbar layout="row" class="top-bar">
 		<div class="md-toolbar-tools">
-			<md-button ng-click="toggleLeftNav()" hide-gt-md>
+			<md-button ng-click="toggleLeftNav()" hide-gt-md aria-label="Toggle Nav">
 				<i class="fa fa-bars fa-lg"></i>
 			</md-button>
 
@@ -52,7 +52,7 @@
 				<h4 class="toolbar-logo-text">Slicebox</h4>
 			</div>
 			<span flex></span>
-			<md-button ng-if="userSignedIn()" href="" ng-click="logout()">
+			<md-button ng-if="userSignedIn()" href="" ng-click="logout()" aria-label="Logout">
 				<i class="fa fa-sign-out fa-lg"></i>
 				<md-tooltip>
   					Logout

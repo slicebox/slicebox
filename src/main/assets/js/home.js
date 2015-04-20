@@ -11,7 +11,7 @@ angular.module('slicebox.home', ['ngRoute'])
   });
 })
 
-.controller('HomeCtrl', function($scope, $http, $mdDialog) {
+.controller('HomeCtrl', function($scope, $http, $mdDialog, $q) {
     // Initialization
     $scope.patientActions =
         [
@@ -44,7 +44,7 @@ angular.module('slicebox.home', ['ngRoute'])
                 action: confirmSendSeries
             },
             {
-                name: 'Send to SCP',
+                name: 'Send to PACS',
                 requiredSelectionCount: 1,
                 action: confirmSendSeriesToScp
             },   
@@ -307,79 +307,152 @@ angular.module('slicebox.home', ['ngRoute'])
         return string.charAt(0).toUpperCase() + string.substring(1);        
     }
 
-    function confirmSend(entities, entitiesText, receiversUrl, sendFunction) {
+    function confirmSend(receiversUrl, receiverSelectedCallback) {
         return $mdDialog.show({
                 templateUrl: '/assets/partials/sendImageFilesModalContent.html',
-                controller: 'SendImageFilesModalCtrl',
+                controller: 'SelectReceiverModalCtrl',
                 scope: $scope.$new(),
                 locals: {
-                    text: entities.length + ' ' + entitiesText,
-                    receiversCallback: function(startIndex, count, orderByProperty, orderByDirection) {
-                        return $http.get(receiversUrl);
-                    },
-                    sendCallback: function(receiverId) {
-                        return sendFunction(receiverId, entities);
-                    }
+                    receiversUrl: receiversUrl,
+                    receiverSelectedCallback: receiverSelectedCallback
                 }
             });        
     }
 
-    function boxSendFunction(sendCommand) {
-        return function(receiverId, entities) {
-            var entityIds = [];
-
-            angular.forEach(entities, function(entity) {
-                entityIds.push(entity.id);
+    function confirmSendSeries(series) {
+        return confirmSend('/api/boxes', function(receiverId) {
+            var seriesIds = series.map(function(entity) { 
+                return entity.id; 
             });
 
-            return $http.post('/api/boxes/' + receiverId + '/' + sendCommand, { entityIds: entityIds, attributeValueMappings: [] } );        
-        };
-    }
+            var patientsPromise = $http.get('/api/metadata/studies/' + series[0].studyId).then(function(study) {
+                return $http.get('/api/metadata/patients/' + study.data.patientId);
+            }).then(function(patient) {
+                return new Array(patient.data);
+            });
 
-    function scuSendFunction() {
-        return function(receiverId, entities) {
-            return $http.post('/api/scus/' + receiverId + '/sendseries/' + entities[0].id);
-        };
-    }
-
-    function confirmSendSeries(series) {
-        return confirmSend(series, 'series', '/api/boxes', boxSendFunction('sendseries'));
+            return showMapAttributesModal("series", patientsPromise, receiverId, 'sendseries', seriesIds);
+        });
     }
 
     function confirmSendStudies(studies) {
-        return confirmSend(studies, 'study(s)', '/api/boxes', boxSendFunction('sendstudies'));
+        return confirmSend('/api/boxes', function(receiverId) {
+            var studyIds = studies.map(function(entity) { 
+                return entity.id; 
+            });
+
+            var patientsPromise = $http.get('/api/metadata/patients/' + studies[0].patientId).then(function(patient) {
+                return new Array(patient.data);
+            });
+
+            return showMapAttributesModal("study(s)", patientsPromise, receiverId, 'sendstudies', studyIds);
+        });
     }
 
     function confirmSendPatients(patients) {
-        return confirmSend(patients, 'patient(s)', '/api/boxes', boxSendFunction('sendpatients'));
+        return confirmSend('/api/boxes', function(receiverId) {
+            var patientIds = patients.map(function(entity) { 
+                return entity.id; 
+            });
+
+            var patientsPromise = $q.when(patients);
+
+            return showMapAttributesModal("patient(s)", patientsPromise, receiverId, 'sendpatients', patientIds);
+        });
     }
 
     function confirmSendSeriesToScp(series) {
-        return confirmSend(series, 'series', '/api/scus', scuSendFunction());
+        return confirmSend('/api/scus', function(receiverId) {
+            return $http.post('/api/scus/' + receiverId + '/sendseries/' + series[0].id).success(function() {
+                $mdDialog.hide();
+                $scope.showInfoMessage("Series sent to PACS");
+            }).error(function(data) {
+                $scope.showErrorMessage('Failed to send to PACS: ' + data);
+            });
+        });
     }
 
+    function showMapAttributesModal(text, patientsPromise, receiverId, sendCommand, entityIds) {
+        return $mdDialog.show({
+                templateUrl: '/assets/partials/mapAttributesModalContent.html',
+                controller: 'MapAttributesModalCtrl',
+                scope: $scope.$new(),
+                locals: {
+                    text: text,
+                    patients: patientsPromise,
+                    receiverId: receiverId,
+                    sendCommand: sendCommand,
+                    entityIds: entityIds
+                }
+        });                
+    }
 })
 
-.controller('SendImageFilesModalCtrl', function($scope, $mdDialog, $http, text, receiversCallback, sendCallback) {
+.controller('SelectReceiverModalCtrl', function($scope, $mdDialog, $http, receiversUrl, receiverSelectedCallback) {
     // Initialization
-    $scope.title = 'Send ' + text + '?';
-    $scope.loadReceivers = receiversCallback;
+    $scope.title = 'Select Receiver';
 
     $scope.uiState.selectedReceiver = null;
 
     // Scope functions
+    $scope.loadReceivers = function() {
+        return $http.get(receiversUrl);
+    };
+
     $scope.receiverSelected = function(receiver) {
         $scope.uiState.selectedReceiver = receiver;
     };
 
+    $scope.selectButtonClicked = function() {
+        receiverSelectedCallback($scope.uiState.selectedReceiver.id);
+    };
+
+    $scope.cancelButtonClicked = function() {
+        $mdDialog.cancel();
+    };
+
+})
+
+.controller('MapAttributesModalCtrl', function($scope, $mdDialog, $http, text, patients, receiverId, sendCommand, entityIds) {
+    // Initialization
+    $scope.title = 'Anonymization Options';
+    $scope.patients = patients.map(function(patient, index) {
+        return { patient: patient, index: index };
+    });
+
+    $scope.namePrefix = "anon";
+    $scope.numberingLength = 3;
+    $scope.numberingStart = 1;
+
+    $scope.listAttributes = function(startIndex, count, orderByProperty, orderByDirection) {
+        return $scope.patients;
+    };
+
+    $scope.updateAnonymousPatientNames = function() {
+        $scope.anonymizedPatientNames = $scope.patients.map(function(patient) {
+            return $scope.namePrefix + " " + zeroPad($scope.numberingStart + patient.index, $scope.numberingLength);                
+        });
+    };
+
+    $scope.cancelButtonClicked = function() {
+        $mdDialog.cancel();
+    };
+
     $scope.sendButtonClicked = function() {
-        var sendPromise = sendCallback($scope.uiState.selectedReceiver.id);
+        var sendData = { 
+            entityIds: entityIds, 
+            attributeValueMappings: $scope.anonymizedPatientNames.map(function(anonName, index) {
+                return { tag: 0x00100010, matchValue: patients[index].patientName.value, mappedValue: anonName };
+            })
+        };
+
+        var sendPromise = $http.post('/api/boxes/' + receiverId + '/' + sendCommand, sendData );
 
         $scope.uiState.sendInProgress = true;
 
-        sendPromise.then(function() {
+        sendPromise.then(function(data) {
             $mdDialog.hide();
-            $scope.showInfoMessage(text + " added to outbox");
+            $scope.showInfoMessage(entityIds.length + " " + text + " added to outbox");
         }, function(data) {
             $scope.showErrorMessage('Failed to send: ' + data);
         });
@@ -389,8 +462,16 @@ angular.module('slicebox.home', ['ngRoute'])
         });
     };
 
-    $scope.cancelButtonClicked = function() {
-        $mdDialog.cancel();
-    };
+    function zeroPad(num, length) {
+        var an = Math.abs(num);
+        var digitCount = 1 + Math.floor(Math.log(an) / Math.LN10);
+        if (digitCount >= length) {
+            return num;
+        }
+        var zeroString = Math.pow(10, length - digitCount).toString().substr(1);
+        return num < 0 ? '-' + zeroString + an : zeroString + an;
+    }
 
+    $scope.updateAnonymousPatientNames();
+    
 });

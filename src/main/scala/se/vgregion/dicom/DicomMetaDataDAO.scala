@@ -165,7 +165,7 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
   def patientById(id: Long)(implicit session: Session): Option[Patient] =
     patientsQuery.filter(_.id === id).list.headOption
 
-  def studyBtId(id: Long)(implicit session: Session): Option[Study] =
+  def studyById(id: Long)(implicit session: Session): Option[Study] =
     studiesQuery.filter(_.id === id).list.headOption
 
   def seriesById(id: Long)(implicit session: Session): Option[Series] =

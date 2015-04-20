@@ -50,7 +50,7 @@ angular.module('slicebox.directives', [])
  * In order for selection check boxes and object actions to work, all objects in the
  * list must have an id property. 
  */
- .directive('sbxGrid', function($filter, $q, $timeout, $log) {
+ .directive('sbxGrid', function($filter, $q, $timeout) {
 
     return {
         restrict: 'E',
@@ -425,7 +425,7 @@ angular.module('slicebox.directives', [])
 
             function calculateFilteredCellValueForRowObjectAndColumn(rowObject, columnDefinition) {
                 var cellValue = rowObject[columnDefinition.property];
-                if (columnDefinition.property.indexOf('[') !== -1) {
+                if (columnDefinition.property && columnDefinition.property.indexOf('[') !== -1) {
                     cellValue = eval('rowObject.' + columnDefinition.property);
                 }
                 var filter = columnDefinition.filter;
@@ -612,7 +612,7 @@ angular.module('slicebox.directives', [])
 
 })
 
-.directive('sbxGridColumn', function($q, $log) {
+.directive('sbxGridColumn', function() {
 
     return {
         require: '^sbxGrid',
@@ -689,7 +689,7 @@ angular.module('slicebox.directives', [])
                 });
 
                 rawPropertyValue = $scope.rowObject[$scope.columnDefinition.property];
-                if ($scope.columnDefinition.property.indexOf('[') !== -1) {
+                if ($scope.columnDefinition.property && $scope.columnDefinition.property.indexOf('[') !== -1) {
                     rawPropertyValue = eval('$scope.rowObject.' + $scope.columnDefinition.property);
                 }
 

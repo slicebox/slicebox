@@ -1,9 +1,7 @@
-<md-dialog aria-label="{{title}}">
+<md-dialog aria-label="{{title}}" flex="40">
     <md-content class="sticky-container">
         <md-subheader class="md-sticky-no-effect">{{title}}</md-subheader>
         <div class="dialog-content">
-
-           <h4>Select Receiver</h4>
 
             <sbx-grid
                 load-page="loadReceivers(startIndex, count, orderByProperty, orderByDirection)"
@@ -20,6 +18,6 @@
     <div class="md-actions" layout="row">
         <span flex></span>
         <md-button ng-click="cancelButtonClicked()">Cancel</md-button>
-        <sbx-button button-class="md-primary" button-title="Send" action="sendButtonClicked()" button-disabled="!uiState.selectedReceiver"></sbx-button>
+        <sbx-button button-class="md-primary" button-title="Select" action="selectButtonClicked()" button-disabled="!uiState.selectedReceiver"></sbx-button>
     </div>
 </md-dialog>

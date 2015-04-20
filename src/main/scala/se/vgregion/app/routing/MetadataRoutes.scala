@@ -7,6 +7,7 @@ import spray.httpx.SprayJsonSupport._
 import spray.routing._
 
 import se.vgregion.app.RestApi
+import se.vgregion.dicom.DicomHierarchy._
 import se.vgregion.dicom.DicomProtocol._
 
 trait MetadataRoutes { this: RestApi =>
@@ -30,7 +31,11 @@ trait MetadataRoutes { this: RestApi =>
               }
           }
         } ~ path(LongNumber) { patientId =>
-          delete {
+          get {
+            onSuccess(dicomService.ask(GetPatient(patientId)).mapTo[Option[Patient]]) {
+                complete(_)
+            }            
+          } ~ delete {
             onSuccess(dicomService.ask(DeletePatient(patientId))) {
               case ImageFilesDeleted(_) =>
                 complete(NoContent)
@@ -51,7 +56,11 @@ trait MetadataRoutes { this: RestApi =>
               }
           }
         } ~ path(LongNumber) { studyId =>
-          delete {
+          get {
+            onSuccess(dicomService.ask(GetStudy(studyId)).mapTo[Option[Study]]) {
+                complete(_)
+            }            
+          } ~ delete {
             onSuccess(dicomService.ask(DeleteStudy(studyId))) {
               case ImageFilesDeleted(_) =>
                 complete(NoContent)
@@ -84,7 +93,11 @@ trait MetadataRoutes { this: RestApi =>
               }
           }
         } ~ path(LongNumber) { seriesId =>
-          delete {
+          get {
+            onSuccess(dicomService.ask(GetSingleSeries(seriesId)).mapTo[Option[Series]]) {
+                complete(_)
+            }            
+          } ~ delete {
             onSuccess(dicomService.ask(DeleteSeries(seriesId))) {
               case ImageFilesDeleted(_) =>
                 complete(NoContent)
