@@ -65,7 +65,7 @@ trait RemoteBoxRoutes { this: RestApi =>
                   parameters('transactionid.as[Long], 'sequencenumber.as[Long]) { (transactionId, sequenceNumber) =>
                     onSuccess(boxService.ask(GetOutboxEntry(token, transactionId, sequenceNumber))) {
                       case outboxEntry: OutboxEntry =>
-                        onSuccess(boxService.ask(GetTransactionTagValues(transactionId)).mapTo[Seq[TransactionTagValue]]) {
+                        onSuccess(boxService.ask(GetTransactionTagValues(outboxEntry.imageFileId, transactionId)).mapTo[Seq[TransactionTagValue]]) {
                           case transactionTagValues =>
                             onSuccess(dicomService.ask(GetImageFile(outboxEntry.imageFileId))) {
                               case imageFile: ImageFile =>

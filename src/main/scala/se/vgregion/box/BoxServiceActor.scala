@@ -190,8 +190,8 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
             removeOutboxEntryFromDb(outboxEntryId)
             sender ! OutboxEntryRemoved(outboxEntryId)
 
-          case GetTransactionTagValues(transactionId) =>
-            sender ! transactionTagValuesForTransactionId(transactionId)
+          case GetTransactionTagValues(imageFileId, transactionId) =>
+            sender ! tagValuesForImageFileIdAndTransactionId(imageFileId, transactionId)
         }
 
       }
@@ -387,9 +387,9 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
       boxDao.updateBoxOnlineStatus(boxId, online)
     }
 
-  def transactionTagValuesForTransactionId(transactionId: Long): Seq[TransactionTagValue] =
+  def tagValuesForImageFileIdAndTransactionId(imageFileId: Long, transactionId: Long): Seq[TransactionTagValue] =
     db.withSession { implicit session =>
-      boxDao.transactionTagValuesByTransactionId(transactionId)
+      boxDao.tagValuesByImageFileIdAndTransactionId(imageFileId, transactionId)
     }
 
   def removeTransactionTagValuesForTransactionId(transactionId: Long) = {

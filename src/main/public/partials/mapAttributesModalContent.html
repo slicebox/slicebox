@@ -26,9 +26,9 @@
                     object-selected="receiverSelected(object)"
                     empty-message="No attributes found">
 
-                    <sbx-grid-column property="patient.patientName['value']" title="Name">
+                    <sbx-grid-column property="patientName['value']" title="Name">
                         <sbx-grid-cell>
-                            {{rowObject.patient.patientName.value | prettyPatientName}}
+                            {{rowObject.patientName.value | prettyPatientName}}
                         </sbx-grid-cell>
                     </sbx-grid-column>
 
@@ -38,9 +38,9 @@
                         </sbx-grid-cell>
                     </sbx-grid-column>
 
-                    <sbx-grid-column property="patient.patientName['value']" title="Name">
+                    <sbx-grid-column property="patientName['value']" title="Name">
                         <sbx-grid-cell>
-                            <input type="text" ng-model="anonymizedPatientNames[rowObject.index]" />
+                            <input type="text" ng-model="anonymizedPatientNames[patients.indexOf(rowObject)]" />
                         </sbx-grid-cell>
                     </sbx-grid-column>
 

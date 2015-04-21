@@ -174,7 +174,9 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
         outboxEntries.map(_.transactionId).forall(_ == transactionId) should be(true)
 
         boxDao.listTransactionTagValues.size should be(3 * 3)
-        boxDao.transactionTagValuesByTransactionId(transactionId).size should be(3 * 3)
+        boxDao.tagValuesByImageFileIdAndTransactionId(if1.id, transactionId).size should be(3)
+        boxDao.tagValuesByImageFileIdAndTransactionId(if2.id, transactionId).size should be(3)
+        boxDao.tagValuesByImageFileIdAndTransactionId(if3.id, transactionId).size should be(3)
 
         outboxEntries.map(_.id).foreach(id => boxServiceActorRef ! RemoveOutboxEntry(id))
 
@@ -183,7 +185,9 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
         expectMsgType[OutboxEntryRemoved]
 
         boxDao.listTransactionTagValues.isEmpty should be(true)
-        boxDao.transactionTagValuesByTransactionId(transactionId).isEmpty should be(true)
+        boxDao.tagValuesByImageFileIdAndTransactionId(if1.id, transactionId).isEmpty should be(true)
+        boxDao.tagValuesByImageFileIdAndTransactionId(if2.id, transactionId).isEmpty should be(true)
+        boxDao.tagValuesByImageFileIdAndTransactionId(if3.id, transactionId).isEmpty should be(true)
       }
     }
 
@@ -226,7 +230,9 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
         outboxEntries.map(_.transactionId).forall(_ == transactionId) should be(true)
 
         boxDao.listTransactionTagValues.size should be(3 * 3)
-        boxDao.transactionTagValuesByTransactionId(transactionId).size should be(3 * 3)
+        boxDao.tagValuesByImageFileIdAndTransactionId(if1.id, transactionId).size should be(3)
+        boxDao.tagValuesByImageFileIdAndTransactionId(if2.id, transactionId).size should be(3)
+        boxDao.tagValuesByImageFileIdAndTransactionId(if3.id, transactionId).size should be(3)
 
         outboxEntries.foreach(entry => boxServiceActorRef ! DeleteOutboxEntry(token, entry.transactionId, entry.sequenceNumber))
 
@@ -235,7 +241,9 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
         expectMsg(OutboxEntryDeleted)
 
         boxDao.listTransactionTagValues.isEmpty should be(true)
-        boxDao.transactionTagValuesByTransactionId(transactionId).isEmpty should be(true)
+        boxDao.tagValuesByImageFileIdAndTransactionId(if1.id, transactionId).isEmpty should be(true)
+        boxDao.tagValuesByImageFileIdAndTransactionId(if2.id, transactionId).isEmpty should be(true)
+        boxDao.tagValuesByImageFileIdAndTransactionId(if3.id, transactionId).isEmpty should be(true)
       }
     }
 

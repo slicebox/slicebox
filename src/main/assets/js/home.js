@@ -325,13 +325,17 @@ angular.module('slicebox.home', ['ngRoute'])
                 return entity.id; 
             });
 
-            var patientsPromise = $http.get('/api/metadata/studies/' + series[0].studyId).then(function(study) {
+            var entityIdToPatientPromise = $http.get('/api/metadata/studies/' + series[0].studyId).then(function(study) {
                 return $http.get('/api/metadata/patients/' + study.data.patientId);
             }).then(function(patient) {
-                return new Array(patient.data);
+                var entityIdToPatient = {};
+                for (var i = 0; i < seriesIds.length; i++) {
+                    entityIdToPatient[seriesIds[i]] = patient.data;                    
+                }
+                return entityIdToPatient;
             });
 
-            return showMapAttributesModal("series", patientsPromise, receiverId, 'sendseries', seriesIds);
+            return showMapAttributesModal("series", entityIdToPatientPromise, receiverId, 'sendseries');
         });
     }
 
@@ -341,23 +345,29 @@ angular.module('slicebox.home', ['ngRoute'])
                 return entity.id; 
             });
 
-            var patientsPromise = $http.get('/api/metadata/patients/' + studies[0].patientId).then(function(patient) {
-                return new Array(patient.data);
+            var entityIdToPatientPromise = $http.get('/api/metadata/patients/' + studies[0].patientId).then(function(patient) {
+                var entityIdToPatient = {};
+                for (var i = 0; i < studyIds.length; i++) {
+                    entityIdToPatient[studyIds[i]] = patient.data;                    
+                }
+                return entityIdToPatient;
             });
 
-            return showMapAttributesModal("study(s)", patientsPromise, receiverId, 'sendstudies', studyIds);
+            return showMapAttributesModal("study(s)", entityIdToPatientPromise, receiverId, 'sendstudies');
         });
     }
 
     function confirmSendPatients(patients) {
         return confirmSend('/api/boxes', function(receiverId) {
-            var patientIds = patients.map(function(entity) { 
-                return entity.id; 
-            });
 
-            var patientsPromise = $q.when(patients);
+            var entityIdToPatient = {};
+            for (var i = 0; i < patients.length; i++) {
+                entityIdToPatient[patients[i].id] = patients[i];
+            }
 
-            return showMapAttributesModal("patient(s)", patientsPromise, receiverId, 'sendpatients', patientIds);
+            var entityIdToPatientPromise = $q.when(entityIdToPatient);
+
+            return showMapAttributesModal("patient(s)", entityIdToPatientPromise, receiverId, 'sendpatients');
         });
     }
 
@@ -372,17 +382,16 @@ angular.module('slicebox.home', ['ngRoute'])
         });
     }
 
-    function showMapAttributesModal(text, patientsPromise, receiverId, sendCommand, entityIds) {
+    function showMapAttributesModal(text, entityIdToPatientPromise, receiverId, sendCommand) {
         return $mdDialog.show({
                 templateUrl: '/assets/partials/mapAttributesModalContent.html',
                 controller: 'MapAttributesModalCtrl',
                 scope: $scope.$new(),
                 locals: {
                     text: text,
-                    patients: patientsPromise,
+                    entityIdToPatient: entityIdToPatientPromise,
                     receiverId: receiverId,
-                    sendCommand: sendCommand,
-                    entityIds: entityIds
+                    sendCommand: sendCommand
                 }
         });                
     }
@@ -413,12 +422,22 @@ angular.module('slicebox.home', ['ngRoute'])
 
 })
 
-.controller('MapAttributesModalCtrl', function($scope, $mdDialog, $http, text, patients, receiverId, sendCommand, entityIds) {
+.controller('MapAttributesModalCtrl', function($scope, $mdDialog, $http, text, entityIdToPatient, receiverId, sendCommand) {
     // Initialization
     $scope.title = 'Anonymization Options';
-    $scope.patients = patients.map(function(patient, index) {
-        return { patient: patient, index: index };
-    });
+
+    // get unique patients and an their respective indices
+    $scope.patients = [];
+    var entityIds = [];
+    for (var entityId in entityIdToPatient) {
+        entityIds.push(parseInt(entityId));
+        if (entityIdToPatient.hasOwnProperty(entityId)) {
+            var patient = entityIdToPatient[entityId];
+            if ($scope.patients.indexOf(patient) < 0) {
+                $scope.patients.push(patient);
+            }
+        }
+    }
 
     $scope.namePrefix = "anon";
     $scope.numberingLength = 3;
@@ -429,8 +448,8 @@ angular.module('slicebox.home', ['ngRoute'])
     };
 
     $scope.updateAnonymousPatientNames = function() {
-        $scope.anonymizedPatientNames = $scope.patients.map(function(patient) {
-            return $scope.namePrefix + " " + zeroPad($scope.numberingStart + patient.index, $scope.numberingLength);                
+        $scope.anonymizedPatientNames = $scope.patients.map(function(patient, index) {
+            return $scope.namePrefix + " " + zeroPad($scope.numberingStart + index, $scope.numberingLength);                
         });
     };
 
@@ -439,11 +458,18 @@ angular.module('slicebox.home', ['ngRoute'])
     };
 
     $scope.sendButtonClicked = function() {
+        var tagValues = [];
+        for (var i = 0; i < entityIds.length; i++) {
+            var entityId = entityIds[i];
+            var patient = entityIdToPatient[entityId];
+            var patientIndex = $scope.patients.indexOf(patient);
+            var anonName = $scope.anonymizedPatientNames[patientIndex];
+            tagValues.push( { entityId: entityId, tag: 0x00100010, value: anonName } );
+        }
+
         var sendData = { 
             entityIds: entityIds, 
-            attributeValueMappings: $scope.anonymizedPatientNames.map(function(anonName, index) {
-                return { tag: 0x00100010, matchValue: patients[index].patientName.value, mappedValue: anonName };
-            })
+            tagValues: tagValues
         };
 
         var sendPromise = $http.post('/api/boxes/' + receiverId + '/' + sendCommand, sendData );

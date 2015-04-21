@@ -71,7 +71,7 @@ object BoxProtocol {
   
   case class GetOutboxEntry(token: String, transactionId: Long, sequenceNumber: Long) extends BoxRequest
   
-  case class GetTransactionTagValues(transactionId: Long) extends BoxRequest
+  case class GetTransactionTagValues(imageFileId: Long, transactionId: Long) extends BoxRequest
   
   case class DeleteOutboxEntry(token: String, transactionId: Long, sequenceNumber: Long) extends BoxRequest
   

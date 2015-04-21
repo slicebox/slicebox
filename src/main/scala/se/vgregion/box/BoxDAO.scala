@@ -193,8 +193,8 @@ class BoxDAO(val driver: JdbcProfile) {
     entry.copy(id = generatedId)
   }
   
-  def transactionTagValuesByTransactionId(transactionId: Long)(implicit session: Session): List[TransactionTagValue] =
-    transactionTagValueQuery.filter(_.transactionId === transactionId).list
+  def tagValuesByImageFileIdAndTransactionId(imageFileId: Long, transactionId: Long)(implicit session: Session): List[TransactionTagValue] =
+    transactionTagValueQuery.filter(_.imageFileId === imageFileId).filter(_.transactionId === transactionId).list
     
   def removeTransactionTagValue(transactionTagValueId: Long)(implicit session: Session): Unit =
     transactionTagValueQuery.filter(_.id === transactionTagValueId).delete

@@ -98,7 +98,7 @@ class BoxPushActor(box: Box,
   def sendFileForOutboxEntry(outboxEntry: OutboxEntry) =
     fileNameForImageFileId(outboxEntry.imageFileId) match {
       case Some(fileName) =>
-        val transactionTagValues = transactionTagValuesForTransactionId(outboxEntry.transactionId)
+        val transactionTagValues = tagValuesForImageFileIdAndTransactionId(outboxEntry.imageFileId, outboxEntry.transactionId)
         sendFileWithName(outboxEntry, fileName, transactionTagValues)
       case None =>
         handleFilenameLookupFailedForOutboxEntry(outboxEntry, new IllegalStateException(s"Can't process outbox entry (${outboxEntry.id}) because no image with id ${outboxEntry.imageFileId} was found"))
@@ -109,9 +109,9 @@ class BoxPushActor(box: Box,
       dicomMetaDataDao.imageFileById(imageFileId).map(_.fileName.value)
     }
 
-  def transactionTagValuesForTransactionId(transactionId: Long): Seq[TransactionTagValue] =
+  def tagValuesForImageFileIdAndTransactionId(imageFileId: Long, transactionId: Long): Seq[TransactionTagValue] =
     db.withSession { implicit session =>
-      boxDao.transactionTagValuesByTransactionId(transactionId)
+      boxDao.tagValuesByImageFileIdAndTransactionId(imageFileId, transactionId)
     }
 
   def sendFileWithName(outboxEntry: OutboxEntry, fileName: String, tagValues: Seq[TransactionTagValue]) = {
