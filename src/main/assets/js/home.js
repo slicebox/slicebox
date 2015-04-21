@@ -335,7 +335,7 @@ angular.module('slicebox.home', ['ngRoute'])
                 return entityIdToPatient;
             });
 
-            return showMapAttributesModal("series", entityIdToPatientPromise, receiverId, 'sendseries');
+            return showBoxSendTagValuesModal("series", entityIdToPatientPromise, receiverId, 'sendseries');
         });
     }
 
@@ -353,7 +353,7 @@ angular.module('slicebox.home', ['ngRoute'])
                 return entityIdToPatient;
             });
 
-            return showMapAttributesModal("study(s)", entityIdToPatientPromise, receiverId, 'sendstudies');
+            return showBoxSendTagValuesModal("study(s)", entityIdToPatientPromise, receiverId, 'sendstudies');
         });
     }
 
@@ -367,7 +367,7 @@ angular.module('slicebox.home', ['ngRoute'])
 
             var entityIdToPatientPromise = $q.when(entityIdToPatient);
 
-            return showMapAttributesModal("patient(s)", entityIdToPatientPromise, receiverId, 'sendpatients');
+            return showBoxSendTagValuesModal("patient(s)", entityIdToPatientPromise, receiverId, 'sendpatients');
         });
     }
 
@@ -382,10 +382,10 @@ angular.module('slicebox.home', ['ngRoute'])
         });
     }
 
-    function showMapAttributesModal(text, entityIdToPatientPromise, receiverId, sendCommand) {
+    function showBoxSendTagValuesModal(text, entityIdToPatientPromise, receiverId, sendCommand) {
         return $mdDialog.show({
-                templateUrl: '/assets/partials/mapAttributesModalContent.html',
-                controller: 'MapAttributesModalCtrl',
+                templateUrl: '/assets/partials/boxSendTagValuesModalContent.html',
+                controller: 'BoxSendTagValuesCtrl',
                 scope: $scope.$new(),
                 locals: {
                     text: text,
@@ -422,7 +422,7 @@ angular.module('slicebox.home', ['ngRoute'])
 
 })
 
-.controller('MapAttributesModalCtrl', function($scope, $mdDialog, $http, text, entityIdToPatient, receiverId, sendCommand) {
+.controller('BoxSendTagValuesCtrl', function($scope, $mdDialog, $http, text, entityIdToPatient, receiverId, sendCommand) {
     // Initialization
     $scope.title = 'Anonymization Options';
 
