@@ -20,10 +20,9 @@ import javax.imageio.ImageIO
 import org.dcm4che3.imageio.plugins.dcm.DicomImageReadParam
 import se.vgregion.dicom.DicomAnonymization._
 import java.io.ByteArrayOutputStream
-import se.vgregion.box.BoxProtocol.AttributeValueMapping
 import org.dcm4che3.data.Attributes.Visitor
 import org.dcm4che3.data.VR
-import se.vgregion.box.BoxProtocol.AttributeValueMappingEntry
+import se.vgregion.box.BoxProtocol.TransactionTagValue
 
 object DicomUtil {
 
@@ -162,16 +161,10 @@ object DicomUtil {
     Seq(bufferedImage);
   }
 
-  def mapAttributes(source: Attributes, target: Attributes, attributeValueMappings: Seq[AttributeValueMappingEntry]): Unit =
-    attributeValueMappings.foreach(mapping => {
-      val tag = mapping.tag
-      val matchValue = mapping.matchValue
-      val mappedValue = mapping.mappedValue
-      val tagValue = source.getString(tag, "")
-      val matchValueIsEmpty = matchValue == null || matchValue.isEmpty
-      val vr = if (source.contains(tag)) source.getVR(tag) else VR.SH
-      if (matchValueIsEmpty && tagValue.isEmpty || matchValue == tagValue)
-        target.setString(tag, vr, mappedValue)
+  def applyTagValues(dataset: Attributes, tagValues: Seq[TransactionTagValue]): Unit =
+    tagValues.foreach(tagValue => {
+      val vr = if (dataset.contains(tagValue.tag)) dataset.getVR(tagValue.tag) else VR.SH
+      dataset.setString(tagValue.tag, vr, tagValue.value)
     })
 
 }

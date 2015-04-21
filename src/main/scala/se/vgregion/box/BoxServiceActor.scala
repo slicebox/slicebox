@@ -5,6 +5,7 @@ import akka.actor.Actor
 import akka.event.LoggingReceive
 import se.vgregion.box.BoxProtocol._
 import se.vgregion.log.LogProtocol._
+import se.vgregion.dicom.DicomMetaDataDAO
 import akka.actor.Props
 import akka.actor.PoisonPill
 import java.util.UUID
@@ -21,7 +22,8 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
   case object UpdatePollBoxesOnlineStatus
 
   val db = dbProps.db
-  val dao = new BoxDAO(dbProps.driver)
+  val boxDao = new BoxDAO(dbProps.driver)
+  val metaDataDao = new DicomMetaDataDAO(dbProps.driver)
 
   implicit val system = context.system
   implicit val ec = context.dispatcher
@@ -107,13 +109,29 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
 
           // TODO: what should we do if no box was found for token?
 
-          case SendImagesToRemoteBox(remoteBoxId, boxSendData) =>
+          case SendSeriesToRemoteBox(remoteBoxId, seriesIds, tagValues) =>
             boxById(remoteBoxId) match {
               case Some(box) =>
-                val transactionId = generateTransactionId()
-                addOutboxEntries(remoteBoxId, transactionId, boxSendData.entityIds)
-                addAttributeValueMappings(transactionId, boxSendData.attributeValueMappings)
-                sender ! ImagesSent(remoteBoxId, boxSendData.entityIds)
+                val imageFileIds = sendEntities(remoteBoxId, seriesIds, tagValues, imageFileIdsForSeries _)
+                sender ! ImagesSent(remoteBoxId, imageFileIds)
+              case None =>
+                sender ! BoxNotFound
+            }
+
+          case SendStudiesToRemoteBox(remoteBoxId, studyIds, tagValues) =>
+            boxById(remoteBoxId) match {
+              case Some(box) =>
+                val imageFileIds = sendEntities(remoteBoxId, studyIds, tagValues, imageFileIdsForStudy _)
+                sender ! ImagesSent(remoteBoxId, imageFileIds)
+              case None =>
+                sender ! BoxNotFound
+            }
+
+          case SendPatientsToRemoteBox(remoteBoxId, patientIds, tagValues) =>
+            boxById(remoteBoxId) match {
+              case Some(box) =>
+                val imageFileIds = sendEntities(remoteBoxId, patientIds, tagValues, imageFileIdsForPatient _)
+                sender ! ImagesSent(remoteBoxId, imageFileIds)
               case None =>
                 sender ! BoxNotFound
             }
@@ -133,7 +151,7 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
                   removeOutboxEntryFromDb(outboxEntry.id)
 
                   if (outboxEntry.sequenceNumber == outboxEntry.totalImageCount) {
-                    removeAttributeValueMappingsForTransactionId(outboxEntry.transactionId)
+                    removeTransactionTagValuesForTransactionId(outboxEntry.transactionId)
                     context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Box", "Send completed.")))
                   }
 
@@ -157,9 +175,9 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
             val outboxEntries = getOutboxFromDb().map { outboxEntry =>
               idToBox.get(outboxEntry.remoteBoxId) match {
                 case Some(box) =>
-                  OutboxEntryInfo(outboxEntry.id, box.name, outboxEntry.transactionId, outboxEntry.sequenceNumber, outboxEntry.totalImageCount, outboxEntry.imageId, outboxEntry.failed)
+                  OutboxEntryInfo(outboxEntry.id, box.name, outboxEntry.transactionId, outboxEntry.sequenceNumber, outboxEntry.totalImageCount, outboxEntry.imageFileId, outboxEntry.failed)
                 case None =>
-                  OutboxEntryInfo(outboxEntry.id, "" + outboxEntry.remoteBoxId, outboxEntry.transactionId, outboxEntry.sequenceNumber, outboxEntry.totalImageCount, outboxEntry.imageId, outboxEntry.failed)
+                  OutboxEntryInfo(outboxEntry.id, "" + outboxEntry.remoteBoxId, outboxEntry.transactionId, outboxEntry.sequenceNumber, outboxEntry.totalImageCount, outboxEntry.imageFileId, outboxEntry.failed)
               }
             }
             sender ! Outbox(outboxEntries)
@@ -168,12 +186,12 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
             outboxEntryById(outboxEntryId)
               .filter(outboxEntry => outboxEntry.sequenceNumber == outboxEntry.totalImageCount)
               .foreach(outboxEntry =>
-                removeAttributeValueMappingsForTransactionId(outboxEntry.transactionId))
+                removeTransactionTagValuesForTransactionId(outboxEntry.transactionId))
             removeOutboxEntryFromDb(outboxEntryId)
             sender ! OutboxEntryRemoved(outboxEntryId)
-            
-          case GetAttributeValueMappings(transactionId) =>
-            sender ! attributeValueMappingsForTransactionId(transactionId)
+
+          case GetTransactionTagValues(transactionId) =>
+            sender ! transactionTagValuesForTransactionId(transactionId)
         }
 
       }
@@ -182,12 +200,12 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
 
   def setupDb(): Unit =
     db.withSession { implicit session =>
-      dao.create
+      boxDao.create
     }
 
   def teardownDb(): Unit =
     db.withSession { implicit session =>
-      dao.drop
+      boxDao.drop
     }
 
   def baseUrlToToken(url: String): String =
@@ -229,47 +247,47 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
 
   def addBoxToDb(box: Box): Box =
     db.withSession { implicit session =>
-      dao.insertBox(box)
+      boxDao.insertBox(box)
     }
 
   def boxById(boxId: Long): Option[Box] =
     db.withSession { implicit session =>
-      dao.boxById(boxId)
+      boxDao.boxById(boxId)
     }
 
   def pollBoxByToken(token: String): Option[Box] =
     db.withSession { implicit session =>
-      dao.pollBoxByToken(token)
+      boxDao.pollBoxByToken(token)
     }
 
   def pushBoxByBaseUrl(baseUrl: String): Option[Box] =
     db.withSession { implicit session =>
-      dao.pushBoxByBaseUrl(baseUrl)
+      boxDao.pushBoxByBaseUrl(baseUrl)
     }
 
   def removeBoxFromDb(boxId: Long) =
     db.withSession { implicit session =>
-      dao.removeBox(boxId)
+      boxDao.removeBox(boxId)
     }
 
   def getBoxesFromDb(): Seq[Box] =
     db.withSession { implicit session =>
-      dao.listBoxes
+      boxDao.listBoxes
     }
 
   def tokenIsValid(token: String): Boolean =
     db.withSession { implicit session =>
-      dao.pollBoxByToken(token).isDefined
+      boxDao.pollBoxByToken(token).isDefined
     }
 
   def nextOutboxEntry(boxId: Long): Option[OutboxEntry] =
     db.withSession { implicit session =>
-      dao.nextOutboxEntryForRemoteBoxId(boxId)
+      boxDao.nextOutboxEntryForRemoteBoxId(boxId)
     }
 
   def updateInbox(remoteBoxId: Long, transactionId: Long, sequenceNumber: Long, totalImageCount: Long): Unit = {
     db.withSession { implicit session =>
-      dao.updateInbox(remoteBoxId, transactionId, sequenceNumber, totalImageCount)
+      boxDao.updateInbox(remoteBoxId, transactionId, sequenceNumber, totalImageCount)
     }
 
     if (sequenceNumber == totalImageCount)
@@ -296,61 +314,87 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
     // Maybe switch to using Strings as transaction id?
     abs(UUID.randomUUID().getMostSignificantBits())
 
-  def addOutboxEntries(remoteBoxId: Long, transactionId: Long, imageIds: Seq[Long]): Unit = {
-    val totalImageCount = imageIds.length
+  def sendEntities(remoteBoxId: Long, entityIds: Seq[Long], tagValues: Seq[BoxSendTagValue], imageFileIdsForEntityId: Long => Seq[Long]) = {
+    val transactionId = generateTransactionId()
+    val imageFileIdToTagValues = entityIds.flatMap(entityId => imageFileIdsForEntityId(entityId).map(_ -> tagValues.filter(_.entityId == entityId))).toMap
+    val imageFileIds = imageFileIdToTagValues.keys.toSeq
+    addOutboxEntries(remoteBoxId, transactionId, imageFileIds)
+    for ((imageFileId, tagValues) <- imageFileIdToTagValues) {
+      tagValues.foreach(tagValue =>
+        addTagValue(imageFileId, transactionId, tagValue.tag, tagValue.value))
+    }
+    imageFileIds
+  }
+
+  def imageFileIdsForSeries(seriesId: Long) =
+    db.withSession { implicit session =>
+      metaDataDao.imageFilesForSeries(seriesId).map(_.id)
+    }
+
+  def imageFileIdsForStudy(studyId: Long) =
+    db.withSession { implicit session =>
+      metaDataDao.imageFilesForStudy(studyId).map(_.id)
+    }
+
+  def imageFileIdsForPatient(patientId: Long) =
+    db.withSession { implicit session =>
+      metaDataDao.imageFilesForPatient(patientId).map(_.id)
+    }
+
+  def addOutboxEntries(remoteBoxId: Long, transactionId: Long, imageFileIds: Seq[Long]): Unit = {
+    val totalImageCount = imageFileIds.length
 
     db.withSession { implicit session =>
       for (sequenceNumber <- 1 to totalImageCount) {
-        dao.insertOutboxEntry(OutboxEntry(-1, remoteBoxId, transactionId, sequenceNumber, totalImageCount, imageIds(sequenceNumber - 1), false))
+        boxDao.insertOutboxEntry(OutboxEntry(-1, remoteBoxId, transactionId, sequenceNumber, totalImageCount, imageFileIds(sequenceNumber - 1), false))
       }
     }
   }
 
-  def addAttributeValueMappings(transactionId: Long, attributeValueMappings: Seq[AttributeValueMapping]) =
+  def addTagValue(imageFileId: Long, transactionId: Long, tag: Int, value: String) =
     db.withSession { implicit session =>
-      attributeValueMappings.foreach(mapping =>
-        dao.insertAttributeValueMapping(
-          AttributeValueMappingEntry(-1, transactionId, mapping.tag, mapping.matchValue, mapping.mappedValue)))
+      boxDao.insertTransactionTagValue(
+        TransactionTagValue(-1, imageFileId, transactionId, tag, value))
     }
 
   def outboxEntryById(outboxEntryId: Long): Option[OutboxEntry] =
     db.withSession { implicit session =>
-      dao.outboxEntryById(outboxEntryId)
+      boxDao.outboxEntryById(outboxEntryId)
     }
 
   def outboxEntryByTransactionIdAndSequenceNumber(remoteBoxId: Long, transactionId: Long, sequenceNumber: Long): Option[OutboxEntry] =
     db.withSession { implicit session =>
-      dao.outboxEntryByTransactionIdAndSequenceNumber(remoteBoxId, transactionId, sequenceNumber)
+      boxDao.outboxEntryByTransactionIdAndSequenceNumber(remoteBoxId, transactionId, sequenceNumber)
     }
 
   def removeOutboxEntryFromDb(outboxEntryId: Long) =
     db.withSession { implicit session =>
-      dao.removeOutboxEntry(outboxEntryId)
+      boxDao.removeOutboxEntry(outboxEntryId)
     }
 
   def getInboxFromDb() =
     db.withSession { implicit session =>
-      dao.listInboxEntries
+      boxDao.listInboxEntries
     }
 
   def getOutboxFromDb() =
     db.withSession { implicit session =>
-      dao.listOutboxEntries
+      boxDao.listOutboxEntries
     }
 
   def updateBoxOnlineStatusInDb(boxId: Long, online: Boolean): Unit =
     db.withSession { implicit session =>
-      dao.updateBoxOnlineStatus(boxId, online)
+      boxDao.updateBoxOnlineStatus(boxId, online)
     }
 
-  def attributeValueMappingsForTransactionId(transactionId: Long): Seq[AttributeValueMappingEntry] =
+  def transactionTagValuesForTransactionId(transactionId: Long): Seq[TransactionTagValue] =
     db.withSession { implicit session =>
-      dao.attributeValueMappingsByTransactionId(transactionId)
+      boxDao.transactionTagValuesByTransactionId(transactionId)
     }
 
-  def removeAttributeValueMappingsForTransactionId(transactionId: Long) = {
+  def removeTransactionTagValuesForTransactionId(transactionId: Long) = {
     db.withSession { implicit session =>
-      dao.removeAttributeValueMappingsByTransactionId(transactionId)
+      boxDao.removeTransactionTagValuesByTransactionId(transactionId)
     }
   }
 

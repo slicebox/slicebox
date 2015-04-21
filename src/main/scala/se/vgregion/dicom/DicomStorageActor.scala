@@ -96,7 +96,7 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
 
         case DeleteSeries(seriesId) =>
           db.withSession { implicit session =>
-            val imageFiles = dao.imageFilesForSeries(Seq(seriesId))
+            val imageFiles = dao.imageFilesForSeries(seriesId)
             dao.deleteSeries(seriesId)
             deleteFromStorage(imageFiles)
             sender ! ImageFilesDeleted(imageFiles)
@@ -194,21 +194,6 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
               case None =>
                 throw new IllegalArgumentException(s"No file found for image $imageId")
             }
-          }
-
-        case GetImageFilesForSeries(seriesIds) =>
-          db.withSession { implicit session =>
-            sender ! ImageFiles(dao.imageFilesForSeries(seriesIds))
-          }
-
-        case GetImageFilesForStudies(studyIds) =>
-          db.withSession { implicit session =>
-            sender ! ImageFiles(dao.imageFilesForStudies(studyIds))
-          }
-
-        case GetImageFilesForPatients(patientIds) =>
-          db.withSession { implicit session =>
-            sender ! ImageFiles(dao.imageFilesForPatients(patientIds))
           }
 
         case GetFlatSeries(startIndex, count, orderBy, orderAscending, filter) =>

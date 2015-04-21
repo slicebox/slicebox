@@ -14,6 +14,10 @@ import scala.slick.jdbc.JdbcBackend.Database
 import akka.actor.Props
 import se.vgregion.util.TestUtil
 import se.vgregion.box.BoxProtocol._
+import se.vgregion.dicom.DicomMetaDataDAO
+import se.vgregion.dicom.DicomProtocol._
+import se.vgregion.dicom.DicomPropertyValue._
+import se.vgregion.dicom.DicomHierarchy._
 
 class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
   with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {
@@ -26,9 +30,11 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
   val storage = Files.createTempDirectory("slicebox-test-storage-")
 
   val boxDao = new BoxDAO(H2Driver)
+  val metaDataDao = new DicomMetaDataDAO(H2Driver)
 
   db.withSession { implicit session =>
     boxDao.create
+    metaDataDao.create
   }
 
   val boxServiceActorRef = _system.actorOf(Props(new BoxServiceActor(dbProps, storage, "http://testhost:1234")))
@@ -44,8 +50,8 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
       boxDao.listInboxEntries.foreach(inboxEntry =>
         boxDao.removeInboxEntry(inboxEntry.id))
 
-      boxDao.listAttributeValueMappingEntries.foreach(avm =>
-        boxDao.removeAttributeValueMappingEntry(avm.id))
+      boxDao.listTransactionTagValues.foreach(tagValue =>
+        boxDao.removeTransactionTagValue(tagValue.id))
     }
   }
 
@@ -130,83 +136,106 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
       }
     }
 
-    "remove all attribute value mappings when all outbox entries for a transaction have been removed" in {
+    "remove all box tag values when all outbox entries for a transaction have been removed" in {
       db.withSession { implicit session =>
         val remoteBox = boxDao.insertBox(Box(-1, "some remote box", "abc", "https://someurl.com", BoxSendMethod.POLL, false))
 
-        val mappings = Seq(
-          AttributeValueMapping(0x00101010, "A", "B"),
-          AttributeValueMapping(0x00101012, "C", "D"),
-          AttributeValueMapping(0x00101014, "E", "F"))
+        val p1 = metaDataDao.insert(Patient(-1, PatientName("p1"), PatientID("s1"), PatientBirthDate("2000-01-01"), PatientSex("M")))
+        val s1 = metaDataDao.insert(Study(-1, p1.id, StudyInstanceUID("stuid1"), StudyDescription("stdesc1"), StudyDate("19990101"), StudyID("stid1"), AccessionNumber("acc1"), PatientAge("12Y")))
+        val e1 = metaDataDao.insert(Equipment(-1, Manufacturer("manu1"), StationName("station1")))
+        val f1 = metaDataDao.insert(FrameOfReference(-1, FrameOfReferenceUID("frid1")))
+        val r1 = metaDataDao.insert(Series(-1, s1.id, e1.id, f1.id, SeriesInstanceUID("seuid1"), SeriesDescription("sedesc1"), SeriesDate("19990101"), Modality("NM"), ProtocolName("prot1"), BodyPartExamined("bodypart1")))
+        val i1 = metaDataDao.insert(Image(-1, r1.id, SOPInstanceUID("1.1"), ImageType("t1"), InstanceNumber("1")))
+        val i2 = metaDataDao.insert(Image(-1, r1.id, SOPInstanceUID("1.2"), ImageType("t1"), InstanceNumber("1")))
+        val i3 = metaDataDao.insert(Image(-1, r1.id, SOPInstanceUID("1.3"), ImageType("t1"), InstanceNumber("1")))
+        val if1 = metaDataDao.insert(ImageFile(i1.id, FileName("file1")))
+        val if2 = metaDataDao.insert(ImageFile(i2.id, FileName("file2")))
+        val if3 = metaDataDao.insert(ImageFile(i3.id, FileName("file3")))
 
-        val imageIds = Seq(123L, 124L, 125L)
+        val tagValues = Seq(
+          BoxSendTagValue(r1.id, 0x00101010, "B"),
+          BoxSendTagValue(r1.id, 0x00101012, "D"),
+          BoxSendTagValue(r1.id, 0x00101014, "F"))
 
-        boxServiceActorRef ! SendImagesToRemoteBox(remoteBox.id, BoxSendData(imageIds, mappings))
+        val seriesIds = Seq(r1.id)
+
+        boxServiceActorRef ! SendSeriesToRemoteBox(remoteBox.id, seriesIds, tagValues)
 
         expectMsgPF() {
-          case ImagesSent(remoteBoxId, entityIds) =>
+          case ImagesSent(remoteBoxId, imageFileIds) =>
             remoteBoxId should be(remoteBox.id)
-            entityIds should be(imageIds)
+            imageFileIds should be(Seq(if1.id, if2.id, if3.id))
         }
 
         val outboxEntries = boxDao.listOutboxEntries
         outboxEntries.size should be(3)
 
         val transactionId = outboxEntries(0).transactionId
-        outboxEntries.map(_.transactionId).forall(_ == transactionId) should be (true)
-        
-        boxDao.listAttributeValueMappingEntries.size should be(3)
-        boxDao.attributeValueMappingsByTransactionId(transactionId).size should be(3)
+        outboxEntries.map(_.transactionId).forall(_ == transactionId) should be(true)
+
+        boxDao.listTransactionTagValues.size should be(3 * 3)
+        boxDao.transactionTagValuesByTransactionId(transactionId).size should be(3 * 3)
 
         outboxEntries.map(_.id).foreach(id => boxServiceActorRef ! RemoveOutboxEntry(id))
-        
+
         expectMsgType[OutboxEntryRemoved]
         expectMsgType[OutboxEntryRemoved]
         expectMsgType[OutboxEntryRemoved]
-        
-        boxDao.listAttributeValueMappingEntries.isEmpty should be (true)        
-        boxDao.attributeValueMappingsByTransactionId(transactionId).isEmpty should be (true)
+
+        boxDao.listTransactionTagValues.isEmpty should be(true)
+        boxDao.transactionTagValuesByTransactionId(transactionId).isEmpty should be(true)
       }
     }
 
-    "remove all attribute value mappings when last outbox entry has been processed" in {
+    "remove all box tag values when last outbox entry has been processed" in {
       db.withSession { implicit session =>
         val token = "abc"
         val remoteBox = boxDao.insertBox(Box(-1, "some remote box", token, "https://someurl.com", BoxSendMethod.POLL, false))
 
-        val mappings = Seq(
-          AttributeValueMapping(0x00101010, "A", "B"),
-          AttributeValueMapping(0x00101012, "C", "D"),
-          AttributeValueMapping(0x00101014, "E", "F"))
+        val p1 = metaDataDao.insert(Patient(-1, PatientName("p1"), PatientID("s1"), PatientBirthDate("2000-01-01"), PatientSex("M")))
+        val s1 = metaDataDao.insert(Study(-1, p1.id, StudyInstanceUID("stuid1"), StudyDescription("stdesc1"), StudyDate("19990101"), StudyID("stid1"), AccessionNumber("acc1"), PatientAge("12Y")))
+        val e1 = metaDataDao.insert(Equipment(-1, Manufacturer("manu1"), StationName("station1")))
+        val f1 = metaDataDao.insert(FrameOfReference(-1, FrameOfReferenceUID("frid1")))
+        val r1 = metaDataDao.insert(Series(-1, s1.id, e1.id, f1.id, SeriesInstanceUID("seuid1"), SeriesDescription("sedesc1"), SeriesDate("19990101"), Modality("NM"), ProtocolName("prot1"), BodyPartExamined("bodypart1")))
+        val i1 = metaDataDao.insert(Image(-1, r1.id, SOPInstanceUID("1.1"), ImageType("t1"), InstanceNumber("1")))
+        val i2 = metaDataDao.insert(Image(-1, r1.id, SOPInstanceUID("1.2"), ImageType("t1"), InstanceNumber("1")))
+        val i3 = metaDataDao.insert(Image(-1, r1.id, SOPInstanceUID("1.3"), ImageType("t1"), InstanceNumber("1")))
+        val if1 = metaDataDao.insert(ImageFile(i1.id, FileName("file1")))
+        val if2 = metaDataDao.insert(ImageFile(i2.id, FileName("file2")))
+        val if3 = metaDataDao.insert(ImageFile(i3.id, FileName("file3")))
 
-        val imageIds = Seq(123L, 124L, 125L)
+        val tagValues = Seq(
+          BoxSendTagValue(r1.id, 0x00101010, "B"),
+          BoxSendTagValue(r1.id, 0x00101012, "D"),
+          BoxSendTagValue(r1.id, 0x00101014, "F"))
 
-        boxServiceActorRef ! SendImagesToRemoteBox(remoteBox.id, BoxSendData(imageIds, mappings))
+        val seriesIds = Seq(r1.id)
+
+        boxServiceActorRef ! SendSeriesToRemoteBox(remoteBox.id, seriesIds, tagValues)
 
         expectMsgPF() {
-          case ImagesSent(remoteBoxId, entityIds) =>
+          case ImagesSent(remoteBoxId, imageFileIds) =>
             remoteBoxId should be(remoteBox.id)
-            entityIds should be(imageIds)
+            imageFileIds should be(Seq(if1.id, if2.id, if3.id))
         }
 
         val outboxEntries = boxDao.listOutboxEntries
         outboxEntries.size should be(3)
 
         val transactionId = outboxEntries(0).transactionId
-        outboxEntries.map(_.transactionId).forall(_ == transactionId) should be (true)
-        
-        boxDao.listAttributeValueMappingEntries.size should be(3)
-        boxDao.attributeValueMappingsByTransactionId(transactionId).size should be(3)
+        outboxEntries.map(_.transactionId).forall(_ == transactionId) should be(true)
+
+        boxDao.listTransactionTagValues.size should be(3 * 3)
+        boxDao.transactionTagValuesByTransactionId(transactionId).size should be(3 * 3)
 
         outboxEntries.foreach(entry => boxServiceActorRef ! DeleteOutboxEntry(token, entry.transactionId, entry.sequenceNumber))
-        outboxEntries.foreach(entry => boxServiceActorRef ! DeleteOutboxEntry(token, entry.transactionId, entry.sequenceNumber))
-        
+
         expectMsg(OutboxEntryDeleted)
         expectMsg(OutboxEntryDeleted)
         expectMsg(OutboxEntryDeleted)
-        
-        boxDao.listAttributeValueMappingEntries.isEmpty should be (true)        
-        boxDao.attributeValueMappingsByTransactionId(transactionId).isEmpty should be (true)
+
+        boxDao.listTransactionTagValues.isEmpty should be(true)
+        boxDao.transactionTagValuesByTransactionId(transactionId).isEmpty should be(true)
       }
     }
 

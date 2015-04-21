@@ -357,14 +357,15 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       responseAs[List[Patient]].apply(0)
     }
     
-    val mappings = Seq(
-      AttributeValueMapping(PatientName.dicomTag, patient.patientName.value, "TEST NAME"),
-      AttributeValueMapping(PatientID.dicomTag, patient.patientID.value, "TEST ID"),
-      AttributeValueMapping(PatientBirthDate.dicomTag, patient.patientBirthDate.value, "19601010"))
+    val seriesId = 1
+    
+    val tagValues = Seq(
+      BoxSendTagValue(seriesId, PatientName.dicomTag, "TEST NAME"),
+      BoxSendTagValue(seriesId, PatientID.dicomTag, "TEST ID"),
+      BoxSendTagValue(seriesId, PatientBirthDate.dicomTag, "19601010"))
       
     // send series which adds outbox entry
-    val seriesId = 1
-    PostAsUser(s"/api/boxes/${remoteBox.id}/sendseries", BoxSendData(Seq(seriesId), mappings)) ~> routes ~> check {
+    PostAsUser(s"/api/boxes/${remoteBox.id}/sendseries", BoxSendData(Seq(seriesId), tagValues)) ~> routes ~> check {
       status should be(NoContent)
     }
 

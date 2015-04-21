@@ -7,13 +7,12 @@ import org.dcm4che3.data.Tag
 import java.util.Date
 import org.dcm4che3.util.TagUtils
 import org.dcm4che3.data.Attributes.Visitor
-import se.vgregion.box.BoxProtocol.AttributeValueMapping
 
 object DicomAnonymization {
 
   val emptyString = ""
 
-  def anonymizeDataset(dataset: Attributes, attributeValueMappings: AttributeValueMapping*): Attributes = {
+  def anonymizeDataset(dataset: Attributes): Attributes = {
 
     val patientIdentityRemoved = dataset.getString(Tag.PatientIdentityRemoved)
 

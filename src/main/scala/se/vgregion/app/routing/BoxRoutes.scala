@@ -57,39 +57,27 @@ trait BoxRoutes { this: RestApi =>
       } ~ path(LongNumber / "sendpatients") { remoteBoxId =>
         post {
           entity(as[BoxSendData]) { patientSendData =>
-            onSuccess(dicomService.ask(GetImageFilesForPatients(patientSendData.entityIds))) {
-              case ImageFiles(imageFiles) =>
-                val imageSendData = BoxSendData(imageFiles.map(_.id), patientSendData.attributeValueMappings)
-                onSuccess(boxService.ask(SendImagesToRemoteBox(remoteBoxId, imageSendData))) {
-                  case ImagesSent(remoteBoxId, imageIds) => complete(NoContent)
-                  case BoxNotFound                       => complete(NotFound)
-                }
+            onSuccess(boxService.ask(SendPatientsToRemoteBox(remoteBoxId, patientSendData.entityIds, patientSendData.tagValues))) {
+              case ImagesSent(remoteBoxId, imageIds) => complete(NoContent)
+              case BoxNotFound                       => complete(NotFound)
             }
           }
         }
       } ~ path(LongNumber / "sendstudies") { remoteBoxId =>
         post {
           entity(as[BoxSendData]) { studySendData =>
-            onSuccess(dicomService.ask(GetImageFilesForStudies(studySendData.entityIds))) {
-              case ImageFiles(imageFiles) =>
-                val imageSendData = BoxSendData(imageFiles.map(_.id), studySendData.attributeValueMappings)
-                onSuccess(boxService.ask(SendImagesToRemoteBox(remoteBoxId, imageSendData))) {
-                  case ImagesSent(remoteBoxId, imageIds) => complete(NoContent)
-                  case BoxNotFound                       => complete(NotFound)
-                }
+            onSuccess(boxService.ask(SendStudiesToRemoteBox(remoteBoxId, studySendData.entityIds, studySendData.tagValues))) {
+              case ImagesSent(remoteBoxId, imageIds) => complete(NoContent)
+              case BoxNotFound                       => complete(NotFound)
             }
           }
         }
       } ~ path(LongNumber / "sendseries") { remoteBoxId =>
         post {
           entity(as[BoxSendData]) { seriesSendData =>
-            onSuccess(dicomService.ask(GetImageFilesForSeries(seriesSendData.entityIds))) {
-              case ImageFiles(imageFiles) =>
-                val imageSendData = BoxSendData(imageFiles.map(_.id), seriesSendData.attributeValueMappings)
-                onSuccess(boxService.ask(SendImagesToRemoteBox(remoteBoxId, seriesSendData))) {
-                  case ImagesSent(remoteBoxId, imageIds) => complete(NoContent)
-                  case BoxNotFound                       => complete(NotFound)
-                }
+            onSuccess(boxService.ask(SendSeriesToRemoteBox(remoteBoxId, seriesSendData.entityIds, seriesSendData.tagValues))) {
+              case ImagesSent(remoteBoxId, imageIds) => complete(NoContent)
+              case BoxNotFound                       => complete(NotFound)
             }
           }
         }

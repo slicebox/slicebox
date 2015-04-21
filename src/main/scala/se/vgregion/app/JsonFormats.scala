@@ -26,9 +26,6 @@ trait JsonFormats extends DefaultJsonProtocol {
 
   implicit val updateInboxFormat = jsonFormat4(UpdateInbox)
 
-  implicit val imageIdFormat = jsonFormat1(ImageId)
-  implicit val imageIdsFormat = jsonFormat1(ImageIds)
-
   implicit object BoxSendMethodFormat extends JsonFormat[BoxSendMethod] {
     def write(obj: BoxSendMethod) = JsString(obj.toString)
 
@@ -44,7 +41,7 @@ trait JsonFormats extends DefaultJsonProtocol {
   implicit val outboxEntryInfoFormat = jsonFormat7(OutboxEntryInfo)
   implicit val inboxEntryInfoFormat = jsonFormat4(InboxEntryInfo)
 
-  implicit val attributeValueMappingFormat = jsonFormat3(AttributeValueMapping)
+  implicit val attributeValueMappingFormat = jsonFormat3(BoxSendTagValue)
   implicit val sendImagesDataFormat = jsonFormat2(BoxSendData)
   
   implicit val generateBoxBaseUrlFormat = jsonFormat1(GenerateBoxBaseUrl)

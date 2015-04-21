@@ -44,11 +44,11 @@ class BoxPushActor(box: Box,
 
   def sendFilePipeline = sendReceive
 
-  def pushImagePipeline(outboxEntry: OutboxEntry, fileName: String, attributeValueMappings: Seq[AttributeValueMappingEntry]): Future[HttpResponse] = {
+  def pushImagePipeline(outboxEntry: OutboxEntry, fileName: String, tagValues: Seq[TransactionTagValue]): Future[HttpResponse] = {
     val path = storage.resolve(fileName)
     val dataset = loadDataset(path, true)
     val anonymizedDataset = anonymizeDataset(dataset)
-    mapAttributes(dataset, anonymizedDataset, attributeValueMappings)
+    applyTagValues(anonymizedDataset, tagValues)
     val bytes = toByteArray(anonymizedDataset)
     sendFilePipeline(Post(s"${box.baseUrl}/image?transactionid=${outboxEntry.transactionId}&sequencenumber=${outboxEntry.sequenceNumber}&totalimagecount=${outboxEntry.totalImageCount}", HttpData(bytes)))
   }
@@ -96,26 +96,26 @@ class BoxPushActor(box: Box,
     }
 
   def sendFileForOutboxEntry(outboxEntry: OutboxEntry) =
-    fileNameForImageId(outboxEntry.imageId) match {
+    fileNameForImageFileId(outboxEntry.imageFileId) match {
       case Some(fileName) =>
-        val attributeValueMappings = attributeValueMappingsForTransactionId(outboxEntry.transactionId)
-        sendFileWithName(outboxEntry, fileName, attributeValueMappings)
+        val transactionTagValues = transactionTagValuesForTransactionId(outboxEntry.transactionId)
+        sendFileWithName(outboxEntry, fileName, transactionTagValues)
       case None =>
-        handleFilenameLookupFailedForOutboxEntry(outboxEntry, new IllegalStateException(s"Can't process outbox entry (${outboxEntry.id}) because no image with id ${outboxEntry.imageId} was found"))
+        handleFilenameLookupFailedForOutboxEntry(outboxEntry, new IllegalStateException(s"Can't process outbox entry (${outboxEntry.id}) because no image with id ${outboxEntry.imageFileId} was found"))
     }
 
-  def fileNameForImageId(imageId: Long): Option[String] =
+  def fileNameForImageFileId(imageFileId: Long): Option[String] =
     db.withSession { implicit session =>
-      dicomMetaDataDao.imageFileById(imageId).map(_.fileName.value)
+      dicomMetaDataDao.imageFileById(imageFileId).map(_.fileName.value)
     }
 
-  def attributeValueMappingsForTransactionId(transactionId: Long): Seq[AttributeValueMappingEntry] =
+  def transactionTagValuesForTransactionId(transactionId: Long): Seq[TransactionTagValue] =
     db.withSession { implicit session =>
-      boxDao.attributeValueMappingsByTransactionId(transactionId)
+      boxDao.transactionTagValuesByTransactionId(transactionId)
     }
 
-  def sendFileWithName(outboxEntry: OutboxEntry, fileName: String, attributeValueMappings: Seq[AttributeValueMappingEntry]) = {
-    pushImagePipeline(outboxEntry, fileName, attributeValueMappings)
+  def sendFileWithName(outboxEntry: OutboxEntry, fileName: String, tagValues: Seq[TransactionTagValue]) = {
+    pushImagePipeline(outboxEntry, fileName, tagValues)
       .map(response => {
         val responseCode = response.status.intValue
         if (responseCode >= 200 && responseCode < 300)
@@ -138,7 +138,7 @@ class BoxPushActor(box: Box,
 
     if (outboxEntry.sequenceNumber == outboxEntry.totalImageCount) {
       context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Box", "Send completed.")))
-      removeAttributeValueMappingsForTransactionId(outboxEntry.transactionId)
+      removeTransactionTagValuesForTransactionId(outboxEntry.transactionId)
     }
 
     processNextOutboxEntry
@@ -159,9 +159,9 @@ class BoxPushActor(box: Box,
     context.unbecome
   }
 
-  def removeAttributeValueMappingsForTransactionId(transactionId: Long) = {
+  def removeTransactionTagValuesForTransactionId(transactionId: Long) = {
     db.withSession { implicit session =>
-      boxDao.removeAttributeValueMappingsByTransactionId(transactionId)
+      boxDao.removeTransactionTagValuesByTransactionId(transactionId)
     }
   }
 

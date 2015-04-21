@@ -24,9 +24,9 @@ class BoxDAO(val driver: JdbcProfile) {
 
   val boxQuery = TableQuery[BoxTable]
 
-  val toOutboxEntry = (id: Long, remoteBoxId: Long, transactionId: Long, sequenceNumber: Long, totalImageCount: Long, imageId: Long, failed: Boolean) =>
-    OutboxEntry(id, remoteBoxId, transactionId, sequenceNumber, totalImageCount, imageId, failed)
-  val fromOutboxEntry = (entry: OutboxEntry) => Option((entry.id, entry.remoteBoxId, entry.transactionId, entry.sequenceNumber, entry.totalImageCount, entry.imageId, entry.failed))
+  val toOutboxEntry = (id: Long, remoteBoxId: Long, transactionId: Long, sequenceNumber: Long, totalImageCount: Long, imageFileId: Long, failed: Boolean) =>
+    OutboxEntry(id, remoteBoxId, transactionId, sequenceNumber, totalImageCount, imageFileId, failed)
+  val fromOutboxEntry = (entry: OutboxEntry) => Option((entry.id, entry.remoteBoxId, entry.transactionId, entry.sequenceNumber, entry.totalImageCount, entry.imageFileId, entry.failed))
 
   // TODO: should probably add unique index on (remoteBoxId,transactionId)
   class OutboxTable(tag: Tag) extends Table[OutboxEntry](tag, "Outbox") {
@@ -35,9 +35,9 @@ class BoxDAO(val driver: JdbcProfile) {
     def transactionId = column[Long]("transactionid")
     def sequenceNumber = column[Long]("sequencenumber")
     def totalImageCount = column[Long]("totalimagecount")
-    def imageId = column[Long]("imageid")
+    def imageFileId = column[Long]("imagefileid")
     def failed = column[Boolean]("failed")
-    def * = (id, remoteBoxId, transactionId, sequenceNumber, totalImageCount, imageId, failed) <> (toOutboxEntry.tupled, fromOutboxEntry)
+    def * = (id, remoteBoxId, transactionId, sequenceNumber, totalImageCount, imageFileId, failed) <> (toOutboxEntry.tupled, fromOutboxEntry)
   }
 
   val outboxQuery = TableQuery[OutboxTable]
@@ -57,24 +57,24 @@ class BoxDAO(val driver: JdbcProfile) {
 
   val inboxQuery = TableQuery[InboxTable]
 
-  val toAttributeValueMapping = (id: Long, transactionId: Long, tag: Int, matchValue: String, mappedValue: String) =>
-    AttributeValueMappingEntry(id, transactionId, tag, matchValue, mappedValue)
-  val fromAttributeValueMapping = (entry: AttributeValueMappingEntry) => Option((entry.id, entry.transactionId, entry.tag, entry.matchValue, entry.mappedValue))
+  val toTransactionTagValue = (id: Long, imageFileId: Long, transactionId: Long, tag: Int, value: String) =>
+    TransactionTagValue(id, imageFileId, transactionId, tag, value)
+  val fromTransactionTagValue = (entry: TransactionTagValue) => Option((entry.id, entry.imageFileId, entry.transactionId, entry.tag, entry.value))
 
-  class AttributeValueMappingTable(tag: Tag) extends Table[AttributeValueMappingEntry](tag, "AttributeValueMapping") {
+  class TransactionTagValueTable(tag: Tag) extends Table[TransactionTagValue](tag, "TransactionTagValue") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
+    def imageFileId = column[Long]("imagefileid")
     def transactionId = column[Long]("transactionid")
     def dicomTag = column[Int]("tag")
-    def matchValue = column[String]("matchvalue")
-    def mappedValue = column[String]("mappedvalue")
-    def * = (id, transactionId, dicomTag, matchValue, mappedValue) <> (toAttributeValueMapping.tupled, fromAttributeValueMapping)
+    def value = column[String]("value")
+    def * = (id, imageFileId, transactionId, dicomTag, value) <> (toTransactionTagValue.tupled, fromTransactionTagValue)
   }
 
-  val attributeValueMappingQuery = TableQuery[AttributeValueMappingTable]
+  val transactionTagValueQuery = TableQuery[TransactionTagValueTable]
 
   def create(implicit session: Session): Unit =
     if (MTable.getTables("Box").list.isEmpty) {
-      (boxQuery.ddl ++ outboxQuery.ddl ++ inboxQuery.ddl ++ attributeValueMappingQuery.ddl).create
+      (boxQuery.ddl ++ outboxQuery.ddl ++ inboxQuery.ddl ++ transactionTagValueQuery.ddl).create
     }
 
   def drop(implicit session: Session): Unit =
@@ -185,21 +185,21 @@ class BoxDAO(val driver: JdbcProfile) {
   def listInboxEntries(implicit session: Session): List[InboxEntry] =
     inboxQuery.list
     
-  def listAttributeValueMappingEntries(implicit session: Session): List[AttributeValueMappingEntry] =
-    attributeValueMappingQuery.list
+  def listTransactionTagValues(implicit session: Session): List[TransactionTagValue] =
+    transactionTagValueQuery.list
     
-  def insertAttributeValueMapping(entry: AttributeValueMappingEntry)(implicit session: Session): AttributeValueMappingEntry = {
-    val generatedId = (attributeValueMappingQuery returning attributeValueMappingQuery.map(_.id)) += entry
+  def insertTransactionTagValue(entry: TransactionTagValue)(implicit session: Session): TransactionTagValue = {
+    val generatedId = (transactionTagValueQuery returning transactionTagValueQuery.map(_.id)) += entry
     entry.copy(id = generatedId)
   }
   
-  def attributeValueMappingsByTransactionId(transactionId: Long)(implicit session: Session): List[AttributeValueMappingEntry] =
-    attributeValueMappingQuery.filter(_.transactionId === transactionId).list
+  def transactionTagValuesByTransactionId(transactionId: Long)(implicit session: Session): List[TransactionTagValue] =
+    transactionTagValueQuery.filter(_.transactionId === transactionId).list
     
-  def removeAttributeValueMappingEntry(attributeValueMappingId: Long)(implicit session: Session): Unit =
-    attributeValueMappingQuery.filter(_.id === attributeValueMappingId).delete
+  def removeTransactionTagValue(transactionTagValueId: Long)(implicit session: Session): Unit =
+    transactionTagValueQuery.filter(_.id === transactionTagValueId).delete
     
-  def removeAttributeValueMappingsByTransactionId(transactionId: Long)(implicit session: Session): Unit =
-    attributeValueMappingQuery.filter(_.transactionId === transactionId).delete
+  def removeTransactionTagValuesByTransactionId(transactionId: Long)(implicit session: Session): Unit =
+    transactionTagValueQuery.filter(_.transactionId === transactionId).delete
     
 }

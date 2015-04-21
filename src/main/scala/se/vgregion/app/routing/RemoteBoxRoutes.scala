@@ -65,15 +65,15 @@ trait RemoteBoxRoutes { this: RestApi =>
                   parameters('transactionid.as[Long], 'sequencenumber.as[Long]) { (transactionId, sequenceNumber) =>
                     onSuccess(boxService.ask(GetOutboxEntry(token, transactionId, sequenceNumber))) {
                       case outboxEntry: OutboxEntry =>
-                        onSuccess(boxService.ask(GetAttributeValueMappings(transactionId)).mapTo[Seq[AttributeValueMappingEntry]]) {
-                          case attributeValueMappings =>
-                            onSuccess(dicomService.ask(GetImageFile(outboxEntry.imageId))) {
+                        onSuccess(boxService.ask(GetTransactionTagValues(transactionId)).mapTo[Seq[TransactionTagValue]]) {
+                          case transactionTagValues =>
+                            onSuccess(dicomService.ask(GetImageFile(outboxEntry.imageFileId))) {
                               case imageFile: ImageFile =>
                                 detach() {
                                   val path = storage.resolve(imageFile.fileName.value)
                                   val dataset = DicomUtil.loadDataset(path, true)
                                   val anonymizedDataset = DicomAnonymization.anonymizeDataset(dataset)
-                                  DicomUtil.mapAttributes(dataset, anonymizedDataset, attributeValueMappings)
+                                  DicomUtil.applyTagValues(anonymizedDataset, transactionTagValues)
                                   val bytes = DicomUtil.toByteArray(anonymizedDataset)
                                   complete(HttpEntity(ContentTypes.`application/octet-stream`, HttpData(bytes)))
                                 }

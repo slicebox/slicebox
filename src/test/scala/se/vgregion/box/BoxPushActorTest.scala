@@ -98,7 +98,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
         }
     }
 
-    override def pushImagePipeline(outboxEntry: OutboxEntry, fileName: String, attributeValueMappings: Seq[AttributeValueMappingEntry]): Future[HttpResponse] = {
+    override def pushImagePipeline(outboxEntry: OutboxEntry, fileName: String, tagValues: Seq[TransactionTagValue]): Future[HttpResponse] = {
       sendFilePipeline(Post(s"${testBox.baseUrl}/image/${outboxEntry.transactionId}/${outboxEntry.sequenceNumber}/${outboxEntry.totalImageCount}", HttpData(Array.empty[Byte])))
     }
 
@@ -115,8 +115,8 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
     db.withSession { implicit session =>
       boxDao.listOutboxEntries.foreach(outboxEntry =>
         boxDao.removeOutboxEntry(outboxEntry.id))
-      boxDao.listAttributeValueMappingEntries.foreach(entry =>
-        boxDao.removeAttributeValueMappingEntry(entry.id))
+      boxDao.listTransactionTagValues.foreach(entry =>
+        boxDao.removeTransactionTagValue(entry.id))
     }
   }
 
