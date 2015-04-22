@@ -20,7 +20,7 @@
         <table ng-cloak class="ng-cloak">
             <col width="20px" ng-if="objectActions.length > 0" />
 
-            <col ng-repeat="columnDefinition in columnDefinitions track by $index" />
+            <col ng-repeat="columnDefinition in columnDefinitions track by columnDefinition.property" />
 
             <thead>
                 <tr>
@@ -29,7 +29,7 @@
                             ng-change="selectAllChanged()" aria-label="Select"></md-checkbox>
                     </th>
                     
-                    <th ng-repeat="columnDefinition in columnDefinitions track by $index"
+                    <th ng-repeat="columnDefinition in columnDefinitions track by columnDefinition.property"
                         ng-click="columnClicked(columnDefinition)"
                         class="column-header">
                         {{columnDefinition.title}}
@@ -40,7 +40,7 @@
             </thead>
             
             <tbody ng-style="tableBodyStyle()">
-                <tr ng-repeat="rowObject in objectList track by $index"
+                <tr ng-repeat="rowObject in objectList"
                     ng-click="rowClicked(rowObject)"
                     ng-class="rowCSSClasses(rowObject)">
 
@@ -52,7 +52,7 @@
                     </td>
 
                     <td sbx-grid-internal-td
-                        ng-repeat="columnDefinition in columnDefinitions track by $index"
+                        ng-repeat="columnDefinition in columnDefinitions track by columnDefinition.property"
                         class="table-cell">
                         {{filteredCellValues[$parent.$index][columnDefinition.property]}}
                     </td>

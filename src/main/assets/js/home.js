@@ -78,7 +78,7 @@ angular.module('slicebox.home', ['ngRoute'])
     $scope.loadPatients = function(startIndex, count, orderByProperty, orderByDirection, filter) {
         var loadPatientsUrl = '/api/metadata/patients?startindex=' + startIndex + '&count=' + count;
         if (orderByProperty) {
-            var orderByPropertyName = capitalizeFirst(orderByProperty.substring(0, orderByProperty.indexOf('[')));
+            var orderByPropertyName = orderByProperty === "id" ? orderByProperty : capitalizeFirst(orderByProperty.substring(0, orderByProperty.indexOf('[')));
             loadPatientsUrl = loadPatientsUrl + '&orderby=' + orderByPropertyName;
             
             if (orderByDirection === 'ASCENDING') {
@@ -152,7 +152,7 @@ angular.module('slicebox.home', ['ngRoute'])
     $scope.loadFlatSeries = function(startIndex, count, orderByProperty, orderByDirection, filter) {
         var loadFlatSeriesUrl = '/api/metadata/series?startindex=' + startIndex + '&count=' + count;
         if (orderByProperty) {
-            var orderByPropertyName = capitalizeFirst(orderByProperty.substring(orderByProperty.indexOf('.') + 1, orderByProperty.indexOf('[')));
+            var orderByPropertyName = orderByProperty == "id" ? orderByProperty : capitalizeFirst(orderByProperty.substring(orderByProperty.indexOf('.') + 1, orderByProperty.indexOf('[')));
             loadFlatSeriesUrl = loadFlatSeriesUrl + '&orderby=' + orderByPropertyName;
             
             if (orderByDirection === 'ASCENDING') {

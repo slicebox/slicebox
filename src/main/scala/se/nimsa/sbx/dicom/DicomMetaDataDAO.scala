@@ -283,22 +283,23 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
     filter.foreach(filterValue => {
       val filterValueLike = s"'%$filterValue%'".toLowerCase
       query += s""" where 
-        lcase("PatientName") like $filterValueLike or 
-        lcase("PatientID") like $filterValueLike or 
-        lcase("PatientBirthDate") like $filterValueLike or 
-        lcase("PatientSex") like $filterValueLike or
-          lcase("StudyDescription") like $filterValueLike or
-          lcase("StudyDate") like $filterValueLike or
-          lcase("StudyID") like $filterValueLike or
-          lcase("AccessionNumber") like $filterValueLike or
-          lcase("PatientAge") like $filterValueLike or
-            lcase("Manufacturer") like $filterValueLike or
-            lcase("StationName") like $filterValueLike or
-              lcase("SeriesDescription") like $filterValueLike or
-              lcase("SeriesDate") like $filterValueLike or
-              lcase("Modality") like $filterValueLike or
-              lcase("ProtocolName") like $filterValueLike or
-              lcase("BodyPartExamined") like $filterValueLike"""
+        lcase("id") like $filterValueLike or
+          lcase("PatientName") like $filterValueLike or 
+          lcase("PatientID") like $filterValueLike or 
+          lcase("PatientBirthDate") like $filterValueLike or 
+          lcase("PatientSex") like $filterValueLike or
+            lcase("StudyDescription") like $filterValueLike or
+            lcase("StudyDate") like $filterValueLike or
+            lcase("StudyID") like $filterValueLike or
+            lcase("AccessionNumber") like $filterValueLike or
+            lcase("PatientAge") like $filterValueLike or
+              lcase("Manufacturer") like $filterValueLike or
+              lcase("StationName") like $filterValueLike or
+                lcase("SeriesDescription") like $filterValueLike or
+                lcase("SeriesDate") like $filterValueLike or
+                lcase("Modality") like $filterValueLike or
+                lcase("ProtocolName") like $filterValueLike or
+                lcase("BodyPartExamined") like $filterValueLike"""
     })
 
     orderBy.foreach(orderByValue =>

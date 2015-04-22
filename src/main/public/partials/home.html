@@ -21,7 +21,7 @@
                 <md-card>
                     <md-card-content>
                         <h4 class="md-flex card-header">Patients</h4>
-                        <md-content class="md-padding" style="height: 240px">
+                        <md-content class="md-padding">
                             <sbx-grid
                                 load-page="loadPatients(startIndex, count, orderByProperty, orderByDirection, filter)"
                                 page-size="10"
@@ -32,13 +32,16 @@
                                 callbacks="callbacks.patientsTable"
                                 empty-message="No patients found">
 
-                                <sbx-grid-column property="patientName['value']" title="Name">
+                                <sbx-grid-column property="id" title="Id">
+                                </sbx-grid-column>
+
+                                <sbx-grid-column property="patientName['value']" title="Patient Name">
                                     <sbx-grid-cell>
                                         {{rowObject.patientName.value | prettyPatientName}}
                                     </sbx-grid-cell>
                                 </sbx-grid-column>
 
-                                <sbx-grid-column property="patientID['value']" title="Id">
+                                <sbx-grid-column property="patientID['value']" title="Patient Id">
                                 </sbx-grid-column>
 
                                 <sbx-grid-column property="patientBirthDate['value']" title="Birth Date">
@@ -65,13 +68,16 @@
                                 callbacks="callbacks.studiesTable"
                                 empty-message="No studies found">
 
+                                <sbx-grid-column property="id" title="Id">
+                                </sbx-grid-column>
+
                                 <sbx-grid-column property="studyDescription['value']" title="Description">
                                 </sbx-grid-column>
 
                                 <sbx-grid-column property="studyDate['value']" title="Date">
                                 </sbx-grid-column>
 
-                                <sbx-grid-column property="studyID['value']" title="Id">
+                                <sbx-grid-column property="studyID['value']" title="Study Id">
                                 </sbx-grid-column>
 
                                 <sbx-grid-column property="accessionNumber['value']" title="Accession Number">
@@ -97,6 +103,9 @@
                                 object-selected="seriesSelected(object)"
                                 callbacks="callbacks.seriesTable"
                                 empty-message="No series found">
+
+                                <sbx-grid-column property="id" title="Id">
+                                </sbx-grid-column>
 
                                 <sbx-grid-column property="seriesDescription['value']" title="Description">
                                 </sbx-grid-column>
@@ -138,13 +147,16 @@
                                 callbacks="callbacks.flatSeriesTable"
                                 empty-message="No series found">
 
-                                <sbx-grid-column property="patient.patientName['value']" title="Name">
+                                <sbx-grid-column property="id" title="Id">
+                                </sbx-grid-column>
+
+                                <sbx-grid-column property="patient.patientName['value']" title="Patient Name">
                                     <sbx-grid-cell>
                                         {{rowObject.patient.patientName.value | prettyPatientName}}
                                     </sbx-grid-cell>
                                 </sbx-grid-column>
 
-                                <sbx-grid-column property="patient.patientID['value']" title="Id">
+                                <sbx-grid-column property="patient.patientID['value']" title="Patient Id">
                                 </sbx-grid-column>
 
                                 <sbx-grid-column property="patient.patientBirthDate['value']" title="Birth Date">
