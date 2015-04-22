@@ -12,12 +12,17 @@ import se.vgregion.dicom.DicomHierarchy._
 import spray.httpx.SprayJsonSupport.sprayJsonMarshaller
 import spray.httpx.SprayJsonSupport.sprayJsonUnmarshaller
 import spray.httpx.unmarshalling.BasicUnmarshallers.ByteArrayUnmarshaller
+import java.nio.file.Path
+import java.nio.file.Paths
+import org.dcm4che3.data.Tag
+import org.dcm4che3.data.VR
+import spray.http.HttpData
 
 class ImageRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
   def dbUrl() = "jdbc:h2:mem:datasetroutestest;DB_CLOSE_DELAY=-1"
 
-  "The system" should "return a success message when adding an image" in {
+  "Image routes" should "return a success message when adding an image" in {
     val fileName = "anon270.dcm"
     val file = new File(getClass().getResource(fileName).toURI())
     val mfd = MultipartFormData(Seq(BodyPart(file, "file")))
@@ -42,5 +47,23 @@ class ImageRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
   }
   
-  
+  it should "return a BadRequest when adding an invalid image" in {
+    val file = new File("some file that does not exist")
+    val mfd = MultipartFormData(Seq(BodyPart(file, "file")))
+    PostAsUser("/api/images", mfd) ~> routes ~> check {
+      status should be (BadRequest)
+    }    
+  }
+
+  it should "return a BadRequest when adding a file leads to an ill-defined DICOM hierarchy" in {
+    // file already added once. Change some DICOM attributes in order to create an invalid hierarchy
+    val fileName = "anon270.dcm"
+    val dataset = DicomUtil.loadDataset(Paths.get(getClass().getResource(fileName).toURI()), true)
+    dataset.setString(Tag.StudyInstanceUID, VR.UI, "1.2.3.4") // leads to a new db study
+    dataset.setString(Tag.SOPInstanceUID, VR.UI, "5.6.7.8") // leads to a new db image
+    val bytes = DicomUtil.toByteArray(dataset)
+    PostAsUser("/api/images", HttpData(bytes)) ~> routes ~> check {
+      status should be (BadRequest)
+    }
+  }
 }

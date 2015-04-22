@@ -56,10 +56,16 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
       val dataset = loadDataset(path, true)
       if (dataset != null)
         if (checkSopClass(dataset)) {
-          val (image, overwrite) = storeDataset(dataset)
-          if (!overwrite) {
-            log.debug("Stored dataset: " + dataset.getString(Tag.SOPInstanceUID))
-            context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Storage", s"Stored file ${path.toString} as ${dataset.getString(Tag.SOPInstanceUID)}")))
+          try {
+            val (image, overwrite) = storeDataset(dataset)
+            if (!overwrite) {
+              log.debug("Stored dataset: " + dataset.getString(Tag.SOPInstanceUID))
+              context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Storage", s"Stored file ${path.toString} as ${dataset.getString(Tag.SOPInstanceUID)}")))
+            }
+          } catch {
+            case e: IllegalArgumentException =>
+              log.debug(e.getMessage)
+              context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.ERROR, "Storage", e.getMessage)))
           }
         } else {
           log.debug(s"Received file with unsupported SOP Class UID ${dataset.getString(Tag.SOPClassUID)}, skipping")
@@ -69,10 +75,16 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
         log.info(s"File $path is not a DICOM file")
 
     case DatasetReceived(dataset) =>
-      val (image, overwrite) = storeDataset(dataset)
-      if (overwrite) {
-        log.debug("Stored dataset: " + dataset.getString(Tag.SOPInstanceUID))
-        context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Storage", "Stored dataset: " + dataset.getString(Tag.SOPInstanceUID))))
+      try {
+        val (image, overwrite) = storeDataset(dataset)
+        if (overwrite) {
+          log.debug("Stored dataset: " + dataset.getString(Tag.SOPInstanceUID))
+          context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Storage", "Stored dataset: " + dataset.getString(Tag.SOPInstanceUID))))
+        }
+      } catch {
+        case e: IllegalArgumentException =>
+          log.debug(e.getMessage)
+          context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.ERROR, "Storage", e.getMessage)))
       }
 
     case AddDataset(dataset) =>
@@ -205,12 +217,12 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
           db.withSession { implicit session =>
             sender ! dao.patientById(patientId)
           }
-          
+
         case GetStudy(studyId) =>
           db.withSession { implicit session =>
             sender ! dao.studyById(studyId)
           }
-          
+
         case GetSingleSeries(seriesId) =>
           db.withSession { implicit session =>
             sender ! dao.seriesById(seriesId)
@@ -227,40 +239,53 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
     val overwrite = Files.exists(storedPath)
 
     db.withSession { implicit session =>
+
       val patient = datasetToPatient(dataset)
-      val dbPatient = dao.patientByNameAndID(patient)
-        .getOrElse(dao.insert(patient))
-
       val study = datasetToStudy(dataset)
-      val dbStudy = dao.studyByUid(study)
-        .getOrElse(dao.insert(study.copy(patientId = dbPatient.id)))
-
       val equipment = datasetToEquipment(dataset)
-      val dbEquipment = dao.equipmentByManufacturerAndStationName(equipment)
-        .getOrElse(dao.insert(equipment))
-
       val frameOfReference = datasetToFrameOfReference(dataset)
-      val dbFrameOfReference = dao.frameOfReferenceByUid(frameOfReference)
-        .getOrElse(dao.insert(frameOfReference))
-
       val series = datasetToSeries(dataset)
-      val dbSeries = dao.seriesByUid(series)
-        .getOrElse(dao.insert(series.copy(
+      val image = datasetToImage(dataset)
+      val imageFile = ImageFile(-1, FileName(name))
+
+      val dbPatientMaybe = dao.patientByNameAndID(patient)
+      val dbStudyMaybe = dao.studyByUid(study)
+      val dbEquipmentMaybe = dao.equipmentByManufacturerAndStationName(equipment)
+      val dbFrameOfReferenceMaybe = dao.frameOfReferenceByUid(frameOfReference)
+      val dbSeriesMaybe = dao.seriesByUid(series)
+      val dbImageMaybe = dao.imageByUid(image)
+      val dbImageFileMaybe = dao.imageFileByFileName(imageFile)
+
+      // relationships are one to many from top to bottom. There must therefore not be a new instance followed by an existing
+      val hierarchyIsWellDefined = !(
+        dbPatientMaybe.isEmpty && dbStudyMaybe.isDefined ||
+        dbStudyMaybe.isEmpty && dbSeriesMaybe.isDefined ||
+        dbEquipmentMaybe.isEmpty && dbSeriesMaybe.isDefined ||
+        dbFrameOfReferenceMaybe.isEmpty && dbSeriesMaybe.isDefined ||
+        dbSeriesMaybe.isEmpty && dbImageMaybe.isDefined ||
+        dbImageMaybe.isEmpty && dbImageFileMaybe.isDefined)
+
+      if (hierarchyIsWellDefined) {
+
+        val dbPatient = dbPatientMaybe.getOrElse(dao.insert(patient))
+        val dbEquipment = dbEquipmentMaybe.getOrElse(dao.insert(equipment))
+        val dbFrameOfReference = dbFrameOfReferenceMaybe.getOrElse(dao.insert(frameOfReference))
+        val dbStudy = dbStudyMaybe.getOrElse(dao.insert(study.copy(patientId = dbPatient.id)))
+        val dbSeries = dbSeriesMaybe.getOrElse(dao.insert(series.copy(
           studyId = dbStudy.id,
           equipmentId = dbEquipment.id,
           frameOfReferenceId = dbFrameOfReference.id)))
+        val dbImage = dbImageMaybe.getOrElse(dao.insert(image.copy(seriesId = dbSeries.id)))
+        dbImageFileMaybe.getOrElse(dao.insert(imageFile.copy(id = dbImage.id)))
 
-      val image = datasetToImage(dataset)
-      val dbImage = dao.imageByUid(image)
-        .getOrElse(dao.insert(image.copy(seriesId = dbSeries.id)))
+        saveDataset(dataset, storedPath)
 
-      val imageFile = ImageFile(dbImage.id, FileName(name))
-      val dbImageFile = dao.imageFileByFileName(imageFile)
-        .getOrElse(dao.insert(imageFile))
+        (dbImage, overwrite)
 
-      saveDataset(dataset, storedPath)
+      } else
 
-      (dbImage, overwrite)
+        throw new IllegalArgumentException(s"DICOM hierarchy defined by dataset is ill-defined with respect to existing database entries. Cannot add dataset.")
+
     }
   }
 
