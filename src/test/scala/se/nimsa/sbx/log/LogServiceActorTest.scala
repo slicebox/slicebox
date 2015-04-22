@@ -27,6 +27,7 @@ class LogServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
     logDao.create
   }
 
+  
   val logServiceActorRef = _system.actorOf(Props(new LogServiceActor(dbProps)))
 
   override def afterAll = {
