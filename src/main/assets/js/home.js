@@ -320,6 +320,11 @@ angular.module('slicebox.home', ['ngRoute'])
     }
 
     function confirmSendSeries(series) {
+        // check if flat series
+        series = series.map(function(s) {
+            return s.series ? s.series : s;
+        });
+
         return confirmSend('/api/boxes', function(receiverId) {
             var seriesIds = series.map(function(entity) { 
                 return entity.id; 
@@ -372,6 +377,11 @@ angular.module('slicebox.home', ['ngRoute'])
     }
 
     function confirmSendSeriesToScp(series) {
+        // check if flat series
+        series = series.map(function(s) {
+            return s.series ? s.series : s;
+        });
+
         return confirmSend('/api/scus', function(receiverId) {
             return $http.post('/api/scus/' + receiverId + '/sendseries/' + series[0].id).success(function() {
                 $mdDialog.hide();

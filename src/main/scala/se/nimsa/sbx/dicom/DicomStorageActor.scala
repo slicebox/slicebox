@@ -59,31 +59,26 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
           try {
             val (image, overwrite) = storeDataset(dataset)
             if (!overwrite) {
-              log.debug("Stored dataset: " + dataset.getString(Tag.SOPInstanceUID))
               context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Storage", s"Stored file ${path.toString} as ${dataset.getString(Tag.SOPInstanceUID)}")))
             }
           } catch {
             case e: IllegalArgumentException =>
-              log.debug(e.getMessage)
               context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.ERROR, "Storage", e.getMessage)))
           }
         } else {
-          log.debug(s"Received file with unsupported SOP Class UID ${dataset.getString(Tag.SOPClassUID)}, skipping")
           context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Storage", s"Received file ${path.toString} with unsupported SOP Class UID ${dataset.getString(Tag.SOPClassUID)}, skipping")))
         }
       else
-        log.info(s"File $path is not a DICOM file")
+        context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Storage", s"File $path is not a DICOM file, skipping")))
 
     case DatasetReceived(dataset) =>
       try {
         val (image, overwrite) = storeDataset(dataset)
         if (overwrite) {
-          log.debug("Stored dataset: " + dataset.getString(Tag.SOPInstanceUID))
           context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Storage", "Stored dataset: " + dataset.getString(Tag.SOPInstanceUID))))
         }
       } catch {
         case e: IllegalArgumentException =>
-          log.debug(e.getMessage)
           context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.ERROR, "Storage", e.getMessage)))
       }
 
@@ -91,8 +86,14 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
       catchAndReport {
         if (dataset == null)
           throw new IllegalArgumentException("Invalid dataset")
-        val (image, overwrite) = storeDataset(dataset)
-        sender ! ImageAdded(image)
+        try {
+          val (image, overwrite) = storeDataset(dataset)
+          sender ! ImageAdded(image)
+        } catch {
+          case e: IllegalArgumentException =>
+            context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.ERROR, "Storage", e.getMessage)))
+            throw e
+        }
       }
 
     case msg: MetaDataUpdate => catchAndReport {
@@ -295,7 +296,7 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
   def deleteFromStorage(imageFile: ImageFile): Unit = deleteFromStorage(storage.resolve(imageFile.fileName.value))
   def deleteFromStorage(filePath: Path): Unit = {
     Files.delete(filePath)
-    log.info("Deleted file " + filePath)
+    log.debug("Deleted file " + filePath)
   }
 
   def readImageAttributes(fileName: String): ImageAttributes = {

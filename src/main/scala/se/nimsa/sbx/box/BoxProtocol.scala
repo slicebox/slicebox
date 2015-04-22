@@ -111,4 +111,11 @@ object BoxProtocol {
   
   case object BoxNotFound
 
+  // box push actor internal messages
+  
+  case object PollOutbox
+
+  case class FileSent(outboxEntry: OutboxEntry)
+  
+  case class FileSendFailed(outboxEntry: OutboxEntry, statusCode: Int, e: Exception)
 }

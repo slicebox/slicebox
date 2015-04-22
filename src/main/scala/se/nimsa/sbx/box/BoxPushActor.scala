@@ -31,8 +31,6 @@ class BoxPushActor(box: Box,
                    pollInterval: FiniteDuration = 5.seconds,
                    receiveTimeout: FiniteDuration = 1.minute) extends Actor {
 
-  import BoxPushActor._
-
   val log = Logging(context.system, this)
 
   val db = dbProps.db
@@ -82,8 +80,8 @@ class BoxPushActor(box: Box,
     case FileSent(outboxEntry) =>
       handleFileSentForOutboxEntry(outboxEntry)
 
-    case FileSendFailed(outboxEntry, exception) =>
-      handleFileSendFailedForOutboxEntry(outboxEntry, exception)
+    case FileSendFailed(outboxEntry, statusCode, exception) =>
+      handleFileSendFailedForOutboxEntry(outboxEntry, statusCode, exception)
 
     case ReceiveTimeout =>
       log.error("Processing next outbox entry timed out")
@@ -117,15 +115,15 @@ class BoxPushActor(box: Box,
   def sendFileWithName(outboxEntry: OutboxEntry, fileName: String, tagValues: Seq[TransactionTagValue]) = {
     pushImagePipeline(outboxEntry, fileName, tagValues)
       .map(response => {
-        val responseCode = response.status.intValue
-        if (responseCode >= 200 && responseCode < 300)
+        val statusCode = response.status.intValue
+        if (statusCode >= 200 && statusCode < 300)
           self ! FileSent(outboxEntry)
         else
-          self ! FileSendFailed(outboxEntry, new Exception(s"File send failed with status code $responseCode"))
+          self ! FileSendFailed(outboxEntry, statusCode, new Exception(s"File send failed with status code $statusCode"))
       })
       .recover {
         case exception: Exception =>
-          self ! FileSendFailed(outboxEntry, exception)
+          self ! FileSendFailed(outboxEntry, 500, exception)
       }
   }
 
@@ -144,19 +142,27 @@ class BoxPushActor(box: Box,
     processNextOutboxEntry
   }
 
-  def handleFileSendFailedForOutboxEntry(outboxEntry: OutboxEntry, exception: Exception) = {
-    log.debug(s"Failed to send file to box ${outboxEntry.id}: " + exception.getMessage)
+  def handleFileSendFailedForOutboxEntry(outboxEntry: OutboxEntry, statusCode: Int, exception: Exception) = {
+    log.debug(s"Failed to send file to box ${outboxEntry.id}. Status code: $statusCode, message: ${exception.getMessage}")
+    statusCode match {
+      case code if code >= 500 =>
+        // server-side error, remote box is most likely down
+      case _ =>
+        markOutboxTransactionAsFailed(outboxEntry, s"Failed to send file to box ${box.name}. Status code: $statusCode, message: ${exception.getMessage}")
+    }
     context.unbecome
   }
 
-  def handleFilenameLookupFailedForOutboxEntry(outboxEntry: OutboxEntry, exception: Exception) = {
-    log.error(s"Failed to send file to box ${outboxEntry.id}: " + exception.getMessage)
+  def handleFilenameLookupFailedForOutboxEntry(outboxEntry: OutboxEntry, exception: Exception) = {    
+    markOutboxTransactionAsFailed(outboxEntry, s"Failed to send file to box ${box.name}: " + exception.getMessage)
+    context.unbecome
+  }
 
+  def markOutboxTransactionAsFailed(outboxEntry: OutboxEntry, logMessage: String) = {
     db.withSession { implicit session =>
       boxDao.markOutboxTransactionAsFailed(box.id, outboxEntry.transactionId)
     }
-
-    context.unbecome
+    context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.ERROR, "Box", logMessage)))
   }
 
   def removeTransactionTagValuesForTransactionId(transactionId: Long) = {
@@ -175,9 +181,5 @@ object BoxPushActor {
             pollInterval: FiniteDuration = 5.seconds,
             receiveTimeout: FiniteDuration = 1.minute): Props =
     Props(new BoxPushActor(box, dbProps, storage, pollInterval, receiveTimeout))
-
-  case object PollOutbox
-  case class FileSent(outboxEntry: OutboxEntry)
-  case class FileSendFailed(outboxEntry: OutboxEntry, e: Exception)
 
 }
