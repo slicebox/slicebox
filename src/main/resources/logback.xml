@@ -14,7 +14,7 @@
     <logger name="com.mchange" level="ERROR" />
 	<!-- <logger name="scala.slick.jdbc.JdbcBackend.statement" level="DEBUG" /> -->
 	<logger name="org.dcm4che3" level="ERROR" />
-    <logger name="se.vgregion" level="WARN" />
+    <logger name="se.nimsa.sbx" level="WARN" />
 
     <root level="WARN">
         <appender-ref ref="CONSOLE"/>

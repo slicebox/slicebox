@@ -2,7 +2,7 @@
 
 	version := "0.1"
 
-	organization := "se.vgregion"
+	organization := "se.nimsa"
 
 	scalaVersion := "2.11.6"
 
@@ -63,7 +63,7 @@
 
 	EclipseKeys.withSource := true
 
-	mainClass in Compile := Some("se.vgregion.app.Main")
+	mainClass in Compile := Some("se.nimsa.sbx.app.Main")
 
 	lazy val slicebox = (project in file(".")).enablePlugins(SbtWeb, JavaServerAppPackaging)
 

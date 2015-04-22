@@ -12,3 +12,5 @@ project/activator*
 /storage.h2.db
 /storage.trace.db
 /storage.lock.db
+/*.sublime-project
+/*.sublime-workspace
