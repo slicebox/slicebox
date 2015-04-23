@@ -112,6 +112,7 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
           case SendSeriesToRemoteBox(remoteBoxId, seriesIds, tagValues) =>
             boxById(remoteBoxId) match {
               case Some(box) =>
+                context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Box", s"Sending series ${seriesIds.mkString(",")} to box ${box.name} with tag values ${tagValues.map(_.value).mkString(",")}")))
                 val imageFileIds = sendEntities(remoteBoxId, seriesIds, tagValues, imageFileIdsForSeries _)
                 sender ! ImagesSent(remoteBoxId, imageFileIds)
               case None =>
@@ -121,6 +122,7 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
           case SendStudiesToRemoteBox(remoteBoxId, studyIds, tagValues) =>
             boxById(remoteBoxId) match {
               case Some(box) =>
+                context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Box", s"Sending study(s) ${studyIds.mkString(",")} to box ${box.name} with tag values ${tagValues.map(_.value).mkString(",")}")))
                 val imageFileIds = sendEntities(remoteBoxId, studyIds, tagValues, imageFileIdsForStudy _)
                 sender ! ImagesSent(remoteBoxId, imageFileIds)
               case None =>
@@ -130,6 +132,7 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
           case SendPatientsToRemoteBox(remoteBoxId, patientIds, tagValues) =>
             boxById(remoteBoxId) match {
               case Some(box) =>
+                context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Box", s"Sending patient(s) ${patientIds.mkString(",")} to box ${box.name} with tag values ${tagValues.map(_.value).mkString(",")}")))
                 val imageFileIds = sendEntities(remoteBoxId, patientIds, tagValues, imageFileIdsForPatient _)
                 sender ! ImagesSent(remoteBoxId, imageFileIds)
               case None =>
@@ -152,7 +155,7 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
 
                   if (outboxEntry.sequenceNumber == outboxEntry.totalImageCount) {
                     removeTransactionTagValuesForTransactionId(outboxEntry.transactionId)
-                    context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Box", "Send completed.")))
+                    context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Box", s"Finished sending ${outboxEntry.totalImageCount} images to box ${box.name}")))
                   }
 
                   sender ! OutboxEntryDeleted
@@ -291,7 +294,7 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
     }
 
     if (sequenceNumber == totalImageCount)
-      context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Box", "Receive completed.")))
+      context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Box", s"Receiving ${totalImageCount} images from box ${boxById(remoteBoxId)} completed.")))
   }
 
   def updatePollBoxesOnlineStatus(): Unit = {

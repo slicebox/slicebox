@@ -135,7 +135,7 @@ class BoxPushActor(box: Box,
     }
 
     if (outboxEntry.sequenceNumber == outboxEntry.totalImageCount) {
-      context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Box", "Send completed.")))
+      context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Box", s"Finished sending ${outboxEntry.totalImageCount} images to box ${box.name}")))
       removeTransactionTagValuesForTransactionId(outboxEntry.transactionId)
     }
 
@@ -143,12 +143,12 @@ class BoxPushActor(box: Box,
   }
 
   def handleFileSendFailedForOutboxEntry(outboxEntry: OutboxEntry, statusCode: Int, exception: Exception) = {
-    log.debug(s"Failed to send file to box ${outboxEntry.id}. Status code: $statusCode, message: ${exception.getMessage}")
+    log.debug(s"Failed to send file to box ${box.name}: ${exception.getMessage}")
     statusCode match {
       case code if code >= 500 =>
         // server-side error, remote box is most likely down
       case _ =>
-        markOutboxTransactionAsFailed(outboxEntry, s"Failed to send file to box ${box.name}. Status code: $statusCode, message: ${exception.getMessage}")
+        markOutboxTransactionAsFailed(outboxEntry, s"Cannot send file to box ${box.name}: ${exception.getMessage}")
     }
     context.unbecome
   }
