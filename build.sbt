@@ -1,6 +1,6 @@
 	name := "slicebox"
 
-	version := "0.1"
+	version := "1.0-SNAPSHOT"
 
 	organization := "se.nimsa"
 
@@ -10,21 +10,20 @@
 
 	Revolver.settings
 
-	maintainer in Linux := "Exini Diagnostics AB"
+	maintainer in Universal := "NIMSA.se"
 
-	maintainer in Windows := "Exini Diagnostics AB"
+	packageSummary in Universal := "Slicebox DICOM sharing service"
 
-	packageSummary in Linux := "Slicebox DICOM sharing service"
-
-	packageSummary in Windows := "Slicebox DICOM sharing service"
-
-	packageDescription in Linux := "Slicebox is a service for sharing medical image data with collaborators while protecting patient information"
-
-	packageDescription in Windows := "Slicebox is a service for sharing medical image data with collaborators while protecting patient information"
+	packageDescription in Universal := "Slicebox is a service for sharing medical image data with collaborators while protecting patient information"
 
 	mappings in Universal <+= (packageBin in Compile, sourceDirectory ) map { (_, src) =>
-		val conf = src / "main" / "resources" / "slicebox.conf"
-		conf -> "conf/slicebox.conf"
+		val sliceboxConf = src / "main" / "resources" / "slicebox.conf"
+		sliceboxConf -> "conf/slicebox.conf"
+	}
+
+	mappings in Universal <+= (packageBin in Compile, sourceDirectory ) map { (_, src) =>
+		val httpConf = src / "main" / "resources" / "http.conf"
+		httpConf -> "conf/http.conf"
 	}
 
 	resolvers ++= Seq("Typesafe Repository"	at "http://repo.typesafe.com/typesafe/releases/",
