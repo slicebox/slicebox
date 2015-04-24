@@ -33,9 +33,12 @@ import DicomPropertyValue._
 import DicomUtil._
 import akka.dispatch.ExecutionContexts
 import java.util.concurrent.Executors
-import se.nimsa.sbx.log.LogProtocol._
+import se.nimsa.sbx.log.SbxLog
 
 class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with ExceptionCatching {
+
+  import context.system
+
   val log = Logging(context.system, this)
 
   val db = dbProps.db
@@ -59,27 +62,27 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
           try {
             val (image, overwrite) = storeDataset(dataset)
             if (!overwrite) {
-              context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Storage", s"Stored file ${path.toString} as ${dataset.getString(Tag.SOPInstanceUID)}")))
+              SbxLog.info("Storage", s"Stored file ${path.toString} as ${dataset.getString(Tag.SOPInstanceUID)}")
             }
           } catch {
             case e: IllegalArgumentException =>
-              context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.ERROR, "Storage", e.getMessage)))
+              SbxLog.error("Storage", e.getMessage)
           }
         } else {
-          context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Storage", s"Received file ${path.toString} with unsupported SOP Class UID ${dataset.getString(Tag.SOPClassUID)}, skipping")))
+          SbxLog.info("Storage", s"Received file ${path.toString} with unsupported SOP Class UID ${dataset.getString(Tag.SOPClassUID)}, skipping")
         }
       else
-        context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Storage", s"File $path is not a DICOM file, skipping")))
+        SbxLog.info("Storage", s"File $path is not a DICOM file, skipping")
 
     case DatasetReceived(dataset) =>
       try {
         val (image, overwrite) = storeDataset(dataset)
-        if (overwrite) {
-          context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Storage", "Stored dataset: " + dataset.getString(Tag.SOPInstanceUID))))
+        if (!overwrite) {
+          SbxLog.info("Storage", "Stored dataset: " + dataset.getString(Tag.SOPInstanceUID))
         }
       } catch {
         case e: IllegalArgumentException =>
-          context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.ERROR, "Storage", e.getMessage)))
+          SbxLog.error("Storage", e.getMessage)
       }
 
     case AddDataset(dataset) =>
@@ -91,7 +94,7 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
           sender ! ImageAdded(image)
         } catch {
           case e: IllegalArgumentException =>
-            context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.ERROR, "Storage", e.getMessage)))
+            SbxLog.error("Storage", e.getMessage)
             throw e
         }
       }
@@ -227,6 +230,11 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
         case GetSingleSeries(seriesId) =>
           db.withSession { implicit session =>
             sender ! dao.seriesById(seriesId)
+          }
+
+        case GetSingleFlatSeries(seriesId) =>
+          db.withSession { implicit session =>
+            sender ! dao.flatSeriesById(seriesId)
           }
       }
     }

@@ -16,7 +16,7 @@ import spray.httpx.unmarshalling.FromResponseUnmarshaller
 import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.app.JsonFormats
 import se.nimsa.sbx.dicom.DicomProtocol.DatasetReceived
-import se.nimsa.sbx.log.LogProtocol._
+import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.dicom.DicomUtil
 import BoxProtocol.Box
 import BoxProtocol.OutboxEntry
@@ -100,7 +100,7 @@ class BoxPollActor(box: Box,
       context.unbecome
 
     case FetchFileFailed(exception) =>
-      log.error("Failed to fetch remote outbox file: " + exception.getMessage)
+      SbxLog.error("Box", s"Failed to fetch file from box ${box.name}: " + exception.getMessage)
       context.unbecome
 
     case ReceiveTimeout =>
@@ -147,7 +147,9 @@ class BoxPollActor(box: Box,
     }
 
     if (sequenceNumber == totalImageCount)
-      context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Box", "Receive completed.")))
+      db.withSession { implicit session =>
+        SbxLog.info("Box", s"Received ${totalImageCount} files from box ${boxDao.boxById(remoteBoxId)}")
+      }
   }
 
   def updateBoxOnlineStatus(online: Boolean): Unit =

@@ -150,7 +150,7 @@ angular.module('slicebox.home', ['ngRoute'])
     };
 
     $scope.loadFlatSeries = function(startIndex, count, orderByProperty, orderByDirection, filter) {
-        var loadFlatSeriesUrl = '/api/metadata/series?startindex=' + startIndex + '&count=' + count;
+        var loadFlatSeriesUrl = '/api/metadata/flatseries?startindex=' + startIndex + '&count=' + count;
         if (orderByProperty) {
             var orderByPropertyName = orderByProperty == "id" ? orderByProperty : capitalizeFirst(orderByProperty.substring(orderByProperty.indexOf('.') + 1, orderByProperty.indexOf('[')));
             loadFlatSeriesUrl = loadFlatSeriesUrl + '&orderby=' + orderByPropertyName;

@@ -21,9 +21,9 @@ import spray.http.StatusCode
 import se.nimsa.sbx.dicom.DicomUtil._
 import se.nimsa.sbx.dicom.DicomAnonymization._
 import java.io.ByteArrayOutputStream
-import se.nimsa.sbx.log.LogProtocol._
 import java.util.Date
 import akka.actor.ReceiveTimeout
+import se.nimsa.sbx.log.SbxLog
 
 class BoxPushActor(box: Box,
                    dbProps: DbProps,
@@ -135,7 +135,7 @@ class BoxPushActor(box: Box,
     }
 
     if (outboxEntry.sequenceNumber == outboxEntry.totalImageCount) {
-      context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Box", s"Finished sending ${outboxEntry.totalImageCount} images to box ${box.name}")))
+      SbxLog.info("Box", s"Finished sending ${outboxEntry.totalImageCount} images to box ${box.name}")
       removeTransactionTagValuesForTransactionId(outboxEntry.transactionId)
     }
 
@@ -162,7 +162,7 @@ class BoxPushActor(box: Box,
     db.withSession { implicit session =>
       boxDao.markOutboxTransactionAsFailed(box.id, outboxEntry.transactionId)
     }
-    context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.ERROR, "Box", logMessage)))
+    SbxLog.error("Box", logMessage)
   }
 
   def removeTransactionTagValuesForTransactionId(transactionId: Long) = {

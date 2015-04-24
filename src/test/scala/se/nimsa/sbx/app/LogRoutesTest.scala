@@ -1,18 +1,15 @@
 package se.nimsa.sbx.app
 
-import scala.concurrent.Future
-import spray.http.BasicHttpCredentials
-import spray.http.StatusCodes._
-import spray.httpx.SprayJsonSupport._
-import spray.routing._
+import spray.http.StatusCodes.NoContent
+import spray.http.StatusCodes.OK
+import spray.httpx.SprayJsonSupport.sprayJsonUnmarshaller
+
+import org.scalatest.BeforeAndAfterAll
 import org.scalatest.FlatSpec
 import org.scalatest.Matchers
-import se.nimsa.sbx.app.UserProtocol.AuthToken
-import se.nimsa.sbx.log.LogProtocol._
-import scala.slick.driver.H2Driver
-import se.nimsa.sbx.log.LogDAO
-import java.util.Date
-import org.scalatest.BeforeAndAfterAll
+
+import se.nimsa.sbx.log.LogProtocol.LogEntry
+import se.nimsa.sbx.log.SbxLog
 
 class LogRoutesTest extends FlatSpec with Matchers with RoutesTestBase with BeforeAndAfterAll {
 
@@ -20,12 +17,12 @@ class LogRoutesTest extends FlatSpec with Matchers with RoutesTestBase with Befo
 
   override def beforeAll() {
     super.beforeAll()
-    system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Category1", "Message1")))
-    system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Category1", "Message2")))
-    system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.WARN, "Category1", "Message3")))
-    system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.WARN, "Category2", "Message4")))
-    system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.DEFAULT, "Category2", "Message5")))
-    system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.ERROR, "Category2", "Message6")))
+    SbxLog.info("Category1", "Message1")
+    SbxLog.info("Category1", "Message2")
+    SbxLog.warn("Category1", "Message3")
+    SbxLog.warn("Category2", "Message4")
+    SbxLog.default("Category2", "Message5")
+    SbxLog.error("Category2", "Message6")
   }
   
   "Log routes" should "support listing log messages" in {

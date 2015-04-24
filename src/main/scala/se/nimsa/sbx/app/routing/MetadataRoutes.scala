@@ -33,8 +33,8 @@ trait MetadataRoutes { this: RestApi =>
         } ~ path(LongNumber) { patientId =>
           get {
             onSuccess(dicomService.ask(GetPatient(patientId)).mapTo[Option[Patient]]) {
-                complete(_)
-            }            
+              complete(_)
+            }
           } ~ delete {
             onSuccess(dicomService.ask(DeletePatient(patientId))) {
               case ImageFilesDeleted(_) =>
@@ -58,8 +58,8 @@ trait MetadataRoutes { this: RestApi =>
         } ~ path(LongNumber) { studyId =>
           get {
             onSuccess(dicomService.ask(GetStudy(studyId)).mapTo[Option[Study]]) {
-                complete(_)
-            }            
+              complete(_)
+            }
           } ~ delete {
             onSuccess(dicomService.ask(DeleteStudy(studyId))) {
               case ImageFilesDeleted(_) =>
@@ -79,7 +79,22 @@ trait MetadataRoutes { this: RestApi =>
                     complete(series)
                 }
               }
-          } ~ get {
+          }
+        } ~ path(LongNumber) { seriesId =>
+          get {
+            onSuccess(dicomService.ask(GetSingleSeries(seriesId)).mapTo[Option[Series]]) {
+              complete(_)
+            }
+          } ~ delete {
+            onSuccess(dicomService.ask(DeleteSeries(seriesId))) {
+              case ImageFilesDeleted(_) =>
+                complete(NoContent)
+            }
+          }
+        }
+      } ~ path("flatseries") {
+        pathEndOrSingleSlash {
+          get {
             parameters(
               'startindex.as[Long] ? 0,
               'count.as[Long] ? 20,
@@ -94,13 +109,8 @@ trait MetadataRoutes { this: RestApi =>
           }
         } ~ path(LongNumber) { seriesId =>
           get {
-            onSuccess(dicomService.ask(GetSingleSeries(seriesId)).mapTo[Option[Series]]) {
-                complete(_)
-            }            
-          } ~ delete {
-            onSuccess(dicomService.ask(DeleteSeries(seriesId))) {
-              case ImageFilesDeleted(_) =>
-                complete(NoContent)
+            onSuccess(dicomService.ask(GetSingleFlatSeries(seriesId)).mapTo[Option[FlatSeries]]) {
+              complete(_)
             }
           }
         }

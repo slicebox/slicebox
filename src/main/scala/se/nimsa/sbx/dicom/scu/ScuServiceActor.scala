@@ -14,6 +14,7 @@ import se.nimsa.sbx.dicom.DicomMetaDataDAO
 import se.nimsa.sbx.dicom.DicomDispatchActor
 import se.nimsa.sbx.dicom.DicomProtocol._
 import se.nimsa.sbx.util.ExceptionCatching
+import se.nimsa.sbx.log.SbxLog
 
 class ScuServiceActor(dbProps: DbProps, storage: Path) extends Actor with ExceptionCatching {
   val log = Logging(context.system, this)
@@ -22,6 +23,7 @@ class ScuServiceActor(dbProps: DbProps, storage: Path) extends Actor with Except
   val dao = new ScuDataDAO(dbProps.driver)
   val metaDataDao = new DicomMetaDataDAO(dbProps.driver)
 
+  import context.system
   implicit val ec = context.dispatcher
 
   setupDb()
@@ -66,6 +68,7 @@ class ScuServiceActor(dbProps: DbProps, storage: Path) extends Actor with Except
           case SendSeriesToScp(seriesId, scuId) =>
             scuForId(scuId).map(scu => {
               val imageFiles = imageFilesForSeries(seriesId)
+              SbxLog.info("SCU", s"Sending ${imageFiles.length} images using SCU ${scu.name}")
               Future {
                 Scu.sendFiles(scu, imageFiles.map(imageFile => storage.resolve(imageFile.fileName.value)))
               }.map(r => ImagesSentToScp(scuId, imageFiles.map(_.id))).pipeTo(sender)

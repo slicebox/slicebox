@@ -103,6 +103,8 @@ object DicomProtocol {
   
   case class GetSingleSeries(seriesId: Long) extends MetaDataQuery
   
+  case class GetSingleFlatSeries(seriesId: Long) extends MetaDataQuery
+  
   
   sealed trait MetaDataUpdate
   

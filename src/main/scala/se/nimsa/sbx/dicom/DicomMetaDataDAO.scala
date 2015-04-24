@@ -224,7 +224,7 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
 
   def patients(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String])(implicit session: Session): List[Patient] = {
 
-    implicit val getPatientsResult = GetResult(r =>
+    implicit val patientsGetResult = GetResult(r =>
       Patient(r.nextLong, PatientName(r.nextString), PatientID(r.nextString), PatientBirthDate(r.nextString), PatientSex(r.nextString)))
 
     var query = """select * from "Patients""""
@@ -258,17 +258,7 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
 
   def imageFiles(implicit session: Session): List[ImageFile] = imageFilesQuery.list
 
-  def flatSeries(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String])(implicit session: Session): List[FlatSeries] = {
-
-    implicit val getFlatSeriesResult = GetResult(r =>
-      FlatSeries(r.nextLong,
-        Patient(r.nextLong, PatientName(r.nextString), PatientID(r.nextString), PatientBirthDate(r.nextString), PatientSex(r.nextString)),
-        Study(r.nextLong, r.nextLong, StudyInstanceUID(r.nextString), StudyDescription(r.nextString), StudyDate(r.nextString), StudyID(r.nextString), AccessionNumber(r.nextString), PatientAge(r.nextString)),
-        Equipment(r.nextLong, Manufacturer(r.nextString), StationName(r.nextString)),
-        FrameOfReference(r.nextLong, FrameOfReferenceUID(r.nextString)),
-        Series(r.nextLong, r.nextLong, r.nextLong, r.nextLong, SeriesInstanceUID(r.nextString), SeriesDescription(r.nextString), SeriesDate(r.nextString), Modality(r.nextString), ProtocolName(r.nextString), BodyPartExamined(r.nextString))))
-
-    var query = """select "Series"."id", 
+  val flatSeriesQuery = """select "Series"."id", 
       "Patients"."id", "Patients"."PatientName", "Patients"."PatientID", "Patients"."PatientBirthDate","Patients"."PatientSex", 
       "Studies"."id", "Studies"."patientId", "Studies"."StudyInstanceUID", "Studies"."StudyDescription", "Studies"."StudyDate", "Studies"."StudyID", "Studies"."AccessionNumber", "Studies"."PatientAge",
       "Equipments"."id", "Equipments"."Manufacturer", "Equipments"."StationName",
@@ -280,10 +270,24 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
        inner join "FrameOfReferences" on "Series"."frameOfReferenceId" = "FrameOfReferences"."id"
        inner join "Patients" on "Studies"."patientId" = "Patients"."id""""
 
+  def flatSeriesGetResult = GetResult(r =>
+    FlatSeries(r.nextLong,
+      Patient(r.nextLong, PatientName(r.nextString), PatientID(r.nextString), PatientBirthDate(r.nextString), PatientSex(r.nextString)),
+      Study(r.nextLong, r.nextLong, StudyInstanceUID(r.nextString), StudyDescription(r.nextString), StudyDate(r.nextString), StudyID(r.nextString), AccessionNumber(r.nextString), PatientAge(r.nextString)),
+      Equipment(r.nextLong, Manufacturer(r.nextString), StationName(r.nextString)),
+      FrameOfReference(r.nextLong, FrameOfReferenceUID(r.nextString)),
+      Series(r.nextLong, r.nextLong, r.nextLong, r.nextLong, SeriesInstanceUID(r.nextString), SeriesDescription(r.nextString), SeriesDate(r.nextString), Modality(r.nextString), ProtocolName(r.nextString), BodyPartExamined(r.nextString))))
+
+  def flatSeries(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String])(implicit session: Session): List[FlatSeries] = {
+
+  implicit val getResult = flatSeriesGetResult
+    
+    var query = flatSeriesQuery
+
     filter.foreach(filterValue => {
       val filterValueLike = s"'%$filterValue%'".toLowerCase
       query += s""" where 
-        lcase("id") like $filterValueLike or
+        lcase("Series"."id") like $filterValueLike or
           lcase("PatientName") like $filterValueLike or 
           lcase("PatientID") like $filterValueLike or 
           lcase("PatientBirthDate") like $filterValueLike or 
@@ -310,6 +314,14 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
     Q.queryNA(query).list
   }
 
+  def flatSeriesById(seriesId: Long)(implicit session: Session): Option[FlatSeries] = {
+
+    implicit val getResult = flatSeriesGetResult    
+    val query = flatSeriesQuery + s""" where "Series"."id" = $seriesId"""
+    
+    Q.queryNA(query).list.headOption
+  }
+  
   // *** Grouped listings ***
 
   def studiesForPatient(startIndex: Long, count: Long, patientId: Long)(implicit session: Session): List[Study] =

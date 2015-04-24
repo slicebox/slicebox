@@ -178,4 +178,23 @@ class DicomMetaDataDAOTest extends FlatSpec with Matchers {
     }
   }
 
+  it should "support listing flat series complete with series, study and patient information" in {
+    db.withSession { implicit session =>
+      val flatSeries = dao.flatSeries(0, 20, None, true, None)
+      flatSeries.length should be(4)
+      flatSeries(0).series should not be (null)
+      flatSeries(0).study should not be (null)
+      flatSeries(0).patient should not be (null)
+    }
+  }
+
+  it should "support accessing a single flat series by id" in {
+    db.withSession { implicit session =>
+      dao.series.foreach(s => {
+        val flatSeries = dao.flatSeriesById(s.id)
+        flatSeries should not be (None)
+        flatSeries.get.id should be(s.id)
+      })
+    }
+  }
 }

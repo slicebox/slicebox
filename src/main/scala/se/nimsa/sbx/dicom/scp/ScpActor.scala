@@ -10,10 +10,13 @@ import akka.actor.Props
 import akka.event.Logging
 import akka.event.LoggingReceive
 import se.nimsa.sbx.dicom.DicomProtocol._
-import se.nimsa.sbx.log.LogProtocol._
 import java.util.Date
+import se.nimsa.sbx.log.SbxLog
 
 class ScpActor(scpData: ScpData, executor: Executor) extends Actor {
+  
+  import context.system
+  
   val log = Logging(context.system, this)
 
   val scheduledExecutor = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
@@ -28,16 +31,17 @@ class ScpActor(scpData: ScpData, executor: Executor) extends Actor {
   scp.device.setScheduledExecutor(scheduledExecutor)
   scp.device.setExecutor(executor)
   scp.device.bindConnections()
-  context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "SCP", s"Started SCP ${scpData.name} with AE title ${scpData.aeTitle} on port ${scpData.port}")))
+  SbxLog.info("SCP", s"Started SCP ${scpData.name} with AE title ${scpData.aeTitle} on port ${scpData.port}")
 
   override def postStop() {
     scp.device.unbindConnections()
     scheduledExecutor.shutdown()
-    context.system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "SCP", s"Stopped SCP ${scpData.name}")))
+    SbxLog.info("SCP", s"Stopped SCP ${scpData.name}")
   }
 
   def receive = LoggingReceive {
     case DatasetReceivedByScp(dataset) =>
+      SbxLog.info("SCP", "Dataset received")
       context.system.eventStream.publish(DatasetReceived(dataset))
   }
 
