@@ -15,5 +15,3 @@ addSbtPlugin("com.typesafe.sbt" % "sbt-native-packager" % "1.0.0-RC1")
 addSbtPlugin("de.heikoseeberger" % "sbt-header" % "1.5.0")
 
 addSbtPlugin("com.typesafe.sbt" % "sbt-git" % "0.8.0")
-
-addSbtPlugin("com.github.gseitz" % "sbt-release" % "0.8.5")
