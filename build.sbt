@@ -1,3 +1,5 @@
+import de.heikoseeberger.sbtheader.license.Apache2_0
+
 	name := "slicebox"
 
 	version := "1.0-SNAPSHOT"
@@ -25,6 +27,11 @@
 		val httpConf = src / "main" / "resources" / "http.conf"
 		httpConf -> "conf/http.conf"
 	}
+
+	headers := Map(
+	  "scala" -> Apache2_0("2015", "Karl Sjöstrand"),
+	  "conf" -> Apache2_0("2015", "Karl Sjöstrand", "#")
+	)
 
 	resolvers ++= Seq("Typesafe Repository"	at "http://repo.typesafe.com/typesafe/releases/",
 										"Sonatype snapshots"	at "http://oss.sonatype.org/content/repositories/snapshots/",
