@@ -2,8 +2,6 @@ import de.heikoseeberger.sbtheader.license.Apache2_0
 
 	name := "slicebox"
 
-	version := "1.0-SNAPSHOT"
-
 	organization := "se.nimsa"
 
 	scalaVersion := "2.11.6"
@@ -11,6 +9,8 @@ import de.heikoseeberger.sbtheader.license.Apache2_0
 	scalacOptions := Seq("-encoding", "UTF-8", "-Xlint","-deprecation", "-unchecked", "-feature", "-target:jvm-1.8")
 
 	Revolver.settings
+
+	releaseSettings
 
 	maintainer in Universal := "NIMSA.se"
 
@@ -28,9 +28,14 @@ import de.heikoseeberger.sbtheader.license.Apache2_0
 		httpConf -> "conf/http.conf"
 	}
 
+	val licenceYear = "2015"
+	val licencedTo = "Karl Sjöstrand"
+
 	headers := Map(
-	  "scala" -> Apache2_0("2015", "Karl Sjöstrand"),
-	  "conf" -> Apache2_0("2015", "Karl Sjöstrand", "#")
+	  "scala" -> Apache2_0(licenceYear, licencedTo),
+	  "conf" -> Apache2_0(licenceYear, licencedTo, "#"),
+	  "sbt" -> Apache2_0(licenceYear, licencedTo),
+	  "js" -> Apache2_0(licenceYear, licencedTo)
 	)
 
 	resolvers ++= Seq("Typesafe Repository"	at "http://repo.typesafe.com/typesafe/releases/",
@@ -71,7 +76,9 @@ import de.heikoseeberger.sbtheader.license.Apache2_0
 
 	mainClass in Compile := Some("se.nimsa.sbx.app.Main")
 
-	lazy val slicebox = (project in file(".")).enablePlugins(SbtWeb, JavaServerAppPackaging)
+	lazy val slicebox = (project in file(".")).enablePlugins(SbtWeb, JavaServerAppPackaging, GitBranchPrompt)
+
+	GitPlugin.autoImport.git.baseVersion := "1.0.0"
 
 	updateOptions := updateOptions.value.withCachedResolution(true)
 
