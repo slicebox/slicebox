@@ -26,23 +26,22 @@ class LogServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
   db.withSession { implicit session =>
     logDao.create
   }
-
   
-  val logServiceActorRef = _system.actorOf(Props(new LogServiceActor(dbProps)))
+  val logServiceActorRef = _system.actorOf(LogServiceActor.props(dbProps))
 
   override def afterAll = {
-    TestKit.shutdownActorSystem(system)
+    TestKit.shutdownActorSystem(_system)
   }
 
   "A LogServiceActor" should {
 
     "add log messages pushed to the event stream" in {
-      _system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Category1", "Message1")))
-      _system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Category1", "Message2")))
-      _system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.WARN, "Category1", "Message3")))
-      _system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.WARN, "Category2", "Message4")))
-      _system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.DEFAULT, "Category2", "Message5")))
-      _system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.ERROR, "Category2", "Message6")))
+      SbxLog.info("Category1", "Message1")
+      SbxLog.info("Category1", "Message2")
+      SbxLog.warn("Category1", "Message3")
+      SbxLog.warn("Category2", "Message4")
+      SbxLog.default("Category2", "Message5")
+      SbxLog.error("Category2", "Message6")
 
       logServiceActorRef ! GetLogEntries(0, 1000)
 

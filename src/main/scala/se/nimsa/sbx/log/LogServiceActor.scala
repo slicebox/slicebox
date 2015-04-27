@@ -32,11 +32,11 @@ class LogServiceActor(dbProps: DbProps) extends Actor {
   setupDb()
 
   override def preStart {
-    context.system.eventStream.subscribe(context.self, classOf[AddLogEntry])
+    context.system.eventStream.subscribe(self, classOf[AddLogEntry])
   }
 
   override def postStop {
-    context.system.eventStream.unsubscribe(context.self)
+    context.system.eventStream.unsubscribe(self)
   }
 
   def receive = LoggingReceive {
