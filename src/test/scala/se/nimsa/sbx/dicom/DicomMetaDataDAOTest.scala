@@ -185,6 +185,15 @@ class DicomMetaDataDAOTest extends FlatSpec with Matchers {
       dao.queryPatients(0, 10, None, true, Seq(QueryProperty("PatientName", QueryOperator.EQUALS, "p1"), QueryProperty("PatientSex", QueryOperator.EQUALS, "M"))).size should be(1)
       dao.queryPatients(0, 10, None, true, Seq(QueryProperty("PatientName", QueryOperator.EQUALS, "p1"), QueryProperty("PatientSex", QueryOperator.EQUALS, "F"))).size should be(0)
       
+      // Check that query returns Patient with all data
+      dao.queryPatients(0, 1, None, true, Seq(QueryProperty("PatientName", QueryOperator.EQUALS, "p1"))).foreach(dbPatient => {
+        dbPatient.id should be >= (0L)
+        dbPatient.patientName.value should be("p1")
+        dbPatient.patientID.value should be("s1")
+        dbPatient.patientBirthDate.value should be("2000-01-01")
+        dbPatient.patientSex.value should be("M")
+      })
+      
       // Queries on Study properties
       dao.queryPatients(0, 10, None, true, Seq(QueryProperty("StudyInstanceUID", QueryOperator.EQUALS, "stuid1"))).size should be(1)
       dao.queryPatients(0, 10, None, true, Seq(QueryProperty("StudyInstanceUID", QueryOperator.EQUALS, "stuid1"), QueryProperty("StudyDate", QueryOperator.EQUALS, "19990101"))).size should be(1)
