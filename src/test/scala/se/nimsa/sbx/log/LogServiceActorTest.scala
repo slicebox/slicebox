@@ -43,6 +43,8 @@ class LogServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
       SbxLog.default("Category2", "Message5")
       SbxLog.error("Category2", "Message6")
 
+      expectNoMsg
+      
       logServiceActorRef ! GetLogEntries(0, 1000)
 
       expectMsgPF() {
