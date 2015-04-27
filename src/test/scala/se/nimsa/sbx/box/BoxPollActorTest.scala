@@ -67,7 +67,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
           responseCounter = responseCounter + 1
           Future {
             if (withSlowResponse)
-              Thread.sleep(750)
+              Thread.sleep(1500)
             if (responseCounter < mockHttpResponses.size) mockHttpResponses(responseCounter)
             else notFoundResponse
           }
@@ -110,7 +110,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
       pollBoxActorRef ! PollRemoteBox
 
-      Thread.sleep(500)
+      Thread.sleep(1000)
 
       capturedRequests.size should be(1)
       capturedRequests(0).uri.toString() should be(s"$remoteBoxBaseUrl/outbox/poll")
@@ -127,7 +127,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
       pollBoxActorRef ! PollRemoteBox
 
-      Thread.sleep(500)
+      Thread.sleep(1000)
 
       capturedRequests(1).uri.toString() should be(s"$remoteBoxBaseUrl/outbox?transactionid=$transactionId&sequencenumber=1")
     }
@@ -150,7 +150,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
       pollBoxActorRef ! PollRemoteBox
 
-      Thread.sleep(500)
+      Thread.sleep(1000)
 
       // Check that inbox entry has been created
       db.withSession { implicit session =>
@@ -174,11 +174,11 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
     "go back to polling state when poll request returns 404" in {
       mockHttpResponses += notFoundResponse
       pollBoxActorRef ! PollRemoteBox
-      Thread.sleep(500)
+      Thread.sleep(1000)
 
       mockHttpResponses += notFoundResponse
       pollBoxActorRef ! PollRemoteBox
-      Thread.sleep(500)
+      Thread.sleep(1000)
 
       capturedRequests.size should be(2)
       capturedRequests(0).uri.toString() should be(s"$remoteBoxBaseUrl/outbox/poll")
@@ -189,7 +189,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       withSlowResponse = true
 
       pollBoxActorRef ! PollRemoteBox
-      Thread.sleep(1000) // sequence times out after 500 ms, response finally arrives after 750 ms but goes unhandled since we are in the polling state by then
+      Thread.sleep(2000) // sequence times out after 500 ms, response finally arrives after 750 ms but goes unhandled since we are in the polling state by then
 
       // Check that no inbox entry was created since the poll request timed out
       db.withSession { implicit session =>
@@ -200,7 +200,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       withSlowResponse = false
 
       pollBoxActorRef ! PollRemoteBox
-      Thread.sleep(500)
+      Thread.sleep(1000)
       
       // make sure we are back in the polling state. If we are, there should be two polling requests
       capturedRequests.size should be(2)
