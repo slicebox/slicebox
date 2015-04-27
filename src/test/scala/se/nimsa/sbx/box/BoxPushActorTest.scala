@@ -128,7 +128,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
         boxDao.insertOutboxEntry(OutboxEntry(1, testBox.id, testTransactionId, 1, 1, imageFile1.id, false))
 
         // Sleep for a while so that the BoxPushActor has time to poll database
-        Thread.sleep(1000)
+        Thread.sleep(2000)
 
         boxDao.listOutboxEntries.size should be(0)
       }
@@ -142,7 +142,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       }
 
       // Sleep for a while so that the BoxPushActor has time to poll database
-      Thread.sleep(1000)
+      Thread.sleep(2000)
 
       capturedFileSendRequests.size should be(1)
       capturedFileSendRequests(0).uri.toString() should be(s"${testBox.baseUrl}/image/${outboxEntry.transactionId}/${outboxEntry.sequenceNumber}/${outboxEntry.totalImageCount}")
@@ -159,7 +159,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       }
 
       // Sleep for a while so that the BoxPushActor has time to poll database
-      Thread.sleep(1000)
+      Thread.sleep(2000)
 
       capturedFileSendRequests.size should be(2)
       capturedFileSendRequests(0).uri.toString() should be(s"${testBox.baseUrl}/image/${outboxEntrySeq1.transactionId}/${outboxEntrySeq1.sequenceNumber}/${outboxEntrySeq1.totalImageCount}")
@@ -173,7 +173,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
         boxDao.insertOutboxEntry(OutboxEntry(1, testBox.id, testTransactionId, 1, 1, invalidImageId, false))
 
         // Sleep for a while so that the BoxPushActor has time to poll database
-        Thread.sleep(1000)
+        Thread.sleep(2000)
 
         val outboxEntries = boxDao.listOutboxEntries
         outboxEntries.size should be(1)
@@ -191,7 +191,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
         boxDao.insertOutboxEntry(OutboxEntry(1, testBox.id, testTransactionId, 2, 2, invalidImageId, false))
 
         // Sleep for a while so that the BoxPushActor has time to poll database
-        Thread.sleep(1500)
+        Thread.sleep(3000)
 
         val outboxEntries = boxDao.listOutboxEntries
         outboxEntries.size should be(2)
@@ -209,7 +209,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
         val secondOutboxEntry = boxDao.insertOutboxEntry(OutboxEntry(1, 999, testTransactionId, 1, 1, imageFile1.id, false))
 
         // Sleep for a while so that the BoxPushActor has time to poll database
-        Thread.sleep(1500)
+        Thread.sleep(3000)
 
         val outboxEntries = boxDao.listOutboxEntries
         outboxEntries.size should be(2)
@@ -227,11 +227,11 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
         boxDao.insertOutboxEntry(OutboxEntry(1, testBox.id, testTransactionId, 1, 1, invalidImageId, false))
 
         // Sleep for a while so that the BoxPushActor has time to poll database
-        Thread.sleep(1000)
+        Thread.sleep(2000)
 
         boxDao.insertOutboxEntry(OutboxEntry(1, testBox.id, testTransactionId2, 1, 1, imageFile2.id, false))
 
-        Thread.sleep(1000)
+        Thread.sleep(2000)
 
         capturedFileSendRequests.size should be(1)
 
@@ -255,14 +255,14 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
         sendFailedResponseSequenceNumbers ++= Seq(n + 2, n + 3, n + 4, n + 5, n + 6)
 
         // wait for poll, start sending files
-        Thread.sleep(600) 
+        Thread.sleep(1200) 
         
         boxDao.listOutboxEntries.size should be (2)
 
         // remote server is now down
         
         // let two or three poll events happen, nothing gets sent
-        Thread.sleep(1100) 
+        Thread.sleep(2200) 
         
         boxDao.listOutboxEntries.size should be (2)
         
@@ -270,7 +270,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
         sendFailedResponseSequenceNumbers.clear
         
         // wait for poll, send remaining files
-        Thread.sleep(1000) 
+        Thread.sleep(2000) 
         
         boxDao.listOutboxEntries.size should be (0)
       }
