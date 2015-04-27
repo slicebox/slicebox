@@ -294,6 +294,40 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
   }
 
   def studies(implicit session: Session): List[Study] = studiesQuery.list
+  
+  def queryStudies(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, queryProperties: Seq[QueryProperty])(implicit session: Session): List[Study] = {
+    implicit val getResult = GetResult(r =>
+      Study(r.nextLong, r.nextLong, StudyInstanceUID(r.nextString), StudyDescription(r.nextString), StudyDate(r.nextString), StudyID(r.nextString), AccessionNumber(r.nextString), PatientAge(r.nextString)))
+    
+    var query = """select distinct("Studies"."id"),
+      "Studies"."patientId",
+      "Studies"."StudyInstanceUID",
+      "Studies"."StudyDescription",
+      "Studies"."StudyDate",
+      "Studies"."StudyID",
+      "Studies"."AccessionNumber",
+      "Studies"."PatientAge" from "Studies"
+      inner join "Patients" on "Patients"."id" = "Studies"."patientId"
+      inner join "Series" on "Series"."studyId" = "Studies"."id"
+      inner join "Equipments" on "Equipments"."id" = "Series"."equipmentId"
+      inner join "FrameOfReferences" on "FrameOfReferences"."id" = "Series"."frameOfReferenceId""""
+    
+    var wherePart = ""
+    
+    queryProperties.foreach(queryProperty => {
+      if (wherePart.length > 0) wherePart += " and "
+      wherePart += s""""${queryProperty.propertyName}" ${queryProperty.operator.toString()} '${queryProperty.propertyValue}'"""
+    })
+    
+    if (wherePart.length > 0) query += s" where $wherePart"
+      
+    orderBy.foreach(orderByValue =>
+      query += s""" order by "$orderByValue" ${if (orderAscending) "asc" else "desc"}""")
+
+    query += s""" limit $count offset $startIndex"""
+      
+    Q.queryNA(query).list
+  }
 
   def series(implicit session: Session): List[Series] = seriesQuery.list
 
