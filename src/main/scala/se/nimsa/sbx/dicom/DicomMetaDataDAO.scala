@@ -18,8 +18,7 @@ package se.nimsa.sbx.dicom
 
 import scala.slick.driver.JdbcProfile
 import scala.slick.jdbc.{ GetResult, StaticQuery => Q }
-import DicomProtocol.FileName
-import DicomProtocol.ImageFile
+import DicomProtocol._
 import DicomHierarchy._
 import DicomPropertyValue._
 import scala.slick.jdbc.meta.MTable
@@ -238,10 +237,12 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
 
   // *** Listing all patients, studies etc ***
 
+  def patientsGetResult = GetResult(r =>
+      Patient(r.nextLong, PatientName(r.nextString), PatientID(r.nextString), PatientBirthDate(r.nextString), PatientSex(r.nextString)))
+  
   def patients(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String])(implicit session: Session): List[Patient] = {
 
-    implicit val patientsGetResult = GetResult(r =>
-      Patient(r.nextLong, PatientName(r.nextString), PatientID(r.nextString), PatientBirthDate(r.nextString), PatientSex(r.nextString)))
+    implicit val getResult = patientsGetResult 
 
     var query = """select * from "Patients""""
 
@@ -259,6 +260,36 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
 
     query += s""" limit $count offset $startIndex"""
 
+    Q.queryNA(query).list
+  }
+  
+  def queryPatients(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, queryProperties: Seq[QueryProperty])(implicit session: Session): List[Patient] = {
+    implicit val getResult = patientsGetResult
+    
+    var query = """select distinct("Patients"."id"),
+      "Patients"."PatientName",
+      "Patients"."PatientID",
+      "Patients"."PatientBirthDate",
+      "Patients"."PatientSex" from "Patients"
+      inner join "Studies" on "Studies"."patientId" = "Patients"."id"
+      inner join "Series" on "Series"."studyId" = "Studies"."id"
+      inner join "Equipments" on "Equipments"."id" = "Series"."equipmentId"
+      inner join "FrameOfReferences" on "FrameOfReferences"."id" = "Series"."frameOfReferenceId""""
+    
+    var wherePart = ""
+    
+    queryProperties.foreach(queryProperty => {
+      if (wherePart.length > 0) wherePart += " and "
+      wherePart += s""""${queryProperty.propertyName}" ${queryProperty.operator.toString()} '${queryProperty.propertyValue}'"""
+    })
+    
+    if (wherePart.length > 0) query += s" where $wherePart"
+      
+    orderBy.foreach(orderByValue =>
+      query += s""" order by "$orderByValue" ${if (orderAscending) "asc" else "desc"}""")
+
+    query += s""" limit $count offset $startIndex"""
+      
     Q.queryNA(query).list
   }
 

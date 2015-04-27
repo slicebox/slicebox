@@ -177,6 +177,35 @@ class DicomMetaDataDAOTest extends FlatSpec with Matchers {
       dao.imageFilesForPatient(dbPat.id).size should be(8)
     }
   }
+  
+  it should "return the correct number of patients for patients queries" in {
+    db.withSession { implicit session =>
+      // Queries on Patient properties
+      dao.queryPatients(0, 10, None, true, Seq(QueryProperty("PatientName", QueryOperator.EQUALS, "p1"))).size should be(1)
+      dao.queryPatients(0, 10, None, true, Seq(QueryProperty("PatientName", QueryOperator.EQUALS, "p1"), QueryProperty("PatientSex", QueryOperator.EQUALS, "M"))).size should be(1)
+      dao.queryPatients(0, 10, None, true, Seq(QueryProperty("PatientName", QueryOperator.EQUALS, "p1"), QueryProperty("PatientSex", QueryOperator.EQUALS, "F"))).size should be(0)
+      
+      // Queries on Study properties
+      dao.queryPatients(0, 10, None, true, Seq(QueryProperty("StudyInstanceUID", QueryOperator.EQUALS, "stuid1"))).size should be(1)
+      dao.queryPatients(0, 10, None, true, Seq(QueryProperty("StudyInstanceUID", QueryOperator.EQUALS, "stuid1"), QueryProperty("StudyDate", QueryOperator.EQUALS, "19990101"))).size should be(1)
+      dao.queryPatients(0, 10, None, true, Seq(QueryProperty("StudyInstanceUID", QueryOperator.EQUALS, "stuid1"), QueryProperty("StudyDate", QueryOperator.EQUALS, "20100101"))).size should be(0)
+      
+      // Queries on Series properties
+      dao.queryPatients(0, 10, None, true, Seq(QueryProperty("SeriesInstanceUID", QueryOperator.EQUALS, "seuid1"))).size should be(1)
+      
+      // Queries on Equipments properties
+      dao.queryPatients(0, 10, None, true, Seq(QueryProperty("SeriesInstanceUID", QueryOperator.EQUALS, "seuid1"))).size should be(1)
+      
+      // Queries on FrameOfReferences properties
+      dao.queryPatients(0, 10, None, true, Seq(QueryProperty("FrameOfReferenceUID", QueryOperator.EQUALS, "frid1"))).size should be(1)
+      
+      // Test like query
+      dao.queryPatients(0, 10, None, true, Seq(QueryProperty("StudyDescription", QueryOperator.LIKE, "%desc%"))).size should be(1)
+      
+      // Test paging
+      dao.queryPatients(1, 1, None, true, Seq(QueryProperty("Manufacturer", QueryOperator.EQUALS, "manu1"))).size should be(0)
+    }
+  }
 
   it should "support listing flat series complete with series, study and patient information" in {
     db.withSession { implicit session =>
