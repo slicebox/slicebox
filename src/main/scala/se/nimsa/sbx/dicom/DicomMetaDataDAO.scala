@@ -266,7 +266,7 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
   def queryPatients(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, queryProperties: Seq[QueryProperty])(implicit session: Session): List[Patient] = {
     implicit val getResult = patientsGetResult
     
-    var query = """select distinct("Patients"."id"),
+    val querySelectPart = """select distinct("Patients"."id"),
       "Patients"."PatientName",
       "Patients"."PatientID",
       "Patients"."PatientBirthDate",
@@ -276,19 +276,7 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
       inner join "Equipments" on "Equipments"."id" = "Series"."equipmentId"
       inner join "FrameOfReferences" on "FrameOfReferences"."id" = "Series"."frameOfReferenceId""""
     
-    var wherePart = ""
-    
-    queryProperties.foreach(queryProperty => {
-      if (wherePart.length > 0) wherePart += " and "
-      wherePart += s""""${queryProperty.propertyName}" ${queryProperty.operator.toString()} '${queryProperty.propertyValue}'"""
-    })
-    
-    if (wherePart.length > 0) query += s" where $wherePart"
-      
-    orderBy.foreach(orderByValue =>
-      query += s""" order by "$orderByValue" ${if (orderAscending) "asc" else "desc"}""")
-
-    query += s""" limit $count offset $startIndex"""
+    val query = buildMetaDataQuery(querySelectPart, startIndex, count, orderBy, orderAscending, queryProperties)
       
     Q.queryNA(query).list
   }
@@ -299,7 +287,7 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
     implicit val getResult = GetResult(r =>
       Study(r.nextLong, r.nextLong, StudyInstanceUID(r.nextString), StudyDescription(r.nextString), StudyDate(r.nextString), StudyID(r.nextString), AccessionNumber(r.nextString), PatientAge(r.nextString)))
     
-    var query = """select distinct("Studies"."id"),
+    val querySelectPart = """select distinct("Studies"."id"),
       "Studies"."patientId",
       "Studies"."StudyInstanceUID",
       "Studies"."StudyDescription",
@@ -312,22 +300,51 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
       inner join "Equipments" on "Equipments"."id" = "Series"."equipmentId"
       inner join "FrameOfReferences" on "FrameOfReferences"."id" = "Series"."frameOfReferenceId""""
     
-    var wherePart = ""
+    val query = buildMetaDataQuery(querySelectPart, startIndex, count, orderBy, orderAscending, queryProperties)
+      
+    Q.queryNA(query).list
+  }
+  
+  def querySeries(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, queryProperties: Seq[QueryProperty])(implicit session: Session): List[Series] = {
+    implicit val getResult = GetResult(r =>
+      Series(r.nextLong, r.nextLong, r.nextLong, r.nextLong, SeriesInstanceUID(r.nextString), SeriesDescription(r.nextString), SeriesDate(r.nextString), Modality(r.nextString), ProtocolName(r.nextString), BodyPartExamined(r.nextString)))
     
-    queryProperties.foreach(queryProperty => {
-      if (wherePart.length > 0) wherePart += " and "
-      wherePart += s""""${queryProperty.propertyName}" ${queryProperty.operator.toString()} '${queryProperty.propertyValue}'"""
-    })
+    val querySelectPart = """select distinct("Series"."id"),
+      "Series"."studyId",
+      "Series"."equipmentId",
+      "Series"."frameOfReferenceId",
+      "Series"."SeriesInstanceUID",
+      "Series"."SeriesDescription",
+      "Series"."SeriesDate",
+      "Series"."Modality",
+      "Series"."ProtocolName",
+      "Series"."BodyPartExamined" from "Series"
+      inner join "Studies" on "Studies"."id" = "Series"."studyId"
+      inner join "Patients" on "Patients"."id" = "Studies"."patientId"
+      inner join "Equipments" on "Equipments"."id" = "Series"."equipmentId"
+      inner join "FrameOfReferences" on "FrameOfReferences"."id" = "Series"."frameOfReferenceId""""
     
+    val query = buildMetaDataQuery(querySelectPart, startIndex, count, orderBy, orderAscending, queryProperties)
+      
+    Q.queryNA(query).list
+  }
+  
+  def buildMetaDataQuery(selectPart: String, startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, queryProperties: Seq[QueryProperty]): String = {
+    var query = selectPart
+      
+    val wherePart = queryProperties.map(queryPropertyToPart(_)).mkString(" and ")
     if (wherePart.length > 0) query += s" where $wherePart"
       
     orderBy.foreach(orderByValue =>
       query += s""" order by "$orderByValue" ${if (orderAscending) "asc" else "desc"}""")
 
     query += s""" limit $count offset $startIndex"""
-      
-    Q.queryNA(query).list
+    
+    query
   }
+  
+  def queryPropertyToPart(queryProperty: QueryProperty) = 
+    s""""${queryProperty.propertyName}" ${queryProperty.operator.toString()} '${queryProperty.propertyValue}'"""
 
   def series(implicit session: Session): List[Series] = seriesQuery.list
 
