@@ -36,12 +36,12 @@ class LogServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
   "A LogServiceActor" should {
 
     "add log messages pushed to the event stream" in {
-      SbxLog.info("Category1", "Message1")
-      SbxLog.info("Category1", "Message2")
-      SbxLog.warn("Category1", "Message3")
-      SbxLog.warn("Category2", "Message4")
-      SbxLog.default("Category2", "Message5")
-      SbxLog.error("Category2", "Message6")
+      logServiceActorRef ! AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Category1", "Message1"))
+      logServiceActorRef ! AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Category1", "Message2"))
+      logServiceActorRef ! AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.WARN, "Category1", "Message3"))
+      logServiceActorRef ! AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.WARN, "Category2", "Message4"))
+      logServiceActorRef ! AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.DEFAULT, "Category2", "Message5"))
+      logServiceActorRef ! AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.ERROR, "Category2", "Message6"))
 
       expectNoMsg
       
