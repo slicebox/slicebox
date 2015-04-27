@@ -7,3 +7,5 @@ notifications:
   email:
     - karl.sjostrand@gmail.com
     - mattias.hagstrand@caleigo.com
+
+script: sbt ++2.11.6 test
