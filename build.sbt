@@ -2,6 +2,8 @@ import de.heikoseeberger.sbtheader.license.Apache2_0
 
 	name := "slicebox"
 
+	version := "0.1-SNAPSHOT"
+
 	organization := "se.nimsa"
 
 	scalaVersion := "2.11.6"
@@ -10,9 +12,7 @@ import de.heikoseeberger.sbtheader.license.Apache2_0
 
 	Revolver.settings
 
-	releaseSettings
-
-	maintainer in Universal := "NIMSA.se"
+	maintainer in Universal := "nimsa.se"
 
 	packageSummary in Universal := "Slicebox DICOM sharing service"
 
@@ -33,9 +33,7 @@ import de.heikoseeberger.sbtheader.license.Apache2_0
 
 	headers := Map(
 	  "scala" -> Apache2_0(licenceYear, licencedTo),
-	  "conf" -> Apache2_0(licenceYear, licencedTo, "#"),
-	  "sbt" -> Apache2_0(licenceYear, licencedTo),
-	  "js" -> Apache2_0(licenceYear, licencedTo)
+	  "conf" -> Apache2_0(licenceYear, licencedTo, "#")
 	)
 
 	resolvers ++= Seq("Typesafe Repository"	at "http://repo.typesafe.com/typesafe/releases/",
