@@ -246,6 +246,39 @@ class DicomMetaDataDAOTest extends FlatSpec with Matchers {
       dao.queryStudies(0, 10, None, true, Seq(QueryProperty("FrameOfReferenceUID", QueryOperator.EQUALS, "frid1"))).size should be(1)
     }
   }
+  
+  it should "return the correct number of series for series queries" in {
+    db.withSession { implicit session =>
+      // Queries on Study properties
+      dao.querySeries(0, 10, None, true, Seq(QueryProperty("SeriesInstanceUID", QueryOperator.EQUALS, "seuid1"))).size should be(1)
+      
+      // Check that query returns Studies with all data
+      dao.querySeries(0, 1, None, true, Seq(QueryProperty("SeriesInstanceUID", QueryOperator.EQUALS, "seuid1"))).foreach(dbSeries => {
+          dbSeries.id should be >= (0L)
+          dbSeries.studyId should be >= (0L)
+          dbSeries.equipmentId should be >= (0L)
+          dbSeries.frameOfReferenceId should be >= (0L)
+          dbSeries.seriesInstanceUID.value should be("seuid1")
+          dbSeries.seriesDescription.value should be("sedesc1")
+          dbSeries.seriesDate.value should be("19990101")
+          dbSeries.modality.value should be("NM")
+          dbSeries.protocolName.value should be("prot1")
+          dbSeries.bodyPartExamined.value should be("bodypart1")
+        })
+        
+      // Queries on Patient properties
+      dao.querySeries(0, 10, None, true, Seq(QueryProperty("PatientName", QueryOperator.EQUALS, "p1"))).size should be(4)
+      
+      // Queries on Studies properties
+      dao.querySeries(0, 10, None, true, Seq(QueryProperty("StudyInstanceUID", QueryOperator.EQUALS, "stuid1"))).size should be(2)
+      
+      // Queries on Equipments properties
+      dao.querySeries(0, 10, None, true, Seq(QueryProperty("Manufacturer", QueryOperator.EQUALS, "manu2"))).size should be(1)
+      
+      // Queries on FrameOfReferences properties
+      dao.querySeries(0, 10, None, true, Seq(QueryProperty("FrameOfReferenceUID", QueryOperator.EQUALS, "frid1"))).size should be(2)
+    }
+  }
 
   it should "support listing flat series complete with series, study and patient information" in {
     db.withSession { implicit session =>
