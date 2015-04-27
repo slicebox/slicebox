@@ -83,7 +83,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
   val okResponse = HttpResponse()
   val failResponse = HttpResponse(InternalServerError)
   
-  val boxPushActorRef = _system.actorOf(Props(new BoxPushActor(testBox, dbProps, storage, 500.millis) {
+  val boxPushActorRef = _system.actorOf(Props(new BoxPushActor(testBox, dbProps, storage, 1000.millis) {
 
     override def sendFilePipeline = {
       (req: HttpRequest) =>
@@ -244,7 +244,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       }
     }
 
-    "outbox processing is paused when remote server is not working, and resumed once remote server is back up" in {
+    "pause outbox processing when remote server is not working, and resumed once remote server is back up" in {
 
       db.withSession { implicit session =>
         boxDao.insertOutboxEntry(OutboxEntry(1, testBox.id, testTransactionId, 1, 3, imageFile1.id, false))
