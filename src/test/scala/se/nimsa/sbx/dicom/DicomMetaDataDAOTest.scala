@@ -194,7 +194,7 @@ class DicomMetaDataDAOTest extends FlatSpec with Matchers {
       dao.queryPatients(0, 10, None, true, Seq(QueryProperty("SeriesInstanceUID", QueryOperator.EQUALS, "seuid1"))).size should be(1)
       
       // Queries on Equipments properties
-      dao.queryPatients(0, 10, None, true, Seq(QueryProperty("SeriesInstanceUID", QueryOperator.EQUALS, "seuid1"))).size should be(1)
+      dao.queryPatients(0, 10, None, true, Seq(QueryProperty("Manufacturer", QueryOperator.EQUALS, "manu1"))).size should be(1)
       
       // Queries on FrameOfReferences properties
       dao.queryPatients(0, 10, None, true, Seq(QueryProperty("FrameOfReferenceUID", QueryOperator.EQUALS, "frid1"))).size should be(1)
@@ -204,6 +204,37 @@ class DicomMetaDataDAOTest extends FlatSpec with Matchers {
       
       // Test paging
       dao.queryPatients(1, 1, None, true, Seq(QueryProperty("Manufacturer", QueryOperator.EQUALS, "manu1"))).size should be(0)
+    }
+  }
+  
+  it should "return the correct number of studies for studies queries" in {
+    db.withSession { implicit session =>
+      // Queries on Study properties
+      dao.queryStudies(0, 10, None, true, Seq(QueryProperty("StudyInstanceUID", QueryOperator.EQUALS, "stuid1"))).size should be(1)
+      
+      // Check that query returns Studies with all data
+      dao.queryStudies(0, 1, None, true, Seq(QueryProperty("StudyInstanceUID", QueryOperator.EQUALS, "stuid1"))).foreach(dbStudy => {
+          dbStudy.id should be >= (0L)
+          dbStudy.patientId should be >= (0L)
+          dbStudy.studyInstanceUID.value should be("stuid1")
+          dbStudy.studyDescription.value should be("stdesc1")
+          dbStudy.studyDate.value should be("19990101")
+          dbStudy.studyID.value should be("stid1")
+          dbStudy.accessionNumber.value should be("acc1")
+          dbStudy.patientAge.value should be("12Y")
+        })
+        
+      // Queries on Patient properties
+      dao.queryStudies(0, 10, None, true, Seq(QueryProperty("PatientName", QueryOperator.EQUALS, "p1"))).size should be(2)
+      
+      // Queries on Series properties
+      dao.queryStudies(0, 10, None, true, Seq(QueryProperty("SeriesInstanceUID", QueryOperator.EQUALS, "seuid1"))).size should be(1)
+      
+      // Queries on Equipments properties
+      dao.queryStudies(0, 10, None, true, Seq(QueryProperty("Manufacturer", QueryOperator.EQUALS, "manu2"))).size should be(1)
+      
+      // Queries on FrameOfReferences properties
+      dao.queryStudies(0, 10, None, true, Seq(QueryProperty("FrameOfReferenceUID", QueryOperator.EQUALS, "frid1"))).size should be(1)
     }
   }
 
