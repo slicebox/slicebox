@@ -61,6 +61,29 @@ object DicomProtocol {
       minimumPixelValue: Int,
       maximumPixelValue: Int)
       
+      
+  sealed trait QueryOperator {
+    override def toString(): String = this match {
+      case QueryOperator.EQUALS => "="
+      case QueryOperator.LIKE => "like"
+    }
+  }
+
+  object QueryOperator {
+    case object EQUALS extends QueryOperator
+    case object LIKE extends QueryOperator
+
+    def withName(string: String) = string match {
+      case "=" => EQUALS
+      case "like" => LIKE
+    }    
+  }
+      
+  case class QueryProperty(
+      propertyName: String,
+      operator: QueryOperator,
+      propertyValue: String)
+      
   // messages
 
     
