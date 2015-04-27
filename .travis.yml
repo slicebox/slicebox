@@ -1,9 +1,7 @@
 language: scala
- scala:
-   - "2.11.6"
- jdk:
-   - oraclejdk8
-   - openjdk8
+
+jdk:
+  - oraclejdk8
 
 notifications:
   email:
