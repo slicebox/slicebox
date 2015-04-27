@@ -34,8 +34,7 @@ import se.nimsa.sbx.app.JsonFormats
 import se.nimsa.sbx.dicom.DicomProtocol.DatasetReceived
 import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.dicom.DicomUtil
-import BoxProtocol.Box
-import BoxProtocol.OutboxEntry
+import BoxProtocol._
 import akka.actor.ReceiveTimeout
 import java.util.Date
 
@@ -43,8 +42,6 @@ class BoxPollActor(box: Box,
                    dbProps: DbProps,
                    pollInterval: FiniteDuration = 5.seconds,
                    receiveTimeout: FiniteDuration = 1.minute) extends Actor with JsonFormats {
-
-  import BoxPollActor._
 
   val log = Logging(context.system, this)
 
@@ -176,13 +173,5 @@ class BoxPollActor(box: Box,
 
 object BoxPollActor {
   def props(box: Box, dbProps: DbProps): Props = Props(new BoxPollActor(box, dbProps))
-
-  case object PollRemoteBox
-  case object RemoteOutboxEmpty
-  case class RemoteOutboxEntryFound(remoteOutboxEntry: OutboxEntry)
-  case class PollRemoteBoxFailed(e: Throwable)
-  case class RemoteOutboxFileFetched(remoteOutboxEntry: OutboxEntry)
-  case class FetchFileFailed(e: Throwable)
-  case object PollSequenceTimeout
 
 }

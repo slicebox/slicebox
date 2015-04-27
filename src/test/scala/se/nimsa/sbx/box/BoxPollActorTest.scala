@@ -29,7 +29,7 @@ import spray.http.StatusCodes
 import spray.http.ContentTypes
 import java.nio.file.Paths
 import spray.http.HttpData
-import se.nimsa.sbx.box.BoxPollActor.PollRemoteBox
+import akka.actor.ReceiveTimeout
 
 class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
   with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach with JsonFormats {
@@ -57,17 +57,14 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
   var responseCounter = -1
   val mockHttpResponses: ArrayBuffer[HttpResponse] = ArrayBuffer()
   val capturedRequests: ArrayBuffer[HttpRequest] = ArrayBuffer()
-  var withSlowResponse = false
 
-  val pollBoxActorRef = _system.actorOf(Props(new BoxPollActor(remoteBox, dbProps, 1.hour, 500.millis) {
+  val pollBoxActorRef = _system.actorOf(Props(new BoxPollActor(remoteBox, dbProps, 1.hour, 1000.hours) {
     override def sendRequestToRemoteBoxPipeline = {
       (req: HttpRequest) =>
         {
           capturedRequests += req
           responseCounter = responseCounter + 1
           Future {
-            if (withSlowResponse)
-              Thread.sleep(1500)
             if (responseCounter < mockHttpResponses.size) mockHttpResponses(responseCounter)
             else notFoundResponse
           }
@@ -80,8 +77,6 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
     mockHttpResponses.clear()
     responseCounter = -1
-
-    withSlowResponse = false
 
     db.withSession { implicit session =>
       boxDao.listBoxes.foreach(box => {
@@ -110,7 +105,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
       pollBoxActorRef ! PollRemoteBox
 
-      Thread.sleep(1000)
+      expectNoMsg
 
       capturedRequests.size should be(1)
       capturedRequests(0).uri.toString() should be(s"$remoteBoxBaseUrl/outbox/poll")
@@ -127,7 +122,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
       pollBoxActorRef ! PollRemoteBox
 
-      Thread.sleep(1000)
+      expectNoMsg
 
       capturedRequests(1).uri.toString() should be(s"$remoteBoxBaseUrl/outbox?transactionid=$transactionId&sequencenumber=1")
     }
@@ -150,7 +145,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
       pollBoxActorRef ! PollRemoteBox
 
-      Thread.sleep(1000)
+      expectNoMsg
 
       // Check that inbox entry has been created
       db.withSession { implicit session =>
@@ -174,11 +169,11 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
     "go back to polling state when poll request returns 404" in {
       mockHttpResponses += notFoundResponse
       pollBoxActorRef ! PollRemoteBox
-      Thread.sleep(1000)
+      expectNoMsg
 
       mockHttpResponses += notFoundResponse
       pollBoxActorRef ! PollRemoteBox
-      Thread.sleep(1000)
+      expectNoMsg
 
       capturedRequests.size should be(2)
       capturedRequests(0).uri.toString() should be(s"$remoteBoxBaseUrl/outbox/poll")
@@ -186,10 +181,9 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
     }
 
     "go back to polling state if a step in the polling sequence exceeds the PollBoxActor's timeout limit" in {
-      withSlowResponse = true
 
       pollBoxActorRef ! PollRemoteBox
-      Thread.sleep(2000) // sequence times out after 500 ms, response finally arrives after 750 ms but goes unhandled since we are in the polling state by then
+      pollBoxActorRef ! ReceiveTimeout // waiting for remote server timeout triggers this message 
 
       // Check that no inbox entry was created since the poll request timed out
       db.withSession { implicit session =>
@@ -197,10 +191,8 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
         inboxEntries.size should be(0)
       }
 
-      withSlowResponse = false
-
       pollBoxActorRef ! PollRemoteBox
-      Thread.sleep(1000)
+      expectNoMsg
       
       // make sure we are back in the polling state. If we are, there should be two polling requests
       capturedRequests.size should be(2)

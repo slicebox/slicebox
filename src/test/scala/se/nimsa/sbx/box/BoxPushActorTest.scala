@@ -78,12 +78,12 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
   }
 
   val capturedFileSendRequests = ArrayBuffer.empty[HttpRequest]
-  val sendFailedResponseSequenceNumbers  = ArrayBuffer.empty[Int]
-  
+  val sendFailedResponseSequenceNumbers = ArrayBuffer.empty[Int]
+
   val okResponse = HttpResponse()
   val failResponse = HttpResponse(InternalServerError)
-  
-  val boxPushActorRef = _system.actorOf(Props(new BoxPushActor(testBox, dbProps, storage, 1000.millis) {
+
+  val boxPushActorRef = _system.actorOf(Props(new BoxPushActor(testBox, dbProps, storage, 1000.hours) {
 
     override def sendFilePipeline = {
       (req: HttpRequest) =>
@@ -127,8 +127,9 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       db.withSession { implicit session =>
         boxDao.insertOutboxEntry(OutboxEntry(1, testBox.id, testTransactionId, 1, 1, imageFile1.id, false))
 
-        // Sleep for a while so that the BoxPushActor has time to poll database
-        Thread.sleep(2000)
+        boxPushActorRef ! PollOutbox
+
+        expectNoMsg()
 
         boxDao.listOutboxEntries.size should be(0)
       }
@@ -141,8 +142,9 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
         boxDao.insertOutboxEntry(outboxEntry)
       }
 
-      // Sleep for a while so that the BoxPushActor has time to poll database
-      Thread.sleep(2000)
+      boxPushActorRef ! PollOutbox
+
+      expectNoMsg()
 
       capturedFileSendRequests.size should be(1)
       capturedFileSendRequests(0).uri.toString() should be(s"${testBox.baseUrl}/image/${outboxEntry.transactionId}/${outboxEntry.sequenceNumber}/${outboxEntry.totalImageCount}")
@@ -158,8 +160,9 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
         boxDao.insertOutboxEntry(outboxEntrySeq1)
       }
 
-      // Sleep for a while so that the BoxPushActor has time to poll database
-      Thread.sleep(2000)
+      boxPushActorRef ! PollOutbox
+
+      expectNoMsg()
 
       capturedFileSendRequests.size should be(2)
       capturedFileSendRequests(0).uri.toString() should be(s"${testBox.baseUrl}/image/${outboxEntrySeq1.transactionId}/${outboxEntrySeq1.sequenceNumber}/${outboxEntrySeq1.totalImageCount}")
@@ -172,8 +175,9 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
         val invalidImageId = 666
         boxDao.insertOutboxEntry(OutboxEntry(1, testBox.id, testTransactionId, 1, 1, invalidImageId, false))
 
-        // Sleep for a while so that the BoxPushActor has time to poll database
-        Thread.sleep(2000)
+        boxPushActorRef ! PollOutbox
+
+        expectNoMsg()
 
         val outboxEntries = boxDao.listOutboxEntries
         outboxEntries.size should be(1)
@@ -190,8 +194,10 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
         boxDao.insertOutboxEntry(OutboxEntry(1, testBox.id, testTransactionId, 1, 1, invalidImageId, false))
         boxDao.insertOutboxEntry(OutboxEntry(1, testBox.id, testTransactionId, 2, 2, invalidImageId, false))
 
-        // Sleep for a while so that the BoxPushActor has time to poll database
-        Thread.sleep(3000)
+        boxPushActorRef ! PollOutbox
+        boxPushActorRef ! PollOutbox
+        expectNoMsg()
+        expectNoMsg()
 
         val outboxEntries = boxDao.listOutboxEntries
         outboxEntries.size should be(2)
@@ -208,8 +214,8 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
         boxDao.insertOutboxEntry(OutboxEntry(1, testBox.id, testTransactionId, 1, 1, invalidImageId, false))
         val secondOutboxEntry = boxDao.insertOutboxEntry(OutboxEntry(1, 999, testTransactionId, 1, 1, imageFile1.id, false))
 
-        // Sleep for a while so that the BoxPushActor has time to poll database
-        Thread.sleep(3000)
+        boxPushActorRef ! PollOutbox
+        expectNoMsg()
 
         val outboxEntries = boxDao.listOutboxEntries
         outboxEntries.size should be(2)
@@ -223,15 +229,16 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
     "process other transactions when file send fails" in {
 
       db.withSession { implicit session =>
-      val invalidImageId = 666
+        val invalidImageId = 666
         boxDao.insertOutboxEntry(OutboxEntry(1, testBox.id, testTransactionId, 1, 1, invalidImageId, false))
 
-        // Sleep for a while so that the BoxPushActor has time to poll database
-        Thread.sleep(2000)
+        boxPushActorRef ! PollOutbox
+        expectNoMsg()
 
         boxDao.insertOutboxEntry(OutboxEntry(1, testBox.id, testTransactionId2, 1, 1, imageFile2.id, false))
 
-        Thread.sleep(2000)
+        boxPushActorRef ! PollOutbox
+        expectNoMsg()
 
         capturedFileSendRequests.size should be(1)
 
@@ -254,25 +261,31 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
         val n = capturedFileSendRequests.size
         sendFailedResponseSequenceNumbers ++= Seq(n + 2, n + 3, n + 4, n + 5, n + 6)
 
-        // wait for poll, start sending files
-        Thread.sleep(1200) 
-        
-        boxDao.listOutboxEntries.size should be (2)
+        boxPushActorRef ! PollOutbox
+        expectNoMsg()
+
+        boxDao.listOutboxEntries.size should be(2)
 
         // remote server is now down
-        
-        // let two or three poll events happen, nothing gets sent
-        Thread.sleep(2200) 
-        
-        boxDao.listOutboxEntries.size should be (2)
-        
+
+        boxPushActorRef ! PollOutbox
+        boxPushActorRef ! PollOutbox
+        boxPushActorRef ! PollOutbox
+        expectNoMsg()
+        expectNoMsg()
+        expectNoMsg()
+
+        boxDao.listOutboxEntries.size should be(2)
+
         // server back up
         sendFailedResponseSequenceNumbers.clear
-        
-        // wait for poll, send remaining files
-        Thread.sleep(2000) 
-        
-        boxDao.listOutboxEntries.size should be (0)
+
+        boxPushActorRef ! PollOutbox
+        boxPushActorRef ! PollOutbox
+        expectNoMsg()
+        expectNoMsg()
+
+        boxDao.listOutboxEntries.size should be(0)
       }
     }
   }
