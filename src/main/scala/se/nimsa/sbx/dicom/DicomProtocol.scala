@@ -84,6 +84,13 @@ object DicomProtocol {
       operator: QueryOperator,
       propertyValue: String)
       
+  case class Query(
+      startIndex: Long,
+      count: Long,
+      orderBy: Option[String],
+      orderAscending: Boolean,
+      queryProperties: Seq[QueryProperty])
+      
   // messages
 
     
@@ -143,6 +150,12 @@ object DicomProtocol {
   case class GetSingleSeries(seriesId: Long) extends MetaDataQuery
   
   case class GetSingleFlatSeries(seriesId: Long) extends MetaDataQuery
+  
+  case class QueryPatients(query: Query) extends MetaDataQuery
+  
+  case class QueryStudies(query: Query) extends MetaDataQuery
+  
+  case class QuerySeries(query: Query) extends MetaDataQuery
   
   
   sealed trait MetaDataUpdate

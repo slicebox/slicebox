@@ -46,6 +46,15 @@ trait MetadataRoutes { this: RestApi =>
                 }
               }
           }
+        } ~ path("query") {
+          post {
+            entity(as[Query]) { query =>
+              onSuccess(dicomService.ask(QueryPatients(query))) {
+                case Patients(patients) =>
+                  complete(patients)
+              }
+            }
+          }
         } ~ path(LongNumber) { patientId =>
           get {
             onSuccess(dicomService.ask(GetPatient(patientId)).mapTo[Option[Patient]]) {
@@ -71,6 +80,15 @@ trait MetadataRoutes { this: RestApi =>
                 }
               }
           }
+        } ~ path("query") {
+          post {
+            entity(as[Query]) { query =>
+              onSuccess(dicomService.ask(QueryStudies(query))) {
+                case Studies(studies) =>
+                  complete(studies)
+              }
+            }
+          }
         } ~ path(LongNumber) { studyId =>
           get {
             onSuccess(dicomService.ask(GetStudy(studyId)).mapTo[Option[Study]]) {
@@ -95,6 +113,15 @@ trait MetadataRoutes { this: RestApi =>
                     complete(series)
                 }
               }
+          }
+        } ~ path("query") {
+          post {
+            entity(as[Query]) { query =>
+              onSuccess(dicomService.ask(QuerySeries(query))) {
+                case SeriesCollection(series) =>
+                  complete(series)
+              }
+            }
           }
         } ~ path(LongNumber) { seriesId =>
           get {
