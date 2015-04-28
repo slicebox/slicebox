@@ -83,8 +83,8 @@ trait RemoteBoxRoutes { this: RestApi =>
                       case outboxEntry: OutboxEntry =>
                         onSuccess(boxService.ask(GetTransactionTagValues(outboxEntry.imageFileId, transactionId)).mapTo[Seq[TransactionTagValue]]) {
                           case transactionTagValues =>
-                            onSuccess(dicomService.ask(GetImageFile(outboxEntry.imageFileId))) {
-                              case imageFile: ImageFile =>
+                            onSuccess(dicomService.ask(GetImageFile(outboxEntry.imageFileId)).mapTo[Option[ImageFile]]) {
+                              case imageFileMaybe => imageFileMaybe.map(imageFile => {
                                 detach() {
                                   val path = storage.resolve(imageFile.fileName.value)
                                   val dataset = DicomUtil.loadDataset(path, true)
@@ -93,6 +93,9 @@ trait RemoteBoxRoutes { this: RestApi =>
                                   val bytes = DicomUtil.toByteArray(anonymizedDataset)
                                   complete(HttpEntity(ContentTypes.`application/octet-stream`, HttpData(bytes)))
                                 }
+                              }).getOrElse {
+                                  complete((BadRequest, s"File not found for image id ${outboxEntry.imageFileId}"))                                
+                              }
                             }
                         }
                       case OutboxEntryNotFound =>

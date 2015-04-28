@@ -55,8 +55,8 @@ trait ImageRoutes { this: RestApi =>
         }
       } ~ path(LongNumber) { imageId =>
         get {
-          onSuccess(dicomService.ask(GetImageFile(imageId))) {
-            case imageFile: ImageFile =>
+          onSuccess(dicomService.ask(GetImageFile(imageId)).mapTo[Option[ImageFile]]) {
+            case imageFileMaybe => imageFileMaybe.map(imageFile => {
               val file = storage.resolve(imageFile.fileName.value).toFile
               if (file.isFile && file.canRead)
                 detach() {
@@ -64,6 +64,9 @@ trait ImageRoutes { this: RestApi =>
                 }
               else
                 complete((BadRequest, "Dataset could not be read"))
+            }).getOrElse {
+                complete((BadRequest, s"No file found for image id $imageId"))              
+            }
           }
         }
       } ~ path(LongNumber / "attributes") { imageId =>

@@ -15,6 +15,7 @@ import akka.actor.Props
 import se.nimsa.sbx.util.TestUtil
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.dicom.DicomMetaDataDAO
+import se.nimsa.sbx.dicom.DicomDispatchActor
 import se.nimsa.sbx.dicom.DicomProtocol._
 import se.nimsa.sbx.dicom.DicomPropertyValue._
 import se.nimsa.sbx.dicom.DicomHierarchy._
@@ -37,7 +38,9 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
     metaDataDao.create
   }
 
-  val boxServiceActorRef = _system.actorOf(Props(new BoxServiceActor(dbProps, storage, "http://testhost:1234")))
+  val dicomService = system.actorOf(DicomDispatchActor.props(storage, dbProps), name = "DicomDispatch")
+
+  val boxServiceActorRef = system.actorOf(Props(new BoxServiceActor(dbProps, storage, "http://testhost:1234")), name = "BoxService")
 
   override def beforeEach() {
     db.withSession { implicit session =>
@@ -108,7 +111,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
       }
     }
 
-    "returns OuboxEmpty for poll message when outbox is empty" in {
+    "return OuboxEmpty for poll message when outbox is empty" in {
       db.withSession { implicit session =>
         val remoteBox = boxDao.insertBox(Box(-1, "some remote box", "abc", "https://someurl.com", BoxSendMethod.POLL, false))
 
@@ -118,7 +121,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
       }
     }
 
-    "returns first outbox entry when receiving poll message" in {
+    "return first outbox entry when receiving poll message" in {
       db.withSession { implicit session =>
         val remoteBox = boxDao.insertBox(Box(-1, "some remote box", "abc", "https://someurl.com", BoxSendMethod.POLL, false))
         boxDao.insertOutboxEntry(OutboxEntry(-1, remoteBox.id, 987, 1, 2, 123, false))

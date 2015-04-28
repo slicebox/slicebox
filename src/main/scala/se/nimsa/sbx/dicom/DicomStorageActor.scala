@@ -220,12 +220,7 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
 
         case GetImageFile(imageId) =>
           db.withSession { implicit session =>
-            dao.imageFileForImage(imageId) match {
-              case Some(imageFile) =>
-                sender ! imageFile
-              case None =>
-                throw new IllegalArgumentException(s"No file found for image $imageId")
-            }
+            sender ! dao.imageFileForImage(imageId)
           }
 
         case GetFlatSeries(startIndex, count, orderBy, orderAscending, filter) =>

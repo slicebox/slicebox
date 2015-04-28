@@ -82,10 +82,10 @@ trait RestApi extends HttpService with SliceboxRoutes with JsonFormats {
   val superUser = sliceboxConfig.getString("superuser.user")
   val superPassword = sliceboxConfig.getString("superuser.password")
 
-  val userService = actorRefFactory.actorOf(UserServiceActor.props(dbProps, superUser, superPassword), "UserService")
-  val boxService = actorRefFactory.actorOf(BoxServiceActor.props(dbProps, storage, apiBaseURL), "BoxService")
-  val dicomService = actorRefFactory.actorOf(DicomDispatchActor.props(storage, dbProps), "DicomDispatch")
-  val logService = actorRefFactory.actorOf(LogServiceActor.props(dbProps), "LogService")
+  val userService = actorRefFactory.actorOf(UserServiceActor.props(dbProps, superUser, superPassword), name = "UserService")
+  val boxService = actorRefFactory.actorOf(BoxServiceActor.props(dbProps, storage, apiBaseURL), name = "BoxService")
+  val dicomService = actorRefFactory.actorOf(DicomDispatchActor.props(storage, dbProps), name = "DicomDispatch")
+  val logService = actorRefFactory.actorOf(LogServiceActor.props(dbProps), name = "LogService")
 
   val authenticator = new Authenticator(userService)
 
