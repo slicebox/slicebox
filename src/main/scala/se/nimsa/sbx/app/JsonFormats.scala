@@ -141,4 +141,16 @@ trait JsonFormats extends DefaultJsonProtocol {
   implicit val logEntryFormat = jsonFormat5(LogEntry)
   
   implicit val seriesDatasetFormat = jsonFormat2(SeriesDataset)
+  
+  implicit object QueryOperatorFormat extends JsonFormat[QueryOperator] {
+    def write(obj: QueryOperator) = JsString(obj.toString)
+
+    def read(json: JsValue): QueryOperator = json match {
+      case JsString(string) => QueryOperator.withName(string)
+      case _                => deserializationError("Enumeration expected")
+    }
+  }
+  
+  implicit val queryPropertyFormat = jsonFormat3(QueryProperty)
+  implicit val queryFormat = jsonFormat5(Query)
 }

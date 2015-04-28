@@ -174,6 +174,16 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
         seriesQuery.ddl ++
         imagesQuery.ddl ++
         imageFilesQuery.ddl).create
+        
+  def drop(implicit session: Session) =
+    if (MTable.getTables("Patients").list.size > 0)
+      (patientsQuery.ddl ++
+        studiesQuery.ddl ++
+        equipmentsQuery.ddl ++
+        frameOfReferencesQuery.ddl ++
+        seriesQuery.ddl ++
+        imagesQuery.ddl ++
+        imageFilesQuery.ddl).drop
 
   // *** Get entities by id
 
@@ -271,10 +281,10 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
       "Patients"."PatientID",
       "Patients"."PatientBirthDate",
       "Patients"."PatientSex" from "Patients"
-      inner join "Studies" on "Studies"."patientId" = "Patients"."id"
-      inner join "Series" on "Series"."studyId" = "Studies"."id"
-      inner join "Equipments" on "Equipments"."id" = "Series"."equipmentId"
-      inner join "FrameOfReferences" on "FrameOfReferences"."id" = "Series"."frameOfReferenceId""""
+      left join "Studies" on "Studies"."patientId" = "Patients"."id"
+      left join "Series" on "Series"."studyId" = "Studies"."id"
+      left join "Equipments" on "Equipments"."id" = "Series"."equipmentId"
+      left join "FrameOfReferences" on "FrameOfReferences"."id" = "Series"."frameOfReferenceId""""
     
     val query = buildMetaDataQuery(querySelectPart, startIndex, count, orderBy, orderAscending, queryProperties)
       
@@ -295,10 +305,10 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
       "Studies"."StudyID",
       "Studies"."AccessionNumber",
       "Studies"."PatientAge" from "Studies"
-      inner join "Patients" on "Patients"."id" = "Studies"."patientId"
-      inner join "Series" on "Series"."studyId" = "Studies"."id"
-      inner join "Equipments" on "Equipments"."id" = "Series"."equipmentId"
-      inner join "FrameOfReferences" on "FrameOfReferences"."id" = "Series"."frameOfReferenceId""""
+      left join "Patients" on "Patients"."id" = "Studies"."patientId"
+      left join "Series" on "Series"."studyId" = "Studies"."id"
+      left join "Equipments" on "Equipments"."id" = "Series"."equipmentId"
+      left join "FrameOfReferences" on "FrameOfReferences"."id" = "Series"."frameOfReferenceId""""
     
     val query = buildMetaDataQuery(querySelectPart, startIndex, count, orderBy, orderAscending, queryProperties)
       
@@ -319,10 +329,10 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
       "Series"."Modality",
       "Series"."ProtocolName",
       "Series"."BodyPartExamined" from "Series"
-      inner join "Studies" on "Studies"."id" = "Series"."studyId"
-      inner join "Patients" on "Patients"."id" = "Studies"."patientId"
-      inner join "Equipments" on "Equipments"."id" = "Series"."equipmentId"
-      inner join "FrameOfReferences" on "FrameOfReferences"."id" = "Series"."frameOfReferenceId""""
+      left join "Studies" on "Studies"."id" = "Series"."studyId"
+      left join "Patients" on "Patients"."id" = "Studies"."patientId"
+      left join "Equipments" on "Equipments"."id" = "Series"."equipmentId"
+      left join "FrameOfReferences" on "FrameOfReferences"."id" = "Series"."frameOfReferenceId""""
     
     val query = buildMetaDataQuery(querySelectPart, startIndex, count, orderBy, orderAscending, queryProperties)
       
