@@ -1,18 +1,19 @@
 package se.nimsa.sbx.util
 
-import akka.actor.Actor
-import akka.actor.Stash
-import scala.concurrent.Future
-import scala.util.Success
-import scala.util.Failure
-import akka.actor.ActorRef
-import akka.actor.Status
 import scala.concurrent.ExecutionContext
-import language.implicitConversions
+import scala.concurrent.Future
+import scala.language.implicitConversions
+import scala.util.Failure
+import scala.util.Success
+
+import akka.actor.Actor
+import akka.actor.ActorRef
+import akka.actor.Stash
+import akka.actor.Status
 
 trait SequentialPipeToSupport { this: Actor with Stash =>
 
-  import SynchronousProcessing._
+  case object ProcessingFinished
 
   def gotoProcessingState() = context.become(processingState)
 
@@ -27,7 +28,9 @@ trait SequentialPipeToSupport { this: Actor with Stash =>
   }
 
   final class SequentialPipeableFuture[T](val future: Future[T])(implicit executionContext: ExecutionContext) {
+
     def pipeSequentiallyTo(recipient: ActorRef): Future[T] = {
+
       gotoProcessingState()
 
       future onComplete {
@@ -46,8 +49,4 @@ trait SequentialPipeToSupport { this: Actor with Stash =>
   implicit def pipeSequentially[T](future: Future[T])(implicit executionContext: ExecutionContext) = 
     new SequentialPipeableFuture(future)
   
-}
-
-object SynchronousProcessing {
-  case object ProcessingFinished
 }
