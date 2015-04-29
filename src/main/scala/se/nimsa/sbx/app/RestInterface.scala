@@ -33,6 +33,7 @@ import se.nimsa.sbx.box.BoxServiceActor
 import se.nimsa.sbx.dicom.DicomDispatchActor
 import se.nimsa.sbx.log.LogServiceActor
 import com.mchange.v2.c3p0.ComboPooledDataSource
+import se.nimsa.sbx.seriestype.SeriesTypeServiceActor
 
 class RestInterface extends Actor with RestApi {
 
@@ -86,6 +87,7 @@ trait RestApi extends HttpService with SliceboxRoutes with JsonFormats {
   val boxService = actorRefFactory.actorOf(BoxServiceActor.props(dbProps, storage, apiBaseURL), name = "BoxService")
   val dicomService = actorRefFactory.actorOf(DicomDispatchActor.props(storage, dbProps), name = "DicomDispatch")
   val logService = actorRefFactory.actorOf(LogServiceActor.props(dbProps), name = "LogService")
+  val seriesTypeService = actorRefFactory.actorOf(SeriesTypeServiceActor.props(dbProps), name = "SeriesTypeService")
 
   val authenticator = new Authenticator(userService)
 
