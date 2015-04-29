@@ -5,7 +5,7 @@ import scala.concurrent.duration.DurationInt
 import spray.httpx.SprayJsonSupport.sprayJsonMarshaller
 import spray.testkit.ScalatestRouteTest
 import org.scalatest.BeforeAndAfterAll
-import org.scalatest.BeforeAndAfter
+import org.scalatest.BeforeAndAfterEach
 import org.scalatest.Suite
 import se.nimsa.sbx.util.TestUtil
 import UserProtocol._
@@ -14,7 +14,7 @@ import spray.http.StatusCodes.OK
 import spray.http.HttpRequest
 import spray.httpx.marshalling.Marshaller
 
-trait RoutesTestBase extends ScalatestRouteTest with RestApi with BeforeAndAfterAll with BeforeAndAfter { this: Suite =>
+trait RoutesTestBase extends ScalatestRouteTest with RestApi with BeforeAndAfterAll with BeforeAndAfterEach { this: Suite =>
 
   implicit val routeTestTimeout = RouteTestTimeout(5.second)
 

@@ -72,15 +72,15 @@
 			<md-content>	
 				<ul>
 					<li>
-						<md-button ng-click="toggleLeftNav()" ng-class="{ active: isCurrentPath('/')}" href="/">Home</md-button>
+						<md-button ng-class="{ active: isCurrentPath('/')}" href="/">Home</md-button>
 					</li>
 
 					<li>
-						<md-button ng-click="toggleLeftNav()" ng-class="{ active: isCurrentPath('/transactions')}" href="/transactions">Transactions</md-button>
+						<md-button ng-class="{ active: isCurrentPath('/transactions')}" href="/transactions">Transactions</md-button>
 					</li>
 
 					<li>
-						<md-button ng-click="toggleLeftNav()" ng-class="{ active: isCurrentPath('/log')}" href="/log">Log</md-button>
+						<md-button ng-class="{ active: isCurrentPath('/log')}" href="/log">Log</md-button>
 					</li>
 
 					<li ng-if="userSignedIn() && userSignedIn().role !== 'USER'" class="admin-section">
@@ -93,16 +93,16 @@
 
 						<ul>
 							<li>
-								<md-button ng-click="toggleLeftNav()" ng-class="{ active: isCurrentPath('/admin/boxes')}" href="/admin/boxes">Boxes</md-button>
+								<md-button ng-class="{ active: isCurrentPath('/admin/boxes')}" href="/admin/boxes">Boxes</md-button>
 							</li>
 							<li>
-								<md-button ng-click="toggleLeftNav()" ng-class="{ active: isCurrentPath('/admin/pacs')}" href="/admin/pacs">PACS Connectivity</md-button>
+								<md-button ng-class="{ active: isCurrentPath('/admin/pacs')}" href="/admin/pacs">PACS Connectivity</md-button>
 							</li>
 							<li>
-								<md-button ng-click="toggleLeftNav()" ng-class="{ active: isCurrentPath('/admin/watchdirectories')}" href="/admin/watchdirectories">Directories</md-button>
+								<md-button ng-class="{ active: isCurrentPath('/admin/watchdirectories')}" href="/admin/watchdirectories">Directories</md-button>
 							</li>
 							<li>
-								<md-button ng-click="toggleLeftNav()" ng-class="{ active: isCurrentPath('/admin/users')}" href="/admin/users">Users</md-button>
+								<md-button ng-class="{ active: isCurrentPath('/admin/users')}" href="/admin/users">Users</md-button>
 							</li>
 						</ul>
 					</li>

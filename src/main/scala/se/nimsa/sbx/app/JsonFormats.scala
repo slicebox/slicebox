@@ -19,12 +19,12 @@ package se.nimsa.sbx.app
 import spray.json._
 import se.nimsa.sbx.dicom.DicomProperty
 import se.nimsa.sbx.dicom.DicomPropertyValue._
-import se.nimsa.sbx.dicom.DicomPropertyValue
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomProtocol._
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.log.LogProtocol._
 import se.nimsa.sbx.app.UserProtocol._
+import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
 import spray.routing.authentication.UserPass
 
 trait JsonFormats extends DefaultJsonProtocol {
@@ -153,4 +153,6 @@ trait JsonFormats extends DefaultJsonProtocol {
   
   implicit val queryPropertyFormat = jsonFormat3(QueryProperty)
   implicit val queryFormat = jsonFormat5(Query)
+  
+  implicit val seriesTypeFormat = jsonFormat2(SeriesType)
 }
