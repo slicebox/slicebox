@@ -14,22 +14,24 @@ import akka.pattern.pipe
 import se.nimsa.sbx.log.LogProtocol._
 import java.util.Date
 import scala.concurrent.Future
+import akka.actor.Stash
+import akka.actor.Actor
 
-class SynchronousProcessingActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
+class SequentialPipeToSupportTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
   with WordSpecLike with Matchers with BeforeAndAfterAll {
 
-  def this() = this(ActorSystem("SynchronousProcessingActorTestSystem"))
+  def this() = this(ActorSystem("SequentialPipeToSupportTestSystem"))
 
   implicit val ec = system.dispatcher
 
   override def afterAll = {
-    TestKit.shutdownActorSystem(_system)
+    TestKit.shutdownActorSystem(system)
   }
 
-  case class ProcessSynchronously(input: Double)
+  case class ProcessSequentially(input: Double)
   case class ProcessInParallel(input: Double)
 
-  val spActor = system.actorOf(Props(new SynchronousProcessingActor() {
+  class StatefulActor extends Actor with Stash with SequentialPipeToSupport {
 
     var state = 0.5 // a state variable that must be protected
 
@@ -40,25 +42,27 @@ class SynchronousProcessingActorTest(_system: ActorSystem) extends TestKit(_syst
     }
 
     def receive = {
-      case ProcessSynchronously(input) =>
-        processSynchronously(futureStateChange(input), sender)
+      case ProcessSequentially(input) =>
+        futureStateChange(input).pipeSequentiallyTo(sender)
       case ProcessInParallel(input) =>
         futureStateChange(input).pipeTo(sender)
     }
-  }))
+  }
+  
+  val statefulActor = system.actorOf(Props(new StatefulActor()))
 
   "A syncronous processing actor" should {
 
     "execute a process when asked to and return a result" in {
-      spActor ! ProcessSynchronously(1.0)
+      statefulActor ! ProcessSequentially(1.0)
       expectMsg(2.0)
     }
 
     "execute multiple processes synchronously to protect state" in {
-      spActor ! ProcessSynchronously(2.0)
-      spActor ! ProcessSynchronously(3.0)
-      spActor ! ProcessSynchronously(4.0)
-      spActor ! ProcessSynchronously(5.0)
+      statefulActor ! ProcessSequentially(2.0)
+      statefulActor ! ProcessSequentially(3.0)
+      statefulActor ! ProcessSequentially(4.0)
+      statefulActor ! ProcessSequentially(5.0)
       expectMsg(3.0)
       expectMsg(4.0)
       expectMsg(5.0)
@@ -66,11 +70,10 @@ class SynchronousProcessingActorTest(_system: ActorSystem) extends TestKit(_syst
     }
     
     "fail to proctect state when processes are executed in parallel" in {
-      spActor ! ProcessInParallel(6.0)
-      spActor ! ProcessInParallel(7.0)
+      statefulActor ! ProcessInParallel(6.0)
+      statefulActor ! ProcessInParallel(7.0)
       expectMsg(8.0)
       expectMsg(8.0)
-      
     }
   }
 }

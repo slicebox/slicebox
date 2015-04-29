@@ -29,7 +29,7 @@ import akka.actor.PoisonPill
 import java.util.UUID
 import akka.actor.Status.Failure
 import se.nimsa.sbx.util.ExceptionCatching
-import se.nimsa.sbx.util.SynchronousProcessingActor
+import se.nimsa.sbx.util.SequentialPipeToSupport
 import java.nio.file.Path
 import scala.math.abs
 import java.util.Date
@@ -39,8 +39,10 @@ import akka.actor.ActorSelection
 import akka.util.Timeout
 import scala.concurrent.Future
 import scala.concurrent.Future.sequence
+import akka.actor.Stash
 
-class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) extends SynchronousProcessingActor with ExceptionCatching {
+class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) extends Actor with Stash
+  with SequentialPipeToSupport with ExceptionCatching {
 
   case object UpdatePollBoxesOnlineStatus
 
@@ -54,7 +56,7 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
   implicit val timeout = Timeout(70.seconds)
 
   storageService.ask(akka.actor.Identify).mapTo[akka.actor.ActorIdentity].map(println(_))
-  
+
   val pollBoxOnlineStatusTimeoutMillis: Long = 15000
   val pollBoxesLastPollTimestamp = collection.mutable.Map.empty[Long, Date]
 
@@ -141,7 +143,7 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
               case Some(box) =>
                 SbxLog.info("Box", s"Sending series ${seriesIds.mkString(",")} to box ${box.name} with tag values ${tagValues.map(_.value).mkString(",")}")
                 val imageFileIds = sendEntities(remoteBoxId, seriesIds, tagValues, imageFileIdsForSeries _)
-                processSynchronously(imageFileIds.map(ids => ImagesSent(remoteBoxId, ids)), sender)
+                imageFileIds.map(ids => ImagesSent(remoteBoxId, ids)).pipeSequentiallyTo(sender)
               case None =>
                 sender ! BoxNotFound
             }
@@ -151,7 +153,7 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
               case Some(box) =>
                 SbxLog.info("Box", s"Sending study(s) ${studyIds.mkString(",")} to box ${box.name} with tag values ${tagValues.map(_.value).mkString(",")}")
                 val imageFileIds = sendEntities(remoteBoxId, studyIds, tagValues, imageFileIdsForStudy _)
-                processSynchronously(imageFileIds.map(ids => ImagesSent(remoteBoxId, ids)), sender)
+                imageFileIds.map(ids => ImagesSent(remoteBoxId, ids)).pipeSequentiallyTo(sender)
               case None =>
                 sender ! BoxNotFound
             }
@@ -161,7 +163,7 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
               case Some(box) =>
                 SbxLog.info("Box", s"Sending patient(s) ${patientIds.mkString(",")} to box ${box.name} with tag values ${tagValues.map(_.value).mkString(",")}")
                 val imageFileIds = sendEntities(remoteBoxId, patientIds, tagValues, imageFileIdsForPatient _)
-                processSynchronously(imageFileIds.map(ids => ImagesSent(remoteBoxId, ids)), sender)
+                imageFileIds.map(ids => ImagesSent(remoteBoxId, ids)).pipeSequentiallyTo(sender)
               case None =>
                 sender ! BoxNotFound
             }
