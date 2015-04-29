@@ -1,6 +1,16 @@
 function sbxdata = makesbxdata(username, password, varargin)
+% MAKESBXDATA Specify parameters for a SliceBox connection.
+%   sbxdata = MAKESBXDATA(username, password) Creates an sbxdata object
+%       using username and password to connect to the server. The rest of 
+%       the parameters are read from the file 'sbxconf.settings'.
+%
+%   sbxdata = MAKESBXDATA(username, password, url, cachepath) In case no
+%       'sbxconf.settings' file exists, the parameters 'url' and 
+%       'cachepath' are required.
+%
+%   sbxdata = MAKESBXDATA(_, Name, Value) Specify the 'url' or 'cachepath'
+%       to overwrite the parameters from 'sbxconf.settings'.
 
-%Create weboptions object
 sbxdata = struct;
 p = inputParser;
 %If settings file exist, use contents as default. Otherwise, require url
