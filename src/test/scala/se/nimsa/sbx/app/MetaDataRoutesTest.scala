@@ -28,13 +28,13 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   val for1 = FrameOfReference(-1, FrameOfReferenceUID("frid1"))
   val series1 = Series(-1, -1, -1, -1, SeriesInstanceUID("seuid1"), SeriesDescription("sedesc1"), SeriesDate("19990101"), Modality("NM"), ProtocolName("prot1"), BodyPartExamined("bodypart1"))
   
-  before {
+  override def beforeEach() {
     db.withSession { implicit session =>
       dao.create
     }
   }
   
-  after {
+  override def afterEach() {
     db.withSession { implicit session =>
       dao.drop
     }
