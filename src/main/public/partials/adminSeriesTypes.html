@@ -1,0 +1,63 @@
+<div layout="column" layout-margin>
+    <div class="admin-series-types">
+
+	    <div layout="row" layout-margin>
+	        <div flex>
+	            <md-card>
+	                <md-card-content>
+	                    <h4 class="md-flex">Series Types</h4>
+	                    <md-content>
+	                        <sbx-grid
+	                            load-page="loadSeriesTypesPage(startIndex, count, orderByProperty, orderByDirection)"
+	                            page-size="100000"
+	                            sorting="false"
+	                            object-actions="objectActions"
+	                            callbacks="callbacks.seriesTypesTable"
+	                            object-selected="seriesTypeSelected(object)"
+	                            empty-message="No series types added">
+
+	                            <sbx-grid-column property="name" title="Name">
+	                            </sbx-grid-column>
+	                        </sbx-grid>
+
+	                        <div layout="row" class="button-row">
+					            <md-button class="md-primary md-raised" ng-click="addSeriesTypeButtonClicked()">
+					                Add Series Type
+					            </md-button>
+					            <div flex></div>
+					        </div>
+	                    </md-content>
+	                </md-card-content>
+	            </md-card>
+	        </div>
+
+	        <div flex ng-controller="SeriesTypeDetailsCtrl">
+	        	<form name="serviceTypeForm" role="serviceTypeForm" ng-submit="saveServiceType()" novalidate>
+
+	            <md-card ng-if="uiState.selectedSeriesType">
+	                <md-card-content>
+	                	<md-content>
+			                <md-input-container md-no-float md-is-error="serviceTypeForm.$submitted && serviceTypeForm.name.$error.required">
+		                        <input type="text" name="name" placeholder="Series type name" ng-model="uiState.selectedSeriesType.name" required>
+		                        <div ng-messages="serviceTypeForm.name.$error"
+		                            ng-show="serviceTypeForm.$submitted && serviceTypeForm.name.$error.required">
+
+		                            <div ng-message="required">This is required!</div>
+		                        </div>
+		                    </md-input-container>
+
+		                    <md-button class="md-primary md-raised" type="submit"
+		                    	ng-click="saveButtonClicked()"
+		                    	ng-disabled="!seriesTypeDataChanged()">
+				                Save
+				            </md-button>
+	                    </md-content>
+	                </md-card-content>
+	            </md-card>
+
+	            </form>
+	        </div>
+	    </div>
+
+	</div>
+</div>

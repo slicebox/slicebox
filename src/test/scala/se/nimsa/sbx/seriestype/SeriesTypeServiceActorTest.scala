@@ -11,6 +11,7 @@ import org.scalatest.Matchers
 import org.scalatest.WordSpecLike
 import scala.slick.jdbc.JdbcBackend.Database
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
+import akka.actor.Status.Failure
 
 class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
   with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {
@@ -47,18 +48,100 @@ class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
   
   "A SeriesTypeServiceActor" should {
 
-    "return all servie types in database" in {
+    "return all series types in database" in {
       db.withSession { implicit session =>
-        
         seriesTypeDao.insertSeriesType(SeriesType(-1, "st1"))
-
-        seriesTypeService ! GetSeriesTypes
+      }
+      
+      seriesTypeService ! GetSeriesTypes
         
-        expectMsgPF() {
-          case SeriesTypes(serviceTypes) =>
-            serviceTypes.size should be(1)
-            serviceTypes(0).name should be("st1")
-        }
+      expectMsgPF() {
+        case SeriesTypes(seriesTypes) =>
+          seriesTypes.size should be(1)
+          seriesTypes(0).name should be("st1")
+      }
+    }
+    
+    "be able to add new series type" in {
+      val seriesType = SeriesType(-1, "s1")
+      
+      seriesTypeService ! AddSeriesType(seriesType)
+      
+      expectMsgPF() {
+        case SeriesTypeAdded(returnedSeriesType) =>
+          returnedSeriesType.id should be > (0L)
+          returnedSeriesType.name should be(seriesType.name)
+      }
+      
+      seriesTypeService ! GetSeriesTypes
+        
+      expectMsgPF() {
+        case SeriesTypes(seriesTypes) =>
+          seriesTypes.size should be(1)
+          seriesTypes(0).name should be(seriesType.name)
+      }
+    }
+    
+    "not be able to add series type with duplicate name" in {
+      val seriesType = SeriesType(-1, "s1")
+      
+      seriesTypeService ! AddSeriesType(seriesType)
+      expectMsgPF() {
+        case SeriesTypeAdded(_) => true
+      }
+      
+      seriesTypeService ! AddSeriesType(seriesType)
+      expectMsgPF() {
+        case Failure(_) => true
+      }
+      
+      seriesTypeService ! GetSeriesTypes
+        
+      expectMsgPF() {
+        case SeriesTypes(seriesTypes) =>
+          seriesTypes.size should be(1)
+      }
+    }
+    
+    "be able to update existing series type" in {
+      val seriesType = SeriesType(-1, "s1")
+      
+      seriesTypeService ! AddSeriesType(seriesType)
+      
+      val addedSeriesType = expectMsgPF() {
+        case SeriesTypeAdded(seriesType) =>
+          seriesType
+      }
+      
+      val updatedSeriesType = SeriesType(addedSeriesType.id, "s2");
+      seriesTypeService ! UpdateSeriesType(updatedSeriesType)
+      expectMsg(SeriesTypeUpdated)
+      
+      seriesTypeService ! GetSeriesTypes
+        
+      expectMsgPF() {
+        case SeriesTypes(seriesTypes) =>
+          seriesTypes.size should be(1)
+          seriesTypes(0).name should be(updatedSeriesType.name)
+      }
+    }
+    
+    "be able to delete existing series type" in {
+      val addedSeriesType = db.withSession { implicit session =>
+        seriesTypeDao.insertSeriesType(SeriesType(-1, "st1"))
+      }
+      
+      seriesTypeService ! RemoveSeriesType(addedSeriesType.id)
+      expectMsgPF() {
+        case SeriesTypeRemoved(seriesTypeId) =>
+          seriesTypeId should be(addedSeriesType.id)
+      }
+      
+      seriesTypeService ! GetSeriesTypes
+        
+      expectMsgPF() {
+        case SeriesTypes(seriesTypes) =>
+          seriesTypes.size should be(0)
       }
     }
   }

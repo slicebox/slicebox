@@ -12,6 +12,7 @@ import spray.routing._
 import se.nimsa.sbx.app.AuthInfo
 import se.nimsa.sbx.app.RestApi
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
+import se.nimsa.sbx.app.UserProtocol.UserRole
 
 trait SeriesTypeRoutes { this: RestApi =>
 
@@ -22,6 +23,31 @@ trait SeriesTypeRoutes { this: RestApi =>
           onSuccess(seriesTypeService.ask(GetSeriesTypes)) {
             case SeriesTypes(seriesTypes) =>
               complete(seriesTypes)
+          }
+        }
+      } ~ authorize(authInfo.hasPermission(UserRole.ADMINISTRATOR)) {
+        pathEndOrSingleSlash {
+          post {
+            entity(as[SeriesType]) { seriesType =>
+              onSuccess(seriesTypeService.ask(AddSeriesType(seriesType))) {
+                case SeriesTypeAdded(seriesType) =>
+                  complete((Created, seriesType))
+              }
+            }
+          }
+        } ~ path(LongNumber) { seriesTypeId =>
+          put {
+            entity(as[SeriesType]) { seriesType =>
+              onSuccess(seriesTypeService.ask(UpdateSeriesType(seriesType))) {
+                case SeriesTypeUpdated =>
+                  complete(NoContent)
+              }
+            }
+          } ~ delete {
+            onSuccess(seriesTypeService.ask(RemoveSeriesType(seriesTypeId))) {
+              case SeriesTypeRemoved(seriesTypeId) =>
+                complete(NoContent)
+            }
           }
         }
       }

@@ -17,7 +17,8 @@ angular.module('slicebox', [
     'slicebox.adminPacs',
     'slicebox.adminWatchDirectories',
     'slicebox.adminBoxes',
-    'slicebox.adminUsers'
+    'slicebox.adminUsers',
+    'slicebox.adminSeriesTypes'
 ])
 
 .config(function($locationProvider, $routeProvider, $mdThemingProvider, $animateProvider) {
