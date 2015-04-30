@@ -34,7 +34,7 @@ class BoxDAO(val driver: JdbcProfile) {
     def baseUrl = column[String]("baseurl")
     def sendMethod = column[String]("sendmethod")
     def online = column[Boolean]("online")
-    def idxUniqueName = index("idx_unique_name", name, unique = true)
+    def idxUniqueName = index("idx_unique_box_name", name, unique = true)
     def * = (id, name, token, baseUrl, sendMethod, online) <> (toBox.tupled, fromBox)
   }
 

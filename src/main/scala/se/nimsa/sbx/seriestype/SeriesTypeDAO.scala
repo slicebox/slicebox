@@ -14,6 +14,7 @@ class SeriesTypeDAO(val driver: JdbcProfile) {
   private class SeriesTypeTable(tag: Tag) extends Table[SeriesType](tag, "SeriesTypes") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def name = column[String]("name")
+    def idxUniqueName = index("idx_unique_series_type_name", name, unique = true)
     def * = (id, name) <> (toSeriesType.tupled, fromSeriesType)
   }
 
@@ -34,11 +35,11 @@ class SeriesTypeDAO(val driver: JdbcProfile) {
   private val seriesTypeRuleQuery = TableQuery[SeriesTypeRuleTable]
   
   
-  private val toSeriesTypeRuleAttribute = (id: Long, seriesTypeRuleId: Long, group: Int, element: Int, path: Option[String]) =>
-    SeriesTypeRuleAttribute(id, seriesTypeRuleId, group, element, path)
+  private val toSeriesTypeRuleAttribute = (id: Long, seriesTypeRuleId: Long, group: Int, element: Int, path: Option[String], value: String) =>
+    SeriesTypeRuleAttribute(id, seriesTypeRuleId, group, element, path, value)
     
   private val fromSeriesTypeRuleAttribute = (seriesTypeRuleAttribute: SeriesTypeRuleAttribute) =>
-    Option((seriesTypeRuleAttribute.id, seriesTypeRuleAttribute.seriesTypeRuleId, seriesTypeRuleAttribute.group, seriesTypeRuleAttribute.element, seriesTypeRuleAttribute.path))
+    Option((seriesTypeRuleAttribute.id, seriesTypeRuleAttribute.seriesTypeRuleId, seriesTypeRuleAttribute.group, seriesTypeRuleAttribute.element, seriesTypeRuleAttribute.path, seriesTypeRuleAttribute.value))
   
   private class SeriesTypeRuleAttributeTable(tag: Tag) extends Table[SeriesTypeRuleAttribute](tag, "SeriesTypeRuleAttributes") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
@@ -46,8 +47,9 @@ class SeriesTypeDAO(val driver: JdbcProfile) {
     def group = column[Int]("group")
     def element = column[Int]("element")
     def path = column[Option[String]]("path")
+    def value = column[String]("value")
     def fkSeriesTypeRule = foreignKey("fk_series_type_rule", seriesTypeRuleId, seriesTypeRuleQuery)(_.id, onDelete=ForeignKeyAction.Cascade)
-    def * = (id, seriesTypeRuleId, group, element, path) <> (toSeriesTypeRuleAttribute.tupled, fromSeriesTypeRuleAttribute)
+    def * = (id, seriesTypeRuleId, group, element, path, value) <> (toSeriesTypeRuleAttribute.tupled, fromSeriesTypeRuleAttribute)
   }
     
   private val seriesTypeRuleAttributeQuery = TableQuery[SeriesTypeRuleAttributeTable]

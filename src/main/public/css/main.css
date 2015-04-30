@@ -210,3 +210,7 @@ td div.progress {
 .add-user input {
 	min-width: 400px;
 }
+
+.admin-series-types .button-row {
+	margin-top: 10px;
+}
