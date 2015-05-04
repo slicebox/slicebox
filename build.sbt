@@ -19,14 +19,11 @@ import de.heikoseeberger.sbtheader.license.Apache2_0
 	packageDescription in Universal := "Slicebox is a service for sharing medical image data with collaborators while protecting patient information"
 
 	mappings in Universal <+= (packageBin in Compile, sourceDirectory ) map { (_, src) =>
-		val sliceboxConf = src / "main" / "resources" / "slicebox.conf"
-		sliceboxConf -> "conf/slicebox.conf"
+		val httpConf = src / "main" / "resources" / "application.conf"
+		httpConf -> "conf/slicebox.conf"
 	}
 
-	mappings in Universal <+= (packageBin in Compile, sourceDirectory ) map { (_, src) =>
-		val httpConf = src / "main" / "resources" / "http.conf"
-		httpConf -> "conf/http.conf"
-	}
+	bashScriptExtraDefines += """addJava "-Dconfig.file=${app_home}/../conf/slicebox.conf" """
 
 	val licenceYear = "2015"
 	val licencedTo = "Karl Sjöstrand"
