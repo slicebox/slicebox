@@ -24,6 +24,7 @@ import de.heikoseeberger.sbtheader.license.Apache2_0
 	}
 
 	bashScriptExtraDefines += """addJava "-Dconfig.file=${app_home}/../conf/slicebox.conf" """
+	batScriptExtraDefines += """set _JAVA_OPTS=%_JAVA_OPTS% -Dconfig.file=%SLICEBOX_HOME%\\conf\\slicebox.conf"""
 
 	val licenceYear = "2015"
 	val licencedTo = "Karl Sjöstrand"

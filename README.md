@@ -26,7 +26,7 @@ Images can now be exported from PACS to the local slicebox instance easily. Expo
 Installation
 ------------
 
-* Download a zipped distribution of slicebox from [Bintray](https://bintray.com/karlsjostrand/slicebox/universal/_latestVersion) folder.
+* Download a zipped distribution of slicebox from [Bintray](https://bintray.com/karlsjostrand/slicebox/universal/_latestVersion).
 * Unzip onto a suitable server computer. Any computer which is always on and which has a fixed (local or public) IP address will do.
 * Configure the service by editing [conf/slicebox.conf](./src/main/resources/application.conf). In particular, the administrator (superuser) username and password can be configured as well as the hostname and port of the service.
 * The `bin` folder contains start scripts for Windows and Linux/Unix/Mac OS. Make sure the service is started on server startup. 
