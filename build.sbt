@@ -74,8 +74,6 @@ import de.heikoseeberger.sbtheader.license.Apache2_0
 
 	lazy val slicebox = (project in file(".")).enablePlugins(SbtWeb, JavaServerAppPackaging, GitBranchPrompt)
 
-	GitPlugin.autoImport.git.baseVersion := "1.0.0"
-
 	updateOptions := updateOptions.value.withCachedResolution(true)
 
 	WebKeys.packagePrefix in Assets := "public/"
