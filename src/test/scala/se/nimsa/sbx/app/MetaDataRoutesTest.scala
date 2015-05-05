@@ -3,6 +3,7 @@ package se.nimsa.sbx.app
 import org.scalatest.FlatSpec
 import org.scalatest.Matchers
 import spray.http.StatusCodes.OK
+import spray.http.StatusCodes.BadRequest
 import spray.testkit.ScalatestRouteTest
 import scala.concurrent.duration.DurationInt
 import spray.httpx.SprayJsonSupport._
@@ -40,13 +41,37 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
   }
   
-  "Meta data routs" should "return 200 OK and return an empty list of images when asking for all images" in {
+  "Meta data routes" should "return 200 OK and return an empty list of images when asking for all images" in {
     GetAsUser("/api/metadata/patients") ~> routes ~> check {
       status should be(OK)
       responseAs[List[Patient]].size should be (0)
     }
   }
 
+  it should "return 200 OK when listing patients with valid orderby parameter" in {
+    // given
+    db.withSession { implicit session =>
+      dao.insert(pat1)
+    }
+    
+    // then    
+    GetAsUser("/api/metadata/patients?orderby=PatientID") ~> routes ~> check {
+      status should be(OK)
+      responseAs[List[Patient]].size should be (1)
+    }
+  }
+  it should "return 400 Bad Request when listing patients with invalid orderby parameter" in {
+    // given
+    db.withSession { implicit session =>
+      dao.insert(pat1)
+    }
+    
+    // then
+    GetAsUser("/api/metadata/patients?orderby=syntaxerror") ~> routes ~> check {
+      status should be(BadRequest)
+    }
+  }
+  
   it should "return 200 OK and return patient when querying patients" in {
     // given
     db.withSession { implicit session =>
@@ -63,7 +88,7 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
   }
   
-  it should "be able to do like querying" in {
+  it should "be able to do like querying of patients" in {
     // given
     db.withSession { implicit session =>
       dao.insert(pat1)
@@ -83,7 +108,7 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
   }
   
-  it should "be able to sort when querying" in {
+  it should "be able to sort when querying patients" in {
     // given
     db.withSession { implicit session =>
       dao.insert(pat1)
@@ -103,7 +128,7 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
   }
   
-  it should "be able to page results when querying" in {
+  it should "be able to page results when querying patients" in {
     // given
     db.withSession { implicit session =>
       dao.insert(pat1)
@@ -158,4 +183,42 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       responseAs[List[Series]].size should be (1)
     }
   }
+  
+  it should "return 200 OK when listing flat series" in {
+    // given
+    db.withSession { implicit session =>
+      dao.insert(pat1)
+    }
+    
+    // then    
+    GetAsUser("/api/metadata/flatseries") ~> routes ~> check {
+      status should be(OK)
+      responseAs[List[FlatSeries]].size should be (0)
+    }
+  }
+  
+  it should "return 200 OK when listing flat series with valid orderby parameter" in {
+    // given
+    db.withSession { implicit session =>
+      dao.insert(pat1)
+    }
+    
+    // then    
+    GetAsUser("/api/metadata/flatseries?orderby=PatientID") ~> routes ~> check {
+      status should be(OK)
+      responseAs[List[FlatSeries]].size should be (0)
+    }
+  }
+  it should "return 400 Bad Request when listing flat series with invalid orderby parameter" in {
+    // given
+    db.withSession { implicit session =>
+      dao.insert(pat1)
+    }
+    
+    // then
+    GetAsUser("/api/metadata/flatseries?orderby=syntaxerror") ~> routes ~> check {
+      status should be(BadRequest)
+    }
+  }
+  
 }
