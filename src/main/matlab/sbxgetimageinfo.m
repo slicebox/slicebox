@@ -1,6 +1,10 @@
 function datasets = sbxgetimageinfo(seriesid, sbxdata)
 % Will fetch information about the dicom images of a series. The results
 % are needed when using sbreadimage.
+
+% If the connection to the slicebox service fails for some reson, the image
+% info will be read from a local copy, if one exists.
+
 try
     url = [sbxdata.url, '/api/metadata/images?seriesgid=',num2str(seriesid)];
     datasets = webread(url, sbxdata.weboptions);
@@ -13,7 +17,8 @@ catch ME
             try 
                 datasets = readinfofile(seriesid, sbxdata);
             catch
-                ME2 = MException('SBXImageinfo:noSuchSeriesInCache','Could not retreive series with id %d.\nSeries not in cache and connection to server %s could not be established.', seriesid, sbxdata.url);
+                ME2 = MException('SBXImageinfo:noSuchSeriesInCache','Could not retreive series with id %d.\nSeries not in cache and connection to server %s could not be established.',...
+                    seriesid, sbxdata.url);
                 throw(ME2);
             end
         case 'MATLAB:webservices:HTTP401StatusCodeError'

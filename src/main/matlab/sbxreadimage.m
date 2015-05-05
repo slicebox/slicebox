@@ -1,15 +1,15 @@
-function I = sbxreadimage(imagedata, sbdata)
-% Will read an dicom image from cache and return the image data as a 2d
-% array. If the image is not present in the cache it will download the file
-% from the slicebox defined in the sbdata and save it to the cache, then
-% load the file.
+function I = sbxreadimage(imagedata, sbxdata)
+% SBXREADIMAGE Read an image from a slicebox server or a cached image
+% from disk.
+%
+% I = SBXREADIMAGE(imagedata, sbxdata) Reads a dicom image specified by 
+%        'imagedata' return as 2d array. If the image is not present in
+%        the cache it will first be downloaded from the slicebox service.
 
-filepath = [sbdata.cachepath, '/', imagedata.sopInstanceUID.value,'.dcm'];
+filepath = [sbxdata.cachepath, '/', imagedata.sopInstanceUID.value,'.dcm'];
 if exist(filepath, 'file')~=2;
-%     [~, file, ext] = fileparts(filepath);
-%     fprintf('File %s.%s not in cache\nDownloading...\n',file,ext);
-    imageurl = [sbdata.url, '/api/images/', num2str(imagedata.id)];
-    websave(filepath, imageurl, sbdata.weboptions);
+    imageurl = [sbxdata.url, '/api/images/', num2str(imagedata.id)];
+    websave(filepath, imageurl, sbxdata.weboptions);
 end 
 
 I = dicomread(filepath);

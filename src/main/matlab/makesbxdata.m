@@ -1,5 +1,6 @@
 function sbxdata = makesbxdata(username, password, varargin)
-% MAKESBXDATA Specify parameters for a SliceBox connection.
+% MAKESBXDATA Specify parameters for a SliceBox service.
+%
 %   sbxdata = MAKESBXDATA(username, password) Creates an sbxdata object
 %       using username and password to connect to the server. The rest of 
 %       the parameters are read from the file 'sbxconf.settings'.
