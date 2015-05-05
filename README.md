@@ -3,7 +3,7 @@
 
 Service | Status | Description
 ------- | ------ | -----------
-Travis  | [![Build Status](https://travis-ci.org/KarlSjostrand/slicebox.svg?branch=master)](https://travis-ci.org/KarlSjostrand/slicebox.svg?branch=develop) | Tests
+Travis  | [![Build Status](https://travis-ci.org/KarlSjostrand/slicebox.svg?branch=develop)](https://travis-ci.org/KarlSjostrand/slicebox.svg?branch=develop) | Tests
 Bintray | [ ![Download](https://api.bintray.com/packages/karlsjostrand/slicebox/universal/images/download.svg) ](https://bintray.com/karlsjostrand/slicebox/universal/_latestVersion) | Latest Version on Bintray
 Gitter | [![Join the chat at https://gitter.im/KarlSjostrand/slicebox](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/KarlSjostrand/slicebox?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge) | Chatroom
 
