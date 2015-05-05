@@ -16,7 +16,7 @@
 	<logger name="org.dcm4che3" level="ERROR" />
     <logger name="se.nimsa.sbx" level="WARN" />
 
-    <root level="WARN">
+    <root level="INFO">
         <appender-ref ref="CONSOLE"/>
     </root>
 </configuration>

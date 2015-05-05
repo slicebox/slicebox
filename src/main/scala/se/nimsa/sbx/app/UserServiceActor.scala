@@ -110,11 +110,11 @@ class UserServiceActor(dbProps: DbProps, superUser: String, superPassword: Strin
 
   def addSuperUser() =
     db.withSession { implicit session =>
-      dao.userByName(superUser)
-        .getOrElse {
-          dao.listUsers.filter(_.role == UserRole.SUPERUSER).foreach(superUser => dao.removeUser(superUser.id))
-          dao.insert(ApiUser(-1, superUser, UserRole.SUPERUSER).withPassword(superPassword))
-        }
+      val superUsers = dao.listUsers.filter(_.role == UserRole.SUPERUSER)
+      if (superUsers.isEmpty || superUsers(0).user != superUser || !superUsers(0).passwordMatches(superPassword)) {
+        superUsers.foreach(superUser => dao.removeUser(superUser.id))
+        dao.insert(ApiUser(-1, superUser, UserRole.SUPERUSER).withPassword(superPassword))
+      }
     }
 
   def generateNewTokens(user: ApiUser, numberOfTokens: Int): List[AuthToken] = {

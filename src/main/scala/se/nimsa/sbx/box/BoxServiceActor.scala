@@ -322,8 +322,10 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
       boxDao.updateInbox(remoteBoxId, transactionId, sequenceNumber, totalImageCount)
     }
 
-    if (sequenceNumber == totalImageCount)
-      SbxLog.info("Box", s"Receiving ${totalImageCount} images from box ${boxById(remoteBoxId)} completed.")
+    if (sequenceNumber == totalImageCount) {
+      val boxName = boxById(remoteBoxId).map(_.name).getOrElse(remoteBoxId.toString)
+      SbxLog.info("Box", s"Receiving ${totalImageCount} images from box $boxName completed.")
+    }
   }
 
   def updatePollBoxesOnlineStatus(): Unit = {
