@@ -40,7 +40,12 @@ Integration with Matlab
 API
 ---
 
+Versioning
+----------
+
+This project uses [semantic versioning](http://semver.org). Versions are organized as MAJOR.MINOR.PATCH. Between minor versions, we only add functionality in a backwards compatible manner. This means that you can safely upgrade from e.g. version 1.2 to version 1.3. Patch versions are mainly used for bug fixes. Between major version, e.g. going from 1.6 to 2.0, we intrduce one or several breaking changes. Upgrading in this case will be more complex and it may be necessary to dump existing files and databases. Versions prior to 1.0 are pre-production releases and are not required to be backwards compatible. 
+
 License
 -------
 
-Slicebox is release under the [Apache License, version 2.0](./LICENSE).
+Slicebox is released under the [Apache License, version 2.0](./LICENSE).
