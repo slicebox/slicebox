@@ -134,8 +134,10 @@ class BoxPushActor(box: Box,
         val statusCode = response.status.intValue
         if (statusCode >= 200 && statusCode < 300)
           self ! FileSent(outboxEntry)
-        else
-          self ! FileSendFailed(outboxEntry, statusCode, new Exception(s"File send failed with status code $statusCode"))
+        else {
+          val errorMessage = response.entity.asString
+          self ! FileSendFailed(outboxEntry, statusCode, new Exception(s"File send failed with status code $statusCode: $errorMessage"))
+        }
       })
       .recover {
         case exception: Exception =>

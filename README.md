@@ -40,6 +40,8 @@ Integration with Matlab
 API
 ---
 
+A full specification of the Slicebox API is available at [karlsjostrand.github.io/slicebox](http://karlsjostrand.github.io/slicebox), displayed using [Swagger UI](http://swagger.io).
+
 Versioning
 ----------
 

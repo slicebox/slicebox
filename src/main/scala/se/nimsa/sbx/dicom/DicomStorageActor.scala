@@ -327,7 +327,7 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
 
       } else
 
-        throw new IllegalArgumentException(s"DICOM hierarchy defined by dataset is ill-defined with respect to existing database entries. Cannot add dataset.")
+        throw new IllegalArgumentException(s"Dataset already stored, but with different values for one or more DICOM attributes. Skipping.")
 
     }
   }
