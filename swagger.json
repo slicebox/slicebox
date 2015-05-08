@@ -149,7 +149,7 @@
     },
     "/users/generateauthtokens": {
       "post": {
-        "description": "generate authentication tokens for the current user. Each token makes it possible to submit a request with the token supplied as the query parameter 'authtoken' instead of providing the standard authentication headers. This is useful in html tags which fetch protected resources but does not allow headers to be specififed.",
+        "description": "generate authentication tokens for the current user. Each token makes it possible to submit a request with the token supplied as the query parameter 'authtoken' instead of providing the standard authentication headers. This is useful in html tags which fetch protected resources but does not allow headers to be specififed. Unused tokens are removed after 24 hours.",
         "tags": ["Users"],
         "operationId": "generateAuthTokens",
         "parameters": [
