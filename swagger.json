@@ -77,6 +77,66 @@
     "application/octet-stream"
   ],
   "paths": {
+
+    "/metadata/patients": {
+
+      "get": {
+        "description": "Returns a list of metadata on the patient level of the DICOM hierarchy",
+        "tags": ["Meta Data"],
+        "operationId": "findPatients",
+        "parameters": [
+          {
+            "name": "startindex",
+            "in": "query",
+            "description": "start index of returned slice of patients",
+            "required": false,
+            "default": "0",
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "count",
+            "in": "query",
+            "description": "size of returned slice of patients",
+            "required": false,
+            "default": "20",
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "orderby",
+            "in": "query",
+            "description": "patient property to order results by",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "orderascending",
+            "in": "query",
+            "description": "order result ascendingly if true, descendingly otherwise",
+            "required": false,
+            "default": true,
+            "type": "boolean"
+          },
+          {
+            "name": "filter",
+            "in": "query",
+            "description": "filter the results by matching substrings of patient properties against this value",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "authentication tokens",
+            "schema": {
+              "$ref": "#/definitions/patient"
+            }
+          }
+        }          
+      }
+    },
+
     "/users": {
       "get": {
         "description": "Returns all users of slicebox",
@@ -175,6 +235,33 @@
     }
   },
   "definitions": {
+    "patient": {
+      "required": [
+        "id",
+        "patientName",
+        "patientID",
+        "patientBirthDate",
+        "patientSex"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "patientName": {
+          "type": "string"
+        },
+        "patientID": {
+          "type": "string"
+        },
+        "patientBirthDate": {
+          "type": "string"
+        },
+        "patientSex": {
+          "type": "string"
+        }
+      }
+    },
     "user": {
       "required": [
         "id",
@@ -183,8 +270,8 @@
       ],
       "properties": {
         "id": {
-        "type": "integer",
-        "format": "int64"
+          "type": "integer",
+          "format": "int64"
         },
         "user": {
           "type": "string"
