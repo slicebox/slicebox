@@ -158,7 +158,7 @@
             "in": "query",
             "description": "number of tokens to generate",
             "required": false,
-            "defaultValue": "1",
+            "default": "1",
             "type": "integer",
             "format": "int32"
           }
