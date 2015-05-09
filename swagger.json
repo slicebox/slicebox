@@ -169,6 +169,41 @@
       }
     },
 
+    "/metadata/patients/{id}": {
+      "get": {
+        "description": "Return the patient with the supplied ID",
+        "tags": ["Meta Data"],
+        "operationId": "findPatient",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "patient response",
+            "schema": {
+              "$ref": "#/definitions/patient"            
+            }
+          },
+          "404": {
+            "description": "patient not found (invalid ID)"
+          }
+        }
+      },
+      "delete": {
+        "description": "Delete the patient with the supplied ID",
+        "tags": ["Meta Data"],
+        "operationId": "deletePatient",
+        "responses": {
+          "201": {
+            "description": "patient deleted"
+          },
+          "404": {
+            "description": "patient not found (invalid ID)"
+          }
+        }
+      }
+    },
+
     "/users": {
       "get": {
         "description": "Returns all users of slicebox",
