@@ -20,10 +20,6 @@
       "description": "Methods for handling DICOM meta data (attributes)"
     },
     {
-      "name": "Series",
-      "description": "Methods concerning series"
-    },
-    {
       "name": "Images",
       "description": "Methods concerning images"
     },
@@ -344,9 +340,9 @@
             "format": "int64"
           },
           {
-            "name": "patientId",
+            "name": "studyId",
             "in": "query",
-            "description": "reference to patient to list series for",
+            "description": "reference to study to list series for",
             "required": true,
             "type": "integer",
             "format": "int64"
@@ -423,6 +419,201 @@
           },
           "404": {
             "description": "series not found (invalid ID)"
+          }
+        }
+      }
+    },
+
+    "/metadata/images": {
+      "get": {
+        "description": "Returns a list of metadata on the image level of the DICOM hierarchy",
+        "tags": ["Meta Data"],
+        "operationId": "findImages",
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "name": "startindex",
+            "in": "query",
+            "description": "start index of returned slice of images",
+            "required": false,
+            "default": "0",
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "count",
+            "in": "query",
+            "description": "size of returned slice of images",
+            "required": false,
+            "default": "20",
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "seriesId",
+            "in": "query",
+            "description": "reference to series to list images for",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "images",
+            "schema": {
+              "$ref": "#/definitions/image"
+            }
+          }
+        }          
+      }
+    },
+
+    "/metadata/images/query": {
+      "post": {
+        "description": "submit a query for images",
+        "tags": ["Meta Data"],
+        "operationId": "queryImages",
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "name": "query",
+            "in": "body",
+            "description": "parameters of images query",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/query"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "images",
+            "schema": {
+              "$ref": "#/definitions/image"
+            }
+          }
+        }
+      }
+    },
+
+    "/metadata/images/{id}": {
+      "get": {
+        "description": "Return the image with the supplied ID",
+        "tags": ["Meta Data"],
+        "operationId": "findImage",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "image response",
+            "schema": {
+              "$ref": "#/definitions/image"            
+            }
+          },
+          "404": {
+            "description": "image not found (invalid ID)"
+          }
+        }
+      },
+      "delete": {
+        "description": "Delete the image with the supplied ID",
+        "tags": ["Meta Data"],
+        "operationId": "deleteImage",
+        "responses": {
+          "201": {
+            "description": "image deleted"
+          },
+          "404": {
+            "description": "image not found (invalid ID)"
+          }
+        }
+      }
+    },
+
+    "/metadata/flatseries": {
+      "get": {
+        "description": "Returns a list of flattened metadata on the patient, study and series levels",
+        "tags": ["Meta Data"],
+        "operationId": "findFlatSeries",
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "name": "startindex",
+            "in": "query",
+            "description": "start index of returned slice of flat series",
+            "required": false,
+            "default": "0",
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "count",
+            "in": "query",
+            "description": "size of returned slice of flat series",
+            "required": false,
+            "default": "20",
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "orderby",
+            "in": "query",
+            "description": "flat series property to order results by",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "orderascending",
+            "in": "query",
+            "description": "order result ascendingly if true, descendingly otherwise",
+            "required": false,
+            "default": true,
+            "type": "boolean"
+          },
+          {
+            "name": "filter",
+            "in": "query",
+            "description": "filter the results by matching substrings of flat series properties against this value",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "flat series",
+            "schema": {
+              "$ref": "#/definitions/flatSeries"
+            }
+          }
+        }          
+      }
+    },
+
+    "/metadata/flatseries/{id}": {
+      "get": {
+        "description": "Return the flat series with the supplied ID",
+        "tags": ["Meta Data"],
+        "operationId": "findFlatSeries",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "flat series response",
+            "schema": {
+              "$ref": "#/definitions/flatSeries"            
+            }
+          },
+          "404": {
+            "description": "flat series not found (invalid ID)"
           }
         }
       }
@@ -632,6 +823,75 @@
         },
         "bodyPartExamined": {
           "$ref": "#/definitions/dicomPropertyValue"
+        }
+      }
+    },
+    "equipment": {
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "int64"
+        },        
+        "manufacturer": {
+          "$ref": "#/definitions/dicomPropertyValue"
+        },
+        "stationName": {
+          "$ref": "#/definitions/dicomPropertyValue"
+        }
+      }
+    },
+    "frameOfReference": {
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "int64"
+        },        
+        "frameOfReferenceUID": {
+          "$ref": "#/definitions/dicomPropertyValue"
+        }
+      }
+    },
+    "image": {
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "int64"
+        },        
+        "seriesId": {
+          "type": "integer",
+          "format": "int64"
+        },        
+        "sopInstanceUID": {
+          "$ref": "#/definitions/dicomPropertyValue"
+        },
+        "imageType": {
+          "$ref": "#/definitions/dicomPropertyValue"
+        },
+        "instanceNumber": {
+          "$ref": "#/definitions/dicomPropertyValue"
+        }
+      }
+    },
+    "flatSeries": {
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "patient": {
+          "$ref": "#/definitions/patient"
+        },
+        "study": {
+          "$ref": "#/definitions/study"
+        },
+        "equipment": {
+          "$ref": "#/definitions/equipment"
+        },
+        "frameOfReference": {
+          "$ref": "#/definitions/frameOfReference"
+        },
+        "series": {
+          "$ref": "#/definitions/series"
         }
       }
     },
