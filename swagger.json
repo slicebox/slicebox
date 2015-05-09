@@ -204,6 +204,230 @@
       }
     },
 
+    "/metadata/studies": {
+      "get": {
+        "description": "Returns a list of metadata on the study level of the DICOM hierarchy",
+        "tags": ["Meta Data"],
+        "operationId": "findStudies",
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "name": "startindex",
+            "in": "query",
+            "description": "start index of returned slice of studies",
+            "required": false,
+            "default": "0",
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "count",
+            "in": "query",
+            "description": "size of returned slice of studies",
+            "required": false,
+            "default": "20",
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "patientId",
+            "in": "query",
+            "description": "reference to patient to list studies for",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "studies",
+            "schema": {
+              "$ref": "#/definitions/study"
+            }
+          }
+        }          
+      }
+    },
+
+    "/metadata/studies/query": {
+      "post": {
+        "description": "submit a query for studies",
+        "tags": ["Meta Data"],
+        "operationId": "queryStudies",
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "name": "query",
+            "in": "body",
+            "description": "parameters of study query",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/query"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "studies",
+            "schema": {
+              "$ref": "#/definitions/study"
+            }
+          }
+        }
+      }
+    },
+
+    "/metadata/studies/{id}": {
+      "get": {
+        "description": "Return the study with the supplied ID",
+        "tags": ["Meta Data"],
+        "operationId": "findtudy",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "study response",
+            "schema": {
+              "$ref": "#/definitions/study"            
+            }
+          },
+          "404": {
+            "description": "study not found (invalid ID)"
+          }
+        }
+      },
+      "delete": {
+        "description": "Delete the study with the supplied ID",
+        "tags": ["Meta Data"],
+        "operationId": "deleteStudy",
+        "responses": {
+          "201": {
+            "description": "study deleted"
+          },
+          "404": {
+            "description": "study not found (invalid ID)"
+          }
+        }
+      }
+    },
+
+    "/metadata/series": {
+      "get": {
+        "description": "Returns a list of metadata on the series level of the DICOM hierarchy",
+        "tags": ["Meta Data"],
+        "operationId": "findSeries",
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "name": "startindex",
+            "in": "query",
+            "description": "start index of returned slice of series",
+            "required": false,
+            "default": "0",
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "count",
+            "in": "query",
+            "description": "size of returned slice of series",
+            "required": false,
+            "default": "20",
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "patientId",
+            "in": "query",
+            "description": "reference to patient to list series for",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "series",
+            "schema": {
+              "$ref": "#/definitions/series"
+            }
+          }
+        }          
+      }
+    },
+
+    "/metadata/series/query": {
+      "post": {
+        "description": "submit a query for series",
+        "tags": ["Meta Data"],
+        "operationId": "querySeries",
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "name": "query",
+            "in": "body",
+            "description": "parameters of series query",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/query"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "series",
+            "schema": {
+              "$ref": "#/definitions/series"
+            }
+          }
+        }
+      }
+    },
+
+    "/metadata/series/{id}": {
+      "get": {
+        "description": "Return the series with the supplied ID",
+        "tags": ["Meta Data"],
+        "operationId": "findSeries",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "series response",
+            "schema": {
+              "$ref": "#/definitions/series"            
+            }
+          },
+          "404": {
+            "description": "series not found (invalid ID)"
+          }
+        }
+      },
+      "delete": {
+        "description": "Delete the series with the supplied ID",
+        "tags": ["Meta Data"],
+        "operationId": "deleteSeries",
+        "responses": {
+          "201": {
+            "description": "series deleted"
+          },
+          "404": {
+            "description": "series not found (invalid ID)"
+          }
+        }
+      }
+    },
+
     "/users": {
       "get": {
         "description": "Returns all users of slicebox",
@@ -302,6 +526,27 @@
     }
   },
   "definitions": {
+    "dicomProperty": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "dicomTag": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "dicomPropertyValue": {
+      "properties": {
+        "property": {
+          "$ref": "#/definitions/dicomProperty"
+        },
+        "value": {
+          "type": "string"
+        }
+      }
+    },
     "patient": {
       "properties": {
         "id": {
@@ -309,16 +554,84 @@
           "format": "int64"
         },
         "patientName": {
-          "type": "string"
+          "$ref": "#/definitions/dicomPropertyValue"
         },
         "patientID": {
-          "type": "string"
+          "$ref": "#/definitions/dicomPropertyValue"
         },
         "patientBirthDate": {
-          "type": "string"
+          "$ref": "#/definitions/dicomPropertyValue"
         },
         "patientSex": {
-          "type": "string"
+          "$ref": "#/definitions/dicomPropertyValue"
+        }
+      }
+    },
+    "study": {
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "patientId": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "studyInstanceUID": {
+          "$ref": "#/definitions/dicomPropertyValue"
+        },
+        "studyDescription": {
+          "$ref": "#/definitions/dicomPropertyValue"
+        },
+        "studyDate": {
+          "$ref": "#/definitions/dicomPropertyValue"
+        },
+        "studyID": {
+          "$ref": "#/definitions/dicomPropertyValue"
+        },
+        "accessionNumber": {
+          "$ref": "#/definitions/dicomPropertyValue"
+        },
+        "patientAge": {
+          "$ref": "#/definitions/dicomPropertyValue"
+        }
+      }
+    },    
+    "series": {
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "studyId": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "equipmentId": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "frameOfReferenceId": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "seriesInstanceUID": {
+          "$ref": "#/definitions/dicomPropertyValue"
+        },
+        "seriesDescription": {
+          "$ref": "#/definitions/dicomPropertyValue"
+        },
+        "seriesDate": {
+          "$ref": "#/definitions/dicomPropertyValue"
+        },
+        "modality": {
+          "$ref": "#/definitions/dicomPropertyValue"
+        },
+        "protocolName": {
+          "$ref": "#/definitions/dicomPropertyValue"
+        },
+        "bodyPartExamined": {
+          "$ref": "#/definitions/dicomPropertyValue"
         }
       }
     },
