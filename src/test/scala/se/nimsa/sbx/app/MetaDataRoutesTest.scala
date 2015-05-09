@@ -28,6 +28,7 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   val equipment1 = Equipment(-1, Manufacturer("manu1"), StationName("station1"))
   val for1 = FrameOfReference(-1, FrameOfReferenceUID("frid1"))
   val series1 = Series(-1, -1, -1, -1, SeriesInstanceUID("seuid1"), SeriesDescription("sedesc1"), SeriesDate("19990101"), Modality("NM"), ProtocolName("prot1"), BodyPartExamined("bodypart1"))
+  val image1 = Image(-1, -1, SOPInstanceUID("sopuid1"), ImageType("imageType1"), InstanceNumber("1"))
   
   override def beforeEach() {
     db.withSession { implicit session =>
@@ -181,6 +182,27 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     PostAsUser("/api/metadata/series/query", query) ~> routes ~> check {
       status should be(OK)
       responseAs[List[Series]].size should be (1)
+    }
+  }
+  
+  it should "return 200 OK and return images when querying images" in {
+    // given
+    db.withSession { implicit session =>
+      val dbPat = dao.insert(pat1)
+      val dbStudy = dao.insert(study1.copy(patientId = dbPat.id))
+      val dbEquipment = dao.insert(equipment1)
+      val dbFor = dao.insert(for1)
+      val dbSeries = dao.insert(series1.copy(studyId = dbStudy.id, equipmentId = dbEquipment.id, frameOfReferenceId = dbFor.id))
+      dao.insert(image1.copy(seriesId = dbSeries.id))
+    }
+    
+    // then
+    val queryProperties = Seq(QueryProperty("InstanceNumber", QueryOperator.EQUALS, "1"))
+    val query = Query(0, 10, None, false, queryProperties)
+    
+    PostAsUser("/api/metadata/images/query", query) ~> routes ~> check {
+      status should be(OK)
+      responseAs[List[Image]].size should be (1)
     }
   }
   

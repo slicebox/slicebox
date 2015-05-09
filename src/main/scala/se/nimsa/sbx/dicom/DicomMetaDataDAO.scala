@@ -339,6 +339,26 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
     Q.queryNA(query).list
   }
   
+  def queryImages(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, queryProperties: Seq[QueryProperty])(implicit session: Session): List[Image] = {
+    implicit val getResult = GetResult(r =>
+      Image(r.nextLong, r.nextLong, SOPInstanceUID(r.nextString), ImageType(r.nextString), InstanceNumber(r.nextString)))
+    
+    val querySelectPart = """select distinct("Images"."id"),
+      "Images"."seriesId",
+      "Images"."SOPInstanceUID",
+      "Images"."ImageType",
+      "Images"."InstanceNumber" from "Images"
+      left join "Series" on "Series"."id" = "Images"."seriesId"
+      left join "Studies" on "Studies"."id" = "Series"."studyId"
+      left join "Patients" on "Patients"."id" = "Studies"."patientId"
+      left join "Equipments" on "Equipments"."id" = "Series"."equipmentId"
+      left join "FrameOfReferences" on "FrameOfReferences"."id" = "Series"."frameOfReferenceId""""
+    
+    val query = buildMetaDataQuery(querySelectPart, startIndex, count, orderBy, orderAscending, queryProperties)
+      
+    Q.queryNA(query).list
+  }
+  
   def buildMetaDataQuery(selectPart: String, startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, queryProperties: Seq[QueryProperty]): String = {
     var query = selectPart
       
@@ -446,9 +466,11 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
       .take(count)
       .list
 
-  def imagesForSeries(seriesId: Long)(implicit session: Session): List[Image] =
+  def imagesForSeries(startIndex: Long, count: Long, seriesId: Long)(implicit session: Session): List[Image] =
     imagesQuery
       .filter(_.seriesId === seriesId)
+      .drop(startIndex)
+      .take(count)
       .list
 
   def imageFileForImage(imageId: Long)(implicit session: Session): Option[ImageFile] =
@@ -457,18 +479,18 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
       .list.headOption
 
   def imageFilesForSeries(seriesId: Long)(implicit session: Session): List[ImageFile] =
-    imagesForSeries(seriesId)
+    imagesForSeries(0, 100000, seriesId)
       .map(image => imageFileForImage(image.id)).flatten.toList
 
   def imageFilesForStudy(studyId: Long)(implicit session: Session): List[ImageFile] =
     seriesForStudy(0, Integer.MAX_VALUE, studyId)
-      .map(series => imagesForSeries(series.id)
+      .map(series => imagesForSeries(0, 100000, series.id)
         .map(image => imageFileForImage(image.id)).flatten).flatten
 
   def imageFilesForPatient(patientId: Long)(implicit session: Session): List[ImageFile] =
     studiesForPatient(0, Integer.MAX_VALUE, patientId)
       .map(study => seriesForStudy(0, Integer.MAX_VALUE, study.id)
-        .map(series => imagesForSeries(series.id)
+        .map(series => imagesForSeries(0, 100000, series.id)
           .map(image => imageFileForImage(image.id)).flatten).flatten).flatten
 
   def patientByNameAndID(patient: Patient)(implicit session: Session): Option[Patient] =

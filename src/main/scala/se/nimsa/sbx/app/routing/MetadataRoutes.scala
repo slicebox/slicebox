@@ -135,6 +135,40 @@ trait MetadataRoutes { this: RestApi =>
             }
           }
         }
+      } ~ pathPrefix("images") {
+        pathEndOrSingleSlash {
+          get {
+            parameters(
+              'startindex.as[Long] ? 0,
+              'count.as[Long] ? 20,
+              'seriesid.as[Long]) { (startIndex, count, seriesId) =>
+                onSuccess(dicomService.ask(GetImages(startIndex, count, seriesId))) {
+                  case Images(images) =>
+                    complete(images)
+                }
+              }
+          }
+        } ~ path("query") {
+          post {
+            entity(as[Query]) { query =>
+              onSuccess(dicomService.ask(QueryImages(query))) {
+                case Images(images) =>
+                  complete(images)
+              }
+            }
+          }
+        } ~ path(LongNumber) { imageId =>
+          get {
+            onSuccess(dicomService.ask(GetImage(imageId)).mapTo[Option[Image]]) {
+              complete(_)
+            }
+          } ~ delete {
+            onSuccess(dicomService.ask(DeleteImage(imageId))) {
+              case ImageFilesDeleted(_) =>
+                complete(NoContent)
+            }
+          }
+        }
       } ~ path("flatseries") {
         pathEndOrSingleSlash {
           get {
@@ -154,15 +188,6 @@ trait MetadataRoutes { this: RestApi =>
           get {
             onSuccess(dicomService.ask(GetSingleFlatSeries(seriesId)).mapTo[Option[FlatSeries]]) {
               complete(_)
-            }
-          }
-        }
-      } ~ path("images") {
-        get {
-          parameters('seriesid.as[Long]) { seriesId =>
-            onSuccess(dicomService.ask(GetImages(seriesId))) {
-              case Images(images) =>
-                complete(images)
             }
           }
         }

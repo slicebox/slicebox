@@ -139,7 +139,7 @@ object DicomProtocol {
 
   case class GetFlatSeries(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String]) extends MetaDataQuery
 
-  case class GetImages(seriesId: Long) extends MetaDataQuery
+  case class GetImages(startIndex: Long, count: Long, seriesId: Long) extends MetaDataQuery
   
   case class GetImageFile(imageId: Long) extends MetaDataQuery
   
@@ -149,6 +149,8 @@ object DicomProtocol {
   
   case class GetSingleSeries(seriesId: Long) extends MetaDataQuery
   
+  case class GetImage(imageId: Long) extends MetaDataQuery
+  
   case class GetSingleFlatSeries(seriesId: Long) extends MetaDataQuery
   
   case class QueryPatients(query: Query) extends MetaDataQuery
@@ -156,6 +158,8 @@ object DicomProtocol {
   case class QueryStudies(query: Query) extends MetaDataQuery
   
   case class QuerySeries(query: Query) extends MetaDataQuery
+  
+  case class QueryImages(query: Query) extends MetaDataQuery
   
   
   sealed trait MetaDataUpdate

@@ -156,10 +156,10 @@ class DicomMetaDataDAOTest extends FlatSpec with Matchers {
       dao.frameOfReferences.size should be(2)
       dao.seriesForStudy(0, 20, dbStudy1.id).size should be(2)
       dao.seriesForStudy(0, 20, dbStudy2.id).size should be(2)
-      dao.imagesForSeries(dbSeries1.id).size should be(2)
-      dao.imagesForSeries(dbSeries2.id).size should be(2)
-      dao.imagesForSeries(dbSeries3.id).size should be(2)
-      dao.imagesForSeries(dbSeries4.id).size should be(2)
+      dao.imagesForSeries(0, 20, dbSeries1.id).size should be(2)
+      dao.imagesForSeries(0, 20, dbSeries2.id).size should be(2)
+      dao.imagesForSeries(0, 20, dbSeries3.id).size should be(2)
+      dao.imagesForSeries(0, 20, dbSeries4.id).size should be(2)
       dao.imageFileForImage(dbImage1.id).isDefined should be(true)
       dao.imageFileForImage(dbImage2.id).isDefined should be(true)
       dao.imageFileForImage(dbImage3.id).isDefined should be(true)
@@ -249,7 +249,7 @@ class DicomMetaDataDAOTest extends FlatSpec with Matchers {
   
   it should "return the correct number of series for series queries" in {
     db.withSession { implicit session =>
-      // Queries on Study properties
+      // Queries on Series properties
       dao.querySeries(0, 10, None, true, Seq(QueryProperty("SeriesInstanceUID", QueryOperator.EQUALS, "seuid1"))).size should be(1)
       
       // Check that query returns Studies with all data
@@ -277,6 +277,37 @@ class DicomMetaDataDAOTest extends FlatSpec with Matchers {
       
       // Queries on FrameOfReferences properties
       dao.querySeries(0, 10, None, true, Seq(QueryProperty("FrameOfReferenceUID", QueryOperator.EQUALS, "frid1"))).size should be(2)
+    }
+  }
+
+  it should "return the correct number of images for image queries" in {
+    db.withSession { implicit session =>
+      // Queries on Image properties
+      dao.queryImages(0, 10, None, true, Seq(QueryProperty("SOPInstanceUID", QueryOperator.EQUALS, "souid1"))).size should be(1)
+      
+      // Check that query returns Studies with all data
+      dao.queryImages(0, 1, None, true, Seq(QueryProperty("SOPInstanceUID", QueryOperator.EQUALS, "souid1"))).foreach(dbImage => {
+          dbImage.id should be >= (0L)
+          dbImage.seriesId should be >= (0L)
+          dbImage.sopInstanceUID.value should be("souid1")
+          dbImage.imageType.value should be("PRIMARY/RECON/TOMO")
+          dbImage.instanceNumber.value should be("1")
+        })
+        
+      // Queries on Patient properties
+      dao.queryImages(0, 10, None, true, Seq(QueryProperty("PatientName", QueryOperator.EQUALS, "p1"))).size should be(8)
+      
+      // Queries on Studies properties
+      dao.queryImages(0, 10, None, true, Seq(QueryProperty("StudyInstanceUID", QueryOperator.EQUALS, "stuid1"))).size should be(4)
+      
+      // Queries on Equipments properties
+      dao.queryImages(0, 10, None, true, Seq(QueryProperty("Manufacturer", QueryOperator.EQUALS, "manu2"))).size should be(2)
+      
+      // Queries on FrameOfReferences properties
+      dao.queryImages(0, 10, None, true, Seq(QueryProperty("FrameOfReferenceUID", QueryOperator.EQUALS, "frid1"))).size should be(4)
+      
+      // Queries on Series properties
+      dao.queryImages(0, 10, None, true, Seq(QueryProperty("SeriesInstanceUID", QueryOperator.EQUALS, "seuid1"))).size should be(2)
     }
   }
 

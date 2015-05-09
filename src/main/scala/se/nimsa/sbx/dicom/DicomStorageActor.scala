@@ -217,9 +217,9 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
             sender ! SeriesCollection(dao.seriesForStudy(startIndex, count, studyId))
           }
 
-        case GetImages(seriesId) =>
+        case GetImages(startIndex, count, seriesId) =>
           db.withSession { implicit session =>
-            sender ! Images(dao.imagesForSeries(seriesId))
+            sender ! Images(dao.imagesForSeries(startIndex, count, seriesId))
           }
 
         case GetImageFile(imageId) =>
@@ -251,6 +251,11 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
             sender ! dao.seriesById(seriesId)
           }
 
+        case GetImage(imageId) =>
+          db.withSession { implicit session =>
+            sender ! dao.imageById(imageId)
+          }
+
         case GetSingleFlatSeries(seriesId) =>
           db.withSession { implicit session =>
             sender ! dao.flatSeriesById(seriesId)
@@ -269,6 +274,11 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
         case QuerySeries(query) =>
           db.withSession { implicit session =>
             sender ! SeriesCollection(dao.querySeries(query.startIndex, query.count, query.orderBy, query.orderAscending, query.queryProperties))
+          }
+          
+        case QueryImages(query) =>
+          db.withSession { implicit session =>
+            sender ! Images(dao.queryImages(query.startIndex, query.count, query.orderBy, query.orderAscending, query.queryProperties))
           }
       }
     }
