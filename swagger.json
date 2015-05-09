@@ -311,8 +311,7 @@
           "format": "int64"
         },
         "orderby": {
-          "type": "string",
-          "required": false
+          "type": "string"
         },
         "orderascending": {
           "type": "boolean"
