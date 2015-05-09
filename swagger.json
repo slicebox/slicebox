@@ -79,11 +79,13 @@
   "paths": {
 
     "/metadata/patients": {
-
       "get": {
         "description": "Returns a list of metadata on the patient level of the DICOM hierarchy",
         "tags": ["Meta Data"],
         "operationId": "findPatients",
+        "produces": [
+          "application/json"
+        ],
         "parameters": [
           {
             "name": "startindex",
@@ -128,12 +130,42 @@
         ],
         "responses": {
           "200": {
-            "description": "authentication tokens",
+            "description": "patients",
             "schema": {
               "$ref": "#/definitions/patient"
             }
           }
         }          
+      }
+    },
+
+    "/metadata/patients/query": {
+      "post": {
+        "description": "submit a query for patients",
+        "tags": ["Meta Data"],
+        "operationId": "queryPatients",
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "name": "query",
+            "in": "body",
+            "description": "parameters of patient query",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/query"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "patients",
+            "schema": {
+              "$ref": "#/definitions/patient"
+            }
+          }
+        }
       }
     },
 
@@ -236,13 +268,6 @@
   },
   "definitions": {
     "patient": {
-      "required": [
-        "id",
-        "patientName",
-        "patientID",
-        "patientBirthDate",
-        "patientSex"
-      ],
       "properties": {
         "id": {
           "type": "integer",
@@ -259,6 +284,44 @@
         },
         "patientSex": {
           "type": "string"
+        }
+      }
+    },
+    "queryProperty": {
+      "properties": {
+        "propertyName": {
+          "type": "string"
+        },
+        "operator": {
+          "type": "string"
+        },
+        "propertyValue": {
+          "type": "string"
+        }
+      }
+    },
+    "query": {
+      "properties": {
+        "startindex": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "count": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "orderby": {
+          "type": "string",
+          "required": false
+        },
+        "orderascending": {
+          "type": "boolean"
+        },
+        "queryProperties": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/queryProperty"
+          }
         }
       }
     },
@@ -285,11 +348,6 @@
       }
     },
     "newUser": {
-      "required": [
-        "user",
-        "role",
-        "password"
-      ],
       "properties": {
         "user": {
           "type": "string"
@@ -303,9 +361,6 @@
       }
     },
     "authToken": {
-      "required": [
-        "token"
-      ],
       "properties": {
         "token": {
           "type": "string"
