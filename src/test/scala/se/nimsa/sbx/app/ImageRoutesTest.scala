@@ -41,9 +41,9 @@ class ImageRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
   }
   
-  it should "return a BadRequest when requesting an image that does not exist" in {
+  it should "return NotFound when requesting an image that does not exist" in {
     GetAsUser("/api/images/2") ~> routes ~> check {
-      status should be (BadRequest)
+      status should be (NotFound)
     }
   }
   
