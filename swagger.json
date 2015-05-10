@@ -128,7 +128,10 @@
           "200": {
             "description": "patients",
             "schema": {
-              "$ref": "#/definitions/patient"
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/patient"
+              }
             }
           }
         }          
@@ -158,7 +161,10 @@
           "200": {
             "description": "patients",
             "schema": {
-              "$ref": "#/definitions/patient"
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/patient"
+              }
             }
           }
         }
@@ -172,6 +178,16 @@
         "operationId": "findPatient",
         "produces": [
           "application/json"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of patient",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          }
         ],
         "responses": {
           "200": {
@@ -189,6 +205,16 @@
         "description": "Delete the patient with the supplied ID",
         "tags": ["Meta Data"],
         "operationId": "deletePatient",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of patient",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
         "responses": {
           "201": {
             "description": "patient deleted"
@@ -240,7 +266,10 @@
           "200": {
             "description": "studies",
             "schema": {
-              "$ref": "#/definitions/study"
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/study"
+              }
             }
           }
         }          
@@ -270,7 +299,10 @@
           "200": {
             "description": "studies",
             "schema": {
-              "$ref": "#/definitions/study"
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/study"
+              }
             }
           }
         }
@@ -284,6 +316,16 @@
         "operationId": "findtudy",
         "produces": [
           "application/json"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of study",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          }
         ],
         "responses": {
           "200": {
@@ -301,6 +343,16 @@
         "description": "Delete the study with the supplied ID",
         "tags": ["Meta Data"],
         "operationId": "deleteStudy",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of study",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
         "responses": {
           "201": {
             "description": "study deleted"
@@ -352,7 +404,10 @@
           "200": {
             "description": "series",
             "schema": {
-              "$ref": "#/definitions/series"
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/series"
+              }
             }
           }
         }          
@@ -382,7 +437,10 @@
           "200": {
             "description": "series",
             "schema": {
-              "$ref": "#/definitions/series"
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/series"
+              }
             }
           }
         }
@@ -396,6 +454,16 @@
         "operationId": "findSeries",
         "produces": [
           "application/json"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of series",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          }
         ],
         "responses": {
           "200": {
@@ -413,6 +481,16 @@
         "description": "Delete the series with the supplied ID",
         "tags": ["Meta Data"],
         "operationId": "deleteSeries",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of series",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
         "responses": {
           "201": {
             "description": "series deleted"
@@ -464,7 +542,10 @@
           "200": {
             "description": "images",
             "schema": {
-              "$ref": "#/definitions/image"
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/image"
+              }
             }
           }
         }          
@@ -494,7 +575,10 @@
           "200": {
             "description": "images",
             "schema": {
-              "$ref": "#/definitions/image"
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/image"
+              }
             }
           }
         }
@@ -508,6 +592,16 @@
         "operationId": "findImage",
         "produces": [
           "application/json"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of image",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          }
         ],
         "responses": {
           "200": {
@@ -525,6 +619,16 @@
         "description": "Delete the image with the supplied ID",
         "tags": ["Meta Data"],
         "operationId": "deleteImage",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of image",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
         "responses": {
           "201": {
             "description": "image deleted"
@@ -590,7 +694,10 @@
           "200": {
             "description": "flat series",
             "schema": {
-              "$ref": "#/definitions/flatSeries"
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/flatSeries"
+              }
             }
           }
         }          
@@ -605,6 +712,16 @@
         "produces": [
           "application/json"
         ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of flat series",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
         "responses": {
           "200": {
             "description": "flat series response",
@@ -614,6 +731,201 @@
           },
           "404": {
             "description": "flat series not found (invalid ID)"
+          }
+        }
+      }
+    },
+
+    "/images": {
+      "post": {
+        "description": "add a DICOM dataset to slicebox",
+        "tags": ["Images"],
+        "operationId": "addDataset",
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "name": "dataset",
+            "in": "formData",
+            "description": "The dataset file",
+            "required": true,
+            "type": "file"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "meta data for added dataset on the image level of the DICOM hierarchy",
+            "schema": {
+              "$ref": "#/definitions/image"
+            }
+          }
+        }
+      }
+    },
+
+    "/images/{id}": {
+      "get": {
+        "description": "fetch dataset corresponding to the supplied image ID",
+        "tags": ["Images"],
+        "operationId": "getDataset",
+        "produces": [
+          "application/octet-stream"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of image",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "binary data of dataset",
+            "schema": {
+              "type": "file"
+            }
+          },
+          "400": {
+            "description": "if no dataset could be found or read for the image corresponding to the supplied image ID"
+          },
+          "404": {
+            "description": "if no image was found for the supplied image ID"
+          }
+        }
+      }
+    },
+
+    "images/{id}/attributes": {
+      "get": {
+        "description": "list all DICOM attributes of the dataset corresponding to the supplied image ID",
+        "tags": ["Images"],
+        "operationId": "getAttributes",
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of image",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "list of DICOM attributes",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/imageAttribute"
+              }
+            }
+          },
+          "404": {
+            "description": "if no image was found for the supplied image ID"
+          }
+        }
+      }
+    },
+
+    "images/{id}/imageinformation": {
+      "get": {
+        "description": "get basic information about the pixel data of an image",
+        "tags": ["Images"],
+        "operationId": "getImageInformation",
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of image",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "basic information about the pixeldata of an image",
+            "schema": {
+              "$ref": "#/definitions/imageInformation"
+            }
+          },
+          "404": {
+            "description": "if no image was found for the supplied image ID"
+          }
+        }
+      }
+    },
+
+    "images/{id}/png": {
+      "get": {
+        "description": "get a PNG image representation of the image corresponding to the supplied ID",
+        "tags": ["Images"],
+        "operationId": "getPNG",
+        "produces": [
+          "image/png"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of image",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "framenumber",
+            "in": "query",
+            "description": "frame/slice to show",
+            "required": false,
+            "default": 1,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "windowmin",
+            "in": "query",
+            "description": "intensity window minimum value. If not specified or set to zero, windowing will be selected from relevant DICOM attributes",
+            "required": false,
+            "default": 0,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "windowmax",
+            "in": "query",
+            "description": "intensity window maximum value. If not specified or set to zero, windowing will be selected from relevant DICOM attributes",
+            "required": false,
+            "default": 0,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "imageheight",
+            "in": "query",
+            "description": "height of PNG image. If not specified or set to zero, the image height will equal that of the data",
+            "required": false,
+            "default": 0,
+            "type": "integer",
+            "format": "int32"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "image data"
+          },
+          "404": {
+            "description": "if no image was found for the supplied image ID"
           }
         }
       }
@@ -893,6 +1205,60 @@
         "series": {
           "$ref": "#/definitions/series"
         }
+      }
+    },
+    "imageAttribute": {
+      "properties": {
+        "group": {
+          "type": "string"
+        }, 
+        "element": {
+          "type": "string"
+        }, 
+        "vr": {
+          "type": "string"
+        }, 
+        "length": {
+          "type": "integer",
+          "format": "int32"
+        }, 
+        "multiplicity": {
+          "type": "integer",
+          "format": "int32"
+        }, 
+        "depth": {
+          "type": "integer",
+          "format": "int32"
+        }, 
+        "path": {
+          "type": "string"
+        }, 
+        "name": {
+          "type": "string"
+        }, 
+        "value": {
+          "type": "string"
+        }
+      }
+    },
+    "imageInformation": {
+      "properties": {
+        "numberOfFrames": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "frameIndex": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "minimumPixelValue": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "maximumPixelValue": {
+          "type": "integer",
+          "format": "int32"
+        }        
       }
     },
     "queryProperty": {
