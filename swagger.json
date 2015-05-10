@@ -12,7 +12,6 @@
       "url": "http://opensource.org/licenses/Apache-2.0"
     }
   },
-  "host": "127.0.0.1:5000",
   "basePath": "/api",
   "tags": [
     {
