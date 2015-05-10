@@ -24,6 +24,7 @@ import spray.http.HttpData
 import spray.http.HttpEntity
 import spray.http.MediaTypes
 import spray.http.StatusCodes.BadRequest
+import spray.http.StatusCodes.NotFound
 import spray.http.StatusCodes.Created
 import spray.routing._
 
@@ -65,7 +66,7 @@ trait ImageRoutes { this: RestApi =>
               else
                 complete((BadRequest, "Dataset could not be read"))
             }).getOrElse {
-                complete((BadRequest, s"No file found for image id $imageId"))              
+                complete((NotFound, s"No file found for image id $imageId"))              
             }
           }
         }
