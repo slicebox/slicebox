@@ -783,10 +783,7 @@
         ],
         "responses": {
           "200": {
-            "description": "binary data of dataset",
-            "schema": {
-              "type": "file"
-            }
+            "description": "binary data of dataset"
           },
           "400": {
             "description": "if no dataset could be found or read for the image corresponding to the supplied image ID"
@@ -798,7 +795,7 @@
       }
     },
 
-    "images/{id}/attributes": {
+    "/images/{id}/attributes": {
       "get": {
         "description": "list all DICOM attributes of the dataset corresponding to the supplied image ID",
         "tags": ["Images"],
@@ -833,7 +830,7 @@
       }
     },
 
-    "images/{id}/imageinformation": {
+    "/images/{id}/imageinformation": {
       "get": {
         "description": "get basic information about the pixel data of an image",
         "tags": ["Images"],
@@ -865,7 +862,7 @@
       }
     },
 
-    "images/{id}/png": {
+    "/images/{id}/png": {
       "get": {
         "description": "get a PNG image representation of the image corresponding to the supplied ID",
         "tags": ["Images"],
