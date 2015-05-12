@@ -94,7 +94,7 @@ trait RemoteBoxRoutes { this: RestApi =>
                                   complete(HttpEntity(ContentTypes.`application/octet-stream`, HttpData(bytes)))
                                 }
                               }).getOrElse {
-                                  complete((BadRequest, s"File not found for image id ${outboxEntry.imageFileId}"))                                
+                                  complete((NotFound, s"File not found for image id ${outboxEntry.imageFileId}"))                                
                               }
                             }
                         }
