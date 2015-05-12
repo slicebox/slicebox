@@ -1299,7 +1299,7 @@
       }
     },
 
-    "box/{id}/image": {
+    "box/{token}/image": {
       "post": {
         "description": "add an image (dataset) as part of a transaction. This method is used when sending images using the push method to a public slicebox.",
         "tags": ["Remote Boxes"],
@@ -1358,10 +1358,19 @@
       }
     },
 
-    "box/{id}/outbox/poll": {
+    "box/{token}/outbox/poll": {
       "get": {
         "description": "get next outbox entry (next image that the connected box wishes to send to you), if any. This method is used when sending images using the poll method from a public slicebox.",
         "tags": ["Remote Boxes"],
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "description": "authentication token identifying the current box-to-box connection",
+            "required": true,
+            "type": "string"
+          }
+        ],
         "responses": {
           "200": {
             "description": "next outbox entry",
@@ -1379,7 +1388,7 @@
       }
     },
 
-    "/box/{id}/outbox": {
+    "/box/{token}/outbox": {
       "get": {
         "description": "fetch an image from the connected box as part of a transaction. This method is used when sending images using the poll method from a public slicebox.",
         "tags": ["Remote Boxes"],
@@ -1387,6 +1396,13 @@
           "application/octet-stream"
         ],
         "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "description": "authentication token identifying the current box-to-box connection",
+            "required": true,
+            "type": "string"
+          },
           {
             "name": "transactionid",
             "in": "query",
@@ -1418,11 +1434,18 @@
       }
     },
 
-    "box/{id}/outbox/done": {
+    "box/{token}/outbox/done": {
       "post": {
         "description": "signal that the supplied outbox entry was successfully received and can be removed. This method is used when sending images using the poll method from a public slicebox.",
         "tags": ["Remote Boxes"],
         "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "description": "authentication token identifying the current box-to-box connection",
+            "required": true,
+            "type": "string"
+          },
           {
             "name": "outbox entry",
             "in": "body",
