@@ -1303,6 +1303,9 @@
       "post": {
         "description": "add an image (dataset) as part of a transaction. This method is used when sending images using the push method to a public slicebox.",
         "tags": ["Remote Boxes"],
+        "consumes": [
+          "application/octet-stream"
+        ],
         "parameters": [
           {
             "name": "token",
@@ -1340,11 +1343,7 @@
             "in": "body",
             "description": "the dataset byte array",
             "required": true,
-            "type": "array",
-            "items": {
-              "type": "string",
-              "format": "byte"
-            }
+            "type": "array"
           }
         ],
         "responses": {
