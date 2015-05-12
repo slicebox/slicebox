@@ -20,7 +20,7 @@
     },
     {
       "name": "Images",
-      "description": "Methods concerning images"
+      "description": "Methods concerning images and datasets"
     },
     {
       "name": "Boxes",
@@ -48,7 +48,7 @@
     },
     {
       "name": "Logs",
-      "description": "Methods for handling log messages"
+      "description": "Methods for handling slicebox system log messages"
     },
     {
       "name": "Users",
@@ -77,10 +77,6 @@
       "get": {
         "description": "Returns a list of metadata on the patient level of the DICOM hierarchy",
         "tags": ["Meta Data"],
-        "operationId": "findPatients",
-        "produces": [
-          "application/json"
-        ],
         "parameters": [
           {
             "name": "startindex",
@@ -141,10 +137,6 @@
       "post": {
         "description": "submit a query for patients",
         "tags": ["Meta Data"],
-        "operationId": "queryPatients",
-        "produces": [
-          "application/json"
-        ],
         "parameters": [
           {
             "name": "query",
@@ -174,10 +166,6 @@
       "get": {
         "description": "Return the patient with the supplied ID",
         "tags": ["Meta Data"],
-        "operationId": "findPatient",
-        "produces": [
-          "application/json"
-        ],
         "parameters": [
           {
             "name": "id",
@@ -203,7 +191,6 @@
       "delete": {
         "description": "Delete the patient with the supplied ID",
         "tags": ["Meta Data"],
-        "operationId": "deletePatient",
         "parameters": [
           {
             "name": "id",
@@ -229,10 +216,6 @@
       "get": {
         "description": "Returns a list of metadata on the study level of the DICOM hierarchy",
         "tags": ["Meta Data"],
-        "operationId": "findStudies",
-        "produces": [
-          "application/json"
-        ],
         "parameters": [
           {
             "name": "startindex",
@@ -279,10 +262,6 @@
       "post": {
         "description": "submit a query for studies",
         "tags": ["Meta Data"],
-        "operationId": "queryStudies",
-        "produces": [
-          "application/json"
-        ],
         "parameters": [
           {
             "name": "query",
@@ -312,10 +291,6 @@
       "get": {
         "description": "Return the study with the supplied ID",
         "tags": ["Meta Data"],
-        "operationId": "findtudy",
-        "produces": [
-          "application/json"
-        ],
         "parameters": [
           {
             "name": "id",
@@ -341,7 +316,6 @@
       "delete": {
         "description": "Delete the study with the supplied ID",
         "tags": ["Meta Data"],
-        "operationId": "deleteStudy",
         "parameters": [
           {
             "name": "id",
@@ -367,10 +341,6 @@
       "get": {
         "description": "Returns a list of metadata on the series level of the DICOM hierarchy",
         "tags": ["Meta Data"],
-        "operationId": "findSeries",
-        "produces": [
-          "application/json"
-        ],
         "parameters": [
           {
             "name": "startindex",
@@ -417,10 +387,6 @@
       "post": {
         "description": "submit a query for series",
         "tags": ["Meta Data"],
-        "operationId": "querySeries",
-        "produces": [
-          "application/json"
-        ],
         "parameters": [
           {
             "name": "query",
@@ -450,10 +416,6 @@
       "get": {
         "description": "Return the series with the supplied ID",
         "tags": ["Meta Data"],
-        "operationId": "findSeries",
-        "produces": [
-          "application/json"
-        ],
         "parameters": [
           {
             "name": "id",
@@ -479,7 +441,6 @@
       "delete": {
         "description": "Delete the series with the supplied ID",
         "tags": ["Meta Data"],
-        "operationId": "deleteSeries",
         "parameters": [
           {
             "name": "id",
@@ -505,10 +466,6 @@
       "get": {
         "description": "Returns a list of metadata on the image level of the DICOM hierarchy",
         "tags": ["Meta Data"],
-        "operationId": "findImages",
-        "produces": [
-          "application/json"
-        ],
         "parameters": [
           {
             "name": "startindex",
@@ -555,10 +512,6 @@
       "post": {
         "description": "submit a query for images",
         "tags": ["Meta Data"],
-        "operationId": "queryImages",
-        "produces": [
-          "application/json"
-        ],
         "parameters": [
           {
             "name": "query",
@@ -588,10 +541,6 @@
       "get": {
         "description": "Return the image with the supplied ID",
         "tags": ["Meta Data"],
-        "operationId": "findImage",
-        "produces": [
-          "application/json"
-        ],
         "parameters": [
           {
             "name": "id",
@@ -617,7 +566,6 @@
       "delete": {
         "description": "Delete the image with the supplied ID",
         "tags": ["Meta Data"],
-        "operationId": "deleteImage",
         "parameters": [
           {
             "name": "id",
@@ -643,10 +591,6 @@
       "get": {
         "description": "Returns a list of flattened metadata on the patient, study and series levels",
         "tags": ["Meta Data"],
-        "operationId": "findFlatSeries",
-        "produces": [
-          "application/json"
-        ],
         "parameters": [
           {
             "name": "startindex",
@@ -707,10 +651,6 @@
       "get": {
         "description": "Return the flat series with the supplied ID",
         "tags": ["Meta Data"],
-        "operationId": "findFlatSeries",
-        "produces": [
-          "application/json"
-        ],
         "parameters": [
           {
             "name": "id",
@@ -739,10 +679,6 @@
       "post": {
         "description": "add a DICOM dataset to slicebox",
         "tags": ["Images"],
-        "operationId": "addDataset",
-        "produces": [
-          "application/json"
-        ],
         "parameters": [
           {
             "name": "dataset",
@@ -767,7 +703,6 @@
       "get": {
         "description": "fetch dataset corresponding to the supplied image ID",
         "tags": ["Images"],
-        "operationId": "getDataset",
         "produces": [
           "application/octet-stream"
         ],
@@ -783,7 +718,12 @@
         ],
         "responses": {
           "200": {
-            "description": "binary data of dataset"
+            "description": "binary data of dataset",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "byte"
+            }
           },
           "400": {
             "description": "if no dataset could be found or read for the image corresponding to the supplied image ID"
@@ -799,10 +739,6 @@
       "get": {
         "description": "list all DICOM attributes of the dataset corresponding to the supplied image ID",
         "tags": ["Images"],
-        "operationId": "getAttributes",
-        "produces": [
-          "application/json"
-        ],
         "parameters": [
           {
             "name": "id",
@@ -834,10 +770,6 @@
       "get": {
         "description": "get basic information about the pixel data of an image",
         "tags": ["Images"],
-        "operationId": "getImageInformation",
-        "produces": [
-          "application/json"
-        ],
         "parameters": [
           {
             "name": "id",
@@ -866,7 +798,6 @@
       "get": {
         "description": "get a PNG image representation of the image corresponding to the supplied ID",
         "tags": ["Images"],
-        "operationId": "getPNG",
         "produces": [
           "image/png"
         ],
@@ -931,10 +862,6 @@
       "get": {
         "description": "Returns all users of slicebox",
         "tags": ["Users"],
-        "operationId": "findUsers",
-        "produces": [
-          "application/json"
-        ],
         "responses": {
           "200": {
             "description": "user response",
@@ -950,10 +877,6 @@
       "post": {
         "description": "Creates a new user. Dupicates are accepted but not added.",
         "tags": ["Users"],
-        "operationId": "addUser",
-        "produces": [
-          "application/json"
-        ],
         "parameters": [
           {
             "name": "user",
@@ -979,7 +902,6 @@
       "delete": {
         "description": "deletes a single user based on the ID supplied",
         "tags": ["Users"],
-        "operationId": "deleteUser",
         "parameters": [
           {
             "name": "id",
@@ -1001,7 +923,6 @@
       "post": {
         "description": "generate authentication tokens for the current user. Each token makes it possible to submit a request with the token supplied as the query parameter 'authtoken' instead of providing the standard authentication headers. This is useful in html tags which fetch protected resources but does not allow headers to be specififed. Unused tokens are removed after 24 hours.",
         "tags": ["Users"],
-        "operationId": "generateAuthTokens",
         "parameters": [
           {
             "name": "n",
@@ -1022,9 +943,645 @@
           }
         }
       }
+    },
+
+    "/log": {
+      "get": {
+        "description": "get a list of slicebox log messages",
+        "tags": ["Logs"],
+        "parameters": [
+          {
+            "name": "startindex",
+            "in": "query",
+            "description": "start index of returned slice of log messages",
+            "required": false,
+            "default": "0",
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "count",
+            "in": "query",
+            "description": "size of returned slice of log messages",
+            "required": false,
+            "default": "20",
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "subject",
+            "in": "query",
+            "description": "log subject to filter results by",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "description": "log type (DEFAULT, INFO, WARN, ERROR) to filter results by",
+            "required": false,
+            "type": "string"
+
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "log messages",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/logEntry"
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "/log/{id}": {
+      "delete": {
+        "description": "Delete the log entry with the supplied ID",
+        "tags": ["Logs"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of log entry",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "log entry deleted"
+          },
+          "404": {
+            "description": "log entry not found (invalid ID)"
+          }
+        }
+      }
+    },
+
+    "/system/stop": {
+      "post": {
+        "description": "stop and shut down slicebox",
+        "tags": ["System"],
+        "responses": {
+          "200": {
+            "description": "shutdown message"
+          }
+        }
+      }
+    },
+
+    "/boxes": {
+      "get": {
+        "description": "get a list of box connections",
+        "tags": ["Boxes"],
+        "responses": {
+          "200": {
+            "description": "box connections",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/box"
+              }
+            }
+          }
+        }        
+      }
+    },
+
+    "/boxes/generatebaseurl": {
+      "post": {
+        "description": "generate a new box URL for setting up a connection from another box to this box. Used by publicly available boxes.",
+        "tags": ["Boxes"],
+        "parameters": [
+          {
+            "name": "remoteBoxName",
+            "in": "body",
+            "description": "name of box to connect (and send URL) to",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/remoteBoxName"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "box connections",
+            "schema": {
+              "$ref": "#/definitions/boxBaseUrl"
+            }
+          }
+        }                
+      }
+    },
+
+    "/boxes/addremotebox": {
+      "post": {
+        "description": "setup a connection to another box using a given URL",
+        "tags": ["Boxes"],
+        "parameters": [
+          {
+            "name": "remoteBox",
+            "in": "body",
+            "description": "remote box to connect with",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/remoteBox"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "connected box",
+            "schema": {
+              "$ref": "#/definitions/box"
+            }
+          }
+        }                
+      }
+    },
+
+    "/boxes/{id}": {
+      "delete": {
+        "description": "Delete the remote box with the supplied ID",
+        "tags": ["Boxes"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of box to remove",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "box deleted"
+          },
+          "404": {
+            "description": "box not found (invalid ID)"
+          }
+        }
+      }
+    },
+
+    "/boxes/{id}/sendpatients": {
+      "post": {
+        "description": "send all images corresponding to the selected patients to the remote box with the supplied ID",
+        "tags": ["Boxes"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of box to send images to",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "box send data",
+            "in": "body",
+            "description": "ID of box to send images to",
+            "required": true,
+            "type": "array",
+            "items": {
+              "schema": {
+                "$ref": "#/definitions/boxSendData"
+              }
+            }            
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "images sent"
+          },
+          "404": {
+            "description": "box not found (invalid ID)"
+          }
+        }
+      }
+    },
+
+    "/boxes/{id}/sendstudies": {
+      "post": {
+        "description": "send all images corresponding to the selected studies to the remote box with the supplied ID",
+        "tags": ["Boxes"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of box to send images to",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "box send data",
+            "in": "body",
+            "description": "ID of box to send images to",
+            "required": true,
+            "type": "array",
+            "items": {
+              "schema": {
+                "$ref": "#/definitions/boxSendData"
+              }
+            }            
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "images sent"
+          },
+          "404": {
+            "description": "box not found (invalid ID)"
+          }
+        }
+      }
+    },
+
+    "/boxes/{id}/sendseries": {
+      "post": {
+        "description": "send all images corresponding to the selected series to the remote box with the supplied ID",
+        "tags": ["Boxes"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of box to send images to",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "box send data",
+            "in": "body",
+            "description": "ID of box to send images to",
+            "required": true,
+            "type": "array",
+            "items": {
+              "schema": {
+                "$ref": "#/definitions/boxSendData"
+              }
+            }            
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "images sent"
+          },
+          "404": {
+            "description": "box not found (invalid ID)"
+          }
+        }
+      }
+    },
+
+    "/inbox": {
+      "get": {        
+        "description": "get contents of inbox (records of received images)",
+        "tags": ["Boxes"],
+        "responses": {
+          "200": {
+            "description": "incoming transactions, handled and in progress",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/inboxEntry"
+              }
+            }
+          }
+        }        
+      }
+    },
+
+    "/outbox": {
+      "get": {        
+        "description": "get contents of outbox (records of outgoing transactions, failed or in progress)",
+        "tags": ["Boxes"],
+        "responses": {
+          "200": {
+            "description": "outgoing transactions, failed or in progress",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/outboxEntry"
+              }
+            }
+          }
+        }        
+      }
+    },
+
+    "/outbox/{id}": {
+      "delete": {        
+        "description": "delete a transaction from the outbox, thus cancelling sending the corresponding image",
+        "tags": ["Boxes"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of outbox entry",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "outbox entry deleted"
+          }
+        }
+      }
+    },
+
+    "box/{id}/image": {
+      "post": {
+        "description": "add an image (dataset) as part of a transaction. This method is used when sending images using the push method to a public slicebox.",
+        "tags": ["Remote Boxes"],
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "description": "authentication token identifying the current box-to-box connection",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "transactionid",
+            "in": "query",
+            "description": "the ID of this transaction",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "sequencenumber",
+            "in": "query",
+            "description": "the index of this image in the transaction",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "totalimagecount",
+            "in": "query",
+            "description": "the total number of images in this transaction",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "dataset",
+            "in": "body",
+            "description": "the dataset byte array",
+            "required": true,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "byte"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "image data received"
+          },
+          "401": {
+            "description": "unauthorized, invalid token"
+          }
+        }        
+      }
+    },
+
+    "box/{id}/outbox/poll": {
+      "get": {
+        "description": "get next outbox entry (next image that the connected box wishes to send to you), if any. This method is used when sending images using the poll method from a public slicebox.",
+        "tags": ["Remote Boxes"],
+        "responses": {
+          "200": {
+            "description": "next outbox entry",
+            "schema": {
+              "$ref": "#/definitions/outboxEntry"
+            }
+          },
+          "401": {
+            "description": "unauthorized, invalid token"
+          },
+          "404": {
+            "description": "outbox of connected box is empty"
+          }
+        }                
+      }
+    },
+
+    "/box/{id}/outbox": {
+      "get": {
+        "description": "fetch an image from the connected box as part of a transaction. This method is used when sending images using the poll method from a public slicebox.",
+        "tags": ["Remote Boxes"],
+        "produces": [
+          "application/octet-stream"
+        ],
+        "parameters": [
+          {
+            "name": "transactionid",
+            "in": "query",
+            "description": "the ID of this transaction",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "sequencenumber",
+            "in": "query",
+            "description": "the index of this image in the transaction",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          }          
+        ],
+        "responses": {
+          "200": {
+            "description": "binary data of dataset"
+          },
+          "401": {
+            "description": "unauthorized, invalid token"
+          },
+          "404": {
+            "description": "no outbox entry found for the supplied transaction id and sequence number"
+          }
+        }
+      }
+    },
+
+    "box/{id}/outbox/done": {
+      "post": {
+        "description": "signal that the supplied outbox entry was successfully received and can be removed. This method is used when sending images using the poll method from a public slicebox.",
+        "tags": ["Remote Boxes"],
+        "parameters": [
+          {
+            "name": "outbox entry",
+            "in": "body",
+            "description": "outbox entry that has been successfully received",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/outboxEntry"              
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "done message received"
+          },
+          "401": {
+            "description": "unauthorized, invalid token"
+          }
+        }                
+      }
     }
+
   },
+
+
   "definitions": {
+    "outboxEntry": {
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "remoteBoxId": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "transactionId": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "sequenceNumber": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "totalImageCount": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "imageFileId": {
+          "type": "integer",
+          "format": "int64"          
+        },
+        "failed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "inboxEntry": {
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "remoteBoxId": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "transactionId": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "receivedImageCount": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "totalImageCount": {
+          "type": "integer",
+          "format": "int64"
+        }        
+      }
+    },
+    "boxSendTagValue": {
+      "properties": {
+        "entityId": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "tag": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "values": {
+          "type": "string"
+        }        
+      }
+    },
+    "boxSendData": {
+      "properties": {
+        "entityIds": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "tagValues": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/boxSendTagValue"
+          }          
+        }
+      }
+    },
+    "remoteBox": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "baseUrl": {
+          "type": "string"
+        }
+      }
+    },
+    "remoteBoxName": {
+      "properties": {
+        "value": {
+          "type": "string"
+        }
+      }
+    },
+    "boxBaseUrl": {
+      "properties": {
+        "value": {
+          "type": "string"
+        }
+      }
+    },
+    "box": {
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "name": {
+          "type": "string"
+        },
+        "token": {
+          "type": "string"
+        },
+        "baseUrl": {
+          "type": "string"
+        },
+        "sendMethod": {
+          "type": "string"
+        },
+        "online": {
+          "type": "boolean"
+        }
+      }
+    },
     "dicomProperty": {
       "properties": {
         "name": {
@@ -1334,6 +1891,27 @@
         "token": {
           "type": "string"
         }              
+      }
+    },
+    "logEntry": {
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "created": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "entryType": {
+          "type": "string"
+        },
+        "subject": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        }
       }
     },
     "errorModel": {
