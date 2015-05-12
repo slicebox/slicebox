@@ -1451,12 +1451,94 @@
           }
         }                
       }
+    },
+
+    "/directorywatches": {
+      "get": {
+        "description": "get a list of watch directories. Each watch directory and its sub-directories are watched for incoming DICOM files, which are read and imported into slicebox.",
+        "tags": ["Directories"],
+        "responses": {
+          "200": {
+            "description": "the list of watched directories",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/watchedDirectory"
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "description": "add a new directory to watch for incoming DICOM files",
+        "tags": ["Directories"],
+        "parameters": [
+          {
+            "name": "watchDirectory",
+            "description": "directory to setup a watch for",
+            "in": "body",
+            "schema": {
+              "$ref": "#/definitions/watchDirectory"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "the directory now being watched",
+            "schema": {
+              "$ref": "#/definitions/watchedDirectory"
+            }
+          }
+        }        
+      }
+    },
+
+    "/directorywatches/{id}": {
+      "delete": {
+        "description": "stop watching and remove the directory corresponding to the supplied ID",
+        "tags": ["Directories"],
+        "parameters": [
+          {
+            "name": "id",
+            "description": "id of directory to stop watching",
+            "in": "path",
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "directory watch removed"
+          },
+          "404": {
+            "description": "watch directory not found (invalid ID)"
+          }
+        }        
+      }      
     }
 
   },
 
 
   "definitions": {
+    "watchDirectory": {
+      "properties": {
+        "pathString": {
+          "type": "string"
+        }
+      }
+    },
+    "watchedDirectory": {
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "int64"          
+        },
+        "path": {
+          "type": "string"
+        }
+      }
+    },
     "outboxEntry": {
       "properties": {
         "id": {
