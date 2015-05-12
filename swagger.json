@@ -718,12 +718,7 @@
         ],
         "responses": {
           "200": {
-            "description": "binary data of dataset",
-            "type": "array",
-            "items": {
-              "type": "string",
-              "format": "byte"
-            }
+            "description": "binary data of dataset"
           },
           "400": {
             "description": "if no dataset could be found or read for the image corresponding to the supplied image ID"
@@ -1148,12 +1143,9 @@
             "in": "body",
             "description": "ID of box to send images to",
             "required": true,
-            "type": "array",
-            "items": {
-              "schema": {
-                "$ref": "#/definitions/boxSendData"
-              }
-            }            
+            "schema": {
+              "$ref": "#/definitions/boxSendData"
+            }
           }
         ],
         "responses": {
@@ -1185,12 +1177,9 @@
             "in": "body",
             "description": "ID of box to send images to",
             "required": true,
-            "type": "array",
-            "items": {
-              "schema": {
-                "$ref": "#/definitions/boxSendData"
-              }
-            }            
+            "schema": {
+              "$ref": "#/definitions/boxSendData"
+            }
           }
         ],
         "responses": {
@@ -1222,12 +1211,9 @@
             "in": "body",
             "description": "ID of box to send images to",
             "required": true,
-            "type": "array",
-            "items": {
-              "schema": {
-                "$ref": "#/definitions/boxSendData"
-              }
-            }            
+            "schema": {
+              "$ref": "#/definitions/boxSendData"
+            }
           }
         ],
         "responses": {
@@ -1299,7 +1285,7 @@
       }
     },
 
-    "box/{token}/image": {
+    "/box/{token}/image": {
       "post": {
         "description": "add an image (dataset) as part of a transaction. This method is used when sending images using the push method to a public slicebox.",
         "tags": ["Remote Boxes"],
@@ -1343,7 +1329,8 @@
             "in": "body",
             "description": "the dataset byte array",
             "required": true,
-            "type": "array"
+            "schema": {
+            }
           }
         ],
         "responses": {
@@ -1357,7 +1344,7 @@
       }
     },
 
-    "box/{token}/outbox/poll": {
+    "/box/{token}/outbox/poll": {
       "get": {
         "description": "get next outbox entry (next image that the connected box wishes to send to you), if any. This method is used when sending images using the poll method from a public slicebox.",
         "tags": ["Remote Boxes"],
@@ -1433,7 +1420,7 @@
       }
     },
 
-    "box/{token}/outbox/done": {
+    "/box/{token}/outbox/done": {
       "post": {
         "description": "signal that the supplied outbox entry was successfully received and can be removed. This method is used when sending images using the poll method from a public slicebox.",
         "tags": ["Remote Boxes"],
