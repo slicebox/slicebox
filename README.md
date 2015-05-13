@@ -3,10 +3,10 @@
 
 Service | Status | Description
 ------- | ------ | -----------
-Travis  | [![Build Status](https://travis-ci.org/KarlSjostrand/slicebox.svg?branch=develop)](https://travis-ci.org/KarlSjostrand/slicebox.svg?branch=develop) | Tests
-Bintray | [ ![Download](https://api.bintray.com/packages/karlsjostrand/slicebox/universal/images/download.svg) ](https://bintray.com/karlsjostrand/slicebox/universal/_latestVersion) | Latest Version on Bintray
-Gitter | [![Join the chat at https://gitter.im/KarlSjostrand/slicebox](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/KarlSjostrand/slicebox?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge) | Chatroom
-
+Travis        | [![Build Status](https://travis-ci.org/KarlSjostrand/slicebox.svg?branch=develop)](https://travis-ci.org/KarlSjostrand/slicebox.svg?branch=develop) | Tests
+Bintray       | [ ![Download](https://api.bintray.com/packages/karlsjostrand/slicebox/universal/images/download.svg) ](https://bintray.com/karlsjostrand/slicebox/universal/_latestVersion) | Latest Version on Bintray
+Gitter        | [![Join the chat at https://gitter.im/KarlSjostrand/slicebox](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/KarlSjostrand/slicebox?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge) | Chatroom
+Documentation | [karlsjostrand.github.io/slicebox](http://karlsjostrand.github.io/slicebox) | REST API
 
 Slicebox is a microservice for safe sharing and easy access to medical images. The goal of the project is to facilitate research and collaboration between hospitals and universities. The service makes it easy to send images from the hosptial's PACS (image archive) to collaborators on the outside. Anonymization is handled automatically, releaving the hospital staff of the burden of making sure patient information does not leave the hospital network.
 
