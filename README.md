@@ -48,6 +48,21 @@ Installation
 * Configure the service by editing [conf/slicebox.conf](./src/main/resources/application.conf). In particular, the administrator (superuser) username and password can be configured as well as the hostname and port of the service.
 * The `bin` folder contains start scripts for Windows and Linux/Unix/Mac OS. Make sure the service is started on server startup. 
 
+### Windows
+
+Slicebox does not (yet) provide an installer for Windows which configures slicebox to run as a Windows service. A similar behavior can be achieved using "Scheduled Tasks" in Windows.
+
+* Open the Windows Task Scheduler
+* From the menu, select Action -> Create Task...
+* In the 'General' tab, name the task 'slicebox' and select 'Run whether user is logged on or not'
+* In the 'Triggers' tab, create a new trigger which begins 'At startup'
+* In the 'Actions' tab, create a new action of the 'Start a program' type pointing to the `bin/slicebox.bat` startup script in the slicebox installation directory
+* Review other task settings and see if any apply to your installation
+
+There should now be a slicebox task in the list of active tasks. Restart the computer, or start it directly from the list of scheduled tasks
+
+### Linux
+
 Integration with Applications
 -----------------------------
 
