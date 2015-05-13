@@ -1515,12 +1515,210 @@
           }
         }        
       }      
+    },
+
+    "/scps": {
+      "get": {
+        "description": "get a list of DICOM SCPs. Each SCP is a server for receiving DICOM images from e.g. a PACS system.",
+        "tags": ["SCPs"],
+        "responses": {
+          "200": {
+            "description": "the list of SCPs",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/scp"
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "description": "add a new SCP for receiving DICOM images",
+        "tags": ["SCPs"],
+        "parameters": [
+          {
+            "name": "addScp",
+            "description": "SCP information",
+            "in": "body",
+            "schema": {
+              "$ref": "#/definitions/addScp"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "the created SCP",
+            "schema": {
+              "$ref": "#/definitions/scp"
+            }
+          }
+        }        
+      }
+    },
+
+    "/scps/{id}": {
+      "delete": {
+        "description": "shut down and remove the SCP corresponding to the supplied ID",
+        "tags": ["SCPs"],
+        "parameters": [
+          {
+            "name": "id",
+            "description": "id of SCP to remove",
+            "in": "path",
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "SCP removed"
+          },
+          "404": {
+            "description": "SCP not found (invalid ID)"
+          }
+        }        
+      }      
+    },
+
+    "/scus": {
+      "get": {
+        "description": "get a list of DICOM SCUs. Each SCU is a client for sending DICOM images to an SCP, e.g. a PACS system.",
+        "tags": ["SCUs"],
+        "responses": {
+          "200": {
+            "description": "the list of SCUs",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/scu"
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "description": "add a new SCU for sending DICOM images",
+        "tags": ["SCUs"],
+        "parameters": [
+          {
+            "name": "addScu",
+            "description": "SCU information",
+            "in": "body",
+            "schema": {
+              "$ref": "#/definitions/addScu"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "the created SCU",
+            "schema": {
+              "$ref": "#/definitions/scu"
+            }
+          }
+        }        
+      }
+    },
+
+    "/scus/{id}": {
+      "delete": {
+        "description": "remove the SCU corresponding to the supplied ID",
+        "tags": ["SCUs"],
+        "parameters": [
+          {
+            "name": "id",
+            "description": "id of SCU to remove",
+            "in": "path",
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "SCU removed"
+          },
+          "404": {
+            "description": "SCU not found (invalid ID)"
+          }
+        }        
+      }      
     }
 
   },
 
 
   "definitions": {
+    "addScu": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "aeTitle": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "scu": {
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "int64"          
+        },
+        "name": {
+          "type": "string"
+        },
+        "aeTitle": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "addScp": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "aeTitle": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "scp": {
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "int64"          
+        },
+        "name": {
+          "type": "string"
+        },
+        "aeTitle": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
     "watchDirectory": {
       "properties": {
         "pathString": {
