@@ -10,6 +10,21 @@ Gitter | [![Join the chat at https://gitter.im/KarlSjostrand/slicebox](https://b
 
 Slicebox is a microservice for safe sharing and easy access to medical images. The goal of the project is to facilitate research and collaboration between hospitals and universities. The service makes it easy to send images from the hosptial's PACS (image archive) to collaborators on the outside. Anonymization is handled automatically, releaving the hospital staff of the burden of making sure patient information does not leave the hospital network.
 
+Features
+--------
+
+* Browsing of images, either according to a Patient-Study-Series hierarchy, or using a flat view of all available series. 
+* Querying, filtering and sorting of image (meta) data
+* Upload and download of image data (DICOM datasets)
+* Viewing of images
+* Listing of DICOM attributes
+* Managing connections to other slicebox instances
+* Sending images to and receiving images from other slicebox instances
+* Setup of DICOM Service Class Providers (SCP). An SCP is a server accepting transfers of DICOM images. This functionality makes it possible to send images from a PACS (image archive) to Slicebox.
+* Setup of DICOM Service Class Users (SCU). This is the opposite of an SCP. An SCU client makes it possible to export DICOM encapsulated images and results to PACS.
+* Setup directory watches. DICOM files dropped into a directory watched by slicebox will import the image.
+* Protection of resources and routes using authentication and authorization. Users with certain priviliges can be added and removed.
+
 Example Usage
 -------------
 
