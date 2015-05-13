@@ -202,11 +202,8 @@
           }
         ],
         "responses": {
-          "201": {
+          "204": {
             "description": "patient deleted"
-          },
-          "404": {
-            "description": "patient not found (invalid ID)"
           }
         }
       }
@@ -327,11 +324,8 @@
           }
         ],
         "responses": {
-          "201": {
+          "204": {
             "description": "study deleted"
-          },
-          "404": {
-            "description": "study not found (invalid ID)"
           }
         }
       }
@@ -452,11 +446,8 @@
           }
         ],
         "responses": {
-          "201": {
+          "204": {
             "description": "series deleted"
-          },
-          "404": {
-            "description": "series not found (invalid ID)"
           }
         }
       }
@@ -577,11 +568,8 @@
           }
         ],
         "responses": {
-          "201": {
+          "204": {
             "description": "image deleted"
-          },
-          "404": {
-            "description": "image not found (invalid ID)"
           }
         }
       }
@@ -1008,11 +996,8 @@
           }
         ],
         "responses": {
-          "201": {
+          "204": {
             "description": "log entry deleted"
-          },
-          "404": {
-            "description": "log entry not found (invalid ID)"
           }
         }
       }
@@ -1115,11 +1100,8 @@
           }
         ],
         "responses": {
-          "201": {
+          "204": {
             "description": "box deleted"
-          },
-          "404": {
-            "description": "box not found (invalid ID)"
           }
         }
       }
@@ -1278,7 +1260,7 @@
           }
         ],
         "responses": {
-          "201": {
+          "204": {
             "description": "outbox entry deleted"
           }
         }
@@ -1509,9 +1491,6 @@
         "responses": {
           "204": {
             "description": "directory watch removed"
-          },
-          "404": {
-            "description": "watch directory not found (invalid ID)"
           }
         }        
       }      
@@ -1573,9 +1552,6 @@
         "responses": {
           "204": {
             "description": "SCP removed"
-          },
-          "404": {
-            "description": "SCP not found (invalid ID)"
           }
         }        
       }      
@@ -1637,9 +1613,6 @@
         "responses": {
           "204": {
             "description": "SCU removed"
-          },
-          "404": {
-            "description": "SCU not found (invalid ID)"
           }
         }        
       }      
