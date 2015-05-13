@@ -13,6 +13,8 @@ Slicebox is a microservice for safe sharing and easy access to medical images. T
 Features
 --------
 
+Slicebox provides a rich set of features for importing, exporting, managing and sharing image data. All features listed below are available as REST calls. The provided web interface covers most features.
+
 * Browsing of images, either according to a Patient-Study-Series hierarchy, or using a flat view of all available series. 
 * Querying, filtering and sorting of image (meta) data
 * Upload and download of image data (DICOM datasets)
