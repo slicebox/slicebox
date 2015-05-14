@@ -10,21 +10,38 @@ import de.heikoseeberger.sbtheader.license.Apache2_0
 
 	scalacOptions := Seq("-encoding", "UTF-8", "-Xlint","-deprecation", "-unchecked", "-feature", "-target:jvm-1.8")
 
+	// for sbt-resolver, (the re-start and re-stop commands)
+
 	Revolver.settings
 
-	maintainer in Universal := "nimsa.se"
+	// native packaging
 
-	packageSummary in Universal := "Slicebox DICOM sharing service"
+	maintainer := "nimsa.se"
 
-	packageDescription in Universal := "Slicebox is a service for sharing medical image data with collaborators while protecting patient information"
+	packageSummary := "Slicebox DICOM sharing service"
+
+	packageDescription := "Slicebox is a service for sharing medical image data with collaborators while protecting patient information"
+
+	// native packaging - universal
 
 	mappings in Universal <+= (packageBin in Compile, sourceDirectory ) map { (_, src) =>
 		val httpConf = src / "main" / "resources" / "application.conf"
 		httpConf -> "conf/slicebox.conf"
 	}
 
-	bashScriptExtraDefines += """addJava "-Dconfig.file=${app_home}/../conf/slicebox.conf" """
 	batScriptExtraDefines += """set _JAVA_OPTS=%_JAVA_OPTS% -Dconfig.file=%SLICEBOX_HOME%\\conf\\slicebox.conf"""
+
+	// native packaging - linux
+
+	daemonUser in Linux := normalizedName.value         // user which will execute the application
+
+	daemonGroup in Linux := (daemonUser in Linux).value // group which will execute the application
+
+	bashScriptExtraDefines += """addJava "-Dconfig.file=${app_home}/../conf/slicebox.conf" """
+
+	rpmVendor := maintainer.value
+	
+	// for automatic license stub generation
 
 	val licenceYear = "2015"
 	val licencedTo = "Karl Sjöstrand"
@@ -34,10 +51,14 @@ import de.heikoseeberger.sbtheader.license.Apache2_0
 	  "conf" -> Apache2_0(licenceYear, licencedTo, "#")
 	)
 
+	// repos
+
 	resolvers ++= Seq("Typesafe Repository"	at "http://repo.typesafe.com/typesafe/releases/",
 										"Sonatype snapshots"	at "http://oss.sonatype.org/content/repositories/snapshots/",
 										"Spray Repository"		at "http://repo.spray.io",
 										"Spray Nightlies"			at "http://nightlies.spray.io/")
+
+	// deps
 
 	libraryDependencies ++= {
 		val akkaVersion				= "2.3.9"
@@ -64,17 +85,27 @@ import de.heikoseeberger.sbtheader.license.Apache2_0
 		)
 	}
 
+	// run tests in separate JVMs
+
 	fork in Test := true
+
+	// eclipse IDE settings
 
 	EclipseKeys.createSrc := EclipseCreateSrc.Default + EclipseCreateSrc.Resource
 
 	EclipseKeys.withSource := true
 
-	mainClass in Compile := Some("se.nimsa.sbx.app.Main")
+	// define the project
 
 	lazy val slicebox = (project in file(".")).enablePlugins(SbtWeb, JavaServerAppPackaging, GitBranchPrompt)
 
+	mainClass in Compile := Some("se.nimsa.sbx.app.Main")
+
+	// turn on cached resolution in SBT
+
 	updateOptions := updateOptions.value.withCachedResolution(true)
+
+	// make sure files in the public folder are included in build
 
 	WebKeys.packagePrefix in Assets := "public/"
 	

@@ -162,10 +162,10 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
               case Some(imageFile) =>
                 val recipient = sender
                 Future {
-                  readImageAttributes(imageFile.fileName.value)
+                  Some(readImageAttributes(imageFile.fileName.value))
                 }.pipeTo(sender)
               case None =>
-                throw new IllegalArgumentException(s"No file found for image $imageId")
+                sender ! None
             }
           }
 
@@ -174,10 +174,10 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
             dao.imageFileForImage(imageId) match {
               case Some(imageFile) =>
                 Future {
-                  readImageInformation(imageFile.fileName.value)
+                  Some(readImageInformation(imageFile.fileName.value))
                 }.pipeTo(sender)
               case None =>
-                throw new IllegalArgumentException(s"No file found for image $imageId")
+                sender ! None
             }
           }
 
@@ -186,10 +186,10 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
             dao.imageFileForImage(imageId) match {
               case Some(imageFile) =>
                 Future {
-                  readImageFrame(imageFile.fileName.value, frameNumber, windowMin, windowMax, imageHeight)
+                  Some(readImageFrame(imageFile.fileName.value, frameNumber, windowMin, windowMax, imageHeight))
                 }.pipeTo(sender)
               case None =>
-                throw new IllegalArgumentException(s"No file found for image $imageId")
+                sender ! None
             }
           }
 
@@ -351,10 +351,10 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
     log.debug("Deleted file " + filePath)
   }
 
-  def readImageAttributes(fileName: String): ImageAttributes = {
+  def readImageAttributes(fileName: String): List[ImageAttribute] = {
     val filePath = storage.resolve(fileName)
     val dataset = loadDataset(filePath, false)
-    ImageAttributes(readImageAttributes(dataset, 0, ""))
+    readImageAttributes(dataset, 0, "")
   }
 
   def readImageAttributes(dataset: Attributes, depth: Int, path: String): List[ImageAttribute] = {
@@ -418,7 +418,7 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
       dataset.getInt(Tag.LargestImagePixelValue, 0))
   }
 
-  def readImageFrame(fileName: String, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int): ImageFrame = {
+  def readImageFrame(fileName: String, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int): Array[Byte] = {
     val file = storage.resolve(fileName).toFile
     val iis = ImageIO.createImageInputStream(file)
     try {
@@ -437,7 +437,7 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
       val baos = new ByteArrayOutputStream
       ImageIO.write(bi, "png", baos)
       baos.close()
-      ImageFrame(baos.toByteArray)
+      baos.toByteArray
     } finally {
       iis.close()
     }

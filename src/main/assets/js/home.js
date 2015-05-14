@@ -292,9 +292,11 @@ angular.module('slicebox.home', ['ngRoute'])
             return [];
         }
 
-        var loadDatasetsPromise = $http.get('/api/series/datasets?seriesid=' + $scope.uiState.selectedSeries.id);
-
-        loadDatasetsPromise.error(function(error) {
+        var loadDatasetsPromise = $http.get('/api/metadata/images?seriesid=' + $scope.uiState.selectedSeries.id).then(function(images) {
+            return images.data.map(function(image) {
+                return { url: '/api/images/' + image.id };
+            });
+        }, function(error) {
             $scope.showErrorMessage('Failed to load datasets: ' + error);
         });
 

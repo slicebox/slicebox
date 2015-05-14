@@ -3,6 +3,7 @@ package se.nimsa.sbx.app
 import org.scalatest.FlatSpec
 import org.scalatest.Matchers
 import spray.http.StatusCodes.OK
+import spray.http.StatusCodes.NotFound
 import spray.http.StatusCodes.BadRequest
 import spray.testkit.ScalatestRouteTest
 import scala.concurrent.duration.DurationInt
@@ -61,6 +62,16 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       responseAs[List[Patient]].size should be (1)
     }
   }
+  
+  it should "return 404 Not Found when requesting a patient that does not exist" in {
+    // given nothing
+    
+    // then
+    GetAsUser("/api/metadata/patients/1234") ~> routes ~> check {
+      status should be (NotFound)
+    }
+  }
+  
   it should "return 400 Bad Request when listing patients with invalid orderby parameter" in {
     // given
     db.withSession { implicit session =>

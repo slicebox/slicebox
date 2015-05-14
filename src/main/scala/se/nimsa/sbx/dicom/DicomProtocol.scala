@@ -226,11 +226,7 @@ object DicomProtocol {
   // ***from storage***
 
   case class ImageFiles(imageFiles: Seq[ImageFile])
-    
-  case class ImageAttributes(attributes: Seq[ImageAttribute])
-
-  case class ImageFrame(bytes: Array[Byte])
-  
+      
   case class ImageFilesDeleted(imageFiles: Seq[ImageFile])
   
   // Series

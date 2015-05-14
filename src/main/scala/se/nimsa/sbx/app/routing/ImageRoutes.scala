@@ -66,39 +66,38 @@ trait ImageRoutes { this: RestApi =>
               else
                 complete((BadRequest, "Dataset could not be read"))
             }).getOrElse {
-                complete((NotFound, s"No file found for image id $imageId"))              
+              complete((NotFound, s"No file found for image id $imageId"))
             }
           }
         }
       } ~ path(LongNumber / "attributes") { imageId =>
         get {
-          onSuccess(dicomService.ask(GetImageAttributes(imageId))) {
-            case ImageAttributes(attributes) =>
-              import spray.httpx.SprayJsonSupport._
-              complete(attributes)
+          onSuccess(dicomService.ask(GetImageAttributes(imageId)).mapTo[Option[List[ImageAttribute]]]) {
+            import spray.httpx.SprayJsonSupport._
+            complete(_)
           }
         }
       } ~ path(LongNumber / "imageinformation") { imageId =>
         get {
-          onSuccess(dicomService.ask(GetImageInformation(imageId))) {
-            case info: ImageInformation =>
-              import spray.httpx.SprayJsonSupport._
-              complete(info)
+          onSuccess(dicomService.ask(GetImageInformation(imageId)).mapTo[Option[ImageInformation]]) {
+            import spray.httpx.SprayJsonSupport._
+            complete(_)
           }
         }
       } ~ path(LongNumber / "png") { imageId =>
         parameters(
-            'framenumber.as[Int] ? 1, 
-            'windowmin.as[Int] ? 0, 
-            'windowmax.as[Int] ? 0, 
-            'imageheight.as[Int] ? 0) { (frameNumber, min, max, height) =>
-          get {
-            onSuccess(dicomService.ask(GetImageFrame(imageId, frameNumber, min, max, height))) {
-              case ImageFrame(bytes) =>
-                complete(HttpEntity(MediaTypes.`image/png`, HttpData(bytes)))
+          'framenumber.as[Int] ? 1,
+          'windowmin.as[Int] ? 0,
+          'windowmax.as[Int] ? 0,
+          'imageheight.as[Int] ? 0) { (frameNumber, min, max, height) =>
+            get {
+              onSuccess(dicomService.ask(GetImageFrame(imageId, frameNumber, min, max, height)).mapTo[Option[Array[Byte]]]) {
+                _.map(bytes =>
+                  complete(HttpEntity(MediaTypes.`image/png`, HttpData(bytes))))
+                  .getOrElse(complete(NotFound))
+              }
             }
           }
-        }
       }
     }
 

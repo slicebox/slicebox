@@ -17,6 +17,7 @@ import java.nio.file.Paths
 import org.dcm4che3.data.Tag
 import org.dcm4che3.data.VR
 import spray.http.HttpData
+import se.nimsa.sbx.dicom.DicomProtocol.ImageAttribute
 
 class ImageRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
@@ -66,4 +67,31 @@ class ImageRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       status should be (BadRequest)
     }
   }
+  
+  it should "return a non-empty list of attributes when listing attributes for an image" in {
+    GetAsUser("/api/images/1/attributes") ~> routes ~> check {
+      status should be (OK)
+      responseAs[List[ImageAttribute]].size should be > (0)
+    }
+  }
+  
+  it should "return NotFound when listing attributes for an image that does not exist" in {
+    GetAsUser("/api/images/2/attributes") ~> routes ~> check {
+      status should be (NotFound)
+    }
+  }
+  
+  it should "return a non-empty array of bytes when requesting a png represenation of an image" in {
+    GetAsUser("/api/images/1/png") ~> routes ~> check {
+      status should be (OK)
+      responseAs[Array[Byte]].size should be > (0)
+    }
+  }
+  
+  it should "return NotFound when requesting a png for an image that does not exist" in {
+    GetAsUser("/api/images/2/png") ~> routes ~> check {
+      status should be (NotFound)
+    }
+  }
+    
 }
