@@ -4,7 +4,7 @@
 Service | Status | Description
 ------- | ------ | -----------
 Travis        | [![Build Status](https://travis-ci.org/KarlSjostrand/slicebox.svg?branch=develop)](https://travis-ci.org/KarlSjostrand/slicebox.svg?branch=develop) | Tests
-Bintray       | [ ![Download](https://api.bintray.com/packages/karlsjostrand/slicebox/universal/images/download.svg) ](https://bintray.com/karlsjostrand/slicebox/universal/_latestVersion) | Latest Version on Bintray
+Bintray       | [ ![Download](https://api.bintray.com/packages/karlsjostrand/slicebox/installers/images/download.svg) ](https://bintray.com/karlsjostrand/slicebox/installers/_latestVersion) | Latest Version on Bintray
 Gitter        | [![Join the chat at https://gitter.im/KarlSjostrand/slicebox](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/KarlSjostrand/slicebox?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge) | Chatroom
 Documentation | - | [REST API](http://karlsjostrand.github.io/slicebox)
 
@@ -47,7 +47,7 @@ We provide two types of installers, either a zip-file suitable for installation 
 
 ### Universal zip package
 
-* Download a zipped distribution of slicebox from [Bintray](https://bintray.com/karlsjostrand/slicebox/universal/_latestVersion).
+* Download a zipped distribution of slicebox from [Bintray](https://bintray.com/karlsjostrand/slicebox/installers/_latestVersion).
 * Unzip onto a suitable server computer. Any computer which is always on and which has a fixed (local or public) IP address will do.
 * Configure the service by editing [conf/slicebox.conf](./src/main/resources/application.conf). In particular, the administrator (superuser) username and password can be configured as well as the hostname and port of the service.
 * The `bin` folder contains start scripts for Windows and Linux/Unix/Mac OS.
@@ -67,7 +67,7 @@ There should now be a slicebox task in the list of active tasks. Restart the com
 
 ### Linux - installation and configuration
 
-We provide `.deb` and `.rpm` packages, both available on [Bintray](https://bintray.com/karlsjostrand/slicebox/universal/_latestVersion). These installers set up slicebox to run as a background process, or service. The following file structure is used:
+We provide `.deb` and `.rpm` packages, both available on [Bintray](https://bintray.com/karlsjostrand/slicebox/installers/_latestVersion). These installers set up slicebox to run as a background process, or service. The following file structure is used:
 
 Folder                       | Description
 ------                       | -----------
