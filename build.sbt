@@ -35,7 +35,7 @@ import de.heikoseeberger.sbtheader.license.Apache2_0
 
 	daemonUser in Linux := "root" // user which will execute the application
 
-	daemonGroup in Linux := "(daemonUser in Linux).value" // group which will execute the application
+	daemonGroup in Linux := (daemonUser in Linux).value // group which will execute the application
 
 	bashScriptExtraDefines += """addJava "-Dconfig.file=${app_home}/../conf/slicebox.conf" """
 
