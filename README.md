@@ -43,12 +43,16 @@ Images can now be exported from PACS to the local slicebox instance easily. Expo
 Installation
 ------------
 
+We provide two types of installers, either a zip-file suitable for installation on any system, or `deb/rpm` packages for Debian/Red Hat Linux. The linux installers are easiest to use, slicebox will be setup and ready to use upon installation. The zip-file variant requires a little more configuration as described below.
+
+### Universal zip package
+
 * Download a zipped distribution of slicebox from [Bintray](https://bintray.com/karlsjostrand/slicebox/universal/_latestVersion).
 * Unzip onto a suitable server computer. Any computer which is always on and which has a fixed (local or public) IP address will do.
 * Configure the service by editing [conf/slicebox.conf](./src/main/resources/application.conf). In particular, the administrator (superuser) username and password can be configured as well as the hostname and port of the service.
-* The `bin` folder contains start scripts for Windows and Linux/Unix/Mac OS. Make sure the service is started on server startup. 
+* The `bin` folder contains start scripts for Windows and Linux/Unix/Mac OS.
 
-### Windows
+### Windows - running Slicebox as a scheduled task
 
 Slicebox does not (yet) provide an installer for Windows which configures slicebox to run as a Windows service. A similar behavior can be achieved using "Scheduled Tasks" in Windows.
 
@@ -61,7 +65,18 @@ Slicebox does not (yet) provide an installer for Windows which configures sliceb
 
 There should now be a slicebox task in the list of active tasks. Restart the computer, or start it directly from the list of scheduled tasks
 
-### Linux
+### Linux - installation and configuration
+
+We provide `.deb` and `.rpm` packages, both available on [Bintray](https://bintray.com/karlsjostrand/slicebox/universal/_latestVersion). These installers set up slicebox to run as a background process, or service. The following file structure is used:
+
+Folder                       | Description
+------                       | -----------
+`/usr/share/slicebox`        | Installation directory. The database, logs, configureations and stored DICOM files reside here.
+`/etc/default/slicebox.conf` | Config file for environment variables and other settings applied before the application starts
+`/etc/slicebox`              | Sym-link to slicebox configuration folder
+`/var/log/slicebox`          | Location of slicebox log files
+
+Once installed, edit the slicebox configuration files as needed (administrator credentials and hostname/port).
 
 Integration with Applications
 -----------------------------
