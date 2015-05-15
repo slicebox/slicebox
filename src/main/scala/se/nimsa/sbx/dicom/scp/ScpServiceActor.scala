@@ -44,6 +44,8 @@ class ScpServiceActor(dbProps: DbProps) extends Actor with ExceptionCatching {
     executor.shutdown()
   }
 
+  log.info("SCP service started")    
+      
   def receive = LoggingReceive {
 
     case msg: ScpRequest =>

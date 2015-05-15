@@ -69,6 +69,8 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
     context.system.eventStream.subscribe(context.self, classOf[FileReceived])
   }
 
+  log.info("Storage service started")    
+    
   def receive = LoggingReceive {
 
     case FileReceived(path) =>

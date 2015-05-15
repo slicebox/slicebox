@@ -41,6 +41,8 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor 
   setupDb()
   setupWatches()
 
+  log.info("Directory watch service started")    
+      
   def receive = LoggingReceive {
 
     case msg: DirectoryRequest =>

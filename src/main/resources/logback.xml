@@ -3,20 +3,39 @@
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <target>System.out</target>
         <encoder>
-            <pattern>%date{HH:mm:ss:sss} %-6level: %msg%n</pattern>
-            <!--<pattern>%-6level[%logger{0}]: %msg%n</pattern>-->
+            <charset>UTF-8</charset>
+            <pattern>%d %-5level %logger{35} - %msg%n</pattern>
         </encoder>
     </appender>
 
-    <logger name="akka" level="ERROR" />
-    <logger name="spray" level="ERROR" />
-	<logger name="scala.slick" level="ERROR" />
-    <logger name="com.mchange" level="ERROR" />
-	<!-- <logger name="scala.slick.jdbc.JdbcBackend.statement" level="DEBUG" /> -->
-	<logger name="org.dcm4che3" level="ERROR" />
-    <logger name="se.nimsa.sbx" level="WARN" />
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/slicebox.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>logs/slicebox_%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+ 
+            <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+                <maxFileSize>5MB</maxFileSize>
+            </timeBasedFileNamingAndTriggeringPolicy>
 
-    <root level="INFO">
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+ 
+        <encoder>
+            <charset>UTF-8</charset>
+            <pattern>%d %-5level %logger{35} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <logger name="akka" level="WARN" />
+    <logger name="spray" level="ERROR" />
+	<logger name="scala.slick" level="WARN" />
+    <logger name="com.mchange" level="WARN" />
+	<!-- <logger name="scala.slick.jdbc.JdbcBackend.statement" level="DEBUG" /> -->
+	<logger name="org.dcm4che3" level="WARN" />
+    <logger name="se.nimsa.sbx" level="INFO" />
+
+    <root level="DEBUG">
         <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
     </root>
 </configuration>

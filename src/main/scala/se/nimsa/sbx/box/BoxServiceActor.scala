@@ -18,6 +18,7 @@ package se.nimsa.sbx.box
 
 import se.nimsa.sbx.app.DbProps
 import akka.actor.Actor
+import akka.event.Logging
 import akka.event.LoggingReceive
 import akka.pattern.ask
 import se.nimsa.sbx.box.BoxProtocol._
@@ -46,6 +47,8 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
 
   case object UpdatePollBoxesOnlineStatus
 
+  val log = Logging(context.system, this)
+  
   val db = dbProps.db
   val boxDao = new BoxDAO(dbProps.driver)
 
@@ -67,6 +70,8 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
     self ! UpdatePollBoxesOnlineStatus
   }
 
+  log.info("Box service started")
+    
   override def postStop() =
     pollBoxesOnlineStatusSchedule.cancel()
 

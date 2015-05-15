@@ -44,6 +44,8 @@ class ScuServiceActor(dbProps: DbProps, storage: Path) extends Actor with Except
 
   setupDb()
 
+  log.info("SCU service started")    
+  
   def receive = LoggingReceive {
 
     case msg: ScuRequest =>

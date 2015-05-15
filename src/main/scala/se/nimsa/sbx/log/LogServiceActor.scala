@@ -22,6 +22,7 @@ import akka.event.Logging
 import akka.event.LoggingReceive
 import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.log.LogProtocol._
+import se.nimsa.sbx.log.LogProtocol.LogEntryType._
 
 class LogServiceActor(dbProps: DbProps) extends Actor {
   val log = Logging(context.system, this)
@@ -38,6 +39,8 @@ class LogServiceActor(dbProps: DbProps) extends Actor {
   override def postStop {
     context.system.eventStream.unsubscribe(self)
   }
+
+  log.info("Log service started")    
 
   def receive = LoggingReceive {
     case AddLogEntry(logEntry) => addLogEntry(logEntry)
@@ -59,6 +62,12 @@ class LogServiceActor(dbProps: DbProps) extends Actor {
 
   def addLogEntry(logEntry: LogEntry): LogEntry =
     db.withSession { implicit session =>
+      logEntry.entryType match {
+        case INFO => log.info(s"${logEntry.subject}: ${logEntry.message}")
+        case DEFAULT => log.debug(s"${logEntry.subject}: ${logEntry.message}")
+        case WARN => log.warning(s"${logEntry.subject}: ${logEntry.message}")
+        case ERROR => log.error(s"${logEntry.subject}: ${logEntry.message}")
+      }
       dao.insertLogEntry(logEntry)
     }
 

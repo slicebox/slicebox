@@ -49,6 +49,8 @@ class UserServiceActor(dbProps: DbProps, superUser: String, superPassword: Strin
   override def postStop() =
     authTokenCleaner.cancel()
 
+  log.info("User service started")    
+    
   def receive = LoggingReceive {
 
     case msg: UserRequest =>
