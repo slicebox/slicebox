@@ -2,7 +2,7 @@ import de.heikoseeberger.sbtheader.license.Apache2_0
 
 	name := "slicebox"
 
-	version := "0.3"
+	version := "0.4-SNAPSHOT"
 
 	organization := "se.nimsa"
 
@@ -40,6 +40,8 @@ import de.heikoseeberger.sbtheader.license.Apache2_0
 	bashScriptExtraDefines += """addJava "-Dconfig.file=${app_home}/../conf/slicebox.conf" """
 
 	rpmVendor := maintainer.value
+
+	rpmLicense := Some("Apache v2")
 	
 	// for automatic license stub generation
 
