@@ -9,9 +9,9 @@ project/activator*
 /target
 /bin/
 /storage
-/storage.h2.db
-/storage.trace.db
-/storage.lock.db
+/*.h2.db
+/*.trace.db
+/*.lock.db
 /*.sublime-project
 /*.sublime-workspace
 /logs

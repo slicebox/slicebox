@@ -2,7 +2,7 @@ import de.heikoseeberger.sbtheader.license.Apache2_0
 
 	name := "slicebox"
 
-	version := "0.3.1"
+	version := "0.4-SNAPSHOT"
 
 	organization := "se.nimsa"
 
@@ -33,7 +33,7 @@ import de.heikoseeberger.sbtheader.license.Apache2_0
 
 	// native packaging - linux
 
-	daemonUser in Linux := "root" // user which will execute the application
+	daemonUser in Linux := normalizedName.value // user which will execute the application
 
 	daemonGroup in Linux := (daemonUser in Linux).value // group which will execute the application
 

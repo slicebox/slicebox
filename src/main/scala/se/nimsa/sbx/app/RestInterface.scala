@@ -19,34 +19,41 @@ package se.nimsa.sbx.app
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
+
 import scala.concurrent.duration.DurationInt
 import scala.slick.driver.H2Driver
 import scala.slick.jdbc.JdbcBackend.Database
+
 import akka.actor.Actor
 import akka.util.Timeout
-import spray.http.StatusCodes.BadRequest
-import spray.routing.ExceptionHandler
+
 import spray.routing.HttpService
+
+import com.mchange.v2.c3p0.ComboPooledDataSource
 import com.typesafe.config.ConfigFactory
+
 import se.nimsa.sbx.app.routing.SliceboxRoutes
 import se.nimsa.sbx.box.BoxServiceActor
 import se.nimsa.sbx.dicom.DicomDispatchActor
 import se.nimsa.sbx.log.LogServiceActor
-import com.mchange.v2.c3p0.ComboPooledDataSource
 import se.nimsa.sbx.seriestype.SeriesTypeServiceActor
 
 class RestInterface extends Actor with RestApi {
 
   def actorRefFactory = context
 
-  def dbUrl = "jdbc:h2:storage"
+  def dbUrl = "jdbc:h2:" + sliceboxConfig.getString("database.path")
 
   def createStorageDirectory = {
-    val storagePath = Paths.get(sliceboxConfig.getString("storage"))
+    val storagePath = Paths.get(sliceboxConfig.getString("dicom-files.path"))
     if (!Files.exists(storagePath))
-      Files.createDirectories(storagePath)
+      try {
+        Files.createDirectories(storagePath)
+      } catch {
+        case e: Exception => throw new RuntimeException("Dicom-files directory could not be created: " + e.getMessage)
+      }
     if (!Files.isDirectory(storagePath))
-      throw new IllegalArgumentException("Storage directory is not a directory.")
+      throw new IllegalArgumentException("Dicom-files directory is not a directory.")
     storagePath
   }
 
