@@ -43,13 +43,13 @@ Images can now be exported from PACS to the local slicebox instance easily. Expo
 Installation
 ------------
 
-We provide two types of installers, either a zip-file suitable for installation on any system, or `deb/rpm` packages for Debian/Red Hat Linux. The linux installers are easiest to use, slicebox will be setup and ready to use upon installation. The zip-file variant requires a little more configuration as described below.
+We provide two types of installers, either a zip-file suitable for installation on any system, or `deb/rpm` packages for Debian/Red Hat Linux. When using the zip-file, it is up to the user installing slicebox to install the program as a service. The linux installers are configured to automatically install slicebox as a service which is always running.
 
 ### Universal zip package
 
 * Download a zipped distribution of slicebox from [Bintray](https://bintray.com/karlsjostrand/slicebox/installers/_latestVersion).
 * Unzip onto a suitable server computer. Any computer which is always on and which has a fixed (local or public) IP address will do.
-* Configure the service by editing [conf/slicebox.conf](./src/main/resources/application.conf). In particular, the administrator (superuser) username and password can be configured as well as the hostname and port of the service.
+* Configure the service by editing [conf/slicebox.conf](./src/main/resources/application.conf). In particular, the administrator (superuser) username and password can be configured along with the hostname and port of the service, and paths to databaee and file storage. The `slicebox.conf` file reads and appends a second configuration file called `my-slicebox.conf`, if present. A neat way of preserving the reference configuation in `slicebox.conf` is to create a file called `my-slicebox.conf` and place it in the same directory as `slicebox.conf`. Include those configurations you wish to change in this this file, they will override the reference settings.
 * The `bin` folder contains start scripts for Windows and Linux/Unix/Mac OS.
 
 ### Windows - running Slicebox as a scheduled task
@@ -69,14 +69,29 @@ There should now be a slicebox task in the list of active tasks. Restart the com
 
 We provide `.deb` and `.rpm` packages, both available on [Bintray](https://bintray.com/karlsjostrand/slicebox/installers/_latestVersion). These installers set up slicebox to run as a background process, or service. The following file structure is used:
 
-Folder                       | Description
-------                       | -----------
-`/usr/share/slicebox`        | Installation directory. The database, logs, configureations and stored DICOM files reside here.
-`/etc/default/slicebox.conf` | Config file for environment variables and other settings applied before the application starts
-`/etc/slicebox`              | Sym-link to slicebox configuration folder
-`/var/log/slicebox`          | Location of slicebox log files
+Folder                       | User     | Description
+------                       | ----     | -----------
+`/usr/share/slicebox`        | root     | Installation directory. The database, logs, configureations and stored DICOM files reside here.
+`/etc/default/slicebox.conf` | root     | Config file for environment variables and other settings applied before the application starts
+`/etc/slicebox`              | root     | Sym-link to slicebox configuration folder
+`/var/log/slicebox`          | slicebox | Location of slicebox log files
+`/var/run/slicebox`          | slicebox | Currently not used
 
-Once installed, edit the slicebox configuration files as needed (administrator credentials and hostname/port).
+The service can be controlled using commands such as `sudo restart slicebox`, `sudo stop slicebox` and `sudo status slicebox`.
+
+During the installation a user and group named slicebox is created, as indicated in the table above. The service is run using this user, which means that files created by slicebox (such as the database files and stored DICOM files) must reside in a directory in which the slicebox user has the necessary permissions. Upon installation, the default settings in `/etc/slicebox/slicebox.conf` point to the installation directory itself, which is owned by root. This means that slicebox will not run correclty (there will be a log error message indicating this). We suggest the following changes:
+
+* Create a directory `/var/slicebox` owned by the slicebox user and group. 
+* Add a configuration file called `my-slicebox.conf` next to the reference configuration file `/etc/slicebox/slicebox.conf`. Add the following settings to this file:
+   * `slicebox.dicom-files.path = "/var/slicebox/dicom-files"`
+   * `slicebox.database.path = "/var/slicebox/slicebox"`
+* Add any other changes to the reference configuration you wish to make. You probably wish to override `http.host`, `http.port`, `slicebox.superuser.user` and `slicebox.superuser.password`.
+* Restart slicebox using `sudo restart slicebox`
+* The service should now be available at your specified host name and port number. Check the log to make sure the service is running as intended.
+
+### Installation gotchas
+
+* Hospitals often restrict internet access to a limited set of ports, usually ports 80 and 443 (for SSL). Slicebox instances that should communicate with hospital instances may be required to run on port 80 for this reason.
 
 Integration with Applications
 -----------------------------
