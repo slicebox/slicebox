@@ -43,13 +43,13 @@ Images can now be exported from PACS to the local slicebox instance easily. Expo
 Installation
 ------------
 
-We provide two types of installers, either a zip-file suitable for installation on any system, or `deb/rpm` packages for Debian/Red Hat Linux. When using the zip-file, it is up to the user installing slicebox to install the program as a service. The linux installers are configured to automatically install slicebox as a service which is always running.
+We provide two types of installers, either a zip-file suitable for installation on any system, or deb/rpm packages for Debian/Red Hat Linux. When using the zip-file, it is up to the user installing slicebox to install the program as a service. The linux installers are configured to automatically install slicebox as a service which is always running.
 
 ### Universal zip package
 
 * Download a zipped distribution of slicebox from [Bintray](https://bintray.com/karlsjostrand/slicebox/installers/_latestVersion).
 * Unzip onto a suitable server computer. Any computer which is always on and which has a fixed (local or public) IP address will do.
-* Configure the service by editing [conf/slicebox.conf](./src/main/resources/application.conf). In particular, the administrator (superuser) username and password can be configured along with the hostname and port of the service, and paths to databaee and file storage. The `slicebox.conf` file reads and appends a second configuration file called `my-slicebox.conf`, if present. A neat way of preserving the reference configuation in `slicebox.conf` is to create a file called `my-slicebox.conf` and place it in the same directory as `slicebox.conf`. Include those configurations you wish to change in this this file, they will override the reference settings.
+* Configure the service by editing [conf/slicebox.conf](./src/main/resources/application.conf). In particular, the administrator (superuser) username and password can be configured along with the hostname and port of the service, and paths to the database and file storage. The `slicebox.conf` file reads and appends a second configuration file called `my-slicebox.conf`, if present. A neat way of preserving the reference configuation in `slicebox.conf` is to create a file called `my-slicebox.conf` and place it in the same directory as `slicebox.conf`. Include those configurations you wish to change in this this file, they will override the reference settings.
 * The `bin` folder contains start scripts for Windows and Linux/Unix/Mac OS.
 
 ### Windows - running Slicebox as a scheduled task
