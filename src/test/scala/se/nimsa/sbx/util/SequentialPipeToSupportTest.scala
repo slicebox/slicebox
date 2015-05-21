@@ -37,7 +37,7 @@ class SequentialPipeToSupportTest(_system: ActorSystem) extends TestKit(_system)
 
     def futureStateChange(input: Double) = Future {
       state = 1 + input
-      Thread.sleep(500)
+      Thread.sleep(1500)
       state
     }
 
