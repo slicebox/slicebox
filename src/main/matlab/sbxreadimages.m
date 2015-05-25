@@ -1,4 +1,4 @@
-function [I, dcminfo] = sbxreadimage(imagedata, sbxdata)
+function [I, dcminfo] = sbxreadimages(imagedata, sbxdata)
 % SBXREADIMAGE Read an image from a slicebox server or a cached image
 % from disk.
 %
@@ -14,7 +14,8 @@ for i = 1:length(imagedata)
         imageurl = [sbxdata.url, '/api/images/', num2str(imagedata(i).id)];
         websave(filepath, imageurl, sbxdata.weboptions);
     end
-    
-    I{i} = dicomread(filepath);
-    dcminfo{i} = dicominfo(filepath);
+
+    z = str2double(datasets(i).instanceNumber.value);
+    I{z} = dicomread(filepath);
+    dcminfo{z} = dicominfo(filepath);
 end
