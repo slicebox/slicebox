@@ -46,6 +46,6 @@ sbxdata.cachepath = p.Results.cachepath;
 %Test for cache directory
 cachepath = sbxdata.cachepath;
 if exist(cachepath, 'dir') ~= 7
-    ME = MException('SBXMakesbxdata:noCacheDirectory','Cache directory does not exist!');
+    ME = MException('SBX:makesbxdata:NoCacheDirectory','Cache directory does not exist!');
     throw(ME);
 end

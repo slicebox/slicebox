@@ -6,10 +6,10 @@ function datasets = sbxgetimageinfo(seriesid, sbxdata)
 % info will be read from a local copy, if one exists.
 
 try
-    url = [sbxdata.url, '/api/metadata/images?seriesgid=',num2str(seriesid)];
+    url = [sbxdata.url, '/api/metadata/images?seriesid=',num2str(seriesid)];
     datasets = webread(url, sbxdata.weboptions);
     seriesfile = fullfile(sbxdata.cachepath, ['seriesdata', num2str(seriesid)]);
-    fprintf('saving %s', seriesfile);
+    %fprintf('saving %s\n', seriesfile);
     save(seriesfile,'datasets');
 catch ME
     switch ME.identifier
@@ -17,7 +17,7 @@ catch ME
             try 
                 datasets = readinfofile(seriesid, sbxdata);
             catch
-                ME2 = MException('SBXImageinfo:noSuchSeriesInCache','Could not retreive series with id %d.\nSeries not in cache and connection to server %s could not be established.',...
+                ME2 = MException('SBX:imageinfo:NoSuchSeriesInCache','Could not retreive series with id %d.\nSeries not in cache and connection to server %s could not be established.',...
                     seriesid, sbxdata.url);
                 throw(ME2);
             end
