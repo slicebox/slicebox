@@ -15,7 +15,7 @@ for i = 1:length(imagedata)
         websave(filepath, imageurl, sbxdata.weboptions);
     end
 
-    z = str2double(datasets(i).instanceNumber.value);
+    z = str2double(imagedata(i).instanceNumber.value);
     I{z} = dicomread(filepath);
     dcminfo{z} = dicominfo(filepath);
 end

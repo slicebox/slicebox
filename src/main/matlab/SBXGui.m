@@ -88,8 +88,13 @@ uiwait(handles.sbxgui);
 
 % --- Outputs from this function are returned to the command line.
 function varargout = SBXGui_OutputFcn(hObject, eventdata, handles)
-varargout{1} = handles.image;
-varargout{2} = handles.dcminfo;
+if(handles.closeReason == 0)
+    varargout{1} = handles.image;
+    varargout{2} = handles.dcminfo;
+else
+    varargout{1} = {};
+    varargout{2} = {};
+end
 % The figure can be deleted now
 delete(handles.sbxgui);
 
@@ -144,18 +149,18 @@ function loadButton_Callback(hObject, eventdata, handles)
 if(isfield(handles, 'seriesinfo'))
     % add stuff from
     % http://undocumentedmatlab.com/blog/animated-busy-spinning-icon here
-    loadImageToHandles(handles);
-    handles=guidata(handles.sbxgui);
+    [image, dcminfo] = sbxreadimages(handles.seriesinfo, handles.sbxdata);
+    handles.image = image;
+    handles.dcminfo = dcminfo;
+    handles.closeReason = 0;
+    guidata(handles.sbxgui, handles);
     close(handles.sbxgui);
 else
     error('You must select a series to load!');
 end
 
 function loadImageToHandles(handles)
-[image, dcminfo] = sbxreadimage(handles.seriesinfo, handles.sbxdata);
-handles.image = image;
-handles.dcminfo = dcminfo;
-guidata(handles.sbxgui,handles);
+
 
 
 % --- Executes on button press in deleteButton.
@@ -168,7 +173,9 @@ function cancelButton_Callback(hObject, eventdata, handles)
 % hObject    handle to cancelButton (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-delete(handles.sbxgui);
+handles.closeReason = 1;
+guidata(handles.sbxgui, handles);
+close(handles.sbxgui);
 
 % --- Executes when user attempts to close sbxgui.
 function sbxgui_CloseRequestFcn(hObject, eventdata, handles)
