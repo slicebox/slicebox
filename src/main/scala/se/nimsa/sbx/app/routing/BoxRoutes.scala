@@ -97,6 +97,22 @@ trait BoxRoutes { this: RestApi =>
             }
           }
         }
+      } ~ pathPrefix("anonymizationkeys") {
+        pathEndOrSingleSlash {
+          get {
+            onSuccess(boxService.ask(GetAnonymizationKeys)) {
+              case AnonymizationKeys(anonymizationKeys) =>
+                complete(anonymizationKeys)
+            }
+          }
+        } ~ path(LongNumber) { anonymizationKeyId =>
+          delete {
+            onSuccess(boxService.ask(RemoveAnonymizationKey(anonymizationKeyId))) {
+              case AnonymizationKeyRemoved(anonymizationKeyId) =>
+                complete(NoContent)
+            }
+          }
+        }
       }
     }
 
