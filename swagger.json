@@ -1209,6 +1209,46 @@
       }
     },
 
+    "/boxes/anonymizationkeys": {
+      "get": {
+        "description": "get a list of anonymization keys, each specifying how vital DICOM attributes have been anonymized for a particular image",
+        "tags": ["Boxes"],
+        "responses": {
+          "200": {
+            "description": "anonymization keys, one per DICOM image",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/anonymizationKey"
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "/boxes/anonymizationkeys/{id}": {
+      "delete": {        
+        "description": "delete an anonymization key that is no longer of interest",
+        "tags": ["Boxes"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of anonymization key",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "anonymization key deleted"
+          }
+        }
+      }
+    },
+
     "/inbox": {
       "get": {        
         "description": "get contents of inbox (records of received images)",
@@ -1622,6 +1662,71 @@
 
 
   "definitions": {
+    "anonymizationKey": {
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "int64"          
+        },
+        "remoteBoxId": {
+          "type": "integer",
+          "format": "int64"          
+        },
+        "transactionId": {
+          "type": "integer",
+          "format": "int64"          
+        },
+        "imageFileId": {
+          "type": "integer",
+          "format": "int64"          
+        },
+        "remoteBoxName": {
+          "type": "string"
+        },
+        "patientName": {
+          "type": "string"
+        },
+        "anonPatientName": {
+          "type": "string"
+        },
+        "patientID": {
+          "type": "string"
+        },
+        "anonPatientID": {
+          "type": "string"
+        },
+        "studyInstanceUID": {
+          "type": "string"
+        },
+        "anonStudyInstanceUID": {
+          "type": "string"
+        },
+        "seriesInstanceUID": {
+          "type": "string"
+        },
+        "anonSeriesInstanceUID": {
+          "type": "string"
+        },
+        "manufacturer": {
+          "type": "string"
+        },
+        "anonManufacturer": {
+          "type": "string"
+        },
+        "stationName": {
+          "type": "string"
+        },
+        "anonStationName": {
+          "type": "string"
+        },
+        "frameOfReferenceUID": {
+          "type": "string"
+        },
+        "anonFrameOfReferenceUID": {
+          "type": "string"
+        }
+      }
+    },
     "addScu": {
       "properties": {
         "name": {
