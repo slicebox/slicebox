@@ -129,6 +129,35 @@ angular.module('slicebox.transactions', ['ngRoute'])
 
 })
 
+.controller('AnonymizationKeyCtrl', function($scope, $http, $interval) {
+    // Initialization
+    $scope.actions =
+        [
+            {
+                name: 'Delete',
+                action: $scope.confirmDeleteEntitiesFunction('/api/boxes/anonymizationkeys/', 'anonymization key(s)')
+            }
+        ];
+
+    $scope.callbacks = {};
+
+    var timer = $interval(function() {
+        if (angular.isDefined($scope.callbacks.anonymizationKeyTable)) {
+            $scope.callbacks.anonymizationKeyTable.reloadPage();
+        }
+    }, 5000);
+
+    $scope.$on('$destroy', function() {
+        $interval.cancel(timer);
+    });
+  
+    // Scope functions
+    $scope.loadAnonymizationKeyPage = function(startIndex, count) {
+        return $http.get('/api/boxes/anonymizationkeys');
+    };
+
+})
+
 .controller('BoxLogCtrl', function($scope, $http, $interval) {
     // Initialization
     $scope.actions =

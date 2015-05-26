@@ -59,7 +59,7 @@ trait JsonFormats extends DefaultJsonProtocol {
 
   implicit val attributeValueMappingFormat = jsonFormat3(BoxSendTagValue)
   implicit val sendImagesDataFormat = jsonFormat2(BoxSendData)
-  implicit val anonymizationKeyFormat = jsonFormat19(AnonymizationKey)
+  implicit val anonymizationKeyFormat = jsonFormat20(AnonymizationKey)
   
   implicit val generateBoxBaseUrlFormat = jsonFormat1(GenerateBoxBaseUrl)
 

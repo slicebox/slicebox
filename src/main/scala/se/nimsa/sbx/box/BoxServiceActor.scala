@@ -185,10 +185,11 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
             sender ! addAnonymizationKey(anonymizationKey)
 
           case RemoveAnonymizationKey(anonymizationKeyId) =>
-            sender ! removeAnonymizationKey(anonymizationKeyId)
+            removeAnonymizationKey(anonymizationKeyId)
+            sender ! AnonymizationKeyRemoved(anonymizationKeyId)
 
           case GetAnonymizationKeys =>
-            sender ! anonymizationKeys
+            sender ! AnonymizationKeys(listAnonymizationKeys)
 
           case GetOutboxEntry(token, transactionId, sequenceNumber) =>
             pollBoxByToken(token).foreach(box => {
@@ -468,7 +469,7 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
       boxDao.removeAnonymizationKey(anonymizationKeyId)
     }
 
-  def anonymizationKeys =
+  def listAnonymizationKeys =
     db.withSession { implicit session =>
       boxDao.listAnonymizationKeys
     }

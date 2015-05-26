@@ -88,13 +88,14 @@ class BoxDAO(val driver: JdbcProfile) {
 
   val transactionTagValueQuery = TableQuery[TransactionTagValueTable]
 
-  val toAnonymizationKey = (id: Long, remoteBoxId: Long, transactionId: Long, imageFileId: Long, remoteBoxName: String, patientName: String, anonPatientName: String, patientID: String, anonPatientID: String, studyInstanceUID: String, anonStudyInstanceUID: String, seriesInstanceUID: String, anonSeriesInstanceUID: String, manufacturer: String, anonManufacturer: String, stationName: String, anonStationName: String, frameOfReferenceUID: String, anonFrameOfReferenceUID: String) =>
-    AnonymizationKey(id, remoteBoxId, transactionId, imageFileId, remoteBoxName, patientName, anonPatientName, patientID, anonPatientID, studyInstanceUID, anonStudyInstanceUID, seriesInstanceUID, anonSeriesInstanceUID, manufacturer, anonManufacturer, stationName, anonStationName, frameOfReferenceUID, anonFrameOfReferenceUID)
+  val toAnonymizationKey = (id: Long, created: Long, remoteBoxId: Long, transactionId: Long, imageFileId: Long, remoteBoxName: String, patientName: String, anonPatientName: String, patientID: String, anonPatientID: String, studyInstanceUID: String, anonStudyInstanceUID: String, seriesInstanceUID: String, anonSeriesInstanceUID: String, manufacturer: String, anonManufacturer: String, stationName: String, anonStationName: String, frameOfReferenceUID: String, anonFrameOfReferenceUID: String) =>
+    AnonymizationKey(id, created, remoteBoxId, transactionId, imageFileId, remoteBoxName, patientName, anonPatientName, patientID, anonPatientID, studyInstanceUID, anonStudyInstanceUID, seriesInstanceUID, anonSeriesInstanceUID, manufacturer, anonManufacturer, stationName, anonStationName, frameOfReferenceUID, anonFrameOfReferenceUID)
   val fromAnonymizationKey = (entry: AnonymizationKey) => 
-    Option((entry.id, entry.remoteBoxId, entry.transactionId, entry.imageFileId, entry.remoteBoxName, entry.patientName, entry.anonPatientName, entry.patientID, entry.anonPatientID, entry.studyInstanceUID, entry.anonStudyInstanceUID, entry.seriesInstanceUID, entry.anonSeriesInstanceUID, entry.manufacturer, entry.anonManufacturer, entry.stationName, entry.anonStationName, entry.frameOfReferenceUID, entry.anonFrameOfReferenceUID))
+    Option((entry.id, entry.created, entry.remoteBoxId, entry.transactionId, entry.imageFileId, entry.remoteBoxName, entry.patientName, entry.anonPatientName, entry.patientID, entry.anonPatientID, entry.studyInstanceUID, entry.anonStudyInstanceUID, entry.seriesInstanceUID, entry.anonSeriesInstanceUID, entry.manufacturer, entry.anonManufacturer, entry.stationName, entry.anonStationName, entry.frameOfReferenceUID, entry.anonFrameOfReferenceUID))
 
   class AnonymizationKeyTable(tag: Tag) extends Table[AnonymizationKey](tag, "AnonymizationKey") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
+    def created = column[Long]("created")
     def remoteBoxId = column[Long]("remoteboxid")
     def transactionId = column[Long]("transactionid")
     def imageFileId = column[Long]("imagefileid")
@@ -113,14 +114,14 @@ class BoxDAO(val driver: JdbcProfile) {
     def anonStationName = column[String]("anonstationname")
     def frameOfReferenceUID = column[String]("frameofreferenceuid")
     def anonFrameOfReferenceUID = column[String]("anonframeofreferenceuid")
-    def * = (id, remoteBoxId, transactionId, imageFileId, remoteBoxName, patientName, anonPatientName, patientID, anonPatientID, studyInstanceUID, anonStudyInstanceUID, seriesInstanceUID, anonSeriesInstanceUID, manufacturer, anonManufacturer, stationName, anonStationName, frameOfReferenceUID, anonFrameOfReferenceUID) <> (toAnonymizationKey.tupled, fromAnonymizationKey)
+    def * = (id, created, remoteBoxId, transactionId, imageFileId, remoteBoxName, patientName, anonPatientName, patientID, anonPatientID, studyInstanceUID, anonStudyInstanceUID, seriesInstanceUID, anonSeriesInstanceUID, manufacturer, anonManufacturer, stationName, anonStationName, frameOfReferenceUID, anonFrameOfReferenceUID) <> (toAnonymizationKey.tupled, fromAnonymizationKey)
   }
 
   val anonymizationKeyQuery = TableQuery[AnonymizationKeyTable]
 
   def create(implicit session: Session): Unit =
     if (MTable.getTables("Box").list.isEmpty) {
-      (boxQuery.ddl ++ outboxQuery.ddl ++ inboxQuery.ddl ++ transactionTagValueQuery.ddl).create
+      (boxQuery.ddl ++ outboxQuery.ddl ++ inboxQuery.ddl ++ transactionTagValueQuery.ddl ++ anonymizationKeyQuery.ddl).create
     }
 
   def drop(implicit session: Session): Unit =

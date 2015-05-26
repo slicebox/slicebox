@@ -40,6 +40,7 @@ import org.dcm4che3.data.Attributes.Visitor
 import org.dcm4che3.data.VR
 import se.nimsa.sbx.box.BoxProtocol.TransactionTagValue
 import se.nimsa.sbx.box.BoxProtocol.AnonymizationKey
+import java.util.Date
 
 object DicomUtil {
 
@@ -195,7 +196,7 @@ object DicomUtil {
     val anonSeries = datasetToSeries(anonDataset)
     val anonEquipment = datasetToEquipment(anonDataset)
     val anonFrameOfReference = datasetToFrameOfReference(anonDataset)
-    AnonymizationKey(-1, remoteBoxId, transactionId, imageFileId, remoteBoxName,
+    AnonymizationKey(-1, new Date().getTime, remoteBoxId, transactionId, imageFileId, remoteBoxName,
         patient.patientName.value, anonPatient.patientName.value, 
         patient.patientID.value, anonPatient.patientID.value,
         study.studyInstanceUID.value, anonStudy.studyInstanceUID.value,

@@ -58,6 +58,7 @@ object BoxProtocol {
 
   case class AnonymizationKey(
       id: Long, 
+      created: Long,
       remoteBoxId: Long,
       transactionId: Long, 
       imageFileId: Long,
