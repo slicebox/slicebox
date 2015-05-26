@@ -56,6 +56,29 @@ object BoxProtocol {
 
   case class TransactionTagValue(id: Long, imageFileId: Long, transactionId: Long, tag: Int, value: String) extends Entity
 
+  case class AnonymizationKey(
+      id: Long, 
+      remoteBoxId: Long,
+      transactionId: Long, 
+      imageFileId: Long,
+      remoteBoxName: String,
+      patientName: String,
+      anonPatientName: String,
+      patientID: String,
+      anonPatientID: String,
+      studyInstanceUID: String,
+      anonStudyInstanceUID: String,
+      seriesInstanceUID: String,
+      anonSeriesInstanceUID: String,
+      manufacturer: String,
+      anonManufacturer: String,
+      stationName: String,
+      anonStationName: String,
+      frameOfReferenceUID: String,
+      anonFrameOfReferenceUID: String) extends Entity
+      
+  case class BoxSendData(entityIds: Seq[Long], tagValues: Seq[BoxSendTagValue])
+
   case class InboxEntryInfo(remoteBoxName: String, transactionId: Long, receivedImageCount: Long, totalImageCount: Long)
 
   case class PushImageData(transactionId: Long, sequenceNumber: Long, totalImageCount: Long, dataset: Attributes)
@@ -76,8 +99,8 @@ object BoxProtocol {
 
   case class PollOutbox(token: String) extends BoxRequest
 
-  case class BoxSendData(entityIds: Seq[Long], tagValues: Seq[BoxSendTagValue])
-
+  case class AddAnonymizationKey(outboxEntry: OutboxEntry, dataset: Attributes, anonDataset: Attributes) extends BoxRequest
+  
   case class SendPatientsToRemoteBox(remoteBoxId: Long, patientIds: Seq[Long], tagValues: Seq[BoxSendTagValue]) extends BoxRequest
 
   case class SendStudiesToRemoteBox(remoteBoxId: Long, studyIds: Seq[Long], tagValues: Seq[BoxSendTagValue]) extends BoxRequest
@@ -96,6 +119,16 @@ object BoxProtocol {
 
   case class RemoveOutboxEntry(outboxEntryId: Long) extends BoxRequest
 
+  case object GetAnonymizationKeys extends BoxRequest
+  
+  case class RemoveAnonymizationKey(anonymizationKeyId: Long) extends BoxRequest
+  
+  case class AnonymizationKeyAdded(anonymizationKey: AnonymizationKey)
+  
+  case class AnonymizationKeyRemoved(anonymizationKeyId: Long)
+  
+  case class AnonymizationKeys(anonymizationKeys: Seq[AnonymizationKey])
+  
   case class OutboxEntryRemoved(outboxEntryId: Long)
 
   case class RemoteBoxAdded(box: Box)

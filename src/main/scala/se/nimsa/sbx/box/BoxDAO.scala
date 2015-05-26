@@ -88,6 +88,36 @@ class BoxDAO(val driver: JdbcProfile) {
 
   val transactionTagValueQuery = TableQuery[TransactionTagValueTable]
 
+  val toAnonymizationKey = (id: Long, remoteBoxId: Long, transactionId: Long, imageFileId: Long, remoteBoxName: String, patientName: String, anonPatientName: String, patientID: String, anonPatientID: String, studyInstanceUID: String, anonStudyInstanceUID: String, seriesInstanceUID: String, anonSeriesInstanceUID: String, manufacturer: String, anonManufacturer: String, stationName: String, anonStationName: String, frameOfReferenceUID: String, anonFrameOfReferenceUID: String) =>
+    AnonymizationKey(id, remoteBoxId, transactionId, imageFileId, remoteBoxName, patientName, anonPatientName, patientID, anonPatientID, studyInstanceUID, anonStudyInstanceUID, seriesInstanceUID, anonSeriesInstanceUID, manufacturer, anonManufacturer, stationName, anonStationName, frameOfReferenceUID, anonFrameOfReferenceUID)
+  val fromAnonymizationKey = (entry: AnonymizationKey) => 
+    Option((entry.id, entry.remoteBoxId, entry.transactionId, entry.imageFileId, entry.remoteBoxName, entry.patientName, entry.anonPatientName, entry.patientID, entry.anonPatientID, entry.studyInstanceUID, entry.anonStudyInstanceUID, entry.seriesInstanceUID, entry.anonSeriesInstanceUID, entry.manufacturer, entry.anonManufacturer, entry.stationName, entry.anonStationName, entry.frameOfReferenceUID, entry.anonFrameOfReferenceUID))
+
+  class AnonymizationKeyTable(tag: Tag) extends Table[AnonymizationKey](tag, "AnonymizationKey") {
+    def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
+    def remoteBoxId = column[Long]("remoteboxid")
+    def transactionId = column[Long]("transactionid")
+    def imageFileId = column[Long]("imagefileid")
+    def remoteBoxName = column[String]("remoteboxname")
+    def patientName = column[String]("patientname")
+    def anonPatientName = column[String]("anonpatientname")
+    def patientID = column[String]("patientid")
+    def anonPatientID = column[String]("anonpatientid")
+    def studyInstanceUID = column[String]("studyinstanceuid")
+    def anonStudyInstanceUID = column[String]("anonstudyinstanceuid")
+    def seriesInstanceUID = column[String]("seriesinstanceuid")
+    def anonSeriesInstanceUID = column[String]("anonseriesinstanceuid")
+    def manufacturer = column[String]("manufacturer")
+    def anonManufacturer = column[String]("anonmanufacturer")
+    def stationName = column[String]("stationname")
+    def anonStationName = column[String]("anonstationname")
+    def frameOfReferenceUID = column[String]("frameofreferenceuid")
+    def anonFrameOfReferenceUID = column[String]("anonframeofreferenceuid")
+    def * = (id, remoteBoxId, transactionId, imageFileId, remoteBoxName, patientName, anonPatientName, patientID, anonPatientID, studyInstanceUID, anonStudyInstanceUID, seriesInstanceUID, anonSeriesInstanceUID, manufacturer, anonManufacturer, stationName, anonStationName, frameOfReferenceUID, anonFrameOfReferenceUID) <> (toAnonymizationKey.tupled, fromAnonymizationKey)
+  }
+
+  val anonymizationKeyQuery = TableQuery[AnonymizationKeyTable]
+
   def create(implicit session: Session): Unit =
     if (MTable.getTables("Box").list.isEmpty) {
       (boxQuery.ddl ++ outboxQuery.ddl ++ inboxQuery.ddl ++ transactionTagValueQuery.ddl).create
@@ -218,4 +248,15 @@ class BoxDAO(val driver: JdbcProfile) {
   def removeTransactionTagValuesByTransactionId(transactionId: Long)(implicit session: Session): Unit =
     transactionTagValueQuery.filter(_.transactionId === transactionId).delete
     
+  def listAnonymizationKeys(implicit session: Session): List[AnonymizationKey] =
+    anonymizationKeyQuery.list
+
+  def insertAnonymizationKey(entry: AnonymizationKey)(implicit session: Session): AnonymizationKey = {
+    val generatedId = (anonymizationKeyQuery returning anonymizationKeyQuery.map(_.id)) += entry
+    entry.copy(id = generatedId)
+  }
+
+  def removeAnonymizationKey(anonymizationKeyId: Long)(implicit session: Session): Unit =
+    anonymizationKeyQuery.filter(_.id === anonymizationKeyId).delete
+
 }

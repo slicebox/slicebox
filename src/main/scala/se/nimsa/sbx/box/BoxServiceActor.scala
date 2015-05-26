@@ -24,6 +24,7 @@ import akka.pattern.ask
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.dicom.DicomProtocol._
+import se.nimsa.sbx.dicom.DicomUtil._
 import akka.pattern.pipe
 import akka.actor.Props
 import akka.actor.PoisonPill
@@ -41,6 +42,7 @@ import akka.util.Timeout
 import scala.concurrent.Future
 import scala.concurrent.Future.sequence
 import akka.actor.Stash
+import org.dcm4che3.data.Attributes
 
 class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) extends Actor with Stash
   with SequentialPipeToSupport with ExceptionCatching {
@@ -48,7 +50,7 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
   case object UpdatePollBoxesOnlineStatus
 
   val log = Logging(context.system, this)
-  
+
   val db = dbProps.db
   val boxDao = new BoxDAO(dbProps.driver)
 
@@ -71,7 +73,7 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
   }
 
   log.info("Box service started")
-    
+
   override def postStop() =
     pollBoxesOnlineStatusSchedule.cancel()
 
@@ -172,6 +174,21 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
               case None =>
                 sender ! BoxNotFound
             }
+
+          case AddAnonymizationKey(outboxEntry, dataset, anonDataset) =>
+            val anonymizationKey = boxById(outboxEntry.remoteBoxId) match {
+              case Some(box) =>
+                createAnonymizationKey(outboxEntry.remoteBoxId, outboxEntry.transactionId, outboxEntry.imageFileId, box.name, dataset, anonDataset)
+              case None =>
+                createAnonymizationKey(outboxEntry.remoteBoxId, outboxEntry.transactionId, outboxEntry.imageFileId, "" + outboxEntry.remoteBoxId, dataset, anonDataset)
+            }
+            sender ! addAnonymizationKey(anonymizationKey)
+
+          case RemoveAnonymizationKey(anonymizationKeyId) =>
+            sender ! removeAnonymizationKey(anonymizationKeyId)
+
+          case GetAnonymizationKeys =>
+            sender ! anonymizationKeys
 
           case GetOutboxEntry(token, transactionId, sequenceNumber) =>
             pollBoxByToken(token).foreach(box => {
@@ -436,12 +453,25 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
       boxDao.tagValuesByImageFileIdAndTransactionId(imageFileId, transactionId)
     }
 
-  def removeTransactionTagValuesForTransactionId(transactionId: Long) = {
+  def removeTransactionTagValuesForTransactionId(transactionId: Long) =
     db.withSession { implicit session =>
       boxDao.removeTransactionTagValuesByTransactionId(transactionId)
     }
-  }
 
+  def addAnonymizationKey(anonymizatinKey: AnonymizationKey): AnonymizationKey =
+    db.withSession { implicit session =>
+      boxDao.insertAnonymizationKey(anonymizatinKey)
+    }
+
+  def removeAnonymizationKey(anonymizationKeyId: Long) =
+    db.withSession { implicit session =>
+      boxDao.removeAnonymizationKey(anonymizationKeyId)
+    }
+
+  def anonymizationKeys =
+    db.withSession { implicit session =>
+      boxDao.listAnonymizationKeys
+    }
 }
 
 object BoxServiceActor {

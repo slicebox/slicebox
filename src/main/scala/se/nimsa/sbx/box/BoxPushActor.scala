@@ -63,6 +63,13 @@ class BoxPushActor(box: Box,
     val dataset = loadDataset(path, true)
     val anonymizedDataset = anonymizeDataset(dataset)
     applyTagValues(anonymizedDataset, tagValues)
+    val anonymizationKey = boxById(outboxEntry.remoteBoxId) match {
+      case Some(box) => 
+        createAnonymizationKey(outboxEntry.remoteBoxId, outboxEntry.transactionId, outboxEntry.imageFileId, box.name, dataset, anonymizedDataset)
+      case None =>
+        createAnonymizationKey(outboxEntry.remoteBoxId, outboxEntry.transactionId, outboxEntry.imageFileId, "" + outboxEntry.remoteBoxId, dataset, anonymizedDataset)
+    }
+    addAnonymizationKey(anonymizationKey)
     val bytes = toByteArray(anonymizedDataset)
     sendFilePipeline(Post(s"${box.baseUrl}/image?transactionid=${outboxEntry.transactionId}&sequencenumber=${outboxEntry.sequenceNumber}&totalimagecount=${outboxEntry.totalImageCount}", HttpData(bytes)))
   }
@@ -164,14 +171,14 @@ class BoxPushActor(box: Box,
     log.debug(s"Failed to send file to box ${box.name}: ${exception.getMessage}")
     statusCode match {
       case code if code >= 500 =>
-        // server-side error, remote box is most likely down
+      // server-side error, remote box is most likely down
       case _ =>
         markOutboxTransactionAsFailed(outboxEntry, s"Cannot send file to box ${box.name}: ${exception.getMessage}")
     }
     context.unbecome
   }
 
-  def handleFilenameLookupFailedForOutboxEntry(outboxEntry: OutboxEntry, exception: Exception) = {    
+  def handleFilenameLookupFailedForOutboxEntry(outboxEntry: OutboxEntry, exception: Exception) = {
     markOutboxTransactionAsFailed(outboxEntry, s"Failed to send file to box ${box.name}: " + exception.getMessage)
     context.unbecome
   }
@@ -188,6 +195,16 @@ class BoxPushActor(box: Box,
       boxDao.removeTransactionTagValuesByTransactionId(transactionId)
     }
   }
+
+  def addAnonymizationKey(anonymizationKey: AnonymizationKey) =
+    db.withSession { implicit session =>
+      boxDao.insertAnonymizationKey(anonymizationKey)
+    }
+  
+  def boxById(boxId: Long): Option[Box] =
+    db.withSession { implicit session =>
+      boxDao.boxById(boxId)
+    }
 
 }
 
