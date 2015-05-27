@@ -43,6 +43,7 @@ import scala.concurrent.Future
 import scala.concurrent.Future.sequence
 import akka.actor.Stash
 import org.dcm4che3.data.Attributes
+import BoxUtil._
 
 class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) extends Actor with Stash
   with SequentialPipeToSupport with ExceptionCatching {

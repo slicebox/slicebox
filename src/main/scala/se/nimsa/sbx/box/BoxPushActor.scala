@@ -21,6 +21,7 @@ import akka.actor.Props
 import akka.event.Logging
 import akka.event.LoggingReceive
 import BoxProtocol._
+import BoxUtil._
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.duration.FiniteDuration
 import spray.client.pipelining._
