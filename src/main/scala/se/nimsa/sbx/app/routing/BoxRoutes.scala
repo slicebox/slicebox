@@ -100,10 +100,17 @@ trait BoxRoutes { this: RestApi =>
       } ~ pathPrefix("anonymizationkeys") {
         pathEndOrSingleSlash {
           get {
-            onSuccess(boxService.ask(GetAnonymizationKeys)) {
-              case AnonymizationKeys(anonymizationKeys) =>
-                complete(anonymizationKeys)
-            }
+            parameters(
+              'startindex.as[Long] ? 0,
+              'count.as[Long] ? 20,
+              'orderby.as[String].?,
+              'orderascending.as[Boolean] ? true,
+              'filter.as[String].?) { (startIndex, count, orderBy, orderAscending, filter) =>
+                onSuccess(boxService.ask(GetAnonymizationKeys(startIndex, count, orderBy, orderAscending, filter))) {
+                  case AnonymizationKeys(anonymizationKeys) =>
+                    complete(anonymizationKeys)
+                }
+              }
           }
         } ~ path(LongNumber) { anonymizationKeyId =>
           delete {

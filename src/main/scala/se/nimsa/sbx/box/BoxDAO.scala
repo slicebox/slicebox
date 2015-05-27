@@ -20,6 +20,7 @@ import scala.slick.driver.JdbcProfile
 import org.h2.jdbc.JdbcSQLException
 import scala.slick.jdbc.meta.MTable
 import BoxProtocol._
+import scala.slick.jdbc.{ GetResult, StaticQuery => Q }
 
 class BoxDAO(val driver: JdbcProfile) {
   import driver.simple._
@@ -249,9 +250,31 @@ class BoxDAO(val driver: JdbcProfile) {
   def removeTransactionTagValuesByTransactionId(transactionId: Long)(implicit session: Session): Unit =
     transactionTagValueQuery.filter(_.transactionId === transactionId).delete
     
-  def listAnonymizationKeys(implicit session: Session): List[AnonymizationKey] =
-    anonymizationKeyQuery.list
+  def anonymizationKeys(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String])(implicit session: Session): List[AnonymizationKey] = {
 
+    implicit val getResult = GetResult(r =>
+      AnonymizationKey(r.nextLong, r.nextLong, r.nextLong, r.nextLong, r.nextLong, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString))
+
+    var query = """select * from "AnonymizationKey""""
+
+    filter.foreach(filterValue => {
+      val filterValueLike = s"'%$filterValue%'".toLowerCase
+      query += s""" where 
+        lcase("remoteboxname") like $filterValueLike or 
+          lcase("patientname") like $filterValueLike or 
+            lcase("anonpatientname") like $filterValueLike or 
+              lcase("patientid") like $filterValueLike or 
+                lcase("anonpatientid") like $filterValueLike"""
+    })
+
+    orderBy.foreach(orderByValue =>
+      query += s""" order by "$orderByValue" ${if (orderAscending) "asc" else "desc"}""")
+
+    query += s""" limit $count offset $startIndex"""
+
+    Q.queryNA(query).list
+  }
+  
   def insertAnonymizationKey(entry: AnonymizationKey)(implicit session: Session): AnonymizationKey = {
     val generatedId = (anonymizationKeyQuery returning anonymizationKeyQuery.map(_.id)) += entry
     entry.copy(id = generatedId)

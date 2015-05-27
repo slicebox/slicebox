@@ -152,8 +152,29 @@ angular.module('slicebox.transactions', ['ngRoute'])
     });
   
     // Scope functions
-    $scope.loadAnonymizationKeyPage = function(startIndex, count) {
-        return $http.get('/api/boxes/anonymizationkeys');
+    $scope.loadAnonymizationKeyPage = function(startIndex, count, orderByProperty, orderByDirection, filter) {
+        var loadUrl = '/api/boxes/anonymizationkeys?startindex=' + startIndex + '&count=' + count;
+        if (orderByProperty) {
+            loadUrl = loadUrl + '&orderby=' + orderByProperty.toLowerCase();
+            
+            if (orderByDirection === 'ASCENDING') {
+                loadUrl = loadUrl + '&orderascending=true';
+            } else {
+                loadUrl = loadUrl + '&orderascending=false';
+            }
+        }
+
+        if (filter) {
+            loadUrl = loadUrl + '&filter=' + encodeURIComponent(filter);
+        }
+
+        var loadPromise = $http.get(loadUrl);
+
+        loadPromise.error(function(error) {
+            $scope.showErrorMessage('Failed to load anonymization keys: ' + error);
+        });
+
+        return loadPromise;
     };
 
 })

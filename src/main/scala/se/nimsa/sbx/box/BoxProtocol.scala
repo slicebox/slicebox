@@ -120,7 +120,7 @@ object BoxProtocol {
 
   case class RemoveOutboxEntry(outboxEntryId: Long) extends BoxRequest
 
-  case object GetAnonymizationKeys extends BoxRequest
+  case class GetAnonymizationKeys(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String]) extends BoxRequest
   
   case class RemoveAnonymizationKey(anonymizationKeyId: Long) extends BoxRequest
   
