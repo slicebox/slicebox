@@ -1213,6 +1213,48 @@
       "get": {
         "description": "get a list of anonymization keys, each specifying how vital DICOM attributes have been anonymized for a particular image",
         "tags": ["Boxes"],
+        "parameters": [
+          {
+            "name": "startindex",
+            "in": "query",
+            "description": "start index of returned slice of anonymization keys",
+            "required": false,
+            "default": "0",
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "count",
+            "in": "query",
+            "description": "size of returned slice of anonymization keys",
+            "required": false,
+            "default": "20",
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "orderby",
+            "in": "query",
+            "description": "property to order results by",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "orderascending",
+            "in": "query",
+            "description": "order result ascendingly if true, descendingly otherwise",
+            "required": false,
+            "default": true,
+            "type": "boolean"
+          },
+          {
+            "name": "filter",
+            "in": "query",
+            "description": "filter the results by matching substrings of properties against this value",
+            "required": false,
+            "type": "string"
+          }
+        ],
         "responses": {
           "200": {
             "description": "anonymization keys, one per DICOM image",
