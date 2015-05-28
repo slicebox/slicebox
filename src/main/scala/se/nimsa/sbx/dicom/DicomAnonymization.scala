@@ -23,6 +23,7 @@ import org.dcm4che3.data.Tag
 import java.util.Date
 import org.dcm4che3.util.TagUtils
 import org.dcm4che3.data.Attributes.Visitor
+import DicomUtil._
 
 object DicomAnonymization {
 
@@ -30,7 +31,7 @@ object DicomAnonymization {
 
   def anonymizeDataset(dataset: Attributes): Attributes = {
 
-    val patientIdentityRemoved = dataset.getString(Tag.PatientIdentityRemoved)
+    val patientIdentityRemoved = isAnonymous(dataset)
 
     if (patientIdentityRemoved == "YES") {
 
@@ -151,7 +152,7 @@ object DicomAnonymization {
       removeTag(modified, Tag.ParticipantSequence)
       removeTag(modified, Tag.PatientAddress)
       removeTag(modified, Tag.PatientComments)
-      setStringTag(modified, Tag.PatientID, VR.LO, createUid(patientID))
+      setStringTag(modified, Tag.PatientID, VR.LO, createUid())
       removeTag(modified, Tag.PatientState)
       removeTag(modified, Tag.PatientTransportArrangements)
       removeTag(modified, Tag.PatientBirthDate)
@@ -280,8 +281,6 @@ object DicomAnonymization {
 
   }
 
-  def cloneDataset(dataset: Attributes): Attributes = new Attributes(dataset)
-
   def setStringTag(dataset: Attributes, tag: Int, vr: VR, value: String): Unit = dataset.setString(tag, vr, value)
   def setDateTag(dataset: Attributes, tag: Int, vr: VR, value: Date): Unit = dataset.setDate(tag, vr, value)
   def removeTag(dataset: Attributes, tag: Int): Unit = dataset.remove(tag)
@@ -307,6 +306,8 @@ object DicomAnonymization {
       Some(baseValue)
     else
       None
+
+  def createUid(): String = createUid(null)
 
   def createUid(baseValue: String): String =
     if (baseValue == null || baseValue.isEmpty)

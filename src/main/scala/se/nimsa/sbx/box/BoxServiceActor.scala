@@ -192,6 +192,17 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
           case GetAnonymizationKeys(startIndex, count, orderBy, orderAscending, filter) =>
             sender ! AnonymizationKeys(listAnonymizationKeys(startIndex, count, orderBy, orderAscending, filter))
 
+          case ReverseAnonymization(dataset) =>
+            val clonedDataset = cloneDataset(dataset)
+            reverseAnonymization(anonymizationKeysForAnonPatient(clonedDataset), clonedDataset)
+            sender ! clonedDataset
+
+          case HarmonizeAnonymization(dataset, anonDataset) =>
+            val clonedAnonDataset = cloneDataset(anonDataset)
+            val anonymizationKeys = anonymizationKeysForPatient(dataset)
+            harmonizeAnonymization(anonymizationKeys, dataset, clonedAnonDataset)
+            sender ! clonedAnonDataset
+
           case GetOutboxEntry(token, transactionId, sequenceNumber) =>
             pollBoxByToken(token).foreach(box => {
               outboxEntryByTransactionIdAndSequenceNumber(box.id, transactionId, sequenceNumber) match {
@@ -460,9 +471,9 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
       boxDao.removeTransactionTagValuesByTransactionId(transactionId)
     }
 
-  def addAnonymizationKey(anonymizatinKey: AnonymizationKey): AnonymizationKey =
+  def addAnonymizationKey(anonymizationKey: AnonymizationKey): AnonymizationKey =
     db.withSession { implicit session =>
-      boxDao.insertAnonymizationKey(anonymizatinKey)
+      boxDao.insertAnonymizationKey(anonymizationKey)
     }
 
   def removeAnonymizationKey(anonymizationKeyId: Long) =
@@ -474,6 +485,21 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
     db.withSession { implicit session =>
       boxDao.anonymizationKeys(startIndex, count, orderBy, orderAscending, filter)
     }
+
+  def anonymizationKeysForAnonPatient(dataset: Attributes) = {
+    db.withSession { implicit session =>
+      val anonPatient = datasetToPatient(dataset)
+      boxDao.anonymizationKeysForAnonPatient(anonPatient.patientName.value, anonPatient.patientID.value)
+    }
+  }
+
+  def anonymizationKeysForPatient(dataset: Attributes) = {
+    db.withSession { implicit session =>
+      val patient = datasetToPatient(dataset)
+      boxDao.anonymizationKeysForPatient(patient.patientName.value, patient.patientID.value)
+    }
+  }
+
 }
 
 object BoxServiceActor {

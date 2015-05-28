@@ -283,4 +283,17 @@ class BoxDAO(val driver: JdbcProfile) {
   def removeAnonymizationKey(anonymizationKeyId: Long)(implicit session: Session): Unit =
     anonymizationKeyQuery.filter(_.id === anonymizationKeyId).delete
 
+  def anonymizationKeysForAnonPatient(anonPatientName: String, anonPatientID: String)(implicit session: Session): List[AnonymizationKey] =
+    anonymizationKeyQuery
+    .filter(_.anonPatientName === anonPatientName)
+    .filter(_.anonPatientID === anonPatientID)
+    .list    
+
+  def anonymizationKeysForPatient(patientName: String, patientID: String)(implicit session: Session): List[AnonymizationKey] =
+    anonymizationKeyQuery
+    .filter(_.patientName === patientName)
+    .filter(_.patientID === patientID)
+    .list    
+
+
 }

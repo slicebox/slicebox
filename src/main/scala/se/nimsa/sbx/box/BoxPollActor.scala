@@ -33,10 +33,15 @@ import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.app.JsonFormats
 import se.nimsa.sbx.dicom.DicomProtocol.DatasetReceived
 import se.nimsa.sbx.log.SbxLog
-import se.nimsa.sbx.dicom.DicomUtil
+import se.nimsa.sbx.dicom.DicomUtil._
 import BoxProtocol._
+import BoxUtil._
 import akka.actor.ReceiveTimeout
 import java.util.Date
+import org.dcm4che3.data.Attributes
+import org.dcm4che3.data.VR
+import se.nimsa.sbx.dicom.DicomProperty.PatientName
+import org.dcm4che3.data.Tag
 
 class BoxPollActor(box: Box,
                    dbProps: DbProps,
@@ -143,8 +148,10 @@ class BoxPollActor(box: Box,
   def fetchFileForRemoteOutboxEntry(remoteOutboxEntry: OutboxEntry): Unit =
     getRemoteOutboxFile(remoteOutboxEntry)
       .map(response => {
-        val dataset = DicomUtil.loadDataset(response.entity.data.toByteArray, true)
-
+        val dataset = loadDataset(response.entity.data.toByteArray, true)
+                
+        reverseAnonymization(anonymizationKeysForAnonPatient(dataset), dataset)
+        
         context.system.eventStream.publish(DatasetReceived(dataset))
 
         self ! RemoteOutboxFileFetched(remoteOutboxEntry)
@@ -154,6 +161,13 @@ class BoxPollActor(box: Box,
           self ! FetchFileFailed(exception)
       }
 
+  def anonymizationKeysForAnonPatient(dataset: Attributes) = {
+    db.withSession { implicit session =>
+      val anonPatient = datasetToPatient(dataset)
+      boxDao.anonymizationKeysForAnonPatient(anonPatient.patientName.value, anonPatient.patientID.value)
+    }
+  }
+  
   def updateInbox(remoteBoxId: Long, transactionId: Long, sequenceNumber: Long, totalImageCount: Long): Unit = {
     db.withSession { implicit session =>
       boxDao.updateInbox(remoteBoxId, transactionId, sequenceNumber, totalImageCount)

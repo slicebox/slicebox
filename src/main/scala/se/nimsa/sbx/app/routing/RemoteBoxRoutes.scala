@@ -30,6 +30,7 @@ import se.nimsa.sbx.box.BoxUtil._
 import se.nimsa.sbx.dicom.DicomProtocol._
 import se.nimsa.sbx.dicom.DicomUtil._
 import se.nimsa.sbx.dicom.DicomAnonymization
+import org.dcm4che3.data.Attributes
 
 trait RemoteBoxRoutes { this: RestApi =>
 
@@ -47,11 +48,14 @@ trait RemoteBoxRoutes { this: RestApi =>
                   // make sure spray.httpx.SprayJsonSupport._ is NOT imported here. It messes with the content type expectations
                   entity(as[Array[Byte]]) { imageData =>
                     val dataset = loadDataset(imageData, true)
-                    onSuccess(dicomService.ask(AddDataset(dataset))) {
-                      case ImageAdded(image) =>
-                        onSuccess(boxService.ask(UpdateInbox(token, transactionId, sequenceNumber, totalImageCount))) {
-                          case msg: InboxUpdated =>
-                            complete(NoContent)
+                    onSuccess(boxService.ask(ReverseAnonymization(dataset))) {
+                      case dataset: Attributes =>
+                        onSuccess(dicomService.ask(AddDataset(dataset))) {
+                          case ImageAdded(image) =>
+                            onSuccess(boxService.ask(UpdateInbox(token, transactionId, sequenceNumber, totalImageCount))) {
+                              case msg: InboxUpdated =>
+                                complete(NoContent)
+                            }
                         }
                     }
                   }
@@ -88,13 +92,21 @@ trait RemoteBoxRoutes { this: RestApi =>
                               case imageFileMaybe => imageFileMaybe.map(imageFile => {
                                 detach() {
                                   val path = storage.resolve(imageFile.fileName.value)
+
                                   val dataset = loadDataset(path, true)
                                   val anonymizedDataset = DicomAnonymization.anonymizeDataset(dataset)
+
                                   applyTagValues(anonymizedDataset, transactionTagValues)
-                                  onSuccess(boxService.ask(AddAnonymizationKey(outboxEntry, dataset, anonymizedDataset))) {
-                                    case anonymizationKey: AnonymizationKey =>
-                                      val bytes = toByteArray(anonymizedDataset)
-                                      complete(HttpEntity(ContentTypes.`application/octet-stream`, HttpData(bytes)))
+
+                                  onSuccess(boxService.ask(HarmonizeAnonymization(dataset, anonymizedDataset))) {
+                                    case anonymizedDataset: Attributes =>
+                                      
+                                      onSuccess(boxService.ask(AddAnonymizationKey(outboxEntry, dataset, anonymizedDataset))) {
+                                        case anonymizationKey: AnonymizationKey =>
+                                          val bytes = toByteArray(anonymizedDataset)
+                                          complete(HttpEntity(ContentTypes.`application/octet-stream`, HttpData(bytes)))
+                                      }
+
                                   }
                                 }
                               }).getOrElse {

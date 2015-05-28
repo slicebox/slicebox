@@ -78,6 +78,10 @@ object BoxProtocol {
       frameOfReferenceUID: String,
       anonFrameOfReferenceUID: String) extends Entity
       
+  case class ReverseAnonymization(dataset: Attributes) extends BoxRequest
+  
+  case class HarmonizeAnonymization(dataset: Attributes, anonDataset: Attributes) extends BoxRequest
+  
   case class BoxSendData(entityIds: Seq[Long], tagValues: Seq[BoxSendTagValue])
 
   case class InboxEntryInfo(remoteBoxName: String, transactionId: Long, receivedImageCount: Long, totalImageCount: Long)
