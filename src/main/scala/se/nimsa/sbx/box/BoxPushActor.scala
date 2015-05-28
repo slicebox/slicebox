@@ -64,20 +64,21 @@ class BoxPushActor(box: Box,
 
     val dataset = loadDataset(path, true)
     val anonymizedDataset = anonymizeDataset(dataset)
-    
+
     applyTagValues(anonymizedDataset, tagValues)
 
     val anonymizationKeys = anonymizationKeysForPatient(dataset)
     harmonizeAnonymization(anonymizationKeys, dataset, anonymizedDataset)
-    
+
     val anonymizationKey = boxById(outboxEntry.remoteBoxId) match {
-      case Some(box) => 
-        createAnonymizationKey(outboxEntry.remoteBoxId, outboxEntry.transactionId, outboxEntry.imageFileId, box.name, dataset, anonymizedDataset)
+      case Some(box) =>
+        createAnonymizationKey(outboxEntry.remoteBoxId, outboxEntry.transactionId, box.name, dataset, anonymizedDataset)
       case None =>
-        createAnonymizationKey(outboxEntry.remoteBoxId, outboxEntry.transactionId, outboxEntry.imageFileId, "" + outboxEntry.remoteBoxId, dataset, anonymizedDataset)
+        createAnonymizationKey(outboxEntry.remoteBoxId, outboxEntry.transactionId, "" + outboxEntry.remoteBoxId, dataset, anonymizedDataset)
     }
-    addAnonymizationKey(anonymizationKey)
-    
+    if (!anonymizationKeys.contains(anonymizationKey))
+      addAnonymizationKey(anonymizationKey)
+
     val bytes = toByteArray(anonymizedDataset)
     sendFilePipeline(Post(s"${box.baseUrl}/image?transactionid=${outboxEntry.transactionId}&sequencenumber=${outboxEntry.sequenceNumber}&totalimagecount=${outboxEntry.totalImageCount}", HttpData(bytes)))
   }
@@ -208,7 +209,7 @@ class BoxPushActor(box: Box,
     db.withSession { implicit session =>
       boxDao.insertAnonymizationKey(anonymizationKey)
     }
-  
+
   def boxById(boxId: Long): Option[Box] =
     db.withSession { implicit session =>
       boxDao.boxById(boxId)
@@ -220,7 +221,7 @@ class BoxPushActor(box: Box,
       boxDao.anonymizationKeysForPatient(anonPatient.patientName.value, anonPatient.patientID.value)
     }
   }
-  
+
 }
 
 object BoxPushActor {

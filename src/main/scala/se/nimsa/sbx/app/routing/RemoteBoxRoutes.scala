@@ -98,15 +98,10 @@ trait RemoteBoxRoutes { this: RestApi =>
 
                                   applyTagValues(anonymizedDataset, transactionTagValues)
 
-                                  onSuccess(boxService.ask(HarmonizeAnonymization(dataset, anonymizedDataset))) {
+                                  onSuccess(boxService.ask(HarmonizeAnonymization(outboxEntry, dataset, anonymizedDataset))) {
                                     case anonymizedDataset: Attributes =>
-                                      
-                                      onSuccess(boxService.ask(AddAnonymizationKey(outboxEntry, dataset, anonymizedDataset))) {
-                                        case anonymizationKey: AnonymizationKey =>
-                                          val bytes = toByteArray(anonymizedDataset)
-                                          complete(HttpEntity(ContentTypes.`application/octet-stream`, HttpData(bytes)))
-                                      }
-
+                                      val bytes = toByteArray(anonymizedDataset)
+                                      complete(HttpEntity(ContentTypes.`application/octet-stream`, HttpData(bytes)))
                                   }
                                 }
                               }).getOrElse {

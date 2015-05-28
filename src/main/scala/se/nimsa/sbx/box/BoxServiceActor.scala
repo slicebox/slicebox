@@ -176,15 +176,6 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
                 sender ! BoxNotFound
             }
 
-          case AddAnonymizationKey(outboxEntry, dataset, anonDataset) =>
-            val anonymizationKey = boxById(outboxEntry.remoteBoxId) match {
-              case Some(box) =>
-                createAnonymizationKey(outboxEntry.remoteBoxId, outboxEntry.transactionId, outboxEntry.imageFileId, box.name, dataset, anonDataset)
-              case None =>
-                createAnonymizationKey(outboxEntry.remoteBoxId, outboxEntry.transactionId, outboxEntry.imageFileId, "" + outboxEntry.remoteBoxId, dataset, anonDataset)
-            }
-            sender ! addAnonymizationKey(anonymizationKey)
-
           case RemoveAnonymizationKey(anonymizationKeyId) =>
             removeAnonymizationKey(anonymizationKeyId)
             sender ! AnonymizationKeyRemoved(anonymizationKeyId)
@@ -197,10 +188,20 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
             reverseAnonymization(anonymizationKeysForAnonPatient(clonedDataset), clonedDataset)
             sender ! clonedDataset
 
-          case HarmonizeAnonymization(dataset, anonDataset) =>
+          case HarmonizeAnonymization(outboxEntry, dataset, anonDataset) =>
             val clonedAnonDataset = cloneDataset(anonDataset)
             val anonymizationKeys = anonymizationKeysForPatient(dataset)
             harmonizeAnonymization(anonymizationKeys, dataset, clonedAnonDataset)
+
+            val anonymizationKey = boxById(outboxEntry.remoteBoxId) match {
+              case Some(box) =>
+                createAnonymizationKey(outboxEntry.remoteBoxId, outboxEntry.transactionId, box.name, dataset, anonDataset)
+              case None =>
+                createAnonymizationKey(outboxEntry.remoteBoxId, outboxEntry.transactionId, "" + outboxEntry.remoteBoxId, dataset, anonDataset)
+            }
+            if (!anonymizationKeys.contains(anonymizationKey))
+              addAnonymizationKey(anonymizationKey)
+
             sender ! clonedAnonDataset
 
           case GetOutboxEntry(token, transactionId, sequenceNumber) =>

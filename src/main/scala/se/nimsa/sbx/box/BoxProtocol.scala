@@ -57,31 +57,44 @@ object BoxProtocol {
   case class TransactionTagValue(id: Long, imageFileId: Long, transactionId: Long, tag: Int, value: String) extends Entity
 
   case class AnonymizationKey(
-      id: Long, 
-      created: Long,
-      remoteBoxId: Long,
-      transactionId: Long, 
-      imageFileId: Long,
-      remoteBoxName: String,
-      patientName: String,
-      anonPatientName: String,
-      patientID: String,
-      anonPatientID: String,
-      studyInstanceUID: String,
-      anonStudyInstanceUID: String,
-      seriesInstanceUID: String,
-      anonSeriesInstanceUID: String,
-      manufacturer: String,
-      anonManufacturer: String,
-      stationName: String,
-      anonStationName: String,
-      frameOfReferenceUID: String,
-      anonFrameOfReferenceUID: String) extends Entity
-      
+    id: Long,
+    created: Long,
+    remoteBoxId: Long,
+    transactionId: Long,
+    remoteBoxName: String,
+    patientName: String,
+    anonPatientName: String,
+    patientID: String,
+    anonPatientID: String,
+    studyInstanceUID: String,
+    anonStudyInstanceUID: String,
+    seriesInstanceUID: String,
+    anonSeriesInstanceUID: String,
+    manufacturer: String,
+    anonManufacturer: String,
+    stationName: String,
+    anonStationName: String,
+    frameOfReferenceUID: String,
+    anonFrameOfReferenceUID: String) extends Entity {
+    override def equals(a: Any): Boolean = a match {
+      case o: AnonymizationKey =>
+        remoteBoxId == o.remoteBoxId && transactionId == o.transactionId &&
+          patientName == o.patientName && anonPatientName == o.anonPatientName &&
+          patientID == o.patientID && anonPatientID == o.anonPatientID &&
+          studyInstanceUID == o.studyInstanceUID && anonStudyInstanceUID == o.anonStudyInstanceUID &&
+          seriesInstanceUID == o.seriesInstanceUID && anonSeriesInstanceUID == o.anonSeriesInstanceUID &&
+          manufacturer == o.manufacturer && anonManufacturer == o.anonManufacturer &&
+          stationName == o.stationName && anonStationName == o.anonStationName &&
+          frameOfReferenceUID == o.frameOfReferenceUID && anonFrameOfReferenceUID == o.anonFrameOfReferenceUID
+      case _ =>
+        false
+    }
+  }
+
   case class ReverseAnonymization(dataset: Attributes) extends BoxRequest
-  
-  case class HarmonizeAnonymization(dataset: Attributes, anonDataset: Attributes) extends BoxRequest
-  
+
+  case class HarmonizeAnonymization(outboxEntry: OutboxEntry, dataset: Attributes, anonDataset: Attributes) extends BoxRequest
+
   case class BoxSendData(entityIds: Seq[Long], tagValues: Seq[BoxSendTagValue])
 
   case class InboxEntryInfo(remoteBoxName: String, transactionId: Long, receivedImageCount: Long, totalImageCount: Long)
@@ -104,8 +117,6 @@ object BoxProtocol {
 
   case class PollOutbox(token: String) extends BoxRequest
 
-  case class AddAnonymizationKey(outboxEntry: OutboxEntry, dataset: Attributes, anonDataset: Attributes) extends BoxRequest
-  
   case class SendPatientsToRemoteBox(remoteBoxId: Long, patientIds: Seq[Long], tagValues: Seq[BoxSendTagValue]) extends BoxRequest
 
   case class SendStudiesToRemoteBox(remoteBoxId: Long, studyIds: Seq[Long], tagValues: Seq[BoxSendTagValue]) extends BoxRequest
@@ -125,15 +136,13 @@ object BoxProtocol {
   case class RemoveOutboxEntry(outboxEntryId: Long) extends BoxRequest
 
   case class GetAnonymizationKeys(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String]) extends BoxRequest
-  
+
   case class RemoveAnonymizationKey(anonymizationKeyId: Long) extends BoxRequest
-  
-  case class AnonymizationKeyAdded(anonymizationKey: AnonymizationKey)
-  
+
   case class AnonymizationKeyRemoved(anonymizationKeyId: Long)
-  
+
   case class AnonymizationKeys(anonymizationKeys: Seq[AnonymizationKey])
-  
+
   case class OutboxEntryRemoved(outboxEntryId: Long)
 
   case class RemoteBoxAdded(box: Box)

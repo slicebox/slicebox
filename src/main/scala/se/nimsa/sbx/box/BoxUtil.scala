@@ -15,7 +15,7 @@ object BoxUtil {
       dataset.setString(tagValue.tag, vr, tagValue.value)
     })
 
-  def createAnonymizationKey(remoteBoxId: Long, transactionId: Long, imageFileId: Long, remoteBoxName: String, dataset: Attributes, anonDataset: Attributes): AnonymizationKey = {
+  def createAnonymizationKey(remoteBoxId: Long, transactionId: Long, remoteBoxName: String, dataset: Attributes, anonDataset: Attributes): AnonymizationKey = {
     val patient = datasetToPatient(dataset)
     val study = datasetToStudy(dataset)
     val series = datasetToSeries(dataset)
@@ -26,7 +26,7 @@ object BoxUtil {
     val anonSeries = datasetToSeries(anonDataset)
     val anonEquipment = datasetToEquipment(anonDataset)
     val anonFrameOfReference = datasetToFrameOfReference(anonDataset)
-    AnonymizationKey(-1, new Date().getTime, remoteBoxId, transactionId, imageFileId, remoteBoxName,
+    AnonymizationKey(-1, new Date().getTime, remoteBoxId, transactionId, remoteBoxName,
       patient.patientName.value, anonPatient.patientName.value,
       patient.patientID.value, anonPatient.patientID.value,
       study.studyInstanceUID.value, anonStudy.studyInstanceUID.value,

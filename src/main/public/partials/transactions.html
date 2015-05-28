@@ -79,8 +79,7 @@
 
                             <sbx-grid-column property="remoteBoxName" title="Box"></sbx-grid-column>
                             <sbx-grid-column property="created" title="Date" filter="date: yyyy-MM-dd"></sbx-grid-column>
-                            <sbx-grid-column property="imageFileId" title="Image Id"></sbx-grid-column>
-                            <sbx-grid-column property="patientName" title="Patient Name"></sbx-grid-column>
+                            <sbx-grid-column property="patientName" title="Patient Name"><sbx-grid-cell>{{rowObject.patientName | prettyPatientName}}</sbx-grid-cell></sbx-grid-column>
                             <sbx-grid-column property="patientID" title="Patient ID"></sbx-grid-column>umn>
                             <sbx-grid-column property="anonPatientName" title="Anonymous Patient Name"></sbx-grid-column>
                             <sbx-grid-column property="anonPatientID" title="Anonymous Patient ID"></sbx-grid-column>
