@@ -62,7 +62,7 @@ object BoxUtil {
           })
         })
       })
-      dataset.setString(Tag.PatientIdentityRemoved, VR.CS, "NO")
+      setAnonymous(dataset, false)
     }
     dataset
   }

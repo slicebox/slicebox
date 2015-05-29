@@ -47,7 +47,13 @@ object DicomUtil {
   val defaultTransferSyntax = UID.ExplicitVRLittleEndian
 
   def isAnonymous(dataset: Attributes) = dataset.getString(Tag.PatientIdentityRemoved, "NO") == "YES"
-  
+
+  def setAnonymous(dataset: Attributes, anonymous: Boolean): Unit =
+    if (anonymous)
+      dataset.setString(Tag.PatientIdentityRemoved, VR.CS, "YES")
+    else
+      dataset.setString(Tag.PatientIdentityRemoved, VR.CS, "NO")
+
   def cloneDataset(dataset: Attributes): Attributes = new Attributes(dataset)
 
   def saveDataset(dataset: Attributes, filePath: Path): Boolean =

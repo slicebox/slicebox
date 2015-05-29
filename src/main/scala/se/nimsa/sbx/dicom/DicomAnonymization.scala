@@ -46,7 +46,7 @@ object DicomAnonymization {
 
       // this section from standard PS3.15 Table E.1-1
 
-      setStringTag(modified, Tag.PatientIdentityRemoved, VR.CS, "YES")
+      setAnonymous(modified, true)
 
       setStringTag(modified, Tag.AccessionNumber, VR.SH, createUidOrLeaveEmpty(modified.getString(Tag.AccessionNumber)))
       removeTag(modified, Tag.AcquisitionComments)
