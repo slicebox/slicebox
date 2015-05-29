@@ -70,26 +70,8 @@ object BoxProtocol {
     anonStudyInstanceUID: String,
     seriesInstanceUID: String,
     anonSeriesInstanceUID: String,
-    manufacturer: String,
-    anonManufacturer: String,
-    stationName: String,
-    anonStationName: String,
     frameOfReferenceUID: String,
-    anonFrameOfReferenceUID: String) extends Entity {
-    override def equals(a: Any): Boolean = a match {
-      case o: AnonymizationKey =>
-        remoteBoxId == o.remoteBoxId && transactionId == o.transactionId &&
-          patientName == o.patientName && anonPatientName == o.anonPatientName &&
-          patientID == o.patientID && anonPatientID == o.anonPatientID &&
-          studyInstanceUID == o.studyInstanceUID && anonStudyInstanceUID == o.anonStudyInstanceUID &&
-          seriesInstanceUID == o.seriesInstanceUID && anonSeriesInstanceUID == o.anonSeriesInstanceUID &&
-          manufacturer == o.manufacturer && anonManufacturer == o.anonManufacturer &&
-          stationName == o.stationName && anonStationName == o.anonStationName &&
-          frameOfReferenceUID == o.frameOfReferenceUID && anonFrameOfReferenceUID == o.anonFrameOfReferenceUID
-      case _ =>
-        false
-    }
-  }
+    anonFrameOfReferenceUID: String) extends Entity
 
   case class ReverseAnonymization(dataset: Attributes) extends BoxRequest
 

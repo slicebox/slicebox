@@ -64,8 +64,7 @@ class DicomUtilTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     val dcmPath = Paths.get(classOf[DirectoryRoutesTest].getResource(fileName).toURI())
     val dataset1 = loadDataset(dcmPath, false)
     val savePath = tempDir.resolve("dataset1.dcm")
-    val saveResult = saveDataset(dataset1, savePath)
-    saveResult should be (true)
+    saveDataset(dataset1, savePath)
     val dataset2 = loadDataset(savePath, false)
     dataset1 should equal (dataset2)
   }
@@ -76,8 +75,7 @@ class DicomUtilTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     val dataset = loadDataset(dcmPath, true)
     val anonymized1 = DicomAnonymization.anonymizeDataset(dataset)
     val savePath = tempDir.resolve("anonymized.dcm")
-    val saveResult = saveDataset(anonymized1, savePath)
-    saveResult should be (true)
+    saveDataset(anonymized1, savePath)
     val anonymized2 = loadDataset(savePath, true)
     anonymized2 should equal (anonymized1)
     

@@ -24,17 +24,22 @@ object BoxUtil {
     val anonPatient = datasetToPatient(anonDataset)
     val anonStudy = datasetToStudy(anonDataset)
     val anonSeries = datasetToSeries(anonDataset)
-    val anonEquipment = datasetToEquipment(anonDataset)
     val anonFrameOfReference = datasetToFrameOfReference(anonDataset)
     AnonymizationKey(-1, new Date().getTime, remoteBoxId, transactionId, remoteBoxName,
       patient.patientName.value, anonPatient.patientName.value,
       patient.patientID.value, anonPatient.patientID.value,
       study.studyInstanceUID.value, anonStudy.studyInstanceUID.value,
       series.seriesInstanceUID.value, anonSeries.seriesInstanceUID.value,
-      equipment.manufacturer.value, anonEquipment.manufacturer.value,
-      equipment.stationName.value, anonEquipment.stationName.value,
       frameOfReference.frameOfReferenceUID.value, anonFrameOfReference.frameOfReferenceUID.value)
   }
+
+  def isEqual(key1: AnonymizationKey, key2: AnonymizationKey) =
+    key1.remoteBoxId == key2.remoteBoxId && key1.transactionId == key2.transactionId &&
+      key1.patientName == key2.patientName && key1.anonPatientName == key2.anonPatientName &&
+      key1.patientID == key2.patientID && key1.anonPatientID == key2.anonPatientID &&
+      key1.studyInstanceUID == key2.studyInstanceUID && key1.anonStudyInstanceUID == key2.anonStudyInstanceUID &&
+      key1.seriesInstanceUID == key2.seriesInstanceUID && key1.anonSeriesInstanceUID == key2.anonSeriesInstanceUID &&
+      key1.frameOfReferenceUID == key2.frameOfReferenceUID && key1.anonFrameOfReferenceUID == key2.anonFrameOfReferenceUID
 
   def reverseAnonymization(keys: List[AnonymizationKey], dataset: Attributes) = {
     if (isAnonymous(dataset)) {
@@ -43,24 +48,8 @@ object BoxUtil {
         dataset.setString(Tag.PatientID, VR.LO, key.patientID)
         val anonStudy = datasetToStudy(dataset)
         val studyKeys = keys.filter(_.anonStudyInstanceUID == anonStudy.studyInstanceUID.value)
-        studyKeys.headOption.foreach(studyKey => {
-          dataset.setString(Tag.StudyInstanceUID, VR.UI, studyKey.studyInstanceUID)
-          val anonSeries = datasetToSeries(dataset)
-          val seriesKeys = studyKeys.filter(_.anonSeriesInstanceUID == anonSeries.seriesInstanceUID.value)
-          seriesKeys.headOption.foreach(seriesKey => {
-            dataset.setString(Tag.SeriesInstanceUID, VR.UI, seriesKey.seriesInstanceUID)
-            val anonEquipment = datasetToEquipment(dataset)
-            val equipmentKeys = seriesKeys.filter(seriesKey => seriesKey.anonManufacturer == anonEquipment.manufacturer.value && studyKey.anonStationName == anonEquipment.stationName.value)
-            equipmentKeys.headOption.foreach(equipmentKey => {
-              dataset.setString(Tag.Manufacturer, VR.LO, equipmentKey.manufacturer)
-              dataset.setString(Tag.StationName, VR.SH, equipmentKey.stationName)
-            })
-            val anonFoR = datasetToFrameOfReference(dataset)
-            val forKeys = seriesKeys.filter(seriesKey => seriesKey.anonFrameOfReferenceUID == anonFoR.frameOfReferenceUID.value)
-            forKeys.headOption.foreach(forKey =>
-              dataset.setString(Tag.FrameOfReferenceUID, VR.UI, forKey.frameOfReferenceUID))
-          })
-        })
+        studyKeys.headOption.foreach(studyKey =>
+          dataset.setString(Tag.StudyInstanceUID, VR.UI, studyKey.studyInstanceUID))
       })
       setAnonymous(dataset, false)
     }
@@ -79,12 +68,6 @@ object BoxUtil {
           val seriesKeys = studyKeys.filter(_.seriesInstanceUID == series.seriesInstanceUID.value)
           seriesKeys.headOption.foreach(seriesKey => {
             anonDataset.setString(Tag.SeriesInstanceUID, VR.UI, seriesKey.anonSeriesInstanceUID)
-            val equipment = datasetToEquipment(dataset)
-            val equipmentKeys = seriesKeys.filter(seriesKey => seriesKey.manufacturer == equipment.manufacturer.value && studyKey.stationName == equipment.stationName.value)
-            equipmentKeys.headOption.foreach(equipmentKey => {
-              anonDataset.setString(Tag.Manufacturer, VR.LO, equipmentKey.anonManufacturer)
-              anonDataset.setString(Tag.StationName, VR.SH, equipmentKey.anonStationName)
-            })
             val foR = datasetToFrameOfReference(dataset)
             val forKeys = seriesKeys.filter(seriesKey => seriesKey.frameOfReferenceUID == foR.frameOfReferenceUID.value)
             forKeys.headOption.foreach(forKey =>

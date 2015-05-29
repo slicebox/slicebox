@@ -56,19 +56,15 @@ object DicomUtil {
 
   def cloneDataset(dataset: Attributes): Attributes = new Attributes(dataset)
 
-  def saveDataset(dataset: Attributes, filePath: Path): Boolean =
+  def saveDataset(dataset: Attributes, filePath: Path): Unit =
     saveDataset(dataset, Files.newOutputStream(filePath))
 
-  def saveDataset(dataset: Attributes, outputStream: OutputStream): Boolean = {
+  def saveDataset(dataset: Attributes, outputStream: OutputStream): Unit = {
     var dos: DicomOutputStream = null
     try {
       dos = new DicomOutputStream(outputStream, defaultTransferSyntax)
       val metaInformation = dataset.createFileMetaInformation(defaultTransferSyntax)
       dos.writeDataset(metaInformation, dataset)
-      true
-    } catch {
-      case e: Exception =>
-        false
     } finally {
       SafeClose.close(dos)
     }

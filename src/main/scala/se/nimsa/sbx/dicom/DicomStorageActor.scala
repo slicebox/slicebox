@@ -333,7 +333,12 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
         val dbImage = dbImageMaybe.getOrElse(dao.insert(image.copy(seriesId = dbSeries.id)))
         dbImageFileMaybe.getOrElse(dao.insert(imageFile.copy(id = dbImage.id)))
 
-        saveDataset(dataset, storedPath)
+        try {
+          saveDataset(dataset, storedPath)
+        } catch {
+          case e: Exception =>
+            SbxLog.error("Storage", "Dataset file could not be stored: " + e.getMessage)
+        }
 
         (dbImage, overwrite)
 

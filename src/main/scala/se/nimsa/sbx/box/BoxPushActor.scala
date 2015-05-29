@@ -76,7 +76,7 @@ class BoxPushActor(box: Box,
       case None =>
         createAnonymizationKey(outboxEntry.remoteBoxId, outboxEntry.transactionId, "" + outboxEntry.remoteBoxId, dataset, anonymizedDataset)
     }
-    if (!anonymizationKeys.contains(anonymizationKey))
+    if (!anonymizationKeys.exists(isEqual(_, anonymizationKey)))
       addAnonymizationKey(anonymizationKey)
 
     val bytes = toByteArray(anonymizedDataset)

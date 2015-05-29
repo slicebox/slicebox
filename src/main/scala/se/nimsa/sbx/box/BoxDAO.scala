@@ -89,10 +89,10 @@ class BoxDAO(val driver: JdbcProfile) {
 
   val transactionTagValueQuery = TableQuery[TransactionTagValueTable]
 
-  val toAnonymizationKey = (id: Long, created: Long, remoteBoxId: Long, transactionId: Long, remoteBoxName: String, patientName: String, anonPatientName: String, patientID: String, anonPatientID: String, studyInstanceUID: String, anonStudyInstanceUID: String, seriesInstanceUID: String, anonSeriesInstanceUID: String, manufacturer: String, anonManufacturer: String, stationName: String, anonStationName: String, frameOfReferenceUID: String, anonFrameOfReferenceUID: String) =>
-    AnonymizationKey(id, created, remoteBoxId, transactionId, remoteBoxName, patientName, anonPatientName, patientID, anonPatientID, studyInstanceUID, anonStudyInstanceUID, seriesInstanceUID, anonSeriesInstanceUID, manufacturer, anonManufacturer, stationName, anonStationName, frameOfReferenceUID, anonFrameOfReferenceUID)
+  val toAnonymizationKey = (id: Long, created: Long, remoteBoxId: Long, transactionId: Long, remoteBoxName: String, patientName: String, anonPatientName: String, patientID: String, anonPatientID: String, studyInstanceUID: String, anonStudyInstanceUID: String, seriesInstanceUID: String, anonSeriesInstanceUID: String, frameOfReferenceUID: String, anonFrameOfReferenceUID: String) =>
+    AnonymizationKey(id, created, remoteBoxId, transactionId, remoteBoxName, patientName, anonPatientName, patientID, anonPatientID, studyInstanceUID, anonStudyInstanceUID, seriesInstanceUID, anonSeriesInstanceUID, frameOfReferenceUID, anonFrameOfReferenceUID)
   val fromAnonymizationKey = (entry: AnonymizationKey) => 
-    Option((entry.id, entry.created, entry.remoteBoxId, entry.transactionId, entry.remoteBoxName, entry.patientName, entry.anonPatientName, entry.patientID, entry.anonPatientID, entry.studyInstanceUID, entry.anonStudyInstanceUID, entry.seriesInstanceUID, entry.anonSeriesInstanceUID, entry.manufacturer, entry.anonManufacturer, entry.stationName, entry.anonStationName, entry.frameOfReferenceUID, entry.anonFrameOfReferenceUID))
+    Option((entry.id, entry.created, entry.remoteBoxId, entry.transactionId, entry.remoteBoxName, entry.patientName, entry.anonPatientName, entry.patientID, entry.anonPatientID, entry.studyInstanceUID, entry.anonStudyInstanceUID, entry.seriesInstanceUID, entry.anonSeriesInstanceUID, entry.frameOfReferenceUID, entry.anonFrameOfReferenceUID))
 
   class AnonymizationKeyTable(tag: Tag) extends Table[AnonymizationKey](tag, "AnonymizationKey") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
@@ -108,13 +108,9 @@ class BoxDAO(val driver: JdbcProfile) {
     def anonStudyInstanceUID = column[String]("anonstudyinstanceuid")
     def seriesInstanceUID = column[String]("seriesinstanceuid")
     def anonSeriesInstanceUID = column[String]("anonseriesinstanceuid")
-    def manufacturer = column[String]("manufacturer")
-    def anonManufacturer = column[String]("anonmanufacturer")
-    def stationName = column[String]("stationname")
-    def anonStationName = column[String]("anonstationname")
     def frameOfReferenceUID = column[String]("frameofreferenceuid")
     def anonFrameOfReferenceUID = column[String]("anonframeofreferenceuid")
-    def * = (id, created, remoteBoxId, transactionId, remoteBoxName, patientName, anonPatientName, patientID, anonPatientID, studyInstanceUID, anonStudyInstanceUID, seriesInstanceUID, anonSeriesInstanceUID, manufacturer, anonManufacturer, stationName, anonStationName, frameOfReferenceUID, anonFrameOfReferenceUID) <> (toAnonymizationKey.tupled, fromAnonymizationKey)
+    def * = (id, created, remoteBoxId, transactionId, remoteBoxName, patientName, anonPatientName, patientID, anonPatientID, studyInstanceUID, anonStudyInstanceUID, seriesInstanceUID, anonSeriesInstanceUID, frameOfReferenceUID, anonFrameOfReferenceUID) <> (toAnonymizationKey.tupled, fromAnonymizationKey)
   }
 
   val anonymizationKeyQuery = TableQuery[AnonymizationKeyTable]
@@ -125,7 +121,7 @@ class BoxDAO(val driver: JdbcProfile) {
     }
 
   def drop(implicit session: Session): Unit =
-    (boxQuery.ddl ++ outboxQuery.ddl ++ inboxQuery.ddl).drop
+    (boxQuery.ddl ++ outboxQuery.ddl ++ inboxQuery.ddl ++ transactionTagValueQuery.ddl ++ anonymizationKeyQuery.ddl).drop
 
   def insertBox(box: Box)(implicit session: Session): Box = {
     val generatedId = (boxQuery returning boxQuery.map(_.id)) += box
@@ -144,6 +140,9 @@ class BoxDAO(val driver: JdbcProfile) {
 
   def boxById(boxId: Long)(implicit session: Session): Option[Box] =
     boxQuery.filter(_.id === boxId).list.headOption
+
+  def boxByName(name: String)(implicit session: Session): Option[Box] =
+    boxQuery.filter(_.name === name).list.headOption
 
   def pushBoxByBaseUrl(baseUrl: String)(implicit session: Session): Option[Box] =
     boxQuery
@@ -252,7 +251,7 @@ class BoxDAO(val driver: JdbcProfile) {
   def anonymizationKeys(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String])(implicit session: Session): List[AnonymizationKey] = {
 
     implicit val getResult = GetResult(r =>
-      AnonymizationKey(r.nextLong, r.nextLong, r.nextLong, r.nextLong, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString))
+      AnonymizationKey(r.nextLong, r.nextLong, r.nextLong, r.nextLong, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString))
 
     var query = """select * from "AnonymizationKey""""
 

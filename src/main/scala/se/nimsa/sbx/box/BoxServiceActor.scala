@@ -199,7 +199,7 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
               case None =>
                 createAnonymizationKey(outboxEntry.remoteBoxId, outboxEntry.transactionId, "" + outboxEntry.remoteBoxId, dataset, anonDataset)
             }
-            if (!anonymizationKeys.contains(anonymizationKey))
+            if (!anonymizationKeys.exists(isEqual(_, anonymizationKey)))
               addAnonymizationKey(anonymizationKey)
 
             sender ! clonedAnonDataset
@@ -315,6 +315,8 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
 
   def addBoxToDb(box: Box): Box =
     db.withSession { implicit session =>
+      if (boxDao.boxByName(box.name).isDefined)
+        throw new IllegalArgumentException(s"A box with name ${box.name} already exists")
       boxDao.insertBox(box)
     }
 

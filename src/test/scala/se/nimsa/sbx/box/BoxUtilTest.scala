@@ -21,7 +21,6 @@ class BoxUtilTest extends FlatSpec with Matchers {
     dataset.getString(Tag.PatientName) should be ("Mapped Patient Name")
     dataset.getString(Tag.PatientID) should be ("Mapped Patient ID")
     dataset.getString(Tag.SeriesDescription) should be ("Mapped Series Description")
-    dataset.getString(Tag.Manufacturer) should be ("m")
   }
   
   "An anonymized dataset" should "be harmonized with respect to existing anonymization keys" in {
@@ -32,7 +31,7 @@ class BoxUtilTest extends FlatSpec with Matchers {
         dataset, createAnonymousDataset))
     val harmonizedDataset1 = BoxUtil.harmonizeAnonymization(keys1, dataset, createAnonymousDataset)
     val harmonizedKey1 = BoxUtil.createAnonymizationKey(1, 1, "otherbox", dataset, harmonizedDataset1)
-    keys1(0) should equal (harmonizedKey1)
+    BoxUtil.isEqual(keys1(0), harmonizedKey1) should be (true)
     
     // test change patient property
     val keys2 = List(keys1(0).copy(anonPatientID = "apid2"))
@@ -56,7 +55,9 @@ class BoxUtilTest extends FlatSpec with Matchers {
     val dataset = createDataset
     val key1 = BoxUtil.createAnonymizationKey(1, 1, "remote box", dataset, createAnonymousDataset)
     val reversedDataset1 = BoxUtil.reverseAnonymization(List(key1), createAnonymousDataset)
-    BoxUtil.createAnonymizationKey(1, 1, "remote box", reversedDataset1, createAnonymousDataset) should equal (key1)
+    reversedDataset1.getString(Tag.PatientName) should equal (key1.patientName)
+    reversedDataset1.getString(Tag.PatientID) should equal (key1.patientID)
+    reversedDataset1.getString(Tag.StudyInstanceUID) should equal (key1.studyInstanceUID)
     
     val key2 = key1.copy(seriesInstanceUID = "seuid2")
     val reversedDataset2 = BoxUtil.reverseAnonymization(List(key2), createAnonymousDataset)
@@ -72,8 +73,6 @@ class BoxUtilTest extends FlatSpec with Matchers {
     dataset.setString(Tag.PatientID, VR.LO, "pid")
     dataset.setString(Tag.StudyInstanceUID, VR.LO, "stuid")
     dataset.setString(Tag.SeriesInstanceUID, VR.LO, "seuid")
-    dataset.setString(Tag.Manufacturer, VR.LO, "m")
-    dataset.setString(Tag.StationName, VR.LO, "sn")
     dataset.setString(Tag.FrameOfReferenceUID, VR.LO, "foruid")    
     dataset
   }
@@ -84,8 +83,6 @@ class BoxUtilTest extends FlatSpec with Matchers {
     dataset.setString(Tag.PatientID, VR.LO, "apid")
     dataset.setString(Tag.StudyInstanceUID, VR.LO, "astuid")
     dataset.setString(Tag.SeriesInstanceUID, VR.LO, "aseuid")
-    dataset.setString(Tag.Manufacturer, VR.LO, "am")
-    dataset.setString(Tag.StationName, VR.LO, "asn")
     dataset.setString(Tag.FrameOfReferenceUID, VR.LO, "aforuid")    
     setAnonymous(dataset, true)
     dataset
