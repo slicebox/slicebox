@@ -31,9 +31,7 @@ object DicomAnonymization {
 
   def anonymizeDataset(dataset: Attributes): Attributes = {
 
-    val patientIdentityRemoved = isAnonymous(dataset)
-
-    if (patientIdentityRemoved == "YES") {
+    if (isAnonymous(dataset)) {
 
       cloneDataset(dataset)
 

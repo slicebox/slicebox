@@ -62,8 +62,9 @@ object BoxUtil {
           })
         })
       })
-      dataset
+      dataset.setString(Tag.PatientIdentityRemoved, VR.CS, "NO")
     }
+    dataset
   }
 
   def harmonizeAnonymization(keys: List[AnonymizationKey], dataset: Attributes, anonDataset: Attributes) = {
@@ -91,8 +92,8 @@ object BoxUtil {
           })
         })
       })
-      anonDataset
     }
+    anonDataset
   }
 
 }

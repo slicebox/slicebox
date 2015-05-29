@@ -102,12 +102,9 @@ angular.module('slicebox.home', ['ngRoute'])
     };
 
     $scope.patientSelected = function(patient) {
-        if (patient !== $scope.uiState.selectedPatient) {
-            $scope.studySelected(null);
+        if ($scope.uiState.selectedPatient !== patient) {
             $scope.uiState.selectedPatient = patient;
-            if ($scope.callbacks.studiesTable) { 
-                $scope.callbacks.studiesTable.reset();
-            }
+            $scope.studySelected(null, true);
         }
     };
 
@@ -125,13 +122,13 @@ angular.module('slicebox.home', ['ngRoute'])
         return loadStudiesPromise;
     };
 
-    $scope.studySelected = function(study) {
-        if (study !== $scope.uiState.selectedStudy) {
-            $scope.seriesSelected(null);
+    $scope.studySelected = function(study, reset) {
+        if ($scope.uiState.selectedStudy !== study) {
             $scope.uiState.selectedStudy = study;
-            if ($scope.callbacks.imageAttributesTable) { 
-                $scope.callbacks.imageAttributesTable.reset();
-            }
+            $scope.seriesSelected(null);
+        }
+        if (reset && $scope.callbacks.studiesTable) {
+            $scope.callbacks.studiesTable.reset();
         }
     };
 
@@ -175,8 +172,8 @@ angular.module('slicebox.home', ['ngRoute'])
         return loadFlatSeriesPromise;
     };
 
-    $scope.seriesSelected = function(series) {
-        if (series !== $scope.uiState.selectedSeries) {
+    $scope.seriesSelected = function(series, reset) {
+        if ($scope.uiState.selectedSeries !== series) {
             $scope.uiState.selectedSeries = series;
 
             $scope.uiState.seriesDetails.pngImageUrls = [];
@@ -189,6 +186,10 @@ angular.module('slicebox.home', ['ngRoute'])
             }
 
             $scope.updatePNGImageUrls();
+        }
+        
+        if (reset && $scope.callbacks.seriesTable) {
+            $scope.callbacks.seriesTable.reset();
         }
     };
 
