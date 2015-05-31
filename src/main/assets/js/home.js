@@ -187,7 +187,7 @@ angular.module('slicebox.home', ['ngRoute'])
 
             $scope.updatePNGImageUrls();
         }
-        
+
         if (reset && $scope.callbacks.seriesTable) {
             $scope.callbacks.seriesTable.reset();
         }
@@ -204,7 +204,7 @@ angular.module('slicebox.home', ['ngRoute'])
         }
     };
 
-    $scope.loadImageAttributes = function(startIndex, count) {
+    $scope.loadImageAttributes = function(startIndex, count, orderByProperty, orderByDirection) {
         if ($scope.uiState.selectedSeries === null) {
             return [];
         }
@@ -217,7 +217,18 @@ angular.module('slicebox.home', ['ngRoute'])
 
         var attributesPromise = imagesPromise.then(function(images) {
             if (images.data.length > 0) {
-                return $http.get('/api/images/' + images.data[0].id + '/attributes').error(function(error) {
+                return $http.get('/api/images/' + images.data[0].id + '/attributes').then(function(data) {
+                    if (orderByProperty) {
+                        if (!orderByDirection) {
+                            orderByDirection = 'ASCENDING';
+                        }
+                        return data.data.sort(function compare(a,b) {
+                          return a[orderByProperty] < b[orderByProperty] ? -1 : a[orderByProperty] > b[orderByProperty] ? 1 : 0;
+                        });
+                    } else {
+                        return data.data;
+                    }
+                }, function(error) {
                     $scope.showErrorMessage('Failed to load image attributes: ' + error);
                 });
             } else {

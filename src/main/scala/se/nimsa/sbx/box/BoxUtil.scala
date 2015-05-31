@@ -27,8 +27,9 @@ object BoxUtil {
     val anonFrameOfReference = datasetToFrameOfReference(anonDataset)
     AnonymizationKey(-1, new Date().getTime, remoteBoxId, transactionId, remoteBoxName,
       patient.patientName.value, anonPatient.patientName.value,
-      patient.patientID.value, anonPatient.patientID.value,
+      patient.patientID.value, anonPatient.patientID.value, patient.patientBirthDate.value,
       study.studyInstanceUID.value, anonStudy.studyInstanceUID.value,
+      study.studyDescription.value, study.studyID.value, study.accessionNumber.value,
       series.seriesInstanceUID.value, anonSeries.seriesInstanceUID.value,
       frameOfReference.frameOfReferenceUID.value, anonFrameOfReference.frameOfReferenceUID.value)
   }
@@ -46,10 +47,15 @@ object BoxUtil {
       keys.headOption.foreach(key => {
         dataset.setString(Tag.PatientName, VR.PN, key.patientName)
         dataset.setString(Tag.PatientID, VR.LO, key.patientID)
+        dataset.setString(Tag.PatientBirthDate, VR.DA, key.patientBirthDate)
         val anonStudy = datasetToStudy(dataset)
         val studyKeys = keys.filter(_.anonStudyInstanceUID == anonStudy.studyInstanceUID.value)
-        studyKeys.headOption.foreach(studyKey =>
-          dataset.setString(Tag.StudyInstanceUID, VR.UI, studyKey.studyInstanceUID))
+        studyKeys.headOption.foreach(studyKey => {
+          dataset.setString(Tag.StudyInstanceUID, VR.UI, studyKey.studyInstanceUID)
+          dataset.setString(Tag.StudyDescription, VR.LO, studyKey.studyDescription)
+          dataset.setString(Tag.StudyID, VR.SH, studyKey.studyID)
+          dataset.setString(Tag.AccessionNumber, VR.SH, studyKey.accessionNumber)
+        })
       })
       setAnonymous(dataset, false)
     }
