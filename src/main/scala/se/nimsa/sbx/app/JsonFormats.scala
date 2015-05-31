@@ -52,13 +52,14 @@ trait JsonFormats extends DefaultJsonProtocol {
   }
 
   implicit val boxFormat = jsonFormat6(Box)
-
+()
   implicit val outboxEntryFormat = jsonFormat7(OutboxEntry)
   implicit val outboxEntryInfoFormat = jsonFormat7(OutboxEntryInfo)
   implicit val inboxEntryInfoFormat = jsonFormat4(InboxEntryInfo)
 
   implicit val attributeValueMappingFormat = jsonFormat3(BoxSendTagValue)
   implicit val sendImagesDataFormat = jsonFormat2(BoxSendData)
+  implicit val anonymizationKeyFormat = jsonFormat19(AnonymizationKey)
   
   implicit val generateBoxBaseUrlFormat = jsonFormat1(GenerateBoxBaseUrl)
 

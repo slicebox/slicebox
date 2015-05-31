@@ -25,7 +25,6 @@
                             <sbx-grid
                                 load-page="loadPatients(startIndex, count, orderByProperty, orderByDirection, filter)"
                                 page-size="10"
-                                page-sizes="[5, 10, 20, 50, 100]"
                                 filter="true"
                                 object-actions="patientActions"
                                 object-selected="patientSelected(object)"
@@ -307,9 +306,9 @@
                     <md-card-content>
                         <md-content class="md-padding">
                             <sbx-grid
-                                load-page="loadImageAttributes(0, 1000000000)"
+                                load-page="loadImageAttributes(0, 1000000000, orderByProperty, orderByDirection)"
                                 page-size="1000000000"
-                                sorting="false"
+                                sorting="true"
                                 callbacks="callbacks.imageAttributesTable"
                                 empty-message="No image atributes found">
 

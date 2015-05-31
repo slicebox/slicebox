@@ -21,6 +21,7 @@ import akka.actor.Props
 import akka.event.Logging
 import akka.event.LoggingReceive
 import BoxProtocol._
+import BoxUtil._
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.duration.FiniteDuration
 import spray.client.pipelining._
@@ -60,9 +61,24 @@ class BoxPushActor(box: Box,
 
   def pushImagePipeline(outboxEntry: OutboxEntry, fileName: String, tagValues: Seq[TransactionTagValue]): Future[HttpResponse] = {
     val path = storage.resolve(fileName)
+
     val dataset = loadDataset(path, true)
     val anonymizedDataset = anonymizeDataset(dataset)
+
     applyTagValues(anonymizedDataset, tagValues)
+
+    val anonymizationKeys = anonymizationKeysForPatient(dataset)
+    harmonizeAnonymization(anonymizationKeys, dataset, anonymizedDataset)
+
+    val anonymizationKey = boxById(outboxEntry.remoteBoxId) match {
+      case Some(box) =>
+        createAnonymizationKey(outboxEntry.remoteBoxId, outboxEntry.transactionId, box.name, dataset, anonymizedDataset)
+      case None =>
+        createAnonymizationKey(outboxEntry.remoteBoxId, outboxEntry.transactionId, "" + outboxEntry.remoteBoxId, dataset, anonymizedDataset)
+    }
+    if (!anonymizationKeys.exists(isEqual(_, anonymizationKey)))
+      addAnonymizationKey(anonymizationKey)
+
     val bytes = toByteArray(anonymizedDataset)
     sendFilePipeline(Post(s"${box.baseUrl}/image?transactionid=${outboxEntry.transactionId}&sequencenumber=${outboxEntry.sequenceNumber}&totalimagecount=${outboxEntry.totalImageCount}", HttpData(bytes)))
   }
@@ -164,14 +180,14 @@ class BoxPushActor(box: Box,
     log.debug(s"Failed to send file to box ${box.name}: ${exception.getMessage}")
     statusCode match {
       case code if code >= 500 =>
-        // server-side error, remote box is most likely down
+      // server-side error, remote box is most likely down
       case _ =>
         markOutboxTransactionAsFailed(outboxEntry, s"Cannot send file to box ${box.name}: ${exception.getMessage}")
     }
     context.unbecome
   }
 
-  def handleFilenameLookupFailedForOutboxEntry(outboxEntry: OutboxEntry, exception: Exception) = {    
+  def handleFilenameLookupFailedForOutboxEntry(outboxEntry: OutboxEntry, exception: Exception) = {
     markOutboxTransactionAsFailed(outboxEntry, s"Failed to send file to box ${box.name}: " + exception.getMessage)
     context.unbecome
   }
@@ -186,6 +202,23 @@ class BoxPushActor(box: Box,
   def removeTransactionTagValuesForTransactionId(transactionId: Long) = {
     db.withSession { implicit session =>
       boxDao.removeTransactionTagValuesByTransactionId(transactionId)
+    }
+  }
+
+  def addAnonymizationKey(anonymizationKey: AnonymizationKey) =
+    db.withSession { implicit session =>
+      boxDao.insertAnonymizationKey(anonymizationKey)
+    }
+
+  def boxById(boxId: Long): Option[Box] =
+    db.withSession { implicit session =>
+      boxDao.boxById(boxId)
+    }
+
+  def anonymizationKeysForPatient(dataset: Attributes) = {
+    db.withSession { implicit session =>
+      val anonPatient = datasetToPatient(dataset)
+      boxDao.anonymizationKeysForPatient(anonPatient.patientName.value, anonPatient.patientID.value)
     }
   }
 

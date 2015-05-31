@@ -39,24 +39,32 @@ import java.io.ByteArrayOutputStream
 import org.dcm4che3.data.Attributes.Visitor
 import org.dcm4che3.data.VR
 import se.nimsa.sbx.box.BoxProtocol.TransactionTagValue
+import se.nimsa.sbx.box.BoxProtocol.AnonymizationKey
+import java.util.Date
 
 object DicomUtil {
 
   val defaultTransferSyntax = UID.ExplicitVRLittleEndian
 
-  def saveDataset(dataset: Attributes, filePath: Path): Boolean =
+  def isAnonymous(dataset: Attributes) = dataset.getString(Tag.PatientIdentityRemoved, "NO") == "YES"
+
+  def setAnonymous(dataset: Attributes, anonymous: Boolean): Unit =
+    if (anonymous)
+      dataset.setString(Tag.PatientIdentityRemoved, VR.CS, "YES")
+    else
+      dataset.setString(Tag.PatientIdentityRemoved, VR.CS, "NO")
+
+  def cloneDataset(dataset: Attributes): Attributes = new Attributes(dataset)
+
+  def saveDataset(dataset: Attributes, filePath: Path): Unit =
     saveDataset(dataset, Files.newOutputStream(filePath))
 
-  def saveDataset(dataset: Attributes, outputStream: OutputStream): Boolean = {
+  def saveDataset(dataset: Attributes, outputStream: OutputStream): Unit = {
     var dos: DicomOutputStream = null
     try {
       dos = new DicomOutputStream(outputStream, defaultTransferSyntax)
       val metaInformation = dataset.createFileMetaInformation(defaultTransferSyntax)
       dos.writeDataset(metaInformation, dataset)
-      true
-    } catch {
-      case e: Exception =>
-        false
     } finally {
       SafeClose.close(dos)
     }
@@ -176,11 +184,5 @@ object DicomUtil {
     iis.close();
     Seq(bufferedImage);
   }
-
-  def applyTagValues(dataset: Attributes, tagValues: Seq[TransactionTagValue]): Unit =
-    tagValues.foreach(tagValue => {
-      val vr = if (dataset.contains(tagValue.tag)) dataset.getVR(tagValue.tag) else VR.SH
-      dataset.setString(tagValue.tag, vr, tagValue.value)
-    })
 
 }
