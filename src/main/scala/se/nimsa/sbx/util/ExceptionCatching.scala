@@ -18,6 +18,7 @@ package se.nimsa.sbx.util
 
 import akka.actor.Actor
 import akka.actor.Status.Failure
+import se.nimsa.sbx.log.SbxLog
 
 trait ExceptionCatching { this: Actor =>
 
@@ -25,7 +26,10 @@ trait ExceptionCatching { this: Actor =>
     try {
       Some(op)
     } catch {
-      case e: Exception => 
+      case e: Exception =>
+        if (!e.isInstanceOf[IllegalArgumentException]) {
+          SbxLog.error("Sytem", e.getMessage)(context.system)
+        }
         sender ! Failure(e)
         None
     }
@@ -34,7 +38,10 @@ trait ExceptionCatching { this: Actor =>
     try {
       op
     } catch {
-      case e: Exception => 
+      case e: Exception =>
+        if (!e.isInstanceOf[IllegalArgumentException]) {
+          SbxLog.error("Sytem", e.getMessage)(context.system)
+        }
         sender ! Failure(e)
         throw e
     }

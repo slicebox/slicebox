@@ -27,6 +27,7 @@ import se.nimsa.sbx.dicom.DicomProperty.PatientID
 import se.nimsa.sbx.dicom.DicomProperty.PatientBirthDate
 import se.nimsa.sbx.dicom.DicomProperty.PatientSex
 import scala.slick.driver.H2Driver
+import java.util.Date
 
 class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
@@ -63,7 +64,7 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       box
     }
 
-  "The system" should "return a success message when asked to generate a new base url" in {
+  "Box routes" should "return a success message when asked to generate a new base url" in {
     addPollBox("hosp")
   }
 
@@ -423,4 +424,39 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       status should be(NoContent)
     }
   }
+
+  it should "provide a list of anonymization keys" in {
+    db.withSession { implicit session =>
+      val key1 = AnonymizationKey(-1, new Date().getTime, 1, 1234, "remote box", "pat name", "anon pat name", "pat id", "anon pat id", "19700101", "stuid", "anon stuid", "study desc", "study id", "acc num", "seuid", "anon seuid", "foruid", "anon foruid")
+      val key2 = key1.copy(patientName = "pat name 2", anonPatientName = "anon pat name 2")
+      val insertedKey1 = boxDao.insertAnonymizationKey(key1)
+      val insertedKey2 = boxDao.insertAnonymizationKey(key2)
+      GetAsUser("/api/boxes/anonymizationkeys") ~> routes ~> check {
+        status should be(OK)
+        responseAs[List[AnonymizationKey]] should be(List(insertedKey1, insertedKey2))
+      }
+    }
+  }
+
+  it should "provide a list of sorted anonymization keys supporting startindex and count" in {
+    db.withSession { implicit session =>
+      val key1 = AnonymizationKey(-1, new Date().getTime, 1, 1234, "remote box", "B", "anon B", "pat id", "anon pat id", "19700101", "stuid", "anon stuid", "study desc", "study id", "acc num", "seuid", "anon seuid", "foruid", "anon foruid")
+      val key2 = key1.copy(patientName = "A", anonPatientName = "anon A")
+      val insertedKey1 = boxDao.insertAnonymizationKey(key1)
+      val insertedKey2 = boxDao.insertAnonymizationKey(key2)
+      GetAsUser("/api/boxes/anonymizationkeys?startindex=0&count=1&orderby=patientname&orderascending=true") ~> routes ~> check {
+        status should be(OK)
+        val keys = responseAs[List[AnonymizationKey]]
+        keys.length should be(1)
+        keys(0) should be(insertedKey2)
+      }
+    }
+  }
+
+  it should "respond with 400 Bad Request when sorting anonymization keys by a non-existing property" in {
+    GetAsUser("/api/boxes/anonymizationkeys?orderby=xyz") ~> routes ~> check {
+      status should be(BadRequest)
+    }
+  }
+
 }

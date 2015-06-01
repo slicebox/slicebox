@@ -119,6 +119,14 @@ class BoxDAO(val driver: JdbcProfile) {
 
   val anonymizationKeyQuery = TableQuery[AnonymizationKeyTable]
 
+  def columnExists(tableName: String, columnName: String)(implicit session: Session): Boolean = {
+    val tables = MTable.getTables(tableName).list
+    if (tables.isEmpty)
+      false
+    else
+      !tables(0).getColumns.list.filter(_.name == columnName).isEmpty
+  }
+
   def create(implicit session: Session): Unit =
     if (MTable.getTables("Box").list.isEmpty) {
       (boxQuery.ddl ++ outboxQuery.ddl ++ inboxQuery.ddl ++ transactionTagValueQuery.ddl ++ anonymizationKeyQuery.ddl).create
@@ -254,6 +262,10 @@ class BoxDAO(val driver: JdbcProfile) {
     
   def anonymizationKeys(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String])(implicit session: Session): List[AnonymizationKey] = {
 
+    orderBy.foreach(columnName =>
+      if (!columnExists("AnonymizationKey", columnName))
+        throw new IllegalArgumentException(s"Property $columnName does not exist"))
+        
     implicit val getResult = GetResult(r =>
       AnonymizationKey(r.nextLong, r.nextLong, r.nextLong, r.nextLong, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString))
 

@@ -69,8 +69,8 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
     context.system.eventStream.subscribe(context.self, classOf[FileReceived])
   }
 
-  log.info("Storage service started")    
-    
+  log.info("Storage service started")
+
   def receive = LoggingReceive {
 
     case FileReceived(path) =>
@@ -201,12 +201,8 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
     case msg: MetaDataQuery => catchAndReport {
       msg match {
         case GetPatients(startIndex, count, orderBy, orderAscending, filter) =>
-          try {
-            db.withSession { implicit session =>
-              sender ! Patients(dao.patients(startIndex, count, orderBy, orderAscending, filter))
-            }
-          } catch {
-            case e: Exception => throw new IllegalArgumentException(e)
+          db.withSession { implicit session =>
+            sender ! Patients(dao.patients(startIndex, count, orderBy, orderAscending, filter))
           }
 
         case GetStudies(startIndex, count, patientId) =>
@@ -230,12 +226,8 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
           }
 
         case GetFlatSeries(startIndex, count, orderBy, orderAscending, filter) =>
-          try {
-            db.withSession { implicit session =>
-              sender ! FlatSeriesCollection(dao.flatSeries(startIndex, count, orderBy, orderAscending, filter))
-            }
-          } catch {
-            case e: Exception => throw new IllegalArgumentException(e)
+          db.withSession { implicit session =>
+            sender ! FlatSeriesCollection(dao.flatSeries(startIndex, count, orderBy, orderAscending, filter))
           }
 
         case GetPatient(patientId) =>
@@ -277,7 +269,7 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
           db.withSession { implicit session =>
             sender ! SeriesCollection(dao.querySeries(query.startIndex, query.count, query.orderBy, query.orderAscending, query.queryProperties))
           }
-          
+
         case QueryImages(query) =>
           db.withSession { implicit session =>
             sender ! Images(dao.queryImages(query.startIndex, query.count, query.orderBy, query.orderAscending, query.queryProperties))

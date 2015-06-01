@@ -174,7 +174,7 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
         seriesQuery.ddl ++
         imagesQuery.ddl ++
         imageFilesQuery.ddl).create
-        
+
   def drop(implicit session: Session) =
     if (MTable.getTables("Patients").list.size > 0)
       (patientsQuery.ddl ++
@@ -184,6 +184,14 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
         seriesQuery.ddl ++
         imagesQuery.ddl ++
         imageFilesQuery.ddl).drop
+
+  def columnExists(tableName: String, columnName: String)(implicit session: Session): Boolean = {
+    val tables = MTable.getTables(tableName).list
+    if (tables.isEmpty)
+      false
+    else
+      !tables(0).getColumns.list.filter(_.name == columnName).isEmpty
+  }
 
   // *** Get entities by id
 
@@ -248,11 +256,15 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
   // *** Listing all patients, studies etc ***
 
   def patientsGetResult = GetResult(r =>
-      Patient(r.nextLong, PatientName(r.nextString), PatientID(r.nextString), PatientBirthDate(r.nextString), PatientSex(r.nextString)))
-  
+    Patient(r.nextLong, PatientName(r.nextString), PatientID(r.nextString), PatientBirthDate(r.nextString), PatientSex(r.nextString)))
+
   def patients(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String])(implicit session: Session): List[Patient] = {
 
-    implicit val getResult = patientsGetResult 
+    orderBy.foreach(columnName =>
+      if (!columnExists("Patients", columnName))
+        throw new IllegalArgumentException(s"Property $columnName does not exist"))
+
+    implicit val getResult = patientsGetResult
 
     var query = """select * from "Patients""""
 
@@ -272,10 +284,15 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
 
     Q.queryNA(query).list
   }
-  
+
   def queryPatients(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, queryProperties: Seq[QueryProperty])(implicit session: Session): List[Patient] = {
+
+    orderBy.foreach(columnName =>
+      if (!columnExists("Patients", columnName))
+        throw new IllegalArgumentException(s"Property $columnName does not exist"))
+
     implicit val getResult = patientsGetResult
-    
+
     val querySelectPart = """select distinct("Patients"."id"),
       "Patients"."PatientName",
       "Patients"."PatientID",
@@ -285,18 +302,23 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
       left join "Series" on "Series"."studyId" = "Studies"."id"
       left join "Equipments" on "Equipments"."id" = "Series"."equipmentId"
       left join "FrameOfReferences" on "FrameOfReferences"."id" = "Series"."frameOfReferenceId""""
-    
+
     val query = buildMetaDataQuery(querySelectPart, startIndex, count, orderBy, orderAscending, queryProperties)
-      
+
     Q.queryNA(query).list
   }
 
   def studies(implicit session: Session): List[Study] = studiesQuery.list
-  
+
   def queryStudies(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, queryProperties: Seq[QueryProperty])(implicit session: Session): List[Study] = {
+
+    orderBy.foreach(columnName =>
+      if (!columnExists("Studies", columnName))
+        throw new IllegalArgumentException(s"Property $columnName does not exist"))
+        
     implicit val getResult = GetResult(r =>
       Study(r.nextLong, r.nextLong, StudyInstanceUID(r.nextString), StudyDescription(r.nextString), StudyDate(r.nextString), StudyID(r.nextString), AccessionNumber(r.nextString), PatientAge(r.nextString)))
-    
+
     val querySelectPart = """select distinct("Studies"."id"),
       "Studies"."patientId",
       "Studies"."StudyInstanceUID",
@@ -309,16 +331,21 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
       left join "Series" on "Series"."studyId" = "Studies"."id"
       left join "Equipments" on "Equipments"."id" = "Series"."equipmentId"
       left join "FrameOfReferences" on "FrameOfReferences"."id" = "Series"."frameOfReferenceId""""
-    
+
     val query = buildMetaDataQuery(querySelectPart, startIndex, count, orderBy, orderAscending, queryProperties)
-      
+
     Q.queryNA(query).list
   }
-  
+
   def querySeries(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, queryProperties: Seq[QueryProperty])(implicit session: Session): List[Series] = {
+
+    orderBy.foreach(columnName =>
+      if (!columnExists("Series", columnName))
+        throw new IllegalArgumentException(s"Property $columnName does not exist"))
+
     implicit val getResult = GetResult(r =>
       Series(r.nextLong, r.nextLong, r.nextLong, r.nextLong, SeriesInstanceUID(r.nextString), SeriesDescription(r.nextString), SeriesDate(r.nextString), Modality(r.nextString), ProtocolName(r.nextString), BodyPartExamined(r.nextString)))
-    
+
     val querySelectPart = """select distinct("Series"."id"),
       "Series"."studyId",
       "Series"."equipmentId",
@@ -333,16 +360,21 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
       left join "Patients" on "Patients"."id" = "Studies"."patientId"
       left join "Equipments" on "Equipments"."id" = "Series"."equipmentId"
       left join "FrameOfReferences" on "FrameOfReferences"."id" = "Series"."frameOfReferenceId""""
-    
+
     val query = buildMetaDataQuery(querySelectPart, startIndex, count, orderBy, orderAscending, queryProperties)
-      
+
     Q.queryNA(query).list
   }
-  
+
   def queryImages(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, queryProperties: Seq[QueryProperty])(implicit session: Session): List[Image] = {
+
+    orderBy.foreach(columnName =>
+      if (!columnExists("Images", columnName))
+        throw new IllegalArgumentException(s"Property $columnName does not exist"))
+        
     implicit val getResult = GetResult(r =>
       Image(r.nextLong, r.nextLong, SOPInstanceUID(r.nextString), ImageType(r.nextString), InstanceNumber(r.nextString)))
-    
+
     val querySelectPart = """select distinct("Images"."id"),
       "Images"."seriesId",
       "Images"."SOPInstanceUID",
@@ -353,27 +385,27 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
       left join "Patients" on "Patients"."id" = "Studies"."patientId"
       left join "Equipments" on "Equipments"."id" = "Series"."equipmentId"
       left join "FrameOfReferences" on "FrameOfReferences"."id" = "Series"."frameOfReferenceId""""
-    
+
     val query = buildMetaDataQuery(querySelectPart, startIndex, count, orderBy, orderAscending, queryProperties)
-      
+
     Q.queryNA(query).list
   }
-  
+
   def buildMetaDataQuery(selectPart: String, startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, queryProperties: Seq[QueryProperty]): String = {
     var query = selectPart
-      
+
     val wherePart = queryProperties.map(queryPropertyToPart(_)).mkString(" and ")
     if (wherePart.length > 0) query += s" where $wherePart"
-      
+
     orderBy.foreach(orderByValue =>
       query += s""" order by "$orderByValue" ${if (orderAscending) "asc" else "desc"}""")
 
     query += s""" limit $count offset $startIndex"""
-    
+
     query
   }
-  
-  def queryPropertyToPart(queryProperty: QueryProperty) = 
+
+  def queryPropertyToPart(queryProperty: QueryProperty) =
     s""""${queryProperty.propertyName}" ${queryProperty.operator.toString()} '${queryProperty.propertyValue}'"""
 
   def series(implicit session: Session): List[Series] = seriesQuery.list
@@ -408,8 +440,16 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
 
   def flatSeries(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String])(implicit session: Session): List[FlatSeries] = {
 
-  implicit val getResult = flatSeriesGetResult
-    
+    orderBy.foreach(columnName =>
+      if (!(columnExists("Patients", columnName) || 
+          columnExists("Studies", columnName) || 
+          columnExists("Series", columnName) || 
+          columnExists("FrameOfReferences", columnName) || 
+          columnExists("Equipments", columnName)))
+        throw new IllegalArgumentException(s"Property $columnName does not exist"))
+        
+    implicit val getResult = flatSeriesGetResult
+
     var query = flatSeriesQuery
 
     filter.foreach(filterValue => {
@@ -444,12 +484,12 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
 
   def flatSeriesById(seriesId: Long)(implicit session: Session): Option[FlatSeries] = {
 
-    implicit val getResult = flatSeriesGetResult    
+    implicit val getResult = flatSeriesGetResult
     val query = flatSeriesQuery + s""" where "Series"."id" = $seriesId"""
-    
+
     Q.queryNA(query).list.headOption
   }
-  
+
   // *** Grouped listings ***
 
   def studiesForPatient(startIndex: Long, count: Long, patientId: Long)(implicit session: Session): List[Study] =
