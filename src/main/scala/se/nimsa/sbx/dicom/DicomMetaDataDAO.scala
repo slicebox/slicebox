@@ -193,6 +193,12 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
       !tables(0).getColumns.list.filter(_.name == columnName).isEmpty
   }
 
+  def checkOrderBy(orderBy: Option[String], tableNames: String*)(implicit session: Session) =
+    orderBy.foreach(columnName =>
+      if (!tableNames.exists(tableName =>
+        columnExists(tableName, columnName)))
+        throw new IllegalArgumentException(s"Property $columnName does not exist"))
+
   // *** Get entities by id
 
   def patientById(id: Long)(implicit session: Session): Option[Patient] =
@@ -260,9 +266,7 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
 
   def patients(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String])(implicit session: Session): List[Patient] = {
 
-    orderBy.foreach(columnName =>
-      if (!columnExists("Patients", columnName))
-        throw new IllegalArgumentException(s"Property $columnName does not exist"))
+    checkOrderBy(orderBy, "Patients")
 
     implicit val getResult = patientsGetResult
 
@@ -287,9 +291,7 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
 
   def queryPatients(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, queryProperties: Seq[QueryProperty])(implicit session: Session): List[Patient] = {
 
-    orderBy.foreach(columnName =>
-      if (!columnExists("Patients", columnName))
-        throw new IllegalArgumentException(s"Property $columnName does not exist"))
+    checkOrderBy(orderBy, "Patients")
 
     implicit val getResult = patientsGetResult
 
@@ -312,10 +314,8 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
 
   def queryStudies(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, queryProperties: Seq[QueryProperty])(implicit session: Session): List[Study] = {
 
-    orderBy.foreach(columnName =>
-      if (!columnExists("Studies", columnName))
-        throw new IllegalArgumentException(s"Property $columnName does not exist"))
-        
+    checkOrderBy(orderBy, "Studies")
+
     implicit val getResult = GetResult(r =>
       Study(r.nextLong, r.nextLong, StudyInstanceUID(r.nextString), StudyDescription(r.nextString), StudyDate(r.nextString), StudyID(r.nextString), AccessionNumber(r.nextString), PatientAge(r.nextString)))
 
@@ -339,9 +339,7 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
 
   def querySeries(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, queryProperties: Seq[QueryProperty])(implicit session: Session): List[Series] = {
 
-    orderBy.foreach(columnName =>
-      if (!columnExists("Series", columnName))
-        throw new IllegalArgumentException(s"Property $columnName does not exist"))
+    checkOrderBy(orderBy, "Series")
 
     implicit val getResult = GetResult(r =>
       Series(r.nextLong, r.nextLong, r.nextLong, r.nextLong, SeriesInstanceUID(r.nextString), SeriesDescription(r.nextString), SeriesDate(r.nextString), Modality(r.nextString), ProtocolName(r.nextString), BodyPartExamined(r.nextString)))
@@ -368,10 +366,8 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
 
   def queryImages(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, queryProperties: Seq[QueryProperty])(implicit session: Session): List[Image] = {
 
-    orderBy.foreach(columnName =>
-      if (!columnExists("Images", columnName))
-        throw new IllegalArgumentException(s"Property $columnName does not exist"))
-        
+    checkOrderBy(orderBy, "Images")
+
     implicit val getResult = GetResult(r =>
       Image(r.nextLong, r.nextLong, SOPInstanceUID(r.nextString), ImageType(r.nextString), InstanceNumber(r.nextString)))
 
@@ -440,14 +436,8 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
 
   def flatSeries(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String])(implicit session: Session): List[FlatSeries] = {
 
-    orderBy.foreach(columnName =>
-      if (!(columnExists("Patients", columnName) || 
-          columnExists("Studies", columnName) || 
-          columnExists("Series", columnName) || 
-          columnExists("FrameOfReferences", columnName) || 
-          columnExists("Equipments", columnName)))
-        throw new IllegalArgumentException(s"Property $columnName does not exist"))
-        
+    checkOrderBy(orderBy, "Patients", "Studies", "Equipments", "FrameOfReferences", "Series")
+
     implicit val getResult = flatSeriesGetResult
 
     var query = flatSeriesQuery
