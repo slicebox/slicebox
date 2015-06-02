@@ -125,7 +125,7 @@ angular.module('slicebox.home', ['ngRoute'])
     $scope.studySelected = function(study, reset) {
         if ($scope.uiState.selectedStudy !== study) {
             $scope.uiState.selectedStudy = study;
-            $scope.seriesSelected(null);
+            $scope.seriesSelected(null, true);
         }
         if (reset && $scope.callbacks.studiesTable) {
             $scope.callbacks.studiesTable.reset();
@@ -209,7 +209,7 @@ angular.module('slicebox.home', ['ngRoute'])
             return [];
         }
 
-        var imagesPromise = $http.get('/api/metadata/images?seriesid=' + $scope.uiState.selectedSeries.id);
+        var imagesPromise = $http.get('/api/metadata/images?count=1&seriesid=' + $scope.uiState.selectedSeries.id);
 
         imagesPromise.error(function(reason) {
             $scope.showErrorMessage('Failed to load images for series: ' + error);            
@@ -223,7 +223,9 @@ angular.module('slicebox.home', ['ngRoute'])
                             orderByDirection = 'ASCENDING';
                         }
                         return data.data.sort(function compare(a,b) {
-                          return a[orderByProperty] < b[orderByProperty] ? -1 : a[orderByProperty] > b[orderByProperty] ? 1 : 0;
+                          return orderByDirection === 'ASCENDING' ? 
+                            a[orderByProperty] < b[orderByProperty] ? -1 : a[orderByProperty] > b[orderByProperty] ? 1 : 0 :
+                            a[orderByProperty] > b[orderByProperty] ? -1 : a[orderByProperty] < b[orderByProperty] ? 1 : 0;
                         });
                     } else {
                         return data.data;
@@ -245,7 +247,7 @@ angular.module('slicebox.home', ['ngRoute'])
         if ($scope.uiState.selectedSeries !== null) {
             $scope.uiState.loadPngImagesInProgress = true;
 
-            $http.get('/api/metadata/images?seriesid=' + $scope.uiState.selectedSeries.id).success(function(images) {
+            $http.get('/api/metadata/images?count=1000000&seriesid=' + $scope.uiState.selectedSeries.id).success(function(images) {
 
                 var generateMore = true;
 
@@ -304,7 +306,7 @@ angular.module('slicebox.home', ['ngRoute'])
             return [];
         }
 
-        var loadDatasetsPromise = $http.get('/api/metadata/images?seriesid=' + $scope.uiState.selectedSeries.id).then(function(images) {
+        var loadDatasetsPromise = $http.get('/api/metadata/images?count=1000000&seriesid=' + $scope.uiState.selectedSeries.id).then(function(images) {
             return images.data.map(function(image) {
                 return { url: '/api/images/' + image.id };
             });
