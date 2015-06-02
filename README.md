@@ -43,6 +43,10 @@ Images can now be exported from PACS to the local slicebox instance easily. Expo
 Installation
 ------------
 
+### Java
+
+Slicebox runs on the Java Virtual Machine and requires a Java 8 runtime environment. If you machine does not have Java 8 installed, download and install from [java.com](https://java.com) (a JRE i sufficient). Make sure you have the `java` command located in the `bin` folder of your Java installation on the path. Check this by typing `java -version` in a command window. The response should be that you are running Java version 8.
+
 We provide two types of installers, either a zip-file suitable for installation on any system, or deb/rpm packages for Debian/Red Hat Linux. When using the zip-file, it is up to the user installing slicebox to install the program as a service. The linux installers are configured to automatically install slicebox as a service which is always running.
 
 ### Universal zip package
