@@ -19,9 +19,15 @@ import se.nimsa.sbx.dicom.DicomDispatchActor
 import se.nimsa.sbx.dicom.DicomProtocol._
 import se.nimsa.sbx.dicom.DicomPropertyValue._
 import se.nimsa.sbx.dicom.DicomHierarchy._
+import java.util.Date
+import org.dcm4che3.data.Attributes
+import org.dcm4che3.data.VR
+import org.dcm4che3.data.Tag
+import se.nimsa.sbx.dicom.DicomUtil._
+import se.nimsa.sbx.dicom.DicomAnonymization
 
 class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
-  with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {
+    with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {
 
   def this() = this(ActorSystem("BoxServiceActorTestSystem"))
 
@@ -33,6 +39,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
   val boxDao = new BoxDAO(H2Driver)
   val metaDataDao = new DicomMetaDataDAO(H2Driver)
 
+  // this code to avoid race condition with creation of tables in actors below
   db.withSession { implicit session =>
     boxDao.create
     metaDataDao.create
@@ -42,21 +49,13 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
 
   val boxServiceActorRef = system.actorOf(Props(new BoxServiceActor(dbProps, storage, "http://testhost:1234")), name = "BoxService")
 
-  override def beforeEach() {
+  override def afterEach() =
     db.withSession { implicit session =>
-      boxDao.listBoxes.foreach(box =>
-        boxDao.removeBox(box.id))
-
-      boxDao.listOutboxEntries.foreach(outboxEntry =>
-        boxDao.removeOutboxEntry(outboxEntry.id))
-
-      boxDao.listInboxEntries.foreach(inboxEntry =>
-        boxDao.removeInboxEntry(inboxEntry.id))
-
-      boxDao.listTransactionTagValues.foreach(tagValue =>
-        boxDao.removeTransactionTagValue(tagValue.id))
+      boxDao.drop
+      metaDataDao.drop
+      boxDao.create
+      metaDataDao.create
     }
-  }
 
   override def afterAll {
     TestKit.shutdownActorSystem(system)
@@ -143,17 +142,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
       db.withSession { implicit session =>
         val remoteBox = boxDao.insertBox(Box(-1, "some remote box", "abc", "https://someurl.com", BoxSendMethod.POLL, false))
 
-        val p1 = metaDataDao.insert(Patient(-1, PatientName("p1"), PatientID("s1"), PatientBirthDate("2000-01-01"), PatientSex("M")))
-        val s1 = metaDataDao.insert(Study(-1, p1.id, StudyInstanceUID("stuid1"), StudyDescription("stdesc1"), StudyDate("19990101"), StudyID("stid1"), AccessionNumber("acc1"), PatientAge("12Y")))
-        val e1 = metaDataDao.insert(Equipment(-1, Manufacturer("manu1"), StationName("station1")))
-        val f1 = metaDataDao.insert(FrameOfReference(-1, FrameOfReferenceUID("frid1")))
-        val r1 = metaDataDao.insert(Series(-1, s1.id, e1.id, f1.id, SeriesInstanceUID("seuid1"), SeriesDescription("sedesc1"), SeriesDate("19990101"), Modality("NM"), ProtocolName("prot1"), BodyPartExamined("bodypart1")))
-        val i1 = metaDataDao.insert(Image(-1, r1.id, SOPInstanceUID("1.1"), ImageType("t1"), InstanceNumber("1")))
-        val i2 = metaDataDao.insert(Image(-1, r1.id, SOPInstanceUID("1.2"), ImageType("t1"), InstanceNumber("1")))
-        val i3 = metaDataDao.insert(Image(-1, r1.id, SOPInstanceUID("1.3"), ImageType("t1"), InstanceNumber("1")))
-        val if1 = metaDataDao.insert(ImageFile(i1.id, FileName("file1")))
-        val if2 = metaDataDao.insert(ImageFile(i2.id, FileName("file2")))
-        val if3 = metaDataDao.insert(ImageFile(i3.id, FileName("file3")))
+        val (p1, s1, e1, f1, r1, i1, i2, i3, if1, if2, if3) = insertMetadata
 
         val tagValues = Seq(
           BoxSendTagValue(r1.id, 0x00101010, "B"),
@@ -199,17 +188,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
         val token = "abc"
         val remoteBox = boxDao.insertBox(Box(-1, "some remote box", token, "https://someurl.com", BoxSendMethod.POLL, false))
 
-        val p1 = metaDataDao.insert(Patient(-1, PatientName("p1"), PatientID("s1"), PatientBirthDate("2000-01-01"), PatientSex("M")))
-        val s1 = metaDataDao.insert(Study(-1, p1.id, StudyInstanceUID("stuid1"), StudyDescription("stdesc1"), StudyDate("19990101"), StudyID("stid1"), AccessionNumber("acc1"), PatientAge("12Y")))
-        val e1 = metaDataDao.insert(Equipment(-1, Manufacturer("manu1"), StationName("station1")))
-        val f1 = metaDataDao.insert(FrameOfReference(-1, FrameOfReferenceUID("frid1")))
-        val r1 = metaDataDao.insert(Series(-1, s1.id, e1.id, f1.id, SeriesInstanceUID("seuid1"), SeriesDescription("sedesc1"), SeriesDate("19990101"), Modality("NM"), ProtocolName("prot1"), BodyPartExamined("bodypart1")))
-        val i1 = metaDataDao.insert(Image(-1, r1.id, SOPInstanceUID("1.1"), ImageType("t1"), InstanceNumber("1")))
-        val i2 = metaDataDao.insert(Image(-1, r1.id, SOPInstanceUID("1.2"), ImageType("t1"), InstanceNumber("1")))
-        val i3 = metaDataDao.insert(Image(-1, r1.id, SOPInstanceUID("1.3"), ImageType("t1"), InstanceNumber("1")))
-        val if1 = metaDataDao.insert(ImageFile(i1.id, FileName("file1")))
-        val if2 = metaDataDao.insert(ImageFile(i2.id, FileName("file2")))
-        val if3 = metaDataDao.insert(ImageFile(i3.id, FileName("file3")))
+        val (p1, s1, e1, f1, r1, i1, i2, i3, if1, if2, if3) = insertMetadata
 
         val tagValues = Seq(
           BoxSendTagValue(r1.id, 0x00101010, "B"),
@@ -250,5 +229,88 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
       }
     }
 
+    "harmonize anonymization with respect to relevant anonymization keys when sending a file" in {
+      db.withSession { implicit session =>
+        val remoteBox = boxDao.insertBox(Box(-1, "some remote box", "abc", "https://someurl.com", BoxSendMethod.POLL, false))
+
+        val key = insertAnonymizationKey
+
+        val outboxEntry = OutboxEntry(1, 1, 1234, 1, 1, 1, false)
+
+        val dataset = createDataset
+        val anonymizedDataset = DicomAnonymization.anonymizeDataset(dataset)
+        boxServiceActorRef ! HarmonizeAnonymization(outboxEntry, dataset, anonymizedDataset)
+
+        expectMsgPF() {
+          case harmonized: Attributes =>
+            harmonized.getString(Tag.PatientID) should be(key.anonPatientID)
+            harmonized.getString(Tag.StudyInstanceUID) should be(key.anonStudyInstanceUID)
+            harmonized.getString(Tag.SeriesInstanceUID) should be(key.anonSeriesInstanceUID)
+            harmonized.getString(Tag.FrameOfReferenceUID) should be(key.anonFrameOfReferenceUID)
+        }
+      }
+    }
+
+    "reverse anonymization in an anonymous dataset based on anonymization keys" in {
+      db.withSession { implicit session =>
+        val key = insertAnonymizationKey
+        val dataset = createDataset
+        val anonymizedDataset = DicomAnonymization.anonymizeDataset(dataset)
+        anonymizedDataset.setString(Tag.PatientName, VR.PN, key.anonPatientName)
+        anonymizedDataset.setString(Tag.PatientID, VR.SH, key.anonPatientID)
+        anonymizedDataset.setString(Tag.StudyInstanceUID, VR.SH, key.anonStudyInstanceUID)
+        boxServiceActorRef ! ReverseAnonymization(anonymizedDataset)
+
+        expectMsgPF() {
+          case reversed: Attributes =>
+            reversed.getString(Tag.PatientName) should be (key.patientName)
+            reversed.getString(Tag.PatientID) should be (key.patientID)
+            reversed.getString(Tag.StudyInstanceUID) should be (key.studyInstanceUID)
+            reversed.getString(Tag.StudyDescription) should be (key.studyDescription)
+            reversed.getString(Tag.StudyID) should be (key.studyID)
+            reversed.getString(Tag.AccessionNumber) should be (key.accessionNumber)
+
+        }
+      }
+    }
   }
+
+  def createDataset = {
+    val dataset = new Attributes()
+    dataset.setString(Tag.PatientName, VR.LO, "p1")
+    dataset.setString(Tag.PatientID, VR.LO, "s1")
+    dataset.setString(Tag.StudyInstanceUID, VR.LO, "stuid1")
+    dataset.setString(Tag.SeriesInstanceUID, VR.LO, "seuid1")
+    dataset.setString(Tag.FrameOfReferenceUID, VR.LO, "frid1")
+    dataset
+  }
+
+  def insertAnonymizationKey(implicit session: H2Driver.simple.Session) = {
+    val key = AnonymizationKey(-1, new Date().getTime, 1, 1234, "remote box",
+      "p1", "anon p1",
+      "s1", "anon s1",
+      "2000-01-01",
+      "stuid1", "anon stuid1",
+      "stdesc1", "stid1", "acc1",
+      "seuid1", "anon seuid1",
+      "frid1", "anon frid1")
+    boxDao.insertAnonymizationKey(key)
+    key
+  }
+
+  def insertMetadata(implicit session: H2Driver.simple.Session) = {
+    val p1 = metaDataDao.insert(Patient(-1, PatientName("p1"), PatientID("s1"), PatientBirthDate("2000-01-01"), PatientSex("M")))
+    val s1 = metaDataDao.insert(Study(-1, p1.id, StudyInstanceUID("stuid1"), StudyDescription("stdesc1"), StudyDate("19990101"), StudyID("stid1"), AccessionNumber("acc1"), PatientAge("12Y")))
+    val e1 = metaDataDao.insert(Equipment(-1, Manufacturer("manu1"), StationName("station1")))
+    val f1 = metaDataDao.insert(FrameOfReference(-1, FrameOfReferenceUID("frid1")))
+    val r1 = metaDataDao.insert(Series(-1, s1.id, e1.id, f1.id, SeriesInstanceUID("seuid1"), SeriesDescription("sedesc1"), SeriesDate("19990101"), Modality("NM"), ProtocolName("prot1"), BodyPartExamined("bodypart1")))
+    val i1 = metaDataDao.insert(Image(-1, r1.id, SOPInstanceUID("1.1"), ImageType("t1"), InstanceNumber("1")))
+    val i2 = metaDataDao.insert(Image(-1, r1.id, SOPInstanceUID("1.2"), ImageType("t1"), InstanceNumber("1")))
+    val i3 = metaDataDao.insert(Image(-1, r1.id, SOPInstanceUID("1.3"), ImageType("t1"), InstanceNumber("1")))
+    val if1 = metaDataDao.insert(ImageFile(i1.id, FileName("file1")))
+    val if2 = metaDataDao.insert(ImageFile(i2.id, FileName("file2")))
+    val if3 = metaDataDao.insert(ImageFile(i3.id, FileName("file3")))
+    (p1, s1, e1, f1, r1, i1, i2, i3, if1, if2, if3)
+  }
+
 }

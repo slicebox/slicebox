@@ -70,12 +70,7 @@ class BoxPushActor(box: Box,
     val anonymizationKeys = anonymizationKeysForPatient(dataset)
     harmonizeAnonymization(anonymizationKeys, dataset, anonymizedDataset)
 
-    val anonymizationKey = boxById(outboxEntry.remoteBoxId) match {
-      case Some(box) =>
-        createAnonymizationKey(outboxEntry.remoteBoxId, outboxEntry.transactionId, box.name, dataset, anonymizedDataset)
-      case None =>
-        createAnonymizationKey(outboxEntry.remoteBoxId, outboxEntry.transactionId, "" + outboxEntry.remoteBoxId, dataset, anonymizedDataset)
-    }
+    val anonymizationKey = createAnonymizationKey(outboxEntry.remoteBoxId, outboxEntry.transactionId, boxById(outboxEntry.remoteBoxId).map(_.name).getOrElse("" + outboxEntry.remoteBoxId), dataset, anonymizedDataset)
     if (!anonymizationKeys.exists(isEqual(_, anonymizationKey)))
       addAnonymizationKey(anonymizationKey)
 

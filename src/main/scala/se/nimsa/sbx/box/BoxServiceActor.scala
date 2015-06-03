@@ -193,12 +193,7 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
             val anonymizationKeys = anonymizationKeysForPatient(dataset)
             harmonizeAnonymization(anonymizationKeys, dataset, clonedAnonDataset)
 
-            val anonymizationKey = boxById(outboxEntry.remoteBoxId) match {
-              case Some(box) =>
-                createAnonymizationKey(outboxEntry.remoteBoxId, outboxEntry.transactionId, box.name, dataset, anonDataset)
-              case None =>
-                createAnonymizationKey(outboxEntry.remoteBoxId, outboxEntry.transactionId, "" + outboxEntry.remoteBoxId, dataset, anonDataset)
-            }
+            val anonymizationKey = createAnonymizationKey(outboxEntry.remoteBoxId, outboxEntry.transactionId, boxById(outboxEntry.remoteBoxId).map(_.name).getOrElse("" + outboxEntry.remoteBoxId), dataset, anonDataset)            
             if (!anonymizationKeys.exists(isEqual(_, anonymizationKey)))
               addAnonymizationKey(anonymizationKey)
 
