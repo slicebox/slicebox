@@ -5,7 +5,7 @@
     "title": "Slicebox API",
     "description": "Slicebox - safe sharing of medical images",
     "contact": {
-      "url": "http://github.org/KarlSjostrand/slicebox"
+      "url": "http://github.org/slicebox/slicebox"
     },
     "license": {
       "name": "Apache 2.0 License",
