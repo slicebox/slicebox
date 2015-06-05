@@ -59,6 +59,7 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
 
   val db = dbProps.db
   val dao = new DicomMetaDataDAO(dbProps.driver)
+  val propertiesDao = new DicomPropertiesDAO(dbProps.driver)
 
   setupDb()
 
@@ -122,7 +123,7 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
 
         case DeleteImage(imageId) =>
           db.withSession { implicit session =>
-            val imageFiles = dao.imageFileForImage(imageId).toList
+            val imageFiles = propertiesDao.imageFileForImage(imageId).toList
             dao.deleteImage(imageId)
             deleteFromStorage(imageFiles)
             sender ! ImageFilesDeleted(imageFiles)
@@ -130,7 +131,7 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
 
         case DeleteSeries(seriesId) =>
           db.withSession { implicit session =>
-            val imageFiles = dao.imageFilesForSeries(seriesId)
+            val imageFiles = propertiesDao.imageFilesForSeries(seriesId)
             dao.deleteSeries(seriesId)
             deleteFromStorage(imageFiles)
             sender ! ImageFilesDeleted(imageFiles)
@@ -138,7 +139,7 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
 
         case DeleteStudy(studyId) =>
           db.withSession { implicit session =>
-            val imageFiles = dao.imageFilesForStudy(studyId)
+            val imageFiles = propertiesDao.imageFilesForStudy(studyId)
             dao.deleteStudy(studyId)
             deleteFromStorage(imageFiles)
             sender ! ImageFilesDeleted(imageFiles)
@@ -146,7 +147,7 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
 
         case DeletePatient(patientId) =>
           db.withSession { implicit session =>
-            val imageFiles = dao.imageFilesForPatient(patientId)
+            val imageFiles = propertiesDao.imageFilesForPatient(patientId)
             dao.deletePatient(patientId)
             deleteFromStorage(imageFiles)
             sender ! ImageFilesDeleted(imageFiles)
@@ -160,7 +161,7 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
 
         case GetImageAttributes(imageId) =>
           db.withSession { implicit session =>
-            dao.imageFileForImage(imageId) match {
+            propertiesDao.imageFileForImage(imageId) match {
               case Some(imageFile) =>
                 val recipient = sender
                 Future {
@@ -173,7 +174,7 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
 
         case GetImageInformation(imageId) =>
           db.withSession { implicit session =>
-            dao.imageFileForImage(imageId) match {
+            propertiesDao.imageFileForImage(imageId) match {
               case Some(imageFile) =>
                 Future {
                   Some(readImageInformation(imageFile.fileName.value))
@@ -185,7 +186,7 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
 
         case GetImageFrame(imageId, frameNumber, windowMin, windowMax, imageHeight) =>
           db.withSession { implicit session =>
-            dao.imageFileForImage(imageId) match {
+            propertiesDao.imageFileForImage(imageId) match {
               case Some(imageFile) =>
                 Future {
                   Some(readImageFrame(imageFile.fileName.value, frameNumber, windowMin, windowMax, imageHeight))
@@ -222,7 +223,7 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
 
         case GetImageFile(imageId) =>
           db.withSession { implicit session =>
-            sender ! dao.imageFileForImage(imageId)
+            sender ! propertiesDao.imageFileForImage(imageId)
           }
 
         case GetFlatSeries(startIndex, count, orderBy, orderAscending, filter) =>
@@ -301,7 +302,7 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
       val dbFrameOfReferenceMaybe = dao.frameOfReferenceByUid(frameOfReference)
       val dbSeriesMaybe = dao.seriesByUid(series)
       val dbImageMaybe = dao.imageByUid(image)
-      val dbImageFileMaybe = dao.imageFileByFileName(imageFile)
+      val dbImageFileMaybe = propertiesDao.imageFileByFileName(imageFile)
 
       // relationships are one to many from top to bottom. There must therefore not be a new instance followed by an existing
       val hierarchyIsWellDefined = !(
@@ -323,7 +324,7 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
           equipmentId = dbEquipment.id,
           frameOfReferenceId = dbFrameOfReference.id)))
         val dbImage = dbImageMaybe.getOrElse(dao.insert(image.copy(seriesId = dbSeries.id)))
-        dbImageFileMaybe.getOrElse(dao.insert(imageFile.copy(id = dbImage.id)))
+        dbImageFileMaybe.getOrElse(propertiesDao.insert(imageFile.copy(id = dbImage.id)))
 
         try {
           saveDataset(dataset, storedPath)
@@ -459,6 +460,7 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
   def setupDb() =
     db.withSession { implicit session =>
       dao.create
+      propertiesDao.create
     }
 
 }

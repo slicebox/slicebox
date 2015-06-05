@@ -26,7 +26,7 @@ import akka.event.Logging
 import akka.event.LoggingReceive
 import akka.pattern.pipe
 import se.nimsa.sbx.app.DbProps
-import se.nimsa.sbx.dicom.DicomMetaDataDAO
+import se.nimsa.sbx.dicom.DicomPropertiesDAO
 import se.nimsa.sbx.dicom.DicomDispatchActor
 import se.nimsa.sbx.dicom.DicomProtocol._
 import se.nimsa.sbx.util.ExceptionCatching
@@ -37,7 +37,7 @@ class ScuServiceActor(dbProps: DbProps, storage: Path) extends Actor with Except
 
   val db = dbProps.db
   val dao = new ScuDataDAO(dbProps.driver)
-  val metaDataDao = new DicomMetaDataDAO(dbProps.driver)
+  val propertiesDao = new DicomPropertiesDAO(dbProps.driver)
 
   import context.system
   implicit val ec = context.dispatcher
@@ -134,7 +134,7 @@ class ScuServiceActor(dbProps: DbProps, storage: Path) extends Actor with Except
 
   def imageFilesForSeries(seriesId: Long) =
     db.withSession { implicit session =>
-      metaDataDao.imageFilesForSeries(seriesId)
+      propertiesDao.imageFilesForSeries(seriesId)
     }
 
 }

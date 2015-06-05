@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Karl Sjöstrand
+	 * Copyright 2015 Karl Sjöstrand
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,6 +34,7 @@ import scala.concurrent.Future
 import spray.http.HttpResponse
 import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.dicom.DicomMetaDataDAO
+import se.nimsa.sbx.dicom.DicomPropertiesDAO
 import spray.http.StatusCode
 import se.nimsa.sbx.dicom.DicomUtil._
 import se.nimsa.sbx.dicom.DicomAnonymization._
@@ -52,7 +53,7 @@ class BoxPushActor(box: Box,
 
   val db = dbProps.db
   val boxDao = new BoxDAO(dbProps.driver)
-  val dicomMetaDataDao = new DicomMetaDataDAO(dbProps.driver)
+  val dicomPropertiesDao = new DicomPropertiesDAO(dbProps.driver)
 
   implicit val system = context.system
   implicit val ec = context.dispatcher
@@ -131,7 +132,7 @@ class BoxPushActor(box: Box,
 
   def fileNameForImageFileId(imageFileId: Long): Option[String] =
     db.withSession { implicit session =>
-      dicomMetaDataDao.imageFileById(imageFileId).map(_.fileName.value)
+      dicomPropertiesDao.imageFileById(imageFileId).map(_.fileName.value)
     }
 
   def tagValuesForImageFileIdAndTransactionId(imageFileId: Long, transactionId: Long): Seq[TransactionTagValue] =

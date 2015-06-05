@@ -25,6 +25,7 @@ import org.dcm4che3.data.VR
 import org.dcm4che3.data.Tag
 import se.nimsa.sbx.dicom.DicomUtil._
 import se.nimsa.sbx.dicom.DicomAnonymization
+import se.nimsa.sbx.dicom.DicomPropertiesDAO
 
 class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
     with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {
@@ -38,11 +39,13 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
 
   val boxDao = new BoxDAO(H2Driver)
   val metaDataDao = new DicomMetaDataDAO(H2Driver)
+  val propertiesDao = new DicomPropertiesDAO(H2Driver)
 
   // this code to avoid race condition with creation of tables in actors below
   db.withSession { implicit session =>
     boxDao.create
     metaDataDao.create
+    propertiesDao.create
   }
 
   val dicomService = system.actorOf(DicomDispatchActor.props(storage, dbProps), name = "DicomDispatch")
@@ -52,9 +55,11 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
   override def afterEach() =
     db.withSession { implicit session =>
       boxDao.drop
+      propertiesDao.drop
       metaDataDao.drop
-      boxDao.create
       metaDataDao.create
+      propertiesDao.create
+      boxDao.create
     }
 
   override def afterAll {
@@ -307,9 +312,9 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
     val i1 = metaDataDao.insert(Image(-1, r1.id, SOPInstanceUID("1.1"), ImageType("t1"), InstanceNumber("1")))
     val i2 = metaDataDao.insert(Image(-1, r1.id, SOPInstanceUID("1.2"), ImageType("t1"), InstanceNumber("1")))
     val i3 = metaDataDao.insert(Image(-1, r1.id, SOPInstanceUID("1.3"), ImageType("t1"), InstanceNumber("1")))
-    val if1 = metaDataDao.insert(ImageFile(i1.id, FileName("file1")))
-    val if2 = metaDataDao.insert(ImageFile(i2.id, FileName("file2")))
-    val if3 = metaDataDao.insert(ImageFile(i3.id, FileName("file3")))
+    val if1 = propertiesDao.insert(ImageFile(i1.id, FileName("file1")))
+    val if2 = propertiesDao.insert(ImageFile(i2.id, FileName("file2")))
+    val if3 = propertiesDao.insert(ImageFile(i3.id, FileName("file3")))
     (p1, s1, e1, f1, r1, i1, i2, i3, if1, if2, if3)
   }
 

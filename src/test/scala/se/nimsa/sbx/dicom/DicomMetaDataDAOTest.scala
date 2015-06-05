@@ -39,29 +39,20 @@ class DicomMetaDataDAOTest extends FlatSpec with Matchers {
   val image6 = Image(-1, -1, SOPInstanceUID("souid6"), ImageType("PRIMARY/RECON/TOMO"), InstanceNumber("1"))
   val image7 = Image(-1, -1, SOPInstanceUID("souid7"), ImageType("PRIMARY/RECON/TOMO"), InstanceNumber("1"))
   val image8 = Image(-1, -1, SOPInstanceUID("souid8"), ImageType("PRIMARY/RECON/TOMO"), InstanceNumber("1"))
-  val imageFile1 = ImageFile(-1, FileName("file1"))
-  val imageFile2 = ImageFile(-1, FileName("file2"))
-  val imageFile3 = ImageFile(-1, FileName("file3"))
-  val imageFile4 = ImageFile(-1, FileName("file4"))
-  val imageFile5 = ImageFile(-1, FileName("file5"))
-  val imageFile6 = ImageFile(-1, FileName("file6"))
-  val imageFile7 = ImageFile(-1, FileName("file7"))
-  val imageFile8 = ImageFile(-1, FileName("file8"))
 
   val pat1_copy = Patient(-1, PatientName("p1"), PatientID("s1"), PatientBirthDate("1000-01-01"), PatientSex("F"))
   val study3 = Study(-1, -1, StudyInstanceUID("stuid3"), StudyDescription("stdesc3"), StudyDate("19990103"), StudyID("stid3"), AccessionNumber("acc3"), PatientAge("13Y"))
   // the following series has a copied SeriesInstanceUID but unique parent study so should no be treated as copy
   val series1_copy = Series(-1, -1, -1, -1, SeriesInstanceUID("souid1"), SeriesDescription("sedesc1"), SeriesDate("19990101"), Modality("NM"), ProtocolName("prot1"), BodyPartExamined("bodypart1"))
   val image9 = Image(-1, -1, SOPInstanceUID("souid9"), ImageType("PRIMARY/RECON/TOMO"), InstanceNumber("1"))
-  val imageFile9 = ImageFile(-1, FileName("file9"))
 
   "The meta data db" should "be emtpy before anything has been added" in {
     db.withSession { implicit session =>
-      dao.imageFiles.size should be(0)
+      dao.images.size should be(0)
     }
   }
 
-  it should "contain one entry in each table after inserting one patient, study, series, equipent, frame of referenc, image and image file" in {
+  it should "contain one entry in each table after inserting one patient, study, series, equipent, frame of referenc and image" in {
     db.withSession { implicit session =>
       val dbPat = dao.insert(pat1)
       val dbStudy = dao.insert(study1.copy(patientId = dbPat.id))
@@ -69,9 +60,7 @@ class DicomMetaDataDAOTest extends FlatSpec with Matchers {
       val dbFor = dao.insert(for1)
       val dbSeries = dao.insert(series1.copy(studyId = dbStudy.id, equipmentId = dbEquipment.id, frameOfReferenceId = dbFor.id))
       val dbImage = dao.insert(image1.copy(seriesId = dbSeries.id))
-      dao.insert(imageFile1.copy(id = dbImage.id))
 
-      dao.imageFiles.size should be(1)
       dao.images.size should be(1)
       dao.series.size should be(1)
       dao.equipments.size should be(1)
@@ -88,11 +77,10 @@ class DicomMetaDataDAOTest extends FlatSpec with Matchers {
     }
   }
 
-  it should "cascade delete linked studies, series, images and image files when a patient is deleted" in {
+  it should "cascade delete linked studies, series and images when a patient is deleted" in {
     db.withSession { implicit session =>
       dao.patientByNameAndID(pat1).foreach(dbPat => {
         dao.deletePatient(dbPat.id)
-        dao.imageFiles.size should be(0)
         dao.images.size should be(0)
         dao.series.size should be(0)
         dao.studies.size should be(0)
@@ -141,14 +129,6 @@ class DicomMetaDataDAOTest extends FlatSpec with Matchers {
       val dbImage6 = dao.insert(image6.copy(seriesId = dbSeries2.id))
       val dbImage7 = dao.insert(image7.copy(seriesId = dbSeries3.id))
       val dbImage8 = dao.insert(image8.copy(seriesId = dbSeries4.id))
-      dao.insert(imageFile1.copy(id = dbImage1.id))
-      dao.insert(imageFile2.copy(id = dbImage2.id))
-      dao.insert(imageFile3.copy(id = dbImage3.id))
-      dao.insert(imageFile4.copy(id = dbImage4.id))
-      dao.insert(imageFile5.copy(id = dbImage5.id))
-      dao.insert(imageFile6.copy(id = dbImage6.id))
-      dao.insert(imageFile7.copy(id = dbImage7.id))
-      dao.insert(imageFile8.copy(id = dbImage8.id))
 
       dao.patients(0, 20, None, false, None).size should be(1)
       dao.studiesForPatient(0, 20, dbPat.id).size should be(2)
@@ -160,21 +140,6 @@ class DicomMetaDataDAOTest extends FlatSpec with Matchers {
       dao.imagesForSeries(0, 20, dbSeries2.id).size should be(2)
       dao.imagesForSeries(0, 20, dbSeries3.id).size should be(2)
       dao.imagesForSeries(0, 20, dbSeries4.id).size should be(2)
-      dao.imageFileForImage(dbImage1.id).isDefined should be(true)
-      dao.imageFileForImage(dbImage2.id).isDefined should be(true)
-      dao.imageFileForImage(dbImage3.id).isDefined should be(true)
-      dao.imageFileForImage(dbImage4.id).isDefined should be(true)
-      dao.imageFileForImage(dbImage5.id).isDefined should be(true)
-      dao.imageFileForImage(dbImage6.id).isDefined should be(true)
-      dao.imageFileForImage(dbImage7.id).isDefined should be(true)
-      dao.imageFileForImage(dbImage8.id).isDefined should be(true)
-      dao.imageFilesForSeries(dbSeries1.id).size should be(2)
-      dao.imageFilesForSeries(dbSeries2.id).size should be(2)
-      dao.imageFilesForSeries(dbSeries3.id).size should be(2)
-      dao.imageFilesForSeries(dbSeries4.id).size should be(2)
-      dao.imageFilesForStudy(dbStudy1.id).size should be(4)
-      dao.imageFilesForStudy(dbStudy2.id).size should be(4)
-      dao.imageFilesForPatient(dbPat.id).size should be(8)
     }
   }
   
