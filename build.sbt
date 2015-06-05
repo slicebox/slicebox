@@ -46,7 +46,7 @@ import de.heikoseeberger.sbtheader.license.Apache2_0
 	// for automatic license stub generation
 
 	val licenceYear = "2015"
-	val licencedTo = "Karl Sjöstrand"
+	val licencedTo = "Lars Edenbrandt"
 
 	headers := Map(
 	  "scala" -> Apache2_0(licenceYear, licencedTo),

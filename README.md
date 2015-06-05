@@ -3,10 +3,10 @@
 
 Service | Status | Description
 ------- | ------ | -----------
-Travis        | [![Build Status](https://travis-ci.org/KarlSjostrand/slicebox.svg?branch=develop)](https://travis-ci.org/KarlSjostrand/slicebox.svg?branch=develop) | Tests
-Bintray       | [ ![Download](https://api.bintray.com/packages/karlsjostrand/slicebox/installers/images/download.svg) ](https://bintray.com/karlsjostrand/slicebox/installers/_latestVersion) | Latest Version on Bintray
-Gitter        | [![Join the chat at https://gitter.im/KarlSjostrand/slicebox](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/KarlSjostrand/slicebox?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge) | Chatroom
-Documentation | - | [REST API](http://karlsjostrand.github.io/slicebox)
+Travis        | [![Build Status](https://travis-ci.org/slicebox/slicebox.svg?branch=develop)](https://travis-ci.org/slicebox/slicebox.svg?branch=develop) | Tests
+Bintray       | [ ![Download](https://api.bintray.com/packages/slicebox/slicebox/installers/images/download.svg) ](https://bintray.com/slicebox/slicebox/installers/_latestVersion) | Latest Version on Bintray
+Gitter        | [![Join the chat at https://gitter.im/slicebox/slicebox](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/slicebox/slicebox?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge) | Chatroom
+Documentation | - | [REST API](http://slicebox.github.io/slicebox)
 
 Slicebox is a microservice for safe sharing and easy access to medical images. The goal of the project is to facilitate research and collaboration between hospitals and universities. The service makes it easy to send images from the hosptial's PACS (image archive) to collaborators on the outside. Anonymization is handled automatically, releaving the hospital staff of the burden of making sure patient information does not leave the hospital network.
 
@@ -51,7 +51,7 @@ We provide two types of installers, either a zip-file suitable for installation 
 
 ### Universal zip package
 
-* Download a zipped distribution of slicebox from [Bintray](https://bintray.com/karlsjostrand/slicebox/installers/_latestVersion).
+* Download a zipped distribution of slicebox from [Bintray](https://bintray.com/slicebox/slicebox/installers/_latestVersion).
 * Unzip onto a suitable server computer. Any computer which is always on and which has a fixed (local or public) IP address will do.
 * Configure the service by editing [conf/slicebox.conf](./src/main/resources/application.conf). In particular, the administrator (superuser) username and password can be configured along with the hostname and port of the service, and paths to the database and file storage. The `slicebox.conf` file reads and appends a second configuration file called `my-slicebox.conf`, if present. A neat way of preserving the reference configuation in `slicebox.conf` is to create a file called `my-slicebox.conf` and place it in the same directory as `slicebox.conf`. Include those configurations you wish to change in this this file, they will override the reference settings.
 * The `bin` folder contains start scripts for Windows and Linux/Unix/Mac OS.
@@ -71,7 +71,7 @@ There should now be a slicebox task in the list of active tasks. Restart the com
 
 ### Linux - installation and configuration
 
-We provide `.deb` and `.rpm` packages, both available on [Bintray](https://bintray.com/karlsjostrand/slicebox/installers/_latestVersion). These installers set up slicebox to run as a background process, or service. The following file structure is used:
+We provide `.deb` and `.rpm` packages, both available on [Bintray](https://bintray.com/slicebox/slicebox/installers/_latestVersion). These installers set up slicebox to run as a background process, or service. The following file structure is used:
 
 Folder                       | User     | Description
 ------                       | ----     | -----------
@@ -131,7 +131,7 @@ Integration with Matlab
 API
 ---
 
-A full specification of the Slicebox API is available at [karlsjostrand.github.io/slicebox](http://karlsjostrand.github.io/slicebox), displayed using [Swagger UI](http://swagger.io).
+A full specification of the Slicebox API is available at [slicebox.github.io/slicebox](http://slicebox.github.io/slicebox), displayed using [Swagger UI](http://swagger.io).
 
 Versioning
 ----------
