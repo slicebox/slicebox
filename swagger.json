@@ -233,7 +233,7 @@
             "format": "int64"
           },
           {
-            "name": "patientId",
+            "name": "patientid",
             "in": "query",
             "description": "reference to patient to list studies for",
             "required": true,
@@ -355,7 +355,7 @@
             "format": "int64"
           },
           {
-            "name": "studyId",
+            "name": "studyid",
             "in": "query",
             "description": "reference to study to list series for",
             "required": true,
@@ -477,7 +477,7 @@
             "format": "int64"
           },
           {
-            "name": "seriesId",
+            "name": "seriesid",
             "in": "query",
             "description": "reference to series to list images for",
             "required": true,
