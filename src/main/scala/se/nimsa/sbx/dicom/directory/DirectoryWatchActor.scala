@@ -28,8 +28,10 @@ import se.nimsa.sbx.dicom.DicomProtocol.FileAddedToWatchedDirectory
 import org.dcm4che3.data.Tag
 import java.nio.file.Paths
 import se.nimsa.sbx.dicom.DicomProtocol.FileReceived
+import se.nimsa.sbx.dicom.DicomProtocol.SourceType
+import se.nimsa.sbx.dicom.DicomProtocol.WatchedDirectory
 
-class DirectoryWatchActor(directoryPath: String) extends Actor {
+class DirectoryWatchActor(watchedDirectory: WatchedDirectory) extends Actor {
   val log = Logging(context.system, this)
 
   val watchServiceTask = new DirectoryWatch(self)
@@ -39,7 +41,7 @@ class DirectoryWatchActor(directoryPath: String) extends Actor {
   override def preStart() {
     watchThread.setDaemon(true)
     watchThread.start()
-    watchServiceTask watchRecursively Paths.get(directoryPath)
+    watchServiceTask watchRecursively Paths.get(watchedDirectory.path)
   }
 
   override def postStop() {
@@ -49,11 +51,11 @@ class DirectoryWatchActor(directoryPath: String) extends Actor {
   def receive = LoggingReceive {
     case FileAddedToWatchedDirectory(path) =>
       if (Files.isRegularFile(path))
-        context.system.eventStream.publish(FileReceived(path))
+        context.system.eventStream.publish(FileReceived(path, SourceType.DIRECTORY, Some(watchedDirectory.id)))
   }
 
 }
 
 object DirectoryWatchActor {
-  def props(directoryPath: String): Props = Props(new DirectoryWatchActor(directoryPath))
+  def props(watchedDirectory: WatchedDirectory): Props = Props(new DirectoryWatchActor(watchedDirectory))
 }

@@ -62,9 +62,9 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
   val image1 = Image(-1, -1, SOPInstanceUID("souid1"), ImageType("PRIMARY/RECON/TOMO"), InstanceNumber("1"))
   val image2 = Image(-1, -1, SOPInstanceUID("souid2"), ImageType("PRIMARY/RECON/TOMO"), InstanceNumber("1"))
   val image3 = Image(-1, -1, SOPInstanceUID("souid3"), ImageType("PRIMARY/RECON/TOMO"), InstanceNumber("1"))
-  var imageFile1 = ImageFile(-1, FileName("file1"))
-  var imageFile2 = ImageFile(-1, FileName("file2"))
-  var imageFile3 = ImageFile(-1, FileName("file3"))
+  var imageFile1 = ImageFile(-1, FileName("file1"), SourceType.API, None)
+  var imageFile2 = ImageFile(-1, FileName("file2"), SourceType.API, None)
+  var imageFile3 = ImageFile(-1, FileName("file3"), SourceType.API, None)
 
   db.withSession { implicit session =>
     val dbPat = dicomMetaDataDao.insert(pat1)

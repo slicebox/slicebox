@@ -25,6 +25,34 @@ object DicomProtocol {
   import se.nimsa.sbx.model.Entity
   
   // domain objects
+
+  sealed trait SourceType {
+    override def toString(): String = this match {
+      case SourceType.SCP => "scp"
+      case SourceType.DIRECTORY => "directory"
+      case SourceType.BOX => "box"
+      case SourceType.API => "api"
+      case _ => "unknown"
+    }
+  }
+
+  object SourceType {
+    case object SCP extends SourceType
+    case object DIRECTORY extends SourceType
+    case object BOX extends SourceType
+    case object API extends SourceType
+    case object UNKNOWN extends SourceType
+
+    def withName(string: String) = string match {
+      case "scp" => SCP
+      case "directory" => DIRECTORY
+      case "box" => BOX
+      case "api" => API
+      case _ => UNKNOWN
+    }    
+  }
+      
+  case class SeriesSource(id: Long, sourceType: SourceType, sourceId: Option[Long]) extends Entity
   
   case class ScpData(id: Long, name: String, aeTitle: String, port: Int) extends Entity
 
@@ -34,7 +62,9 @@ object DicomProtocol {
 
   case class ImageFile(
     id: Long,
-    fileName: FileName) extends Entity {
+    fileName: FileName,
+    sourceType: SourceType,
+    sourceId: Option[Long]) extends Entity {
     
     override def equals(o: Any): Boolean = o match {
       case that: ImageFile => that.fileName == fileName
@@ -219,9 +249,9 @@ object DicomProtocol {
 
   // ***to storage***
 
-  case class DatasetReceived(dataset: Attributes)
+  case class DatasetReceived(dataset: Attributes, sourceType: SourceType, sourceId: Option[Long])
   
-  case class FileReceived(path: Path)
+  case class FileReceived(path: Path, sourceType: SourceType, sourceId: Option[Long])
   
   // ***from storage***
 

@@ -58,7 +58,7 @@ class ScpActor(scpData: ScpData, executor: Executor) extends Actor {
   def receive = LoggingReceive {
     case DatasetReceivedByScp(dataset) =>
       SbxLog.info("SCP", "Dataset received")
-      context.system.eventStream.publish(DatasetReceived(dataset))
+      context.system.eventStream.publish(DatasetReceived(dataset, SourceType.SCP, Some(scpData.id)))
   }
 
 }

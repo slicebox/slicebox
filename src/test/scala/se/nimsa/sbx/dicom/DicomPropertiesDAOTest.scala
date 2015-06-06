@@ -49,21 +49,21 @@ class DicomPropertiesDAOTest extends FlatSpec with Matchers with BeforeAndAfterE
   val image6 = Image(-1, -1, SOPInstanceUID("souid6"), ImageType("PRIMARY/RECON/TOMO"), InstanceNumber("1"))
   val image7 = Image(-1, -1, SOPInstanceUID("souid7"), ImageType("PRIMARY/RECON/TOMO"), InstanceNumber("1"))
   val image8 = Image(-1, -1, SOPInstanceUID("souid8"), ImageType("PRIMARY/RECON/TOMO"), InstanceNumber("1"))
-  val imageFile1 = ImageFile(-1, FileName("file1"))
-  val imageFile2 = ImageFile(-1, FileName("file2"))
-  val imageFile3 = ImageFile(-1, FileName("file3"))
-  val imageFile4 = ImageFile(-1, FileName("file4"))
-  val imageFile5 = ImageFile(-1, FileName("file5"))
-  val imageFile6 = ImageFile(-1, FileName("file6"))
-  val imageFile7 = ImageFile(-1, FileName("file7"))
-  val imageFile8 = ImageFile(-1, FileName("file8"))
+  val imageFile1 = ImageFile(-1, FileName("file1"), SourceType.API, None)
+  val imageFile2 = ImageFile(-1, FileName("file2"), SourceType.API, None)
+  val imageFile3 = ImageFile(-1, FileName("file3"), SourceType.API, None)
+  val imageFile4 = ImageFile(-1, FileName("file4"), SourceType.API, None)
+  val imageFile5 = ImageFile(-1, FileName("file5"), SourceType.API, None)
+  val imageFile6 = ImageFile(-1, FileName("file6"), SourceType.API, None)
+  val imageFile7 = ImageFile(-1, FileName("file7"), SourceType.API, None)
+  val imageFile8 = ImageFile(-1, FileName("file8"), SourceType.API, None)
 
   val pat1_copy = Patient(-1, PatientName("p1"), PatientID("s1"), PatientBirthDate("1000-01-01"), PatientSex("F"))
   val study3 = Study(-1, -1, StudyInstanceUID("stuid3"), StudyDescription("stdesc3"), StudyDate("19990103"), StudyID("stid3"), AccessionNumber("acc3"), PatientAge("13Y"))
   // the following series has a copied SeriesInstanceUID but unique parent study so should no be treated as copy
   val series1_copy = Series(-1, -1, -1, -1, SeriesInstanceUID("souid1"), SeriesDescription("sedesc1"), SeriesDate("19990101"), Modality("NM"), ProtocolName("prot1"), BodyPartExamined("bodypart1"))
   val image9 = Image(-1, -1, SOPInstanceUID("souid9"), ImageType("PRIMARY/RECON/TOMO"), InstanceNumber("1"))
-  val imageFile9 = ImageFile(-1, FileName("file9"))
+  val imageFile9 = ImageFile(-1, FileName("file9"), SourceType.API, None)
 
   "The properties db" should "be emtpy before anything has been added" in {
     db.withSession { implicit session =>

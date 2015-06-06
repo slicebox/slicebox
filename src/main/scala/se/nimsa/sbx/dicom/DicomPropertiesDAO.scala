@@ -31,28 +31,49 @@ class DicomPropertiesDAO(val driver: JdbcProfile) {
 
   // *** Files ***
 
-  private val toImageFile = (id: Long, fileName: String) => ImageFile(id, FileName(fileName))
+  private val toImageFile = (id: Long, fileName: String, sourceType: String, sourceId: Option[Long]) => ImageFile(id, FileName(fileName), SourceType.withName(sourceType), sourceId)
 
-  private val fromImageFile = (imageFile: ImageFile) => Option((imageFile.id, imageFile.fileName.value))
+  private val fromImageFile = (imageFile: ImageFile) => Option((imageFile.id, imageFile.fileName.value, imageFile.sourceType.toString, imageFile.sourceId))
 
   private class ImageFiles(tag: Tag) extends Table[ImageFile](tag, "ImageFiles") {
     def id = column[Long]("id", O.PrimaryKey)
     def fileName = column[String]("fileName")
-    def * = (id, fileName) <> (toImageFile.tupled, fromImageFile)
+    def sourceType = column[String]("sourceType")
+    def sourceId = column[Option[Long]]("sourceId")
+    def * = (id, fileName, sourceType, sourceId) <> (toImageFile.tupled, fromImageFile)
 
-    def imageFKey = foreignKey("imageFKey", id, imagesQuery)(_.id, onUpdate = ForeignKeyAction.Cascade, onDelete = ForeignKeyAction.Cascade)
+    def imageFileToImageFKey = foreignKey("imageFileToImageFKey", id, imagesQuery)(_.id, onUpdate = ForeignKeyAction.Cascade, onDelete = ForeignKeyAction.Cascade)
     def imageIdJoin = imagesQuery.filter(_.id === id)
   }
 
   private val imageFilesQuery = TableQuery[ImageFiles]
 
+  // *** Sources ***
+  
+  private val toSeriesSource = (id: Long, sourceType: String, sourceId: Option[Long]) => SeriesSource(id, SourceType.withName(sourceType), sourceId)
+
+  private val fromSeriesSource = (seriesSource: SeriesSource) => Option((seriesSource.id, seriesSource.sourceType.toString, seriesSource.sourceId))
+
+  private class SeriesSources(tag: Tag) extends Table[SeriesSource](tag, "SeriesSources") {
+    def id = column[Long]("id", O.PrimaryKey)
+    def sourceType = column[String]("sourceType")
+    def sourceId = column[Option[Long]]("sourceId")
+    def * = (id, sourceType, sourceId) <> (toSeriesSource.tupled, fromSeriesSource)
+
+    def seriesSourceToImageFKey = foreignKey("seriesSourceToImageFKey", id, seriesQuery)(_.id, onUpdate = ForeignKeyAction.Cascade, onDelete = ForeignKeyAction.Cascade)
+    def seriesIdJoin = seriesQuery.filter(_.id === id)
+  }
+
+  private val seriesSourceQuery = TableQuery[SeriesSources]
+  
+  
   def create(implicit session: Session) =
     if (MTable.getTables("ImageFiles").list.isEmpty)
-      (imageFilesQuery.ddl).create
+      (imageFilesQuery.ddl ++ seriesSourceQuery.ddl).create
 
   def drop(implicit session: Session) =
     if (MTable.getTables("ImageFiles").list.size > 0)
-      (imageFilesQuery.ddl).drop
+      (imageFilesQuery.ddl ++ seriesSourceQuery.ddl).drop
 
   def imageFileById(imageId: Long)(implicit session: Session): Option[ImageFile] =
     imageFilesQuery.filter(_.id === imageId).list.headOption

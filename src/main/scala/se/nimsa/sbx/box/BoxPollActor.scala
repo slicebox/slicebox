@@ -32,6 +32,7 @@ import spray.httpx.unmarshalling.FromResponseUnmarshaller
 import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.app.JsonFormats
 import se.nimsa.sbx.dicom.DicomProtocol.DatasetReceived
+import se.nimsa.sbx.dicom.DicomProtocol.SourceType
 import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.dicom.DicomUtil._
 import BoxProtocol._
@@ -152,7 +153,7 @@ class BoxPollActor(box: Box,
                 
         reverseAnonymization(anonymizationKeysForAnonPatient(dataset), dataset)
         
-        context.system.eventStream.publish(DatasetReceived(dataset))
+        context.system.eventStream.publish(DatasetReceived(dataset, SourceType.BOX, Some(remoteOutboxEntry.remoteBoxId)))
 
         self ! RemoteOutboxFileFetched(remoteOutboxEntry)
       })

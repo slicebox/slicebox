@@ -74,12 +74,12 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
 
   def receive = LoggingReceive {
 
-    case FileReceived(path) =>
+    case FileReceived(path, sourceType, sourceId) =>
       val dataset = loadDataset(path, true)
       if (dataset != null)
         if (checkSopClass(dataset)) {
           try {
-            val (image, overwrite) = storeDataset(dataset)
+            val (image, overwrite) = storeDataset(dataset, sourceType, sourceId)
             if (!overwrite) {
               SbxLog.info("Storage", s"Stored file ${path.toString} as ${dataset.getString(Tag.SOPInstanceUID)}")
             }
@@ -93,9 +93,9 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
       else
         SbxLog.info("Storage", s"File $path is not a DICOM file, skipping")
 
-    case DatasetReceived(dataset) =>
+    case DatasetReceived(dataset, sourceType, sourceId) =>
       try {
-        val (image, overwrite) = storeDataset(dataset)
+        val (image, overwrite) = storeDataset(dataset, sourceType, sourceId)
         if (!overwrite) {
           SbxLog.info("Storage", "Stored dataset: " + dataset.getString(Tag.SOPInstanceUID))
         }
@@ -109,7 +109,7 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
         if (dataset == null)
           throw new IllegalArgumentException("Invalid dataset")
         try {
-          val (image, overwrite) = storeDataset(dataset)
+          val (image, overwrite) = storeDataset(dataset, SourceType.API, None)
           sender ! ImageAdded(image)
         } catch {
           case e: IllegalArgumentException =>
@@ -280,7 +280,7 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
 
   }
 
-  def storeDataset(dataset: Attributes): (Image, Boolean) = {
+  def storeDataset(dataset: Attributes, sourceType: SourceType, sourceId : Option[Long]): (Image, Boolean) = {
     val name = fileName(dataset)
     val storedPath = storage.resolve(name)
 
@@ -294,7 +294,7 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
       val frameOfReference = datasetToFrameOfReference(dataset)
       val series = datasetToSeries(dataset)
       val image = datasetToImage(dataset)
-      val imageFile = ImageFile(-1, FileName(name))
+      val imageFile = ImageFile(-1, FileName(name), sourceType, sourceId)
 
       val dbPatientMaybe = dao.patientByNameAndID(patient)
       val dbStudyMaybe = dao.studyByUid(study)

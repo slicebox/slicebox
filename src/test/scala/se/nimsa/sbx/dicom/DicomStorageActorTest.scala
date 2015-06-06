@@ -32,7 +32,7 @@ class DicomStorageActorTest(_system: ActorSystem) extends TestKit(_system) with 
 
   val storageActorRef = TestActorRef(new DicomStorageActor(dbProps, storage))
   val storageActor = storageActorRef.underlyingActor
-
+  
   override def afterAll {
     TestKit.shutdownActorSystem(system)
     TestUtil.deleteFolder(storage)

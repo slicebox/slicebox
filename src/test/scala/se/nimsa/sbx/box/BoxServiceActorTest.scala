@@ -312,9 +312,9 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
     val i1 = metaDataDao.insert(Image(-1, r1.id, SOPInstanceUID("1.1"), ImageType("t1"), InstanceNumber("1")))
     val i2 = metaDataDao.insert(Image(-1, r1.id, SOPInstanceUID("1.2"), ImageType("t1"), InstanceNumber("1")))
     val i3 = metaDataDao.insert(Image(-1, r1.id, SOPInstanceUID("1.3"), ImageType("t1"), InstanceNumber("1")))
-    val if1 = propertiesDao.insert(ImageFile(i1.id, FileName("file1")))
-    val if2 = propertiesDao.insert(ImageFile(i2.id, FileName("file2")))
-    val if3 = propertiesDao.insert(ImageFile(i3.id, FileName("file3")))
+    val if1 = propertiesDao.insert(ImageFile(i1.id, FileName("file1"), SourceType.API, None))
+    val if2 = propertiesDao.insert(ImageFile(i2.id, FileName("file2"), SourceType.API, None))
+    val if3 = propertiesDao.insert(ImageFile(i3.id, FileName("file3"), SourceType.API, None))
     (p1, s1, e1, f1, r1, i1, i2, i3, if1, if2, if3)
   }
 

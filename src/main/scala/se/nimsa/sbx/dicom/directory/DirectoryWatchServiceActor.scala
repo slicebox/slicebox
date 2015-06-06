@@ -73,7 +73,7 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor 
                 val watchedDirectory = addDirectory(pathString)
 
                 context.child(watchedDirectory.id.toString).getOrElse(
-                  context.actorOf(DirectoryWatchActor.props(pathString), watchedDirectory.id.toString))
+                  context.actorOf(DirectoryWatchActor.props(watchedDirectory), watchedDirectory.id.toString))
 
                 sender ! watchedDirectory
             }
@@ -103,7 +103,7 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor 
       watchedDirectories foreach (watchedDirectory => {
         val path = Paths.get(watchedDirectory.path)
         if (Files.isDirectory(path))
-          context.actorOf(DirectoryWatchActor.props(watchedDirectory.path), watchedDirectory.id.toString)
+          context.actorOf(DirectoryWatchActor.props(watchedDirectory), watchedDirectory.id.toString)
         else
           deleteDirectory(watchedDirectory.id)
       })

@@ -42,6 +42,15 @@ trait JsonFormats extends DefaultJsonProtocol {
 
   implicit val updateInboxFormat = jsonFormat4(UpdateInbox)
 
+  implicit object SourceTypeFormat extends JsonFormat[SourceType] {
+    def write(obj: SourceType) = JsString(obj.toString)
+
+    def read(json: JsValue): SourceType = json match {
+      case JsString(string) => SourceType.withName(string)
+      case _                => deserializationError("Enumeration expected")
+    }
+  }
+
   implicit object BoxSendMethodFormat extends JsonFormat[BoxSendMethod] {
     def write(obj: BoxSendMethod) = JsString(obj.toString)
 
@@ -123,7 +132,7 @@ trait JsonFormats extends DefaultJsonProtocol {
   implicit val imageFormat = jsonFormat5(Image)
 
   implicit val fileNameFormat = jsonFormat1(FileName)
-  implicit val imageFileFormat = jsonFormat2(ImageFile)
+  implicit val imageFileFormat = jsonFormat4(ImageFile)
   implicit val imageAttributeFormat = jsonFormat9(ImageAttribute)
   
   implicit val imagesFormat = jsonFormat1(Images)
