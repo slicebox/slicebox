@@ -61,7 +61,7 @@ trait JsonFormats extends DefaultJsonProtocol {
   }
 
   implicit val boxFormat = jsonFormat6(Box)
-()
+
   implicit val outboxEntryFormat = jsonFormat7(OutboxEntry)
   implicit val outboxEntryInfoFormat = jsonFormat7(OutboxEntryInfo)
   implicit val inboxEntryInfoFormat = jsonFormat4(InboxEntryInfo)
@@ -122,6 +122,8 @@ trait JsonFormats extends DefaultJsonProtocol {
   implicit val protocolNameFormat = jsonFormat1(ProtocolName)
   implicit val bodyPartExaminedFormat = jsonFormat1(BodyPartExamined)
 
+  implicit val seriesSourceFormat = jsonFormat3(SeriesSource)
+  
   implicit val seriesFormat = jsonFormat10(Series)
   implicit val flatSeriesFormat = jsonFormat6(FlatSeries)
 

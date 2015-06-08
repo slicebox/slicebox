@@ -46,7 +46,7 @@ class DicomStorageActorTest(_system: ActorSystem) extends TestKit(_system) with 
     }
 
     "return a notification that the dataset has been added when adding a dataset" in {
-      storageActorRef ! AddDataset(dataset)
+      storageActorRef ! AddDataset(dataset, SourceType.UNKNOWN, -1)
       expectMsgPF() {
         case ImageAdded(image) => true
       }
@@ -60,7 +60,7 @@ class DicomStorageActorTest(_system: ActorSystem) extends TestKit(_system) with 
     }
 
     "return a notification that the dataset has been added when adding an already added dataset" in {
-      storageActorRef ! AddDataset(dataset)
+      storageActorRef ! AddDataset(dataset, SourceType.UNKNOWN, -1)
       expectMsgPF() {
         case ImageAdded(image) => true
       }

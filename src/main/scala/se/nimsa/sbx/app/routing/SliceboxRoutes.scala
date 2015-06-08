@@ -49,7 +49,7 @@ trait SliceboxRoutes extends DirectoryRoutes
             scpRoutes(authInfo) ~
             scuRoutes(authInfo) ~
             metaDataRoutes ~
-            imageRoutes ~
+            imageRoutes(authInfo) ~
             boxRoutes(authInfo) ~
             userRoutes(authInfo) ~
             inboxRoutes ~

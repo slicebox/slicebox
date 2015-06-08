@@ -104,12 +104,12 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
           SbxLog.error("Storage", e.getMessage)
       }
 
-    case AddDataset(dataset) =>
+    case AddDataset(dataset, sourceType, sourceId) =>
       catchAndReport {
         if (dataset == null)
           throw new IllegalArgumentException("Invalid dataset")
         try {
-          val (image, overwrite) = storeDataset(dataset, SourceType.API, None)
+          val (image, overwrite) = storeDataset(dataset, sourceType, sourceId)
           sender ! ImageAdded(image)
         } catch {
           case e: IllegalArgumentException =>
@@ -280,12 +280,14 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
 
   }
 
-  def storeDataset(dataset: Attributes, sourceType: SourceType, sourceId : Option[Long]): (Image, Boolean) = {
+  def storeDataset(dataset: Attributes, sourceType: SourceType, sourceId : Long): (Image, Boolean) = {
     val name = fileName(dataset)
     val storedPath = storage.resolve(name)
 
     val overwrite = Files.exists(storedPath)
 
+    val seriesSource = SeriesSource(-1, sourceType, sourceId)
+    
     db.withSession { implicit session =>
 
       val patient = datasetToPatient(dataset)
@@ -303,6 +305,7 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
       val dbSeriesMaybe = dao.seriesByUid(series)
       val dbImageMaybe = dao.imageByUid(image)
       val dbImageFileMaybe = propertiesDao.imageFileByFileName(imageFile)
+      val dbSeriesSourceMaybe = dbSeriesMaybe.flatMap(dbSeries => propertiesDao.seriesSourceById(dbSeries.id))
 
       // relationships are one to many from top to bottom. There must therefore not be a new instance followed by an existing
       val hierarchyIsWellDefined = !(
@@ -310,6 +313,7 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
         dbStudyMaybe.isEmpty && dbSeriesMaybe.isDefined ||
         dbEquipmentMaybe.isEmpty && dbSeriesMaybe.isDefined ||
         dbFrameOfReferenceMaybe.isEmpty && dbSeriesMaybe.isDefined ||
+        dbSeriesSourceMaybe.isEmpty && dbSeriesMaybe.isDefined ||
         dbSeriesMaybe.isEmpty && dbImageMaybe.isDefined ||
         dbImageMaybe.isEmpty && dbImageFileMaybe.isDefined)
 
@@ -323,8 +327,9 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
           studyId = dbStudy.id,
           equipmentId = dbEquipment.id,
           frameOfReferenceId = dbFrameOfReference.id)))
+        val dbSeriesSource = dbSeriesSourceMaybe.getOrElse(propertiesDao.insertSeriesSource(seriesSource.copy(id = dbSeries.id)))
         val dbImage = dbImageMaybe.getOrElse(dao.insert(image.copy(seriesId = dbSeries.id)))
-        dbImageFileMaybe.getOrElse(propertiesDao.insert(imageFile.copy(id = dbImage.id)))
+        dbImageFileMaybe.getOrElse(propertiesDao.insertImageFile(imageFile.copy(id = dbImage.id)))
 
         try {
           saveDataset(dataset, storedPath)

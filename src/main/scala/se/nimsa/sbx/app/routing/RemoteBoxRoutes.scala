@@ -38,10 +38,10 @@ trait RemoteBoxRoutes { this: RestApi =>
     pathPrefix("box") {
       pathPrefix(Segment) { token =>
 
-        onSuccess(boxService.ask(ValidateToken(token))) {
-          case InvalidToken(token) =>
+        onSuccess(boxService.ask(GetBoxByToken(token)).mapTo[Option[Box]]) {
+          case None =>
             complete((Unauthorized, "Invalid token"))
-          case ValidToken(token) =>
+          case Some(box) =>
             path("image") {
               parameters('transactionid.as[Long], 'sequencenumber.as[Long], 'totalimagecount.as[Long]) { (transactionId, sequenceNumber, totalImageCount) =>
                 post {
@@ -50,7 +50,7 @@ trait RemoteBoxRoutes { this: RestApi =>
                     val dataset = loadDataset(imageData, true)
                     onSuccess(boxService.ask(ReverseAnonymization(dataset))) {
                       case dataset: Attributes =>
-                        onSuccess(dicomService.ask(AddDataset(dataset))) {
+                        onSuccess(dicomService.ask(AddDataset(dataset, SourceType.BOX, box.id))) {
                           case ImageAdded(image) =>
                             onSuccess(boxService.ask(UpdateInbox(token, transactionId, sequenceNumber, totalImageCount))) {
                               case msg: InboxUpdated =>

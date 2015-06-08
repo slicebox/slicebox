@@ -31,7 +31,7 @@ object DicomProtocol {
       case SourceType.SCP => "scp"
       case SourceType.DIRECTORY => "directory"
       case SourceType.BOX => "box"
-      case SourceType.API => "api"
+      case SourceType.USER => "user"
       case _ => "unknown"
     }
   }
@@ -40,19 +40,19 @@ object DicomProtocol {
     case object SCP extends SourceType
     case object DIRECTORY extends SourceType
     case object BOX extends SourceType
-    case object API extends SourceType
+    case object USER extends SourceType
     case object UNKNOWN extends SourceType
 
     def withName(string: String) = string match {
       case "scp" => SCP
       case "directory" => DIRECTORY
       case "box" => BOX
-      case "api" => API
+      case "user" => USER
       case _ => UNKNOWN
     }    
   }
       
-  case class SeriesSource(id: Long, sourceType: SourceType, sourceId: Option[Long]) extends Entity
+  case class SeriesSource(id: Long, sourceType: SourceType, sourceId: Long) extends Entity
   
   case class ScpData(id: Long, name: String, aeTitle: String, port: Int) extends Entity
 
@@ -64,7 +64,7 @@ object DicomProtocol {
     id: Long,
     fileName: FileName,
     sourceType: SourceType,
-    sourceId: Option[Long]) extends Entity {
+    sourceId: Long) extends Entity {
     
     override def equals(o: Any): Boolean = o match {
       case that: ImageFile => that.fileName == fileName
@@ -212,7 +212,7 @@ object DicomProtocol {
   case class GetImageFrame(imageId: Long, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int) extends ImageRequest
   
   
-  case class AddDataset(dataset: Attributes)
+  case class AddDataset(dataset: Attributes, sourceType: SourceType, sourceId: Long)
   
   // ***to API***
 
@@ -249,9 +249,9 @@ object DicomProtocol {
 
   // ***to storage***
 
-  case class DatasetReceived(dataset: Attributes, sourceType: SourceType, sourceId: Option[Long])
+  case class DatasetReceived(dataset: Attributes, sourceType: SourceType, sourceId: Long)
   
-  case class FileReceived(path: Path, sourceType: SourceType, sourceId: Option[Long])
+  case class FileReceived(path: Path, sourceType: SourceType, sourceId: Long)
   
   // ***from storage***
 

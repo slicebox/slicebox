@@ -17,7 +17,6 @@
 package se.nimsa.sbx.app.routing
 
 import akka.pattern.ask
-
 import spray.http.ContentTypes
 import spray.http.FormFile
 import spray.http.HttpData
@@ -27,27 +26,27 @@ import spray.http.StatusCodes.BadRequest
 import spray.http.StatusCodes.NotFound
 import spray.http.StatusCodes.Created
 import spray.routing._
-
 import se.nimsa.sbx.app.RestApi
 import se.nimsa.sbx.dicom.DicomProtocol._
 import se.nimsa.sbx.dicom.DicomUtil
+import se.nimsa.sbx.app.AuthInfo
 
 trait ImageRoutes { this: RestApi =>
 
-  def imageRoutes: Route =
+  def imageRoutes(authInfo: AuthInfo): Route =
     pathPrefix("images") {
       pathEndOrSingleSlash {
         post {
           formField('file.as[FormFile]) { file =>
             val dataset = DicomUtil.loadDataset(file.entity.data.toByteArray, true)
-            onSuccess(dicomService.ask(AddDataset(dataset))) {
+            onSuccess(dicomService.ask(AddDataset(dataset, SourceType.USER, authInfo.user.id))) {
               case ImageAdded(image) =>
                 import spray.httpx.SprayJsonSupport._
                 complete((Created, image))
             }
           } ~ entity(as[Array[Byte]]) { bytes =>
             val dataset = DicomUtil.loadDataset(bytes, true)
-            onSuccess(dicomService.ask(AddDataset(dataset))) {
+            onSuccess(dicomService.ask(AddDataset(dataset, SourceType.USER, authInfo.user.id))) {
               case ImageAdded(image) =>
                 import spray.httpx.SprayJsonSupport._
                 complete((Created, image))

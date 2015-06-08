@@ -120,11 +120,8 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
             val boxes = getBoxesFromDb()
             sender ! Boxes(boxes)
 
-          case ValidateToken(token) =>
-            if (tokenIsValid(token))
-              sender ! ValidToken(token)
-            else
-              sender ! InvalidToken(token)
+          case GetBoxByToken(token) =>
+            sender ! pollBoxByToken(token)
 
           case UpdateInbox(token, transactionId, sequenceNumber, totalImageCount) =>
             pollBoxByToken(token).foreach(box =>
@@ -320,11 +317,6 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
       boxDao.boxById(boxId)
     }
 
-  def pollBoxByToken(token: String): Option[Box] =
-    db.withSession { implicit session =>
-      boxDao.pollBoxByToken(token)
-    }
-
   def pushBoxByBaseUrl(baseUrl: String): Option[Box] =
     db.withSession { implicit session =>
       boxDao.pushBoxByBaseUrl(baseUrl)
@@ -340,9 +332,9 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
       boxDao.listBoxes
     }
 
-  def tokenIsValid(token: String): Boolean =
+  def pollBoxByToken(token: String): Option[Box] =
     db.withSession { implicit session =>
-      boxDao.pollBoxByToken(token).isDefined
+      boxDao.pollBoxByToken(token)
     }
 
   def nextOutboxEntry(boxId: Long): Option[OutboxEntry] =

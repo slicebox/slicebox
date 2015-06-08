@@ -153,7 +153,7 @@ class BoxPollActor(box: Box,
                 
         reverseAnonymization(anonymizationKeysForAnonPatient(dataset), dataset)
         
-        context.system.eventStream.publish(DatasetReceived(dataset, SourceType.BOX, Some(remoteOutboxEntry.remoteBoxId)))
+        context.system.eventStream.publish(DatasetReceived(dataset, SourceType.BOX, remoteOutboxEntry.remoteBoxId))
 
         self ! RemoteOutboxFileFetched(remoteOutboxEntry)
       })

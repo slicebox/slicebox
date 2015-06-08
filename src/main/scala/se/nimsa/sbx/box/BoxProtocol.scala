@@ -97,7 +97,7 @@ object BoxProtocol {
 
   case object GetBoxes extends BoxRequest
 
-  case class ValidateToken(token: String) extends BoxRequest
+  case class GetBoxByToken(token: String) extends BoxRequest
 
   case class UpdateInbox(token: String, transactionId: Long, sequenceNumber: Long, totalImageCount: Long) extends BoxRequest
 
@@ -138,10 +138,6 @@ object BoxProtocol {
   case class Boxes(boxes: Seq[Box])
 
   case class BoxBaseUrlGenerated(baseUrl: String)
-
-  case class ValidToken(token: String)
-
-  case class InvalidToken(token: String)
 
   case class InboxUpdated(token: String, transactionId: Long, sequenceNumber: Long, totalImageCount: Long)
 

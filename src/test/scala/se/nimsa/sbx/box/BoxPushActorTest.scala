@@ -62,9 +62,9 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
   val image1 = Image(-1, -1, SOPInstanceUID("souid1"), ImageType("PRIMARY/RECON/TOMO"), InstanceNumber("1"))
   val image2 = Image(-1, -1, SOPInstanceUID("souid2"), ImageType("PRIMARY/RECON/TOMO"), InstanceNumber("1"))
   val image3 = Image(-1, -1, SOPInstanceUID("souid3"), ImageType("PRIMARY/RECON/TOMO"), InstanceNumber("1"))
-  var imageFile1 = ImageFile(-1, FileName("file1"), SourceType.API, None)
-  var imageFile2 = ImageFile(-1, FileName("file2"), SourceType.API, None)
-  var imageFile3 = ImageFile(-1, FileName("file3"), SourceType.API, None)
+  var imageFile1 = ImageFile(-1, FileName("file1"), SourceType.UNKNOWN, -1)
+  var imageFile2 = ImageFile(-1, FileName("file2"), SourceType.UNKNOWN, -1)
+  var imageFile3 = ImageFile(-1, FileName("file3"), SourceType.UNKNOWN, -1)
 
   db.withSession { implicit session =>
     val dbPat = dicomMetaDataDao.insert(pat1)
@@ -75,9 +75,9 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
     val dbImage1 = dicomMetaDataDao.insert(image1.copy(seriesId = dbSeries.id))
     val dbImage2 = dicomMetaDataDao.insert(image2.copy(seriesId = dbSeries.id))
     val dbImage3 = dicomMetaDataDao.insert(image3.copy(seriesId = dbSeries.id))
-    imageFile1 = dicomPropertiesDao.insert(imageFile1.copy(id = dbImage1.id))
-    imageFile2 = dicomPropertiesDao.insert(imageFile2.copy(id = dbImage2.id))
-    imageFile3 = dicomPropertiesDao.insert(imageFile3.copy(id = dbImage3.id))
+    imageFile1 = dicomPropertiesDao.insertImageFile(imageFile1.copy(id = dbImage1.id))
+    imageFile2 = dicomPropertiesDao.insertImageFile(imageFile2.copy(id = dbImage2.id))
+    imageFile3 = dicomPropertiesDao.insertImageFile(imageFile3.copy(id = dbImage3.id))
   }
 
   val capturedFileSendRequests = ArrayBuffer.empty[HttpRequest]
