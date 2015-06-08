@@ -201,9 +201,9 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
 
     case msg: MetaDataQuery => catchAndReport {
       msg match {
-        case GetPatients(startIndex, count, orderBy, orderAscending, filter) =>
+        case GetPatients(startIndex, count, orderBy, orderAscending, filter, sourceType, sourceId) =>
           db.withSession { implicit session =>
-            sender ! Patients(dao.patients(startIndex, count, orderBy, orderAscending, filter))
+            sender ! Patients(propertiesDao.patients(startIndex, count, orderBy, orderAscending, filter, sourceType, sourceId))
           }
 
         case GetStudies(startIndex, count, patientId) =>
@@ -226,9 +226,9 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
             sender ! propertiesDao.imageFileForImage(imageId)
           }
 
-        case GetFlatSeries(startIndex, count, orderBy, orderAscending, filter) =>
+        case GetFlatSeries(startIndex, count, orderBy, orderAscending, filter, sourceType, sourceId) =>
           db.withSession { implicit session =>
-            sender ! FlatSeriesCollection(dao.flatSeries(startIndex, count, orderBy, orderAscending, filter))
+            sender ! FlatSeriesCollection(propertiesDao.flatSeries(startIndex, count, orderBy, orderAscending, filter, sourceType, sourceId))
           }
 
         case GetPatient(patientId) =>
@@ -280,14 +280,14 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
 
   }
 
-  def storeDataset(dataset: Attributes, sourceType: SourceType, sourceId : Long): (Image, Boolean) = {
+  def storeDataset(dataset: Attributes, sourceType: SourceType, sourceId: Long): (Image, Boolean) = {
     val name = fileName(dataset)
     val storedPath = storage.resolve(name)
 
     val overwrite = Files.exists(storedPath)
 
     val seriesSource = SeriesSource(-1, sourceType, sourceId)
-    
+
     db.withSession { implicit session =>
 
       val patient = datasetToPatient(dataset)

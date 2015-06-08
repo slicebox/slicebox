@@ -17,20 +17,40 @@
 package se.nimsa.sbx.app.routing
 
 import akka.pattern.ask
-
 import spray.http.StatusCodes.NoContent
 import spray.httpx.SprayJsonSupport._
 import spray.routing._
-
 import se.nimsa.sbx.app.RestApi
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomProtocol._
+import se.nimsa.sbx.app.UserProtocol.GetUsers
+import se.nimsa.sbx.app.UserProtocol.Users
+import se.nimsa.sbx.box.BoxProtocol.GetBoxes
+import se.nimsa.sbx.box.BoxProtocol.Boxes
 
 trait MetadataRoutes { this: RestApi =>
 
   def metaDataRoutes: Route = {
     pathPrefix("metadata") {
-      pathPrefix("patients") {
+      path("sources") {
+        get {
+          val futureSources =
+            for {
+              users <- userService.ask(GetUsers).mapTo[Users]
+              boxes <- boxService.ask(GetBoxes).mapTo[Boxes]
+              scps <- dicomService.ask(GetScps).mapTo[Scps]
+              dirs <- dicomService.ask(GetWatchedDirectories).mapTo[WatchedDirectories]
+            } yield {
+              users.users.map(user => Source(SourceType.USER, user.id)) ++
+                boxes.boxes.map(box => Source(SourceType.BOX, box.id)) ++
+                scps.scps.map(scp => Source(SourceType.SCP, scp.id)) ++
+                dirs.directories.map(dir => Source(SourceType.DIRECTORY, dir.id))
+            }
+          onSuccess(futureSources) {
+            complete(_)
+          }
+        }
+      } ~ pathPrefix("patients") {
         pathEndOrSingleSlash {
           get {
             parameters(
@@ -38,9 +58,11 @@ trait MetadataRoutes { this: RestApi =>
               'count.as[Long] ? 20,
               'orderby.as[String].?,
               'orderascending.as[Boolean] ? true,
-              'filter.as[String].?) { (startIndex, count, orderBy, orderAscending, filter) =>
+              'filter.as[String].?,
+              'sourcetype.as[String].?,
+              'sourceid.as[Long].?) { (startIndex, count, orderBy, orderAscending, filter, sourceType, sourceId) =>
 
-                onSuccess(dicomService.ask(GetPatients(startIndex, count, orderBy, orderAscending, filter))) {
+                onSuccess(dicomService.ask(GetPatients(startIndex, count, orderBy, orderAscending, filter, sourceType.map(SourceType.withName(_)), sourceId))) {
                   case Patients(patients) =>
                     complete(patients)
                 }
@@ -177,8 +199,10 @@ trait MetadataRoutes { this: RestApi =>
               'count.as[Long] ? 20,
               'orderby.as[String].?,
               'orderascending.as[Boolean] ? true,
-              'filter.as[String].?) { (startIndex, count, orderBy, orderAscending, filter) =>
-                onSuccess(dicomService.ask(GetFlatSeries(startIndex, count, orderBy, orderAscending, filter))) {
+              'filter.as[String].?,
+              'sourcetype.as[String].?,
+              'sourceid.as[Long].?) { (startIndex, count, orderBy, orderAscending, filter, sourceType, sourceId) =>
+                onSuccess(dicomService.ask(GetFlatSeries(startIndex, count, orderBy, orderAscending, filter, sourceType.map(SourceType.withName(_)), sourceId))) {
                   case FlatSeriesCollection(flatSeries) =>
                     complete(flatSeries)
                 }

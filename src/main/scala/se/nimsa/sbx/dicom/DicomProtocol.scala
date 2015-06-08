@@ -52,6 +52,8 @@ object DicomProtocol {
     }    
   }
       
+  case class Source(sourceType: SourceType, sourceId: Long)
+  
   case class SeriesSource(id: Long, sourceType: SourceType, sourceId: Long) extends Entity
   
   case class ScpData(id: Long, name: String, aeTitle: String, port: Int) extends Entity
@@ -161,13 +163,13 @@ object DicomProtocol {
 
   sealed trait MetaDataQuery
 
-  case class GetPatients(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String]) extends MetaDataQuery
+  case class GetPatients(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String], sourceType: Option[SourceType], sourceId: Option[Long]) extends MetaDataQuery
 
   case class GetStudies(startIndex: Long, count: Long, patientId: Long) extends MetaDataQuery
 
   case class GetSeries(startIndex: Long, count: Long, studyId: Long) extends MetaDataQuery
 
-  case class GetFlatSeries(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String]) extends MetaDataQuery
+  case class GetFlatSeries(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String], sourceType: Option[SourceType], sourceId: Option[Long]) extends MetaDataQuery
 
   case class GetImages(startIndex: Long, count: Long, seriesId: Long) extends MetaDataQuery
   

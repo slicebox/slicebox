@@ -41,7 +41,7 @@ class DicomStorageActorTest(_system: ActorSystem) extends TestKit(_system) with 
   "A DicomStorageActor" must {
 
     "return an empty list of patients when no metadata exists" in {
-      storageActorRef ! GetPatients(0, 10000, None, true, None)
+      storageActorRef ! GetPatients(0, 10000, None, true, None, None, None)
       expectMsg(Patients(Seq()))
     }
 
@@ -53,7 +53,7 @@ class DicomStorageActorTest(_system: ActorSystem) extends TestKit(_system) with 
     }
 
     "return a list of one object when asking for all patients" in {
-      storageActorRef ! GetPatients(0, 10000, None, true, None)
+      storageActorRef ! GetPatients(0, 10000, None, true, None, None, None)
       expectMsgPF() {
         case Patients(list) if (list.size == 1) => true
       }
@@ -67,7 +67,7 @@ class DicomStorageActorTest(_system: ActorSystem) extends TestKit(_system) with 
     }
 
     "return a list of one object when asking for all patients even though a dataset has been added twice" in {
-      storageActorRef ! GetPatients(0, 10000, None, true, None)
+      storageActorRef ! GetPatients(0, 10000, None, true, None, None, None)
       expectMsgPF() {
         case Patients(list) if (list.size == 1) => true
       }

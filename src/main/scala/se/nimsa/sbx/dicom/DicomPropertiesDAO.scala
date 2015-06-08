@@ -84,6 +84,12 @@ class DicomPropertiesDAO(val driver: JdbcProfile) {
 
   def imageFiles(implicit session: Session): List[ImageFile] = imageFilesQuery.list
 
+  def imageFilesForSource(sourceType: SourceType, sourceId: Long)(implicit session: Session): List[ImageFile] =
+    imageFilesQuery
+      .filter(_.sourceType === sourceType.toString)
+      .filter(_.sourceId === sourceId)
+      .list
+
   def imageFileForImage(imageId: Long)(implicit session: Session): Option[ImageFile] =
     imageFilesQuery
       .filter(_.id === imageId)
@@ -136,9 +142,10 @@ class DicomPropertiesDAO(val driver: JdbcProfile) {
        inner join "Equipments" on "Series"."equipmentId" = "Equipments"."id"
        inner join "FrameOfReferences" on "Series"."frameOfReferenceId" = "FrameOfReferences"."id"
        inner join "Patients" on "Studies"."patientId" = "Patients"."id"
-       inner join "SeriesSources" on "Series"."id" = "SeriesSources"."id""""
+       inner join "SeriesSources" on "Series"."id" = "SeriesSources"."id"
+       """
 
-  def flatSeriesAndSourceGetResult = GetResult(r =>
+  def flatSeriesGetResult = GetResult(r =>
     FlatSeries(r.nextLong,
       Patient(r.nextLong, PatientName(r.nextString), PatientID(r.nextString), PatientBirthDate(r.nextString), PatientSex(r.nextString)),
       Study(r.nextLong, r.nextLong, StudyInstanceUID(r.nextString), StudyDescription(r.nextString), StudyDate(r.nextString), StudyID(r.nextString), AccessionNumber(r.nextString), PatientAge(r.nextString)),
@@ -146,19 +153,25 @@ class DicomPropertiesDAO(val driver: JdbcProfile) {
       FrameOfReference(r.nextLong, FrameOfReferenceUID(r.nextString)),
       Series(r.nextLong, r.nextLong, r.nextLong, r.nextLong, SeriesInstanceUID(r.nextString), SeriesDescription(r.nextString), SeriesDate(r.nextString), Modality(r.nextString), ProtocolName(r.nextString), BodyPartExamined(r.nextString))))
 
-  def flatSeriesAndSources(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String], source: SeriesSource)(implicit session: Session): List[FlatSeries] = {
+  def flatSeries(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String], sourceType: Option[SourceType], sourceId: Option[Long])(implicit session: Session): List[FlatSeries] = {
 
-    checkOrderBy(orderBy, "Patients", "Studies", "Equipments", "FrameOfReferences", "Series")
+    if (sourceType.isEmpty || sourceId.isEmpty)
+      metaDataDao.flatSeries(startIndex, count, orderBy, orderAscending, filter)
 
-    implicit val getResult = flatSeriesAndSourceGetResult
+    else {
+      checkOrderBy(orderBy, "Patients", "Studies", "Equipments", "FrameOfReferences", "Series")
 
-    var query = flatSeriesQuery
+      implicit val getResult = flatSeriesGetResult
 
-    query += s""" where "SeriesSource"."sourceType" = ${source.sourceType.toString} and "SeriesSource"."sourceId" = ${source.sourceId}"""
+      var query = flatSeriesQuery
 
-    filter.foreach(filterValue => {
-      val filterValueLike = s"'%$filterValue%'".toLowerCase
-      query += s""" and (
+      query += s"""where
+        "SeriesSources"."sourceType" = '${sourceType.get.toString}' and "SeriesSources"."sourceId" = ${sourceId.get}
+        """
+
+      filter.foreach(filterValue => {
+        val filterValueLike = s"'%$filterValue%'".toLowerCase
+        query += s"""and (
         lcase("Series"."id") like $filterValueLike or
           lcase("PatientName") like $filterValueLike or 
           lcase("PatientID") like $filterValueLike or 
@@ -175,55 +188,67 @@ class DicomPropertiesDAO(val driver: JdbcProfile) {
                 lcase("SeriesDate") like $filterValueLike or
                 lcase("Modality") like $filterValueLike or
                 lcase("ProtocolName") like $filterValueLike or
-                lcase("BodyPartExamined") like $filterValueLike)"""
-    })
+                lcase("BodyPartExamined") like $filterValueLike)
+                """
+      })
 
-    orderBy.foreach(orderByValue =>
-      query += s""" order by "$orderByValue" ${if (orderAscending) "asc" else "desc"}""")
+      orderBy.foreach(orderByValue =>
+        query += s"""order by "$orderByValue" ${if (orderAscending) "asc" else "desc"}
+      """)
 
-    query += s""" limit $count offset $startIndex"""
+      query += s"""limit $count offset $startIndex"""
 
-    Q.queryNA(query).list
+      Q.queryNA(query).list
+    }
   }
 
-  def flatSeriesAndSourceById(seriesId: Long)(implicit session: Session): Option[FlatSeries] = {
+  def flatSeriesById(seriesId: Long)(implicit session: Session): Option[FlatSeries] = {
 
-    implicit val getResult = flatSeriesAndSourceGetResult
+    implicit val getResult = flatSeriesGetResult
     val query = flatSeriesQuery + s""" where "Series"."id" = $seriesId"""
 
     Q.queryNA(query).list.headOption
   }
 
-  def patientsBySource(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String], source: SeriesSource)(implicit session: Session): List[Patient] = {
-    val patientsBySourceQuery = 
+  def patients(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String], sourceType: Option[SourceType], sourceId: Option[Long])(implicit session: Session): List[Patient] = {
 
-    checkOrderBy(orderBy, "Patients")
+    if (sourceType.isEmpty || sourceId.isEmpty)
+      metaDataDao.patients(startIndex, count, orderBy, orderAscending, filter)
 
-    implicit val getResult = patientsGetResult
+    else {
+      checkOrderBy(orderBy, "Patients")
 
-    var query = s"""select 
+      implicit val getResult = patientsGetResult
+
+      var query = s"""select 
       "Patients"."id", "Patients"."PatientName", "Patients"."PatientID", "Patients"."PatientBirthDate","Patients"."PatientSex"
-       distinct "Patients"."id"
        from "Series" 
        inner join "SeriesSources" on "Series"."id" = "SeriesSources"."id"
        inner join "Studies" on "Series"."studyId" = "Studies"."id" 
-       inner join "Patients" on "Studies"."patientId" = "Patients"."id" where 
-       "SeriesSource"."sourceType" = ${source.sourceType.toString} and "SeriesSource"."sourceId" = ${source.sourceId}"""
+       inner join "Patients" on "Studies"."patientId" = "Patients"."id"
+       where
+       "SeriesSources"."sourceType" = '${sourceType.get.toString}' and "SeriesSources"."sourceId" = ${sourceId.get}
+       """
 
-    filter.foreach(filterValue => {
-      val filterValueLike = s"'%$filterValue%'".toLowerCase
-      query += s""" where 
+      filter.foreach(filterValue => {
+        val filterValueLike = s"'%$filterValue%'".toLowerCase
+        query += s"""and (
         lcase("PatientName") like $filterValueLike or 
           lcase("PatientID") like $filterValueLike or 
             lcase("PatientBirthDate") like $filterValueLike or 
-              lcase("PatientSex") like $filterValueLike"""
-    })
+              lcase("PatientSex") like $filterValueLike)
+              """
+      })
 
-    orderBy.foreach(orderByValue =>
-      query += s""" order by "$orderByValue" ${if (orderAscending) "asc" else "desc"}""")
+      orderBy.foreach(orderByValue =>
+        query += s"""order by "$orderByValue" ${if (orderAscending) "asc" else "desc"}
+        """)
 
-    query += s""" limit $count offset $startIndex"""
+      query += s"""group by "Patients"."id"
+        limit $count offset $startIndex
+        """
 
-    Q.queryNA(query).list
+      Q.queryNA(query).list
+    }
   }
 }
