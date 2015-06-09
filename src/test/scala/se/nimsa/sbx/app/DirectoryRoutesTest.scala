@@ -19,10 +19,11 @@ class DirectoryRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   def dbUrl() = "jdbc:h2:mem:directoryroutestest;DB_CLOSE_DELAY=-1"
 
   val tempDir = Files.createTempDirectory("slicebox-watch-dir-")
-  val watchDir = WatchDirectory(tempDir.toString)
+  val watchDir = WatchDirectory("test dir", tempDir.toString)
+  val watchDir2 = WatchDirectory("test dir 2", tempDir.toString)
   val tempFile = Files.createTempFile("slicebox-temp-file-", ".tmp")
-  val watchFile = WatchDirectory(tempFile.toString)
-  val watchStorage = WatchDirectory(storage.toString)
+  val watchFile = WatchDirectory("test file", tempFile.toString)
+  val watchStorage = WatchDirectory("test storage", storage.toString)
 
   override def afterAll {
     super.afterAll();
@@ -30,13 +31,23 @@ class DirectoryRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     Files.delete(tempFile)
   }
 
-  "The system" should "return 201 Created and the watched directory when asking to watch a new directory" in {
+  "Directory watch routes" should "return 201 Created and the watched directory when asking to watch a new directory" in {
     PostAsAdmin("/api/directorywatches", watchDir) ~> routes ~> check {
       status should be (Created)
       responseAs[WatchedDirectory] should not be (null)
     }
   }
 
+  it should "return 201 Created and the watched directory but not add anything when adding the same directory twice" in {
+    PostAsAdmin("/api/directorywatches", watchDir) ~> routes ~> check {
+      status should be (Created)
+      responseAs[WatchedDirectory] should not be (null)
+    }
+    GetAsUser("/api/directorywatches") ~> routes ~> check {
+      responseAs[List[WatchedDirectory]].size should be (1)
+    }
+  }
+  
   it should "respond with BadRequest when asking to watch a path which is not a directory" in {
     PostAsAdmin("/api/directorywatches", watchFile) ~> routes ~> check {
       status should be(BadRequest)
@@ -45,6 +56,12 @@ class DirectoryRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
   it should "respond with BadRequest when asking to watch the storage directory" in {
     PostAsAdmin("/api/directorywatches", watchStorage) ~> routes ~> check {
+      status should be(BadRequest)
+    }
+  }
+
+  it should "respond with BadRequest when watching the same directory twice with different names" in {
+    PostAsAdmin("/api/directorywatches", watchDir2) ~> routes ~> check {
       status should be(BadRequest)
     }
   }

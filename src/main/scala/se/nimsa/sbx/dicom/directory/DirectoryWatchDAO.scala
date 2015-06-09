@@ -27,8 +27,9 @@ class DirectoryWatchDAO(val driver: JdbcProfile) {
 
   class DirectoryWatchDataTable(tag: Tag) extends Table[WatchedDirectory](tag, "DirectoryWatchData") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
+    def name = column[String]("name")
     def path = column[String]("path")
-    def * = (id, path) <> (WatchedDirectory.tupled, WatchedDirectory.unapply)
+    def * = (id, name, path) <> (WatchedDirectory.tupled, WatchedDirectory.unapply)
   }
 
   val watchedDirectoriesQuery = TableQuery[DirectoryWatchDataTable]
@@ -57,6 +58,4 @@ class DirectoryWatchDAO(val driver: JdbcProfile) {
   def watchedDirectoryForPath(path: String)(implicit session: Session): Option[WatchedDirectory] =
     watchedDirectoriesQuery.filter(_.path === path).list.headOption
     
-  private def toWatchedDirectory(watchedDirectory: WatchedDirectory) = WatchedDirectory(watchedDirectory.id, watchedDirectory.path)
-
 }

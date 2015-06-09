@@ -29,9 +29,9 @@ import spray.routing.authentication.UserPass
 
 trait JsonFormats extends DefaultJsonProtocol {
 
-  implicit val watchDirectoryFormat = jsonFormat1(WatchDirectory)
+  implicit val watchDirectoryFormat = jsonFormat2(WatchDirectory)
   implicit val unWatchDirectoryFormat = jsonFormat1(UnWatchDirectory)
-  implicit val watchedDirectoryFormat = jsonFormat2(WatchedDirectory)
+  implicit val watchedDirectoryFormat = jsonFormat3(WatchedDirectory)
 
   implicit val scpDataFormat = jsonFormat4(ScpData)
   implicit val scuDataFormat = jsonFormat5(ScuData)

@@ -41,8 +41,8 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor 
   setupDb()
   setupWatches()
 
-  log.info("Directory watch service started")    
-      
+  log.info("Directory watch service started")
+
   def receive = LoggingReceive {
 
     case msg: DirectoryRequest =>
@@ -50,11 +50,13 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor 
 
         msg match {
 
-          case WatchDirectory(pathString) =>
+          case WatchDirectory(name, pathString) =>
             watchedDirectoryForPath(pathString) match {
               case Some(watchedDirectory) =>
-
-                sender ! watchedDirectory
+                if (name == watchedDirectory.name)
+                  sender ! watchedDirectory
+                else
+                  throw new IllegalArgumentException(s"Directory watch ${watchedDirectory.name} already watches directory " + pathString)
 
               case None =>
 
@@ -70,7 +72,7 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor 
                   if (path.startsWith(other) || other.startsWith(path))
                     throw new IllegalArgumentException("Directory intersects existing directory " + other))
 
-                val watchedDirectory = addDirectory(pathString)
+                val watchedDirectory = addDirectory(name, pathString)
 
                 context.child(watchedDirectory.id.toString).getOrElse(
                   context.actorOf(DirectoryWatchActor.props(watchedDirectory), watchedDirectory.id.toString))
@@ -109,9 +111,9 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor 
       })
     }
 
-  def addDirectory(pathString: String): WatchedDirectory =
+  def addDirectory(name: String, path: String): WatchedDirectory =
     db.withSession { implicit session =>
-      dao.insert(WatchedDirectory(-1, pathString))
+      dao.insert(WatchedDirectory(-1, name, path))
     }
 
   def deleteDirectory(id: Long) =

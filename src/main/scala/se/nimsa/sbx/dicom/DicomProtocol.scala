@@ -74,7 +74,7 @@ object DicomProtocol {
     }
   }
   
-  case class WatchedDirectory(id: Long, path: String) extends Entity
+  case class WatchedDirectory(id: Long, name: String, path: String) extends Entity
 
   case class ImageAttribute(
       group: String, 
@@ -128,7 +128,7 @@ object DicomProtocol {
     
   sealed trait DirectoryRequest
   
-  case class WatchDirectory(pathString: String) extends DirectoryRequest
+  case class WatchDirectory(name: String, path: String) extends DirectoryRequest
 
   case class UnWatchDirectory(id: Long) extends DirectoryRequest
 

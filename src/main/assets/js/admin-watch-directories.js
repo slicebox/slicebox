@@ -38,7 +38,7 @@ angular.module('slicebox.adminWatchDirectories', ['ngRoute'])
 
     // Scope functions
     $scope.addButtonClicked = function() {
-        $mdDialog.hide({ pathString: $scope.path });
+        $mdDialog.hide({ name: $scope.name, path: $scope.path });
     };
 
     $scope.cancelButtonClicked = function() {
