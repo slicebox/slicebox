@@ -122,7 +122,7 @@ trait JsonFormats extends DefaultJsonProtocol {
   implicit val protocolNameFormat = jsonFormat1(ProtocolName)
   implicit val bodyPartExaminedFormat = jsonFormat1(BodyPartExamined)
 
-  implicit val sourceFormat = jsonFormat2(Source)
+  implicit val sourceFormat = jsonFormat3(Source)
   
   implicit val seriesFormat = jsonFormat10(Series)
   implicit val flatSeriesFormat = jsonFormat6(FlatSeries)

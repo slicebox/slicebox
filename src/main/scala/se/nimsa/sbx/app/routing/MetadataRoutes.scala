@@ -41,10 +41,10 @@ trait MetadataRoutes { this: RestApi =>
               scps <- dicomService.ask(GetScps).mapTo[Scps]
               dirs <- dicomService.ask(GetWatchedDirectories).mapTo[WatchedDirectories]
             } yield {
-              users.users.map(user => Source(SourceType.USER, user.id)) ++
-                boxes.boxes.map(box => Source(SourceType.BOX, box.id)) ++
-                scps.scps.map(scp => Source(SourceType.SCP, scp.id)) ++
-                dirs.directories.map(dir => Source(SourceType.DIRECTORY, dir.id))
+              users.users.map(user => Source(SourceType.USER, user.user, user.id)) ++
+                boxes.boxes.map(box => Source(SourceType.BOX, box.name, box.id)) ++
+                scps.scps.map(scp => Source(SourceType.SCP, scp.name, scp.id)) ++
+                dirs.directories.map(dir => Source(SourceType.DIRECTORY, dir.name, dir.id))
             }
           onSuccess(futureSources) {
             complete(_)

@@ -52,7 +52,7 @@ object DicomProtocol {
     }    
   }
       
-  case class Source(sourceType: SourceType, sourceId: Long)
+  case class Source(sourceType: SourceType, sourceName: String, sourceId: Long)
   
   case class SeriesSource(id: Long, sourceType: SourceType, sourceId: Long) extends Entity
   
