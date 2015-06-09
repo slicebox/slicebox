@@ -3,6 +3,7 @@ package se.nimsa.sbx.app
 import org.scalatest.FlatSpec
 import org.scalatest.Matchers
 import spray.http.StatusCodes.OK
+import spray.http.StatusCodes.Created
 import spray.http.StatusCodes.NotFound
 import spray.http.StatusCodes.BadRequest
 import spray.testkit.ScalatestRouteTest
@@ -16,6 +17,9 @@ import se.nimsa.sbx.dicom.DicomMetaDataDAO
 import se.nimsa.sbx.dicom.DicomPropertyValue._
 import se.nimsa.sbx.dicom.DicomProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy._
+import se.nimsa.sbx.app.UserProtocol.ClearTextUser
+import se.nimsa.sbx.app.UserProtocol.UserRole.ADMINISTRATOR
+import se.nimsa.sbx.box.BoxProtocol.RemoteBoxName
 
 class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
@@ -253,5 +257,17 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       status should be(BadRequest)
     }
   }
-  
+
+  it should "return a list of sources of the correct length" in {
+    PostAsAdmin("/api/users", ClearTextUser("name", ADMINISTRATOR, "password")) ~> routes ~> check {
+      status should be (Created)
+    }
+    PostAsAdmin("/api/boxes/generatebaseurl", RemoteBoxName("remote box")) ~> routes ~> check {
+      status should be(Created)
+    }
+    GetAsUser("/api/metadata/sources") ~> routes ~> check {
+      status should be (OK)
+      responseAs[List[Source]].length should be (4) // admin + user users added by system and test class, name user, remote box
+    }
+  }
 }

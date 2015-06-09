@@ -106,6 +106,28 @@ class DicomPropertiesDAOTest extends FlatSpec with Matchers with BeforeAndAfterE
     }
   }
 
+  it should "support filtering studies by source" in {
+    db.withSession { implicit session =>
+      insertMetaData
+      propertiesDao.studiesForPatient(0, 20, 1, None, None).size should be (2)
+      propertiesDao.studiesForPatient(0, 20, 1, None, Some(1)).size should be (2)
+      propertiesDao.studiesForPatient(0, 20, 1, Some(SourceType.BOX), Some(-1)).size should be (1)
+      propertiesDao.studiesForPatient(0, 20, 1, Some(SourceType.BOX), Some(2)).size should be (0)      
+    }
+  }
+
+  it should "support filtering series by source" in {
+    db.withSession { implicit session =>
+      insertMetaData
+      propertiesDao.seriesForStudy(0, 20, 1, None, None).size should be (2)
+      propertiesDao.seriesForStudy(0, 20, 1, None, Some(1)).size should be (2)
+      propertiesDao.seriesForStudy(0, 20, 1, Some(SourceType.BOX), Some(-1)).size should be (2)
+      propertiesDao.seriesForStudy(0, 20, 2, Some(SourceType.UNKNOWN), Some(-1)).size should be (1)
+      propertiesDao.seriesForStudy(0, 20, 2, Some(SourceType.DIRECTORY), Some(-1)).size should be (1)
+      propertiesDao.seriesForStudy(0, 20, 1, Some(SourceType.BOX), Some(2)).size should be (0)      
+    }
+  }
+  
   def insertMetaData(implicit session: Session) = {
     val pat1 = Patient(-1, PatientName("p1"), PatientID("s1"), PatientBirthDate("2000-01-01"), PatientSex("M"))
     val study1 = Study(-1, -1, StudyInstanceUID("stuid1"), StudyDescription("stdesc1"), StudyDate("19990101"), StudyID("stid1"), AccessionNumber("acc1"), PatientAge("12Y"))

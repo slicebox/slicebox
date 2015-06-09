@@ -100,13 +100,13 @@ class DicomPropertiesDAO(val driver: JdbcProfile) {
       .map(image => imageFileForImage(image.id)).flatten.toList
 
   def imageFilesForStudy(studyId: Long)(implicit session: Session): List[ImageFile] =
-    seriesForStudy(0, Integer.MAX_VALUE, studyId)
+    metaDataDao.seriesForStudy(0, Integer.MAX_VALUE, studyId)
       .map(series => imagesForSeries(0, 100000, series.id)
         .map(image => imageFileForImage(image.id)).flatten).flatten
 
   def imageFilesForPatient(patientId: Long)(implicit session: Session): List[ImageFile] =
-    studiesForPatient(0, Integer.MAX_VALUE, patientId)
-      .map(study => seriesForStudy(0, Integer.MAX_VALUE, study.id)
+    metaDataDao.studiesForPatient(0, Integer.MAX_VALUE, patientId)
+      .map(study => metaDataDao.seriesForStudy(0, Integer.MAX_VALUE, study.id)
         .map(series => imagesForSeries(0, 100000, series.id)
           .map(image => imageFileForImage(image.id)).flatten).flatten).flatten
 
@@ -251,4 +251,45 @@ class DicomPropertiesDAO(val driver: JdbcProfile) {
       Q.queryNA(query).list
     }
   }
+
+  def studiesGetResult = GetResult(r =>
+    Study(r.nextLong, r.nextLong, StudyInstanceUID(r.nextString), StudyDescription(r.nextString), StudyDate(r.nextString), StudyID(r.nextString), AccessionNumber(r.nextString), PatientAge(r.nextString)))
+
+  def studiesForPatient(startIndex: Long, count: Long, patientId: Long, sourceType: Option[SourceType], sourceId: Option[Long])(implicit session: Session): List[Study] = {
+
+    if (sourceType.isEmpty || sourceId.isEmpty)
+      metaDataDao.studiesForPatient(startIndex, count, patientId)
+
+    else {
+
+      implicit val getResult = studiesGetResult
+
+      val query = s"""select 
+      "Studies"."id", "Studies"."patientId", "Studies"."StudyInstanceUID", "Studies"."StudyDescription","Studies"."StudyDate","Studies"."StudyID","Studies"."AccessionNumber","Studies"."PatientAge"
+       from "Series" 
+       inner join "SeriesSources" on "Series"."id" = "SeriesSources"."id"
+       inner join "Studies" on "Series"."studyId" = "Studies"."id" 
+       where
+       "Studies"."patientId" = $patientId and
+       "SeriesSources"."sourceType" = '${sourceType.get.toString}' and "SeriesSources"."sourceId" = ${sourceId.get}
+       group by "Studies"."id"
+       limit $count offset $startIndex"""
+
+      Q.queryNA(query).list
+    }
+  }
+
+  def seriesForStudy(startIndex: Long, count: Long, studyId: Long, sourceType: Option[SourceType], sourceId: Option[Long])(implicit session: Session): List[Series] =
+    if (sourceType.isEmpty || sourceId.isEmpty)
+      metaDataDao.seriesForStudy(startIndex, count, studyId)
+    else
+      seriesQuery.filter(_.studyId === studyId)
+        .innerJoin(
+          seriesSourceQuery
+            .filter(_.sourceType === sourceType.get.toString)
+            .filter(_.sourceId === sourceId.get))
+        .on(_.id === _.id)
+        .map(_._1)
+        .list
+
 }
