@@ -73,6 +73,24 @@
   ],
   "paths": {
 
+    "/metadata/sources": {
+      "get": {
+        "description": "Returns a list of currently available data sources. Possible source types are user - data imported by an API call by a user, box - data received from a remote box, directory - data imported via a watched directory or scp - data received from a PACS.",
+        "tags": ["Meta Data"],
+        "responses": {
+          "200": {
+            "description": "sources",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/source"
+              }
+            }
+          }
+        }
+      }
+    },
+
     "/metadata/patients": {
       "get": {
         "description": "Returns a list of metadata on the patient level of the DICOM hierarchy",
@@ -115,6 +133,20 @@
             "name": "filter",
             "in": "query",
             "description": "filter the results by matching substrings of patient properties against this value",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "sourcetype",
+            "in": "query",
+            "description": "filter the results by matching on type of source. Type should be one of user, box, directory or scp.",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "sourceid",
+            "in": "query",
+            "description": "if the sourcetype parameter is present, also filter on the id of the source. E.g. for boxes this means the id of the remote box as available when listing boxes.",
             "required": false,
             "type": "string"
           }
@@ -239,6 +271,20 @@
             "required": true,
             "type": "integer",
             "format": "int64"
+          },
+          {
+            "name": "sourcetype",
+            "in": "query",
+            "description": "filter the results by matching on type of source. Type should be one of user, box, directory or scp.",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "sourceid",
+            "in": "query",
+            "description": "if the sourcetype parameter is present, also filter on the id of the source. E.g. for boxes this means the id of the remote box as available when listing boxes.",
+            "required": false,
+            "type": "string"
           }
         ],
         "responses": {
@@ -361,6 +407,20 @@
             "required": true,
             "type": "integer",
             "format": "int64"
+          },
+          {
+            "name": "sourcetype",
+            "in": "query",
+            "description": "filter the results by matching on type of source. Type should be one of user, box, directory or scp.",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "sourceid",
+            "in": "query",
+            "description": "if the sourcetype parameter is present, also filter on the id of the source. E.g. for boxes this means the id of the remote box as available when listing boxes.",
+            "required": false,
+            "type": "string"
           }
         ],
         "responses": {
@@ -448,6 +508,34 @@
         "responses": {
           "204": {
             "description": "series deleted"
+          }
+        }
+      }
+    },
+
+    "/metadata/series/{id}/source": {
+      "get": {
+        "description": "Return the source of the series with the supplied ID",
+        "tags": ["Meta Data"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of series",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "source for series",
+            "schema": {
+              "$ref": "#/definitions/source"            
+            }
+          },
+          "404": {
+            "description": "series not found (invalid ID)"
           }
         }
       }
@@ -617,6 +705,20 @@
             "name": "filter",
             "in": "query",
             "description": "filter the results by matching substrings of flat series properties against this value",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "sourcetype",
+            "in": "query",
+            "description": "filter the results by matching on type of source. Type should be one of user, box, directory or scp.",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "sourceid",
+            "in": "query",
+            "description": "if the sourcetype parameter is present, also filter on the id of the source. E.g. for boxes this means the id of the remote box as available when listing boxes.",
             "required": false,
             "type": "string"
           }
@@ -1704,6 +1806,19 @@
 
 
   "definitions": {
+    "source": {
+      "properties": {
+        "sourceType": {
+          "type": "string"
+        },
+        "sourceName": {
+          "type": "string"
+        },
+        "sourceId": {
+          "type": "string"
+        }
+      }
+    },
     "anonymizationKey": {
       "properties": {
         "id": {
