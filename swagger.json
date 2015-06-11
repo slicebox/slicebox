@@ -5,7 +5,7 @@
     "title": "Slicebox API",
     "description": "Slicebox - safe sharing of medical images",
     "contact": {
-      "url": "http://github.org/KarlSjostrand/slicebox"
+      "url": "http://github.org/slicebox/slicebox"
     },
     "license": {
       "name": "Apache 2.0 License",
@@ -265,7 +265,7 @@
             "format": "int64"
           },
           {
-            "name": "patientId",
+            "name": "patientid",
             "in": "query",
             "description": "reference to patient to list studies for",
             "required": true,
@@ -401,7 +401,7 @@
             "format": "int64"
           },
           {
-            "name": "studyId",
+            "name": "studyid",
             "in": "query",
             "description": "reference to study to list series for",
             "required": true,
@@ -565,7 +565,7 @@
             "format": "int64"
           },
           {
-            "name": "seriesId",
+            "name": "seriesid",
             "in": "query",
             "description": "reference to series to list images for",
             "required": true,
