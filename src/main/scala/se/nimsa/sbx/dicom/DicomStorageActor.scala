@@ -206,14 +206,14 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
             sender ! Patients(propertiesDao.patients(startIndex, count, orderBy, orderAscending, filter, sourceType, sourceId))
           }
 
-        case GetStudies(startIndex, count, patientId) =>
+        case GetStudies(startIndex, count, patientId, sourceType, sourceId) =>
           db.withSession { implicit session =>
-            sender ! Studies(dao.studiesForPatient(startIndex, count, patientId))
+            sender ! Studies(propertiesDao.studiesForPatient(startIndex, count, patientId, sourceType, sourceId))
           }
 
-        case GetSeries(startIndex, count, studyId) =>
+        case GetSeries(startIndex, count, studyId, sourceType, sourceId) =>
           db.withSession { implicit session =>
-            sender ! SeriesCollection(dao.seriesForStudy(startIndex, count, studyId))
+            sender ! SeriesCollection(propertiesDao.seriesForStudy(startIndex, count, studyId, sourceType, sourceId))
           }
 
         case GetImages(startIndex, count, seriesId) =>

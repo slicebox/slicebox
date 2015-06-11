@@ -169,9 +169,9 @@ object DicomProtocol {
 
   case class GetPatients(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String], sourceType: Option[SourceType], sourceId: Option[Long]) extends MetaDataQuery
 
-  case class GetStudies(startIndex: Long, count: Long, patientId: Long) extends MetaDataQuery
+  case class GetStudies(startIndex: Long, count: Long, patientId: Long, sourceType: Option[SourceType], sourceId: Option[Long]) extends MetaDataQuery
 
-  case class GetSeries(startIndex: Long, count: Long, studyId: Long) extends MetaDataQuery
+  case class GetSeries(startIndex: Long, count: Long, studyId: Long, sourceType: Option[SourceType], sourceId: Option[Long]) extends MetaDataQuery
 
   case class GetFlatSeries(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String], sourceType: Option[SourceType], sourceId: Option[Long]) extends MetaDataQuery
 

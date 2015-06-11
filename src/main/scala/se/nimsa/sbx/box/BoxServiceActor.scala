@@ -403,8 +403,8 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
     getStudies(patientId)
       .flatMap(studies => sequence(studies.map(study => imageFileIdsForStudy(study.id)))).map(_.flatten)
 
-  def getStudies(patientId: Long) = storageService.ask(GetStudies(0, Integer.MAX_VALUE, patientId)).mapTo[Studies].map(_.studies)
-  def getSeries(studyId: Long) = storageService.ask(GetSeries(0, Integer.MAX_VALUE, studyId)).mapTo[SeriesCollection].map(_.series)
+  def getStudies(patientId: Long) = storageService.ask(GetStudies(0, Integer.MAX_VALUE, patientId, None, None)).mapTo[Studies].map(_.studies)
+  def getSeries(studyId: Long) = storageService.ask(GetSeries(0, Integer.MAX_VALUE, studyId, None, None)).mapTo[SeriesCollection].map(_.series)
   def getImages(seriesId: Long) = storageService.ask(GetImages(0, 100000, seriesId)).mapTo[Images].map(_.images)
   def getImageFile(imageId: Long) = storageService.ask(GetImageFile(imageId)).mapTo[Option[ImageFile]]
 

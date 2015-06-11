@@ -212,7 +212,7 @@ class DicomPropertiesDAO(val driver: JdbcProfile) {
 
   def patients(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String], sourceType: Option[SourceType], sourceId: Option[Long])(implicit session: Session): List[Patient] = {
 
-    if (sourceType.isEmpty || sourceId.isEmpty)
+    if (sourceType.isEmpty)
       metaDataDao.patients(startIndex, count, orderBy, orderAscending, filter)
 
     else {
@@ -227,8 +227,11 @@ class DicomPropertiesDAO(val driver: JdbcProfile) {
        inner join "Studies" on "Series"."studyId" = "Studies"."id" 
        inner join "Patients" on "Studies"."patientId" = "Patients"."id"
        where
-       "SeriesSources"."sourceType" = '${sourceType.get.toString}' and "SeriesSources"."sourceId" = ${sourceId.get}
-       """
+       "SeriesSources"."sourceType" = '${sourceType.get.toString}'"""
+
+      sourceId.foreach(sid => query += s""" and "SeriesSources"."sourceId" = $sid""")
+
+      query += "\n"
 
       filter.foreach(filterValue => {
         val filterValueLike = s"'%$filterValue%'".toLowerCase
@@ -257,39 +260,49 @@ class DicomPropertiesDAO(val driver: JdbcProfile) {
 
   def studiesForPatient(startIndex: Long, count: Long, patientId: Long, sourceType: Option[SourceType], sourceId: Option[Long])(implicit session: Session): List[Study] = {
 
-    if (sourceType.isEmpty || sourceId.isEmpty)
+    if (sourceType.isEmpty)
       metaDataDao.studiesForPatient(startIndex, count, patientId)
 
     else {
 
       implicit val getResult = studiesGetResult
 
-      val query = s"""select 
+      var query = s"""select 
       "Studies"."id", "Studies"."patientId", "Studies"."StudyInstanceUID", "Studies"."StudyDescription","Studies"."StudyDate","Studies"."StudyID","Studies"."AccessionNumber","Studies"."PatientAge"
        from "Series" 
        inner join "SeriesSources" on "Series"."id" = "SeriesSources"."id"
        inner join "Studies" on "Series"."studyId" = "Studies"."id" 
        where
        "Studies"."patientId" = $patientId and
-       "SeriesSources"."sourceType" = '${sourceType.get.toString}' and "SeriesSources"."sourceId" = ${sourceId.get}
-       group by "Studies"."id"
-       limit $count offset $startIndex"""
+       "SeriesSources"."sourceType" = '${sourceType.get.toString}'"""
+
+      sourceId.foreach(sid => query += s""" and "SeriesSources"."sourceId" = $sid""")
+
+      query += s"""
+        group by "Studies"."id"
+        limit $count offset $startIndex"""
 
       Q.queryNA(query).list
     }
   }
 
   def seriesForStudy(startIndex: Long, count: Long, studyId: Long, sourceType: Option[SourceType], sourceId: Option[Long])(implicit session: Session): List[Series] =
-    if (sourceType.isEmpty || sourceId.isEmpty)
+    if (sourceType.isEmpty)
       metaDataDao.seriesForStudy(startIndex, count, studyId)
-    else
-      seriesQuery.filter(_.studyId === studyId)
-        .innerJoin(
+    else {
+      val q1 = seriesQuery.filter(_.studyId === studyId)
+      val q2 = if (sourceId.isEmpty)
+        q1.innerJoin(
+          seriesSourceQuery
+            .filter(_.sourceType === sourceType.get.toString))
+          .on(_.id === _.id)
+      else
+        q1.innerJoin(
           seriesSourceQuery
             .filter(_.sourceType === sourceType.get.toString)
             .filter(_.sourceId === sourceId.get))
-        .on(_.id === _.id)
-        .map(_._1)
+          .on(_.id === _.id)
+      q2.map(_._1)
         .list
-
+    }
 }

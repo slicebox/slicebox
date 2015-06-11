@@ -95,8 +95,10 @@ trait MetadataRoutes { this: RestApi =>
             parameters(
               'startindex.as[Long] ? 0,
               'count.as[Long] ? 20,
-              'patientid.as[Long]) { (startIndex, count, patientId) =>
-                onSuccess(dicomService.ask(GetStudies(startIndex, count, patientId))) {
+              'patientid.as[Long],
+              'sourcetype.as[String].?,
+              'sourceid.as[Long].?) { (startIndex, count, patientId, sourceType, sourceId) =>
+                onSuccess(dicomService.ask(GetStudies(startIndex, count, patientId, sourceType.map(SourceType.withName(_)), sourceId))) {
                   case Studies(studies) =>
                     complete(studies)
                 }
@@ -129,8 +131,10 @@ trait MetadataRoutes { this: RestApi =>
             parameters(
               'startindex.as[Long] ? 0,
               'count.as[Long] ? 20,
-              'studyid.as[Long]) { (startIndex, count, studyId) =>
-                onSuccess(dicomService.ask(GetSeries(startIndex, count, studyId))) {
+              'studyid.as[Long],
+              'sourcetype.as[String].?,
+              'sourceid.as[Long].?) { (startIndex, count, studyId, sourceType, sourceId) =>
+                onSuccess(dicomService.ask(GetSeries(startIndex, count, studyId, sourceType.map(SourceType.withName(_)), sourceId))) {
                   case SeriesCollection(series) =>
                     complete(series)
                 }
