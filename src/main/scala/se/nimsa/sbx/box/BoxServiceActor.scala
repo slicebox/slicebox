@@ -120,6 +120,9 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
             val boxes = getBoxesFromDb()
             sender ! Boxes(boxes)
 
+          case GetBoxById(boxId) =>
+            sender ! boxById(boxId)
+            
           case GetBoxByToken(token) =>
             sender ! pollBoxByToken(token)
 

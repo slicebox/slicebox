@@ -57,6 +57,8 @@ angular.module('slicebox.home', ['ngRoute'])
     $scope.callbacks = {};
 
     $scope.uiState = {};
+    $scope.uiState.sources = [ { sourceType: null, sourceName: 'None' } ];
+    $scope.uiState.selectedSource = null;
     $scope.uiState.selectedPatient = null;
     $scope.uiState.selectedStudy = null;
     $scope.uiState.selectedSeries = null;
@@ -64,6 +66,7 @@ angular.module('slicebox.home', ['ngRoute'])
     $scope.uiState.seriesDetails = {
         leftColumnSelectedTabIndex: 0,
         rightColumnSelectedTabIndex: 0,
+        selectedSeriesSource: "",
         pngImageUrls: [],
         imageHeight: 0,
         images: 1,
@@ -72,8 +75,18 @@ angular.module('slicebox.home', ['ngRoute'])
         windowMax: 100
     };
 
-
     // Scope functions
+
+    $scope.uiState.sourcesPromise = $http.get('/api/metadata/sources').then(function(sourcesData) {
+        angular.forEach(sourcesData.data, function(source) {
+            $scope.uiState.sources.push(source);
+        });
+        return $scope.uiState.sources;
+    });
+
+    $scope.nameForSource = function(source) {
+        return source.sourceType === null ? "No filter" : source.sourceName + " (" + source.sourceType + ")";        
+    };
 
     $scope.loadPatients = function(startIndex, count, orderByProperty, orderByDirection, filter) {
         var loadPatientsUrl = '/api/metadata/patients?startindex=' + startIndex + '&count=' + count;
@@ -92,6 +105,8 @@ angular.module('slicebox.home', ['ngRoute'])
             loadPatientsUrl = loadPatientsUrl + '&filter=' + encodeURIComponent(filter);
         }
 
+        loadPatientsUrl = urlWithSourceQuery(loadPatientsUrl);
+
         var loadPatientsPromise = $http.get(loadPatientsUrl);
 
         loadPatientsPromise.error(function(error) {
@@ -99,6 +114,14 @@ angular.module('slicebox.home', ['ngRoute'])
         });
 
         return loadPatientsPromise;
+    };
+
+    $scope.sourceSelected = function() {
+        $scope.patientSelected(null);        
+        $scope.callbacks.patientsTable.reset();
+        if ($scope.callbacks.flatSeriesTable) {
+            $scope.callbacks.flatSeriesTable.reset();
+        }
     };
 
     $scope.patientSelected = function(patient) {
@@ -113,7 +136,11 @@ angular.module('slicebox.home', ['ngRoute'])
             return [];
         }
 
-        var loadStudiesPromise = $http.get('/api/metadata/studies?startindex=' + startIndex + '&count=' + count + '&patientid=' + $scope.uiState.selectedPatient.id);
+        var loadStudiesUrl = '/api/metadata/studies?startindex=' + startIndex + '&count=' + count + '&patientid=' + $scope.uiState.selectedPatient.id;
+
+        loadStudiesUrl = urlWithSourceQuery(loadStudiesUrl);
+
+        var loadStudiesPromise = $http.get(loadStudiesUrl);
 
         loadStudiesPromise.error(function(error) {
             $scope.showErrorMessage('Failed to load studies: ' + error);
@@ -137,7 +164,11 @@ angular.module('slicebox.home', ['ngRoute'])
             return [];
         }
 
-        var loadSeriesPromise = $http.get('/api/metadata/series?startindex=' + startIndex + '&count=' + count + '&studyid=' + $scope.uiState.selectedStudy.id);
+        var loadSeriesUrl = '/api/metadata/series?startindex=' + startIndex + '&count=' + count + '&studyid=' + $scope.uiState.selectedStudy.id;
+
+        loadSeriesUrl = urlWithSourceQuery(loadSeriesUrl);
+
+        var loadSeriesPromise = $http.get(loadSeriesUrl);
 
         loadSeriesPromise.error(function(error) {
             $scope.showErrorMessage('Failed to load series: ' + error);
@@ -163,6 +194,8 @@ angular.module('slicebox.home', ['ngRoute'])
             loadFlatSeriesUrl = loadFlatSeriesUrl + '&filter=' + encodeURIComponent(filter);
         }
 
+        loadFlatSeriesUrl = urlWithSourceQuery(loadFlatSeriesUrl);
+
         var loadFlatSeriesPromise = $http.get(loadFlatSeriesUrl);
 
         loadFlatSeriesPromise.error(function(error) {
@@ -176,6 +209,7 @@ angular.module('slicebox.home', ['ngRoute'])
         if ($scope.uiState.selectedSeries !== series) {
             $scope.uiState.selectedSeries = series;
 
+            $scope.uiState.seriesDetails.selectedSeriesSource = "";
             $scope.uiState.seriesDetails.pngImageUrls = [];
 
             if ($scope.callbacks.imageAttributesTable) { 
@@ -186,6 +220,10 @@ angular.module('slicebox.home', ['ngRoute'])
             }
 
             $scope.updatePNGImageUrls();
+
+            if (series !== null) {
+                updateSelectedSeriesSource(series);
+            }
         }
 
         if (reset && $scope.callbacks.seriesTable) {
@@ -318,6 +356,22 @@ angular.module('slicebox.home', ['ngRoute'])
     };
 
     // Private functions
+
+    function urlWithSourceQuery(url) {
+        if ($scope.uiState.selectedSource !== null && $scope.uiState.selectedSource.sourceType !== null) {
+            return url + '&sourcetype=' + $scope.uiState.selectedSource.sourceType + '&sourceid=' + $scope.uiState.selectedSource.sourceId;
+        } else {
+            return url;
+        }
+    }
+
+    function updateSelectedSeriesSource(series) {
+        $scope.uiState.sourcesPromise.then(function(sources) {
+            $http.get('/api/metadata/series/' + series.id + '/source').success(function(source) {
+                $scope.uiState.seriesDetails.selectedSeriesSource = source.sourceName + " (" + source.sourceType + ")";
+            });                
+        });        
+    }
 
     function capitalizeFirst(string) {
         return string.charAt(0).toUpperCase() + string.substring(1);        

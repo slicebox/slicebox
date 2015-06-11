@@ -246,6 +246,11 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
             sender ! dao.seriesById(seriesId)
           }
 
+        case GetSeriesSource(seriesId) =>
+          db.withSession { implicit session =>
+            sender ! propertiesDao.seriesSourceById(seriesId)
+          }
+          
         case GetImage(imageId) =>
           db.withSession { implicit session =>
             sender ! dao.imageById(imageId)

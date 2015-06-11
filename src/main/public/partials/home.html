@@ -206,6 +206,12 @@
             </div>
         </ng-switch>
         
+        <hr>
+
+        <md-select ng-model="uiState.selectedSource" placeholder="Filter by source" md-on-open="uiState.sourcesPromise" ng-change="sourceSelected()">
+          <md-option ng-repeat="source in uiState.sources" ng-value="source">{{nameForSource(source)}}</md-option>
+        </md-select>
+
     </div>
 
     <div layout="column" flex="59" class="right-column">
@@ -216,8 +222,8 @@
             <md-tab id="dicom-tags" aria-controls="dicom-tags-content">
                 DICOM Tags
             </md-tab>
-            <md-tab id="datasets" aria-controls="datasets-content">
-                Datasets
+            <md-tab id="details" aria-controls="details-content">
+                Details
             </md-tab>
         </md-tabs>
 
@@ -340,17 +346,26 @@
             </div>
 
             <div role="tabpanel"
-                id="datasets-content"
-                aria-labelledby="datasets"
+                id="details-content"
+                aria-labelledby="details"
                 ng-switch-when="2"
                 class="tab-content">
 
                 <md-card>
                     <md-card-content>
                         <md-content class="md-padding">
+                            <h4 class="md-flex card-header">Source</h4>
+                            {{uiState.seriesDetails.selectedSeriesSource}}
+                        </md-content>
+                    </md-card-content>
+                </md-card>
+                <md-card>
+                    <md-card-content>
+                        <md-content class="md-padding">
+                            <h4 class="md-flex card-header">Datasets</h4>
                             <sbx-grid
                                 load-page="loadSelectedSeriesDatasets()"
-                                page-size="1000000000"
+                                page-size="1000000"
                                 sorting="false"
                                 callbacks="callbacks.datasetsTable"
                                 empty-message="No datasets found">

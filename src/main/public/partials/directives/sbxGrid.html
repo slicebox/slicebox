@@ -5,7 +5,7 @@
     <!-- HEADER START -->
     <div class="header" layout="row" layout-wrap layout-align="space-between center">
         <md-select ng-change="objectActionSelected()" ng-model="uiState.selectedObjectAction" ng-if="objectActions.length > 0" ng-disabled="objectActionsEnabled() == false">
-            <md-select-label><span class="fa fa-cog"></span></md-select-label>
+            <md-select-label aria-label="actions"><span class="fa fa-cog"></span></md-select-label>
             <md-option class="sbx-grid-object-action-option" ng-repeat="objectAction in objectActions" ng-value="objectAction">{{objectAction.name}}</md-option>
         </md-select>
         <div ng-if="filterEnabled()">

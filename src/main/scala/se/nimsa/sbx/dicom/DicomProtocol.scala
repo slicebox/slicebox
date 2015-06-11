@@ -134,6 +134,8 @@ object DicomProtocol {
 
   case object GetWatchedDirectories extends DirectoryRequest
     
+  case class GetWatchedDirectoryById(watchedDirectoryId: Long) extends DirectoryRequest
+  
   case class WatchedDirectories(directories: Seq[WatchedDirectory])
 
   
@@ -146,6 +148,8 @@ object DicomProtocol {
 
   case object GetScps extends ScpRequest 
 
+  case class GetScpById(scpId: Long) extends ScpRequest
+  
   case class Scps(scps: Seq[ScpData]) 
 
 
@@ -180,6 +184,8 @@ object DicomProtocol {
   case class GetStudy(studyId: Long) extends MetaDataQuery
   
   case class GetSingleSeries(seriesId: Long) extends MetaDataQuery
+  
+  case class GetSeriesSource(seriesId: Long) extends MetaDataQuery
   
   case class GetImage(imageId: Long) extends MetaDataQuery
   

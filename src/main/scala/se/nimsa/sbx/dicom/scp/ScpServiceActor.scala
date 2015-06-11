@@ -44,8 +44,8 @@ class ScpServiceActor(dbProps: DbProps) extends Actor with ExceptionCatching {
     executor.shutdown()
   }
 
-  log.info("SCP service started")    
-      
+  log.info("SCP service started")
+
   def receive = LoggingReceive {
 
     case msg: ScpRequest =>
@@ -87,6 +87,10 @@ class ScpServiceActor(dbProps: DbProps) extends Actor with ExceptionCatching {
             val scps = getScps()
             sender ! Scps(scps)
 
+          case GetScpById(id) =>
+            db.withSession { implicit session =>
+              sender ! dao.scpDataForId(id)
+            }
         }
       }
 

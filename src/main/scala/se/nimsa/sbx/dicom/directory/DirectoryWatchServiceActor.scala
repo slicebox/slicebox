@@ -89,6 +89,10 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor 
             val directories = getWatchedDirectories()
             sender ! WatchedDirectories(directories)
 
+          case GetWatchedDirectoryById(id) =>
+            db.withSession { implicit session =>
+              sender ! dao.watchedDirectoryForId(id)
+            }
         }
       }
 

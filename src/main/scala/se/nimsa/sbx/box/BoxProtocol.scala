@@ -97,6 +97,8 @@ object BoxProtocol {
 
   case object GetBoxes extends BoxRequest
 
+  case class GetBoxById(boxId: Long) extends BoxRequest
+  
   case class GetBoxByToken(token: String) extends BoxRequest
 
   case class UpdateInbox(token: String, transactionId: Long, sequenceNumber: Long, totalImageCount: Long) extends BoxRequest
