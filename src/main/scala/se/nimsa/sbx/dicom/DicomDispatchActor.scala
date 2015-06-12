@@ -62,6 +62,8 @@ class DicomDispatchActor(storage: Path, dbProps: DbProps) extends Actor {
     case msg: AddDataset =>
       storageActor forward msg
       
+    case msg: AnonymizeImage =>
+      storageActor forward msg
   }
 
 }

@@ -11,7 +11,7 @@ angular.module('slicebox.home', ['ngRoute'])
   });
 })
 
-.controller('HomeCtrl', function($scope, $http, $mdDialog, $q) {
+.controller('HomeCtrl', function($scope, $http, $mdDialog, $q, openConfirmActionModal) {
     // Initialization
     $scope.patientActions =
         [
@@ -22,6 +22,10 @@ angular.module('slicebox.home', ['ngRoute'])
             {
                 name: 'Delete',
                 action: $scope.confirmDeleteEntitiesFunction('/api/metadata/patients/', 'patient(s)')
+            },
+            {
+                name: 'Anonymize',
+                action: confirmAnonymizePatients
             }
         ];
 
@@ -34,6 +38,10 @@ angular.module('slicebox.home', ['ngRoute'])
             {
                 name: 'Delete',
                 action: $scope.confirmDeleteEntitiesFunction('/api/metadata/studies/', 'study(s)')
+            },
+            {
+                name: 'Anonymize',
+                action: confirmAnonymizeStudies
             }
         ];
 
@@ -51,6 +59,10 @@ angular.module('slicebox.home', ['ngRoute'])
             {
                 name: 'Delete',
                 action: $scope.confirmDeleteEntitiesFunction('/api/metadata/series/', 'series')
+            },
+            {
+                name: 'Anonymize',
+                action: confirmAnonymizeSeries
             }
         ];
 
@@ -357,6 +369,39 @@ angular.module('slicebox.home', ['ngRoute'])
 
     // Private functions
 
+    function imagesForSeries(series) {
+        var promises = series.map(function(singleSeries) {
+            return $http.get(urlWithSourceQuery('/api/metadata/images?startindex=0&count=1000000&seriesid=' + singleSeries.id)).then(function (imagesData) {
+                return imagesData.data;
+            });
+        });
+        return flatten(promises);
+    }
+
+    function imagesForStudies(studies) {
+        var promises = studies.map(function(study) {
+            return $http.get(urlWithSourceQuery('/api/metadata/series?startindex=0&count=1000000&studyid=' + study.id)).then(function (seriesData) {
+                return imagesForSeries(seriesData.data);
+            });
+        });
+        return flatten(promises);
+    }
+
+    function imagesForPatients(patients) {
+        var promises = patients.map(function(patient) {
+            return $http.get(urlWithSourceQuery('/api/metadata/studies?startindex=0&count=1000000&patientid=' + patient.id)).then(function (studiesData) {
+                return imagesForStudies(studiesData.data);
+            });
+        });
+        return flatten(promises);
+    }
+
+    function flatten(promises) {
+        return $q.all(promises).then(function (arrayOfImageArrays) {
+            return [].concat.apply([], arrayOfImageArrays);
+        });                
+    }
+
     function urlWithSourceQuery(url) {
         if ($scope.uiState.selectedSource !== null && $scope.uiState.selectedSource.sourceType !== null) {
             return url + '&sourcetype=' + $scope.uiState.selectedSource.sourceType + '&sourceid=' + $scope.uiState.selectedSource.sourceId;
@@ -460,6 +505,29 @@ angular.module('slicebox.home', ['ngRoute'])
                 $scope.showErrorMessage('Failed to send to PACS: ' + data);
             });
         });
+    }
+
+    function confirmAnonymizePatients(patients) {
+        imagesForPatients(patients).then(function(images) {
+            openConfirmActionModal('Anonymize', 'Force anonymization of ' + images.length + ' images? Patient information will be lost.', 'Anonymize', function() {
+                var promises = images.forEach(function(image) {
+                    return $http.put('/api/images/' + image.id + '/anonymize');
+                });
+                return $q.all(promises).finally(function() {
+                    $scope.patientSelected(null);        
+                    $scope.callbacks.patientsTable.reset();
+                    if ($scope.callbacks.flatSeriesTable) {
+                        $scope.callbacks.flatSeriesTable.reset();
+                    }                
+                });
+            });
+        });
+    }
+
+    function confirmAnonymizeStudies(studies) {
+    } 
+
+    function confirmAnonymizeSeries(series) {
     }
 
     function showBoxSendTagValuesModal(text, entityIdToPatientPromise, receiverId, sendCommand) {

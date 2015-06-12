@@ -33,7 +33,7 @@ angular.module('slicebox.transactions', ['ngRoute'])
     };
 })
 
-.controller('OutboxCtrl', function($scope, $http, $q, $interval, openConfirmationDeleteModal) {
+.controller('OutboxCtrl', function($scope, $http, $q, $interval, openConfirmActionModal) {
     // Initialization
     $scope.objectActions =
         [
@@ -99,7 +99,7 @@ angular.module('slicebox.transactions', ['ngRoute'])
     function confirmDeleteEntities(entities) {
         var deleteConfirmationText = 'Permanently delete ' + entities.length + ' transaction(s)?';
 
-        return openConfirmationDeleteModal('Delete transaction(s)', deleteConfirmationText, function() {
+        return openConfirmActionModal('Delete transaction(s)', deleteConfirmationText, 'Delete', function() {
             return deleteEntities(entities);
         });
     }

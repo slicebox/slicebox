@@ -52,6 +52,8 @@ trait RoutesTestBase extends ScalatestRouteTest with RestApi with BeforeAndAfter
   def DeleteAsUser(url: String): HttpRequest = Delete(url) ~> addCredentials(userCredentials)
   def PutAsAdmin[E: Marshaller](url: String, e: E): HttpRequest = Put(url, e) ~> addCredentials(adminCredentials)
   def PutAsUser[E: Marshaller](url: String, e: E): HttpRequest = Put(url, e) ~> addCredentials(userCredentials)
+  def PutAsAdmin(url: String): HttpRequest = Put(url) ~> addCredentials(adminCredentials)
+  def PutAsUser(url: String): HttpRequest = Put(url) ~> addCredentials(userCredentials)
   def PostAsAdmin[E: Marshaller](url: String, e: E): HttpRequest = Post(url, e) ~> addCredentials(adminCredentials)
   def PostAsUser[E: Marshaller](url: String, e: E): HttpRequest = Post(url, e) ~> addCredentials(userCredentials)
 

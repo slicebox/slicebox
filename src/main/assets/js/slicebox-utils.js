@@ -1,33 +1,35 @@
 angular.module('slicebox.utils', [])
 
-.factory('openConfirmationDeleteModal', function($mdDialog) {
+.factory('openConfirmActionModal', function($mdDialog) {
 
-    return function(title, message, deleteCallback) {
+    return function(title, message, action, actionCallback) {
 
         return $mdDialog.show({
-                templateUrl: '/assets/partials/confirmDeleteModalContent.html',
-                controller: 'SbxConfirmDeleteModalController',
+                templateUrl: '/assets/partials/confirmActionModalContent.html',
+                controller: 'SbxConfirmActionModalController',
                 locals: {
                         title: title,
                         message: message,
-                        deleteCallback: deleteCallback
+                        action: action,
+                        actionCallback: actionCallback
                     }
             });
     };
 })
 
-.controller('SbxConfirmDeleteModalController', function ($scope, $q, $mdDialog, title, message, deleteCallback) {
+.controller('SbxConfirmActionModalController', function ($scope, $q, $mdDialog, title, message, action, actionCallback) {
     $scope.title = title;
     $scope.message = message;
+    $scope.action = action;
 
-    $scope.deleteButtonClicked = function () {
-        var deletePromise = deleteCallback();
+    $scope.actionButtonClicked = function () {
+        var actionPromise = actionCallback();
 
-        deletePromise.finally(function() {
+        actionPromise.finally(function() {
             $mdDialog.hide();
         });
 
-        return deletePromise;
+        return actionPromise;
     };    
 
     $scope.cancelButtonClicked = function () {

@@ -11,7 +11,7 @@ angular.module('slicebox.log', ['ngRoute'])
   });
 })
 
-.controller('LogCtrl', function($scope, $http, $q, openConfirmationDeleteModal) {
+.controller('LogCtrl', function($scope, $http, $q) {
     // Initialization
     $scope.actions =
         [

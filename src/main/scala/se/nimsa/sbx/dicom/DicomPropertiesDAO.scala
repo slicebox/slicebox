@@ -305,4 +305,11 @@ class DicomPropertiesDAO(val driver: JdbcProfile) {
       q2.map(_._1)
         .list
     }
+
+  def deleteFully(imageFile: ImageFile)(implicit session: Session): Unit = {
+    deleteImageFile(imageFile.id)
+    metaDataDao.imageById(imageFile.id).foreach(image =>
+      metaDataDao.deleteFully(image))
+  }
+
 }

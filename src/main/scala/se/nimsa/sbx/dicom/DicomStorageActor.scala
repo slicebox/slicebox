@@ -47,9 +47,11 @@ import DicomProtocol._
 import DicomHierarchy._
 import DicomPropertyValue._
 import DicomUtil._
+import DicomAnonymization._
 import akka.dispatch.ExecutionContexts
 import java.util.concurrent.Executors
 import se.nimsa.sbx.log.SbxLog
+import scala.slick.jdbc.JdbcBackend.Session
 
 class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with ExceptionCatching {
 
@@ -80,9 +82,8 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
         if (checkSopClass(dataset)) {
           try {
             val (image, overwrite) = storeDataset(dataset, sourceType, sourceId)
-            if (!overwrite) {
+            if (!overwrite)
               SbxLog.info("Storage", s"Stored file ${path.toString} as ${dataset.getString(Tag.SOPInstanceUID)}")
-            }
           } catch {
             case e: IllegalArgumentException =>
               SbxLog.error("Storage", e.getMessage)
@@ -96,9 +97,8 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
     case DatasetReceived(dataset, sourceType, sourceId) =>
       try {
         val (image, overwrite) = storeDataset(dataset, sourceType, sourceId)
-        if (!overwrite) {
+        if (!overwrite)
           SbxLog.info("Storage", "Stored dataset: " + dataset.getString(Tag.SOPInstanceUID))
-        }
       } catch {
         case e: IllegalArgumentException =>
           SbxLog.error("Storage", e.getMessage)
@@ -108,14 +108,14 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
       catchAndReport {
         if (dataset == null)
           throw new IllegalArgumentException("Invalid dataset")
-        try {
-          val (image, overwrite) = storeDataset(dataset, sourceType, sourceId)
-          sender ! ImageAdded(image)
-        } catch {
-          case e: IllegalArgumentException =>
-            SbxLog.error("Storage", e.getMessage)
-            throw e
-        }
+        val (image, overwrite) = storeDatasetTryCatchThrow(dataset, sourceType, sourceId)
+        sender ! ImageAdded(image)
+      }
+
+    case AnonymizeImage(imageId) =>
+      catchAndReport {
+        val anonImageMaybe = anonymizeImage(imageId)
+        sender ! anonImageMaybe
       }
 
     case msg: MetaDataUpdate => catchAndReport {
@@ -250,7 +250,7 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
           db.withSession { implicit session =>
             sender ! propertiesDao.seriesSourceById(seriesId)
           }
-          
+
         case GetImage(imageId) =>
           db.withSession { implicit session =>
             sender ! dao.imageById(imageId)
@@ -284,6 +284,15 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
     }
 
   }
+
+  def storeDatasetTryCatchThrow(dataset: Attributes, sourceType: SourceType, sourceId: Long): (Image, Boolean) =
+    try {
+      storeDataset(dataset, sourceType, sourceId)
+    } catch {
+      case e: IllegalArgumentException =>
+        SbxLog.error("Storage", e.getMessage)
+        throw e
+    }
 
   def storeDataset(dataset: Attributes, sourceType: SourceType, sourceId: Long): (Image, Boolean) = {
     val name = fileName(dataset)
@@ -466,6 +475,20 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
     } else
       image
   }
+
+  def anonymizeImage(imageId: Long): Option[Image] =
+    db.withSession { implicit session =>
+      propertiesDao.imageFileForImage(imageId).map { imageFile =>
+        val path = storage.resolve(imageFile.fileName.value)
+        val dataset = loadDataset(path, true)
+        deleteFromStorage(imageFile)
+        propertiesDao.deleteFully(imageFile)
+        setAnonymous(dataset, false)
+        val anonDataset = anonymizeDataset(dataset)
+        val (image, overwrite) = storeDatasetTryCatchThrow(anonDataset, imageFile.sourceType, imageFile.sourceId)
+        image
+      }
+    }
 
   def setupDb() =
     db.withSession { implicit session =>

@@ -544,4 +544,25 @@ class DicomMetaDataDAO(val driver: JdbcProfile) {
       .delete
   }
 
+  def deleteFully(image: Image)(implicit session: Session): Unit = {
+    deleteImage(image.id)
+    seriesById(image.seriesId).foreach(series =>
+      if (imagesForSeries(0, 2, series.id).isEmpty)
+        deleteFully(series))
+  }
+
+  def deleteFully(series: Series)(implicit session: Session): Unit = {
+    deleteSeries(series.id)
+    studyById(series.studyId).foreach(study =>
+      if (seriesForStudy(0, 2, study.id).isEmpty)
+        deleteFully(study))
+  }
+
+  def deleteFully(study: Study)(implicit session: Session): Unit = {
+    deleteStudy(study.id)
+    patientById(study.patientId).foreach(patient =>
+      if (studiesForPatient(0, 2, patient.id).isEmpty)
+        deletePatient(patient.id))
+  }
+
 }

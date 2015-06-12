@@ -45,7 +45,7 @@ angular.module('slicebox', [
     };
 })
 
-.controller('SliceboxCtrl', function($scope, $http, $q, $location, $mdSidenav, $mdToast, $mdDialog, authenticationService, openConfirmationDeleteModal) {
+.controller('SliceboxCtrl', function($scope, $http, $q, $location, $mdSidenav, $mdToast, $mdDialog, authenticationService, openConfirmActionModal) {
 
     $scope.uiState = {
         showMenu: true,
@@ -124,7 +124,7 @@ angular.module('slicebox', [
         return function(entities) {
             var deleteConfirmationText = 'Permanently delete ' + entities.length + ' ' + entitiesText + '?';
 
-            return openConfirmationDeleteModal('Delete ' + entitiesText, deleteConfirmationText, function() {
+            return openConfirmActionModal('Delete ' + entitiesText, deleteConfirmationText, 'Delete', function() {
                 return deleteEntities(url, entities, entitiesText);
             });
         };

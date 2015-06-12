@@ -94,4 +94,48 @@ class ImageRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
   }
     
+  it should "anonymize the data by removing the old data and inserting new anonymized data upon manual anonymization" in {
+    val patient = GetAsUser("/api/metadata/patients/1") ~> routes ~> check {
+      status should be (OK)
+      responseAs[Patient]
+    }
+    PutAsUser("/api/images/1/anonymize") ~> routes ~> check {
+      status should be (NoContent)
+    }
+    GetAsUser("/api/metadata/patients/1") ~> routes ~> check {
+      status should be (NotFound)      
+    }
+    GetAsUser("/api/metadata/patients/2") ~> routes ~> check {
+      status should be (OK)
+      val anonPatient = responseAs[Patient]
+      anonPatient.patientName should not be (patient.patientName)
+      anonPatient.patientID should not be (patient.patientID)
+      anonPatient.patientSex should be (patient.patientSex)
+    }
+    GetAsUser("/api/metadata/studies/1") ~> routes ~> check {
+      status should be (NotFound)            
+    }
+    GetAsUser("/api/metadata/studies/2") ~> routes ~> check {
+      status should be (OK)            
+    }
+    GetAsUser("/api/metadata/series/1") ~> routes ~> check {
+      status should be (NotFound)            
+    }
+    GetAsUser("/api/metadata/series/2") ~> routes ~> check {
+      status should be (OK)            
+    }
+    GetAsUser("/api/metadata/images/1") ~> routes ~> check {
+      status should be (NotFound)            
+    }
+    GetAsUser("/api/metadata/images/2") ~> routes ~> check {
+      status should be (OK)            
+    }
+  }
+  
+  it should "return NotFound when manually anonymizing an image that does not exist" in {
+    PutAsUser("/api/images/3/anonymize") ~> routes ~> check {
+      status should be (NotFound)
+    }
+  }
+    
 }

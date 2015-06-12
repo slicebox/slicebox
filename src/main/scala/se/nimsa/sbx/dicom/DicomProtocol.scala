@@ -218,9 +218,12 @@ object DicomProtocol {
   case class GetImageInformation(imageId: Long) extends ImageRequest
   
   case class GetImageFrame(imageId: Long, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int) extends ImageRequest
-  
+
   
   case class AddDataset(dataset: Attributes, sourceType: SourceType, sourceId: Long)
+  
+  case class AnonymizeImage(imageId: Long)
+  
   
   // ***to API***
 
@@ -237,7 +240,7 @@ object DicomProtocol {
   case class ImagesDeleted(images: Seq[Image])
 
   case class ImageAdded(image: Image)
-
+  
   case class DirectoryUnwatched(id: Long)
 
   case class ScpRemoved(scpDataId: Long)

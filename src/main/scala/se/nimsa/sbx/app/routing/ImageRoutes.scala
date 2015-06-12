@@ -25,11 +25,13 @@ import spray.http.MediaTypes
 import spray.http.StatusCodes.BadRequest
 import spray.http.StatusCodes.NotFound
 import spray.http.StatusCodes.Created
+import spray.http.StatusCodes.NoContent
 import spray.routing._
 import se.nimsa.sbx.app.RestApi
 import se.nimsa.sbx.dicom.DicomProtocol._
 import se.nimsa.sbx.dicom.DicomUtil
 import se.nimsa.sbx.app.AuthInfo
+import se.nimsa.sbx.dicom.DicomHierarchy.Image
 
 trait ImageRoutes { this: RestApi =>
 
@@ -81,6 +83,15 @@ trait ImageRoutes { this: RestApi =>
           onSuccess(dicomService.ask(GetImageInformation(imageId)).mapTo[Option[ImageInformation]]) {
             import spray.httpx.SprayJsonSupport._
             complete(_)
+          }
+        }
+      } ~ path(LongNumber / "anonymize") { imageId =>
+        put {
+          onSuccess(dicomService.ask(AnonymizeImage(imageId)).mapTo[Option[Image]]) {
+            _ match {
+              case Some(image) => complete(NoContent)
+              case None => complete(NotFound)
+            }
           }
         }
       } ~ path(LongNumber / "png") { imageId =>
