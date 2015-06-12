@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package se.nimsa.sbx.dicom.scp
+package se.nimsa.sbx.scp
 
 import org.dcm4che3.data.Attributes
 import org.dcm4che3.data.Tag
@@ -32,8 +32,8 @@ import org.dcm4che3.net.service.DicomServiceRegistry
 import com.typesafe.scalalogging.LazyLogging
 import akka.actor.ActorRef
 import akka.actor.actorRef2Scala
-import se.nimsa.sbx.dicom.DicomProtocol.DatasetReceivedByScp
 import se.nimsa.sbx.dicom.SopClasses
+import ScpProtocol.DatasetReceivedByScp
 
 class Scp(val name: String, val aeTitle: String, val port: Int, notifyActor: ActorRef) extends LazyLogging {
 

@@ -23,7 +23,7 @@ import akka.event.LoggingReceive
 import akka.pattern.ask
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.log.SbxLog
-import se.nimsa.sbx.dicom.DicomProtocol._
+import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.dicom.DicomUtil._
 import akka.pattern.pipe
 import akka.actor.Props
@@ -55,13 +55,11 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
   val db = dbProps.db
   val boxDao = new BoxDAO(dbProps.driver)
 
-  val storageService = context.actorSelection("../DicomDispatch/Storage")
+  val storageService = context.actorSelection("../StorageService")
 
   implicit val system = context.system
   implicit val ec = context.dispatcher
   implicit val timeout = Timeout(70.seconds)
-
-  storageService.ask(akka.actor.Identify).mapTo[akka.actor.ActorIdentity].map(println(_))
 
   val pollBoxOnlineStatusTimeoutMillis: Long = 15000
   val pollBoxesLastPollTimestamp = collection.mutable.Map.empty[Long, Date]
@@ -89,14 +87,13 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
 
         msg match {
 
-          case GenerateBoxBaseUrl(remoteBoxName) =>
+          case CreateConnection(remoteBoxName) =>
             val token = UUID.randomUUID().toString()
             val baseUrl = s"$apiBaseURL/box/$token"
-            val box = Box(-1, remoteBoxName, token, baseUrl, BoxSendMethod.POLL, false)
-            addBoxToDb(box)
-            sender ! BoxBaseUrlGenerated(baseUrl)
+            val box = addBoxToDb(Box(-1, remoteBoxName, token, baseUrl, BoxSendMethod.POLL, false))
+            sender ! RemoteBoxAdded(box)
 
-          case AddRemoteBox(remoteBox) =>
+          case Connect(remoteBox) =>
             val box = pushBoxByBaseUrl(remoteBox.baseUrl) getOrElse {
               val token = baseUrlToToken(remoteBox.baseUrl)
               val box = Box(-1, remoteBox.name, token, remoteBox.baseUrl, BoxSendMethod.PUSH, false)

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package se.nimsa.sbx.dicom.scp
+package se.nimsa.sbx.scp
 
 import java.nio.file.Path
 import java.util.concurrent.Executors
@@ -25,9 +25,8 @@ import akka.actor.Props
 import akka.event.Logging
 import akka.event.LoggingReceive
 import se.nimsa.sbx.app.DbProps
-import se.nimsa.sbx.dicom.DicomDispatchActor
-import se.nimsa.sbx.dicom.DicomProtocol._
 import se.nimsa.sbx.util.ExceptionCatching
+import ScpProtocol._
 
 class ScpServiceActor(dbProps: DbProps) extends Actor with ExceptionCatching {
   val log = Logging(context.system, this)

@@ -34,7 +34,10 @@ import com.typesafe.config.ConfigFactory
 
 import se.nimsa.sbx.app.routing.SliceboxRoutes
 import se.nimsa.sbx.box.BoxServiceActor
-import se.nimsa.sbx.dicom.DicomDispatchActor
+import se.nimsa.sbx.storage.StorageServiceActor
+import se.nimsa.sbx.scp.ScpServiceActor
+import se.nimsa.sbx.scu.ScuServiceActor
+import se.nimsa.sbx.directory.DirectoryWatchServiceActor
 import se.nimsa.sbx.log.LogServiceActor
 import se.nimsa.sbx.seriestype.SeriesTypeServiceActor
 
@@ -91,9 +94,12 @@ trait RestApi extends HttpService with SliceboxRoutes with JsonFormats {
   val superPassword = sliceboxConfig.getString("superuser.password")
 
   val userService = actorRefFactory.actorOf(UserServiceActor.props(dbProps, superUser, superPassword), name = "UserService")
-  val boxService = actorRefFactory.actorOf(BoxServiceActor.props(dbProps, storage, apiBaseURL), name = "BoxService")
-  val dicomService = actorRefFactory.actorOf(DicomDispatchActor.props(storage, dbProps), name = "DicomDispatch")
   val logService = actorRefFactory.actorOf(LogServiceActor.props(dbProps), name = "LogService")
+  val storageService = actorRefFactory.actorOf(StorageServiceActor.props(dbProps, storage), name = "StorageService")
+  val boxService = actorRefFactory.actorOf(BoxServiceActor.props(dbProps, storage, apiBaseURL), name = "BoxService")
+  val scpService = actorRefFactory.actorOf(ScpServiceActor.props(dbProps), name = "ScpService")
+  val scuService = actorRefFactory.actorOf(ScuServiceActor.props(dbProps, storage), name = "ScuService")
+  val directoryService = actorRefFactory.actorOf(DirectoryWatchServiceActor.props(dbProps, storage), name = "DirectoryService")
   val seriesTypeService = actorRefFactory.actorOf(SeriesTypeServiceActor.props(dbProps), name = "SeriesTypeService")
 
   val authenticator = new Authenticator(userService)

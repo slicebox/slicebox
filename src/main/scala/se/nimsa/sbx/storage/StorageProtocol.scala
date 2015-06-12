@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-package se.nimsa.sbx.dicom
+package se.nimsa.sbx.storage
 
 import java.nio.file.Path
 import org.dcm4che3.data.Attributes
-import DicomHierarchy._
+import se.nimsa.sbx.dicom.DicomHierarchy._
 
-object DicomProtocol {
+object StorageProtocol {
 
   import se.nimsa.sbx.model.Entity
   
@@ -56,10 +56,6 @@ object DicomProtocol {
   
   case class SeriesSource(id: Long, sourceType: SourceType, sourceId: Long) extends Entity
   
-  case class ScpData(id: Long, name: String, aeTitle: String, port: Int) extends Entity
-
-  case class ScuData(id: Long, name: String, aeTitle: String, host: String, port: Int) extends Entity
-
   case class FileName(value: String)
 
   case class ImageFile(
@@ -74,8 +70,6 @@ object DicomProtocol {
     }
   }
   
-  case class WatchedDirectory(id: Long, name: String, path: String) extends Entity
-
   case class ImageAttribute(
       group: String, 
       element: String, 
@@ -125,45 +119,6 @@ object DicomProtocol {
       
   // messages
 
-    
-  sealed trait DirectoryRequest
-  
-  case class WatchDirectory(name: String, path: String) extends DirectoryRequest
-
-  case class UnWatchDirectory(id: Long) extends DirectoryRequest
-
-  case object GetWatchedDirectories extends DirectoryRequest
-    
-  case class GetWatchedDirectoryById(watchedDirectoryId: Long) extends DirectoryRequest
-  
-  case class WatchedDirectories(directories: Seq[WatchedDirectory])
-
-  
-  
-  sealed trait ScpRequest
-  
-  case class AddScp(name: String, aeTitle: String, port: Int) extends ScpRequest
-
-  case class RemoveScp(id: Long) extends ScpRequest 
-
-  case object GetScps extends ScpRequest 
-
-  case class GetScpById(scpId: Long) extends ScpRequest
-  
-  case class Scps(scps: Seq[ScpData]) 
-
-
-  sealed trait ScuRequest
-  
-  case class AddScu(name: String, aeTitle: String, host: String, port: Int) extends ScuRequest
-
-  case class RemoveScu(id: Long) extends ScuRequest 
-
-  case object GetScus extends ScuRequest 
-
-  case class SendSeriesToScp(seriesId: Long, scuId: Long) extends ScuRequest
-  
-  case class Scus(scps: Seq[ScuData]) 
 
   sealed trait MetaDataQuery
 
@@ -241,23 +196,6 @@ object DicomProtocol {
 
   case class ImageAdded(image: Image)
   
-  case class DirectoryUnwatched(id: Long)
-
-  case class ScpRemoved(scpDataId: Long)
-
-  case class ScuRemoved(scuDataId: Long)
-
-  case class ImagesSentToScp(scuId: Long, imageIds: Seq[Long])
-  
-
-  // ***from scp***
-
-  case class DatasetReceivedByScp(dataset: Attributes)
-
-  // ***from direcory watch***
-
-  case class FileAddedToWatchedDirectory(filePath: Path)
-
   // ***to storage***
 
   case class DatasetReceived(dataset: Attributes, sourceType: SourceType, sourceId: Long)

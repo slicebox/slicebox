@@ -22,9 +22,9 @@ import spray.http.HttpResponse
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.dicom.DicomPropertyValue._
 import se.nimsa.sbx.dicom.DicomHierarchy._
-import se.nimsa.sbx.dicom.DicomProtocol._
-import se.nimsa.sbx.dicom.DicomMetaDataDAO
-import se.nimsa.sbx.dicom.DicomPropertiesDAO
+import se.nimsa.sbx.storage.StorageProtocol._
+import se.nimsa.sbx.storage.MetaDataDAO
+import se.nimsa.sbx.storage.PropertiesDAO
 import spray.http.StatusCodes._
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.duration.DurationInt
@@ -40,13 +40,13 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
   val storage = Files.createTempDirectory("slicebox-test-storage-")
 
   val boxDao = new BoxDAO(H2Driver)
-  val dicomMetaDataDao = new DicomMetaDataDAO(H2Driver)
-  val dicomPropertiesDao = new DicomPropertiesDAO(H2Driver)
+  val metaDataDao = new MetaDataDAO(H2Driver)
+  val propertiesDao = new PropertiesDAO(H2Driver)
 
   db.withSession { implicit session =>
     boxDao.create
-    dicomMetaDataDao.create
-    dicomPropertiesDao.create
+    metaDataDao.create
+    propertiesDao.create
   }
 
   val testBox = Box(1, "Test Box", "abc123", "testbox.com", BoxSendMethod.PUSH, false)
@@ -67,17 +67,17 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
   var imageFile3 = ImageFile(-1, FileName("file3"), SourceType.UNKNOWN, -1)
 
   db.withSession { implicit session =>
-    val dbPat = dicomMetaDataDao.insert(pat1)
-    val dbStudy = dicomMetaDataDao.insert(study1.copy(patientId = dbPat.id))
-    val dbEquipment = dicomMetaDataDao.insert(equipment1)
-    val dbFor = dicomMetaDataDao.insert(for1)
-    val dbSeries = dicomMetaDataDao.insert(series1.copy(studyId = dbStudy.id, equipmentId = dbEquipment.id, frameOfReferenceId = dbFor.id))
-    val dbImage1 = dicomMetaDataDao.insert(image1.copy(seriesId = dbSeries.id))
-    val dbImage2 = dicomMetaDataDao.insert(image2.copy(seriesId = dbSeries.id))
-    val dbImage3 = dicomMetaDataDao.insert(image3.copy(seriesId = dbSeries.id))
-    imageFile1 = dicomPropertiesDao.insertImageFile(imageFile1.copy(id = dbImage1.id))
-    imageFile2 = dicomPropertiesDao.insertImageFile(imageFile2.copy(id = dbImage2.id))
-    imageFile3 = dicomPropertiesDao.insertImageFile(imageFile3.copy(id = dbImage3.id))
+    val dbPat = metaDataDao.insert(pat1)
+    val dbStudy = metaDataDao.insert(study1.copy(patientId = dbPat.id))
+    val dbEquipment = metaDataDao.insert(equipment1)
+    val dbFor = metaDataDao.insert(for1)
+    val dbSeries = metaDataDao.insert(series1.copy(studyId = dbStudy.id, equipmentId = dbEquipment.id, frameOfReferenceId = dbFor.id))
+    val dbImage1 = metaDataDao.insert(image1.copy(seriesId = dbSeries.id))
+    val dbImage2 = metaDataDao.insert(image2.copy(seriesId = dbSeries.id))
+    val dbImage3 = metaDataDao.insert(image3.copy(seriesId = dbSeries.id))
+    imageFile1 = propertiesDao.insertImageFile(imageFile1.copy(id = dbImage1.id))
+    imageFile2 = propertiesDao.insertImageFile(imageFile2.copy(id = dbImage2.id))
+    imageFile3 = propertiesDao.insertImageFile(imageFile3.copy(id = dbImage3.id))
   }
 
   val capturedFileSendRequests = ArrayBuffer.empty[HttpRequest]

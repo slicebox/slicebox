@@ -34,7 +34,7 @@ import java.io.OutputStream
 import java.awt.image.BufferedImage
 import javax.imageio.ImageIO
 import org.dcm4che3.imageio.plugins.dcm.DicomImageReadParam
-import se.nimsa.sbx.dicom.DicomAnonymization._
+import se.nimsa.sbx.anonymization.AnonymizationUtil._
 import java.io.ByteArrayOutputStream
 import org.dcm4che3.data.Attributes.Visitor
 import org.dcm4che3.data.VR

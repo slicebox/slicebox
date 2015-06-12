@@ -17,7 +17,7 @@ import java.nio.file.Paths
 import org.dcm4che3.data.Tag
 import org.dcm4che3.data.VR
 import spray.http.HttpData
-import se.nimsa.sbx.dicom.DicomProtocol.ImageAttribute
+import se.nimsa.sbx.storage.StorageProtocol.ImageAttribute
 
 class ImageRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 

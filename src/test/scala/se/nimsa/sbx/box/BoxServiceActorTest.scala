@@ -14,18 +14,20 @@ import scala.slick.jdbc.JdbcBackend.Database
 import akka.actor.Props
 import se.nimsa.sbx.util.TestUtil
 import se.nimsa.sbx.box.BoxProtocol._
-import se.nimsa.sbx.dicom.DicomMetaDataDAO
-import se.nimsa.sbx.dicom.DicomDispatchActor
-import se.nimsa.sbx.dicom.DicomProtocol._
+import se.nimsa.sbx.storage.MetaDataDAO
+import se.nimsa.sbx.storage.PropertiesDAO
+import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.dicom.DicomPropertyValue._
 import se.nimsa.sbx.dicom.DicomHierarchy._
+import se.nimsa.sbx.dicom.DicomUtil._
+import se.nimsa.sbx.anonymization.AnonymizationUtil._
 import java.util.Date
 import org.dcm4che3.data.Attributes
 import org.dcm4che3.data.VR
 import org.dcm4che3.data.Tag
-import se.nimsa.sbx.dicom.DicomUtil._
-import se.nimsa.sbx.dicom.DicomAnonymization
-import se.nimsa.sbx.dicom.DicomPropertiesDAO
+import akka.actor.PoisonPill
+import akka.actor.ActorRef
+import se.nimsa.sbx.storage.StorageServiceActor
 
 class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
     with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {
@@ -38,28 +40,23 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
   val storage = Files.createTempDirectory("slicebox-test-storage-")
 
   val boxDao = new BoxDAO(H2Driver)
-  val metaDataDao = new DicomMetaDataDAO(H2Driver)
-  val propertiesDao = new DicomPropertiesDAO(H2Driver)
+  val metaDataDao = new MetaDataDAO(H2Driver)
+  val propertiesDao = new PropertiesDAO(H2Driver)
 
-  // this code to avoid race condition with creation of tables in actors below
   db.withSession { implicit session =>
     boxDao.create
     metaDataDao.create
     propertiesDao.create
   }
 
-  val dicomService = system.actorOf(DicomDispatchActor.props(storage, dbProps), name = "DicomDispatch")
-
-  val boxServiceActorRef = system.actorOf(Props(new BoxServiceActor(dbProps, storage, "http://testhost:1234")), name = "BoxService")
+  val storageService = system.actorOf(Props(new StorageServiceActor(dbProps, storage)), name = "StorageService")
+  val boxService = system.actorOf(Props(new BoxServiceActor(dbProps, storage, "http://testhost:1234")), name = "BoxService")
 
   override def afterEach() =
     db.withSession { implicit session =>
-      boxDao.drop
-      propertiesDao.drop
-      metaDataDao.drop
-      metaDataDao.create
-      propertiesDao.create
-      boxDao.create
+      propertiesDao.clear
+      metaDataDao.clear
+      boxDao.clear
     }
 
   override def afterAll {
@@ -74,7 +71,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
 
         val remoteBox = boxDao.insertBox(Box(-1, "some remote box", "abc", "https://someurl.com", BoxSendMethod.POLL, false))
 
-        boxServiceActorRef ! UpdateInbox(remoteBox.token, 123, 1, 2)
+        boxService ! UpdateInbox(remoteBox.token, 123, 1, 2)
 
         expectMsg(InboxUpdated(remoteBox.token, 123, 1, 2))
 
@@ -96,10 +93,10 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
 
         val remoteBox = boxDao.insertBox(Box(-1, "some remote box", "abc", "https://someurl.com", BoxSendMethod.POLL, false))
 
-        boxServiceActorRef ! UpdateInbox(remoteBox.token, 123, 1, 3)
+        boxService ! UpdateInbox(remoteBox.token, 123, 1, 3)
         expectMsg(InboxUpdated(remoteBox.token, 123, 1, 3))
 
-        boxServiceActorRef ! UpdateInbox(remoteBox.token, 123, 2, 3)
+        boxService ! UpdateInbox(remoteBox.token, 123, 2, 3)
         expectMsg(InboxUpdated(remoteBox.token, 123, 2, 3))
 
         val inboxEntries = boxDao.listInboxEntries
@@ -119,7 +116,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
       db.withSession { implicit session =>
         val remoteBox = boxDao.insertBox(Box(-1, "some remote box", "abc", "https://someurl.com", BoxSendMethod.POLL, false))
 
-        boxServiceActorRef ! PollOutbox(remoteBox.token)
+        boxService ! PollOutbox(remoteBox.token)
 
         expectMsg(OutboxEmpty)
       }
@@ -130,7 +127,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
         val remoteBox = boxDao.insertBox(Box(-1, "some remote box", "abc", "https://someurl.com", BoxSendMethod.POLL, false))
         boxDao.insertOutboxEntry(OutboxEntry(-1, remoteBox.id, 987, 1, 2, 123, false))
 
-        boxServiceActorRef ! PollOutbox(remoteBox.token)
+        boxService ! PollOutbox(remoteBox.token)
 
         expectMsgPF() {
           case OutboxEntry(id, remoteBoxId, transactionId, sequenceNumber, totalImageCount, imageId, failed) =>
@@ -156,7 +153,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
 
         val seriesIds = Seq(r1.id)
 
-        boxServiceActorRef ! SendSeriesToRemoteBox(remoteBox.id, seriesIds, tagValues)
+        boxService ! SendSeriesToRemoteBox(remoteBox.id, seriesIds, tagValues)
 
         expectMsgPF() {
           case ImagesSent(remoteBoxId, imageFileIds) =>
@@ -175,7 +172,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
         boxDao.tagValuesByImageFileIdAndTransactionId(if2.id, transactionId).size should be(3)
         boxDao.tagValuesByImageFileIdAndTransactionId(if3.id, transactionId).size should be(3)
 
-        outboxEntries.map(_.id).foreach(id => boxServiceActorRef ! RemoveOutboxEntry(id))
+        outboxEntries.map(_.id).foreach(id => boxService ! RemoveOutboxEntry(id))
 
         expectMsgType[OutboxEntryRemoved]
         expectMsgType[OutboxEntryRemoved]
@@ -202,7 +199,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
 
         val seriesIds = Seq(r1.id)
 
-        boxServiceActorRef ! SendSeriesToRemoteBox(remoteBox.id, seriesIds, tagValues)
+        boxService ! SendSeriesToRemoteBox(remoteBox.id, seriesIds, tagValues)
 
         expectMsgPF() {
           case ImagesSent(remoteBoxId, imageFileIds) =>
@@ -221,7 +218,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
         boxDao.tagValuesByImageFileIdAndTransactionId(if2.id, transactionId).size should be(3)
         boxDao.tagValuesByImageFileIdAndTransactionId(if3.id, transactionId).size should be(3)
 
-        outboxEntries.foreach(entry => boxServiceActorRef ! DeleteOutboxEntry(token, entry.transactionId, entry.sequenceNumber))
+        outboxEntries.foreach(entry => boxService ! DeleteOutboxEntry(token, entry.transactionId, entry.sequenceNumber))
 
         expectMsg(OutboxEntryDeleted)
         expectMsg(OutboxEntryDeleted)
@@ -243,8 +240,8 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
         val outboxEntry = OutboxEntry(1, 1, 1234, 1, 1, 1, false)
 
         val dataset = createDataset
-        val anonymizedDataset = DicomAnonymization.anonymizeDataset(dataset)
-        boxServiceActorRef ! HarmonizeAnonymization(outboxEntry, dataset, anonymizedDataset)
+        val anonymizedDataset = anonymizeDataset(dataset)
+        boxService ! HarmonizeAnonymization(outboxEntry, dataset, anonymizedDataset)
 
         expectMsgPF() {
           case harmonized: Attributes =>
@@ -260,20 +257,20 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
       db.withSession { implicit session =>
         val key = insertAnonymizationKey
         val dataset = createDataset
-        val anonymizedDataset = DicomAnonymization.anonymizeDataset(dataset)
+        val anonymizedDataset = anonymizeDataset(dataset)
         anonymizedDataset.setString(Tag.PatientName, VR.PN, key.anonPatientName)
         anonymizedDataset.setString(Tag.PatientID, VR.SH, key.anonPatientID)
         anonymizedDataset.setString(Tag.StudyInstanceUID, VR.SH, key.anonStudyInstanceUID)
-        boxServiceActorRef ! ReverseAnonymization(anonymizedDataset)
+        boxService ! ReverseAnonymization(anonymizedDataset)
 
         expectMsgPF() {
           case reversed: Attributes =>
-            reversed.getString(Tag.PatientName) should be (key.patientName)
-            reversed.getString(Tag.PatientID) should be (key.patientID)
-            reversed.getString(Tag.StudyInstanceUID) should be (key.studyInstanceUID)
-            reversed.getString(Tag.StudyDescription) should be (key.studyDescription)
-            reversed.getString(Tag.StudyID) should be (key.studyID)
-            reversed.getString(Tag.AccessionNumber) should be (key.accessionNumber)
+            reversed.getString(Tag.PatientName) should be(key.patientName)
+            reversed.getString(Tag.PatientID) should be(key.patientID)
+            reversed.getString(Tag.StudyInstanceUID) should be(key.studyInstanceUID)
+            reversed.getString(Tag.StudyDescription) should be(key.studyDescription)
+            reversed.getString(Tag.StudyID) should be(key.studyID)
+            reversed.getString(Tag.AccessionNumber) should be(key.accessionNumber)
 
         }
       }

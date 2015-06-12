@@ -14,16 +14,15 @@
  * limitations under the License.
  */
 
-package se.nimsa.sbx.dicom
+package se.nimsa.sbx.storage
 
 import akka.dispatch.PriorityGenerator
 import akka.dispatch.UnboundedPriorityMailbox
 import com.typesafe.config.Config
-import se.nimsa.sbx.dicom.DicomProtocol.FileReceived
-import se.nimsa.sbx.dicom.DicomProtocol.DatasetReceived
+import StorageProtocol._
 import akka.actor.ActorSystem
 
-class DicomStorageMailbox(settings: ActorSystem.Settings, config: Config)
+class StorageServiceMailbox(settings: ActorSystem.Settings, config: Config)
   extends UnboundedPriorityMailbox(
     PriorityGenerator {
       case msg: FileReceived    => 2 // low

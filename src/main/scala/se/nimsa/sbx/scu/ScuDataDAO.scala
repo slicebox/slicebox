@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-package se.nimsa.sbx.dicom.scu
+package se.nimsa.sbx.scu
 
 import scala.slick.driver.JdbcProfile
-import se.nimsa.sbx.dicom.DicomProtocol.ScuData
 import scala.slick.jdbc.meta.MTable
+import ScuProtocol.ScuData
 
 class ScuDataDAO(val driver: JdbcProfile) {
   import driver.simple._

@@ -31,8 +31,8 @@ import spray.httpx.marshalling.marshal
 import spray.httpx.unmarshalling.FromResponseUnmarshaller
 import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.app.JsonFormats
-import se.nimsa.sbx.dicom.DicomProtocol.DatasetReceived
-import se.nimsa.sbx.dicom.DicomProtocol.SourceType
+import se.nimsa.sbx.storage.StorageProtocol.DatasetReceived
+import se.nimsa.sbx.storage.StorageProtocol.SourceType
 import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.dicom.DicomUtil._
 import BoxProtocol._

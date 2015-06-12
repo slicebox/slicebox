@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-package se.nimsa.sbx.dicom.scp
+package se.nimsa.sbx.scp
 
 import scala.slick.driver.JdbcProfile
-import se.nimsa.sbx.dicom.DicomProtocol.ScpData
 import scala.slick.jdbc.meta.MTable
+import ScpProtocol.ScpData
 
 class ScpDataDAO(val driver: JdbcProfile) {
   import driver.simple._

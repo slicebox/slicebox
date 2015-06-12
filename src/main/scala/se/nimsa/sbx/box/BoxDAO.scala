@@ -91,7 +91,7 @@ class BoxDAO(val driver: JdbcProfile) {
 
   val toAnonymizationKey = (id: Long, created: Long, remoteBoxId: Long, transactionId: Long, remoteBoxName: String, patientName: String, anonPatientName: String, patientID: String, anonPatientID: String, patientBirthDate: String, studyInstanceUID: String, anonStudyInstanceUID: String, studyDescription: String, studyID: String, accessionNumber: String, seriesInstanceUID: String, anonSeriesInstanceUID: String, frameOfReferenceUID: String, anonFrameOfReferenceUID: String) =>
     AnonymizationKey(id, created, remoteBoxId, transactionId, remoteBoxName, patientName, anonPatientName, patientID, anonPatientID, patientBirthDate, studyInstanceUID, anonStudyInstanceUID, studyDescription, studyID, accessionNumber, seriesInstanceUID, anonSeriesInstanceUID, frameOfReferenceUID, anonFrameOfReferenceUID)
-  val fromAnonymizationKey = (entry: AnonymizationKey) => 
+  val fromAnonymizationKey = (entry: AnonymizationKey) =>
     Option((entry.id, entry.created, entry.remoteBoxId, entry.transactionId, entry.remoteBoxName, entry.patientName, entry.anonPatientName, entry.patientID, entry.anonPatientID, entry.patientBirthDate, entry.studyInstanceUID, entry.anonStudyInstanceUID, entry.studyDescription, entry.studyID, entry.accessionNumber, entry.seriesInstanceUID, entry.anonSeriesInstanceUID, entry.frameOfReferenceUID, entry.anonFrameOfReferenceUID))
 
   class AnonymizationKeyTable(tag: Tag) extends Table[AnonymizationKey](tag, "AnonymizationKey") {
@@ -135,6 +135,14 @@ class BoxDAO(val driver: JdbcProfile) {
   def drop(implicit session: Session): Unit =
     (boxQuery.ddl ++ outboxQuery.ddl ++ inboxQuery.ddl ++ transactionTagValueQuery.ddl ++ anonymizationKeyQuery.ddl).drop
 
+  def clear(implicit session: Session): Unit = {
+    boxQuery.delete
+    inboxQuery.delete
+    outboxQuery.delete
+    transactionTagValueQuery.delete
+    anonymizationKeyQuery.delete
+  }
+  
   def insertBox(box: Box)(implicit session: Session): Box = {
     val generatedId = (boxQuery returning boxQuery.map(_.id)) += box
     box.copy(id = generatedId)
@@ -167,7 +175,7 @@ class BoxDAO(val driver: JdbcProfile) {
       .filter(_.sendMethod === BoxSendMethod.POLL.toString)
       .filter(_.token === token)
       .list.headOption
-      
+
   def updateBoxOnlineStatus(boxId: Long, online: Boolean)(implicit session: Session): Unit =
     boxQuery
       .filter(_.id === boxId)
@@ -190,7 +198,7 @@ class BoxDAO(val driver: JdbcProfile) {
       .filter(_.transactionId === transactionId)
       .map(_.failed)
       .update(true)
-      
+
   def updateInbox(remoteBoxId: Long, transactionId: Long, sequenceNumber: Long, totalImageCount: Long)(implicit session: Session): Unit = {
     inboxEntryByTransactionId(remoteBoxId, transactionId) match {
       case Some(inboxEntry) => {
@@ -203,25 +211,25 @@ class BoxDAO(val driver: JdbcProfile) {
       }
     }
   }
-      
+
   def inboxEntryByTransactionId(remoteBoxId: Long, transactionId: Long)(implicit session: Session): Option[InboxEntry] =
     inboxQuery
       .filter(_.remoteBoxId === remoteBoxId)
       .filter(_.transactionId === transactionId)
       .list.headOption
-      
+
   def outboxEntryById(outboxEntryId: Long)(implicit session: Session): Option[OutboxEntry] =
     outboxQuery
       .filter(_.id === outboxEntryId)
       .list.headOption
-      
+
   def outboxEntryByTransactionIdAndSequenceNumber(remoteBoxId: Long, transactionId: Long, sequenceNumber: Long)(implicit session: Session): Option[OutboxEntry] =
     outboxQuery
       .filter(_.remoteBoxId === remoteBoxId)
       .filter(_.transactionId === transactionId)
       .filter(_.sequenceNumber === sequenceNumber)
       .list.headOption
-      
+
   def removeInboxEntry(entryId: Long)(implicit session: Session): Unit =
     inboxQuery.filter(_.id === entryId).delete
 
@@ -233,7 +241,7 @@ class BoxDAO(val driver: JdbcProfile) {
 
   def removeOutboxEntries(entryIds: Seq[Long])(implicit session: Session): Unit =
     outboxQuery.filter(_.id inSet entryIds).delete
-    
+
   def listBoxes(implicit session: Session): List[Box] =
     boxQuery.list
 
@@ -242,30 +250,30 @@ class BoxDAO(val driver: JdbcProfile) {
 
   def listInboxEntries(implicit session: Session): List[InboxEntry] =
     inboxQuery.list
-    
+
   def listTransactionTagValues(implicit session: Session): List[TransactionTagValue] =
     transactionTagValueQuery.list
-    
+
   def insertTransactionTagValue(entry: TransactionTagValue)(implicit session: Session): TransactionTagValue = {
     val generatedId = (transactionTagValueQuery returning transactionTagValueQuery.map(_.id)) += entry
     entry.copy(id = generatedId)
   }
-  
+
   def tagValuesByImageFileIdAndTransactionId(imageFileId: Long, transactionId: Long)(implicit session: Session): List[TransactionTagValue] =
     transactionTagValueQuery.filter(_.imageFileId === imageFileId).filter(_.transactionId === transactionId).list
-    
+
   def removeTransactionTagValue(transactionTagValueId: Long)(implicit session: Session): Unit =
     transactionTagValueQuery.filter(_.id === transactionTagValueId).delete
-    
+
   def removeTransactionTagValuesByTransactionId(transactionId: Long)(implicit session: Session): Unit =
     transactionTagValueQuery.filter(_.transactionId === transactionId).delete
-    
+
   def anonymizationKeys(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String])(implicit session: Session): List[AnonymizationKey] = {
 
     orderBy.foreach(columnName =>
       if (!columnExists("AnonymizationKey", columnName))
         throw new IllegalArgumentException(s"Property $columnName does not exist"))
-        
+
     implicit val getResult = GetResult(r =>
       AnonymizationKey(r.nextLong, r.nextLong, r.nextLong, r.nextLong, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString))
 
@@ -289,7 +297,7 @@ class BoxDAO(val driver: JdbcProfile) {
 
     Q.queryNA(query).list
   }
-  
+
   def insertAnonymizationKey(entry: AnonymizationKey)(implicit session: Session): AnonymizationKey = {
     val generatedId = (anonymizationKeyQuery returning anonymizationKeyQuery.map(_.id)) += entry
     entry.copy(id = generatedId)
@@ -300,15 +308,14 @@ class BoxDAO(val driver: JdbcProfile) {
 
   def anonymizationKeysForAnonPatient(anonPatientName: String, anonPatientID: String)(implicit session: Session): List[AnonymizationKey] =
     anonymizationKeyQuery
-    .filter(_.anonPatientName === anonPatientName)
-    .filter(_.anonPatientID === anonPatientID)
-    .list    
+      .filter(_.anonPatientName === anonPatientName)
+      .filter(_.anonPatientID === anonPatientID)
+      .list
 
   def anonymizationKeysForPatient(patientName: String, patientID: String)(implicit session: Session): List[AnonymizationKey] =
     anonymizationKeyQuery
-    .filter(_.patientName === patientName)
-    .filter(_.patientID === patientID)
-    .list    
-
+      .filter(_.patientName === patientName)
+      .filter(_.patientID === patientID)
+      .list
 
 }

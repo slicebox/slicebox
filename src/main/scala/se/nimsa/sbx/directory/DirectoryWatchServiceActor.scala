@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package se.nimsa.sbx.dicom.directory
+package se.nimsa.sbx.directory
 
 import java.nio.file.FileSystems
 import java.nio.file.Files
@@ -27,10 +27,9 @@ import akka.actor.Props
 import akka.event.Logging
 import akka.event.LoggingReceive
 import se.nimsa.sbx.app.DbProps
-import se.nimsa.sbx.dicom.DicomDispatchActor
-import se.nimsa.sbx.dicom.DicomProtocol._
 import akka.actor.Status.Failure
 import se.nimsa.sbx.util.ExceptionCatching
+import DirectoryWatchProtocol._
 
 class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor with ExceptionCatching {
   val log = Logging(context.system, this)

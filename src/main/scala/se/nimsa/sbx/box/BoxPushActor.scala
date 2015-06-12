@@ -33,11 +33,11 @@ import spray.http.StatusCodes._
 import scala.concurrent.Future
 import spray.http.HttpResponse
 import se.nimsa.sbx.app.DbProps
-import se.nimsa.sbx.dicom.DicomMetaDataDAO
-import se.nimsa.sbx.dicom.DicomPropertiesDAO
+import se.nimsa.sbx.storage.MetaDataDAO
+import se.nimsa.sbx.storage.PropertiesDAO
 import spray.http.StatusCode
 import se.nimsa.sbx.dicom.DicomUtil._
-import se.nimsa.sbx.dicom.DicomAnonymization._
+import se.nimsa.sbx.anonymization.AnonymizationUtil._
 import java.io.ByteArrayOutputStream
 import java.util.Date
 import akka.actor.ReceiveTimeout
@@ -53,7 +53,7 @@ class BoxPushActor(box: Box,
 
   val db = dbProps.db
   val boxDao = new BoxDAO(dbProps.driver)
-  val dicomPropertiesDao = new DicomPropertiesDAO(dbProps.driver)
+  val propertiesDao = new PropertiesDAO(dbProps.driver)
 
   implicit val system = context.system
   implicit val ec = context.dispatcher
@@ -132,7 +132,7 @@ class BoxPushActor(box: Box,
 
   def fileNameForImageFileId(imageFileId: Long): Option[String] =
     db.withSession { implicit session =>
-      dicomPropertiesDao.imageFileById(imageFileId).map(_.fileName.value)
+      propertiesDao.imageFileById(imageFileId).map(_.fileName.value)
     }
 
   def tagValuesForImageFileIdAndTransactionId(imageFileId: Long, transactionId: Long): Seq[TransactionTagValue] =

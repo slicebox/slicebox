@@ -26,7 +26,7 @@ import spray.routing._
 import se.nimsa.sbx.app.AuthInfo
 import se.nimsa.sbx.app.RestApi
 import se.nimsa.sbx.app.UserProtocol.UserRole
-import se.nimsa.sbx.dicom.DicomProtocol._
+import se.nimsa.sbx.scp.ScpProtocol._
 
 trait ScpRoutes { this: RestApi =>
 
@@ -34,14 +34,14 @@ def scpRoutes(authInfo: AuthInfo): Route =
     pathPrefix("scps") {
       pathEndOrSingleSlash {
         get {
-          onSuccess(dicomService.ask(GetScps)) {
+          onSuccess(scpService.ask(GetScps)) {
             case Scps(scps) =>
               complete(scps)
           }
         } ~ post {
           authorize(authInfo.hasPermission(UserRole.ADMINISTRATOR)) {
             entity(as[AddScp]) { addScp =>
-              onSuccess(dicomService.ask(addScp)) {
+              onSuccess(scpService.ask(addScp)) {
                 case scpData: ScpData =>
                   complete((Created, scpData))
               }
@@ -51,7 +51,7 @@ def scpRoutes(authInfo: AuthInfo): Route =
       } ~ path(LongNumber) { scpDataId =>
         delete {
           authorize(authInfo.hasPermission(UserRole.ADMINISTRATOR)) {
-            onSuccess(dicomService.ask(RemoveScp(scpDataId))) {
+            onSuccess(scpService.ask(RemoveScp(scpDataId))) {
               case ScpRemoved(scpDataId) =>
                 complete(NoContent)
             }

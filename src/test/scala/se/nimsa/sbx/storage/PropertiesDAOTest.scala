@@ -1,21 +1,21 @@
-package se.nimsa.sbx.dicom
+package se.nimsa.sbx.storage
 
 import scala.slick.driver.H2Driver
 import scala.slick.jdbc.JdbcBackend.{ Database, Session }
 import org.scalatest.FlatSpec
 import org.scalatest.Matchers
 import org.scalatest.BeforeAndAfterEach
-import DicomPropertyValue._
-import DicomHierarchy._
-import DicomProtocol._
+import se.nimsa.sbx.dicom.DicomPropertyValue._
+import se.nimsa.sbx.dicom.DicomHierarchy._
 import org.h2.jdbc.JdbcSQLException
+import StorageProtocol._
 
-class DicomPropertiesDAOTest extends FlatSpec with Matchers with BeforeAndAfterEach {
+class PropertiesDAOTest extends FlatSpec with Matchers with BeforeAndAfterEach {
 
   private val db = Database.forURL("jdbc:h2:mem:dicompropertiesdaotest;DB_CLOSE_DELAY=-1", driver = "org.h2.Driver")
 
-  val metaDataDao = new DicomMetaDataDAO(H2Driver)
-  val propertiesDao = new DicomPropertiesDAO(H2Driver)
+  val metaDataDao = new MetaDataDAO(H2Driver)
+  val propertiesDao = new PropertiesDAO(H2Driver)
 
   override def beforeEach() =
     db.withSession { implicit session =>

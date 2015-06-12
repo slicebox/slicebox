@@ -42,8 +42,6 @@ object BoxProtocol {
 
   case class RemoteBoxName(value: String)
 
-  case class BoxBaseUrl(value: String)
-
   case class Box(id: Long, name: String, token: String, baseUrl: String, sendMethod: BoxSendMethod, online: Boolean) extends Entity
 
   case class OutboxEntry(id: Long, remoteBoxId: Long, transactionId: Long, sequenceNumber: Long, totalImageCount: Long, imageFileId: Long, failed: Boolean) extends Entity
@@ -89,9 +87,9 @@ object BoxProtocol {
 
   sealed trait BoxRequest
 
-  case class GenerateBoxBaseUrl(remoteBoxName: String) extends BoxRequest
+  case class CreateConnection(remoteBoxName: String) extends BoxRequest
 
-  case class AddRemoteBox(remoteBox: RemoteBox) extends BoxRequest
+  case class Connect(remoteBox: RemoteBox) extends BoxRequest
 
   case class RemoveBox(boxId: Long) extends BoxRequest
 
@@ -138,8 +136,6 @@ object BoxProtocol {
   case class BoxRemoved(boxId: Long)
 
   case class Boxes(boxes: Seq[Box])
-
-  case class BoxBaseUrlGenerated(baseUrl: String)
 
   case class InboxUpdated(token: String, transactionId: Long, sequenceNumber: Long, totalImageCount: Long)
 

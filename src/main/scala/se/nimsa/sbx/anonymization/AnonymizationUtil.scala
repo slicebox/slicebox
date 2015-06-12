@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package se.nimsa.sbx.dicom
+package se.nimsa.sbx.anonymization
 
 import org.dcm4che3.data.VR
 import org.dcm4che3.util.UIDUtils
@@ -23,9 +23,9 @@ import org.dcm4che3.data.Tag
 import java.util.Date
 import org.dcm4che3.util.TagUtils
 import org.dcm4che3.data.Attributes.Visitor
-import DicomUtil._
+import se.nimsa.sbx.dicom.DicomUtil._
 
-object DicomAnonymization {
+object AnonymizationUtil {
 
   val emptyString = ""
 

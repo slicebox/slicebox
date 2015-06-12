@@ -1,4 +1,4 @@
-package se.nimsa.sbx.dicom
+package se.nimsa.sbx.storage
 
 import java.nio.file.Files
 import java.nio.file.Paths
@@ -13,10 +13,10 @@ import org.scalatest.Matchers
 import org.scalatest.WordSpecLike
 import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.util.TestUtil
-import DicomProtocol._
-import DicomUtil.loadDataset
+import se.nimsa.sbx.dicom.DicomUtil.loadDataset
+import StorageProtocol._
 
-class DicomStorageActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
+class StorageServiceActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
   with WordSpecLike with Matchers with BeforeAndAfterAll {
 
   def this() = this(ActorSystem("StorageTestSystem"))
@@ -30,7 +30,7 @@ class DicomStorageActorTest(_system: ActorSystem) extends TestKit(_system) with 
 
   val storage = Files.createTempDirectory("slicebox-test-storage-")
 
-  val storageActorRef = TestActorRef(new DicomStorageActor(dbProps, storage))
+  val storageActorRef = TestActorRef(new StorageServiceActor(dbProps, storage))
   val storageActor = storageActorRef.underlyingActor
   
   override def afterAll {
@@ -38,7 +38,7 @@ class DicomStorageActorTest(_system: ActorSystem) extends TestKit(_system) with 
     TestUtil.deleteFolder(storage)
   }
     
-  "A DicomStorageActor" must {
+  "The storage service" must {
 
     "return an empty list of patients when no metadata exists" in {
       storageActorRef ! GetPatients(0, 10000, None, true, None, None, None)

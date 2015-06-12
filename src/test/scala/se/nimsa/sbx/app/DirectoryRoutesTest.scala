@@ -11,7 +11,7 @@ import org.scalatest.FlatSpec
 import org.scalatest.Matchers
 
 import se.nimsa.sbx.dicom.DicomHierarchy._
-import se.nimsa.sbx.dicom.DicomProtocol._
+import se.nimsa.sbx.directory.DirectoryWatchProtocol._
 import se.nimsa.sbx.util.TestUtil
 
 class DirectoryRoutesTest extends FlatSpec with Matchers with RoutesTestBase {

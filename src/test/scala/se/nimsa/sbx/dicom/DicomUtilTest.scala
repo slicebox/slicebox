@@ -13,7 +13,7 @@ import se.nimsa.sbx.util.TestUtil
 import se.nimsa.sbx.app.DirectoryRoutesTest
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomPropertyValue._
-
+import se.nimsa.sbx.anonymization.AnonymizationUtil._
 
 class DicomUtilTest extends FlatSpec with Matchers with BeforeAndAfterAll {
 
@@ -73,7 +73,7 @@ class DicomUtilTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     val fileName = "anon270.dcm"
     val dcmPath = Paths.get(classOf[DirectoryRoutesTest].getResource(fileName).toURI())
     val dataset = loadDataset(dcmPath, true)
-    val anonymized1 = DicomAnonymization.anonymizeDataset(dataset)
+    val anonymized1 = anonymizeDataset(dataset)
     val savePath = tempDir.resolve("anonymized.dcm")
     saveDataset(anonymized1, savePath)
     val anonymized2 = loadDataset(savePath, true)

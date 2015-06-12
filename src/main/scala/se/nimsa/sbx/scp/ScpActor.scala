@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package se.nimsa.sbx.dicom.scp
+package se.nimsa.sbx.scp
 
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
@@ -25,9 +25,11 @@ import akka.actor.PoisonPill
 import akka.actor.Props
 import akka.event.Logging
 import akka.event.LoggingReceive
-import se.nimsa.sbx.dicom.DicomProtocol._
 import java.util.Date
 import se.nimsa.sbx.log.SbxLog
+import se.nimsa.sbx.storage.StorageProtocol.DatasetReceived
+import se.nimsa.sbx.storage.StorageProtocol.SourceType
+import ScpProtocol._
 
 class ScpActor(scpData: ScpData, executor: Executor) extends Actor {
   

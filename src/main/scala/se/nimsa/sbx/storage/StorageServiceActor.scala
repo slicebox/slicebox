@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package se.nimsa.sbx.dicom
+package se.nimsa.sbx.storage
 
 import java.nio.file.Files
 import java.nio.file.Path
@@ -34,7 +34,6 @@ import org.dcm4che3.imageio.plugins.dcm.DicomImageReadParam
 import org.dcm4che3.data.Keyword
 import org.dcm4che3.util.TagUtils
 import se.nimsa.sbx.app.DbProps
-import se.nimsa.sbx.dicom.DicomProtocol.DatasetReceived
 import se.nimsa.sbx.util.ExceptionCatching
 import java.awt.image.BufferedImage
 import java.awt.Color
@@ -43,25 +42,25 @@ import javax.imageio.ImageIO
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.Date
-import DicomProtocol._
-import DicomHierarchy._
-import DicomPropertyValue._
-import DicomUtil._
-import DicomAnonymization._
+import se.nimsa.sbx.storage.StorageProtocol._
+import se.nimsa.sbx.dicom.DicomHierarchy._
+import se.nimsa.sbx.dicom.DicomPropertyValue._
+import se.nimsa.sbx.dicom.DicomUtil._
+import se.nimsa.sbx.anonymization.AnonymizationUtil._
 import akka.dispatch.ExecutionContexts
 import java.util.concurrent.Executors
 import se.nimsa.sbx.log.SbxLog
 import scala.slick.jdbc.JdbcBackend.Session
 
-class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with ExceptionCatching {
+class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with ExceptionCatching {
 
   import context.system
 
   val log = Logging(context.system, this)
 
   val db = dbProps.db
-  val dao = new DicomMetaDataDAO(dbProps.driver)
-  val propertiesDao = new DicomPropertiesDAO(dbProps.driver)
+  val dao = new MetaDataDAO(dbProps.driver)
+  val propertiesDao = new PropertiesDAO(dbProps.driver)
 
   setupDb()
 
@@ -498,6 +497,6 @@ class DicomStorageActor(dbProps: DbProps, storage: Path) extends Actor with Exce
 
 }
 
-object DicomStorageActor {
-  def props(dbProps: DbProps, storage: Path): Props = Props(new DicomStorageActor(dbProps, storage))
+object StorageServiceActor {
+  def props(dbProps: DbProps, storage: Path): Props = Props(new StorageServiceActor(dbProps, storage))
 }

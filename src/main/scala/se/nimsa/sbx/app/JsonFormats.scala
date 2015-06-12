@@ -20,7 +20,10 @@ import spray.json._
 import se.nimsa.sbx.dicom.DicomProperty
 import se.nimsa.sbx.dicom.DicomPropertyValue._
 import se.nimsa.sbx.dicom.DicomHierarchy._
-import se.nimsa.sbx.dicom.DicomProtocol._
+import se.nimsa.sbx.storage.StorageProtocol._
+import se.nimsa.sbx.directory.DirectoryWatchProtocol._
+import se.nimsa.sbx.scp.ScpProtocol._
+import se.nimsa.sbx.scu.ScuProtocol._
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.log.LogProtocol._
 import se.nimsa.sbx.app.UserProtocol._
@@ -38,7 +41,6 @@ trait JsonFormats extends DefaultJsonProtocol {
 
   implicit val remoteBoxFormat = jsonFormat2(RemoteBox)
   implicit val remoteBoxNameFormat = jsonFormat1(RemoteBoxName)
-  implicit val boxBaseUrlFormat = jsonFormat1(BoxBaseUrl)
 
   implicit val updateInboxFormat = jsonFormat4(UpdateInbox)
 
@@ -70,8 +72,6 @@ trait JsonFormats extends DefaultJsonProtocol {
   implicit val sendImagesDataFormat = jsonFormat2(BoxSendData)
   implicit val anonymizationKeyFormat = jsonFormat19(AnonymizationKey)
   
-  implicit val generateBoxBaseUrlFormat = jsonFormat1(GenerateBoxBaseUrl)
-
   implicit val addScpDataFormat = jsonFormat3(AddScp)
   implicit val addScuDataFormat = jsonFormat4(AddScu)
 

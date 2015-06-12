@@ -1,8 +1,8 @@
-package se.nimsa.sbx.dicom
+package se.nimsa.sbx.anonymization
 
 import org.scalatest.FlatSpec
 import org.scalatest.Matchers
-import DicomAnonymization._
+import se.nimsa.sbx.anonymization.AnonymizationUtil._
 import org.dcm4che3.data.Attributes
 import org.dcm4che3.data.Tag
 import org.dcm4che3.data.VR
@@ -15,9 +15,9 @@ import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomPropertyValue._
 import java.util.Date
 
-class DicomAnonymizationTest extends FlatSpec with Matchers {
+class AnonymizationUtilTest extends FlatSpec with Matchers {
 
-  "The anonnymization procedure" should "replace an existing accession number with a named based UID" in {
+  "The anonymization procedure" should "replace an existing accession number with a named based UID" in {
     val dataset = new Attributes()
     dataset.setString(Tag.AccessionNumber, VR.SH, "ACC001")
     val anonymized = anonymizeDataset(dataset)

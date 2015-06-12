@@ -10,12 +10,11 @@ import spray.testkit.ScalatestRouteTest
 import scala.concurrent.duration.DurationInt
 import spray.httpx.SprayJsonSupport._
 import se.nimsa.sbx.dicom.DicomHierarchy.Patient
-import se.nimsa.sbx.dicom.DicomProtocol._
 import scala.slick.driver.H2Driver
 import scala.slick.jdbc.JdbcBackend.Database
-import se.nimsa.sbx.dicom.DicomMetaDataDAO
+import se.nimsa.sbx.storage.MetaDataDAO
 import se.nimsa.sbx.dicom.DicomPropertyValue._
-import se.nimsa.sbx.dicom.DicomProtocol._
+import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.app.UserProtocol.ClearTextUser
 import se.nimsa.sbx.app.UserProtocol.UserRole.ADMINISTRATOR
@@ -25,7 +24,7 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
   def dbUrl() = "jdbc:h2:mem:metadataroutestest;DB_CLOSE_DELAY=-1"
   
-  val dao = new DicomMetaDataDAO(H2Driver)
+  val dao = new MetaDataDAO(H2Driver)
   
   val pat1 = Patient(-1, PatientName("p1"), PatientID("s1"), PatientBirthDate("2000-01-01"), PatientSex("M"))
   val pat2 = Patient(-1, PatientName("p2"), PatientID("s2"), PatientBirthDate("2001-01-01"), PatientSex("F"))
@@ -34,16 +33,10 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   val for1 = FrameOfReference(-1, FrameOfReferenceUID("frid1"))
   val series1 = Series(-1, -1, -1, -1, SeriesInstanceUID("seuid1"), SeriesDescription("sedesc1"), SeriesDate("19990101"), Modality("NM"), ProtocolName("prot1"), BodyPartExamined("bodypart1"))
   val image1 = Image(-1, -1, SOPInstanceUID("sopuid1"), ImageType("imageType1"), InstanceNumber("1"))
-  
-  override def beforeEach() {
-    db.withSession { implicit session =>
-      dao.create
-    }
-  }
-  
+    
   override def afterEach() {
     db.withSession { implicit session =>
-      dao.drop
+      dao.clear
     }
   }
   
@@ -262,7 +255,7 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     PostAsAdmin("/api/users", ClearTextUser("name", ADMINISTRATOR, "password")) ~> routes ~> check {
       status should be (Created)
     }
-    PostAsAdmin("/api/boxes/generatebaseurl", RemoteBoxName("remote box")) ~> routes ~> check {
+    PostAsAdmin("/api/boxes/createconnection", RemoteBoxName("remote box")) ~> routes ~> check {
       status should be(Created)
     }
     GetAsUser("/api/metadata/sources") ~> routes ~> check {

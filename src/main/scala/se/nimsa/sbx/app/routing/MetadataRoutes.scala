@@ -22,10 +22,12 @@ import spray.httpx.SprayJsonSupport._
 import spray.routing._
 import se.nimsa.sbx.app.RestApi
 import se.nimsa.sbx.dicom.DicomHierarchy._
-import se.nimsa.sbx.dicom.DicomProtocol._
-import se.nimsa.sbx.dicom.DicomProtocol.SourceType._
+import se.nimsa.sbx.storage.StorageProtocol._
+import se.nimsa.sbx.storage.StorageProtocol.SourceType._
 import se.nimsa.sbx.app.UserProtocol._
 import se.nimsa.sbx.box.BoxProtocol._
+import se.nimsa.sbx.scp.ScpProtocol._
+import se.nimsa.sbx.directory.DirectoryWatchProtocol._
 import scala.concurrent.Future
 
 trait MetadataRoutes { this: RestApi =>
@@ -34,12 +36,12 @@ trait MetadataRoutes { this: RestApi =>
     pathPrefix("metadata") {
       path("sources") {
         get {
-          val futureSources =
+          def futureSources =
             for {
               users <- userService.ask(GetUsers).mapTo[Users]
               boxes <- boxService.ask(GetBoxes).mapTo[Boxes]
-              scps <- dicomService.ask(GetScps).mapTo[Scps]
-              dirs <- dicomService.ask(GetWatchedDirectories).mapTo[WatchedDirectories]
+              scps <- scpService.ask(GetScps).mapTo[Scps]
+              dirs <- directoryService.ask(GetWatchedDirectories).mapTo[WatchedDirectories]
             } yield {
               users.users.map(user => Source(SourceType.USER, user.user, user.id)) ++
                 boxes.boxes.map(box => Source(SourceType.BOX, box.name, box.id)) ++
@@ -62,7 +64,7 @@ trait MetadataRoutes { this: RestApi =>
               'sourcetype.as[String].?,
               'sourceid.as[Long].?) { (startIndex, count, orderBy, orderAscending, filter, sourceType, sourceId) =>
 
-                onSuccess(dicomService.ask(GetPatients(startIndex, count, orderBy, orderAscending, filter, sourceType.map(SourceType.withName(_)), sourceId))) {
+                onSuccess(storageService.ask(GetPatients(startIndex, count, orderBy, orderAscending, filter, sourceType.map(SourceType.withName(_)), sourceId))) {
                   case Patients(patients) =>
                     complete(patients)
                 }
@@ -71,7 +73,7 @@ trait MetadataRoutes { this: RestApi =>
         } ~ path("query") {
           post {
             entity(as[Query]) { query =>
-              onSuccess(dicomService.ask(QueryPatients(query))) {
+              onSuccess(storageService.ask(QueryPatients(query))) {
                 case Patients(patients) =>
                   complete(patients)
               }
@@ -79,11 +81,11 @@ trait MetadataRoutes { this: RestApi =>
           }
         } ~ path(LongNumber) { patientId =>
           get {
-            onSuccess(dicomService.ask(GetPatient(patientId)).mapTo[Option[Patient]]) {
+            onSuccess(storageService.ask(GetPatient(patientId)).mapTo[Option[Patient]]) {
               complete(_)
             }
           } ~ delete {
-            onSuccess(dicomService.ask(DeletePatient(patientId))) {
+            onSuccess(storageService.ask(DeletePatient(patientId))) {
               case ImageFilesDeleted(_) =>
                 complete(NoContent)
             }
@@ -98,7 +100,7 @@ trait MetadataRoutes { this: RestApi =>
               'patientid.as[Long],
               'sourcetype.as[String].?,
               'sourceid.as[Long].?) { (startIndex, count, patientId, sourceType, sourceId) =>
-                onSuccess(dicomService.ask(GetStudies(startIndex, count, patientId, sourceType.map(SourceType.withName(_)), sourceId))) {
+                onSuccess(storageService.ask(GetStudies(startIndex, count, patientId, sourceType.map(SourceType.withName(_)), sourceId))) {
                   case Studies(studies) =>
                     complete(studies)
                 }
@@ -107,7 +109,7 @@ trait MetadataRoutes { this: RestApi =>
         } ~ path("query") {
           post {
             entity(as[Query]) { query =>
-              onSuccess(dicomService.ask(QueryStudies(query))) {
+              onSuccess(storageService.ask(QueryStudies(query))) {
                 case Studies(studies) =>
                   complete(studies)
               }
@@ -115,11 +117,11 @@ trait MetadataRoutes { this: RestApi =>
           }
         } ~ path(LongNumber) { studyId =>
           get {
-            onSuccess(dicomService.ask(GetStudy(studyId)).mapTo[Option[Study]]) {
+            onSuccess(storageService.ask(GetStudy(studyId)).mapTo[Option[Study]]) {
               complete(_)
             }
           } ~ delete {
-            onSuccess(dicomService.ask(DeleteStudy(studyId))) {
+            onSuccess(storageService.ask(DeleteStudy(studyId))) {
               case ImageFilesDeleted(_) =>
                 complete(NoContent)
             }
@@ -134,7 +136,7 @@ trait MetadataRoutes { this: RestApi =>
               'studyid.as[Long],
               'sourcetype.as[String].?,
               'sourceid.as[Long].?) { (startIndex, count, studyId, sourceType, sourceId) =>
-                onSuccess(dicomService.ask(GetSeries(startIndex, count, studyId, sourceType.map(SourceType.withName(_)), sourceId))) {
+                onSuccess(storageService.ask(GetSeries(startIndex, count, studyId, sourceType.map(SourceType.withName(_)), sourceId))) {
                   case SeriesCollection(series) =>
                     complete(series)
                 }
@@ -143,7 +145,7 @@ trait MetadataRoutes { this: RestApi =>
         } ~ path("query") {
           post {
             entity(as[Query]) { query =>
-              onSuccess(dicomService.ask(QuerySeries(query))) {
+              onSuccess(storageService.ask(QuerySeries(query))) {
                 case SeriesCollection(series) =>
                   complete(series)
               }
@@ -151,24 +153,24 @@ trait MetadataRoutes { this: RestApi =>
           }
         } ~ path(LongNumber) { seriesId =>
           get {
-            onSuccess(dicomService.ask(GetSingleSeries(seriesId)).mapTo[Option[Series]]) {
+            onSuccess(storageService.ask(GetSingleSeries(seriesId)).mapTo[Option[Series]]) {
               complete(_)
             }
           } ~ delete {
-            onSuccess(dicomService.ask(DeleteSeries(seriesId))) {
+            onSuccess(storageService.ask(DeleteSeries(seriesId))) {
               case ImageFilesDeleted(_) =>
                 complete(NoContent)
             }
           }
         } ~ path(LongNumber / "source") { seriesId =>
           get {
-            onSuccess(dicomService.ask(GetSeriesSource(seriesId)).mapTo[Option[SeriesSource]]) { seriesSourceMaybe =>
-              val futureSourceMaybe = seriesSourceMaybe.map(seriesSource => {
+            onSuccess(storageService.ask(GetSeriesSource(seriesId)).mapTo[Option[SeriesSource]]) { seriesSourceMaybe =>
+              def futureSourceMaybe = seriesSourceMaybe.map(seriesSource => {
                 val futureNameMaybe = seriesSource.sourceType match {
                   case USER      => userService.ask(GetUser(seriesSource.sourceId)).mapTo[Option[ApiUser]].map(_.map(_.user))
                   case BOX       => boxService.ask(GetBoxById(seriesSource.sourceId)).mapTo[Option[Box]].map(_.map(_.name))
-                  case DIRECTORY => dicomService.ask(GetWatchedDirectoryById(seriesSource.sourceId)).mapTo[Option[WatchedDirectory]].map(_.map(_.name))
-                  case SCP       => dicomService.ask(GetScpById(seriesSource.sourceId)).mapTo[Option[ScpData]].map(_.map(_.name))
+                  case DIRECTORY => directoryService.ask(GetWatchedDirectoryById(seriesSource.sourceId)).mapTo[Option[WatchedDirectory]].map(_.map(_.name))
+                  case SCP       => scpService.ask(GetScpById(seriesSource.sourceId)).mapTo[Option[ScpData]].map(_.map(_.name))
                   case UNKNOWN   => Future(None)
                 }
                 val futureName: Future[String] = futureNameMaybe.map(_.getOrElse("<source removed>"))
@@ -187,7 +189,7 @@ trait MetadataRoutes { this: RestApi =>
               'startindex.as[Long] ? 0,
               'count.as[Long] ? 20,
               'seriesid.as[Long]) { (startIndex, count, seriesId) =>
-                onSuccess(dicomService.ask(GetImages(startIndex, count, seriesId))) {
+                onSuccess(storageService.ask(GetImages(startIndex, count, seriesId))) {
                   case Images(images) =>
                     complete(images)
                 }
@@ -196,7 +198,7 @@ trait MetadataRoutes { this: RestApi =>
         } ~ path("query") {
           post {
             entity(as[Query]) { query =>
-              onSuccess(dicomService.ask(QueryImages(query))) {
+              onSuccess(storageService.ask(QueryImages(query))) {
                 case Images(images) =>
                   complete(images)
               }
@@ -204,11 +206,11 @@ trait MetadataRoutes { this: RestApi =>
           }
         } ~ path(LongNumber) { imageId =>
           get {
-            onSuccess(dicomService.ask(GetImage(imageId)).mapTo[Option[Image]]) {
+            onSuccess(storageService.ask(GetImage(imageId)).mapTo[Option[Image]]) {
               complete(_)
             }
           } ~ delete {
-            onSuccess(dicomService.ask(DeleteImage(imageId))) {
+            onSuccess(storageService.ask(DeleteImage(imageId))) {
               case ImageFilesDeleted(_) =>
                 complete(NoContent)
             }
@@ -225,7 +227,7 @@ trait MetadataRoutes { this: RestApi =>
               'filter.as[String].?,
               'sourcetype.as[String].?,
               'sourceid.as[Long].?) { (startIndex, count, orderBy, orderAscending, filter, sourceType, sourceId) =>
-                onSuccess(dicomService.ask(GetFlatSeries(startIndex, count, orderBy, orderAscending, filter, sourceType.map(SourceType.withName(_)), sourceId))) {
+                onSuccess(storageService.ask(GetFlatSeries(startIndex, count, orderBy, orderAscending, filter, sourceType.map(SourceType.withName(_)), sourceId))) {
                   case FlatSeriesCollection(flatSeries) =>
                     complete(flatSeries)
                 }
@@ -233,7 +235,7 @@ trait MetadataRoutes { this: RestApi =>
           }
         } ~ path(LongNumber) { seriesId =>
           get {
-            onSuccess(dicomService.ask(GetSingleFlatSeries(seriesId)).mapTo[Option[FlatSeries]]) {
+            onSuccess(storageService.ask(GetSingleFlatSeries(seriesId)).mapTo[Option[FlatSeries]]) {
               complete(_)
             }
           }

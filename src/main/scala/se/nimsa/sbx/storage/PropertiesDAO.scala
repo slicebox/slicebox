@@ -14,19 +14,19 @@
  * limitations under the License.
  */
 
-package se.nimsa.sbx.dicom
+package se.nimsa.sbx.storage
 
 import scala.slick.driver.JdbcProfile
 import scala.slick.jdbc.{ GetResult, StaticQuery => Q }
-import DicomProtocol._
-import DicomHierarchy._
-import DicomPropertyValue._
+import se.nimsa.sbx.dicom.DicomHierarchy._
+import se.nimsa.sbx.dicom.DicomPropertyValue._
 import scala.slick.jdbc.meta.MTable
+import StorageProtocol._
 
-class DicomPropertiesDAO(val driver: JdbcProfile) {
+class PropertiesDAO(val driver: JdbcProfile) {
   import driver.simple._
 
-  val metaDataDao = new DicomMetaDataDAO(driver)
+  val metaDataDao = new MetaDataDAO(driver)
   import metaDataDao._
 
   // *** Files ***
@@ -73,6 +73,11 @@ class DicomPropertiesDAO(val driver: JdbcProfile) {
   def drop(implicit session: Session) =
     if (MTable.getTables("ImageFiles").list.size > 0)
       (imageFilesQuery.ddl ++ seriesSourceQuery.ddl).drop
+
+  def clear(implicit session: Session) = {
+    imageFilesQuery.delete
+    seriesSourceQuery.delete
+  }
 
   def imageFileById(imageId: Long)(implicit session: Session): Option[ImageFile] =
     imageFilesQuery.filter(_.id === imageId).list.headOption

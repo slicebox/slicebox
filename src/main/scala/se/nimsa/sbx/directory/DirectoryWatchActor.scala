@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package se.nimsa.sbx.dicom.directory
+package se.nimsa.sbx.directory
 
 import java.nio.file.Files
 import java.nio.file.Path
@@ -24,12 +24,11 @@ import akka.actor.Props
 import akka.event.Logging
 import akka.event.LoggingReceive
 import se.nimsa.sbx.dicom.DicomUtil._
-import se.nimsa.sbx.dicom.DicomProtocol.FileAddedToWatchedDirectory
 import org.dcm4che3.data.Tag
 import java.nio.file.Paths
-import se.nimsa.sbx.dicom.DicomProtocol.FileReceived
-import se.nimsa.sbx.dicom.DicomProtocol.SourceType
-import se.nimsa.sbx.dicom.DicomProtocol.WatchedDirectory
+import se.nimsa.sbx.storage.StorageProtocol.FileReceived
+import se.nimsa.sbx.storage.StorageProtocol.SourceType
+import DirectoryWatchProtocol._
 
 class DirectoryWatchActor(watchedDirectory: WatchedDirectory) extends Actor {
   val log = Logging(context.system, this)

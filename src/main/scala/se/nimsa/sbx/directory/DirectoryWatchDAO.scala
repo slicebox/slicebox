@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-package se.nimsa.sbx.dicom.directory
+package se.nimsa.sbx.directory
 
 import scala.slick.driver.JdbcProfile
 import java.nio.file.Path
 import java.nio.file.Paths
 import scala.slick.jdbc.meta.MTable
-import se.nimsa.sbx.dicom.DicomProtocol._
+import DirectoryWatchProtocol._
 
 class DirectoryWatchDAO(val driver: JdbcProfile) {
   import driver.simple._

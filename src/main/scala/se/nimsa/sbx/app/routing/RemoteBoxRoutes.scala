@@ -27,9 +27,9 @@ import se.nimsa.sbx.app.RestApi
 import se.nimsa.sbx.app.UserProtocol.UserRole
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.box.BoxUtil._
-import se.nimsa.sbx.dicom.DicomProtocol._
+import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.dicom.DicomUtil._
-import se.nimsa.sbx.dicom.DicomAnonymization
+import se.nimsa.sbx.anonymization.AnonymizationUtil._
 import org.dcm4che3.data.Attributes
 
 trait RemoteBoxRoutes { this: RestApi =>
@@ -50,7 +50,7 @@ trait RemoteBoxRoutes { this: RestApi =>
                     val dataset = loadDataset(imageData, true)
                     onSuccess(boxService.ask(ReverseAnonymization(dataset))) {
                       case dataset: Attributes =>
-                        onSuccess(dicomService.ask(AddDataset(dataset, SourceType.BOX, box.id))) {
+                        onSuccess(storageService.ask(AddDataset(dataset, SourceType.BOX, box.id))) {
                           case ImageAdded(image) =>
                             onSuccess(boxService.ask(UpdateInbox(token, transactionId, sequenceNumber, totalImageCount))) {
                               case msg: InboxUpdated =>
@@ -88,13 +88,13 @@ trait RemoteBoxRoutes { this: RestApi =>
                       case outboxEntry: OutboxEntry =>
                         onSuccess(boxService.ask(GetTransactionTagValues(outboxEntry.imageFileId, transactionId)).mapTo[Seq[TransactionTagValue]]) {
                           case transactionTagValues =>
-                            onSuccess(dicomService.ask(GetImageFile(outboxEntry.imageFileId)).mapTo[Option[ImageFile]]) {
+                            onSuccess(storageService.ask(GetImageFile(outboxEntry.imageFileId)).mapTo[Option[ImageFile]]) {
                               case imageFileMaybe => imageFileMaybe.map(imageFile => {
                                 detach() {
                                   val path = storage.resolve(imageFile.fileName.value)
 
                                   val dataset = loadDataset(path, true)
-                                  val anonymizedDataset = DicomAnonymization.anonymizeDataset(dataset)
+                                  val anonymizedDataset = anonymizeDataset(dataset)
 
                                   applyTagValues(anonymizedDataset, transactionTagValues)
 

@@ -1,19 +1,19 @@
-package se.nimsa.sbx.dicom
+package se.nimsa.sbx.storage
 
 import scala.slick.driver.H2Driver
 import scala.slick.jdbc.JdbcBackend.Database
 import org.scalatest.FlatSpec
 import org.scalatest.Matchers
-import DicomPropertyValue._
-import DicomHierarchy._
-import DicomProtocol._
+import se.nimsa.sbx.dicom.DicomPropertyValue._
+import se.nimsa.sbx.dicom.DicomHierarchy._
 import org.h2.jdbc.JdbcSQLException
+import StorageProtocol._
 
-class DicomMetaDataDAOTest extends FlatSpec with Matchers {
+class MetaDataDAOTest extends FlatSpec with Matchers {
 
   private val db = Database.forURL("jdbc:h2:mem:dicommetadatadaotest;DB_CLOSE_DELAY=-1", driver = "org.h2.Driver")
 
-  val dao = new DicomMetaDataDAO(H2Driver)
+  val dao = new MetaDataDAO(H2Driver)
 
   db.withSession { implicit session =>
     dao.create

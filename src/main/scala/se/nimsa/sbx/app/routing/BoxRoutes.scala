@@ -29,7 +29,7 @@ import se.nimsa.sbx.app.AuthInfo
 import se.nimsa.sbx.app.RestApi
 import se.nimsa.sbx.app.UserProtocol.UserRole
 import se.nimsa.sbx.box.BoxProtocol._
-import se.nimsa.sbx.dicom.DicomProtocol._
+import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.dicom.DicomUtil
 
 trait BoxRoutes { this: RestApi =>
@@ -44,19 +44,19 @@ trait BoxRoutes { this: RestApi =>
           }
         }
       } ~ authorize(authInfo.hasPermission(UserRole.ADMINISTRATOR)) {
-        path("generatebaseurl") {
+        path("createconnection") {
           post {
             entity(as[RemoteBoxName]) { remoteBoxName =>
-              onSuccess(boxService.ask(GenerateBoxBaseUrl(remoteBoxName.value))) {
-                case BoxBaseUrlGenerated(baseUrl) =>
-                  complete((Created, BoxBaseUrl(baseUrl)))
+              onSuccess(boxService.ask(CreateConnection(remoteBoxName.value))) {
+                case RemoteBoxAdded(box) =>
+                  complete((Created, box))
               }
             }
           }
-        } ~ path("addremotebox") {
+        } ~ path("connect") {
           post {
             entity(as[RemoteBox]) { remoteBox =>
-              onSuccess(boxService.ask(AddRemoteBox(remoteBox))) {
+              onSuccess(boxService.ask(Connect(remoteBox))) {
                 case RemoteBoxAdded(box) =>
                   complete((Created, box))
               }

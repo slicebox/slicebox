@@ -28,7 +28,7 @@ import spray.http.StatusCodes.Created
 import spray.http.StatusCodes.NoContent
 import spray.routing._
 import se.nimsa.sbx.app.RestApi
-import se.nimsa.sbx.dicom.DicomProtocol._
+import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.dicom.DicomUtil
 import se.nimsa.sbx.app.AuthInfo
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
@@ -41,14 +41,14 @@ trait ImageRoutes { this: RestApi =>
         post {
           formField('file.as[FormFile]) { file =>
             val dataset = DicomUtil.loadDataset(file.entity.data.toByteArray, true)
-            onSuccess(dicomService.ask(AddDataset(dataset, SourceType.USER, authInfo.user.id))) {
+            onSuccess(storageService.ask(AddDataset(dataset, SourceType.USER, authInfo.user.id))) {
               case ImageAdded(image) =>
                 import spray.httpx.SprayJsonSupport._
                 complete((Created, image))
             }
           } ~ entity(as[Array[Byte]]) { bytes =>
             val dataset = DicomUtil.loadDataset(bytes, true)
-            onSuccess(dicomService.ask(AddDataset(dataset, SourceType.USER, authInfo.user.id))) {
+            onSuccess(storageService.ask(AddDataset(dataset, SourceType.USER, authInfo.user.id))) {
               case ImageAdded(image) =>
                 import spray.httpx.SprayJsonSupport._
                 complete((Created, image))
@@ -57,7 +57,7 @@ trait ImageRoutes { this: RestApi =>
         }
       } ~ path(LongNumber) { imageId =>
         get {
-          onSuccess(dicomService.ask(GetImageFile(imageId)).mapTo[Option[ImageFile]]) {
+          onSuccess(storageService.ask(GetImageFile(imageId)).mapTo[Option[ImageFile]]) {
             case imageFileMaybe => imageFileMaybe.map(imageFile => {
               val file = storage.resolve(imageFile.fileName.value).toFile
               if (file.isFile && file.canRead)
@@ -73,21 +73,21 @@ trait ImageRoutes { this: RestApi =>
         }
       } ~ path(LongNumber / "attributes") { imageId =>
         get {
-          onSuccess(dicomService.ask(GetImageAttributes(imageId)).mapTo[Option[List[ImageAttribute]]]) {
+          onSuccess(storageService.ask(GetImageAttributes(imageId)).mapTo[Option[List[ImageAttribute]]]) {
             import spray.httpx.SprayJsonSupport._
             complete(_)
           }
         }
       } ~ path(LongNumber / "imageinformation") { imageId =>
         get {
-          onSuccess(dicomService.ask(GetImageInformation(imageId)).mapTo[Option[ImageInformation]]) {
+          onSuccess(storageService.ask(GetImageInformation(imageId)).mapTo[Option[ImageInformation]]) {
             import spray.httpx.SprayJsonSupport._
             complete(_)
           }
         }
       } ~ path(LongNumber / "anonymize") { imageId =>
         put {
-          onSuccess(dicomService.ask(AnonymizeImage(imageId)).mapTo[Option[Image]]) {
+          onSuccess(storageService.ask(AnonymizeImage(imageId)).mapTo[Option[Image]]) {
             _ match {
               case Some(image) => complete(NoContent)
               case None => complete(NotFound)
@@ -101,7 +101,7 @@ trait ImageRoutes { this: RestApi =>
           'windowmax.as[Int] ? 0,
           'imageheight.as[Int] ? 0) { (frameNumber, min, max, height) =>
             get {
-              onSuccess(dicomService.ask(GetImageFrame(imageId, frameNumber, min, max, height)).mapTo[Option[Array[Byte]]]) {
+              onSuccess(storageService.ask(GetImageFrame(imageId, frameNumber, min, max, height)).mapTo[Option[Array[Byte]]]) {
                 _.map(bytes =>
                   complete(HttpEntity(MediaTypes.`image/png`, HttpData(bytes))))
                   .getOrElse(complete(NotFound))

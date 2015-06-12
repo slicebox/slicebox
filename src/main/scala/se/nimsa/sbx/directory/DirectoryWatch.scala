@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package se.nimsa.sbx.dicom.directory
+package se.nimsa.sbx.directory
 
 import java.nio.file.FileSystems
 import java.nio.file.FileVisitResult
@@ -26,7 +26,7 @@ import java.nio.file.attribute.BasicFileAttributes
 import scala.collection.JavaConversions.asScalaBuffer
 import com.typesafe.scalalogging.LazyLogging
 import akka.actor.ActorRef
-import se.nimsa.sbx.dicom.DicomProtocol.FileAddedToWatchedDirectory
+import DirectoryWatchProtocol.FileAddedToWatchedDirectory
 
 class DirectoryWatch(notifyActor: ActorRef) extends Runnable with LazyLogging {
 

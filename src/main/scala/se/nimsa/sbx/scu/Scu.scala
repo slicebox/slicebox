@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package se.nimsa.sbx.dicom.scu
+package se.nimsa.sbx.scu
 
 import java.io.BufferedReader
 import java.io.BufferedWriter
@@ -57,7 +57,7 @@ import org.xml.sax.SAXException
 import org.dcm4che3.net.pdu.CommonExtendedNegotiation
 import scala.collection.JavaConversions._
 import java.nio.file.Path
-import se.nimsa.sbx.dicom.DicomProtocol.ScuData
+import ScuProtocol.ScuData
 
 class RelatedGeneralSOPClasses {
 
