@@ -1135,9 +1135,9 @@
       }
     },
 
-    "/boxes/generatebaseurl": {
+    "/boxes/createconnection": {
       "post": {
-        "description": "generate a new box URL for setting up a connection from another box to this box. Used by publicly available boxes.",
+        "description": "create a new box connection where the supplied entity holds the remote box name. Used by publicly available boxes.",
         "tags": ["Boxes"],
         "parameters": [
           {
@@ -1152,18 +1152,18 @@
         ],
         "responses": {
           "201": {
-            "description": "box connections",
+            "description": "remote box of the connection",
             "schema": {
-              "$ref": "#/definitions/boxBaseUrl"
+              "$ref": "#/definitions/box"
             }
           }
         }                
       }
     },
 
-    "/boxes/addremotebox": {
+    "/boxes/connect": {
       "post": {
-        "description": "setup a connection to another box using a given URL",
+        "description": "connect to another box using a received URL. Used to connect to a public box.",
         "tags": ["Boxes"],
         "parameters": [
           {
@@ -2070,13 +2070,6 @@
       }
     },
     "remoteBoxName": {
-      "properties": {
-        "value": {
-          "type": "string"
-        }
-      }
-    },
-    "boxBaseUrl": {
       "properties": {
         "value": {
           "type": "string"
