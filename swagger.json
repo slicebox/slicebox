@@ -219,25 +219,6 @@
             "description": "patient not found (invalid ID)"
           }
         }
-      },
-      "delete": {
-        "description": "Delete the patient with the supplied ID",
-        "tags": ["Meta Data"],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "description": "ID of patient",
-            "required": true,
-            "type": "integer",
-            "format": "int64"
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "patient deleted"
-          }
-        }
       }
     },
 
@@ -355,25 +336,6 @@
             "description": "study not found (invalid ID)"
           }
         }
-      },
-      "delete": {
-        "description": "Delete the study with the supplied ID",
-        "tags": ["Meta Data"],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "description": "ID of study",
-            "required": true,
-            "type": "integer",
-            "format": "int64"
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "study deleted"
-          }
-        }
       }
     },
 
@@ -489,25 +451,6 @@
           },
           "404": {
             "description": "series not found (invalid ID)"
-          }
-        }
-      },
-      "delete": {
-        "description": "Delete the series with the supplied ID",
-        "tags": ["Meta Data"],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "description": "ID of series",
-            "required": true,
-            "type": "integer",
-            "format": "int64"
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "series deleted"
           }
         }
       }
@@ -639,25 +582,6 @@
           },
           "404": {
             "description": "image not found (invalid ID)"
-          }
-        }
-      },
-      "delete": {
-        "description": "Delete the image with the supplied ID",
-        "tags": ["Meta Data"],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "description": "ID of image",
-            "required": true,
-            "type": "integer",
-            "format": "int64"
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "image deleted"
           }
         }
       }
@@ -815,6 +739,25 @@
           },
           "404": {
             "description": "if no image was found for the supplied image ID"
+          }
+        }
+      },
+      "delete": {
+        "description": "Delete the image with the supplied ID",
+        "tags": ["Images"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of image",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "image deleted"
           }
         }
       }
