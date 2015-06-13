@@ -84,11 +84,6 @@ trait MetadataRoutes { this: RestApi =>
             onSuccess(storageService.ask(GetPatient(patientId)).mapTo[Option[Patient]]) {
               complete(_)
             }
-          } ~ delete {
-            onSuccess(storageService.ask(DeletePatient(patientId))) {
-              case ImageFilesDeleted(_) =>
-                complete(NoContent)
-            }
           }
         }
       } ~ pathPrefix("studies") {
@@ -120,11 +115,6 @@ trait MetadataRoutes { this: RestApi =>
             onSuccess(storageService.ask(GetStudy(studyId)).mapTo[Option[Study]]) {
               complete(_)
             }
-          } ~ delete {
-            onSuccess(storageService.ask(DeleteStudy(studyId))) {
-              case ImageFilesDeleted(_) =>
-                complete(NoContent)
-            }
           }
         }
       } ~ pathPrefix("series") {
@@ -155,11 +145,6 @@ trait MetadataRoutes { this: RestApi =>
           get {
             onSuccess(storageService.ask(GetSingleSeries(seriesId)).mapTo[Option[Series]]) {
               complete(_)
-            }
-          } ~ delete {
-            onSuccess(storageService.ask(DeleteSeries(seriesId))) {
-              case ImageFilesDeleted(_) =>
-                complete(NoContent)
             }
           }
         } ~ path(LongNumber / "source") { seriesId =>
@@ -208,11 +193,6 @@ trait MetadataRoutes { this: RestApi =>
           get {
             onSuccess(storageService.ask(GetImage(imageId)).mapTo[Option[Image]]) {
               complete(_)
-            }
-          } ~ delete {
-            onSuccess(storageService.ask(DeleteImage(imageId))) {
-              case ImageFilesDeleted(_) =>
-                complete(NoContent)
             }
           }
         }

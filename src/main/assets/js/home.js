@@ -21,7 +21,7 @@ angular.module('slicebox.home', ['ngRoute'])
             },
             {
                 name: 'Delete',
-                action: $scope.confirmDeleteEntitiesFunction('/api/metadata/patients/', 'patient(s)')
+                action: confirmDeletePatients
             },
             {
                 name: 'Anonymize',
@@ -37,7 +37,7 @@ angular.module('slicebox.home', ['ngRoute'])
             },
             {
                 name: 'Delete',
-                action: $scope.confirmDeleteEntitiesFunction('/api/metadata/studies/', 'study(s)')
+                action: confirmDeleteStudies
             },
             {
                 name: 'Anonymize',
@@ -58,7 +58,7 @@ angular.module('slicebox.home', ['ngRoute'])
             },   
             {
                 name: 'Delete',
-                action: $scope.confirmDeleteEntitiesFunction('/api/metadata/series/', 'series')
+                action: confirmDeleteSeries
             },
             {
                 name: 'Anonymize',
@@ -245,9 +245,7 @@ angular.module('slicebox.home', ['ngRoute'])
 
     $scope.flatSeriesSelected = function(flatSeries) {
 
-        if (flatSeries === null) {
-            $scope.patientSelected(null);
-        } else {
+        if (flatSeries !== null) {
             $scope.patientSelected(flatSeries.patient);
             $scope.studySelected(flatSeries.study);
             $scope.seriesSelected(flatSeries.series);
@@ -503,6 +501,42 @@ angular.module('slicebox.home', ['ngRoute'])
                 $scope.showInfoMessage("Series sent to PACS");
             }).error(function(data) {
                 $scope.showErrorMessage('Failed to send to PACS: ' + data);
+            });
+        });
+    }
+
+    function confirmDeletePatients(patients) {
+        imagesForPatients(patients).then(function(images) {
+            var f = $scope.confirmDeleteEntitiesFunction('/api/images/', 'images');
+            f(images).finally(function() {
+                $scope.patientSelected(null);        
+                $scope.callbacks.patientsTable.reset();
+            });
+        });
+    }
+
+    function confirmDeleteStudies(studies) {
+        imagesForStudies(studies).then(function(images) {
+            var f = $scope.confirmDeleteEntitiesFunction('/api/images/', 'images');
+            f(images).finally(function() {
+                $scope.studySelected(null);        
+                $scope.callbacks.studiesTable.reset();
+            });
+        });
+    }
+
+    function confirmDeleteSeries(series) {
+        imagesForSeries(series).then(function(images) {
+            var f = $scope.confirmDeleteEntitiesFunction('/api/images/', 'images');
+            f(images).finally(function() {
+                if ($scope.callbacks.flatSeriesTable) {
+                    $scope.flatSeriesSelected(null);     
+                    $scope.callbacks.flatSeriesTable.reset();
+                } 
+                if ($scope.callbacks.seriesTable) {
+                    $scope.seriesSelected(null);        
+                    $scope.callbacks.seriesTable.reset();
+                }
             });
         });
     }

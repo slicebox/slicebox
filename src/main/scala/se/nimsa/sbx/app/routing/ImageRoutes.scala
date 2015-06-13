@@ -70,6 +70,11 @@ trait ImageRoutes { this: RestApi =>
               complete((NotFound, s"No file found for image id $imageId"))
             }
           }
+        } ~ delete {
+          onSuccess(storageService.ask(DeleteImage(imageId))) {
+            case ImageDeleted(imageId) =>
+              complete(NoContent)
+          }
         }
       } ~ path(LongNumber / "attributes") { imageId =>
         get {

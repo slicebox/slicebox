@@ -137,5 +137,16 @@ class ImageRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       status should be (NotFound)
     }
   }
-    
+
+  it should "support deleting and image" in {
+    GetAsUser("/api/metadata/images/2") ~> routes ~> check {
+      status should be (OK)            
+    }
+    DeleteAsUser("/api/images/2") ~> routes ~> check {
+      status should be (NoContent)
+    }
+    GetAsUser("/api/metadata/images/2") ~> routes ~> check {
+      status should be (NotFound)            
+    }
+  }
 }

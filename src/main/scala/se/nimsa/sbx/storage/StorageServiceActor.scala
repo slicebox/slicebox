@@ -117,43 +117,17 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
         sender ! anonImageMaybe
       }
 
-    case msg: MetaDataUpdate => catchAndReport {
-      msg match {
-
-        case DeleteImage(imageId) =>
-          db.withSession { implicit session =>
-            val imageFiles = propertiesDao.imageFileForImage(imageId).toList
-            dao.deleteImage(imageId)
-            deleteFromStorage(imageFiles)
-            sender ! ImageFilesDeleted(imageFiles)
+    case DeleteImage(imageId) =>
+      catchAndReport {
+        db.withSession { implicit session =>
+          dao.imageById(imageId).foreach { image =>
+            val imageFile = propertiesDao.imageFileForImage(image.id)
+              .foreach(deleteFromStorage(_))
+            dao.deleteFully(image)
           }
-
-        case DeleteSeries(seriesId) =>
-          db.withSession { implicit session =>
-            val imageFiles = propertiesDao.imageFilesForSeries(seriesId)
-            dao.deleteSeries(seriesId)
-            deleteFromStorage(imageFiles)
-            sender ! ImageFilesDeleted(imageFiles)
-          }
-
-        case DeleteStudy(studyId) =>
-          db.withSession { implicit session =>
-            val imageFiles = propertiesDao.imageFilesForStudy(studyId)
-            dao.deleteStudy(studyId)
-            deleteFromStorage(imageFiles)
-            sender ! ImageFilesDeleted(imageFiles)
-          }
-
-        case DeletePatient(patientId) =>
-          db.withSession { implicit session =>
-            val imageFiles = propertiesDao.imageFilesForPatient(patientId)
-            dao.deletePatient(patientId)
-            deleteFromStorage(imageFiles)
-            sender ! ImageFilesDeleted(imageFiles)
-          }
-
+          sender ! ImageDeleted(imageId)
+        }
       }
-    }
 
     case msg: ImageRequest => catchAndReport {
       msg match {

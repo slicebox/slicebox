@@ -155,15 +155,7 @@ object StorageProtocol {
   case class QueryImages(query: Query) extends MetaDataQuery
   
   
-  sealed trait MetaDataUpdate
-  
-  case class DeleteImage(imageId: Long) extends MetaDataUpdate
-
-  case class DeleteSeries(seriesId: Long) extends MetaDataUpdate
-
-  case class DeleteStudy(studyId: Long) extends MetaDataUpdate
-
-  case class DeletePatient(patientId: Long) extends MetaDataUpdate
+  case class DeleteImage(imageId: Long)
   
   
   sealed trait ImageRequest
@@ -192,9 +184,9 @@ object StorageProtocol {
 
   case class Images(images: Seq[Image]) 
 
-  case class ImagesDeleted(images: Seq[Image])
-
   case class ImageAdded(image: Image)
+  
+  case class ImageDeleted(imageId: Long)
   
   // ***to storage***
 
@@ -205,9 +197,7 @@ object StorageProtocol {
   // ***from storage***
 
   case class ImageFiles(imageFiles: Seq[ImageFile])
-      
-  case class ImageFilesDeleted(imageFiles: Seq[ImageFile])
-  
+        
   // Series
   
   case class SeriesDataset(id: Long, url: String)
