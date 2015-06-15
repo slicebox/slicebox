@@ -19,19 +19,14 @@ package se.nimsa.sbx.app
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
-
 import scala.concurrent.duration.DurationInt
 import scala.slick.driver.H2Driver
 import scala.slick.jdbc.JdbcBackend.Database
-
 import akka.actor.Actor
 import akka.util.Timeout
-
 import spray.routing.HttpService
-
 import com.mchange.v2.c3p0.ComboPooledDataSource
 import com.typesafe.config.ConfigFactory
-
 import se.nimsa.sbx.app.routing.SliceboxRoutes
 import se.nimsa.sbx.box.BoxServiceActor
 import se.nimsa.sbx.storage.StorageServiceActor
@@ -40,6 +35,7 @@ import se.nimsa.sbx.scu.ScuServiceActor
 import se.nimsa.sbx.directory.DirectoryWatchServiceActor
 import se.nimsa.sbx.log.LogServiceActor
 import se.nimsa.sbx.seriestype.SeriesTypeServiceActor
+import se.nimsa.sbx.anonymization.AnonymizationServiceActor
 
 class RestInterface extends Actor with RestApi {
 
@@ -96,6 +92,7 @@ trait RestApi extends HttpService with SliceboxRoutes with JsonFormats {
   val userService = actorRefFactory.actorOf(UserServiceActor.props(dbProps, superUser, superPassword), name = "UserService")
   val logService = actorRefFactory.actorOf(LogServiceActor.props(dbProps), name = "LogService")
   val storageService = actorRefFactory.actorOf(StorageServiceActor.props(dbProps, storage), name = "StorageService")
+  val anonymizationService = actorRefFactory.actorOf(AnonymizationServiceActor.props(dbProps), name = "AnonymizationService")
   val boxService = actorRefFactory.actorOf(BoxServiceActor.props(dbProps, storage, apiBaseURL), name = "BoxService")
   val scpService = actorRefFactory.actorOf(ScpServiceActor.props(dbProps), name = "ScpService")
   val scuService = actorRefFactory.actorOf(ScuServiceActor.props(dbProps, storage), name = "ScuService")
