@@ -24,6 +24,8 @@ import java.util.Date
 import org.dcm4che3.util.TagUtils
 import org.dcm4che3.data.Attributes.Visitor
 import DicomUtil._
+import java.util.UUID
+import scala.util.Random
 
 object DicomAnonymization {
 
@@ -48,7 +50,7 @@ object DicomAnonymization {
 
       setAnonymous(modified, true)
 
-      setStringTagIfPresent(modified, Tag.AccessionNumber, VR.SH, createUid(modified.getString(Tag.AccessionNumber)))
+      setStringTagIfPresent(modified, Tag.AccessionNumber, VR.SH, createAccessionNumber(modified.getString(Tag.AccessionNumber)))
       removeTag(modified, Tag.AcquisitionComments)
       removeTag(modified, Tag.AcquisitionContextSequence)
       removeTag(modified, Tag.AcquisitionDeviceProcessingDescription)
@@ -311,4 +313,10 @@ object DicomAnonymization {
     s"Anonymous $sexString $ageString"
   }
 
+  def createAccessionNumber(accessionNumber: String): String = {
+    val seed = UUID.nameUUIDFromBytes(accessionNumber.getBytes).getMostSignificantBits
+    val rand = new Random(seed)
+    (1 to 16).foldLeft("")((s, i) => s + rand.nextInt(10).toString)
+  }
+    
 }
