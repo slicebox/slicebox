@@ -24,6 +24,8 @@ import java.util.Date
 import org.dcm4che3.util.TagUtils
 import org.dcm4che3.data.Attributes.Visitor
 import se.nimsa.sbx.dicom.DicomUtil._
+import java.util.UUID
+import scala.util.Random
 
 object AnonymizationUtil {
 
@@ -48,7 +50,7 @@ object AnonymizationUtil {
 
       setAnonymous(modified, true)
 
-      setStringTag(modified, Tag.AccessionNumber, VR.SH, createUidOrLeaveEmpty(modified.getString(Tag.AccessionNumber)))
+      setStringTagIfPresent(modified, Tag.AccessionNumber, VR.SH, createAccessionNumber(modified.getString(Tag.AccessionNumber)))
       removeTag(modified, Tag.AcquisitionComments)
       removeTag(modified, Tag.AcquisitionContextSequence)
       removeTag(modified, Tag.AcquisitionDeviceProcessingDescription)
@@ -59,21 +61,21 @@ object AnonymizationUtil {
       removeTag(modified, Tag.AdmissionID)
       removeTag(modified, Tag.AdmittingDiagnosesCodeSequence)
       removeTag(modified, Tag.AdmittingDiagnosesDescription)
-      setUidTagOrLeaveEmpty(modified, Tag.ConcatenationUID)
+      setUidTagIfPresent(modified, Tag.ConcatenationUID)
       removeTag(modified, Tag.Allergies)
       removeTag(modified, Tag.Arbitrary)
       removeTag(modified, Tag.AuthorObserverSequence)
       removeTag(modified, Tag.BranchOfService)
       removeTag(modified, Tag.CommentsOnThePerformedProcedureStep)
       removeTag(modified, Tag.ConfidentialityConstraintOnPatientDataDescription)
-      setStringTag(modified, Tag.ContentCreatorName, VR.PN, emptyString)
+      setStringTagIfPresent(modified, Tag.ContentCreatorName, VR.PN, emptyString)
       removeTag(modified, Tag.ContentCreatorIdentificationCodeSequence)
       removeTag(modified, Tag.ContentSequence)
-      setUidTagOrLeaveEmpty(modified, Tag.ContextGroupExtensionCreatorUID)
-      setStringTag(modified, Tag.ContrastBolusAgent, VR.LO, emptyString)
+      setUidTagIfPresent(modified, Tag.ContextGroupExtensionCreatorUID)
+      setStringTagIfPresent(modified, Tag.ContrastBolusAgent, VR.LO, emptyString)
       removeTag(modified, Tag.ContributionDescription)
       removeTag(modified, Tag.CountryOfResidence)
-      setUidTagOrLeaveEmpty(modified, Tag.CreatorVersionUID)
+      setUidTagIfPresent(modified, Tag.CreatorVersionUID)
       removeTag(modified, Tag.CurrentObserverTrial)
       removeTag(modified, Tag.CurrentPatientLocation)
       removeTag(modified, Tag.CurveData)
@@ -82,16 +84,16 @@ object AnonymizationUtil {
       removeTag(modified, Tag.DerivationDescription)
       removeTag(modified, Tag.DigitalSignatureUID)
       removeTag(modified, Tag.DigitalSignaturesSequence)
-      setUidTagOrLeaveEmpty(modified, Tag.DimensionOrganizationUID)
+      setUidTagIfPresent(modified, Tag.DimensionOrganizationUID)
       removeTag(modified, Tag.DischargeDiagnosisDescription)
       removeTag(modified, Tag.DistributionAddress)
       removeTag(modified, Tag.DistributionName)
-      setUidTagOrLeaveEmpty(modified, Tag.DoseReferenceUID)
+      setUidTagIfPresent(modified, Tag.DoseReferenceUID)
       removeTag(modified, Tag.FailedSOPInstanceUIDList)
-      setUidTagOrLeaveEmpty(modified, Tag.FiducialUID)
-      setStringTag(modified, Tag.FillerOrderNumberImagingServiceRequest, VR.LO, emptyString)
+      setUidTagIfPresent(modified, Tag.FiducialUID)
+      setStringTagIfPresent(modified, Tag.FillerOrderNumberImagingServiceRequest, VR.LO, emptyString)
       removeTag(modified, Tag.FrameComments)
-      setUidTagOrLeaveEmpty(modified, Tag.FrameOfReferenceUID)
+      setUidTagIfPresent(modified, Tag.FrameOfReferenceUID)
       removeTag(modified, Tag.GraphicAnnotationSequence) // type D
       removeTag(modified, Tag.HumanPerformerName)
       removeTag(modified, Tag.HumanPerformerOrganization)
@@ -102,7 +104,7 @@ object AnonymizationUtil {
       removeTag(modified, Tag.ImagingServiceRequestComments)
       removeTag(modified, Tag.Impressions)
       removeTag(modified, Tag.InstanceCoercionDateTime)
-      setUidTagOrLeaveEmpty(modified, Tag.InstanceCreatorUID)
+      setUidTagIfPresent(modified, Tag.InstanceCreatorUID)
       removeTag(modified, Tag.InstitutionAddress)
       removeTag(modified, Tag.InstitutionCodeSequence)
       removeTag(modified, Tag.InstitutionName)
@@ -116,13 +118,13 @@ object AnonymizationUtil {
       removeTag(modified, Tag.InterpretationRecorder)
       removeTag(modified, Tag.InterpretationText)
       removeTag(modified, Tag.InterpretationTranscriber)
-      setUidTagOrLeaveEmpty(modified, Tag.IrradiationEventUID)
+      setUidTagIfPresent(modified, Tag.IrradiationEventUID)
       removeTag(modified, Tag.IssuerOfAdmissionID)
       removeTag(modified, Tag.IssuerOfPatientID)
       removeTag(modified, Tag.IssuerOfServiceEpisodeID)
-      setUidTagOrLeaveEmpty(modified, Tag.LargePaletteColorLookupTableUID)
+      setUidTagIfPresent(modified, Tag.LargePaletteColorLookupTableUID)
       removeTag(modified, Tag.MAC)
-      setUidTagOrLeaveEmpty(modified, Tag.MediaStorageSOPInstanceUID)
+      setUidTagIfPresent(modified, Tag.MediaStorageSOPInstanceUID)
       removeTag(modified, Tag.MedicalAlerts)
       removeTag(modified, Tag.MedicalRecordLocator)
       removeTag(modified, Tag.MilitaryRank)
@@ -132,8 +134,8 @@ object AnonymizationUtil {
       removeTag(modified, Tag.ModifyingDeviceManufacturer)
       removeTag(modified, Tag.NameOfPhysiciansReadingStudy)
       removeTag(modified, Tag.NamesOfIntendedRecipientsOfResults)
-      setUidTagOrLeaveEmpty(modified, Tag.ObservationSubjectUIDTrial)
-      setUidTagOrLeaveEmpty(modified, Tag.ObservationUID)
+      setUidTagIfPresent(modified, Tag.ObservationSubjectUIDTrial)
+      setUidTagIfPresent(modified, Tag.ObservationUID)
       removeTag(modified, Tag.Occupation)
       removeTag(modified, Tag.OperatorIdentificationSequence)
       removeTag(modified, Tag.OperatorsName)
@@ -146,7 +148,7 @@ object AnonymizationUtil {
       removeTag(modified, Tag.OtherPatientNames)
       removeTag(modified, Tag.OverlayComments)
       removeTag(modified, Tag.OverlayData)
-      setUidTagOrLeaveEmpty(modified, Tag.PaletteColorLookupTableUID)
+      setUidTagIfPresent(modified, Tag.PaletteColorLookupTableUID)
       removeTag(modified, Tag.ParticipantSequence)
       removeTag(modified, Tag.PatientAddress)
       removeTag(modified, Tag.PatientComments)
@@ -177,37 +179,37 @@ object AnonymizationUtil {
       removeTag(modified, Tag.PhysiciansReadingStudyIdentificationSequence)
       removeTag(modified, Tag.PhysiciansOfRecord)
       removeTag(modified, Tag.PhysiciansOfRecordIdentificationSequence)
-      setStringTag(modified, Tag.PlacerOrderNumberImagingServiceRequest, VR.LO, emptyString)
+      setStringTagIfPresent(modified, Tag.PlacerOrderNumberImagingServiceRequest, VR.LO, emptyString)
       removeTag(modified, Tag.PreMedication)
       removeTag(modified, Tag.ProtocolName)
       removeTag(modified, Tag.ReasonForTheImagingServiceRequest)
       removeTag(modified, Tag.ReasonForStudy)
       removeTag(modified, Tag.ReferencedDigitalSignatureSequence)
-      setUidTagOrLeaveEmpty(modified, Tag.ReferencedFrameOfReferenceUID)
-      setUidTagOrLeaveEmpty(modified, Tag.ReferencedGeneralPurposeScheduledProcedureStepTransactionUID)
+      setUidTagIfPresent(modified, Tag.ReferencedFrameOfReferenceUID)
+      setUidTagIfPresent(modified, Tag.ReferencedGeneralPurposeScheduledProcedureStepTransactionUID)
       removeTag(modified, Tag.ReferencedImageSequence) // Keep in UID option but removed here
-      setUidTagOrLeaveEmpty(modified, Tag.ReferencedObservationUIDTrial)
+      setUidTagIfPresent(modified, Tag.ReferencedObservationUIDTrial)
       removeTag(modified, Tag.ReferencedPatientAliasSequence)
       removeTag(modified, Tag.ReferencedPatientPhotoSequence)
       removeTag(modified, Tag.ReferencedPatientSequence)
       removeTag(modified, Tag.ReferencedPerformedProcedureStepSequence) // Keep in UID option but removed here
       removeTag(modified, Tag.ReferencedSOPInstanceMACSequence)
-      setUidTagOrLeaveEmpty(modified, Tag.ReferencedSOPInstanceUID)
-      setUidTagOrLeaveEmpty(modified, Tag.ReferencedSOPInstanceUIDInFile)
+      setUidTagIfPresent(modified, Tag.ReferencedSOPInstanceUID)
+      setUidTagIfPresent(modified, Tag.ReferencedSOPInstanceUIDInFile)
       removeTag(modified, Tag.ReferencedStudySequence) // Keep in UID option but removed here
       removeTag(modified, Tag.ReferringPhysicianAddress)
       removeTag(modified, Tag.ReferringPhysicianIdentificationSequence)
-      setStringTag(modified, Tag.ReferringPhysicianName, VR.PN, emptyString)
+      setStringTagIfPresent(modified, Tag.ReferringPhysicianName, VR.PN, emptyString)
       removeTag(modified, Tag.ReferringPhysicianTelephoneNumbers)
       removeTag(modified, Tag.RegionOfResidence)
-      setUidTagOrLeaveEmpty(modified, Tag.RelatedFrameOfReferenceUID)
+      setUidTagIfPresent(modified, Tag.RelatedFrameOfReferenceUID)
       removeTag(modified, Tag.RequestAttributesSequence)
       removeTag(modified, Tag.RequestedContrastAgent)
       removeTag(modified, Tag.RequestedProcedureComments)
       removeTag(modified, Tag.RequestedProcedureDescription)
       removeTag(modified, Tag.RequestedProcedureID)
       removeTag(modified, Tag.RequestedProcedureLocation)
-      setUidTagOrLeaveEmpty(modified, Tag.RequestedSOPInstanceUID)
+      setUidTagIfPresent(modified, Tag.RequestedSOPInstanceUID)
       removeTag(modified, Tag.RequestingPhysician)
       removeTag(modified, Tag.RequestingService)
       removeTag(modified, Tag.ResponsibleOrganization)
@@ -222,35 +224,35 @@ object AnonymizationUtil {
       removeTag(modified, Tag.ScheduledPerformingPhysicianName)
       removeTag(modified, Tag.ScheduledProcedureStepDescription)
       removeTag(modified, Tag.SeriesDescription)
-      setUidTagOrLeaveEmpty(modified, Tag.SeriesInstanceUID)
+      setUidTagIfPresent(modified, Tag.SeriesInstanceUID)
       removeTag(modified, Tag.ServiceEpisodeDescription)
       removeTag(modified, Tag.ServiceEpisodeID)
       setUidTag(modified, Tag.SOPInstanceUID)
       removeTag(modified, Tag.SourceImageSequence) // Keep in UID option but removed here
       removeTag(modified, Tag.SpecialNeeds)
-      setUidTagOrLeaveEmpty(modified, Tag.StorageMediaFileSetUID)
+      setUidTagIfPresent(modified, Tag.StorageMediaFileSetUID)
       removeTag(modified, Tag.StudyComments)
       removeTag(modified, Tag.StudyDescription)
-      setStringTag(modified, Tag.StudyID, VR.SH, emptyString)
+      setStringTagIfPresent(modified, Tag.StudyID, VR.SH, emptyString)
       removeTag(modified, Tag.StudyIDIssuer)
-      setUidTagOrLeaveEmpty(modified, Tag.StudyInstanceUID)
-      setUidTagOrLeaveEmpty(modified, Tag.SynchronizationFrameOfReferenceUID)
-      setUidTagOrLeaveEmpty(modified, Tag.TargetUID)
+      setUidTagIfPresent(modified, Tag.StudyInstanceUID)
+      setUidTagIfPresent(modified, Tag.SynchronizationFrameOfReferenceUID)
+      setUidTagIfPresent(modified, Tag.TargetUID)
       removeTag(modified, Tag.TelephoneNumberTrial)
-      setUidTagOrLeaveEmpty(modified, Tag.TemplateExtensionCreatorUID)
-      setUidTagOrLeaveEmpty(modified, Tag.TemplateExtensionOrganizationUID)
+      setUidTagIfPresent(modified, Tag.TemplateExtensionCreatorUID)
+      setUidTagIfPresent(modified, Tag.TemplateExtensionOrganizationUID)
       removeTag(modified, Tag.TextComments)
       removeTag(modified, Tag.TextString)
       removeTag(modified, Tag.TopicAuthor)
       removeTag(modified, Tag.TopicKeywords)
       removeTag(modified, Tag.TopicSubject)
       removeTag(modified, Tag.TopicTitle)
-      setUidTagOrLeaveEmpty(modified, Tag.TransactionUID)
-      setUidTagOrLeaveEmpty(modified, Tag.UID)
+      setUidTagIfPresent(modified, Tag.TransactionUID)
+      setUidTagIfPresent(modified, Tag.UID)
       removeTag(modified, Tag.VerbalSourceTrial)
       removeTag(modified, Tag.VerbalSourceIdentifierCodeSequenceTrial)
       removeTag(modified, Tag.VerifyingObserverIdentificationCodeSequence) // type Z
-      setStringTag(modified, Tag.VerifyingObserverName, VR.PN, emptyString)
+      setStringTagIfPresent(modified, Tag.VerifyingObserverName, VR.PN, emptyString)
       removeTag(modified, Tag.VerifyingObserverSequence) // type D
       removeTag(modified, Tag.VerifyingOrganization)
       removeTag(modified, Tag.VisitComments)
@@ -281,29 +283,21 @@ object AnonymizationUtil {
 
   def setStringTag(dataset: Attributes, tag: Int, vr: VR, value: String): Unit = dataset.setString(tag, vr, value)
   def setDateTag(dataset: Attributes, tag: Int, vr: VR, value: Date): Unit = dataset.setDate(tag, vr, value)
+  def setUidTag(dataset: Attributes, tag: Int) = setStringTag(dataset, tag, VR.UI, createUid(dataset.getString(tag)))
+
   def removeTag(dataset: Attributes, tag: Int): Unit = dataset.remove(tag)
 
-  def setUidTag(dataset: Attributes, tag: Int) =
-    setStringTag(dataset, tag, VR.UI, createUid(dataset.getString(tag)))
+  def setStringTagIfPresent(dataset: Attributes, tag: Int, vr: VR, value: String) =
+    if (isPresent(dataset, tag))
+      setStringTag(dataset, tag, vr, value)
 
-  def setUidTagOrLeaveEmpty(dataset: Attributes, tag: Int) =
-    setStringTag(dataset, tag, VR.UI, createUidOrLeaveEmpty(dataset.getString(tag)))
+  def setUidTagIfPresent(dataset: Attributes, tag: Int): Unit =
+    setStringTagIfPresent(dataset, tag, VR.UI, createUid(dataset.getString(tag)))
 
-  def createUidsOrLeaveEmpty(baseValues: String*): Array[String] =
-    if (baseValues == null)
-      null
-    else
-      baseValues.map(createUidOrLeaveEmpty(_)).toArray
-
-  def createUidOrLeaveEmpty(baseValue: String): String = leaveEmpty(baseValue).getOrElse(createUid(baseValue))
-
-  def leaveEmpty(baseValue: String): Option[String] =
-    if (baseValue == null)
-      Some(null)
-    else if (baseValue.isEmpty())
-      Some(baseValue)
-    else
-      None
+  def isPresent(dataset: Attributes, tag: Int): Boolean = {
+    val value = dataset.getString(tag)
+    value != null && !value.isEmpty
+  }
 
   def createUid(): String = createUid(null)
 
@@ -319,4 +313,10 @@ object AnonymizationUtil {
     s"Anonymous $sexString $ageString"
   }
 
+  def createAccessionNumber(accessionNumber: String): String = {
+    val seed = UUID.nameUUIDFromBytes(accessionNumber.getBytes).getMostSignificantBits
+    val rand = new Random(seed)
+    (1 to 16).foldLeft("")((s, i) => s + rand.nextInt(10).toString)
+  }
+    
 }
