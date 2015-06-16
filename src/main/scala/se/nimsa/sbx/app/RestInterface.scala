@@ -78,14 +78,26 @@ trait RestApi extends HttpService with SliceboxRoutes with JsonFormats {
     ds.setJdbcUrl(dbUrl)
     Database.forDataSource(ds)
   }
-  
+
   val dbProps = DbProps(db, H2Driver)
 
   val storage = createStorageDirectory()
 
-  val host = config.getString("http.host")
-  val port = config.getInt("http.port")
-  val apiBaseURL = s"http://$host:$port/api"
+  val host = if (config.hasPath("slicebox.host"))
+    config.getString("slicebox.host")
+  else
+    config.getString("http.host")
+    
+  val port = if (config.hasPath("slicebox.port"))
+    config.getInt("slicebox.port")
+  else
+    config.getInt("http.port")
+    
+  val apiBaseURL = if (port == 80)
+    s"http://$host/api"
+  else
+    s"http://$host:$port/api"
+    
   val superUser = sliceboxConfig.getString("superuser.user")
   val superPassword = sliceboxConfig.getString("superuser.password")
 
