@@ -287,9 +287,9 @@ object AnonymizationUtil {
 
   def removeTag(dataset: Attributes, tag: Int): Unit = dataset.remove(tag)
 
-  def setStringTagIfPresent(dataset: Attributes, tag: Int, vr: VR, value: String) =
+  def setStringTagIfPresent(dataset: Attributes, tag: Int, vr: VR, valueFunction: => String) =
     if (isPresent(dataset, tag))
-      setStringTag(dataset, tag, vr, value)
+      setStringTag(dataset, tag, vr, valueFunction)
 
   def setUidTagIfPresent(dataset: Attributes, tag: Int): Unit =
     setStringTagIfPresent(dataset, tag, VR.UI, createUid(dataset.getString(tag)))
