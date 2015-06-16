@@ -77,11 +77,12 @@ class PropertiesDAOTest extends FlatSpec with Matchers with BeforeAndAfterEach {
       insertMetaData
       propertiesDao.flatSeries(0, 20, None, true, None, None, None).size should be (4)
       propertiesDao.flatSeries(0, 20, None, true, None, None, Some(1)).size should be (4)
-      propertiesDao.flatSeries(0, 20, None, true, None, Some(SourceType.BOX), Some(-1)).size should be (2)
+      propertiesDao.flatSeries(0, 20, None, true, None, Some(SourceType.BOX), Some(-1)).size should be (1)
       propertiesDao.flatSeries(0, 20, None, true, None, Some(SourceType.BOX), Some(2)).size should be (0)
       
       // with filter
-      propertiesDao.flatSeries(0, 20, None, true, Some("p1"), Some(SourceType.BOX), Some(-1)).size should be (2)
+      propertiesDao.flatSeries(0, 20, None, true, Some("p1"), Some(SourceType.BOX), Some(-1)).size should be (1)
+      propertiesDao.flatSeries(0, 20, None, true, Some("p1"), Some(SourceType.SCP), Some(-1)).size should be (1)
       propertiesDao.flatSeries(0, 20, None, true, Some("p2"), Some(SourceType.BOX), Some(-1)).size should be (0)
       
       // filter only
@@ -121,10 +122,12 @@ class PropertiesDAOTest extends FlatSpec with Matchers with BeforeAndAfterEach {
       insertMetaData
       propertiesDao.seriesForStudy(0, 20, 1, None, None).size should be (2)
       propertiesDao.seriesForStudy(0, 20, 1, None, Some(1)).size should be (2)
-      propertiesDao.seriesForStudy(0, 20, 1, Some(SourceType.BOX), Some(-1)).size should be (2)
+      propertiesDao.seriesForStudy(0, 20, 1, Some(SourceType.BOX), Some(-1)).size should be (1)
+      propertiesDao.seriesForStudy(0, 20, 1, Some(SourceType.SCP), Some(-1)).size should be (1)
       propertiesDao.seriesForStudy(0, 20, 2, Some(SourceType.UNKNOWN), Some(-1)).size should be (1)
       propertiesDao.seriesForStudy(0, 20, 2, Some(SourceType.DIRECTORY), Some(-1)).size should be (1)
       propertiesDao.seriesForStudy(0, 20, 1, Some(SourceType.BOX), Some(2)).size should be (0)      
+      propertiesDao.seriesForStudy(0, 20, 1, Some(SourceType.SCP), Some(2)).size should be (0)      
     }
   }
   
@@ -158,7 +161,7 @@ class PropertiesDAOTest extends FlatSpec with Matchers with BeforeAndAfterEach {
     val imageFile7 = ImageFile(-1, FileName("file7"), SourceType.SCP, 1)
     val imageFile8 = ImageFile(-1, FileName("file8"), SourceType.SCP, 1)
     val seriesSource1 = SeriesSource(-1, SourceType.BOX, -1)
-    val seriesSource2 = SeriesSource(-1, SourceType.BOX, -1)
+    val seriesSource2 = SeriesSource(-1, SourceType.SCP, -1)
     val seriesSource3 = SeriesSource(-1, SourceType.UNKNOWN, -1)
     val seriesSource4 = SeriesSource(-1, SourceType.DIRECTORY, -1)
 
