@@ -60,15 +60,13 @@ class ScpServiceActor(dbProps: DbProps) extends Actor with ExceptionCatching {
                 sender ! scpData
 
               case None =>
-                val scpData = ScpData(-1, name, aeTitle, port)
-
                 if (port < 0 || port > 65535)
                   throw new IllegalArgumentException("Port must be a value between 0 and 65535")
 
                 if (scpForPort(port).isDefined)
                   throw new IllegalArgumentException(s"Port $port is already in use")
 
-                addScp(scpData)
+                val scpData = addScp(ScpData(-1, name, aeTitle, port))
 
                 context.child(scpData.id.toString).getOrElse(
                   context.actorOf(ScpActor.props(scpData, executor), scpData.id.toString))
@@ -92,9 +90,6 @@ class ScpServiceActor(dbProps: DbProps) extends Actor with ExceptionCatching {
             }
         }
       }
-
-    case msg: DatasetReceivedByScp =>
-      context.parent ! msg
 
   }
 
