@@ -25,6 +25,7 @@ import se.nimsa.sbx.directory.DirectoryWatchProtocol._
 import se.nimsa.sbx.scp.ScpProtocol._
 import se.nimsa.sbx.scu.ScuProtocol._
 import se.nimsa.sbx.box.BoxProtocol._
+import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.log.LogProtocol._
 import se.nimsa.sbx.app.UserProtocol._
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
@@ -70,7 +71,7 @@ trait JsonFormats extends DefaultJsonProtocol {
 
   implicit val attributeValueMappingFormat = jsonFormat3(BoxSendTagValue)
   implicit val sendImagesDataFormat = jsonFormat2(BoxSendData)
-  implicit val anonymizationKeyFormat = jsonFormat19(AnonymizationKey)
+  implicit val anonymizationKeyFormat = jsonFormat16(AnonymizationKey)
   
   implicit val addScpDataFormat = jsonFormat3(AddScp)
   implicit val addScuDataFormat = jsonFormat4(AddScu)

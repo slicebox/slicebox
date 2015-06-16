@@ -44,6 +44,7 @@ import scala.concurrent.Future.sequence
 import akka.actor.Stash
 import org.dcm4che3.data.Attributes
 import BoxUtil._
+import se.nimsa.sbx.anonymization.AnonymizationProtocol.TagValue
 
 class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) extends Actor with Stash
   with SequentialPipeToSupport with ExceptionCatching {
@@ -172,29 +173,6 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
               case None =>
                 sender ! BoxNotFound
             }
-
-          case RemoveAnonymizationKey(anonymizationKeyId) =>
-            removeAnonymizationKey(anonymizationKeyId)
-            sender ! AnonymizationKeyRemoved(anonymizationKeyId)
-
-          case GetAnonymizationKeys(startIndex, count, orderBy, orderAscending, filter) =>
-            sender ! AnonymizationKeys(listAnonymizationKeys(startIndex, count, orderBy, orderAscending, filter))
-
-          case ReverseAnonymization(dataset) =>
-            val clonedDataset = cloneDataset(dataset)
-            reverseAnonymization(anonymizationKeysForAnonPatient(clonedDataset), clonedDataset)
-            sender ! clonedDataset
-
-          case HarmonizeAnonymization(outboxEntry, dataset, anonDataset) =>
-            val clonedAnonDataset = cloneDataset(anonDataset)
-            val anonymizationKeys = anonymizationKeysForPatient(dataset)
-            harmonizeAnonymization(anonymizationKeys, dataset, clonedAnonDataset)
-
-            val anonymizationKey = createAnonymizationKey(outboxEntry.remoteBoxId, outboxEntry.transactionId, boxById(outboxEntry.remoteBoxId).map(_.name).getOrElse("" + outboxEntry.remoteBoxId), dataset, anonDataset)            
-            if (!anonymizationKeys.exists(isEqual(_, anonymizationKey)))
-              addAnonymizationKey(anonymizationKey)
-
-            sender ! clonedAnonDataset
 
           case GetOutboxEntry(token, transactionId, sequenceNumber) =>
             pollBoxByToken(token).foreach(box => {
@@ -415,10 +393,10 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
     }
   }
 
-  def addTagValue(imageFileId: Long, transactionId: Long, tag: Int, value: String) =
+  def addTagValue(transactionId: Long, imageId: Long, tag: Int, value: String) =
     db.withSession { implicit session =>
       boxDao.insertTransactionTagValue(
-        TransactionTagValue(-1, imageFileId, transactionId, tag, value))
+        TransactionTagValue(-1, transactionId, TagValue(imageId, tag, value)))
     }
 
   def outboxEntryById(outboxEntryId: Long): Option[OutboxEntry] =
@@ -460,35 +438,6 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
     db.withSession { implicit session =>
       boxDao.removeTransactionTagValuesByTransactionId(transactionId)
     }
-
-  def addAnonymizationKey(anonymizationKey: AnonymizationKey): AnonymizationKey =
-    db.withSession { implicit session =>
-      boxDao.insertAnonymizationKey(anonymizationKey)
-    }
-
-  def removeAnonymizationKey(anonymizationKeyId: Long) =
-    db.withSession { implicit session =>
-      boxDao.removeAnonymizationKey(anonymizationKeyId)
-    }
-
-  def listAnonymizationKeys(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String]) =
-    db.withSession { implicit session =>
-      boxDao.anonymizationKeys(startIndex, count, orderBy, orderAscending, filter)
-    }
-
-  def anonymizationKeysForAnonPatient(dataset: Attributes) = {
-    db.withSession { implicit session =>
-      val anonPatient = datasetToPatient(dataset)
-      boxDao.anonymizationKeysForAnonPatient(anonPatient.patientName.value, anonPatient.patientID.value)
-    }
-  }
-
-  def anonymizationKeysForPatient(dataset: Attributes) = {
-    db.withSession { implicit session =>
-      val patient = datasetToPatient(dataset)
-      boxDao.anonymizationKeysForPatient(patient.patientName.value, patient.patientID.value)
-    }
-  }
 
 }
 

@@ -4,15 +4,12 @@ import se.nimsa.sbx.model.Entity
 import org.dcm4che3.data.Attributes
 
 object AnonymizationProtocol {
-  
-  case class TransactionTagValue(id: Long, imageFileId: Long, transactionId: Long, tag: Int, value: String) extends Entity
+
+  case class TagValue(imageId: Long, tag: Int, value: String)
 
   case class AnonymizationKey(
     id: Long,
     created: Long,
-    remoteBoxId: Long,
-    transactionId: Long,
-    remoteBoxName: String,
     patientName: String,
     anonPatientName: String,
     patientID: String,
@@ -29,10 +26,10 @@ object AnonymizationProtocol {
     anonFrameOfReferenceUID: String) extends Entity
 
   trait AnonymizationRequest
-    
+
   case class ReverseAnonymization(dataset: Attributes) extends AnonymizationRequest
 
-  case class HarmonizeAnonymization(outboxEntry: OutboxEntry, dataset: Attributes, anonDataset: Attributes) extends AnonymizationRequest
+  case class Anonymize(dataset: Attributes, tagValues: Seq[TagValue]) extends AnonymizationRequest
 
   case class GetAnonymizationKeys(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String]) extends AnonymizationRequest
 

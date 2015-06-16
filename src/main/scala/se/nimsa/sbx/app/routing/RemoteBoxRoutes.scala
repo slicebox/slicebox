@@ -30,6 +30,7 @@ import se.nimsa.sbx.box.BoxUtil._
 import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.dicom.DicomUtil._
 import se.nimsa.sbx.anonymization.AnonymizationUtil._
+import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import org.dcm4che3.data.Attributes
 
 trait RemoteBoxRoutes { this: RestApi =>
@@ -48,7 +49,7 @@ trait RemoteBoxRoutes { this: RestApi =>
                   // make sure spray.httpx.SprayJsonSupport._ is NOT imported here. It messes with the content type expectations
                   entity(as[Array[Byte]]) { imageData =>
                     val dataset = loadDataset(imageData, true)
-                    onSuccess(boxService.ask(ReverseAnonymization(dataset))) {
+                    onSuccess(anonymizationService.ask(ReverseAnonymization(dataset))) {
                       case dataset: Attributes =>
                         onSuccess(storageService.ask(AddDataset(dataset, SourceType.BOX, box.id))) {
                           case ImageAdded(image) =>
@@ -96,9 +97,9 @@ trait RemoteBoxRoutes { this: RestApi =>
                                   val dataset = loadDataset(path, true)
                                   val anonymizedDataset = anonymizeDataset(dataset)
 
-                                  applyTagValues(anonymizedDataset, transactionTagValues)
+                                  applyTagValues(anonymizedDataset, transactionTagValues.map(_.tagValue))
 
-                                  onSuccess(boxService.ask(HarmonizeAnonymization(outboxEntry, dataset, anonymizedDataset))) {
+                                  onSuccess(anonymizationService.ask(HarmonizeAnonymization(dataset, anonymizedDataset))) {
                                     case anonymizedDataset: Attributes =>
                                       val bytes = toByteArray(anonymizedDataset)
                                       complete(HttpEntity(ContentTypes.`application/octet-stream`, HttpData(bytes)))

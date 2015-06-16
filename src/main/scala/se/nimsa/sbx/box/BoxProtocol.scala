@@ -17,6 +17,7 @@
 package se.nimsa.sbx.box
 
 import se.nimsa.sbx.model.Entity
+import se.nimsa.sbx.anonymization.AnonymizationProtocol.TagValue
 import org.dcm4che3.data.Attributes
 
 object BoxProtocol {
@@ -58,6 +59,9 @@ object BoxProtocol {
 
   case class PushImageData(transactionId: Long, sequenceNumber: Long, totalImageCount: Long, dataset: Attributes)
 
+  case class TransactionTagValue(id: Long, transactionId: Long, tagValue: TagValue) extends Entity
+  
+  
   sealed trait BoxRequest
 
   case class CreateConnection(remoteBoxName: String) extends BoxRequest

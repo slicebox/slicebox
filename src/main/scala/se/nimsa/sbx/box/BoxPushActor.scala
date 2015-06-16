@@ -20,6 +20,7 @@ import akka.actor.Actor
 import akka.actor.Props
 import akka.event.Logging
 import akka.event.LoggingReceive
+import akka.pattern.ask
 import BoxProtocol._
 import BoxUtil._
 import scala.concurrent.duration.DurationInt
@@ -32,16 +33,17 @@ import spray.http.HttpRequest
 import spray.http.StatusCodes._
 import scala.concurrent.Future
 import spray.http.HttpResponse
+import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.storage.MetaDataDAO
 import se.nimsa.sbx.storage.PropertiesDAO
 import spray.http.StatusCode
 import se.nimsa.sbx.dicom.DicomUtil._
-import se.nimsa.sbx.anonymization.AnonymizationUtil._
 import java.io.ByteArrayOutputStream
 import java.util.Date
 import akka.actor.ReceiveTimeout
 import se.nimsa.sbx.log.SbxLog
+import akka.util.Timeout
 
 class BoxPushActor(box: Box,
                    dbProps: DbProps,
@@ -55,8 +57,11 @@ class BoxPushActor(box: Box,
   val boxDao = new BoxDAO(dbProps.driver)
   val propertiesDao = new PropertiesDAO(dbProps.driver)
 
+  val anonymizationService = context.actorSelection("../../AnonymizationService")
+
   implicit val system = context.system
   implicit val ec = context.dispatcher
+  implicit val timeout = Timeout(70.seconds)
 
   def sendFilePipeline = sendReceive
 
@@ -64,19 +69,11 @@ class BoxPushActor(box: Box,
     val path = storage.resolve(fileName)
 
     val dataset = loadDataset(path, true)
-    val anonymizedDataset = anonymizeDataset(dataset)
 
-    applyTagValues(anonymizedDataset, tagValues)
-
-    val anonymizationKeys = anonymizationKeysForPatient(dataset)
-    harmonizeAnonymization(anonymizationKeys, dataset, anonymizedDataset)
-
-    val anonymizationKey = createAnonymizationKey(outboxEntry.remoteBoxId, outboxEntry.transactionId, boxById(outboxEntry.remoteBoxId).map(_.name).getOrElse("" + outboxEntry.remoteBoxId), dataset, anonymizedDataset)
-    if (!anonymizationKeys.exists(isEqual(_, anonymizationKey)))
-      addAnonymizationKey(anonymizationKey)
-
-    val bytes = toByteArray(anonymizedDataset)
-    sendFilePipeline(Post(s"${box.baseUrl}/image?transactionid=${outboxEntry.transactionId}&sequencenumber=${outboxEntry.sequenceNumber}&totalimagecount=${outboxEntry.totalImageCount}", HttpData(bytes)))
+    anonymize(dataset, tagValues).flatMap { anonymizedDataset =>
+      val bytes = toByteArray(anonymizedDataset)
+      sendFilePipeline(Post(s"${box.baseUrl}/image?transactionid=${outboxEntry.transactionId}&sequencenumber=${outboxEntry.sequenceNumber}&totalimagecount=${outboxEntry.totalImageCount}", HttpData(bytes)))
+    }
   }
 
   val poller = system.scheduler.schedule(pollInterval, pollInterval) {
@@ -201,22 +198,13 @@ class BoxPushActor(box: Box,
     }
   }
 
-  def addAnonymizationKey(anonymizationKey: AnonymizationKey) =
-    db.withSession { implicit session =>
-      boxDao.insertAnonymizationKey(anonymizationKey)
-    }
-
   def boxById(boxId: Long): Option[Box] =
     db.withSession { implicit session =>
       boxDao.boxById(boxId)
     }
 
-  def anonymizationKeysForPatient(dataset: Attributes) = {
-    db.withSession { implicit session =>
-      val anonPatient = datasetToPatient(dataset)
-      boxDao.anonymizationKeysForPatient(anonPatient.patientName.value, anonPatient.patientID.value)
-    }
-  }
+  def anonymize(dataset: Attributes, tagValues: Seq[TransactionTagValue]): Future[Attributes] =
+    anonymizationService.ask(Anonymize(dataset, tagValues.map(_.tagValue))).mapTo[Attributes]
 
 }
 

@@ -29,6 +29,7 @@ import spray.http.StatusCodes.NoContent
 import spray.routing._
 import se.nimsa.sbx.app.RestApi
 import se.nimsa.sbx.storage.StorageProtocol._
+import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.dicom.DicomUtil
 import se.nimsa.sbx.app.AuthInfo
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
@@ -113,6 +114,29 @@ trait ImageRoutes { this: RestApi =>
               }
             }
           }
+      } ~ pathPrefix("anonymizationkeys") {
+        pathEndOrSingleSlash {
+          get {
+            parameters(
+              'startindex.as[Long] ? 0,
+              'count.as[Long] ? 20,
+              'orderby.as[String].?,
+              'orderascending.as[Boolean] ? true,
+              'filter.as[String].?) { (startIndex, count, orderBy, orderAscending, filter) =>
+                onSuccess(boxService.ask(GetAnonymizationKeys(startIndex, count, orderBy, orderAscending, filter))) {
+                  case AnonymizationKeys(anonymizationKeys) =>
+                    complete(anonymizationKeys)
+                }
+              }
+          }
+        } ~ path(LongNumber) { anonymizationKeyId =>
+          delete {
+            onSuccess(boxService.ask(RemoveAnonymizationKey(anonymizationKeyId))) {
+              case AnonymizationKeyRemoved(anonymizationKeyId) =>
+                complete(NoContent)
+            }
+          }
+        }
       }
     }
 

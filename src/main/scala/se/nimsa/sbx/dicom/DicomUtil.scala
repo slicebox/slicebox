@@ -39,7 +39,7 @@ import java.io.ByteArrayOutputStream
 import org.dcm4che3.data.Attributes.Visitor
 import org.dcm4che3.data.VR
 import se.nimsa.sbx.box.BoxProtocol.TransactionTagValue
-import se.nimsa.sbx.box.BoxProtocol.AnonymizationKey
+import se.nimsa.sbx.anonymization.AnonymizationProtocol.AnonymizationKey
 import java.util.Date
 
 object DicomUtil {

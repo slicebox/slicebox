@@ -23,6 +23,7 @@ import akka.actor.Actor
 import akka.actor.Props
 import akka.event.Logging
 import akka.event.LoggingReceive
+import akka.pattern.ask
 import spray.client.pipelining._
 import spray.http.HttpResponse
 import spray.http.StatusCodes
@@ -43,6 +44,8 @@ import org.dcm4che3.data.Attributes
 import org.dcm4che3.data.VR
 import se.nimsa.sbx.dicom.DicomProperty.PatientName
 import org.dcm4che3.data.Tag
+import akka.util.Timeout
+import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 
 class BoxPollActor(box: Box,
                    dbProps: DbProps,
@@ -54,8 +57,11 @@ class BoxPollActor(box: Box,
   val db = dbProps.db
   val boxDao = new BoxDAO(dbProps.driver)
 
+  val anonymizationService = context.actorSelection("../../AnonymizationService")
+
   implicit val system = context.system
   implicit val ec = context.dispatcher
+  implicit val timeout = Timeout(70.seconds)
 
   def convertOption[T](implicit unmarshaller: FromResponseUnmarshaller[T]): Future[HttpResponse] => Future[Option[T]] =
     (futureResponse: Future[HttpResponse]) => futureResponse.map { response =>
@@ -148,27 +154,23 @@ class BoxPollActor(box: Box,
 
   def fetchFileForRemoteOutboxEntry(remoteOutboxEntry: OutboxEntry): Unit =
     getRemoteOutboxFile(remoteOutboxEntry)
-      .map(response => {
+      .flatMap(response => {
         val dataset = loadDataset(response.entity.data.toByteArray, true)
-                
-        reverseAnonymization(anonymizationKeysForAnonPatient(dataset), dataset)
-        
-        context.system.eventStream.publish(DatasetReceived(dataset, SourceType.BOX, remoteOutboxEntry.remoteBoxId))
 
-        self ! RemoteOutboxFileFetched(remoteOutboxEntry)
+        anonymizationService.ask(ReverseAnonymization(dataset)).mapTo[Attributes]
+          .map { reversedDataset =>
+
+            context.system.eventStream.publish(DatasetReceived(dataset, SourceType.BOX, remoteOutboxEntry.remoteBoxId))
+
+            self ! RemoteOutboxFileFetched(remoteOutboxEntry)
+          }
+
       })
       .recover {
         case exception: Exception =>
           self ! FetchFileFailed(exception)
       }
 
-  def anonymizationKeysForAnonPatient(dataset: Attributes) = {
-    db.withSession { implicit session =>
-      val anonPatient = datasetToPatient(dataset)
-      boxDao.anonymizationKeysForAnonPatient(anonPatient.patientName.value, anonPatient.patientID.value)
-    }
-  }
-  
   def updateInbox(remoteBoxId: Long, transactionId: Long, sequenceNumber: Long, totalImageCount: Long): Unit = {
     db.withSession { implicit session =>
       boxDao.updateInbox(remoteBoxId, transactionId, sequenceNumber, totalImageCount)

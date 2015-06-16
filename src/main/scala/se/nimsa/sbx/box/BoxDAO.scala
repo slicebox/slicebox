@@ -21,6 +21,7 @@ import org.h2.jdbc.JdbcSQLException
 import scala.slick.jdbc.meta.MTable
 import BoxProtocol._
 import scala.slick.jdbc.{ GetResult, StaticQuery => Q }
+import se.nimsa.sbx.anonymization.AnonymizationProtocol.TagValue
 
 class BoxDAO(val driver: JdbcProfile) {
   import driver.simple._
@@ -74,6 +75,20 @@ class BoxDAO(val driver: JdbcProfile) {
 
   val inboxQuery = TableQuery[InboxTable]
 
+  val toTransactionTagValue = (id: Long, imageId: Long, transactionId: Long, tag: Int, value: String) => TransactionTagValue(id, transactionId, TagValue(imageId, tag, value))
+  val fromTransactionTagValue = (entry: TransactionTagValue) => Option((entry.id, entry.transactionId, entry.tagValue.imageId, entry.tagValue.tag, entry.tagValue.value))
+
+  class TransactionTagValueTable(tag: Tag) extends Table[TransactionTagValue](tag, "TransactionTagValue") {
+    def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
+		def transactionId = column[Long]("transactionid")
+    def imageFileId = column[Long]("imageid")
+    def dicomTag = column[Int]("tag")
+    def value = column[String]("value")
+    def * = (id, transactionId, imageFileId, dicomTag, value) <> (toTransactionTagValue.tupled, fromTransactionTagValue)
+  }
+
+  val transactionTagValueQuery = TableQuery[TransactionTagValueTable]
+
   def columnExists(tableName: String, columnName: String)(implicit session: Session): Boolean = {
     val tables = MTable.getTables(tableName).list
     if (tables.isEmpty)
@@ -84,18 +99,36 @@ class BoxDAO(val driver: JdbcProfile) {
 
   def create(implicit session: Session): Unit =
     if (MTable.getTables("Box").list.isEmpty) {
-      (boxQuery.ddl ++ outboxQuery.ddl ++ inboxQuery.ddl).create
+      (boxQuery.ddl ++ outboxQuery.ddl ++ inboxQuery.ddl ++ transactionTagValueQuery.ddl).create
     }
 
   def drop(implicit session: Session): Unit =
-    (boxQuery.ddl ++ outboxQuery.ddl ++ inboxQuery.ddl).drop
+    (boxQuery.ddl ++ outboxQuery.ddl ++ inboxQuery.ddl ++ transactionTagValueQuery.ddl).drop
 
   def clear(implicit session: Session): Unit = {
     boxQuery.delete
     inboxQuery.delete
     outboxQuery.delete
+    transactionTagValueQuery.delete
   }
   
+  def listTransactionTagValues(implicit session: Session): List[TransactionTagValue] =
+    transactionTagValueQuery.list
+
+  def insertTransactionTagValue(entry: TransactionTagValue)(implicit session: Session): TransactionTagValue = {
+    val generatedId = (transactionTagValueQuery returning transactionTagValueQuery.map(_.id)) += entry
+    entry.copy(id = generatedId)
+  }
+
+  def tagValuesByImageFileIdAndTransactionId(imageFileId: Long, transactionId: Long)(implicit session: Session): List[TransactionTagValue] =
+    transactionTagValueQuery.filter(_.imageFileId === imageFileId).filter(_.transactionId === transactionId).list
+
+  def removeTransactionTagValue(transactionTagValueId: Long)(implicit session: Session): Unit =
+    transactionTagValueQuery.filter(_.id === transactionTagValueId).delete
+
+  def removeTransactionTagValuesByTransactionId(transactionId: Long)(implicit session: Session): Unit =
+    transactionTagValueQuery.filter(_.transactionId === transactionId).delete
+
   def insertBox(box: Box)(implicit session: Session): Box = {
     val generatedId = (boxQuery returning boxQuery.map(_.id)) += box
     box.copy(id = generatedId)
