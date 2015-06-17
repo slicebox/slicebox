@@ -5,7 +5,7 @@ import org.dcm4che3.data.Attributes
 
 object AnonymizationProtocol {
 
-  case class TagValue(imageId: Long, tag: Int, value: String)
+  case class TagValue(tag: Int, value: String)
 
   case class AnonymizationKey(
     id: Long,

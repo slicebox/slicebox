@@ -42,9 +42,9 @@ class BoxDAO(val driver: JdbcProfile) {
 
   val boxQuery = TableQuery[BoxTable]
 
-  val toOutboxEntry = (id: Long, remoteBoxId: Long, transactionId: Long, sequenceNumber: Long, totalImageCount: Long, imageFileId: Long, failed: Boolean) =>
-    OutboxEntry(id, remoteBoxId, transactionId, sequenceNumber, totalImageCount, imageFileId, failed)
-  val fromOutboxEntry = (entry: OutboxEntry) => Option((entry.id, entry.remoteBoxId, entry.transactionId, entry.sequenceNumber, entry.totalImageCount, entry.imageFileId, entry.failed))
+  val toOutboxEntry = (id: Long, remoteBoxId: Long, transactionId: Long, sequenceNumber: Long, totalImageCount: Long, imageId: Long, failed: Boolean) =>
+    OutboxEntry(id, remoteBoxId, transactionId, sequenceNumber, totalImageCount, imageId, failed)
+  val fromOutboxEntry = (entry: OutboxEntry) => Option((entry.id, entry.remoteBoxId, entry.transactionId, entry.sequenceNumber, entry.totalImageCount, entry.imageId, entry.failed))
 
   // TODO: should probably add unique index on (remoteBoxId,transactionId)
   class OutboxTable(tag: Tag) extends Table[OutboxEntry](tag, "Outbox") {
@@ -53,9 +53,9 @@ class BoxDAO(val driver: JdbcProfile) {
     def transactionId = column[Long]("transactionid")
     def sequenceNumber = column[Long]("sequencenumber")
     def totalImageCount = column[Long]("totalimagecount")
-    def imageFileId = column[Long]("imagefileid")
+    def imageId = column[Long]("imageid")
     def failed = column[Boolean]("failed")
-    def * = (id, remoteBoxId, transactionId, sequenceNumber, totalImageCount, imageFileId, failed) <> (toOutboxEntry.tupled, fromOutboxEntry)
+    def * = (id, remoteBoxId, transactionId, sequenceNumber, totalImageCount, imageId, failed) <> (toOutboxEntry.tupled, fromOutboxEntry)
   }
 
   val outboxQuery = TableQuery[OutboxTable]
@@ -75,16 +75,16 @@ class BoxDAO(val driver: JdbcProfile) {
 
   val inboxQuery = TableQuery[InboxTable]
 
-  val toTransactionTagValue = (id: Long, imageId: Long, transactionId: Long, tag: Int, value: String) => TransactionTagValue(id, transactionId, TagValue(imageId, tag, value))
-  val fromTransactionTagValue = (entry: TransactionTagValue) => Option((entry.id, entry.transactionId, entry.tagValue.imageId, entry.tagValue.tag, entry.tagValue.value))
+  val toTransactionTagValue = (id: Long, transactionId: Long, imageId: Long, tag: Int, value: String) => TransactionTagValue(id, transactionId, imageId, TagValue(tag, value))
+  val fromTransactionTagValue = (entry: TransactionTagValue) => Option((entry.id, entry.transactionId, entry.imageId, entry.tagValue.tag, entry.tagValue.value))
 
   class TransactionTagValueTable(tag: Tag) extends Table[TransactionTagValue](tag, "TransactionTagValue") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
 		def transactionId = column[Long]("transactionid")
-    def imageFileId = column[Long]("imageid")
+    def imageId = column[Long]("imageid")
     def dicomTag = column[Int]("tag")
     def value = column[String]("value")
-    def * = (id, transactionId, imageFileId, dicomTag, value) <> (toTransactionTagValue.tupled, fromTransactionTagValue)
+    def * = (id, transactionId, imageId, dicomTag, value) <> (toTransactionTagValue.tupled, fromTransactionTagValue)
   }
 
   val transactionTagValueQuery = TableQuery[TransactionTagValueTable]
@@ -120,8 +120,8 @@ class BoxDAO(val driver: JdbcProfile) {
     entry.copy(id = generatedId)
   }
 
-  def tagValuesByImageFileIdAndTransactionId(imageFileId: Long, transactionId: Long)(implicit session: Session): List[TransactionTagValue] =
-    transactionTagValueQuery.filter(_.imageFileId === imageFileId).filter(_.transactionId === transactionId).list
+  def tagValuesByImageIdAndTransactionId(imageId: Long, transactionId: Long)(implicit session: Session): List[TransactionTagValue] =
+    transactionTagValueQuery.filter(_.imageId === imageId).filter(_.transactionId === transactionId).list
 
   def removeTransactionTagValue(transactionTagValueId: Long)(implicit session: Session): Unit =
     transactionTagValueQuery.filter(_.id === transactionTagValueId).delete

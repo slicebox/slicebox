@@ -49,15 +49,14 @@ trait RemoteBoxRoutes { this: RestApi =>
                   // make sure spray.httpx.SprayJsonSupport._ is NOT imported here. It messes with the content type expectations
                   entity(as[Array[Byte]]) { imageData =>
                     val dataset = loadDataset(imageData, true)
-                    onSuccess(anonymizationService.ask(ReverseAnonymization(dataset))) {
-                      case dataset: Attributes =>
-                        onSuccess(storageService.ask(AddDataset(dataset, SourceType.BOX, box.id))) {
-                          case ImageAdded(image) =>
-                            onSuccess(boxService.ask(UpdateInbox(token, transactionId, sequenceNumber, totalImageCount))) {
-                              case msg: InboxUpdated =>
-                                complete(NoContent)
-                            }
-                        }
+                    onSuccess(anonymizationService.ask(ReverseAnonymization(dataset)).mapTo[Attributes]) { reversedDataset =>
+                      onSuccess(storageService.ask(AddDataset(reversedDataset, SourceType.BOX, box.id))) {
+                        case ImageAdded(image) =>
+                          onSuccess(boxService.ask(UpdateInbox(token, transactionId, sequenceNumber, totalImageCount))) {
+                            case msg: InboxUpdated =>
+                              complete(NoContent)
+                          }
+                      }
                     }
                   }
                 }
@@ -87,26 +86,20 @@ trait RemoteBoxRoutes { this: RestApi =>
                   parameters('transactionid.as[Long], 'sequencenumber.as[Long]) { (transactionId, sequenceNumber) =>
                     onSuccess(boxService.ask(GetOutboxEntry(token, transactionId, sequenceNumber))) {
                       case outboxEntry: OutboxEntry =>
-                        onSuccess(boxService.ask(GetTransactionTagValues(outboxEntry.imageFileId, transactionId)).mapTo[Seq[TransactionTagValue]]) {
+                        onSuccess(boxService.ask(GetTransactionTagValues(outboxEntry.imageId, transactionId)).mapTo[Seq[TransactionTagValue]]) {
                           case transactionTagValues =>
-                            onSuccess(storageService.ask(GetImageFile(outboxEntry.imageFileId)).mapTo[Option[ImageFile]]) {
-                              case imageFileMaybe => imageFileMaybe.map(imageFile => {
-                                detach() {
-                                  val path = storage.resolve(imageFile.fileName.value)
+                            onSuccess(storageService.ask(GetDataset(outboxEntry.imageId)).mapTo[Option[Attributes]]) {
+                              _ match {
+                                case Some(dataset) =>
 
-                                  val dataset = loadDataset(path, true)
-                                  val anonymizedDataset = anonymizeDataset(dataset)
-
-                                  applyTagValues(anonymizedDataset, transactionTagValues.map(_.tagValue))
-
-                                  onSuccess(anonymizationService.ask(HarmonizeAnonymization(dataset, anonymizedDataset))) {
+                                  onSuccess(anonymizationService.ask(Anonymize(dataset, transactionTagValues.map(_.tagValue)))) {
                                     case anonymizedDataset: Attributes =>
                                       val bytes = toByteArray(anonymizedDataset)
                                       complete(HttpEntity(ContentTypes.`application/octet-stream`, HttpData(bytes)))
                                   }
-                                }
-                              }).getOrElse {
-                                complete((NotFound, s"File not found for image id ${outboxEntry.imageFileId}"))
+                                case None =>
+                                  
+                                  complete((NotFound, s"File not found for image id ${outboxEntry.imageId}"))
                               }
                             }
                         }

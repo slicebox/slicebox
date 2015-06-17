@@ -33,6 +33,7 @@ import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.dicom.DicomUtil
 import se.nimsa.sbx.app.AuthInfo
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
+import org.dcm4che3.data.Attributes
 
 trait ImageRoutes { this: RestApi =>
 
@@ -92,11 +93,18 @@ trait ImageRoutes { this: RestApi =>
           }
         }
       } ~ path(LongNumber / "anonymize") { imageId =>
-        put {
-          onSuccess(storageService.ask(AnonymizeImage(imageId)).mapTo[Option[Image]]) {
-            _ match {
-              case Some(image) => complete(NoContent)
-              case None => complete(NotFound)
+        post {
+          import spray.httpx.SprayJsonSupport.sprayJsonUnmarshaller
+          entity(as[Seq[TagValue]]) { tagValues =>
+            onSuccess(storageService.ask(GetDataset(imageId)).mapTo[Option[Attributes]]) {
+              _ match {
+                case Some(dataset) =>
+                  onSuccess(anonymizationService.ask(Anonymize(dataset, tagValues)).mapTo[Attributes]) { anonDataset =>
+                    val bytes = DicomUtil.toByteArray(dataset)
+                    complete(HttpEntity(ContentTypes.`application/octet-stream`, HttpData(bytes)))
+                  }
+                case None => complete(NotFound)
+              }
             }
           }
         }
@@ -108,9 +116,10 @@ trait ImageRoutes { this: RestApi =>
           'imageheight.as[Int] ? 0) { (frameNumber, min, max, height) =>
             get {
               onSuccess(storageService.ask(GetImageFrame(imageId, frameNumber, min, max, height)).mapTo[Option[Array[Byte]]]) {
-                _.map(bytes =>
-                  complete(HttpEntity(MediaTypes.`image/png`, HttpData(bytes))))
-                  .getOrElse(complete(NotFound))
+                _ match {
+                  case Some(bytes) => complete(HttpEntity(MediaTypes.`image/png`, HttpData(bytes)))
+                  case None        => complete(NotFound)
+                }
               }
             }
           }
@@ -125,6 +134,7 @@ trait ImageRoutes { this: RestApi =>
               'filter.as[String].?) { (startIndex, count, orderBy, orderAscending, filter) =>
                 onSuccess(boxService.ask(GetAnonymizationKeys(startIndex, count, orderBy, orderAscending, filter))) {
                   case AnonymizationKeys(anonymizationKeys) =>
+                    import spray.httpx.SprayJsonSupport._
                     complete(anonymizationKeys)
                 }
               }

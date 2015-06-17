@@ -44,6 +44,7 @@ import java.util.Date
 import akka.actor.ReceiveTimeout
 import se.nimsa.sbx.log.SbxLog
 import akka.util.Timeout
+import se.nimsa.sbx.storage.StorageProtocol.GetDataset
 
 class BoxPushActor(box: Box,
                    dbProps: DbProps,
@@ -55,8 +56,8 @@ class BoxPushActor(box: Box,
 
   val db = dbProps.db
   val boxDao = new BoxDAO(dbProps.driver)
-  val propertiesDao = new PropertiesDAO(dbProps.driver)
 
+  val storageService = context.actorSelection("../../StorageService")
   val anonymizationService = context.actorSelection("../../AnonymizationService")
 
   implicit val system = context.system
@@ -65,15 +66,20 @@ class BoxPushActor(box: Box,
 
   def sendFilePipeline = sendReceive
 
-  def pushImagePipeline(outboxEntry: OutboxEntry, fileName: String, tagValues: Seq[TransactionTagValue]): Future[HttpResponse] = {
-    val path = storage.resolve(fileName)
+  def pushImagePipeline(outboxEntry: OutboxEntry, tagValues: Seq[TransactionTagValue]): Future[HttpResponse] = {
+    val futureDatasetMaybe = storageService.ask(GetDataset(outboxEntry.imageId)).mapTo[Option[Attributes]]
+    futureDatasetMaybe.flatMap(_ match {
+      case Some(dataset) =>
+        
+        val futureAnonymizedDataset = anonymizationService.ask(Anonymize(dataset, tagValues.map(_.tagValue))).mapTo[Attributes]
+        futureAnonymizedDataset flatMap { anonymizedDataset =>
+          val bytes = toByteArray(anonymizedDataset)
+          sendFilePipeline(Post(s"${box.baseUrl}/image?transactionid=${outboxEntry.transactionId}&sequencenumber=${outboxEntry.sequenceNumber}&totalimagecount=${outboxEntry.totalImageCount}", HttpData(bytes)))
+        }
+      case None =>
 
-    val dataset = loadDataset(path, true)
-
-    anonymize(dataset, tagValues).flatMap { anonymizedDataset =>
-      val bytes = toByteArray(anonymizedDataset)
-      sendFilePipeline(Post(s"${box.baseUrl}/image?transactionid=${outboxEntry.transactionId}&sequencenumber=${outboxEntry.sequenceNumber}&totalimagecount=${outboxEntry.totalImageCount}", HttpData(bytes)))
-    }
+        Future.failed(new Exception("No dataset found for image id " + outboxEntry.imageId))
+    })
   }
 
   val poller = system.scheduler.schedule(pollInterval, pollInterval) {
@@ -118,27 +124,18 @@ class BoxPushActor(box: Box,
       boxDao.nextOutboxEntryForRemoteBoxId(box.id)
     }
 
-  def sendFileForOutboxEntry(outboxEntry: OutboxEntry) =
-    fileNameForImageFileId(outboxEntry.imageFileId) match {
-      case Some(fileName) =>
-        val transactionTagValues = tagValuesForImageFileIdAndTransactionId(outboxEntry.imageFileId, outboxEntry.transactionId)
-        sendFileWithName(outboxEntry, fileName, transactionTagValues)
-      case None =>
-        handleFilenameLookupFailedForOutboxEntry(outboxEntry, new IllegalStateException(s"Can't process outbox entry (${outboxEntry.id}) because no image with id ${outboxEntry.imageFileId} was found"))
-    }
+  def sendFileForOutboxEntry(outboxEntry: OutboxEntry) = {
+    val transactionTagValues = tagValuesForImageIdAndTransactionId(outboxEntry.imageId, outboxEntry.transactionId)
+    sendFile(outboxEntry, transactionTagValues)
+  }
 
-  def fileNameForImageFileId(imageFileId: Long): Option[String] =
+  def tagValuesForImageIdAndTransactionId(imageId: Long, transactionId: Long): Seq[TransactionTagValue] =
     db.withSession { implicit session =>
-      propertiesDao.imageFileById(imageFileId).map(_.fileName.value)
+      boxDao.tagValuesByImageIdAndTransactionId(imageId, transactionId)
     }
 
-  def tagValuesForImageFileIdAndTransactionId(imageFileId: Long, transactionId: Long): Seq[TransactionTagValue] =
-    db.withSession { implicit session =>
-      boxDao.tagValuesByImageFileIdAndTransactionId(imageFileId, transactionId)
-    }
-
-  def sendFileWithName(outboxEntry: OutboxEntry, fileName: String, tagValues: Seq[TransactionTagValue]) = {
-    pushImagePipeline(outboxEntry, fileName, tagValues)
+  def sendFile(outboxEntry: OutboxEntry, tagValues: Seq[TransactionTagValue]) = {
+    pushImagePipeline(outboxEntry, tagValues)
       .map(response => {
         val statusCode = response.status.intValue
         if (statusCode >= 200 && statusCode < 300)
@@ -180,11 +177,6 @@ class BoxPushActor(box: Box,
     context.unbecome
   }
 
-  def handleFilenameLookupFailedForOutboxEntry(outboxEntry: OutboxEntry, exception: Exception) = {
-    markOutboxTransactionAsFailed(outboxEntry, s"Failed to send file to box ${box.name}: " + exception.getMessage)
-    context.unbecome
-  }
-
   def markOutboxTransactionAsFailed(outboxEntry: OutboxEntry, logMessage: String) = {
     db.withSession { implicit session =>
       boxDao.markOutboxTransactionAsFailed(box.id, outboxEntry.transactionId)
@@ -197,14 +189,6 @@ class BoxPushActor(box: Box,
       boxDao.removeTransactionTagValuesByTransactionId(transactionId)
     }
   }
-
-  def boxById(boxId: Long): Option[Box] =
-    db.withSession { implicit session =>
-      boxDao.boxById(boxId)
-    }
-
-  def anonymize(dataset: Attributes, tagValues: Seq[TransactionTagValue]): Future[Attributes] =
-    anonymizationService.ask(Anonymize(dataset, tagValues.map(_.tagValue))).mapTo[Attributes]
 
 }
 

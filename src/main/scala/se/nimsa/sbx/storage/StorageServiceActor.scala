@@ -46,7 +46,6 @@ import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomPropertyValue._
 import se.nimsa.sbx.dicom.DicomUtil._
-import se.nimsa.sbx.anonymization.AnonymizationUtil._
 import akka.dispatch.ExecutionContexts
 import java.util.concurrent.Executors
 import se.nimsa.sbx.log.SbxLog
@@ -111,12 +110,6 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
         sender ! ImageAdded(image)
       }
 
-    case AnonymizeImage(imageId) =>
-      catchAndReport {
-        val anonImageMaybe = anonymizeImage(imageId)
-        sender ! anonImageMaybe
-      }
-
     case DeleteImage(imageId) =>
       catchAndReport {
         db.withSession { implicit session =>
@@ -132,11 +125,16 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
     case msg: ImageRequest => catchAndReport {
       msg match {
 
+        case GetDataset(imageId) =>
+          db.withSession { implicit session =>
+            propertiesDao.imageFileForImage(imageId).map(imageFile =>
+              Option(readDataset(imageFile.fileName.value)))
+          }
+
         case GetImageAttributes(imageId) =>
           db.withSession { implicit session =>
             propertiesDao.imageFileForImage(imageId) match {
               case Some(imageFile) =>
-                val recipient = sender
                 Future {
                   Some(readImageAttributes(imageFile.fileName.value))
                 }.pipeTo(sender)
@@ -343,6 +341,8 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
     log.debug("Deleted file " + filePath)
   }
 
+  def readDataset(fileName: String): Attributes = loadDataset(storage.resolve(fileName), false)
+
   def readImageAttributes(fileName: String): List[ImageAttribute] = {
     val filePath = storage.resolve(fileName)
     val dataset = loadDataset(filePath, false)
@@ -448,20 +448,6 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
     } else
       image
   }
-
-  def anonymizeImage(imageId: Long): Option[Image] =
-    db.withSession { implicit session =>
-      propertiesDao.imageFileForImage(imageId).map { imageFile =>
-        val path = storage.resolve(imageFile.fileName.value)
-        val dataset = loadDataset(path, true)
-        deleteFromStorage(imageFile)
-        propertiesDao.deleteFully(imageFile)
-        setAnonymous(dataset, false)
-        val anonDataset = anonymizeDataset(dataset)
-        val (image, overwrite) = storeDatasetTryCatchThrow(anonDataset, imageFile.sourceType, imageFile.sourceId)
-        image
-      }
-    }
 
   def setupDb() =
     db.withSession { implicit session =>

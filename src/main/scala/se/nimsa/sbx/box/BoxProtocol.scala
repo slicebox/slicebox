@@ -45,21 +45,21 @@ object BoxProtocol {
 
   case class Box(id: Long, name: String, token: String, baseUrl: String, sendMethod: BoxSendMethod, online: Boolean) extends Entity
 
-  case class OutboxEntry(id: Long, remoteBoxId: Long, transactionId: Long, sequenceNumber: Long, totalImageCount: Long, imageFileId: Long, failed: Boolean) extends Entity
+  case class OutboxEntry(id: Long, remoteBoxId: Long, transactionId: Long, sequenceNumber: Long, totalImageCount: Long, imageId: Long, failed: Boolean) extends Entity
 
-  case class OutboxEntryInfo(id: Long, remoteBoxName: String, transactionId: Long, sequenceNumber: Long, totalImageCount: Long, imageFileId: Long, failed: Boolean)
+  case class OutboxEntryInfo(id: Long, remoteBoxName: String, transactionId: Long, sequenceNumber: Long, totalImageCount: Long, imageId: Long, failed: Boolean)
 
   case class InboxEntry(id: Long, remoteBoxId: Long, transactionId: Long, receivedImageCount: Long, totalImageCount: Long) extends Entity
 
-  case class BoxSendTagValue(entityId: Long, tag: Int, value: String)
-
-  case class BoxSendData(entityIds: Seq[Long], tagValues: Seq[BoxSendTagValue])
+  case class EntityTagValue(entityId: Long, tagValue: TagValue)
+  
+  case class BoxSendData(entityIds: Seq[Long], tagValues: Seq[EntityTagValue])
 
   case class InboxEntryInfo(remoteBoxName: String, transactionId: Long, receivedImageCount: Long, totalImageCount: Long)
 
   case class PushImageData(transactionId: Long, sequenceNumber: Long, totalImageCount: Long, dataset: Attributes)
 
-  case class TransactionTagValue(id: Long, transactionId: Long, tagValue: TagValue) extends Entity
+  case class TransactionTagValue(id: Long, transactionId: Long, imageId: Long, tagValue: TagValue) extends Entity
   
   
   sealed trait BoxRequest
@@ -80,15 +80,15 @@ object BoxProtocol {
 
   case class PollOutbox(token: String) extends BoxRequest
 
-  case class SendPatientsToRemoteBox(remoteBoxId: Long, patientIds: Seq[Long], tagValues: Seq[BoxSendTagValue]) extends BoxRequest
+  case class SendPatientsToRemoteBox(remoteBoxId: Long, patientIds: Seq[Long], tagValues: Seq[EntityTagValue]) extends BoxRequest
 
-  case class SendStudiesToRemoteBox(remoteBoxId: Long, studyIds: Seq[Long], tagValues: Seq[BoxSendTagValue]) extends BoxRequest
+  case class SendStudiesToRemoteBox(remoteBoxId: Long, studyIds: Seq[Long], tagValues: Seq[EntityTagValue]) extends BoxRequest
 
-  case class SendSeriesToRemoteBox(remoteBoxId: Long, seriesIds: Seq[Long], tagValues: Seq[BoxSendTagValue]) extends BoxRequest
+  case class SendSeriesToRemoteBox(remoteBoxId: Long, seriesIds: Seq[Long], tagValues: Seq[EntityTagValue]) extends BoxRequest
 
   case class GetOutboxEntry(token: String, transactionId: Long, sequenceNumber: Long) extends BoxRequest
 
-  case class GetTransactionTagValues(imageFileId: Long, transactionId: Long) extends BoxRequest
+  case class GetTransactionTagValues(imageId: Long, transactionId: Long) extends BoxRequest
 
   case class DeleteOutboxEntry(token: String, transactionId: Long, sequenceNumber: Long) extends BoxRequest
 
@@ -110,7 +110,7 @@ object BoxProtocol {
 
   case object OutboxEmpty
 
-  case class ImagesSent(remoteBoxId: Long, imageFileIds: Seq[Long])
+  case class ImagesSent(remoteBoxId: Long, imageIds: Seq[Long])
 
   case object OutboxEntryNotFound
 

@@ -18,10 +18,22 @@ import org.dcm4che3.data.Tag
 import org.dcm4che3.data.VR
 import spray.http.HttpData
 import se.nimsa.sbx.storage.StorageProtocol.ImageAttribute
+import se.nimsa.sbx.anonymization.AnonymizationProtocol._
+import se.nimsa.sbx.anonymization.AnonymizationDAO
+import java.util.Date
+import scala.slick.driver.H2Driver
 
 class ImageRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
   def dbUrl() = "jdbc:h2:mem:datasetroutestest;DB_CLOSE_DELAY=-1"
+
+  val dao = new AnonymizationDAO(H2Driver)
+  
+  override def afterEach() {
+    db.withSession { implicit session =>
+      dao.clear
+    }
+  }
 
   "Image routes" should "return a success message when adding an image" in {
     val fileName = "anon270.dcm"
@@ -149,4 +161,39 @@ class ImageRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       status should be (NotFound)            
     }
   }
+  
+  it should "provide a list of anonymization keys" in {
+    db.withSession { implicit session =>
+      val key1 = AnonymizationKey(-1, new Date().getTime, "pat name", "anon pat name", "pat id", "anon pat id", "19700101", "stuid", "anon stuid", "study desc", "study id", "acc num", "seuid", "anon seuid", "foruid", "anon foruid")
+      val key2 = key1.copy(patientName = "pat name 2", anonPatientName = "anon pat name 2")
+      val insertedKey1 = dao.insertAnonymizationKey(key1)
+      val insertedKey2 = dao.insertAnonymizationKey(key2)
+      GetAsUser("/api/images/anonymizationkeys") ~> routes ~> check {
+        status should be(OK)
+        responseAs[List[AnonymizationKey]] should be(List(insertedKey1, insertedKey2))
+      }
+    }
+  }
+
+  it should "provide a list of sorted anonymization keys supporting startindex and count" in {
+    db.withSession { implicit session =>
+      val key1 = AnonymizationKey(-1, new Date().getTime, "B", "anon B", "pat id", "anon pat id", "19700101", "stuid", "anon stuid", "study desc", "study id", "acc num", "seuid", "anon seuid", "foruid", "anon foruid")
+      val key2 = key1.copy(patientName = "A", anonPatientName = "anon A")
+      val insertedKey1 = dao.insertAnonymizationKey(key1)
+      val insertedKey2 = dao.insertAnonymizationKey(key2)
+      GetAsUser("/api/images/anonymizationkeys?startindex=0&count=1&orderby=patientname&orderascending=true") ~> routes ~> check {
+        status should be(OK)
+        val keys = responseAs[List[AnonymizationKey]]
+        keys.length should be(1)
+        keys(0) should be(insertedKey2)
+      }
+    }
+  }
+
+  it should "respond with 400 Bad Request when sorting anonymization keys by a non-existing property" in {
+    GetAsUser("/api/images/anonymizationkeys?orderby=xyz") ~> routes ~> check {
+      status should be(BadRequest)
+    }
+  }
+
 }

@@ -160,6 +160,8 @@ object StorageProtocol {
   
   sealed trait ImageRequest
   
+  case class GetDataset(imageId: Long) extends ImageRequest
+  
   case class GetImageAttributes(imageId: Long) extends ImageRequest
   
   case class GetImageInformation(imageId: Long) extends ImageRequest
@@ -168,8 +170,6 @@ object StorageProtocol {
 
   
   case class AddDataset(dataset: Attributes, sourceType: SourceType, sourceId: Long)
-  
-  case class AnonymizeImage(imageId: Long)
   
   
   // ***to API***

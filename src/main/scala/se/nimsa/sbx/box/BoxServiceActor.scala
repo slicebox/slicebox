@@ -147,9 +147,9 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
           case SendSeriesToRemoteBox(remoteBoxId, seriesIds, tagValues) =>
             boxById(remoteBoxId) match {
               case Some(box) =>
-                SbxLog.info("Box", s"Sending series ${seriesIds.mkString(",")} to box ${box.name} with tag values ${tagValues.map(_.value).mkString(",")}")
-                val imageFileIds = sendEntities(remoteBoxId, seriesIds, tagValues, imageFileIdsForSeries _)
-                imageFileIds.map(ids => ImagesSent(remoteBoxId, ids)).pipeSequentiallyTo(sender)
+                SbxLog.info("Box", s"Sending series ${seriesIds.mkString(",")} to box ${box.name} with tag values ${tagValues.map(_.tagValue.value).mkString(",")}")
+                val imageIds = sendEntities(remoteBoxId, seriesIds, tagValues, imageIdsForSeries _)
+                imageIds.map(ids => ImagesSent(remoteBoxId, ids)).pipeSequentiallyTo(sender)
               case None =>
                 sender ! BoxNotFound
             }
@@ -157,9 +157,9 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
           case SendStudiesToRemoteBox(remoteBoxId, studyIds, tagValues) =>
             boxById(remoteBoxId) match {
               case Some(box) =>
-                SbxLog.info("Box", s"Sending study(s) ${studyIds.mkString(",")} to box ${box.name} with tag values ${tagValues.map(_.value).mkString(",")}")
-                val imageFileIds = sendEntities(remoteBoxId, studyIds, tagValues, imageFileIdsForStudy _)
-                imageFileIds.map(ids => ImagesSent(remoteBoxId, ids)).pipeSequentiallyTo(sender)
+                SbxLog.info("Box", s"Sending study(s) ${studyIds.mkString(",")} to box ${box.name} with tag values ${tagValues.map(_.tagValue.value).mkString(",")}")
+                val imageIds = sendEntities(remoteBoxId, studyIds, tagValues, imageIdsForStudy _)
+                imageIds.map(ids => ImagesSent(remoteBoxId, ids)).pipeSequentiallyTo(sender)
               case None =>
                 sender ! BoxNotFound
             }
@@ -167,9 +167,9 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
           case SendPatientsToRemoteBox(remoteBoxId, patientIds, tagValues) =>
             boxById(remoteBoxId) match {
               case Some(box) =>
-                SbxLog.info("Box", s"Sending patient(s) ${patientIds.mkString(",")} to box ${box.name} with tag values ${tagValues.map(_.value).mkString(",")}")
-                val imageFileIds = sendEntities(remoteBoxId, patientIds, tagValues, imageFileIdsForPatient _)
-                imageFileIds.map(ids => ImagesSent(remoteBoxId, ids)).pipeSequentiallyTo(sender)
+                SbxLog.info("Box", s"Sending patient(s) ${patientIds.mkString(",")} to box ${box.name} with tag values ${tagValues.map(_.tagValue.value).mkString(",")}")
+                val imageIds = sendEntities(remoteBoxId, patientIds, tagValues, imageIdsForPatient _)
+                imageIds.map(ids => ImagesSent(remoteBoxId, ids)).pipeSequentiallyTo(sender)
               case None =>
                 sender ! BoxNotFound
             }
@@ -213,9 +213,9 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
             val outboxEntries = getOutboxFromDb().map { outboxEntry =>
               idToBox.get(outboxEntry.remoteBoxId) match {
                 case Some(box) =>
-                  OutboxEntryInfo(outboxEntry.id, box.name, outboxEntry.transactionId, outboxEntry.sequenceNumber, outboxEntry.totalImageCount, outboxEntry.imageFileId, outboxEntry.failed)
+                  OutboxEntryInfo(outboxEntry.id, box.name, outboxEntry.transactionId, outboxEntry.sequenceNumber, outboxEntry.totalImageCount, outboxEntry.imageId, outboxEntry.failed)
                 case None =>
-                  OutboxEntryInfo(outboxEntry.id, "" + outboxEntry.remoteBoxId, outboxEntry.transactionId, outboxEntry.sequenceNumber, outboxEntry.totalImageCount, outboxEntry.imageFileId, outboxEntry.failed)
+                  OutboxEntryInfo(outboxEntry.id, "" + outboxEntry.remoteBoxId, outboxEntry.transactionId, outboxEntry.sequenceNumber, outboxEntry.totalImageCount, outboxEntry.imageId, outboxEntry.failed)
               }
             }
             sender ! Outbox(outboxEntries)
@@ -228,8 +228,8 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
             removeOutboxEntryFromDb(outboxEntryId)
             sender ! OutboxEntryRemoved(outboxEntryId)
 
-          case GetTransactionTagValues(imageFileId, transactionId) =>
-            sender ! tagValuesForImageFileIdAndTransactionId(imageFileId, transactionId)
+          case GetTransactionTagValues(imageId, transactionId) =>
+            sender ! tagValuesForImageIdAndTransactionId(imageId, transactionId)
         }
 
       }
@@ -351,44 +351,41 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
     // Maybe switch to using Strings as transaction id?
     abs(UUID.randomUUID().getMostSignificantBits())
 
-  def sendEntities(remoteBoxId: Long, entityIds: Seq[Long], tagValues: Seq[BoxSendTagValue], imageFileIdsForEntityId: Long => Future[Seq[Long]]) = {
+  def sendEntities(remoteBoxId: Long, entityIds: Seq[Long], tagValues: Seq[EntityTagValue], imageIdsForEntityId: Long => Future[Seq[Long]]) = {
     val transactionId = generateTransactionId()
-    val futureImageFileIdToTagValues = sequence(entityIds.map(entityId => imageFileIdsForEntityId(entityId)
+    val futureImageIdToTagValues = sequence(entityIds.map(entityId => imageIdsForEntityId(entityId)
       .map(_.map(_ -> tagValues.filter(_.entityId == entityId))))).map(_.flatten.toMap)
-    futureImageFileIdToTagValues.map(imageFileIdToTagValues => {
-      val imageFileIds = imageFileIdToTagValues.keys.toSeq
-      addOutboxEntries(remoteBoxId, transactionId, imageFileIds)
-      for ((imageFileId, tagValues) <- imageFileIdToTagValues) {
+    futureImageIdToTagValues.map(imageIdToTagValues => {
+      val imageIds = imageIdToTagValues.keys.toSeq
+      addOutboxEntries(remoteBoxId, transactionId, imageIds)
+      for ((imageId, tagValues) <- imageIdToTagValues) {
         tagValues.foreach(tagValue =>
-          addTagValue(imageFileId, transactionId, tagValue.tag, tagValue.value))
+          addTagValue(imageId, transactionId, tagValue.tagValue.tag, tagValue.tagValue.value))
       }
-      imageFileIds
+      imageIds
     })
   }
 
-  def imageFileIdsForSeries(seriesId: Long) =
-    getImages(seriesId)
-      .flatMap(images => sequence(images.map(image => getImageFile(image.id).map(_.map(imageFile => imageFile.id))))).map(_.flatten)
+  def imageIdsForSeries(seriesId: Long) = getImages(seriesId).map(_.map(_.id))
 
-  def imageFileIdsForStudy(studyId: Long) =
+  def imageIdsForStudy(studyId: Long) =
     getSeries(studyId)
-      .flatMap(seriesCollection => sequence(seriesCollection.map(series => imageFileIdsForSeries(series.id)))).map(_.flatten)
+      .flatMap(seriesCollection => sequence(seriesCollection.map(series => imageIdsForSeries(series.id)))).map(_.flatten)
 
-  def imageFileIdsForPatient(patientId: Long) =
+  def imageIdsForPatient(patientId: Long) =
     getStudies(patientId)
-      .flatMap(studies => sequence(studies.map(study => imageFileIdsForStudy(study.id)))).map(_.flatten)
+      .flatMap(studies => sequence(studies.map(study => imageIdsForStudy(study.id)))).map(_.flatten)
 
   def getStudies(patientId: Long) = storageService.ask(GetStudies(0, Integer.MAX_VALUE, patientId, None, None)).mapTo[Studies].map(_.studies)
   def getSeries(studyId: Long) = storageService.ask(GetSeries(0, Integer.MAX_VALUE, studyId, None, None)).mapTo[SeriesCollection].map(_.series)
   def getImages(seriesId: Long) = storageService.ask(GetImages(0, 100000, seriesId)).mapTo[Images].map(_.images)
-  def getImageFile(imageId: Long) = storageService.ask(GetImageFile(imageId)).mapTo[Option[ImageFile]]
 
-  def addOutboxEntries(remoteBoxId: Long, transactionId: Long, imageFileIds: Seq[Long]): Unit = {
-    val totalImageCount = imageFileIds.length
+  def addOutboxEntries(remoteBoxId: Long, transactionId: Long, imageIds: Seq[Long]): Unit = {
+    val totalImageCount = imageIds.length
 
     db.withSession { implicit session =>
       for (sequenceNumber <- 1 to totalImageCount) {
-        boxDao.insertOutboxEntry(OutboxEntry(-1, remoteBoxId, transactionId, sequenceNumber, totalImageCount, imageFileIds(sequenceNumber - 1), false))
+        boxDao.insertOutboxEntry(OutboxEntry(-1, remoteBoxId, transactionId, sequenceNumber, totalImageCount, imageIds(sequenceNumber - 1), false))
       }
     }
   }
@@ -396,7 +393,7 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
   def addTagValue(transactionId: Long, imageId: Long, tag: Int, value: String) =
     db.withSession { implicit session =>
       boxDao.insertTransactionTagValue(
-        TransactionTagValue(-1, transactionId, TagValue(imageId, tag, value)))
+        TransactionTagValue(-1, transactionId, imageId, TagValue(tag, value)))
     }
 
   def outboxEntryById(outboxEntryId: Long): Option[OutboxEntry] =
@@ -429,9 +426,9 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
       boxDao.updateBoxOnlineStatus(boxId, online)
     }
 
-  def tagValuesForImageFileIdAndTransactionId(imageFileId: Long, transactionId: Long): Seq[TransactionTagValue] =
+  def tagValuesForImageIdAndTransactionId(imageId: Long, transactionId: Long): Seq[TransactionTagValue] =
     db.withSession { implicit session =>
-      boxDao.tagValuesByImageFileIdAndTransactionId(imageFileId, transactionId)
+      boxDao.tagValuesByImageIdAndTransactionId(imageId, transactionId)
     }
 
   def removeTransactionTagValuesForTransactionId(transactionId: Long) =

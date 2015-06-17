@@ -34,7 +34,6 @@ import java.io.OutputStream
 import java.awt.image.BufferedImage
 import javax.imageio.ImageIO
 import org.dcm4che3.imageio.plugins.dcm.DicomImageReadParam
-import se.nimsa.sbx.anonymization.AnonymizationUtil._
 import java.io.ByteArrayOutputStream
 import org.dcm4che3.data.Attributes.Visitor
 import org.dcm4che3.data.VR
@@ -47,12 +46,6 @@ object DicomUtil {
   val defaultTransferSyntax = UID.ExplicitVRLittleEndian
 
   def isAnonymous(dataset: Attributes) = dataset.getString(Tag.PatientIdentityRemoved, "NO") == "YES"
-
-  def setAnonymous(dataset: Attributes, anonymous: Boolean): Unit =
-    if (anonymous)
-      dataset.setString(Tag.PatientIdentityRemoved, VR.CS, "YES")
-    else
-      dataset.setString(Tag.PatientIdentityRemoved, VR.CS, "NO")
 
   def cloneDataset(dataset: Attributes): Attributes = new Attributes(dataset)
 
@@ -94,12 +87,6 @@ object DicomUtil {
     } finally {
       SafeClose.close(dis)
     }
-  }
-
-  def toAnonymizedByteArray(path: Path): Array[Byte] = {
-    val dataset = loadDataset(path, true)
-    val anonymizedDataset = anonymizeDataset(dataset)
-    toByteArray(anonymizedDataset)
   }
 
   def toByteArray(dataset: Attributes): Array[Byte] = {

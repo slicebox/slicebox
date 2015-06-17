@@ -30,9 +30,14 @@ import AnonymizationProtocol._
 
 object AnonymizationUtil {
 
-  val emptyString = ""
+  def setAnonymous(dataset: Attributes, anonymous: Boolean): Unit =
+    if (anonymous)
+      dataset.setString(Tag.PatientIdentityRemoved, VR.CS, "YES")
+    else
+      dataset.setString(Tag.PatientIdentityRemoved, VR.CS, "NO")
 
   def anonymizeDataset(dataset: Attributes): Attributes = {
+    val emptyString = ""
 
     if (isAnonymous(dataset)) {
 
@@ -319,7 +324,7 @@ object AnonymizationUtil {
     val rand = new Random(seed)
     (1 to 16).foldLeft("")((s, i) => s + rand.nextInt(10).toString)
   }
-    
+
   def applyTagValues(dataset: Attributes, tagValues: Seq[TagValue]): Unit =
     tagValues.foreach(tagValue => {
       val vr = if (dataset.contains(tagValue.tag)) dataset.getVR(tagValue.tag) else VR.SH
@@ -346,7 +351,7 @@ object AnonymizationUtil {
   }
 
   def isEqual(key1: AnonymizationKey, key2: AnonymizationKey) =
-      key1.patientName == key2.patientName && key1.anonPatientName == key2.anonPatientName &&
+    key1.patientName == key2.patientName && key1.anonPatientName == key2.anonPatientName &&
       key1.patientID == key2.patientID && key1.anonPatientID == key2.anonPatientID &&
       key1.studyInstanceUID == key2.studyInstanceUID && key1.anonStudyInstanceUID == key2.anonStudyInstanceUID &&
       key1.seriesInstanceUID == key2.seriesInstanceUID && key1.anonSeriesInstanceUID == key2.anonSeriesInstanceUID &&

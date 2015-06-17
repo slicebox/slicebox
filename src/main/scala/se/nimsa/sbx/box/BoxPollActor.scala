@@ -160,7 +160,7 @@ class BoxPollActor(box: Box,
         anonymizationService.ask(ReverseAnonymization(dataset)).mapTo[Attributes]
           .map { reversedDataset =>
 
-            context.system.eventStream.publish(DatasetReceived(dataset, SourceType.BOX, remoteOutboxEntry.remoteBoxId))
+            context.system.eventStream.publish(DatasetReceived(reversedDataset, SourceType.BOX, remoteOutboxEntry.remoteBoxId))
 
             self ! RemoteOutboxFileFetched(remoteOutboxEntry)
           }
