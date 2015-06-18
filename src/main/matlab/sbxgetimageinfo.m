@@ -6,7 +6,7 @@ function datasets = sbxgetimageinfo(seriesid, sbxdata)
 % info will be read from a local copy, if one exists.
 
 try
-    url = [sbxdata.url, '/api/metadata/images?seriesid=',num2str(seriesid)];
+    url = [sbxdata.url, '/api/metadata/images?count=1000000&seriesid=',num2str(seriesid)];
     datasets = webread(url, sbxdata.weboptions);
     seriesfile = fullfile(sbxdata.cachepath, ['seriesdata', num2str(seriesid)]);
     %fprintf('saving %s\n', seriesfile);

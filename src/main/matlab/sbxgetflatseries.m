@@ -6,7 +6,7 @@ function dbinfo = sbxgetflatseries( sbxdata )
 %   mainly used to populate the patient list of the GUI.
 
 try
-    url = [sbxdata.url, '/api/metadata/flatseries'];
+    url = [sbxdata.url, '/api/metadata/flatseries?count=1000000'];
     dbinfo = webread(url, sbxdata.weboptions);
     dbinfofile = fullfile(sbxdata.cachepath, 'dbinfo');
     %fprintf('saving %s\n', dbinfofile);
