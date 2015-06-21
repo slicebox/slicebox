@@ -89,6 +89,8 @@ object DicomUtil {
     }
   }
 
+  def toByteArray(path: Path): Array[Byte] = toByteArray(loadDataset(path, true))
+    
   def toByteArray(dataset: Attributes): Array[Byte] = {
     val bos = new ByteArrayOutputStream
     saveDataset(dataset, bos)

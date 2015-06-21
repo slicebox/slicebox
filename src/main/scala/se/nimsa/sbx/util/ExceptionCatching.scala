@@ -28,7 +28,7 @@ trait ExceptionCatching { this: Actor =>
     } catch {
       case e: Exception =>
         if (!e.isInstanceOf[IllegalArgumentException]) {
-          SbxLog.error("Sytem", e.getMessage)(context.system)
+          SbxLog.error("System", "" + e.getMessage)(context.system)
         }
         sender ! Failure(e)
         None
@@ -40,7 +40,7 @@ trait ExceptionCatching { this: Actor =>
     } catch {
       case e: Exception =>
         if (!e.isInstanceOf[IllegalArgumentException]) {
-          SbxLog.error("Sytem", e.getMessage)(context.system)
+          SbxLog.error("System", "" + e.getMessage)(context.system)
         }
         sender ! Failure(e)
         throw e

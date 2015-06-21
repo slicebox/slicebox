@@ -183,7 +183,7 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     // then, push an image from the hospital to the uni box we just set up
     val fileName = "anon270.dcm"
     val dcmPath = Paths.get(getClass().getResource(fileName).toURI())
-    val bytes = DicomUtil.toAnonymizedByteArray(dcmPath)
+    val bytes = DicomUtil.toByteArray(dcmPath)
 
     val testTransactionId = abs(UUID.randomUUID().getMostSignificantBits())
     val sequenceNumber = 1L

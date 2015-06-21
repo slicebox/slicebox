@@ -127,8 +127,9 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
 
         case GetDataset(imageId) =>
           db.withSession { implicit session =>
-            propertiesDao.imageFileForImage(imageId).map(imageFile =>
-              Option(readDataset(imageFile.fileName.value)))
+            sender ! propertiesDao.imageFileForImage(imageId)
+              .flatMap(imageFile =>
+                Option(readDataset(imageFile.fileName.value)))
           }
 
         case GetImageAttributes(imageId) =>

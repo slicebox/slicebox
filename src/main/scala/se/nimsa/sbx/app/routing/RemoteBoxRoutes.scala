@@ -26,7 +26,6 @@ import se.nimsa.sbx.app.AuthInfo
 import se.nimsa.sbx.app.RestApi
 import se.nimsa.sbx.app.UserProtocol.UserRole
 import se.nimsa.sbx.box.BoxProtocol._
-import se.nimsa.sbx.box.BoxUtil._
 import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.dicom.DicomUtil._
 import se.nimsa.sbx.anonymization.AnonymizationUtil._

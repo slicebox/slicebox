@@ -96,14 +96,30 @@ trait ImageRoutes { this: RestApi =>
         post {
           import spray.httpx.SprayJsonSupport.sprayJsonUnmarshaller
           entity(as[Seq[TagValue]]) { tagValues =>
-            onSuccess(storageService.ask(GetDataset(imageId)).mapTo[Option[Attributes]]) {
+            onSuccess(storageService.ask(GetImageFile(imageId)).mapTo[Option[ImageFile]]) {
               _ match {
-                case Some(dataset) =>
-                  onSuccess(anonymizationService.ask(Anonymize(dataset, tagValues)).mapTo[Attributes]) { anonDataset =>
-                    val bytes = DicomUtil.toByteArray(dataset)
-                    complete(HttpEntity(ContentTypes.`application/octet-stream`, HttpData(bytes)))
+                case Some(imageFile) =>
+                  onSuccess(storageService.ask(GetDataset(imageId)).mapTo[Option[Attributes]]) {
+                    _ match {
+
+                      case Some(dataset) =>
+                        onSuccess(anonymizationService.ask(Anonymize(dataset, tagValues)).mapTo[Attributes]) { anonDataset =>
+                          onSuccess(storageService.ask(DeleteImage(imageId))) {
+                            case ImageDeleted(imageId) =>
+                              onSuccess(storageService.ask(AddDataset(anonDataset, imageFile.sourceType, imageFile.sourceId))) {
+                                case ImageAdded(image) =>
+                                  complete(NoContent)
+                              }
+                          }
+                        }
+
+                      case None =>
+                        complete(NotFound)
+                    }
                   }
-                case None => complete(NotFound)
+
+                case None =>
+                  complete(NotFound)
               }
             }
           }
@@ -132,7 +148,7 @@ trait ImageRoutes { this: RestApi =>
               'orderby.as[String].?,
               'orderascending.as[Boolean] ? true,
               'filter.as[String].?) { (startIndex, count, orderBy, orderAscending, filter) =>
-                onSuccess(boxService.ask(GetAnonymizationKeys(startIndex, count, orderBy, orderAscending, filter))) {
+                onSuccess(anonymizationService.ask(GetAnonymizationKeys(startIndex, count, orderBy, orderAscending, filter))) {
                   case AnonymizationKeys(anonymizationKeys) =>
                     import spray.httpx.SprayJsonSupport._
                     complete(anonymizationKeys)
@@ -141,7 +157,7 @@ trait ImageRoutes { this: RestApi =>
           }
         } ~ path(LongNumber) { anonymizationKeyId =>
           delete {
-            onSuccess(boxService.ask(RemoveAnonymizationKey(anonymizationKeyId))) {
+            onSuccess(anonymizationService.ask(RemoveAnonymizationKey(anonymizationKeyId))) {
               case AnonymizationKeyRemoved(anonymizationKeyId) =>
                 complete(NoContent)
             }

@@ -37,7 +37,6 @@ import se.nimsa.sbx.storage.StorageProtocol.SourceType
 import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.dicom.DicomUtil._
 import BoxProtocol._
-import BoxUtil._
 import akka.actor.ReceiveTimeout
 import java.util.Date
 import org.dcm4che3.data.Attributes
@@ -50,14 +49,15 @@ import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 class BoxPollActor(box: Box,
                    dbProps: DbProps,
                    pollInterval: FiniteDuration = 5.seconds,
-                   receiveTimeout: FiniteDuration = 1.minute) extends Actor with JsonFormats {
+                   receiveTimeout: FiniteDuration = 1.minute,
+                   anonymizationServicePath: String = "../../AnonymizationService") extends Actor with JsonFormats {
 
   val log = Logging(context.system, this)
 
   val db = dbProps.db
   val boxDao = new BoxDAO(dbProps.driver)
 
-  val anonymizationService = context.actorSelection("../../AnonymizationService")
+  val anonymizationService = context.actorSelection(anonymizationServicePath)
 
   implicit val system = context.system
   implicit val ec = context.dispatcher
@@ -157,6 +157,8 @@ class BoxPollActor(box: Box,
       .flatMap(response => {
         val dataset = loadDataset(response.entity.data.toByteArray, true)
 
+        if (dataset == null) throw new RuntimeException("fetched dataset could not be read")
+        
         anonymizationService.ask(ReverseAnonymization(dataset)).mapTo[Attributes]
           .map { reversedDataset =>
 

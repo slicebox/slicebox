@@ -30,9 +30,10 @@ import spray.http.ContentTypes
 import java.nio.file.Paths
 import spray.http.HttpData
 import akka.actor.ReceiveTimeout
+import se.nimsa.sbx.anonymization.AnonymizationServiceActor
 
 class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
-  with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach with JsonFormats {
+    with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach with JsonFormats {
 
   def this() = this(ActorSystem("BoxPollActorTestSystem"))
 
@@ -58,7 +59,9 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
   val mockHttpResponses: ArrayBuffer[HttpResponse] = ArrayBuffer()
   val capturedRequests: ArrayBuffer[HttpRequest] = ArrayBuffer()
 
-  val pollBoxActorRef = _system.actorOf(Props(new BoxPollActor(remoteBox, dbProps, 1.hour, 1000.hours) {
+  val anonymizationService = system.actorOf(AnonymizationServiceActor.props(dbProps), name = "AnonymizationService")
+  val pollBoxActorRef = system.actorOf(Props(new BoxPollActor(remoteBox, dbProps, 1.hour, 1000.hours, "../AnonymizationService") {
+    
     override def sendRequestToRemoteBoxPipeline = {
       (req: HttpRequest) =>
         {
@@ -79,17 +82,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
     responseCounter = -1
 
     db.withSession { implicit session =>
-      boxDao.listBoxes.foreach(box => {
-        boxDao.removeBox(box.id)
-      })
-
-      boxDao.listInboxEntries.foreach(inboxEntry => {
-        boxDao.removeInboxEntry(inboxEntry.id)
-      })
-
-      boxDao.listOutboxEntries.foreach(outboxEntry => {
-        boxDao.removeOutboxEntry(outboxEntry.id)
-      })
+      boxDao.clear
     }
   }
 
@@ -193,7 +186,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
       pollBoxActorRef ! PollRemoteBox
       expectNoMsg
-      
+
       // make sure we are back in the polling state. If we are, there should be two polling requests
       capturedRequests.size should be(2)
       capturedRequests(0).uri.toString() should be(s"$remoteBoxBaseUrl/outbox/poll")

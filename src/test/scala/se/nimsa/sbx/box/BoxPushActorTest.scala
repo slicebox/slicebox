@@ -3,6 +3,7 @@ package se.nimsa.sbx.box
 import akka.testkit.TestKit
 import akka.testkit.ImplicitSender
 import org.scalatest._
+import akka.actor.Actor
 import akka.actor.ActorSystem
 import akka.actor.Props
 import org.scalatest.Matchers
@@ -28,9 +29,35 @@ import se.nimsa.sbx.storage.PropertiesDAO
 import spray.http.StatusCodes._
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.duration.DurationInt
+import se.nimsa.sbx.storage.StorageServiceActor
+import se.nimsa.sbx.anonymization.AnonymizationServiceActor
+import org.dcm4che3.data.Attributes
+import org.dcm4che3.data.Tag
+import org.dcm4che3.data.VR
+
+class MockupStorageActor extends Actor {
+  def receive = {
+    case GetDataset(imageId) =>
+      val datasetMaybe = imageId match {
+        case id if id <= 3 =>
+          val dataset = new Attributes()
+          dataset.setString(Tag.SOPClassUID, VR.UI, "1.2.840.10008.5.1.4.1.1.2")
+          dataset.setString(Tag.PatientName, VR.LO, "pn")
+          dataset.setString(Tag.PatientID, VR.LO, "pid")
+          dataset.setString(Tag.StudyInstanceUID, VR.LO, "stuid")
+          dataset.setString(Tag.SeriesInstanceUID, VR.LO, "seuid")
+          dataset.setString(Tag.SOPInstanceUID, VR.LO, "sopid")
+          dataset.setString(Tag.FrameOfReferenceUID, VR.LO, "foruid")
+          Some(dataset)
+        case _ =>
+          None
+      }
+      sender ! datasetMaybe
+  }
+}
 
 class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
-  with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {
+    with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {
 
   def this() = this(ActorSystem("BoxPushActorTestSystem"))
 
@@ -41,12 +68,10 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
   val boxDao = new BoxDAO(H2Driver)
   val metaDataDao = new MetaDataDAO(H2Driver)
-  val propertiesDao = new PropertiesDAO(H2Driver)
 
   db.withSession { implicit session =>
     boxDao.create
     metaDataDao.create
-    propertiesDao.create
   }
 
   val testBox = Box(1, "Test Box", "abc123", "testbox.com", BoxSendMethod.PUSH, false)
@@ -62,11 +87,8 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
   val image1 = Image(-1, -1, SOPInstanceUID("souid1"), ImageType("PRIMARY/RECON/TOMO"), InstanceNumber("1"))
   val image2 = Image(-1, -1, SOPInstanceUID("souid2"), ImageType("PRIMARY/RECON/TOMO"), InstanceNumber("1"))
   val image3 = Image(-1, -1, SOPInstanceUID("souid3"), ImageType("PRIMARY/RECON/TOMO"), InstanceNumber("1"))
-  var imageFile1 = ImageFile(-1, FileName("file1"), SourceType.UNKNOWN, -1)
-  var imageFile2 = ImageFile(-1, FileName("file2"), SourceType.UNKNOWN, -1)
-  var imageFile3 = ImageFile(-1, FileName("file3"), SourceType.UNKNOWN, -1)
 
-  db.withSession { implicit session =>
+  val (dbImage1, dbImage2, dbImage3) = db.withSession { implicit session =>
     val dbPat = metaDataDao.insert(pat1)
     val dbStudy = metaDataDao.insert(study1.copy(patientId = dbPat.id))
     val dbEquipment = metaDataDao.insert(equipment1)
@@ -75,9 +97,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
     val dbImage1 = metaDataDao.insert(image1.copy(seriesId = dbSeries.id))
     val dbImage2 = metaDataDao.insert(image2.copy(seriesId = dbSeries.id))
     val dbImage3 = metaDataDao.insert(image3.copy(seriesId = dbSeries.id))
-    imageFile1 = propertiesDao.insertImageFile(imageFile1.copy(id = dbImage1.id))
-    imageFile2 = propertiesDao.insertImageFile(imageFile2.copy(id = dbImage2.id))
-    imageFile3 = propertiesDao.insertImageFile(imageFile3.copy(id = dbImage3.id))
+    (dbImage1, dbImage2, dbImage3)
   }
 
   val capturedFileSendRequests = ArrayBuffer.empty[HttpRequest]
@@ -86,7 +106,9 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
   val okResponse = HttpResponse()
   val failResponse = HttpResponse(InternalServerError)
 
-  val boxPushActorRef = _system.actorOf(Props(new BoxPushActor(testBox, dbProps, storage, 1000.hours) {
+  val storageService = system.actorOf(Props[MockupStorageActor], name = "StorageService")
+  val anonymizationService = system.actorOf(AnonymizationServiceActor.props(dbProps), name = "AnonymizationService")
+  val boxPushActorRef = system.actorOf(Props(new BoxPushActor(testBox, dbProps, storage, 1000.hours, 1000.hours, "../StorageService", "../AnonymizationService") {
 
     override def sendFilePipeline = {
       (req: HttpRequest) =>
@@ -101,10 +123,6 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
         }
     }
 
-    override def pushImagePipeline(outboxEntry: OutboxEntry, fileName: String, tagValues: Seq[TransactionTagValue]): Future[HttpResponse] = {
-      sendFilePipeline(Post(s"${testBox.baseUrl}/image/${outboxEntry.transactionId}/${outboxEntry.sequenceNumber}/${outboxEntry.totalImageCount}", HttpData(Array.empty[Byte])))
-    }
-
   }))
 
   override def afterAll {
@@ -116,10 +134,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
     capturedFileSendRequests.clear()
 
     db.withSession { implicit session =>
-      boxDao.listOutboxEntries.foreach(outboxEntry =>
-        boxDao.removeOutboxEntry(outboxEntry.id))
-      boxDao.listTransactionTagValues.foreach(entry =>
-        boxDao.removeTransactionTagValue(entry.id))
+      boxDao.clear
     }
   }
 
@@ -128,7 +143,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
     "remove processed outbox entry" in {
 
       db.withSession { implicit session =>
-        boxDao.insertOutboxEntry(OutboxEntry(1, testBox.id, testTransactionId, 1, 1, imageFile1.id, false))
+        boxDao.insertOutboxEntry(OutboxEntry(1, testBox.id, testTransactionId, 1, 1, dbImage1.id, false))
 
         boxPushActorRef ! PollOutbox
 
@@ -140,7 +155,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
     "should post file to correct URL" in {
 
-      val outboxEntry = OutboxEntry(1, testBox.id, testTransactionId, 2, 5, imageFile1.id, false)
+      val outboxEntry = OutboxEntry(1, testBox.id, testTransactionId, 2, 5, dbImage1.id, false)
       db.withSession { implicit session =>
         boxDao.insertOutboxEntry(outboxEntry)
       }
@@ -150,13 +165,13 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       expectNoMsg()
 
       capturedFileSendRequests.size should be(1)
-      capturedFileSendRequests(0).uri.toString() should be(s"${testBox.baseUrl}/image/${outboxEntry.transactionId}/${outboxEntry.sequenceNumber}/${outboxEntry.totalImageCount}")
+      capturedFileSendRequests(0).uri.toString() should be(s"${testBox.baseUrl}/image?transactionid=${outboxEntry.transactionId}&sequencenumber=${outboxEntry.sequenceNumber}&totalimagecount=${outboxEntry.totalImageCount}")
     }
 
     "should post file in correct order" in {
 
-      val outboxEntrySeq1 = OutboxEntry(1, testBox.id, testTransactionId, 1, 2, imageFile1.id, false)
-      val outboxEntrySeq2 = OutboxEntry(1, testBox.id, testTransactionId, 2, 2, imageFile2.id, false)
+      val outboxEntrySeq1 = OutboxEntry(1, testBox.id, testTransactionId, 1, 2, dbImage1.id, false)
+      val outboxEntrySeq2 = OutboxEntry(1, testBox.id, testTransactionId, 2, 2, dbImage2.id, false)
       db.withSession { implicit session =>
         // Insert outbox entries out of order
         boxDao.insertOutboxEntry(outboxEntrySeq2)
@@ -164,12 +179,13 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       }
 
       boxPushActorRef ! PollOutbox
-
+      expectNoMsg()
+      boxPushActorRef ! PollOutbox
       expectNoMsg()
 
       capturedFileSendRequests.size should be(2)
-      capturedFileSendRequests(0).uri.toString() should be(s"${testBox.baseUrl}/image/${outboxEntrySeq1.transactionId}/${outboxEntrySeq1.sequenceNumber}/${outboxEntrySeq1.totalImageCount}")
-      capturedFileSendRequests(1).uri.toString() should be(s"${testBox.baseUrl}/image/${outboxEntrySeq2.transactionId}/${outboxEntrySeq2.sequenceNumber}/${outboxEntrySeq2.totalImageCount}")
+      capturedFileSendRequests(0).uri.toString() should be(s"${testBox.baseUrl}/image?transactionid=${outboxEntrySeq1.transactionId}&sequencenumber=${outboxEntrySeq1.sequenceNumber}&totalimagecount=${outboxEntrySeq1.totalImageCount}")
+      capturedFileSendRequests(1).uri.toString() should be(s"${testBox.baseUrl}/image?transactionid=${outboxEntrySeq2.transactionId}&sequencenumber=${outboxEntrySeq2.sequenceNumber}&totalimagecount=${outboxEntrySeq2.totalImageCount}")
     }
 
     "mark outbox entry as failed when file send fails" in {
@@ -215,7 +231,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       db.withSession { implicit session =>
         val invalidImageId = 666
         boxDao.insertOutboxEntry(OutboxEntry(1, testBox.id, testTransactionId, 1, 1, invalidImageId, false))
-        val secondOutboxEntry = boxDao.insertOutboxEntry(OutboxEntry(1, 999, testTransactionId, 1, 1, imageFile1.id, false))
+        val secondOutboxEntry = boxDao.insertOutboxEntry(OutboxEntry(1, 999, testTransactionId, 1, 1, dbImage1.id, false))
 
         boxPushActorRef ! PollOutbox
         expectNoMsg()
@@ -238,7 +254,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
         boxPushActorRef ! PollOutbox
         expectNoMsg()
 
-        boxDao.insertOutboxEntry(OutboxEntry(1, testBox.id, testTransactionId2, 1, 1, imageFile2.id, false))
+        boxDao.insertOutboxEntry(OutboxEntry(1, testBox.id, testTransactionId2, 1, 1, dbImage2.id, false))
 
         boxPushActorRef ! PollOutbox
         expectNoMsg()
@@ -254,12 +270,12 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       }
     }
 
-    "pause outbox processing when remote server is not working, and resumed once remote server is back up" in {
+    "pause outbox processing when remote server is not working, and resume once remote server is back up" in {
 
       db.withSession { implicit session =>
-        boxDao.insertOutboxEntry(OutboxEntry(1, testBox.id, testTransactionId, 1, 3, imageFile1.id, false))
-        boxDao.insertOutboxEntry(OutboxEntry(2, testBox.id, testTransactionId, 2, 3, imageFile2.id, false))
-        boxDao.insertOutboxEntry(OutboxEntry(3, testBox.id, testTransactionId, 3, 3, imageFile3.id, false))
+        boxDao.insertOutboxEntry(OutboxEntry(1, testBox.id, testTransactionId, 1, 3, dbImage1.id, false))
+        boxDao.insertOutboxEntry(OutboxEntry(2, testBox.id, testTransactionId, 2, 3, dbImage2.id, false))
+        boxDao.insertOutboxEntry(OutboxEntry(3, testBox.id, testTransactionId, 3, 3, dbImage3.id, false))
 
         val n = capturedFileSendRequests.size
         sendFailedResponseSequenceNumbers ++= Seq(n + 2, n + 3, n + 4, n + 5, n + 6)

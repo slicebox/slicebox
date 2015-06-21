@@ -43,7 +43,6 @@ import scala.concurrent.Future
 import scala.concurrent.Future.sequence
 import akka.actor.Stash
 import org.dcm4che3.data.Attributes
-import BoxUtil._
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.TagValue
 
 class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) extends Actor with Stash
@@ -360,7 +359,7 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
       addOutboxEntries(remoteBoxId, transactionId, imageIds)
       for ((imageId, tagValues) <- imageIdToTagValues) {
         tagValues.foreach(tagValue =>
-          addTagValue(imageId, transactionId, tagValue.tagValue.tag, tagValue.tagValue.value))
+          addTagValue(transactionId, imageId, tagValue.tagValue.tag, tagValue.tagValue.value))
       }
       imageIds
     })

@@ -111,7 +111,7 @@ class ImageRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       status should be (OK)
       responseAs[Patient]
     }
-    PutAsUser("/api/images/1/anonymize") ~> routes ~> check {
+    PostAsUser("/api/images/1/anonymize", Seq.empty[TagValue]) ~> routes ~> check {
       status should be (NoContent)
     }
     GetAsUser("/api/metadata/patients/1") ~> routes ~> check {
@@ -145,12 +145,12 @@ class ImageRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   }
   
   it should "return NotFound when manually anonymizing an image that does not exist" in {
-    PutAsUser("/api/images/3/anonymize") ~> routes ~> check {
+    PostAsUser("/api/images/3/anonymize", Seq.empty[TagValue]) ~> routes ~> check {
       status should be (NotFound)
     }
   }
 
-  it should "support deleting and image" in {
+  it should "support deleting an image" in {
     GetAsUser("/api/metadata/images/2") ~> routes ~> check {
       status should be (OK)            
     }

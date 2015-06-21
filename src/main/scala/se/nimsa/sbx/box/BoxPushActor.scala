@@ -22,7 +22,6 @@ import akka.event.Logging
 import akka.event.LoggingReceive
 import akka.pattern.ask
 import BoxProtocol._
-import BoxUtil._
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.duration.FiniteDuration
 import spray.client.pipelining._
@@ -50,15 +49,17 @@ class BoxPushActor(box: Box,
                    dbProps: DbProps,
                    storage: Path,
                    pollInterval: FiniteDuration = 5.seconds,
-                   receiveTimeout: FiniteDuration = 1.minute) extends Actor {
+                   receiveTimeout: FiniteDuration = 1.minute,
+                   storageServicePath: String = "../../StorageService",
+                   anonymizationServicePath: String = "../../AnonymizationService") extends Actor {
 
   val log = Logging(context.system, this)
 
   val db = dbProps.db
   val boxDao = new BoxDAO(dbProps.driver)
 
-  val storageService = context.actorSelection("../../StorageService")
-  val anonymizationService = context.actorSelection("../../AnonymizationService")
+  val storageService = context.actorSelection(storageServicePath)
+  val anonymizationService = context.actorSelection(anonymizationServicePath)
 
   implicit val system = context.system
   implicit val ec = context.dispatcher
@@ -70,15 +71,13 @@ class BoxPushActor(box: Box,
     val futureDatasetMaybe = storageService.ask(GetDataset(outboxEntry.imageId)).mapTo[Option[Attributes]]
     futureDatasetMaybe.flatMap(_ match {
       case Some(dataset) =>
-        
         val futureAnonymizedDataset = anonymizationService.ask(Anonymize(dataset, tagValues.map(_.tagValue))).mapTo[Attributes]
         futureAnonymizedDataset flatMap { anonymizedDataset =>
           val bytes = toByteArray(anonymizedDataset)
           sendFilePipeline(Post(s"${box.baseUrl}/image?transactionid=${outboxEntry.transactionId}&sequencenumber=${outboxEntry.sequenceNumber}&totalimagecount=${outboxEntry.totalImageCount}", HttpData(bytes)))
         }
       case None =>
-
-        Future.failed(new Exception("No dataset found for image id " + outboxEntry.imageId))
+        Future.failed(new IllegalArgumentException("No dataset found for image id " + outboxEntry.imageId))
     })
   }
 
@@ -146,6 +145,8 @@ class BoxPushActor(box: Box,
         }
       })
       .recover {
+        case exception: IllegalArgumentException =>
+          self ! FileSendFailed(outboxEntry, 400, exception)
         case exception: Exception =>
           self ! FileSendFailed(outboxEntry, 500, exception)
       }
