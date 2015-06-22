@@ -42,17 +42,13 @@ class DicomUtilTest extends FlatSpec with Matchers with BeforeAndAfterAll {
   val tempDir = Files.createTempDirectory("slicebox-temp-dir-")
 
   "Loading a dataset" should "return a dataset" in {
-    val fileName = "anon270.dcm"
-    val dcmPath = Paths.get(classOf[DirectoryRoutesTest].getResource(fileName).toURI())
-    val dataset = loadDataset(dcmPath, true)
+    val dataset = TestUtil.testImageDataset()
     dataset.isInstanceOf[Attributes] should be(true)
   }
 
   "Loading a dataset" should "return the same dataset, disregarding pixelData, when loading with and without pixelData" in {
-    val fileName = "anon270.dcm"
-    val dcmPath = Paths.get(classOf[DirectoryRoutesTest].getResource(fileName).toURI())
-    val dataset1 = loadDataset(dcmPath, false)
-    val dataset2 = loadDataset(dcmPath, true)
+    val dataset1 = TestUtil.testImageDataset(false)
+    val dataset2 = TestUtil.testImageDataset(true)
     dataset1 should not equal (dataset2)
     dataset1.remove(Tag.PixelData)
     dataset2.remove(Tag.PixelData)
@@ -60,9 +56,7 @@ class DicomUtilTest extends FlatSpec with Matchers with BeforeAndAfterAll {
   }
 
   "loading and saving a dataset and loading it again" should "produce the same dataset twice" in {
-    val fileName = "anon270.dcm"
-    val dcmPath = Paths.get(classOf[DirectoryRoutesTest].getResource(fileName).toURI())
-    val dataset1 = loadDataset(dcmPath, false)
+    val dataset1 = TestUtil.testImageDataset(false)
     val savePath = tempDir.resolve("dataset1.dcm")
     saveDataset(dataset1, savePath)
     val dataset2 = loadDataset(savePath, false)
@@ -70,9 +64,7 @@ class DicomUtilTest extends FlatSpec with Matchers with BeforeAndAfterAll {
   }
 
   it should "work also in combination with anonymization and loading pixel data" in {
-    val fileName = "anon270.dcm"
-    val dcmPath = Paths.get(classOf[DirectoryRoutesTest].getResource(fileName).toURI())
-    val dataset = loadDataset(dcmPath, true)
+    val dataset = TestUtil.testImageDataset()
     val anonymized1 = anonymizeDataset(dataset)
     val savePath = tempDir.resolve("anonymized.dcm")
     saveDataset(anonymized1, savePath)

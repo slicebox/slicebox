@@ -39,16 +39,7 @@ class MockupStorageActor extends Actor {
   def receive = {
     case GetDataset(imageId) =>
       val datasetMaybe = imageId match {
-        case id if id <= 3 =>
-          val dataset = new Attributes()
-          dataset.setString(Tag.SOPClassUID, VR.UI, "1.2.840.10008.5.1.4.1.1.2")
-          dataset.setString(Tag.PatientName, VR.LO, "pn")
-          dataset.setString(Tag.PatientID, VR.LO, "pid")
-          dataset.setString(Tag.StudyInstanceUID, VR.LO, "stuid")
-          dataset.setString(Tag.SeriesInstanceUID, VR.LO, "seuid")
-          dataset.setString(Tag.SOPInstanceUID, VR.LO, "sopid")
-          dataset.setString(Tag.FrameOfReferenceUID, VR.LO, "foruid")
-          Some(dataset)
+        case id if id <= 3 => Some(TestUtil.createDataset())
         case _ =>
           None
       }
@@ -79,26 +70,10 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
   val testTransactionId = 888
   val testTransactionId2 = 999
 
-  val pat1 = Patient(-1, PatientName("p1"), PatientID("s1"), PatientBirthDate("2000-01-01"), PatientSex("M"))
-  val study1 = Study(-1, -1, StudyInstanceUID("stuid1"), StudyDescription("stdesc1"), StudyDate("19990101"), StudyID("stid1"), AccessionNumber("acc1"), PatientAge("12Y"))
-  val equipment1 = Equipment(-1, Manufacturer("manu1"), StationName("station1"))
-  val for1 = FrameOfReference(-1, FrameOfReferenceUID("frid1"))
-  val series1 = Series(-1, -1, -1, -1, SeriesInstanceUID("seuid1"), SeriesDescription("sedesc1"), SeriesDate("19990101"), Modality("NM"), ProtocolName("prot1"), BodyPartExamined("bodypart1"))
-  val image1 = Image(-1, -1, SOPInstanceUID("souid1"), ImageType("PRIMARY/RECON/TOMO"), InstanceNumber("1"))
-  val image2 = Image(-1, -1, SOPInstanceUID("souid2"), ImageType("PRIMARY/RECON/TOMO"), InstanceNumber("1"))
-  val image3 = Image(-1, -1, SOPInstanceUID("souid3"), ImageType("PRIMARY/RECON/TOMO"), InstanceNumber("1"))
-
-  val (dbImage1, dbImage2, dbImage3) = db.withSession { implicit session =>
-    val dbPat = metaDataDao.insert(pat1)
-    val dbStudy = metaDataDao.insert(study1.copy(patientId = dbPat.id))
-    val dbEquipment = metaDataDao.insert(equipment1)
-    val dbFor = metaDataDao.insert(for1)
-    val dbSeries = metaDataDao.insert(series1.copy(studyId = dbStudy.id, equipmentId = dbEquipment.id, frameOfReferenceId = dbFor.id))
-    val dbImage1 = metaDataDao.insert(image1.copy(seriesId = dbSeries.id))
-    val dbImage2 = metaDataDao.insert(image2.copy(seriesId = dbSeries.id))
-    val dbImage3 = metaDataDao.insert(image3.copy(seriesId = dbSeries.id))
-    (dbImage1, dbImage2, dbImage3)
-  }
+  val (dbPatient1, (dbStudy1, dbStudy2), (dbSeries1, dbSeries2, dbSeries3, dbSeries4), (dbEquipment1, dbEquipment2, dbEquipment3), (dbFor1, dbFor2), (dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)) =
+    db.withSession { implicit session =>
+      TestUtil.insertMetaData(metaDataDao)
+    }
 
   val capturedFileSendRequests = ArrayBuffer.empty[HttpRequest]
   val sendFailedResponseSequenceNumbers = ArrayBuffer.empty[Int]

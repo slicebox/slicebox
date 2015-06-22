@@ -16,7 +16,7 @@ import spray.httpx.marshalling.Marshaller
 
 trait RoutesTestBase extends ScalatestRouteTest with RestApi with BeforeAndAfterAll with BeforeAndAfterEach { this: Suite =>
 
-  implicit val routeTestTimeout = RouteTestTimeout(5.second)
+  implicit val routeTestTimeout = RouteTestTimeout(10.seconds)
 
   val adminCredentials = BasicHttpCredentials(superUser, superPassword)
   val userCredentials = BasicHttpCredentials("user", "userpassword")

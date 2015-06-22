@@ -1,4 +1,4 @@
-package se.nimsa.sbx.box
+package se.nimsa.sbx.anonymization
 
 import java.util.Date
 
@@ -18,11 +18,13 @@ import akka.actor.Props
 import akka.actor.actorRef2Scala
 import akka.testkit.ImplicitSender
 import akka.testkit.TestKit
-import se.nimsa.sbx.anonymization.AnonymizationDAO
-import se.nimsa.sbx.anonymization.AnonymizationProtocol._
-import se.nimsa.sbx.anonymization.AnonymizationServiceActor
-import se.nimsa.sbx.anonymization.AnonymizationUtil._
+
 import se.nimsa.sbx.app.DbProps
+
+import se.nimsa.sbx.util.TestUtil._
+
+import AnonymizationProtocol._
+import AnonymizationUtil.anonymizeDataset
 
 class AnonymizationServiceActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
     with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {
@@ -53,8 +55,8 @@ class AnonymizationServiceActorTest(_system: ActorSystem) extends TestKit(_syste
 
     "harmonize anonymization with respect to relevant anonymization keys when sending a file" in {
       db.withSession { implicit session =>
-        val dataset = createDataset
-        val key = insertAnonymizationKey
+        val dataset = createDataset()
+        val key = insertAnonymizationKey(dataset)
         anonymizationService ! Anonymize(dataset, Seq.empty)
         expectMsgPF() {
           case harmonized: Attributes =>
@@ -68,8 +70,8 @@ class AnonymizationServiceActorTest(_system: ActorSystem) extends TestKit(_syste
 
     "reverse anonymization in an anonymous dataset based on anonymization keys" in {
       db.withSession { implicit session =>
-        val key = insertAnonymizationKey
-        val dataset = createDataset
+        val dataset = createDataset()
+        val key = insertAnonymizationKey(dataset)
         val anonymizedDataset = anonymizeDataset(dataset)
         anonymizedDataset.setString(Tag.PatientName, VR.PN, key.anonPatientName)
         anonymizedDataset.setString(Tag.PatientID, VR.SH, key.anonPatientID)
@@ -90,25 +92,8 @@ class AnonymizationServiceActorTest(_system: ActorSystem) extends TestKit(_syste
     }
   }
 
-  def createDataset = {
-    val dataset = new Attributes()
-    dataset.setString(Tag.PatientName, VR.LO, "p1")
-    dataset.setString(Tag.PatientID, VR.LO, "s1")
-    dataset.setString(Tag.StudyInstanceUID, VR.LO, "stuid1")
-    dataset.setString(Tag.SeriesInstanceUID, VR.LO, "seuid1")
-    dataset.setString(Tag.FrameOfReferenceUID, VR.LO, "frid1")
-    dataset
-  }
-
-  def insertAnonymizationKey(implicit session: H2Driver.simple.Session) = {
-    val key = AnonymizationKey(-1, new Date().getTime,
-      "p1", "anon p1",
-      "s1", "anon s1",
-      "2000-01-01",
-      "stuid1", "anon stuid1",
-      "stdesc1", "stid1", "acc1",
-      "seuid1", "anon seuid1",
-      "frid1", "anon frid1")
+  def insertAnonymizationKey(dataset: Attributes)(implicit session: H2Driver.simple.Session) = {
+    val key = createAnonymizationKey(dataset)
     anonymizationDao.insertAnonymizationKey(key)
     key
   }

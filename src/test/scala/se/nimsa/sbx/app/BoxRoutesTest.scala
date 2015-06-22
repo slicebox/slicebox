@@ -27,6 +27,7 @@ import scala.slick.driver.H2Driver
 import java.util.Date
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.TagValue
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.AnonymizationKey
+import se.nimsa.sbx.util.TestUtil
 
 class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
@@ -181,9 +182,7 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       }
 
     // then, push an image from the hospital to the uni box we just set up
-    val fileName = "anon270.dcm"
-    val dcmPath = Paths.get(getClass().getResource(fileName).toURI())
-    val bytes = DicomUtil.toByteArray(dcmPath)
+    val bytes = TestUtil.testImageByteArray
 
     val testTransactionId = abs(UUID.randomUUID().getMostSignificantBits())
     val sequenceNumber = 1L
@@ -250,8 +249,7 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
   it should "return an image file when requesting outbox entry" in {
     // add image (image will get id 1)
-    val fileName = "anon270.dcm"
-    val file = new File(getClass().getResource(fileName).toURI())
+    val file = TestUtil.testImageFile
     val mfd = MultipartFormData(Seq(BodyPart(file, "file")))
     PostAsUser("/api/images", mfd)
 
@@ -284,8 +282,7 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
   it should "remove outbox entry when done is received" in {
     // add image (image will get id 1)
-    val fileName = "anon270.dcm"
-    val file = new File(getClass().getResource(fileName).toURI())
+    val file = TestUtil.testImageFile
     val mfd = MultipartFormData(Seq(BodyPart(file, "file")))
     PostAsUser("/api/images", mfd)
 
@@ -318,8 +315,7 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
   it should "correctly map dicom attributes according to supplied mapping when sending a series" in {
     // add image (image will get id 1)
-    val fileName = "anon270.dcm"
-    val file = new File(getClass().getResource(fileName).toURI())
+    val file = TestUtil.testImageFile
     val mfd = MultipartFormData(Seq(BodyPart(file, "file")))
     PostAsUser("/api/images", mfd)
 

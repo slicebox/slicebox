@@ -24,9 +24,7 @@ class StorageServiceActorTest(_system: ActorSystem) extends TestKit(_system) wit
   val db = Database.forURL("jdbc:h2:mem:dicomstorageactortest;DB_CLOSE_DELAY=-1", driver = "org.h2.Driver")
   val dbProps = DbProps(db, H2Driver)
 
-  val fileName = "anon270.dcm"
-  val dcmPath = Paths.get(getClass().getResource("../app/" + fileName).toURI())
-  val dataset = loadDataset(dcmPath, true)
+  val dataset = TestUtil.testImageDataset()
 
   val storage = Files.createTempDirectory("slicebox-test-storage-")
 

@@ -129,9 +129,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
         case Left(e)       => fail(e)
       }
 
-      val fileName = "anon270.dcm"
-      val dcmPath = Paths.get(getClass().getResource(fileName).toURI())
-      val dcmFile = dcmPath.toFile
+      val dcmFile = TestUtil.testImageFile
 
       mockHttpResponses += HttpResponse(StatusCodes.OK, HttpEntity(ContentTypes.`application/octet-stream`, HttpData(dcmFile)))
       mockHttpResponses += HttpResponse(StatusCodes.OK)

@@ -40,10 +40,8 @@ trait SeriesTypeRoutes { this: RestApi =>
             case SeriesTypes(seriesTypes) =>
               complete(seriesTypes)
           }
-        }
-      } ~ authorize(authInfo.hasPermission(UserRole.ADMINISTRATOR)) {
-        pathEndOrSingleSlash {
-          post {
+        } ~ post {
+          authorize(authInfo.hasPermission(UserRole.ADMINISTRATOR)) {
             entity(as[SeriesType]) { seriesType =>
               onSuccess(seriesTypeService.ask(AddSeriesType(seriesType))) {
                 case SeriesTypeAdded(seriesType) =>
@@ -51,15 +49,20 @@ trait SeriesTypeRoutes { this: RestApi =>
               }
             }
           }
-        } ~ path(LongNumber) { seriesTypeId =>
-          put {
+        }
+
+      } ~ path(LongNumber) { seriesTypeId =>
+        put {
+          authorize(authInfo.hasPermission(UserRole.ADMINISTRATOR)) {
             entity(as[SeriesType]) { seriesType =>
               onSuccess(seriesTypeService.ask(UpdateSeriesType(seriesType))) {
                 case SeriesTypeUpdated =>
                   complete(NoContent)
               }
             }
-          } ~ delete {
+          }
+        } ~ delete {
+          authorize(authInfo.hasPermission(UserRole.ADMINISTRATOR)) {
             onSuccess(seriesTypeService.ask(RemoveSeriesType(seriesTypeId))) {
               case SeriesTypeRemoved(seriesTypeId) =>
                 complete(NoContent)
@@ -67,5 +70,5 @@ trait SeriesTypeRoutes { this: RestApi =>
           }
         }
       }
-  }
+    }
 }
