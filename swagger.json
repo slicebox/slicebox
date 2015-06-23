@@ -904,11 +904,9 @@
             "in": "body",
             "description": "specification of values for DICOM attributes",
             "required": true,
-            "schema": {
-              "type": "array",
-              "items": {
-                "$ref": "#/definitions/entityTagValue"
-              }
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/entityTagValue"
             }
           }
         ],
