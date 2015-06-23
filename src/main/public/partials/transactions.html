@@ -77,11 +77,10 @@
                             callbacks="callbacks.anonymizationKeyTable"
                             empty-message="No anonymization keys">
 
-                            <sbx-grid-column property="remoteBoxName" title="Box"></sbx-grid-column>
-                            <sbx-grid-column property="created" title="Date" filter="date: yyyy-MM-dd"></sbx-grid-column>
+                            <sbx-grid-column property="created" title="Created" filter="date: yyyy-MM-dd HH:mm"></sbx-grid-column>
                             <sbx-grid-column property="patientName" title="Patient Name"><sbx-grid-cell>{{rowObject.patientName | prettyPatientName}}</sbx-grid-cell></sbx-grid-column>
-                            <sbx-grid-column property="patientID" title="Patient ID"></sbx-grid-column>umn>
                             <sbx-grid-column property="anonPatientName" title="Anonymous Patient Name"></sbx-grid-column>
+                            <sbx-grid-column property="patientID" title="Patient ID"></sbx-grid-column>umn>
                             <sbx-grid-column property="anonPatientID" title="Anonymous Patient ID"></sbx-grid-column>
                             <sbx-grid-column property="accessionNumber" title="Accession Number"></sbx-grid-column>
 
@@ -107,7 +106,7 @@
                             callbacks="callbacks.logTable"
                             empty-message="Event log is empty">
 
-                            <sbx-grid-column property="created" title="Created" filter="date: yyyy-MM-dd HH:mm:ss.sss">
+                            <sbx-grid-column property="created" title="Created" filter="date: yyyy-MM-dd HH:mm">
                             </sbx-grid-column>
 
                             <sbx-grid-column property="entryType" title="Type">

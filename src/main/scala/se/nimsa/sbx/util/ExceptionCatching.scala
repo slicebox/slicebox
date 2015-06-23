@@ -27,9 +27,10 @@ trait ExceptionCatching { this: Actor =>
       Some(op)
     } catch {
       case e: Exception =>
-        if (!e.isInstanceOf[IllegalArgumentException]) {
-          SbxLog.error("System", "" + e.getMessage)(context.system)
-        }
+        if (e.isInstanceOf[IllegalArgumentException]) 
+           SbxLog.info("System", "Bad request caused error: " + e.getMessage)(context.system)
+         else
+        	 SbxLog.error("System", "" + e.getMessage)(context.system)
         sender ! Failure(e)
         None
     }
@@ -39,9 +40,10 @@ trait ExceptionCatching { this: Actor =>
       op
     } catch {
       case e: Exception =>
-        if (!e.isInstanceOf[IllegalArgumentException]) {
-          SbxLog.error("System", "" + e.getMessage)(context.system)
-        }
+        if (e.isInstanceOf[IllegalArgumentException]) 
+           SbxLog.info("System", "Bad request caused error: " + e.getMessage)(context.system)
+         else
+           SbxLog.error("System", "" + e.getMessage)(context.system)
         sender ! Failure(e)
         throw e
     }

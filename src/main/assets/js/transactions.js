@@ -135,7 +135,7 @@ angular.module('slicebox.transactions', ['ngRoute'])
         [
             {
                 name: 'Delete',
-                action: $scope.confirmDeleteEntitiesFunction('/api/boxes/anonymizationkeys/', 'anonymization key(s)')
+                action: $scope.confirmDeleteEntitiesFunction('/api/images/anonymizationkeys/', 'anonymization key(s)')
             }
         ];
 

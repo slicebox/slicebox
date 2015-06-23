@@ -339,23 +339,17 @@ object AnonymizationUtil {
     val frameOfReference = datasetToFrameOfReference(dataset)
     val anonPatient = datasetToPatient(anonDataset)
     val anonStudy = datasetToStudy(anonDataset)
-    val anonSeries = datasetToSeries(anonDataset)
-    val anonFrameOfReference = datasetToFrameOfReference(anonDataset)
     AnonymizationKey(-1, new Date().getTime,
       patient.patientName.value, anonPatient.patientName.value,
       patient.patientID.value, anonPatient.patientID.value, patient.patientBirthDate.value,
       study.studyInstanceUID.value, anonStudy.studyInstanceUID.value,
-      study.studyDescription.value, study.studyID.value, study.accessionNumber.value,
-      series.seriesInstanceUID.value, anonSeries.seriesInstanceUID.value,
-      frameOfReference.frameOfReferenceUID.value, anonFrameOfReference.frameOfReferenceUID.value)
+      study.studyDescription.value, study.studyID.value, study.accessionNumber.value)
   }
 
   def isEqual(key1: AnonymizationKey, key2: AnonymizationKey) =
     key1.patientName == key2.patientName && key1.anonPatientName == key2.anonPatientName &&
       key1.patientID == key2.patientID && key1.anonPatientID == key2.anonPatientID &&
-      key1.studyInstanceUID == key2.studyInstanceUID && key1.anonStudyInstanceUID == key2.anonStudyInstanceUID &&
-      key1.seriesInstanceUID == key2.seriesInstanceUID && key1.anonSeriesInstanceUID == key2.anonSeriesInstanceUID &&
-      key1.frameOfReferenceUID == key2.frameOfReferenceUID && key1.anonFrameOfReferenceUID == key2.anonFrameOfReferenceUID
+      key1.studyInstanceUID == key2.studyInstanceUID && key1.anonStudyInstanceUID == key2.anonStudyInstanceUID
 
   def reverseAnonymization(keys: List[AnonymizationKey], dataset: Attributes) = {
     if (isAnonymous(dataset)) {
@@ -385,15 +379,6 @@ object AnonymizationUtil {
         val studyKeys = keys.filter(_.studyInstanceUID == study.studyInstanceUID.value)
         studyKeys.headOption.foreach(studyKey => {
           anonDataset.setString(Tag.StudyInstanceUID, VR.UI, studyKey.anonStudyInstanceUID)
-          val series = datasetToSeries(dataset)
-          val seriesKeys = studyKeys.filter(_.seriesInstanceUID == series.seriesInstanceUID.value)
-          seriesKeys.headOption.foreach(seriesKey => {
-            anonDataset.setString(Tag.SeriesInstanceUID, VR.UI, seriesKey.anonSeriesInstanceUID)
-            val foR = datasetToFrameOfReference(dataset)
-            val forKeys = seriesKeys.filter(seriesKey => seriesKey.frameOfReferenceUID == foR.frameOfReferenceUID.value)
-            forKeys.headOption.foreach(forKey =>
-              anonDataset.setString(Tag.FrameOfReferenceUID, VR.UI, forKey.anonFrameOfReferenceUID))
-          })
         })
       })
     }

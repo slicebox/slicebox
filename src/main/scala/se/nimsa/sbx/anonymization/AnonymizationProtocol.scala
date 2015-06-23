@@ -19,11 +19,7 @@ object AnonymizationProtocol {
     anonStudyInstanceUID: String,
     studyDescription: String,
     studyID: String,
-    accessionNumber: String,
-    seriesInstanceUID: String,
-    anonSeriesInstanceUID: String,
-    frameOfReferenceUID: String,
-    anonFrameOfReferenceUID: String) extends Entity
+    accessionNumber: String) extends Entity
 
   trait AnonymizationRequest
 

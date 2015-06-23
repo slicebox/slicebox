@@ -32,7 +32,7 @@
     <logger name="com.mchange" level="WARN" />
 	<!-- <logger name="scala.slick.jdbc.JdbcBackend.statement" level="DEBUG" /> -->
 	<logger name="org.dcm4che3" level="WARN" />
-    <logger name="se.nimsa.sbx" level="INFO" />
+    <logger name="se.nimsa.sbx" level="DEBUG" />
 
     <root level="DEBUG">
         <appender-ref ref="CONSOLE"/>
