@@ -153,7 +153,7 @@ angular.module('slicebox.transactions', ['ngRoute'])
   
     // Scope functions
     $scope.loadAnonymizationKeyPage = function(startIndex, count, orderByProperty, orderByDirection, filter) {
-        var loadUrl = '/api/boxes/anonymizationkeys?startindex=' + startIndex + '&count=' + count;
+        var loadUrl = '/api/images/anonymizationkeys?startindex=' + startIndex + '&count=' + count;
         if (orderByProperty) {
             loadUrl = loadUrl + '&orderby=' + orderByProperty.toLowerCase();
             

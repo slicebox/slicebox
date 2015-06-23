@@ -545,7 +545,7 @@ angular.module('slicebox.home', ['ngRoute'])
         imagesForPatients(patients).then(function(images) {
             openConfirmActionModal('Anonymize', 'Force anonymization of ' + images.length + ' images? Patient information will be lost.', 'Anonymize', function() {
                 var promises = images.forEach(function(image) {
-                    return $http.put('/api/images/' + image.id + '/anonymize');
+                    return $http.post('/api/images/' + image.id + '/anonymize');
                 });
                 return $q.all(promises).finally(function() {
                     $scope.patientSelected(null);        

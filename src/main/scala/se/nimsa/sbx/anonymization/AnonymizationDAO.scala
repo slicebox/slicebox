@@ -36,14 +36,6 @@ class AnonymizationDAO(val driver: JdbcProfile) {
 
   val anonymizationKeyQuery = TableQuery[AnonymizationKeyTable]
 
-  def columnExists(tableName: String, columnName: String)(implicit session: Session): Boolean = {
-    val tables = MTable.getTables(tableName).list
-    if (tables.isEmpty)
-      false
-    else
-      !tables(0).getColumns.list.filter(_.name == columnName).isEmpty
-  }
-
   def create(implicit session: Session): Unit =
     if (MTable.getTables("AnonymizationKey").list.isEmpty) {
       anonymizationKeyQuery.ddl.create
@@ -56,11 +48,23 @@ class AnonymizationDAO(val driver: JdbcProfile) {
     anonymizationKeyQuery.delete
   }
   
+  def columnExists(tableName: String, columnName: String)(implicit session: Session): Boolean = {
+    val tables = MTable.getTables(tableName).list
+    if (tables.isEmpty)
+      false
+    else
+      !tables(0).getColumns.list.filter(_.name == columnName).isEmpty
+  }
+
+  def checkOrderBy(orderBy: Option[String], tableNames: String*)(implicit session: Session) =
+    orderBy.foreach(columnName =>
+      if (!tableNames.exists(tableName =>
+        columnExists(tableName, columnName)))
+        throw new IllegalArgumentException(s"Property $columnName does not exist"))
+        
   def anonymizationKeys(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String])(implicit session: Session): List[AnonymizationKey] = {
 
-    orderBy.foreach(columnName =>
-      if (!columnExists("AnonymizationKey", columnName))
-        throw new IllegalArgumentException(s"Property $columnName does not exist"))
+    checkOrderBy(orderBy, "AnonymizationKey")
 
     implicit val getResult = GetResult(r =>
       AnonymizationKey(r.nextLong, r.nextLong, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString))

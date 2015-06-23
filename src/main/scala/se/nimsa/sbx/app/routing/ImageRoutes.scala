@@ -94,7 +94,7 @@ trait ImageRoutes { this: RestApi =>
         }
       } ~ path(LongNumber / "anonymize") { imageId =>
         post {
-          import spray.httpx.SprayJsonSupport.sprayJsonUnmarshaller
+          import spray.httpx.SprayJsonSupport._
           entity(as[Seq[TagValue]]) { tagValues =>
             onSuccess(storageService.ask(GetImageFile(imageId)).mapTo[Option[ImageFile]]) {
               _ match {
