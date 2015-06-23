@@ -886,6 +886,125 @@
       }
     },
 
+    "/images/{id}/anonymize": {
+      "post": {
+        "description": "delete the selected image and replace it with an anonymized version",
+        "tags": ["Images"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of image to anonymize",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "tag values",
+            "in": "body",
+            "description": "specification of values for DICOM attributes",
+            "required": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/entityTagValue"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "image anonymized"
+          },
+          "404": {
+            "description": "image or corresponding dataset not found"
+          }
+        }
+      }
+    },
+
+    "/images/anonymizationkeys": {
+      "get": {
+        "description": "get a list of anonymization keys, each specifying how vital DICOM attributes have been anonymized for a particular image",
+        "tags": ["Images"],
+        "parameters": [
+          {
+            "name": "startindex",
+            "in": "query",
+            "description": "start index of returned slice of anonymization keys",
+            "required": false,
+            "default": "0",
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "count",
+            "in": "query",
+            "description": "size of returned slice of anonymization keys",
+            "required": false,
+            "default": "20",
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "orderby",
+            "in": "query",
+            "description": "property to order results by",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "orderascending",
+            "in": "query",
+            "description": "order result ascendingly if true, descendingly otherwise",
+            "required": false,
+            "default": true,
+            "type": "boolean"
+          },
+          {
+            "name": "filter",
+            "in": "query",
+            "description": "filter the results by matching substrings of properties against this value",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "anonymization keys, one per DICOM image",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/anonymizationKey"
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "/images/anonymizationkeys/{id}": {
+      "delete": {        
+        "description": "delete an anonymization key that is no longer of interest",
+        "tags": ["Images"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of anonymization key",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "anonymization key deleted"
+          }
+        }
+      }
+    },
+
     "/users": {
       "get": {
         "description": "Returns all users of slicebox",
@@ -1168,7 +1287,7 @@
           {
             "name": "box send data",
             "in": "body",
-            "description": "ID of box to send images to",
+            "description": "specification of which entities to send and list of DICOM attribute values",
             "required": true,
             "schema": {
               "$ref": "#/definitions/boxSendData"
@@ -1202,7 +1321,7 @@
           {
             "name": "box send data",
             "in": "body",
-            "description": "ID of box to send images to",
+            "description": "specification of which entities to send and list of DICOM attribute values",
             "required": true,
             "schema": {
               "$ref": "#/definitions/boxSendData"
@@ -1236,7 +1355,7 @@
           {
             "name": "box send data",
             "in": "body",
-            "description": "ID of box to send images to",
+            "description": "specification of which entities to send and list of DICOM attribute values",
             "required": true,
             "schema": {
               "$ref": "#/definitions/boxSendData"
@@ -1249,88 +1368,6 @@
           },
           "404": {
             "description": "box not found (invalid ID)"
-          }
-        }
-      }
-    },
-
-    "/boxes/anonymizationkeys": {
-      "get": {
-        "description": "get a list of anonymization keys, each specifying how vital DICOM attributes have been anonymized for a particular image",
-        "tags": ["Boxes"],
-        "parameters": [
-          {
-            "name": "startindex",
-            "in": "query",
-            "description": "start index of returned slice of anonymization keys",
-            "required": false,
-            "default": "0",
-            "type": "integer",
-            "format": "int64"
-          },
-          {
-            "name": "count",
-            "in": "query",
-            "description": "size of returned slice of anonymization keys",
-            "required": false,
-            "default": "20",
-            "type": "integer",
-            "format": "int64"
-          },
-          {
-            "name": "orderby",
-            "in": "query",
-            "description": "property to order results by",
-            "required": false,
-            "type": "string"
-          },
-          {
-            "name": "orderascending",
-            "in": "query",
-            "description": "order result ascendingly if true, descendingly otherwise",
-            "required": false,
-            "default": true,
-            "type": "boolean"
-          },
-          {
-            "name": "filter",
-            "in": "query",
-            "description": "filter the results by matching substrings of properties against this value",
-            "required": false,
-            "type": "string"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "anonymization keys, one per DICOM image",
-            "schema": {
-              "type": "array",
-              "items": {
-                "$ref": "#/definitions/anonymizationKey"
-              }
-            }
-          }
-        }
-      }
-    },
-
-    "/boxes/anonymizationkeys/{id}": {
-      "delete": {        
-        "description": "delete an anonymization key that is no longer of interest",
-        "tags": ["Boxes"],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "description": "ID of anonymization key",
-            "required": true,
-            "type": "integer",
-            "format": "int64"
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "anonymization key deleted"
           }
         }
       }
@@ -1768,20 +1805,9 @@
           "type": "integer",
           "format": "int64"          
         },
-        "remoteBoxId": {
+        "created": {
           "type": "integer",
           "format": "int64"          
-        },
-        "transactionId": {
-          "type": "integer",
-          "format": "int64"          
-        },
-        "imageFileId": {
-          "type": "integer",
-          "format": "int64"          
-        },
-        "remoteBoxName": {
-          "type": "string"
         },
         "patientName": {
           "type": "string"
@@ -1795,34 +1821,22 @@
         "anonPatientID": {
           "type": "string"
         },
+        "patientBirthDate": {
+          "type": "string"
+        },
         "studyInstanceUID": {
           "type": "string"
         },
         "anonStudyInstanceUID": {
           "type": "string"
         },
-        "seriesInstanceUID": {
+        "studyDescription": {
           "type": "string"
         },
-        "anonSeriesInstanceUID": {
+        "studyID": {
           "type": "string"
         },
-        "manufacturer": {
-          "type": "string"
-        },
-        "anonManufacturer": {
-          "type": "string"
-        },
-        "stationName": {
-          "type": "string"
-        },
-        "anonStationName": {
-          "type": "string"
-        },
-        "frameOfReferenceUID": {
-          "type": "string"
-        },
-        "anonFrameOfReferenceUID": {
+        "accessionNumber": {
           "type": "string"
         }
       }
@@ -1970,18 +1984,25 @@
         }        
       }
     },
-    "boxSendTagValue": {
+    "tagValue" : {
+      "properties": {
+        "tag": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "value": {
+          "type": "string"
+        }
+      }
+    },
+    "entityTagValue": {
       "properties": {
         "entityId": {
           "type": "integer",
           "format": "int64"
         },
-        "tag": {
-          "type": "integer",
-          "format": "int32"
-        },
-        "values": {
-          "type": "string"
+        "tagValue": {
+          "$ref": "#/definitions/tagValue"
         }        
       }
     },
@@ -1997,7 +2018,7 @@
         "tagValues": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/boxSendTagValue"
+            "$ref": "#/definitions/entityTagValue"
           }          
         }
       }
