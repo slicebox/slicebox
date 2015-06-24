@@ -906,7 +906,7 @@
             "required": true,
             "type": "array",
             "items": {
-              "$ref": "#/definitions/entityTagValue"
+              "$ref": "#/definitions/tagValue"
             }
           }
         ],
@@ -1269,9 +1269,9 @@
       }
     },
 
-    "/boxes/{id}/sendpatients": {
+    "/boxes/{id}/send": {
       "post": {
-        "description": "send all images corresponding to the selected patients to the remote box with the supplied ID",
+        "description": "send images corresponding to the supplied image ids to the remote box with the supplied ID",
         "tags": ["Boxes"],
         "parameters": [
           {
@@ -1283,80 +1283,13 @@
             "format": "int64"
           },
           {
-            "name": "box send data",
+            "name": "sequence of image tag values",
             "in": "body",
-            "description": "specification of which entities to send and list of DICOM attribute values",
+            "description": "specification of which images to send and list of DICOM attribute values to use in anonymized datasets",
             "required": true,
-            "schema": {
-              "$ref": "#/definitions/boxSendData"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": "images sent"
-          },
-          "404": {
-            "description": "box not found (invalid ID)"
-          }
-        }
-      }
-    },
-
-    "/boxes/{id}/sendstudies": {
-      "post": {
-        "description": "send all images corresponding to the selected studies to the remote box with the supplied ID",
-        "tags": ["Boxes"],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "description": "ID of box to send images to",
-            "required": true,
-            "type": "integer",
-            "format": "int64"
-          },
-          {
-            "name": "box send data",
-            "in": "body",
-            "description": "specification of which entities to send and list of DICOM attribute values",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/boxSendData"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": "images sent"
-          },
-          "404": {
-            "description": "box not found (invalid ID)"
-          }
-        }
-      }
-    },
-
-    "/boxes/{id}/sendseries": {
-      "post": {
-        "description": "send all images corresponding to the selected series to the remote box with the supplied ID",
-        "tags": ["Boxes"],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "description": "ID of box to send images to",
-            "required": true,
-            "type": "integer",
-            "format": "int64"
-          },
-          {
-            "name": "box send data",
-            "in": "body",
-            "description": "specification of which entities to send and list of DICOM attribute values",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/boxSendData"
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/imageTagValues"
             }
           }
         ],
@@ -1993,32 +1926,18 @@
         }
       }
     },
-    "entityTagValue": {
+    "imageTagValues": {
       "properties": {
-        "entityId": {
+        "imageId": {
           "type": "integer",
           "format": "int64"
-        },
-        "tagValue": {
-          "$ref": "#/definitions/tagValue"
-        }        
-      }
-    },
-    "boxSendData": {
-      "properties": {
-        "entityIds": {
-          "type": "array",
-          "items": {
-            "type": "integer",
-            "format": "int64"
-          }
         },
         "tagValues": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/entityTagValue"
-          }          
-        }
+            "$ref": "#/definitions/tagValue"
+          }
+        }        
       }
     },
     "remoteBox": {
