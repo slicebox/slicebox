@@ -62,8 +62,6 @@ class AnonymizationServiceActorTest(_system: ActorSystem) extends TestKit(_syste
           case harmonized: Attributes =>
             harmonized.getString(Tag.PatientID) should be(key.anonPatientID)
             harmonized.getString(Tag.StudyInstanceUID) should be(key.anonStudyInstanceUID)
-            harmonized.getString(Tag.SeriesInstanceUID) should be(key.anonSeriesInstanceUID)
-            harmonized.getString(Tag.FrameOfReferenceUID) should be(key.anonFrameOfReferenceUID)
         }
       }
     }

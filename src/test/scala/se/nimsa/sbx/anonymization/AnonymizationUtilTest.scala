@@ -64,12 +64,11 @@ class AnonymizationUtilTest extends FlatSpec with Matchers {
     reversedDataset1.getString(Tag.PatientID) should equal (key1.patientID)
     reversedDataset1.getString(Tag.StudyInstanceUID) should equal (key1.studyInstanceUID)
     
-    val key2 = key1.copy(seriesInstanceUID = "seuid2")
+    val key2 = key1.copy(studyInstanceUID = "seuid2")
     val reversedDataset2 = reverseAnonymization(List(key2), createAnonymousDataset)
     reversedDataset2.getString(Tag.PatientName) should be (dataset.getString(Tag.PatientName)) 
     reversedDataset2.getString(Tag.PatientID) should be (dataset.getString(Tag.PatientID)) 
-    reversedDataset2.getString(Tag.StudyInstanceUID) should be (dataset.getString(Tag.StudyInstanceUID)) 
-    reversedDataset2.getString(Tag.SeriesInstanceUID) should not be (dataset.getString(Tag.SeriesInstanceUID)) 
+    reversedDataset2.getString(Tag.StudyInstanceUID) should not be (dataset.getString(Tag.StudyInstanceUID)) 
   }
   
   "The anonymization procedure" should "replace an existing accession number with a named based UID" in {

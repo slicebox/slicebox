@@ -139,9 +139,7 @@ object TestUtil {
     dataset: Attributes,
     anonPatientName: String = "anon patient name",
     anonPatientID: String = "anon patient ID",
-    anonStudyInstanceUID: String = "anon study instance UID",
-    anonSeriesInstanceUID: String = "anon series instance UID",
-    anonFrameOfReferenceUID: String = "anon frame of reference UID") =
+    anonStudyInstanceUID: String = "anon study instance UID") =
     AnonymizationKey(-1, new Date().getTime,
       dataset.getString(Tag.PatientName), anonPatientName,
       dataset.getString(Tag.PatientID), anonPatientID,
@@ -149,9 +147,7 @@ object TestUtil {
       dataset.getString(Tag.StudyInstanceUID), anonStudyInstanceUID,
       dataset.getString(Tag.StudyDescription),
       dataset.getString(Tag.StudyID),
-      dataset.getString(Tag.AccessionNumber),
-      dataset.getString(Tag.SeriesInstanceUID), anonSeriesInstanceUID,
-      dataset.getString(Tag.FrameOfReferenceUID), anonFrameOfReferenceUID)
+      dataset.getString(Tag.AccessionNumber))
 
   def deleteFolder(path: Path) =
     Files.walkFileTree(path, new SimpleFileVisitor[Path]() {

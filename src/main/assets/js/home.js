@@ -668,6 +668,8 @@ angular.module('slicebox.home', ['ngRoute'])
         sendPromise.finally(function() {
             $scope.uiState.sendInProgress = false;
         });
+
+        return sendPromise;
     };
 
     function zeroPad(num, length) {
