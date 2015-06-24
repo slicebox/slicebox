@@ -1949,7 +1949,7 @@
           "type": "integer",
           "format": "int64"
         },
-        "imageFileId": {
+        "imageId": {
           "type": "integer",
           "format": "int64"          
         },
