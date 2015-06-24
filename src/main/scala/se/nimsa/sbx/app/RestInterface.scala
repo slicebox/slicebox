@@ -83,13 +83,13 @@ trait RestApi extends HttpService with SliceboxRoutes with JsonFormats {
 
   val storage = createStorageDirectory()
 
-  val host = if (config.hasPath("slicebox.host"))
-    config.getString("slicebox.host")
+  val host = if (sliceboxConfig.hasPath("host"))
+    sliceboxConfig.getString("host")
   else
     config.getString("http.host")
     
-  val port = if (config.hasPath("slicebox.port"))
-    config.getInt("slicebox.port")
+  val port = if (sliceboxConfig.hasPath("port"))
+    sliceboxConfig.getInt("port")
   else
     config.getInt("http.port")
     

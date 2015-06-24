@@ -398,62 +398,48 @@ angular.module('slicebox.home', ['ngRoute'])
         });
 
         return confirmSend('/api/boxes', function(receiverId) {
-            var seriesIds = series.map(function(entity) { 
-                return entity.id; 
+            var imageIdToPatientPromise = $http.get('/api/metadata/studies/' + series[0].studyId).then(function(study) {
+                return $http.get('/api/metadata/patients/' + study.data.patientId).then(function(patient) {
+                    return createImageIdToPatientPromise([ patient.data ]);
+                });
             });
 
-            var entityIdToPatientPromise = $http.get('/api/metadata/studies/' + series[0].studyId).then(function(study) {
-                return $http.get('/api/metadata/patients/' + study.data.patientId);
-            }).then(function(patient) {
-                var entityIdToPatient = {};
-                for (var i = 0; i < seriesIds.length; i++) {
-                    entityIdToPatient[seriesIds[i]] = patient.data;                    
-                }
-                return entityIdToPatient;
-            });
-
-            return showBoxSendTagValuesModal("series", entityIdToPatientPromise, receiverId);
+            return showBoxSendTagValuesModal(imageIdToPatientPromise, receiverId);
         });
     }
 
     function confirmSendStudies(studies) {
         return confirmSend('/api/boxes', function(receiverId) {
-            var studyIds = studies.map(function(entity) { 
-                return entity.id; 
+            var imageIdToPatientPromise = $http.get('/api/metadata/patients/' + studies[0].patientId).then(function(patient) {
+                return createImageIdToPatientPromise([ patient.data ]);
             });
 
-            var entityIdToPatientPromise = $http.get('/api/metadata/patients/' + studies[0].patientId).then(function(patient) {
-                var entityIdToPatient = {};
-                for (var i = 0; i < studyIds.length; i++) {
-                    entityIdToPatient[studyIds[i]] = patient.data;                    
-                }
-                return entityIdToPatient;
-            });
-
-            return showBoxSendTagValuesModal("study(s)", entityIdToPatientPromise, receiverId);
+            return showBoxSendTagValuesModal(imageIdToPatientPromise, receiverId);
         });
     }
 
     function confirmSendPatients(patients) {
         return confirmSend('/api/boxes', function(receiverId) {
+            var imageIdToPatientPromise = createImageIdToPatientPromise(patients);
+            return showBoxSendTagValuesModal(imageIdToPatientPromise, receiverId);
+        });
+    }
 
-            var imageIdAndPatientsPromises = patients.map(function (patient) {
-                return sbxMetaData.imagesForPatients([ patient ]).then(function (images) {
-                    return images.map(function (image) {
-                        return { imageId: image.id, patient: patient };
-                    });
+    function createImageIdToPatientPromise(patients) {
+        var imageIdAndPatientsPromises = patients.map(function (patient) {
+            return sbxMetaData.imagesForPatients([ patient ]).then(function (images) {
+                return images.map(function (image) {
+                    return { imageId: image.id, patient: patient };
                 });
             });
-
-            var imageIdToPatientPromise = sbxMisc.flattenPromises(imageIdAndPatientsPromises).then(function(imageIdAndPatients) {
-                return imageIdAndPatients.reduce(function ( imageIdToPatient, imageIdAndPatient ) {
-                    imageIdToPatient[ imageIdAndPatient.imageId ] = imageIdAndPatient.patient;
-                    return imageIdToPatient;
-                }, {});                
-            });
-
-            return showBoxSendTagValuesModal("patient(s)", imageIdToPatientPromise, receiverId);
         });
+
+        return sbxMisc.flattenPromises(imageIdAndPatientsPromises).then(function(imageIdAndPatients) {
+            return imageIdAndPatients.reduce(function ( imageIdToPatient, imageIdAndPatient ) {
+                imageIdToPatient[ imageIdAndPatient.imageId ] = imageIdAndPatient.patient;
+                return imageIdToPatient;
+            }, {});                
+        });        
     }
 
     function confirmSendSeriesToScp(series) {
@@ -531,13 +517,12 @@ angular.module('slicebox.home', ['ngRoute'])
     function confirmAnonymizeSeries(series) {
     }
 
-    function showBoxSendTagValuesModal(text, imageIdToPatientPromise, receiverId) {
+    function showBoxSendTagValuesModal(imageIdToPatientPromise, receiverId) {
         return $mdDialog.show({
                 templateUrl: '/assets/partials/boxSendTagValuesModalContent.html',
                 controller: 'BoxSendTagValuesCtrl',
                 scope: $scope.$new(),
                 locals: {
-                    text: text,
                     imageIdToPatient: imageIdToPatientPromise,
                     receiverId: receiverId
                 }
@@ -570,7 +555,7 @@ angular.module('slicebox.home', ['ngRoute'])
 
 })
 
-.controller('BoxSendTagValuesCtrl', function($scope, $mdDialog, $http, text, imageIdToPatient, receiverId) {
+.controller('BoxSendTagValuesCtrl', function($scope, $mdDialog, $http, imageIdToPatient, receiverId) {
     // Initialization
     $scope.title = 'Anonymization Options';
 
@@ -621,7 +606,7 @@ angular.module('slicebox.home', ['ngRoute'])
 
         sendPromise.then(function(data) {
             $mdDialog.hide();
-            $scope.showInfoMessage(imageIds.length + " " + text + " added to outbox");
+            $scope.showInfoMessage(imageIds.length + " images added to outbox");
         }, function(data) {
             $scope.showErrorMessage('Failed to send: ' + data);
         });

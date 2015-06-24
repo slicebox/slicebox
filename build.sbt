@@ -24,9 +24,9 @@ import de.heikoseeberger.sbtheader.license.Apache2_0
 
 	// native packaging - universal
 
-	mappings in Universal <+= (packageBin in Compile, sourceDirectory ) map { (_, src) =>
-		val httpConf = src / "main" / "resources" / "application.conf"
-		httpConf -> "conf/slicebox.conf"
+	mappings in Universal += {
+    	val conf = (resourceDirectory in Compile).value / "slicebox.conf"
+    	conf -> "conf/slicebox.conf"
 	}
 
 	batScriptExtraDefines += """set _JAVA_OPTS=%_JAVA_OPTS% -Dconfig.file=%SLICEBOX_HOME%\\conf\\slicebox.conf"""
