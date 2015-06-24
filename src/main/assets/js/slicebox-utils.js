@@ -1,5 +1,58 @@
 angular.module('slicebox.utils', [])
 
+.factory('sbxMisc', function($q) {
+    return {
+        urlWithSourceQuery: function(url, source) {
+            if (source && source.sourceType && source.sourceId) {
+                return url + '&sourcetype=' + source.sourceType + '&sourceid=' + source.sourceId;
+            } else {
+                return url;
+            }            
+        },
+
+        flatten: function(arrayOfArrays) {
+            return [].concat.apply([], arrayOfArrays);
+        },
+
+        flattenPromises: function(arrayOfPromisesOfArrays) {
+            return $q.all(arrayOfPromisesOfArrays).then(this.flatten); 
+        }
+    };
+})
+
+.factory('sbxMetaData', function($http, sbxMisc) {
+    return {
+        imagesForSeries: function(series, source) {
+            var promises = series.map(function(singleSeries) {
+                return $http.get(sbxMisc.urlWithSourceQuery('/api/metadata/images?startindex=0&count=1000000&seriesid=' + singleSeries.id, source)).then(function (imagesData) {
+                    return imagesData.data;
+                });
+            });
+            return sbxMisc.flattenPromises(promises);
+        },
+
+        imagesForStudies: function(studies, source) {
+            var self = this;
+            var promises = studies.map(function(study) {
+                return $http.get(sbxMisc.urlWithSourceQuery('/api/metadata/series?startindex=0&count=1000000&studyid=' + study.id, source)).then(function (seriesData) {
+                    return self.imagesForSeries(seriesData.data, source);
+                });
+            });
+            return sbxMisc.flattenPromises(promises);
+        },
+
+        imagesForPatients: function(patients, source) {
+            var self = this;
+            var promises = patients.map(function(patient) {
+                return $http.get(sbxMisc.urlWithSourceQuery('/api/metadata/studies?startindex=0&count=1000000&patientid=' + patient.id, source)).then(function (studiesData) {
+                    return self.imagesForStudies(studiesData.data, source);
+                });
+            });
+            return sbxMisc.flattenPromises(promises);
+        }
+    };
+})
+
 .factory('openConfirmActionModal', function($mdDialog) {
 
     return function(title, message, action, actionCallback) {

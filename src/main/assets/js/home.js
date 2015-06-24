@@ -11,7 +11,7 @@ angular.module('slicebox.home', ['ngRoute'])
   });
 })
 
-.controller('HomeCtrl', function($scope, $http, $mdDialog, $q, openConfirmActionModal) {
+.controller('HomeCtrl', function($scope, $http, $mdDialog, $q, openConfirmActionModal, sbxMisc, sbxMetaData) {
     // Initialization
     $scope.patientActions =
         [
@@ -117,7 +117,7 @@ angular.module('slicebox.home', ['ngRoute'])
             loadPatientsUrl = loadPatientsUrl + '&filter=' + encodeURIComponent(filter);
         }
 
-        loadPatientsUrl = urlWithSourceQuery(loadPatientsUrl);
+        loadPatientsUrl = sbxMisc.urlWithSourceQuery(loadPatientsUrl, $scope.uiState.selectedSource);
 
         var loadPatientsPromise = $http.get(loadPatientsUrl);
 
@@ -150,7 +150,7 @@ angular.module('slicebox.home', ['ngRoute'])
 
         var loadStudiesUrl = '/api/metadata/studies?startindex=' + startIndex + '&count=' + count + '&patientid=' + $scope.uiState.selectedPatient.id;
 
-        loadStudiesUrl = urlWithSourceQuery(loadStudiesUrl);
+        loadStudiesUrl = sbxMisc.urlWithSourceQuery(loadStudiesUrl, $scope.uiState.selectedSource);
 
         var loadStudiesPromise = $http.get(loadStudiesUrl);
 
@@ -178,7 +178,7 @@ angular.module('slicebox.home', ['ngRoute'])
 
         var loadSeriesUrl = '/api/metadata/series?startindex=' + startIndex + '&count=' + count + '&studyid=' + $scope.uiState.selectedStudy.id;
 
-        loadSeriesUrl = urlWithSourceQuery(loadSeriesUrl);
+        loadSeriesUrl = sbxMisc.urlWithSourceQuery(loadSeriesUrl, $scope.uiState.selectedSource);
 
         var loadSeriesPromise = $http.get(loadSeriesUrl);
 
@@ -206,7 +206,7 @@ angular.module('slicebox.home', ['ngRoute'])
             loadFlatSeriesUrl = loadFlatSeriesUrl + '&filter=' + encodeURIComponent(filter);
         }
 
-        loadFlatSeriesUrl = urlWithSourceQuery(loadFlatSeriesUrl);
+        loadFlatSeriesUrl = sbxMisc.urlWithSourceQuery(loadFlatSeriesUrl, $scope.uiState.selectedSource);
 
         var loadFlatSeriesPromise = $http.get(loadFlatSeriesUrl);
 
@@ -367,47 +367,6 @@ angular.module('slicebox.home', ['ngRoute'])
 
     // Private functions
 
-    function imagesForSeries(series) {
-        var promises = series.map(function(singleSeries) {
-            return $http.get(urlWithSourceQuery('/api/metadata/images?startindex=0&count=1000000&seriesid=' + singleSeries.id)).then(function (imagesData) {
-                return imagesData.data;
-            });
-        });
-        return flatten(promises);
-    }
-
-    function imagesForStudies(studies) {
-        var promises = studies.map(function(study) {
-            return $http.get(urlWithSourceQuery('/api/metadata/series?startindex=0&count=1000000&studyid=' + study.id)).then(function (seriesData) {
-                return imagesForSeries(seriesData.data);
-            });
-        });
-        return flatten(promises);
-    }
-
-    function imagesForPatients(patients) {
-        var promises = patients.map(function(patient) {
-            return $http.get(urlWithSourceQuery('/api/metadata/studies?startindex=0&count=1000000&patientid=' + patient.id)).then(function (studiesData) {
-                return imagesForStudies(studiesData.data);
-            });
-        });
-        return flatten(promises);
-    }
-
-    function flatten(promises) {
-        return $q.all(promises).then(function (arrayOfImageArrays) {
-            return [].concat.apply([], arrayOfImageArrays);
-        });                
-    }
-
-    function urlWithSourceQuery(url) {
-        if ($scope.uiState.selectedSource !== null && $scope.uiState.selectedSource.sourceType !== null) {
-            return url + '&sourcetype=' + $scope.uiState.selectedSource.sourceType + '&sourceid=' + $scope.uiState.selectedSource.sourceId;
-        } else {
-            return url;
-        }
-    }
-
     function updateSelectedSeriesSource(series) {
         $scope.uiState.sourcesPromise.then(function(sources) {
             $http.get('/api/metadata/series/' + series.id + '/source').success(function(source) {
@@ -506,7 +465,7 @@ angular.module('slicebox.home', ['ngRoute'])
     }
 
     function confirmDeletePatients(patients) {
-        imagesForPatients(patients).then(function(images) {
+        sbxMetaData.imagesForPatients(patients).then(function(images) {
             var f = $scope.confirmDeleteEntitiesFunction('/api/images/', 'images');
             f(images).finally(function() {
                 $scope.patientSelected(null);        
@@ -516,7 +475,7 @@ angular.module('slicebox.home', ['ngRoute'])
     }
 
     function confirmDeleteStudies(studies) {
-        imagesForStudies(studies).then(function(images) {
+        sbxMetaData.imagesForStudies(studies).then(function(images) {
             var f = $scope.confirmDeleteEntitiesFunction('/api/images/', 'images');
             f(images).finally(function() {
                 $scope.studySelected(null);        
@@ -526,7 +485,7 @@ angular.module('slicebox.home', ['ngRoute'])
     }
 
     function confirmDeleteSeries(series) {
-        imagesForSeries(series).then(function(images) {
+        sbxMetaData.imagesForSeries(series).then(function(images) {
             var f = $scope.confirmDeleteEntitiesFunction('/api/images/', 'images');
             f(images).finally(function() {
                 if ($scope.callbacks.flatSeriesTable) {
@@ -542,7 +501,7 @@ angular.module('slicebox.home', ['ngRoute'])
     }
 
     function confirmAnonymizePatients(patients) {
-        imagesForPatients(patients).then(function(images) {
+        sbxMetaData.imagesForPatients(patients).then(function(images) {
             openConfirmActionModal('Anonymize', 'Force anonymization of ' + images.length + ' images? Patient information will be lost.', 'Anonymize', function() {
                 var promises = images.forEach(function(image) {
                     return $http.post('/api/images/' + image.id + '/anonymize', []);
