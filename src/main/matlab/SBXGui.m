@@ -1,28 +1,11 @@
 function varargout = SBXGui(varargin)
-% SBXGUI MATLAB code for SBXGui.fig
-%      SBXGUI, by itself, creates a new SBXGUI or raises the existing
-%      singleton*.
-%
-%      H = SBXGUI returns the handle to a new SBXGUI or the handle to
-%      the existing singleton*.
-%
-%      SBXGUI('CALLBACK',hObject,eventData,handles,...) calls the local
-%      function named CALLBACK in SBXGUI.M with the given input arguments.
-%
-%      SBXGUI('Property','Value',...) creates a new SBXGUI or raises the
-%      existing singleton*.  Starting from the left, property value pairs are
-%      applied to the GUI before SBXGui_OpeningFcn gets called.  An
-%      unrecognized property name or invalid value makes property application
-%      stop.  All inputs are passed to SBXGui_OpeningFcn via varargin.
-%
-%      *See GUI Options on GUIDE's Tools menu.  Choose "GUI allows only one
-%      instance to run (singleton)".
-%
-% See also: GUIDE, GUIDATA, GUIHANDLES
+% SBXGUI Provides a simple gui to select and download dicom images from a
+% slicebox server.
+%      [I, dcminfo] = SBXGUI(username, password) Launches the gui, which
+%      provides a simple way to select and download dicom files from a
+%      slicebox server. If no sbxsettings.conf exists, the options'url', and
+%      'cachepath' must also be specified.
 
-% Edit the above text to modify the response to help SBXGui
-
-% Last Modified by GUIDE v2.5 25-May-2015 14:17:09
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -46,13 +29,7 @@ end
 
 % --- Executes just before SBXGui is made visible.
 function SBXGui_OpeningFcn(hObject, eventdata, handles, varargin)
-% This function has no output args, see OutputFcn.
-% hObject    handle to figure
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-% varargin   command line arguments to SBXGui (see VARARGIN)
-
-% Choose default command line output for SBXGui
+% Create the sbxdata object and fetch the flattened database image.
 sbxdata = makesbxdata(varargin{:});
 flatseries = sbxgetflatseries(sbxdata);
 patients = [];
@@ -85,8 +62,8 @@ guidata(hObject, handles);
 % UIWAIT makes SBXGui wait for user response (see UIRESUME)
 uiwait(handles.sbxgui);
 
-
-% --- Outputs from this function are returned to the command line.
+% If a series has been selected, return the image and dicom info.
+% Otherwise, return empty cells.
 function varargout = SBXGui_OutputFcn(hObject, eventdata, handles)
 if(handles.closeReason == 0)
     varargout{1} = handles.image;
@@ -99,10 +76,12 @@ end
 delete(handles.sbxgui);
 
 
-% --- Executes when selected cell(s) is changed in patientTable.
 function patientTable_CellSelectionCallback(hObject, eventdata, handles)
 % When a row in the patientTable is selected, populate the seriesTable with
 % all the series which belong to that particular patient.
+if handles.isBusy
+    return;
+end
 row = eventdata.Indices(1);
 patientData = get(hObject, 'Data');
 id = patientData{row,1};
@@ -124,12 +103,15 @@ guidata(hObject,handles);
 % --- Executes when selected cell(s) is changed in seriesTable.
 function seriesTable_CellSelectionCallback(hObject, eventdata, handles)
 % When clicking a cell (well, row really) in seriesTable, pull the
-% imageinfo from slicebox. Also update infobox.
+% imageinfo from slicebox. Also update the infobox. While working, disable
+% all the buttons.
 if(~isempty(eventdata.Indices))
     row = eventdata.Indices(1);
     seriesData = get(hObject,'Data');
     seriesId = seriesData{row,1};
+    isBusy(true);
     seriesinfo = sbxgetimageinfo(seriesId, handles.sbxdata);
+    isBusy(false);
     handles.seriesinfo = seriesinfo;
     
     infotext = handles.infotext;
@@ -145,11 +127,14 @@ guidata(hObject,handles);
 
 % --- Executes on button press in loadButton.
 function loadButton_Callback(hObject, eventdata, handles)
-% load the images in the series seleected in the seriesTable
+% load the images in the series seleected in the seriesTable. Disable all
+% buttons while files are being downloaded.
 if(isfield(handles, 'seriesinfo'))
     % add stuff from
     % http://undocumentedmatlab.com/blog/animated-busy-spinning-icon here
+    setBusy(true);
     [image, dcminfo] = sbxreadimages(handles.seriesinfo, handles.sbxdata);
+    setBusy(false);
     handles.image = image;
     handles.dcminfo = dcminfo;
     handles.closeReason = 0;
@@ -159,29 +144,15 @@ else
     error('You must select a series to load!');
 end
 
-function loadImageToHandles(handles)
-
-
-
-% --- Executes on button press in deleteButton.
 function deleteButton_Callback(hObject, eventdata, handles)
 % When clicked, remove all cached series data from local storage.
 
-
-% --- Executes on button press in cancelButton.
 function cancelButton_Callback(hObject, eventdata, handles)
-% hObject    handle to cancelButton (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
 handles.closeReason = 1;
 guidata(handles.sbxgui, handles);
 close(handles.sbxgui);
 
-% --- Executes when user attempts to close sbxgui.
 function sbxgui_CloseRequestFcn(hObject, eventdata, handles)
-% hObject    handle to sbxgui (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
 
 if isequal(get(hObject, 'waitstatus'), 'waiting')
     % The GUI is still in UIWAIT, us UIRESUME
@@ -190,3 +161,23 @@ else
     % The GUI is no longer waiting, just close it
     delete(hObject);
 end
+
+function setBusy(busy, handles)
+if busy
+    handles.isBusy = true;
+    set(handles.figure1, 'pointer', 'clock');
+    set(handles.loadButton, 'Enable', 'off');
+    set(handles.reloadButton, 'Enable', 'off');
+    set(handles.deleteButton, 'Enable', 'off');
+    set(handles.cancelButton, 'Enable', 'off');
+    guidata(handles.sbxgui, handles);
+else
+    handles.isBusy = false;
+    set(handles.figure1, 'pointer', 'arrow');
+    set(handles.loadButton, 'Enable', 'on');
+    set(handles.reloadButton, 'Enable', 'on');
+    set(handles.deleteButton, 'Enable', 'on');
+    set(handles.cancelButton, 'Enable', 'on');
+    guidata(handles.sbxgui, handles);
+end
+    

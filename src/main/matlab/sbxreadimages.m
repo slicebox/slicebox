@@ -2,9 +2,10 @@ function [I, dcminfo] = sbxreadimages(imagedata, sbxdata)
 % SBXREADIMAGE Read an image from a slicebox server or a cached image
 % from disk.
 %
-% I = SBXREADIMAGE(imagedata, sbxdata) Reads a dicom image specified by 
-%        'imagedata', Return as 2d array. If the image is not present in
-%        the cache it will first be downloaded from the slicebox service.
+%   [I, dcminfo] = SBXREADIMAGE(imagedata, sbxdata) Reads a dicom image and
+%       dicom header specified by 'imagedata', Return as 2d array. If the 
+%       image is not present in the cache it will first be downloaded from 
+%       the slicebox service.
 
 I = cell(1,length(imagedata));
 dcminfo = cell(1,length(imagedata));

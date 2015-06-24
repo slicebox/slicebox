@@ -7,7 +7,12 @@ function datasets = sbxgetimageinfo(seriesid, sbxdata)
 
 try
     url = [sbxdata.url, '/api/metadata/images?count=1000000&seriesid=',num2str(seriesid)];
-    datasets = webread(url, sbxdata.weboptions);
+    unsorteddatasets = webread(url, sbxdata.weboptions);
+    datasets = cell(size(unsorteddatasets));
+    for i = 1:numel(unsorteddatasets)
+        z = str2double(imagedata(i).instanceNumber.value);
+        datasets{z} = unsorteddatasets{i};
+    end
     seriesfile = fullfile(sbxdata.cachepath, ['seriesdata', num2str(seriesid)]);
     %fprintf('saving %s\n', seriesfile);
     save(seriesfile,'datasets');
