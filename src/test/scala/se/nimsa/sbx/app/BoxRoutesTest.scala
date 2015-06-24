@@ -95,62 +95,22 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
   }
 
-  it should "return a no content message when asked to send patients" in {
+  it should "return a no content message when asked to send images" in {
     val box1 = addPollBox("hosp")
-    PostAsAdmin(s"/api/boxes/${box1.id}/sendpatients", BoxSendData(Seq(1), Seq.empty)) ~> routes ~> check {
+    PostAsAdmin(s"/api/boxes/${box1.id}/send", Seq(ImageTagValues(1, Seq.empty))) ~> routes ~> check {
       status should be(NoContent)
     }
   }
 
-  it should "return a no content message when asked to send patients with empty patient ids list" in {
+  it should "return a no content message when asked to send images with empty images list" in {
     val box1 = addPollBox("hosp")
-    PostAsAdmin(s"/api/boxes/${box1.id}/sendpatients", BoxSendData(Seq.empty, Seq.empty)) ~> routes ~> check {
+    PostAsAdmin(s"/api/boxes/${box1.id}/send", Seq.empty[ImageTagValues]) ~> routes ~> check {
       status should be(NoContent)
     }
   }
 
-  it should "return a not found message when asked to send patients with unknown box id" in {
-    PostAsAdmin("/api/boxes/999/sendpatients", BoxSendData(Seq(1), Seq.empty)) ~> sealRoute(routes) ~> check {
-      status should be(NotFound)
-    }
-  }
-
-  it should "return a no content message when asked to send studies" in {
-    val box1 = addPollBox("hosp")
-    PostAsAdmin(s"/api/boxes/${box1.id}/sendstudies", BoxSendData(Seq(1), Seq.empty)) ~> routes ~> check {
-      status should be(NoContent)
-    }
-  }
-
-  it should "return a no content message when asked to send studies with empty study ids list" in {
-    val box1 = addPollBox("hosp")
-    PostAsAdmin(s"/api/boxes/${box1.id}/sendstudies", BoxSendData(Seq.empty, Seq.empty)) ~> routes ~> check {
-      status should be(NoContent)
-    }
-  }
-
-  it should "return a not found message when asked to send studies with unknown box id" in {
-    PostAsAdmin("/api/boxes/999/sendstudies", BoxSendData(Seq(1), Seq.empty)) ~> sealRoute(routes) ~> check {
-      status should be(NotFound)
-    }
-  }
-
-  it should "return a no content message when asked to send series" in {
-    val box1 = addPollBox("hosp")
-    PostAsAdmin(s"/api/boxes/${box1.id}/sendseries", BoxSendData(Seq(1), Seq.empty)) ~> routes ~> check {
-      status should be(NoContent)
-    }
-  }
-
-  it should "return a no content message when asked to send series with empty series ids list" in {
-    val box1 = addPollBox("hosp")
-    PostAsAdmin(s"/api/boxes/${box1.id}/sendseries", BoxSendData(Seq.empty, Seq.empty)) ~> routes ~> check {
-      status should be(NoContent)
-    }
-  }
-
-  it should "return a not found message when asked to send series with unknown box id" in {
-    PostAsAdmin("/api/boxes/999/sendseries", BoxSendData(Seq(1), Seq.empty)) ~> sealRoute(routes) ~> check {
+  it should "return a not found message when asked to send images with unknown box id" in {
+    PostAsAdmin("/api/boxes/999/send", Seq(ImageTagValues(1, Seq.empty))) ~> sealRoute(routes) ~> check {
       status should be(NotFound)
     }
   }
@@ -216,9 +176,8 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     // first, add a box on the poll (university) side
     val uniBox = addPollBox("hosp3")
 
-    // send series which adds outbox entry
-    val seriesId = 1
-    PostAsUser(s"/api/boxes/${uniBox.id}/sendseries", BoxSendData(Seq(seriesId), Seq.empty)) ~> routes ~> check {
+    // send image which adds outbox entry
+    PostAsUser(s"/api/boxes/${uniBox.id}/send", Seq(ImageTagValues(1, Seq.empty))) ~> routes ~> check {
       status should be(NoContent)
     }
 
@@ -236,9 +195,9 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
   }
 
-  it should "return a non-empty result when listing outbox entries for sent files" in {
+  it should "return a non-empty result when listing outbox entries for sent images" in {
     val box1 = addPollBox("hosp")
-    PostAsAdmin(s"/api/boxes/${box1.id}/sendseries", BoxSendData(Seq(1), Seq.empty)) ~> routes ~> check {
+    PostAsAdmin(s"/api/boxes/${box1.id}/send", Seq(ImageTagValues(1, Seq.empty))) ~> routes ~> check {
       status should be(NoContent)
     }
     GetAsUser("/api/outbox") ~> routes ~> check {
@@ -256,9 +215,8 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     // first, add a box on the poll (university) side
     val uniBox = addPollBox("hosp4")
 
-    // send series which adds outbox entry
-    val seriesId = 1
-    PostAsUser(s"/api/boxes/${uniBox.id}/sendseries", BoxSendData(Seq(seriesId), Seq.empty)) ~> routes ~> check {
+    // send image which adds outbox entry
+    PostAsUser(s"/api/boxes/${uniBox.id}/send", Seq(ImageTagValues(1, Seq.empty))) ~> routes ~> check {
       status should be(NoContent)
     }
 
@@ -289,9 +247,8 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     // first, add a box on the poll (university) side
     val uniBox = addPollBox("hosp5")
 
-    // send series which adds outbox entry
-    val seriesId = 1
-    PostAsUser(s"/api/boxes/${uniBox.id}/sendseries", BoxSendData(Seq(seriesId), Seq.empty)) ~> routes ~> check {
+    // send image which adds outbox entry
+    PostAsUser(s"/api/boxes/${uniBox.id}/send", Seq(ImageTagValues(1, Seq.empty))) ~> routes ~> check {
       status should be(NoContent)
     }
 
@@ -313,7 +270,7 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
   }
 
-  it should "correctly map dicom attributes according to supplied mapping when sending a series" in {
+  it should "correctly map dicom attributes according to supplied mapping when sending images" in {
     // add image (image will get id 1)
     val file = TestUtil.testImageFile
     val mfd = MultipartFormData(Seq(BodyPart(file, "file")))
@@ -327,15 +284,13 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       responseAs[List[Patient]].apply(0)
     }
 
-    val seriesId = 1
+    val imageTagValues = ImageTagValues(1, Seq(
+      TagValue(PatientName.dicomTag, "TEST NAME"),
+      TagValue(PatientID.dicomTag, "TEST ID"),
+      TagValue(PatientBirthDate.dicomTag, "19601010")))
 
-    val tagValues = Seq(
-      EntityTagValue(seriesId, TagValue(PatientName.dicomTag, "TEST NAME")),
-      EntityTagValue(seriesId, TagValue(PatientID.dicomTag, "TEST ID")),
-      EntityTagValue(seriesId, TagValue(PatientBirthDate.dicomTag, "19601010")))
-
-    // send series which adds outbox entry
-    PostAsUser(s"/api/boxes/${uniBox.id}/sendseries", BoxSendData(Seq(seriesId), tagValues)) ~> routes ~> check {
+    // send image which adds outbox entry
+    PostAsUser(s"/api/boxes/${uniBox.id}/send", Seq(imageTagValues)) ~> routes ~> check {
       status should be(NoContent)
     }
 

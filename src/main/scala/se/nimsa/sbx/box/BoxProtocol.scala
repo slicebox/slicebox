@@ -51,10 +51,8 @@ object BoxProtocol {
 
   case class InboxEntry(id: Long, remoteBoxId: Long, transactionId: Long, receivedImageCount: Long, totalImageCount: Long) extends Entity
 
-  case class EntityTagValue(entityId: Long, tagValue: TagValue)
+  case class ImageTagValues(imageId: Long, tagValues: Seq[TagValue])
   
-  case class BoxSendData(entityIds: Seq[Long], tagValues: Seq[EntityTagValue])
-
   case class InboxEntryInfo(remoteBoxName: String, transactionId: Long, receivedImageCount: Long, totalImageCount: Long)
 
   case class PushImageData(transactionId: Long, sequenceNumber: Long, totalImageCount: Long, dataset: Attributes)
@@ -80,11 +78,7 @@ object BoxProtocol {
 
   case class PollOutbox(token: String) extends BoxRequest
 
-  case class SendPatientsToRemoteBox(remoteBoxId: Long, patientIds: Seq[Long], tagValues: Seq[EntityTagValue]) extends BoxRequest
-
-  case class SendStudiesToRemoteBox(remoteBoxId: Long, studyIds: Seq[Long], tagValues: Seq[EntityTagValue]) extends BoxRequest
-
-  case class SendSeriesToRemoteBox(remoteBoxId: Long, seriesIds: Seq[Long], tagValues: Seq[EntityTagValue]) extends BoxRequest
+  case class SendToRemoteBox(remoteBoxId: Long, imageTagValuesSeq: Seq[ImageTagValues]) extends BoxRequest
 
   case class GetOutboxEntry(token: String, transactionId: Long, sequenceNumber: Long) extends BoxRequest
 

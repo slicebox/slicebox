@@ -30,7 +30,7 @@ import se.nimsa.sbx.storage.StorageServiceActor
 import se.nimsa.sbx.util.TestUtil
 
 class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
-    with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {
+  with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {
 
   def this() = this(ActorSystem("BoxServiceActorTestSystem"))
 
@@ -143,14 +143,21 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
 
         val (p1, s1, e1, f1, r1, i1, i2, i3) = insertMetadata
 
-        val tagValues = Seq(
-          EntityTagValue(r1.id, TagValue(0x00101010, "B")),
-          EntityTagValue(r1.id, TagValue(0x00101012, "D")),
-          EntityTagValue(r1.id, TagValue(0x00101014, "F")))
+        val imageTagValuesSeq = Seq(
+          ImageTagValues(i1.id, Seq(
+            TagValue(0x00101010, "B"),
+            TagValue(0x00101012, "D"),
+            TagValue(0x00101014, "F"))),
+          ImageTagValues(i2.id, Seq(
+            TagValue(0x00101010, "B"),
+            TagValue(0x00101012, "D"),
+            TagValue(0x00101014, "F"))),
+          ImageTagValues(i3.id, Seq(
+            TagValue(0x00101010, "B"),
+            TagValue(0x00101012, "D"),
+            TagValue(0x00101014, "F"))))
 
-        val seriesIds = Seq(r1.id)
-
-        boxService ! SendSeriesToRemoteBox(remoteBox.id, seriesIds, tagValues)
+        boxService ! SendToRemoteBox(remoteBox.id, imageTagValuesSeq)
 
         expectMsgPF() {
           case ImagesSent(remoteBoxId, imageIds) =>
@@ -189,14 +196,21 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
 
         val (p1, s1, e1, f1, r1, i1, i2, i3) = insertMetadata
 
-        val tagValues = Seq(
-          EntityTagValue(r1.id, TagValue(0x00101010, "B")),
-          EntityTagValue(r1.id, TagValue(0x00101012, "D")),
-          EntityTagValue(r1.id, TagValue(0x00101014, "F")))
+        val imageTagValuesSeq = Seq(
+          ImageTagValues(i1.id, Seq(
+            TagValue(0x00101010, "B"),
+            TagValue(0x00101012, "D"),
+            TagValue(0x00101014, "F"))),
+          ImageTagValues(i2.id, Seq(
+            TagValue(0x00101010, "B"),
+            TagValue(0x00101012, "D"),
+            TagValue(0x00101014, "F"))),
+          ImageTagValues(i3.id, Seq(
+            TagValue(0x00101010, "B"),
+            TagValue(0x00101012, "D"),
+            TagValue(0x00101014, "F"))))
 
-        val seriesIds = Seq(r1.id)
-
-        boxService ! SendSeriesToRemoteBox(remoteBox.id, seriesIds, tagValues)
+        boxService ! SendToRemoteBox(remoteBox.id, imageTagValuesSeq)
 
         expectMsgPF() {
           case ImagesSent(remoteBoxId, imageIds) =>

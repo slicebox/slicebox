@@ -31,7 +31,6 @@ import akka.actor.PoisonPill
 import java.util.UUID
 import akka.actor.Status.Failure
 import se.nimsa.sbx.util.ExceptionCatching
-import se.nimsa.sbx.util.SequentialPipeToSupport
 import java.nio.file.Path
 import scala.math.abs
 import java.util.Date
@@ -45,8 +44,7 @@ import akka.actor.Stash
 import org.dcm4che3.data.Attributes
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.TagValue
 
-class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) extends Actor with Stash
-  with SequentialPipeToSupport with ExceptionCatching {
+class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) extends Actor with Stash with ExceptionCatching {
 
   case object UpdatePollBoxesOnlineStatus
 
@@ -119,7 +117,7 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
 
           case GetBoxById(boxId) =>
             sender ! boxById(boxId)
-            
+
           case GetBoxByToken(token) =>
             sender ! pollBoxByToken(token)
 
@@ -143,32 +141,12 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
 
           // TODO: what should we do if no box was found for token?
 
-          case SendSeriesToRemoteBox(remoteBoxId, seriesIds, tagValues) =>
+          case SendToRemoteBox(remoteBoxId, imageTagValuesSeq) =>
             boxById(remoteBoxId) match {
               case Some(box) =>
-                SbxLog.info("Box", s"Sending series ${seriesIds.mkString(",")} to box ${box.name} with tag values ${tagValues.map(_.tagValue.value).mkString(",")}")
-                val imageIds = sendEntities(remoteBoxId, seriesIds, tagValues, imageIdsForSeries _)
-                imageIds.map(ids => ImagesSent(remoteBoxId, ids)).pipeSequentiallyTo(sender)
-              case None =>
-                sender ! BoxNotFound
-            }
-
-          case SendStudiesToRemoteBox(remoteBoxId, studyIds, tagValues) =>
-            boxById(remoteBoxId) match {
-              case Some(box) =>
-                SbxLog.info("Box", s"Sending study(s) ${studyIds.mkString(",")} to box ${box.name} with tag values ${tagValues.map(_.tagValue.value).mkString(",")}")
-                val imageIds = sendEntities(remoteBoxId, studyIds, tagValues, imageIdsForStudy _)
-                imageIds.map(ids => ImagesSent(remoteBoxId, ids)).pipeSequentiallyTo(sender)
-              case None =>
-                sender ! BoxNotFound
-            }
-
-          case SendPatientsToRemoteBox(remoteBoxId, patientIds, tagValues) =>
-            boxById(remoteBoxId) match {
-              case Some(box) =>
-                SbxLog.info("Box", s"Sending patient(s) ${patientIds.mkString(",")} to box ${box.name} with tag values ${tagValues.map(_.tagValue.value).mkString(",")}")
-                val imageIds = sendEntities(remoteBoxId, patientIds, tagValues, imageIdsForPatient _)
-                imageIds.map(ids => ImagesSent(remoteBoxId, ids)).pipeSequentiallyTo(sender)
+                SbxLog.info("Box", s"Sending ${imageTagValuesSeq.length} images to box ${box.name}")
+                sendImages(remoteBoxId, imageTagValuesSeq)
+                sender ! ImagesSent(remoteBoxId, imageTagValuesSeq.map(_.imageId))
               case None =>
                 sender ! BoxNotFound
             }
@@ -350,34 +328,13 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
     // Maybe switch to using Strings as transaction id?
     abs(UUID.randomUUID().getMostSignificantBits())
 
-  def sendEntities(remoteBoxId: Long, entityIds: Seq[Long], tagValues: Seq[EntityTagValue], imageIdsForEntityId: Long => Future[Seq[Long]]) = {
+  def sendImages(remoteBoxId: Long, imageTagValuesSeq: Seq[ImageTagValues]) = {
     val transactionId = generateTransactionId()
-    val futureImageIdToTagValues = sequence(entityIds.map(entityId => imageIdsForEntityId(entityId)
-      .map(_.map(_ -> tagValues.filter(_.entityId == entityId))))).map(_.flatten.toMap)
-    futureImageIdToTagValues.map(imageIdToTagValues => {
-      val imageIds = imageIdToTagValues.keys.toSeq
-      addOutboxEntries(remoteBoxId, transactionId, imageIds)
-      for ((imageId, tagValues) <- imageIdToTagValues) {
-        tagValues.foreach(tagValue =>
-          addTagValue(transactionId, imageId, tagValue.tagValue.tag, tagValue.tagValue.value))
-      }
-      imageIds
-    })
+    addOutboxEntries(remoteBoxId, transactionId, imageTagValuesSeq.map(_.imageId))
+    imageTagValuesSeq.foreach(imageTagValues =>
+      imageTagValues.tagValues.foreach(tagValue =>
+        addTagValue(transactionId, imageTagValues.imageId, tagValue.tag, tagValue.value)))
   }
-
-  def imageIdsForSeries(seriesId: Long) = getImages(seriesId).map(_.map(_.id))
-
-  def imageIdsForStudy(studyId: Long) =
-    getSeries(studyId)
-      .flatMap(seriesCollection => sequence(seriesCollection.map(series => imageIdsForSeries(series.id)))).map(_.flatten)
-
-  def imageIdsForPatient(patientId: Long) =
-    getStudies(patientId)
-      .flatMap(studies => sequence(studies.map(study => imageIdsForStudy(study.id)))).map(_.flatten)
-
-  def getStudies(patientId: Long) = storageService.ask(GetStudies(0, Integer.MAX_VALUE, patientId, None, None)).mapTo[Studies].map(_.studies)
-  def getSeries(studyId: Long) = storageService.ask(GetSeries(0, Integer.MAX_VALUE, studyId, None, None)).mapTo[SeriesCollection].map(_.series)
-  def getImages(seriesId: Long) = storageService.ask(GetImages(0, 100000, seriesId)).mapTo[Images].map(_.images)
 
   def addOutboxEntries(remoteBoxId: Long, transactionId: Long, imageIds: Seq[Long]): Unit = {
     val totalImageCount = imageIds.length

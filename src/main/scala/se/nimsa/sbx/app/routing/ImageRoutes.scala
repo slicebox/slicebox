@@ -34,6 +34,7 @@ import se.nimsa.sbx.dicom.DicomUtil
 import se.nimsa.sbx.app.AuthInfo
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import org.dcm4che3.data.Attributes
+import se.nimsa.sbx.anonymization.AnonymizationUtil
 
 trait ImageRoutes { this: RestApi =>
 
@@ -103,6 +104,7 @@ trait ImageRoutes { this: RestApi =>
                     _ match {
 
                       case Some(dataset) =>
+                        AnonymizationUtil.setAnonymous(dataset, false) // pretend not anonymized to force anonymization
                         onSuccess(anonymizationService.ask(Anonymize(dataset, tagValues)).mapTo[Attributes]) { anonDataset =>
                           onSuccess(storageService.ask(DeleteImage(imageId))) {
                             case ImageDeleted(imageId) =>

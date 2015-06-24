@@ -70,28 +70,10 @@ trait BoxRoutes { this: RestApi =>
             }
           }
         }
-      } ~ path(LongNumber / "sendpatients") { remoteBoxId =>
+      } ~ path(LongNumber / "send") { remoteBoxId =>
         post {
-          entity(as[BoxSendData]) { patientSendData =>
-            onSuccess(boxService.ask(SendPatientsToRemoteBox(remoteBoxId, patientSendData.entityIds, patientSendData.tagValues))) {
-              case ImagesSent(remoteBoxId, imageIds) => complete(NoContent)
-              case BoxNotFound                       => complete(NotFound)
-            }
-          }
-        }
-      } ~ path(LongNumber / "sendstudies") { remoteBoxId =>
-        post {
-          entity(as[BoxSendData]) { studySendData =>
-            onSuccess(boxService.ask(SendStudiesToRemoteBox(remoteBoxId, studySendData.entityIds, studySendData.tagValues))) {
-              case ImagesSent(remoteBoxId, imageIds) => complete(NoContent)
-              case BoxNotFound                       => complete(NotFound)
-            }
-          }
-        }
-      } ~ path(LongNumber / "sendseries") { remoteBoxId =>
-        post {
-          entity(as[BoxSendData]) { seriesSendData =>
-            onSuccess(boxService.ask(SendSeriesToRemoteBox(remoteBoxId, seriesSendData.entityIds, seriesSendData.tagValues))) {
+          entity(as[Seq[ImageTagValues]]) { imageTagValuesSeq =>
+            onSuccess(boxService.ask(SendToRemoteBox(remoteBoxId, imageTagValuesSeq))) {
               case ImagesSent(remoteBoxId, imageIds) => complete(NoContent)
               case BoxNotFound                       => complete(NotFound)
             }

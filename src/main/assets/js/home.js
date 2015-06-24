@@ -412,7 +412,7 @@ angular.module('slicebox.home', ['ngRoute'])
                 return entityIdToPatient;
             });
 
-            return showBoxSendTagValuesModal("series", entityIdToPatientPromise, receiverId, 'sendseries');
+            return showBoxSendTagValuesModal("series", entityIdToPatientPromise, receiverId);
         });
     }
 
@@ -430,21 +430,29 @@ angular.module('slicebox.home', ['ngRoute'])
                 return entityIdToPatient;
             });
 
-            return showBoxSendTagValuesModal("study(s)", entityIdToPatientPromise, receiverId, 'sendstudies');
+            return showBoxSendTagValuesModal("study(s)", entityIdToPatientPromise, receiverId);
         });
     }
 
     function confirmSendPatients(patients) {
         return confirmSend('/api/boxes', function(receiverId) {
 
-            var entityIdToPatient = {};
-            for (var i = 0; i < patients.length; i++) {
-                entityIdToPatient[patients[i].id] = patients[i];
-            }
+            var imageIdAndPatientsPromises = patients.map(function (patient) {
+                return sbxMetaData.imagesForPatients([ patient ]).then(function (images) {
+                    return images.map(function (image) {
+                        return { imageId: image.id, patient: patient };
+                    });
+                });
+            });
 
-            var entityIdToPatientPromise = $q.when(entityIdToPatient);
+            var imageIdToPatientPromise = sbxMisc.flattenPromises(imageIdAndPatientsPromises).then(function(imageIdAndPatients) {
+                return imageIdAndPatients.reduce(function ( imageIdToPatient, imageIdAndPatient ) {
+                    imageIdToPatient[ imageIdAndPatient.imageId ] = imageIdAndPatient.patient;
+                    return imageIdToPatient;
+                }, {});                
+            });
 
-            return showBoxSendTagValuesModal("patient(s)", entityIdToPatientPromise, receiverId, 'sendpatients');
+            return showBoxSendTagValuesModal("patient(s)", imageIdToPatientPromise, receiverId);
         });
     }
 
@@ -523,16 +531,15 @@ angular.module('slicebox.home', ['ngRoute'])
     function confirmAnonymizeSeries(series) {
     }
 
-    function showBoxSendTagValuesModal(text, entityIdToPatientPromise, receiverId, sendCommand) {
+    function showBoxSendTagValuesModal(text, imageIdToPatientPromise, receiverId) {
         return $mdDialog.show({
                 templateUrl: '/assets/partials/boxSendTagValuesModalContent.html',
                 controller: 'BoxSendTagValuesCtrl',
                 scope: $scope.$new(),
                 locals: {
                     text: text,
-                    entityIdToPatient: entityIdToPatientPromise,
-                    receiverId: receiverId,
-                    sendCommand: sendCommand
+                    imageIdToPatient: imageIdToPatientPromise,
+                    receiverId: receiverId
                 }
         });                
     }
@@ -563,17 +570,17 @@ angular.module('slicebox.home', ['ngRoute'])
 
 })
 
-.controller('BoxSendTagValuesCtrl', function($scope, $mdDialog, $http, text, entityIdToPatient, receiverId, sendCommand) {
+.controller('BoxSendTagValuesCtrl', function($scope, $mdDialog, $http, text, imageIdToPatient, receiverId) {
     // Initialization
     $scope.title = 'Anonymization Options';
 
     // get unique patients and an their respective indices
     $scope.patients = [];
-    var entityIds = [];
-    for (var entityId in entityIdToPatient) {
-        entityIds.push(parseInt(entityId));
-        if (entityIdToPatient.hasOwnProperty(entityId)) {
-            var patient = entityIdToPatient[entityId];
+    var imageIds = [];
+    for (var imageId in imageIdToPatient) {
+        imageIds.push(parseInt(imageId));
+        if (imageIdToPatient.hasOwnProperty(imageId)) {
+            var patient = imageIdToPatient[imageId];
             if ($scope.patients.indexOf(patient) < 0) {
                 $scope.patients.push(patient);
             }
@@ -599,27 +606,22 @@ angular.module('slicebox.home', ['ngRoute'])
     };
 
     $scope.sendButtonClicked = function() {
-        var tagValues = [];
-        for (var i = 0; i < entityIds.length; i++) {
-            var entityId = entityIds[i];
-            var patient = entityIdToPatient[entityId];
+        var imageTagValuesSeq = [];
+        for (var i = 0; i < imageIds.length; i++) {
+            var imageId = imageIds[i];
+            var patient = imageIdToPatient[imageId];
             var patientIndex = $scope.patients.indexOf(patient);
             var anonName = $scope.anonymizedPatientNames[patientIndex];
-            tagValues.push( { entityId: entityId, tagValue: { tag: 0x00100010, value: anonName } } );
+            imageTagValuesSeq.push( { imageId: imageId, tagValues: [ { tag: 0x00100010, value: anonName } ] } );
         }
 
-        var sendData = { 
-            entityIds: entityIds, 
-            tagValues: tagValues
-        };
-
-        var sendPromise = $http.post('/api/boxes/' + receiverId + '/' + sendCommand, sendData );
+        var sendPromise = $http.post('/api/boxes/' + receiverId + '/send', imageTagValuesSeq );
 
         $scope.uiState.sendInProgress = true;
 
         sendPromise.then(function(data) {
             $mdDialog.hide();
-            $scope.showInfoMessage(entityIds.length + " " + text + " added to outbox");
+            $scope.showInfoMessage(imageIds.length + " " + text + " added to outbox");
         }, function(data) {
             $scope.showErrorMessage('Failed to send: ' + data);
         });
