@@ -36,7 +36,8 @@ import se.nimsa.sbx.directory.DirectoryWatchServiceActor
 import se.nimsa.sbx.log.LogServiceActor
 import se.nimsa.sbx.seriestype.SeriesTypeServiceActor
 import se.nimsa.sbx.anonymization.AnonymizationServiceActor
-import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeUnit._
+import com.typesafe.config.Config
 
 class RestInterface extends Actor with RestApi {
 
@@ -63,8 +64,8 @@ class RestInterface extends Actor with RestApi {
 
 trait RestApi extends HttpService with SliceboxRoutes with JsonFormats {
 
-  val config = ConfigFactory.load()
-  val sliceboxConfig = config.getConfig("slicebox")
+  val appConfig: Config = ConfigFactory.load()
+  val sliceboxConfig: Config = appConfig.getConfig("slicebox")
 
   def createStorageDirectory(): Path
   def dbUrl(): String
@@ -83,16 +84,17 @@ trait RestApi extends HttpService with SliceboxRoutes with JsonFormats {
   val host = if (sliceboxConfig.hasPath("host"))
     sliceboxConfig.getString("host")
   else
-    config.getString("http.host")
+    appConfig.getString("http.host")
 
   val port = if (sliceboxConfig.hasPath("port"))
     sliceboxConfig.getInt("port")
   else
-    config.getInt("http.port")
+    appConfig.getInt("http.port")
 
-  val clientTimeout = config.getDuration("spray.can.client.request-timeout", TimeUnit.MILLISECONDS)
-  val serverTimeout = config.getDuration("spray.can.server.request-timeout", TimeUnit.MILLISECONDS)
-  implicit val timeout = Timeout(math.max(clientTimeout, serverTimeout) + 10, TimeUnit.MILLISECONDS)
+  val clientTimeout = appConfig.getDuration("spray.can.client.request-timeout", MILLISECONDS)
+  val serverTimeout = appConfig.getDuration("spray.can.server.request-timeout", MILLISECONDS)
+  
+  implicit val timeout = Timeout(math.max(clientTimeout, serverTimeout) + 10, MILLISECONDS)
 
   val apiBaseURL = if (port == 80)
     s"http://$host/api"
