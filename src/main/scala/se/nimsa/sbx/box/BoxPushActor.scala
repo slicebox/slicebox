@@ -48,6 +48,7 @@ import se.nimsa.sbx.storage.StorageProtocol.GetDataset
 class BoxPushActor(box: Box,
                    dbProps: DbProps,
                    storage: Path,
+                   implicit val timeout: Timeout,
                    pollInterval: FiniteDuration = 5.seconds,
                    receiveTimeout: FiniteDuration = 1.minute,
                    storageServicePath: String = "../../StorageService",
@@ -63,7 +64,6 @@ class BoxPushActor(box: Box,
 
   implicit val system = context.system
   implicit val ec = context.dispatcher
-  implicit val timeout = Timeout(70.seconds)
 
   def sendFilePipeline = sendReceive
 
@@ -198,8 +198,7 @@ object BoxPushActor {
   def props(box: Box,
             dbProps: DbProps,
             storage: Path,
-            pollInterval: FiniteDuration = 5.seconds,
-            receiveTimeout: FiniteDuration = 1.minute): Props =
-    Props(new BoxPushActor(box, dbProps, storage, pollInterval, receiveTimeout))
+            timeout: Timeout): Props =
+    Props(new BoxPushActor(box, dbProps, storage, timeout))
 
 }

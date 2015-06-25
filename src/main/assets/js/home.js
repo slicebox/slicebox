@@ -398,9 +398,14 @@ angular.module('slicebox.home', ['ngRoute'])
         });
 
         return confirmSend('/api/boxes', function(receiverId) {
-            var imageIdToPatientPromise = $http.get('/api/metadata/studies/' + series[0].studyId).then(function(study) {
-                return $http.get('/api/metadata/patients/' + study.data.patientId).then(function(patient) {
-                    return createImageIdToPatientPromise([ patient.data ]);
+            var imageIdToPatientPromise = $http.get('/api/metadata/studies/' + series[0].studyId).then(function (study) {
+                return $http.get('/api/metadata/patients/' + study.data.patientId).then(function (patient) {
+                    return sbxMetaData.imagesForSeries(series).then(function (images) {
+                        return images.reduce(function ( imageIdToPatient, image ) {
+                            imageIdToPatient[ image.id ] = patient.data;
+                            return imageIdToPatient;
+                        }, {});                
+                    });
                 });
             });
 
@@ -410,8 +415,13 @@ angular.module('slicebox.home', ['ngRoute'])
 
     function confirmSendStudies(studies) {
         return confirmSend('/api/boxes', function(receiverId) {
-            var imageIdToPatientPromise = $http.get('/api/metadata/patients/' + studies[0].patientId).then(function(patient) {
-                return createImageIdToPatientPromise([ patient.data ]);
+            var imageIdToPatientPromise = $http.get('/api/metadata/patients/' + studies[0].patientId).then(function (patient) {
+                return sbxMetaData.imagesForStudies(studies).then(function (images) {
+                    return images.reduce(function ( imageIdToPatient, image ) {
+                        imageIdToPatient[ image.id ] = patient.data;
+                        return imageIdToPatient;
+                    }, {});                
+                });
             });
 
             return showBoxSendTagValuesModal(imageIdToPatientPromise, receiverId);
@@ -420,26 +430,23 @@ angular.module('slicebox.home', ['ngRoute'])
 
     function confirmSendPatients(patients) {
         return confirmSend('/api/boxes', function(receiverId) {
-            var imageIdToPatientPromise = createImageIdToPatientPromise(patients);
-            return showBoxSendTagValuesModal(imageIdToPatientPromise, receiverId);
-        });
-    }
-
-    function createImageIdToPatientPromise(patients) {
-        var imageIdAndPatientsPromises = patients.map(function (patient) {
-            return sbxMetaData.imagesForPatients([ patient ]).then(function (images) {
-                return images.map(function (image) {
-                    return { imageId: image.id, patient: patient };
+            var imageIdAndPatientsPromises = patients.map(function (patient) {
+                return sbxMetaData.imagesForPatients([ patient ]).then(function (images) {
+                    return images.map(function (image) {
+                        return { imageId: image.id, patient: patient };
+                    });
                 });
             });
-        });
 
-        return sbxMisc.flattenPromises(imageIdAndPatientsPromises).then(function(imageIdAndPatients) {
-            return imageIdAndPatients.reduce(function ( imageIdToPatient, imageIdAndPatient ) {
-                imageIdToPatient[ imageIdAndPatient.imageId ] = imageIdAndPatient.patient;
-                return imageIdToPatient;
-            }, {});                
-        });        
+            var imageIdToPatientPromise = sbxMisc.flattenPromises(imageIdAndPatientsPromises).then(function(imageIdAndPatients) {
+                return imageIdAndPatients.reduce(function ( imageIdToPatient, imageIdAndPatient ) {
+                    imageIdToPatient[ imageIdAndPatient.imageId ] = imageIdAndPatient.patient;
+                    return imageIdToPatient;
+                }, {});                
+            });        
+
+            return showBoxSendTagValuesModal(imageIdToPatientPromise, receiverId);
+        });
     }
 
     function confirmSendSeriesToScp(series) {

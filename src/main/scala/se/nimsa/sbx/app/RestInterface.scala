@@ -36,6 +36,7 @@ import se.nimsa.sbx.directory.DirectoryWatchServiceActor
 import se.nimsa.sbx.log.LogServiceActor
 import se.nimsa.sbx.seriestype.SeriesTypeServiceActor
 import se.nimsa.sbx.anonymization.AnonymizationServiceActor
+import java.util.concurrent.TimeUnit
 
 class RestInterface extends Actor with RestApi {
 
@@ -62,10 +63,6 @@ class RestInterface extends Actor with RestApi {
 
 trait RestApi extends HttpService with SliceboxRoutes with JsonFormats {
 
-  implicit def executionContext = actorRefFactory.dispatcher
-
-  implicit val timeout = Timeout(70.seconds)
-
   val config = ConfigFactory.load()
   val sliceboxConfig = config.getConfig("slicebox")
 
@@ -87,25 +84,31 @@ trait RestApi extends HttpService with SliceboxRoutes with JsonFormats {
     sliceboxConfig.getString("host")
   else
     config.getString("http.host")
-    
+
   val port = if (sliceboxConfig.hasPath("port"))
     sliceboxConfig.getInt("port")
   else
     config.getInt("http.port")
-    
+
+  val clientTimeout = config.getDuration("spray.can.client.request-timeout", TimeUnit.MILLISECONDS)
+  val serverTimeout = config.getDuration("spray.can.server.request-timeout", TimeUnit.MILLISECONDS)
+  implicit val timeout = Timeout(math.max(clientTimeout, serverTimeout) + 10, TimeUnit.MILLISECONDS)
+
   val apiBaseURL = if (port == 80)
     s"http://$host/api"
   else
     s"http://$host:$port/api"
-    
+
   val superUser = sliceboxConfig.getString("superuser.user")
   val superPassword = sliceboxConfig.getString("superuser.password")
+
+  implicit def executionContext = actorRefFactory.dispatcher
 
   val userService = actorRefFactory.actorOf(UserServiceActor.props(dbProps, superUser, superPassword), name = "UserService")
   val logService = actorRefFactory.actorOf(LogServiceActor.props(dbProps), name = "LogService")
   val storageService = actorRefFactory.actorOf(StorageServiceActor.props(dbProps, storage), name = "StorageService")
   val anonymizationService = actorRefFactory.actorOf(AnonymizationServiceActor.props(dbProps), name = "AnonymizationService")
-  val boxService = actorRefFactory.actorOf(BoxServiceActor.props(dbProps, storage, apiBaseURL), name = "BoxService")
+  val boxService = actorRefFactory.actorOf(BoxServiceActor.props(dbProps, storage, apiBaseURL, timeout), name = "BoxService")
   val scpService = actorRefFactory.actorOf(ScpServiceActor.props(dbProps), name = "ScpService")
   val scuService = actorRefFactory.actorOf(ScuServiceActor.props(dbProps, storage), name = "ScuService")
   val directoryService = actorRefFactory.actorOf(DirectoryWatchServiceActor.props(dbProps, storage), name = "DirectoryService")

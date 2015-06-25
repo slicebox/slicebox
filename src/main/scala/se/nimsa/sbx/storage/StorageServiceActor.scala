@@ -129,7 +129,7 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
           db.withSession { implicit session =>
             sender ! propertiesDao.imageFileForImage(imageId)
               .flatMap(imageFile =>
-                Option(readDataset(imageFile.fileName.value)))
+                Option(readDataset(imageFile.fileName.value, true)))
           }
 
         case GetImageAttributes(imageId) =>
@@ -342,7 +342,7 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
     log.debug("Deleted file " + filePath)
   }
 
-  def readDataset(fileName: String): Attributes = loadDataset(storage.resolve(fileName), false)
+  def readDataset(fileName: String, withPixelData: Boolean): Attributes = loadDataset(storage.resolve(fileName), withPixelData)
 
   def readImageAttributes(fileName: String): List[ImageAttribute] = {
     val filePath = storage.resolve(fileName)

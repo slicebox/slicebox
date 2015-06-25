@@ -44,7 +44,7 @@ import akka.actor.Stash
 import org.dcm4che3.data.Attributes
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.TagValue
 
-class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) extends Actor with Stash with ExceptionCatching {
+class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String, implicit val timeout: Timeout) extends Actor with Stash with ExceptionCatching {
 
   case object UpdatePollBoxesOnlineStatus
 
@@ -57,7 +57,6 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
 
   implicit val system = context.system
   implicit val ec = context.dispatcher
-  implicit val timeout = Timeout(70.seconds)
 
   val pollBoxOnlineStatusTimeoutMillis: Long = 15000
   val pollBoxesLastPollTimestamp = collection.mutable.Map.empty[Long, Date]
@@ -247,13 +246,13 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
   def maybeStartPushActor(box: Box): Unit = {
     val actorName = pushActorName(box)
     if (context.child(actorName).isEmpty)
-      context.actorOf(BoxPushActor.props(box, dbProps, storage), actorName)
+      context.actorOf(BoxPushActor.props(box, dbProps, storage, timeout), actorName)
   }
 
   def maybeStartPollActor(box: Box): Unit = {
     val actorName = pollActorName(box)
     if (context.child(actorName).isEmpty)
-      context.actorOf(BoxPollActor.props(box, dbProps), actorName)
+      context.actorOf(BoxPollActor.props(box, dbProps, timeout), actorName)
   }
 
   def pushActorName(box: Box): String = BoxSendMethod.PUSH + "-" + box.id.toString
@@ -395,5 +394,5 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
 }
 
 object BoxServiceActor {
-  def props(dbProps: DbProps, storage: Path, apiBaseURL: String): Props = Props(new BoxServiceActor(dbProps, storage, apiBaseURL))
+  def props(dbProps: DbProps, storage: Path, apiBaseURL: String, timeout: Timeout): Props = Props(new BoxServiceActor(dbProps, storage, apiBaseURL, timeout))
 }

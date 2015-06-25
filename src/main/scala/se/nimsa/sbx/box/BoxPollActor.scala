@@ -48,6 +48,7 @@ import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 
 class BoxPollActor(box: Box,
                    dbProps: DbProps,
+                   implicit val timeout: Timeout,
                    pollInterval: FiniteDuration = 5.seconds,
                    receiveTimeout: FiniteDuration = 1.minute,
                    anonymizationServicePath: String = "../../AnonymizationService") extends Actor with JsonFormats {
@@ -61,7 +62,6 @@ class BoxPollActor(box: Box,
 
   implicit val system = context.system
   implicit val ec = context.dispatcher
-  implicit val timeout = Timeout(70.seconds)
 
   def convertOption[T](implicit unmarshaller: FromResponseUnmarshaller[T]): Future[HttpResponse] => Future[Option[T]] =
     (futureResponse: Future[HttpResponse]) => futureResponse.map { response =>
@@ -158,7 +158,7 @@ class BoxPollActor(box: Box,
         val dataset = loadDataset(response.entity.data.toByteArray, true)
 
         if (dataset == null) throw new RuntimeException("fetched dataset could not be read")
-        
+
         anonymizationService.ask(ReverseAnonymization(dataset)).mapTo[Attributes]
           .map { reversedDataset =>
 
@@ -191,6 +191,8 @@ class BoxPollActor(box: Box,
 }
 
 object BoxPollActor {
-  def props(box: Box, dbProps: DbProps): Props = Props(new BoxPollActor(box, dbProps))
+  def props(box: Box,
+            dbProps: DbProps,
+            timeout: Timeout): Props = Props(new BoxPollActor(box, dbProps, timeout))
 
 }

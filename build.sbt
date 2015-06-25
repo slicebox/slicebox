@@ -29,7 +29,7 @@ import de.heikoseeberger.sbtheader.license.Apache2_0
     	conf -> "conf/slicebox.conf"
 	}
 
-	batScriptExtraDefines += """set _JAVA_OPTS=%_JAVA_OPTS% -Dconfig.file=%SLICEBOX_HOME%\\conf\\slicebox.conf"""
+	batScriptExtraDefines += """set _JAVA_OPTS=%_JAVA_OPTS% -Xmx1024m -Dconfig.file=%SLICEBOX_HOME%\\conf\\slicebox.conf"""
 
 	// native packaging - linux
 
