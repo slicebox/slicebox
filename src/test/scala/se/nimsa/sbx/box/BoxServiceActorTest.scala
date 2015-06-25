@@ -1,10 +1,8 @@
 package se.nimsa.sbx.box
 
 import java.nio.file.Files
-
 import scala.slick.driver.H2Driver
 import scala.slick.jdbc.JdbcBackend.Database
-
 import org.dcm4che3.data.Attributes
 import org.dcm4che3.data.Tag
 import org.dcm4che3.data.VR
@@ -12,7 +10,6 @@ import org.scalatest.BeforeAndAfterAll
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.Matchers
 import org.scalatest.WordSpecLike
-
 import akka.actor.ActorSystem
 import akka.actor.Props
 import akka.actor.actorRef2Scala
@@ -28,6 +25,8 @@ import se.nimsa.sbx.storage.PropertiesDAO
 import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.storage.StorageServiceActor
 import se.nimsa.sbx.util.TestUtil
+import akka.util.Timeout
+import scala.concurrent.duration.DurationInt
 
 class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
   with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {
@@ -48,7 +47,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
   }
 
   val storageService = system.actorOf(Props(new StorageServiceActor(dbProps, storage)), name = "StorageService")
-  val boxService = system.actorOf(Props(new BoxServiceActor(dbProps, storage, "http://testhost:1234")), name = "BoxService")
+  val boxService = system.actorOf(Props(new BoxServiceActor(dbProps, storage, "http://testhost:1234", Timeout(30.seconds))), name = "BoxService")
 
   override def afterEach() =
     db.withSession { implicit session =>

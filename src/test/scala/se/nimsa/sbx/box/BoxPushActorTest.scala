@@ -34,6 +34,7 @@ import se.nimsa.sbx.anonymization.AnonymizationServiceActor
 import org.dcm4che3.data.Attributes
 import org.dcm4che3.data.Tag
 import org.dcm4che3.data.VR
+import akka.util.Timeout
 
 class MockupStorageActor extends Actor {
   def receive = {
@@ -83,7 +84,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
   val storageService = system.actorOf(Props[MockupStorageActor], name = "StorageService")
   val anonymizationService = system.actorOf(AnonymizationServiceActor.props(dbProps), name = "AnonymizationService")
-  val boxPushActorRef = system.actorOf(Props(new BoxPushActor(testBox, dbProps, storage, 1000.hours, 1000.hours, "../StorageService", "../AnonymizationService") {
+  val boxPushActorRef = system.actorOf(Props(new BoxPushActor(testBox, dbProps, storage, Timeout(30.seconds), 1000.hours, 1000.hours, "../StorageService", "../AnonymizationService") {
 
     override def sendFilePipeline = {
       (req: HttpRequest) =>

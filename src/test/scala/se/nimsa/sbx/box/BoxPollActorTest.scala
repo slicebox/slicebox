@@ -31,6 +31,7 @@ import java.nio.file.Paths
 import spray.http.HttpData
 import akka.actor.ReceiveTimeout
 import se.nimsa.sbx.anonymization.AnonymizationServiceActor
+import akka.util.Timeout
 
 class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
     with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach with JsonFormats {
@@ -60,7 +61,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
   val capturedRequests: ArrayBuffer[HttpRequest] = ArrayBuffer()
 
   val anonymizationService = system.actorOf(AnonymizationServiceActor.props(dbProps), name = "AnonymizationService")
-  val pollBoxActorRef = system.actorOf(Props(new BoxPollActor(remoteBox, dbProps, 1.hour, 1000.hours, "../AnonymizationService") {
+  val pollBoxActorRef = system.actorOf(Props(new BoxPollActor(remoteBox, dbProps, Timeout(30.seconds), 1.hour, 1000.hours, "../AnonymizationService") {
     
     override def sendRequestToRemoteBoxPipeline = {
       (req: HttpRequest) =>
