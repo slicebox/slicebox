@@ -23,7 +23,7 @@ import akka.event.LoggingReceive
 import akka.pattern.ask
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.log.SbxLog
-import se.nimsa.sbx.dicom.DicomProtocol._
+import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.dicom.DicomUtil._
 import akka.pattern.pipe
 import akka.actor.Props
@@ -31,7 +31,6 @@ import akka.actor.PoisonPill
 import java.util.UUID
 import akka.actor.Status.Failure
 import se.nimsa.sbx.util.ExceptionCatching
-import se.nimsa.sbx.util.SequentialPipeToSupport
 import java.nio.file.Path
 import scala.math.abs
 import java.util.Date
@@ -43,10 +42,9 @@ import scala.concurrent.Future
 import scala.concurrent.Future.sequence
 import akka.actor.Stash
 import org.dcm4che3.data.Attributes
-import BoxUtil._
+import se.nimsa.sbx.anonymization.AnonymizationProtocol.TagValue
 
-class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) extends Actor with Stash
-  with SequentialPipeToSupport with ExceptionCatching {
+class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String, implicit val timeout: Timeout) extends Actor with Stash with ExceptionCatching {
 
   case object UpdatePollBoxesOnlineStatus
 
@@ -55,13 +53,10 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
   val db = dbProps.db
   val boxDao = new BoxDAO(dbProps.driver)
 
-  val storageService = context.actorSelection("../DicomDispatch/Storage")
+  val storageService = context.actorSelection("../StorageService")
 
   implicit val system = context.system
   implicit val ec = context.dispatcher
-  implicit val timeout = Timeout(70.seconds)
-
-  storageService.ask(akka.actor.Identify).mapTo[akka.actor.ActorIdentity].map(println(_))
 
   val pollBoxOnlineStatusTimeoutMillis: Long = 15000
   val pollBoxesLastPollTimestamp = collection.mutable.Map.empty[Long, Date]
@@ -89,14 +84,13 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
 
         msg match {
 
-          case GenerateBoxBaseUrl(remoteBoxName) =>
+          case CreateConnection(remoteBoxName) =>
             val token = UUID.randomUUID().toString()
             val baseUrl = s"$apiBaseURL/box/$token"
-            val box = Box(-1, remoteBoxName, token, baseUrl, BoxSendMethod.POLL, false)
-            addBoxToDb(box)
-            sender ! BoxBaseUrlGenerated(baseUrl)
+            val box = addBoxToDb(Box(-1, remoteBoxName, token, baseUrl, BoxSendMethod.POLL, false))
+            sender ! RemoteBoxAdded(box)
 
-          case AddRemoteBox(remoteBox) =>
+          case Connect(remoteBox) =>
             val box = pushBoxByBaseUrl(remoteBox.baseUrl) getOrElse {
               val token = baseUrlToToken(remoteBox.baseUrl)
               val box = Box(-1, remoteBox.name, token, remoteBox.baseUrl, BoxSendMethod.PUSH, false)
@@ -122,7 +116,7 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
 
           case GetBoxById(boxId) =>
             sender ! boxById(boxId)
-            
+
           case GetBoxByToken(token) =>
             sender ! pollBoxByToken(token)
 
@@ -146,58 +140,15 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
 
           // TODO: what should we do if no box was found for token?
 
-          case SendSeriesToRemoteBox(remoteBoxId, seriesIds, tagValues) =>
+          case SendToRemoteBox(remoteBoxId, imageTagValuesSeq) =>
             boxById(remoteBoxId) match {
               case Some(box) =>
-                SbxLog.info("Box", s"Sending series ${seriesIds.mkString(",")} to box ${box.name} with tag values ${tagValues.map(_.value).mkString(",")}")
-                val imageFileIds = sendEntities(remoteBoxId, seriesIds, tagValues, imageFileIdsForSeries _)
-                imageFileIds.map(ids => ImagesSent(remoteBoxId, ids)).pipeSequentiallyTo(sender)
+                SbxLog.info("Box", s"Sending ${imageTagValuesSeq.length} images to box ${box.name}")
+                sendImages(remoteBoxId, imageTagValuesSeq)
+                sender ! ImagesSent(remoteBoxId, imageTagValuesSeq.map(_.imageId))
               case None =>
                 sender ! BoxNotFound
             }
-
-          case SendStudiesToRemoteBox(remoteBoxId, studyIds, tagValues) =>
-            boxById(remoteBoxId) match {
-              case Some(box) =>
-                SbxLog.info("Box", s"Sending study(s) ${studyIds.mkString(",")} to box ${box.name} with tag values ${tagValues.map(_.value).mkString(",")}")
-                val imageFileIds = sendEntities(remoteBoxId, studyIds, tagValues, imageFileIdsForStudy _)
-                imageFileIds.map(ids => ImagesSent(remoteBoxId, ids)).pipeSequentiallyTo(sender)
-              case None =>
-                sender ! BoxNotFound
-            }
-
-          case SendPatientsToRemoteBox(remoteBoxId, patientIds, tagValues) =>
-            boxById(remoteBoxId) match {
-              case Some(box) =>
-                SbxLog.info("Box", s"Sending patient(s) ${patientIds.mkString(",")} to box ${box.name} with tag values ${tagValues.map(_.value).mkString(",")}")
-                val imageFileIds = sendEntities(remoteBoxId, patientIds, tagValues, imageFileIdsForPatient _)
-                imageFileIds.map(ids => ImagesSent(remoteBoxId, ids)).pipeSequentiallyTo(sender)
-              case None =>
-                sender ! BoxNotFound
-            }
-
-          case RemoveAnonymizationKey(anonymizationKeyId) =>
-            removeAnonymizationKey(anonymizationKeyId)
-            sender ! AnonymizationKeyRemoved(anonymizationKeyId)
-
-          case GetAnonymizationKeys(startIndex, count, orderBy, orderAscending, filter) =>
-            sender ! AnonymizationKeys(listAnonymizationKeys(startIndex, count, orderBy, orderAscending, filter))
-
-          case ReverseAnonymization(dataset) =>
-            val clonedDataset = cloneDataset(dataset)
-            reverseAnonymization(anonymizationKeysForAnonPatient(clonedDataset), clonedDataset)
-            sender ! clonedDataset
-
-          case HarmonizeAnonymization(outboxEntry, dataset, anonDataset) =>
-            val clonedAnonDataset = cloneDataset(anonDataset)
-            val anonymizationKeys = anonymizationKeysForPatient(dataset)
-            harmonizeAnonymization(anonymizationKeys, dataset, clonedAnonDataset)
-
-            val anonymizationKey = createAnonymizationKey(outboxEntry.remoteBoxId, outboxEntry.transactionId, boxById(outboxEntry.remoteBoxId).map(_.name).getOrElse("" + outboxEntry.remoteBoxId), dataset, anonDataset)            
-            if (!anonymizationKeys.exists(isEqual(_, anonymizationKey)))
-              addAnonymizationKey(anonymizationKey)
-
-            sender ! clonedAnonDataset
 
           case GetOutboxEntry(token, transactionId, sequenceNumber) =>
             pollBoxByToken(token).foreach(box => {
@@ -227,8 +178,8 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
           case GetInbox =>
             val inboxEntries = getInboxFromDb().map { inboxEntry =>
               boxById(inboxEntry.remoteBoxId) match {
-                case Some(box) => InboxEntryInfo(box.name, inboxEntry.transactionId, inboxEntry.receivedImageCount, inboxEntry.totalImageCount)
-                case None      => InboxEntryInfo(inboxEntry.remoteBoxId.toString, inboxEntry.transactionId, inboxEntry.receivedImageCount, inboxEntry.totalImageCount)
+                case Some(box) => InboxEntryInfo(inboxEntry.id, box.name, inboxEntry.transactionId, inboxEntry.receivedImageCount, inboxEntry.totalImageCount)
+                case None      => InboxEntryInfo(inboxEntry.id, inboxEntry.remoteBoxId.toString, inboxEntry.transactionId, inboxEntry.receivedImageCount, inboxEntry.totalImageCount)
               }
             }
             sender ! Inbox(inboxEntries)
@@ -238,9 +189,9 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
             val outboxEntries = getOutboxFromDb().map { outboxEntry =>
               idToBox.get(outboxEntry.remoteBoxId) match {
                 case Some(box) =>
-                  OutboxEntryInfo(outboxEntry.id, box.name, outboxEntry.transactionId, outboxEntry.sequenceNumber, outboxEntry.totalImageCount, outboxEntry.imageFileId, outboxEntry.failed)
+                  OutboxEntryInfo(outboxEntry.id, box.name, outboxEntry.transactionId, outboxEntry.sequenceNumber, outboxEntry.totalImageCount, outboxEntry.imageId, outboxEntry.failed)
                 case None =>
-                  OutboxEntryInfo(outboxEntry.id, "" + outboxEntry.remoteBoxId, outboxEntry.transactionId, outboxEntry.sequenceNumber, outboxEntry.totalImageCount, outboxEntry.imageFileId, outboxEntry.failed)
+                  OutboxEntryInfo(outboxEntry.id, "" + outboxEntry.remoteBoxId, outboxEntry.transactionId, outboxEntry.sequenceNumber, outboxEntry.totalImageCount, outboxEntry.imageId, outboxEntry.failed)
               }
             }
             sender ! Outbox(outboxEntries)
@@ -253,8 +204,12 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
             removeOutboxEntryFromDb(outboxEntryId)
             sender ! OutboxEntryRemoved(outboxEntryId)
 
-          case GetTransactionTagValues(imageFileId, transactionId) =>
-            sender ! tagValuesForImageFileIdAndTransactionId(imageFileId, transactionId)
+          case RemoveInboxEntry(inboxEntryId) =>
+            removeInboxEntryFromDb(inboxEntryId)
+            sender ! InboxEntryRemoved(inboxEntryId)
+
+          case GetTransactionTagValues(imageId, transactionId) =>
+            sender ! tagValuesForImageIdAndTransactionId(imageId, transactionId)
         }
 
       }
@@ -295,13 +250,13 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
   def maybeStartPushActor(box: Box): Unit = {
     val actorName = pushActorName(box)
     if (context.child(actorName).isEmpty)
-      context.actorOf(BoxPushActor.props(box, dbProps, storage), actorName)
+      context.actorOf(BoxPushActor.props(box, dbProps, storage, timeout), actorName)
   }
 
   def maybeStartPollActor(box: Box): Unit = {
     val actorName = pollActorName(box)
     if (context.child(actorName).isEmpty)
-      context.actorOf(BoxPollActor.props(box, dbProps), actorName)
+      context.actorOf(BoxPollActor.props(box, dbProps, timeout), actorName)
   }
 
   def pushActorName(box: Box): String = BoxSendMethod.PUSH + "-" + box.id.toString
@@ -376,52 +331,28 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
     // Maybe switch to using Strings as transaction id?
     abs(UUID.randomUUID().getMostSignificantBits())
 
-  def sendEntities(remoteBoxId: Long, entityIds: Seq[Long], tagValues: Seq[BoxSendTagValue], imageFileIdsForEntityId: Long => Future[Seq[Long]]) = {
+  def sendImages(remoteBoxId: Long, imageTagValuesSeq: Seq[ImageTagValues]) = {
     val transactionId = generateTransactionId()
-    val futureImageFileIdToTagValues = sequence(entityIds.map(entityId => imageFileIdsForEntityId(entityId)
-      .map(_.map(_ -> tagValues.filter(_.entityId == entityId))))).map(_.flatten.toMap)
-    futureImageFileIdToTagValues.map(imageFileIdToTagValues => {
-      val imageFileIds = imageFileIdToTagValues.keys.toSeq
-      addOutboxEntries(remoteBoxId, transactionId, imageFileIds)
-      for ((imageFileId, tagValues) <- imageFileIdToTagValues) {
-        tagValues.foreach(tagValue =>
-          addTagValue(imageFileId, transactionId, tagValue.tag, tagValue.value))
-      }
-      imageFileIds
-    })
+    addOutboxEntries(remoteBoxId, transactionId, imageTagValuesSeq.map(_.imageId))
+    imageTagValuesSeq.foreach(imageTagValues =>
+      imageTagValues.tagValues.foreach(tagValue =>
+        addTagValue(transactionId, imageTagValues.imageId, tagValue.tag, tagValue.value)))
   }
 
-  def imageFileIdsForSeries(seriesId: Long) =
-    getImages(seriesId)
-      .flatMap(images => sequence(images.map(image => getImageFile(image.id).map(_.map(imageFile => imageFile.id))))).map(_.flatten)
-
-  def imageFileIdsForStudy(studyId: Long) =
-    getSeries(studyId)
-      .flatMap(seriesCollection => sequence(seriesCollection.map(series => imageFileIdsForSeries(series.id)))).map(_.flatten)
-
-  def imageFileIdsForPatient(patientId: Long) =
-    getStudies(patientId)
-      .flatMap(studies => sequence(studies.map(study => imageFileIdsForStudy(study.id)))).map(_.flatten)
-
-  def getStudies(patientId: Long) = storageService.ask(GetStudies(0, Integer.MAX_VALUE, patientId, None, None)).mapTo[Studies].map(_.studies)
-  def getSeries(studyId: Long) = storageService.ask(GetSeries(0, Integer.MAX_VALUE, studyId, None, None)).mapTo[SeriesCollection].map(_.series)
-  def getImages(seriesId: Long) = storageService.ask(GetImages(0, 100000, seriesId)).mapTo[Images].map(_.images)
-  def getImageFile(imageId: Long) = storageService.ask(GetImageFile(imageId)).mapTo[Option[ImageFile]]
-
-  def addOutboxEntries(remoteBoxId: Long, transactionId: Long, imageFileIds: Seq[Long]): Unit = {
-    val totalImageCount = imageFileIds.length
+  def addOutboxEntries(remoteBoxId: Long, transactionId: Long, imageIds: Seq[Long]): Unit = {
+    val totalImageCount = imageIds.length
 
     db.withSession { implicit session =>
       for (sequenceNumber <- 1 to totalImageCount) {
-        boxDao.insertOutboxEntry(OutboxEntry(-1, remoteBoxId, transactionId, sequenceNumber, totalImageCount, imageFileIds(sequenceNumber - 1), false))
+        boxDao.insertOutboxEntry(OutboxEntry(-1, remoteBoxId, transactionId, sequenceNumber, totalImageCount, imageIds(sequenceNumber - 1), false))
       }
     }
   }
 
-  def addTagValue(imageFileId: Long, transactionId: Long, tag: Int, value: String) =
+  def addTagValue(transactionId: Long, imageId: Long, tag: Int, value: String) =
     db.withSession { implicit session =>
       boxDao.insertTransactionTagValue(
-        TransactionTagValue(-1, imageFileId, transactionId, tag, value))
+        TransactionTagValue(-1, transactionId, imageId, TagValue(tag, value)))
     }
 
   def outboxEntryById(outboxEntryId: Long): Option[OutboxEntry] =
@@ -432,6 +363,11 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
   def outboxEntryByTransactionIdAndSequenceNumber(remoteBoxId: Long, transactionId: Long, sequenceNumber: Long): Option[OutboxEntry] =
     db.withSession { implicit session =>
       boxDao.outboxEntryByTransactionIdAndSequenceNumber(remoteBoxId, transactionId, sequenceNumber)
+    }
+
+  def removeInboxEntryFromDb(inboxEntryId: Long) =
+    db.withSession { implicit session =>
+      boxDao.removeInboxEntry(inboxEntryId)
     }
 
   def removeOutboxEntryFromDb(outboxEntryId: Long) =
@@ -454,9 +390,9 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
       boxDao.updateBoxOnlineStatus(boxId, online)
     }
 
-  def tagValuesForImageFileIdAndTransactionId(imageFileId: Long, transactionId: Long): Seq[TransactionTagValue] =
+  def tagValuesForImageIdAndTransactionId(imageId: Long, transactionId: Long): Seq[TransactionTagValue] =
     db.withSession { implicit session =>
-      boxDao.tagValuesByImageFileIdAndTransactionId(imageFileId, transactionId)
+      boxDao.tagValuesByImageIdAndTransactionId(imageId, transactionId)
     }
 
   def removeTransactionTagValuesForTransactionId(transactionId: Long) =
@@ -464,37 +400,8 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String) exten
       boxDao.removeTransactionTagValuesByTransactionId(transactionId)
     }
 
-  def addAnonymizationKey(anonymizationKey: AnonymizationKey): AnonymizationKey =
-    db.withSession { implicit session =>
-      boxDao.insertAnonymizationKey(anonymizationKey)
-    }
-
-  def removeAnonymizationKey(anonymizationKeyId: Long) =
-    db.withSession { implicit session =>
-      boxDao.removeAnonymizationKey(anonymizationKeyId)
-    }
-
-  def listAnonymizationKeys(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String]) =
-    db.withSession { implicit session =>
-      boxDao.anonymizationKeys(startIndex, count, orderBy, orderAscending, filter)
-    }
-
-  def anonymizationKeysForAnonPatient(dataset: Attributes) = {
-    db.withSession { implicit session =>
-      val anonPatient = datasetToPatient(dataset)
-      boxDao.anonymizationKeysForAnonPatient(anonPatient.patientName.value, anonPatient.patientID.value)
-    }
-  }
-
-  def anonymizationKeysForPatient(dataset: Attributes) = {
-    db.withSession { implicit session =>
-      val patient = datasetToPatient(dataset)
-      boxDao.anonymizationKeysForPatient(patient.patientName.value, patient.patientID.value)
-    }
-  }
-
 }
 
 object BoxServiceActor {
-  def props(dbProps: DbProps, storage: Path, apiBaseURL: String): Props = Props(new BoxServiceActor(dbProps, storage, apiBaseURL))
+  def props(dbProps: DbProps, storage: Path, apiBaseURL: String, timeout: Timeout): Props = Props(new BoxServiceActor(dbProps, storage, apiBaseURL, timeout))
 }

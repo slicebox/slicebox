@@ -1,26 +1,30 @@
 <div layout="column" layout-margin>
     <div class="admin-users">
-        <h4>Manage users</h4>
-        <h5>Add and remove user accoumts</h5>
-        <sbx-grid
-            load-page="loadUsersPage(startIndex, count, orderByProperty, orderByDirection)"
-            page-size="20"
-            object-actions="objectActions"
-            callbacks="callbacks.usersTable"
-            empty-message="No users exist">
+        <md-card>
+            <md-card-content>
+                <h4>Manage users</h4>
+                <h5>Add and remove user accoumts</h5>
+                <sbx-grid
+                    load-page="loadUsersPage(startIndex, count, orderByProperty, orderByDirection)"
+                    page-size="20"
+                    object-actions="objectActions"
+                    callbacks="callbacks.usersTable"
+                    empty-message="No users exist">
 
-            <sbx-grid-column property="user" title="Name">
-            </sbx-grid-column>
+                    <sbx-grid-column property="user" title="Name">
+                    </sbx-grid-column>
 
-            <sbx-grid-column property="role" title="Role">
-            </sbx-grid-column>
-        </sbx-grid>
+                    <sbx-grid-column property="role" title="Role">
+                    </sbx-grid-column>
+                </sbx-grid>
 
-        <div layout="row" class="button-row">
-            <md-button class="md-primary md-raised" ng-click="addUserButtonClicked()" ng-disabled="uiState.addUserInProgress">
-                Add User
-            </md-button>
-            <div flex></div>
-        </div>
+                <div layout="row" class="button-row">
+                    <md-button class="md-primary md-raised" ng-click="addUserButtonClicked()" ng-disabled="uiState.addUserInProgress">
+                        Add User
+                    </md-button>
+                    <div flex></div>
+                </div>
+            </md-card-content>
+        </md-card>
     </div>
 </div>

@@ -20,8 +20,8 @@ import akka.actor.Actor
 import akka.actor.Props
 import akka.event.Logging
 import akka.event.LoggingReceive
+import akka.pattern.ask
 import BoxProtocol._
-import BoxUtil._
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.duration.FiniteDuration
 import spray.client.pipelining._
@@ -32,51 +32,53 @@ import spray.http.HttpRequest
 import spray.http.StatusCodes._
 import scala.concurrent.Future
 import spray.http.HttpResponse
+import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.app.DbProps
-import se.nimsa.sbx.dicom.DicomMetaDataDAO
-import se.nimsa.sbx.dicom.DicomPropertiesDAO
+import se.nimsa.sbx.storage.MetaDataDAO
+import se.nimsa.sbx.storage.PropertiesDAO
 import spray.http.StatusCode
 import se.nimsa.sbx.dicom.DicomUtil._
-import se.nimsa.sbx.dicom.DicomAnonymization._
 import java.io.ByteArrayOutputStream
 import java.util.Date
 import akka.actor.ReceiveTimeout
 import se.nimsa.sbx.log.SbxLog
+import akka.util.Timeout
+import se.nimsa.sbx.storage.StorageProtocol.GetDataset
 
 class BoxPushActor(box: Box,
                    dbProps: DbProps,
                    storage: Path,
+                   implicit val timeout: Timeout,
                    pollInterval: FiniteDuration = 5.seconds,
-                   receiveTimeout: FiniteDuration = 1.minute) extends Actor {
+                   receiveTimeout: FiniteDuration = 1.minute,
+                   storageServicePath: String = "../../StorageService",
+                   anonymizationServicePath: String = "../../AnonymizationService") extends Actor {
 
   val log = Logging(context.system, this)
 
   val db = dbProps.db
   val boxDao = new BoxDAO(dbProps.driver)
-  val dicomPropertiesDao = new DicomPropertiesDAO(dbProps.driver)
+
+  val storageService = context.actorSelection(storageServicePath)
+  val anonymizationService = context.actorSelection(anonymizationServicePath)
 
   implicit val system = context.system
   implicit val ec = context.dispatcher
 
   def sendFilePipeline = sendReceive
 
-  def pushImagePipeline(outboxEntry: OutboxEntry, fileName: String, tagValues: Seq[TransactionTagValue]): Future[HttpResponse] = {
-    val path = storage.resolve(fileName)
-
-    val dataset = loadDataset(path, true)
-    val anonymizedDataset = anonymizeDataset(dataset)
-
-    applyTagValues(anonymizedDataset, tagValues)
-
-    val anonymizationKeys = anonymizationKeysForPatient(dataset)
-    harmonizeAnonymization(anonymizationKeys, dataset, anonymizedDataset)
-
-    val anonymizationKey = createAnonymizationKey(outboxEntry.remoteBoxId, outboxEntry.transactionId, boxById(outboxEntry.remoteBoxId).map(_.name).getOrElse("" + outboxEntry.remoteBoxId), dataset, anonymizedDataset)
-    if (!anonymizationKeys.exists(isEqual(_, anonymizationKey)))
-      addAnonymizationKey(anonymizationKey)
-
-    val bytes = toByteArray(anonymizedDataset)
-    sendFilePipeline(Post(s"${box.baseUrl}/image?transactionid=${outboxEntry.transactionId}&sequencenumber=${outboxEntry.sequenceNumber}&totalimagecount=${outboxEntry.totalImageCount}", HttpData(bytes)))
+  def pushImagePipeline(outboxEntry: OutboxEntry, tagValues: Seq[TransactionTagValue]): Future[HttpResponse] = {
+    val futureDatasetMaybe = storageService.ask(GetDataset(outboxEntry.imageId)).mapTo[Option[Attributes]]
+    futureDatasetMaybe.flatMap(_ match {
+      case Some(dataset) =>
+        val futureAnonymizedDataset = anonymizationService.ask(Anonymize(dataset, tagValues.map(_.tagValue))).mapTo[Attributes]
+        futureAnonymizedDataset flatMap { anonymizedDataset =>
+          val bytes = toByteArray(anonymizedDataset)
+          sendFilePipeline(Post(s"${box.baseUrl}/image?transactionid=${outboxEntry.transactionId}&sequencenumber=${outboxEntry.sequenceNumber}&totalimagecount=${outboxEntry.totalImageCount}", HttpData(bytes)))
+        }
+      case None =>
+        Future.failed(new IllegalArgumentException("No dataset found for image id " + outboxEntry.imageId))
+    })
   }
 
   val poller = system.scheduler.schedule(pollInterval, pollInterval) {
@@ -121,27 +123,18 @@ class BoxPushActor(box: Box,
       boxDao.nextOutboxEntryForRemoteBoxId(box.id)
     }
 
-  def sendFileForOutboxEntry(outboxEntry: OutboxEntry) =
-    fileNameForImageFileId(outboxEntry.imageFileId) match {
-      case Some(fileName) =>
-        val transactionTagValues = tagValuesForImageFileIdAndTransactionId(outboxEntry.imageFileId, outboxEntry.transactionId)
-        sendFileWithName(outboxEntry, fileName, transactionTagValues)
-      case None =>
-        handleFilenameLookupFailedForOutboxEntry(outboxEntry, new IllegalStateException(s"Can't process outbox entry (${outboxEntry.id}) because no image with id ${outboxEntry.imageFileId} was found"))
-    }
+  def sendFileForOutboxEntry(outboxEntry: OutboxEntry) = {
+    val transactionTagValues = tagValuesForImageIdAndTransactionId(outboxEntry.imageId, outboxEntry.transactionId)
+    sendFile(outboxEntry, transactionTagValues)
+  }
 
-  def fileNameForImageFileId(imageFileId: Long): Option[String] =
+  def tagValuesForImageIdAndTransactionId(imageId: Long, transactionId: Long): Seq[TransactionTagValue] =
     db.withSession { implicit session =>
-      dicomPropertiesDao.imageFileById(imageFileId).map(_.fileName.value)
+      boxDao.tagValuesByImageIdAndTransactionId(imageId, transactionId)
     }
 
-  def tagValuesForImageFileIdAndTransactionId(imageFileId: Long, transactionId: Long): Seq[TransactionTagValue] =
-    db.withSession { implicit session =>
-      boxDao.tagValuesByImageFileIdAndTransactionId(imageFileId, transactionId)
-    }
-
-  def sendFileWithName(outboxEntry: OutboxEntry, fileName: String, tagValues: Seq[TransactionTagValue]) = {
-    pushImagePipeline(outboxEntry, fileName, tagValues)
+  def sendFile(outboxEntry: OutboxEntry, tagValues: Seq[TransactionTagValue]) = {
+    pushImagePipeline(outboxEntry, tagValues)
       .map(response => {
         val statusCode = response.status.intValue
         if (statusCode >= 200 && statusCode < 300)
@@ -152,6 +145,8 @@ class BoxPushActor(box: Box,
         }
       })
       .recover {
+        case exception: IllegalArgumentException =>
+          self ! FileSendFailed(outboxEntry, 400, exception)
         case exception: Exception =>
           self ! FileSendFailed(outboxEntry, 500, exception)
       }
@@ -183,11 +178,6 @@ class BoxPushActor(box: Box,
     context.unbecome
   }
 
-  def handleFilenameLookupFailedForOutboxEntry(outboxEntry: OutboxEntry, exception: Exception) = {
-    markOutboxTransactionAsFailed(outboxEntry, s"Failed to send file to box ${box.name}: " + exception.getMessage)
-    context.unbecome
-  }
-
   def markOutboxTransactionAsFailed(outboxEntry: OutboxEntry, logMessage: String) = {
     db.withSession { implicit session =>
       boxDao.markOutboxTransactionAsFailed(box.id, outboxEntry.transactionId)
@@ -201,23 +191,6 @@ class BoxPushActor(box: Box,
     }
   }
 
-  def addAnonymizationKey(anonymizationKey: AnonymizationKey) =
-    db.withSession { implicit session =>
-      boxDao.insertAnonymizationKey(anonymizationKey)
-    }
-
-  def boxById(boxId: Long): Option[Box] =
-    db.withSession { implicit session =>
-      boxDao.boxById(boxId)
-    }
-
-  def anonymizationKeysForPatient(dataset: Attributes) = {
-    db.withSession { implicit session =>
-      val anonPatient = datasetToPatient(dataset)
-      boxDao.anonymizationKeysForPatient(anonPatient.patientName.value, anonPatient.patientID.value)
-    }
-  }
-
 }
 
 object BoxPushActor {
@@ -225,8 +198,7 @@ object BoxPushActor {
   def props(box: Box,
             dbProps: DbProps,
             storage: Path,
-            pollInterval: FiniteDuration = 5.seconds,
-            receiveTimeout: FiniteDuration = 1.minute): Props =
-    Props(new BoxPushActor(box, dbProps, storage, pollInterval, receiveTimeout))
+            timeout: Timeout): Props =
+    Props(new BoxPushActor(box, dbProps, storage, timeout))
 
 }

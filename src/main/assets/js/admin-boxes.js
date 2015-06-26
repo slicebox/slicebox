@@ -63,10 +63,10 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
             return;
         }
 
-        var generateURLPromise = $http.post('/api/boxes/generatebaseurl', {value: $scope.uiState.remoteBoxName});
+        var generateURLPromise = $http.post('/api/boxes/createconnection', {value: $scope.uiState.remoteBoxName});
 
         generateURLPromise.success(function(data) {
-            showBaseURLDialog(data.value);
+            showBaseURLDialog(data.baseUrl);
             $mdDialog.hide();
         });
 
@@ -84,7 +84,7 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
 
         $scope.uiState.errorMessage = null;
 
-        var connectPromise = $http.post('/api/boxes/addremotebox',
+        var connectPromise = $http.post('/api/boxes/connect',
             {
                 name: $scope.uiState.remoteBoxName,
                 baseUrl: $scope.uiState.connectionURL

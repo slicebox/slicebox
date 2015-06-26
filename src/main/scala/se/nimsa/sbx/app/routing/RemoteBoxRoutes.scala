@@ -26,10 +26,10 @@ import se.nimsa.sbx.app.AuthInfo
 import se.nimsa.sbx.app.RestApi
 import se.nimsa.sbx.app.UserProtocol.UserRole
 import se.nimsa.sbx.box.BoxProtocol._
-import se.nimsa.sbx.box.BoxUtil._
-import se.nimsa.sbx.dicom.DicomProtocol._
+import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.dicom.DicomUtil._
-import se.nimsa.sbx.dicom.DicomAnonymization
+import se.nimsa.sbx.anonymization.AnonymizationUtil._
+import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import org.dcm4che3.data.Attributes
 
 trait RemoteBoxRoutes { this: RestApi =>
@@ -48,15 +48,14 @@ trait RemoteBoxRoutes { this: RestApi =>
                   // make sure spray.httpx.SprayJsonSupport._ is NOT imported here. It messes with the content type expectations
                   entity(as[Array[Byte]]) { imageData =>
                     val dataset = loadDataset(imageData, true)
-                    onSuccess(boxService.ask(ReverseAnonymization(dataset))) {
-                      case dataset: Attributes =>
-                        onSuccess(dicomService.ask(AddDataset(dataset, SourceType.BOX, box.id))) {
-                          case ImageAdded(image) =>
-                            onSuccess(boxService.ask(UpdateInbox(token, transactionId, sequenceNumber, totalImageCount))) {
-                              case msg: InboxUpdated =>
-                                complete(NoContent)
-                            }
-                        }
+                    onSuccess(anonymizationService.ask(ReverseAnonymization(dataset)).mapTo[Attributes]) { reversedDataset =>
+                      onSuccess(storageService.ask(AddDataset(reversedDataset, SourceType.BOX, box.id))) {
+                        case ImageAdded(image) =>
+                          onSuccess(boxService.ask(UpdateInbox(token, transactionId, sequenceNumber, totalImageCount))) {
+                            case msg: InboxUpdated =>
+                              complete(NoContent)
+                          }
+                      }
                     }
                   }
                 }
@@ -86,26 +85,20 @@ trait RemoteBoxRoutes { this: RestApi =>
                   parameters('transactionid.as[Long], 'sequencenumber.as[Long]) { (transactionId, sequenceNumber) =>
                     onSuccess(boxService.ask(GetOutboxEntry(token, transactionId, sequenceNumber))) {
                       case outboxEntry: OutboxEntry =>
-                        onSuccess(boxService.ask(GetTransactionTagValues(outboxEntry.imageFileId, transactionId)).mapTo[Seq[TransactionTagValue]]) {
+                        onSuccess(boxService.ask(GetTransactionTagValues(outboxEntry.imageId, transactionId)).mapTo[Seq[TransactionTagValue]]) {
                           case transactionTagValues =>
-                            onSuccess(dicomService.ask(GetImageFile(outboxEntry.imageFileId)).mapTo[Option[ImageFile]]) {
-                              case imageFileMaybe => imageFileMaybe.map(imageFile => {
-                                detach() {
-                                  val path = storage.resolve(imageFile.fileName.value)
+                            onSuccess(storageService.ask(GetDataset(outboxEntry.imageId)).mapTo[Option[Attributes]]) {
+                              _ match {
+                                case Some(dataset) =>
 
-                                  val dataset = loadDataset(path, true)
-                                  val anonymizedDataset = DicomAnonymization.anonymizeDataset(dataset)
-
-                                  applyTagValues(anonymizedDataset, transactionTagValues)
-
-                                  onSuccess(boxService.ask(HarmonizeAnonymization(outboxEntry, dataset, anonymizedDataset))) {
+                                  onSuccess(anonymizationService.ask(Anonymize(dataset, transactionTagValues.map(_.tagValue)))) {
                                     case anonymizedDataset: Attributes =>
                                       val bytes = toByteArray(anonymizedDataset)
                                       complete(HttpEntity(ContentTypes.`application/octet-stream`, HttpData(bytes)))
                                   }
-                                }
-                              }).getOrElse {
-                                complete((NotFound, s"File not found for image id ${outboxEntry.imageFileId}"))
+                                case None =>
+                                  
+                                  complete((NotFound, s"File not found for image id ${outboxEntry.imageId}"))
                               }
                             }
                         }

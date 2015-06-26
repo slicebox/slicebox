@@ -2,7 +2,7 @@ import de.heikoseeberger.sbtheader.license.Apache2_0
 
 	name := "slicebox"
 
-	version := "0.5.2"
+	version := "0.6"
 
 	organization := "se.nimsa"
 
@@ -24,12 +24,12 @@ import de.heikoseeberger.sbtheader.license.Apache2_0
 
 	// native packaging - universal
 
-	mappings in Universal <+= (packageBin in Compile, sourceDirectory ) map { (_, src) =>
-		val httpConf = src / "main" / "resources" / "application.conf"
-		httpConf -> "conf/slicebox.conf"
+	mappings in Universal += {
+    	val conf = (resourceDirectory in Compile).value / "slicebox.conf"
+    	conf -> "conf/slicebox.conf"
 	}
 
-	batScriptExtraDefines += """set _JAVA_OPTS=%_JAVA_OPTS% -Dconfig.file=%SLICEBOX_HOME%\\conf\\slicebox.conf"""
+	batScriptExtraDefines += """set _JAVA_OPTS=%_JAVA_OPTS% -Xmx1024m -Dconfig.file=%SLICEBOX_HOME%\\conf\\slicebox.conf"""
 
 	// native packaging - linux
 
@@ -81,8 +81,8 @@ import de.heikoseeberger.sbtheader.license.Apache2_0
 			"org.scalatest"					%% "scalatest"				% "2.2.4"			% "test",
 			"io.spray" 						%% "spray-testkit"			% sprayVersion		% "test",
 			"com.typesafe.akka" 			%% "akka-testkit"			% akkaVersion		% "test",
-			"org.webjars" 					%  "angularjs"				% "1.3.15",
-			"org.webjars"					%  "angular-material"		% "0.9.7",
+			"org.webjars" 					%  "angularjs"				% "1.4.1",
+			"org.webjars"					%  "angular-material"		% "0.10.0",
 			"org.webjars"					%  "font-awesome"			% "4.2.0"
 		)
 	}

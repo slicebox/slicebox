@@ -29,7 +29,7 @@ import se.nimsa.sbx.app.AuthInfo
 import se.nimsa.sbx.app.RestApi
 import se.nimsa.sbx.app.UserProtocol.UserRole
 import se.nimsa.sbx.box.BoxProtocol._
-import se.nimsa.sbx.dicom.DicomProtocol._
+import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.dicom.DicomUtil
 
 trait BoxRoutes { this: RestApi =>
@@ -44,19 +44,19 @@ trait BoxRoutes { this: RestApi =>
           }
         }
       } ~ authorize(authInfo.hasPermission(UserRole.ADMINISTRATOR)) {
-        path("generatebaseurl") {
+        path("createconnection") {
           post {
             entity(as[RemoteBoxName]) { remoteBoxName =>
-              onSuccess(boxService.ask(GenerateBoxBaseUrl(remoteBoxName.value))) {
-                case BoxBaseUrlGenerated(baseUrl) =>
-                  complete((Created, BoxBaseUrl(baseUrl)))
+              onSuccess(boxService.ask(CreateConnection(remoteBoxName.value))) {
+                case RemoteBoxAdded(box) =>
+                  complete((Created, box))
               }
             }
           }
-        } ~ path("addremotebox") {
+        } ~ path("connect") {
           post {
             entity(as[RemoteBox]) { remoteBox =>
-              onSuccess(boxService.ask(AddRemoteBox(remoteBox))) {
+              onSuccess(boxService.ask(Connect(remoteBox))) {
                 case RemoteBoxAdded(box) =>
                   complete((Created, box))
               }
@@ -70,53 +70,12 @@ trait BoxRoutes { this: RestApi =>
             }
           }
         }
-      } ~ path(LongNumber / "sendpatients") { remoteBoxId =>
+      } ~ path(LongNumber / "send") { remoteBoxId =>
         post {
-          entity(as[BoxSendData]) { patientSendData =>
-            onSuccess(boxService.ask(SendPatientsToRemoteBox(remoteBoxId, patientSendData.entityIds, patientSendData.tagValues))) {
+          entity(as[Seq[ImageTagValues]]) { imageTagValuesSeq =>
+            onSuccess(boxService.ask(SendToRemoteBox(remoteBoxId, imageTagValuesSeq))) {
               case ImagesSent(remoteBoxId, imageIds) => complete(NoContent)
               case BoxNotFound                       => complete(NotFound)
-            }
-          }
-        }
-      } ~ path(LongNumber / "sendstudies") { remoteBoxId =>
-        post {
-          entity(as[BoxSendData]) { studySendData =>
-            onSuccess(boxService.ask(SendStudiesToRemoteBox(remoteBoxId, studySendData.entityIds, studySendData.tagValues))) {
-              case ImagesSent(remoteBoxId, imageIds) => complete(NoContent)
-              case BoxNotFound                       => complete(NotFound)
-            }
-          }
-        }
-      } ~ path(LongNumber / "sendseries") { remoteBoxId =>
-        post {
-          entity(as[BoxSendData]) { seriesSendData =>
-            onSuccess(boxService.ask(SendSeriesToRemoteBox(remoteBoxId, seriesSendData.entityIds, seriesSendData.tagValues))) {
-              case ImagesSent(remoteBoxId, imageIds) => complete(NoContent)
-              case BoxNotFound                       => complete(NotFound)
-            }
-          }
-        }
-      } ~ pathPrefix("anonymizationkeys") {
-        pathEndOrSingleSlash {
-          get {
-            parameters(
-              'startindex.as[Long] ? 0,
-              'count.as[Long] ? 20,
-              'orderby.as[String].?,
-              'orderascending.as[Boolean] ? true,
-              'filter.as[String].?) { (startIndex, count, orderBy, orderAscending, filter) =>
-                onSuccess(boxService.ask(GetAnonymizationKeys(startIndex, count, orderBy, orderAscending, filter))) {
-                  case AnonymizationKeys(anonymizationKeys) =>
-                    complete(anonymizationKeys)
-                }
-              }
-          }
-        } ~ path(LongNumber) { anonymizationKeyId =>
-          delete {
-            onSuccess(boxService.ask(RemoveAnonymizationKey(anonymizationKeyId))) {
-              case AnonymizationKeyRemoved(anonymizationKeyId) =>
-                complete(NoContent)
             }
           }
         }
@@ -130,6 +89,13 @@ trait BoxRoutes { this: RestApi =>
           onSuccess(boxService.ask(GetInbox)) {
             case Inbox(entries) =>
               complete(entries)
+          }
+        }
+      } ~ path(LongNumber) { inboxEntryId =>
+        delete {
+          onSuccess(boxService.ask(RemoveInboxEntry(inboxEntryId))) {
+            case InboxEntryRemoved(inboxEntryId) =>
+              complete(NoContent)
           }
         }
       }

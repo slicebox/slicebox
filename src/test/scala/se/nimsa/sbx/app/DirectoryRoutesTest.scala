@@ -11,7 +11,7 @@ import org.scalatest.FlatSpec
 import org.scalatest.Matchers
 
 import se.nimsa.sbx.dicom.DicomHierarchy._
-import se.nimsa.sbx.dicom.DicomProtocol._
+import se.nimsa.sbx.directory.DirectoryWatchProtocol._
 import se.nimsa.sbx.util.TestUtil
 
 class DirectoryRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
@@ -72,9 +72,8 @@ class DirectoryRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       responseAs[List[Patient]].size should be(0)
     }
 
-    val fileName = "anon270.dcm"
-    val dcmPath = Paths.get(getClass().getResource(fileName).toURI())
-    Files.copy(dcmPath, tempDir.resolve(fileName))
+    val dcmFile = TestUtil.testImageFile
+    Files.copy(dcmFile.toPath, tempDir.resolve(dcmFile.getName))
 
     // sleep for a while and let the OS find out there was a new file in the watched directory. It will be picked up by slicebox
     Thread.sleep(1000)
@@ -87,9 +86,8 @@ class DirectoryRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
   it should "not pick up a secondary capture file (unsupported SOP Class)" in {
 
-    val fileName = "cat.dcm"
-    val dcmPath = Paths.get(getClass().getResource(fileName).toURI())
-    Files.copy(dcmPath, tempDir.resolve(fileName))
+    val scFile = TestUtil.testSecondaryCaptureFile
+    Files.copy(scFile.toPath, tempDir.resolve(scFile.getName))
 
     // sleep for a while and let the OS find out there was a new file in the watched directory. It will be picked up by slicebox
     Thread.sleep(1000)

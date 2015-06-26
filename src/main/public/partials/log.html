@@ -1,26 +1,30 @@
 <div layout="column" layout-margin>
     <div class="outbox">
-        <h4>Log messages</h4>
-        <sbx-grid
-            load-page="loadLogPage(startIndex, count)"
-            page-size="20"
-            page-sizes="[10, 20, 50, 100]"
-            object-actions="actions"
-            sorting="false"
-            callbacks="callbacks.logTable"
-            empty-message="Event log is empty">
+        <md-card>
+            <md-card-content>
+                <h4>Log messages</h4>
+                <sbx-grid
+                    load-page="loadLogPage(startIndex, count)"
+                    page-size="20"
+                    page-sizes="[10, 20, 50, 100]"
+                    object-actions="actions"
+                    sorting="false"
+                    callbacks="callbacks.logTable"
+                    empty-message="Event log is empty">
 
-            <sbx-grid-column property="created" title="Created" filter="date: yyyy-MM-dd HH:mm:ss.sss">
-            </sbx-grid-column>
+                    <sbx-grid-column property="created" title="Created" filter="date: yyyy-MM-dd HH:mm:ss">
+                    </sbx-grid-column>
 
-            <sbx-grid-column property="entryType" title="Type">
-            </sbx-grid-column>
+                    <sbx-grid-column property="entryType" title="Type">
+                    </sbx-grid-column>
 
-            <sbx-grid-column property="subject" title="Subject">
-            </sbx-grid-column>
+                    <sbx-grid-column property="subject" title="Subject">
+                    </sbx-grid-column>
 
-            <sbx-grid-column property="message" title="Message">
-            </sbx-grid-column>
-        </sbx-grid>
+                    <sbx-grid-column property="message" title="Message">
+                    </sbx-grid-column>
+                </sbx-grid>
+            </md-card-content>
+        </md-card>
     </div>
 </div>

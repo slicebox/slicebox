@@ -17,6 +17,7 @@
 package se.nimsa.sbx.box
 
 import se.nimsa.sbx.model.Entity
+import se.nimsa.sbx.anonymization.AnonymizationProtocol.TagValue
 import org.dcm4che3.data.Attributes
 
 object BoxProtocol {
@@ -42,56 +43,28 @@ object BoxProtocol {
 
   case class RemoteBoxName(value: String)
 
-  case class BoxBaseUrl(value: String)
-
   case class Box(id: Long, name: String, token: String, baseUrl: String, sendMethod: BoxSendMethod, online: Boolean) extends Entity
 
-  case class OutboxEntry(id: Long, remoteBoxId: Long, transactionId: Long, sequenceNumber: Long, totalImageCount: Long, imageFileId: Long, failed: Boolean) extends Entity
+  case class OutboxEntry(id: Long, remoteBoxId: Long, transactionId: Long, sequenceNumber: Long, totalImageCount: Long, imageId: Long, failed: Boolean) extends Entity
 
-  case class OutboxEntryInfo(id: Long, remoteBoxName: String, transactionId: Long, sequenceNumber: Long, totalImageCount: Long, imageFileId: Long, failed: Boolean)
+  case class OutboxEntryInfo(id: Long, remoteBoxName: String, transactionId: Long, sequenceNumber: Long, totalImageCount: Long, imageId: Long, failed: Boolean)
 
   case class InboxEntry(id: Long, remoteBoxId: Long, transactionId: Long, receivedImageCount: Long, totalImageCount: Long) extends Entity
 
-  case class BoxSendTagValue(entityId: Long, tag: Int, value: String)
-
-  case class TransactionTagValue(id: Long, imageFileId: Long, transactionId: Long, tag: Int, value: String) extends Entity
-
-  case class AnonymizationKey(
-    id: Long,
-    created: Long,
-    remoteBoxId: Long,
-    transactionId: Long,
-    remoteBoxName: String,
-    patientName: String,
-    anonPatientName: String,
-    patientID: String,
-    anonPatientID: String,
-    patientBirthDate: String,
-    studyInstanceUID: String,
-    anonStudyInstanceUID: String,
-    studyDescription: String,
-    studyID: String,
-    accessionNumber: String,
-    seriesInstanceUID: String,
-    anonSeriesInstanceUID: String,
-    frameOfReferenceUID: String,
-    anonFrameOfReferenceUID: String) extends Entity
-
-  case class ReverseAnonymization(dataset: Attributes) extends BoxRequest
-
-  case class HarmonizeAnonymization(outboxEntry: OutboxEntry, dataset: Attributes, anonDataset: Attributes) extends BoxRequest
-
-  case class BoxSendData(entityIds: Seq[Long], tagValues: Seq[BoxSendTagValue])
-
-  case class InboxEntryInfo(remoteBoxName: String, transactionId: Long, receivedImageCount: Long, totalImageCount: Long)
-
+  case class InboxEntryInfo(id: Long, remoteBoxName: String, transactionId: Long, receivedImageCount: Long, totalImageCount: Long)
+  
+  case class ImageTagValues(imageId: Long, tagValues: Seq[TagValue])
+  
   case class PushImageData(transactionId: Long, sequenceNumber: Long, totalImageCount: Long, dataset: Attributes)
 
+  case class TransactionTagValue(id: Long, transactionId: Long, imageId: Long, tagValue: TagValue) extends Entity
+  
+  
   sealed trait BoxRequest
 
-  case class GenerateBoxBaseUrl(remoteBoxName: String) extends BoxRequest
+  case class CreateConnection(remoteBoxName: String) extends BoxRequest
 
-  case class AddRemoteBox(remoteBox: RemoteBox) extends BoxRequest
+  case class Connect(remoteBox: RemoteBox) extends BoxRequest
 
   case class RemoveBox(boxId: Long) extends BoxRequest
 
@@ -105,15 +78,11 @@ object BoxProtocol {
 
   case class PollOutbox(token: String) extends BoxRequest
 
-  case class SendPatientsToRemoteBox(remoteBoxId: Long, patientIds: Seq[Long], tagValues: Seq[BoxSendTagValue]) extends BoxRequest
-
-  case class SendStudiesToRemoteBox(remoteBoxId: Long, studyIds: Seq[Long], tagValues: Seq[BoxSendTagValue]) extends BoxRequest
-
-  case class SendSeriesToRemoteBox(remoteBoxId: Long, seriesIds: Seq[Long], tagValues: Seq[BoxSendTagValue]) extends BoxRequest
+  case class SendToRemoteBox(remoteBoxId: Long, imageTagValuesSeq: Seq[ImageTagValues]) extends BoxRequest
 
   case class GetOutboxEntry(token: String, transactionId: Long, sequenceNumber: Long) extends BoxRequest
 
-  case class GetTransactionTagValues(imageFileId: Long, transactionId: Long) extends BoxRequest
+  case class GetTransactionTagValues(imageId: Long, transactionId: Long) extends BoxRequest
 
   case class DeleteOutboxEntry(token: String, transactionId: Long, sequenceNumber: Long) extends BoxRequest
 
@@ -121,15 +90,11 @@ object BoxProtocol {
 
   case object GetOutbox extends BoxRequest
 
+  case class RemoveInboxEntry(inboxEntryId: Long) extends BoxRequest
+  
   case class RemoveOutboxEntry(outboxEntryId: Long) extends BoxRequest
 
-  case class GetAnonymizationKeys(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String]) extends BoxRequest
-
-  case class RemoveAnonymizationKey(anonymizationKeyId: Long) extends BoxRequest
-
-  case class AnonymizationKeyRemoved(anonymizationKeyId: Long)
-
-  case class AnonymizationKeys(anonymizationKeys: Seq[AnonymizationKey])
+  case class InboxEntryRemoved(inboxEntryId: Long)
 
   case class OutboxEntryRemoved(outboxEntryId: Long)
 
@@ -139,13 +104,11 @@ object BoxProtocol {
 
   case class Boxes(boxes: Seq[Box])
 
-  case class BoxBaseUrlGenerated(baseUrl: String)
-
   case class InboxUpdated(token: String, transactionId: Long, sequenceNumber: Long, totalImageCount: Long)
 
   case object OutboxEmpty
 
-  case class ImagesSent(remoteBoxId: Long, imageFileIds: Seq[Long])
+  case class ImagesSent(remoteBoxId: Long, imageIds: Seq[Long])
 
   case object OutboxEntryNotFound
 

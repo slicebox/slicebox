@@ -3,7 +3,7 @@
 
 Service | Status | Description
 ------- | ------ | -----------
-Travis        | [![Build Status](https://travis-ci.org/slicebox/slicebox.svg?branch=master)](https://travis-ci.org/slicebox/slicebox.svg?branch=master) | [Tests](https://travis-ci.org/slicebox/slicebox/)
+Travis        | [![Build Status](https://travis-ci.org/slicebox/slicebox.svg?branch=develop)](https://travis-ci.org/slicebox/slicebox.svg?branch=develop) | [Tests](https://travis-ci.org/slicebox/slicebox/)
 Bintray       | [ ![Download](https://api.bintray.com/packages/slicebox/slicebox/installers/images/download.svg) ](https://bintray.com/slicebox/slicebox/installers/_latestVersion) | Latest Version on Bintray
 Gitter        | [![Join the chat at https://gitter.im/slicebox/slicebox](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/slicebox/slicebox?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge) | Chatroom
 Documentation | - | [REST API](http://slicebox.github.io/slicebox)
@@ -53,7 +53,7 @@ We provide two types of installers, either a zip-file suitable for installation 
 
 * Download a zipped distribution of slicebox from [Bintray](https://bintray.com/slicebox/slicebox/installers/_latestVersion).
 * Unzip onto a suitable server computer. Any computer which is always on and which has a fixed (local or public) IP address will do.
-* Configure the service by editing [conf/slicebox.conf](./src/main/resources/application.conf). In particular, the administrator (superuser) username and password can be configured along with the hostname and port of the service, and paths to the database and file storage. The `slicebox.conf` file reads and appends a second configuration file called `my-slicebox.conf`, if present. A neat way of preserving the reference configuation in `slicebox.conf` is to create a file called `my-slicebox.conf` and place it in the same directory as `slicebox.conf`. Include those configurations you wish to change in this this file, they will override the reference settings.
+* Configure the service by editing [conf/slicebox.conf](./src/main/resources/slicebox.conf). In particular, the administrator (superuser) username and password can be configured along with the hostname and port of the service, and paths to the database and file storage. 
 * The `bin` folder contains start scripts for Windows and Linux/Unix/Mac OS.
 
 ### Windows - running Slicebox as a scheduled task
@@ -86,22 +86,29 @@ The service can be controlled using commands such as `sudo restart slicebox`, `s
 During the installation a user and group named slicebox is created, as indicated in the table above. The service is run using this user, which means that files created by slicebox (such as the database files and stored DICOM files) must reside in a directory in which the slicebox user has the necessary permissions. Upon installation, the default settings in `/etc/slicebox/slicebox.conf` point to the installation directory itself, which is owned by root. This means that slicebox will not run correclty (there will be a log error message indicating this). We suggest the following changes:
 
 * Create a directory `/var/slicebox` owned by the slicebox user and group. 
-* Add a configuration file called `my-slicebox.conf` next to the reference configuration file `/etc/slicebox/slicebox.conf`. Add the following settings to this file:
+* Change the following settings in the config file `/etc/slicebox/slicebox.conf`:
    * `slicebox.dicom-files.path = "/var/slicebox/dicom-files"`
    * `slicebox.database.path = "/var/slicebox/slicebox"`
-* Add any other changes to the reference configuration you wish to make. You probably wish to override `http.host`, `http.port`, `slicebox.superuser.user` and `slicebox.superuser.password`.
+* Make other applicable changes to the configuration. You probably wish to override `http.host`, `http.port`, `slicebox.superuser.user` and `slicebox.superuser.password`.
 * Restart slicebox using `sudo restart slicebox`
 * The service should now be available at your specified host name and port number. Check the log to make sure the service is running as intended.
 
-A complete example of the file `my-slicebox.conf` for Linux is given below.
+
+### Installation notes
+
+* Hospitals often restrict internet access to a limited set of ports, usually ports 80 and 443 (for SSL). Slicebox instances that should communicate with hospital instances may be required to run on port 80 for this reason. This is difficult to accompish on Linux servers as users other than root are not permitted to open ports below 1024. One possibility is to run slicebox on a high port number such as 5000, and set up a reverse proxy using e.g. Apache or Nginx which redirects incoming traffic to your site example.com:80 to slicebox running on localhost:5000. When running slicebox behind a reverse proxy the service is running on a local hostname (typically localhost:5000) while it is accessed via a public hostname. To separate these, the `host` and `port` configurations under the `http` group specifies the local hostname, while adding `host` and `port` under the `slicebox` group specifies the public hostname. The resulting example configuration is
 
 ```
 http {
-	host = "localhost" // or the ip/hostname of your site
-	port = 5000
+	host = "localhost" // local hostname
+	port = 5000        // local port
 }
 
 slicebox {
+
+	host = "slicebox.se" // public hostname
+	port = 80            // public port
+
 	dicom-files {
 		path = "/var/slicebox"
 	}
@@ -118,9 +125,6 @@ slicebox {
 }
 ```
 
-### Installation gotchas
-
-* Hospitals often restrict internet access to a limited set of ports, usually ports 80 and 443 (for SSL). Slicebox instances that should communicate with hospital instances may be required to run on port 80 for this reason. This is difficult to accompish on Linux servers as users other than root are not permitted to open ports below 1024. One possibility is to run slicebox on a high port number such as 5000, and set up a reverse proxy using e.g. Apache or Nginx which redirects incoming traffic to your site example.com:80 to slicebox running on localhost:5000.
 
 Integration with Applications
 -----------------------------

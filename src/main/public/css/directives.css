@@ -1,3 +1,26 @@
+.sbx-chip {
+    color: rgba(255,255,255,0.87);
+    background-color: rgb(84,110,122);
+    border-radius: 8px; 
+    box-shadow: 0 2px 5px 0 rgba(0, 0, 0, 0.26);
+    padding: 4px 6px;
+    -webkit-user-select: none;
+    margin: 3px 6px;
+    text-align: center;
+    text-transform: uppercase;
+    font-weight: 500;
+    font-size: 12px;
+    font-style: inherit;
+    font-variant: inherit;
+    font-family: inherit;
+    letter-spacing: 0.01em;
+    -webkit-font-smoothing: antialiased;
+}
+
+.sbx-chip-warn {
+    background: #B71C1C;
+}
+
 .sbx-grid {
 }
 

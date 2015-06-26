@@ -3,6 +3,17 @@
 
 angular.module('slicebox.directives', [])
 
+.directive('sbxChip', function() {
+    return {
+        restrict: 'E',
+        transclude: true,
+        template: '<span class="sbx-chip {{chipClass}}" ng-transclude></span>',
+        scope: {
+            chipClass: '@'
+        }
+    };
+})
+
 .directive('sbxButton', function($q, $timeout) {
 	
     return {

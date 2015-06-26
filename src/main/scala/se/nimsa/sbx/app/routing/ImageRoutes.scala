@@ -25,11 +25,16 @@ import spray.http.MediaTypes
 import spray.http.StatusCodes.BadRequest
 import spray.http.StatusCodes.NotFound
 import spray.http.StatusCodes.Created
+import spray.http.StatusCodes.NoContent
 import spray.routing._
 import se.nimsa.sbx.app.RestApi
-import se.nimsa.sbx.dicom.DicomProtocol._
+import se.nimsa.sbx.storage.StorageProtocol._
+import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.dicom.DicomUtil
 import se.nimsa.sbx.app.AuthInfo
+import se.nimsa.sbx.dicom.DicomHierarchy.Image
+import org.dcm4che3.data.Attributes
+import se.nimsa.sbx.anonymization.AnonymizationUtil
 
 trait ImageRoutes { this: RestApi =>
 
@@ -39,14 +44,14 @@ trait ImageRoutes { this: RestApi =>
         post {
           formField('file.as[FormFile]) { file =>
             val dataset = DicomUtil.loadDataset(file.entity.data.toByteArray, true)
-            onSuccess(dicomService.ask(AddDataset(dataset, SourceType.USER, authInfo.user.id))) {
+            onSuccess(storageService.ask(AddDataset(dataset, SourceType.USER, authInfo.user.id))) {
               case ImageAdded(image) =>
                 import spray.httpx.SprayJsonSupport._
                 complete((Created, image))
             }
           } ~ entity(as[Array[Byte]]) { bytes =>
             val dataset = DicomUtil.loadDataset(bytes, true)
-            onSuccess(dicomService.ask(AddDataset(dataset, SourceType.USER, authInfo.user.id))) {
+            onSuccess(storageService.ask(AddDataset(dataset, SourceType.USER, authInfo.user.id))) {
               case ImageAdded(image) =>
                 import spray.httpx.SprayJsonSupport._
                 complete((Created, image))
@@ -55,7 +60,7 @@ trait ImageRoutes { this: RestApi =>
         }
       } ~ path(LongNumber) { imageId =>
         get {
-          onSuccess(dicomService.ask(GetImageFile(imageId)).mapTo[Option[ImageFile]]) {
+          onSuccess(storageService.ask(GetImageFile(imageId)).mapTo[Option[ImageFile]]) {
             case imageFileMaybe => imageFileMaybe.map(imageFile => {
               val file = storage.resolve(imageFile.fileName.value).toFile
               if (file.isFile && file.canRead)
@@ -68,19 +73,57 @@ trait ImageRoutes { this: RestApi =>
               complete((NotFound, s"No file found for image id $imageId"))
             }
           }
+        } ~ delete {
+          onSuccess(storageService.ask(DeleteImage(imageId))) {
+            case ImageDeleted(imageId) =>
+              complete(NoContent)
+          }
         }
       } ~ path(LongNumber / "attributes") { imageId =>
         get {
-          onSuccess(dicomService.ask(GetImageAttributes(imageId)).mapTo[Option[List[ImageAttribute]]]) {
+          onSuccess(storageService.ask(GetImageAttributes(imageId)).mapTo[Option[List[ImageAttribute]]]) {
             import spray.httpx.SprayJsonSupport._
             complete(_)
           }
         }
       } ~ path(LongNumber / "imageinformation") { imageId =>
         get {
-          onSuccess(dicomService.ask(GetImageInformation(imageId)).mapTo[Option[ImageInformation]]) {
+          onSuccess(storageService.ask(GetImageInformation(imageId)).mapTo[Option[ImageInformation]]) {
             import spray.httpx.SprayJsonSupport._
             complete(_)
+          }
+        }
+      } ~ path(LongNumber / "anonymize") { imageId =>
+        post {
+          import spray.httpx.SprayJsonSupport._
+          entity(as[Seq[TagValue]]) { tagValues =>
+            onSuccess(storageService.ask(GetImageFile(imageId)).mapTo[Option[ImageFile]]) {
+              _ match {
+                case Some(imageFile) =>
+                  onSuccess(storageService.ask(GetDataset(imageId)).mapTo[Option[Attributes]]) {
+                    _ match {
+
+                      case Some(dataset) =>
+                        AnonymizationUtil.setAnonymous(dataset, false) // pretend not anonymized to force anonymization
+                        onSuccess(anonymizationService.ask(Anonymize(dataset, tagValues)).mapTo[Attributes]) { anonDataset =>
+                          onSuccess(storageService.ask(DeleteImage(imageId))) {
+                            case ImageDeleted(imageId) =>
+                              onSuccess(storageService.ask(AddDataset(anonDataset, imageFile.sourceType, imageFile.sourceId))) {
+                                case ImageAdded(image) =>
+                                  complete(NoContent)
+                              }
+                          }
+                        }
+
+                      case None =>
+                        complete(NotFound)
+                    }
+                  }
+
+                case None =>
+                  complete(NotFound)
+              }
+            }
           }
         }
       } ~ path(LongNumber / "png") { imageId =>
@@ -90,13 +133,38 @@ trait ImageRoutes { this: RestApi =>
           'windowmax.as[Int] ? 0,
           'imageheight.as[Int] ? 0) { (frameNumber, min, max, height) =>
             get {
-              onSuccess(dicomService.ask(GetImageFrame(imageId, frameNumber, min, max, height)).mapTo[Option[Array[Byte]]]) {
-                _.map(bytes =>
-                  complete(HttpEntity(MediaTypes.`image/png`, HttpData(bytes))))
-                  .getOrElse(complete(NotFound))
+              onSuccess(storageService.ask(GetImageFrame(imageId, frameNumber, min, max, height)).mapTo[Option[Array[Byte]]]) {
+                _ match {
+                  case Some(bytes) => complete(HttpEntity(MediaTypes.`image/png`, HttpData(bytes)))
+                  case None        => complete(NotFound)
+                }
               }
             }
           }
+      } ~ pathPrefix("anonymizationkeys") {
+        pathEndOrSingleSlash {
+          get {
+            parameters(
+              'startindex.as[Long] ? 0,
+              'count.as[Long] ? 20,
+              'orderby.as[String].?,
+              'orderascending.as[Boolean] ? true,
+              'filter.as[String].?) { (startIndex, count, orderBy, orderAscending, filter) =>
+                onSuccess(anonymizationService.ask(GetAnonymizationKeys(startIndex, count, orderBy, orderAscending, filter))) {
+                  case AnonymizationKeys(anonymizationKeys) =>
+                    import spray.httpx.SprayJsonSupport._
+                    complete(anonymizationKeys)
+                }
+              }
+          }
+        } ~ path(LongNumber) { anonymizationKeyId =>
+          delete {
+            onSuccess(anonymizationService.ask(RemoveAnonymizationKey(anonymizationKeyId))) {
+              case AnonymizationKeyRemoved(anonymizationKeyId) =>
+                complete(NoContent)
+            }
+          }
+        }
       }
     }
 

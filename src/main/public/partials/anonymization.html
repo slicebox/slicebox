@@ -1,0 +1,31 @@
+<div layout="column" layout-margin>
+
+    <div layout="row" layout-margin>
+        <div flex ng-controller="AnonymizationCtrl">
+            <md-card>
+                <md-card-content>
+                    <h4 class="md-flex">Anonymization Keys</h4>
+                    <md-content class="md-padding">
+                        <sbx-grid
+                            load-page="loadAnonymizationKeyPage(startIndex, count, orderByProperty, orderByDirection, filter)"
+                            page-size="20"
+                            filter="true"
+                            object-actions="actions"
+                            callbacks="callbacks.anonymizationKeyTable"
+                            empty-message="No anonymization keys">
+
+                            <sbx-grid-column property="created" title="Created" filter="date: yyyy-MM-dd HH:mm"></sbx-grid-column>
+                            <sbx-grid-column property="patientName" title="Patient Name"><sbx-grid-cell>{{rowObject.patientName | prettyPatientName}}</sbx-grid-cell></sbx-grid-column>
+                            <sbx-grid-column property="anonPatientName" title="Anonymous Patient Name"></sbx-grid-column>
+                            <sbx-grid-column property="patientID" title="Patient ID"></sbx-grid-column>umn>
+                            <sbx-grid-column property="anonPatientID" title="Anonymous Patient ID"></sbx-grid-column>
+                            <sbx-grid-column property="accessionNumber" title="Accession Number"></sbx-grid-column>
+
+                        </sbx-grid>
+                    </md-content>
+                </md-card-content>
+            </md-card>
+        </div>
+    </div>
+
+</div>

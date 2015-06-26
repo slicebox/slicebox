@@ -19,24 +19,25 @@ package se.nimsa.sbx.app
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
-
 import scala.concurrent.duration.DurationInt
 import scala.slick.driver.H2Driver
 import scala.slick.jdbc.JdbcBackend.Database
-
 import akka.actor.Actor
 import akka.util.Timeout
-
 import spray.routing.HttpService
-
 import com.mchange.v2.c3p0.ComboPooledDataSource
 import com.typesafe.config.ConfigFactory
-
 import se.nimsa.sbx.app.routing.SliceboxRoutes
 import se.nimsa.sbx.box.BoxServiceActor
-import se.nimsa.sbx.dicom.DicomDispatchActor
+import se.nimsa.sbx.storage.StorageServiceActor
+import se.nimsa.sbx.scp.ScpServiceActor
+import se.nimsa.sbx.scu.ScuServiceActor
+import se.nimsa.sbx.directory.DirectoryWatchServiceActor
 import se.nimsa.sbx.log.LogServiceActor
 import se.nimsa.sbx.seriestype.SeriesTypeServiceActor
+import se.nimsa.sbx.anonymization.AnonymizationServiceActor
+import java.util.concurrent.TimeUnit._
+import com.typesafe.config.Config
 
 class RestInterface extends Actor with RestApi {
 
@@ -63,12 +64,8 @@ class RestInterface extends Actor with RestApi {
 
 trait RestApi extends HttpService with SliceboxRoutes with JsonFormats {
 
-  implicit def executionContext = actorRefFactory.dispatcher
-
-  implicit val timeout = Timeout(70.seconds)
-
-  val config = ConfigFactory.load()
-  val sliceboxConfig = config.getConfig("slicebox")
+  val appConfig: Config = ConfigFactory.load()
+  val sliceboxConfig: Config = appConfig.getConfig("slicebox")
 
   def createStorageDirectory(): Path
   def dbUrl(): String
@@ -79,21 +76,44 @@ trait RestApi extends HttpService with SliceboxRoutes with JsonFormats {
     ds.setJdbcUrl(dbUrl)
     Database.forDataSource(ds)
   }
-  
+
   val dbProps = DbProps(db, H2Driver)
 
   val storage = createStorageDirectory()
 
-  val host = config.getString("http.host")
-  val port = config.getInt("http.port")
-  val apiBaseURL = s"http://$host:$port/api"
+  val host = if (sliceboxConfig.hasPath("host"))
+    sliceboxConfig.getString("host")
+  else
+    appConfig.getString("http.host")
+
+  val port = if (sliceboxConfig.hasPath("port"))
+    sliceboxConfig.getInt("port")
+  else
+    appConfig.getInt("http.port")
+
+  val clientTimeout = appConfig.getDuration("spray.can.client.request-timeout", MILLISECONDS)
+  val serverTimeout = appConfig.getDuration("spray.can.server.request-timeout", MILLISECONDS)
+  
+  implicit val timeout = Timeout(math.max(clientTimeout, serverTimeout) + 10, MILLISECONDS)
+
+  val apiBaseURL = if (port == 80)
+    s"http://$host/api"
+  else
+    s"http://$host:$port/api"
+
   val superUser = sliceboxConfig.getString("superuser.user")
   val superPassword = sliceboxConfig.getString("superuser.password")
 
+  implicit def executionContext = actorRefFactory.dispatcher
+
   val userService = actorRefFactory.actorOf(UserServiceActor.props(dbProps, superUser, superPassword), name = "UserService")
-  val boxService = actorRefFactory.actorOf(BoxServiceActor.props(dbProps, storage, apiBaseURL), name = "BoxService")
-  val dicomService = actorRefFactory.actorOf(DicomDispatchActor.props(storage, dbProps), name = "DicomDispatch")
   val logService = actorRefFactory.actorOf(LogServiceActor.props(dbProps), name = "LogService")
+  val storageService = actorRefFactory.actorOf(StorageServiceActor.props(dbProps, storage), name = "StorageService")
+  val anonymizationService = actorRefFactory.actorOf(AnonymizationServiceActor.props(dbProps), name = "AnonymizationService")
+  val boxService = actorRefFactory.actorOf(BoxServiceActor.props(dbProps, storage, apiBaseURL, timeout), name = "BoxService")
+  val scpService = actorRefFactory.actorOf(ScpServiceActor.props(dbProps), name = "ScpService")
+  val scuService = actorRefFactory.actorOf(ScuServiceActor.props(dbProps, storage), name = "ScuService")
+  val directoryService = actorRefFactory.actorOf(DirectoryWatchServiceActor.props(dbProps, storage), name = "DirectoryService")
   val seriesTypeService = actorRefFactory.actorOf(SeriesTypeServiceActor.props(dbProps), name = "SeriesTypeService")
 
   val authenticator = new Authenticator(userService)

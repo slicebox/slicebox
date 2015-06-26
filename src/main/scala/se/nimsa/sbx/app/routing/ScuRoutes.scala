@@ -26,7 +26,7 @@ import spray.routing._
 import se.nimsa.sbx.app.AuthInfo
 import se.nimsa.sbx.app.RestApi
 import se.nimsa.sbx.app.UserProtocol.UserRole
-import se.nimsa.sbx.dicom.DicomProtocol._
+import se.nimsa.sbx.scu.ScuProtocol._
 
 trait ScuRoutes { this: RestApi =>
 
@@ -34,14 +34,14 @@ trait ScuRoutes { this: RestApi =>
     pathPrefix("scus") {
       pathEndOrSingleSlash {
         get {
-          onSuccess(dicomService.ask(GetScus)) {
+          onSuccess(scuService.ask(GetScus)) {
             case Scus(scus) =>
               complete(scus)
           }
         } ~ post {
           authorize(authInfo.hasPermission(UserRole.ADMINISTRATOR)) {
             entity(as[AddScu]) { addScu =>
-              onSuccess(dicomService.ask(addScu)) {
+              onSuccess(scuService.ask(addScu)) {
                 case scuData: ScuData =>
                   complete((Created, scuData))
               }
@@ -52,7 +52,7 @@ trait ScuRoutes { this: RestApi =>
         pathEndOrSingleSlash {
           delete {
             authorize(authInfo.hasPermission(UserRole.ADMINISTRATOR)) {
-              onSuccess(dicomService.ask(RemoveScu(scuDataId))) {
+              onSuccess(scuService.ask(RemoveScu(scuDataId))) {
                 case ScuRemoved(scuDataId) =>
                   complete(NoContent)
               }
@@ -60,7 +60,7 @@ trait ScuRoutes { this: RestApi =>
           }
         } ~ path("sendseries" / LongNumber) { seriesId =>
           post {
-            onSuccess(dicomService.ask(SendSeriesToScp(seriesId, scuDataId))) {
+            onSuccess(scuService.ask(SendSeriesToScp(seriesId, scuDataId))) {
               case ImagesSentToScp(scuDataId, imageIds) => complete(NoContent)
             }
           }

@@ -8,7 +8,7 @@
                     <md-content class="md-padding" style="height: 300px">
                         <sbx-grid
                             load-page="loadInboxPage(startIndex, count, orderByProperty, orderByDirection)"
-                            page-size="20"
+                            page-size="10000000"
                             object-actions="objectActions"
                             callbacks="callbacks.inboxTable"
                             empty-message="Inbox is empty">
@@ -45,45 +45,17 @@
 
                             <sbx-grid-column property="sequenceNumber" title="Progress">
                                 <sbx-grid-cell>
-                                    <progressbar
-                                        type="success"
-                                        max="rowObject.totalImageCount"
-                                        value="rowObject.totalImageCount - rowObject.imagesLeft">
-                                        {{rowObject.totalImageCount - rowObject.imagesLeft}} / {{rowObject.totalImageCount}}
-                                    </progressbar>
+                                    <md-progress-linear md-mode="determinate" ng-value="calculateProgress(rowObject)"></md-progress-linear>
+                                    <p>{{rowObject.totalImageCount - rowObject.imagesLeft}} / {{rowObject.totalImageCount}}</p>
                                 </sbx-grid-cell>
                             </sbx-grid-column>
 
-                            <sbx-grid-column property="failed" title="Failed">
+                            <sbx-grid-column property="failed" title="Status">
+                                <sbx-grid-cell>
+                                    <sbx-chip ng-if="rowObject.failed" chip-class="sbx-chip-warn">Failed</sbx-chip>
+                                    <sbx-chip ng-if="!rowObject.failed">Sending</sbx-chip>
+                                </sbx-grid-cell>
                             </sbx-grid-column>
-                        </sbx-grid>
-                    </md-content>
-                </md-card-content>
-            </md-card>
-        </div>
-    </div>
-
-    <div layout="row" layout-margin>
-        <div flex ng-controller="AnonymizationKeyCtrl">
-            <md-card>
-                <md-card-content>
-                    <h4 class="md-flex">Anonymization Keys</h4>
-                    <md-content class="md-padding">
-                        <sbx-grid
-                            load-page="loadAnonymizationKeyPage(startIndex, count, orderByProperty, orderByDirection, filter)"
-                            page-size="20"
-                            filter="true"
-                            object-actions="actions"
-                            callbacks="callbacks.anonymizationKeyTable"
-                            empty-message="No anonymization keys">
-
-                            <sbx-grid-column property="remoteBoxName" title="Box"></sbx-grid-column>
-                            <sbx-grid-column property="created" title="Date" filter="date: yyyy-MM-dd"></sbx-grid-column>
-                            <sbx-grid-column property="patientName" title="Patient Name"><sbx-grid-cell>{{rowObject.patientName | prettyPatientName}}</sbx-grid-cell></sbx-grid-column>
-                            <sbx-grid-column property="patientID" title="Patient ID"></sbx-grid-column>umn>
-                            <sbx-grid-column property="anonPatientName" title="Anonymous Patient Name"></sbx-grid-column>
-                            <sbx-grid-column property="anonPatientID" title="Anonymous Patient ID"></sbx-grid-column>
-                            <sbx-grid-column property="accessionNumber" title="Accession Number"></sbx-grid-column>
 
                         </sbx-grid>
                     </md-content>
@@ -107,7 +79,7 @@
                             callbacks="callbacks.logTable"
                             empty-message="Event log is empty">
 
-                            <sbx-grid-column property="created" title="Created" filter="date: yyyy-MM-dd HH:mm:ss.sss">
+                            <sbx-grid-column property="created" title="Created" filter="date: yyyy-MM-dd HH:mm">
                             </sbx-grid-column>
 
                             <sbx-grid-column property="entryType" title="Type">
