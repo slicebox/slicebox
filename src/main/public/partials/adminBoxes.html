@@ -22,25 +22,8 @@
 
                     <sbx-grid-column property="online" title="Status">
                         <sbx-grid-cell>
-                            <md-card class="status" ng-if="rawPropertyValue">
-                                <md-toolbar class="md-primary" layout="row" layout-align="center center">
-                                    <span flex></span>
-                                    <div>
-                                        ONLINE
-                                    </div>
-                                    <span flex></span>
-                                </md-toolbar>
-                            </md-card>
-
-                            <md-card class="status" ng-if="!rawPropertyValue">
-                                <md-toolbar class="md-warn" layout="row" layout-align="center center">
-                                    <span flex></span>
-                                    <div>
-                                        OFFLINE
-                                    </div>
-                                    <span flex></span>
-                                </md-toolbar>
-                            </md-card>
+                            <sbx-chip ng-if="!rawPropertyValue" chip-class="sbx-chip-warn">offline</sbx-chip>
+                            <sbx-chip ng-if="rawPropertyValue">online</sbx-chip>
                         </sbx-grid-cell>
                     </sbx-grid-column>
                 </sbx-grid>

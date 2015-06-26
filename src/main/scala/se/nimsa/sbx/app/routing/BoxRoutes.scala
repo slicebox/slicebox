@@ -91,6 +91,13 @@ trait BoxRoutes { this: RestApi =>
               complete(entries)
           }
         }
+      } ~ path(LongNumber) { inboxEntryId =>
+        delete {
+          onSuccess(boxService.ask(RemoveInboxEntry(inboxEntryId))) {
+            case InboxEntryRemoved(inboxEntryId) =>
+              complete(NoContent)
+          }
+        }
       }
     }
 

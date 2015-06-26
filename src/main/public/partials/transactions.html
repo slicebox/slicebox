@@ -45,17 +45,18 @@
 
                             <sbx-grid-column property="sequenceNumber" title="Progress">
                                 <sbx-grid-cell>
-                                    <progressbar
-                                        type="success"
-                                        max="rowObject.totalImageCount"
-                                        value="rowObject.totalImageCount - rowObject.imagesLeft">
-                                        {{rowObject.totalImageCount - rowObject.imagesLeft}} / {{rowObject.totalImageCount}}
-                                    </progressbar>
+                                    <md-progress-linear md-mode="determinate" ng-value="calculateProgress(rowObject)"></md-progress-linear>
+                                    <p>{{rowObject.totalImageCount - rowObject.imagesLeft}} / {{rowObject.totalImageCount}}</p>
                                 </sbx-grid-cell>
                             </sbx-grid-column>
 
-                            <sbx-grid-column property="failed" title="Failed">
+                            <sbx-grid-column property="failed" title="Status">
+                                <sbx-grid-cell>
+                                    <sbx-chip ng-if="rowObject.failed" chip-class="sbx-chip-warn">Failed</sbx-chip>
+                                    <sbx-chip ng-if="!rowObject.failed">Sending</sbx-chip>
+                                </sbx-grid-cell>
                             </sbx-grid-column>
+
                         </sbx-grid>
                     </md-content>
                 </md-card-content>

@@ -397,7 +397,7 @@ angular.module('slicebox.home', ['ngRoute'])
 
             return showBoxSendTagValuesModal(imageIdToPatientPromise, function(imageTagValuesSeq) {
                 return $http.post('/api/boxes/' + receiverId + '/send', imageTagValuesSeq);
-            });
+            }, "sent", "send");
         });
     }
 
@@ -407,7 +407,7 @@ angular.module('slicebox.home', ['ngRoute'])
 
             return showBoxSendTagValuesModal(imageIdToPatientPromise, function (imageTagValuesSeq) {
                 return $http.post('/api/boxes/' + receiverId + '/send', imageTagValuesSeq);
-            });
+            }, "sent", "send");
         });
     }
 
@@ -422,7 +422,7 @@ angular.module('slicebox.home', ['ngRoute'])
 
             return showBoxSendTagValuesModal(imageIdToPatientPromise, function(imageTagValuesSeq) {
                 return $http.post('/api/boxes/' + receiverId + '/send', imageTagValuesSeq);
-            });
+            }, "sent", "send");
         });
     }
 
@@ -518,7 +518,7 @@ angular.module('slicebox.home', ['ngRoute'])
             });
 
             return allPromise;
-        });
+        }, "anonymized", "anonymize");
     }
 
     function createImageIdToPatientPromiseForPatients(patients) {
@@ -562,14 +562,16 @@ angular.module('slicebox.home', ['ngRoute'])
         });
     }
 
-    function showBoxSendTagValuesModal(imageIdToPatientPromise, actionCallback) {
+    function showBoxSendTagValuesModal(imageIdToPatientPromise, actionCallback, actionStringPastTense, actionString) {
         return $mdDialog.show({
                 templateUrl: '/assets/partials/tagValuesModalContent.html',
                 controller: 'TagValuesCtrl',
                 scope: $scope.$new(),
                 locals: {
                     imageIdToPatient: imageIdToPatientPromise,
-                    actionCallback: actionCallback
+                    actionCallback: actionCallback,
+                    actionStringPastTense: actionStringPastTense,
+                    actionString: actionString
                 }
         });                
     }
@@ -600,7 +602,7 @@ angular.module('slicebox.home', ['ngRoute'])
 
 })
 
-.controller('TagValuesCtrl', function($scope, $mdDialog, $http, imageIdToPatient, actionCallback) {
+.controller('TagValuesCtrl', function($scope, $mdDialog, $http, imageIdToPatient, actionCallback, actionStringPastTense, actionString) {
     // Initialization
     $scope.title = 'Anonymization Options';
 
@@ -649,9 +651,9 @@ angular.module('slicebox.home', ['ngRoute'])
 
         actionPromise.then(function(data) {
             $mdDialog.hide();
-            $scope.showInfoMessage(imageIds.length + " images processed");
+            $scope.showInfoMessage(imageIds.length + " images " + actionStringPastTense);
         }, function(data) {
-            $scope.showErrorMessage('Failed to process images: ' + data);
+            $scope.showErrorMessage('Failed to ' + actionString + ' images: ' + data);
         });
 
         return actionPromise;

@@ -178,8 +178,8 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String, impli
           case GetInbox =>
             val inboxEntries = getInboxFromDb().map { inboxEntry =>
               boxById(inboxEntry.remoteBoxId) match {
-                case Some(box) => InboxEntryInfo(box.name, inboxEntry.transactionId, inboxEntry.receivedImageCount, inboxEntry.totalImageCount)
-                case None      => InboxEntryInfo(inboxEntry.remoteBoxId.toString, inboxEntry.transactionId, inboxEntry.receivedImageCount, inboxEntry.totalImageCount)
+                case Some(box) => InboxEntryInfo(inboxEntry.id, box.name, inboxEntry.transactionId, inboxEntry.receivedImageCount, inboxEntry.totalImageCount)
+                case None      => InboxEntryInfo(inboxEntry.id, inboxEntry.remoteBoxId.toString, inboxEntry.transactionId, inboxEntry.receivedImageCount, inboxEntry.totalImageCount)
               }
             }
             sender ! Inbox(inboxEntries)
@@ -203,6 +203,10 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String, impli
                 removeTransactionTagValuesForTransactionId(outboxEntry.transactionId))
             removeOutboxEntryFromDb(outboxEntryId)
             sender ! OutboxEntryRemoved(outboxEntryId)
+
+          case RemoveInboxEntry(inboxEntryId) =>
+            removeInboxEntryFromDb(inboxEntryId)
+            sender ! InboxEntryRemoved(inboxEntryId)
 
           case GetTransactionTagValues(imageId, transactionId) =>
             sender ! tagValuesForImageIdAndTransactionId(imageId, transactionId)
@@ -359,6 +363,11 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String, impli
   def outboxEntryByTransactionIdAndSequenceNumber(remoteBoxId: Long, transactionId: Long, sequenceNumber: Long): Option[OutboxEntry] =
     db.withSession { implicit session =>
       boxDao.outboxEntryByTransactionIdAndSequenceNumber(remoteBoxId, transactionId, sequenceNumber)
+    }
+
+  def removeInboxEntryFromDb(inboxEntryId: Long) =
+    db.withSession { implicit session =>
+      boxDao.removeInboxEntry(inboxEntryId)
     }
 
   def removeOutboxEntryFromDb(outboxEntryId: Long) =

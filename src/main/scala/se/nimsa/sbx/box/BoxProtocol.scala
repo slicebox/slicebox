@@ -51,10 +51,10 @@ object BoxProtocol {
 
   case class InboxEntry(id: Long, remoteBoxId: Long, transactionId: Long, receivedImageCount: Long, totalImageCount: Long) extends Entity
 
+  case class InboxEntryInfo(id: Long, remoteBoxName: String, transactionId: Long, receivedImageCount: Long, totalImageCount: Long)
+  
   case class ImageTagValues(imageId: Long, tagValues: Seq[TagValue])
   
-  case class InboxEntryInfo(remoteBoxName: String, transactionId: Long, receivedImageCount: Long, totalImageCount: Long)
-
   case class PushImageData(transactionId: Long, sequenceNumber: Long, totalImageCount: Long, dataset: Attributes)
 
   case class TransactionTagValue(id: Long, transactionId: Long, imageId: Long, tagValue: TagValue) extends Entity
@@ -90,7 +90,11 @@ object BoxProtocol {
 
   case object GetOutbox extends BoxRequest
 
+  case class RemoveInboxEntry(inboxEntryId: Long) extends BoxRequest
+  
   case class RemoveOutboxEntry(outboxEntryId: Long) extends BoxRequest
+
+  case class InboxEntryRemoved(inboxEntryId: Long)
 
   case class OutboxEntryRemoved(outboxEntryId: Long)
 

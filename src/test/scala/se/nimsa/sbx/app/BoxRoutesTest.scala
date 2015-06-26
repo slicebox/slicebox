@@ -320,4 +320,34 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
   }
 
+  it should "support removing inbox entries" in {
+    val inboxEntry =
+      db.withSession { implicit session =>
+        boxDao.insertInboxEntry(InboxEntry(-1, 1, 2, 3, 4))
+      }
+
+    DeleteAsUser(s"/api/inbox/${inboxEntry.id}") ~> routes ~> check {
+      status should be (NoContent)
+    }
+    
+    GetAsUser("/api/inbox") ~> routes ~> check {
+      responseAs[List[InboxEntryInfo]].size should be (0) 
+    }
+  }
+  
+  it should "support removing outbox entries" in {
+    val outboxEntry =
+      db.withSession { implicit session =>
+        boxDao.insertOutboxEntry(OutboxEntry(-1, 1, 2, 3, 4, 5, false))
+      }
+
+    DeleteAsUser(s"/api/outbox/${outboxEntry.id}") ~> routes ~> check {
+      status should be (NoContent)
+    }
+    
+    GetAsUser("/api/outbox") ~> routes ~> check {
+      responseAs[List[OutboxEntryInfo]].size should be (0) 
+    }
+  }
+  
 }
