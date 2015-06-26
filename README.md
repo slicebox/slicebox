@@ -53,7 +53,7 @@ We provide two types of installers, either a zip-file suitable for installation 
 
 * Download a zipped distribution of slicebox from [Bintray](https://bintray.com/slicebox/slicebox/installers/_latestVersion).
 * Unzip onto a suitable server computer. Any computer which is always on and which has a fixed (local or public) IP address will do.
-* Configure the service by editing [conf/slicebox.conf](./src/main/resources/application.conf). In particular, the administrator (superuser) username and password can be configured along with the hostname and port of the service, and paths to the database and file storage. The `slicebox.conf` file reads and appends a second configuration file called `my-slicebox.conf`, if present. A neat way of preserving the reference configuation in `slicebox.conf` is to create a file called `my-slicebox.conf` and place it in the same directory as `slicebox.conf`. Include those configurations you wish to change in this this file, they will override the reference settings.
+* Configure the service by editing [conf/slicebox.conf](./src/main/resources/slicebox.conf). In particular, the administrator (superuser) username and password can be configured along with the hostname and port of the service, and paths to the database and file storage. 
 * The `bin` folder contains start scripts for Windows and Linux/Unix/Mac OS.
 
 ### Windows - running Slicebox as a scheduled task
@@ -86,37 +86,13 @@ The service can be controlled using commands such as `sudo restart slicebox`, `s
 During the installation a user and group named slicebox is created, as indicated in the table above. The service is run using this user, which means that files created by slicebox (such as the database files and stored DICOM files) must reside in a directory in which the slicebox user has the necessary permissions. Upon installation, the default settings in `/etc/slicebox/slicebox.conf` point to the installation directory itself, which is owned by root. This means that slicebox will not run correclty (there will be a log error message indicating this). We suggest the following changes:
 
 * Create a directory `/var/slicebox` owned by the slicebox user and group. 
-* Add a configuration file called `my-slicebox.conf` next to the reference configuration file `/etc/slicebox/slicebox.conf`. Add the following settings to this file:
+* Change the following settings in the config file `/etc/slicebox/slicebox.conf`:
    * `slicebox.dicom-files.path = "/var/slicebox/dicom-files"`
    * `slicebox.database.path = "/var/slicebox/slicebox"`
-* Add any other changes to the reference configuration you wish to make. You probably wish to override `http.host`, `http.port`, `slicebox.superuser.user` and `slicebox.superuser.password`.
+* Make other applicable changes to the configuration. You probably wish to override `http.host`, `http.port`, `slicebox.superuser.user` and `slicebox.superuser.password`.
 * Restart slicebox using `sudo restart slicebox`
 * The service should now be available at your specified host name and port number. Check the log to make sure the service is running as intended.
 
-A complete example of the file `my-slicebox.conf` for Linux is given below.
-
-```
-http {
-	host = "localhost" // or the ip/hostname of your site
-	port = 5000
-}
-
-slicebox {
-	dicom-files {
-		path = "/var/slicebox"
-	}
-
-	database {
-		path = "/var/slicebox/slicebox"
-	}
-	  
-	superuser {
-		user = "admin"
-		password = "secret"
-	}
-
-}
-```
 
 ### Installation notes
 
