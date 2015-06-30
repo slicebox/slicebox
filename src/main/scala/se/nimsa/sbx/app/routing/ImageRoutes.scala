@@ -65,7 +65,9 @@ trait ImageRoutes { this: RestApi =>
               val file = storage.resolve(imageFile.fileName.value).toFile
               if (file.isFile && file.canRead)
                 detach() {
-                  complete(HttpEntity(ContentTypes.`application/octet-stream`, HttpData(file)))
+                  autoChunk(5000000) {
+                    complete(HttpEntity(ContentTypes.`application/octet-stream`, HttpData(file)))
+                  }
                 }
               else
                 complete((BadRequest, "Dataset could not be read"))

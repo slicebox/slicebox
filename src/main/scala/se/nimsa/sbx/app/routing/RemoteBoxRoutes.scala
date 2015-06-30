@@ -94,10 +94,12 @@ trait RemoteBoxRoutes { this: RestApi =>
                                   onSuccess(anonymizationService.ask(Anonymize(dataset, transactionTagValues.map(_.tagValue)))) {
                                     case anonymizedDataset: Attributes =>
                                       val bytes = toByteArray(anonymizedDataset)
-                                      complete(HttpEntity(ContentTypes.`application/octet-stream`, HttpData(bytes)))
+                                      autoChunk(5000000) {
+                                        complete(HttpEntity(ContentTypes.`application/octet-stream`, HttpData(bytes)))
+                                      }
                                   }
                                 case None =>
-                                  
+
                                   complete((NotFound, s"File not found for image id ${outboxEntry.imageId}"))
                               }
                             }
