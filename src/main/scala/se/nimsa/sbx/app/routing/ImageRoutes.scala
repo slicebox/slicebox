@@ -16,27 +16,35 @@
 
 package se.nimsa.sbx.app.routing
 
+import java.nio.file.Files
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
+import scala.concurrent.Future
+import scala.concurrent.duration.DurationInt
+import org.dcm4che3.data.Attributes
+import akka.actor.Props
+import akka.actor.Actor
 import akka.pattern.ask
-import spray.http.ContentTypes
+import se.nimsa.sbx.anonymization.AnonymizationProtocol._
+import se.nimsa.sbx.anonymization.AnonymizationUtil
+import se.nimsa.sbx.app.AuthInfo
+import se.nimsa.sbx.app.RestApi
+import se.nimsa.sbx.dicom.DicomUtil
+import se.nimsa.sbx.storage.StorageProtocol._
 import spray.http.FormFile
 import spray.http.HttpData
 import spray.http.HttpEntity
-import spray.http.MediaTypes
-import spray.http.StatusCodes.BadRequest
-import spray.http.StatusCodes.NotFound
-import spray.http.StatusCodes.Created
-import spray.http.StatusCodes.NoContent
-import spray.routing._
-import se.nimsa.sbx.app.RestApi
-import se.nimsa.sbx.storage.StorageProtocol._
-import se.nimsa.sbx.anonymization.AnonymizationProtocol._
-import se.nimsa.sbx.dicom.DicomUtil
-import se.nimsa.sbx.app.AuthInfo
-import se.nimsa.sbx.dicom.DicomHierarchy.Image
-import org.dcm4che3.data.Attributes
-import se.nimsa.sbx.anonymization.AnonymizationUtil
+import spray.http.MediaTypes._
+import spray.http.StatusCodes._
+import spray.routing.Route
+import spray.http.MediaType
+import java.nio.file.Paths
+import java.nio.file.Path
 
 trait ImageRoutes { this: RestApi =>
+
+  val chunkSize = 524288
+  val bufferSize = chunkSize
 
   def imageRoutes(authInfo: AuthInfo): Route =
     pathPrefix("images") {
@@ -58,91 +66,93 @@ trait ImageRoutes { this: RestApi =>
             }
           }
         }
-      } ~ path(LongNumber) { imageId =>
-        get {
-          onSuccess(storageService.ask(GetImageFile(imageId)).mapTo[Option[ImageFile]]) {
-            case imageFileMaybe => imageFileMaybe.map(imageFile => {
-              val file = storage.resolve(imageFile.fileName.value).toFile
-              if (file.isFile && file.canRead)
-                detach() {
-                  autoChunk(5000000) {
-                    complete(HttpEntity(ContentTypes.`application/octet-stream`, HttpData(file)))
-                  }
-                }
-              else
-                complete((BadRequest, "Dataset could not be read"))
-            }).getOrElse {
-              complete((NotFound, s"No file found for image id $imageId"))
-            }
-          }
-        } ~ delete {
-          onSuccess(storageService.ask(DeleteImage(imageId))) {
-            case ImageDeleted(imageId) =>
-              complete(NoContent)
-          }
-        }
-      } ~ path(LongNumber / "attributes") { imageId =>
-        get {
-          onSuccess(storageService.ask(GetImageAttributes(imageId)).mapTo[Option[List[ImageAttribute]]]) {
-            import spray.httpx.SprayJsonSupport._
-            complete(_)
-          }
-        }
-      } ~ path(LongNumber / "imageinformation") { imageId =>
-        get {
-          onSuccess(storageService.ask(GetImageInformation(imageId)).mapTo[Option[ImageInformation]]) {
-            import spray.httpx.SprayJsonSupport._
-            complete(_)
-          }
-        }
-      } ~ path(LongNumber / "anonymize") { imageId =>
-        post {
-          import spray.httpx.SprayJsonSupport._
-          entity(as[Seq[TagValue]]) { tagValues =>
+      } ~ pathPrefix(LongNumber) { imageId =>
+        pathEndOrSingleSlash {
+          get {
             onSuccess(storageService.ask(GetImageFile(imageId)).mapTo[Option[ImageFile]]) {
-              _ match {
-                case Some(imageFile) =>
-                  onSuccess(storageService.ask(GetDataset(imageId)).mapTo[Option[Attributes]]) {
-                    _ match {
-
-                      case Some(dataset) =>
-                        AnonymizationUtil.setAnonymous(dataset, false) // pretend not anonymized to force anonymization
-                        onSuccess(anonymizationService.ask(Anonymize(dataset, tagValues)).mapTo[Attributes]) { anonDataset =>
-                          onSuccess(storageService.ask(DeleteImage(imageId))) {
-                            case ImageDeleted(imageId) =>
-                              onSuccess(storageService.ask(AddDataset(anonDataset, imageFile.sourceType, imageFile.sourceId))) {
-                                case ImageAdded(image) =>
-                                  complete(NoContent)
-                              }
-                          }
-                        }
-
-                      case None =>
-                        complete(NotFound)
+              case imageFileMaybe => imageFileMaybe.map(imageFile => {
+                val path = storage.resolve(imageFile.fileName.value)
+                if (Files.isRegularFile(path) && Files.isReadable(path))
+                  detach() {
+                    autoChunk(chunkSize) {
+                      complete(HttpEntity(`application/octet-stream`, HttpData(path.toFile)))
                     }
                   }
-
-                case None =>
-                  complete(NotFound)
+                else
+                  complete((BadRequest, "Dataset could not be read"))
+              }).getOrElse {
+                complete((NotFound, s"No file found for image id $imageId"))
               }
             }
+          } ~ delete {
+            onSuccess(storageService.ask(DeleteImage(imageId))) {
+              case ImageDeleted(imageId) =>
+                complete(NoContent)
+            }
           }
-        }
-      } ~ path(LongNumber / "png") { imageId =>
-        parameters(
-          'framenumber.as[Int] ? 1,
-          'windowmin.as[Int] ? 0,
-          'windowmax.as[Int] ? 0,
-          'imageheight.as[Int] ? 0) { (frameNumber, min, max, height) =>
-            get {
-              onSuccess(storageService.ask(GetImageFrame(imageId, frameNumber, min, max, height)).mapTo[Option[Array[Byte]]]) {
+        } ~ path("attributes") {
+          get {
+            onSuccess(storageService.ask(GetImageAttributes(imageId)).mapTo[Option[List[ImageAttribute]]]) {
+              import spray.httpx.SprayJsonSupport._
+              complete(_)
+            }
+          }
+        } ~ path("imageinformation") {
+          get {
+            onSuccess(storageService.ask(GetImageInformation(imageId)).mapTo[Option[ImageInformation]]) {
+              import spray.httpx.SprayJsonSupport._
+              complete(_)
+            }
+          }
+        } ~ path("anonymize") {
+          post {
+            import spray.httpx.SprayJsonSupport._
+            entity(as[Seq[TagValue]]) { tagValues =>
+              onSuccess(storageService.ask(GetImageFile(imageId)).mapTo[Option[ImageFile]]) {
                 _ match {
-                  case Some(bytes) => complete(HttpEntity(MediaTypes.`image/png`, HttpData(bytes)))
-                  case None        => complete(NotFound)
+                  case Some(imageFile) =>
+                    onSuccess(storageService.ask(GetDataset(imageId)).mapTo[Option[Attributes]]) {
+                      _ match {
+
+                        case Some(dataset) =>
+                          AnonymizationUtil.setAnonymous(dataset, false) // pretend not anonymized to force anonymization
+                          onSuccess(anonymizationService.ask(Anonymize(dataset, tagValues)).mapTo[Attributes]) { anonDataset =>
+                            onSuccess(storageService.ask(DeleteImage(imageId))) {
+                              case ImageDeleted(imageId) =>
+                                onSuccess(storageService.ask(AddDataset(anonDataset, imageFile.sourceType, imageFile.sourceId))) {
+                                  case ImageAdded(image) =>
+                                    complete(NoContent)
+                                }
+                            }
+                          }
+
+                        case None =>
+                          complete(NotFound)
+                      }
+                    }
+
+                  case None =>
+                    complete(NotFound)
                 }
               }
             }
           }
+        } ~ path("png") {
+          parameters(
+            'framenumber.as[Int] ? 1,
+            'windowmin.as[Int] ? 0,
+            'windowmax.as[Int] ? 0,
+            'imageheight.as[Int] ? 0) { (frameNumber, min, max, height) =>
+              get {
+                onSuccess(storageService.ask(GetImageFrame(imageId, frameNumber, min, max, height)).mapTo[Option[Array[Byte]]]) {
+                  _ match {
+                    case Some(bytes) => complete(HttpEntity(`image/png`, HttpData(bytes)))
+                    case None        => complete(NotFound)
+                  }
+                }
+              }
+            }
+        }
       } ~ pathPrefix("anonymizationkeys") {
         pathEndOrSingleSlash {
           get {
@@ -167,7 +177,82 @@ trait ImageRoutes { this: RestApi =>
             }
           }
         }
+      } ~ path("export") {
+        post {
+          import spray.httpx.SprayJsonSupport._
+          entity(as[Seq[Long]]) { imageIds =>
+
+            if (imageIds.isEmpty)
+              complete(NoContent)
+            else
+              onSuccess(createTempZipFile(imageIds)) { file =>
+                detach() {
+                  autoChunk(chunkSize) {
+                    complete(HttpEntity(`application/zip`, HttpData(file.toFile)))
+                  }
+                }
+              }
+          }
+        }
+      }
+    }
+
+  def createTempZipFile(imageIds: Seq[Long]): Future[Path] = {
+    val futurePaths = Future.sequence(imageIds.map(imageId =>
+      storageService.ask(GetImageFile(imageId)).mapTo[Option[ImageFile]]))
+      .map(_
+        .flatten
+        .map(imageFile => storage.resolve(imageFile.fileName.value))
+        .filter(file => Files.isRegularFile(file) && Files.isReadable(file)))
+
+    futurePaths.map(paths => {
+      val tempFile = Files.createTempFile("slicebox-export-", ".zip")
+
+      val fos = Files.newOutputStream(tempFile)
+      val zos = new ZipOutputStream(fos);
+
+      paths.foreach(path => addToZipFile(path.toString, zos))
+
+      zos.close
+      fos.close
+
+      scheduleDeleteTempFile(tempFile)
+
+      tempFile
+    })
+  }
+
+  def addToZipFile(fileName: String, zos: ZipOutputStream): Unit = {
+    val path = Paths.get(fileName)
+    val is = Files.newInputStream(path)
+    val zipEntry = new ZipEntry(path.getFileName.toString + ".dcm")
+    zos.putNextEntry(zipEntry)
+
+    val bytes = new Array[Byte](bufferSize)
+    var bytesLeft = true
+    while (bytesLeft) {
+      val length = is.read(bytes)
+      bytesLeft = length > 0
+      if (bytesLeft) zos.write(bytes, 0, length)
+    }
+
+    zos.closeEntry
+    is.close
+  }
+
+  def scheduleDeleteTempFile(tempFile: Path) =
+    actorRefFactory.actorOf {
+      Props {
+        new Actor {
+          context.system.scheduler.scheduleOnce(12.hours, self, tempFile)
+          def receive = {
+            case file: Path =>
+              Files.deleteIfExists(file)
+              context.stop(self)
+          }
+        }
       }
     }
 
 }
+
