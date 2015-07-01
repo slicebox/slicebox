@@ -732,7 +732,10 @@
         ],
         "responses": {
           "200": {
-            "description": "binary data of dataset"
+            "description": "binary data of dataset",
+            "schema": {
+              "type": "file"
+            }
           },
           "400": {
             "description": "if no dataset could be found or read for the image corresponding to the supplied image ID"
@@ -998,6 +1001,37 @@
         "responses": {
           "204": {
             "description": "anonymization key deleted"
+          }
+        }
+      }
+    },
+
+    "/images/export": {
+      "post": {
+        "description": "download the selected images as a zip archive",
+        "tags": ["Images"],
+        "parameters": [
+          {
+            "name": "image ids",
+            "in": "body",
+            "description": "ids of images to export",
+            "required": true,
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "if the supplied list of image ids is empty or no if images could be found"
+          },
+          "200": {
+            "description": "zip archive of images",
+            "schema": {
+              "type": "file"
+            }
           }
         }
       }
