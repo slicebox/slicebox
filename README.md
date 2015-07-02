@@ -136,7 +136,12 @@ The Matlab integration uses the REST API to connect to an instance of slicebox. 
 
 The Matlab files are not included in the universal zip package. To use these files you must clone the repository where the files can be found in /src/main/matlab/. Matlab 2015a or later is required to use these scripts.
 
-For more detailed descriptions of file usage and usage examples, see /src/main/matlab/README, or the comments in the function files.
+For more detailed descriptions of file usage and usage examples, see [./src/main/matlab/README](matlab/README.txt), or the comments in the function files.
+
+### Getting started
+* Clone the repository and find the files in [./src/main/matlab](src/main/matlab/).
+* Edit the [./src/main/matlab/sbxsettings.conf](sbxsettings.conf). The file only contains two options, an url to an instance of slicebox (defaults to localhost:5000) and the path to a cache directory where dicom files and some offline data will be saved to allow offline usage of the GUI.
+* Start SBXGui_osx in Matlab 2015a or later. Normal usage is SBXGui_osx(username, password), but other options can be entered as well, see the readme.
 
 API
 ---
