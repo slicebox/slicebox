@@ -10,8 +10,8 @@ try
     unsorteddatasets = webread(url, sbxdata.weboptions);
     datasets = cell(size(unsorteddatasets));
     for i = 1:numel(unsorteddatasets)
-        z = str2double(imagedata(i).instanceNumber.value);
-        datasets{z} = unsorteddatasets{i};
+        z = str2double(unsorteddatasets(i).instanceNumber.value);
+        datasets{z} = unsorteddatasets(i);
     end
     seriesfile = fullfile(sbxdata.cachepath, ['seriesdata', num2str(seriesid)]);
     %fprintf('saving %s\n', seriesfile);

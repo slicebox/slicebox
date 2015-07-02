@@ -1,7 +1,7 @@
-function varargout = SBXGui(varargin)
-% SBXGUI Provides a simple gui to select and download dicom images from a
-% slicebox server.
-%      [I, dcminfo] = SBXGUI(username, password) Launches the gui, which
+function varargout = SBXGui_osx(varargin)
+% SBXGUI_OSX Provides a simple gui to select and download dicom images from a
+% slicebox server. Works best using OSX.
+%      [I, dcminfo] = SBXGUI_OSX(username, password) Launches the gui, which
 %      provides a simple way to select and download dicom files from a
 %      slicebox server. If no sbxsettings.conf exists, the options'url', and
 %      'cachepath' must also be specified.
@@ -11,8 +11,8 @@ function varargout = SBXGui(varargin)
 gui_Singleton = 1;
 gui_State = struct('gui_Name',       mfilename, ...
                    'gui_Singleton',  gui_Singleton, ...
-                   'gui_OpeningFcn', @SBXGui_OpeningFcn, ...
-                   'gui_OutputFcn',  @SBXGui_OutputFcn, ...
+                   'gui_OpeningFcn', @SBXGui_osx_OpeningFcn, ...
+                   'gui_OutputFcn',  @SBXGui_osx_OutputFcn, ...
                    'gui_LayoutFcn',  [] , ...
                    'gui_Callback',   []);
 if nargin && ischar(varargin{1})
@@ -27,8 +27,8 @@ end
 % End initialization code - DO NOT EDIT
 
 
-% --- Executes just before SBXGui is made visible.
-function SBXGui_OpeningFcn(hObject, eventdata, handles, varargin)
+% --- Executes just before SBXGui_osx is made visible.
+function SBXGui_osx_OpeningFcn(hObject, eventdata, handles, varargin)
 % Create the sbxdata object and fetch the flattened database image.
 sbxdata = makesbxdata(varargin{:});
 flatseries = sbxgetflatseries(sbxdata);
@@ -48,6 +48,8 @@ end
 handles.sbxdata = sbxdata;
 handles.patients = patients;
 handles.flatseries = flatseries;
+handles.isBusy = false;
+handles.closeReason = 1;
 
 patientTable = handles.patientTable;
 data = cell(length(patients), 4);
@@ -59,12 +61,12 @@ set(patientTable, 'Data', data);
 % Update handles structure
 guidata(hObject, handles);
 
-% UIWAIT makes SBXGui wait for user response (see UIRESUME)
+% UIWAIT makes SBXGui_osx wait for user response (see UIRESUME)
 uiwait(handles.sbxgui);
 
 % If a series has been selected, return the image and dicom info.
 % Otherwise, return empty cells.
-function varargout = SBXGui_OutputFcn(hObject, eventdata, handles)
+function varargout = SBXGui_osx_OutputFcn(hObject, eventdata, handles)
 if(handles.closeReason == 0)
     varargout{1} = handles.image;
     varargout{2} = handles.dcminfo;
@@ -109,14 +111,14 @@ if(~isempty(eventdata.Indices))
     row = eventdata.Indices(1);
     seriesData = get(hObject,'Data');
     seriesId = seriesData{row,1};
-    isBusy(true);
+    setBusy(true, handles);
     seriesinfo = sbxgetimageinfo(seriesId, handles.sbxdata);
-    isBusy(false);
+    setBusy(false, handles);
     handles.seriesinfo = seriesinfo;
     
     infotext = handles.infotext;
-    textdata = sprintf('Number of Slices: %d\nType: %s',length(seriesinfo),...
-        seriesinfo(1).imageType.value);
+    textdata = sprintf('Number of Slices: %d\nType: %s',numel(seriesinfo),...
+        seriesinfo{1}.imageType.value);
     set(infotext, 'String', textdata);
 else
     infotext = handles.infotext;
@@ -132,9 +134,10 @@ function loadButton_Callback(hObject, eventdata, handles)
 if(isfield(handles, 'seriesinfo'))
     % add stuff from
     % http://undocumentedmatlab.com/blog/animated-busy-spinning-icon here
-    setBusy(true);
+    setBusy(true, handles);
+    pause(.1);
     [image, dcminfo] = sbxreadimages(handles.seriesinfo, handles.sbxdata);
-    setBusy(false);
+    setBusy(false, handles);
     handles.image = image;
     handles.dcminfo = dcminfo;
     handles.closeReason = 0;
@@ -144,13 +147,11 @@ else
     error('You must select a series to load!');
 end
 
-function deleteButton_Callback(hObject, eventdata, handles)
-% When clicked, remove all cached series data from local storage.
-
 function cancelButton_Callback(hObject, eventdata, handles)
 handles.closeReason = 1;
 guidata(handles.sbxgui, handles);
 close(handles.sbxgui);
+
 
 function sbxgui_CloseRequestFcn(hObject, eventdata, handles)
 
@@ -160,23 +161,23 @@ if isequal(get(hObject, 'waitstatus'), 'waiting')
 else
     % The GUI is no longer waiting, just close it
     delete(hObject);
+%     if(handles.closeReason == 1)
+%         ME = MException('SBX:gui:GuiCancelled', 'Selection of images aborted');
+%         throw(ME);
+%     end
 end
 
 function setBusy(busy, handles)
 if busy
     handles.isBusy = true;
-    set(handles.figure1, 'pointer', 'clock');
+    set(handles.sbxgui, 'pointer', 'watch');
     set(handles.loadButton, 'Enable', 'off');
-    set(handles.reloadButton, 'Enable', 'off');
-    set(handles.deleteButton, 'Enable', 'off');
     set(handles.cancelButton, 'Enable', 'off');
     guidata(handles.sbxgui, handles);
 else
     handles.isBusy = false;
-    set(handles.figure1, 'pointer', 'arrow');
+    set(handles.sbxgui, 'pointer', 'arrow');
     set(handles.loadButton, 'Enable', 'on');
-    set(handles.reloadButton, 'Enable', 'on');
-    set(handles.deleteButton, 'Enable', 'on');
     set(handles.cancelButton, 'Enable', 'on');
     guidata(handles.sbxgui, handles);
 end

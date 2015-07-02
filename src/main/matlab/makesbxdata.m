@@ -3,21 +3,21 @@ function sbxdata = makesbxdata(username, password, varargin)
 %
 %   sbxdata = MAKESBXDATA(username, password) Creates an sbxdata object
 %       using username and password to connect to the server. The rest of 
-%       the parameters are read from the file 'sbxconf.settings'.
+%       the parameters are read from the file 'sbxsettings.conf'.
 %
 %   sbxdata = MAKESBXDATA(username, password, url, cachepath) In case no
-%       'sbxconf.settings' file exists, the parameters 'url' and 
+%       'sbxsettings.conf' file exists, the parameters 'url' and 
 %       'cachepath' are required.
 %
 %   sbxdata = MAKESBXDATA(_, Name, Value) Specify the 'url' or 'cachepath'
-%       to overwrite the parameters from 'sbxconf.settings'.
+%       to overwrite the parameters from 'sbxsettings.conf'.
 
 sbxdata = struct;
 p = inputParser;
 %If settings file exist, use contents as default. Otherwise, require url
 %and cachepath.
-if (exist('sbxconf.settings', 'file') == 2)
-    sbxconf = fopen('sbxconf.settings');
+if (exist('sbxsettings.conf', 'file') == 2)
+    sbxconf = fopen('sbxsettings.conf');
     cells = textscan(sbxconf,'%s %s','delimiter','=');
     fclose(sbxconf);
     names = cells{1};
