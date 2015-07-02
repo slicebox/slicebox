@@ -11,7 +11,7 @@ For more in depth usage documatation, read the in-file comments.
 
 		sbxreadseries -- will download the images and their dicom headers of the specified series. The images will be saved in the cache directory, if not already present. If present, the images will be read from the cache instead.
 
-		SBXGui -- provides a simple gui to select and download images from a slicebox server. Start the gui, providing a username and password, select a patient in the upper table and then select a series in the bottom table. Press Load to download the images. The GUI will terminate when all the images have been downloaded. The images will be saved in the cache directory, if not already present. If present, the images will be read from the cache instead.
+		SBXGui_osx -- provides a simple gui to select and download images from a slicebox server. Start the gui, providing a username and password, select a patient in the upper table and then select a series in the bottom table. Press Load to download the images. The GUI will terminate when all the images have been downloaded. The images will be saved in the cache directory, if not already present. If present, the images will be read from the cache instead. This GUI works best with OSX, but can be used with other OSes as well. You will find that when used with a different os, the font size will be slightly too large.
 
 --- Example Usage ---
 There are three ways of retrieving images. In all three cases, a sbxdata object must first be created, like so:
