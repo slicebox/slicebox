@@ -132,7 +132,7 @@ Integration with Applications
 Integration with Matlab
 -----------------------
 
-The Matlab integration uses the REST API to connect to an instance of slicebox. Several scripts and are provided which can be used to retrieve image information and dicom files. There is also a simple GUI which can list patients and series, show some very basic image information and can be used to retrieve images. Note that the GUI is created using Matlab for OSX, which limits it's usefulness on other OS due to differences in font size etc.
+The Matlab integration uses the REST API to connect to an instance of slicebox. Several scripts and are provided which can be used to retrieve image information and dicom files. There is also a simple GUI which can list patients and series, show some very basic image information and can be used to retrieve images. Note that the GUI is created using Matlab for OSX, which limits its usefulness on other OS due to differences in font size etc.
 
 The Matlab files are not included in the universal zip package. To use these files you must clone the repository where the files can be found in /src/main/matlab/. Matlab 2015a or later is required to use these scripts.
 
