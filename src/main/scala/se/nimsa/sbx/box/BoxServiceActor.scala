@@ -333,10 +333,10 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String, impli
 
   def sendImages(remoteBoxId: Long, imageTagValuesSeq: Seq[ImageTagValues]) = {
     val transactionId = generateTransactionId()
-    addOutboxEntries(remoteBoxId, transactionId, imageTagValuesSeq.map(_.imageId))
     imageTagValuesSeq.foreach(imageTagValues =>
       imageTagValues.tagValues.foreach(tagValue =>
-        addTagValue(transactionId, imageTagValues.imageId, tagValue.tag, tagValue.value)))
+        addTagValue(transactionId, imageTagValues.imageId, tagValue)))
+    addOutboxEntries(remoteBoxId, transactionId, imageTagValuesSeq.map(_.imageId))
   }
 
   def addOutboxEntries(remoteBoxId: Long, transactionId: Long, imageIds: Seq[Long]): Unit = {
@@ -349,10 +349,10 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String, impli
     }
   }
 
-  def addTagValue(transactionId: Long, imageId: Long, tag: Int, value: String) =
+  def addTagValue(transactionId: Long, imageId: Long, tagValue: TagValue) =
     db.withSession { implicit session =>
       boxDao.insertTransactionTagValue(
-        TransactionTagValue(-1, transactionId, imageId, TagValue(tag, value)))
+        TransactionTagValue(-1, transactionId, imageId, tagValue))
     }
 
   def outboxEntryById(outboxEntryId: Long): Option[OutboxEntry] =
