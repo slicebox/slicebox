@@ -79,10 +79,13 @@ class BoxPollActor(box: Box,
     sendRequestToRemoteBoxPipeline(Get(s"${box.baseUrl}/outbox?transactionid=${remoteOutboxEntry.transactionId}&sequencenumber=${remoteOutboxEntry.sequenceNumber}"))
 
   // We don't need to wait for done message to be sent since it is not critical that it is received by the remote box
-  def sendRemoteOutboxFileCompleted(remoteOutboxEntry: OutboxEntry): Unit =
+  def sendRemoteOutboxFileCompleted(remoteOutboxEntry: OutboxEntry): Future[HttpResponse] =
     marshal(remoteOutboxEntry) match {
-      case Right(entity) => sendRequestToRemoteBoxPipeline(Post(s"${box.baseUrl}/outbox/done", entity))
-      case Left(e)       => log.error(e, s"Failed to send done message to remote box (${box.name},${remoteOutboxEntry.transactionId},${remoteOutboxEntry.sequenceNumber})")
+      case Right(entity) => 
+        sendRequestToRemoteBoxPipeline(Post(s"${box.baseUrl}/outbox/done", entity))
+      case Left(e)       => 
+        SbxLog.error("Box", s"Failed to send done message to remote box (${box.name},${remoteOutboxEntry.transactionId},${remoteOutboxEntry.sequenceNumber})")
+        Future.failed(e)
     }
 
   val poller = system.scheduler.schedule(pollInterval, pollInterval) {
@@ -121,8 +124,9 @@ class BoxPollActor(box: Box,
   def waitForFileFetchedState: PartialFunction[Any, Unit] = LoggingReceive {
     case RemoteOutboxFileFetched(remoteOutboxEntry) =>
       updateInbox(box.id, remoteOutboxEntry.transactionId, remoteOutboxEntry.sequenceNumber, remoteOutboxEntry.totalImageCount)
-      sendRemoteOutboxFileCompleted(remoteOutboxEntry)
-      context.unbecome
+      sendRemoteOutboxFileCompleted(remoteOutboxEntry).foreach { response =>
+        pollRemoteBox()
+      }
 
     case FetchFileFailed(exception) =>
       SbxLog.error("Box", s"Failed to fetch file from box ${box.name}: " + exception.getMessage)

@@ -152,9 +152,9 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
         })
       }
 
-      // Check that done message is sent
+      // Check that poll + get image + done + poll message is sent
 
-      capturedRequests.size should be(3)
+      capturedRequests.size should be(4)
       capturedRequests(2).uri.toString() should be(s"$remoteBoxBaseUrl/outbox/done")
     }
 
