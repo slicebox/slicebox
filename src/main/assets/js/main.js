@@ -11,6 +11,7 @@ angular.module('slicebox', [
     'slicebox.utils',
     'slicebox.directives',
     'slicebox.login',
+    'slicebox.import',
     'slicebox.home',
     'slicebox.anonymization',
     'slicebox.transactions',
