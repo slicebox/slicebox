@@ -6,23 +6,24 @@
 
             <div flex>
 
-                <md-card>
-                    <md-card-content>
+                <div ngf-drop ngf-change="import($files)" 
+                     class="import-drop-box-container" 
+                     ngf-drag-over-class="import-drop-box-dragover" 
+                     ngf-multiple="true" 
+                     ngf-allow-dir="true"> 
+                    <div layout="row" layout-align="center center" style="height: 300px"> 
+                        <h3>Drop DICOM files or folders here</h3>
+                    </div>
+                </div>
+                
+                <div ngf-no-file-drop>Drag/Drop is not supported for this browser</div>
 
-                        <div ngf-drop ngf-change="import($files)" 
-                             class="import-drop-box-container" 
-                             ngf-drag-over-class="import-drop-box-dragover" 
-                             ngf-multiple="true" 
-                             ngf-allow-dir="true"> 
-                            <div layout="row" layout-align="center center" style="height: 300px"> 
-                                <h3>Drop DICOM files or folders here</h3>
-                            </div>
-                        </div>
-                        
-                        <div ngf-no-file-drop>Drag/Drop is not supported for this browser</div>
+                <div layout="row">
+                    <div flex="33">
 
-                        <div layout="row">
-                            <div flex="50">
+                        <md-card>
+                            <md-card-content>
+
                                 <h4>Imported files</h4>
                                 
                                 <sbx-grid
@@ -35,8 +36,15 @@
                                 
                                 </sbx-grid>
 
-                            </div>
-                            <div flex="50">
+                            </md-card-content>
+                        </md-card>
+
+                    </div>
+                    <div flex="66">
+
+                        <md-card>
+                            <md-card-content>
+
                                 <h4>Rejected files</h4>                                
 
                                 <sbx-grid
@@ -51,12 +59,11 @@
                                 
                                 </sbx-grid>
 
-                            </div>
-                        </div>
+                            </md-card-content>
+                        </md-card>
 
-
-                    </md-card-content>
-                </md-card>
+                    </div>
+                </div>
 
             </div>
         </div>

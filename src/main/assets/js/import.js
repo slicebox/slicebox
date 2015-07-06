@@ -28,7 +28,8 @@ angular.module('slicebox.import', ['ngRoute', 'ngFileUpload'])
                     importedFiles.push({ name: config.file.name });
                     $scope.callbacks.importedFilesTable.reset();
                 }).error(function (message, status, headers, config) {
-                    rejectedFiles.push({ name: config.file.name, status: status, message: message });
+                    var errorMessage = status === 400 ? "Not a valid DICOM file" : message;
+                    rejectedFiles.push({ name: config.file.name, status: status, message: errorMessage });
                     $scope.callbacks.rejectedFilesTable.reset();
                 });
             });
