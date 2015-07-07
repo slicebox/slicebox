@@ -26,6 +26,10 @@ angular.module('slicebox.home', ['ngRoute'])
             {
                 name: 'Anonymize',
                 action: confirmAnonymizePatients
+            },
+            {
+                name: 'Export',
+                action: confirmExportPatients
             }
         ];
 
@@ -42,6 +46,10 @@ angular.module('slicebox.home', ['ngRoute'])
             {
                 name: 'Anonymize',
                 action: confirmAnonymizeStudies
+            },
+            {
+                name: 'Export',
+                action: confirmExportStudies
             }
         ];
 
@@ -63,6 +71,10 @@ angular.module('slicebox.home', ['ngRoute'])
             {
                 name: 'Anonymize',
                 action: confirmAnonymizeSeries
+            },
+            {
+                name: 'Export',
+                action: confirmExportSeries
             }
         ];
 
@@ -575,6 +587,49 @@ angular.module('slicebox.home', ['ngRoute'])
                 }
         });                
     }
+
+    function confirmExportPatients(patients) {
+        openConfirmActionModal('Export', 'This will export ' + patients.length + ' patient(s) as a zip archive. Proceed?', 'Ok', function() {
+            var images = sbxMetaData.imagesForPatients(patients);
+            return exportImages(images);
+        });
+    }
+
+    function confirmExportStudies(studies) {
+        openConfirmActionModal('Export', 'This will export ' + studies.length + ' study(s) as a zip archive. Proceed?', 'Ok', function() {
+            var images = sbxMetaData.imagesForStudies(studies);
+            return exportImages(images);
+        });
+    } 
+
+    function confirmExportSeries(series) {
+        openConfirmActionModal('Export', 'This will export ' + series.length + ' series as a zip archive. Proceed?', 'Ok', function() {
+            var images = sbxMetaData.imagesForSeries(series);
+            return exportImages(images);
+        });
+    }
+
+    function exportImages(imagesPromise) {
+        return imagesPromise.then(function(images) {
+            var imageIds = images.map(function(image) {
+                return image.id;
+            });
+            return $http({
+                url: '/api/images/export',
+                method: "POST",
+                data: imageIds,
+                headers: {
+                   'Content-type': 'application/json'
+                },
+                responseType: 'arraybuffer'
+            }).success(function (data, status, headers, config) {
+                var blob = new Blob([data], {type: "application/zip"});
+                var objectUrl = URL.createObjectURL(blob);
+                window.open(objectUrl);
+            });        
+        });
+    }
+
 })
 
 .controller('SelectReceiverModalCtrl', function($scope, $mdDialog, $http, receiversUrl, receiverSelectedCallback) {

@@ -181,7 +181,6 @@ trait ImageRoutes { this: RestApi =>
         post {
           import spray.httpx.SprayJsonSupport._
           entity(as[Seq[Long]]) { imageIds =>
-
             if (imageIds.isEmpty)
               complete(NoContent)
             else
