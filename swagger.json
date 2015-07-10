@@ -1594,6 +1594,39 @@
       }
     },
 
+    "/box/{token}/outbox/failed": {
+      "post": {
+        "description": "signal that the image corresponding to the supplied outbox entry could not be read or stored properly on the receiving side, and that the transaction should be marked as failed.",
+        "tags": ["Remote Boxes"],
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "description": "authentication token identifying the current box-to-box connection",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "outbox entry and error message",
+            "in": "body",
+            "description": "the outbox entry corresponding to the failed image transfer, along with the associated error message",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/failedOutboxEntry"              
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "failed message received"
+          },
+          "401": {
+            "description": "unauthorized, invalid token"
+          }
+        }                
+      }
+    },
+
     "/directorywatches": {
       "get": {
         "description": "get a list of watch directories. Each watch directory and its sub-directories are watched for incoming DICOM files, which are read and imported into slicebox.",
@@ -1959,6 +1992,16 @@
         },
         "failed": {
           "type": "boolean"
+        }
+      }
+    },
+    "failedOutboxEntry": {
+      "properties": {
+        "outboxEntry": {
+          "$ref": "#/definitions/outboxEntry"
+        },
+        "message" : {
+          "type": "string"
         }
       }
     },
