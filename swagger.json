@@ -1038,10 +1038,7 @@
             }
           }
         }
-      }
-    },
-
-    "/images/export": {
+      },
       "get": {
         "description": "download the export zip archive with the supplied file name",
         "produces": [
