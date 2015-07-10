@@ -1,28 +1,27 @@
-package se.nimsa.sbx.app
+package se.nimsa.sbx.app.routing
 
 import java.io.File
-import spray.http.BodyPart
-import spray.http.MultipartFormData
-import org.scalatest.FlatSpec
-import org.scalatest.Matchers
-import spray.http.ContentTypes
-import se.nimsa.sbx.dicom.DicomUtil
-import spray.http.StatusCodes._
-import se.nimsa.sbx.dicom.DicomHierarchy._
-import spray.httpx.SprayJsonSupport.sprayJsonMarshaller
-import spray.httpx.SprayJsonSupport.sprayJsonUnmarshaller
-import spray.httpx.unmarshalling.BasicUnmarshallers.ByteArrayUnmarshaller
-import java.nio.file.Path
-import java.nio.file.Paths
+
+import scala.slick.driver.H2Driver
+
 import org.dcm4che3.data.Tag
 import org.dcm4che3.data.VR
-import spray.http.HttpData
-import se.nimsa.sbx.storage.StorageProtocol.ImageAttribute
-import se.nimsa.sbx.anonymization.AnonymizationProtocol._
+import org.scalatest.FlatSpec
+import org.scalatest.Matchers
+
 import se.nimsa.sbx.anonymization.AnonymizationDAO
-import java.util.Date
-import scala.slick.driver.H2Driver
+import se.nimsa.sbx.anonymization.AnonymizationProtocol._
+import se.nimsa.sbx.dicom.DicomHierarchy._
+import se.nimsa.sbx.dicom.DicomUtil
+import se.nimsa.sbx.storage.StorageProtocol.ImageAttribute
 import se.nimsa.sbx.util.TestUtil
+import spray.http.BodyPart
+import spray.http.ContentTypes
+import spray.http.HttpData
+import spray.http.MultipartFormData
+import spray.http.StatusCodes._
+import spray.httpx.SprayJsonSupport._
+import spray.httpx.unmarshalling.BasicUnmarshallers.ByteArrayUnmarshaller
 
 class ImageRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 

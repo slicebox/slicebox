@@ -1,16 +1,14 @@
-package se.nimsa.sbx.app
+package se.nimsa.sbx.app.routing
 
 import scala.concurrent.Future
-
-import spray.http.BasicHttpCredentials
-import spray.http.StatusCodes._
-import spray.httpx.SprayJsonSupport._
-import spray.routing._
 
 import org.scalatest.FlatSpec
 import org.scalatest.Matchers
 
 import se.nimsa.sbx.app.UserProtocol.AuthToken
+import spray.http.BasicHttpCredentials
+import spray.http.StatusCodes._
+import spray.httpx.SprayJsonSupport._
 
 class AppRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 

@@ -1,18 +1,15 @@
-package se.nimsa.sbx.app
+package se.nimsa.sbx.app.routing
 
 import java.nio.file.Files
-import java.nio.file.Paths
-
-import spray.http.StatusCodes._
-import spray.httpx.SprayJsonSupport.sprayJsonMarshaller
-import spray.httpx.SprayJsonSupport.sprayJsonUnmarshaller
 
 import org.scalatest.FlatSpec
 import org.scalatest.Matchers
 
-import se.nimsa.sbx.dicom.DicomHierarchy._
+import se.nimsa.sbx.dicom.DicomHierarchy.Patient
 import se.nimsa.sbx.directory.DirectoryWatchProtocol._
 import se.nimsa.sbx.util.TestUtil
+import spray.http.StatusCodes._
+import spray.httpx.SprayJsonSupport._
 
 class DirectoryRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 

@@ -49,6 +49,8 @@ object BoxProtocol {
 
   case class OutboxEntryInfo(id: Long, remoteBoxName: String, transactionId: Long, sequenceNumber: Long, totalImageCount: Long, imageId: Long, failed: Boolean)
 
+  case class FailedOutboxEntry(outboxEntry: OutboxEntry, message: String)
+  
   case class InboxEntry(id: Long, remoteBoxId: Long, transactionId: Long, receivedImageCount: Long, totalImageCount: Long) extends Entity
 
   case class InboxEntryInfo(id: Long, remoteBoxName: String, transactionId: Long, receivedImageCount: Long, totalImageCount: Long)
@@ -86,6 +88,8 @@ object BoxProtocol {
 
   case class DeleteOutboxEntry(token: String, transactionId: Long, sequenceNumber: Long) extends BoxRequest
 
+  case class MarkOutboxTransactionAsFailed(token: String, transactionId: Long, message: String) extends BoxRequest
+  
   case object GetInbox extends BoxRequest
 
   case object GetOutbox extends BoxRequest
@@ -114,6 +118,8 @@ object BoxProtocol {
 
   case object OutboxEntryDeleted
 
+  case object OutboxTransactionMarkedAsFailed
+  
   case class Inbox(entries: Seq[InboxEntryInfo])
 
   case class Outbox(entries: Seq[OutboxEntryInfo])
@@ -140,6 +146,7 @@ object BoxProtocol {
 
   case class RemoteOutboxFileFetched(remoteOutboxEntry: OutboxEntry)
 
-  case class FetchFileFailed(e: Throwable)
+  case class FetchFileFailed(remoteOutboxEntry: OutboxEntry, e: Throwable)
 
+  case class HandlingFetchedFileFailed(remoteOutboxEntry: OutboxEntry, e: Throwable)
 }

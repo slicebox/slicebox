@@ -22,6 +22,7 @@ import se.nimsa.sbx.log.LogProtocol.LogEntry
 import java.util.Date
 import se.nimsa.sbx.log.LogProtocol.LogEntryType._
 import se.nimsa.sbx.log.LogProtocol.LogEntryType
+import akka.event.Logging
 
 object SbxLog {
 
@@ -33,6 +34,14 @@ object SbxLog {
 
   def default(subject: String, message: String)(implicit system: ActorSystem) = log(subject, message, DEFAULT)
 
-  private def log(subject: String, message: String, entryType: LogEntryType)(implicit system: ActorSystem) = 
+  private def log(subject: String, message: String, entryType: LogEntryType)(implicit system: ActorSystem) = {
+    val log = Logging(system, "")
+    entryType match {
+      case INFO    => log.info(s"$subject: $message")
+      case DEFAULT => log.debug(s"$subject: $message")
+      case WARN    => log.warning(s"$subject: $message")
+      case ERROR   => log.error(s"$subject: $message")
+    }
     system.eventStream.publish(AddLogEntry(LogEntry(-1, new Date().getTime, entryType, subject, message)))
+  }
 }

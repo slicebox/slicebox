@@ -1,8 +1,4 @@
-package se.nimsa.sbx.app
-
-import spray.http.StatusCodes.NoContent
-import spray.http.StatusCodes.OK
-import spray.httpx.SprayJsonSupport.sprayJsonUnmarshaller
+package se.nimsa.sbx.app.routing
 
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.FlatSpec
@@ -10,6 +6,8 @@ import org.scalatest.Matchers
 
 import se.nimsa.sbx.log.LogProtocol.LogEntry
 import se.nimsa.sbx.log.SbxLog
+import spray.http.StatusCodes._
+import spray.httpx.SprayJsonSupport._
 
 class LogRoutesTest extends FlatSpec with Matchers with RoutesTestBase with BeforeAndAfterAll {
 

@@ -175,6 +175,12 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String, impli
               }
             })
 
+          case MarkOutboxTransactionAsFailed(token, transactionId, message) =>
+            pollBoxByToken(token).foreach(box => {
+              markOutboxTransactionAsFailed(box, transactionId, message)
+              sender ! OutboxTransactionMarkedAsFailed
+            })
+
           case GetInbox =>
             val inboxEntries = getInboxFromDb().map { inboxEntry =>
               boxById(inboxEntry.remoteBoxId) match {
@@ -375,6 +381,13 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String, impli
       boxDao.removeOutboxEntry(outboxEntryId)
     }
 
+  def markOutboxTransactionAsFailed(box: Box, transactionId: Long, message: String) = {
+    db.withSession { implicit session =>
+      boxDao.markOutboxTransactionAsFailed(box.id, transactionId)
+    }
+    SbxLog.error("Box", message)
+  }
+  
   def getInboxFromDb() =
     db.withSession { implicit session =>
       boxDao.listInboxEntries

@@ -1,4 +1,4 @@
-package se.nimsa.sbx.app
+package se.nimsa.sbx.app.routing
 
 import org.scalatest.Matchers
 import org.scalatest.FlatSpec

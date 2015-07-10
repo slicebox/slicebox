@@ -36,18 +36,6 @@ import org.dcm4che3.data.Tag
 import org.dcm4che3.data.VR
 import akka.util.Timeout
 
-class MockupStorageActor extends Actor {
-  def receive = {
-    case GetDataset(imageId) =>
-      val datasetMaybe = imageId match {
-        case id if id <= 3 => Some(TestUtil.createDataset())
-        case _ =>
-          None
-      }
-      sender ! datasetMaybe
-  }
-}
-
 class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
     with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {
 

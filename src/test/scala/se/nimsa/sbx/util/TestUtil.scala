@@ -102,6 +102,8 @@ object TestUtil {
   def testImageDataset(withPixelData: Boolean = true) = DicomUtil.loadDataset(testImageFile.toPath, withPixelData)
   def testImageByteArray = DicomUtil.toByteArray(testImageFile.toPath)
 
+  def invalidImageFile = new File(getClass().getResource("invalid.dcm").toURI())
+  
   def createDataset(
     patientName: String = "pat name",
     patientID: String = "pat id",

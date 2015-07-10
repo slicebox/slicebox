@@ -1,26 +1,20 @@
-package se.nimsa.sbx.app
+package se.nimsa.sbx.app.routing
+
+import scala.slick.driver.H2Driver
 
 import org.scalatest.FlatSpec
 import org.scalatest.Matchers
-import spray.http.StatusCodes.OK
-import spray.http.StatusCodes.Created
-import spray.http.StatusCodes.NotFound
-import spray.http.StatusCodes.BadRequest
-import spray.testkit.ScalatestRouteTest
-import scala.concurrent.duration.DurationInt
-import spray.httpx.SprayJsonSupport._
-import se.nimsa.sbx.dicom.DicomHierarchy.Patient
-import scala.slick.driver.H2Driver
-import scala.slick.jdbc.JdbcBackend.Database
-import se.nimsa.sbx.storage.MetaDataDAO
-import se.nimsa.sbx.dicom.DicomPropertyValue._
-import se.nimsa.sbx.storage.StorageProtocol._
-import se.nimsa.sbx.dicom.DicomHierarchy._
-import se.nimsa.sbx.app.UserProtocol.ClearTextUser
-import se.nimsa.sbx.app.UserProtocol.UserRole.ADMINISTRATOR
+
+import se.nimsa.sbx.app.UserProtocol._
+import se.nimsa.sbx.app.UserProtocol.UserRole._
 import se.nimsa.sbx.box.BoxProtocol.RemoteBoxName
+import se.nimsa.sbx.dicom.DicomHierarchy._
+import se.nimsa.sbx.dicom.DicomPropertyValue._
+import se.nimsa.sbx.storage.MetaDataDAO
+import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.util.TestUtil
-import se.nimsa.sbx.storage.PropertiesDAO
+import spray.http.StatusCodes._
+import spray.httpx.SprayJsonSupport._
 
 class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
