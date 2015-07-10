@@ -62,12 +62,6 @@ class LogServiceActor(dbProps: DbProps) extends Actor {
 
   def addLogEntry(logEntry: LogEntry): LogEntry =
     db.withSession { implicit session =>
-      logEntry.entryType match {
-        case INFO => log.info(s"${logEntry.subject}: ${logEntry.message}")
-        case DEFAULT => log.debug(s"${logEntry.subject}: ${logEntry.message}")
-        case WARN => log.warning(s"${logEntry.subject}: ${logEntry.message}")
-        case ERROR => log.error(s"${logEntry.subject}: ${logEntry.message}")
-      }
       dao.insertLogEntry(logEntry)
     }
 

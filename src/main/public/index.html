@@ -72,6 +72,10 @@
 			<md-content>	
 				<ul>
 					<li>
+						<md-button ng-class="{ active: isCurrentPath('/import')}" href="/import">Import</md-button>
+					</li>
+
+					<li>
 						<md-button ng-class="{ active: isCurrentPath('/')}" href="/">Home</md-button>
 					</li>
 
@@ -129,10 +133,12 @@
 	<script type="text/javascript" src="/assets/lib/angularjs/angular-cookies.js"></script>
 	<script type="text/javascript" src="/assets/lib/angularjs/angular-route.js"></script>
 	<script type="text/javascript" src="/assets/lib/angular-material/angular-material.js"></script>
+	<script type="text/javascript" src="/assets/lib/angular-file-upload/ng-file-upload.min.js"></script>
 	<script type="text/javascript" src="/assets/js/directives.js"></script>
 	<script type="text/javascript" src="/assets/js/slicebox-utils.js"></script>
 	<script type="text/javascript" src="/assets/js/main.js"></script>
 	<script type="text/javascript" src="/assets/js/login.js"></script>
+	<script type="text/javascript" src="/assets/js/import.js"></script>
 	<script type="text/javascript" src="/assets/js/home.js"></script>
 	<script type="text/javascript" src="/assets/js/anonymization.js"></script>
 	<script type="text/javascript" src="/assets/js/transactions.js"></script>

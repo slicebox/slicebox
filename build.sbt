@@ -2,7 +2,7 @@ import de.heikoseeberger.sbtheader.license.Apache2_0
 
 	name := "slicebox"
 
-	version := "0.6"
+	version := "0.7-SNAPSHOT"
 
 	organization := "se.nimsa"
 
@@ -83,7 +83,8 @@ import de.heikoseeberger.sbtheader.license.Apache2_0
 			"com.typesafe.akka" 			%% "akka-testkit"			% akkaVersion		% "test",
 			"org.webjars" 					%  "angularjs"				% "1.4.1",
 			"org.webjars"					%  "angular-material"		% "0.10.0",
-			"org.webjars"					%  "font-awesome"			% "4.2.0"
+			"org.webjars"					%  "font-awesome"			% "4.2.0",
+			"org.webjars"                   % "angular-file-upload"     % "5.0.0"
 		)
 	}
 

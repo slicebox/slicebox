@@ -45,12 +45,16 @@ import se.nimsa.sbx.dicom.DicomProperty.PatientName
 import org.dcm4che3.data.Tag
 import akka.util.Timeout
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
+import se.nimsa.sbx.storage.StorageProtocol._
+import scala.util.Success
+import scala.util.Failure
 
 class BoxPollActor(box: Box,
                    dbProps: DbProps,
                    implicit val timeout: Timeout,
                    pollInterval: FiniteDuration = 5.seconds,
                    receiveTimeout: FiniteDuration = 1.minute,
+                   storageServicePath: String = "../../StorageService",
                    anonymizationServicePath: String = "../../AnonymizationService") extends Actor with JsonFormats {
 
   val log = Logging(context.system, this)
@@ -58,6 +62,7 @@ class BoxPollActor(box: Box,
   val db = dbProps.db
   val boxDao = new BoxDAO(dbProps.driver)
 
+  val storageService = context.actorSelection(storageServicePath)
   val anonymizationService = context.actorSelection(anonymizationServicePath)
 
   implicit val system = context.system
@@ -79,10 +84,22 @@ class BoxPollActor(box: Box,
     sendRequestToRemoteBoxPipeline(Get(s"${box.baseUrl}/outbox?transactionid=${remoteOutboxEntry.transactionId}&sequencenumber=${remoteOutboxEntry.sequenceNumber}"))
 
   // We don't need to wait for done message to be sent since it is not critical that it is received by the remote box
-  def sendRemoteOutboxFileCompleted(remoteOutboxEntry: OutboxEntry): Unit =
+  def sendRemoteOutboxFileCompleted(remoteOutboxEntry: OutboxEntry): Future[HttpResponse] =
     marshal(remoteOutboxEntry) match {
-      case Right(entity) => sendRequestToRemoteBoxPipeline(Post(s"${box.baseUrl}/outbox/done", entity))
-      case Left(e)       => log.error(e, s"Failed to send done message to remote box (${box.name},${remoteOutboxEntry.transactionId},${remoteOutboxEntry.sequenceNumber})")
+      case Right(entity) =>
+        sendRequestToRemoteBoxPipeline(Post(s"${box.baseUrl}/outbox/done", entity))
+      case Left(e) =>
+        SbxLog.error("Box", s"Failed to send done message to remote box (${box.name},${remoteOutboxEntry.transactionId},${remoteOutboxEntry.sequenceNumber})")
+        Future.failed(e)
+    }
+
+  def sendRemoteOutboxFileFailed(failedOutboxEntry: FailedOutboxEntry): Future[HttpResponse] =
+    marshal(failedOutboxEntry) match {
+      case Right(entity) =>
+        sendRequestToRemoteBoxPipeline(Post(s"${box.baseUrl}/outbox/failed", entity))
+      case Left(e) =>
+        SbxLog.error("Box", s"Failed to send failed message to remote box (${box.name},${failedOutboxEntry.outboxEntry.transactionId},${failedOutboxEntry.outboxEntry.sequenceNumber})")
+        Future.failed(e)
     }
 
   val poller = system.scheduler.schedule(pollInterval, pollInterval) {
@@ -121,11 +138,17 @@ class BoxPollActor(box: Box,
   def waitForFileFetchedState: PartialFunction[Any, Unit] = LoggingReceive {
     case RemoteOutboxFileFetched(remoteOutboxEntry) =>
       updateInbox(box.id, remoteOutboxEntry.transactionId, remoteOutboxEntry.sequenceNumber, remoteOutboxEntry.totalImageCount)
-      sendRemoteOutboxFileCompleted(remoteOutboxEntry)
+      sendRemoteOutboxFileCompleted(remoteOutboxEntry).foreach { response =>
+        pollRemoteBox()
+      }
+
+    case FetchFileFailed(remoteOutboxEntry, exception) =>
+      SbxLog.info("Box", s"Failed to fetch file from box ${box.name}: " + exception.getMessage)
       context.unbecome
 
-    case FetchFileFailed(exception) =>
-      SbxLog.error("Box", s"Failed to fetch file from box ${box.name}: " + exception.getMessage)
+    case HandlingFetchedFileFailed(remoteOutboxEntry, exception) =>
+      sendRemoteOutboxFileFailed(FailedOutboxEntry(remoteOutboxEntry, exception.getMessage))
+      SbxLog.error("Box", s"Failed to handle fetched file from box ${box.name}: " + exception.getMessage)
       context.unbecome
 
     case ReceiveTimeout =>
@@ -154,23 +177,38 @@ class BoxPollActor(box: Box,
 
   def fetchFileForRemoteOutboxEntry(remoteOutboxEntry: OutboxEntry): Unit =
     getRemoteOutboxFile(remoteOutboxEntry)
-      .flatMap(response => {
-        val dataset = loadDataset(response.entity.data.toByteArray, true)
+      .onComplete {
 
-        if (dataset == null) throw new RuntimeException("fetched dataset could not be read")
+        case Success(response) =>
+          if (response.status.intValue < 300) {
+            val dataset = loadDataset(response.entity.data.toByteArray, true)
 
-        anonymizationService.ask(ReverseAnonymization(dataset)).mapTo[Attributes]
-          .map { reversedDataset =>
+            if (dataset == null)
+              self ! HandlingFetchedFileFailed(remoteOutboxEntry, new IllegalArgumentException("Dataset could not be read"))
 
-            context.system.eventStream.publish(DatasetReceived(reversedDataset, SourceType.BOX, remoteOutboxEntry.remoteBoxId))
+            else
+              anonymizationService.ask(ReverseAnonymization(dataset)).mapTo[Attributes]
+                .onComplete {
 
-            self ! RemoteOutboxFileFetched(remoteOutboxEntry)
-          }
+                  case Success(reversedDataset) =>
+                    storageService.ask(AddDataset(reversedDataset, SourceType.BOX, remoteOutboxEntry.remoteBoxId))
+                      .onComplete {
 
-      })
-      .recover {
-        case exception: Exception =>
-          self ! FetchFileFailed(exception)
+                        case Success(any) =>
+                          self ! RemoteOutboxFileFetched(remoteOutboxEntry)
+
+                        case Failure(exception) =>
+                          self ! HandlingFetchedFileFailed(remoteOutboxEntry, exception)
+                      }
+
+                  case Failure(exception) =>
+                    self ! HandlingFetchedFileFailed(remoteOutboxEntry, exception)
+                }
+          } else
+            self ! FetchFileFailed(remoteOutboxEntry, new RuntimeException("Server responded with status code " + response.status.intValue))
+
+        case Failure(exception) =>
+          self ! FetchFileFailed(remoteOutboxEntry, exception)
       }
 
   def updateInbox(remoteBoxId: Long, transactionId: Long, sequenceNumber: Long, totalImageCount: Long): Unit = {

@@ -1,4 +1,4 @@
-package se.nimsa.sbx.app
+package se.nimsa.sbx.app.routing
 
 import java.nio.file.Files
 import org.scalatest.FlatSpec

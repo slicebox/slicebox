@@ -10,7 +10,6 @@ import java.nio.file.Files
 import java.nio.file.Paths
 import org.scalatest.BeforeAndAfterAll
 import se.nimsa.sbx.util.TestUtil
-import se.nimsa.sbx.app.DirectoryRoutesTest
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomPropertyValue._
 import java.util.Date

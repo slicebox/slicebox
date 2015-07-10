@@ -1,18 +1,23 @@
-package se.nimsa.sbx.app
+package se.nimsa.sbx.app.routing
 
 import java.nio.file.Files
+
 import scala.concurrent.duration.DurationInt
-import spray.httpx.SprayJsonSupport.sprayJsonMarshaller
-import spray.testkit.ScalatestRouteTest
+
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.Suite
+
+import se.nimsa.sbx.app.RestApi
+import se.nimsa.sbx.app.UserProtocol.ClearTextUser
+import se.nimsa.sbx.app.UserProtocol.UserRole
 import se.nimsa.sbx.util.TestUtil
-import UserProtocol._
 import spray.http.BasicHttpCredentials
-import spray.http.StatusCodes.OK
 import spray.http.HttpRequest
+import spray.http.StatusCodes.OK
+import spray.httpx.SprayJsonSupport._
 import spray.httpx.marshalling.Marshaller
+import spray.testkit.ScalatestRouteTest
 
 trait RoutesTestBase extends ScalatestRouteTest with RestApi with BeforeAndAfterAll with BeforeAndAfterEach { this: Suite =>
 

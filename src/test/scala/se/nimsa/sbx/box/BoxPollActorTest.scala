@@ -14,6 +14,7 @@ import scala.slick.jdbc.JdbcBackend.Database
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.storage.StorageProtocol.DatasetReceived
 import se.nimsa.sbx.util.TestUtil
+import akka.actor.Actor
 import akka.actor.Props
 import spray.http.HttpResponse
 import spray.http.HttpRequest
@@ -32,9 +33,12 @@ import spray.http.HttpData
 import akka.actor.ReceiveTimeout
 import se.nimsa.sbx.anonymization.AnonymizationServiceActor
 import akka.util.Timeout
+import se.nimsa.sbx.storage.StorageProtocol.GetDataset
+import se.nimsa.sbx.box.MockupStorageActor.ShowGoodBehavior
+import se.nimsa.sbx.box.MockupStorageActor.ShowBadBehavior
 
 class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
-    with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach with JsonFormats {
+  with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach with JsonFormats {
 
   def this() = this(ActorSystem("BoxPollActorTestSystem"))
 
@@ -60,9 +64,10 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
   val mockHttpResponses: ArrayBuffer[HttpResponse] = ArrayBuffer()
   val capturedRequests: ArrayBuffer[HttpRequest] = ArrayBuffer()
 
+  val storageService = system.actorOf(Props[MockupStorageActor], name = "StorageService")
   val anonymizationService = system.actorOf(AnonymizationServiceActor.props(dbProps), name = "AnonymizationService")
-  val pollBoxActorRef = system.actorOf(Props(new BoxPollActor(remoteBox, dbProps, Timeout(30.seconds), 1.hour, 1000.hours, "../AnonymizationService") {
-    
+  val pollBoxActorRef = system.actorOf(Props(new BoxPollActor(remoteBox, dbProps, Timeout(30.seconds), 1.hour, 1000.hours, "../StorageService", "../AnonymizationService") {
+
     override def sendRequestToRemoteBoxPipeline = {
       (req: HttpRequest) =>
         {
@@ -77,6 +82,8 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
   }))
 
   override def beforeEach() {
+    storageService ! ShowGoodBehavior(3)
+    
     capturedRequests.clear()
 
     mockHttpResponses.clear()
@@ -123,7 +130,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
     "handle remote outbox file" in {
       val transactionId = 999
-      val outboxEntry = OutboxEntry(123, 987, transactionId, 1, 2, 112233, false)
+      val outboxEntry = OutboxEntry(123, 987, transactionId, 1, 2, 2, false)
 
       marshal(outboxEntry) match {
         case Right(entity) => mockHttpResponses += HttpResponse(StatusCodes.OK, entity)
@@ -152,9 +159,9 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
         })
       }
 
-      // Check that done message is sent
+      // Check that poll + get image + done + poll message is sent
 
-      capturedRequests.size should be(3)
+      capturedRequests.size should be(4)
       capturedRequests(2).uri.toString() should be(s"$remoteBoxBaseUrl/outbox/done")
     }
 
@@ -190,6 +197,91 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       capturedRequests.size should be(2)
       capturedRequests(0).uri.toString() should be(s"$remoteBoxBaseUrl/outbox/poll")
       capturedRequests(1).uri.toString() should be(s"$remoteBoxBaseUrl/outbox/poll")
+    }
+
+    "keep trying to fetch remote file until fetching succeeds" in {
+      val transactionId = 999
+      val outboxEntry = OutboxEntry(123, 987, transactionId, 1, 2, 2, false)
+
+      marshal(outboxEntry) match {
+        case Right(entity) => 
+          mockHttpResponses += HttpResponse(StatusCodes.OK, entity)
+          mockHttpResponses += HttpResponse(StatusCodes.BadGateway)
+          mockHttpResponses += HttpResponse(StatusCodes.OK, entity)
+          mockHttpResponses += HttpResponse(StatusCodes.BadGateway)
+          mockHttpResponses += HttpResponse(StatusCodes.OK, entity)
+        case Left(e)       => fail(e)
+      }
+      
+      val dcmFile = TestUtil.testImageFile
+
+      mockHttpResponses += HttpResponse(StatusCodes.OK, HttpEntity(ContentTypes.`application/octet-stream`, HttpData(dcmFile)))
+      mockHttpResponses += HttpResponse(StatusCodes.NoContent)
+
+      // poll box, outbox entry will be found and an attempt to fetch the file will fail
+      pollBoxActorRef ! PollRemoteBox
+      expectNoMsg
+
+      // poll box again, fetching the file will fail again
+      pollBoxActorRef ! PollRemoteBox
+      expectNoMsg
+      
+      // poll box again, fetching the file will succeed, done message will be sent
+      pollBoxActorRef ! PollRemoteBox
+      expectNoMsg
+      
+      // Check that requests are sent as expected
+      capturedRequests.size should be(8)
+      capturedRequests(6).uri.toString() should be(s"$remoteBoxBaseUrl/outbox/done")
+      capturedRequests(7).uri.toString() should be(s"$remoteBoxBaseUrl/outbox/poll")
+    }
+    
+    "should tell the box it is pulling images from that a transaction has failed due to receiving an invalid DICOM file" in {
+      val transactionId = 999
+      val outboxEntry = OutboxEntry(123, 987, transactionId, 1, 2, 2, false)
+
+      marshal(outboxEntry) match {
+        case Right(entity) => mockHttpResponses += HttpResponse(StatusCodes.OK, entity)
+        case Left(e)       => fail(e)
+      }
+      
+      val dcmFile = TestUtil.invalidImageFile
+
+      mockHttpResponses += HttpResponse(StatusCodes.OK, HttpEntity(ContentTypes.`application/octet-stream`, HttpData(dcmFile)))
+      mockHttpResponses += HttpResponse(StatusCodes.NoContent)
+
+      // poll box, reading the file will fail, failed message will be sent
+      pollBoxActorRef ! PollRemoteBox
+      expectNoMsg
+      
+      // Check that requests are sent as expected
+      capturedRequests.size should be(3)
+      capturedRequests(2).uri.toString() should be(s"$remoteBoxBaseUrl/outbox/failed")
+    }
+
+    "should tell the box it is pulling images from that a transaction has failed when an image cannot be stored" in {
+      storageService ! ShowBadBehavior(new IllegalArgumentException("Pretending I cannot store dataset."))
+      
+      val transactionId = 999
+      val outboxEntry = OutboxEntry(123, 987, transactionId, 1, 2, 2, false)
+
+      marshal(outboxEntry) match {
+        case Right(entity) => mockHttpResponses += HttpResponse(StatusCodes.OK, entity)
+        case Left(e)       => fail(e)
+      }
+      
+      val dcmFile = TestUtil.testImageFile
+
+      mockHttpResponses += HttpResponse(StatusCodes.OK, HttpEntity(ContentTypes.`application/octet-stream`, HttpData(dcmFile)))
+      mockHttpResponses += HttpResponse(StatusCodes.NoContent)
+
+      // poll box, storing the file will fail, failed message will be sent
+      pollBoxActorRef ! PollRemoteBox
+      expectNoMsg
+      
+      // Check that requests are sent as expected
+      capturedRequests.size should be(3)
+      capturedRequests(2).uri.toString() should be(s"$remoteBoxBaseUrl/outbox/failed")
     }
 
   }

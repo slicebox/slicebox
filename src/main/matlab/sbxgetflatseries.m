@@ -1,12 +1,14 @@
 function dbinfo = sbxgetflatseries( sbxdata )
 %SBXFLATSERIES Fetches a complete listing of all patients and series.
-%   Fetches a complete listing of all patients and series associated with
-%   them. The datastructure is flattened and does not contain the
-%   information required to select individual frames. This is structure is
-%   mainly used to populate the patient list of the GUI.
+%
+%   dbinfo = SBXFLATSERIES(sbxinfo) Fetches a complete listing of all
+%       patients and series associated with them. The datastructure is 
+%       flattened and does not contain the information required to select 
+%       individual frames. This is structure is mainly used to populate the 
+%       patient list of the GUI.
 
 try
-    url = [sbxdata.url, '/api/metadata/flatseries'];
+    url = [sbxdata.url, '/api/metadata/flatseries?count=1000000'];
     dbinfo = webread(url, sbxdata.weboptions);
     dbinfofile = fullfile(sbxdata.cachepath, 'dbinfo');
     %fprintf('saving %s\n', dbinfofile);

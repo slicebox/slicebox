@@ -31,6 +31,8 @@ import se.nimsa.sbx.dicom.DicomUtil._
 import se.nimsa.sbx.anonymization.AnonymizationUtil._
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import org.dcm4che3.data.Attributes
+import spray.httpx.SprayJsonSupport._
+import spray.httpx.unmarshalling.BasicUnmarshallers.ByteArrayUnmarshaller
 
 trait RemoteBoxRoutes { this: RestApi =>
 
@@ -45,7 +47,6 @@ trait RemoteBoxRoutes { this: RestApi =>
             path("image") {
               parameters('transactionid.as[Long], 'sequencenumber.as[Long], 'totalimagecount.as[Long]) { (transactionId, sequenceNumber, totalImageCount) =>
                 post {
-                  // make sure spray.httpx.SprayJsonSupport._ is NOT imported here. It messes with the content type expectations
                   entity(as[Array[Byte]]) { imageData =>
                     val dataset = loadDataset(imageData, true)
                     onSuccess(anonymizationService.ask(ReverseAnonymization(dataset)).mapTo[Attributes]) { reversedDataset =>
@@ -65,7 +66,6 @@ trait RemoteBoxRoutes { this: RestApi =>
                 get {
                   onSuccess(boxService.ask(PollOutbox(token))) {
                     case outboxEntry: OutboxEntry =>
-                      import spray.httpx.SprayJsonSupport._
                       complete(outboxEntry)
                     case OutboxEmpty =>
                       complete(NotFound)
@@ -73,10 +73,17 @@ trait RemoteBoxRoutes { this: RestApi =>
                 }
               } ~ path("done") {
                 post {
-                  import spray.httpx.SprayJsonSupport._
                   entity(as[OutboxEntry]) { outboxEntry =>
                     onSuccess(boxService.ask(DeleteOutboxEntry(token, outboxEntry.transactionId, outboxEntry.sequenceNumber))) {
                       case OutboxEntryDeleted => complete(NoContent)
+                    }
+                  }
+                }
+              } ~ path("failed") {
+                post {
+                  entity(as[FailedOutboxEntry]) { failedOutboxEntry =>
+                    onSuccess(boxService.ask(MarkOutboxTransactionAsFailed(token, failedOutboxEntry.outboxEntry.transactionId, failedOutboxEntry.message))) {
+                      case OutboxTransactionMarkedAsFailed => complete(NoContent)
                     }
                   }
                 }
@@ -97,7 +104,7 @@ trait RemoteBoxRoutes { this: RestApi =>
                                       complete(HttpEntity(ContentTypes.`application/octet-stream`, HttpData(bytes)))
                                   }
                                 case None =>
-                                  
+
                                   complete((NotFound, s"File not found for image id ${outboxEntry.imageId}"))
                               }
                             }

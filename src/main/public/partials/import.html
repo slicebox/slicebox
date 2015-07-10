@@ -1,0 +1,73 @@
+<div layout="column" layout-margin>
+
+    <div flex ng-controller="ImportCtrl">
+
+        <div layout="row" layout-margin>
+
+            <div flex>
+
+                <div ngf-drop ngf-change="import($files)" 
+                     class="import-drop-box-container" 
+                     ngf-drag-over-class="import-drop-box-dragover" 
+                     ngf-multiple="true" 
+                     ngf-allow-dir="true"> 
+                    <div layout="row" layout-align="center center" style="height: 300px"> 
+                        <h3>Drop DICOM files or folders here</h3>
+                    </div>
+                </div>
+                
+                <div ngf-no-file-drop>Drag/Drop is not supported for this browser</div>
+
+                <div layout="row">
+                    <div flex="33">
+
+                        <md-card>
+                            <md-card-content>
+
+                                <h4>Imported files</h4>
+                                
+                                <sbx-grid
+                                    load-page="getImportedFiles()"
+                                    page-size="10000000"
+                                    callbacks="callbacks.importedFilesTable"
+                                    empty-message="No imported files">
+
+                                    <sbx-grid-column property="name" title="File Name"></sbx-grid-column>
+                                
+                                </sbx-grid>
+
+                            </md-card-content>
+                        </md-card>
+
+                    </div>
+                    <div flex="66">
+
+                        <md-card>
+                            <md-card-content>
+
+                                <h4>Rejected files</h4>                                
+
+                                <sbx-grid
+                                    load-page="getRejectedFiles()"
+                                    page-size="10000000"
+                                    callbacks="callbacks.rejectedFilesTable"
+                                    empty-message="No rejected files">
+
+                                    <sbx-grid-column property="name" title="File Name"></sbx-grid-column>
+                                    <sbx-grid-column property="status" title="Status Code"></sbx-grid-column>
+                                    <sbx-grid-column property="message" title="Message"></sbx-grid-column>
+                                
+                                </sbx-grid>
+
+                            </md-card-content>
+                        </md-card>
+
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+
+</div>
