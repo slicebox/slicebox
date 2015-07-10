@@ -79,7 +79,7 @@
         "tags": ["Meta Data"],
         "responses": {
           "200": {
-            "description": "sources",
+            "description": "currently available sources",
             "schema": {
               "type": "array",
               "items": {
@@ -907,9 +907,11 @@
             "in": "body",
             "description": "specification of values for DICOM attributes",
             "required": true,
-            "type": "array",
-            "items": {
-              "$ref": "#/definitions/tagValue"
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/tagValue"
+              }
             }
           }
         ],
@@ -1008,7 +1010,7 @@
 
     "/images/export": {
       "post": {
-        "description": "download the selected images as a zip archive",
+        "description": "create a zip archive containing the selected images. The archive is available for downloading for 12 hours before it is automatically deleted.",
         "tags": ["Images"],
         "parameters": [
           {
@@ -1016,10 +1018,12 @@
             "in": "body",
             "description": "ids of images to export",
             "required": true,
-            "type": "array",
-            "items": {
-              "type": "integer",
-              "format": "int64"
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "format": "int64"
+              }
             }
           }
         ],
@@ -1027,6 +1031,30 @@
           "201": {
             "description": "if the supplied list of image ids is empty or no if images could be found"
           },
+          "200": {
+            "description": "file name of created zip archive. To be used with the below GET method for downloading.",
+            "schema": {
+              "$ref": "#/definitions/fileName"
+            }
+          }
+        }
+      }
+    },
+
+    "/images/export": {
+      "get": {
+        "description": "download the export zip archive with the supplied file name",
+        "tags": ["Images"],
+        "parameters": [
+          {
+            "name": "filename",
+            "in": "query",
+            "description": "file name of zip archive to download",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
           "200": {
             "description": "zip archive of images",
             "schema": {
@@ -1321,9 +1349,11 @@
             "in": "body",
             "description": "specification of which images to send and list of DICOM attribute values to use in anonymized datasets",
             "required": true,
-            "type": "array",
-            "items": {
-              "$ref": "#/definitions/imageTagValues"
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/imageTagValues"
+              }
             }
           }
         ],
@@ -1751,6 +1781,13 @@
 
 
   "definitions": {
+    "fileName": {
+      "properties": {
+        "value": {
+          "type": "string"
+        }
+      }
+    },
     "source": {
       "properties": {
         "sourceType": {
