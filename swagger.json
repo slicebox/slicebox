@@ -1044,6 +1044,9 @@
     "/images/export": {
       "get": {
         "description": "download the export zip archive with the supplied file name",
+        "produces": [
+          "application/zip"
+        ],
         "tags": ["Images"],
         "parameters": [
           {
@@ -1057,7 +1060,9 @@
         "responses": {
           "200": {
             "description": "zip archive of images",
-            "type": "file"
+            "schema": {
+              "type": "file"
+            }
           }
         }
       }
