@@ -1032,8 +1032,8 @@
             "description": "if the supplied list of image ids is empty or no if images could be found"
           },
           "200": {
+            "description": "file name of created zip archive. To be used with the below GET method for downloading.",
             "schema": {
-              "description": "file name of created zip archive. To be used with the below GET method for downloading.",
               "$ref": "#/definitions/fileName"
             }
           }
