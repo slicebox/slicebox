@@ -1057,9 +1057,7 @@
         "responses": {
           "200": {
             "description": "zip archive of images",
-            "schema": {
-              "type": "file"
-            }
+            "type": "file"
           }
         }
       }
