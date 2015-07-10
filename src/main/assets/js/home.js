@@ -610,23 +610,15 @@ angular.module('slicebox.home', ['ngRoute'])
     }
 
     function exportImages(imagesPromise) {
-        return imagesPromise.then(function(images) {
-            var imageIds = images.map(function(image) {
+        return imagesPromise.then(function (images) {
+            var imageIds = images.map(function (image) {
                 return image.id;
             });
-            return $http({
-                url: '/api/images/export',
-                method: "POST",
-                data: imageIds,
-                headers: {
-                   'Content-type': 'application/json'
-                },
-                responseType: 'arraybuffer'
-            }).success(function (data, status, headers, config) {
-                var blob = new Blob([data], {type: "application/zip"});
-                var objectUrl = URL.createObjectURL(blob);
-                window.open(objectUrl);
-            });        
+            return $http.post('/api/users/generateauthtokens?n=1').success(function(tokens) {
+                return $http.post('/api/images/export', imageIds).success(function (fileName) {
+                    location.href = '/api/images/export?authtoken=' + tokens[0].token + '&filename=' + fileName.value;
+                });
+            });
         });
     }
 

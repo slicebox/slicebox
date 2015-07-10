@@ -38,8 +38,10 @@ import spray.http.MediaTypes._
 import spray.http.StatusCodes._
 import spray.routing.Route
 import spray.http.MediaType
+import spray.http.HttpHeaders.`Content-Disposition`
 import java.nio.file.Paths
 import java.nio.file.Path
+import java.io.File
 
 trait ImageRoutes { this: RestApi =>
 
@@ -185,12 +187,18 @@ trait ImageRoutes { this: RestApi =>
               complete(NoContent)
             else
               onSuccess(createTempZipFile(imageIds)) { file =>
-                detach() {
-                  autoChunk(chunkSize) {
-                    complete(HttpEntity(`application/zip`, HttpData(file.toFile)))
-                  }
+                complete(FileName(file.getFileName.toString))
+              }
+          }
+        } ~ get {
+          parameter('filename) { fileName =>
+            detach() {
+              autoChunk(chunkSize) {
+                respondWithHeader(`Content-Disposition`("attachment; filename=\"slicebox-export.zip\"")) {
+                  complete(HttpEntity(`application/zip`, HttpData(new File(System.getProperty("java.io.tmpdir"), fileName))))
                 }
               }
+            }
           }
         }
       }
