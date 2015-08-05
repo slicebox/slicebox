@@ -144,5 +144,107 @@ class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
           seriesTypes.size should be(0)
       }
     }
+    
+    "be able to add and get series type rule" in {
+      val addedSeriesType = db.withSession { implicit session =>
+        seriesTypeDao.insertSeriesType(SeriesType(-1, "st1"))
+      }
+      
+      val seriesTypeRule = SeriesTypeRule(-1, addedSeriesType.id)
+      
+      seriesTypeService ! AddSeriesTypeRule(seriesTypeRule)
+        
+      expectMsgPF() {
+        case SeriesTypeRuleAdded(returnedSeriesTypeRule) =>
+          returnedSeriesTypeRule.id should be > (0L)
+          returnedSeriesTypeRule.seriesTypeId should be(addedSeriesType.id)
+      }
+      
+      seriesTypeService ! GetSeriesTypeRules(addedSeriesType.id)
+        
+      expectMsgPF() {
+        case SeriesTypeRules(seriesTypeRules) =>
+          seriesTypeRules.size should be(1)
+          seriesTypeRules(0).seriesTypeId should be(addedSeriesType.id)
+      }
+    }
+    
+    "be able to delete existing series type rule" in {
+      val addedSeriesType = db.withSession { implicit session =>
+        seriesTypeDao.insertSeriesType(SeriesType(-1, "st1"))
+      }
+      
+      val addedSeriesTypeRule = db.withSession { implicit session =>
+        seriesTypeDao.insertSeriesTypeRule(SeriesTypeRule(-1, addedSeriesType.id))
+      }
+      
+      seriesTypeService ! RemoveSeriesTypeRule(addedSeriesTypeRule.id)
+      expectMsgPF() {
+        case SeriesTypeRuleRemoved(seriesTypeRuleId) =>
+          seriesTypeRuleId should be(addedSeriesTypeRule.id)
+      }
+      
+      seriesTypeService ! GetSeriesTypeRules(addedSeriesType.id)
+        
+      expectMsgPF() {
+        case SeriesTypeRules(seriesTypeRules) =>
+          seriesTypeRules.size should be(0)
+      }
+    }
+    
+    "be able to add and get series type rule attribute" in {
+      val addedSeriesType = db.withSession { implicit session =>
+        seriesTypeDao.insertSeriesType(SeriesType(-1, "st1"))
+      }
+      
+      val addedSeriesTypeRule = db.withSession { implicit session =>
+        seriesTypeDao.insertSeriesTypeRule(SeriesTypeRule(-1, addedSeriesType.id))
+      }
+      
+      val seriesTypeRuleAttribute = SeriesTypeRuleAttribute(-1, addedSeriesTypeRule.id, 1, 2, None, "test")
+      
+      seriesTypeService ! AddSeriesTypeRuleAttribute(seriesTypeRuleAttribute)
+        
+      expectMsgPF() {
+        case SeriesTypeRuleAttributeAdded(returnedSeriesTypeRuleAttribute) =>
+          returnedSeriesTypeRuleAttribute.id should be > (0L)
+          returnedSeriesTypeRuleAttribute.seriesTypeRuleId should be(addedSeriesTypeRule.id)
+      }
+      
+      seriesTypeService ! GetSeriesTypeRuleAttributes(addedSeriesTypeRule.id)
+        
+      expectMsgPF() {
+        case SeriesTypeRuleAttributes(seriesTypeRuleAttributes) =>
+          seriesTypeRuleAttributes.size should be(1)
+          seriesTypeRuleAttributes(0).seriesTypeRuleId should be(addedSeriesTypeRule.id)
+      }
+    }
+    
+    "be able to delete existing series type rule attribute" in {
+      val addedSeriesType = db.withSession { implicit session =>
+        seriesTypeDao.insertSeriesType(SeriesType(-1, "st1"))
+      }
+      
+      val addedSeriesTypeRule = db.withSession { implicit session =>
+        seriesTypeDao.insertSeriesTypeRule(SeriesTypeRule(-1, addedSeriesType.id))
+      }
+      
+      val addedSeriesTypeRuleAttribute = db.withSession { implicit session =>
+        seriesTypeDao.insertSeriesTypeRuleAttribute(SeriesTypeRuleAttribute(-1, addedSeriesTypeRule.id, 1, 2, None, "test"))
+      }
+      
+      seriesTypeService ! RemoveSeriesTypeRuleAttribute(addedSeriesTypeRuleAttribute.id)
+      expectMsgPF() {
+        case SeriesTypeRuleAttributeRemoved(seriesTypeRuleAttributeId) =>
+          seriesTypeRuleAttributeId should be(addedSeriesTypeRuleAttribute.id)
+      }
+      
+      seriesTypeService ! GetSeriesTypeRuleAttributes(addedSeriesTypeRule.id)
+        
+      expectMsgPF() {
+        case SeriesTypeRuleAttributes(seriesTypeRuleAttributes) =>
+          seriesTypeRuleAttributes.size should be(0)
+      }
+    }
   }
 }
