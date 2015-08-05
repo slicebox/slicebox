@@ -90,4 +90,98 @@ class SeriesTypeRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       responseAs[List[SeriesType]].size should be(0)
     }
   }
+  
+  it should "return 403 forbidden when deleting an existing series type as non-admin user" in {
+    val addedSeriesType = db.withSession { implicit session =>
+      seriesTypeDao.insertSeriesType(SeriesType(-1, "st1"))
+    }
+
+    DeleteAsUser(s"/api/seriestypes/${addedSeriesType.id}") ~> sealRoute(routes) ~> check {
+      status should be(Forbidden)
+    }
+    
+    GetAsUser("/api/seriestypes") ~> routes ~> check {
+      responseAs[List[SeriesType]].size should be(1)
+    }
+  }
+  
+  it should "return 200 OK and return list of series type rules" in {
+
+    val addedSeriesType = db.withSession { implicit session =>
+      seriesTypeDao.insertSeriesType(SeriesType(-1, "st1"))
+    }
+    
+    val addedSeriesTypeRule = db.withSession { implicit session =>
+      seriesTypeDao.insertSeriesTypeRule(SeriesTypeRule(-1, addedSeriesType.id))
+    }
+
+    GetAsUser(s"/api/seriestypes/${addedSeriesType.id}/rules") ~> routes ~> check {
+      status should be(OK)
+      responseAs[List[SeriesTypeRule]].size should be(1)
+    }
+  }
+  
+  it should "return 201 created and created series type rule when adding new series type rule" in {
+    val addedSeriesType = db.withSession { implicit session =>
+      seriesTypeDao.insertSeriesType(SeriesType(-1, "st1"))
+    }
+    
+    val seriesTypeRule = SeriesTypeRule(-1, addedSeriesType.id)
+
+    PostAsAdmin(s"/api/seriestypes/${addedSeriesType.id}/rules", seriesTypeRule) ~> routes ~> check {
+      status should be(Created)
+      val returnedSeriesTypeRule = responseAs[SeriesTypeRule]
+
+      returnedSeriesTypeRule.id should be > (0L)
+      returnedSeriesTypeRule.seriesTypeId should be(addedSeriesType.id)
+    }
+  }
+  
+  it should "return 403 forbidden when adding new series type rule as non-admin user" in {
+    val addedSeriesType = db.withSession { implicit session =>
+      seriesTypeDao.insertSeriesType(SeriesType(-1, "st1"))
+    }
+    
+    val seriesTypeRule = SeriesTypeRule(-1, addedSeriesType.id)
+
+    PostAsUser(s"/api/seriestypes/${addedSeriesType.id}/rules", seriesTypeRule) ~> sealRoute(routes) ~> check {
+      status should be(Forbidden)
+    }
+  }
+  
+  it should "return 204 no content when deleting an existing series type rule" in {
+    val addedSeriesType = db.withSession { implicit session =>
+      seriesTypeDao.insertSeriesType(SeriesType(-1, "st1"))
+    }
+    
+    val addedSeriesTypeRule = db.withSession { implicit session =>
+      seriesTypeDao.insertSeriesTypeRule(SeriesTypeRule(-1, addedSeriesType.id))
+    }
+
+    DeleteAsAdmin(s"/api/seriestypes/${addedSeriesType.id}/rules/${addedSeriesTypeRule.id}") ~> routes ~> check {
+      status should be(NoContent)
+    }
+
+    GetAsUser(s"/api/seriestypes/${addedSeriesType.id}/rules") ~> routes ~> check {
+      responseAs[List[SeriesTypeRule]].size should be(0)
+    }
+  }
+  
+  it should "return 403 forbidden deleting an existing series type rule as non-admin user" in {
+    val addedSeriesType = db.withSession { implicit session =>
+      seriesTypeDao.insertSeriesType(SeriesType(-1, "st1"))
+    }
+    
+    val addedSeriesTypeRule = db.withSession { implicit session =>
+      seriesTypeDao.insertSeriesTypeRule(SeriesTypeRule(-1, addedSeriesType.id))
+    }
+
+    DeleteAsUser(s"/api/seriestypes/${addedSeriesType.id}/rules/${addedSeriesTypeRule.id}") ~> sealRoute(routes) ~> check {
+      status should be(Forbidden)
+    }
+    
+    GetAsUser(s"/api/seriestypes/${addedSeriesType.id}/rules") ~> routes ~> check {
+      responseAs[List[SeriesTypeRule]].size should be(1)
+    }
+  }
 }

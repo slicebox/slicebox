@@ -34,6 +34,8 @@ object SeriesTypeProtocol {
   
   case class SeriesTypes(seriesTypes: Seq[SeriesType])
   
+  case class SeriesTypeRules(seriesTypeRules: Seq[SeriesTypeRule])
+  
   
   sealed trait SeriesTypeRequest
   
@@ -50,4 +52,15 @@ object SeriesTypeProtocol {
   case object SeriesTypeUpdated
   
   case class SeriesTypeRemoved(seriesTypeId: Long)
+  
+  
+  case class GetSeriesTypeRules(seriesTypeId: Long) extends SeriesTypeRequest
+  
+  case class AddSeriesTypeRule(seriesTypeRule: SeriesTypeRule) extends SeriesTypeRequest
+  
+  case class RemoveSeriesTypeRule(seriesTypeRuleId: Long) extends SeriesTypeRequest
+  
+  case class SeriesTypeRuleAdded(seriesTypeRule: SeriesTypeRule)
+  
+  case class SeriesTypeRuleRemoved(seriesTypeRuleId: Long)
 }

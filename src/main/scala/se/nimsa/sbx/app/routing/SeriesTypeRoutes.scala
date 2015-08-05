@@ -51,24 +51,56 @@ trait SeriesTypeRoutes { this: RestApi =>
           }
         }
 
-      } ~ path(LongNumber) { seriesTypeId =>
-        put {
-          authorize(authInfo.hasPermission(UserRole.ADMINISTRATOR)) {
-            entity(as[SeriesType]) { seriesType =>
-              onSuccess(seriesTypeService.ask(UpdateSeriesType(seriesType))) {
-                case SeriesTypeUpdated =>
+      } ~ pathPrefix(LongNumber) { seriesTypeId =>
+        pathEndOrSingleSlash {
+          put {
+            authorize(authInfo.hasPermission(UserRole.ADMINISTRATOR)) {
+              entity(as[SeriesType]) { seriesType =>
+                onSuccess(seriesTypeService.ask(UpdateSeriesType(seriesType))) {
+                  case SeriesTypeUpdated =>
+                    complete(NoContent)
+                }
+              }
+            }
+          } ~ delete {
+            authorize(authInfo.hasPermission(UserRole.ADMINISTRATOR)) {
+              onSuccess(seriesTypeService.ask(RemoveSeriesType(seriesTypeId))) {
+                case SeriesTypeRemoved(seriesTypeId) =>
                   complete(NoContent)
               }
             }
           }
-        } ~ delete {
-          authorize(authInfo.hasPermission(UserRole.ADMINISTRATOR)) {
-            onSuccess(seriesTypeService.ask(RemoveSeriesType(seriesTypeId))) {
-              case SeriesTypeRemoved(seriesTypeId) =>
-                complete(NoContent)
+        } ~ pathPrefix("rules") {
+          pathEndOrSingleSlash {
+            get {
+              onSuccess(seriesTypeService.ask(GetSeriesTypeRules(seriesTypeId))) {
+                case SeriesTypeRules(seriesTypeRules) =>
+                  complete(seriesTypeRules)
+              }
+            } ~post {
+              authorize(authInfo.hasPermission(UserRole.ADMINISTRATOR)) {
+                entity(as[SeriesTypeRule]) { seriesTypeRule =>
+                  onSuccess(seriesTypeService.ask(AddSeriesTypeRule(seriesTypeRule))) {
+                    case SeriesTypeRuleAdded(seriesTypeRule) =>
+                      complete((Created, seriesTypeRule))
+                  }
+                }
+              }
+            }
+          } ~ path(LongNumber) { seriesTypeRuleId =>
+            pathEndOrSingleSlash {
+              delete {
+                authorize(authInfo.hasPermission(UserRole.ADMINISTRATOR)) {
+                  onSuccess(seriesTypeService.ask(RemoveSeriesTypeRule(seriesTypeRuleId))) {
+                    case SeriesTypeRuleRemoved(seriesTypeRuleId) =>
+                      complete(NoContent)
+                  }
+                }
+              }
             }
           }
         }
+        
       }
     }
 }

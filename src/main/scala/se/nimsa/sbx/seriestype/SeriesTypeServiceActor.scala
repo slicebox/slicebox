@@ -57,6 +57,18 @@ class SeriesTypeServiceActor(dbProps: DbProps) extends Actor with Stash
           case RemoveSeriesType(seriesTypeId) =>
             removeSeriesTypeFromDb(seriesTypeId)
             sender ! SeriesTypeRemoved(seriesTypeId)
+            
+          case GetSeriesTypeRules(seriesTypeId) =>
+            val seriesTypeRules = getSeriesTypeRulesFromDb(seriesTypeId)
+            sender ! SeriesTypeRules(seriesTypeRules)
+            
+          case AddSeriesTypeRule(seriesTypeRule) =>
+            val dbSeriesTypeRule = addSeriesTypeRuleToDb(seriesTypeRule)
+            sender ! SeriesTypeRuleAdded(dbSeriesTypeRule)
+            
+          case RemoveSeriesTypeRule(seriesTypeRuleId) =>
+            removeSeriesTypeRuleFromDb(seriesTypeRuleId)
+            sender ! SeriesTypeRuleRemoved(seriesTypeRuleId)
         }
       }
   }
@@ -89,6 +101,21 @@ class SeriesTypeServiceActor(dbProps: DbProps) extends Actor with Stash
   def removeSeriesTypeFromDb(seriesTypeId: Long): Unit =
     db.withSession { implicit session =>
       seriesTypeDao.removeSeriesType(seriesTypeId)
+    }
+  
+  def getSeriesTypeRulesFromDb(seriesTypeId: Long): Seq[SeriesTypeRule] =
+    db.withSession { implicit session =>
+      seriesTypeDao.listSeriesTypeRulesForSeriesTypeId(seriesTypeId)
+    }
+  
+  def addSeriesTypeRuleToDb(seriesTypeRule: SeriesTypeRule): SeriesTypeRule =
+    db.withSession { implicit session =>
+      seriesTypeDao.insertSeriesTypeRule(seriesTypeRule)
+    }
+  
+  def removeSeriesTypeRuleFromDb(seriesTypeRuleId: Long): Unit =
+    db.withSession { implicit session =>
+      seriesTypeDao.removeSeriesTypeRule(seriesTypeRuleId)
     }
 }
 

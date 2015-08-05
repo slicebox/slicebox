@@ -106,6 +106,9 @@ class SeriesTypeDAO(val driver: JdbcProfile) {
   def listSeriesTypes(implicit session: Session): List[SeriesType] =
     seriesTypeQuery.list
     
+  def listSeriesTypeRulesForSeriesTypeId(seriesTypeId: Long)(implicit session: Session): List[SeriesTypeRule] =
+    seriesTypeRuleQuery.filter(_.seriesTypeId === seriesTypeId).list
+    
   def removeSeriesType(seriesTypeId: Long)(implicit session: Session): Unit =
     seriesTypeQuery.filter(_.id === seriesTypeId).delete
     
