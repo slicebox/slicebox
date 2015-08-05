@@ -184,4 +184,107 @@ class SeriesTypeRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       responseAs[List[SeriesTypeRule]].size should be(1)
     }
   }
+  
+  it should "return 200 OK and return list of series type rule attributes" in {
+
+    val addedSeriesType = db.withSession { implicit session =>
+      seriesTypeDao.insertSeriesType(SeriesType(-1, "st1"))
+    }
+    
+    val addedSeriesTypeRule = db.withSession { implicit session =>
+      seriesTypeDao.insertSeriesTypeRule(SeriesTypeRule(-1, addedSeriesType.id))
+    }
+    
+    val addedSeriesTypeRuleAttribute = db.withSession { implicit session =>
+      seriesTypeDao.insertSeriesTypeRuleAttribute(SeriesTypeRuleAttribute(-1, addedSeriesTypeRule.id, 1, 2, None, "test"))
+    }
+
+    GetAsUser(s"/api/seriestypes/${addedSeriesType.id}/rules/${addedSeriesTypeRule.id}/attributes") ~> routes ~> check {
+      status should be(OK)
+      responseAs[List[SeriesTypeRuleAttribute]].size should be(1)
+    }
+  }
+  
+  it should "return 201 created and created series type rule attribute when adding new series type rule attribute" in {
+    val addedSeriesType = db.withSession { implicit session =>
+      seriesTypeDao.insertSeriesType(SeriesType(-1, "st1"))
+    }
+    
+    val addedSeriesTypeRule = db.withSession { implicit session =>
+      seriesTypeDao.insertSeriesTypeRule(SeriesTypeRule(-1, addedSeriesType.id))
+    }
+    
+    val seriesTypeRuleAttribute = SeriesTypeRuleAttribute(-1, addedSeriesTypeRule.id, 1, 2, None, "test")
+
+    PostAsAdmin(s"/api/seriestypes/${addedSeriesType.id}/rules/${addedSeriesTypeRule.id}/attributes", seriesTypeRuleAttribute) ~> routes ~> check {
+      status should be(Created)
+      val returnedSeriesTypeRuleAttribute = responseAs[SeriesTypeRuleAttribute]
+
+      returnedSeriesTypeRuleAttribute.id should be > (0L)
+      returnedSeriesTypeRuleAttribute.seriesTypeRuleId should be(addedSeriesTypeRule.id)
+      returnedSeriesTypeRuleAttribute.group should be(seriesTypeRuleAttribute.group)
+      returnedSeriesTypeRuleAttribute.element should be(seriesTypeRuleAttribute.element)
+      returnedSeriesTypeRuleAttribute.value should be(seriesTypeRuleAttribute.value)
+    }
+  }
+  
+  it should "return 403 forbidden when adding new series type rule attribute as non-admin user" in {
+    val addedSeriesType = db.withSession { implicit session =>
+      seriesTypeDao.insertSeriesType(SeriesType(-1, "st1"))
+    }
+    
+    val addedSeriesTypeRule = db.withSession { implicit session =>
+      seriesTypeDao.insertSeriesTypeRule(SeriesTypeRule(-1, addedSeriesType.id))
+    }
+    
+    val seriesTypeRuleAttribute = SeriesTypeRuleAttribute(-1, addedSeriesTypeRule.id, 1, 2, None, "test")
+
+    PostAsUser(s"/api/seriestypes/${addedSeriesType.id}/rules/${addedSeriesTypeRule.id}/attributes", seriesTypeRuleAttribute) ~> sealRoute(routes) ~> check {
+      status should be(Forbidden)
+    }
+  }
+  
+  it should "return 204 no content when deleting an existing series type rule attribute" in {
+    val addedSeriesType = db.withSession { implicit session =>
+      seriesTypeDao.insertSeriesType(SeriesType(-1, "st1"))
+    }
+    
+    val addedSeriesTypeRule = db.withSession { implicit session =>
+      seriesTypeDao.insertSeriesTypeRule(SeriesTypeRule(-1, addedSeriesType.id))
+    }
+    
+    val addedSeriesTypeRuleAttribute = db.withSession { implicit session =>
+      seriesTypeDao.insertSeriesTypeRuleAttribute(SeriesTypeRuleAttribute(-1, addedSeriesTypeRule.id, 1, 2, None, "test"))
+    }
+
+    DeleteAsAdmin(s"/api/seriestypes/${addedSeriesType.id}/rules/${addedSeriesTypeRule.id}/attributes/${addedSeriesTypeRuleAttribute.id}") ~> routes ~> check {
+      status should be(NoContent)
+    }
+
+    GetAsUser(s"/api/seriestypes/${addedSeriesType.id}/rules/${addedSeriesTypeRule.id}/attributes") ~> routes ~> check {
+      responseAs[List[SeriesTypeRuleAttribute]].size should be(0)
+    }
+  }
+  
+  it should "return 403 forbidden deleting an existing series type rule attribute as non-admin user" in {
+    val addedSeriesType = db.withSession { implicit session =>
+      seriesTypeDao.insertSeriesType(SeriesType(-1, "st1"))
+    }
+    
+    val addedSeriesTypeRule = db.withSession { implicit session =>
+      seriesTypeDao.insertSeriesTypeRule(SeriesTypeRule(-1, addedSeriesType.id))
+    }
+    
+    val addedSeriesTypeRuleAttribute = db.withSession { implicit session =>
+      seriesTypeDao.insertSeriesTypeRuleAttribute(SeriesTypeRuleAttribute(-1, addedSeriesTypeRule.id, 1, 2, None, "test"))
+    }
+
+    DeleteAsUser(s"/api/seriestypes/${addedSeriesType.id}/rules/${addedSeriesTypeRule.id}/attributes/${addedSeriesTypeRuleAttribute.id}") ~> sealRoute(routes) ~> check {
+      status should be(Forbidden)
+    }
+    
+    GetAsUser(s"/api/seriestypes/${addedSeriesType.id}/rules/${addedSeriesTypeRule.id}/attributes") ~> routes ~> check {
+      responseAs[List[SeriesTypeRuleAttribute]].size should be(1)
+    }
+  }
 }

@@ -69,6 +69,18 @@ class SeriesTypeServiceActor(dbProps: DbProps) extends Actor with Stash
           case RemoveSeriesTypeRule(seriesTypeRuleId) =>
             removeSeriesTypeRuleFromDb(seriesTypeRuleId)
             sender ! SeriesTypeRuleRemoved(seriesTypeRuleId)
+            
+          case GetSeriesTypeRuleAttributes(seriesTypeRuleId) =>
+            val seriesTypeRuleAttributes = getSeriesTypeRuleAttributesFromDb(seriesTypeRuleId)
+            sender ! SeriesTypeRuleAttributes(seriesTypeRuleAttributes)
+            
+          case AddSeriesTypeRuleAttribute(seriesTypeRuleAttribute) =>
+            val dbSeriesTypeRuleAttribute = addSeriesTypeRuleAttributeToDb(seriesTypeRuleAttribute)
+            sender ! SeriesTypeRuleAttributeAdded(dbSeriesTypeRuleAttribute)
+            
+          case RemoveSeriesTypeRuleAttribute(seriesTypeRuleAttributeId) =>
+            removeSeriesTypeRuleAttributeFromDb(seriesTypeRuleAttributeId)
+            sender ! SeriesTypeRuleAttributeRemoved(seriesTypeRuleAttributeId)
         }
       }
   }
@@ -108,6 +120,11 @@ class SeriesTypeServiceActor(dbProps: DbProps) extends Actor with Stash
       seriesTypeDao.listSeriesTypeRulesForSeriesTypeId(seriesTypeId)
     }
   
+  def getSeriesTypeRuleAttributesFromDb(seriesTypeRuleId: Long): Seq[SeriesTypeRuleAttribute] =
+    db.withSession { implicit session =>
+      seriesTypeDao.listSeriesTypeRuleAttributesForSeriesTypeRuleId(seriesTypeRuleId)
+    }
+  
   def addSeriesTypeRuleToDb(seriesTypeRule: SeriesTypeRule): SeriesTypeRule =
     db.withSession { implicit session =>
       seriesTypeDao.insertSeriesTypeRule(seriesTypeRule)
@@ -116,6 +133,16 @@ class SeriesTypeServiceActor(dbProps: DbProps) extends Actor with Stash
   def removeSeriesTypeRuleFromDb(seriesTypeRuleId: Long): Unit =
     db.withSession { implicit session =>
       seriesTypeDao.removeSeriesTypeRule(seriesTypeRuleId)
+    }
+  
+  def addSeriesTypeRuleAttributeToDb(seriesTypeRuleAttribute: SeriesTypeRuleAttribute): SeriesTypeRuleAttribute =
+    db.withSession { implicit session =>
+      seriesTypeDao.insertSeriesTypeRuleAttribute(seriesTypeRuleAttribute)
+    }
+  
+  def removeSeriesTypeRuleAttributeFromDb(seriesTypeRuleAttributeId: Long): Unit =
+    db.withSession { implicit session =>
+      seriesTypeDao.removeSeriesTypeRuleAttribute(seriesTypeRuleAttributeId)
     }
 }
 
