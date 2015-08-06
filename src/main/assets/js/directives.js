@@ -707,10 +707,56 @@ angular.module('slicebox.directives', [])
                 rendererChildScope.rawPropertyValue = rawPropertyValue;
                 rendererChildScope.filteredPropertyValue = $scope.filteredCellValues[$scope.$parent.$index][$scope.columnDefinition.property];
 
+                rendererChildScope.firstRowObject = $scope.$parent.$first;
+                rendererChildScope.lastRowObject = $scope.$parent.$last;
+
                 rendererTranscludeFn(rendererChildScope, function(rendererElement) {
                     $element.append(rendererElement);
                 });
             }
+        }
+        
+    };
+    
+})
+
+.directive('sbxDicomHexValue', function() {
+    
+    return {
+        require: 'ngModel',
+        restrict: 'A',
+        link: function($scope, $element, $attrs, ngModel) {
+            ngModel.$parsers.push(function(value) {
+                if (angular.isUndefined(value)) {
+                    return value;
+                }
+
+                var hexValue = '0x' + value.trim();
+
+                var intValue = parseInt(hexValue);
+                if (!isNaN(intValue)) {
+                    ngModel.$setValidity('sbxDicomHexValue', true);
+
+                    return intValue;
+                }
+
+                ngModel.$setValidity('sbxDicomHexValue', false);
+                return undefined;
+            });
+
+            ngModel.$formatters.push(function(value) {
+                if (angular.isUndefined(value) || value === 0) {
+                    return '';
+                }
+
+                var returnValue = value.toString(16);
+
+                while (returnValue.length < 4) {
+                    returnValue = '0' + returnValue;
+                }
+
+                return returnValue;
+            });
         }
         
     };
