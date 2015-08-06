@@ -192,6 +192,29 @@ class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
       }
     }
     
+    "deletes series type rules when a series type is deleted" in {
+      val addedSeriesType = db.withSession { implicit session =>
+        seriesTypeDao.insertSeriesType(SeriesType(-1, "st1"))
+      }
+      
+      val addedSeriesTypeRule = db.withSession { implicit session =>
+        seriesTypeDao.insertSeriesTypeRule(SeriesTypeRule(-1, addedSeriesType.id))
+      }
+      
+      seriesTypeService ! RemoveSeriesType(addedSeriesType.id)
+      
+      expectMsgPF() {
+        case SeriesTypeRemoved(seriesTypeId) => true
+      }
+      
+      seriesTypeService ! GetSeriesTypeRules(addedSeriesType.id)
+        
+      expectMsgPF() {
+        case SeriesTypeRules(seriesTypeRules) =>
+          seriesTypeRules.size should be(0)
+      }
+    }
+    
     "be able to add and get series type rule attribute" in {
       val addedSeriesType = db.withSession { implicit session =>
         seriesTypeDao.insertSeriesType(SeriesType(-1, "st1"))
@@ -237,6 +260,32 @@ class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
       expectMsgPF() {
         case SeriesTypeRuleAttributeRemoved(seriesTypeRuleAttributeId) =>
           seriesTypeRuleAttributeId should be(addedSeriesTypeRuleAttribute.id)
+      }
+      
+      seriesTypeService ! GetSeriesTypeRuleAttributes(addedSeriesTypeRule.id)
+        
+      expectMsgPF() {
+        case SeriesTypeRuleAttributes(seriesTypeRuleAttributes) =>
+          seriesTypeRuleAttributes.size should be(0)
+      }
+    }
+    
+    "deletes series type rule attributes when a series type rule is deleted" in {
+      val addedSeriesType = db.withSession { implicit session =>
+        seriesTypeDao.insertSeriesType(SeriesType(-1, "st1"))
+      }
+      
+      val addedSeriesTypeRule = db.withSession { implicit session =>
+        seriesTypeDao.insertSeriesTypeRule(SeriesTypeRule(-1, addedSeriesType.id))
+      }
+      
+      val addedSeriesTypeRuleAttribute = db.withSession { implicit session =>
+        seriesTypeDao.insertSeriesTypeRuleAttribute(SeriesTypeRuleAttribute(-1, addedSeriesTypeRule.id, 1, 2, None, "test"))
+      }
+      
+      seriesTypeService ! RemoveSeriesTypeRule(addedSeriesTypeRule.id)
+      expectMsgPF() {
+        case SeriesTypeRuleRemoved(seriesTypeRuleId) => true
       }
       
       seriesTypeService ! GetSeriesTypeRuleAttributes(addedSeriesTypeRule.id)
