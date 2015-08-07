@@ -1,0 +1,80 @@
+<md-dialog aria-label="Add Box" flex="75">
+	<form name="editAttributeForm" ng-submit="saveAttribute()" novalidate>
+
+  	<md-content class="sticky-container">
+  		<md-subheader class="md-sticky-no-effect">
+  			<span ng-if="attribute.id">Edit Attribute</span>
+  			<span ng-if="!attribute.id">Add Attribute</span>
+  		</md-subheader>
+
+  		<div layout="row">
+	  		<md-input-container flex>
+	  			<label>Group</label>
+				<input
+					sbx-dicom-hex-value
+					ng-model="attribute.group"
+					type="text"
+					name="group"
+					required>
+				<div ng-messages="editAttributeForm.group.$error"
+		            ng-show="editAttributeForm.$submitted">
+
+		            <div ng-message="required"
+		            	ng-show="editAttributeForm.group.$error.required">group is required</div>
+		            <div ng-message="sbxDicomHexValue"
+		            	ng-show="editAttributeForm.group.$error.sbxDicomHexValue">must be valid hex number</div>
+		        </div>
+			</md-input-container>
+
+			<md-input-container flex>
+				<label>Element</label>
+				<input
+					sbx-dicom-hex-value
+					ng-model="attribute.element"
+					type="text"
+					name="element"
+					required>		             
+
+				<div ng-messages="editAttributeForm.element.$error"
+		            ng-show="editAttributeForm.$submitted">
+
+		            <div ng-message="required"
+		            	ng-show="editAttributeForm.element.$error.required">element is required</div>
+		            <div ng-message="sbxDicomHexValue"
+		            	ng-show="editAttributeForm.element.$error.sbxDicomHexValue">must be valid hex number</div>
+		        </div>       			
+			</md-input-container>
+
+			<md-input-container flex>
+				<label>Path</label>
+				<input
+					ng-model="attribute.path"
+					type="text">
+			</md-input-container>
+
+			<md-input-container flex>
+				<label>Value</label>
+				<input
+					ng-model="attribute.value"
+					type="text"
+					name="value"
+					required>
+
+				<div ng-messages="editAttributeForm.value.$error"
+		            ng-show="editAttributeForm.$submitted">
+
+		            <div ng-message="required"
+		            	ng-show="editAttributeForm.value.$error.required">value is required</div>
+		        </div>
+		    </md-input-container>
+		</div>
+  	</md-content>
+
+  	<div class="md-actions" layout="row">
+    	<span flex></span>
+    	<md-button ng-click="cancelButtonClicked()">Cancel</md-button>
+		<md-button class="md-primary" type="submit">OK</md-button>
+    </div>
+
+    </form>
+ </md-dialog>
