@@ -46,11 +46,68 @@
 		                        </div>
 		                    </md-input-container>
 
-		                    <md-button class="md-primary md-raised" type="submit"
-		                    	ng-click="saveButtonClicked()"
-		                    	ng-disabled="!seriesTypeDataChanged()">
-				                Save
-				            </md-button>
+		                    <md-card ng-repeat="rule in state.rules">
+		                    	<md-card-content>
+		                    		<h4 class="md-flex">Rule {{$index + 1}}</h4>
+
+		                    		<md-progress-circular ng-if="!rule.attributes" md-mode="indeterminate"></md-progress-circular>
+
+		                    		<span ng-if="rule.attributes">
+			                    		<sbx-grid
+				                            load-page="loadSeriesTypeRuleAttributes(rule)"
+				                            object-actions="attributeActions"
+				                            page-size="100000"
+				                            sorting="false"
+				                            callbacks="callbacks.ruleAttributesTables[$index]"
+				                            empty-message="No attributes added">
+
+				                            <sbx-grid-column property="group" title="Group" filter="hexvalue: 4">
+				                            </sbx-grid-column>
+
+				                            <sbx-grid-column property="element" title="Element" filter="hexvalue: 4">
+				                            </sbx-grid-column>
+
+				                            <sbx-grid-column property="path" title="Path">
+				                            </sbx-grid-column>
+
+				                            <sbx-grid-column property="temp1" title="">
+				                            	<sbx-grid-cell>
+				                            		<span>=</span>
+				                            	</sbx-grid-cell>
+				                            </sbx-grid-column>
+
+											<sbx-grid-column property="value" title="Value">
+				                            </sbx-grid-column>
+
+				                            <sbx-grid-column property="temp2" title="">
+				                            	<sbx-grid-cell>
+				                            		<span ng-if="!isLastRowObject()" style="font-weight: bold">AND</span>
+				                            	</sbx-grid-cell>
+				                            </sbx-grid-column>		                            
+				                        </sbx-grid>
+				                    </span>
+		                    		
+		                    		<div layout="row" class="button-row">
+					                    <md-button md-no-ink class="md-primary" type="button" ng-click="addRuleAttributeButtonClicked(rule, $index)">
+					                        Add Attribute
+					                    </md-button>
+					                </div>
+		                    	</md-card-content>
+		                    </md-card>
+
+		                    <div layout="row" class="button-row">
+		                    	<div flex></div>
+			                    <md-button md-no-ink class="md-primary" type="button" ng-click="addRuleButtonClicked()">
+			                        Add Rule
+			                    </md-button>
+			                </div>
+
+			                <sbx-button button-class="md-raised md-primary"
+								button-type="submit"
+								button-disabled="!seriesTypeDataChanged()"
+								button-title="Save"
+								action="saveButtonClicked()">
+							</sbx-button>
 	                    </md-content>
 	                </md-card-content>
 	            </md-card>

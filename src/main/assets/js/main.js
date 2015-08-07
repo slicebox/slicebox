@@ -23,7 +23,7 @@ angular.module('slicebox', [
     'slicebox.adminSeriesTypes'
 ])
 
-.config(function($locationProvider, $routeProvider, $mdThemingProvider, $animateProvider) {
+.config(function($locationProvider, $routeProvider, $mdThemingProvider, $animateProvider, $filterProvider) {
     $locationProvider.html5Mode(true);
     $routeProvider.otherwise({redirectTo: '/'});
 
@@ -39,6 +39,27 @@ angular.module('slicebox', [
 
     // prevent ng-animate on spinners, causes weird behaviour with ng-if/ng-show
     $animateProvider.classNameFilter(/^((?!(fa-spinner)).)*$/);
+
+    // Register filters
+    $filterProvider.register('hexvalue', function() {
+        return function(intValue, length) {
+            var returnValue = intValue;
+
+            if (!length) {
+                length = 4;
+            }
+
+            if (angular.isDefined(intValue) && angular.isNumber(intValue) && intValue !== 0) {
+                returnValue = intValue.toString(16);
+
+                while (returnValue.length < length) {
+                    returnValue = '0' + returnValue;
+                }
+            }
+
+            return returnValue;
+        };
+    });
 })
 
 .filter('prettyPatientName', function () {
