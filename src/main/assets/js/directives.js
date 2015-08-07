@@ -707,8 +707,13 @@ angular.module('slicebox.directives', [])
                 rendererChildScope.rawPropertyValue = rawPropertyValue;
                 rendererChildScope.filteredPropertyValue = $scope.filteredCellValues[$scope.$parent.$index][$scope.columnDefinition.property];
 
-                rendererChildScope.firstRowObject = $scope.$parent.$first;
-                rendererChildScope.lastRowObject = $scope.$parent.$last;
+                rendererChildScope.isFirstRowObject = function() {
+                        return $scope.$parent.$first;
+                    };
+
+                rendererChildScope.isLastRowObject = function() {
+                        return $scope.$parent.$last;
+                    };
 
                 rendererTranscludeFn(rendererChildScope, function(rendererElement) {
                     $element.append(rendererElement);
