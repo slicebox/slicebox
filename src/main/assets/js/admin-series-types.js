@@ -137,7 +137,9 @@ angular.module('slicebox.adminSeriesTypes', ['ngRoute'])
 		}
 		
 		savePromise = savePromise.then(function(response) {
-			$scope.uiState.selectedSeriesType.id = response.data.id;
+			if (response.data.id) {
+				$scope.uiState.selectedSeriesType.id = response.data.id;
+			}
 			
 			return saveRules();
 		});
