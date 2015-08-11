@@ -55,6 +55,8 @@ angular.module('slicebox', [
                 while (returnValue.length < length) {
                     returnValue = '0' + returnValue;
                 }
+
+                returnValue = returnValue.toUpperCase();
             }
 
             return returnValue;
