@@ -369,7 +369,10 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
               val strings = truncatedStrings.map(s => if (s.length() > 1024) s.substring(0, 1024) + " ..." else s)
               (toSingleString(strings), strings.length)
           }
-          attributesBuffer += ImageAttribute(group, element, vrName, length, multiplicity, depth, path, name, content)
+          
+          var valueStringRepresentation = attrs.getString(tag, "")
+          
+          attributesBuffer += ImageAttribute(group, element, vrName, length, multiplicity, depth, path, name, content, valueStringRepresentation)
           if (vr == VR.SQ) {
             val nextPath = if (path.isEmpty()) name else path + '/' + name
             attributesBuffer ++= readImageAttributes(attrs.getNestedDataset(tag), depth + 1, nextPath)

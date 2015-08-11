@@ -138,7 +138,7 @@ trait JsonFormats extends DefaultJsonProtocol {
 
   implicit val fileNameFormat = jsonFormat1(FileName)
   implicit val imageFileFormat = jsonFormat4(ImageFile)
-  implicit val imageAttributeFormat = jsonFormat9(ImageAttribute)
+  implicit val imageAttributeFormat = jsonFormat10(ImageAttribute)
   
   implicit val imagesFormat = jsonFormat1(Images)
   

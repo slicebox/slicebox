@@ -1,0 +1,58 @@
+<md-dialog aria-label="Add Series Type Rule" flex="50">
+	<md-content class="sticky-container">
+		<md-subheader class="md-sticky-no-effect">
+			Add Series Type Rule
+		</md-subheader>
+
+		<h5>
+			Add rule
+		</h5>
+
+		<div layout="row">
+			<div flex layout="column">
+				<div layout="row" ng-repeat="tagValue in tagValues">
+					<span>
+						<span>{{tagValue.name}}</span>
+						<span ng-if="tagValue.path">({{tagValue.path}})</span>
+					</span>
+					
+					<!-- <div flex="5" layout="row" layout-align="center center"> -->
+						<span style="margin-left: 5px; margin-right: 5px">=</span>
+					<!-- </div> -->
+
+					<span>{{tagValue.valueStringRepresentation}}</span>
+
+					<span ng-if="!$last" style="margin-left: 5px; font-weight: bold">AND</span>
+				</div>
+			</div>
+		</div>
+
+		<div layout="column">
+			<div layout="row" layout-align="start center">
+				<h5 style="margin-right: 5px">
+					to Series Type
+			    </h5>
+
+			    <md-select
+					name="seriesType"
+					ng-model="seriesType"
+					md-on-open="loadSeriesTypes()"
+					required>
+			     	
+			     	<md-select-label>{{ seriesType ? seriesType.name : 'Select Series Type' }}</md-select-label>
+			     	<md-option ng-value="seriesType" ng-repeat="seriesType in seriesTypes">{{seriesType.name}}</md-option>
+			    </md-select>
+			</div>
+		</div>
+	</md-content>
+
+	<div class="md-actions" layout="row">
+    	<span flex></span>
+    	<md-button ng-click="cancelButtonClicked()">Cancel</md-button>
+    	<sbx-button button-class="md-primary"
+			button-disabled="!seriesType"
+			button-title="Create Rule"
+			action="createRuleButtonClicked()">
+		</sbx-button>
+    </div>
+</md-dialog>
