@@ -79,7 +79,8 @@ object StorageProtocol {
       depth: Int, 
       path: String, 
       name: String, 
-      value: String)
+      value: String,
+      valueStringRepresentation: String)
   
   case class ImageInformation(
       numberOfFrames: Int,

@@ -78,6 +78,15 @@ angular.module('slicebox.home', ['ngRoute'])
             }
         ];
 
+    $scope.imageAttributesActions =
+        [
+            {
+                name: 'Add Series Type Rule',
+                action: addSeriesTypeRule
+            }
+        ];
+
+
     $scope.callbacks = {};
 
     $scope.uiState = {};
@@ -622,6 +631,19 @@ angular.module('slicebox.home', ['ngRoute'])
         });
     }
 
+    function addSeriesTypeRule(tagValues) {
+        var dialogPromise = $mdDialog.show({
+            templateUrl: '/assets/partials/addSeriesTypeRuleFromTagValuesModalContent.html',
+            controller: 'AddSeriesTypeRuleFromTagValuesModalCtrl',
+            locals: {
+                    tagValues: tagValues
+                },
+            scope: $scope.$new()
+        });
+
+        return dialogPromise;
+    }
+
 })
 
 .controller('SelectReceiverModalCtrl', function($scope, $mdDialog, $http, receiversUrl, receiverSelectedCallback) {
@@ -718,4 +740,74 @@ angular.module('slicebox.home', ['ngRoute'])
 
     $scope.updateAnonymousPatientNames();
     
+})
+
+.controller('AddSeriesTypeRuleFromTagValuesModalCtrl', function($scope, $mdDialog, $http, $q, tagValues) {
+    // Initialization
+    $scope.tagValues = tagValues;
+
+    // Scope functions
+    $scope.loadSeriesTypes = function() {
+        var loadSeriesTypesPromise = $http.get('/api/seriestypes');
+
+        $scope.seriesTypes = [];
+
+        loadSeriesTypesPromise.success(function(seriesTypes) {
+            $scope.seriesTypes = seriesTypes;
+        });      
+
+        return loadSeriesTypesPromise;
+    };
+
+    $scope.createRuleButtonClicked = function() {
+        var savePromise = $http.post('/api/seriestypes/' + $scope.seriesType.id + '/rules',
+            { id: -1, seriesTypeId: $scope.seriesType.id });
+
+        savePromise = savePromise.then(function(response) {
+                return saveRuleAttributes(response.data);
+            });
+
+        savePromise.then(function() {
+            $scope.showInfoMessage("Rule created");
+            $mdDialog.hide();
+        }, function(error) {
+            $scope.showErrorMessage('Failed to create rule: ' + error);
+        });
+
+        return savePromise;
+    };
+
+    $scope.cancelButtonClicked = function() {
+        $mdDialog.cancel();
+    };
+
+    // Private functions
+    function saveRuleAttributes(rule) {
+        var saveAttributePromises = [];
+        var savePromise;
+
+        angular.forEach($scope.tagValues, function(attribute) {
+            newAttribute = {
+                    id: -1,
+                    seriesTypeRuleId: rule.id,
+                    group: parseInt(attribute.group,16),
+                    element: parseInt(attribute.element,16),
+                    value: attribute.valueStringRepresentation
+                };
+
+            if (attribute.path && attribute.path.length > 0) {
+                newAttribute.path = attribute.path;
+            }
+
+            savePromise = $http.post(
+                '/api/seriestypes/' +
+                $scope.seriesType.id + '/rules/' +
+                rule.id + '/attributes',
+                newAttribute);
+
+            saveAttributePromises.push(savePromise);
+        });
+
+        return $q.all(saveAttributePromises);
+    }
 });
