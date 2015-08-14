@@ -25,14 +25,21 @@ import akka.event.LoggingReceive
 import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.util.ExceptionCatching
 import se.nimsa.sbx.util.SequentialPipeToSupport
+import akka.event.Logging
 
 class SeriesTypeServiceActor(dbProps: DbProps) extends Actor with Stash
   with SequentialPipeToSupport with ExceptionCatching {
   
+  val log = Logging(context.system, this)
+  
   val db = dbProps.db
   val seriesTypeDao = new SeriesTypeDAO(dbProps.driver)
   
+  val seriesTypeUpdateService = context.actorSelection("../SeriesTypeUpdateService")
+  
   setupDb()
+  
+  log.info("Series type service started")
 
   def receive = LoggingReceive {
     
@@ -56,6 +63,7 @@ class SeriesTypeServiceActor(dbProps: DbProps) extends Actor with Stash
             
           case RemoveSeriesType(seriesTypeId) =>
             removeSeriesTypeFromDb(seriesTypeId)
+            seriesTypeUpdateService ! UpdateSeriesTypesForAllSeries
             sender ! SeriesTypeRemoved(seriesTypeId)
             
           case GetSeriesTypeRules(seriesTypeId) =>
@@ -68,6 +76,7 @@ class SeriesTypeServiceActor(dbProps: DbProps) extends Actor with Stash
             
           case RemoveSeriesTypeRule(seriesTypeRuleId) =>
             removeSeriesTypeRuleFromDb(seriesTypeRuleId)
+            seriesTypeUpdateService ! UpdateSeriesTypesForAllSeries
             sender ! SeriesTypeRuleRemoved(seriesTypeRuleId)
             
           case GetSeriesTypeRuleAttributes(seriesTypeRuleId) =>
@@ -76,10 +85,12 @@ class SeriesTypeServiceActor(dbProps: DbProps) extends Actor with Stash
             
           case AddSeriesTypeRuleAttribute(seriesTypeRuleAttribute) =>
             val dbSeriesTypeRuleAttribute = addSeriesTypeRuleAttributeToDb(seriesTypeRuleAttribute)
+            seriesTypeUpdateService ! UpdateSeriesTypesForAllSeries
             sender ! SeriesTypeRuleAttributeAdded(dbSeriesTypeRuleAttribute)
             
           case RemoveSeriesTypeRuleAttribute(seriesTypeRuleAttributeId) =>
             removeSeriesTypeRuleAttributeFromDb(seriesTypeRuleAttributeId)
+            seriesTypeUpdateService ! UpdateSeriesTypesForAllSeries
             sender ! SeriesTypeRuleAttributeRemoved(seriesTypeRuleAttributeId)
         }
       }

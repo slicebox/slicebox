@@ -3,18 +3,24 @@ package se.nimsa.sbx.app.routing
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.FlatSpec
 import org.scalatest.Matchers
-
 import se.nimsa.sbx.log.LogProtocol.LogEntry
 import se.nimsa.sbx.log.SbxLog
 import spray.http.StatusCodes._
 import spray.httpx.SprayJsonSupport._
+import scala.slick.driver.H2Driver
+import se.nimsa.sbx.log.LogDAO
 
 class LogRoutesTest extends FlatSpec with Matchers with RoutesTestBase with BeforeAndAfterAll {
 
   def dbUrl() = "jdbc:h2:mem:logroutestest;DB_CLOSE_DELAY=-1"
+  
+  val logDao = new LogDAO(H2Driver)
 
-  override def beforeAll() {
-    super.beforeAll()
+  override def beforeEach() {
+    db.withSession { implicit session =>
+      logDao.clear
+    }
+    
     SbxLog.info("Category1", "Message1")
     SbxLog.info("Category1", "Message2")
     SbxLog.warn("Category1", "Message3")
@@ -38,11 +44,15 @@ class LogRoutesTest extends FlatSpec with Matchers with RoutesTestBase with Befo
   }
   
   it should "support removing log messages" in {
-    DeleteAsUser("/api/log/1") ~> routes ~> check {
+    val logEntries = db.withSession { implicit session =>
+      logDao.listLogEntries(0, 2)
+    }
+    
+    DeleteAsUser(s"/api/log/${logEntries(0).id}") ~> routes ~> check {
       status should be (NoContent)
     }
     
-    DeleteAsUser("/api/log/6") ~> routes ~> check {
+    DeleteAsUser(s"/api/log/${logEntries(1).id}") ~> routes ~> check {
       status should be (NoContent)
     }
     

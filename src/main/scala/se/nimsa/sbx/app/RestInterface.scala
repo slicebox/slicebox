@@ -38,6 +38,7 @@ import se.nimsa.sbx.seriestype.SeriesTypeServiceActor
 import se.nimsa.sbx.anonymization.AnonymizationServiceActor
 import java.util.concurrent.TimeUnit._
 import com.typesafe.config.Config
+import se.nimsa.sbx.seriestype.SeriesTypeUpdateActor
 
 class RestInterface extends Actor with RestApi {
 
@@ -115,6 +116,7 @@ trait RestApi extends HttpService with SliceboxRoutes with JsonFormats {
   val scuService = actorRefFactory.actorOf(ScuServiceActor.props(dbProps, storage), name = "ScuService")
   val directoryService = actorRefFactory.actorOf(DirectoryWatchServiceActor.props(dbProps, storage), name = "DirectoryService")
   val seriesTypeService = actorRefFactory.actorOf(SeriesTypeServiceActor.props(dbProps), name = "SeriesTypeService")
+  val seriesTypeUpdateService = actorRefFactory.actorOf(SeriesTypeUpdateActor.props(dbProps), name = "SeriesTypeUpdateService")
 
   val authenticator = new Authenticator(userService)
 

@@ -45,6 +45,9 @@ class LogDAO(val driver: JdbcProfile) {
 
   def drop(implicit session: Session): Unit =
     (logQuery.ddl).drop
+    
+  def clear(implicit session: Session): Unit =
+    logQuery.delete
 
   def insertLogEntry(logEntry: LogEntry)(implicit session: Session): LogEntry = {
     val generatedId = (logQuery returning logQuery.map(_.id)) += logEntry
