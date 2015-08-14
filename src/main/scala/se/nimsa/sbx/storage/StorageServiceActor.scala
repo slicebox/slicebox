@@ -43,6 +43,7 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.Date
 import se.nimsa.sbx.storage.StorageProtocol._
+import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomPropertyValue._
 import se.nimsa.sbx.dicom.DicomUtil._
@@ -62,6 +63,8 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
   val propertiesDao = new PropertiesDAO(dbProps.driver)
 
   setupDb()
+  
+  val seriesTypeUpdateService = context.actorSelection("../SeriesTypeUpdateService")
 
   implicit val ec = ExecutionContexts.fromExecutor(Executors.newWorkStealingPool())
 
@@ -319,6 +322,8 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
 
         try {
           saveDataset(dataset, storedPath)
+          
+          seriesTypeUpdateService ! UpdateSeriesTypesForSeries(dbSeries.id)
         } catch {
           case e: Exception =>
             SbxLog.error("Storage", "Dataset file could not be stored: " + e.getMessage)

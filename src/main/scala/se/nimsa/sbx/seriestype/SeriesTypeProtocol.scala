@@ -32,6 +32,7 @@ object SeriesTypeProtocol {
       path: Option[String],
       value: String) extends Entity
   
+  case class SeriesSeriesType(seriesId: Long, seriesTypeId: Long)
   
   case class SeriesTypes(seriesTypes: Seq[SeriesType])
   
@@ -77,4 +78,20 @@ object SeriesTypeProtocol {
   case class SeriesTypeRuleAttributeAdded(seriesTypeRuleAttribute: SeriesTypeRuleAttribute)
   
   case class SeriesTypeRuleAttributeRemoved(seriesTypeRuleAttributeId: Long)
+  
+  
+  sealed trait SeriesTypesUpdateRequest
+  
+  case class UpdateSeriesTypesForSeries(seriesId: Long) extends SeriesTypesUpdateRequest
+  
+  case object UpdateSeriesTypesForAllSeries extends SeriesTypesUpdateRequest
+  
+  case object GetUpdateSeriesTypesRunningStatus extends SeriesTypesUpdateRequest
+  
+  case class UpdateSeriesTypesRunningStatus(running: Boolean)
+  
+  
+  // series types update actor internal messages
+
+  case object PollSeriesTypesUpdateQueue
 }
