@@ -19,6 +19,7 @@ package se.nimsa.sbx.storage
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
+import java.nio.file.NoSuchFileException
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.Future
 import akka.actor.Actor
@@ -63,7 +64,7 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
   val propertiesDao = new PropertiesDAO(dbProps.driver)
 
   setupDb()
-  
+
   val seriesTypeUpdateService = context.actorSelection("../SeriesTypeUpdateService")
 
   implicit val ec = ExecutionContexts.fromExecutor(Executors.newWorkStealingPool())
@@ -117,8 +118,16 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
       catchAndReport {
         db.withSession { implicit session =>
           dao.imageById(imageId).foreach { image =>
-            val imageFile = propertiesDao.imageFileForImage(image.id)
-              .foreach(deleteFromStorage(_))
+            propertiesDao.imageFileForImage(image.id)
+              .foreach { imageFile =>
+                try {
+                  deleteFromStorage(imageFile)
+                } catch {
+                  case e: NoSuchFileException =>
+                    SbxLog.info("Storage", s"DICOM file ${imageFile.fileName.value} for image with id ${image.id} could not be found, no need to delete.")
+                    null
+                }
+              }
             dao.deleteFully(image)
           }
           sender ! ImageDeleted(imageId)
@@ -322,7 +331,7 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
 
         try {
           saveDataset(dataset, storedPath)
-          
+
           seriesTypeUpdateService ! UpdateSeriesTypesForSeries(dbSeries.id)
         } catch {
           case e: Exception =>
@@ -374,9 +383,9 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
               val strings = truncatedStrings.map(s => if (s.length() > 1024) s.substring(0, 1024) + " ..." else s)
               (toSingleString(strings), strings.length)
           }
-          
+
           var valueStringRepresentation = attrs.getString(tag, "")
-          
+
           attributesBuffer += ImageAttribute(group, element, vrName, length, multiplicity, depth, path, name, content, valueStringRepresentation)
           if (vr == VR.SQ) {
             val nextPath = if (path.isEmpty()) name else path + '/' + name

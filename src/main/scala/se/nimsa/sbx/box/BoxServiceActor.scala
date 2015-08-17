@@ -53,8 +53,6 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String, impli
   val db = dbProps.db
   val boxDao = new BoxDAO(dbProps.driver)
 
-  val storageService = context.actorSelection("../StorageService")
-
   implicit val system = context.system
   implicit val ec = context.dispatcher
 
