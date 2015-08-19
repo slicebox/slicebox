@@ -1648,11 +1648,11 @@
         "tags": ["Directories"],
         "parameters": [
           {
-            "name": "watchDirectory",
-            "description": "directory to setup a watch for",
+            "name": "watchedDirectory",
+            "description": "directory to setup a watch for. The ID property is irrelevant, the ID of the inserted record is present in the returned data.",
             "in": "body",
             "schema": {
-              "$ref": "#/definitions/watchDirectory"
+              "$ref": "#/definitions/watchedDirectory"
             }
           }
         ],
@@ -1709,11 +1709,11 @@
         "tags": ["SCPs"],
         "parameters": [
           {
-            "name": "addScp",
-            "description": "SCP information",
+            "name": "scp",
+            "description": "SCP information. The ID property is irrelevant, the ID of the inserted record is present in the returned data.",
             "in": "body",
             "schema": {
-              "$ref": "#/definitions/addScp"
+              "$ref": "#/definitions/scp"
             }
           }
         ],
@@ -1770,11 +1770,11 @@
         "tags": ["SCUs"],
         "parameters": [
           {
-            "name": "addScu",
-            "description": "SCU information",
+            "name": "scu",
+            "description": "SCU information. The ID property is irrelevant, the ID of the inserted record is present in the returned data.",
             "in": "body",
             "schema": {
-              "$ref": "#/definitions/addScu"
+              "$ref": "#/definitions/scu"
             }
           }
         ],
@@ -1808,12 +1808,294 @@
           }
         }        
       }      
+    },
+
+    "/seriestypes": {
+      "get": {
+        "description": "get a list of added series types. By filtering search results for certain series types, it is easier for applications to ensure that they read images of applicable types.",
+        "tags": ["Series Types"],
+        "responses": {
+          "200": {
+            "description": "the list of series types",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/seriestype"
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "description": "add a new series type",
+        "tags": ["Series Types"],
+        "parameters": [
+          {
+            "name": "SeriesType",
+            "description": "Series type information. The ID property is irrelevant, the ID of the inserted record is present in the returned data.",
+            "in": "body",
+            "schema": {
+              "$ref": "#/definitions/seriestype"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "the created series type",
+            "schema": {
+              "$ref": "#/definitions/seriestype"
+            }
+          }
+        }
+      }
+    },
+
+    "seriestypes/{id}": {
+      "put": {
+        "description": "request an asynchronous update of all series, labelling appropriate series with the series type corresponding to the supplied ID.",
+        "tags": ["Series Types"],
+        "parameters": [
+          {
+            "name": "id",
+            "description": "id of series type to update series labels for",
+            "in": "path",
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "update successfully added to queue of series type updates"
+          }
+        }
+      },
+      "delete": {
+        "description": "remove the series type corresponding to the supplied ID",
+        "tags": ["Series Types"],
+        "parameters": [
+          {
+            "name": "id",
+            "description": "id of series type to remove",
+            "in": "path",
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "series type removed"
+          }
+        }        
+      }      
+    },
+
+    "seriestypes/rules": {
+      "get": {
+        "description": "get a list of rules for assigning series types to series. A rule connects to a series of attributes with values and a resulting series type. If a series has the required values of the listed attributes, it is assigned to the series type of the rule.",
+        "tags": ["Series Types"],
+        "parameters": [
+          {
+            "name": "seriestypeid",
+            "in": "query",
+            "description": "ID of series type to list rules for",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "the list of series type rules for the series type with the supplied ID",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/seriestyperule"
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "description": "add a new series type rule",
+        "tags": ["Series Types"],
+        "parameters": [
+          {
+            "name": "SeriesTypeRule",
+            "description": "Series type rule information. The ID property is irrelevant, the ID of the inserted record is present in the returned data.",
+            "in": "body",
+            "schema": {
+              "$ref": "#/definitions/seriestyperule"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "the created series type rule",
+            "schema": {
+              "$ref": "#/definitions/seriestyperule"
+            }
+          }
+        }
+      }
+    },
+
+    "seriestypes/rules/{id}": {
+      "delete": {
+        "description": "remove the series type rule corresponding to the supplied ID",
+        "tags": ["Series Types"],
+        "parameters": [
+          {
+            "name": "id",
+            "description": "id of series type rule to remove",
+            "in": "path",
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "series type rule removed"
+          }
+        }        
+      }      
+    },
+
+    "seriestypes/rules/{id}/attributes": {
+      "get": {
+        "description": "get the list of attributes for the series type rule with the supplied ID.",
+        "tags": ["Series Types"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "index of series type rule to list rule attributes for",
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "the list of series type rule attributes for the series type rule with the supplied ID",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/seriestyperuleattribute"
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "description": "add a new series type rule attribute",
+        "tags": ["Series Types"],
+        "parameters": [
+          {
+            "name": "SeriesTypeRuleAttribute",
+            "description": "Series type rule attribute information. The ID property is irrelevant, the ID of the inserted record is present in the returned data.",
+            "in": "body",
+            "schema": {
+              "$ref": "#/definitions/seriestyperuleattribute"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "the created series type rule attribute",
+            "schema": {
+              "$ref": "#/definitions/seriestyperuleattribute"
+            }
+          }
+        }
+      }
+    },
+
+    "seriestypes/rules/{ruleId}/attributes/{attributeId}": {
+      "delete": {
+        "description": "remove the series type rule attribute corresponding to the supplied series type and attribute IDs",
+        "tags": ["Series Types"],
+        "parameters": [
+          {
+            "name": "ruleId",
+            "description": "id of series type rule for which to remove an attribute",
+            "in": "path",
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "attributeId",
+            "description": "id of attribute to remove",
+            "in": "path",
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "series type rule attribute removed"
+          }
+        }
+      }
     }
 
   },
 
-
   "definitions": {
+    "seriestype": {
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "int64"          
+        },
+        "name": {
+          "type": "string"          
+        }
+      }
+    },
+    "seriestyperule": {
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "int64"          
+        },        
+        "seriesTypeId": {
+          "type": "integer",
+          "format": "int64"          
+        }
+      }
+    },
+    "seriestyperuleattribute": {
+      "required": [
+        "id",
+        "seriesTypeRuleId",
+        "group",
+        "element",
+        "value"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "int64"          
+        },        
+        "seriesTypeRuleId": {
+          "type": "integer",
+          "format": "int64"          
+        },
+        "group": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "element": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "path": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      }      
+    },
     "fileName": {
       "properties": {
         "value": {
@@ -1876,23 +2158,6 @@
         }
       }
     },
-    "addScu": {
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "aeTitle": {
-          "type": "string"
-        },
-        "host": {
-          "type": "string"
-        },
-        "port": {
-          "type": "integer",
-          "format": "int32"
-        }
-      }
-    },
     "scu": {
       "properties": {
         "id": {
@@ -1906,20 +2171,6 @@
           "type": "string"
         },
         "host": {
-          "type": "string"
-        },
-        "port": {
-          "type": "integer",
-          "format": "int32"
-        }
-      }
-    },
-    "addScp": {
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "aeTitle": {
           "type": "string"
         },
         "port": {
@@ -1943,13 +2194,6 @@
         "port": {
           "type": "integer",
           "format": "int32"
-        }
-      }
-    },
-    "watchDirectory": {
-      "properties": {
-        "pathString": {
-          "type": "string"
         }
       }
     },
