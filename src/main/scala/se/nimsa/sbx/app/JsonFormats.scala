@@ -33,7 +33,6 @@ import spray.routing.authentication.UserPass
 
 trait JsonFormats extends DefaultJsonProtocol {
 
-  implicit val watchDirectoryFormat = jsonFormat2(WatchDirectory)
   implicit val unWatchDirectoryFormat = jsonFormat1(UnWatchDirectory)
   implicit val watchedDirectoryFormat = jsonFormat3(WatchedDirectory)
 
@@ -74,9 +73,6 @@ trait JsonFormats extends DefaultJsonProtocol {
   implicit val anonymizationKeyFormat = jsonFormat12(AnonymizationKey)
 
   implicit val entityTagValueFormat = jsonFormat2(ImageTagValues)
-
-  implicit val addScpDataFormat = jsonFormat3(AddScp)
-  implicit val addScuDataFormat = jsonFormat4(AddScu)
 
   implicit object RoleFormat extends JsonFormat[UserRole] {
     def write(obj: UserRole) = JsString(obj.toString)

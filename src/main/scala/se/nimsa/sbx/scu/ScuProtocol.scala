@@ -25,7 +25,7 @@ object ScuProtocol {
 
   sealed trait ScuRequest
   
-  case class AddScu(name: String, aeTitle: String, host: String, port: Int) extends ScuRequest
+  case class AddScu(scuData: ScuData) extends ScuRequest
 
   case class RemoveScu(id: Long) extends ScuRequest 
 

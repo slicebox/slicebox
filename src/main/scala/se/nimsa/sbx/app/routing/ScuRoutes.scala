@@ -40,8 +40,8 @@ trait ScuRoutes { this: RestApi =>
           }
         } ~ post {
           authorize(authInfo.hasPermission(UserRole.ADMINISTRATOR)) {
-            entity(as[AddScu]) { addScu =>
-              onSuccess(scuService.ask(addScu)) {
+            entity(as[ScuData]) { scu =>
+              onSuccess(scuService.ask(AddScu(scu))) {
                 case scuData: ScuData =>
                   complete((Created, scuData))
               }

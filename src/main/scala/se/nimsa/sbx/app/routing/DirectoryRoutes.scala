@@ -37,10 +37,10 @@ trait DirectoryRoutes { this: RestApi =>
           }
         } ~ post {
           authorize(authInfo.hasPermission(UserRole.ADMINISTRATOR)) {
-            entity(as[WatchDirectory]) { directory =>
-              onSuccess(directoryService.ask(directory)) {
-                case dir: WatchedDirectory =>
-                  complete((Created, dir))
+            entity(as[WatchedDirectory]) { directory =>
+              onSuccess(directoryService.ask(WatchDirectory(directory))) {
+                case watchedDirectory: WatchedDirectory =>
+                  complete((Created, watchedDirectory))
               }
             }
           }

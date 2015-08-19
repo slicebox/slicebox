@@ -49,20 +49,20 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor 
 
         msg match {
 
-          case WatchDirectory(name, pathString) =>
-            watchedDirectoryForPath(pathString) match {
+          case WatchDirectory(directory) =>
+            watchedDirectoryForPath(directory.path) match {
               case Some(watchedDirectory) =>
-                if (name == watchedDirectory.name)
+                if (directory.name == watchedDirectory.name)
                   sender ! watchedDirectory
                 else
-                  throw new IllegalArgumentException(s"Directory watch ${watchedDirectory.name} already watches directory " + pathString)
+                  throw new IllegalArgumentException(s"Directory watch ${watchedDirectory.name} already watches directory " + directory.path)
 
               case None =>
 
-                val path = Paths.get(pathString)
+                val path = Paths.get(directory.path)
 
                 if (!Files.isDirectory(path))
-                  throw new IllegalArgumentException("Could not create directory watch: Not a directory: " + pathString)
+                  throw new IllegalArgumentException("Could not create directory watch: Not a directory: " + directory.path)
 
                 if (Files.isSameFile(path, storage))
                   throw new IllegalArgumentException("The storage directory may not be watched.")
@@ -71,7 +71,7 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor 
                   if (path.startsWith(other) || other.startsWith(path))
                     throw new IllegalArgumentException("Directory intersects existing directory " + other))
 
-                val watchedDirectory = addDirectory(name, pathString)
+                val watchedDirectory = addDirectory(directory)
 
                 context.child(watchedDirectory.id.toString).getOrElse(
                   context.actorOf(DirectoryWatchActor.props(watchedDirectory), watchedDirectory.id.toString))
@@ -114,9 +114,9 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor 
       })
     }
 
-  def addDirectory(name: String, path: String): WatchedDirectory =
+  def addDirectory(directory: WatchedDirectory): WatchedDirectory =
     db.withSession { implicit session =>
-      dao.insert(WatchedDirectory(-1, name, path))
+      dao.insert(directory)
     }
 
   def deleteDirectory(id: Long) =

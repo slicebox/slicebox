@@ -53,22 +53,21 @@ class ScuServiceActor(dbProps: DbProps, storage: Path) extends Actor with Except
 
         msg match {
 
-          case AddScu(name, aeTitle, host, port) =>
-            scuForName(name) match {
+          case AddScu(scu) =>
+            scuForName(scu.name) match {
               case Some(scuData) =>
 
                 sender ! scuData
 
               case None =>
-                val scuData = ScuData(-1, name, aeTitle, host, port)
-
-                if (port < 0 || port > 65535)
+                
+                if (scu.port < 0 || scu.port > 65535)
                   throw new IllegalArgumentException("Port must be a value between 0 and 65535")
 
-                if (scuForHostAndPort(host, port).isDefined)
-                  throw new IllegalArgumentException(s"Host $host and port $port is already in use")
+                if (scuForHostAndPort(scu.host, scu.port).isDefined)
+                  throw new IllegalArgumentException(s"Host ${scu.host} and port ${scu.port} is already in use")
 
-                addScu(scuData)
+                val scuData = addScu(scu)
 
                 sender ! scuData
 

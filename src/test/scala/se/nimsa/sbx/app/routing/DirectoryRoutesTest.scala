@@ -16,11 +16,11 @@ class DirectoryRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   def dbUrl() = "jdbc:h2:mem:directoryroutestest;DB_CLOSE_DELAY=-1"
 
   val tempDir = Files.createTempDirectory("slicebox-watch-dir-")
-  val watchDir = WatchDirectory("test dir", tempDir.toString)
-  val watchDir2 = WatchDirectory("test dir 2", tempDir.toString)
+  val watchDir = WatchedDirectory(-1, "test dir", tempDir.toString)
+  val watchDir2 = WatchedDirectory(-1, "test dir 2", tempDir.toString)
   val tempFile = Files.createTempFile("slicebox-temp-file-", ".tmp")
-  val watchFile = WatchDirectory("test file", tempFile.toString)
-  val watchStorage = WatchDirectory("test storage", storage.toString)
+  val watchFile = WatchedDirectory(-1, "test file", tempFile.toString)
+  val watchStorage = WatchedDirectory(-1, "test storage", storage.toString)
 
   override def afterAll {
     super.afterAll();

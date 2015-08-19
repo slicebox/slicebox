@@ -40,8 +40,8 @@ def scpRoutes(authInfo: AuthInfo): Route =
           }
         } ~ post {
           authorize(authInfo.hasPermission(UserRole.ADMINISTRATOR)) {
-            entity(as[AddScp]) { addScp =>
-              onSuccess(scpService.ask(addScp)) {
+            entity(as[ScpData]) { scp =>
+              onSuccess(scpService.ask(AddScp(scp))) {
                 case scpData: ScpData =>
                   complete((Created, scpData))
               }

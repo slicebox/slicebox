@@ -43,7 +43,7 @@ angular.module('slicebox.adminPacs', ['ngRoute'])
 
     // Scope functions
     $scope.addButtonClicked = function() {
-        $mdDialog.hide({ name: $scope.name, aeTitle: $scope.aeTitle, port: $scope.port });
+        $mdDialog.hide({ id: -1, name: $scope.name, aeTitle: $scope.aeTitle, port: $scope.port });
     };
 
     $scope.cancelButtonClicked = function() {
@@ -80,7 +80,7 @@ angular.module('slicebox.adminPacs', ['ngRoute'])
 
     // Scope functions
     $scope.addButtonClicked = function() {
-        $mdDialog.hide({ name: $scope.name, aeTitle: $scope.aeTitle, host: $scope.host, port: $scope.port });
+        $mdDialog.hide({ id: -1, name: $scope.name, aeTitle: $scope.aeTitle, host: $scope.host, port: $scope.port });
     };
 
     $scope.cancelButtonClicked = function() {

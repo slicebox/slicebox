@@ -26,7 +26,7 @@ object ScpProtocol {
   
   sealed trait ScpRequest
   
-  case class AddScp(name: String, aeTitle: String, port: Int) extends ScpRequest
+  case class AddScp(scpData: ScpData) extends ScpRequest
 
   case class RemoveScp(id: Long) extends ScpRequest 
 
