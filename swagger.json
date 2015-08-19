@@ -732,10 +732,7 @@
         ],
         "responses": {
           "200": {
-            "description": "binary data of dataset",
-            "schema": {
-              "type": "file"
-            }
+            "description": "binary data of dataset"
           },
           "400": {
             "description": "if no dataset could be found or read for the image corresponding to the supplied image ID"
@@ -1056,10 +1053,7 @@
         ],
         "responses": {
           "200": {
-            "description": "zip archive of images",
-            "schema": {
-              "type": "file"
-            }
+            "description": "zip archive of images"
           }
         }
       }
@@ -1676,6 +1670,7 @@
             "name": "id",
             "description": "id of directory to stop watching",
             "in": "path",
+            "required": true,
             "type": "integer",
             "format": "int64"
           }
@@ -1737,6 +1732,7 @@
             "name": "id",
             "description": "id of SCP to remove",
             "in": "path",
+            "required": true,
             "type": "integer",
             "format": "int64"
           }
@@ -1798,6 +1794,7 @@
             "name": "id",
             "description": "id of SCU to remove",
             "in": "path",
+            "required": true,            
             "type": "integer",
             "format": "int64"
           }
@@ -1850,7 +1847,7 @@
       }
     },
 
-    "seriestypes/{id}": {
+    "/seriestypes/{id}": {
       "put": {
         "description": "request an asynchronous update of all series, labelling appropriate series with the series type corresponding to the supplied ID.",
         "tags": ["Series Types"],
@@ -1859,6 +1856,7 @@
             "name": "id",
             "description": "id of series type to update series labels for",
             "in": "path",
+            "required": true,
             "type": "integer",
             "format": "int64"
           }
@@ -1877,6 +1875,7 @@
             "name": "id",
             "description": "id of series type to remove",
             "in": "path",
+            "required": true,
             "type": "integer",
             "format": "int64"
           }
@@ -1889,7 +1888,7 @@
       }      
     },
 
-    "seriestypes/rules": {
+    "/seriestypes/rules": {
       "get": {
         "description": "get a list of rules for assigning series types to series. A rule connects to a series of attributes with values and a resulting series type. If a series has the required values of the listed attributes, it is assigned to the series type of the rule.",
         "tags": ["Series Types"],
@@ -1939,7 +1938,7 @@
       }
     },
 
-    "seriestypes/rules/{id}": {
+    "/seriestypes/rules/{id}": {
       "delete": {
         "description": "remove the series type rule corresponding to the supplied ID",
         "tags": ["Series Types"],
@@ -1948,6 +1947,7 @@
             "name": "id",
             "description": "id of series type rule to remove",
             "in": "path",
+            "required": true,
             "type": "integer",
             "format": "int64"
           }
@@ -1960,7 +1960,7 @@
       }      
     },
 
-    "seriestypes/rules/{id}/attributes": {
+    "/seriestypes/rules/{id}/attributes": {
       "get": {
         "description": "get the list of attributes for the series type rule with the supplied ID.",
         "tags": ["Series Types"],
@@ -1968,6 +1968,7 @@
           {
             "name": "id",
             "in": "path",
+            "required": true,
             "description": "index of series type rule to list rule attributes for",
             "type": "integer",
             "format": "int64"
@@ -2009,7 +2010,7 @@
       }
     },
 
-    "seriestypes/rules/{ruleId}/attributes/{attributeId}": {
+    "/seriestypes/rules/{ruleId}/attributes/{attributeId}": {
       "delete": {
         "description": "remove the series type rule attribute corresponding to the supplied series type and attribute IDs",
         "tags": ["Series Types"],
@@ -2018,6 +2019,7 @@
             "name": "ruleId",
             "description": "id of series type rule for which to remove an attribute",
             "in": "path",
+            "required": true,
             "type": "integer",
             "format": "int64"
           },
@@ -2025,6 +2027,7 @@
             "name": "attributeId",
             "description": "id of attribute to remove",
             "in": "path",
+            "required": true,
             "type": "integer",
             "format": "int64"
           }
