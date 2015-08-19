@@ -184,7 +184,7 @@ angular.module('slicebox.adminSeriesTypes', ['ngRoute'])
 			return;
 		}
 
-		$http.get('/api/seriestypes/' + $scope.uiState.selectedSeriesType.id + '/rules')
+		$http.get('/api/seriestypes/rules?seriestypeid=' + $scope.uiState.selectedSeriesType.id)
 			.success(function(rules) {
 				handleLoadedRules(rules);
 			})
@@ -204,7 +204,7 @@ angular.module('slicebox.adminSeriesTypes', ['ngRoute'])
 	}
 
 	function loadRuleAttributes(rule) {
-		$http.get('/api/seriestypes/' + $scope.uiState.selectedSeriesType.id + '/rules/' + rule.id + '/attributes')
+		$http.get('/api/seriestypes/rules/' + rule.id + '/attributes')
 			.success(function(attributes) {
 				rule.attributes = attributes;
 				rule.originalAttributes = angular.copy(attributes);
@@ -240,14 +240,11 @@ angular.module('slicebox.adminSeriesTypes', ['ngRoute'])
 	}
 
 	function deleteRule(rule) {
-		return $http.delete('/api/seriestypes/' +
-				$scope.uiState.selectedSeriesType.id + '/rules/' +
-				rule.id);
+		return $http.delete('/api/seriestypes/rules/' + rule.id);
 	}
 
 	function createRule(rule) {
-		var savePromise = $http.post('/api/seriestypes/' + $scope.uiState.selectedSeriesType.id + '/rules',
-			{ id: -1, seriesTypeId: $scope.uiState.selectedSeriesType.id });
+		var savePromise = $http.post('/api/seriestypes/rules', { id: -1, seriesTypeId: $scope.uiState.selectedSeriesType.id });
 
 		savePromise = savePromise.then(function(response) {
 				return saveRuleAttributes(response.data, rule.attributes, rule.originalAttributes);
@@ -325,11 +322,7 @@ angular.module('slicebox.adminSeriesTypes', ['ngRoute'])
 				newAttribute.path = attribute.path;
 			}
 
-			savePromise = $http.post(
-				'/api/seriestypes/' +
-				$scope.uiState.selectedSeriesType.id + '/rules/' +
-				rule.id + '/attributes',
-				newAttribute);
+			savePromise = $http.post('/api/seriestypes/rules/' + rule.id + '/attributes', newAttribute);
 
 			saveAttributePromises.push(savePromise);
 		});
@@ -342,10 +335,7 @@ angular.module('slicebox.adminSeriesTypes', ['ngRoute'])
 		var deletePromise;
 
 		angular.forEach(removedAttributes, function(attribute) {
-			deletePromise = $http.delete(
-				'/api/seriestypes/' +
-				$scope.uiState.selectedSeriesType.id + '/rules/' +
-				rule.id + '/attributes/' + attribute.id);
+			deletePromise = $http.delete('/api/seriestypes/rules/' + rule.id + '/attributes/' + attribute.id);
 
 			deleteAttributePromises.push(deletePromise);
 		});

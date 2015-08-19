@@ -115,7 +115,7 @@ class SeriesTypeRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       seriesTypeDao.insertSeriesTypeRule(SeriesTypeRule(-1, addedSeriesType.id))
     }
 
-    GetAsUser(s"/api/seriestypes/${addedSeriesType.id}/rules") ~> routes ~> check {
+    GetAsUser(s"/api/seriestypes/rules?seriestypeid=${addedSeriesType.id}") ~> routes ~> check {
       status should be(OK)
       responseAs[List[SeriesTypeRule]].size should be(1)
     }
@@ -128,7 +128,7 @@ class SeriesTypeRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     
     val seriesTypeRule = SeriesTypeRule(-1, addedSeriesType.id)
 
-    PostAsAdmin(s"/api/seriestypes/${addedSeriesType.id}/rules", seriesTypeRule) ~> routes ~> check {
+    PostAsAdmin(s"/api/seriestypes/rules", seriesTypeRule) ~> routes ~> check {
       status should be(Created)
       val returnedSeriesTypeRule = responseAs[SeriesTypeRule]
 
@@ -144,7 +144,7 @@ class SeriesTypeRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     
     val seriesTypeRule = SeriesTypeRule(-1, addedSeriesType.id)
 
-    PostAsUser(s"/api/seriestypes/${addedSeriesType.id}/rules", seriesTypeRule) ~> sealRoute(routes) ~> check {
+    PostAsUser(s"/api/seriestypes/rules", seriesTypeRule) ~> sealRoute(routes) ~> check {
       status should be(Forbidden)
     }
   }
@@ -158,11 +158,11 @@ class SeriesTypeRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       seriesTypeDao.insertSeriesTypeRule(SeriesTypeRule(-1, addedSeriesType.id))
     }
 
-    DeleteAsAdmin(s"/api/seriestypes/${addedSeriesType.id}/rules/${addedSeriesTypeRule.id}") ~> routes ~> check {
+    DeleteAsAdmin(s"/api/seriestypes/rules/${addedSeriesTypeRule.id}") ~> routes ~> check {
       status should be(NoContent)
     }
 
-    GetAsUser(s"/api/seriestypes/${addedSeriesType.id}/rules") ~> routes ~> check {
+    GetAsUser(s"/api/seriestypes/rules?seriestypeid=${addedSeriesType.id}") ~> routes ~> check {
       responseAs[List[SeriesTypeRule]].size should be(0)
     }
   }
@@ -176,11 +176,11 @@ class SeriesTypeRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       seriesTypeDao.insertSeriesTypeRule(SeriesTypeRule(-1, addedSeriesType.id))
     }
 
-    DeleteAsUser(s"/api/seriestypes/${addedSeriesType.id}/rules/${addedSeriesTypeRule.id}") ~> sealRoute(routes) ~> check {
+    DeleteAsUser(s"/api/seriestypes/rules/${addedSeriesTypeRule.id}") ~> sealRoute(routes) ~> check {
       status should be(Forbidden)
     }
     
-    GetAsUser(s"/api/seriestypes/${addedSeriesType.id}/rules") ~> routes ~> check {
+    GetAsUser(s"/api/seriestypes/rules?seriestypeid=${addedSeriesType.id}") ~> routes ~> check {
       responseAs[List[SeriesTypeRule]].size should be(1)
     }
   }
@@ -199,7 +199,7 @@ class SeriesTypeRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       seriesTypeDao.insertSeriesTypeRuleAttribute(SeriesTypeRuleAttribute(-1, addedSeriesTypeRule.id, 1, 2, None, "test"))
     }
 
-    GetAsUser(s"/api/seriestypes/${addedSeriesType.id}/rules/${addedSeriesTypeRule.id}/attributes") ~> routes ~> check {
+    GetAsUser(s"/api/seriestypes/rules/${addedSeriesTypeRule.id}/attributes") ~> routes ~> check {
       status should be(OK)
       responseAs[List[SeriesTypeRuleAttribute]].size should be(1)
     }
@@ -216,7 +216,7 @@ class SeriesTypeRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     
     val seriesTypeRuleAttribute = SeriesTypeRuleAttribute(-1, addedSeriesTypeRule.id, 1, 2, None, "test")
 
-    PostAsAdmin(s"/api/seriestypes/${addedSeriesType.id}/rules/${addedSeriesTypeRule.id}/attributes", seriesTypeRuleAttribute) ~> routes ~> check {
+    PostAsAdmin(s"/api/seriestypes/rules/${addedSeriesTypeRule.id}/attributes", seriesTypeRuleAttribute) ~> routes ~> check {
       status should be(Created)
       val returnedSeriesTypeRuleAttribute = responseAs[SeriesTypeRuleAttribute]
 
@@ -239,7 +239,7 @@ class SeriesTypeRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     
     val seriesTypeRuleAttribute = SeriesTypeRuleAttribute(-1, addedSeriesTypeRule.id, 1, 2, None, "test")
 
-    PostAsUser(s"/api/seriestypes/${addedSeriesType.id}/rules/${addedSeriesTypeRule.id}/attributes", seriesTypeRuleAttribute) ~> sealRoute(routes) ~> check {
+    PostAsUser(s"/api/seriestypes/rules/${addedSeriesTypeRule.id}/attributes", seriesTypeRuleAttribute) ~> sealRoute(routes) ~> check {
       status should be(Forbidden)
     }
   }
@@ -257,11 +257,11 @@ class SeriesTypeRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       seriesTypeDao.insertSeriesTypeRuleAttribute(SeriesTypeRuleAttribute(-1, addedSeriesTypeRule.id, 1, 2, None, "test"))
     }
 
-    DeleteAsAdmin(s"/api/seriestypes/${addedSeriesType.id}/rules/${addedSeriesTypeRule.id}/attributes/${addedSeriesTypeRuleAttribute.id}") ~> routes ~> check {
+    DeleteAsAdmin(s"/api/seriestypes/rules/${addedSeriesTypeRule.id}/attributes/${addedSeriesTypeRuleAttribute.id}") ~> routes ~> check {
       status should be(NoContent)
     }
 
-    GetAsUser(s"/api/seriestypes/${addedSeriesType.id}/rules/${addedSeriesTypeRule.id}/attributes") ~> routes ~> check {
+    GetAsUser(s"/api/seriestypes/rules/${addedSeriesTypeRule.id}/attributes") ~> routes ~> check {
       responseAs[List[SeriesTypeRuleAttribute]].size should be(0)
     }
   }
@@ -279,11 +279,11 @@ class SeriesTypeRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       seriesTypeDao.insertSeriesTypeRuleAttribute(SeriesTypeRuleAttribute(-1, addedSeriesTypeRule.id, 1, 2, None, "test"))
     }
 
-    DeleteAsUser(s"/api/seriestypes/${addedSeriesType.id}/rules/${addedSeriesTypeRule.id}/attributes/${addedSeriesTypeRuleAttribute.id}") ~> sealRoute(routes) ~> check {
+    DeleteAsUser(s"/api/seriestypes/rules/${addedSeriesTypeRule.id}/attributes/${addedSeriesTypeRuleAttribute.id}") ~> sealRoute(routes) ~> check {
       status should be(Forbidden)
     }
     
-    GetAsUser(s"/api/seriestypes/${addedSeriesType.id}/rules/${addedSeriesTypeRule.id}/attributes") ~> routes ~> check {
+    GetAsUser(s"/api/seriestypes/rules/${addedSeriesTypeRule.id}/attributes") ~> routes ~> check {
       responseAs[List[SeriesTypeRuleAttribute]].size should be(1)
     }
   }
