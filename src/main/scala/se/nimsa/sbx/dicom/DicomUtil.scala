@@ -174,4 +174,10 @@ object DicomUtil {
     Seq(bufferedImage);
   }
 
+  def attributeStringForTag(attrs: Attributes, tag: Int) = {
+    val s = attrs.getStrings(tag)
+    val array = if (s == null || s.isEmpty) Array("") else s
+    array.mkString(",")
+  }
+    
 }

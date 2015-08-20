@@ -760,7 +760,7 @@ angular.module('slicebox.home', ['ngRoute'])
     };
 
     $scope.createRuleButtonClicked = function() {
-        var savePromise = $http.post('/api/seriestypes/' + $scope.seriesType.id + '/rules',
+        var savePromise = $http.post('/api/seriestypes/rules',
             { id: -1, seriesTypeId: $scope.seriesType.id });
 
         savePromise = savePromise.then(function(response) {
@@ -799,11 +799,7 @@ angular.module('slicebox.home', ['ngRoute'])
                 newAttribute.path = attribute.path;
             }
 
-            savePromise = $http.post(
-                '/api/seriestypes/' +
-                $scope.seriesType.id + '/rules/' +
-                rule.id + '/attributes',
-                newAttribute);
+            savePromise = $http.post('/api/seriestypes/rules/' + rule.id + '/attributes', newAttribute);
 
             saveAttributePromises.push(savePromise);
         });

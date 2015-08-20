@@ -384,7 +384,7 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
               (toSingleString(strings), strings.length)
           }
 
-          var valueStringRepresentation = attrs.getString(tag, "")
+          val valueStringRepresentation = attributeStringForTag(attrs, tag)
 
           attributesBuffer += ImageAttribute(group, element, vrName, length, multiplicity, depth, path, name, content, valueStringRepresentation)
           if (vr == VR.SQ) {
@@ -413,7 +413,7 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
     if (strings.length == 1)
       strings(0)
     else
-      "[" + strings.tail.foldLeft(strings.head)((single, s) => single + "," + s) + "]"
+      "[" + strings.mkString(",") + "]"
 
   def readImageInformation(fileName: String): ImageInformation = {
     val path = storage.resolve(fileName)

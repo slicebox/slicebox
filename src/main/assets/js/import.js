@@ -18,22 +18,28 @@ angular.module('slicebox.import', ['ngRoute', 'ngFileUpload'])
 
     $scope.callbacks = {};
 
-    $scope.import = function(files) {
+    function importFirst(files) {
         if (files && files.length) {
-            files.forEach(function(file) {
-                Upload.upload({
-                    url: '/api/images',
-                    file: file
-                }).success(function (data, status, headers, config) {
-                    importedFiles.push({ name: config.file.name });
-                    $scope.callbacks.importedFilesTable.reset();
-                }).error(function (message, status, headers, config) {
-                    var errorMessage = status === 400 ? "Not a valid DICOM file" : message;
-                    rejectedFiles.push({ name: config.file.name, status: status, message: errorMessage });
-                    $scope.callbacks.rejectedFilesTable.reset();
-                });
+            Upload.upload({
+                url: '/api/images',
+                file: files[0]
+            }).success(function (data, status, headers, config) {
+                importedFiles.push({ name: config.file.name });
+                $scope.callbacks.importedFilesTable.reset();
+                files.shift();
+                importFirst(files);
+            }).error(function (message, status, headers, config) {
+                var errorMessage = status === 400 ? "Not a valid DICOM file" : message;
+                rejectedFiles.push({ name: config.file.name, status: status, message: errorMessage });
+                $scope.callbacks.rejectedFilesTable.reset();
+                files.shift();
+                importFirst(files);
             });
         }
+    }
+
+    $scope.import = function(files) {
+        importFirst(files);
     };
 
     $scope.getImportedFiles = function() {

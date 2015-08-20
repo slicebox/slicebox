@@ -17,6 +17,7 @@ import se.nimsa.sbx.storage.PropertiesDAO
 import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.util.ExceptionCatching
 import se.nimsa.sbx.log.SbxLog
+import se.nimsa.sbx.dicom.DicomUtil
 
 
 class SeriesTypeUpdateActor(dbProps: DbProps) extends Actor with Stash with ExceptionCatching {
@@ -174,11 +175,7 @@ class SeriesTypeUpdateActor(dbProps: DbProps) extends Actor with Stash with Exce
     val tag = TagUtils.toTag(attribute.group, attribute.element)
     
     // TODO: handle path
-    Option.apply(dataset.getString(tag))
-      .map(datasetAttributeValue => {
-        Objects.equals(datasetAttributeValue, attribute.value)
-      })
-      .getOrElse(false)
+    DicomUtil.attributeStringForTag(dataset, tag) == attribute.value
   }
   
   def getSeriesFromDb(seriesId: Long): Option[Series] =

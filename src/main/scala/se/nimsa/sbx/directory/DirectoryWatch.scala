@@ -41,6 +41,7 @@ class DirectoryWatch(notifyActor: ActorRef) extends Runnable with LazyLogging {
       }
       override def visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult = {
         super.visitFile(file, attrs)
+        makeSureFileIsNotInUse(file)
         notifyActor ! FileAddedToWatchedDirectory(file)
         FileVisitResult.CONTINUE
       }
@@ -50,6 +51,14 @@ class DirectoryWatch(notifyActor: ActorRef) extends Runnable with LazyLogging {
   private def watch(path: Path) =
     path.register(watchService, ENTRY_CREATE)
 
+  private def makeSureFileIsNotInUse(path: Path) = {
+    val file = path.toFile
+    while (!file.renameTo(file)) {
+      // Cannot read from file, windows still working on it.
+      Thread.sleep(100)
+    }
+  }
+  
   def run() = {
 
     try {
@@ -59,7 +68,7 @@ class DirectoryWatch(notifyActor: ActorRef) extends Runnable with LazyLogging {
         key.pollEvents() foreach {
           event =>
             logger.debug(s"Recevied event: $event")
-            
+
             val relativePath = event.context().asInstanceOf[Path]
             val path = key.watchable().asInstanceOf[Path].resolve(relativePath)
             event.kind() match {
@@ -68,9 +77,11 @@ class DirectoryWatch(notifyActor: ActorRef) extends Runnable with LazyLogging {
 
                 if (Files.isDirectory(path))
                   watchRecursively(path)
-                else
+                else {                  
+                  makeSureFileIsNotInUse(path)
                   notifyActor ! FileAddedToWatchedDirectory(path)
-
+                }
+                
               case x =>
 
                 logger.warn(s"Unknown event $x")
