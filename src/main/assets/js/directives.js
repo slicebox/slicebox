@@ -756,7 +756,7 @@ angular.module('slicebox.directives', [])
 
                 var returnValue = value.toString(16);
 
-                while (returnValue.length < 4) {
+                while (returnValue.length < 8) {
                     returnValue = '0' + returnValue;
                 }
 

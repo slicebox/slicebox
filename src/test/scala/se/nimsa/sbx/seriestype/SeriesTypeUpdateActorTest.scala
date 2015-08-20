@@ -21,6 +21,7 @@ import org.dcm4che3.util.TagUtils
 import org.dcm4che3.data.Tag
 import com.sun.istack.internal.NotNull
 import scala.concurrent.duration.DurationInt
+import org.dcm4che3.data.Keyword
 
 
 class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
@@ -211,15 +212,16 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
   def addSeriesTypeRuleAttribute(
       seriesTypeRule: SeriesTypeRule,
       tag: Int,
-      value: String): SeriesTypeRuleAttribute =
+      values: String): SeriesTypeRuleAttribute =
     db.withSession { implicit session =>
       seriesTypeDao.insertSeriesTypeRuleAttribute(
           SeriesTypeRuleAttribute(-1,
               seriesTypeRule.id,
-              TagUtils.groupNumber(tag),
-              TagUtils.elementNumber(tag),
+              tag,
+              Keyword.valueOf(tag),
               None,
-              value))
+              None,
+              values))
     }
   
   def waitForSeriesTypesUpdateCompletion(): Unit = {

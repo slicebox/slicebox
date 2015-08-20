@@ -42,6 +42,7 @@ import spray.http.HttpHeaders.`Content-Disposition`
 import java.nio.file.Paths
 import java.nio.file.Path
 import java.io.File
+import se.nimsa.sbx.dicom.ImageAttribute
 
 trait ImageRoutes { this: RestApi =>
 

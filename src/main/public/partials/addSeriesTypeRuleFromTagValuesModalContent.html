@@ -12,15 +12,14 @@
 			<div flex layout="column">
 				<div layout="row" ng-repeat="tagValue in tagValues">
 					<span>
-						<span>{{tagValue.name}}</span>
-						<span ng-if="tagValue.path">({{tagValue.path}})</span>
+						<span ng-if="tagValue.namePath.length">{{tagValue.namePath.join("/")}}/</span><span>{{tagValue.name}}</span>
 					</span>
 					
 					<!-- <div flex="5" layout="row" layout-align="center center"> -->
 						<span style="margin-left: 5px; margin-right: 5px">=</span>
 					<!-- </div> -->
 
-					<span>{{tagValue.valueStringRepresentation}}</span>
+					<span>{{tagValue.values.join(",")}}</span>
 
 					<span ng-if="!$last" style="margin-left: 5px; font-weight: bold">AND</span>
 				</div>

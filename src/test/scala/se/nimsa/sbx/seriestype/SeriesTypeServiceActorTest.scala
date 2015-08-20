@@ -224,7 +224,7 @@ class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
         seriesTypeDao.insertSeriesTypeRule(SeriesTypeRule(-1, addedSeriesType.id))
       }
       
-      val seriesTypeRuleAttribute = SeriesTypeRuleAttribute(-1, addedSeriesTypeRule.id, 1, 2, None, "test")
+      val seriesTypeRuleAttribute = SeriesTypeRuleAttribute(-1, addedSeriesTypeRule.id, 1, "Name", None, None, "test")
       
       seriesTypeService ! AddSeriesTypeRuleAttribute(seriesTypeRuleAttribute)
         
@@ -253,7 +253,7 @@ class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
       }
       
       val addedSeriesTypeRuleAttribute = db.withSession { implicit session =>
-        seriesTypeDao.insertSeriesTypeRuleAttribute(SeriesTypeRuleAttribute(-1, addedSeriesTypeRule.id, 1, 2, None, "test"))
+        seriesTypeDao.insertSeriesTypeRuleAttribute(SeriesTypeRuleAttribute(-1, addedSeriesTypeRule.id, 1, "Name", None, None, "test"))
       }
       
       seriesTypeService ! RemoveSeriesTypeRuleAttribute(addedSeriesTypeRuleAttribute.id)
@@ -280,7 +280,7 @@ class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
       }
       
       val addedSeriesTypeRuleAttribute = db.withSession { implicit session =>
-        seriesTypeDao.insertSeriesTypeRuleAttribute(SeriesTypeRuleAttribute(-1, addedSeriesTypeRule.id, 1, 2, None, "test"))
+        seriesTypeDao.insertSeriesTypeRuleAttribute(SeriesTypeRuleAttribute(-1, addedSeriesTypeRule.id, 1, "Name", None, None, "test"))
       }
       
       seriesTypeService ! RemoveSeriesTypeRule(addedSeriesTypeRule.id)

@@ -313,14 +313,10 @@ angular.module('slicebox.adminSeriesTypes', ['ngRoute'])
 			newAttribute = {
 					id: -1,
 					seriesTypeRuleId: rule.id,
-					group: attribute.group,
-					element: attribute.element,
-					value: attribute.value
+					tag: attribute.tag,
+					name: "",
+					values: attribute.values
 				};
-
-			if (attribute.path) {
-				newAttribute.path = attribute.path;
-			}
 
 			savePromise = $http.post('/api/seriestypes/rules/' + rule.id + '/attributes', newAttribute);
 

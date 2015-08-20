@@ -27,10 +27,11 @@ object SeriesTypeProtocol {
   case class SeriesTypeRuleAttribute(
       id: Long,
       seriesTypeRuleId: Long,
-      group: Int,
-      element: Int,
-      path: Option[String],
-      value: String) extends Entity
+      tag: Int,
+      name: String,
+      tagPath: Option[String],
+      namePath: Option[String],
+      values: String) extends Entity
   
   case class SeriesSeriesType(seriesId: Long, seriesTypeId: Long)
   

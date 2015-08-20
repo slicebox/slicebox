@@ -319,10 +319,16 @@
                                 callbacks="callbacks.imageAttributesTable"
                                 empty-message="No image atributes found">
 
-                                <sbx-grid-column property="group" title="Group">
+                                <sbx-grid-column property="tag" title="Tag" filter="hexvalue: 8">
                                 </sbx-grid-column>
 
-                                <sbx-grid-column property="element" title="Element">
+                                <sbx-grid-column property="name" title="Name">
+                                </sbx-grid-column>
+
+                                <sbx-grid-column property="values" title="Value">
+                                    <sbx-grid-cell>
+                                        {{rowObject.values.join(",")}}
+                                    </sbx-grid-cell>
                                 </sbx-grid-column>
 
                                 <sbx-grid-column property="vr" title="VR">
@@ -331,13 +337,10 @@
                                 <sbx-grid-column property="length" title="Length">
                                 </sbx-grid-column>
 
-                                <sbx-grid-column property="name" title="Name">
-                                </sbx-grid-column>
-
-                                <sbx-grid-column property="value" title="Value">
-                                </sbx-grid-column>
-
-                                <sbx-grid-column property="path" title="Path">
+                                <sbx-grid-column property="namePath" title="Path">
+                                    <sbx-grid-cell>
+                                        {{rowObject.namePath.join("/")}}
+                                    </sbx-grid-cell>
                                 </sbx-grid-column>
 
                             </sbx-grid> 

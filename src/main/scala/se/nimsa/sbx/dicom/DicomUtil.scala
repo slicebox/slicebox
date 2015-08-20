@@ -40,6 +40,9 @@ import org.dcm4che3.data.VR
 import se.nimsa.sbx.box.BoxProtocol.TransactionTagValue
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.AnonymizationKey
 import java.util.Date
+import scala.collection.mutable.ListBuffer
+import org.dcm4che3.util.TagUtils
+import org.dcm4che3.data.Keyword
 
 object DicomUtil {
 
@@ -90,7 +93,7 @@ object DicomUtil {
   }
 
   def toByteArray(path: Path): Array[Byte] = toByteArray(loadDataset(path, true))
-    
+
   def toByteArray(dataset: Attributes): Array[Byte] = {
     val bos = new ByteArrayOutputStream
     saveDataset(dataset, bos)
@@ -174,10 +177,69 @@ object DicomUtil {
     Seq(bufferedImage);
   }
 
-  def attributeStringForTag(attrs: Attributes, tag: Int) = {
+  def readImageAttributes(dataset: Attributes): List[ImageAttribute] =
+    readImageAttributes(dataset, 0, Nil, Nil)
+
+  def readImageAttributes(dataset: Attributes, depth: Int, tagPath: List[Int], namePath: List[String]): List[ImageAttribute] = {
+    val attributesBuffer = ListBuffer.empty[ImageAttribute]
+    if (dataset != null) {
+      dataset.accept(new Visitor() {
+        override def visit(attrs: Attributes, tag: Int, vr: VR, value: AnyRef): Boolean = {
+          val length = lengthOf(attrs.getBytes(tag))
+          val group = TagUtils.groupNumber(tag)
+          val element = TagUtils.elementNumber(tag)
+          val name = nameForTag(tag)
+          val vrName = vr.name
+
+          val values = vr match {
+            case VR.OW | VR.OF | VR.OB =>
+              List(s"< Binary data ($length bytes) >")
+            case _ =>
+              getStrings(attrs, tag).toList
+          }
+
+          val multiplicity = values.length
+          
+          attributesBuffer += ImageAttribute(
+            tag,
+            group,
+            element,
+            name,
+            vrName,
+            multiplicity,
+            length,
+            depth,
+            tagPath,
+            namePath,
+            values)
+          if (vr == VR.SQ)
+            attributesBuffer ++= readImageAttributes(attrs.getNestedDataset(tag), depth + 1, tagPath :+ tag, namePath :+ name)
+          true
+        }
+      }, false)
+    }
+    attributesBuffer.toList
+  }
+
+  private def lengthOf(bytes: Array[Byte]) =
+    if (bytes == null)
+      0
+    else
+      bytes.length
+
+  private def getStrings(attrs: Attributes, tag: Int) = {
     val s = attrs.getStrings(tag)
-    val array = if (s == null || s.isEmpty) Array("") else s
+    if (s == null || s.isEmpty) Array("") else s
+  }
+
+  def concatenatedStringForTag(attrs: Attributes, tag: Int) = {
+    val array = getStrings(attrs, tag)
     array.mkString(",")
   }
-    
+
+  def nameForTag(tag: Int) = {
+    val name = Keyword.valueOf(tag)
+    if (name == null) "" else name
+  }
+  
 }

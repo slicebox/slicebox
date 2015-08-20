@@ -70,18 +70,6 @@ object StorageProtocol {
     }
   }
   
-  case class ImageAttribute(
-      group: String, 
-      element: String, 
-      vr: String, 
-      length: Int, 
-      multiplicity: Int, 
-      depth: Int, 
-      path: String, 
-      name: String, 
-      value: String,
-      valueStringRepresentation: String)
-  
   case class ImageInformation(
       numberOfFrames: Int,
       frameIndex: Int,

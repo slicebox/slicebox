@@ -790,9 +790,11 @@ angular.module('slicebox.home', ['ngRoute'])
             newAttribute = {
                     id: -1,
                     seriesTypeRuleId: rule.id,
-                    group: parseInt(attribute.group,16),
-                    element: parseInt(attribute.element,16),
-                    value: attribute.valueStringRepresentation
+                    tag: attribute.tag,
+                    name: attribute.name,
+                    tagPath: attribute.tagPath.join(","),
+                    namePath: attribute.namePath.join("/"),
+                    values: attribute.values.join(",")
                 };
 
             if (attribute.path && attribute.path.length > 0) {

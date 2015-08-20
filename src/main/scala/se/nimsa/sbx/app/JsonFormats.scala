@@ -30,6 +30,7 @@ import se.nimsa.sbx.log.LogProtocol._
 import se.nimsa.sbx.app.UserProtocol._
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
 import spray.routing.authentication.UserPass
+import se.nimsa.sbx.dicom.ImageAttribute
 
 trait JsonFormats extends DefaultJsonProtocol {
 
@@ -134,7 +135,7 @@ trait JsonFormats extends DefaultJsonProtocol {
 
   implicit val fileNameFormat = jsonFormat1(FileName)
   implicit val imageFileFormat = jsonFormat4(ImageFile)
-  implicit val imageAttributeFormat = jsonFormat10(ImageAttribute)
+  implicit val imageAttributeFormat = jsonFormat11(ImageAttribute)
   
   implicit val imagesFormat = jsonFormat1(Images)
   
@@ -169,5 +170,5 @@ trait JsonFormats extends DefaultJsonProtocol {
   
   implicit val seriesTypeRuleFormat = jsonFormat2(SeriesTypeRule)
   
-  implicit val seriesTypeRuleAttributeFormat = jsonFormat6(SeriesTypeRuleAttribute)
+  implicit val seriesTypeRuleAttributeFormat = jsonFormat7(SeriesTypeRuleAttribute)
 }

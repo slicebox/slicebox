@@ -13,7 +13,7 @@ import se.nimsa.sbx.anonymization.AnonymizationDAO
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomUtil
-import se.nimsa.sbx.storage.StorageProtocol.ImageAttribute
+import se.nimsa.sbx.dicom.ImageAttribute
 import se.nimsa.sbx.util.TestUtil
 import spray.http.BodyPart
 import spray.http.ContentTypes

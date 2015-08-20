@@ -196,7 +196,7 @@ class SeriesTypeRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
     
     val addedSeriesTypeRuleAttribute = db.withSession { implicit session =>
-      seriesTypeDao.insertSeriesTypeRuleAttribute(SeriesTypeRuleAttribute(-1, addedSeriesTypeRule.id, 1, 2, None, "test"))
+      seriesTypeDao.insertSeriesTypeRuleAttribute(SeriesTypeRuleAttribute(-1, addedSeriesTypeRule.id, 1, "Name", None, None, "test"))
     }
 
     GetAsUser(s"/api/seriestypes/rules/${addedSeriesTypeRule.id}/attributes") ~> routes ~> check {
@@ -214,7 +214,7 @@ class SeriesTypeRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       seriesTypeDao.insertSeriesTypeRule(SeriesTypeRule(-1, addedSeriesType.id))
     }
     
-    val seriesTypeRuleAttribute = SeriesTypeRuleAttribute(-1, addedSeriesTypeRule.id, 1, 2, None, "test")
+    val seriesTypeRuleAttribute = SeriesTypeRuleAttribute(-1, addedSeriesTypeRule.id, 1, "Name", None, None, "test")
 
     PostAsAdmin(s"/api/seriestypes/rules/${addedSeriesTypeRule.id}/attributes", seriesTypeRuleAttribute) ~> routes ~> check {
       status should be(Created)
@@ -222,9 +222,9 @@ class SeriesTypeRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
       returnedSeriesTypeRuleAttribute.id should be > (0L)
       returnedSeriesTypeRuleAttribute.seriesTypeRuleId should be(addedSeriesTypeRule.id)
-      returnedSeriesTypeRuleAttribute.group should be(seriesTypeRuleAttribute.group)
-      returnedSeriesTypeRuleAttribute.element should be(seriesTypeRuleAttribute.element)
-      returnedSeriesTypeRuleAttribute.value should be(seriesTypeRuleAttribute.value)
+      returnedSeriesTypeRuleAttribute.tag should be(seriesTypeRuleAttribute.tag)
+      returnedSeriesTypeRuleAttribute.name should be(seriesTypeRuleAttribute.name)
+      returnedSeriesTypeRuleAttribute.values should be(seriesTypeRuleAttribute.values)
     }
   }
   
@@ -237,7 +237,7 @@ class SeriesTypeRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       seriesTypeDao.insertSeriesTypeRule(SeriesTypeRule(-1, addedSeriesType.id))
     }
     
-    val seriesTypeRuleAttribute = SeriesTypeRuleAttribute(-1, addedSeriesTypeRule.id, 1, 2, None, "test")
+    val seriesTypeRuleAttribute = SeriesTypeRuleAttribute(-1, addedSeriesTypeRule.id, 1, "Name", None, None, "test")
 
     PostAsUser(s"/api/seriestypes/rules/${addedSeriesTypeRule.id}/attributes", seriesTypeRuleAttribute) ~> sealRoute(routes) ~> check {
       status should be(Forbidden)
@@ -254,7 +254,7 @@ class SeriesTypeRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
     
     val addedSeriesTypeRuleAttribute = db.withSession { implicit session =>
-      seriesTypeDao.insertSeriesTypeRuleAttribute(SeriesTypeRuleAttribute(-1, addedSeriesTypeRule.id, 1, 2, None, "test"))
+      seriesTypeDao.insertSeriesTypeRuleAttribute(SeriesTypeRuleAttribute(-1, addedSeriesTypeRule.id, 1, "Name", None, None, "test"))
     }
 
     DeleteAsAdmin(s"/api/seriestypes/rules/${addedSeriesTypeRule.id}/attributes/${addedSeriesTypeRuleAttribute.id}") ~> routes ~> check {
@@ -276,7 +276,7 @@ class SeriesTypeRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
     
     val addedSeriesTypeRuleAttribute = db.withSession { implicit session =>
-      seriesTypeDao.insertSeriesTypeRuleAttribute(SeriesTypeRuleAttribute(-1, addedSeriesTypeRule.id, 1, 2, None, "test"))
+      seriesTypeDao.insertSeriesTypeRuleAttribute(SeriesTypeRuleAttribute(-1, addedSeriesTypeRule.id, 1, "Name", None, None, "test"))
     }
 
     DeleteAsUser(s"/api/seriestypes/rules/${addedSeriesTypeRule.id}/attributes/${addedSeriesTypeRuleAttribute.id}") ~> sealRoute(routes) ~> check {

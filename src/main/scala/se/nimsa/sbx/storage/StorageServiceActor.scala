@@ -47,7 +47,9 @@ import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomPropertyValue._
+import se.nimsa.sbx.dicom.DicomUtil
 import se.nimsa.sbx.dicom.DicomUtil._
+import se.nimsa.sbx.dicom.ImageAttribute
 import akka.dispatch.ExecutionContexts
 import java.util.concurrent.Executors
 import se.nimsa.sbx.log.SbxLog
@@ -361,59 +363,8 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
   def readImageAttributes(fileName: String): List[ImageAttribute] = {
     val filePath = storage.resolve(fileName)
     val dataset = loadDataset(filePath, false)
-    readImageAttributes(dataset, 0, "")
+    DicomUtil.readImageAttributes(dataset)
   }
-
-  def readImageAttributes(dataset: Attributes, depth: Int, path: String): List[ImageAttribute] = {
-    val attributesBuffer = ListBuffer.empty[ImageAttribute]
-    if (dataset != null) {
-      dataset.accept(new Visitor() {
-        override def visit(attrs: Attributes, tag: Int, vr: VR, value: AnyRef): Boolean = {
-          val length = lengthOf(attrs.getBytes(tag))
-          val group = TagUtils.toHexString(TagUtils.groupNumber(tag)).substring(4)
-          val element = TagUtils.toHexString(TagUtils.elementNumber(tag)).substring(4)
-          val name = Keyword.valueOf(tag)
-          val vrName = vr.name
-          val (content, multiplicity) = vr match {
-            case VR.OW | VR.OF | VR.OB =>
-              (s"< Binary data ($length bytes) >", 1)
-            case _ =>
-              val rawStrings = getStrings(attrs, tag)
-              val truncatedStrings = if (rawStrings.length > 32) rawStrings.slice(0, 32) :+ " ..." else rawStrings
-              val strings = truncatedStrings.map(s => if (s.length() > 1024) s.substring(0, 1024) + " ..." else s)
-              (toSingleString(strings), strings.length)
-          }
-
-          val valueStringRepresentation = attributeStringForTag(attrs, tag)
-
-          attributesBuffer += ImageAttribute(group, element, vrName, length, multiplicity, depth, path, name, content, valueStringRepresentation)
-          if (vr == VR.SQ) {
-            val nextPath = if (path.isEmpty()) name else path + '/' + name
-            attributesBuffer ++= readImageAttributes(attrs.getNestedDataset(tag), depth + 1, nextPath)
-          }
-          true
-        }
-      }, false)
-    }
-    attributesBuffer.toList
-  }
-
-  def lengthOf(bytes: Array[Byte]) =
-    if (bytes == null)
-      0
-    else
-      bytes.length
-
-  def getStrings(attrs: Attributes, tag: Int) = {
-    val s = attrs.getStrings(tag)
-    if (s == null || s.isEmpty) Array("") else s
-  }
-
-  def toSingleString(strings: Array[String]) =
-    if (strings.length == 1)
-      strings(0)
-    else
-      "[" + strings.mkString(",") + "]"
 
   def readImageInformation(fileName: String): ImageInformation = {
     val path = storage.resolve(fileName)
