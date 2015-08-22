@@ -1809,22 +1809,7 @@
 
     "/seriestypes": {
       "get": {
-        "description": "get a list of added series types. By filtering search results for certain series types, it is easier for applications to ensure that they read images of applicable types.",
-        "tags": ["Series Types"],
-        "responses": {
-          "200": {
-            "description": "the list of series types",
-            "schema": {
-              "type": "array",
-              "items": {
-                "$ref": "#/definitions/seriestype"
-              }
-            }
-          }
-        }
-      },
-      "get": {
-        "description": "get the list of series types of the series with the supplied ID.",
+        "description": "get a list of all added series types, or the list of series types for a particular series. By filtering search results for certain series types, it is easier for applications to ensure that they read images of applicable types.",
         "tags": ["Series Types"],
         "parameters": [
           {
