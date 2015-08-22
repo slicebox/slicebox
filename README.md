@@ -129,19 +129,35 @@ slicebox {
 Integration with Applications
 -----------------------------
 
+Developing medical imaging applications for clinical use is an undertaking. Ideally, developers should be allowed to focus on the application code itself, and worry less about imaging hardware, protocols, communication and patient integrity. In reality, such obstacles can consume a majority of project resources. By letting a Slicebox instance take care of the communication with image sources as well as storage and management of image data, the path to a running imaging application is shortened considerably. 
+
+Most imaging applications are created with a certain type of image in mind. For instance, you may be developing a program that calculates the dynamic uptake of a radioactive isotope in the kidneys (a *renography*). When your program starts you want it to contact the connected Slicebox instance and ask for all images of this type. But how can you distinguish such images from others? The vital information resides in the attributes of the DICOM files. Let's assume that by inspecting the attributes of the images you have received from the hospital you work at or collaborate with, you notice that these images share the following unique characteristic.
+
+* `SeriesDescription` = `RENOGRAPHY`
+
+To make sure that you get the right type of renography image, you may decide to be a little more specific:
+
+* `SeriesDescription` = `RENOGRAPHY` 
+* `Modality` = `NM`
+* `NumberOfFrames` = `80`
+
+Now, the `NuberOfFrames` tag is not indexed by Slicebox so you cannot write this rule as a query to Slicebox. Instead, Slicebox introduces the concept of *series types* which are a set of labels associated with each series of the DICOM hierarchy. Administrator users of Slicebox can define any number of series types by just coming up with a name for each of them. In this case we create the series type `RENO` through the series type view in the Slicebox GUI. A series type can be associated with one or more rules of the type defined above. We can for instance associate `RENO` with the rule of three attributes above. Series containing DICOM attributes that exactly match all three attribute equalities above are assigned to the `RENO` series type. If a second rule is defined for `RENO`, say
+
+* `SeriesDescription` = `RENOGRAPHY` 
+* `Modality` = `NM`
+* `NumberOfFrames` = `40`
+
+then series mathing one or both rules will be labelled `RENO`. Series can have zero, one or many series types assigned to them. 
+
+The maker of the renography application can now ask Slicebox to list patients, studies and series associated with the `RENO` series type. When the application is moved to another hospital or starts receiving images from another camera, this may mean that image attributes look different. It is then simple to define new rules for the `RENO` series type that make sure these new images are also labelled correctly.
+
+
 Integration with Matlab
 -----------------------
 
-The Matlab integration uses the REST API to connect to an instance of slicebox. Several scripts and are provided which can be used to retrieve image information and dicom files. There is also a simple GUI which can list patients and series, show some very basic image information and can be used to retrieve images. Note that the GUI is created using Matlab for OSX, which limits its usefulness on other OS due to differences in font size etc.
+Slicebox integrates smoothly with Matlab such that a research team can store and manage their entire collection of DICOM images on a central Slicebox instance and access these images using simple Matab commands. This has major benefits. All team members have access to the same images, code becomes easier to move between computers and image data will be properly ordered and can be searched, queried and labelled. To reduce network traffic, increase speed and make it possible to work also in situations when the Slicebox instance cannot be reached, images are cached locally. 
 
-The Matlab files are not included in the universal zip package. To use these files you must clone the repository where the files can be found in [./src/main/matlab/](/src/main/matlab/). Matlab 2015a or later is required to use these scripts.
-
-For more detailed descriptions of file usage and usage examples, see [/matlab/README](src/main/matlab/README.txt), or the comments in the function files.
-
-### Getting started
-* Clone the repository and find the files in [./src/main/matlab](src/main/matlab/).
-* Edit the [./src/main/matlab/sbxsettings.conf](sbxsettings.conf). The file only contains two options, an url to an instance of slicebox (defaults to localhost:5000) and the path to a cache directory where dicom files and some offline data will be saved to allow offline usage of the GUI.
-* Start SBXGui_osx in Matlab 2015a or later. Normal usage is `SBXGui_osx(username, password)`, but other options can be entered as well, see the readme.
+The Matlab integration library for Slicebox resides in the branch [matlab-integration](https://github.com/slicebox/slicebox/tree/matlab-integration). The [README](https://github.com/slicebox/slicebox/blob/matlab-integration/README.md) file of that branch provides more information.
 
 API
 ---
