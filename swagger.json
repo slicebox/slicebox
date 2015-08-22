@@ -1948,7 +1948,7 @@
       }
     },
 
-    "/seriestypes/rules/updatestatus" : {
+    "/seriestypes/rules/updatestatus": {
       "get": {
         "description": "get the status of the internal process of updating series types for series following a change of series types, rules or attributes.",
         "tags": ["Series Types"],
