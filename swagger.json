@@ -1954,7 +1954,7 @@
         "tags": ["Series Types"],
         "responses": {
           "200": {
-            "a status message, either 'idle' or 'running'."
+            "a status message, either idle or running."
           }
         }
       }
