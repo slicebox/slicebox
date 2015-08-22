@@ -19,26 +19,35 @@ package se.nimsa.sbx.app
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
-import scala.concurrent.duration.DurationInt
+import java.util.concurrent.TimeUnit.MILLISECONDS
+
 import scala.slick.driver.H2Driver
 import scala.slick.jdbc.JdbcBackend.Database
+
+import com.mchange.v2.c3p0.ComboPooledDataSource
+import com.typesafe.config.Config
+import com.typesafe.config.ConfigFactory
+
 import akka.actor.Actor
 import akka.util.Timeout
-import spray.routing.HttpService
-import com.mchange.v2.c3p0.ComboPooledDataSource
-import com.typesafe.config.ConfigFactory
-import se.nimsa.sbx.app.routing.SliceboxRoutes
-import se.nimsa.sbx.box.BoxServiceActor
-import se.nimsa.sbx.storage.StorageServiceActor
-import se.nimsa.sbx.scp.ScpServiceActor
-import se.nimsa.sbx.scu.ScuServiceActor
-import se.nimsa.sbx.directory.DirectoryWatchServiceActor
-import se.nimsa.sbx.log.LogServiceActor
-import se.nimsa.sbx.seriestype.SeriesTypeServiceActor
 import se.nimsa.sbx.anonymization.AnonymizationServiceActor
-import java.util.concurrent.TimeUnit._
-import com.typesafe.config.Config
-import se.nimsa.sbx.seriestype.SeriesTypeUpdateActor
+import se.nimsa.sbx.app.routing.SliceboxRoutes
+import se.nimsa.sbx.box.BoxDAO
+import se.nimsa.sbx.box.BoxServiceActor
+import se.nimsa.sbx.directory.DirectoryWatchDAO
+import se.nimsa.sbx.directory.DirectoryWatchServiceActor
+import se.nimsa.sbx.log.LogDAO
+import se.nimsa.sbx.log.LogServiceActor
+import se.nimsa.sbx.scp.ScpDAO
+import se.nimsa.sbx.scp.ScpServiceActor
+import se.nimsa.sbx.scu.ScuDAO
+import se.nimsa.sbx.scu.ScuServiceActor
+import se.nimsa.sbx.seriestype.SeriesTypeDAO
+import se.nimsa.sbx.seriestype.SeriesTypeServiceActor
+import se.nimsa.sbx.storage.MetaDataDAO
+import se.nimsa.sbx.storage.PropertiesDAO
+import se.nimsa.sbx.storage.StorageServiceActor
+import spray.routing.HttpService
 
 class RestInterface extends Actor with RestApi {
 
@@ -80,6 +89,18 @@ trait RestApi extends HttpService with SliceboxRoutes with JsonFormats {
 
   val dbProps = DbProps(db, H2Driver)
 
+  db.withSession { implicit session =>
+    new LogDAO(dbProps.driver).create
+    new UserDAO(dbProps.driver).create
+    new MetaDataDAO(dbProps.driver).create
+    new PropertiesDAO(dbProps.driver).create
+    new DirectoryWatchDAO(dbProps.driver).create
+    new ScpDAO(dbProps.driver).create
+    new ScuDAO(dbProps.driver).create
+    new BoxDAO(dbProps.driver).create
+    new SeriesTypeDAO(dbProps.driver).create
+  }
+  
   val storage = createStorageDirectory()
 
   val host = if (sliceboxConfig.hasPath("host"))
@@ -94,7 +115,7 @@ trait RestApi extends HttpService with SliceboxRoutes with JsonFormats {
 
   val clientTimeout = appConfig.getDuration("spray.can.client.request-timeout", MILLISECONDS)
   val serverTimeout = appConfig.getDuration("spray.can.server.request-timeout", MILLISECONDS)
-  
+
   implicit val timeout = Timeout(math.max(clientTimeout, serverTimeout) + 10, MILLISECONDS)
 
   val apiBaseURL = if (port == 80)
@@ -115,8 +136,7 @@ trait RestApi extends HttpService with SliceboxRoutes with JsonFormats {
   val scpService = actorRefFactory.actorOf(ScpServiceActor.props(dbProps), name = "ScpService")
   val scuService = actorRefFactory.actorOf(ScuServiceActor.props(dbProps, storage), name = "ScuService")
   val directoryService = actorRefFactory.actorOf(DirectoryWatchServiceActor.props(dbProps, storage), name = "DirectoryService")
-  val seriesTypeService = actorRefFactory.actorOf(SeriesTypeServiceActor.props(dbProps), name = "SeriesTypeService")
-  val seriesTypeUpdateService = actorRefFactory.actorOf(SeriesTypeUpdateActor.props(dbProps), name = "SeriesTypeUpdateService")
+  val seriesTypeService = actorRefFactory.actorOf(SeriesTypeServiceActor.props(dbProps, timeout), name = "SeriesTypeService")
 
   val authenticator = new Authenticator(userService)
 

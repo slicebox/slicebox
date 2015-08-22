@@ -20,7 +20,7 @@ import scala.slick.driver.JdbcProfile
 import scala.slick.jdbc.meta.MTable
 import ScpProtocol.ScpData
 
-class ScpDataDAO(val driver: JdbcProfile) {
+class ScpDAO(val driver: JdbcProfile) {
   import driver.simple._
 
   class ScpDataTable(tag: Tag) extends Table[ScpData](tag, "ScpData") {

@@ -16,6 +16,8 @@
 
 package se.nimsa.sbx.seriestype
 
+import se.nimsa.sbx.dicom.DicomHierarchy.Series
+
 object SeriesTypeProtocol {
 
   import se.nimsa.sbx.model.Entity
@@ -45,6 +47,8 @@ object SeriesTypeProtocol {
   sealed trait SeriesTypeRequest
   
   case object GetSeriesTypes extends SeriesTypeRequest
+  
+  case class GetSeriesTypesForSeries(seriesId: Long) extends SeriesTypeRequest
   
   case class AddSeriesType(seriesType: SeriesType) extends SeriesTypeRequest
   
@@ -83,16 +87,19 @@ object SeriesTypeProtocol {
   
   sealed trait SeriesTypesUpdateRequest
   
-  case class UpdateSeriesTypesForSeries(seriesId: Long) extends SeriesTypesUpdateRequest
-  
-  case object UpdateSeriesTypesForAllSeries extends SeriesTypesUpdateRequest
-  
-  case object GetUpdateSeriesTypesRunningStatus extends SeriesTypesUpdateRequest
+  case class UpdateSeriesTypesForSeries(seriesIds: Seq[Long]) extends SeriesTypesUpdateRequest
+    
+  case object GetUpdateSeriesTypesRunningStatus extends SeriesTypesUpdateRequest with SeriesTypeRequest
   
   case class UpdateSeriesTypesRunningStatus(running: Boolean)
   
-  
-  // series types update actor internal messages
+  case class AddSeriesTypeToSeries(seriesType: SeriesType, series: Series) extends SeriesTypeRequest
 
-  case object PollSeriesTypesUpdateQueue
+  case class RemoveSeriesTypesFromSeries(series: Series) extends SeriesTypeRequest
+    
+  case class SeriesTypeAddedToSeries(seriesSeriesType: SeriesSeriesType)
+
+  case class SeriesTypesRemovedFromSeries(series: Series)
+  
+
 }

@@ -29,12 +29,12 @@ class MetaDataDAO(val driver: JdbcProfile) {
 
   // *** Patient *** 
 
-  protected[storage] val toPatient = (id: Long, patientName: String, patientID: String, patientBirthDate: String, patientSex: String) =>
+  val toPatient = (id: Long, patientName: String, patientID: String, patientBirthDate: String, patientSex: String) =>
     Patient(id, PatientName(patientName), PatientID(patientID), PatientBirthDate(patientBirthDate), PatientSex(patientSex))
 
-  protected[storage] val fromPatient = (patient: Patient) => Option((patient.id, patient.patientName.value, patient.patientID.value, patient.patientBirthDate.value, patient.patientSex.value))
+  val fromPatient = (patient: Patient) => Option((patient.id, patient.patientName.value, patient.patientID.value, patient.patientBirthDate.value, patient.patientSex.value))
 
-  protected[storage] class Patients(tag: Tag) extends Table[Patient](tag, "Patients") {
+  class Patients(tag: Tag) extends Table[Patient](tag, "Patients") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def patientName = column[String](DicomProperty.PatientName.name)
     def patientID = column[String](DicomProperty.PatientID.name)
@@ -43,16 +43,16 @@ class MetaDataDAO(val driver: JdbcProfile) {
     def * = (id, patientName, patientID, patientBirthDate, patientSex) <> (toPatient.tupled, fromPatient)
   }
 
-  protected[storage] val patientsQuery = TableQuery[Patients]
+  val patientsQuery = TableQuery[Patients]
 
-  protected[storage] val fromStudy = (study: Study) => Option((study.id, study.patientId, study.studyInstanceUID.value, study.studyDescription.value, study.studyDate.value, study.studyID.value, study.accessionNumber.value, study.patientAge.value))
+  val fromStudy = (study: Study) => Option((study.id, study.patientId, study.studyInstanceUID.value, study.studyDescription.value, study.studyDate.value, study.studyID.value, study.accessionNumber.value, study.patientAge.value))
 
   // *** Study *** //
 
-  protected[storage] val toStudy = (id: Long, patientId: Long, studyInstanceUID: String, studyDescription: String, studyDate: String, studyID: String, accessionNumber: String, patientAge: String) =>
+  val toStudy = (id: Long, patientId: Long, studyInstanceUID: String, studyDescription: String, studyDate: String, studyID: String, accessionNumber: String, patientAge: String) =>
     Study(id, patientId, StudyInstanceUID(studyInstanceUID), StudyDescription(studyDescription), StudyDate(studyDate), StudyID(studyID), AccessionNumber(accessionNumber), PatientAge(patientAge))
 
-  protected[storage] class Studies(tag: Tag) extends Table[Study](tag, "Studies") {
+  class Studies(tag: Tag) extends Table[Study](tag, "Studies") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def patientId = column[Long]("patientId")
     def studyInstanceUID = column[String](DicomProperty.StudyInstanceUID.name)
@@ -67,47 +67,47 @@ class MetaDataDAO(val driver: JdbcProfile) {
     def patientIdJoin = patientsQuery.filter(_.id === patientId)
   }
 
-  protected[storage] val studiesQuery = TableQuery[Studies]
+  val studiesQuery = TableQuery[Studies]
 
   // *** Equipment ***
 
-  protected[storage] val toEquipment = (id: Long, manufacturer: String, stationName: String) =>
+  val toEquipment = (id: Long, manufacturer: String, stationName: String) =>
     Equipment(id, Manufacturer(manufacturer), StationName(stationName))
 
-  protected[storage] val fromEquipment = (equipment: Equipment) => Option((equipment.id, equipment.manufacturer.value, equipment.stationName.value))
+  val fromEquipment = (equipment: Equipment) => Option((equipment.id, equipment.manufacturer.value, equipment.stationName.value))
 
-  protected[storage] class Equipments(tag: Tag) extends Table[Equipment](tag, "Equipments") {
+  class Equipments(tag: Tag) extends Table[Equipment](tag, "Equipments") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def manufacturer = column[String](DicomProperty.Manufacturer.name)
     def stationName = column[String](DicomProperty.StationName.name)
     def * = (id, manufacturer, stationName) <> (toEquipment.tupled, fromEquipment)
   }
 
-  protected[storage] val equipmentsQuery = TableQuery[Equipments]
+  val equipmentsQuery = TableQuery[Equipments]
 
   // *** Frame of Reference ***
 
-  protected[storage] val toFrameOfReference = (id: Long, frameOfReferenceUID: String) =>
+  val toFrameOfReference = (id: Long, frameOfReferenceUID: String) =>
     FrameOfReference(id, FrameOfReferenceUID(frameOfReferenceUID))
 
-  protected[storage] val fromFrameOfReference = (frameOfReference: FrameOfReference) => Option((frameOfReference.id, frameOfReference.frameOfReferenceUID.value))
+  val fromFrameOfReference = (frameOfReference: FrameOfReference) => Option((frameOfReference.id, frameOfReference.frameOfReferenceUID.value))
 
-  protected[storage] class FrameOfReferences(tag: Tag) extends Table[FrameOfReference](tag, "FrameOfReferences") {
+  class FrameOfReferences(tag: Tag) extends Table[FrameOfReference](tag, "FrameOfReferences") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def frameOfReferenceUID = column[String](DicomProperty.FrameOfReferenceUID.name)
     def * = (id, frameOfReferenceUID) <> (toFrameOfReference.tupled, fromFrameOfReference)
   }
 
-  protected[storage] val frameOfReferencesQuery = TableQuery[FrameOfReferences]
+  val frameOfReferencesQuery = TableQuery[FrameOfReferences]
 
   // *** Series ***
 
-  protected[storage] val toSeries = (id: Long, studyId: Long, equipmentId: Long, frameOfReferenceId: Long, seriesInstanceUID: String, seriesDescription: String, seriesDate: String, modality: String, protocolName: String, bodyPartExamined: String) =>
+  val toSeries = (id: Long, studyId: Long, equipmentId: Long, frameOfReferenceId: Long, seriesInstanceUID: String, seriesDescription: String, seriesDate: String, modality: String, protocolName: String, bodyPartExamined: String) =>
     Series(id, studyId, equipmentId, frameOfReferenceId, SeriesInstanceUID(seriesInstanceUID), SeriesDescription(seriesDescription), SeriesDate(seriesDate), Modality(modality), ProtocolName(protocolName), BodyPartExamined(bodyPartExamined))
 
-  protected[storage] val fromSeries = (series: Series) => Option((series.id, series.studyId, series.equipmentId, series.frameOfReferenceId, series.seriesInstanceUID.value, series.seriesDescription.value, series.seriesDate.value, series.modality.value, series.protocolName.value, series.bodyPartExamined.value))
+  val fromSeries = (series: Series) => Option((series.id, series.studyId, series.equipmentId, series.frameOfReferenceId, series.seriesInstanceUID.value, series.seriesDescription.value, series.seriesDate.value, series.modality.value, series.protocolName.value, series.bodyPartExamined.value))
 
-  protected[storage] class SeriesTable(tag: Tag) extends Table[Series](tag, "Series") {
+  class SeriesTable(tag: Tag) extends Table[Series](tag, "Series") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def studyId = column[Long]("studyId")
     def equipmentId = column[Long]("equipmentId")
@@ -126,16 +126,16 @@ class MetaDataDAO(val driver: JdbcProfile) {
     def studyIdJoin = studiesQuery.filter(_.id === studyId)
   }
 
-  protected[storage] val seriesQuery = TableQuery[SeriesTable]
+  val seriesQuery = TableQuery[SeriesTable]
 
   // *** Image ***
 
-  protected[storage] val toImage = (id: Long, seriesId: Long, sopInstanceUID: String, imageType: String, instanceNumber: String) =>
+  val toImage = (id: Long, seriesId: Long, sopInstanceUID: String, imageType: String, instanceNumber: String) =>
     Image(id, seriesId, SOPInstanceUID(sopInstanceUID), ImageType(imageType), InstanceNumber(instanceNumber))
 
-  protected[storage] val fromImage = (image: Image) => Option((image.id, image.seriesId, image.sopInstanceUID.value, image.imageType.value, image.instanceNumber.value))
+  val fromImage = (image: Image) => Option((image.id, image.seriesId, image.sopInstanceUID.value, image.imageType.value, image.instanceNumber.value))
 
-  protected[storage] class Images(tag: Tag) extends Table[Image](tag, "Images") {
+  class Images(tag: Tag) extends Table[Image](tag, "Images") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def seriesId = column[Long]("seriesId")
     def sopInstanceUID = column[String](DicomProperty.SOPInstanceUID.name)
@@ -147,7 +147,7 @@ class MetaDataDAO(val driver: JdbcProfile) {
     def seriesIdJoin = seriesQuery.filter(_.id === seriesId)
   }
 
-  protected[storage] val imagesQuery = TableQuery[Images]
+  val imagesQuery = TableQuery[Images]
 
   def create(implicit session: Session) =
     if (MTable.getTables("Patients").list.isEmpty)

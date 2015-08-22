@@ -36,9 +36,19 @@ trait SeriesTypeRoutes { this: RestApi =>
     pathPrefix("seriestypes") {
       pathEndOrSingleSlash {
         get {
-          onSuccess(seriesTypeService.ask(GetSeriesTypes)) {
-            case SeriesTypes(seriesTypes) =>
-              complete(seriesTypes)
+          parameter('seriesid.as[Long].?) {
+            _ match {
+              case Some(seriesId) =>
+                onSuccess(seriesTypeService.ask(GetSeriesTypesForSeries(seriesId))) {
+                  case SeriesTypes(seriesTypes) =>
+                    complete(seriesTypes)
+                }
+              case None =>
+                onSuccess(seriesTypeService.ask(GetSeriesTypes)) {
+                  case SeriesTypes(seriesTypes) =>
+                    complete(seriesTypes)
+                }
+            }
           }
         } ~ post {
           authorize(authInfo.hasPermission(UserRole.ADMINISTRATOR)) {
@@ -72,7 +82,15 @@ trait SeriesTypeRoutes { this: RestApi =>
           }
         }
       } ~ pathPrefix("rules") {
-        pathEndOrSingleSlash {
+        path("updatestatus") {
+          onSuccess(seriesTypeService.ask(GetUpdateSeriesTypesRunningStatus)) {
+            case UpdateSeriesTypesRunningStatus(running) =>
+              if (running)
+                complete("running")
+              else
+                complete("idle")
+          }
+        } ~ pathEndOrSingleSlash {
           get {
             parameter('seriestypeid.as[Long]) { seriesTypeId =>
               onSuccess(seriesTypeService.ask(GetSeriesTypeRules(seriesTypeId))) {

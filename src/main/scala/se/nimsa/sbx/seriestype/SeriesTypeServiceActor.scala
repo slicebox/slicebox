@@ -19,29 +19,37 @@ package se.nimsa.sbx.seriestype
 import SeriesTypeProtocol._
 import akka.actor.Actor
 import akka.actor.Props
-import akka.actor.Stash
 import akka.actor.actorRef2Scala
 import akka.event.Logging
 import akka.event.LoggingReceive
+import akka.util.Timeout
+import akka.pattern.ask
 import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.util.ExceptionCatching
 import se.nimsa.sbx.util.SequentialPipeToSupport
 import se.nimsa.sbx.dicom.DicomUtil
+import se.nimsa.sbx.dicom.DicomHierarchy.Series
+import se.nimsa.sbx.storage.StorageProtocol.GetAllSeries
+import se.nimsa.sbx.storage.StorageProtocol.SeriesCollection
+import scala.concurrent.Future
 
-class SeriesTypeServiceActor(dbProps: DbProps) extends Actor with Stash
-    with SequentialPipeToSupport with ExceptionCatching {
+class SeriesTypeServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extends Actor with ExceptionCatching {
 
   val log = Logging(context.system, this)
+
+  implicit val system = context.system
+  implicit val ec = context.dispatcher
 
   val db = dbProps.db
   val seriesTypeDao = new SeriesTypeDAO(dbProps.driver)
 
-  val seriesTypeUpdateService = context.actorSelection("../SeriesTypeUpdateService")
-
-  setupDb()
+  val storageService = context.actorSelection("../StorageService")
+  val seriesTypeUpdateService = context.actorOf(SeriesTypeUpdateActor.props(timeout), name = "SeriesTypeUpdate")
 
   log.info("Series type service started")
 
+  updateSeriesTypesForAllSeries()
+  
   def receive = LoggingReceive {
 
     case msg: SeriesTypeRequest =>
@@ -54,6 +62,10 @@ class SeriesTypeServiceActor(dbProps: DbProps) extends Actor with Stash
             val seriesTypes = getSeriesTypesFromDb()
             sender ! SeriesTypes(seriesTypes)
 
+          case GetSeriesTypesForSeries(seriesId) =>
+            val seriesTypes = getSeriesTypesForSeries(seriesId)
+            sender ! SeriesTypes(seriesTypes)
+
           case AddSeriesType(seriesType) =>
             val dbSeriesType = addSeriesTypeToDb(seriesType)
             sender ! SeriesTypeAdded(dbSeriesType)
@@ -64,7 +76,7 @@ class SeriesTypeServiceActor(dbProps: DbProps) extends Actor with Stash
 
           case RemoveSeriesType(seriesTypeId) =>
             removeSeriesTypeFromDb(seriesTypeId)
-            seriesTypeUpdateService ! UpdateSeriesTypesForAllSeries
+            updateSeriesTypesForAllSeries()
             sender ! SeriesTypeRemoved(seriesTypeId)
 
           case GetSeriesTypeRules(seriesTypeId) =>
@@ -77,7 +89,7 @@ class SeriesTypeServiceActor(dbProps: DbProps) extends Actor with Stash
 
           case RemoveSeriesTypeRule(seriesTypeRuleId) =>
             removeSeriesTypeRuleFromDb(seriesTypeRuleId)
-            seriesTypeUpdateService ! UpdateSeriesTypesForAllSeries
+            updateSeriesTypesForAllSeries()
             sender ! SeriesTypeRuleRemoved(seriesTypeRuleId)
 
           case GetSeriesTypeRuleAttributes(seriesTypeRuleId) =>
@@ -86,26 +98,31 @@ class SeriesTypeServiceActor(dbProps: DbProps) extends Actor with Stash
 
           case AddSeriesTypeRuleAttribute(seriesTypeRuleAttribute) =>
             val dbSeriesTypeRuleAttribute = addSeriesTypeRuleAttributeToDb(seriesTypeRuleAttribute)
-            seriesTypeUpdateService ! UpdateSeriesTypesForAllSeries
+            updateSeriesTypesForAllSeries()
             sender ! SeriesTypeRuleAttributeAdded(dbSeriesTypeRuleAttribute)
 
           case RemoveSeriesTypeRuleAttribute(seriesTypeRuleAttributeId) =>
             removeSeriesTypeRuleAttributeFromDb(seriesTypeRuleAttributeId)
-            seriesTypeUpdateService ! UpdateSeriesTypesForAllSeries
+            updateSeriesTypesForAllSeries()
             sender ! SeriesTypeRuleAttributeRemoved(seriesTypeRuleAttributeId)
+
+          case AddSeriesTypeToSeries(seriesType, series) =>
+            db.withSession { implicit session =>
+              val seriesSeriesType = seriesTypeDao.insertSeriesSeriesType(SeriesSeriesType(series.id, seriesType.id))
+              sender ! SeriesTypeAddedToSeries(seriesSeriesType)
+            }
+
+          case RemoveSeriesTypesFromSeries(series) =>
+            db.withSession { implicit session =>
+              seriesTypeDao.removeSeriesTypesForSeriesId(series.id)
+              sender ! SeriesTypesRemovedFromSeries(series)
+            }
+            
+          case GetUpdateSeriesTypesRunningStatus =>
+            seriesTypeUpdateService.forward(GetUpdateSeriesTypesRunningStatus)
         }
       }
   }
-
-  def setupDb(): Unit =
-    db.withSession { implicit session =>
-      seriesTypeDao.create
-    }
-
-  def teardownDb(): Unit =
-    db.withSession { implicit session =>
-      seriesTypeDao.drop
-    }
 
   def getSeriesTypesFromDb(): Seq[SeriesType] =
     db.withSession { implicit session =>
@@ -160,8 +177,21 @@ class SeriesTypeServiceActor(dbProps: DbProps) extends Actor with Stash
     db.withSession { implicit session =>
       seriesTypeDao.removeSeriesTypeRuleAttribute(seriesTypeRuleAttributeId)
     }
+
+  def updateSeriesTypesForAllSeries() =
+    getAllSeries().map(allSeries =>
+      seriesTypeUpdateService ! UpdateSeriesTypesForSeries(allSeries.map(_.id)))
+
+  def getAllSeries(): Future[Seq[Series]] =
+    storageService.ask(GetAllSeries).mapTo[SeriesCollection].map(_.series)
+
+  def getSeriesTypesForSeries(seriesId: Long) =
+    db.withSession { implicit session =>
+      seriesTypeDao.seriesTypesForSeries(seriesId)
+    }
+  
 }
 
 object SeriesTypeServiceActor {
-  def props(dbProps: DbProps): Props = Props(new SeriesTypeServiceActor(dbProps))
+  def props(dbProps: DbProps, timeout: Timeout): Props = Props(new SeriesTypeServiceActor(dbProps)(timeout))
 }

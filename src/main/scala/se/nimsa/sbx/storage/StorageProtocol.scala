@@ -129,6 +129,8 @@ object StorageProtocol {
   
   case class GetSingleSeries(seriesId: Long) extends MetaDataQuery
   
+  case object GetAllSeries extends MetaDataQuery
+  
   case class GetSeriesSource(seriesId: Long) extends MetaDataQuery
   
   case class GetImage(imageId: Long) extends MetaDataQuery
@@ -143,7 +145,7 @@ object StorageProtocol {
   
   case class QueryImages(query: Query) extends MetaDataQuery
   
-  
+
   case class DeleteImage(imageId: Long)
   
   

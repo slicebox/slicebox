@@ -37,7 +37,6 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor 
   val db = dbProps.db
   val dao = new DirectoryWatchDAO(dbProps.driver)
 
-  setupDb()
   setupWatches()
 
   log.info("Directory watch service started")
@@ -96,11 +95,6 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor 
       }
 
   }
-
-  def setupDb() =
-    db.withSession { implicit session =>
-      dao.create
-    }
 
   def setupWatches() =
     db.withTransaction { implicit session =>

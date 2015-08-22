@@ -20,7 +20,7 @@ import scala.slick.driver.JdbcProfile
 import scala.slick.jdbc.meta.MTable
 import ScuProtocol.ScuData
 
-class ScuDataDAO(val driver: JdbcProfile) {
+class ScuDAO(val driver: JdbcProfile) {
   import driver.simple._
 
   class ScuDataTable(tag: Tag) extends Table[ScuData](tag, "ScuData") {

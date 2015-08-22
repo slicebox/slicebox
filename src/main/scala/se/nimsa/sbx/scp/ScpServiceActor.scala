@@ -32,11 +32,10 @@ class ScpServiceActor(dbProps: DbProps) extends Actor with ExceptionCatching {
   val log = Logging(context.system, this)
 
   val db = dbProps.db
-  val dao = new ScpDataDAO(dbProps.driver)
+  val dao = new ScpDAO(dbProps.driver)
 
   val executor = Executors.newCachedThreadPool()
 
-  setupDb()
   setupScps()
 
   override def postStop() {
@@ -121,11 +120,6 @@ class ScpServiceActor(dbProps: DbProps) extends Actor with ExceptionCatching {
   def getScps() =
     db.withSession { implicit session =>
       dao.allScpDatas
-    }
-
-  def setupDb() =
-    db.withSession { implicit session =>
-      dao.create
     }
 
   def setupScps() =

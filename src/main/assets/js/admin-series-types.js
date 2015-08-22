@@ -11,7 +11,7 @@ angular.module('slicebox.adminSeriesTypes', ['ngRoute'])
   });
 })
 
-.controller('AdminSeriesTypesCtrl', function($scope, $http) {
+.controller('AdminSeriesTypesCtrl', function($scope, $http, $interval) {
 	// Initialization
 	$scope.objectActions =
 		[
@@ -24,8 +24,19 @@ angular.module('slicebox.adminSeriesTypes', ['ngRoute'])
 	$scope.callbacks = {};
 
 	$scope.uiState = {
-		selectedSeriesType: null
+		selectedSeriesType: null,
+		updateIsRunning: false
 	};
+
+	var timer = $interval(function() {
+        $http.get('/api/seriestypes/rules/updatestatus').success(function (status) {
+            $scope.uiState.updateIsRunning = status !== "idle";
+        });
+    }, 3000);
+
+    $scope.$on('$destroy', function() {
+        $interval.cancel(timer);
+    });
 
 	// Scope functions
 	$scope.loadSeriesTypesPage = function(startIndex, count, orderByProperty, orderByDirection) {

@@ -20,6 +20,8 @@ import scala.slick.driver.JdbcProfile
 import scala.slick.jdbc.{ GetResult, StaticQuery => Q }
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomPropertyValue._
+import se.nimsa.sbx.seriestype.SeriesTypeDAO
+import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
 import scala.slick.jdbc.meta.MTable
 import StorageProtocol._
 
@@ -27,8 +29,9 @@ class PropertiesDAO(val driver: JdbcProfile) {
   import driver.simple._
 
   val metaDataDao = new MetaDataDAO(driver)
+  
   import metaDataDao._
-
+  
   // *** Files ***
 
   private val toImageFile = (id: Long, fileName: String, sourceType: String, sourceId: Long) => ImageFile(id, FileName(fileName), SourceType.withName(sourceType), sourceId)
@@ -66,6 +69,9 @@ class PropertiesDAO(val driver: JdbcProfile) {
 
   private val seriesSourceQuery = TableQuery[SeriesSources]
 
+    
+  // Setup
+
   def create(implicit session: Session) =
     if (MTable.getTables("ImageFiles").list.isEmpty)
       (imageFilesQuery.ddl ++ seriesSourceQuery.ddl).create
@@ -79,6 +85,8 @@ class PropertiesDAO(val driver: JdbcProfile) {
     seriesSourceQuery.delete
   }
 
+  // Functions
+  
   def imageFileById(imageId: Long)(implicit session: Session): Option[ImageFile] =
     imageFilesQuery.filter(_.id === imageId).list.headOption
 

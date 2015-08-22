@@ -36,7 +36,6 @@ class UserServiceActor(dbProps: DbProps, superUser: String, superPassword: Strin
 
   val authTokens = Map.empty[AuthToken, Tuple2[ApiUser, Long]]
 
-  setupDb()
   addSuperUser()
 
   implicit val system = context.system
@@ -104,11 +103,6 @@ class UserServiceActor(dbProps: DbProps, superUser: String, superPassword: Strin
     case CleanupTokens =>
       cleanupTokens()
   }
-
-  def setupDb() =
-    db.withSession { implicit session =>
-      dao.create
-    }
 
   def addSuperUser() =
     db.withSession { implicit session =>

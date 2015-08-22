@@ -12,6 +12,7 @@ import org.scalatest.WordSpecLike
 import scala.slick.jdbc.JdbcBackend.Database
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
 import akka.actor.Status.Failure
+import scala.concurrent.duration.DurationInt
 
 class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
   with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {
@@ -27,7 +28,7 @@ class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     seriesTypeDao.create
   }
   
-  val seriesTypeService = system.actorOf(SeriesTypeServiceActor.props(dbProps), name = "SeriesTypeService")
+  val seriesTypeService = system.actorOf(SeriesTypeServiceActor.props(dbProps, 1.minute), name = "SeriesTypeService")
   
   override def afterAll {
     TestKit.shutdownActorSystem(system)

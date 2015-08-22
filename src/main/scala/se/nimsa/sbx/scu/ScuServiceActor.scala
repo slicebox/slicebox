@@ -35,13 +35,11 @@ class ScuServiceActor(dbProps: DbProps, storage: Path) extends Actor with Except
   val log = Logging(context.system, this)
 
   val db = dbProps.db
-  val dao = new ScuDataDAO(dbProps.driver)
+  val dao = new ScuDAO(dbProps.driver)
   val propertiesDao = new PropertiesDAO(dbProps.driver)
 
   import context.system
   implicit val ec = context.dispatcher
-
-  setupDb()
 
   log.info("SCU service started")    
   
@@ -123,11 +121,6 @@ class ScuServiceActor(dbProps: DbProps, storage: Path) extends Actor with Except
   def getScus() =
     db.withSession { implicit session =>
       dao.allScuDatas
-    }
-
-  def setupDb() =
-    db.withSession { implicit session =>
-      dao.create
     }
 
   def imageFilesForSeries(seriesId: Long) =

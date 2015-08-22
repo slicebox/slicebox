@@ -100,6 +100,7 @@ angular.module('slicebox.home', ['ngRoute'])
         leftColumnSelectedTabIndex: 0,
         rightColumnSelectedTabIndex: 0,
         selectedSeriesSource: "",
+        selectedSeriesSeriesTypes: [],
         pngImageUrls: [],
         imageHeight: 0,
         images: 1,
@@ -243,6 +244,7 @@ angular.module('slicebox.home', ['ngRoute'])
             $scope.uiState.selectedSeries = series;
 
             $scope.uiState.seriesDetails.selectedSeriesSource = "";
+            $scope.uiState.seriesDetails.selectedSeriesSeriesTypes = [];
             $scope.uiState.seriesDetails.pngImageUrls = [];
 
             if ($scope.callbacks.imageAttributesTable) { 
@@ -256,6 +258,7 @@ angular.module('slicebox.home', ['ngRoute'])
 
             if (series !== null) {
                 updateSelectedSeriesSource(series);
+                updateSelectedSeriesSeriesTypes(series);
             }
         }
 
@@ -270,6 +273,8 @@ angular.module('slicebox.home', ['ngRoute'])
             $scope.patientSelected(flatSeries.patient);
             $scope.studySelected(flatSeries.study);
             $scope.seriesSelected(flatSeries.series);
+        } else {
+            $scope.seriesSelected(null);
         }
     };
 
@@ -390,10 +395,16 @@ angular.module('slicebox.home', ['ngRoute'])
 
     function updateSelectedSeriesSource(series) {
         $scope.uiState.sourcesPromise.then(function(sources) {
-            $http.get('/api/metadata/series/' + series.id + '/source').success(function(source) {
+            $http.get('/api/metadata/series/' + series.id + '/source').success(function (source) {
                 $scope.uiState.seriesDetails.selectedSeriesSource = source.sourceName + " (" + source.sourceType + ")";
             });                
         });        
+    }
+
+    function updateSelectedSeriesSeriesTypes(series) {
+        $http.get('/api/seriestypes?seriesid=' + series.id).success(function (seriesTypes) {
+            $scope.uiState.seriesDetails.selectedSeriesSeriesTypes = seriesTypes;
+        });                
     }
 
     function capitalizeFirst(string) {

@@ -17,12 +17,17 @@ import se.nimsa.sbx.dicom.DicomUtil.loadDataset
 import StorageProtocol._
 
 class StorageServiceActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
-  with WordSpecLike with Matchers with BeforeAndAfterAll {
+    with WordSpecLike with Matchers with BeforeAndAfterAll {
 
   def this() = this(ActorSystem("StorageTestSystem"))
 
   val db = Database.forURL("jdbc:h2:mem:dicomstorageactortest;DB_CLOSE_DELAY=-1", driver = "org.h2.Driver")
   val dbProps = DbProps(db, H2Driver)
+
+  db.withSession { implicit session =>
+    new MetaDataDAO(dbProps.driver).create
+    new PropertiesDAO(dbProps.driver).create
+  }
 
   val dataset = TestUtil.testImageDataset()
 
@@ -30,12 +35,12 @@ class StorageServiceActorTest(_system: ActorSystem) extends TestKit(_system) wit
 
   val storageActorRef = TestActorRef(new StorageServiceActor(dbProps, storage))
   val storageActor = storageActorRef.underlyingActor
-  
+
   override def afterAll {
     TestKit.shutdownActorSystem(system)
     TestUtil.deleteFolder(storage)
   }
-    
+
   "The storage service" must {
 
     "return an empty list of patients when no metadata exists" in {

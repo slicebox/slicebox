@@ -65,10 +65,6 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
   val dao = new MetaDataDAO(dbProps.driver)
   val propertiesDao = new PropertiesDAO(dbProps.driver)
 
-  setupDb()
-
-  val seriesTypeUpdateService = context.actorSelection("../SeriesTypeUpdateService")
-
   implicit val ec = ExecutionContexts.fromExecutor(Executors.newWorkStealingPool())
 
   override def preStart {
@@ -86,8 +82,10 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
         if (checkSopClass(dataset)) {
           try {
             val (image, overwrite) = storeDataset(dataset, sourceType, sourceId)
-            if (!overwrite)
+            if (!overwrite) {
+              context.system.eventStream.publish(ImageAdded(image))
               SbxLog.info("Storage", s"Stored file ${path.toString} as ${dataset.getString(Tag.SOPInstanceUID)}")
+            }
           } catch {
             case e: IllegalArgumentException =>
               SbxLog.error("Storage", e.getMessage)
@@ -101,8 +99,10 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
     case DatasetReceived(dataset, sourceType, sourceId) =>
       try {
         val (image, overwrite) = storeDataset(dataset, sourceType, sourceId)
-        if (!overwrite)
+        if (!overwrite) {
+          context.system.eventStream.publish(ImageAdded(image))
           SbxLog.info("Storage", "Stored dataset: " + dataset.getString(Tag.SOPInstanceUID))
+        }
       } catch {
         case e: IllegalArgumentException =>
           SbxLog.error("Storage", e.getMessage)
@@ -113,6 +113,8 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
         if (dataset == null)
           throw new IllegalArgumentException("Invalid dataset")
         val (image, overwrite) = storeDatasetTryCatchThrow(dataset, sourceType, sourceId)
+        if (!overwrite)
+          context.system.eventStream.publish(ImageAdded(image))
         sender ! ImageAdded(image)
       }
 
@@ -232,6 +234,11 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
             sender ! dao.seriesById(seriesId)
           }
 
+        case GetAllSeries =>
+          db.withSession { implicit session =>
+            sender ! SeriesCollection(dao.series)
+          }
+
         case GetSeriesSource(seriesId) =>
           db.withSession { implicit session =>
             sender ! propertiesDao.seriesSourceById(seriesId)
@@ -266,6 +273,7 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
           db.withSession { implicit session =>
             sender ! Images(dao.queryImages(query.startIndex, query.count, query.orderBy, query.orderAscending, query.queryProperties))
           }
+
       }
     }
 
@@ -333,8 +341,6 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
 
         try {
           saveDataset(dataset, storedPath)
-
-          seriesTypeUpdateService ! UpdateSeriesTypesForSeries(dbSeries.id)
         } catch {
           case e: Exception =>
             SbxLog.error("Storage", "Dataset file could not be stored: " + e.getMessage)
@@ -417,12 +423,6 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
     } else
       image
   }
-
-  def setupDb() =
-    db.withSession { implicit session =>
-      dao.create
-      propertiesDao.create
-    }
 
 }
 

@@ -59,7 +59,6 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String, impli
   val pollBoxOnlineStatusTimeoutMillis: Long = 15000
   val pollBoxesLastPollTimestamp = collection.mutable.Map.empty[Long, Date]
 
-  setupDb()
   setupBoxes()
 
   val pollBoxesOnlineStatusSchedule = system.scheduler.schedule(100.milliseconds, 5.seconds) {
@@ -219,16 +218,6 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String, impli
       }
 
   }
-
-  def setupDb(): Unit =
-    db.withSession { implicit session =>
-      boxDao.create
-    }
-
-  def teardownDb(): Unit =
-    db.withSession { implicit session =>
-      boxDao.drop
-    }
 
   def baseUrlToToken(url: String): String =
     try {

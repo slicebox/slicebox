@@ -30,8 +30,6 @@ class LogServiceActor(dbProps: DbProps) extends Actor {
   val db = dbProps.db
   val dao = new LogDAO(dbProps.driver)
 
-  setupDb()
-
   override def preStart {
     context.system.eventStream.subscribe(self, classOf[AddLogEntry])
   }
@@ -54,11 +52,6 @@ class LogServiceActor(dbProps: DbProps) extends Actor {
       removeLogEntry(id)
       sender ! LogEntryRemoved(id)
   }
-
-  def setupDb() =
-    db.withSession { implicit session =>
-      dao.create
-    }
 
   def addLogEntry(logEntry: LogEntry): LogEntry =
     db.withSession { implicit session =>
