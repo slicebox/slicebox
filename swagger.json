@@ -1948,6 +1948,18 @@
       }
     },
 
+    "/seriestypes/rules/updatestatus" : {
+      "get": {
+        "description": "get the status of the internal process of updating series types for series following a change of series types, rules or attributes.",
+        "tags": ["Series Types"],
+        "responses": {
+          "200": {
+            "a status message, either 'idle' or 'running'."
+          }
+        }
+      }
+    },
+
     "/seriestypes/rules/{id}": {
       "delete": {
         "description": "remove the series type rule corresponding to the supplied ID",
