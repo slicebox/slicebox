@@ -1823,6 +1823,31 @@
           }
         }
       },
+      "get": {
+        "description": "get the list of series types of the series with the supplied ID.",
+        "tags": ["Series Types"],
+        "parameters": [
+          {
+            "name": "seriesid",
+            "description": "id of series type to list series types for",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "the list of series types",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/seriestype"
+              }
+            }
+          }
+        }
+      },
       "post": {
         "description": "add a new series type",
         "tags": ["Series Types"],
