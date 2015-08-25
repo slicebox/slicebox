@@ -55,6 +55,10 @@ object StorageProtocol {
   case class Source(sourceType: SourceType, sourceName: String, sourceId: Long)
   
   case class SeriesSource(id: Long, sourceType: SourceType, sourceId: Long) extends Entity
+
+  case class SeriesTag(id: Long, name: String) extends Entity
+  
+  case class SeriesSeriesTag(seriesId: Long, seriesTagId: Long)
   
   case class FileName(value: String)
 
