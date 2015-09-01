@@ -123,31 +123,35 @@ angular.module('slicebox.home', ['ngRoute'])
     };
 
     $scope.loadPatients = function(startIndex, count, orderByProperty, orderByDirection, filter) {
-        var loadPatientsUrl = '/api/metadata/patients?startindex=' + startIndex + '&count=' + count;
-        if (orderByProperty) {
-            var orderByPropertyName = orderByProperty === "id" ? orderByProperty : capitalizeFirst(orderByProperty.substring(0, orderByProperty.indexOf('[')));
-            loadPatientsUrl = loadPatientsUrl + '&orderby=' + orderByPropertyName;
-            
-            if (orderByDirection === 'ASCENDING') {
-                loadPatientsUrl = loadPatientsUrl + '&orderascending=true';
-            } else {
-                loadPatientsUrl = loadPatientsUrl + '&orderascending=false';
+        if ($scope.uiState.selectedPatient) {
+            return $q.when([ $scope.uiState.selectedPatient ]);
+        } else {
+            var loadPatientsUrl = '/api/metadata/patients?startindex=' + startIndex + '&count=' + count;
+            if (orderByProperty) {
+                var orderByPropertyName = orderByProperty === "id" ? orderByProperty : capitalizeFirst(orderByProperty.substring(0, orderByProperty.indexOf('[')));
+                loadPatientsUrl = loadPatientsUrl + '&orderby=' + orderByPropertyName;
+                
+                if (orderByDirection === 'ASCENDING') {
+                    loadPatientsUrl = loadPatientsUrl + '&orderascending=true';
+                } else {
+                    loadPatientsUrl = loadPatientsUrl + '&orderascending=false';
+                }
             }
+
+            if (filter) {
+                loadPatientsUrl = loadPatientsUrl + '&filter=' + encodeURIComponent(filter);
+            }
+
+            loadPatientsUrl = sbxMisc.urlWithSourceQuery(loadPatientsUrl, $scope.uiState.selectedSource);
+
+            var loadPatientsPromise = $http.get(loadPatientsUrl);
+
+            loadPatientsPromise.error(function(error) {
+                $scope.showErrorMessage('Failed to load patients: ' + error);
+            });
+
+            return loadPatientsPromise;
         }
-
-        if (filter) {
-            loadPatientsUrl = loadPatientsUrl + '&filter=' + encodeURIComponent(filter);
-        }
-
-        loadPatientsUrl = sbxMisc.urlWithSourceQuery(loadPatientsUrl, $scope.uiState.selectedSource);
-
-        var loadPatientsPromise = $http.get(loadPatientsUrl);
-
-        loadPatientsPromise.error(function(error) {
-            $scope.showErrorMessage('Failed to load patients: ' + error);
-        });
-
-        return loadPatientsPromise;
     };
 
     $scope.sourceSelected = function() {
@@ -163,6 +167,7 @@ angular.module('slicebox.home', ['ngRoute'])
             $scope.uiState.selectedPatient = patient;
             $scope.studySelected(null, true);
         }
+        $scope.callbacks.patientsTable.reloadPage();
     };
 
     $scope.loadStudies = function(startIndex, count, orderByProperty, orderByDirection) {
@@ -170,17 +175,21 @@ angular.module('slicebox.home', ['ngRoute'])
             return [];
         }
 
-        var loadStudiesUrl = '/api/metadata/studies?startindex=' + startIndex + '&count=' + count + '&patientid=' + $scope.uiState.selectedPatient.id;
+        if ($scope.uiState.selectedStudy) {
+            return $q.when([ $scope.uiState.selectedStudy ]);
+        } else {
+            var loadStudiesUrl = '/api/metadata/studies?startindex=' + startIndex + '&count=' + count + '&patientid=' + $scope.uiState.selectedPatient.id;
 
-        loadStudiesUrl = sbxMisc.urlWithSourceQuery(loadStudiesUrl, $scope.uiState.selectedSource);
+            loadStudiesUrl = sbxMisc.urlWithSourceQuery(loadStudiesUrl, $scope.uiState.selectedSource);
 
-        var loadStudiesPromise = $http.get(loadStudiesUrl);
+            var loadStudiesPromise = $http.get(loadStudiesUrl);
 
-        loadStudiesPromise.error(function(error) {
-            $scope.showErrorMessage('Failed to load studies: ' + error);
-        });
+            loadStudiesPromise.error(function(error) {
+                $scope.showErrorMessage('Failed to load studies: ' + error);
+            });
 
-        return loadStudiesPromise;
+            return loadStudiesPromise;
+        }
     };
 
     $scope.studySelected = function(study, reset) {
@@ -190,6 +199,8 @@ angular.module('slicebox.home', ['ngRoute'])
         }
         if (reset && $scope.callbacks.studiesTable) {
             $scope.callbacks.studiesTable.reset();
+        } else if ($scope.callbacks.studiesTable) {
+            $scope.callbacks.studiesTable.reloadPage();
         }
     };
 
