@@ -10,6 +10,9 @@ import se.nimsa.sbx.dicom.DicomHierarchy._
 import org.h2.jdbc.JdbcSQLException
 import StorageProtocol._
 import se.nimsa.sbx.util.TestUtil._
+import se.nimsa.sbx.seriestype.SeriesTypeDAO
+import se.nimsa.sbx.seriestype.SeriesTypeProtocol.SeriesType
+import se.nimsa.sbx.seriestype.SeriesTypeProtocol.SeriesSeriesType
 
 class PropertiesDAOTest extends FlatSpec with Matchers with BeforeAndAfterEach {
 
@@ -17,17 +20,20 @@ class PropertiesDAOTest extends FlatSpec with Matchers with BeforeAndAfterEach {
 
   val metaDataDao = new MetaDataDAO(H2Driver)
   val propertiesDao = new PropertiesDAO(H2Driver)
+  val seriesTypeDAO = new SeriesTypeDAO(H2Driver)
 
   override def beforeEach() =
     db.withSession { implicit session =>
       metaDataDao.create
       propertiesDao.create
+      seriesTypeDAO.create
     }
 
   override def afterEach() =
     db.withSession { implicit session =>
       propertiesDao.drop
       metaDataDao.drop
+      seriesTypeDAO.drop
     }
 
   "The properties db" should "be emtpy before anything has been added" in {
@@ -132,11 +138,24 @@ class PropertiesDAOTest extends FlatSpec with Matchers with BeforeAndAfterEach {
       propertiesDao.seriesForStudy(0, 20, 1, Some(SourceType.SCP), Some(2)).size should be(0)
     }
   }
+  
+  it should "support filtering patients by series type" in {
+    db.withSession { implicit session =>
+      insertMetaDataAndProperties
+
+      propertiesDao.patients(0, 20, None, true, Some("Test Type"), Some(SourceType.BOX), None).size should be(1)
+      propertiesDao.patients(0, 20, None, true, Some("Unknown Type"), Some(SourceType.BOX), None).size should be(0)
+    }
+  }
+  
 
   def insertMetaDataAndProperties(implicit session: Session) = {
     val (dbPatient1, (dbStudy1, dbStudy2), (dbSeries1, dbSeries2, dbSeries3, dbSeries4), (dbEquipment1, dbEquipment2, dbEquipment3), (dbFor1, dbFor2), (dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)) =
       insertMetaData(metaDataDao)
     insertProperties(propertiesDao, dbSeries1, dbSeries2, dbSeries3, dbSeries4, dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)
+    
+    val seriesType = seriesTypeDAO.insertSeriesType(SeriesType(-1, "Test Type"))
+    seriesTypeDAO.insertSeriesSeriesType(SeriesSeriesType(dbSeries1.id, seriesType.id))
   }
   
 }
