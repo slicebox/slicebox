@@ -234,8 +234,10 @@ class PropertiesDAO(val driver: JdbcProfile) {
       implicit val getResult = patientsGetResult
 
       var query = s"""select 
-      "Patients"."id", "Patients"."PatientName", "Patients"."PatientID", "Patients"."PatientBirthDate","Patients"."PatientSex"
+      "Patients"."id", "Patients"."PatientName", "Patients"."PatientID", "Patients"."PatientBirthDate","Patients"."PatientSex","SeriesTypes"."name"
        from "Series" 
+       inner join "SeriesSeriesTypes" on "Series"."id" = "SeriesSeriesTypes"."seriesid"
+       inner join "SeriesTypes" on "SeriesSeriesTypes"."seriestypeid" = "SeriesTypes"."id"
        inner join "SeriesSources" on "Series"."id" = "SeriesSources"."id"
        inner join "Studies" on "Series"."studyId" = "Studies"."id" 
        inner join "Patients" on "Studies"."patientId" = "Patients"."id"
@@ -248,11 +250,13 @@ class PropertiesDAO(val driver: JdbcProfile) {
 
       filter.foreach(filterValue => {
         val filterValueLike = s"'%$filterValue%'".toLowerCase
+        val filterValueEqual = s"'$filterValue'".toLowerCase
         query += s"""and (
         lcase("PatientName") like $filterValueLike or 
           lcase("PatientID") like $filterValueLike or 
             lcase("PatientBirthDate") like $filterValueLike or 
-              lcase("PatientSex") like $filterValueLike)
+              lcase("PatientSex") like $filterValueLike or
+                lcase("name") = $filterValueEqual)
               """
       })
 
