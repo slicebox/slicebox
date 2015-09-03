@@ -25,6 +25,7 @@
                             <sbx-grid
                                 load-page="loadPatients(startIndex, count, orderByProperty, orderByDirection, filter)"
                                 page-size="10"
+                                page-sizes="[10, 25, 100, 1000]"
                                 filter="true"
                                 object-actions="patientActions"
                                 object-selected="patientSelected(object)"
@@ -59,8 +60,7 @@
                         <md-content>
                             <sbx-grid
                                 load-page="loadStudies(startIndex, count, orderByProperty, orderByDirection)"
-                                page-size="10"
-                                page-sizes="[5, 10, 20, 50, 100]"
+                                page-size="100000"
                                 sorting="false"
                                 object-actions="studyActions"
                                 object-selected="studySelected(object)"
@@ -95,8 +95,7 @@
                         <md-content>
                             <sbx-grid
                                 load-page="loadSeries(startIndex, count, orderByProperty, orderByDirection)"
-                                page-size="10"
-                                page-sizes="[5, 10, 20, 50, 100]"
+                                page-size="100000"
                                 sorting="false"
                                 object-actions="seriesActions"
                                 object-selected="seriesSelected(object)"
@@ -139,7 +138,7 @@
                             <sbx-grid
                                 load-page="loadFlatSeries(startIndex, count, orderByProperty, orderByDirection, filter)"
                                 page-size="10"
-                                page-sizes="[5, 10, 20, 50, 100]"
+                                page-sizes="[10, 25, 100, 1000]"
                                 filter="true"
                                 object-actions="seriesActions"
                                 object-selected="flatSeriesSelected(object)"
@@ -237,7 +236,7 @@
                 <div ng-if="uiState.selectedSeries !== null">
 
                     <md-button class="md-icon-button md-primary" ng-click="openImageSettingsModal()" aria-label="Display Settings">
-                        <md-tooltip>Display Settings</md-tooltip>
+                        <md-tooltip md-direction="top">Display Settings</md-tooltip>
                         <md-icon md-svg-icon="/assets/images/ic_settings_24px.svg"></md-icon>
                     </md-button>
 

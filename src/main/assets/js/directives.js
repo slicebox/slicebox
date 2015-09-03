@@ -71,6 +71,7 @@ angular.module('slicebox.directives', [])
             loadPage: '&',
             converter: '&',
             pageSize: '=',
+            pageSizes: '=',
             objectSelectedCallback: '&objectSelected',
             objectActions: '=',
             sorting: '=',
@@ -108,9 +109,7 @@ angular.module('slicebox.directives', [])
             $scope.orderByDirection = null;
             $scope.objectActionSelection = [];
             $scope.uiState = {
-                objectActionsDropdownOpen: false,
                 selectAllChecked: false,
-                pageSizeOpen: false,
                 emptyMessage: 'Empty',
                 filter: ''
             };
@@ -132,13 +131,11 @@ angular.module('slicebox.directives', [])
                 doOnColumnsChanged();
             });            
 
-            $scope.$watch('pageSize', function() {
-                loadPageData();
-            });
-
             $scope.$watchCollection('objectActionSelection', function() {
                 updateSelectAllObjectActionChecked();
             });
+
+            loadPageData();
 
             // Scope functions
             $scope.tableBodyStyle = function() {
@@ -276,9 +273,8 @@ angular.module('slicebox.directives', [])
                 performObjectAction(objectAction);
             };
 
-            $scope.pageSizeChanged = function(size) {
-                $scope.currentPageSize = size;
-                $scope.uiState.pageSizeOpen = false;
+            $scope.pageSizeChanged = function() {
+                $scope.currentPageSize = pageSizeAsNumber();
                 loadPageData();
             };
 
@@ -594,7 +590,6 @@ angular.module('slicebox.directives', [])
                     throwError('TypeError', 'An object action must define an action function: ' + angular.toJson(objectAction));
                 }
 
-                $scope.uiState.objectActionsDropdownOpen = false;
             }
         }
     };

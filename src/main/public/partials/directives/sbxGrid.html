@@ -15,10 +15,22 @@
                 </md-menu-item>
             </md-menu-content>
         </md-menu>
+
+        <div flex></div>
                
         <div ng-if="filterEnabled()">
             <input type="text" class="filter" ng-model="uiState.filter" ng-change="filterChanged()" placeholder="Filter">
         </div>
+
+        <div flex></div>
+
+        <div ng-if="pageSizes && pageSizes.length > 1">
+            <md-select aria-label="Page Size" placeholder="Page Size" ng-model="$parent.pageSize" md-on-close="pageSizeChanged()">
+                <md-option ng-repeat="pSize in pageSizes" ng-value="pSize">{{pSize}}</md-option>
+            </md-select>
+            <md-tooltip md-direction="top">Page Size</md-tooltip>
+        </div>
+
     </div>
     <!-- HEADER END -->
 
