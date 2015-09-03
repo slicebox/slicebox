@@ -4,10 +4,18 @@
 
     <!-- HEADER START -->
     <div class="header" layout="row" layout-wrap layout-align="space-between center">
-        <md-select ng-change="objectActionSelected()" ng-model="uiState.selectedObjectAction" ng-if="objectActions.length > 0" ng-disabled="objectActionsEnabled() == false">
-            <md-select-label aria-label="actions"><span class="fa fa-cog"></span></md-select-label>
-            <md-option class="sbx-grid-object-action-option" ng-repeat="objectAction in objectActions" ng-value="objectAction">{{objectAction.name}}</md-option>
-        </md-select>
+
+        <md-menu class="actions-menu" ng-if="objectActions.length > 0">
+            <md-button aria-label="Open object action menu" class="md-icon-button actions-menu-button" ng-click="$mdOpenMenu($event)">
+                <md-icon md-menu-origin md-svg-src="/assets/images/ic_menu_18px.svg"></md-icon>
+            </md-button>
+            <md-menu-content width="2">
+                <md-menu-item ng-repeat="objectAction in objectActions">
+                    <md-button ng-click="objectActionSelected(objectAction)" ng-disabled="objectActionEnabled(objectAction) === false"> {{objectAction.name}} </md-button>
+                </md-menu-item>
+            </md-menu-content>
+        </md-menu>
+               
         <div ng-if="filterEnabled()">
             <input type="text" class="filter" ng-model="uiState.filter" ng-change="filterChanged()" placeholder="Filter">
         </div>

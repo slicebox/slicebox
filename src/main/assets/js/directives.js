@@ -126,8 +126,7 @@ angular.module('slicebox.directives', [])
                 selectAllChecked: false,
                 pageSizeOpen: false,
                 emptyMessage: 'Empty',
-                filter: '',
-                selectedObjectAction: undefined
+                filter: ''
             };
 
             if (angular.isDefined($attrs.callbacks)) {
@@ -291,10 +290,7 @@ angular.module('slicebox.directives', [])
                 return true;
             };
 
-            $scope.objectActionSelected = function() {
-                var objectAction = $scope.uiState.selectedObjectAction;
-                $scope.uiState.selectedObjectAction = undefined;
-
+            $scope.objectActionSelected = function(objectAction) {
                 performObjectAction(objectAction);
             };
 

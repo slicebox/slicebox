@@ -265,7 +265,7 @@ angular.module('slicebox.home', ['ngRoute'])
                 $scope.callbacks.datasetsTable.reset();
             }
 
-            $scope.updatePNGImageUrls();
+            updatePNGImageUrls();
 
             if (series !== null) {
                 updateSelectedSeriesSource(series);
@@ -326,7 +326,45 @@ angular.module('slicebox.home', ['ngRoute'])
         return attributesPromise;
     };
 
-    $scope.updatePNGImageUrls = function() {
+    $scope.loadSelectedSeriesDatasets = function() {
+        if ($scope.uiState.selectedSeries === null) {
+            return [];
+        }
+
+        var loadDatasetsPromise = $http.get('/api/metadata/images?count=1000000&seriesid=' + $scope.uiState.selectedSeries.id).then(function(images) {
+            return images.data.map(function(image) {
+                return { url: '/api/images/' + image.id };
+            });
+        }, function(error) {
+            $scope.showErrorMessage('Failed to load datasets: ' + error);
+        });
+
+        return loadDatasetsPromise;
+    };
+
+    $scope.openImageSettingsModal = function() {
+        var dialogPromise = $mdDialog.show({
+            templateUrl: '/assets/partials/imageSettingsModalContent.html',
+            controller: 'ImageSettingsModalCtrl',
+            locals: { 
+                imageHeight: $scope.uiState.seriesDetails.imageHeight, 
+                images: $scope.uiState.seriesDetails.images, 
+                isWindowManual: $scope.uiState.seriesDetails.isWindowManual, 
+                windowMin: $scope.uiState.seriesDetails.windowMin, 
+                windowMax: $scope.uiState.seriesDetails.windowMax },
+            scope: $scope.$new()
+        });
+
+        dialogPromise.then(function (settings) {
+            angular.extend($scope.uiState.seriesDetails, settings);
+            updatePNGImageUrls();
+        });
+        return dialogPromise;
+    };
+
+    // Private functions
+
+    function updatePNGImageUrls() {
         $scope.uiState.seriesDetails.pngImageUrls = [];
 
         if ($scope.uiState.selectedSeries !== null) {
@@ -384,25 +422,7 @@ angular.module('slicebox.home', ['ngRoute'])
             });
 
         }
-    };
-
-    $scope.loadSelectedSeriesDatasets = function() {
-        if ($scope.uiState.selectedSeries === null) {
-            return [];
-        }
-
-        var loadDatasetsPromise = $http.get('/api/metadata/images?count=1000000&seriesid=' + $scope.uiState.selectedSeries.id).then(function(images) {
-            return images.data.map(function(image) {
-                return { url: '/api/images/' + image.id };
-            });
-        }, function(error) {
-            $scope.showErrorMessage('Failed to load datasets: ' + error);
-        });
-
-        return loadDatasetsPromise;
-    };
-
-    // Private functions
+    }
 
     function updateSelectedSeriesSource(series) {
         $scope.uiState.sourcesPromise.then(function(sources) {
@@ -830,4 +850,20 @@ angular.module('slicebox.home', ['ngRoute'])
 
         return $q.all(saveAttributePromises);
     }
+})
+
+.controller('ImageSettingsModalCtrl', function($scope, $mdDialog, $http, imageHeight, images, isWindowManual, windowMin, windowMax) {
+    $scope.uiState.imageHeight = imageHeight;
+    $scope.uiState.images = images;
+    $scope.uiState.isWindowManual = isWindowManual;
+    $scope.uiState.windowMin = windowMin;
+    $scope.uiState.windowMax = windowMax;
+
+    $scope.applyButtonClicked = function() {
+        $mdDialog.hide($scope.uiState);
+    };
+
+    $scope.cancelButtonClicked = function() {
+        $mdDialog.cancel();
+    };
 });

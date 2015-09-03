@@ -57,6 +57,18 @@
     border-color: #CFD8DC;
 }
 
+.actions-menu {
+	padding: 0px;
+}
+
+.md-button.md-icon-button.actions-menu-button {
+	padding: 0;
+	margin: 0;
+	height: 18px;
+	line-height: 18px;
+	width: 18px;
+}
+
 .left-nav ul {
 	list-style: none;
 	padding: 0;
@@ -106,7 +118,7 @@
 	margin-right: 60px;
 }
 
-.home .left-column md-card h4 {
+.home md-card h4 {
 	margin-top: 0;
 	margin-bottom: 5px;
 	color: rgb(100, 100, 100);

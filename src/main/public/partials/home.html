@@ -21,7 +21,7 @@
                 <md-card>
                     <md-card-content>
                         <h4 class="md-flex card-header">Patients</h4>
-                        <md-content class="md-padding">
+                        <md-content>
                             <sbx-grid
                                 load-page="loadPatients(startIndex, count, orderByProperty, orderByDirection, filter)"
                                 page-size="10"
@@ -56,7 +56,7 @@
                 <md-card ng-if="uiState.selectedPatient !== null">
                     <md-card-content>
                         <h4 class="md-flex card-header">Studies</h4>
-                        <md-content class="md-padding">
+                        <md-content>
                             <sbx-grid
                                 load-page="loadStudies(startIndex, count, orderByProperty, orderByDirection)"
                                 page-size="10"
@@ -92,7 +92,7 @@
                 <md-card ng-if="uiState.selectedStudy !== null">
                     <md-card-content>
                         <h4 class="md-flex card-header">Series</h4>
-                        <md-content class="md-padding">
+                        <md-content>
                             <sbx-grid
                                 load-page="loadSeries(startIndex, count, orderByProperty, orderByDirection)"
                                 page-size="10"
@@ -135,7 +135,7 @@
                 <md-card>
                     <md-card-content>
                         <h4 class="md-flex card-header">All Series</h4>
-                        <md-content class="md-padding">
+                        <md-content>
                             <sbx-grid
                                 load-page="loadFlatSeries(startIndex, count, orderByProperty, orderByDirection, filter)"
                                 page-size="10"
@@ -236,62 +236,16 @@
 
                 <div ng-if="uiState.selectedSeries !== null">
 
-                    <form ng-submit="updatePNGImageUrls()" class="image-options">
-                        <div layout="row" layout-align="space-around">
-                            <div layout="column" flex="10" layout-align="space-around start">
-                                <div>
-                                    Size: 
-                                </div>
-                                <div>
-                                    Images: 
-                                </div>
-                            </div>
-                            <div layout="column" flex="30" layout-align="space-around start">
-                                <div>
-                                    <md-select ng-change="updatePNGImageUrls()" placeholder="Size" ng-model="uiState.seriesDetails.imageHeight">
-                                        <md-option value="0">Original</md-option>
-                                        <md-option value="50">50</md-option>
-                                        <md-option value="100">100</md-option>
-                                        <md-option value="150">150</md-option>
-                                    </md-select>
-                                </div>
-                                
-                                <div>
-                                    <md-select ng-change="updatePNGImageUrls()" placeholder="Images" ng-model="uiState.seriesDetails.images">
-                                        <md-option value="1">1</md-option>
-                                        <md-option value="5">5</md-option>
-                                        <md-option value="10">10</md-option>
-                                        <md-option value="10000">All</md-option>
-                                    </md-select>
-                                </div>
-                            </div>
-
-                            <div layout="column" flex="20" layout-align="space-around start">
-                                <md-checkbox ng-change="updatePNGImageUrls()" ng-model="uiState.seriesDetails.isWindowManual">Window</md-checkbox>
-                            </div>
-
-                            <div flex layout="column" flex="40" layout-align="space-between center">
-                                <md-input-container>
-                                    <label>Min</label>
-                                    <input type="number" ng-model="uiState.seriesDetails.windowMin" ng-disabled="!uiState.seriesDetails.isWindowManual">
-                                </md-input-container>
-
-                                <md-input-container>
-                                    <label>Max</label>
-                                    <input type="number" ng-model="uiState.seriesDetails.windowMax" ng-disabled="!uiState.seriesDetails.isWindowManual">
-                                </md-input-container>
-                            </div>
-
-                            <input type="submit" ng-hide="true">
-                        </div>
-                    </form>
-
-                    <md-divider></md-divider>
+                    <md-button class="md-icon-button md-primary" ng-click="openImageSettingsModal()" aria-label="Display Settings">
+                        <md-tooltip>Display Settings</md-tooltip>
+                        <md-icon md-svg-icon="/assets/images/ic_settings_24px.svg"></md-icon>
+                    </md-button>
 
                     <md-card>
                         <md-card-content>
-                            <md-content class="md-padding">
-                                <i ng-if="uiState.loadPngImagesInProgress" class="fa fa-spinner fa-2x fa-spin"></i>
+                            <md-content>
+
+                                <md-progress-circular ng-if="uiState.loadPngImagesInProgress" md-mode="indeterminate"></md-progress-circular>
 
                                 <div class="clearfix">
                                     <img ng-repeat="imageUrl in uiState.seriesDetails.pngImageUrls | orderBy:'frameIndex'" class="frame-image" ng-src="{{imageUrl.url}}" alt=""></img>
@@ -310,7 +264,7 @@
 
                 <md-card>
                     <md-card-content>
-                        <md-content class="md-padding">
+                        <md-content>
                             <sbx-grid
                                 load-page="loadImageAttributes(0, 1000000000, orderByProperty, orderByDirection)"
                                 page-size="1000000000"
@@ -357,16 +311,16 @@
 
                 <md-card>
                     <md-card-content>
-                        <md-content class="md-padding">
-                            <h4 class="md-flex card-header">Source</h4>
+                        <h4 class="md-flex card-header">Source</h4>
+                        <md-content>
                             {{uiState.seriesDetails.selectedSeriesSource}}
                         </md-content>
                     </md-card-content>
                 </md-card>
                 <md-card>
                     <md-card-content>
-                        <md-content class="md-padding">
-                            <h4 class="md-flex card-header">Series Type(s)</h4>
+                        <h4 class="md-flex card-header">Series Type(s)</h4>
+                        <md-content>
                             <p ng-if="uiState.selectedSeries && uiState.seriesDetails.selectedSeriesSeriesTypes.length === 0"><i>There are no series types assigned to this series</i></p>
                             <ul>
                                 <li ng-repeat="seriesType in uiState.seriesDetails.selectedSeriesSeriesTypes">{{seriesType.name}}</li>
@@ -376,8 +330,8 @@
                 </md-card>
                 <md-card>
                     <md-card-content>
-                        <md-content class="md-padding">
-                            <h4 class="md-flex card-header">Datasets</h4>
+                        <h4 class="md-flex card-header">Datasets</h4>
+                        <md-content>
                             <sbx-grid
                                 load-page="loadSelectedSeriesDatasets()"
                                 page-size="1000000"
