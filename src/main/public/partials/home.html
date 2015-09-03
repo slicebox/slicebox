@@ -216,7 +216,7 @@
 
     <div layout="column" flex="59" class="right-column">
         <md-tabs md-selected="uiState.rightColumnSelectedTabIndex">
-            <md-tab id="images" aria-controls="images-content">
+            <md-tab id="images" aria-controls="images-content" md-on-select="updatePNGImageUrls()">
                 Images
             </md-tab>
             <md-tab id="dicom-tags" aria-controls="dicom-tags-content">
@@ -313,7 +313,7 @@
                     <md-card-content>
                         <h4 class="md-flex card-header">Source</h4>
                         <md-content>
-                            {{uiState.seriesDetails.selectedSeriesSource}}
+                            <p>{{uiState.seriesDetails.selectedSeriesSource}}</p>
                         </md-content>
                     </md-card-content>
                 </md-card>

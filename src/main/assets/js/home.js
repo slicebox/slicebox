@@ -265,7 +265,7 @@ angular.module('slicebox.home', ['ngRoute'])
                 $scope.callbacks.datasetsTable.reset();
             }
 
-            updatePNGImageUrls();
+            $scope.updatePNGImageUrls();
 
             if (series !== null) {
                 updateSelectedSeriesSource(series);
@@ -357,14 +357,12 @@ angular.module('slicebox.home', ['ngRoute'])
 
         dialogPromise.then(function (settings) {
             angular.extend($scope.uiState.seriesDetails, settings);
-            updatePNGImageUrls();
+            $scope.updatePNGImageUrls();
         });
         return dialogPromise;
     };
 
-    // Private functions
-
-    function updatePNGImageUrls() {
+    $scope.updatePNGImageUrls = function() {
         $scope.uiState.seriesDetails.pngImageUrls = [];
 
         if ($scope.uiState.selectedSeries !== null) {
@@ -422,7 +420,9 @@ angular.module('slicebox.home', ['ngRoute'])
             });
 
         }
-    }
+    };
+
+    // Private functions
 
     function updateSelectedSeriesSource(series) {
         $scope.uiState.sourcesPromise.then(function(sources) {
