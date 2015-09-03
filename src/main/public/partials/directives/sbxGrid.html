@@ -39,10 +39,18 @@
                     
                     <th ng-repeat="columnDefinition in columnDefinitions track by columnDefinition.property"
                         ng-click="columnClicked(columnDefinition)"
-                        class="column-header">
+                        class="column-header"
+                        ng-style="columnHeaderOrderByStyle(columnDefinition)">
                         {{columnDefinition.title}}
-
-                        <i ng-class="columnHeaderOrderByClass(columnDefinition)"></i>
+                        &nbsp;
+                        <md-icon 
+                            md-svg-src="/assets/images/ic_arrow_drop_up_black_18px.svg" 
+                            ng-if="orderByProperty === columnDefinition.property && orderByDirection === 'ASCENDING'">
+                        </md-icon>
+                        <md-icon 
+                            md-svg-src="/assets/images/ic_arrow_drop_down_black_18px.svg" 
+                            ng-if="orderByProperty === columnDefinition.property && orderByDirection === 'DESCENDING'">
+                        </md-icon>
                     </th>
                 </tr>
             </thead>

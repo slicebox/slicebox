@@ -37,9 +37,6 @@ angular.module('slicebox', [
     $mdThemingProvider.theme('redTheme')
         .primaryPalette('red');
 
-    // prevent ng-animate on spinners, causes weird behaviour with ng-if/ng-show
-    $animateProvider.classNameFilter(/^((?!(fa-spinner)).)*$/);
-
     // Register filters
     $filterProvider.register('hexvalue', function() {
         return function(intValue, length) {

@@ -19,7 +19,7 @@ angular.module('slicebox.directives', [])
     return {
         restrict: 'E',
         template: '<md-button type="{{buttonType}}" ng-class="buttonClass" ng-click="buttonClicked()" ng-disabled="buttonDisabled || disabled">' + 
-                    '{{buttonTitle}} <i ng-if="disabled && showSpinner" class="fa fa-lg fa-spinner fa-spin">' + 
+                    '<section layout="row" layout-align="center center">{{buttonTitle}}<md-progress-circular md-mode="indeterminate" md-diameter="12" ng-if="disabled && showSpinner"></md-progress-circular></section>' + 
                     '</md-button>',
         scope: {
             action: '&',
@@ -96,20 +96,6 @@ angular.module('slicebox.directives', [])
                 pointerCursor: {
                     cursor: 'pointer'
                 },
-                orderBy: {
-                    ascending: {
-                        'fa': true,
-                        'fa-fw': true,
-                        'pull-right': true,
-                        'fa-sort-up': true
-                    },
-                    descending: {
-                        'fa': true,
-                        'fa-fw': true,
-                        'pull-right': true,
-                        'fa-sort-down': true
-                    }
-                },
                 rowSelected: {
                     'row-selected': true
                 }
@@ -163,18 +149,14 @@ angular.module('slicebox.directives', [])
                 return $scope.cssClasses.empty;
             };
 
-            $scope.columnHeaderOrderByClass = function(columnDefinition) {
-                var orderByClass = $scope.cssClasses.empty;
+            $scope.columnHeaderOrderByStyle = function(columnDefinition) {
+                var orderByStyle = $scope.cssClasses.empty;
 
-                if ($scope.orderByProperty === columnDefinition.property) {
-                    if ($scope.orderByDirection === 'ASCENDING') {
-                        orderByClass = $scope.cssClasses.orderBy.ascending;
-                    } else {
-                        orderByClass = $scope.cssClasses.orderBy.descending;
-                    }
+                if ($scope.sortingEnabled()) {
+                    orderByStyle = $scope.cssClasses.pointerCursor;
                 }
 
-                return orderByClass;
+                return orderByStyle;
             };
 
             $scope.rowCSSClasses = function(rowObject) {
