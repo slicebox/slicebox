@@ -207,9 +207,39 @@
         
         <hr>
 
-        <md-select ng-model="uiState.selectedSource" placeholder="Filter by source" md-on-open="uiState.sourcesPromise" ng-change="sourceSelected()">
-          <md-option ng-repeat="source in uiState.sources" ng-value="source">{{nameForSource(source)}}</md-option>
-        </md-select>
+        <md-card>
+            <md-card-content>
+                <h4 class="md-flex card-header">Filters</h4>
+                <md-content>
+                    
+                    <div layout="row" layout-align="space-between">
+                    
+                        <md-select ng-model="uiState.selectedSource" placeholder="Filter by source" md-on-open="uiState.sourcesPromise" ng-change="filteringChanged()">
+                          <md-option ng-repeat="source in uiState.sources" ng-value="source">{{nameForSource(source)}}</md-option>
+                        </md-select>
+
+                        <md-menu>
+                            <md-button aria-label="Open series types list" ng-click="$mdOpenMenu($event)">Series Types</md-button>
+                            <md-menu-content width="6">
+                                <md-content layout-padding style="height: 200px;padding: 8px;">
+                                    <md-menu-item ng-repeat="seriesType in uiState.seriesTypes">
+                                        <md-checkbox ng-model="seriesType.selected" aria-label="{{seriesType.name}}">
+                                            {{seriesType.name}}
+                                        </md-checkbox>
+                                    </md-menu-item>
+                                    <md-menu-divider></md-menu-divider>
+                                    <md-menu-item>
+                                        <md-button class="md-primary" ng-click="filteringChanged()">APPLY</md-button>
+                                    </md-menu-item>
+                                </md-content>
+                            </md-menu-content>
+                        </md-menu>
+
+                    </div>
+
+                </md-content>
+            </md-card-content>
+        </md-card>
 
     </div>
 

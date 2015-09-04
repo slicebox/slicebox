@@ -108,9 +108,17 @@ angular.module('slicebox.home', ['ngRoute'])
         windowMin: 0,
         windowMax: 100
     };
+    $scope.uiState.seriesTypes = [];
 
     // Scope functions
 
+    $http.get('/api/seriestypes').success(function (seriesTypes) {        
+        $scope.uiState.seriesTypes = seriesTypes.map(function (seriesType) {
+            seriesType.selected = false;
+            return seriesType;
+        }); 
+    });
+    
     $scope.uiState.sourcesPromise = $http.get('/api/metadata/sources').then(function(sourcesData) {
         angular.forEach(sourcesData.data, function(source) {
             $scope.uiState.sources.push(source);
@@ -154,7 +162,7 @@ angular.module('slicebox.home', ['ngRoute'])
         }
     };
 
-    $scope.sourceSelected = function() {
+    $scope.filteringChanged = function() {
         $scope.patientSelected(null);        
         $scope.callbacks.patientsTable.reset();
         if ($scope.callbacks.flatSeriesTable) {
