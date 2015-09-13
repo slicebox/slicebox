@@ -12,7 +12,9 @@ angular.module('slicebox.home', ['ngRoute'])
 })
 
 .controller('HomeCtrl', function($scope, $http, $mdDialog, $q, openConfirmActionModal, sbxMisc, sbxMetaData) {
+
     // Initialization
+
     $scope.patientActions =
         [
             {
@@ -90,8 +92,6 @@ angular.module('slicebox.home', ['ngRoute'])
     $scope.callbacks = {};
 
     $scope.uiState = {};
-    $scope.uiState.sources = [ { sourceType: null, sourceName: 'None' } ];
-    $scope.uiState.selectedSource = null;
     $scope.uiState.selectedPatient = null;
     $scope.uiState.selectedStudy = null;
     $scope.uiState.selectedSeries = null;
@@ -108,26 +108,31 @@ angular.module('slicebox.home', ['ngRoute'])
         windowMin: 0,
         windowMax: 100
     };
-    $scope.uiState.seriesTypes = [];
+    $scope.uiState.advancedFiltering = {
+        sourcesPromise: null,
+        seriesTypesPromise: null,
+        selectedSources: [],
+        selectedSeriesTypes: []
+    };
 
-    // Scope functions
+    $scope.uiState.advancedFiltering.sourcesPromise = $http.get('/api/metadata/sources').then(function(sourcesData) {
+        return sourcesData.data.map(function (source) {
+            source.selected = false;
+            return source;
+        }); 
+    });
 
-    $http.get('/api/seriestypes').success(function (seriesTypes) {        
-        $scope.uiState.seriesTypes = seriesTypes.map(function (seriesType) {
+    $scope.uiState.advancedFiltering.seriesTypesPromise = $http.get('/api/seriestypes').then(function (seriesTypesData) {        
+        return seriesTypesData.data.map(function (seriesType) {
             seriesType.selected = false;
             return seriesType;
         }); 
     });
     
-    $scope.uiState.sourcesPromise = $http.get('/api/metadata/sources').then(function(sourcesData) {
-        angular.forEach(sourcesData.data, function(source) {
-            $scope.uiState.sources.push(source);
-        });
-        return $scope.uiState.sources;
-    });
+    // Scope functions
 
     $scope.nameForSource = function(source) {
-        return source.sourceType === null ? "No filter" : source.sourceName + " (" + source.sourceType + ")";        
+        return source.sourceName + " (" + source.sourceType + ")";        
     };
 
     $scope.loadPatients = function(startIndex, count, orderByProperty, orderByDirection, filter) {
@@ -159,14 +164,6 @@ angular.module('slicebox.home', ['ngRoute'])
             });
 
             return loadPatientsPromise;
-        }
-    };
-
-    $scope.filteringChanged = function() {
-        $scope.patientSelected(null);        
-        $scope.callbacks.patientsTable.reset();
-        if ($scope.callbacks.flatSeriesTable) {
-            $scope.callbacks.flatSeriesTable.reset();
         }
     };
 
@@ -350,6 +347,30 @@ angular.module('slicebox.home', ['ngRoute'])
         return loadDatasetsPromise;
     };
 
+    $scope.openAdvancedFilteringModal = function() {
+        var dialogPromise = $mdDialog.show({
+            templateUrl: '/assets/partials/advancedFilteringModalContent.html',
+            controller: 'AdvancedFilteringModalCtrl',
+            locals: {
+                sources: $scope.uiState.advancedFiltering.sourcesPromise,
+                seriesTypes: $scope.uiState.advancedFiltering.seriesTypesPromise
+            },
+            scope: $scope.$new()
+        });
+
+        dialogPromise.then(function (selections) {
+            $scope.uiState.advancedFiltering.selectedSources = selections.selectedSources;
+            $scope.uiState.advancedFiltering.selectedSeriesTypes = selections.selectedSeriesTypes;
+
+            $scope.patientSelected(null);        
+            $scope.callbacks.patientsTable.reset();
+            if ($scope.callbacks.flatSeriesTable) {
+                $scope.callbacks.flatSeriesTable.reset();
+            }
+        });
+        return dialogPromise;
+    };
+
     $scope.openImageSettingsModal = function() {
         var dialogPromise = $mdDialog.show({
             templateUrl: '/assets/partials/imageSettingsModalContent.html',
@@ -433,17 +454,19 @@ angular.module('slicebox.home', ['ngRoute'])
     // Private functions
 
     function updateSelectedSeriesSource(series) {
-        $scope.uiState.sourcesPromise.then(function(sources) {
-            $http.get('/api/metadata/series/' + series.id + '/source').success(function (source) {
+        $scope.uiState.advancedFiltering.sourcesPromise.then(function(sources) {
+            return $http.get('/api/metadata/series/' + series.id + '/source').success(function (source) {
                 $scope.uiState.seriesDetails.selectedSeriesSource = source.sourceName + " (" + source.sourceType + ")";
-            });                
-        });        
+            });
+        });
     }
 
     function updateSelectedSeriesSeriesTypes(series) {
-        $http.get('/api/seriestypes?seriesid=' + series.id).success(function (seriesTypes) {
-            $scope.uiState.seriesDetails.selectedSeriesSeriesTypes = seriesTypes;
-        });                
+        $scope.uiState.advancedFiltering.seriesTypesPromise.then(function(allSeriesTypesData) {
+            return $http.get('/api/seriestypes?seriesid=' + series.id).success(function (seriesTypes) {
+                $scope.uiState.seriesDetails.selectedSeriesSeriesTypes = seriesTypes;
+            });
+        });
     }
 
     function capitalizeFirst(string) {
@@ -800,10 +823,10 @@ angular.module('slicebox.home', ['ngRoute'])
     $scope.loadSeriesTypes = function() {
         var loadSeriesTypesPromise = $http.get('/api/seriestypes');
 
-        $scope.seriesTypes = [];
+        $scope.advancedFiltering.seriesTypes = [];
 
         loadSeriesTypesPromise.success(function(seriesTypes) {
-            $scope.seriesTypes = seriesTypes;
+            $scope.advancedFiltering.seriesTypes = seriesTypes;
         });      
 
         return loadSeriesTypesPromise;
@@ -858,6 +881,28 @@ angular.module('slicebox.home', ['ngRoute'])
 
         return $q.all(saveAttributePromises);
     }
+})
+
+.controller('AdvancedFilteringModalCtrl', function($scope, $mdDialog, $http, sources, seriesTypes) {
+    $scope.uiState = {
+        sources: sources,
+        seriesTypes: seriesTypes
+    };
+
+    $scope.applyButtonClicked = function() {
+        var selectedSources = $scope.uiState.sources.filter(function(source) { return source.selected; });
+        var selectedSeriesTypes = $scope.uiState.seriesTypes.filter(function(seriesType) { return seriesType.selected; });
+        $mdDialog.hide({ selectedSources: selectedSources, selectedSeriesTypes: selectedSeriesTypes });
+    };
+
+    $scope.clearButtonClicked = function() {
+        $scope.uiState.sources.map(function(source) { source.selected = false; });
+        $scope.uiState.seriesTypes.map(function(seriesType) { seriesType.selected = false; });
+    };
+
+    $scope.cancelButtonClicked = function() {
+        $mdDialog.cancel();
+    };
 })
 
 .controller('ImageSettingsModalCtrl', function($scope, $mdDialog, $http, imageHeight, images, isWindowManual, windowMin, windowMax) {

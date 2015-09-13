@@ -1,0 +1,49 @@
+<md-dialog aria-label="Advanced Filtering" flex="40" class="home">
+  	<md-content class="sticky-container">
+    	<md-subheader class="md-sticky-no-effect">Advanced Filtering</md-subheader>
+    	<div class="dialog-content">
+
+            <div layout="column" layout-align="space-between">
+
+            	<div layout="row">
+					<md-card flex>
+	                    <md-card-content>
+	                        <md-content>
+	                        	<h4 class="md-flex card-header">Sources</h4>
+	                            <md-content style="height: 120px;padding: 8px;">
+	                                <md-checkbox ng-repeat="source in uiState.sources" ng-model="source.selected" aria-label="{{source.name}}">
+	                                    {{nameForSource(source)}}
+	                                </md-checkbox>
+	                            </md-content>
+	                        </md-content>
+	                    </md-card-content>
+	                </md-card>
+                </div>
+
+            	<div layout="row">
+					<md-card flex>
+	                    <md-card-content>
+	                        <md-content>
+	                        	<h4 class="md-flex card-header">Series Types</h4>
+	                            <md-content style="height: 120px;padding: 8px;">
+	                                <md-checkbox ng-repeat="seriesType in uiState.seriesTypes" ng-model="seriesType.selected" aria-label="{{seriesType.name}}">
+	                                    {{seriesType.name}}
+	                                </md-checkbox>
+	                            </md-content>
+	                        </md-content>
+	                    </md-card-content>
+	                </md-card>
+                </div>
+
+            </div>
+
+    	</div>
+    </md-content>
+
+    <div class="md-actions" layout="row">
+    	<span flex></span>
+    	<md-button ng-click="cancelButtonClicked()">Cancel</md-button>
+    	<md-button ng-click="clearButtonClicked()">Clear</md-button>
+        <sbx-button button-class="md-primary" button-title="Apply" action="applyButtonClicked()"></sbx-button>
+    </div>
+</md-dialog>
