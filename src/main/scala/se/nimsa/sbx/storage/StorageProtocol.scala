@@ -52,6 +52,8 @@ object StorageProtocol {
     }    
   }
       
+  case class SourceId(sourceType: SourceType, sourceId: Long)
+  
   case class Source(sourceType: SourceType, sourceName: String, sourceId: Long)
   
   case class SeriesSource(id: Long, sourceType: SourceType, sourceId: Long) extends Entity
@@ -111,7 +113,7 @@ object StorageProtocol {
 
   sealed trait MetaDataQuery
 
-  case class GetPatients(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String], sourceType: Option[SourceType], sourceId: Option[Long]) extends MetaDataQuery
+  case class GetPatients(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String], sources: Array[SourceId], seriesTypes: Array[Long]) extends MetaDataQuery
 
   case class GetStudies(startIndex: Long, count: Long, patientId: Long, sourceType: Option[SourceType], sourceId: Option[Long]) extends MetaDataQuery
 

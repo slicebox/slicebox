@@ -61,10 +61,11 @@ trait MetadataRoutes { this: RestApi =>
               'orderby.as[String].?,
               'orderascending.as[Boolean] ? true,
               'filter.as[String].?,
-              'sourcetype.as[String].?,
-              'sourceid.as[Long].?) { (startIndex, count, orderBy, orderAscending, filter, sourceType, sourceId) =>
-
-                onSuccess(storageService.ask(GetPatients(startIndex, count, orderBy, orderAscending, filter, sourceType.map(SourceType.withName(_)), sourceId))) {
+              'sources.as[String].?,
+              'seriesTypes.as[String].?) { (startIndex, count, orderBy, orderAscending, filter, sourcesString, seriesTypesString) =>
+                val sources = sourcesString.map(parseSourcesString(_)).getOrElse(Array.empty)
+                val seriesTypes = seriesTypesString.map(parseSeriesTypesString(_)).getOrElse(Array.empty)
+                onSuccess(storageService.ask(GetPatients(startIndex, count, orderBy, orderAscending, filter, sources, seriesTypes))) {
                   case Patients(patients) =>
                     complete(patients)
                 }
@@ -159,7 +160,7 @@ trait MetadataRoutes { this: RestApi =>
                   case UNKNOWN   => Future(None)
                 }
                 val futureName: Future[String] = futureNameMaybe.map(_.getOrElse("<source removed>"))
-                futureName.map(name => Some(Source(seriesSource.sourceType, name, seriesSource.sourceId)))    
+                futureName.map(name => Some(Source(seriesSource.sourceType, name, seriesSource.sourceId)))
               }).getOrElse(Future(None))
               onSuccess(futureSourceMaybe) {
                 complete(_)
@@ -224,4 +225,25 @@ trait MetadataRoutes { this: RestApi =>
     }
   }
 
+  def parseSourcesString(sourcesString: String): Array[SourceId] = {
+    try {
+      sourcesString.split(",").map(typeIdString => {
+        val typeIdArray = typeIdString.split(":")
+        SourceId(SourceType.withName(typeIdArray(0)), typeIdArray(1).toLong)
+      })
+    } catch {
+      case e: Exception =>
+        throw new IllegalArgumentException("Sources parameter must be formatted as a comma separated list of sourceType:sourceId elements, e.g. BOX:23,BOX:12,USER:2")
+    }
+  }
+  
+  def parseSeriesTypesString(seriesTypesString: String): Array[Long] = {
+    try {
+      seriesTypesString.split(",").map(_.toLong)
+    } catch {
+      case e: Exception =>
+        throw new IllegalArgumentException("Series types parameter must be formatted as a comma separated list of series type ids, e.g. 2,5,11")
+    }
+  }
+  
 }

@@ -223,8 +223,12 @@ class PropertiesDAO(val driver: JdbcProfile) {
     Q.queryNA(query).list.headOption
   }
 
-  def patients(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String], sourceType: Option[SourceType], sourceId: Option[Long])(implicit session: Session): List[Patient] = {
+  def patients(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String], sources: Array[SourceId], seriesTypes: Array[Long])(implicit session: Session): List[Patient] = {
 
+    // temp
+    val sourceType = sources.headOption.map(_.sourceType)
+    val sourceId = sources.headOption.map(_.sourceId)
+    
     if (sourceType.isEmpty)
       metaDataDao.patients(startIndex, count, orderBy, orderAscending, filter)
 

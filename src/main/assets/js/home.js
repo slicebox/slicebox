@@ -155,7 +155,7 @@ angular.module('slicebox.home', ['ngRoute'])
                 loadPatientsUrl = loadPatientsUrl + '&filter=' + encodeURIComponent(filter);
             }
 
-            loadPatientsUrl = sbxMisc.urlWithSourceQuery(loadPatientsUrl, $scope.uiState.selectedSource);
+            loadPatientsUrl = sbxMisc.urlWithAdvancedFiltering(loadPatientsUrl, $scope.uiState.advancedFiltering.selectedSources, $scope.uiState.advancedFiltering.selectedSeriesTypes);
 
             var loadPatientsPromise = $http.get(loadPatientsUrl);
 
@@ -185,7 +185,7 @@ angular.module('slicebox.home', ['ngRoute'])
         } else {
             var loadStudiesUrl = '/api/metadata/studies?startindex=' + startIndex + '&count=' + count + '&patientid=' + $scope.uiState.selectedPatient.id;
 
-            loadStudiesUrl = sbxMisc.urlWithSourceQuery(loadStudiesUrl, $scope.uiState.selectedSource);
+            loadStudiesUrl = sbxMisc.urlWithAdvancedFiltering(loadStudiesUrl, $scope.uiState.advancedFiltering.selectedSources, $scope.uiState.advancedFiltering.selectedSeriesTypes);
 
             var loadStudiesPromise = $http.get(loadStudiesUrl);
 
@@ -216,7 +216,7 @@ angular.module('slicebox.home', ['ngRoute'])
 
         var loadSeriesUrl = '/api/metadata/series?startindex=' + startIndex + '&count=' + count + '&studyid=' + $scope.uiState.selectedStudy.id;
 
-        loadSeriesUrl = sbxMisc.urlWithSourceQuery(loadSeriesUrl, $scope.uiState.selectedSource);
+        loadSeriesUrl = sbxMisc.urlWithAdvancedFiltering(loadSeriesUrl, $scope.uiState.advancedFiltering.selectedSources, $scope.uiState.advancedFiltering.selectedSeriesTypes);
 
         var loadSeriesPromise = $http.get(loadSeriesUrl);
 
@@ -244,7 +244,7 @@ angular.module('slicebox.home', ['ngRoute'])
             loadFlatSeriesUrl = loadFlatSeriesUrl + '&filter=' + encodeURIComponent(filter);
         }
 
-        loadFlatSeriesUrl = sbxMisc.urlWithSourceQuery(loadFlatSeriesUrl, $scope.uiState.selectedSource);
+        loadFlatSeriesUrl = sbxMisc.urlWithAdvancedFiltering(loadFlatSeriesUrl, $scope.uiState.advancedFiltering.selectedSources, $scope.uiState.advancedFiltering.selectedSeriesTypes);
 
         var loadFlatSeriesPromise = $http.get(loadFlatSeriesUrl);
 

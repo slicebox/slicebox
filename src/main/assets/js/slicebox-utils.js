@@ -2,12 +2,17 @@ angular.module('slicebox.utils', [])
 
 .factory('sbxMisc', function($q) {
     return {
-        urlWithSourceQuery: function(url, source) {
-            if (source && source.sourceType && source.sourceId) {
-                return url + '&sourcetype=' + source.sourceType + '&sourceid=' + source.sourceId;
-            } else {
-                return url;
-            }            
+        urlWithAdvancedFiltering: function(baseUrl, sources, seriesTypes) {
+            var url = baseUrl;
+            if (sources && sources.length > 0) {
+                var sourcesPart = sources.map(function (source) { return source.sourceType + ':' + source.sourceId; }).join();
+                url = url + '&sources=' + sourcesPart;
+            }
+            if (seriesTypes && seriesTypes.length > 0) {
+                var seriesTypesPart = seriesTypes.map(function (seriesType) { return seriesType.id; }).join();
+                url = url + '&seriestypes=' + seriesTypesPart;
+            }
+            return url;
         },
 
         flatten: function(arrayOfArrays) {

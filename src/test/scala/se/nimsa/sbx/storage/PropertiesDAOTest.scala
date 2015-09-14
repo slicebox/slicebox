@@ -101,17 +101,16 @@ class PropertiesDAOTest extends FlatSpec with Matchers with BeforeAndAfterEach {
   it should "support filtering patients by source" in {
     db.withSession { implicit session =>
       insertMetaDataAndProperties
-      propertiesDao.patients(0, 20, None, true, None, None, None).size should be(1)
-      propertiesDao.patients(0, 20, None, true, None, None, Some(1)).size should be(1)
-      propertiesDao.patients(0, 20, None, true, None, Some(SourceType.BOX), Some(-1)).size should be(1)
-      propertiesDao.patients(0, 20, None, true, None, Some(SourceType.BOX), Some(2)).size should be(0)
+      propertiesDao.patients(0, 20, None, true, None, Array.empty, Array.empty).size should be(1)
+      propertiesDao.patients(0, 20, None, true, None, Array(SourceId(SourceType.BOX, -1)), Array.empty).size should be(1)
+      propertiesDao.patients(0, 20, None, true, None, Array(SourceId(SourceType.BOX, 2)), Array.empty).size should be(0)
 
       // with filter
-      propertiesDao.patients(0, 20, None, true, Some("p1"), Some(SourceType.BOX), Some(-1)).size should be(1)
-      propertiesDao.patients(0, 20, None, true, Some("p2"), Some(SourceType.BOX), Some(-1)).size should be(0)
+      propertiesDao.patients(0, 20, None, true, Some("p1"), Array(SourceId(SourceType.BOX, -1)), Array.empty).size should be(1)
+      propertiesDao.patients(0, 20, None, true, Some("p2"), Array(SourceId(SourceType.BOX, -1)), Array.empty).size should be(0)
 
       // filter only
-      propertiesDao.patients(0, 20, None, true, Some("p1"), None, None).size should be(1)
+      propertiesDao.patients(0, 20, None, true, Some("p1"), Array.empty, Array.empty).size should be(1)
     }
   }
 
@@ -143,8 +142,8 @@ class PropertiesDAOTest extends FlatSpec with Matchers with BeforeAndAfterEach {
     db.withSession { implicit session =>
       insertMetaDataAndProperties
 
-      propertiesDao.patients(0, 20, None, true, Some("Test Type"), Some(SourceType.BOX), None).size should be(1)
-      propertiesDao.patients(0, 20, None, true, Some("Unknown Type"), Some(SourceType.BOX), None).size should be(0)
+      propertiesDao.patients(0, 20, None, true, Some("Test Type"), Array.empty, Array.empty).size should be(1)
+      propertiesDao.patients(0, 20, None, true, Some("Unknown Type"), Array.empty, Array.empty).size should be(0)
     }
   }
   

@@ -44,7 +44,7 @@ class StorageServiceActorTest(_system: ActorSystem) extends TestKit(_system) wit
   "The storage service" must {
 
     "return an empty list of patients when no metadata exists" in {
-      storageActorRef ! GetPatients(0, 10000, None, true, None, None, None)
+      storageActorRef ! GetPatients(0, 10000, None, true, None, Array.empty, Array.empty)
       expectMsg(Patients(Seq()))
     }
 
@@ -56,7 +56,7 @@ class StorageServiceActorTest(_system: ActorSystem) extends TestKit(_system) wit
     }
 
     "return a list of one object when asking for all patients" in {
-      storageActorRef ! GetPatients(0, 10000, None, true, None, None, None)
+      storageActorRef ! GetPatients(0, 10000, None, true, None, Array.empty, Array.empty)
       expectMsgPF() {
         case Patients(list) if (list.size == 1) => true
       }
@@ -70,7 +70,7 @@ class StorageServiceActorTest(_system: ActorSystem) extends TestKit(_system) wit
     }
 
     "return a list of one object when asking for all patients even though a dataset has been added twice" in {
-      storageActorRef ! GetPatients(0, 10000, None, true, None, None, None)
+      storageActorRef ! GetPatients(0, 10000, None, true, None, Array.empty, Array.empty)
       expectMsgPF() {
         case Patients(list) if (list.size == 1) => true
       }

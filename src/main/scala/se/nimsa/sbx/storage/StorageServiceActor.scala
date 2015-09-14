@@ -189,9 +189,9 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
 
     case msg: MetaDataQuery => catchAndReport {
       msg match {
-        case GetPatients(startIndex, count, orderBy, orderAscending, filter, sourceType, sourceId) =>
+        case GetPatients(startIndex, count, orderBy, orderAscending, filter, sources, seriesTypes) =>
           db.withSession { implicit session =>
-            sender ! Patients(propertiesDao.patients(startIndex, count, orderBy, orderAscending, filter, sourceType, sourceId))
+            sender ! Patients(propertiesDao.patients(startIndex, count, orderBy, orderAscending, filter, sources, seriesTypes))
           }
 
         case GetStudies(startIndex, count, patientId, sourceType, sourceId) =>

@@ -140,7 +140,14 @@
 
                 <md-card>
                     <md-card-content>
-                        <h4 class="md-flex card-header">All Series</h4>
+                        <div class="header" layout="row" layout-wrap layout-align="space-between center">
+                            <h4 class="md-flex card-header">All Series</h4>
+                            <div flex></div>
+                            <md-button aria-label="Advanced filtering options" class="md-icon-button"  ng-click="openAdvancedFilteringModal()">
+                                <md-tooltip md-direction="right">Advanced filtering</md-tooltip>
+                                <md-icon md-menu-origin md-svg-src="/assets/images/ic_filter_list_black_18px.svg"></md-icon>
+                            </md-button>
+                        </div>
                         <md-content>
                             <sbx-grid
                                 load-page="loadFlatSeries(startIndex, count, orderByProperty, orderByDirection, filter)"
