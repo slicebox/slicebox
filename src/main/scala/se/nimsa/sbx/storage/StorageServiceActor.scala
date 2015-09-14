@@ -44,7 +44,7 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.Date
 import se.nimsa.sbx.storage.StorageProtocol._
-import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
+import se.nimsa.sbx.seriestype.SeriesTypeProtocol.SeriesTypes
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomPropertyValue._
 import se.nimsa.sbx.dicom.DicomUtil
@@ -137,6 +137,27 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
           sender ! ImageDeleted(imageId)
         }
       }
+
+    case msg: PropertiesRequest => catchAndReport {
+      msg match {
+
+        case AddSeriesTypeToSeries(seriesType, series) =>
+          db.withSession { implicit session =>
+            val seriesSeriesType = propertiesDao.insertSeriesSeriesType(SeriesSeriesType(series.id, seriesType.id))
+            sender ! SeriesTypeAddedToSeries(seriesSeriesType)
+          }
+
+        case RemoveSeriesTypesFromSeries(series) =>
+          db.withSession { implicit session =>
+            propertiesDao.removeSeriesTypesForSeriesId(series.id)
+            sender ! SeriesTypesRemovedFromSeries(series)
+          }
+
+        case GetSeriesTypesForSeries(seriesId) =>
+          val seriesTypes = getSeriesTypesForSeries(seriesId)
+          sender ! SeriesTypes(seriesTypes)
+      }
+    }
 
     case msg: ImageRequest => catchAndReport {
       msg match {
@@ -278,6 +299,11 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
     }
 
   }
+
+  def getSeriesTypesForSeries(seriesId: Long) =
+    db.withSession { implicit session =>
+      propertiesDao.seriesTypesForSeries(seriesId)
+    }
 
   def storeDatasetTryCatchThrow(dataset: Attributes, sourceType: SourceType, sourceId: Long): (Image, Boolean) =
     try {

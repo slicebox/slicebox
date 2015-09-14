@@ -19,13 +19,9 @@ package se.nimsa.sbx.seriestype
 import scala.slick.driver.JdbcProfile
 import scala.slick.jdbc.meta.MTable
 import SeriesTypeProtocol._
-import se.nimsa.sbx.storage.MetaDataDAO
 
 class SeriesTypeDAO(val driver: JdbcProfile) {
   import driver.simple._
-
-  val metaDataDao = new MetaDataDAO(driver)
-  import metaDataDao.seriesQuery
 
   private val toSeriesType = (id: Long, name: String) => SeriesType(id, name)
 
@@ -38,20 +34,20 @@ class SeriesTypeDAO(val driver: JdbcProfile) {
     def * = (id, name) <> (toSeriesType.tupled, fromSeriesType)
   }
 
-  private val seriesTypeQuery = TableQuery[SeriesTypeTable]
+  val seriesTypeQuery = TableQuery[SeriesTypeTable]
 
   private val toSeriesTypeRule = (id: Long, seriesTypeId: Long) => SeriesTypeRule(id, seriesTypeId)
 
   private val fromSeriesTypeRule = (seriesTypeRule: SeriesTypeRule) => Option((seriesTypeRule.id, seriesTypeRule.seriesTypeId))
 
-  private class SeriesTypeRuleTable(tag: Tag) extends Table[SeriesTypeRule](tag, "SeriesTypeRules") {
+  class SeriesTypeRuleTable(tag: Tag) extends Table[SeriesTypeRule](tag, "SeriesTypeRules") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def seriesTypeId = column[Long]("seriestypeid")
     def fkSeriesType = foreignKey("fk_series_type", seriesTypeId, seriesTypeQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
     def * = (id, seriesTypeId) <> (toSeriesTypeRule.tupled, fromSeriesTypeRule)
   }
 
-  private val seriesTypeRuleQuery = TableQuery[SeriesTypeRuleTable]
+  val seriesTypeRuleQuery = TableQuery[SeriesTypeRuleTable]
 
   private val toSeriesTypeRuleAttribute = (id: Long, seriesTypeRuleId: Long, tag: Int, name: String, tagPath: Option[String], namePath: Option[String], values: String) =>
     SeriesTypeRuleAttribute(id, seriesTypeRuleId, tag, name, tagPath, namePath, values)
@@ -59,7 +55,7 @@ class SeriesTypeDAO(val driver: JdbcProfile) {
   private val fromSeriesTypeRuleAttribute = (seriesTypeRuleAttribute: SeriesTypeRuleAttribute) =>
     Option((seriesTypeRuleAttribute.id, seriesTypeRuleAttribute.seriesTypeRuleId, seriesTypeRuleAttribute.tag, seriesTypeRuleAttribute.name, seriesTypeRuleAttribute.tagPath, seriesTypeRuleAttribute.namePath, seriesTypeRuleAttribute.values))
 
-  private class SeriesTypeRuleAttributeTable(tag: Tag) extends Table[SeriesTypeRuleAttribute](tag, "SeriesTypeRuleAttributes") {
+  class SeriesTypeRuleAttributeTable(tag: Tag) extends Table[SeriesTypeRuleAttribute](tag, "SeriesTypeRuleAttributes") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def seriesTypeRuleId = column[Long]("seriestyperuleid")
     def dicomTag = column[Int]("tag")
@@ -71,35 +67,20 @@ class SeriesTypeDAO(val driver: JdbcProfile) {
     def * = (id, seriesTypeRuleId, dicomTag, name, tagPath, namePath, values) <> (toSeriesTypeRuleAttribute.tupled, fromSeriesTypeRuleAttribute)
   }
 
-  private val seriesTypeRuleAttributeQuery = TableQuery[SeriesTypeRuleAttributeTable]
+  val seriesTypeRuleAttributeQuery = TableQuery[SeriesTypeRuleAttributeTable]
 
-  private val toSeriesSeriesTypesRule = (seriesId: Long, seriesTypeId: Long) => SeriesSeriesType(seriesId, seriesTypeId)
-
-  private val fromSeriesSeriesTypesRule = (seriesSeriesType: SeriesSeriesType) => Option((seriesSeriesType.seriesId, seriesSeriesType.seriesTypeId))
-
-  private class SeriesSeriesTypeTable(tag: Tag) extends Table[SeriesSeriesType](tag, "SeriesSeriesTypes") {
-    def seriesId = column[Long]("seriesid")
-    def seriesTypeId = column[Long]("seriestypeid")
-    def pk = primaryKey("pk_a", (seriesId, seriesTypeId))
-    def fkSeries = foreignKey("fk_series_series", seriesId, seriesQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
-    def fkSeriesType = foreignKey("fk_series_series_type", seriesTypeId, seriesTypeQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
-    def * = (seriesId, seriesTypeId) <> (toSeriesSeriesTypesRule.tupled, fromSeriesSeriesTypesRule)
-  }
-
-  private val seriesSeriesTypeQuery = TableQuery[SeriesSeriesTypeTable]
   def create(implicit session: Session): Unit =
     if (MTable.getTables("SeriesTypes").list.isEmpty) {
-      (seriesTypeQuery.ddl ++ seriesTypeRuleQuery.ddl ++ seriesTypeRuleAttributeQuery.ddl ++ seriesSeriesTypeQuery.ddl).create
+      (seriesTypeQuery.ddl ++ seriesTypeRuleQuery.ddl ++ seriesTypeRuleAttributeQuery.ddl).create
     }
 
   def drop(implicit session: Session): Unit =
-    (seriesTypeQuery.ddl ++ seriesTypeRuleQuery.ddl ++ seriesTypeRuleAttributeQuery.ddl ++ seriesSeriesTypeQuery.ddl).drop
+    (seriesTypeQuery.ddl ++ seriesTypeRuleQuery.ddl ++ seriesTypeRuleAttributeQuery.ddl).drop
 
   def clear(implicit session: Session) = {
     seriesTypeQuery.delete
     seriesTypeRuleQuery.delete
     seriesTypeRuleAttributeQuery.delete
-    seriesSeriesTypeQuery.delete
   }
 
   def insertSeriesType(seriesType: SeriesType)(implicit session: Session): SeriesType = {
@@ -144,21 +125,4 @@ class SeriesTypeDAO(val driver: JdbcProfile) {
   def removeSeriesTypeRuleAttribute(seriesTypeRuleAttributeId: Long)(implicit session: Session): Unit =
     seriesTypeRuleAttributeQuery.filter(_.id === seriesTypeRuleAttributeId).delete
 
-  def insertSeriesSeriesType(seriesSeriesType: SeriesSeriesType)(implicit session: Session): SeriesSeriesType = {
-    seriesSeriesTypeQuery += seriesSeriesType
-    seriesSeriesType
-  }
-
-  def listSeriesSeriesTypesForSeriesId(seriesId: Long)(implicit session: Session): List[SeriesSeriesType] =
-    seriesSeriesTypeQuery.filter(_.seriesId === seriesId).list
-
-  def removeSeriesTypesForSeriesId(seriesId: Long)(implicit session: Session): Unit =
-    seriesSeriesTypeQuery.filter(_.seriesId === seriesId).delete
-
-  def seriesTypesForSeries(seriesId: Long)(implicit session: Session) = {
-    seriesSeriesTypeQuery.filter(_.seriesId === seriesId)
-    .innerJoin(seriesTypeQuery).on(_.seriesTypeId === _.id)
-    .map(_._2).list
-    
-  }
 }

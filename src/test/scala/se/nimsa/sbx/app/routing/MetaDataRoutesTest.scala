@@ -1,10 +1,8 @@
 package se.nimsa.sbx.app.routing
 
 import scala.slick.driver.H2Driver
-
 import org.scalatest.FlatSpec
 import org.scalatest.Matchers
-
 import se.nimsa.sbx.app.UserProtocol._
 import se.nimsa.sbx.app.UserProtocol.UserRole._
 import se.nimsa.sbx.box.BoxProtocol.RemoteBoxName
@@ -12,16 +10,23 @@ import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomPropertyValue._
 import se.nimsa.sbx.storage.MetaDataDAO
 import se.nimsa.sbx.storage.StorageProtocol._
+import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
 import se.nimsa.sbx.util.TestUtil
 import spray.http.StatusCodes._
 import spray.httpx.SprayJsonSupport._
+import se.nimsa.sbx.seriestype.SeriesTypeDAO
+import se.nimsa.sbx.storage.PropertiesDAO
+import spray.http.MultipartFormData
+import spray.http.BodyPart
 
 class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
   def dbUrl() = "jdbc:h2:mem:metadataroutestest;DB_CLOSE_DELAY=-1"
   
   val dao = new MetaDataDAO(H2Driver)
-      
+  val seriesTypeDao = new SeriesTypeDAO(H2Driver)
+  val propertiesDao = new PropertiesDAO(H2Driver)    
+  
   override def afterEach() {
     db.withSession { implicit session =>
       dao.clear
@@ -238,4 +243,37 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       responseAs[List[Source]].length should be (4) // admin + user users added by system and test class, name user, remote box
     }
   }
+  
+  it should "return 200 OK with the list of series types when asked to list series types for a specific series" in {
+    val addedSeriesType = db.withSession { implicit session =>
+      seriesTypeDao.insertSeriesType(SeriesType(-1, "st0"))
+      seriesTypeDao.insertSeriesType(SeriesType(-1, "st1"))
+    }
+
+    val addedSeriesTypeRule = db.withSession { implicit session =>
+      seriesTypeDao.insertSeriesTypeRule(SeriesTypeRule(-1, addedSeriesType.id))
+    }
+
+    db.withSession { implicit session =>
+      seriesTypeDao.insertSeriesTypeRuleAttribute(SeriesTypeRuleAttribute(-1, addedSeriesTypeRule.id, 0x00100010, "PatientName", None, None, "anon270"))
+    }
+
+    val file = TestUtil.testImageFile
+    val mfd = MultipartFormData(Seq(BodyPart(file, "file")))
+    val addedSeriesId = PostAsUser("/api/images", mfd) ~> routes ~> check {
+      status should be(Created)
+      responseAs[Image].seriesId
+    }
+    // adding an image will trigger a series type update
+    
+    Thread.sleep(3000) // let the series type update run
+
+    GetAsUser(s"/api/metadata/series/$addedSeriesId/seriestypes") ~> routes ~> check {
+      status should be(OK)
+      val seriesTypes = responseAs[List[SeriesType]]
+      seriesTypes.length should be(1)
+      seriesTypes(0).name should be("st1")
+    }
+  }
+
 }

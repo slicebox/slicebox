@@ -19,6 +19,7 @@ package se.nimsa.sbx.storage
 import java.nio.file.Path
 import org.dcm4che3.data.Attributes
 import se.nimsa.sbx.dicom.DicomHierarchy._
+import se.nimsa.sbx.seriestype.SeriesTypeProtocol.SeriesType
 
 object StorageProtocol {
 
@@ -26,6 +27,8 @@ object StorageProtocol {
   
   // domain objects
 
+  case class SeriesSeriesType(seriesId: Long, seriesTypeId: Long)
+  
   sealed trait SourceType {
     override def toString(): String = this match {
       case SourceType.SCP => "scp"
@@ -160,11 +163,20 @@ object StorageProtocol {
   case class GetImageInformation(imageId: Long) extends ImageRequest
   
   case class GetImageFrame(imageId: Long, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int) extends ImageRequest
+  
+  
+  sealed trait PropertiesRequest
+  
+  case class AddSeriesTypeToSeries(seriesType: SeriesType, series: Series) extends PropertiesRequest
+  
+  case class RemoveSeriesTypesFromSeries(series: Series) extends PropertiesRequest
 
+  case class GetSeriesTypesForSeries(seriesId: Long) extends PropertiesRequest
+  
   
   case class AddDataset(dataset: Attributes, sourceType: SourceType, sourceId: Long)
   
-  
+    
   // ***to API***
 
   case class Patients(patients: Seq[Patient]) 
@@ -180,6 +192,10 @@ object StorageProtocol {
   case class ImageAdded(image: Image)
   
   case class ImageDeleted(imageId: Long)
+  
+  case class SeriesTypeAddedToSeries(seriesSeriesType: SeriesSeriesType)
+
+  case class SeriesTypesRemovedFromSeries(series: Series)
   
   // ***to storage***
 

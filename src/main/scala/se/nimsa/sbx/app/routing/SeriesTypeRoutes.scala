@@ -17,18 +17,17 @@
 package se.nimsa.sbx.app.routing
 
 import akka.pattern.ask
-
 import spray.http.ContentTypes
 import spray.http.HttpData
 import spray.http.HttpEntity
 import spray.http.StatusCodes._
 import spray.httpx.SprayJsonSupport._
 import spray.routing._
-
 import se.nimsa.sbx.app.AuthInfo
 import se.nimsa.sbx.app.RestApi
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
 import se.nimsa.sbx.app.UserProtocol.UserRole
+import se.nimsa.sbx.storage.StorageProtocol.GetSeriesTypesForSeries
 
 trait SeriesTypeRoutes { this: RestApi =>
 
@@ -36,19 +35,9 @@ trait SeriesTypeRoutes { this: RestApi =>
     pathPrefix("seriestypes") {
       pathEndOrSingleSlash {
         get {
-          parameter('seriesid.as[Long].?) {
-            _ match {
-              case Some(seriesId) =>
-                onSuccess(seriesTypeService.ask(GetSeriesTypesForSeries(seriesId))) {
-                  case SeriesTypes(seriesTypes) =>
-                    complete(seriesTypes)
-                }
-              case None =>
-                onSuccess(seriesTypeService.ask(GetSeriesTypes)) {
-                  case SeriesTypes(seriesTypes) =>
-                    complete(seriesTypes)
-                }
-            }
+          onSuccess(seriesTypeService.ask(GetSeriesTypes)) {
+            case SeriesTypes(seriesTypes) =>
+              complete(seriesTypes)
           }
         } ~ post {
           authorize(authInfo.hasPermission(UserRole.ADMINISTRATOR)) {

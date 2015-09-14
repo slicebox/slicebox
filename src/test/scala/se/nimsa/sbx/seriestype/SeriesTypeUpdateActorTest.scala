@@ -39,9 +39,9 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
   val propertiesDao = new PropertiesDAO(H2Driver)
 
   db.withSession { implicit session =>
+    seriesTypeDao.create
     metaDataDao.create
     propertiesDao.create
-    seriesTypeDao.create
   }
 
   val storageService = system.actorOf(StorageServiceActor.props(dbProps, storage), name = "StorageService")
@@ -103,7 +103,7 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
       val series = addTestDataset()
 
       db.withSession { implicit session =>
-        seriesTypeDao.insertSeriesSeriesType(SeriesSeriesType(series.id, seriesType.id))
+        propertiesDao.insertSeriesSeriesType(SeriesSeriesType(series.id, seriesType.id))
       }
 
       seriesTypeUpdateService ! UpdateSeriesTypesForSeries(Seq(series.id))
@@ -234,6 +234,6 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
 
   def seriesSeriesTypesForSeries(series: Series): Seq[SeriesSeriesType] =
     db.withSession { implicit session =>
-      seriesTypeDao.listSeriesSeriesTypesForSeriesId(series.id)
+      propertiesDao.listSeriesSeriesTypesForSeriesId(series.id)
     }
 }

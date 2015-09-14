@@ -24,6 +24,8 @@ object SeriesTypeProtocol {
   
   case class SeriesType(id: Long, name: String) extends Entity
   
+  case class SeriesTypes(seriesTypes: Seq[SeriesType])
+  
   case class SeriesTypeRule(id: Long, seriesTypeId: Long) extends Entity
   
   case class SeriesTypeRuleAttribute(
@@ -35,10 +37,6 @@ object SeriesTypeProtocol {
       namePath: Option[String],
       values: String) extends Entity
   
-  case class SeriesSeriesType(seriesId: Long, seriesTypeId: Long)
-  
-  case class SeriesTypes(seriesTypes: Seq[SeriesType])
-  
   case class SeriesTypeRules(seriesTypeRules: Seq[SeriesTypeRule])
   
   case class SeriesTypeRuleAttributes(seriesTypeRuleAttributes: Seq[SeriesTypeRuleAttribute])
@@ -47,8 +45,6 @@ object SeriesTypeProtocol {
   sealed trait SeriesTypeRequest
   
   case object GetSeriesTypes extends SeriesTypeRequest
-  
-  case class GetSeriesTypesForSeries(seriesId: Long) extends SeriesTypeRequest
   
   case class AddSeriesType(seriesType: SeriesType) extends SeriesTypeRequest
   
@@ -92,14 +88,6 @@ object SeriesTypeProtocol {
   case object GetUpdateSeriesTypesRunningStatus extends SeriesTypesUpdateRequest with SeriesTypeRequest
   
   case class UpdateSeriesTypesRunningStatus(running: Boolean)
-  
-  case class AddSeriesTypeToSeries(seriesType: SeriesType, series: Series) extends SeriesTypeRequest
-
-  case class RemoveSeriesTypesFromSeries(series: Series) extends SeriesTypeRequest
-    
-  case class SeriesTypeAddedToSeries(seriesSeriesType: SeriesSeriesType)
-
-  case class SeriesTypesRemovedFromSeries(series: Series)
   
 
 }

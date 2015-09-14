@@ -15,6 +15,7 @@ import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.util.TestUtil
 import se.nimsa.sbx.dicom.DicomUtil.loadDataset
 import StorageProtocol._
+import se.nimsa.sbx.seriestype.SeriesTypeDAO
 
 class StorageServiceActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
     with WordSpecLike with Matchers with BeforeAndAfterAll {
@@ -25,6 +26,7 @@ class StorageServiceActorTest(_system: ActorSystem) extends TestKit(_system) wit
   val dbProps = DbProps(db, H2Driver)
 
   db.withSession { implicit session =>
+    new SeriesTypeDAO(dbProps.driver).create
     new MetaDataDAO(dbProps.driver).create
     new PropertiesDAO(dbProps.driver).create
   }

@@ -28,6 +28,7 @@ import se.nimsa.sbx.app.UserProtocol._
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.scp.ScpProtocol._
 import se.nimsa.sbx.directory.DirectoryWatchProtocol._
+import se.nimsa.sbx.seriestype.SeriesTypeProtocol.SeriesTypes
 import scala.concurrent.Future
 
 trait MetadataRoutes { this: RestApi =>
@@ -142,28 +143,37 @@ trait MetadataRoutes { this: RestApi =>
               }
             }
           }
-        } ~ path(LongNumber) { seriesId =>
-          get {
-            onSuccess(storageService.ask(GetSingleSeries(seriesId)).mapTo[Option[Series]]) {
-              complete(_)
-            }
-          }
-        } ~ path(LongNumber / "source") { seriesId =>
-          get {
-            onSuccess(storageService.ask(GetSeriesSource(seriesId)).mapTo[Option[SeriesSource]]) { seriesSourceMaybe =>
-              def futureSourceMaybe = seriesSourceMaybe.map(seriesSource => {
-                val futureNameMaybe = seriesSource.sourceType match {
-                  case USER      => userService.ask(GetUser(seriesSource.sourceId)).mapTo[Option[ApiUser]].map(_.map(_.user))
-                  case BOX       => boxService.ask(GetBoxById(seriesSource.sourceId)).mapTo[Option[Box]].map(_.map(_.name))
-                  case DIRECTORY => directoryService.ask(GetWatchedDirectoryById(seriesSource.sourceId)).mapTo[Option[WatchedDirectory]].map(_.map(_.name))
-                  case SCP       => scpService.ask(GetScpById(seriesSource.sourceId)).mapTo[Option[ScpData]].map(_.map(_.name))
-                  case UNKNOWN   => Future(None)
-                }
-                val futureName: Future[String] = futureNameMaybe.map(_.getOrElse("<source removed>"))
-                futureName.map(name => Some(Source(seriesSource.sourceType, name, seriesSource.sourceId)))
-              }).getOrElse(Future(None))
-              onSuccess(futureSourceMaybe) {
+        } ~ pathPrefix(LongNumber) { seriesId =>
+          pathEndOrSingleSlash {
+            get {
+              onSuccess(storageService.ask(GetSingleSeries(seriesId)).mapTo[Option[Series]]) {
                 complete(_)
+              }
+            }
+          } ~ path("source") {
+            get {
+              onSuccess(storageService.ask(GetSeriesSource(seriesId)).mapTo[Option[SeriesSource]]) { seriesSourceMaybe =>
+                def futureSourceMaybe = seriesSourceMaybe.map(seriesSource => {
+                  val futureNameMaybe = seriesSource.sourceType match {
+                    case USER      => userService.ask(GetUser(seriesSource.sourceId)).mapTo[Option[ApiUser]].map(_.map(_.user))
+                    case BOX       => boxService.ask(GetBoxById(seriesSource.sourceId)).mapTo[Option[Box]].map(_.map(_.name))
+                    case DIRECTORY => directoryService.ask(GetWatchedDirectoryById(seriesSource.sourceId)).mapTo[Option[WatchedDirectory]].map(_.map(_.name))
+                    case SCP       => scpService.ask(GetScpById(seriesSource.sourceId)).mapTo[Option[ScpData]].map(_.map(_.name))
+                    case UNKNOWN   => Future(None)
+                  }
+                  val futureName: Future[String] = futureNameMaybe.map(_.getOrElse("<source removed>"))
+                  futureName.map(name => Some(Source(seriesSource.sourceType, name, seriesSource.sourceId)))
+                }).getOrElse(Future(None))
+                onSuccess(futureSourceMaybe) {
+                  complete(_)
+                }
+              }
+            }
+          } ~ path("seriestypes") {
+            get {
+              onSuccess(storageService.ask(GetSeriesTypesForSeries(seriesId))) {
+                case SeriesTypes(seriesTypes) =>
+                  complete(seriesTypes)
               }
             }
           }
@@ -236,7 +246,7 @@ trait MetadataRoutes { this: RestApi =>
         throw new IllegalArgumentException("Sources parameter must be formatted as a comma separated list of sourceType:sourceId elements, e.g. BOX:23,BOX:12,USER:2")
     }
   }
-  
+
   def parseSeriesTypesString(seriesTypesString: String): Array[Long] = {
     try {
       seriesTypesString.split(",").map(_.toLong)
@@ -245,5 +255,5 @@ trait MetadataRoutes { this: RestApi =>
         throw new IllegalArgumentException("Series types parameter must be formatted as a comma separated list of series type ids, e.g. 2,5,11")
     }
   }
-  
+
 }

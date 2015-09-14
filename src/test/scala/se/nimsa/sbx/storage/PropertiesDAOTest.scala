@@ -12,7 +12,7 @@ import StorageProtocol._
 import se.nimsa.sbx.util.TestUtil._
 import se.nimsa.sbx.seriestype.SeriesTypeDAO
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol.SeriesType
-import se.nimsa.sbx.seriestype.SeriesTypeProtocol.SeriesSeriesType
+import se.nimsa.sbx.storage.StorageProtocol.SeriesSeriesType
 
 class PropertiesDAOTest extends FlatSpec with Matchers with BeforeAndAfterEach {
 
@@ -24,9 +24,9 @@ class PropertiesDAOTest extends FlatSpec with Matchers with BeforeAndAfterEach {
 
   override def beforeEach() =
     db.withSession { implicit session =>
+      seriesTypeDAO.create
       metaDataDao.create
       propertiesDao.create
-      seriesTypeDAO.create
     }
 
   override def afterEach() =
@@ -154,7 +154,7 @@ class PropertiesDAOTest extends FlatSpec with Matchers with BeforeAndAfterEach {
     insertProperties(propertiesDao, dbSeries1, dbSeries2, dbSeries3, dbSeries4, dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)
     
     val seriesType = seriesTypeDAO.insertSeriesType(SeriesType(-1, "Test Type"))
-    seriesTypeDAO.insertSeriesSeriesType(SeriesSeriesType(dbSeries1.id, seriesType.id))
+    propertiesDao.insertSeriesSeriesType(SeriesSeriesType(dbSeries1.id, seriesType.id))
   }
   
 }

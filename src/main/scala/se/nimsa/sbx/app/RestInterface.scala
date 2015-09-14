@@ -92,13 +92,13 @@ trait RestApi extends HttpService with SliceboxRoutes with JsonFormats {
   db.withSession { implicit session =>
     new LogDAO(dbProps.driver).create
     new UserDAO(dbProps.driver).create
+    new SeriesTypeDAO(dbProps.driver).create
     new MetaDataDAO(dbProps.driver).create
     new PropertiesDAO(dbProps.driver).create
     new DirectoryWatchDAO(dbProps.driver).create
     new ScpDAO(dbProps.driver).create
     new ScuDAO(dbProps.driver).create
     new BoxDAO(dbProps.driver).create
-    new SeriesTypeDAO(dbProps.driver).create
   }
   
   val storage = createStorageDirectory()

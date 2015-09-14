@@ -463,7 +463,7 @@ angular.module('slicebox.home', ['ngRoute'])
 
     function updateSelectedSeriesSeriesTypes(series) {
         $scope.uiState.advancedFiltering.seriesTypesPromise.then(function(allSeriesTypesData) {
-            return $http.get('/api/seriestypes?seriesid=' + series.id).success(function (seriesTypes) {
+            return $http.get('/api/metadata/' + series.id + '/seriestypes').success(function (seriesTypes) {
                 $scope.uiState.seriesDetails.selectedSeriesSeriesTypes = seriesTypes;
             });
         });

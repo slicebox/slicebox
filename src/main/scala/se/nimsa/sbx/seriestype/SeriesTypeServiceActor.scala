@@ -62,10 +62,6 @@ class SeriesTypeServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extend
             val seriesTypes = getSeriesTypesFromDb()
             sender ! SeriesTypes(seriesTypes)
 
-          case GetSeriesTypesForSeries(seriesId) =>
-            val seriesTypes = getSeriesTypesForSeries(seriesId)
-            sender ! SeriesTypes(seriesTypes)
-
           case AddSeriesType(seriesType) =>
             val dbSeriesType = addSeriesTypeToDb(seriesType)
             sender ! SeriesTypeAdded(dbSeriesType)
@@ -106,18 +102,6 @@ class SeriesTypeServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extend
             updateSeriesTypesForAllSeries()
             sender ! SeriesTypeRuleAttributeRemoved(seriesTypeRuleAttributeId)
 
-          case AddSeriesTypeToSeries(seriesType, series) =>
-            db.withSession { implicit session =>
-              val seriesSeriesType = seriesTypeDao.insertSeriesSeriesType(SeriesSeriesType(series.id, seriesType.id))
-              sender ! SeriesTypeAddedToSeries(seriesSeriesType)
-            }
-
-          case RemoveSeriesTypesFromSeries(series) =>
-            db.withSession { implicit session =>
-              seriesTypeDao.removeSeriesTypesForSeriesId(series.id)
-              sender ! SeriesTypesRemovedFromSeries(series)
-            }
-            
           case GetUpdateSeriesTypesRunningStatus =>
             seriesTypeUpdateService.forward(GetUpdateSeriesTypesRunningStatus)
         }
@@ -185,11 +169,6 @@ class SeriesTypeServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extend
   def getAllSeries(): Future[Seq[Series]] =
     storageService.ask(GetAllSeries).mapTo[SeriesCollection].map(_.series)
 
-  def getSeriesTypesForSeries(seriesId: Long) =
-    db.withSession { implicit session =>
-      seriesTypeDao.seriesTypesForSeries(seriesId)
-    }
-  
 }
 
 object SeriesTypeServiceActor {

@@ -29,8 +29,10 @@ class PropertiesDAO(val driver: JdbcProfile) {
   import driver.simple._
 
   val metaDataDao = new MetaDataDAO(driver)
+  val seriesTypeDAO = new SeriesTypeDAO(driver)
   
   import metaDataDao._
+  import seriesTypeDAO.seriesTypeQuery
   
   // *** Files ***
 
@@ -69,24 +71,41 @@ class PropertiesDAO(val driver: JdbcProfile) {
 
   private val seriesSourceQuery = TableQuery[SeriesSources]
 
-    
+  // *** Series types ***
+
+  private val toSeriesSeriesTypesRule = (seriesId: Long, seriesTypeId: Long) => SeriesSeriesType(seriesId, seriesTypeId)
+
+  private val fromSeriesSeriesTypesRule = (seriesSeriesType: SeriesSeriesType) => Option((seriesSeriesType.seriesId, seriesSeriesType.seriesTypeId))
+
+  private class SeriesSeriesTypeTable(tag: Tag) extends Table[SeriesSeriesType](tag, "SeriesSeriesTypes") {
+    def seriesId = column[Long]("seriesid")
+    def seriesTypeId = column[Long]("seriestypeid")
+    def pk = primaryKey("pk_a", (seriesId, seriesTypeId))
+    def fkSeries = foreignKey("fk_series_series", seriesId, seriesQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
+    def fkSeriesType = foreignKey("fk_series_series_type", seriesTypeId, seriesTypeQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
+    def * = (seriesId, seriesTypeId) <> (toSeriesSeriesTypesRule.tupled, fromSeriesSeriesTypesRule)
+  }
+
+  private val seriesSeriesTypeQuery = TableQuery[SeriesSeriesTypeTable]
+
   // Setup
 
   def create(implicit session: Session) =
     if (MTable.getTables("ImageFiles").list.isEmpty)
-      (imageFilesQuery.ddl ++ seriesSourceQuery.ddl).create
+      (imageFilesQuery.ddl ++ seriesSourceQuery.ddl ++ seriesSeriesTypeQuery.ddl).create
 
   def drop(implicit session: Session) =
     if (MTable.getTables("ImageFiles").list.size > 0)
-      (imageFilesQuery.ddl ++ seriesSourceQuery.ddl).drop
+      (imageFilesQuery.ddl ++ seriesSourceQuery.ddl ++ seriesSeriesTypeQuery.ddl).drop
 
   def clear(implicit session: Session) = {
     imageFilesQuery.delete
     seriesSourceQuery.delete
+    seriesSeriesTypeQuery.delete
   }
 
   // Functions
-  
+
   def imageFileById(imageId: Long)(implicit session: Session): Option[ImageFile] =
     imageFilesQuery.filter(_.id === imageId).list.headOption
 
@@ -228,7 +247,7 @@ class PropertiesDAO(val driver: JdbcProfile) {
     // temp
     val sourceType = sources.headOption.map(_.sourceType)
     val sourceId = sources.headOption.map(_.sourceId)
-    
+
     if (sourceType.isEmpty)
       metaDataDao.patients(startIndex, count, orderBy, orderAscending, filter)
 
@@ -332,5 +351,21 @@ class PropertiesDAO(val driver: JdbcProfile) {
     metaDataDao.imageById(imageFile.id).foreach(image =>
       metaDataDao.deleteFully(image))
   }
+
+  def insertSeriesSeriesType(seriesSeriesType: SeriesSeriesType)(implicit session: Session): SeriesSeriesType = {
+    seriesSeriesTypeQuery += seriesSeriesType
+    seriesSeriesType
+  }
+
+  def listSeriesSeriesTypesForSeriesId(seriesId: Long)(implicit session: Session): List[SeriesSeriesType] =
+    seriesSeriesTypeQuery.filter(_.seriesId === seriesId).list
+
+  def removeSeriesTypesForSeriesId(seriesId: Long)(implicit session: Session): Unit =
+    seriesSeriesTypeQuery.filter(_.seriesId === seriesId).delete
+
+  def seriesTypesForSeries(seriesId: Long)(implicit session: Session) =
+    seriesSeriesTypeQuery.filter(_.seriesId === seriesId)
+      .innerJoin(seriesTypeQuery).on(_.seriesTypeId === _.id)
+      .map(_._2).list
 
 }
