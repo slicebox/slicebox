@@ -171,7 +171,7 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
       patientName = patientName,
       patientSex = patientSex)
 
-    storageService ! AddDataset(dataset, SourceType.UNKNOWN, -1)
+    storageService ! AddDataset(dataset, SourceTypeId(SourceType.UNKNOWN, -1))
     expectMsgPF() {
       case ImageAdded(image) => true
     }

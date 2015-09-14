@@ -55,14 +55,14 @@ trait ImageRoutes { this: RestApi =>
         post {
           formField('file.as[FormFile]) { file =>
             val dataset = DicomUtil.loadDataset(file.entity.data.toByteArray, true)
-            onSuccess(storageService.ask(AddDataset(dataset, SourceType.USER, authInfo.user.id))) {
+            onSuccess(storageService.ask(AddDataset(dataset, SourceTypeId(SourceType.USER, authInfo.user.id)))) {
               case ImageAdded(image) =>
                 import spray.httpx.SprayJsonSupport._
                 complete((Created, image))
             }
           } ~ entity(as[Array[Byte]]) { bytes =>
             val dataset = DicomUtil.loadDataset(bytes, true)
-            onSuccess(storageService.ask(AddDataset(dataset, SourceType.USER, authInfo.user.id))) {
+            onSuccess(storageService.ask(AddDataset(dataset, SourceTypeId(SourceType.USER, authInfo.user.id)))) {
               case ImageAdded(image) =>
                 import spray.httpx.SprayJsonSupport._
                 complete((Created, image))
@@ -122,7 +122,7 @@ trait ImageRoutes { this: RestApi =>
                           onSuccess(anonymizationService.ask(Anonymize(dataset, tagValues)).mapTo[Attributes]) { anonDataset =>
                             onSuccess(storageService.ask(DeleteImage(imageId))) {
                               case ImageDeleted(imageId) =>
-                                onSuccess(storageService.ask(AddDataset(anonDataset, imageFile.sourceType, imageFile.sourceId))) {
+                                onSuccess(storageService.ask(AddDataset(anonDataset, SourceTypeId(imageFile.sourceTypeId.sourceType, imageFile.sourceTypeId.sourceId)))) {
                                   case ImageAdded(image) =>
                                     complete(NoContent)
                                 }

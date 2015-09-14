@@ -18,6 +18,8 @@ import scala.slick.jdbc.JdbcBackend.Session
 import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.storage.MetaDataDAO
 import se.nimsa.sbx.storage.PropertiesDAO
+import se.nimsa.sbx.seriestype.SeriesTypeProtocol.SeriesType
+import se.nimsa.sbx.seriestype.SeriesTypeDAO
 
 object TestUtil {
 
@@ -67,19 +69,21 @@ object TestUtil {
     (dbPatient1, (dbStudy1, dbStudy2), (dbSeries1, dbSeries2, dbSeries3, dbSeries4), (dbEquipment1, dbEquipment2, dbEquipment3), (dbFor1, dbFor2), (dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8))
   }
 
-  def insertProperties(propertiesDao: PropertiesDAO, dbSeries1: Series, dbSeries2: Series, dbSeries3: Series, dbSeries4: Series, dbImage1: Image, dbImage2: Image, dbImage3: Image, dbImage4: Image, dbImage5: Image, dbImage6: Image, dbImage7: Image, dbImage8: Image)(implicit session: Session) = {
-    val imageFile1 = ImageFile(-1, FileName("file1"), SourceType.USER, 1)
-    val imageFile2 = ImageFile(-1, FileName("file2"), SourceType.USER, 1)
-    val imageFile3 = ImageFile(-1, FileName("file3"), SourceType.BOX, 1)
-    val imageFile4 = ImageFile(-1, FileName("file4"), SourceType.BOX, 1)
-    val imageFile5 = ImageFile(-1, FileName("file5"), SourceType.DIRECTORY, 1)
-    val imageFile6 = ImageFile(-1, FileName("file6"), SourceType.UNKNOWN, -1)
-    val imageFile7 = ImageFile(-1, FileName("file7"), SourceType.SCP, 1)
-    val imageFile8 = ImageFile(-1, FileName("file8"), SourceType.SCP, 1)
-    val seriesSource1 = SeriesSource(-1, SourceType.BOX, -1)
-    val seriesSource2 = SeriesSource(-1, SourceType.SCP, -1)
-    val seriesSource3 = SeriesSource(-1, SourceType.UNKNOWN, -1)
-    val seriesSource4 = SeriesSource(-1, SourceType.DIRECTORY, -1)
+  def insertProperties(seriesTypeDao: SeriesTypeDAO, propertiesDao: PropertiesDAO, dbSeries1: Series, dbSeries2: Series, dbSeries3: Series, dbSeries4: Series, dbImage1: Image, dbImage2: Image, dbImage3: Image, dbImage4: Image, dbImage5: Image, dbImage6: Image, dbImage7: Image, dbImage8: Image)(implicit session: Session) = {
+    val imageFile1 = ImageFile(-1, FileName("file1"), SourceTypeId(SourceType.USER, 1))
+    val imageFile2 = ImageFile(-1, FileName("file2"), SourceTypeId(SourceType.USER, 1))
+    val imageFile3 = ImageFile(-1, FileName("file3"), SourceTypeId(SourceType.BOX, 1))
+    val imageFile4 = ImageFile(-1, FileName("file4"), SourceTypeId(SourceType.BOX, 1))
+    val imageFile5 = ImageFile(-1, FileName("file5"), SourceTypeId(SourceType.DIRECTORY, 1))
+    val imageFile6 = ImageFile(-1, FileName("file6"), SourceTypeId(SourceType.DIRECTORY, 1))
+    val imageFile7 = ImageFile(-1, FileName("file7"), SourceTypeId(SourceType.SCP, 1))
+    val imageFile8 = ImageFile(-1, FileName("file8"), SourceTypeId(SourceType.SCP, 1))
+    val seriesSource1 = SeriesSource(-1, SourceTypeId(SourceType.USER, 1))
+    val seriesSource2 = SeriesSource(-1, SourceTypeId(SourceType.BOX, 1))
+    val seriesSource3 = SeriesSource(-1, SourceTypeId(SourceType.DIRECTORY, 1))
+    val seriesSource4 = SeriesSource(-1, SourceTypeId(SourceType.SCP, 1))
+    val seriesType1 = SeriesType(-1, "Test Type 1")
+    val seriesType2 = SeriesType(-1, "Test Type 2")
     
     val dbImageFile1 = propertiesDao.insertImageFile(imageFile1.copy(id = dbImage1.id))
     val dbImageFile2 = propertiesDao.insertImageFile(imageFile2.copy(id = dbImage2.id))
@@ -93,8 +97,20 @@ object TestUtil {
     val dbSeriesSource2 = propertiesDao.insertSeriesSource(seriesSource2.copy(id = dbSeries2.id))
     val dbSeriesSource3 = propertiesDao.insertSeriesSource(seriesSource3.copy(id = dbSeries3.id))
     val dbSeriesSource4 = propertiesDao.insertSeriesSource(seriesSource4.copy(id = dbSeries4.id))
+    val dbSeriesType1 = seriesTypeDao.insertSeriesType(seriesType1)
+    val dbSeriesType2 = seriesTypeDao.insertSeriesType(seriesType2)
     
-    ((dbImageFile1, dbImageFile2, dbImageFile3, dbImageFile4, dbImageFile5, dbImageFile6, dbImageFile7, dbImageFile8), (dbSeriesSource1, dbSeriesSource2, dbSeriesSource3, dbSeriesSource4))
+    val seriesSeriesType1 = SeriesSeriesType(dbSeries1.id, dbSeriesType1.id)
+    val seriesSeriesType2 = SeriesSeriesType(dbSeries2.id, dbSeriesType1.id)
+    val seriesSeriesType3 = SeriesSeriesType(dbSeries2.id, dbSeriesType2.id)
+    val seriesSeriesType4 = SeriesSeriesType(dbSeries3.id, dbSeriesType2.id)
+
+    val dbSeriesSeriesType1 = propertiesDao.insertSeriesSeriesType(seriesSeriesType1)
+    val dbSeriesSeriesType2 = propertiesDao.insertSeriesSeriesType(seriesSeriesType2)
+    val dbSeriesSeriesType3 = propertiesDao.insertSeriesSeriesType(seriesSeriesType3)
+    val dbSeriesSeriesType4 = propertiesDao.insertSeriesSeriesType(seriesSeriesType4)
+    
+    ((dbImageFile1, dbImageFile2, dbImageFile3, dbImageFile4, dbImageFile5, dbImageFile6, dbImageFile7, dbImageFile8), (dbSeriesSource1, dbSeriesSource2, dbSeriesSource3, dbSeriesSource4), (dbSeriesSeriesType1, dbSeriesSeriesType2, dbSeriesSeriesType3, dbSeriesSeriesType4))
   }
   
   def testImageFile = new File(getClass().getResource("test.dcm").toURI())

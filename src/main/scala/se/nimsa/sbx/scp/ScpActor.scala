@@ -29,6 +29,7 @@ import java.util.Date
 import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.storage.StorageProtocol.DatasetReceived
 import se.nimsa.sbx.storage.StorageProtocol.SourceType
+import se.nimsa.sbx.storage.StorageProtocol.SourceTypeId
 import ScpProtocol._
 
 class ScpActor(scpData: ScpData, executor: Executor) extends Actor {
@@ -60,7 +61,7 @@ class ScpActor(scpData: ScpData, executor: Executor) extends Actor {
   def receive = LoggingReceive {
     case DatasetReceivedByScp(dataset) =>
       SbxLog.info("SCP", "Dataset received")
-      context.system.eventStream.publish(DatasetReceived(dataset, SourceType.SCP, scpData.id))
+      context.system.eventStream.publish(DatasetReceived(dataset, SourceTypeId(SourceType.SCP, scpData.id)))
   }
 
 }

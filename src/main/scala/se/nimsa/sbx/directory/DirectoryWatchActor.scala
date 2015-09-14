@@ -28,6 +28,7 @@ import org.dcm4che3.data.Tag
 import java.nio.file.Paths
 import se.nimsa.sbx.storage.StorageProtocol.FileReceived
 import se.nimsa.sbx.storage.StorageProtocol.SourceType
+import se.nimsa.sbx.storage.StorageProtocol.SourceTypeId
 import DirectoryWatchProtocol._
 
 class DirectoryWatchActor(watchedDirectory: WatchedDirectory) extends Actor {
@@ -50,7 +51,7 @@ class DirectoryWatchActor(watchedDirectory: WatchedDirectory) extends Actor {
   def receive = LoggingReceive {
     case FileAddedToWatchedDirectory(path) =>
       if (Files.isRegularFile(path))
-        context.system.eventStream.publish(FileReceived(path, SourceType.DIRECTORY, watchedDirectory.id))
+        context.system.eventStream.publish(FileReceived(path, SourceTypeId(SourceType.DIRECTORY, watchedDirectory.id)))
   }
 
 }

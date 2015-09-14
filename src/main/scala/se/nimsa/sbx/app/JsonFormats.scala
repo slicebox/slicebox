@@ -123,6 +123,7 @@ trait JsonFormats extends DefaultJsonProtocol {
   implicit val bodyPartExaminedFormat = jsonFormat1(BodyPartExamined)
 
   implicit val sourceFormat = jsonFormat3(Source)
+  implicit val sourceTypeIdFormat = jsonFormat2(SourceTypeId)
   
   implicit val seriesFormat = jsonFormat10(Series)
   implicit val flatSeriesFormat = jsonFormat6(FlatSeries)
@@ -134,7 +135,7 @@ trait JsonFormats extends DefaultJsonProtocol {
   implicit val imageFormat = jsonFormat5(Image)
 
   implicit val fileNameFormat = jsonFormat1(FileName)
-  implicit val imageFileFormat = jsonFormat4(ImageFile)
+  implicit val imageFileFormat = jsonFormat3(ImageFile)
   implicit val imageAttributeFormat = jsonFormat11(ImageAttribute)
   
   implicit val imagesFormat = jsonFormat1(Images)

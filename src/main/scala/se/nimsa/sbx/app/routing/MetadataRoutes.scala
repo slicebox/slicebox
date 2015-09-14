@@ -95,9 +95,11 @@ trait MetadataRoutes { this: RestApi =>
               'startindex.as[Long] ? 0,
               'count.as[Long] ? 20,
               'patientid.as[Long],
-              'sourcetype.as[String].?,
-              'sourceid.as[Long].?) { (startIndex, count, patientId, sourceType, sourceId) =>
-                onSuccess(storageService.ask(GetStudies(startIndex, count, patientId, sourceType.map(SourceType.withName(_)), sourceId))) {
+              'sources.as[String].?,
+              'seriesTypes.as[String].?) { (startIndex, count, patientId, sourcesString, seriesTypesString) =>
+                val sources = sourcesString.map(parseSourcesString(_)).getOrElse(Array.empty)
+                val seriesTypes = seriesTypesString.map(parseSeriesTypesString(_)).getOrElse(Array.empty)
+                onSuccess(storageService.ask(GetStudies(startIndex, count, patientId, sources, seriesTypes))) {
                   case Studies(studies) =>
                     complete(studies)
                 }
@@ -126,9 +128,11 @@ trait MetadataRoutes { this: RestApi =>
               'startindex.as[Long] ? 0,
               'count.as[Long] ? 20,
               'studyid.as[Long],
-              'sourcetype.as[String].?,
-              'sourceid.as[Long].?) { (startIndex, count, studyId, sourceType, sourceId) =>
-                onSuccess(storageService.ask(GetSeries(startIndex, count, studyId, sourceType.map(SourceType.withName(_)), sourceId))) {
+              'sources.as[String].?,
+              'seriesTypes.as[String].?) { (startIndex, count, studyId, sourcesString, seriesTypesString) =>
+                val sources = sourcesString.map(parseSourcesString(_)).getOrElse(Array.empty)
+                val seriesTypes = seriesTypesString.map(parseSeriesTypesString(_)).getOrElse(Array.empty)
+                onSuccess(storageService.ask(GetSeries(startIndex, count, studyId, sources, seriesTypes))) {
                   case SeriesCollection(series) =>
                     complete(series)
                 }
@@ -154,15 +158,15 @@ trait MetadataRoutes { this: RestApi =>
             get {
               onSuccess(storageService.ask(GetSeriesSource(seriesId)).mapTo[Option[SeriesSource]]) { seriesSourceMaybe =>
                 def futureSourceMaybe = seriesSourceMaybe.map(seriesSource => {
-                  val futureNameMaybe = seriesSource.sourceType match {
-                    case USER      => userService.ask(GetUser(seriesSource.sourceId)).mapTo[Option[ApiUser]].map(_.map(_.user))
-                    case BOX       => boxService.ask(GetBoxById(seriesSource.sourceId)).mapTo[Option[Box]].map(_.map(_.name))
-                    case DIRECTORY => directoryService.ask(GetWatchedDirectoryById(seriesSource.sourceId)).mapTo[Option[WatchedDirectory]].map(_.map(_.name))
-                    case SCP       => scpService.ask(GetScpById(seriesSource.sourceId)).mapTo[Option[ScpData]].map(_.map(_.name))
+                  val futureNameMaybe = seriesSource.sourceTypeId.sourceType match {
+                    case USER      => userService.ask(GetUser(seriesSource.sourceTypeId.sourceId)).mapTo[Option[ApiUser]].map(_.map(_.user))
+                    case BOX       => boxService.ask(GetBoxById(seriesSource.sourceTypeId.sourceId)).mapTo[Option[Box]].map(_.map(_.name))
+                    case DIRECTORY => directoryService.ask(GetWatchedDirectoryById(seriesSource.sourceTypeId.sourceId)).mapTo[Option[WatchedDirectory]].map(_.map(_.name))
+                    case SCP       => scpService.ask(GetScpById(seriesSource.sourceTypeId.sourceId)).mapTo[Option[ScpData]].map(_.map(_.name))
                     case UNKNOWN   => Future(None)
                   }
                   val futureName: Future[String] = futureNameMaybe.map(_.getOrElse("<source removed>"))
-                  futureName.map(name => Some(Source(seriesSource.sourceType, name, seriesSource.sourceId)))
+                  futureName.map(name => Some(Source(seriesSource.sourceTypeId.sourceType, name, seriesSource.sourceTypeId.sourceId)))
                 }).getOrElse(Future(None))
                 onSuccess(futureSourceMaybe) {
                   complete(_)
@@ -216,9 +220,11 @@ trait MetadataRoutes { this: RestApi =>
               'orderby.as[String].?,
               'orderascending.as[Boolean] ? true,
               'filter.as[String].?,
-              'sourcetype.as[String].?,
-              'sourceid.as[Long].?) { (startIndex, count, orderBy, orderAscending, filter, sourceType, sourceId) =>
-                onSuccess(storageService.ask(GetFlatSeries(startIndex, count, orderBy, orderAscending, filter, sourceType.map(SourceType.withName(_)), sourceId))) {
+              'sources.as[String].?,
+              'seriesTypes.as[String].?) { (startIndex, count, orderBy, orderAscending, filter, sourcesString, seriesTypesString) =>
+                val sources = sourcesString.map(parseSourcesString(_)).getOrElse(Array.empty)
+                val seriesTypes = seriesTypesString.map(parseSeriesTypesString(_)).getOrElse(Array.empty)
+                onSuccess(storageService.ask(GetFlatSeries(startIndex, count, orderBy, orderAscending, filter, sources, seriesTypes))) {
                   case FlatSeriesCollection(flatSeries) =>
                     complete(flatSeries)
                 }
@@ -235,11 +241,11 @@ trait MetadataRoutes { this: RestApi =>
     }
   }
 
-  def parseSourcesString(sourcesString: String): Array[SourceId] = {
+  def parseSourcesString(sourcesString: String): Array[SourceTypeId] = {
     try {
       sourcesString.split(",").map(typeIdString => {
         val typeIdArray = typeIdString.split(":")
-        SourceId(SourceType.withName(typeIdArray(0)), typeIdArray(1).toLong)
+        SourceTypeId(SourceType.withName(typeIdArray(0)), typeIdArray(1).toLong)
       })
     } catch {
       case e: Exception =>

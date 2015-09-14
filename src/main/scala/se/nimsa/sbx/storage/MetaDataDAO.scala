@@ -253,24 +253,37 @@ class MetaDataDAO(val driver: JdbcProfile) {
 
     implicit val getResult = patientsGetResult
 
-    var query = """select * from "Patients""""
-
-    filter.foreach(filterValue => {
-      val filterValueLike = s"'%$filterValue%'".toLowerCase
-      query += s""" where 
-        lcase("PatientName") like $filterValueLike or 
-          lcase("PatientID") like $filterValueLike or 
-            lcase("PatientBirthDate") like $filterValueLike or 
-              lcase("PatientSex") like $filterValueLike"""
-    })
-
-    orderBy.foreach(orderByValue =>
-      query += s""" order by "$orderByValue" ${if (orderAscending) "asc" else "desc"}""")
-
-    query += s""" limit $count offset $startIndex"""
+    val query =
+      patientsBasePart +
+        wherePart(filter) +
+        patientsFilterPart(filter) +
+        orderByPart(orderBy, orderAscending) +
+        pagePart(startIndex, count)
 
     Q.queryNA(query).list
   }
+
+  val patientsBasePart = """select * from "Patients""""
+
+  def wherePart(whereParts: Option[String]*) =
+    if (whereParts.exists(_.isDefined)) " where" else ""
+
+  def patientsFilterPart(filter: Option[String]) =
+    filter.map(filterValue => {
+      val filterValueLike = s"'%$filterValue%'".toLowerCase
+      s""" (lcase("PatientName") like $filterValueLike or 
+           lcase("PatientID") like $filterValueLike or 
+           lcase("PatientBirthDate") like $filterValueLike or 
+           lcase("PatientSex") like $filterValueLike)"""
+    })
+      .getOrElse("")
+
+  def orderByPart(orderBy: Option[String], orderAscending: Boolean) =
+    orderBy.map(orderByValue =>
+      s""" order by "$orderByValue" ${if (orderAscending) "asc" else "desc"}""")
+      .getOrElse("")
+
+  def pagePart(startIndex: Long, count: Long) = s""" limit $count offset $startIndex"""
 
   def queryPatients(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, queryProperties: Seq[QueryProperty])(implicit session: Session): List[Patient] = {
 
@@ -395,12 +408,12 @@ class MetaDataDAO(val driver: JdbcProfile) {
 
   def images(implicit session: Session): List[Image] = imagesQuery.list
 
-  val flatSeriesQuery = """select "Series"."id", 
-      "Patients"."id", "Patients"."PatientName", "Patients"."PatientID", "Patients"."PatientBirthDate","Patients"."PatientSex", 
-      "Studies"."id", "Studies"."patientId", "Studies"."StudyInstanceUID", "Studies"."StudyDescription", "Studies"."StudyDate", "Studies"."StudyID", "Studies"."AccessionNumber", "Studies"."PatientAge",
-      "Equipments"."id", "Equipments"."Manufacturer", "Equipments"."StationName",
-      "FrameOfReferences"."id", "FrameOfReferences"."FrameOfReferenceUID",
-      "Series"."id", "Series"."studyId", "Series"."equipmentId", "Series"."frameOfReferenceId", "Series"."SeriesInstanceUID", "Series"."SeriesDescription", "Series"."SeriesDate", "Series"."Modality", "Series"."ProtocolName", "Series"."BodyPartExamined"
+  val flatSeriesBasePart = """select "Series"."id", 
+      "Patients"."id","Patients"."PatientName","Patients"."PatientID","Patients"."PatientBirthDate","Patients"."PatientSex", 
+      "Studies"."id","Studies"."patientId","Studies"."StudyInstanceUID","Studies"."StudyDescription","Studies"."StudyDate","Studies"."StudyID","Studies"."AccessionNumber","Studies"."PatientAge",
+      "Equipments"."id","Equipments"."Manufacturer","Equipments"."StationName",
+      "FrameOfReferences"."id","FrameOfReferences"."FrameOfReferenceUID",
+      "Series"."id","Series"."studyId","Series"."equipmentId","Series"."frameOfReferenceId","Series"."SeriesInstanceUID","Series"."SeriesDescription","Series"."SeriesDate","Series"."Modality","Series"."ProtocolName","Series"."BodyPartExamined"
        from "Series" 
        inner join "Studies" on "Series"."studyId" = "Studies"."id" 
        inner join "Equipments" on "Series"."equipmentId" = "Equipments"."id"
@@ -421,42 +434,42 @@ class MetaDataDAO(val driver: JdbcProfile) {
 
     implicit val getResult = flatSeriesGetResult
 
-    var query = flatSeriesQuery
-
-    filter.foreach(filterValue => {
-      val filterValueLike = s"'%$filterValue%'".toLowerCase
-      query += s""" where 
-        lcase("Series"."id") like $filterValueLike or
-          lcase("PatientName") like $filterValueLike or 
-          lcase("PatientID") like $filterValueLike or 
-          lcase("PatientBirthDate") like $filterValueLike or 
-          lcase("PatientSex") like $filterValueLike or
-            lcase("StudyDescription") like $filterValueLike or
-            lcase("StudyDate") like $filterValueLike or
-            lcase("StudyID") like $filterValueLike or
-            lcase("AccessionNumber") like $filterValueLike or
-            lcase("PatientAge") like $filterValueLike or
-              lcase("Manufacturer") like $filterValueLike or
-              lcase("StationName") like $filterValueLike or
-                lcase("SeriesDescription") like $filterValueLike or
-                lcase("SeriesDate") like $filterValueLike or
-                lcase("Modality") like $filterValueLike or
-                lcase("ProtocolName") like $filterValueLike or
-                lcase("BodyPartExamined") like $filterValueLike"""
-    })
-
-    orderBy.foreach(orderByValue =>
-      query += s""" order by "$orderByValue" ${if (orderAscending) "asc" else "desc"}""")
-
-    query += s""" limit $count offset $startIndex"""
+    val query = flatSeriesBasePart +
+      wherePart(filter) +
+      flatSeriesFilterPart(filter) +
+      orderByPart(orderBy, orderAscending) +
+      pagePart(startIndex, count)
 
     Q.queryNA(query).list
   }
 
+  def flatSeriesFilterPart(filter: Option[String]) =
+    filter.map(filterValue => {
+      val filterValueLike = s"'%$filterValue%'".toLowerCase
+      s""" (lcase("Series"."id") like $filterValueLike or
+           lcase("PatientName") like $filterValueLike or 
+           lcase("PatientID") like $filterValueLike or 
+           lcase("PatientBirthDate") like $filterValueLike or 
+           lcase("PatientSex") like $filterValueLike or
+             lcase("StudyDescription") like $filterValueLike or
+             lcase("StudyDate") like $filterValueLike or
+             lcase("StudyID") like $filterValueLike or
+             lcase("AccessionNumber") like $filterValueLike or
+             lcase("PatientAge") like $filterValueLike or
+               lcase("Manufacturer") like $filterValueLike or
+               lcase("StationName") like $filterValueLike or
+                 lcase("SeriesDescription") like $filterValueLike or
+                 lcase("SeriesDate") like $filterValueLike or
+                 lcase("Modality") like $filterValueLike or
+                 lcase("ProtocolName") like $filterValueLike or
+                 lcase("BodyPartExamined") like $filterValueLike)"""
+    })
+      .getOrElse("")
+
   def flatSeriesById(seriesId: Long)(implicit session: Session): Option[FlatSeries] = {
 
     implicit val getResult = flatSeriesGetResult
-    val query = flatSeriesQuery + s""" where "Series"."id" = $seriesId"""
+    val query = flatSeriesBasePart + s""" where "Series"."id" = $seriesId"""
 
     Q.queryNA(query).list.headOption
   }

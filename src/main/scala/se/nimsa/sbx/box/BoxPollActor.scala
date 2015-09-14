@@ -34,6 +34,7 @@ import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.app.JsonFormats
 import se.nimsa.sbx.storage.StorageProtocol.DatasetReceived
 import se.nimsa.sbx.storage.StorageProtocol.SourceType
+import se.nimsa.sbx.storage.StorageProtocol.SourceTypeId
 import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.dicom.DicomUtil._
 import BoxProtocol._
@@ -191,7 +192,7 @@ class BoxPollActor(box: Box,
                 .onComplete {
 
                   case Success(reversedDataset) =>
-                    storageService.ask(AddDataset(reversedDataset, SourceType.BOX, remoteOutboxEntry.remoteBoxId))
+                    storageService.ask(AddDataset(reversedDataset, SourceTypeId(SourceType.BOX, remoteOutboxEntry.remoteBoxId)))
                       .onComplete {
 
                         case Success(any) =>
