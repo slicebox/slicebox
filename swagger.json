@@ -484,6 +484,37 @@
       }
     },
 
+    "/metadata/series/{id}/seriestypes": {
+      "get": {
+        "description": "get the list of series types for the series with the supplied ID.",
+        "tags": ["Meta Data"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of series",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "the list of series types",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/seriestype"
+              }
+            }
+          },
+          "404": {
+            "description": "series not found (invalid ID)"
+          }
+        }
+      }
+    },
+
     "/metadata/images": {
       "get": {
         "description": "Returns a list of metadata on the image level of the DICOM hierarchy",
@@ -1809,18 +1840,8 @@
 
     "/seriestypes": {
       "get": {
-        "description": "get a list of all added series types, or the list of series types for a particular series. By filtering search results for certain series types, it is easier for applications to ensure that they read images of applicable types.",
+        "description": "get a list of all added series types. By filtering search results for certain series types, it is easier for applications to ensure that they read images of applicable types.",
         "tags": ["Series Types"],
-        "parameters": [
-          {
-            "name": "seriesid",
-            "description": "id of series type to list series types for",
-            "in": "query",
-            "required": false,
-            "type": "integer",
-            "format": "int64"
-          }
-        ],
         "responses": {
           "200": {
             "description": "the list of series types",
