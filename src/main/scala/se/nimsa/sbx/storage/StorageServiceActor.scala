@@ -156,6 +156,22 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
         case GetSeriesTypesForSeries(seriesId) =>
           val seriesTypes = getSeriesTypesForSeries(seriesId)
           sender ! SeriesTypes(seriesTypes)
+          
+        case GetSeriesTagsForSeries(seriesId) =>
+          val seriesTags = getSeriesTagsForSeries(seriesId)
+          sender ! SeriesTags(seriesTags)
+          
+        case AddSeriesTagToSeries(seriesTag, seriesId) =>
+         db.withSession { implicit session =>
+            val dbSeriesTag = propertiesDao.addAndInsertSeriesTagForSeriesId(seriesTag, seriesId)
+            sender ! SeriesTagAddedToSeries(dbSeriesTag)
+          }
+         
+        case RemoveSeriesTagFromSeries(seriesTagId, seriesId) =>
+          db.withSession { implicit session =>
+            propertiesDao.removeAndCleanupSeriesTagForSeriesId(seriesTagId, seriesId)
+            sender ! SeriesTagRemovedFromSeries(seriesId)
+          }
       }
     }
 
@@ -210,19 +226,19 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
 
     case msg: MetaDataQuery => catchAndReport {
       msg match {
-        case GetPatients(startIndex, count, orderBy, orderAscending, filter, sourceIds, seriesTypeIds) =>
+        case GetPatients(startIndex, count, orderBy, orderAscending, filter, sourceIds, seriesTypeIds, seriesTagIds) =>
           db.withSession { implicit session =>
-            sender ! Patients(propertiesDao.patients(startIndex, count, orderBy, orderAscending, filter, sourceIds, seriesTypeIds))
+            sender ! Patients(propertiesDao.patients(startIndex, count, orderBy, orderAscending, filter, sourceIds, seriesTypeIds, seriesTagIds))
           }
 
-        case GetStudies(startIndex, count, patientId, sourceTypeIds, seriesTypeIds) =>
+        case GetStudies(startIndex, count, patientId, sourceTypeIds, seriesTypeIds, seriesTagIds) =>
           db.withSession { implicit session =>
-            sender ! Studies(propertiesDao.studiesForPatient(startIndex, count, patientId, sourceTypeIds, seriesTypeIds))
+            sender ! Studies(propertiesDao.studiesForPatient(startIndex, count, patientId, sourceTypeIds, seriesTypeIds, seriesTagIds))
           }
 
-        case GetSeries(startIndex, count, studyId, sourceTypeIds, seriesTypeIds) =>
+        case GetSeries(startIndex, count, studyId, sourceTypeIds, seriesTypeIds, seriesTagIds) =>
           db.withSession { implicit session =>
-            sender ! SeriesCollection(propertiesDao.seriesForStudy(startIndex, count, studyId, sourceTypeIds, seriesTypeIds))
+            sender ! SeriesCollection(propertiesDao.seriesForStudy(startIndex, count, studyId, sourceTypeIds, seriesTypeIds, seriesTagIds))
           }
 
         case GetImages(startIndex, count, seriesId) =>
@@ -235,9 +251,9 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
             sender ! propertiesDao.imageFileForImage(imageId)
           }
 
-        case GetFlatSeries(startIndex, count, orderBy, orderAscending, filter, sourceTypeIds, seriesTypeIds) =>
+        case GetFlatSeries(startIndex, count, orderBy, orderAscending, filter, sourceTypeIds, seriesTypeIds, seriesTagIds) =>
           db.withSession { implicit session =>
-            sender ! FlatSeriesCollection(propertiesDao.flatSeries(startIndex, count, orderBy, orderAscending, filter, sourceTypeIds, seriesTypeIds))
+            sender ! FlatSeriesCollection(propertiesDao.flatSeries(startIndex, count, orderBy, orderAscending, filter, sourceTypeIds, seriesTypeIds, seriesTagIds))
           }
 
         case GetPatient(patientId) =>
@@ -303,6 +319,11 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
   def getSeriesTypesForSeries(seriesId: Long) =
     db.withSession { implicit session =>
       propertiesDao.seriesTypesForSeries(seriesId)
+    }
+
+  def getSeriesTagsForSeries(seriesId: Long) =
+    db.withSession { implicit session =>
+      propertiesDao.seriesTagsForSeries(seriesId)
     }
 
   def storeDatasetTryCatchThrow(dataset: Attributes, sourceTypeId: SourceTypeId): (Image, Boolean) =

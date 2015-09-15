@@ -119,13 +119,13 @@ object StorageProtocol {
 
   sealed trait MetaDataQuery
 
-  case class GetPatients(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String], sourceTypeIds: Array[SourceTypeId], seriesTypeIds: Array[Long]) extends MetaDataQuery
+  case class GetPatients(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String], sourceTypeIds: Array[SourceTypeId], seriesTypeIds: Array[Long], seriesTagIds: Array[Long]) extends MetaDataQuery
 
-  case class GetStudies(startIndex: Long, count: Long, patientId: Long, sourceTypeIds: Array[SourceTypeId], seriesTypeIds: Array[Long]) extends MetaDataQuery
+  case class GetStudies(startIndex: Long, count: Long, patientId: Long, sourceTypeIds: Array[SourceTypeId], seriesTypeIds: Array[Long], seriesTagIds: Array[Long]) extends MetaDataQuery
 
-  case class GetSeries(startIndex: Long, count: Long, studyId: Long, sourceTypeIds: Array[SourceTypeId], seriesTypeIds: Array[Long]) extends MetaDataQuery
+  case class GetSeries(startIndex: Long, count: Long, studyId: Long, sourceTypeIds: Array[SourceTypeId], seriesTypeIds: Array[Long], seriesTagIds: Array[Long]) extends MetaDataQuery
 
-  case class GetFlatSeries(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String], sourceTypeIds: Array[SourceTypeId], seriesTypeIds: Array[Long]) extends MetaDataQuery
+  case class GetFlatSeries(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String], sourceTypeIds: Array[SourceTypeId], seriesTypeIds: Array[Long], seriesTagIds: Array[Long]) extends MetaDataQuery
 
   case class GetImages(startIndex: Long, count: Long, seriesId: Long) extends MetaDataQuery
   
@@ -172,9 +172,15 @@ object StorageProtocol {
   
   case class AddSeriesTypeToSeries(seriesType: SeriesType, series: Series) extends PropertiesRequest
   
+  case class AddSeriesTagToSeries(seriesTag: SeriesTag, seriesId: Long) extends PropertiesRequest
+  
   case class RemoveSeriesTypesFromSeries(series: Series) extends PropertiesRequest
 
+  case class RemoveSeriesTagFromSeries(seriesTagId: Long, seriesId: Long) extends PropertiesRequest
+
   case class GetSeriesTypesForSeries(seriesId: Long) extends PropertiesRequest
+  
+  case class GetSeriesTagsForSeries(seriesId: Long) extends PropertiesRequest
   
   
   case class AddDataset(dataset: Attributes, sourceTypeId: SourceTypeId)
@@ -198,7 +204,13 @@ object StorageProtocol {
   
   case class SeriesTypeAddedToSeries(seriesSeriesType: SeriesSeriesType)
 
+  case class SeriesTagAddedToSeries(seriesTag: SeriesTag)
+  
   case class SeriesTypesRemovedFromSeries(series: Series)
+  
+  case class SeriesTagRemovedFromSeries(seriesId: Long)
+  
+  case class SeriesTags(seriesTags: Seq[SeriesTag]) 
   
   // ***to storage***
 

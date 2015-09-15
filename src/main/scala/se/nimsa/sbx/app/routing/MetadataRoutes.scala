@@ -18,6 +18,7 @@ package se.nimsa.sbx.app.routing
 
 import akka.pattern.ask
 import spray.http.StatusCodes.NoContent
+import spray.http.StatusCodes.Created
 import spray.httpx.SprayJsonSupport._
 import spray.routing._
 import se.nimsa.sbx.app.RestApi
@@ -63,10 +64,12 @@ trait MetadataRoutes { this: RestApi =>
               'orderascending.as[Boolean] ? true,
               'filter.as[String].?,
               'sources.as[String].?,
-              'seriestypes.as[String].?) { (startIndex, count, orderBy, orderAscending, filter, sourcesString, seriesTypesString) =>
+              'seriestypes.as[String].?,
+              'seriestags.as[String].?) { (startIndex, count, orderBy, orderAscending, filter, sourcesString, seriesTypesString, seriesTagsString) =>
                 val sources = sourcesString.map(parseSourcesString(_)).getOrElse(Array.empty)
-                val seriesTypes = seriesTypesString.map(parseSeriesTypesString(_)).getOrElse(Array.empty)
-                onSuccess(storageService.ask(GetPatients(startIndex, count, orderBy, orderAscending, filter, sources, seriesTypes))) {
+                val seriesTypes = seriesTypesString.map(parseIdsString(_)).getOrElse(Array.empty)
+                val seriesTags = seriesTagsString.map(parseIdsString(_)).getOrElse(Array.empty)
+                onSuccess(storageService.ask(GetPatients(startIndex, count, orderBy, orderAscending, filter, sources, seriesTypes, seriesTags))) {
                   case Patients(patients) =>
                     complete(patients)
                 }
@@ -96,10 +99,12 @@ trait MetadataRoutes { this: RestApi =>
               'count.as[Long] ? 20,
               'patientid.as[Long],
               'sources.as[String].?,
-              'seriestypes.as[String].?) { (startIndex, count, patientId, sourcesString, seriesTypesString) =>
+              'seriestypes.as[String].?,
+              'seriestags.as[String].?) { (startIndex, count, patientId, sourcesString, seriesTypesString, seriesTagsString) =>
                 val sources = sourcesString.map(parseSourcesString(_)).getOrElse(Array.empty)
-                val seriesTypes = seriesTypesString.map(parseSeriesTypesString(_)).getOrElse(Array.empty)
-                onSuccess(storageService.ask(GetStudies(startIndex, count, patientId, sources, seriesTypes))) {
+                val seriesTypes = seriesTypesString.map(parseIdsString(_)).getOrElse(Array.empty)
+                val seriesTags = seriesTagsString.map(parseIdsString(_)).getOrElse(Array.empty)
+                onSuccess(storageService.ask(GetStudies(startIndex, count, patientId, sources, seriesTypes, seriesTags))) {
                   case Studies(studies) =>
                     complete(studies)
                 }
@@ -129,10 +134,12 @@ trait MetadataRoutes { this: RestApi =>
               'count.as[Long] ? 20,
               'studyid.as[Long],
               'sources.as[String].?,
-              'seriestypes.as[String].?) { (startIndex, count, studyId, sourcesString, seriesTypesString) =>
+              'seriestypes.as[String].?,
+              'seriestags.as[String].?) { (startIndex, count, studyId, sourcesString, seriesTypesString, seriesTagsString) =>
                 val sources = sourcesString.map(parseSourcesString(_)).getOrElse(Array.empty)
-                val seriesTypes = seriesTypesString.map(parseSeriesTypesString(_)).getOrElse(Array.empty)
-                onSuccess(storageService.ask(GetSeries(startIndex, count, studyId, sources, seriesTypes))) {
+                val seriesTypes = seriesTypesString.map(parseIdsString(_)).getOrElse(Array.empty)
+                val seriesTags = seriesTagsString.map(parseIdsString(_)).getOrElse(Array.empty)
+                onSuccess(storageService.ask(GetSeries(startIndex, count, studyId, sources, seriesTypes, seriesTags))) {
                   case SeriesCollection(series) =>
                     complete(series)
                 }
@@ -180,6 +187,29 @@ trait MetadataRoutes { this: RestApi =>
                   complete(seriesTypes)
               }
             }
+          } ~ pathPrefix("seriestags") {
+            pathEndOrSingleSlash {
+              get {
+                onSuccess(storageService.ask(GetSeriesTagsForSeries(seriesId))) {
+                  case SeriesTags(seriesTags) =>
+                    complete(seriesTags)
+                }
+              } ~ post {
+                entity(as[SeriesTag]) { seriesTag =>
+                  onSuccess(storageService.ask(AddSeriesTagToSeries(seriesTag, seriesId))) {
+                    case SeriesTagAddedToSeries(seriesTag) =>
+                      complete((Created, seriesTag))
+                  }
+                }
+              }
+            } ~ path(LongNumber) { seriesTagId =>
+              delete {
+                onSuccess(storageService.ask(RemoveSeriesTagFromSeries(seriesTagId, seriesId))) {
+                  case SeriesTagRemovedFromSeries(seriesId) =>
+                    complete(NoContent)
+                }
+              }
+            }
           }
         }
       } ~ pathPrefix("images") {
@@ -221,10 +251,12 @@ trait MetadataRoutes { this: RestApi =>
               'orderascending.as[Boolean] ? true,
               'filter.as[String].?,
               'sources.as[String].?,
-              'seriestypes.as[String].?) { (startIndex, count, orderBy, orderAscending, filter, sourcesString, seriesTypesString) =>
+              'seriestypes.as[String].?,
+              'seriestags.as[String].?) { (startIndex, count, orderBy, orderAscending, filter, sourcesString, seriesTypesString, seriesTagsString) =>
                 val sources = sourcesString.map(parseSourcesString(_)).getOrElse(Array.empty)
-                val seriesTypes = seriesTypesString.map(parseSeriesTypesString(_)).getOrElse(Array.empty)
-                onSuccess(storageService.ask(GetFlatSeries(startIndex, count, orderBy, orderAscending, filter, sources, seriesTypes))) {
+                val seriesTypes = seriesTypesString.map(parseIdsString(_)).getOrElse(Array.empty)
+                val seriesTags = seriesTagsString.map(parseIdsString(_)).getOrElse(Array.empty)
+                onSuccess(storageService.ask(GetFlatSeries(startIndex, count, orderBy, orderAscending, filter, sources, seriesTypes, seriesTags))) {
                   case FlatSeriesCollection(flatSeries) =>
                     complete(flatSeries)
                 }
@@ -253,12 +285,12 @@ trait MetadataRoutes { this: RestApi =>
     }
   }
 
-  def parseSeriesTypesString(seriesTypesString: String): Array[Long] = {
+  def parseIdsString(seriesTypesString: String): Array[Long] = {
     try {
       seriesTypesString.split(",").map(_.toLong)
     } catch {
       case e: Exception =>
-        throw new IllegalArgumentException("Series types parameter must be formatted as a comma separated list of series type ids, e.g. 2,5,11")
+        throw new IllegalArgumentException("Series types and series tags parameters must be formatted as a comma separated list of ids, e.g. 2,5,11")
     }
   }
 

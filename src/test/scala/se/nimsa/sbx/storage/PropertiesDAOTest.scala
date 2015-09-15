@@ -82,58 +82,58 @@ class PropertiesDAOTest extends FlatSpec with Matchers with BeforeAndAfterEach {
     db.withSession { implicit session =>
       insertMetaDataAndProperties
 
-      propertiesDao.flatSeries(0, 20, None, true, None, Array.empty, Array.empty).size should be(4)
-      propertiesDao.flatSeries(0, 20, None, true, None, Array(SourceTypeId(SourceType.BOX, 1)), Array.empty).size should be(1)
-      propertiesDao.flatSeries(0, 20, None, true, None, Array(SourceTypeId(SourceType.BOX, 2)), Array.empty).size should be(0)
+      propertiesDao.flatSeries(0, 20, None, true, None, Array.empty, Array.empty, Array.empty).size should be(4)
+      propertiesDao.flatSeries(0, 20, None, true, None, Array(SourceTypeId(SourceType.BOX, 1)), Array.empty, Array.empty).size should be(1)
+      propertiesDao.flatSeries(0, 20, None, true, None, Array(SourceTypeId(SourceType.BOX, 2)), Array.empty, Array.empty).size should be(0)
 
       // with filter
-      propertiesDao.flatSeries(0, 20, None, true, Some("p1"), Array(SourceTypeId(SourceType.BOX, 1)), Array.empty).size should be(1)
-      propertiesDao.flatSeries(0, 20, None, true, Some("p1"), Array(SourceTypeId(SourceType.SCP, 1)), Array.empty).size should be(1)
-      propertiesDao.flatSeries(0, 20, None, true, Some("p2"), Array(SourceTypeId(SourceType.BOX, 1)), Array.empty).size should be(0)
+      propertiesDao.flatSeries(0, 20, None, true, Some("p1"), Array(SourceTypeId(SourceType.BOX, 1)), Array.empty, Array.empty).size should be(1)
+      propertiesDao.flatSeries(0, 20, None, true, Some("p1"), Array(SourceTypeId(SourceType.SCP, 1)), Array.empty, Array.empty).size should be(1)
+      propertiesDao.flatSeries(0, 20, None, true, Some("p2"), Array(SourceTypeId(SourceType.BOX, 1)), Array.empty, Array.empty).size should be(0)
 
       // filter only
-      propertiesDao.flatSeries(0, 20, None, true, Some("p1"), Array.empty, Array.empty).size should be(4)
-      propertiesDao.flatSeries(0, 20, None, true, Some("p2"), Array.empty, Array.empty).size should be(0)
+      propertiesDao.flatSeries(0, 20, None, true, Some("p1"), Array.empty, Array.empty, Array.empty).size should be(4)
+      propertiesDao.flatSeries(0, 20, None, true, Some("p2"), Array.empty, Array.empty, Array.empty).size should be(0)
     }
   }
 
   it should "support filtering patients by source" in {
     db.withSession { implicit session =>
       insertMetaDataAndProperties
-      propertiesDao.patients(0, 20, None, true, None, Array.empty, Array.empty).size should be(1)
-      propertiesDao.patients(0, 20, None, true, None, Array(SourceTypeId(SourceType.BOX, 1)), Array.empty).size should be(1)
-      propertiesDao.patients(0, 20, None, true, None, Array(SourceTypeId(SourceType.BOX, 2)), Array.empty).size should be(0)
-      propertiesDao.patients(0, 20, None, true, None, Array(SourceTypeId(SourceType.UNKNOWN, 1)), Array.empty).size should be(0)
+      propertiesDao.patients(0, 20, None, true, None, Array.empty, Array.empty, Array.empty).size should be(1)
+      propertiesDao.patients(0, 20, None, true, None, Array(SourceTypeId(SourceType.BOX, 1)), Array.empty, Array.empty).size should be(1)
+      propertiesDao.patients(0, 20, None, true, None, Array(SourceTypeId(SourceType.BOX, 2)), Array.empty, Array.empty).size should be(0)
+      propertiesDao.patients(0, 20, None, true, None, Array(SourceTypeId(SourceType.UNKNOWN, 1)), Array.empty, Array.empty).size should be(0)
 
       // with filter
-      propertiesDao.patients(0, 20, None, true, Some("p1"), Array(SourceTypeId(SourceType.BOX, 1)), Array.empty).size should be(1)
-      propertiesDao.patients(0, 20, None, true, Some("p2"), Array(SourceTypeId(SourceType.BOX, 1)), Array.empty).size should be(0)
+      propertiesDao.patients(0, 20, None, true, Some("p1"), Array(SourceTypeId(SourceType.BOX, 1)), Array.empty, Array.empty).size should be(1)
+      propertiesDao.patients(0, 20, None, true, Some("p2"), Array(SourceTypeId(SourceType.BOX, 1)), Array.empty, Array.empty).size should be(0)
 
       // filter only
-      propertiesDao.patients(0, 20, None, true, Some("p1"), Array.empty, Array.empty).size should be(1)
-      propertiesDao.patients(0, 20, None, true, Some("p2"), Array.empty, Array.empty).size should be(0)
+      propertiesDao.patients(0, 20, None, true, Some("p1"), Array.empty, Array.empty, Array.empty).size should be(1)
+      propertiesDao.patients(0, 20, None, true, Some("p2"), Array.empty, Array.empty, Array.empty).size should be(0)
     }
   }
 
   it should "support filtering studies by source" in {
     db.withSession { implicit session =>
       insertMetaDataAndProperties
-      propertiesDao.studiesForPatient(0, 20, 1, Array.empty, Array.empty).size should be(2)
-      propertiesDao.studiesForPatient(0, 20, 1, Array(SourceTypeId(SourceType.BOX, 1)), Array.empty).size should be(1)
-      propertiesDao.studiesForPatient(0, 20, 1, Array(SourceTypeId(SourceType.BOX, 2)), Array.empty).size should be(0)
-      propertiesDao.studiesForPatient(0, 20, 1, Array(SourceTypeId(SourceType.UNKNOWN, 1)), Array.empty).size should be(0)
+      propertiesDao.studiesForPatient(0, 20, 1, Array.empty, Array.empty, Array.empty).size should be(2)
+      propertiesDao.studiesForPatient(0, 20, 1, Array(SourceTypeId(SourceType.BOX, 1)), Array.empty, Array.empty).size should be(1)
+      propertiesDao.studiesForPatient(0, 20, 1, Array(SourceTypeId(SourceType.BOX, 2)), Array.empty, Array.empty).size should be(0)
+      propertiesDao.studiesForPatient(0, 20, 1, Array(SourceTypeId(SourceType.UNKNOWN, 1)), Array.empty, Array.empty).size should be(0)
     }
   }
 
   it should "support filtering series by source" in {
     db.withSession { implicit session =>
       insertMetaDataAndProperties
-      propertiesDao.seriesForStudy(0, 20, 1, Array.empty, Array.empty).size should be(2)
-      propertiesDao.seriesForStudy(0, 20, 1, Array(SourceTypeId(SourceType.BOX, 1)), Array.empty).size should be(1)
-      propertiesDao.seriesForStudy(0, 20, 2, Array(SourceTypeId(SourceType.SCP, 1)), Array.empty).size should be(1)
-      propertiesDao.seriesForStudy(0, 20, 2, Array(SourceTypeId(SourceType.DIRECTORY, 1)), Array.empty).size should be(1)
-      propertiesDao.seriesForStudy(0, 20, 1, Array(SourceTypeId(SourceType.BOX, 2)), Array.empty).size should be(0)
-      propertiesDao.seriesForStudy(0, 20, 1, Array(SourceTypeId(SourceType.SCP, 2)), Array.empty).size should be(0)
+      propertiesDao.seriesForStudy(0, 20, 1, Array.empty, Array.empty, Array.empty).size should be(2)
+      propertiesDao.seriesForStudy(0, 20, 1, Array(SourceTypeId(SourceType.BOX, 1)), Array.empty, Array.empty).size should be(1)
+      propertiesDao.seriesForStudy(0, 20, 2, Array(SourceTypeId(SourceType.SCP, 1)), Array.empty, Array.empty).size should be(1)
+      propertiesDao.seriesForStudy(0, 20, 2, Array(SourceTypeId(SourceType.DIRECTORY, 1)), Array.empty, Array.empty).size should be(1)
+      propertiesDao.seriesForStudy(0, 20, 1, Array(SourceTypeId(SourceType.BOX, 2)), Array.empty, Array.empty).size should be(0)
+      propertiesDao.seriesForStudy(0, 20, 1, Array(SourceTypeId(SourceType.SCP, 2)), Array.empty, Array.empty).size should be(0)
     }
   }
   
@@ -141,11 +141,11 @@ class PropertiesDAOTest extends FlatSpec with Matchers with BeforeAndAfterEach {
     db.withSession { implicit session =>
       insertMetaDataAndProperties
 
-      propertiesDao.patients(0, 20, None, true, None, Array.empty, Array.empty).size should be(1)
-      propertiesDao.patients(0, 20, None, true, None, Array.empty, Array(1)).size should be(1)
-      propertiesDao.patients(0, 20, None, true, None, Array.empty, Array(1,2)).size should be(1)
-      propertiesDao.patients(0, 20, None, true, None, Array.empty, Array(1,2,3)).size should be(1)
-      propertiesDao.patients(0, 20, None, true, None, Array.empty, Array(3)).size should be(0)
+      propertiesDao.patients(0, 20, None, true, None, Array.empty, Array.empty, Array.empty).size should be(1)
+      propertiesDao.patients(0, 20, None, true, None, Array.empty, Array(1), Array.empty).size should be(1)
+      propertiesDao.patients(0, 20, None, true, None, Array.empty, Array(1,2), Array.empty).size should be(1)
+      propertiesDao.patients(0, 20, None, true, None, Array.empty, Array(1,2,3), Array.empty).size should be(1)
+      propertiesDao.patients(0, 20, None, true, None, Array.empty, Array(3), Array.empty).size should be(0)
     }
   }
   
