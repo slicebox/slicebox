@@ -120,21 +120,8 @@ object DicomUtil {
       AccessionNumber(valueOrEmpty(dataset, DicomProperty.AccessionNumber.dicomTag)),
       PatientAge(valueOrEmpty(dataset, DicomProperty.PatientAge.dicomTag)))
 
-  def datasetToEquipment(dataset: Attributes): Equipment =
-    Equipment(
-      -1,
-      Manufacturer(valueOrEmpty(dataset, DicomProperty.Manufacturer.dicomTag)),
-      StationName(valueOrEmpty(dataset, DicomProperty.StationName.dicomTag)))
-
-  def datasetToFrameOfReference(dataset: Attributes): FrameOfReference =
-    FrameOfReference(
-      -1,
-      FrameOfReferenceUID(valueOrEmpty(dataset, DicomProperty.FrameOfReferenceUID.dicomTag)))
-
   def datasetToSeries(dataset: Attributes): Series =
     Series(
-      -1,
-      -1,
       -1,
       -1,
       SeriesInstanceUID(valueOrEmpty(dataset, DicomProperty.SeriesInstanceUID.dicomTag)),
@@ -142,7 +129,10 @@ object DicomUtil {
       SeriesDate(valueOrEmpty(dataset, DicomProperty.SeriesDate.dicomTag)),
       Modality(valueOrEmpty(dataset, DicomProperty.Modality.dicomTag)),
       ProtocolName(valueOrEmpty(dataset, DicomProperty.ProtocolName.dicomTag)),
-      BodyPartExamined(valueOrEmpty(dataset, DicomProperty.BodyPartExamined.dicomTag)))
+      BodyPartExamined(valueOrEmpty(dataset, DicomProperty.BodyPartExamined.dicomTag)),
+      Manufacturer(valueOrEmpty(dataset, DicomProperty.Manufacturer.dicomTag)),
+      StationName(valueOrEmpty(dataset, DicomProperty.StationName.dicomTag)),
+      FrameOfReferenceUID(valueOrEmpty(dataset, DicomProperty.FrameOfReferenceUID.dicomTag)))
 
   def datasetToImage(dataset: Attributes): Image =
     Image(

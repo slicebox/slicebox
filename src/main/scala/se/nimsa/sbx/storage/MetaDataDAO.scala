@@ -69,60 +69,28 @@ class MetaDataDAO(val driver: JdbcProfile) {
 
   val studiesQuery = TableQuery[Studies]
 
-  // *** Equipment ***
-
-  val toEquipment = (id: Long, manufacturer: String, stationName: String) =>
-    Equipment(id, Manufacturer(manufacturer), StationName(stationName))
-
-  val fromEquipment = (equipment: Equipment) => Option((equipment.id, equipment.manufacturer.value, equipment.stationName.value))
-
-  class Equipments(tag: Tag) extends Table[Equipment](tag, "Equipments") {
-    def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
-    def manufacturer = column[String](DicomProperty.Manufacturer.name)
-    def stationName = column[String](DicomProperty.StationName.name)
-    def * = (id, manufacturer, stationName) <> (toEquipment.tupled, fromEquipment)
-  }
-
-  val equipmentsQuery = TableQuery[Equipments]
-
-  // *** Frame of Reference ***
-
-  val toFrameOfReference = (id: Long, frameOfReferenceUID: String) =>
-    FrameOfReference(id, FrameOfReferenceUID(frameOfReferenceUID))
-
-  val fromFrameOfReference = (frameOfReference: FrameOfReference) => Option((frameOfReference.id, frameOfReference.frameOfReferenceUID.value))
-
-  class FrameOfReferences(tag: Tag) extends Table[FrameOfReference](tag, "FrameOfReferences") {
-    def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
-    def frameOfReferenceUID = column[String](DicomProperty.FrameOfReferenceUID.name)
-    def * = (id, frameOfReferenceUID) <> (toFrameOfReference.tupled, fromFrameOfReference)
-  }
-
-  val frameOfReferencesQuery = TableQuery[FrameOfReferences]
-
   // *** Series ***
 
-  val toSeries = (id: Long, studyId: Long, equipmentId: Long, frameOfReferenceId: Long, seriesInstanceUID: String, seriesDescription: String, seriesDate: String, modality: String, protocolName: String, bodyPartExamined: String) =>
-    Series(id, studyId, equipmentId, frameOfReferenceId, SeriesInstanceUID(seriesInstanceUID), SeriesDescription(seriesDescription), SeriesDate(seriesDate), Modality(modality), ProtocolName(protocolName), BodyPartExamined(bodyPartExamined))
+  val toSeries = (id: Long, studyId: Long, seriesInstanceUID: String, seriesDescription: String, seriesDate: String, modality: String, protocolName: String, bodyPartExamined: String, manufacturer: String, stationName: String, frameOfReferenceUID: String) =>
+    Series(id, studyId, SeriesInstanceUID(seriesInstanceUID), SeriesDescription(seriesDescription), SeriesDate(seriesDate), Modality(modality), ProtocolName(protocolName), BodyPartExamined(bodyPartExamined), Manufacturer(manufacturer), StationName(stationName), FrameOfReferenceUID(frameOfReferenceUID))
 
-  val fromSeries = (series: Series) => Option((series.id, series.studyId, series.equipmentId, series.frameOfReferenceId, series.seriesInstanceUID.value, series.seriesDescription.value, series.seriesDate.value, series.modality.value, series.protocolName.value, series.bodyPartExamined.value))
+  val fromSeries = (series: Series) => Option((series.id, series.studyId, series.seriesInstanceUID.value, series.seriesDescription.value, series.seriesDate.value, series.modality.value, series.protocolName.value, series.bodyPartExamined.value, series.manufacturer.value, series.stationName.value, series.frameOfReferenceUID.value))
 
   class SeriesTable(tag: Tag) extends Table[Series](tag, "Series") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def studyId = column[Long]("studyId")
-    def equipmentId = column[Long]("equipmentId")
-    def frameOfReferenceId = column[Long]("frameOfReferenceId")
     def seriesInstanceUID = column[String](DicomProperty.SeriesInstanceUID.name)
     def seriesDescription = column[String](DicomProperty.SeriesDescription.name)
     def seriesDate = column[String](DicomProperty.SeriesDate.name)
     def modality = column[String](DicomProperty.Modality.name)
     def protocolName = column[String](DicomProperty.ProtocolName.name)
     def bodyPartExamined = column[String](DicomProperty.BodyPartExamined.name)
-    def * = (id, studyId, equipmentId, frameOfReferenceId, seriesInstanceUID, seriesDescription, seriesDate, modality, protocolName, bodyPartExamined) <> (toSeries.tupled, fromSeries)
+    def manufacturer = column[String](DicomProperty.Manufacturer.name)
+    def stationName = column[String](DicomProperty.StationName.name)
+    def frameOfReferenceUID = column[String](DicomProperty.FrameOfReferenceUID.name)
+    def * = (id, studyId, seriesInstanceUID, seriesDescription, seriesDate, modality, protocolName, bodyPartExamined, manufacturer, stationName, frameOfReferenceUID) <> (toSeries.tupled, fromSeries)
 
     def studyFKey = foreignKey("studyFKey", studyId, studiesQuery)(_.id, onUpdate = ForeignKeyAction.Cascade, onDelete = ForeignKeyAction.Cascade)
-    def equipmentFKey = foreignKey("equipmentFKey", equipmentId, equipmentsQuery)(_.id, onUpdate = ForeignKeyAction.Cascade, onDelete = ForeignKeyAction.Cascade)
-    def frameOfReferenceFKey = foreignKey("frameOfReferenceFKey", frameOfReferenceId, frameOfReferencesQuery)(_.id, onUpdate = ForeignKeyAction.Cascade, onDelete = ForeignKeyAction.Cascade)
     def studyIdJoin = studiesQuery.filter(_.id === studyId)
   }
 
@@ -153,8 +121,6 @@ class MetaDataDAO(val driver: JdbcProfile) {
     if (MTable.getTables("Patients").list.isEmpty)
       (patientsQuery.ddl ++
         studiesQuery.ddl ++
-        equipmentsQuery.ddl ++
-        frameOfReferencesQuery.ddl ++
         seriesQuery.ddl ++
         imagesQuery.ddl).create
 
@@ -162,16 +128,12 @@ class MetaDataDAO(val driver: JdbcProfile) {
     if (MTable.getTables("Patients").list.size > 0)
       (patientsQuery.ddl ++
         studiesQuery.ddl ++
-        equipmentsQuery.ddl ++
-        frameOfReferencesQuery.ddl ++
         seriesQuery.ddl ++
         imagesQuery.ddl).drop
 
   def clear(implicit session: Session) = {
     patientsQuery.delete
     studiesQuery.delete
-    equipmentsQuery.delete
-    frameOfReferencesQuery.delete
     seriesQuery.delete
     imagesQuery.delete
   }
@@ -201,12 +163,6 @@ class MetaDataDAO(val driver: JdbcProfile) {
   def seriesById(id: Long)(implicit session: Session): Option[Series] =
     seriesQuery.filter(_.id === id).list.headOption
 
-  def equipmentById(id: Long)(implicit session: Session): Option[Equipment] =
-    equipmentsQuery.filter(_.id === id).list.headOption
-
-  def frameOfReferenceById(id: Long)(implicit session: Session): Option[FrameOfReference] =
-    frameOfReferencesQuery.filter(_.id === id).list.headOption
-
   def imageById(id: Long)(implicit session: Session): Option[Image] =
     imagesQuery.filter(_.id === id).list.headOption
 
@@ -225,16 +181,6 @@ class MetaDataDAO(val driver: JdbcProfile) {
   def insert(series: Series)(implicit session: Session): Series = {
     val generatedId = (seriesQuery returning seriesQuery.map(_.id)) += series
     series.copy(id = generatedId)
-  }
-
-  def insert(frameOfReference: FrameOfReference)(implicit session: Session): FrameOfReference = {
-    val generatedId = (frameOfReferencesQuery returning frameOfReferencesQuery.map(_.id)) += frameOfReference
-    frameOfReference.copy(id = generatedId)
-  }
-
-  def insert(equipment: Equipment)(implicit session: Session): Equipment = {
-    val generatedId = (equipmentsQuery returning equipmentsQuery.map(_.id)) += equipment
-    equipment.copy(id = generatedId)
   }
 
   def insert(image: Image)(implicit session: Session): Image = {
@@ -297,9 +243,7 @@ class MetaDataDAO(val driver: JdbcProfile) {
       "Patients"."PatientBirthDate",
       "Patients"."PatientSex" from "Patients"
       left join "Studies" on "Studies"."patientId" = "Patients"."id"
-      left join "Series" on "Series"."studyId" = "Studies"."id"
-      left join "Equipments" on "Equipments"."id" = "Series"."equipmentId"
-      left join "FrameOfReferences" on "FrameOfReferences"."id" = "Series"."frameOfReferenceId""""
+      left join "Series" on "Series"."studyId" = "Studies"."id""""
 
     val query = buildMetaDataQuery(querySelectPart, startIndex, count, orderBy, orderAscending, queryProperties)
 
@@ -324,9 +268,7 @@ class MetaDataDAO(val driver: JdbcProfile) {
       "Studies"."AccessionNumber",
       "Studies"."PatientAge" from "Studies"
       left join "Patients" on "Patients"."id" = "Studies"."patientId"
-      left join "Series" on "Series"."studyId" = "Studies"."id"
-      left join "Equipments" on "Equipments"."id" = "Series"."equipmentId"
-      left join "FrameOfReferences" on "FrameOfReferences"."id" = "Series"."frameOfReferenceId""""
+      left join "Series" on "Series"."studyId" = "Studies"."id""""
 
     val query = buildMetaDataQuery(querySelectPart, startIndex, count, orderBy, orderAscending, queryProperties)
 
@@ -338,22 +280,21 @@ class MetaDataDAO(val driver: JdbcProfile) {
     checkOrderBy(orderBy, "Series")
 
     implicit val getResult = GetResult(r =>
-      Series(r.nextLong, r.nextLong, r.nextLong, r.nextLong, SeriesInstanceUID(r.nextString), SeriesDescription(r.nextString), SeriesDate(r.nextString), Modality(r.nextString), ProtocolName(r.nextString), BodyPartExamined(r.nextString)))
+      Series(r.nextLong, r.nextLong, SeriesInstanceUID(r.nextString), SeriesDescription(r.nextString), SeriesDate(r.nextString), Modality(r.nextString), ProtocolName(r.nextString), BodyPartExamined(r.nextString), Manufacturer(r.nextString), StationName(r.nextString), FrameOfReferenceUID(r.nextString)))
 
     val querySelectPart = """select distinct("Series"."id"),
       "Series"."studyId",
-      "Series"."equipmentId",
-      "Series"."frameOfReferenceId",
       "Series"."SeriesInstanceUID",
       "Series"."SeriesDescription",
       "Series"."SeriesDate",
       "Series"."Modality",
       "Series"."ProtocolName",
-      "Series"."BodyPartExamined" from "Series"
+      "Series"."BodyPartExamined",
+      "Series"."Manufacturer",
+      "Series"."StationName",
+      "Series"."FrameOfReferenceUID" from "Series"
       left join "Studies" on "Studies"."id" = "Series"."studyId"
-      left join "Patients" on "Patients"."id" = "Studies"."patientId"
-      left join "Equipments" on "Equipments"."id" = "Series"."equipmentId"
-      left join "FrameOfReferences" on "FrameOfReferences"."id" = "Series"."frameOfReferenceId""""
+      left join "Patients" on "Patients"."id" = "Studies"."patientId""""
 
     val query = buildMetaDataQuery(querySelectPart, startIndex, count, orderBy, orderAscending, queryProperties)
 
@@ -374,9 +315,7 @@ class MetaDataDAO(val driver: JdbcProfile) {
       "Images"."InstanceNumber" from "Images"
       left join "Series" on "Series"."id" = "Images"."seriesId"
       left join "Studies" on "Studies"."id" = "Series"."studyId"
-      left join "Patients" on "Patients"."id" = "Studies"."patientId"
-      left join "Equipments" on "Equipments"."id" = "Series"."equipmentId"
-      left join "FrameOfReferences" on "FrameOfReferences"."id" = "Series"."frameOfReferenceId""""
+      left join "Patients" on "Patients"."id" = "Studies"."patientId""""
 
     val query = buildMetaDataQuery(querySelectPart, startIndex, count, orderBy, orderAscending, queryProperties)
 
@@ -402,35 +341,25 @@ class MetaDataDAO(val driver: JdbcProfile) {
 
   def series(implicit session: Session): List[Series] = seriesQuery.list
 
-  def equipments(implicit session: Session): List[Equipment] = equipmentsQuery.list
-
-  def frameOfReferences(implicit session: Session): List[FrameOfReference] = frameOfReferencesQuery.list
-
   def images(implicit session: Session): List[Image] = imagesQuery.list
 
   val flatSeriesBasePart = """select "Series"."id", 
       "Patients"."id","Patients"."PatientName","Patients"."PatientID","Patients"."PatientBirthDate","Patients"."PatientSex", 
       "Studies"."id","Studies"."patientId","Studies"."StudyInstanceUID","Studies"."StudyDescription","Studies"."StudyDate","Studies"."StudyID","Studies"."AccessionNumber","Studies"."PatientAge",
-      "Equipments"."id","Equipments"."Manufacturer","Equipments"."StationName",
-      "FrameOfReferences"."id","FrameOfReferences"."FrameOfReferenceUID",
-      "Series"."id","Series"."studyId","Series"."equipmentId","Series"."frameOfReferenceId","Series"."SeriesInstanceUID","Series"."SeriesDescription","Series"."SeriesDate","Series"."Modality","Series"."ProtocolName","Series"."BodyPartExamined"
+      "Series"."id","Series"."studyId","Series"."SeriesInstanceUID","Series"."SeriesDescription","Series"."SeriesDate","Series"."Modality","Series"."ProtocolName","Series"."BodyPartExamined","Series"."Manufacturer","Series"."StationName","Series"."FrameOfReferenceUID"
        from "Series" 
        inner join "Studies" on "Series"."studyId" = "Studies"."id" 
-       inner join "Equipments" on "Series"."equipmentId" = "Equipments"."id"
-       inner join "FrameOfReferences" on "Series"."frameOfReferenceId" = "FrameOfReferences"."id"
        inner join "Patients" on "Studies"."patientId" = "Patients"."id""""
 
   def flatSeriesGetResult = GetResult(r =>
     FlatSeries(r.nextLong,
       Patient(r.nextLong, PatientName(r.nextString), PatientID(r.nextString), PatientBirthDate(r.nextString), PatientSex(r.nextString)),
       Study(r.nextLong, r.nextLong, StudyInstanceUID(r.nextString), StudyDescription(r.nextString), StudyDate(r.nextString), StudyID(r.nextString), AccessionNumber(r.nextString), PatientAge(r.nextString)),
-      Equipment(r.nextLong, Manufacturer(r.nextString), StationName(r.nextString)),
-      FrameOfReference(r.nextLong, FrameOfReferenceUID(r.nextString)),
-      Series(r.nextLong, r.nextLong, r.nextLong, r.nextLong, SeriesInstanceUID(r.nextString), SeriesDescription(r.nextString), SeriesDate(r.nextString), Modality(r.nextString), ProtocolName(r.nextString), BodyPartExamined(r.nextString))))
+      Series(r.nextLong, r.nextLong, SeriesInstanceUID(r.nextString), SeriesDescription(r.nextString), SeriesDate(r.nextString), Modality(r.nextString), ProtocolName(r.nextString), BodyPartExamined(r.nextString), Manufacturer(r.nextString), StationName(r.nextString), FrameOfReferenceUID(r.nextString))))
 
   def flatSeries(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String])(implicit session: Session): List[FlatSeries] = {
 
-    checkOrderBy(orderBy, "Patients", "Studies", "Equipments", "FrameOfReferences", "Series")
+    checkOrderBy(orderBy, "Patients", "Studies", "Series")
 
     implicit val getResult = flatSeriesGetResult
 
@@ -456,13 +385,13 @@ class MetaDataDAO(val driver: JdbcProfile) {
              lcase("StudyID") like $filterValueLike or
              lcase("AccessionNumber") like $filterValueLike or
              lcase("PatientAge") like $filterValueLike or
-               lcase("Manufacturer") like $filterValueLike or
-               lcase("StationName") like $filterValueLike or
                  lcase("SeriesDescription") like $filterValueLike or
                  lcase("SeriesDate") like $filterValueLike or
                  lcase("Modality") like $filterValueLike or
                  lcase("ProtocolName") like $filterValueLike or
-                 lcase("BodyPartExamined") like $filterValueLike)"""
+                 lcase("BodyPartExamined") like $filterValueLike or
+                 lcase("Manufacturer") like $filterValueLike or
+                 lcase("StationName") like $filterValueLike)"""
     })
       .getOrElse("")
 
@@ -508,17 +437,6 @@ class MetaDataDAO(val driver: JdbcProfile) {
       .filter(_.studyInstanceUID === study.studyInstanceUID.value)
       .list.headOption
 
-  def equipmentByManufacturerAndStationName(equipment: Equipment)(implicit session: Session): Option[Equipment] =
-    equipmentsQuery
-      .filter(_.manufacturer === equipment.manufacturer.value)
-      .filter(_.stationName === equipment.stationName.value)
-      .list.headOption
-
-  def frameOfReferenceByUid(frameOfReference: FrameOfReference)(implicit session: Session): Option[FrameOfReference] =
-    frameOfReferencesQuery
-      .filter(_.frameOfReferenceUID === frameOfReference.frameOfReferenceUID.value)
-      .list.headOption
-
   def seriesByUid(series: Series)(implicit session: Session): Option[Series] =
     seriesQuery
       .filter(_.seriesInstanceUID === series.seriesInstanceUID.value)
@@ -546,18 +464,6 @@ class MetaDataDAO(val driver: JdbcProfile) {
   def deleteSeries(seriesId: Long)(implicit session: Session): Int = {
     seriesQuery
       .filter(_.id === seriesId)
-      .delete
-  }
-
-  def deleteFrameOfReference(frameOfReferenceId: Long)(implicit session: Session): Int = {
-    frameOfReferencesQuery
-      .filter(_.id === frameOfReferenceId)
-      .delete
-  }
-
-  def deleteEquipment(equipmentId: Long)(implicit session: Session): Int = {
-    equipmentsQuery
-      .filter(_.id === equipmentId)
       .delete
   }
 

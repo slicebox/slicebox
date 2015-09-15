@@ -164,7 +164,7 @@ class PropertiesDAO(val driver: JdbcProfile) {
 
     if (isWithAdvancedFiltering(sourceTypeIds, seriesTypeIds)) {
 
-      metaDataDao.checkOrderBy(orderBy, "Patients", "Studies", "Equipments", "FrameOfReferences", "Series")
+      metaDataDao.checkOrderBy(orderBy, "Patients", "Studies", "Series")
 
       implicit val getResult = metaDataDao.flatSeriesGetResult
 
@@ -220,8 +220,8 @@ class PropertiesDAO(val driver: JdbcProfile) {
 
   def isWithAdvancedFiltering(arrays: Array[_ <: Any]*) = arrays.exists(!_.isEmpty)
 
-  def patientsBasePart = s"""select distinct 
-      "Patients"."id","Patients"."PatientName","Patients"."PatientID","Patients"."PatientBirthDate","Patients"."PatientSex"
+  def patientsBasePart = s"""select distinct("Patients"."id"),
+       "Patients"."PatientName","Patients"."PatientID","Patients"."PatientBirthDate","Patients"."PatientSex"
        from "Series" 
        inner join "Patients" on "Studies"."patientId" = "Patients"."id"
        inner join "Studies" on "Series"."studyId" = "Studies"."id""""
@@ -257,8 +257,8 @@ class PropertiesDAO(val driver: JdbcProfile) {
 
       implicit val getResult = studiesGetResult
 
-      val basePart = s"""select distinct 
-        "Studies"."id","Studies"."patientId","Studies"."StudyInstanceUID","Studies"."StudyDescription","Studies"."StudyDate","Studies"."StudyID","Studies"."AccessionNumber","Studies"."PatientAge"
+      val basePart = s"""select distinct("Studies"."id"),
+        "Studies"."patientId","Studies"."StudyInstanceUID","Studies"."StudyDescription","Studies"."StudyDate","Studies"."StudyID","Studies"."AccessionNumber","Studies"."PatientAge"
         from "Series" 
         inner join "Studies" on "Series"."studyId" = "Studies"."id""""
 
@@ -282,7 +282,7 @@ class PropertiesDAO(val driver: JdbcProfile) {
   }
 
   def seriesGetResult = GetResult(r =>
-    Series(r.nextLong, r.nextLong, r.nextLong, r.nextLong, SeriesInstanceUID(r.nextString), SeriesDescription(r.nextString), SeriesDate(r.nextString), Modality(r.nextString), ProtocolName(r.nextString), BodyPartExamined(r.nextString)))
+    Series(r.nextLong, r.nextLong, SeriesInstanceUID(r.nextString), SeriesDescription(r.nextString), SeriesDate(r.nextString), Modality(r.nextString), ProtocolName(r.nextString), BodyPartExamined(r.nextString), Manufacturer(r.nextString), StationName(r.nextString), FrameOfReferenceUID(r.nextString)))
 
   def seriesForStudy(startIndex: Long, count: Long, studyId: Long, sourceTypeIds: Array[SourceTypeId], seriesTypeIds: Array[Long])(implicit session: Session): List[Series] = {
 
@@ -290,8 +290,8 @@ class PropertiesDAO(val driver: JdbcProfile) {
 
       implicit val getResult = seriesGetResult
 
-      val basePart = s"""select distinct 
-        "Series"."id", "Series"."studyId", "Series"."equipmentId", "Series"."frameOfReferenceId", "Series"."SeriesInstanceUID", "Series"."SeriesDescription", "Series"."SeriesDate", "Series"."Modality", "Series"."ProtocolName", "Series"."BodyPartExamined"
+      val basePart = s"""select distinct("Series"."id"),
+        "Series"."studyId","Series"."SeriesInstanceUID","Series"."SeriesDescription","Series"."SeriesDate","Series"."Modality","Series"."ProtocolName","Series"."BodyPartExamined","Series"."Manufacturer","Series"."StationName","Series"."FrameOfReferenceUID"
         from "Series""""
 
       val wherePart = s"""

@@ -109,11 +109,7 @@ trait JsonFormats extends DefaultJsonProtocol {
   implicit val manufacturerFormat = jsonFormat1(Manufacturer)
   implicit val stationNameFormat = jsonFormat1(StationName)
 
-  implicit val equipmentFormat = jsonFormat3(Equipment)
-
   implicit val frameOfReferenceUidFormat = jsonFormat1(FrameOfReferenceUID)
-
-  implicit val frameOfReferenceFormat = jsonFormat2(FrameOfReference)
 
   implicit val seriesInstanceUidFormat = jsonFormat1(SeriesInstanceUID)
   implicit val seriesDescriptionFormat = jsonFormat1(SeriesDescription)
@@ -125,8 +121,8 @@ trait JsonFormats extends DefaultJsonProtocol {
   implicit val sourceFormat = jsonFormat3(Source)
   implicit val sourceTypeIdFormat = jsonFormat2(SourceTypeId)
   
-  implicit val seriesFormat = jsonFormat10(Series)
-  implicit val flatSeriesFormat = jsonFormat6(FlatSeries)
+  implicit val seriesFormat = jsonFormat11(Series)
+  implicit val flatSeriesFormat = jsonFormat4(FlatSeries)
 
   implicit val sopInstanceUidFormat = jsonFormat1(SOPInstanceUID)
   implicit val imageTypeFormat = jsonFormat1(ImageType)

@@ -151,7 +151,7 @@ class PropertiesDAOTest extends FlatSpec with Matchers with BeforeAndAfterEach {
   
 
   def insertMetaDataAndProperties(implicit session: Session) = {
-    val (dbPatient1, (dbStudy1, dbStudy2), (dbSeries1, dbSeries2, dbSeries3, dbSeries4), (dbEquipment1, dbEquipment2, dbEquipment3), (dbFor1, dbFor2), (dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)) =
+    val (dbPatient1, (dbStudy1, dbStudy2), (dbSeries1, dbSeries2, dbSeries3, dbSeries4), (dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)) =
       insertMetaData(metaDataDao)
     insertProperties(seriesTypeDao, propertiesDao, dbSeries1, dbSeries2, dbSeries3, dbSeries4, dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)    
   }

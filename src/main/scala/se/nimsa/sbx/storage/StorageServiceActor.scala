@@ -326,16 +326,12 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
 
       val patient = datasetToPatient(dataset)
       val study = datasetToStudy(dataset)
-      val equipment = datasetToEquipment(dataset)
-      val frameOfReference = datasetToFrameOfReference(dataset)
       val series = datasetToSeries(dataset)
       val image = datasetToImage(dataset)
       val imageFile = ImageFile(-1, FileName(name), sourceTypeId)
 
       val dbPatientMaybe = dao.patientByNameAndID(patient)
       val dbStudyMaybe = dao.studyByUid(study)
-      val dbEquipmentMaybe = dao.equipmentByManufacturerAndStationName(equipment)
-      val dbFrameOfReferenceMaybe = dao.frameOfReferenceByUid(frameOfReference)
       val dbSeriesMaybe = dao.seriesByUid(series)
       val dbImageMaybe = dao.imageByUid(image)
       val dbImageFileMaybe = propertiesDao.imageFileByFileName(imageFile)
@@ -345,8 +341,6 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
       val hierarchyIsWellDefined = !(
         dbPatientMaybe.isEmpty && dbStudyMaybe.isDefined ||
         dbStudyMaybe.isEmpty && dbSeriesMaybe.isDefined ||
-        dbEquipmentMaybe.isEmpty && dbSeriesMaybe.isDefined ||
-        dbFrameOfReferenceMaybe.isEmpty && dbSeriesMaybe.isDefined ||
         dbSeriesSourceMaybe.isEmpty && dbSeriesMaybe.isDefined ||
         dbSeriesMaybe.isEmpty && dbImageMaybe.isDefined ||
         dbImageMaybe.isEmpty && dbImageFileMaybe.isDefined)
@@ -354,13 +348,8 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
       if (hierarchyIsWellDefined) {
 
         val dbPatient = dbPatientMaybe.getOrElse(dao.insert(patient))
-        val dbEquipment = dbEquipmentMaybe.getOrElse(dao.insert(equipment))
-        val dbFrameOfReference = dbFrameOfReferenceMaybe.getOrElse(dao.insert(frameOfReference))
         val dbStudy = dbStudyMaybe.getOrElse(dao.insert(study.copy(patientId = dbPatient.id)))
-        val dbSeries = dbSeriesMaybe.getOrElse(dao.insert(series.copy(
-          studyId = dbStudy.id,
-          equipmentId = dbEquipment.id,
-          frameOfReferenceId = dbFrameOfReference.id)))
+        val dbSeries = dbSeriesMaybe.getOrElse(dao.insert(series.copy(studyId = dbStudy.id)))
         val dbSeriesSource = dbSeriesSourceMaybe.getOrElse(propertiesDao.insertSeriesSource(seriesSource.copy(id = dbSeries.id)))
         val dbImage = dbImageMaybe.getOrElse(dao.insert(image.copy(seriesId = dbSeries.id)))
         dbImageFileMaybe.getOrElse(propertiesDao.insertImageFile(imageFile.copy(id = dbImage.id)))

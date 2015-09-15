@@ -335,8 +335,6 @@ object AnonymizationUtil {
     val patient = datasetToPatient(dataset)
     val study = datasetToStudy(dataset)
     val series = datasetToSeries(dataset)
-    val equipment = datasetToEquipment(dataset)
-    val frameOfReference = datasetToFrameOfReference(dataset)
     val anonPatient = datasetToPatient(anonDataset)
     val anonStudy = datasetToStudy(anonDataset)
     AnonymizationKey(-1, new Date().getTime,
