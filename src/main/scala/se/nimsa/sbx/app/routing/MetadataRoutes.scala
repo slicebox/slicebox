@@ -63,7 +63,7 @@ trait MetadataRoutes { this: RestApi =>
               'orderascending.as[Boolean] ? true,
               'filter.as[String].?,
               'sources.as[String].?,
-              'seriesTypes.as[String].?) { (startIndex, count, orderBy, orderAscending, filter, sourcesString, seriesTypesString) =>
+              'seriestypes.as[String].?) { (startIndex, count, orderBy, orderAscending, filter, sourcesString, seriesTypesString) =>
                 val sources = sourcesString.map(parseSourcesString(_)).getOrElse(Array.empty)
                 val seriesTypes = seriesTypesString.map(parseSeriesTypesString(_)).getOrElse(Array.empty)
                 onSuccess(storageService.ask(GetPatients(startIndex, count, orderBy, orderAscending, filter, sources, seriesTypes))) {
@@ -96,7 +96,7 @@ trait MetadataRoutes { this: RestApi =>
               'count.as[Long] ? 20,
               'patientid.as[Long],
               'sources.as[String].?,
-              'seriesTypes.as[String].?) { (startIndex, count, patientId, sourcesString, seriesTypesString) =>
+              'seriestypes.as[String].?) { (startIndex, count, patientId, sourcesString, seriesTypesString) =>
                 val sources = sourcesString.map(parseSourcesString(_)).getOrElse(Array.empty)
                 val seriesTypes = seriesTypesString.map(parseSeriesTypesString(_)).getOrElse(Array.empty)
                 onSuccess(storageService.ask(GetStudies(startIndex, count, patientId, sources, seriesTypes))) {
@@ -129,7 +129,7 @@ trait MetadataRoutes { this: RestApi =>
               'count.as[Long] ? 20,
               'studyid.as[Long],
               'sources.as[String].?,
-              'seriesTypes.as[String].?) { (startIndex, count, studyId, sourcesString, seriesTypesString) =>
+              'seriestypes.as[String].?) { (startIndex, count, studyId, sourcesString, seriesTypesString) =>
                 val sources = sourcesString.map(parseSourcesString(_)).getOrElse(Array.empty)
                 val seriesTypes = seriesTypesString.map(parseSeriesTypesString(_)).getOrElse(Array.empty)
                 onSuccess(storageService.ask(GetSeries(startIndex, count, studyId, sources, seriesTypes))) {
@@ -221,7 +221,7 @@ trait MetadataRoutes { this: RestApi =>
               'orderascending.as[Boolean] ? true,
               'filter.as[String].?,
               'sources.as[String].?,
-              'seriesTypes.as[String].?) { (startIndex, count, orderBy, orderAscending, filter, sourcesString, seriesTypesString) =>
+              'seriestypes.as[String].?) { (startIndex, count, orderBy, orderAscending, filter, sourcesString, seriesTypesString) =>
                 val sources = sourcesString.map(parseSourcesString(_)).getOrElse(Array.empty)
                 val seriesTypes = seriesTypesString.map(parseSeriesTypesString(_)).getOrElse(Array.empty)
                 onSuccess(storageService.ask(GetFlatSeries(startIndex, count, orderBy, orderAscending, filter, sources, seriesTypes))) {

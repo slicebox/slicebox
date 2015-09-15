@@ -160,10 +160,6 @@ class PropertiesDAO(val driver: JdbcProfile) {
 
   def seriesSources(implicit session: Session): List[SeriesSource] = seriesSourceQuery.list
 
-  val flatSeriesBasePart = metaDataDao.flatSeriesBasePart + """
-       left join "SeriesSeriesTypes" on "Series"."id" = "SeriesSeriesTypes"."seriesid"
-       left join "SeriesSources" on "Series"."id" = "SeriesSources"."id""""
-
   def flatSeries(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String], sourceTypeIds: Array[SourceTypeId], seriesTypeIds: Array[Long])(implicit session: Session): List[FlatSeries] = {
 
     if (isWithAdvancedFiltering(sourceTypeIds, seriesTypeIds)) {
@@ -173,7 +169,8 @@ class PropertiesDAO(val driver: JdbcProfile) {
       implicit val getResult = metaDataDao.flatSeriesGetResult
 
       val query =
-        flatSeriesBasePart +
+        metaDataDao.flatSeriesBasePart +
+          propertiesJoinPart(sourceTypeIds, seriesTypeIds) +
           " where" +
           metaDataDao.flatSeriesFilterPart(filter) +
           andPart(filter, sourceTypeIds) +
@@ -181,7 +178,6 @@ class PropertiesDAO(val driver: JdbcProfile) {
           andPart(filter, sourceTypeIds, seriesTypeIds) +
           seriesTypesPart(seriesTypeIds) +
           metaDataDao.orderByPart(orderBy, orderAscending) +
-          groupByPart(""""Series"."id"""") +
           metaDataDao.pagePart(startIndex, count)
 
       Q.queryNA(query).list
@@ -190,13 +186,11 @@ class PropertiesDAO(val driver: JdbcProfile) {
       metaDataDao.flatSeries(startIndex, count, orderBy, orderAscending, filter)
   }
 
-  def flatSeriesById(seriesId: Long)(implicit session: Session): Option[FlatSeries] = {
+  def propertiesJoinPart(sourceTypeIds: Array[SourceTypeId], seriesTypeIds: Array[Long]) =
+    singlePropertyJoinPart(sourceTypeIds, """ inner join "SeriesSources" on "Series"."id" = "SeriesSources"."id"""") +
+      singlePropertyJoinPart(seriesTypeIds, """ inner join "SeriesSeriesTypes" on "Series"."id" = "SeriesSeriesTypes"."seriesid"""")
 
-    implicit val getResult = metaDataDao.flatSeriesGetResult
-    val query = flatSeriesBasePart + s""" where "Series"."id" = $seriesId"""
-
-    Q.queryNA(query).list.headOption
-  }
+  def singlePropertyJoinPart(property: Array[_ <: Any], part: String) = if (property.isEmpty) "" else part
 
   def patients(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String], sourceTypeIds: Array[SourceTypeId], seriesTypeIds: Array[Long])(implicit session: Session): List[Patient] = {
 
@@ -208,6 +202,7 @@ class PropertiesDAO(val driver: JdbcProfile) {
 
       val query =
         patientsBasePart +
+          propertiesJoinPart(sourceTypeIds, seriesTypeIds) +
           " where" +
           metaDataDao.patientsFilterPart(filter) +
           andPart(filter, sourceTypeIds) +
@@ -215,7 +210,6 @@ class PropertiesDAO(val driver: JdbcProfile) {
           andPart(filter, sourceTypeIds, seriesTypeIds) +
           seriesTypesPart(seriesTypeIds) +
           metaDataDao.orderByPart(orderBy, orderAscending) +
-          groupByPart(""""Patients"."id"""") +
           metaDataDao.pagePart(startIndex, count)
 
       Q.queryNA(query).list
@@ -226,13 +220,11 @@ class PropertiesDAO(val driver: JdbcProfile) {
 
   def isWithAdvancedFiltering(arrays: Array[_ <: Any]*) = arrays.exists(!_.isEmpty)
 
-  def patientsBasePart = s"""select 
+  def patientsBasePart = s"""select distinct 
       "Patients"."id","Patients"."PatientName","Patients"."PatientID","Patients"."PatientBirthDate","Patients"."PatientSex"
        from "Series" 
        inner join "Patients" on "Studies"."patientId" = "Patients"."id"
-       inner join "Studies" on "Series"."studyId" = "Studies"."id" 
-       left join "SeriesSeriesTypes" on "Series"."id" = "SeriesSeriesTypes"."seriesid"
-       left join "SeriesSources" on "Series"."id" = "SeriesSources"."id""""
+       inner join "Studies" on "Series"."studyId" = "Studies"."id""""
 
   def andPart(target: Array[_ <: Any]) = if (!target.isEmpty) " and" else ""
 
@@ -240,17 +232,21 @@ class PropertiesDAO(val driver: JdbcProfile) {
 
   def andPart(option: Option[Any], array: Array[_ <: Any], target: Array[_ <: Any]) = if ((option.isDefined || !array.isEmpty) && !target.isEmpty) " and" else ""
 
-  def groupByPart(property: String) = s" group by $property"
-
   def sourcesPart(sourceTypeIds: Array[SourceTypeId]) =
-    " " + sourceTypeIds.map(sourceTypeId =>
-      s""""SeriesSources"."sourceType" = '${sourceTypeId.sourceType}' and "SeriesSources"."sourceId" = ${sourceTypeId.sourceId}""")
-      .mkString(" or ")
+    if (sourceTypeIds.isEmpty)
+      ""
+    else
+      " (" + sourceTypeIds.map(sourceTypeId =>
+        s""""SeriesSources"."sourceType" = '${sourceTypeId.sourceType}' and "SeriesSources"."sourceId" = ${sourceTypeId.sourceId}""")
+        .mkString(" or ") + ")"
 
   def seriesTypesPart(seriesTypeIds: Array[Long]) =
-    " " + seriesTypeIds.map(seriesTypeId =>
-      s""""SeriesSeriesTypes"."seriestypeid" = $seriesTypeId""")
-      .mkString(" or ")
+    if (seriesTypeIds.isEmpty)
+      ""
+    else
+      " (" + seriesTypeIds.map(seriesTypeId =>
+        s""""SeriesSeriesTypes"."seriestypeid" = $seriesTypeId""")
+        .mkString(" or ") + ")"
 
   def studiesGetResult = GetResult(r =>
     Study(r.nextLong, r.nextLong, StudyInstanceUID(r.nextString), StudyDescription(r.nextString), StudyDate(r.nextString), StudyID(r.nextString), AccessionNumber(r.nextString), PatientAge(r.nextString)))
@@ -261,21 +257,22 @@ class PropertiesDAO(val driver: JdbcProfile) {
 
       implicit val getResult = studiesGetResult
 
-      val basePart = s"""select 
+      val basePart = s"""select distinct 
         "Studies"."id","Studies"."patientId","Studies"."StudyInstanceUID","Studies"."StudyDescription","Studies"."StudyDate","Studies"."StudyID","Studies"."AccessionNumber","Studies"."PatientAge"
         from "Series" 
-        inner join "Studies" on "Series"."studyId" = "Studies"."id" 
-        left join "SeriesSeriesTypes" on "Series"."id" = "SeriesSeriesTypes"."seriesid"
-        left join "SeriesSources" on "Series"."id" = "SeriesSources"."id"
+        inner join "Studies" on "Series"."studyId" = "Studies"."id""""
+
+      val wherePart = s"""
         where
         "Studies"."patientId" = $patientId"""
 
       val query = basePart +
+        propertiesJoinPart(sourceTypeIds, seriesTypeIds) +
+        wherePart +
         andPart(sourceTypeIds) +
         sourcesPart(sourceTypeIds) +
         andPart(seriesTypeIds) +
         seriesTypesPart(seriesTypeIds) +
-        groupByPart(""""Studies"."id"""") +
         metaDataDao.pagePart(startIndex, count)
 
       Q.queryNA(query).list
@@ -293,20 +290,21 @@ class PropertiesDAO(val driver: JdbcProfile) {
 
       implicit val getResult = seriesGetResult
 
-      val basePart = s"""select 
+      val basePart = s"""select distinct 
         "Series"."id", "Series"."studyId", "Series"."equipmentId", "Series"."frameOfReferenceId", "Series"."SeriesInstanceUID", "Series"."SeriesDescription", "Series"."SeriesDate", "Series"."Modality", "Series"."ProtocolName", "Series"."BodyPartExamined"
-        from "Series" 
-        left join "SeriesSeriesTypes" on "Series"."id" = "SeriesSeriesTypes"."seriesid"
-        left join "SeriesSources" on "Series"."id" = "SeriesSources"."id"
+        from "Series""""
+
+      val wherePart = s"""
         where
         "Series"."studyId" = $studyId"""
 
       val query = basePart +
+        propertiesJoinPart(sourceTypeIds, seriesTypeIds) +
+        wherePart +
         andPart(sourceTypeIds) +
         sourcesPart(sourceTypeIds) +
         andPart(seriesTypeIds) +
         seriesTypesPart(seriesTypeIds) +
-        groupByPart(""""Series"."id"""") +
         metaDataDao.pagePart(startIndex, count)
 
       Q.queryNA(query).list

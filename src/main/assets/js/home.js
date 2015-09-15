@@ -463,7 +463,7 @@ angular.module('slicebox.home', ['ngRoute'])
 
     function updateSelectedSeriesSeriesTypes(series) {
         $scope.uiState.advancedFiltering.seriesTypesPromise.then(function(allSeriesTypesData) {
-            return $http.get('/api/metadata/' + series.id + '/seriestypes').success(function (seriesTypes) {
+            return $http.get('/api/metadata/series/' + series.id + '/seriestypes').success(function (seriesTypes) {
                 $scope.uiState.seriesDetails.selectedSeriesSeriesTypes = seriesTypes;
             });
         });
@@ -823,10 +823,10 @@ angular.module('slicebox.home', ['ngRoute'])
     $scope.loadSeriesTypes = function() {
         var loadSeriesTypesPromise = $http.get('/api/seriestypes');
 
-        $scope.advancedFiltering.seriesTypes = [];
+        $scope.seriesTypes = [];
 
         loadSeriesTypesPromise.success(function(seriesTypes) {
-            $scope.advancedFiltering.seriesTypes = seriesTypes;
+            $scope.seriesTypes = seriesTypes;
         });      
 
         return loadSeriesTypesPromise;
