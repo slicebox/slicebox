@@ -157,6 +157,9 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
           val seriesTypes = getSeriesTypesForSeries(seriesId)
           sender ! SeriesTypes(seriesTypes)
           
+        case GetSeriesTags =>
+          sender ! SeriesTags(getSeriesTags)
+          
         case GetSeriesTagsForSeries(seriesId) =>
           val seriesTags = getSeriesTagsForSeries(seriesId)
           sender ! SeriesTags(seriesTags)
@@ -315,6 +318,11 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
     }
 
   }
+
+  def getSeriesTags =
+    db.withSession { implicit session =>
+      propertiesDao.listSeriesTags
+    }
 
   def getSeriesTypesForSeries(seriesId: Long) =
     db.withSession { implicit session =>

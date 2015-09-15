@@ -35,6 +35,21 @@
 	                </md-card>
                 </div>
 
+            	<div layout="row">
+					<md-card flex>
+	                    <md-card-content>
+	                        <md-content>
+	                        	<h4 class="md-flex card-header">Series Tags</h4>
+	                            <md-content style="height: 120px;padding: 8px;">
+	                                <md-checkbox ng-repeat="seriesTag in uiState.seriesTags" ng-model="seriesTag.selected" aria-label="{{seriesTag.name}}">
+	                                    {{seriesTag.name}}
+	                                </md-checkbox>
+	                            </md-content>
+	                        </md-content>
+	                    </md-card-content>
+	                </md-card>
+                </div>
+
             </div>
 
     	</div>

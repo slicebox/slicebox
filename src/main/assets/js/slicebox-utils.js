@@ -2,7 +2,7 @@ angular.module('slicebox.utils', [])
 
 .factory('sbxMisc', function($q) {
     return {
-        urlWithAdvancedFiltering: function(baseUrl, sources, seriesTypes) {
+        urlWithAdvancedFiltering: function(baseUrl, sources, seriesTypes, seriesTags) {
             var url = baseUrl;
             if (sources && sources.length > 0) {
                 var sourcesPart = sources.map(function (source) { return source.sourceType + ':' + source.sourceId; }).join();
@@ -11,6 +11,10 @@ angular.module('slicebox.utils', [])
             if (seriesTypes && seriesTypes.length > 0) {
                 var seriesTypesPart = seriesTypes.map(function (seriesType) { return seriesType.id; }).join();
                 url = url + '&seriestypes=' + seriesTypesPart;
+            }
+            if (seriesTags && seriesTags.length > 0) {
+                var seriesTagsPart = seriesTags.map(function (seriesTag) { return seriesTag.id; }).join();
+                url = url + '&seriestags=' + seriesTagsPart;
             }
             return url;
         },
@@ -27,30 +31,30 @@ angular.module('slicebox.utils', [])
 
 .factory('sbxMetaData', function($http, sbxMisc) {
     return {
-        imagesForSeries: function(series, source) {
+        imagesForSeries: function(series, sources, seriesTypes) {
             var promises = series.map(function(singleSeries) {
-                return $http.get(sbxMisc.urlWithSourceQuery('/api/metadata/images?startindex=0&count=1000000&seriesid=' + singleSeries.id, source)).then(function (imagesData) {
+                return $http.get(sbxMisc.urlWithAdvancedFiltering('/api/metadata/images?startindex=0&count=1000000&seriesid=' + singleSeries.id, sources, seriesTypes)).then(function (imagesData) {
                     return imagesData.data;
                 });
             });
             return sbxMisc.flattenPromises(promises);
         },
 
-        imagesForStudies: function(studies, source) {
+        imagesForStudies: function(studies, sources, seriesTypes) {
             var self = this;
             var promises = studies.map(function(study) {
-                return $http.get(sbxMisc.urlWithSourceQuery('/api/metadata/series?startindex=0&count=1000000&studyid=' + study.id, source)).then(function (seriesData) {
-                    return self.imagesForSeries(seriesData.data, source);
+                return $http.get(sbxMisc.urlWithAdvancedFiltering('/api/metadata/series?startindex=0&count=1000000&studyid=' + study.id, sources, seriesTypes)).then(function (seriesData) {
+                    return self.imagesForSeries(seriesData.data, sources, seriesTypes);
                 });
             });
             return sbxMisc.flattenPromises(promises);
         },
 
-        imagesForPatients: function(patients, source) {
+        imagesForPatients: function(patients, sources, seriesTypes) {
             var self = this;
             var promises = patients.map(function(patient) {
-                return $http.get(sbxMisc.urlWithSourceQuery('/api/metadata/studies?startindex=0&count=1000000&patientid=' + patient.id, source)).then(function (studiesData) {
-                    return self.imagesForStudies(studiesData.data, source);
+                return $http.get(sbxMisc.urlWithAdvancedFiltering('/api/metadata/studies?startindex=0&count=1000000&patientid=' + patient.id, sources, seriesTypes)).then(function (studiesData) {
+                    return self.imagesForStudies(studiesData.data, sources, seriesTypes);
                 });
             });
             return sbxMisc.flattenPromises(promises);

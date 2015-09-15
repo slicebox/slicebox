@@ -252,7 +252,7 @@ class PropertiesDAO(val driver: JdbcProfile) {
     val dbSeriesTag = seriesTagForName(seriesTag.name).getOrElse(insertSeriesTag(seriesTag))
     val dbSeriesSeriesTag =
       seriesSeriesTagForSeriesTagIdAndSeriesId(dbSeriesTag.id, seriesId)
-        .getOrElse(insertSeriesSeriesTag(SeriesSeriesTag(seriesId, seriesTag.id)))
+        .getOrElse(insertSeriesSeriesTag(SeriesSeriesTag(seriesId, dbSeriesTag.id)))
     dbSeriesTag
   }
 
@@ -342,10 +342,6 @@ class PropertiesDAO(val driver: JdbcProfile) {
 
   def andPart(target: Array[_ <: Any]) = if (!target.isEmpty) " and" else ""
 
-  def andPart(array: Array[_ <: Any], target: Array[_ <: Any]) = if (!array.isEmpty && !target.isEmpty) " and" else ""
-
-  def andPart(array1: Array[_ <: Any], array2: Array[_ <: Any], target: Array[_ <: Any]) = if ((!array1.isEmpty || !array2.isEmpty) && !target.isEmpty) " and" else ""
-
   def andPart(option: Option[Any], target: Array[_ <: Any]) = if (option.isDefined && !target.isEmpty) " and" else ""
 
   def andPart(option: Option[Any], array: Array[_ <: Any], target: Array[_ <: Any]) = if ((option.isDefined || !array.isEmpty) && !target.isEmpty) " and" else ""
@@ -397,11 +393,10 @@ class PropertiesDAO(val driver: JdbcProfile) {
       val query = basePart +
         propertiesJoinPart(sourceTypeIds, seriesTypeIds, seriesTagIds) +
         wherePart +
-        andPart(sourceTypeIds) +
         sourcesPart(sourceTypeIds) +
-        andPart(sourceTypeIds, seriesTypeIds) +
+        andPart(seriesTypeIds) +
         seriesTypesPart(seriesTypeIds) +
-        andPart(sourceTypeIds, seriesTypeIds, seriesTagIds) +
+        andPart(seriesTagIds) +
         seriesTagsPart(seriesTagIds) +
         metaDataDao.pagePart(startIndex, count)
 
@@ -433,9 +428,9 @@ class PropertiesDAO(val driver: JdbcProfile) {
         wherePart +
         andPart(sourceTypeIds) +
         sourcesPart(sourceTypeIds) +
-        andPart(sourceTypeIds, seriesTypeIds) +
+        andPart(seriesTypeIds) +
         seriesTypesPart(seriesTypeIds) +
-        andPart(sourceTypeIds, seriesTypeIds, seriesTagIds) +
+        andPart(seriesTagIds) +
         seriesTagsPart(seriesTagIds) +
         metaDataDao.pagePart(startIndex, count)
 

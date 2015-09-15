@@ -54,6 +54,13 @@ trait MetadataRoutes { this: RestApi =>
             complete(_)
           }
         }
+      } ~ path("seriestags") {
+        get {
+          onSuccess(storageService.ask(GetSeriesTags)) {
+            case SeriesTags(seriesTags) =>
+              complete(seriesTags)
+          }
+        }
       } ~ pathPrefix("patients") {
         pathEndOrSingleSlash {
           get {

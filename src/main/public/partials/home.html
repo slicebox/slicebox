@@ -247,7 +247,10 @@
                 ng-switch-when="0"
                 class="tab-content">
 
-                <div ng-if="uiState.selectedSeries !== null">
+                <div ng-if="!uiState.selectedSeries">
+                    <p><em>No series selected</em></p>
+                </div>
+                <div ng-if="uiState.selectedSeries">
 
                     <md-button class="md-icon-button md-primary" ng-click="openImageSettingsModal()" aria-label="Display Settings">
                         <md-tooltip md-direction="right">Display Settings</md-tooltip>
@@ -275,45 +278,50 @@
                 ng-switch-when="1"
                 class="tab-content">
 
-                <md-card>
-                    <md-card-content>
-                        <md-content>
-                            <sbx-grid
-                                load-page="loadImageAttributes(0, 1000000000, orderByProperty, orderByDirection)"
-                                page-size="1000000000"
-                                sorting="true"
-                                object-actions="imageAttributesActions"
-                                callbacks="callbacks.imageAttributesTable"
-                                empty-message="No image atributes found">
+                <div ng-if="!uiState.selectedSeries">
+                    <p><em>No series selected</em></p>
+                </div>
+                <div ng-if="uiState.selectedSeries">
+                    <md-card>
+                        <md-card-content>
+                            <md-content>
+                                <sbx-grid
+                                    load-page="loadImageAttributes(0, 1000000000, orderByProperty, orderByDirection)"
+                                    page-size="1000000000"
+                                    sorting="true"
+                                    object-actions="imageAttributesActions"
+                                    callbacks="callbacks.imageAttributesTable"
+                                    empty-message="No image atributes found">
 
-                                <sbx-grid-column property="tag" title="Tag" filter="hexvalue: 8">
-                                </sbx-grid-column>
+                                    <sbx-grid-column property="tag" title="Tag" filter="hexvalue: 8">
+                                    </sbx-grid-column>
 
-                                <sbx-grid-column property="name" title="Name">
-                                </sbx-grid-column>
+                                    <sbx-grid-column property="name" title="Name">
+                                    </sbx-grid-column>
 
-                                <sbx-grid-column property="values" title="Value">
-                                    <sbx-grid-cell>
-                                        {{rowObject.values.join(",")}}
-                                    </sbx-grid-cell>
-                                </sbx-grid-column>
+                                    <sbx-grid-column property="values" title="Value">
+                                        <sbx-grid-cell>
+                                            {{rowObject.values.join(",")}}
+                                        </sbx-grid-cell>
+                                    </sbx-grid-column>
 
-                                <sbx-grid-column property="vr" title="VR">
-                                </sbx-grid-column>
+                                    <sbx-grid-column property="vr" title="VR">
+                                    </sbx-grid-column>
 
-                                <sbx-grid-column property="length" title="Length">
-                                </sbx-grid-column>
+                                    <sbx-grid-column property="length" title="Length">
+                                    </sbx-grid-column>
 
-                                <sbx-grid-column property="namePath" title="Path">
-                                    <sbx-grid-cell>
-                                        {{rowObject.namePath.join("/")}}
-                                    </sbx-grid-cell>
-                                </sbx-grid-column>
+                                    <sbx-grid-column property="namePath" title="Path">
+                                        <sbx-grid-cell>
+                                            {{rowObject.namePath.join("/")}}
+                                        </sbx-grid-cell>
+                                    </sbx-grid-column>
 
-                            </sbx-grid> 
-                        </md-content>
-                    </md-card-content>
-                </md-card>
+                                </sbx-grid> 
+                            </md-content>
+                        </md-card-content>
+                    </md-card>
+                </div>
             </div>
 
             <div role="tabpanel"
@@ -322,45 +330,76 @@
                 ng-switch-when="2"
                 class="tab-content">
 
-                <md-card>
-                    <md-card-content>
-                        <h4 class="md-flex card-header">Source</h4>
-                        <md-content>
-                            <p>{{uiState.seriesDetails.selectedSeriesSource}}</p>
-                        </md-content>
-                    </md-card-content>
-                </md-card>
-                <md-card>
-                    <md-card-content>
-                        <h4 class="md-flex card-header">Series Type(s)</h4>
-                        <md-content>
-                            <p ng-if="uiState.selectedSeries && uiState.seriesDetails.selectedSeriesSeriesTypes.length === 0"><i>There are no series types assigned to this series</i></p>
-                            <ul>
-                                <li ng-repeat="seriesType in uiState.seriesDetails.selectedSeriesSeriesTypes">{{seriesType.name}}</li>
-                            </ul>
-                        </md-content>
-                    </md-card-content>
-                </md-card>
-                <md-card>
-                    <md-card-content>
-                        <h4 class="md-flex card-header">Datasets</h4>
-                        <md-content>
-                            <sbx-grid
-                                load-page="loadSelectedSeriesDatasets()"
-                                page-size="1000000"
-                                sorting="false"
-                                callbacks="callbacks.datasetsTable"
-                                empty-message="No datasets found">
+                <div ng-if="!uiState.selectedSeries">
+                    <p><em>No series selected</em></p>
+                </div>
+                <div ng-if="uiState.selectedSeries">
+                    <md-card>
+                        <md-card-content>
+                            <h4 class="md-flex card-header">Source</h4>
+                            <md-content>
+                                <p>{{uiState.seriesDetails.selectedSeriesSource}}</p>
+                            </md-content>
+                        </md-card-content>
+                    </md-card>
+                    <md-card>
+                        <md-card-content>
+                            <h4 class="md-flex card-header">Series Types</h4>
+                            <md-content>
+                                <p ng-if="uiState.selectedSeries && uiState.seriesDetails.selectedSeriesSeriesTypes.length === 0"><i>There are no series types assigned to this series</i></p>
+                                <ul>
+                                    <li ng-repeat="seriesType in uiState.seriesDetails.selectedSeriesSeriesTypes">{{seriesType.name}}</li>
+                                </ul>
+                            </md-content>
+                        </md-card-content>
+                    </md-card>
+                    <md-card>
+                        <md-card-content>
+                            <h4 class="md-flex card-header">Series Tags</h4>
+                            <md-content>
+                                <md-chips 
+                                    ng-model="uiState.seriesDetails.selectedSeriesSeriesTags" 
+                                    md-autocomplete-snap 
+                                    md-require-match="false"
+                                    md-on-remove="seriesTagRemoved($chip)"
+                                    md-on-append="seriesTagAdded($chip)">
+                                    <md-autocomplete
+                                        md-search-text="uiState.seriesDetails.tags.searchText"
+                                        md-items="seriesTag in findSeriesTags(uiState.seriesDetails.tags.searchText)"
+                                        md-item-text="seriesTag.name"
+                                        md-min-length="1"
+                                        placeholder="+tag">
+                                        <span md-highlight-text="uiState.seriesDetails.tags.searchText">{{seriesTag.name}}</span>
+                                    </md-autocomplete>
+                                    <md-chip-template>
+                                        <span>{{$chip.name}} </span>
+                                    </md-chip-template>
+                                </md-chips>
+                                {{uiState.seriesDetails.selectedSeriesSeriesTags}}                            
+                            </md-content>
+                        </md-card-content>
+                    </md-card>
+                    <md-card>
+                        <md-card-content>
+                            <h4 class="md-flex card-header">Datasets</h4>
+                            <md-content>
+                                <sbx-grid
+                                    load-page="loadSelectedSeriesDatasets()"
+                                    page-size="1000000"
+                                    sorting="false"
+                                    callbacks="callbacks.datasetsTable"
+                                    empty-message="No datasets found">
 
-                                <sbx-grid-column property="url" title="URL">
-                                    <sbx-grid-cell>
-                                        <a ng-href="{{rowObject.url}}" target="_blank">{{rowObject.url}}</a>
-                                    </sbx-grid-cell>
-                                </sbx-grid-column>
-                            </sbx-grid>
-                        </md-content>
-                    </md-card-content>
-                </md-card>
+                                    <sbx-grid-column property="url" title="URL">
+                                        <sbx-grid-cell>
+                                            <a ng-href="{{rowObject.url}}" target="_blank">{{rowObject.url}}</a>
+                                        </sbx-grid-cell>
+                                    </sbx-grid-column>
+                                </sbx-grid>
+                            </md-content>
+                        </md-card-content>
+                    </md-card>
+                </div>
             </div>
         </ng-switch>
     </div>

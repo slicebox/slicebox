@@ -180,6 +180,8 @@ object StorageProtocol {
 
   case class GetSeriesTypesForSeries(seriesId: Long) extends PropertiesRequest
   
+  case object GetSeriesTags extends PropertiesRequest
+  
   case class GetSeriesTagsForSeries(seriesId: Long) extends PropertiesRequest
   
   
