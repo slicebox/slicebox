@@ -1,23 +1,22 @@
 <md-dialog aria-label="Add Dicom SCP" class="add-scpscu">
-    <md-content class="sticky-container">
+    <md-dialog-content>
         <md-subheader class="md-sticky-no-effect">Add Dicom SCP</md-subheader>
-        <div class="dialog-content">
-            <md-input-container>
-                <label>Name</label>
-                <input type="text" ng-model="name" required />
-            </md-input-container>
 
-            <md-input-container>
-                <label>AE-Title</label>
-                <input type="text" ng-model="aeTitle" required />
-            </md-input-container>
+        <md-input-container>
+            <label>Name</label>
+            <input type="text" ng-model="name" required />
+        </md-input-container>
 
-            <md-input-container>
-                <label>Port</label>
-                <input type="number" ng-model="port" required />
-            </md-input-container>            
-        </div>
-    </md-content>
+        <md-input-container>
+            <label>AE-Title</label>
+            <input type="text" ng-model="aeTitle" required />
+        </md-input-container>
+
+        <md-input-container>
+            <label>Port</label>
+            <input type="number" ng-model="port" required />
+        </md-input-container>            
+    </md-dialog-content>
 
     <div class="md-actions" layout="row">
         <span flex></span>

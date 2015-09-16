@@ -1,28 +1,27 @@
 <md-dialog aria-label="Add Dicom SCU" class="add-scpscu">
-    <md-content class="sticky-container">
+    <md-dialog-content>
         <md-subheader class="md-sticky-no-effect">Add Dicom SCU</md-subheader>
-        <div class="dialog-content">
-            <md-input-container>
-                <label>Name</label>
-                <input type="text" ng-model="name">
-            </md-input-container>
+        
+        <md-input-container>
+            <label>Name</label>
+            <input type="text" ng-model="name">
+        </md-input-container>
 
-            <md-input-container>
-                <label>AE-Title</label>
-                <input type="text" ng-model="aeTitle">
-            </md-input-container>
+        <md-input-container>
+            <label>AE-Title</label>
+            <input type="text" ng-model="aeTitle">
+        </md-input-container>
 
-            <md-input-container>
-                <label>Host</label>
-                <input type="text" ng-model="host">
-            </md-input-container>
+        <md-input-container>
+            <label>Host</label>
+            <input type="text" ng-model="host">
+        </md-input-container>
 
-            <md-input-container>
-                <label>Port</label>
-                <input type="number" ng-model="port">
-            </md-input-container>            
-        </div>
-    </md-content>
+        <md-input-container>
+            <label>Port</label>
+            <input type="number" ng-model="port">
+        </md-input-container>            
+    </md-dialog-content>
 
     <div class="md-actions" layout="row">
         <span flex></span>

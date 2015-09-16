@@ -364,18 +364,18 @@
                                     md-on-remove="seriesTagRemoved($chip)"
                                     md-on-append="seriesTagAdded($chip)">
                                     <md-autocomplete
-                                        md-search-text="uiState.seriesDetails.tags.searchText"
-                                        md-items="seriesTag in findSeriesTags(uiState.seriesDetails.tags.searchText)"
-                                        md-item-text="seriesTag.name"
+                                        md-search-text="uiState.seriesDetails.tagState.searchText"
+                                        md-items="item in findSeriesTags(uiState.seriesDetails.tagState.searchText)"
+                                        md-item-text="item.name"
                                         md-min-length="1"
+                                        md-no-cache
                                         placeholder="+tag">
-                                        <span md-highlight-text="uiState.seriesDetails.tags.searchText">{{seriesTag.name}}</span>
+                                        <span md-highlight-text="uiState.seriesDetails.tagState.searchText">{{item.name}}</span>
                                     </md-autocomplete>
                                     <md-chip-template>
                                         <span>{{$chip.name}} </span>
                                     </md-chip-template>
                                 </md-chips>
-                                {{uiState.seriesDetails.selectedSeriesSeriesTags}}                            
                             </md-content>
                         </md-card-content>
                     </md-card>

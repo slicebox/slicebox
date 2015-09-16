@@ -96,7 +96,6 @@ angular.module('slicebox.home', ['ngRoute'])
     $scope.uiState.selectedStudy = null;
     $scope.uiState.selectedSeries = null;
     $scope.uiState.loadPngImagesInProgress = false;
-    $scope.uiState.seriesTags = [];
     $scope.uiState.seriesDetails = {
         leftColumnSelectedTabIndex: 0,
         rightColumnSelectedTabIndex: 0,
@@ -109,13 +108,17 @@ angular.module('slicebox.home', ['ngRoute'])
         isWindowManual: false,
         windowMin: 0,
         windowMax: 100,
-        tags: {}
+        tagState: {
+            searchText: ""
+        }
     };
     $scope.uiState.advancedFiltering = {
-        sourcesPromise: null,
-        seriesTypesPromise: null,
+        sourcesPromise: $q.when([]),
+        seriesTypesPromise: $q.when([]),
+        seriesTagsPromise: $q.when([]),
         selectedSources: [],
-        selectedSeriesTypes: []
+        selectedSeriesTypes: [],
+        selectedSeriesTags: []
     };
 
     $scope.uiState.advancedFiltering.sourcesPromise = $http.get('/api/metadata/sources').then(function(sourcesData) {
@@ -132,33 +135,43 @@ angular.module('slicebox.home', ['ngRoute'])
         }); 
     });
     
-    updateSeriesTags();
+    updateSeriesTagsPromise();
 
     // Scope functions
 
     $scope.findSeriesTags = function(searchText) {
         var lcSearchText = angular.lowercase(searchText);
         var selectedTagNames = $scope.uiState.seriesDetails.selectedSeriesSeriesTags.map(function (seriesTag) { return seriesTag.name; });
-        return searchText ? $scope.uiState.seriesTags.filter(function (seriesTag) {
-            var lcName = angular.lowercase(seriesTag.name);
-            return lcName.indexOf(lcSearchText) === 0;
-        }).filter(function (seriesTag) {
-            return selectedTagNames.indexOf(seriesTag.name) < 0;
+        return searchText ? $scope.uiState.advancedFiltering.seriesTagsPromise.then(function (seriesTags) { 
+            return seriesTags.filter(function (seriesTag) {
+                var lcName = angular.lowercase(seriesTag.name);
+                return lcName.indexOf(lcSearchText) === 0;
+            }).filter(function (seriesTag) {
+                return selectedTagNames.indexOf(seriesTag.name) < 0;
+            });
         }) : [];
     };
 
     $scope.seriesTagAdded = function(tag) {
         var theTag = tag.name ? tag : { id: -1, name: tag };
         $http.post('/api/metadata/series/' + $scope.uiState.selectedSeries.id + '/seriestags', theTag).success(function (addedTag) {
-            // TODO replace tag in selectedTags
-            updateSeriesTags();
+            // copy database id to selected tag
+            $scope.uiState.seriesDetails.selectedSeriesSeriesTags.forEach(function (selectedTag) {
+                if (selectedTag.name === addedTag.name) {
+                    selectedTag.id = addedTag.id;
+                }
+            });
+            if ($scope.uiState.selectedSeries) {
+                updateSelectedSeriesSeriesTags($scope.uiState.selectedSeries);
+            }
+            updateSeriesTagsPromise();
         });
         return theTag;
     };
 
     $scope.seriesTagRemoved = function(tag) {
-        return $http.delete('/api/metadata/series/' + $scope.uiState.selectedSeries.id + '/seriestags/' + tag.id).success(function () {
-            return updateSeriesTags();
+        $http.delete('/api/metadata/series/' + $scope.uiState.selectedSeries.id + '/seriestags/' + tag.id).success(function () {
+            updateSeriesTagsPromise();
         });
     };
 
@@ -294,6 +307,7 @@ angular.module('slicebox.home', ['ngRoute'])
             $scope.uiState.seriesDetails.selectedSeriesSeriesTypes = [];
             $scope.uiState.seriesDetails.selectedSeriesSeriesTags = [];
             $scope.uiState.seriesDetails.pngImageUrls = [];
+            $scope.uiState.seriesDetails.tagState.searchText = "";
 
             if ($scope.callbacks.imageAttributesTable) { 
                 $scope.callbacks.imageAttributesTable.reset(); 
@@ -387,7 +401,7 @@ angular.module('slicebox.home', ['ngRoute'])
             locals: {
                 sources: $scope.uiState.advancedFiltering.sourcesPromise,
                 seriesTypes: $scope.uiState.advancedFiltering.seriesTypesPromise,
-                seriesTags: createSeriesTagsPromise()
+                seriesTags: $scope.uiState.advancedFiltering.seriesTagsPromise
             },
             scope: $scope.$new()
         });
@@ -488,19 +502,21 @@ angular.module('slicebox.home', ['ngRoute'])
 
     // Private functions
 
-    function createSeriesTagsPromise() {
-        return $http.get('/api/metadata/seriestags').then(function (seriesTagsData) {        
-            return seriesTagsData.data.map(function (seriesTag) {
-                seriesTag.selected = false;
-                return seriesTag;
-            }); 
-        });
-    }
-
-    function updateSeriesTags() {
-        return createSeriesTagsPromise().then(function (seriesTags) {
-            // TODO copy selected field
-            $scope.uiState.seriesTags = seriesTags;            
+    function updateSeriesTagsPromise() {
+        $scope.uiState.advancedFiltering.seriesTagsPromise = $scope.uiState.advancedFiltering.seriesTagsPromise.then(function (oldTags) {
+            return $http.get('/api/metadata/seriestags').then(function (newTagsData) {        
+                var newTags = newTagsData.data;
+                // copy selected attribute from existing tags
+                newTags.forEach(function (newTag) {
+                    newTag.selected = false;
+                    oldTags.forEach(function (oldTag) {
+                        if (newTag.name === oldTag.name) {
+                            newTag.selected = oldTag.selected;
+                        }
+                    });
+                }); 
+                return newTags;
+            });
         });
     }
 

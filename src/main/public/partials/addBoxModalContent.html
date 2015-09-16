@@ -1,69 +1,68 @@
 <md-dialog aria-label="Add Box" flex="60">
-  	<md-content class="sticky-container">
+	<md-dialog-content>
     	<md-subheader class="md-sticky-no-effect">Add Box</md-subheader>
-    	<div class="dialog-content add-box">
-    		<md-card ng-if="uiState.errorMessage">
-				<md-toolbar class="md-warn" layout="row" layout-align="start center">
-					<div layout-padding layout-fill>
-						{{uiState.errorMessage}}
-					</div>
-				</md-toolbar>
-			</md-card>
 
-			<md-radio-group ng-model="uiState.addChoice" ng-change="radioButtonChanged()">
-				<md-radio-button value="generateURL">This is a publicly accessible server and I would like to create a new Slicebox URL to send to a collaborator.</md-radio-button>
-				<md-radio-button value="connect">I have received a Slicebox URL from a collaborator and would like to connect.</md-radio-button>
-			</md-radio-group>
-
-			<form name="addBoxForm" layout="column" novalidate>
-				<md-input-container md-is-error="addBoxForm.remoteBoxName.$error.required && addBoxForm.$submitted">
-					<label>Remote Slicebox name</label>
-                    <input type="text"
-						ng-model="uiState.remoteBoxName"
-						ng-disabled="uiState.addInProgress"
-						name="remoteBoxName"
-						required></input>
-
-                    <div ng-messages="addBoxForm.remoteBoxName.$error"
-                        ng-show="addBoxForm.remoteBoxName.$error.required && addBoxForm.$submitted">
-
-                        <div ng-message="required">This is required!</div>
-                    </div>
-                </md-input-container>
-
-                <md-input-container
-                	ng-if="uiState.addChoice == 'connect'"
-                	md-is-error="addBoxForm.connectionURL.$error.required && addBoxForm.$submitted">
-					
-					<label>Connection URL</label>
-                    <input type="text"
-						ng-model="uiState.connectionURL"
-						ng-disabled="uiState.addInProgress"
-						name="connectionURL"
-						required></input>
-
-                    <div ng-messages="addBoxForm.connectionURL.$error"
-                        ng-show="addBoxForm.connectionURL.$error.required && addBoxForm.$submitted">
-
-                        <div ng-message="required">This is required!</div>
-                    </div>
-                </md-input-container>
-
-				<div ng-if="uiState.addChoice == 'connect'">
-					<sbx-button button-class="md-raised md-primary"
-						button-type="submit"
-						button-title="Connect"
-						action="connectButtonClicked()"></sbx-button>
+		<md-card ng-if="uiState.errorMessage">
+			<md-toolbar class="md-warn" layout="row" layout-align="start center">
+				<div layout-padding layout-fill>
+					{{uiState.errorMessage}}
 				</div>
-				<div ng-if="uiState.addChoice == 'generateURL'">
-					<sbx-button button-class="md-raised md-primary"
-						button-type="submit"
-						button-title="Generate Connection URL"
-						action="generateURLButtonClicked()"></sbx-button>
-				</div>
-			</form>
-    	</div>
-    </md-content>
+			</md-toolbar>
+		</md-card>
+
+		<md-radio-group ng-model="uiState.addChoice" ng-change="radioButtonChanged()">
+			<md-radio-button value="generateURL">This is a publicly accessible server and I would like to create a new Slicebox URL to send to a collaborator.</md-radio-button>
+			<md-radio-button value="connect">I have received a Slicebox URL from a collaborator and would like to connect.</md-radio-button>
+		</md-radio-group>
+
+		<form name="addBoxForm" layout="column" novalidate>
+			<md-input-container md-is-error="addBoxForm.remoteBoxName.$error.required && addBoxForm.$submitted">
+				<label>Remote Slicebox name</label>
+                <input type="text"
+					ng-model="uiState.remoteBoxName"
+					ng-disabled="uiState.addInProgress"
+					name="remoteBoxName"
+					required></input>
+
+                <div ng-messages="addBoxForm.remoteBoxName.$error"
+                    ng-show="addBoxForm.remoteBoxName.$error.required && addBoxForm.$submitted">
+
+                    <div ng-message="required">This is required!</div>
+                </div>
+            </md-input-container>
+
+            <md-input-container
+            	ng-if="uiState.addChoice == 'connect'"
+            	md-is-error="addBoxForm.connectionURL.$error.required && addBoxForm.$submitted">
+				
+				<label>Connection URL</label>
+                <input type="text"
+					ng-model="uiState.connectionURL"
+					ng-disabled="uiState.addInProgress"
+					name="connectionURL"
+					required></input>
+
+                <div ng-messages="addBoxForm.connectionURL.$error"
+                    ng-show="addBoxForm.connectionURL.$error.required && addBoxForm.$submitted">
+
+                    <div ng-message="required">This is required!</div>
+                </div>
+            </md-input-container>
+
+			<div ng-if="uiState.addChoice == 'connect'">
+				<sbx-button button-class="md-raised md-primary"
+					button-type="submit"
+					button-title="Connect"
+					action="connectButtonClicked()"></sbx-button>
+			</div>
+			<div ng-if="uiState.addChoice == 'generateURL'">
+				<sbx-button button-class="md-raised md-primary"
+					button-type="submit"
+					button-title="Generate Connection URL"
+					action="generateURLButtonClicked()"></sbx-button>
+			</div>
+		</form>
+    </md-dialog-content>
 
     <div class="md-actions" layout="row">
     	<span flex></span>

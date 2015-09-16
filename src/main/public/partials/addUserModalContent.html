@@ -2,33 +2,34 @@
 
     <form name="userForm">
 
-        <md-content class="sticky-container">
+        <md-dialog-content>
             <md-subheader class="md-sticky-no-effect">Add User</md-subheader>
-            <div class="dialog-content">
-                <md-input-container>
-                    <label>User Name</label>
-                    <input name="userName" ng-model="userName" type="text" id="userName" required />
-                </md-input-container>
 
-                <md-input-container>
-                    <label>Password</label>
-                    <input name="password" ng-model="password" type="text" id="password" required />
-                </md-input-container>
+            <md-input-container>
+                <label>User Name</label>
+                <input name="userName" ng-model="userName" type="text" id="userName" required />
+            </md-input-container>
 
-                <md-input-container>
-                    <md-select name="role" placeholder="Role" ng-model="role">
-                        <md-option value="USER">User</md-option>
-                        <md-option value="ADMINISTRATOR">Administrator</md-option>
-                    </md-select>
-                </md-input-container>            
-            </div>
-        </md-content>
+            <md-input-container>
+                <label>Password</label>
+                <input name="password" ng-model="password" type="text" id="password" required />
+            </md-input-container>
+
+            <md-input-container>
+                <md-select name="role" placeholder="Role" ng-model="role">
+                    <md-option value="USER">User</md-option>
+                    <md-option value="ADMINISTRATOR">Administrator</md-option>
+                </md-select>
+            </md-input-container>            
+
+        </md-dialog-content>
 
         <div class="md-actions" layout="row">
             <span flex></span>
             <md-button ng-click="cancelButtonClicked()">Cancel</md-button>
             <md-button type="submit" class="md-primary" ng-click="addButtonClicked()" ng-disabled="userForm.$invalid">Add</md-button>
         </div>
-
+        
     </form>
+
 </md-dialog>

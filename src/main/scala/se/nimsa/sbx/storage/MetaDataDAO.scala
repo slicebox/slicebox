@@ -343,7 +343,7 @@ class MetaDataDAO(val driver: JdbcProfile) {
 
   def images(implicit session: Session): List[Image] = imagesQuery.list
 
-  val flatSeriesBasePart = """select "Series"."id", 
+  val flatSeriesBasePart = """select distinct("Series"."id"), 
       "Patients"."id","Patients"."PatientName","Patients"."PatientID","Patients"."PatientBirthDate","Patients"."PatientSex", 
       "Studies"."id","Studies"."patientId","Studies"."StudyInstanceUID","Studies"."StudyDescription","Studies"."StudyDate","Studies"."StudyID","Studies"."AccessionNumber","Studies"."PatientAge",
       "Series"."id","Series"."studyId","Series"."SeriesInstanceUID","Series"."SeriesDescription","Series"."SeriesDate","Series"."Modality","Series"."ProtocolName","Series"."BodyPartExamined","Series"."Manufacturer","Series"."StationName","Series"."FrameOfReferenceUID"

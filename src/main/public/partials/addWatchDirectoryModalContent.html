@@ -2,26 +2,27 @@
 
     <form name="watchdirectoryForm">
 
-        <md-content class="sticky-container">
+        <md-dialog-content>
             <md-subheader class="md-sticky-no-effect">Add Watch Directory</md-subheader>
-            <div class="dialog-content">
-                <md-input-container>
-                    <label>Name</label>
-                    <input type="text" ng-model="name" required />
-                </md-input-container>
 
-                <md-input-container>
-                    <label>Directory path</label>
-                    <input type="text" ng-model="path" required />
-                </md-input-container>
-            </div>
-        </md-content>
+            <md-input-container>
+                <label>Name</label>
+                <input type="text" ng-model="name" required />
+            </md-input-container>
+
+            <md-input-container>
+                <label>Directory path</label>
+                <input type="text" ng-model="path" required />
+            </md-input-container>
+
+        </md-dialog-content>
 
         <div class="md-actions" layout="row">
             <span flex></span>
             <md-button ng-click="cancelButtonClicked()">Cancel</md-button>
             <md-button type="submit" class="md-primary" ng-click="addButtonClicked()" ng-disabled="userForm.$invalid">Add</md-button>
         </div>
-
+        
     </form>
+
 </md-dialog>

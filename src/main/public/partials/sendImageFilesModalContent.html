@@ -1,19 +1,18 @@
 <md-dialog aria-label="{{title}}" flex="40">
-    <md-content class="sticky-container">
+    <md-dialog-content>
         <md-subheader class="md-sticky-no-effect">{{title}}</md-subheader>
-        <div class="dialog-content">
 
-            <sbx-grid
-                load-page="loadReceivers(startIndex, count, orderByProperty, orderByDirection)"
-                page-size="100000"
-                object-selected="receiverSelected(object)"
-                empty-message="No receivers found">
+        <sbx-grid
+            load-page="loadReceivers(startIndex, count, orderByProperty, orderByDirection)"
+            page-size="100000"
+            object-selected="receiverSelected(object)"
+            empty-message="No receivers found">
 
-                <sbx-grid-column property="name" title="Name">
-                </sbx-grid-column>
-            </sbx-grid>
-        </div>
-    </md-content>
+            <sbx-grid-column property="name" title="Name">
+            </sbx-grid-column>
+        </sbx-grid>
+
+    </md-dialog-content>
 
     <div class="md-actions" layout="row">
         <span flex></span>
