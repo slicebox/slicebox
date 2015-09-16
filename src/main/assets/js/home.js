@@ -658,6 +658,11 @@ angular.module('slicebox.home', ['ngRoute'])
     } 
 
     function confirmAnonymizeSeries(series) {
+        // check if flat series
+        series = series.map(function(s) {
+            return s.series ? s.series : s;
+        });
+
         openConfirmActionModal('Anonymize', 'Force anonymization of ' + series.length + ' series? Patient information will be lost.', 'Ok', function() {
             var imageIdToPatientPromise = createImageIdToPatientPromiseForSeries(series);
 
