@@ -393,6 +393,7 @@ class PropertiesDAO(val driver: JdbcProfile) {
       val query = basePart +
         propertiesJoinPart(sourceTypeIds, seriesTypeIds, seriesTagIds) +
         wherePart +
+        andPart(sourceTypeIds) +
         sourcesPart(sourceTypeIds) +
         andPart(seriesTypeIds) +
         seriesTypesPart(seriesTypeIds) +
