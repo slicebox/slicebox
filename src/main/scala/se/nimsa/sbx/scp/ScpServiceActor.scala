@@ -59,6 +59,15 @@ class ScpServiceActor(dbProps: DbProps) extends Actor with ExceptionCatching {
                 sender ! scpData
 
               case None =>
+                
+                val trimmedAeTitle = scp.aeTitle.trim
+                
+                if (trimmedAeTitle.isEmpty)
+                  throw new IllegalArgumentException("Ae title must not be empty")
+                
+                if (trimmedAeTitle.length > 16)
+                  throw new IllegalArgumentException("Ae title must not exceed 16 characters, excluding leading and trailing epaces.")
+                
                 if (scp.port < 0 || scp.port > 65535)
                   throw new IllegalArgumentException("Port must be a value between 0 and 65535")
 

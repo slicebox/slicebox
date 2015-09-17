@@ -21,6 +21,8 @@ import spray.http.StatusCodes._
 import se.nimsa.sbx.app.RestApi
 import se.nimsa.sbx.app.UserProtocol.UserRole
 import spray.routing.ExceptionHandler
+import se.nimsa.sbx.lang.NotFoundException
+import se.nimsa.sbx.lang.BadGatewayException
 
 trait SliceboxRoutes extends DirectoryRoutes
   with ScpRoutes
@@ -39,6 +41,10 @@ trait SliceboxRoutes extends DirectoryRoutes
     ExceptionHandler {
       case e: IllegalArgumentException =>
         complete((BadRequest, e.getMessage()))
+      case e: NotFoundException =>
+        complete((NotFound, e.getMessage()))
+      case e: BadGatewayException =>
+        complete((BadGateway, e.getMessage()))
     }
 
   def sliceboxRoutes: Route =

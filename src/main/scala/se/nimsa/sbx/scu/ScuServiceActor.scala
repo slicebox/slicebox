@@ -30,6 +30,10 @@ import se.nimsa.sbx.storage.PropertiesDAO
 import se.nimsa.sbx.util.ExceptionCatching
 import se.nimsa.sbx.log.SbxLog
 import ScuProtocol._
+import java.net.UnknownHostException
+import java.net.ConnectException
+import se.nimsa.sbx.lang.NotFoundException
+import se.nimsa.sbx.lang.BadGatewayException
 
 class ScuServiceActor(dbProps: DbProps, storage: Path) extends Actor with ExceptionCatching {
   val log = Logging(context.system, this)
@@ -41,8 +45,8 @@ class ScuServiceActor(dbProps: DbProps, storage: Path) extends Actor with Except
   import context.system
   implicit val ec = context.dispatcher
 
-  log.info("SCU service started")    
-  
+  log.info("SCU service started")
+
   def receive = LoggingReceive {
 
     case msg: ScuRequest =>
@@ -58,7 +62,15 @@ class ScuServiceActor(dbProps: DbProps, storage: Path) extends Actor with Except
                 sender ! scuData
 
               case None =>
-                
+
+                val trimmedAeTitle = scu.aeTitle.trim
+
+                if (trimmedAeTitle.isEmpty)
+                  throw new IllegalArgumentException("Ae title must not be empty")
+
+                if (trimmedAeTitle.length > 16)
+                  throw new IllegalArgumentException("Ae title must not exceed 16 characters, excluding leading and trailing epaces.")
+
                 if (scu.port < 0 || scu.port > 65535)
                   throw new IllegalArgumentException("Port must be a value between 0 and 65535")
 
@@ -82,12 +94,22 @@ class ScuServiceActor(dbProps: DbProps, storage: Path) extends Actor with Except
           case SendSeriesToScp(seriesId, scuId) =>
             scuForId(scuId).map(scu => {
               val imageFiles = imageFilesForSeries(seriesId)
+              if (imageFiles.isEmpty)
+                throw new NotFoundException(s"No images found for series is $seriesId")
               SbxLog.info("SCU", s"Sending ${imageFiles.length} images using SCU ${scu.name}")
               Future {
                 Scu.sendFiles(scu, imageFiles.map(imageFile => storage.resolve(imageFile.fileName.value)))
-              }.map(r => ImagesSentToScp(scuId, imageFiles.map(_.id))).pipeTo(sender)
-            }).orElse(throw new IllegalArgumentException(s"SCU with id $scuId not found"))
-            // TODO handle errors when sending (do not return 500)
+              }
+                .map(r => ImagesSentToScp(scuId, imageFiles.map(_.id)))
+                .recover {
+                  case e: UnknownHostException =>
+                    throw new BadGatewayException(s"Unable to reach host ${scu.name}@${scu.host}:${scu.port}")
+                  case e: ConnectException =>
+                    throw new BadGatewayException(s"Connection refused on host ${scu.name}@${scu.host}:${scu.port}")
+                }
+                .pipeTo(sender)
+            }).orElse(throw new NotFoundException(s"SCU with id $scuId not found"))
+          // TODO handle errors when sending (do not return 500)
         }
       }
 
