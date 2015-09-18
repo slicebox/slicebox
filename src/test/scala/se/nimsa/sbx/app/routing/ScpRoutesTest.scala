@@ -6,10 +6,14 @@ import org.scalatest.Matchers
 import se.nimsa.sbx.scp.ScpProtocol._
 import spray.httpx.SprayJsonSupport._
 import spray.http.StatusCodes._
+import se.nimsa.sbx.scp.ScpDAO
+import scala.slick.driver.H2Driver
 
 class ScpRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
   def dbUrl() = "jdbc:h2:mem:scproutestest;DB_CLOSE_DELAY=-1"
+  
+  val scpDao = new ScpDAO(H2Driver)
   
   "SCP routes" should "return a success message when asked to start a new SCP" in {
     PostAsAdmin("/api/scps", ScpData(-1, "TestName", "TestAeTitle", 13579)) ~> routes ~> check {
@@ -26,7 +30,10 @@ class ScpRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }    
   }
   it should "be possible to remove the SCP again" in {
-    DeleteAsAdmin("/api/scps/1") ~> routes ~> check {
+    val scp = db.withSession { implicit session =>
+      scpDao.allScpDatas.head
+    }
+    DeleteAsAdmin(s"/api/scps/${scp.id}") ~> routes ~> check {
       status should be(NoContent)
     }
   }
