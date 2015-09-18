@@ -47,8 +47,12 @@ class ScpRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   }
 
   it should "return 201 Created when adding an SCP with an AE title over 16 characters long but less than 17 characters after trimming" in {
-    PostAsAdmin("/api/scps", ScpData(-1, "SomeOtherTestName", " ABCDEFGHIJKLMNOP ", 12323)) ~> routes ~> check {
+    val scp = PostAsAdmin("/api/scps", ScpData(-1, "SomeOtherTestName", " ABCDEFGHIJKLMNOP ", 12324)) ~> routes ~> check {
       status should be (Created)
+      responseAs[ScpData]
+    }
+    DeleteAsAdmin(s"/api/scps/${scp.id}") ~> routes ~> check {
+      status should be(NoContent)
     }
   }
   
