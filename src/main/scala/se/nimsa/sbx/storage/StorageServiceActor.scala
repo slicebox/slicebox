@@ -132,7 +132,7 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
                     null
                 }
               }
-            dao.deleteFully(image)
+            propertiesDao.deleteFully(image)
           }
           sender ! ImageDeleted(imageId)
         }

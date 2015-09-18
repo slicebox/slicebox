@@ -199,7 +199,7 @@ angular.module('slicebox.home', ['ngRoute'])
                 loadPatientsUrl = loadPatientsUrl + '&filter=' + encodeURIComponent(filter);
             }
 
-            loadPatientsUrl = sbxMisc.urlWithAdvancedFiltering(loadPatientsUrl, $scope.uiState.advancedFiltering.selectedSources, $scope.uiState.advancedFiltering.selectedSeriesTypes, $scope.uiState.advancedFiltering.selectedSeriesTags);
+            loadPatientsUrl = urlWithAdvancedFiltering(loadPatientsUrl);
 
             var loadPatientsPromise = $http.get(loadPatientsUrl);
 
@@ -229,7 +229,7 @@ angular.module('slicebox.home', ['ngRoute'])
         } else {
             var loadStudiesUrl = '/api/metadata/studies?startindex=' + startIndex + '&count=' + count + '&patientid=' + $scope.uiState.selectedPatient.id;
 
-            loadStudiesUrl = sbxMisc.urlWithAdvancedFiltering(loadStudiesUrl, $scope.uiState.advancedFiltering.selectedSources, $scope.uiState.advancedFiltering.selectedSeriesTypes, $scope.uiState.advancedFiltering.selectedSeriesTags);
+            loadStudiesUrl = urlWithAdvancedFiltering(loadStudiesUrl);
 
             var loadStudiesPromise = $http.get(loadStudiesUrl);
 
@@ -260,7 +260,7 @@ angular.module('slicebox.home', ['ngRoute'])
 
         var loadSeriesUrl = '/api/metadata/series?startindex=' + startIndex + '&count=' + count + '&studyid=' + $scope.uiState.selectedStudy.id;
 
-        loadSeriesUrl = sbxMisc.urlWithAdvancedFiltering(loadSeriesUrl, $scope.uiState.advancedFiltering.selectedSources, $scope.uiState.advancedFiltering.selectedSeriesTypes, $scope.uiState.advancedFiltering.selectedSeriesTags);
+        loadSeriesUrl = urlWithAdvancedFiltering(loadSeriesUrl);
 
         var loadSeriesPromise = $http.get(loadSeriesUrl);
 
@@ -288,7 +288,7 @@ angular.module('slicebox.home', ['ngRoute'])
             loadFlatSeriesUrl = loadFlatSeriesUrl + '&filter=' + encodeURIComponent(filter);
         }
 
-        loadFlatSeriesUrl = sbxMisc.urlWithAdvancedFiltering(loadFlatSeriesUrl, $scope.uiState.advancedFiltering.selectedSources, $scope.uiState.advancedFiltering.selectedSeriesTypes, $scope.uiState.advancedFiltering.selectedSeriesTags);
+        loadFlatSeriesUrl = urlWithAdvancedFiltering(loadFlatSeriesUrl);
 
         var loadFlatSeriesPromise = $http.get(loadFlatSeriesUrl);
 
@@ -502,6 +502,38 @@ angular.module('slicebox.home', ['ngRoute'])
 
     // Private functions
 
+    function urlWithAdvancedFiltering(url) {
+        return sbxMisc.urlWithAdvancedFiltering(
+            url, 
+            $scope.uiState.advancedFiltering.selectedSources, 
+            $scope.uiState.advancedFiltering.selectedSeriesTypes, 
+            $scope.uiState.advancedFiltering.selectedSeriesTags);        
+    }
+
+    function imagesForPatients(patients) {
+        return sbxMetaData.imagesForPatients(
+            patients,
+            $scope.uiState.advancedFiltering.selectedSources, 
+            $scope.uiState.advancedFiltering.selectedSeriesTypes, 
+            $scope.uiState.advancedFiltering.selectedSeriesTags);
+    }
+
+    function imagesForStudies(studies) {
+        return sbxMetaData.imagesForStudies(
+            studies,
+            $scope.uiState.advancedFiltering.selectedSources, 
+            $scope.uiState.advancedFiltering.selectedSeriesTypes, 
+            $scope.uiState.advancedFiltering.selectedSeriesTags);
+    }
+
+    function imagesForSeries(series) {
+        return sbxMetaData.imagesForSeries(
+            series,
+            $scope.uiState.advancedFiltering.selectedSources, 
+            $scope.uiState.advancedFiltering.selectedSeriesTypes, 
+            $scope.uiState.advancedFiltering.selectedSeriesTags);
+    }
+
     function updateSeriesTagsPromise() {
         $scope.uiState.advancedFiltering.seriesTagsPromise = $scope.uiState.advancedFiltering.seriesTagsPromise.then(function (oldTags) {
             return $http.get('/api/metadata/seriestags').then(function (newTagsData) {        
@@ -606,27 +638,29 @@ angular.module('slicebox.home', ['ngRoute'])
     }
 
     function confirmDeletePatients(patients) {
-        sbxMetaData.imagesForPatients(patients).then(function(images) {
+        imagesForPatients(patients).then(function(images) {
             var f = $scope.confirmDeleteEntitiesFunction('/api/images/', 'images');
             f(images).finally(function() {
                 $scope.patientSelected(null);        
                 $scope.callbacks.patientsTable.reset();
+                updateSeriesTagsPromise();
             });
         });
     }
 
     function confirmDeleteStudies(studies) {
-        sbxMetaData.imagesForStudies(studies).then(function(images) {
+        imagesForStudies(studies).then(function(images) {
             var f = $scope.confirmDeleteEntitiesFunction('/api/images/', 'images');
             f(images).finally(function() {
                 $scope.studySelected(null);        
                 $scope.callbacks.studiesTable.reset();
+                updateSeriesTagsPromise();
             });
         });
     }
 
     function confirmDeleteSeries(series) {
-        sbxMetaData.imagesForSeries(series).then(function(images) {
+        imagesForSeries(series).then(function(images) {
             var f = $scope.confirmDeleteEntitiesFunction('/api/images/', 'images');
             f(images).finally(function() {
                 if ($scope.callbacks.flatSeriesTable) {
@@ -637,6 +671,7 @@ angular.module('slicebox.home', ['ngRoute'])
                     $scope.seriesSelected(null);        
                     $scope.callbacks.seriesTable.reset();
                 }
+                updateSeriesTagsPromise();
             });
         });
     }
@@ -683,6 +718,7 @@ angular.module('slicebox.home', ['ngRoute'])
                 if ($scope.callbacks.flatSeriesTable) {
                     $scope.callbacks.flatSeriesTable.reset();
                 }                
+                updateSeriesTagsPromise();
             });
 
             return allPromise;
@@ -691,7 +727,7 @@ angular.module('slicebox.home', ['ngRoute'])
 
     function createImageIdToPatientPromiseForPatients(patients) {
         var imageIdAndPatientsPromises = patients.map(function (patient) {
-            return sbxMetaData.imagesForPatients([ patient ]).then(function (images) {
+            return imagesForPatients([ patient ]).then(function (images) {
                 return images.map(function (image) {
                     return { imageId: image.id, patient: patient };
                 });
@@ -708,7 +744,7 @@ angular.module('slicebox.home', ['ngRoute'])
 
     function createImageIdToPatientPromiseForStudies(studies) {
         return $http.get('/api/metadata/patients/' + studies[0].patientId).then(function (patient) {
-            return sbxMetaData.imagesForStudies(studies).then(function (images) {
+            return imagesForStudies(studies).then(function (images) {
                 return images.reduce(function ( imageIdToPatient, image ) {
                     imageIdToPatient[ image.id ] = patient.data;
                     return imageIdToPatient;
@@ -720,7 +756,7 @@ angular.module('slicebox.home', ['ngRoute'])
     function createImageIdToPatientPromiseForSeries(series) {
         return $http.get('/api/metadata/studies/' + series[0].studyId).then(function (study) {
             return $http.get('/api/metadata/patients/' + study.data.patientId).then(function (patient) {
-                return sbxMetaData.imagesForSeries(series).then(function (images) {
+                return imagesForSeries(series).then(function (images) {
                     return images.reduce(function ( imageIdToPatient, image ) {
                         imageIdToPatient[ image.id ] = patient.data;
                         return imageIdToPatient;
@@ -746,21 +782,21 @@ angular.module('slicebox.home', ['ngRoute'])
 
     function confirmExportPatients(patients) {
         openConfirmActionModal('Export', 'This will export ' + patients.length + ' patient(s) as a zip archive. Proceed?', 'Ok', function() {
-            var images = sbxMetaData.imagesForPatients(patients);
+            var images = imagesForPatients(patients);
             return exportImages(images);
         });
     }
 
     function confirmExportStudies(studies) {
         openConfirmActionModal('Export', 'This will export ' + studies.length + ' study(s) as a zip archive. Proceed?', 'Ok', function() {
-            var images = sbxMetaData.imagesForStudies(studies);
+            var images = imagesForStudies(studies);
             return exportImages(images);
         });
     } 
 
     function confirmExportSeries(series) {
         openConfirmActionModal('Export', 'This will export ' + series.length + ' series as a zip archive. Proceed?', 'Ok', function() {
-            var images = sbxMetaData.imagesForSeries(series);
+            var images = imagesForSeries(series);
             return exportImages(images);
         });
     }

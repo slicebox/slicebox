@@ -17,10 +17,12 @@ class ScuRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   def dbUrl() = "jdbc:h2:mem:scproutestest;DB_CLOSE_DELAY=-1"
   
   "SCU routes" should "return a success message when asked to setup a new SCP" in {
-    PostAsAdmin("/api/scps", ScpData(-1, "ScpName", "TestAeTitle", 12345)) ~> routes ~> check {
+    PostAsAdmin("/api/scps", ScpData(-1, "ScpName", "TestAeTitle", 12347)) ~> routes ~> check {
+      val scpData = responseAs[ScpData]
+      scpData.id should be (1)
       status should be (Created)
     }
-    PostAsAdmin("/api/scus", ScuData(-1, "TestName", "TestAeTitle", "127.0.0.1", 12345)) ~> routes ~> check {
+    PostAsAdmin("/api/scus", ScuData(-1, "TestName", "TestAeTitle", "127.0.0.1", 12347)) ~> routes ~> check {
       status should be (Created)
       val scuData = responseAs[ScuData]
       scuData.id should be (1)
@@ -55,7 +57,7 @@ class ScuRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       val image = responseAs[Image]
       image.id should be(1)
     }
-    PostAsAdmin("/api/scus", ScuData(-1, "TestName2", "TestAeTitle2", "123.456.789.1", 12345)) ~> routes ~> check {
+    PostAsAdmin("/api/scus", ScuData(-1, "TestName2", "TestAeTitle2", "127.0.0.1", 12349)) ~> routes ~> check {
       status should be (Created)
       val scuData = responseAs[ScuData]
       scuData.id should be (2)
@@ -73,6 +75,9 @@ class ScuRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     
   it should "be possible to remove the SCU again" in {
     DeleteAsAdmin("/api/scus/1") ~> routes ~> check {
+      status should be(NoContent)
+    }
+    DeleteAsAdmin("/api/scps/1") ~> routes ~> check {
       status should be(NoContent)
     }
   }

@@ -256,17 +256,25 @@ class PropertiesDAO(val driver: JdbcProfile) {
     dbSeriesTag
   }
 
-  def removeAndCleanupSeriesTagForSeriesId(seriesTagId: Long, seriesId: Long)(implicit session: Session): Unit = {
-    removeSeriesSeriesTag(seriesTagId, seriesId)
+  def cleanupSeriesTag(seriesTagId: Long)(implicit session: Session) = {
     val otherSeriesWithSameTag = listSeriesSeriesTagsForSeriesTagId(seriesTagId)
     if (otherSeriesWithSameTag.isEmpty)
       removeSeriesTag(seriesTagId)
   }
 
-  def deleteFully(imageFile: ImageFile)(implicit session: Session): Unit = {
-    deleteImageFile(imageFile.id)
-    metaDataDao.imageById(imageFile.id).foreach(image =>
-      metaDataDao.deleteFully(image))
+  def removeAndCleanupSeriesTagForSeriesId(seriesTagId: Long, seriesId: Long)(implicit session: Session): Unit = {
+    removeSeriesSeriesTag(seriesTagId, seriesId)
+    cleanupSeriesTag(seriesTagId)
+  }
+
+  def deleteFully(image: Image)(implicit session: Session): Unit = {
+    metaDataDao.deleteImage(image.id)
+    metaDataDao.seriesById(image.seriesId).foreach(series =>
+      if (metaDataDao.imagesForSeries(0, 2, series.id).isEmpty) {
+        val seriesSeriesTags = seriesTagsForSeries(series.id)
+        metaDataDao.deleteFully(series)
+        seriesSeriesTags.foreach(seriesTag => cleanupSeriesTag(seriesTag.id))
+      })
   }
 
   def flatSeries(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String], sourceTypeIds: Array[SourceTypeId], seriesTypeIds: Array[Long], seriesTagIds: Array[Long])(implicit session: Session): List[FlatSeries] = {
