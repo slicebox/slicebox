@@ -92,13 +92,13 @@ class ScuRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   }
   
   it should "return 400 Bad Request when adding an SCU with an invalid AE title" in {
-    PostAsAdmin("/api/scus", ScuData(-1, "TestName", "ABCDEFGHIJKLMNOPQ", "123.456.789.1", 123)) ~> routes ~> check {
+    PostAsAdmin("/api/scus", ScuData(-1, "TestName", "ABCDEFGHIJKLMNOPQ", "123.456.789.1", 12321)) ~> routes ~> check {
       status should be (BadRequest)
     }
   }
 
   it should "return 201 Created when adding an SCU with an AE title over 16 characters long but less than 17 characters after trimming" in {
-    PostAsAdmin("/api/scus", ScuData(-1, "TestName", " ABCDEFGHIJKLMNOP ", "123.456.789.1", 123)) ~> routes ~> check {
+    PostAsAdmin("/api/scus", ScuData(-1, "TestName", " ABCDEFGHIJKLMNOP ", "123.456.789.1", 12323)) ~> routes ~> check {
       status should be (Created)
     }
   }

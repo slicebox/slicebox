@@ -41,13 +41,13 @@ class ScpRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   }
   
   it should "return 400 Bad Request when adding an SCP with an invalid AE title" in {
-    PostAsAdmin("/api/scps", ScpData(-1, "InvalidTestName", "ABCDEFGHIJKLMNOPQ", 123)) ~> routes ~> check {
+    PostAsAdmin("/api/scps", ScpData(-1, "InvalidTestName", "ABCDEFGHIJKLMNOPQ", 12321)) ~> routes ~> check {
       status should be (BadRequest)
     }
   }
 
   it should "return 201 Created when adding an SCP with an AE title over 16 characters long but less than 17 characters after trimming" in {
-    PostAsAdmin("/api/scps", ScpData(-1, "SomeOtherTestName", " ABCDEFGHIJKLMNOP ", 123)) ~> routes ~> check {
+    PostAsAdmin("/api/scps", ScpData(-1, "SomeOtherTestName", " ABCDEFGHIJKLMNOP ", 12323)) ~> routes ~> check {
       status should be (Created)
     }
   }
