@@ -1752,7 +1752,7 @@
           },
           "400": {
             "description": "Invalid port number or AE title"
-          },
+          }
         }        
       }
     },
@@ -1817,7 +1817,7 @@
           },
           "400": {
             "description": "Invalid port number or AE title"
-          },
+          }
         }        
       }
     },
