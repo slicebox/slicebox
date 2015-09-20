@@ -3,11 +3,9 @@
         <md-tabs md-selected="uiState.leftColumnSelectedTabIndex">
             <md-tab id="patient-study-series" aria-controls="patient-study-series-content">
                 Patient-Study-Series
-                <md-tooltip>Hierarchical view</md-tooltip>
             </md-tab>
             <md-tab id="series" aria-controls="series-content">
                 Series
-                <md-tooltip>Flat view of all series</md-tooltip>
             </md-tab>
         </md-tabs>
 
@@ -24,7 +22,6 @@
                             <h4 class="md-flex card-header">Patients</h4>
                             <div flex></div>
                             <md-button aria-label="Advanced filtering options" class="md-icon-button"  ng-click="openAdvancedFilteringModal()">
-                                <md-tooltip md-direction="right">Advanced filtering</md-tooltip>
                                 <md-icon md-menu-origin md-svg-src="/assets/images/ic_filter_list_black_18px.svg"></md-icon>
                             </md-button>
                         </div>
@@ -37,6 +34,7 @@
                                 object-actions="patientActions"
                                 object-selected="patientSelected(object)"
                                 callbacks="callbacks.patientsTable"
+                                refresh-button="true"
                                 empty-message="No patients found">
 
                                 <sbx-grid-column property="id" title="Id">
@@ -72,6 +70,7 @@
                                 object-actions="studyActions"
                                 object-selected="studySelected(object)"
                                 callbacks="callbacks.studiesTable"
+                                refresh-button="true"
                                 empty-message="No studies found">
 
                                 <sbx-grid-column property="id" title="Id">
@@ -107,6 +106,7 @@
                                 object-actions="seriesActions"
                                 object-selected="seriesSelected(object)"
                                 callbacks="callbacks.seriesTable"
+                                refresh-button="true"
                                 empty-message="No series found">
 
                                 <sbx-grid-column property="id" title="Id">
@@ -150,7 +150,6 @@
                             <h4 class="md-flex card-header">All Series</h4>
                             <div flex></div>
                             <md-button aria-label="Advanced filtering options" class="md-icon-button"  ng-click="openAdvancedFilteringModal()">
-                                <md-tooltip md-direction="right">Advanced filtering</md-tooltip>
                                 <md-icon md-menu-origin md-svg-src="/assets/images/ic_filter_list_black_18px.svg"></md-icon>
                             </md-button>
                         </div>
@@ -163,6 +162,7 @@
                                 object-actions="seriesActions"
                                 object-selected="flatSeriesSelected(object)"
                                 callbacks="callbacks.flatSeriesTable"
+                                refresh-button="true"
                                 empty-message="No series found">
 
                                 <sbx-grid-column property="id" title="Id">
@@ -253,7 +253,6 @@
                 <div ng-if="uiState.selectedSeries">
 
                     <md-button class="md-icon-button md-primary" ng-click="openImageSettingsModal()" aria-label="Display Settings">
-                        <md-tooltip md-direction="right">Display Settings</md-tooltip>
                         <md-icon md-svg-icon="/assets/images/ic_settings_24px.svg"></md-icon>
                     </md-button>
 

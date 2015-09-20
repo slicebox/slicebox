@@ -27,16 +27,6 @@ angular.module('slicebox.anonymization', ['ngRoute'])
 
     $scope.callbacks = {};
 
-    var timer = $interval(function() {
-        if (angular.isDefined($scope.callbacks.anonymizationKeyTable)) {
-            $scope.callbacks.anonymizationKeyTable.reloadPage();
-        }
-    }, 5000);
-
-    $scope.$on('$destroy', function() {
-        $interval.cancel(timer);
-    });
-  
     // Scope functions
     $scope.loadAnonymizationKeyPage = function(startIndex, count, orderByProperty, orderByDirection, filter) {
         var loadUrl = '/api/images/anonymizationkeys?startindex=' + startIndex + '&count=' + count;

@@ -79,7 +79,8 @@ angular.module('slicebox.directives', [])
             callbacks: '=',
             rowCSSClassesCallback: '&rowCssClasses',
             rowObjectActionsCallback: '&rowObjectActions',
-            emptyMessage: '@'
+            emptyMessage: '@',
+            refreshButton: '='
         },
         controller: function($scope, $element, $attrs) {
             $scope.columnDefinitions = [];
@@ -222,6 +223,10 @@ angular.module('slicebox.directives', [])
                 loadPageData();
             };
 
+            $scope.refreshButtonEnabled = function() {
+                return $scope.refreshButton;
+            };
+
             $scope.columnClicked = function(columnDefinition) {
                 if (!$scope.sortingEnabled()) {
                     return;
@@ -275,6 +280,10 @@ angular.module('slicebox.directives', [])
 
             $scope.pageSizeChanged = function() {
                 $scope.currentPageSize = pageSizeAsNumber();
+                loadPageData();
+            };
+
+            $scope.refresh = function() {
                 loadPageData();
             };
 
