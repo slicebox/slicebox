@@ -73,24 +73,6 @@
   ],
   "paths": {
 
-    "/metadata/sources": {
-      "get": {
-        "description": "Returns a list of currently available data sources. Possible source types are user - data imported by an API call by a user, box - data received from a remote box, directory - data imported via a watched directory or scp - data received from a PACS.",
-        "tags": ["Meta Data"],
-        "responses": {
-          "200": {
-            "description": "currently available sources",
-            "schema": {
-              "type": "array",
-              "items": {
-                "$ref": "#/definitions/source"
-              }
-            }
-          }
-        }
-      }
-    },
-
     "/metadata/patients": {
       "get": {
         "description": "Returns a list of metadata on the patient level of the DICOM hierarchy",
@@ -137,16 +119,23 @@
             "type": "string"
           },
           {
-            "name": "sourcetype",
+            "name": "sources",
             "in": "query",
-            "description": "filter the results by matching on type of source. Type should be one of user, box, directory or scp.",
+            "description": "filter the results by matching on one or more underlying series sources. Examples of sources are user, box, directory or scp. The list of sources to filter results by must have the form TYPE1:ID1,TYPE2:ID2,...,TYPEN:IDN. For instance, the argument sources=box:1,user:5 shows results either sent from (slice)box with id 1 or uploaded by user with id 5.",
             "required": false,
             "type": "string"
           },
           {
-            "name": "sourceid",
+            "name": "seriestypes",
             "in": "query",
-            "description": "if the sourcetype parameter is present, also filter on the id of the source. E.g. for boxes this means the id of the remote box as available when listing boxes.",
+            "description": "filter the results by matching on one or more underlying series types. The supplied list of series types must be a comma separated list of series type ids. For instance, the argument seriestypes=3,7,22 shows results including series assigned to either of the series types with ids 3, 7 and 22.",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "seriestags",
+            "in": "query",
+            "description": "filter the results by matching on one or more underlying series tags. The supplied list of series tags must be a comma separated list of series tag ids. For instance, the argument seriestags=6,2,11 shows results including series with either of the series tags with ids 6, 2 and 11.",
             "required": false,
             "type": "string"
           }
@@ -254,16 +243,23 @@
             "format": "int64"
           },
           {
-            "name": "sourcetype",
+            "name": "sources",
             "in": "query",
-            "description": "filter the results by matching on type of source. Type should be one of user, box, directory or scp.",
+            "description": "filter the results by matching on one or more underlying series sources. Examples of sources are user, box, directory or scp. The list of sources to filter results by must have the form TYPE1:ID1,TYPE2:ID2,...,TYPEN:IDN. For instance, the argument sources=box:1,user:5 shows results either sent from (slice)box with id 1 or uploaded by user with id 5.",
             "required": false,
             "type": "string"
           },
           {
-            "name": "sourceid",
+            "name": "seriestypes",
             "in": "query",
-            "description": "if the sourcetype parameter is present, also filter on the id of the source. E.g. for boxes this means the id of the remote box as available when listing boxes.",
+            "description": "filter the results by matching on one or more underlying series types. The supplied list of series types must be a comma separated list of series type ids. For instance, the argument seriestypes=3,7,22 shows results including series assigned to either of the series types with ids 3, 7 and 22.",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "seriestags",
+            "in": "query",
+            "description": "filter the results by matching on one or more underlying series tags. The supplied list of series tags must be a comma separated list of series tag ids. For instance, the argument seriestags=6,2,11 shows results including series with either of the series tags with ids 6, 2 and 11.",
             "required": false,
             "type": "string"
           }
@@ -371,16 +367,23 @@
             "format": "int64"
           },
           {
-            "name": "sourcetype",
+            "name": "sources",
             "in": "query",
-            "description": "filter the results by matching on type of source. Type should be one of user, box, directory or scp.",
+            "description": "filter the results by matching on one or more series sources. Examples of sources are user, box, directory or scp. The list of sources to filter results by must have the form TYPE1:ID1,TYPE2:ID2,...,TYPEN:IDN. For instance, the argument sources=box:1,user:5 shows results either sent from (slice)box with id 1 or uploaded by user with id 5.",
             "required": false,
             "type": "string"
           },
           {
-            "name": "sourceid",
+            "name": "seriestypes",
             "in": "query",
-            "description": "if the sourcetype parameter is present, also filter on the id of the source. E.g. for boxes this means the id of the remote box as available when listing boxes.",
+            "description": "filter the results by matching on one or more series types. The supplied list of series types must be a comma separated list of series type ids. For instance, the argument seriestypes=3,7,22 shows series assigned to either of the series types with ids 3, 7 and 22.",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "seriestags",
+            "in": "query",
+            "description": "filter the results by matching on one or more series tags. The supplied list of series tags must be a comma separated list of series tag ids. For instance, the argument seriestags=6,2,11 shows series with either of the series tags with ids 6, 2 and 11.",
             "required": false,
             "type": "string"
           }
@@ -510,6 +513,73 @@
           },
           "404": {
             "description": "series not found (invalid ID)"
+          }
+        }
+      }
+    },
+
+    "/metadata/series/{id}/seriestags": {
+      "get": {
+        "description": "get the list of series tags for the series with the supplied ID.",
+        "tags": ["Meta Data"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of series",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "the list of series tags",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/seriestag"
+              }
+            }
+          },
+          "404": {
+            "description": "series not found (invalid ID)"
+          }
+        }
+      }
+    },
+
+    "/metadata/sources": {
+      "get": {
+        "description": "Returns a list of currently available data sources. Possible source types are user - data imported by an API call by a user, box - data received from a remote box, directory - data imported via a watched directory or scp - data received from a PACS.",
+        "tags": ["Meta Data"],
+        "responses": {
+          "200": {
+            "description": "currently available sources",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/source"
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "/metadata/seriestags": {
+      "get": {
+        "description": "Returns a list of series tags currently currently in use.",
+        "tags": ["Meta Data"],
+        "responses": {
+          "200": {
+            "description": "a list of unique series tags currently used to tag series",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/seriestag"
+              }
+            }
           }
         }
       }
@@ -664,16 +734,23 @@
             "type": "string"
           },
           {
-            "name": "sourcetype",
+            "name": "sources",
             "in": "query",
-            "description": "filter the results by matching on type of source. Type should be one of user, box, directory or scp.",
+            "description": "filter the results by matching on one or more series sources. Examples of sources are user, box, directory or scp. The list of sources to filter results by must have the form TYPE1:ID1,TYPE2:ID2,...,TYPEN:IDN. For instance, the argument sources=box:1,user:5 shows results either sent from (slice)box with id 1 or uploaded by user with id 5.",
             "required": false,
             "type": "string"
           },
           {
-            "name": "sourceid",
+            "name": "seriestypes",
             "in": "query",
-            "description": "if the sourcetype parameter is present, also filter on the id of the source. E.g. for boxes this means the id of the remote box as available when listing boxes.",
+            "description": "filter the results by matching on one or more series types. The supplied list of series types must be a comma separated list of series type ids. For instance, the argument seriestypes=3,7,22 shows series assigned to either of the series types with ids 3, 7 and 22.",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "seriestags",
+            "in": "query",
+            "description": "filter the results by matching on one or more series tags. The supplied list of series tags must be a comma separated list of series tag ids. For instance, the argument seriestags=6,2,11 shows series with either of the series tags with ids 6, 2 and 11.",
             "required": false,
             "type": "string"
           }
@@ -2200,6 +2277,17 @@
           "type": "string"
         },
         "sourceId": {
+          "type": "string"
+        }
+      }
+    },
+    "seriestag": {
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "int64"          
+        },        
+        "name": {
           "type": "string"
         }
       }
