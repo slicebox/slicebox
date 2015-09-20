@@ -1749,7 +1749,10 @@
             "schema": {
               "$ref": "#/definitions/scp"
             }
-          }
+          },
+          "400": {
+            "description": "Invalid port number or AE title"
+          },
         }        
       }
     },
@@ -1811,7 +1814,10 @@
             "schema": {
               "$ref": "#/definitions/scu"
             }
-          }
+          },
+          "400": {
+            "description": "Invalid port number or AE title"
+          },
         }        
       }
     },
@@ -1834,6 +1840,42 @@
           "204": {
             "description": "SCU removed"
           }
+        }        
+      }      
+    },
+
+    "/scus/{id}/sendseries/{seriesid}": {
+      "post": {
+        "description": "send the series with the supplied series ID to a DICOM SCP using the the SCU with the supplied scu ID",
+        "tags": ["SCUs"],
+        "parameters": [
+          {
+            "name": "id",
+            "description": "id of SCU to use for sending",
+            "in": "path",
+            "required": true,            
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "seriesid",
+            "description": "id of series to send",
+            "in": "path",
+            "required": true,            
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Series sent"
+          },
+          "404": {
+            "description": "Series not found or SCU not found"
+          },
+          "502": {
+            "description": "Receiving SCP host not available"
+          }          
         }        
       }      
     },
