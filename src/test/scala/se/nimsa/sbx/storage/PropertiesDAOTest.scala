@@ -136,24 +136,58 @@ class PropertiesDAOTest extends FlatSpec with Matchers with BeforeAndAfterEach {
       propertiesDao.seriesForStudy(0, 20, 1, Array(SourceTypeId(SourceType.SCP, 2)), Array.empty, Array.empty).size should be(0)
     }
   }
-  
+
   it should "support filtering patients by series type" in {
     db.withSession { implicit session =>
       insertMetaDataAndProperties
 
       propertiesDao.patients(0, 20, None, true, None, Array.empty, Array.empty, Array.empty).size should be(1)
       propertiesDao.patients(0, 20, None, true, None, Array.empty, Array(1), Array.empty).size should be(1)
-      propertiesDao.patients(0, 20, None, true, None, Array.empty, Array(1,2), Array.empty).size should be(1)
-      propertiesDao.patients(0, 20, None, true, None, Array.empty, Array(1,2,3), Array.empty).size should be(1)
+      propertiesDao.patients(0, 20, None, true, None, Array.empty, Array(1, 2), Array.empty).size should be(1)
+      propertiesDao.patients(0, 20, None, true, None, Array.empty, Array(1, 2, 3), Array.empty).size should be(1)
       propertiesDao.patients(0, 20, None, true, None, Array.empty, Array(3), Array.empty).size should be(0)
     }
   }
-  
+
+  it should "remove a series tag when the last occurrence of it has been removed" in {
+    db.withSession { implicit session =>
+      val (dbPatient1, (dbStudy1, dbStudy2), (dbSeries1, dbSeries2, dbSeries3, dbSeries4), (dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)) =
+        insertMetaDataAndProperties
+      val seriesTags = propertiesDao.listSeriesTags
+      seriesTags.size should be(2)
+      seriesTags.map(_.name) should be (List("Tag1","Tag2"))
+      propertiesDao.removeAndCleanupSeriesTagForSeriesId(seriesTags(0).id, dbSeries1.id)
+      propertiesDao.listSeriesTags.size should be(2)
+      propertiesDao.removeAndCleanupSeriesTagForSeriesId(seriesTags(1).id, dbSeries1.id)
+      propertiesDao.listSeriesTags.size should be(2)
+      propertiesDao.removeAndCleanupSeriesTagForSeriesId(seriesTags(0).id, dbSeries2.id)
+      propertiesDao.listSeriesTags.size should be(1)
+      propertiesDao.removeAndCleanupSeriesTagForSeriesId(seriesTags(1).id, dbSeries3.id)
+      propertiesDao.listSeriesTags.size should be(0)
+    }
+  }
+
+  it should "remove a series tag when deleting a series if the series tag attached to the series was the last of its kind" in {
+    db.withSession { implicit session =>
+      val (dbPatient1, (dbStudy1, dbStudy2), (dbSeries1, dbSeries2, dbSeries3, dbSeries4), (dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)) =
+        insertMetaDataAndProperties
+      propertiesDao.listSeriesTags.size should be(2)
+      propertiesDao.deleteFully(dbSeries4)
+      propertiesDao.listSeriesTags.size should be(2)
+      propertiesDao.deleteFully(dbSeries1)
+      propertiesDao.listSeriesTags.size should be(2)
+      propertiesDao.deleteFully(dbSeries2)
+      propertiesDao.listSeriesTags.size should be(1)
+      propertiesDao.deleteFully(dbSeries3)
+      propertiesDao.listSeriesTags.size should be(0)
+    }
+  }
 
   def insertMetaDataAndProperties(implicit session: Session) = {
     val (dbPatient1, (dbStudy1, dbStudy2), (dbSeries1, dbSeries2, dbSeries3, dbSeries4), (dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)) =
       insertMetaData(metaDataDao)
-    insertProperties(seriesTypeDao, propertiesDao, dbSeries1, dbSeries2, dbSeries3, dbSeries4, dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)    
+    insertProperties(seriesTypeDao, propertiesDao, dbSeries1, dbSeries2, dbSeries3, dbSeries4, dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)
+    (dbPatient1, (dbStudy1, dbStudy2), (dbSeries1, dbSeries2, dbSeries3, dbSeries4), (dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8))
   }
-  
+
 }

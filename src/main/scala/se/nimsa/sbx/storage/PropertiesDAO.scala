@@ -271,12 +271,16 @@ class PropertiesDAO(val driver: JdbcProfile) {
     metaDataDao.deleteImage(image.id)
     metaDataDao.seriesById(image.seriesId).foreach(series =>
       if (metaDataDao.imagesForSeries(0, 2, series.id).isEmpty) {
-        val seriesSeriesTags = seriesTagsForSeries(series.id)
-        metaDataDao.deleteFully(series)
-        seriesSeriesTags.foreach(seriesTag => cleanupSeriesTag(seriesTag.id))
+        deleteFully(series)
       })
   }
 
+  def deleteFully(series: Series)(implicit session: Session): Unit = {
+    val seriesSeriesTags = seriesTagsForSeries(series.id)
+    metaDataDao.deleteFully(series)
+    seriesSeriesTags.foreach(seriesTag => cleanupSeriesTag(seriesTag.id))
+  }
+  
   def flatSeries(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String], sourceTypeIds: Array[SourceTypeId], seriesTypeIds: Array[Long], seriesTagIds: Array[Long])(implicit session: Session): List[FlatSeries] = {
 
     if (isWithAdvancedFiltering(sourceTypeIds, seriesTypeIds, seriesTagIds)) {

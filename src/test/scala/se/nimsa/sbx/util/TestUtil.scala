@@ -89,6 +89,10 @@ object TestUtil {
     val dbSeriesSource4 = propertiesDao.insertSeriesSource(seriesSource4.copy(id = dbSeries4.id))
     val dbSeriesType1 = seriesTypeDao.insertSeriesType(seriesType1)
     val dbSeriesType2 = seriesTypeDao.insertSeriesType(seriesType2)
+    val dbSeriesTag1 = propertiesDao.addAndInsertSeriesTagForSeriesId(SeriesTag(-1, "Tag1"), dbSeries1.id)
+    val dbSeriesTag2 = propertiesDao.addAndInsertSeriesTagForSeriesId(SeriesTag(-1, "Tag2"), dbSeries1.id)
+    val dbSeriesTag3 = propertiesDao.addAndInsertSeriesTagForSeriesId(SeriesTag(-1, "Tag1"), dbSeries2.id)
+    val dbSeriesTag4 = propertiesDao.addAndInsertSeriesTagForSeriesId(SeriesTag(-1, "Tag2"), dbSeries3.id)
     
     val seriesSeriesType1 = SeriesSeriesType(dbSeries1.id, dbSeriesType1.id)
     val seriesSeriesType2 = SeriesSeriesType(dbSeries2.id, dbSeriesType1.id)
