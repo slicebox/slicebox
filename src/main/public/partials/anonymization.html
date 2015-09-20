@@ -8,7 +8,8 @@
                     <md-content class="md-padding">
                         <sbx-grid
                             load-page="loadAnonymizationKeyPage(startIndex, count, orderByProperty, orderByDirection, filter)"
-                            page-size="20"
+                            page-size="25"
+                            page-sizes="[10, 25, 100, 1000]"
                             filter="true"
                             object-actions="actions"
                             callbacks="callbacks.anonymizationKeyTable"

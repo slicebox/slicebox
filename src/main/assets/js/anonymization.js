@@ -11,13 +11,17 @@ angular.module('slicebox.anonymization', ['ngRoute'])
   });
 })
 
-.controller('AnonymizationCtrl', function($scope, $http, $interval) {
+.controller('AnonymizationCtrl', function($scope, $http, $interval, openMessageModal) {
     // Initialization
     $scope.actions =
         [
             {
                 name: 'Delete',
                 action: $scope.confirmDeleteEntitiesFunction('/api/images/anonymizationkeys/', 'anonymization key(s)')
+            },
+            {
+                name: 'Export',
+                action: $scope.exportToCsv
             }
         ];
 
@@ -59,4 +63,18 @@ angular.module('slicebox.anonymization', ['ngRoute'])
         return loadPromise;
     };
 
+    $scope.exportToCsv = function(keys) {
+        var csv = 
+            "Id;Created;Patient Birth Date;Patient Name;Anonymous Patient Name;Patient ID;Anonymous Patient ID;" + 
+            "Study Instance UID;Anonymous Study Instance UID;Study ID;Accession Number\n" +
+            keys.map(function (key) {
+                return key.id + ";" + key.created + ";" + key.patientBirthDate + ";" + key.patientName + ";" + key.anonPatientName + ";" + key.patientID + ";" + key.anonPatientID + ";" + 
+                    key.studyInstanceUID + ";" + key.anonStudyInstanceUID + ";" + key.studyID + ";" + key.accessionNumber;
+            }).join("\n");
+        var anchor = "<a class='md-button md-primary' href='data:text/csv;charset=UTF-8," + encodeURIComponent(csv) + "' download='slicebox-anonymization-keys.csv'>Download CSV</a>";
+        var textBoxHeader = '<h4>...or copy these values to the clipboard:</h4>';
+        var textBox = "<md-content style='height: 200px;padding: 8px;'><pre>" + csv + "</pre></md-content>";
+        var body = anchor + textBoxHeader + textBox;
+        openMessageModal("Download or copy CSV", body);
+    };
 });

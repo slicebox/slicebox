@@ -79,6 +79,18 @@ angular.module('slicebox.utils', [])
     };
 })
 
+.factory('openMessageModal', function($mdDialog) {
+
+    return function(title, message) {
+
+        return $mdDialog.show($mdDialog.alert({
+            title: title,
+            content: message,
+            ok: 'Close'
+        }));
+    };
+})
+
 .controller('SbxConfirmActionModalController', function ($scope, $q, $mdDialog, title, message, action, actionCallback) {
     $scope.title = title;
     $scope.message = message;
