@@ -50,6 +50,7 @@ import se.nimsa.sbx.dicom.DicomPropertyValue._
 import se.nimsa.sbx.dicom.DicomUtil
 import se.nimsa.sbx.dicom.DicomUtil._
 import se.nimsa.sbx.dicom.ImageAttribute
+import se.nimsa.sbx.lang.NotFoundException
 import akka.dispatch.ExecutionContexts
 import java.util.concurrent.Executors
 import se.nimsa.sbx.log.SbxLog
@@ -156,20 +157,23 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
         case GetSeriesTypesForSeries(seriesId) =>
           val seriesTypes = getSeriesTypesForSeries(seriesId)
           sender ! SeriesTypes(seriesTypes)
-          
+
         case GetSeriesTags =>
           sender ! SeriesTags(getSeriesTags)
-          
+
         case GetSeriesTagsForSeries(seriesId) =>
           val seriesTags = getSeriesTagsForSeries(seriesId)
           sender ! SeriesTags(seriesTags)
-          
+
         case AddSeriesTagToSeries(seriesTag, seriesId) =>
-         db.withSession { implicit session =>
+          db.withSession { implicit session =>
+            dao.seriesById(seriesId).getOrElse {
+              throw new NotFoundException("Series not found")
+            }
             val dbSeriesTag = propertiesDao.addAndInsertSeriesTagForSeriesId(seriesTag, seriesId)
             sender ! SeriesTagAddedToSeries(dbSeriesTag)
           }
-         
+
         case RemoveSeriesTagFromSeries(seriesTagId, seriesId) =>
           db.withSession { implicit session =>
             propertiesDao.removeAndCleanupSeriesTagForSeriesId(seriesTagId, seriesId)

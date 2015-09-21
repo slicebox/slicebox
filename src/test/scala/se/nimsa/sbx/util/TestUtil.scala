@@ -83,16 +83,19 @@ object TestUtil {
     val dbImageFile6 = propertiesDao.insertImageFile(imageFile6.copy(id = dbImage6.id))
     val dbImageFile7 = propertiesDao.insertImageFile(imageFile7.copy(id = dbImage7.id))
     val dbImageFile8 = propertiesDao.insertImageFile(imageFile8.copy(id = dbImage8.id))
+    
     val dbSeriesSource1 = propertiesDao.insertSeriesSource(seriesSource1.copy(id = dbSeries1.id))
     val dbSeriesSource2 = propertiesDao.insertSeriesSource(seriesSource2.copy(id = dbSeries2.id))
     val dbSeriesSource3 = propertiesDao.insertSeriesSource(seriesSource3.copy(id = dbSeries3.id))
     val dbSeriesSource4 = propertiesDao.insertSeriesSource(seriesSource4.copy(id = dbSeries4.id))
-    val dbSeriesType1 = seriesTypeDao.insertSeriesType(seriesType1)
-    val dbSeriesType2 = seriesTypeDao.insertSeriesType(seriesType2)
+
     val dbSeriesTag1 = propertiesDao.addAndInsertSeriesTagForSeriesId(SeriesTag(-1, "Tag1"), dbSeries1.id)
     val dbSeriesTag2 = propertiesDao.addAndInsertSeriesTagForSeriesId(SeriesTag(-1, "Tag2"), dbSeries1.id)
     val dbSeriesTag3 = propertiesDao.addAndInsertSeriesTagForSeriesId(SeriesTag(-1, "Tag1"), dbSeries2.id)
     val dbSeriesTag4 = propertiesDao.addAndInsertSeriesTagForSeriesId(SeriesTag(-1, "Tag2"), dbSeries3.id)
+    
+    val dbSeriesType1 = seriesTypeDao.insertSeriesType(seriesType1)
+    val dbSeriesType2 = seriesTypeDao.insertSeriesType(seriesType2)
     
     val seriesSeriesType1 = SeriesSeriesType(dbSeries1.id, dbSeriesType1.id)
     val seriesSeriesType2 = SeriesSeriesType(dbSeries2.id, dbSeriesType1.id)
