@@ -546,6 +546,32 @@
             "description": "series not found (invalid ID)"
           }
         }
+      },
+      "post": {
+        "description": "add a series tag to the series with the supplied ID",
+        "tags": ["Meta Data"],
+        "parameters": [
+          {
+            "name": "query",
+            "in": "body",
+            "description": "series tag to add",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/seriestag"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "added series tag",
+            "schema": {
+              "$ref": "#/definitions/seriestag"
+            }
+          },
+          "404": {
+            "description": "if no series with the supplied ID exists"
+          }
+        }
       }
     },
 
