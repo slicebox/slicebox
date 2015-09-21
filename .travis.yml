@@ -8,4 +8,5 @@ notifications:
     - karl.sjostrand@gmail.com
     - mattias.hagstrand@caleigo.com
 
-script: sbt ++2.11.6 test
+script: "sbt ++2.11.6 clean coverage test"
+after_success: "sbt coveralls"

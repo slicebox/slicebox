@@ -10,6 +10,14 @@ import de.heikoseeberger.sbtheader.license.Apache2_0
 
 	scalacOptions := Seq("-encoding", "UTF-8", "-Xlint","-deprecation", "-unchecked", "-feature", "-target:jvm-1.8")
 
+	// for coveralls
+
+	resolvers += Classpaths.sbtPluginReleases
+
+	addSbtPlugin("org.scoverage" % "sbt-scoverage" % "1.0.4")
+
+	addSbtPlugin("org.scoverage" % "sbt-coveralls" % "1.0.0")
+
 	// for sbt-resolver, (the re-start and re-stop commands)
 
 	Revolver.settings
