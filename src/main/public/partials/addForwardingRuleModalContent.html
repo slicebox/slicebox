@@ -1,0 +1,38 @@
+<md-dialog aria-label="Add Forwarding Rule" class="add-forwarding-rule">
+
+    <form name="addRuleForm" layout="column" ng-submit="addButtonClicked()" novalidate>
+
+        <md-dialog-content>
+            <md-subheader class="md-sticky-no-effect">Add Forwarding Rule</md-subheader>
+
+            <md-input-container>
+                <label>Source</label>
+                <md-select name="source" ng-model="uiState.source" md-on-open="loadSources()" placeholder="Select a source">
+                    <md-option ng-value="source" ng-repeat="source in uiState.sources">{{ source.sourceName }} ({{ source.sourceType }})</md-option>
+                </md-select>
+            </md-input-container>
+
+            <md-input-container>
+                <label>Target box</label>
+                <md-select ng-model="uiState.target" md-on-open="loadBoxes()" placeholder="Select a box">
+                    <md-option ng-value="box" ng-repeat="box in uiState.boxes">{{ box.name }}</md-option>
+                </md-select>
+            </md-input-container>
+
+            <md-input-container>
+                <md-checkbox ng-model="uiState.keepImages" aria-label="Keep images after forwarding">
+                    Keep images after forwarding
+                </md-checkbox>            
+            </md-input-container>
+
+        </md-dialog-content>
+
+        <div class="md-actions" layout="row">
+            <span flex></span>
+            <md-button ng-click="cancelButtonClicked()">Cancel</md-button>
+            <md-button type="submit" class="md-primary" ng-disabled="!(uiState.source && uiState.target)">Add</md-button>
+        </div>
+
+    </form>
+
+</md-dialog>

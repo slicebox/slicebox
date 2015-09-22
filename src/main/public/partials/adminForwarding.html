@@ -1,0 +1,34 @@
+<div layout="column" layout-margin>
+    <div class="admin-forwarding">
+        <md-card>
+            <md-card-content>
+                <h4>Forwarding</h4>
+                <h5>Automatically forward images from sources to other Slicebox instances</h5>
+                <sbx-grid
+                    load-page="loadRulesPage(startIndex, count, orderByProperty, orderByDirection)"
+                    page-size="20"
+                    object-actions="objectActions"
+                    callbacks="callbacks.rulesTable"
+                    empty-message="No rules added">
+
+                    <sbx-grid-column property="source" title="Source">
+                    </sbx-grid-column>
+
+                    <sbx-grid-column property="target" title="Target">
+                    </sbx-grid-column>
+
+                    <sbx-grid-column property="keepImages" title="Keep Images">
+                    </sbx-grid-column>
+
+                </sbx-grid>
+
+                <div layout="row" class="button-row">
+                    <md-button class="md-primary md-raised" ng-click="addRuleButtonClicked()">
+                        Add Rule
+                    </md-button>
+                    <div flex></div>
+                </div>
+            </md-card-content>
+        </md-card>
+    </div>
+</div>
