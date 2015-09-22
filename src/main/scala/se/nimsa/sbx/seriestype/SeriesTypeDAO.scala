@@ -69,10 +69,11 @@ class SeriesTypeDAO(val driver: JdbcProfile) {
 
   val seriesTypeRuleAttributeQuery = TableQuery[SeriesTypeRuleAttributeTable]
 
-  def create(implicit session: Session): Unit =
-    if (MTable.getTables("SeriesTypes").list.isEmpty) {
-      (seriesTypeQuery.ddl ++ seriesTypeRuleQuery.ddl ++ seriesTypeRuleAttributeQuery.ddl).create
-    }
+  def create(implicit session: Session): Unit = {
+    if (MTable.getTables("SeriesTypes").list.isEmpty) seriesTypeQuery.ddl.create
+    if (MTable.getTables("SeriesTypeRules").list.isEmpty) seriesTypeRuleQuery.ddl.create
+    if (MTable.getTables("SeriesTypeRuleAttributes").list.isEmpty) seriesTypeRuleAttributeQuery.ddl.create
+  }
 
   def drop(implicit session: Session): Unit =
     (seriesTypeQuery.ddl ++ seriesTypeRuleQuery.ddl ++ seriesTypeRuleAttributeQuery.ddl).drop

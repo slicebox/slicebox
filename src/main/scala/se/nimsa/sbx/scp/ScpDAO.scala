@@ -34,9 +34,7 @@ class ScpDAO(val driver: JdbcProfile) {
   val scpDataQuery = TableQuery[ScpDataTable]
   
   def create(implicit session: Session) =
-    if (MTable.getTables("ScpData").list.isEmpty) {
-      scpDataQuery.ddl.create
-    }
+    if (MTable.getTables("ScpData").list.isEmpty) scpDataQuery.ddl.create
   
   
   def insert(scpData: ScpData)(implicit session: Session): ScpData = {

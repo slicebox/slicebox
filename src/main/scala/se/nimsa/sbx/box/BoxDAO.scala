@@ -97,11 +97,13 @@ class BoxDAO(val driver: JdbcProfile) {
       !tables(0).getColumns.list.filter(_.name == columnName).isEmpty
   }
 
-  def create(implicit session: Session): Unit =
-    if (MTable.getTables("Box").list.isEmpty) {
-      (boxQuery.ddl ++ outboxQuery.ddl ++ inboxQuery.ddl ++ transactionTagValueQuery.ddl).create
-    }
-
+  def create(implicit session: Session): Unit = {
+    if (MTable.getTables("Box").list.isEmpty) boxQuery.ddl.create
+    if (MTable.getTables("Outbox").list.isEmpty) outboxQuery.ddl.create
+    if (MTable.getTables("Inbox").list.isEmpty) inboxQuery.ddl.create
+    if (MTable.getTables("TransactionTagValue").list.isEmpty) transactionTagValueQuery.ddl.create
+  }
+  
   def drop(implicit session: Session): Unit =
     (boxQuery.ddl ++ outboxQuery.ddl ++ inboxQuery.ddl ++ transactionTagValueQuery.ddl).drop
 

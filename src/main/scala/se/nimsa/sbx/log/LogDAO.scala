@@ -39,9 +39,7 @@ class LogDAO(val driver: JdbcProfile) {
   val logQuery = TableQuery[LogTable]
 
   def create(implicit session: Session): Unit =
-    if (MTable.getTables("Log").list.isEmpty) {
-      logQuery.ddl.create
-    }
+    if (MTable.getTables("Log").list.isEmpty) logQuery.ddl.create
 
   def drop(implicit session: Session): Unit =
     (logQuery.ddl).drop

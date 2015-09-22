@@ -35,9 +35,7 @@ class ScuDAO(val driver: JdbcProfile) {
   val scuDataQuery = TableQuery[ScuDataTable]
   
   def create(implicit session: Session) =
-    if (MTable.getTables("ScuData").list.isEmpty) {
-      scuDataQuery.ddl.create
-    }
+    if (MTable.getTables("ScuData").list.isEmpty) scuDataQuery.ddl.create
   
   
   def insert(scuData: ScuData)(implicit session: Session): ScuData = {

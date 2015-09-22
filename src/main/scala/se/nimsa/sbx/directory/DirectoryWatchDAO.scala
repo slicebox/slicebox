@@ -35,9 +35,7 @@ class DirectoryWatchDAO(val driver: JdbcProfile) {
   val watchedDirectoriesQuery = TableQuery[DirectoryWatchDataTable]
 
   def create(implicit session: Session) =
-    if (MTable.getTables("DirectoryWatchData").list.isEmpty) {
-      watchedDirectoriesQuery.ddl.create
-    }
+    if (MTable.getTables("DirectoryWatchData").list.isEmpty) watchedDirectoriesQuery.ddl.create
   
   def insert(watchedDirectory: WatchedDirectory)(implicit session: Session): WatchedDirectory = {
     val generatedId = (watchedDirectoriesQuery returning watchedDirectoriesQuery.map(_.id)) += watchedDirectory

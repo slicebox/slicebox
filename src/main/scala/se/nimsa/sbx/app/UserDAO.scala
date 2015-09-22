@@ -39,9 +39,7 @@ class UserDAO(val driver: JdbcProfile) {
   val userQuery = TableQuery[UserTable]
 
   def create(implicit session: Session) =
-    if (MTable.getTables("User").list.isEmpty) {
-      userQuery.ddl.create
-    }
+    if (MTable.getTables("User").list.isEmpty) userQuery.ddl.create
   
   def drop(implicit session: Session): Unit =
     (userQuery.ddl).drop

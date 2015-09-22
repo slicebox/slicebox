@@ -117,12 +117,12 @@ class MetaDataDAO(val driver: JdbcProfile) {
 
   val imagesQuery = TableQuery[Images]
 
-  def create(implicit session: Session) =
-    if (MTable.getTables("Patients").list.isEmpty)
-      (patientsQuery.ddl ++
-        studiesQuery.ddl ++
-        seriesQuery.ddl ++
-        imagesQuery.ddl).create
+  def create(implicit session: Session) = {
+    if (MTable.getTables("Patients").list.isEmpty) patientsQuery.ddl.create
+    if (MTable.getTables("Studies").list.isEmpty) studiesQuery.ddl.create
+    if (MTable.getTables("Series").list.isEmpty) seriesQuery.ddl.create
+    if (MTable.getTables("Images").list.isEmpty) imagesQuery.ddl.create
+  }
 
   def drop(implicit session: Session) =
     if (MTable.getTables("Patients").list.size > 0)

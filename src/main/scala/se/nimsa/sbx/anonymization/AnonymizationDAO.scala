@@ -49,9 +49,7 @@ class AnonymizationDAO(val driver: JdbcProfile) {
   val anonymizationKeyQuery = TableQuery[AnonymizationKeyTable]
 
   def create(implicit session: Session): Unit =
-    if (MTable.getTables("AnonymizationKey").list.isEmpty) {
-      anonymizationKeyQuery.ddl.create
-    }
+    if (MTable.getTables("AnonymizationKey").list.isEmpty) anonymizationKeyQuery.ddl.create
 
   def drop(implicit session: Session): Unit =
     anonymizationKeyQuery.ddl.drop

@@ -117,10 +117,14 @@ class PropertiesDAO(val driver: JdbcProfile) {
 
   // Setup
 
-  def create(implicit session: Session) =
-    if (MTable.getTables("ImageFiles").list.isEmpty)
-      (imageFilesQuery.ddl ++ seriesSourceQuery.ddl ++ seriesSeriesTypeQuery.ddl ++ seriesTagQuery.ddl ++ seriesSeriesTagQuery.ddl).create
-
+  def create(implicit session: Session) = {
+    if (MTable.getTables("ImageFiles").list.isEmpty) imageFilesQuery.ddl.create
+    if (MTable.getTables("SeriesSources").list.isEmpty) seriesSourceQuery.ddl.create
+    if (MTable.getTables("SeriesSeriesTypes").list.isEmpty) seriesSeriesTypeQuery.ddl.create
+    if (MTable.getTables("SeriesTags").list.isEmpty) seriesTagQuery.ddl.create
+    if (MTable.getTables("SeriesSeriesTags").list.isEmpty) seriesSeriesTagQuery.ddl.create
+  }
+  
   def drop(implicit session: Session) =
     if (MTable.getTables("ImageFiles").list.size > 0)
       (imageFilesQuery.ddl ++ seriesSourceQuery.ddl ++ seriesSeriesTypeQuery.ddl ++ seriesTagQuery.ddl ++ seriesSeriesTagQuery.ddl).drop
