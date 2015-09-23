@@ -136,6 +136,18 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
   }
 
+  it should "support listing sent entries" in {
+    val sentEntry =
+      db.withSession { implicit session =>
+        boxDao.insertSentEntry(SentEntry(-1, 1, 1, 3, 4))
+        boxDao.insertSentEntry(SentEntry(-1, 1, 2, 3, 5))
+      }
+
+    GetAsUser("/api/sent") ~> routes ~> check {
+      responseAs[List[SentEntryInfo]].size should be(2)
+    }
+  }
+
   it should "support removing inbox entries" in {
     val inboxEntry =
       db.withSession { implicit session =>
@@ -163,6 +175,21 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
     GetAsUser("/api/outbox") ~> routes ~> check {
       responseAs[List[OutboxEntryInfo]].size should be(0)
+    }
+  }
+
+  it should "support removing sent entries" in {
+    val sentEntry =
+      db.withSession { implicit session =>
+        boxDao.insertSentEntry(SentEntry(-1, 1, 2, 3, 4))
+      }
+
+    DeleteAsUser(s"/api/sent/${sentEntry.id}") ~> routes ~> check {
+      status should be(NoContent)
+    }
+
+    GetAsUser("/api/sent") ~> routes ~> check {
+      responseAs[List[InboxEntryInfo]].size should be(0)
     }
   }
 
@@ -196,6 +223,41 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       }
     
     GetAsUser(s"/api/inbox/${inboxEntry.id}/images") ~> routes ~> check {
+      status should be(OK)
+      responseAs[List[Image]].length should be(2)
+    }    
+  }
+
+  it should "support listing images corresponding to a sent entry" in {
+    val sentEntry =
+      db.withSession { implicit session =>
+        val (dbPatient1, (dbStudy1, dbStudy2), (dbSeries1, dbSeries2, dbSeries3, dbSeries4), (dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)) =
+          TestUtil.insertMetaData(metaDataDao)
+        val sentEntry = boxDao.insertSentEntry(SentEntry(-1, 1, 2, 3, 4))
+        val sentImage1 = boxDao.insertSentImage(SentImage(-1, sentEntry.id, dbImage1.id))
+        val sentImage2 = boxDao.insertSentImage(SentImage(-1, sentEntry.id, dbImage2.id))
+        sentEntry
+      }
+    
+    GetAsUser(s"/api/sent/${sentEntry.id}/images") ~> routes ~> check {
+      status should be(OK)
+      responseAs[List[Image]].length should be(2)
+    }
+  }
+  
+  it should "only list images corresponding to a sent entry that exists" in {
+    val sentEntry =
+      db.withSession { implicit session =>
+        val (dbPatient1, (dbStudy1, dbStudy2), (dbSeries1, dbSeries2, dbSeries3, dbSeries4), (dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)) =
+          TestUtil.insertMetaData(metaDataDao)
+        val sentEntry = boxDao.insertSentEntry(SentEntry(-1, 1, 2, 3, 4))
+        val sentImage1 = boxDao.insertSentImage(SentImage(-1, sentEntry.id, dbImage1.id))
+        val sentImage2 = boxDao.insertSentImage(SentImage(-1, sentEntry.id, dbImage2.id))
+        val sentImage3 = boxDao.insertSentImage(SentImage(-1, sentEntry.id, 666))
+        sentEntry
+      }
+    
+    GetAsUser(s"/api/sent/${sentEntry.id}/images") ~> routes ~> check {
       status should be(OK)
       responseAs[List[Image]].length should be(2)
     }    

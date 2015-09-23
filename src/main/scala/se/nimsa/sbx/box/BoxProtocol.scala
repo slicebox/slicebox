@@ -52,6 +52,12 @@ object BoxProtocol {
 
   case class FailedOutboxEntry(outboxEntry: OutboxEntry, message: String)
   
+  case class SentEntry(id: Long, remoteBoxId: Long, transactionId: Long, sentImageCount: Long, totalImageCount: Long) extends Entity
+
+  case class SentEntryInfo(id: Long, remoteBoxName: String, transactionId: Long, sentImageCount: Long, totalImageCount: Long)
+  
+  case class SentImage(id: Long, sentEntryId: Long, imageId: Long) extends Entity
+
   case class InboxEntry(id: Long, remoteBoxId: Long, transactionId: Long, receivedImageCount: Long, totalImageCount: Long) extends Entity
 
   case class InboxEntryInfo(id: Long, remoteBoxName: String, transactionId: Long, receivedImageCount: Long, totalImageCount: Long)
@@ -97,16 +103,24 @@ object BoxProtocol {
 
   case object GetOutbox extends BoxRequest
 
+  case object GetSent extends BoxRequest
+  
   case class RemoveInboxEntry(inboxEntryId: Long) extends BoxRequest
   
   case class RemoveOutboxEntry(outboxEntryId: Long) extends BoxRequest
 
+  case class RemoveSentEntry(sentEntryId: Long) extends BoxRequest
+  
   case class GetImagesForInboxEntry(inboxEntryId: Long) extends BoxRequest
+  
+  case class GetImagesForSentEntry(sentEntryId: Long) extends BoxRequest
   
   
   case class InboxEntryRemoved(inboxEntryId: Long)
 
   case class OutboxEntryRemoved(outboxEntryId: Long)
+
+  case class SentEntryRemoved(sentEntryId: Long)
 
   case class RemoteBoxAdded(box: Box)
 
@@ -130,6 +144,8 @@ object BoxProtocol {
 
   case class Outbox(entries: Seq[OutboxEntryInfo])
 
+  case class Sent(entries: Seq[SentEntryInfo])
+  
   case object BoxNotFound
 
   // box push actor internal messages

@@ -257,15 +257,53 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
         val inboxEntry = inboxEntries.head
         val inboxImages = boxDao.listInboxImagesForInboxEntryId(inboxEntry.id)
         inboxImages.size should be(2)
-        
+
         boxService ! RemoveInboxEntry(inboxEntry.id)
         expectMsg(InboxEntryRemoved(inboxEntry.id))
-        
-        boxDao.listInboxImagesForInboxEntryId(inboxEntry.id).size should be (0)
-        boxDao.listInboxImages.size should be (0)
+
+        boxDao.listInboxImagesForInboxEntryId(inboxEntry.id).size should be(0)
+        boxDao.listInboxImages.size should be(0)
       }
     }
 
+    "add processed outbox entries to the list of sent entries, along with records of sent images" in {
+      db.withSession { implicit session =>
+        val remoteBox = boxDao.insertBox(Box(-1, "some remote box", "abc", "https://someurl.com", BoxSendMethod.POLL, false))
+        boxDao.insertOutboxEntry(OutboxEntry(-1, remoteBox.id, 123, 1, 100, 5, false))
+        boxDao.insertOutboxEntry(OutboxEntry(-1, remoteBox.id, 123, 2, 100, 33, false))
+
+        boxService ! DeleteOutboxEntry("abc", 123, 1)
+        expectMsg(OutboxEntryDeleted)
+
+        var sentEntries = boxDao.listSentEntries
+        sentEntries.size should be(1)
+        boxDao.listSentImagesForSentEntryId(sentEntries.head.id).map(_.imageId) should be(List(5))
+
+        boxService ! DeleteOutboxEntry("abc", 123, 2)
+        expectMsg(OutboxEntryDeleted)
+
+        sentEntries = boxDao.listSentEntries
+        sentEntries.size should be(1)
+        boxDao.listSentImagesForSentEntryId(sentEntries.head.id).map(_.imageId) should be(List(5, 33))
+      }
+    }
+
+    "remove sent images when the related sent entry is removed" in {
+      db.withSession { implicit session =>
+        val se = boxDao.insertSentEntry(SentEntry(-1, 1, 123, 1, 2))
+        boxDao.insertSentImage(SentImage(-1, se.id, 5))
+        boxDao.insertSentImage(SentImage(-1, se.id, 33))
+        
+        boxDao.listSentEntries.size should be (1)
+        boxDao.listSentImagesForSentEntryId(se.id).size should be (2)
+        
+        boxService ! RemoveSentEntry(se.id)
+        expectMsg(SentEntryRemoved(se.id))        
+        
+        boxDao.listSentEntries.size should be (0)
+        boxDao.listSentImagesForSentEntryId(se.id).size should be (0)        
+      }
+    }
   }
 
   def insertMetadata(implicit session: H2Driver.simple.Session) = {

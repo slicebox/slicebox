@@ -75,6 +75,34 @@ class BoxDAO(val driver: JdbcProfile) {
 
   val inboxQuery = TableQuery[InboxTable]
 
+  val toSentEntry = (id: Long, remoteBoxId: Long, transactionId: Long, sentImageCount: Long, totalImageCount: Long) =>
+    SentEntry(id, remoteBoxId, transactionId, sentImageCount, totalImageCount)
+  val fromSentEntry = (entry: SentEntry) => Option((entry.id, entry.remoteBoxId, entry.transactionId, entry.sentImageCount, entry.totalImageCount))
+
+  class SentTable(tag: Tag) extends Table[SentEntry](tag, "Sent") {
+    def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
+    def remoteBoxId = column[Long]("remoteboxid")
+    def transactionId = column[Long]("transactionid")
+    def sentImageCount = column[Long]("sentimagecount")
+    def totalImageCount = column[Long]("totalimagecount")
+    def * = (id, remoteBoxId, transactionId, sentImageCount, totalImageCount) <> (toSentEntry.tupled, fromSentEntry)
+  }
+
+  val sentQuery = TableQuery[SentTable]
+
+  val toSentImage = (id: Long, sentEntryId: Long, imageId: Long) => SentImage(id, sentEntryId, imageId)
+  val fromSentImage = (sentImage: SentImage) => Option((sentImage.id, sentImage.sentEntryId, sentImage.imageId))
+
+  class SentImageTable(tag: Tag) extends Table[SentImage](tag, "SentImages") {
+    def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
+    def sentEntryId = column[Long]("sententryid")
+    def imageId = column[Long]("imageid")
+    def fkInboxEntry = foreignKey("fk_sent_entry", sentEntryId, sentQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
+    def * = (id, sentEntryId, imageId) <> (toSentImage.tupled, fromSentImage)
+  }
+
+  val sentImageQuery = TableQuery[SentImageTable]
+
   val toInboxImage = (id: Long, inboxEntryId: Long, imageId: Long) => InboxImage(id, inboxEntryId, imageId)
   val fromInboxImage = (inboxImage: InboxImage) => Option((inboxImage.id, inboxImage.inboxEntryId, inboxImage.imageId))
 
@@ -114,18 +142,22 @@ class BoxDAO(val driver: JdbcProfile) {
     if (MTable.getTables("Box").list.isEmpty) boxQuery.ddl.create
     if (MTable.getTables("Outbox").list.isEmpty) outboxQuery.ddl.create
     if (MTable.getTables("Inbox").list.isEmpty) inboxQuery.ddl.create
+    if (MTable.getTables("Sent").list.isEmpty) sentQuery.ddl.create
     if (MTable.getTables("InboxImages").list.isEmpty) inboxImageQuery.ddl.create
+    if (MTable.getTables("SentImages").list.isEmpty) sentImageQuery.ddl.create
     if (MTable.getTables("TransactionTagValue").list.isEmpty) transactionTagValueQuery.ddl.create
   }
 
   def drop(implicit session: Session): Unit =
-    (boxQuery.ddl ++ outboxQuery.ddl ++ inboxQuery.ddl ++ inboxImageQuery.ddl ++ transactionTagValueQuery.ddl).drop
+    (boxQuery.ddl ++ outboxQuery.ddl ++ inboxQuery.ddl ++ inboxImageQuery.ddl ++ sentQuery.ddl ++ sentImageQuery.ddl ++ transactionTagValueQuery.ddl).drop
 
   def clear(implicit session: Session): Unit = {
     boxQuery.delete
     inboxQuery.delete
     outboxQuery.delete
+    sentQuery.delete
     inboxImageQuery.delete
+    sentImageQuery.delete
     transactionTagValueQuery.delete
   }
 
@@ -161,9 +193,19 @@ class BoxDAO(val driver: JdbcProfile) {
     entry.copy(id = generatedId)
   }
 
+  def insertSentEntry(entry: SentEntry)(implicit session: Session): SentEntry = {
+    val generatedId = (sentQuery returning sentQuery.map(_.id)) += entry
+    entry.copy(id = generatedId)
+  }
+
   def insertInboxImage(inboxImage: InboxImage)(implicit session: Session): InboxImage = {
     val generatedId = (inboxImageQuery returning inboxImageQuery.map(_.id)) += inboxImage
     inboxImage.copy(id = generatedId)
+  }
+
+  def insertSentImage(sentImage: SentImage)(implicit session: Session): SentImage = {
+    val generatedId = (sentImageQuery returning sentImageQuery.map(_.id)) += sentImage
+    sentImage.copy(id = generatedId)
   }
 
   def boxById(boxId: Long)(implicit session: Session): Option[Box] =
@@ -193,6 +235,9 @@ class BoxDAO(val driver: JdbcProfile) {
   def updateInboxEntry(entry: InboxEntry)(implicit session: Session): Unit =
     inboxQuery.filter(_.id === entry.id).update(entry)
 
+  def updateSentEntry(entry: SentEntry)(implicit session: Session): Unit =
+    sentQuery.filter(_.id === entry.id).update(entry)
+
   def nextOutboxEntryForRemoteBoxId(remoteBoxId: Long)(implicit session: Session): Option[OutboxEntry] =
     outboxQuery
       .filter(_.remoteBoxId === remoteBoxId)
@@ -221,8 +266,28 @@ class BoxDAO(val driver: JdbcProfile) {
     }
   }
 
+  def updateSent(remoteBoxId: Long, transactionId: Long, sequenceNumber: Long, totalImageCount: Long)(implicit session: Session): SentEntry = {
+    sentEntryByTransactionId(remoteBoxId, transactionId) match {
+      case Some(sentEntry) => {
+        val updatedSentEntry = sentEntry.copy(sentImageCount = sequenceNumber, totalImageCount = totalImageCount)
+        updateSentEntry(updatedSentEntry)
+        updatedSentEntry
+      }
+      case None => {
+        val sentEntry = SentEntry(-1, remoteBoxId, transactionId, sequenceNumber, totalImageCount)
+        insertSentEntry(sentEntry)
+      }
+    }
+  }
+
   def inboxEntryByTransactionId(remoteBoxId: Long, transactionId: Long)(implicit session: Session): Option[InboxEntry] =
     inboxQuery
+      .filter(_.remoteBoxId === remoteBoxId)
+      .filter(_.transactionId === transactionId)
+      .list.headOption
+
+  def sentEntryByTransactionId(remoteBoxId: Long, transactionId: Long)(implicit session: Session): Option[SentEntry] =
+    sentQuery
       .filter(_.remoteBoxId === remoteBoxId)
       .filter(_.transactionId === transactionId)
       .list.headOption
@@ -251,6 +316,9 @@ class BoxDAO(val driver: JdbcProfile) {
   def removeOutboxEntries(entryIds: Seq[Long])(implicit session: Session): Unit =
     outboxQuery.filter(_.id inSet entryIds).delete
 
+  def removeSentEntry(entryId: Long)(implicit session: Session): Unit =
+    sentQuery.filter(_.id === entryId).delete
+
   def listBoxes(implicit session: Session): List[Box] =
     boxQuery.list
 
@@ -260,8 +328,14 @@ class BoxDAO(val driver: JdbcProfile) {
   def listInboxEntries(implicit session: Session): List[InboxEntry] =
     inboxQuery.list
 
+  def listSentEntries(implicit session: Session): List[SentEntry] =
+    sentQuery.list
+
   def listInboxImages(implicit session: Session): List[InboxImage] =
     inboxImageQuery.list
+
+  def listSentImagesForSentEntryId(sentEntryId: Long)(implicit session: Session): List[SentImage] =
+    sentImageQuery.filter(_.sentEntryId === sentEntryId).list
 
   def listInboxImagesForInboxEntryId(inboxEntryId: Long)(implicit session: Session): List[InboxImage] =
     inboxImageQuery.filter(_.inboxEntryId === inboxEntryId).list

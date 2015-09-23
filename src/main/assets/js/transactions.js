@@ -11,10 +11,24 @@ angular.module('slicebox.transactions', ['ngRoute'])
   });
 })
 
-.controller('TransactionsCtrl', function($scope) {
+.controller('TransactionsCtrl', function($scope, $http, $q, sbxMisc, openTagSeriesModal) {
+    $scope.uiState = {};
+
+    $scope.openTagSeriesModalFunction = function() {
+        return function(inboxEntries) {
+            var inboxEntryIds = inboxEntries.map(function (inboxEntry) { return inboxEntry.id; });
+            var imagesPromises = inboxEntryIds.map(function (inboxEntryId) { return $http.get('/api/inbox/' + inboxEntryId + "/images").then(function (imagesData) { return imagesData.data; }); });
+            var imagesPromise = $q.all(imagesPromises).then(function (listOfImageLists) { return sbxMisc.flatten(listOfImageLists); });
+            var seriesIdsPromise = imagesPromise.then(function (images) { return images.map(function (image) { return image.seriesId; }); });
+            var uniqueSeriesIdsPromise = seriesIdsPromise.then(function (seriesIds) { return sbxMisc.unique(seriesIds); });
+
+            return openTagSeriesModal(uniqueSeriesIdsPromise);
+        };
+    };
+
 })
 
-.controller('InboxCtrl', function($scope, $http, $interval, $q, $mdDialog, sbxMisc, openTagSeriesModal) {
+.controller('InboxCtrl', function($scope, $http, $interval, $mdDialog) {
     // Initialization
     $scope.objectActions =
         [
@@ -24,7 +38,7 @@ angular.module('slicebox.transactions', ['ngRoute'])
             },
             {
                 name: 'Tag Series',
-                action: openTagSeriesModalFunction()
+                action: $scope.openTagSeriesModalFunction()
             }
         ];
 
@@ -43,18 +57,6 @@ angular.module('slicebox.transactions', ['ngRoute'])
     $scope.loadInboxPage = function(startIndex, count, orderByProperty, orderByDirection) {
         return $http.get('/api/inbox');
     };
-
-    function openTagSeriesModalFunction() {
-        return function(inboxEntries) {
-            var inboxEntryIds = inboxEntries.map(function (inboxEntry) { return inboxEntry.id; });
-            var imagesPromises = inboxEntryIds.map(function (inboxEntryId) { return $http.get('/api/inbox/' + inboxEntryId + "/images").then(function (imagesData) { return imagesData.data; }); });
-            var imagesPromise = $q.all(imagesPromises).then(function (listOfImageLists) { return sbxMisc.flatten(listOfImageLists); });
-            var seriesIdsPromise = imagesPromise.then(function (images) { return images.map(function (image) { return image.seriesId; }); });
-            var uniqueSeriesIdsPromise = seriesIdsPromise.then(function (seriesIds) { return sbxMisc.unique(seriesIds); });
-
-            return openTagSeriesModal(uniqueSeriesIdsPromise);
-        };
-    }
 
 })
 
@@ -156,6 +158,38 @@ angular.module('slicebox.transactions', ['ngRoute'])
 
         return deleteAllPromises;
     }
+
+})
+
+.controller('SentCtrl', function($scope, $http, $interval, $mdDialog) {
+    // Initialization
+    $scope.objectActions =
+        [
+            {
+                name: 'Delete',
+                action: $scope.confirmDeleteEntitiesFunction('/api/sent/', 'sent entries')
+            },
+            {
+                name: 'Tag Series',
+                action: $scope.openTagSeriesModalFunction()
+            }
+        ];
+
+    $scope.callbacks = {};
+
+    var timer = $interval(function() {
+        if (angular.isDefined($scope.callbacks.sentTable)) {
+            $scope.callbacks.sentTable.reloadPage();
+        }
+    }, 5000);
+
+    $scope.$on('$destroy', function() {
+        $interval.cancel(timer);
+    });
+  
+    $scope.loadSentPage = function(startIndex, count, orderByProperty, orderByDirection) {
+        return $http.get('/api/sent');
+    };
 
 })
 

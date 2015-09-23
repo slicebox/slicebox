@@ -12,6 +12,7 @@ import se.nimsa.sbx.anonymization.AnonymizationProtocol.TagValue
 import se.nimsa.sbx.box.BoxDAO
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy.Patient
+import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.DicomProperty._
 import se.nimsa.sbx.dicom.DicomUtil
 import se.nimsa.sbx.util.TestUtil
@@ -170,7 +171,7 @@ class RemoteBoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
   }
 
-  it should "remove outbox entry when done is received" in {
+  it should "remove outbox entry and add sent entry when done is received" in {
     // add image (image will get id 1)
     val file = TestUtil.testImageFile
     val mfd = MultipartFormData(Seq(BodyPart(file, "file")))
@@ -191,6 +192,12 @@ class RemoteBoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
         responseAs[OutboxEntry]
       }
 
+    // check that sent table is empty at this stage
+    GetAsUser("/api/sent") ~> routes ~> check {
+      status should be(OK)
+      responseAs[List[SentEntryInfo]].size should be(0)
+    }
+
     // send done
     Post(s"/api/box/${uniBox.token}/outbox/done", outboxEntry) ~> routes ~> check {
       status should be(NoContent)
@@ -199,6 +206,19 @@ class RemoteBoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     // poll outbox to check that outbox is empty
     Get(s"/api/box/${uniBox.token}/outbox/poll") ~> routes ~> check {
       status should be(NotFound)
+    }
+
+    // check that sent table has an entry now
+    val sentEntries =
+      GetAsUser("/api/sent") ~> routes ~> check {
+        val sentEntries = responseAs[List[SentEntryInfo]]
+        sentEntries.size should be(1)
+        sentEntries
+      }
+
+    GetAsUser(s"/api/sent/${sentEntries.head.id}/images") ~> routes ~> check {
+      status should be(OK)
+      responseAs[List[Image]].size should be(1)
     }
   }
 

@@ -157,6 +157,8 @@ class BoxPushActor(box: Box,
 
     db.withSession { implicit session =>
       boxDao.removeOutboxEntry(outboxEntry.id)
+      val sentEntry = boxDao.updateSent(outboxEntry.remoteBoxId, outboxEntry.transactionId, outboxEntry.sequenceNumber, outboxEntry.totalImageCount)
+      boxDao.insertSentImage(SentImage(-1, sentEntry.id, outboxEntry.imageId))
     }
 
     if (outboxEntry.sequenceNumber == outboxEntry.totalImageCount) {

@@ -163,6 +163,7 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String, impli
               outboxEntryByTransactionIdAndSequenceNumber(box.id, transactionId, sequenceNumber) match {
                 case Some(outboxEntry) =>
                   removeOutboxEntryFromDb(outboxEntry.id)
+                  updateSent(outboxEntry)
 
                   if (outboxEntry.sequenceNumber == outboxEntry.totalImageCount) {
                     removeTransactionTagValuesForTransactionId(outboxEntry.transactionId)
@@ -202,13 +203,22 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String, impli
             }
             sender ! Outbox(outboxEntries)
 
+          case GetSent =>
+            val sentEntries = getSentFromDb().map { sentEntry =>
+              boxById(sentEntry.remoteBoxId) match {
+                case Some(box) => SentEntryInfo(sentEntry.id, box.name, sentEntry.transactionId, sentEntry.sentImageCount, sentEntry.totalImageCount)
+                case None      => SentEntryInfo(sentEntry.id, sentEntry.remoteBoxId.toString, sentEntry.transactionId, sentEntry.sentImageCount, sentEntry.totalImageCount)
+              }
+            }
+            sender ! Sent(sentEntries)
+
           case GetImagesForInboxEntry(inboxEntryId) =>
-            val inboxImages = getInboxImagesByInboxEntryId(inboxEntryId)
-            val futureImageMaybes = Future.sequence(
-              inboxImages.map(inboxImage =>
-                storageService.ask(GetImage(inboxImage.imageId)).mapTo[Option[Image]]))
-            val futureImages = futureImageMaybes.map(imageMaybes => Images(imageMaybes.flatten))
-            futureImages.pipeTo(sender)
+            val imageIds = getInboxImagesByInboxEntryId(inboxEntryId).map(_.imageId)
+            getImagesFromStorage(imageIds).pipeTo(sender)
+
+          case GetImagesForSentEntry(sentEntryId) =>
+            val imageIds = getSentImagesBySentEntryId(sentEntryId).map(_.imageId)
+            getImagesFromStorage(imageIds).pipeTo(sender)
 
           case RemoveOutboxEntry(outboxEntryId) =>
             outboxEntryById(outboxEntryId)
@@ -221,6 +231,10 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String, impli
           case RemoveInboxEntry(inboxEntryId) =>
             removeInboxEntryFromDb(inboxEntryId)
             sender ! InboxEntryRemoved(inboxEntryId)
+
+          case RemoveSentEntry(sentEntryId) =>
+            removeSentEntryFromDb(sentEntryId)
+            sender ! SentEntryRemoved(sentEntryId)
 
           case GetTransactionTagValues(imageId, transactionId) =>
             sender ! tagValuesForImageIdAndTransactionId(imageId, transactionId)
@@ -380,6 +394,17 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String, impli
       boxDao.removeOutboxEntry(outboxEntryId)
     }
 
+  def removeSentEntryFromDb(sentEntryId: Long) =
+    db.withSession { implicit session =>
+      boxDao.removeSentEntry(sentEntryId)
+    }
+
+  def updateSent(outboxEntry: OutboxEntry) =
+    db.withSession { implicit session =>
+      val sentEntry = boxDao.updateSent(outboxEntry.remoteBoxId, outboxEntry.transactionId, outboxEntry.sequenceNumber, outboxEntry.totalImageCount)
+      boxDao.insertSentImage(SentImage(-1, sentEntry.id, outboxEntry.imageId))
+    }
+
   def markOutboxTransactionAsFailed(box: Box, transactionId: Long, message: String) = {
     db.withSession { implicit session =>
       boxDao.markOutboxTransactionAsFailed(box.id, transactionId)
@@ -397,9 +422,19 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String, impli
       boxDao.listOutboxEntries
     }
 
+  def getSentFromDb() =
+    db.withSession { implicit session =>
+      boxDao.listSentEntries
+    }
+
   def getInboxImagesByInboxEntryId(inboxEntryId: Long) =
     db.withSession { implicit session =>
       boxDao.listInboxImagesForInboxEntryId(inboxEntryId)
+    }
+
+  def getSentImagesBySentEntryId(sentEntryId: Long) =
+    db.withSession { implicit session =>
+      boxDao.listSentImagesForSentEntryId(sentEntryId)
     }
 
   def updateBoxOnlineStatusInDb(boxId: Long, online: Boolean): Unit =
@@ -416,6 +451,12 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String, impli
     db.withSession { implicit session =>
       boxDao.removeTransactionTagValuesByTransactionId(transactionId)
     }
+
+  def getImagesFromStorage(imageIds: List[Long]): Future[Images] =
+    Future.sequence(
+      imageIds.map(imageId =>
+        storageService.ask(GetImage(imageId)).mapTo[Option[Image]]))
+      .map(imageMaybes => Images(imageMaybes.flatten))
 
 }
 

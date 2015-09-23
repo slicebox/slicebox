@@ -128,5 +128,33 @@ trait BoxRoutes { this: RestApi =>
         }
       }
     }
+  
+  def sentRoutes: Route =
+    pathPrefix("sent") {
+      pathEndOrSingleSlash {
+        get {
+          onSuccess(boxService.ask(GetSent)) {
+            case Sent(entries) =>
+              complete(entries)
+          }
+        }
+      } ~ pathPrefix(LongNumber) { sentEntryId =>
+        pathEndOrSingleSlash {
+          delete {
+            onSuccess(boxService.ask(RemoveSentEntry(sentEntryId))) {
+              case SentEntryRemoved(sentEntryId) =>
+                complete(NoContent)
+            }
+          }
+        } ~ path("images") {
+          get {
+            onSuccess(boxService.ask(GetImagesForSentEntry(sentEntryId))) {
+              case Images(images) =>
+                complete(images)
+            }
+          }
+        }
+      }
+    }
 
 }

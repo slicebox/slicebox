@@ -61,6 +61,7 @@ trait SliceboxRoutes extends DirectoryRoutes
             userRoutes(authInfo) ~
             inboxRoutes ~
             outboxRoutes ~
+            sentRoutes ~
             logRoutes ~
             systemRoutes(authInfo) ~
             seriesTypeRoutes(authInfo) ~
