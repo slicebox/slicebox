@@ -23,6 +23,10 @@ angular.module('slicebox.utils', [])
             return [].concat.apply([], arrayOfArrays);
         },
 
+        unique: function(array) {
+            return array.filter(function (value, index, self) { return self.indexOf(value) === index; });
+        },
+
         flattenPromises: function(arrayOfPromisesOfArrays) {
             return $q.all(arrayOfPromisesOfArrays).then(this.flatten); 
         }
@@ -55,6 +59,25 @@ angular.module('slicebox.utils', [])
             var promises = patients.map(function(patient) {
                 return $http.get(sbxMisc.urlWithAdvancedFiltering('/api/metadata/studies?startindex=0&count=1000000&patientid=' + patient.id, sources, seriesTypes, seriesTags)).then(function (studiesData) {
                     return self.imagesForStudies(studiesData.data, sources, seriesTypes, seriesTags);
+                });
+            });
+            return sbxMisc.flattenPromises(promises);
+        },
+
+        seriesForStudies: function(studies, sources, seriesTypes, seriesTags) {
+            var promises = studies.map(function(study) {
+                return $http.get(sbxMisc.urlWithAdvancedFiltering('/api/metadata/series?startindex=0&count=1000000&studyid=' + study.id, sources, seriesTypes, seriesTags)).then(function (seriesData) {
+                    return seriesData.data;
+                });
+            });
+            return sbxMisc.flattenPromises(promises);            
+        },
+
+        seriesForPatients: function(patients, sources, seriesTypes, seriesTags) {
+            var self = this;
+            var promises = patients.map(function(patient) {
+                return $http.get(sbxMisc.urlWithAdvancedFiltering('/api/metadata/studies?startindex=0&count=1000000&patientid=' + patient.id, sources, seriesTypes, seriesTags)).then(function (studiesData) {
+                    return self.seriesForStudies(studiesData.data, sources, seriesTypes, seriesTags);
                 });
             });
             return sbxMisc.flattenPromises(promises);
@@ -109,6 +132,75 @@ angular.module('slicebox.utils', [])
     $scope.cancelButtonClicked = function () {
         $mdDialog.cancel();
     };
+})
+
+.factory('openTagSeriesModal', function($mdDialog) {
+    return function(seriesIdsPromise) {
+        return $mdDialog.show({
+            templateUrl: '/assets/partials/tagSeriesModalContent.html',
+            controller: 'TagSeriesModalCtrl',
+            locals: {
+                seriesIds: seriesIdsPromise
+            }
+        });
+    };
+})
+
+.controller('TagSeriesModalCtrl', function($scope, $mdDialog, $http, $q, sbxMisc, seriesIds) {
+    $scope.uiState = {
+        seriesIds: seriesIds,
+        seriesTags: [],
+        tagState: {
+            searchText: ""
+        }
+    };
+
+    var seriesTagsPromise = $http.get('/api/metadata/seriestags').then(function (seriesTagsData) { return seriesTagsData.data; });
+
+    $scope.okButtonClicked = function() {
+        var promise = 
+            $q.all(
+                sbxMisc.flatten(
+                    $scope.uiState.seriesTags.map(function (seriesTag) {
+                        return $scope.uiState.seriesIds.map(function (seriesId) {
+                            return $http.post('/api/metadata/series/' + seriesId + '/seriestags', seriesTag);
+                        });
+                    })
+                )
+            );
+
+        promise.finally(function() {
+            $mdDialog.hide();
+        });
+
+        return promise;
+    };
+
+    $scope.cancelButtonClicked = function() {
+        $mdDialog.cancel();
+    };
+
+    $scope.findSeriesTags = function(searchText) {
+        var lcSearchText = angular.lowercase(searchText);
+        var selectedTagNames = $scope.uiState.seriesTags.map(function (seriesTag) { return seriesTag.name; });
+        return searchText ? seriesTagsPromise.then(function (seriesTags) { 
+            return seriesTags.filter(function (seriesTag) {
+                var lcName = angular.lowercase(seriesTag.name);
+                return lcName.indexOf(lcSearchText) === 0;
+            }).filter(function (seriesTag) {
+                return selectedTagNames.indexOf(seriesTag.name) < 0;
+            });
+        }) : [];
+    };
+
+    $scope.seriesTagAdded = function(tag) {
+        var theTag = tag.name ? tag : { id: -1, name: tag };
+        if ($scope.uiState.seriesTags.filter(function (seriesTag) { return seriesTag.name === tag.name; }).length === 0) {
+            $scope.uiState.seriesTags.push(theTag);
+        }
+        return theTag;
+    };
+
 })
 
 .factory('authenticationService', function (base64, $http, $cookieStore, $rootScope, $timeout) {

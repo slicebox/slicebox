@@ -17,7 +17,7 @@ angular.module('slicebox.adminForwarding', ['ngRoute'])
         [
             {
                 name: 'Delete',
-                action: $scope.confirmDeleteEntitiesFunction('/api/forwarding/rules', 'rule(s)')
+                action: $scope.confirmDeleteEntitiesFunction('/api/forwarding/rules/', 'forwarding rule(s)')
             }
         ];
 
@@ -36,7 +36,7 @@ angular.module('slicebox.adminForwarding', ['ngRoute'])
         });
         dialogPromise.then(function (response) {
             $scope.showInfoMessage("Forwarding rule added");                
-            $scope.callbacks.forwardingTable.reloadPage();
+            $scope.callbacks.rulesTable.reloadPage();
         });
     };
 })
@@ -67,8 +67,10 @@ angular.module('slicebox.adminForwarding', ['ngRoute'])
 
     $scope.addButtonClicked = function() {
         var rule = { 
+            id: -1,
             source: $scope.uiState.source, 
-            target: $scope.uiState.target, 
+            targetBoxName: $scope.uiState.target.name,
+            targetBoxId: $scope.uiState.target.id, 
             keepImages: $scope.uiState.keepImages 
         };
 

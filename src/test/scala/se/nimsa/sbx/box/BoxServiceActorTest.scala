@@ -29,7 +29,7 @@ import akka.util.Timeout
 import scala.concurrent.duration.DurationInt
 
 class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
-  with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {
+    with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {
 
   def this() = this(ActorSystem("BoxServiceActorTestSystem"))
 
@@ -67,7 +67,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
 
         val remoteBox = boxDao.insertBox(Box(-1, "some remote box", "abc", "https://someurl.com", BoxSendMethod.POLL, false))
 
-        boxService ! UpdateInbox(remoteBox.token, 123, 1, 2)
+        boxService ! UpdateInbox(remoteBox.token, 123, 1, 2, 2)
 
         expectMsg(InboxUpdated(remoteBox.token, 123, 1, 2))
 
@@ -89,10 +89,10 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
 
         val remoteBox = boxDao.insertBox(Box(-1, "some remote box", "abc", "https://someurl.com", BoxSendMethod.POLL, false))
 
-        boxService ! UpdateInbox(remoteBox.token, 123, 1, 3)
+        boxService ! UpdateInbox(remoteBox.token, 123, 1, 3, 4)
         expectMsg(InboxUpdated(remoteBox.token, 123, 1, 3))
 
-        boxService ! UpdateInbox(remoteBox.token, 123, 2, 3)
+        boxService ! UpdateInbox(remoteBox.token, 123, 2, 3, 5)
         expectMsg(InboxUpdated(remoteBox.token, 123, 2, 3))
 
         val inboxEntries = boxDao.listInboxEntries
@@ -238,6 +238,31 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
         boxDao.tagValuesByImageIdAndTransactionId(i1.id, transactionId).isEmpty should be(true)
         boxDao.tagValuesByImageIdAndTransactionId(i2.id, transactionId).isEmpty should be(true)
         boxDao.tagValuesByImageIdAndTransactionId(i3.id, transactionId).isEmpty should be(true)
+      }
+    }
+
+    "remove inbox images when the related inbox entry is removed" in {
+      db.withSession { implicit session =>
+        val remoteBox = boxDao.insertBox(Box(-1, "some remote box", "abc", "https://someurl.com", BoxSendMethod.POLL, false))
+
+        boxService ! UpdateInbox(remoteBox.token, 123, 1, 3, 4)
+        expectMsg(InboxUpdated(remoteBox.token, 123, 1, 3))
+
+        boxService ! UpdateInbox(remoteBox.token, 123, 2, 3, 5)
+        expectMsg(InboxUpdated(remoteBox.token, 123, 2, 3))
+
+        val inboxEntries = boxDao.listInboxEntries
+        inboxEntries.size should be(1)
+
+        val inboxEntry = inboxEntries.head
+        val inboxImages = boxDao.listInboxImagesForInboxEntryId(inboxEntry.id)
+        inboxImages.size should be(2)
+        
+        boxService ! RemoveInboxEntry(inboxEntry.id)
+        expectMsg(InboxEntryRemoved(inboxEntry.id))
+        
+        boxDao.listInboxImagesForInboxEntryId(inboxEntry.id).size should be (0)
+        boxDao.listInboxImages.size should be (0)
       }
     }
 

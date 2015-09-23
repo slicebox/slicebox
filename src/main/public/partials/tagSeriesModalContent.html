@@ -1,0 +1,33 @@
+<md-dialog aria-label="Tag Series" class="tag-series">
+
+    <md-dialog-content>
+        <md-subheader class="md-sticky-no-effect">Add Tags to {{ uiState.seriesIds.length }} Series</md-subheader>
+
+        <md-chips 
+            ng-model="uiState.seriesTags" 
+            md-autocomplete-snap 
+            md-require-match="false"
+            md-on-append="seriesTagAdded($chip)">
+            <md-autocomplete
+                md-search-text="uiState.tagState.searchText"
+                md-items="item in findSeriesTags(uiState.tagState.searchText)"
+                md-item-text="item.name"
+                md-min-length="1"
+                md-no-cache
+                placeholder="+tag">
+                <span md-highlight-text="uiState.tagState.searchText">{{item.name}}</span>
+            </md-autocomplete>
+            <md-chip-template>
+                <span>{{$chip.name}} </span>
+            </md-chip-template>
+        </md-chips>
+
+    </md-dialog-content>
+
+    <div class="md-actions" layout="row">
+        <span flex></span>
+        <md-button ng-click="cancelButtonClicked()">Cancel</md-button>
+        <sbx-button button-class="md-primary" button-title="Ok" action="okButtonClicked()"></sbx-button>
+    </div>
+
+</md-dialog>

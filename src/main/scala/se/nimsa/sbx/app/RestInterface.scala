@@ -44,6 +44,8 @@ import se.nimsa.sbx.scu.ScuDAO
 import se.nimsa.sbx.scu.ScuServiceActor
 import se.nimsa.sbx.seriestype.SeriesTypeDAO
 import se.nimsa.sbx.seriestype.SeriesTypeServiceActor
+import se.nimsa.sbx.forwarding.ForwardingDAO
+import se.nimsa.sbx.forwarding.ForwardingServiceActor
 import se.nimsa.sbx.storage.MetaDataDAO
 import se.nimsa.sbx.storage.PropertiesDAO
 import se.nimsa.sbx.storage.StorageServiceActor
@@ -93,6 +95,7 @@ trait RestApi extends HttpService with SliceboxRoutes with JsonFormats {
     new LogDAO(dbProps.driver).create
     new UserDAO(dbProps.driver).create
     new SeriesTypeDAO(dbProps.driver).create
+    new ForwardingDAO(dbProps.driver).create
     new MetaDataDAO(dbProps.driver).create
     new PropertiesDAO(dbProps.driver).create
     new DirectoryWatchDAO(dbProps.driver).create
@@ -137,6 +140,7 @@ trait RestApi extends HttpService with SliceboxRoutes with JsonFormats {
   val scuService = actorRefFactory.actorOf(ScuServiceActor.props(dbProps, storage), name = "ScuService")
   val directoryService = actorRefFactory.actorOf(DirectoryWatchServiceActor.props(dbProps, storage), name = "DirectoryService")
   val seriesTypeService = actorRefFactory.actorOf(SeriesTypeServiceActor.props(dbProps, timeout), name = "SeriesTypeService")
+  val forwardingService = actorRefFactory.actorOf(ForwardingServiceActor.props(dbProps, timeout), name = "ForwardingService")
 
   val authenticator = new Authenticator(userService)
 

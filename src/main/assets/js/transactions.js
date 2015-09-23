@@ -14,13 +14,17 @@ angular.module('slicebox.transactions', ['ngRoute'])
 .controller('TransactionsCtrl', function($scope) {
 })
 
-.controller('InboxCtrl', function($scope, $http, $interval) {
+.controller('InboxCtrl', function($scope, $http, $interval, $q, $mdDialog, sbxMisc, openTagSeriesModal) {
     // Initialization
     $scope.objectActions =
         [
             {
                 name: 'Delete',
                 action: $scope.confirmDeleteEntitiesFunction('/api/inbox/', 'inbox entries')
+            },
+            {
+                name: 'Tag Series',
+                action: openTagSeriesModalFunction()
             }
         ];
 
@@ -39,6 +43,19 @@ angular.module('slicebox.transactions', ['ngRoute'])
     $scope.loadInboxPage = function(startIndex, count, orderByProperty, orderByDirection) {
         return $http.get('/api/inbox');
     };
+
+    function openTagSeriesModalFunction() {
+        return function(inboxEntries) {
+            var inboxEntryIds = inboxEntries.map(function (inboxEntry) { return inboxEntry.id; });
+            var imagesPromises = inboxEntryIds.map(function (inboxEntryId) { return $http.get('/api/inbox/' + inboxEntryId + "/images").then(function (imagesData) { return imagesData.data; }); });
+            var imagesPromise = $q.all(imagesPromises).then(function (listOfImageLists) { return sbxMisc.flatten(listOfImageLists); });
+            var seriesIdsPromise = imagesPromise.then(function (images) { return images.map(function (image) { return image.seriesId; }); });
+            var uniqueSeriesIdsPromise = seriesIdsPromise.then(function (seriesIds) { return sbxMisc.unique(seriesIds); });
+
+            return openTagSeriesModal(uniqueSeriesIdsPromise);
+        };
+    }
+
 })
 
 .controller('OutboxCtrl', function($scope, $http, $q, $interval, openConfirmActionModal) {
@@ -108,6 +125,7 @@ angular.module('slicebox.transactions', ['ngRoute'])
     };
 
     // private functions
+
     function confirmDeleteEntities(entities) {
         var deleteConfirmationText = 'Permanently delete ' + entities.length + ' transaction(s)?';
 

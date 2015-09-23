@@ -29,6 +29,7 @@ import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.log.LogProtocol._
 import se.nimsa.sbx.app.UserProtocol._
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
+import se.nimsa.sbx.forwarding.ForwardingProtocol._
 import spray.routing.authentication.UserPass
 import se.nimsa.sbx.dicom.ImageAttribute
 
@@ -42,8 +43,6 @@ trait JsonFormats extends DefaultJsonProtocol {
 
   implicit val remoteBoxFormat = jsonFormat2(RemoteBox)
   implicit val remoteBoxNameFormat = jsonFormat1(RemoteBoxName)
-
-  implicit val updateInboxFormat = jsonFormat4(UpdateInbox)
 
   implicit object SourceTypeFormat extends JsonFormat[SourceType] {
     def write(obj: SourceType) = JsString(obj.toString)
@@ -170,4 +169,6 @@ trait JsonFormats extends DefaultJsonProtocol {
   implicit val seriesTypeRuleFormat = jsonFormat2(SeriesTypeRule)
   
   implicit val seriesTypeRuleAttributeFormat = jsonFormat7(SeriesTypeRuleAttribute)
+  
+  implicit val forwardingRuleFormat = jsonFormat5(ForwardingRule)
 }

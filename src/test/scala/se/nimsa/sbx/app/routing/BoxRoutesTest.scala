@@ -1,17 +1,15 @@
 package se.nimsa.sbx.app.routing
 
 import java.util.UUID
-
 import scala.math.abs
 import scala.slick.driver.H2Driver
-
 import org.scalatest.FlatSpec
 import org.scalatest.Matchers
-
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.TagValue
 import se.nimsa.sbx.box.BoxDAO
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy.Patient
+import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.DicomProperty._
 import se.nimsa.sbx.dicom.DicomUtil
 import se.nimsa.sbx.util.TestUtil
@@ -21,12 +19,14 @@ import spray.http.HttpData
 import spray.http.MultipartFormData
 import spray.http.StatusCodes._
 import spray.httpx.SprayJsonSupport._
+import se.nimsa.sbx.storage.MetaDataDAO
 
 class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
   def dbUrl() = "jdbc:h2:mem:boxroutestest;DB_CLOSE_DELAY=-1"
 
   val boxDao = new BoxDAO(H2Driver)
+  val metaDataDao = new MetaDataDAO(H2Driver)
 
   override def afterEach() {
     db.withSession { implicit session =>
@@ -143,14 +143,14 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       }
 
     DeleteAsUser(s"/api/inbox/${inboxEntry.id}") ~> routes ~> check {
-      status should be (NoContent)
+      status should be(NoContent)
     }
-    
+
     GetAsUser("/api/inbox") ~> routes ~> check {
-      responseAs[List[InboxEntryInfo]].size should be (0) 
+      responseAs[List[InboxEntryInfo]].size should be(0)
     }
   }
-  
+
   it should "support removing outbox entries" in {
     val outboxEntry =
       db.withSession { implicit session =>
@@ -158,12 +158,47 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       }
 
     DeleteAsUser(s"/api/outbox/${outboxEntry.id}") ~> routes ~> check {
-      status should be (NoContent)
+      status should be(NoContent)
     }
-    
+
     GetAsUser("/api/outbox") ~> routes ~> check {
-      responseAs[List[OutboxEntryInfo]].size should be (0) 
+      responseAs[List[OutboxEntryInfo]].size should be(0)
+    }
+  }
+
+  it should "support listing images corresponding to an inbox entry" in {
+    val inboxEntry =
+      db.withSession { implicit session =>
+        val (dbPatient1, (dbStudy1, dbStudy2), (dbSeries1, dbSeries2, dbSeries3, dbSeries4), (dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)) =
+          TestUtil.insertMetaData(metaDataDao)
+        val inboxEntry = boxDao.insertInboxEntry(InboxEntry(-1, 1, 2, 3, 4))
+        val inboxImage1 = boxDao.insertInboxImage(InboxImage(-1, inboxEntry.id, dbImage1.id))
+        val inboxImage2 = boxDao.insertInboxImage(InboxImage(-1, inboxEntry.id, dbImage2.id))
+        inboxEntry
+      }
+    
+    GetAsUser(s"/api/inbox/${inboxEntry.id}/images") ~> routes ~> check {
+      status should be(OK)
+      responseAs[List[Image]].length should be(2)
     }
   }
   
+  it should "only list images corresponding to an inbox entry that exists" in {
+    val inboxEntry =
+      db.withSession { implicit session =>
+        val (dbPatient1, (dbStudy1, dbStudy2), (dbSeries1, dbSeries2, dbSeries3, dbSeries4), (dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)) =
+          TestUtil.insertMetaData(metaDataDao)
+        val inboxEntry = boxDao.insertInboxEntry(InboxEntry(-1, 1, 2, 3, 4))
+        val inboxImage1 = boxDao.insertInboxImage(InboxImage(-1, inboxEntry.id, dbImage1.id))
+        val inboxImage2 = boxDao.insertInboxImage(InboxImage(-1, inboxEntry.id, dbImage2.id))
+        val inboxImage3 = boxDao.insertInboxImage(InboxImage(-1, inboxEntry.id, 666))
+        inboxEntry
+      }
+    
+    GetAsUser(s"/api/inbox/${inboxEntry.id}/images") ~> routes ~> check {
+      status should be(OK)
+      responseAs[List[Image]].length should be(2)
+    }    
+  }
+
 }

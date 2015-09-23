@@ -52,7 +52,7 @@ trait RemoteBoxRoutes { this: RestApi =>
                     onSuccess(anonymizationService.ask(ReverseAnonymization(dataset)).mapTo[Attributes]) { reversedDataset =>
                       onSuccess(storageService.ask(AddDataset(reversedDataset, SourceTypeId(SourceType.BOX, box.id)))) {
                         case ImageAdded(image) =>
-                          onSuccess(boxService.ask(UpdateInbox(token, transactionId, sequenceNumber, totalImageCount))) {
+                          onSuccess(boxService.ask(UpdateInbox(token, transactionId, sequenceNumber, totalImageCount, image.id))) {
                             case msg: InboxUpdated =>
                               complete(NoContent)
                           }

@@ -91,11 +91,20 @@ trait BoxRoutes { this: RestApi =>
               complete(entries)
           }
         }
-      } ~ path(LongNumber) { inboxEntryId =>
-        delete {
-          onSuccess(boxService.ask(RemoveInboxEntry(inboxEntryId))) {
-            case InboxEntryRemoved(inboxEntryId) =>
-              complete(NoContent)
+      } ~ pathPrefix(LongNumber) { inboxEntryId =>
+        pathEndOrSingleSlash {
+          delete {
+            onSuccess(boxService.ask(RemoveInboxEntry(inboxEntryId))) {
+              case InboxEntryRemoved(inboxEntryId) =>
+                complete(NoContent)
+            }
+          }
+        } ~ path("images") {
+          get {
+            onSuccess(boxService.ask(GetImagesForInboxEntry(inboxEntryId))) {
+              case Images(images) =>
+                complete(images)
+            }
           }
         }
       }

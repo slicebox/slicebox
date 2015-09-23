@@ -25,6 +25,7 @@ import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.dicom.DicomUtil._
+import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import akka.pattern.pipe
 import akka.actor.Props
 import akka.actor.PoisonPill
@@ -58,6 +59,8 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String, impli
 
   val pollBoxOnlineStatusTimeoutMillis: Long = 15000
   val pollBoxesLastPollTimestamp = collection.mutable.Map.empty[Long, Date]
+
+  val storageService = context.actorSelection("../StorageService")
 
   setupBoxes()
 
@@ -117,9 +120,9 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String, impli
           case GetBoxByToken(token) =>
             sender ! pollBoxByToken(token)
 
-          case UpdateInbox(token, transactionId, sequenceNumber, totalImageCount) =>
+          case UpdateInbox(token, transactionId, sequenceNumber, totalImageCount, imageId) =>
             pollBoxByToken(token).foreach(box =>
-              updateInbox(box.id, transactionId, sequenceNumber, totalImageCount))
+              updateInbox(box.id, transactionId, sequenceNumber, totalImageCount, imageId))
 
             // TODO: what should we do if no box was found for token?
 
@@ -198,6 +201,14 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String, impli
               }
             }
             sender ! Outbox(outboxEntries)
+
+          case GetImagesForInboxEntry(inboxEntryId) =>
+            val inboxImages = getInboxImagesByInboxEntryId(inboxEntryId)
+            val futureImageMaybes = Future.sequence(
+              inboxImages.map(inboxImage =>
+                storageService.ask(GetImage(inboxImage.imageId)).mapTo[Option[Image]]))
+            val futureImages = futureImageMaybes.map(imageMaybes => Images(imageMaybes.flatten))
+            futureImages.pipeTo(sender)
 
           case RemoveOutboxEntry(outboxEntryId) =>
             outboxEntryById(outboxEntryId)
@@ -293,9 +304,10 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String, impli
       boxDao.nextOutboxEntryForRemoteBoxId(boxId)
     }
 
-  def updateInbox(remoteBoxId: Long, transactionId: Long, sequenceNumber: Long, totalImageCount: Long): Unit = {
+  def updateInbox(remoteBoxId: Long, transactionId: Long, sequenceNumber: Long, totalImageCount: Long, imageId: Long): Unit = {
     db.withSession { implicit session =>
-      boxDao.updateInbox(remoteBoxId, transactionId, sequenceNumber, totalImageCount)
+      val inboxEntry = boxDao.updateInbox(remoteBoxId, transactionId, sequenceNumber, totalImageCount)
+      boxDao.insertInboxImage(InboxImage(-1, inboxEntry.id, imageId))
     }
 
     if (sequenceNumber == totalImageCount) {
@@ -374,7 +386,7 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String, impli
     }
     SbxLog.error("Box", message)
   }
-  
+
   def getInboxFromDb() =
     db.withSession { implicit session =>
       boxDao.listInboxEntries
@@ -383,6 +395,11 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String, impli
   def getOutboxFromDb() =
     db.withSession { implicit session =>
       boxDao.listOutboxEntries
+    }
+
+  def getInboxImagesByInboxEntryId(inboxEntryId: Long) =
+    db.withSession { implicit session =>
+      boxDao.listInboxImagesForInboxEntryId(inboxEntryId)
     }
 
   def updateBoxOnlineStatusInDb(boxId: Long, online: Boolean): Unit =

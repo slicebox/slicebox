@@ -11,7 +11,7 @@ angular.module('slicebox.home', ['ngRoute'])
   });
 })
 
-.controller('HomeCtrl', function($scope, $http, $mdDialog, $q, openConfirmActionModal, sbxMisc, sbxMetaData) {
+.controller('HomeCtrl', function($scope, $http, $mdDialog, $q, openConfirmActionModal, openTagSeriesModal, sbxMisc, sbxMetaData) {
 
     // Initialization
 
@@ -24,6 +24,10 @@ angular.module('slicebox.home', ['ngRoute'])
             {
                 name: 'Delete',
                 action: confirmDeletePatients
+            },
+            {
+                name: 'Tag',
+                action: tagSeriesForPatients
             },
             {
                 name: 'Anonymize',
@@ -44,6 +48,10 @@ angular.module('slicebox.home', ['ngRoute'])
             {
                 name: 'Delete',
                 action: confirmDeleteStudies
+            },
+            {
+                name: 'Tag',
+                action: tagSeriesForStudies
             },
             {
                 name: 'Anonymize',
@@ -69,6 +77,10 @@ angular.module('slicebox.home', ['ngRoute'])
             {
                 name: 'Delete',
                 action: confirmDeleteSeries
+            },
+            {
+                name: 'Tag',
+                action: tagSeries
             },
             {
                 name: 'Anonymize',
@@ -534,6 +546,22 @@ angular.module('slicebox.home', ['ngRoute'])
             $scope.uiState.advancedFiltering.selectedSeriesTags);
     }
 
+    function seriesForPatients(patients) {
+        return sbxMetaData.seriesForPatients(
+            patients,
+            $scope.uiState.advancedFiltering.selectedSources, 
+            $scope.uiState.advancedFiltering.selectedSeriesTypes, 
+            $scope.uiState.advancedFiltering.selectedSeriesTags);
+    }
+
+    function seriesForStudies(studies) {
+        return sbxMetaData.seriesForStudies(
+            studies,
+            $scope.uiState.advancedFiltering.selectedSources, 
+            $scope.uiState.advancedFiltering.selectedSeriesTypes, 
+            $scope.uiState.advancedFiltering.selectedSeriesTags);
+    }
+
     function updateSeriesTagsPromise() {
         $scope.uiState.advancedFiltering.seriesTagsPromise = $scope.uiState.advancedFiltering.seriesTagsPromise.then(function (oldTags) {
             return $http.get('/api/metadata/seriestags').then(function (newTagsData) {        
@@ -764,6 +792,21 @@ angular.module('slicebox.home', ['ngRoute'])
                 });
             });
         });
+    }
+
+    function tagSeriesForPatients(patients) {
+        var seriesIdsPromise = seriesForPatients(patients).then(function (series) { return series.map(function (s) { return s.id; }); });
+        openTagSeriesModal(seriesIdsPromise).then(function() { return updateSeriesTagsPromise(); });
+    }
+
+    function tagSeriesForStudies(studies) {
+        var seriesIdsPromise = seriesForStudies(studies).then(function (series) { return series.map(function (s) { return s.id; }); });
+        openTagSeriesModal(seriesIdsPromise).then(function() { return updateSeriesTagsPromise(); });
+    }
+
+    function tagSeries(series) {
+        var seriesIds = series.map(function (s) { return s.id; });
+        openTagSeriesModal($q.when(seriesIds)).then(function() { return updateSeriesTagsPromise(); });
     }
 
     function showBoxSendTagValuesModal(imageIdToPatientPromise, actionCallback, actionStringPastTense, actionString) {

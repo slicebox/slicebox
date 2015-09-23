@@ -17,6 +17,7 @@
 package se.nimsa.sbx.box
 
 import se.nimsa.sbx.model.Entity
+import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.TagValue
 import org.dcm4che3.data.Attributes
 
@@ -55,6 +56,8 @@ object BoxProtocol {
 
   case class InboxEntryInfo(id: Long, remoteBoxName: String, transactionId: Long, receivedImageCount: Long, totalImageCount: Long)
   
+  case class InboxImage(id: Long, inboxEntryId: Long, imageId: Long) extends Entity
+  
   case class ImageTagValues(imageId: Long, tagValues: Seq[TagValue])
   
   case class PushImageData(transactionId: Long, sequenceNumber: Long, totalImageCount: Long, dataset: Attributes)
@@ -76,7 +79,7 @@ object BoxProtocol {
   
   case class GetBoxByToken(token: String) extends BoxRequest
 
-  case class UpdateInbox(token: String, transactionId: Long, sequenceNumber: Long, totalImageCount: Long) extends BoxRequest
+  case class UpdateInbox(token: String, transactionId: Long, sequenceNumber: Long, totalImageCount: Long, imageId: Long) extends BoxRequest
 
   case class PollOutbox(token: String) extends BoxRequest
 
@@ -98,6 +101,9 @@ object BoxProtocol {
   
   case class RemoveOutboxEntry(outboxEntryId: Long) extends BoxRequest
 
+  case class GetImagesForInboxEntry(inboxEntryId: Long) extends BoxRequest
+  
+  
   case class InboxEntryRemoved(inboxEntryId: Long)
 
   case class OutboxEntryRemoved(outboxEntryId: Long)
@@ -144,7 +150,7 @@ object BoxProtocol {
 
   case class PollRemoteBoxFailed(e: Throwable)
 
-  case class RemoteOutboxFileFetched(remoteOutboxEntry: OutboxEntry)
+  case class RemoteOutboxFileFetched(remoteOutboxEntry: OutboxEntry, imageId: Long)
 
   case class FetchFileFailed(remoteOutboxEntry: OutboxEntry, e: Throwable)
 

@@ -72,6 +72,30 @@ class RemoteBoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
   }
 
+  it should "add a record of the received image connected to the inbox entry" in {
+
+    // first, add a box on the poll (university) side
+    val uniBox =
+      PostAsAdmin("/api/boxes/createconnection", RemoteBoxName("hosp")) ~> routes ~> check {
+        responseAs[Box]
+      }
+
+    // then, push an image from the hospital to the uni box we just set up
+    val bytes = TestUtil.testImageByteArray
+
+    val testTransactionId = abs(UUID.randomUUID().getMostSignificantBits())
+    val sequenceNumber = 1L
+    val totalImageCount = 1L
+
+    Post(s"/api/box/${uniBox.token}/image?transactionid=$testTransactionId&sequencenumber=$sequenceNumber&totalimagecount=$totalImageCount", HttpData(bytes)) ~> routes ~> check {
+      status should be(NoContent)
+    }
+
+    db.withSession { implicit session =>
+      boxDao.listInboxImages.length should be(1)
+    }
+  }
+
   it should "return unauthorized when polling outbox with unvalid token" in {
     Get(s"/api/box/abc/outbox/poll") ~> sealRoute(routes) ~> check {
       status should be(Unauthorized)
@@ -175,7 +199,7 @@ class RemoteBoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     // poll outbox to check that outbox is empty
     Get(s"/api/box/${uniBox.token}/outbox/poll") ~> routes ~> check {
       status should be(NotFound)
-    }        
+    }
   }
 
   it should "mark correct transaction as failed when failed message is received" in {
@@ -212,12 +236,12 @@ class RemoteBoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     // check contents of outbox, should contain one failed entry
     GetAsUser("/api/outbox") ~> routes ~> check {
       val outboxEntries = responseAs[Seq[OutboxEntryInfo]]
-      outboxEntries.size should be (1)
-      outboxEntries(0).failed should be (true)
+      outboxEntries.size should be(1)
+      outboxEntries(0).failed should be(true)
     }
-    
+
   }
-  
+
   it should "correctly map dicom attributes according to supplied mapping when sending images" in {
     // add image (image will get id 1)
     val file = TestUtil.testImageFile

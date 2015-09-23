@@ -30,6 +30,7 @@ trait SliceboxRoutes extends DirectoryRoutes
   with MetadataRoutes
   with ImageRoutes
   with BoxRoutes
+  with ForwardingRoutes
   with RemoteBoxRoutes
   with UserRoutes
   with LogRoutes
@@ -62,7 +63,8 @@ trait SliceboxRoutes extends DirectoryRoutes
             outboxRoutes ~
             logRoutes ~
             systemRoutes(authInfo) ~
-            seriesTypeRoutes(authInfo)
+            seriesTypeRoutes(authInfo) ~
+            forwardingRoutes(authInfo)
         }
       } ~ remoteBoxRoutes
     } ~ pathPrefixTest(!"api") {

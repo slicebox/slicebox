@@ -37,6 +37,7 @@ import se.nimsa.sbx.storage.StorageProtocol.SourceType
 import se.nimsa.sbx.storage.StorageProtocol.SourceTypeId
 import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.dicom.DicomUtil._
+import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import BoxProtocol._
 import akka.actor.ReceiveTimeout
 import java.util.Date
@@ -137,8 +138,8 @@ class BoxPollActor(box: Box,
   }
 
   def waitForFileFetchedState: PartialFunction[Any, Unit] = LoggingReceive {
-    case RemoteOutboxFileFetched(remoteOutboxEntry) =>
-      updateInbox(box.id, remoteOutboxEntry.transactionId, remoteOutboxEntry.sequenceNumber, remoteOutboxEntry.totalImageCount)
+    case RemoteOutboxFileFetched(remoteOutboxEntry, imageId) =>
+      updateInbox(box.id, remoteOutboxEntry.transactionId, remoteOutboxEntry.sequenceNumber, remoteOutboxEntry.totalImageCount, imageId)
       sendRemoteOutboxFileCompleted(remoteOutboxEntry).foreach { response =>
         pollRemoteBox()
       }
@@ -195,9 +196,10 @@ class BoxPollActor(box: Box,
                     storageService.ask(AddDataset(reversedDataset, SourceTypeId(SourceType.BOX, remoteOutboxEntry.remoteBoxId)))
                       .onComplete {
 
-                        case Success(any) =>
-                          self ! RemoteOutboxFileFetched(remoteOutboxEntry)
-
+                        case Success(ImageAdded(image)) =>
+                          self ! RemoteOutboxFileFetched(remoteOutboxEntry, image.id)
+                        case Success(_) =>
+                          self ! HandlingFetchedFileFailed(remoteOutboxEntry, new Exception("Unexpected response when adding dataset"))
                         case Failure(exception) =>
                           self ! HandlingFetchedFileFailed(remoteOutboxEntry, exception)
                       }
@@ -212,9 +214,10 @@ class BoxPollActor(box: Box,
           self ! FetchFileFailed(remoteOutboxEntry, exception)
       }
 
-  def updateInbox(remoteBoxId: Long, transactionId: Long, sequenceNumber: Long, totalImageCount: Long): Unit = {
+  def updateInbox(remoteBoxId: Long, transactionId: Long, sequenceNumber: Long, totalImageCount: Long, imageId: Long): Unit = {
     db.withSession { implicit session =>
-      boxDao.updateInbox(remoteBoxId, transactionId, sequenceNumber, totalImageCount)
+      val inboxEntry = boxDao.updateInbox(remoteBoxId, transactionId, sequenceNumber, totalImageCount)
+      boxDao.insertInboxImage(InboxImage(-1, inboxEntry.id, imageId))
     }
 
     if (sequenceNumber == totalImageCount)
