@@ -139,8 +139,8 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   it should "support listing sent entries" in {
     val sentEntry =
       db.withSession { implicit session =>
-        boxDao.insertSentEntry(SentEntry(-1, 1, 1, 3, 4))
-        boxDao.insertSentEntry(SentEntry(-1, 1, 2, 3, 5))
+        boxDao.insertSentEntry(SentEntry(-1, 1, 1, 3, 4, System.currentTimeMillis()))
+        boxDao.insertSentEntry(SentEntry(-1, 1, 2, 3, 5, System.currentTimeMillis()))
       }
 
     GetAsUser("/api/sent") ~> routes ~> check {
@@ -151,7 +151,7 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   it should "support removing inbox entries" in {
     val inboxEntry =
       db.withSession { implicit session =>
-        boxDao.insertInboxEntry(InboxEntry(-1, 1, 2, 3, 4))
+        boxDao.insertInboxEntry(InboxEntry(-1, 1, 2, 3, 4, System.currentTimeMillis()))
       }
 
     DeleteAsUser(s"/api/inbox/${inboxEntry.id}") ~> routes ~> check {
@@ -181,7 +181,7 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   it should "support removing sent entries" in {
     val sentEntry =
       db.withSession { implicit session =>
-        boxDao.insertSentEntry(SentEntry(-1, 1, 2, 3, 4))
+        boxDao.insertSentEntry(SentEntry(-1, 1, 2, 3, 4, System.currentTimeMillis()))
       }
 
     DeleteAsUser(s"/api/sent/${sentEntry.id}") ~> routes ~> check {
@@ -198,7 +198,7 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       db.withSession { implicit session =>
         val (dbPatient1, (dbStudy1, dbStudy2), (dbSeries1, dbSeries2, dbSeries3, dbSeries4), (dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)) =
           TestUtil.insertMetaData(metaDataDao)
-        val inboxEntry = boxDao.insertInboxEntry(InboxEntry(-1, 1, 2, 3, 4))
+        val inboxEntry = boxDao.insertInboxEntry(InboxEntry(-1, 1, 2, 3, 4, System.currentTimeMillis()))
         val inboxImage1 = boxDao.insertInboxImage(InboxImage(-1, inboxEntry.id, dbImage1.id))
         val inboxImage2 = boxDao.insertInboxImage(InboxImage(-1, inboxEntry.id, dbImage2.id))
         inboxEntry
@@ -215,7 +215,7 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       db.withSession { implicit session =>
         val (dbPatient1, (dbStudy1, dbStudy2), (dbSeries1, dbSeries2, dbSeries3, dbSeries4), (dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)) =
           TestUtil.insertMetaData(metaDataDao)
-        val inboxEntry = boxDao.insertInboxEntry(InboxEntry(-1, 1, 2, 3, 4))
+        val inboxEntry = boxDao.insertInboxEntry(InboxEntry(-1, 1, 2, 3, 4, System.currentTimeMillis()))
         val inboxImage1 = boxDao.insertInboxImage(InboxImage(-1, inboxEntry.id, dbImage1.id))
         val inboxImage2 = boxDao.insertInboxImage(InboxImage(-1, inboxEntry.id, dbImage2.id))
         val inboxImage3 = boxDao.insertInboxImage(InboxImage(-1, inboxEntry.id, 666))
@@ -233,7 +233,7 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       db.withSession { implicit session =>
         val (dbPatient1, (dbStudy1, dbStudy2), (dbSeries1, dbSeries2, dbSeries3, dbSeries4), (dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)) =
           TestUtil.insertMetaData(metaDataDao)
-        val sentEntry = boxDao.insertSentEntry(SentEntry(-1, 1, 2, 3, 4))
+        val sentEntry = boxDao.insertSentEntry(SentEntry(-1, 1, 2, 3, 4, System.currentTimeMillis()))
         val sentImage1 = boxDao.insertSentImage(SentImage(-1, sentEntry.id, dbImage1.id))
         val sentImage2 = boxDao.insertSentImage(SentImage(-1, sentEntry.id, dbImage2.id))
         sentEntry
@@ -250,7 +250,7 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       db.withSession { implicit session =>
         val (dbPatient1, (dbStudy1, dbStudy2), (dbSeries1, dbSeries2, dbSeries3, dbSeries4), (dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)) =
           TestUtil.insertMetaData(metaDataDao)
-        val sentEntry = boxDao.insertSentEntry(SentEntry(-1, 1, 2, 3, 4))
+        val sentEntry = boxDao.insertSentEntry(SentEntry(-1, 1, 2, 3, 4, System.currentTimeMillis()))
         val sentImage1 = boxDao.insertSentImage(SentImage(-1, sentEntry.id, dbImage1.id))
         val sentImage2 = boxDao.insertSentImage(SentImage(-1, sentEntry.id, dbImage2.id))
         val sentImage3 = boxDao.insertSentImage(SentImage(-1, sentEntry.id, 666))

@@ -290,7 +290,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
 
     "remove sent images when the related sent entry is removed" in {
       db.withSession { implicit session =>
-        val se = boxDao.insertSentEntry(SentEntry(-1, 1, 123, 1, 2))
+        val se = boxDao.insertSentEntry(SentEntry(-1, 1, 123, 1, 2, System.currentTimeMillis()))
         boxDao.insertSentImage(SentImage(-1, se.id, 5))
         boxDao.insertSentImage(SentImage(-1, se.id, 33))
         
