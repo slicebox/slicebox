@@ -52,15 +52,15 @@ object BoxProtocol {
 
   case class FailedOutboxEntry(outboxEntry: OutboxEntry, message: String)
   
-  case class SentEntry(id: Long, remoteBoxId: Long, transactionId: Long, sentImageCount: Long, totalImageCount: Long) extends Entity
+  case class SentEntry(id: Long, remoteBoxId: Long, transactionId: Long, sentImageCount: Long, totalImageCount: Long, lastUpdated: Long) extends Entity
 
-  case class SentEntryInfo(id: Long, remoteBoxName: String, transactionId: Long, sentImageCount: Long, totalImageCount: Long)
+  case class SentEntryInfo(id: Long, remoteBoxName: String, transactionId: Long, sentImageCount: Long, totalImageCount: Long, lastUpdated: Long)
   
   case class SentImage(id: Long, sentEntryId: Long, imageId: Long) extends Entity
 
-  case class InboxEntry(id: Long, remoteBoxId: Long, transactionId: Long, receivedImageCount: Long, totalImageCount: Long) extends Entity
+  case class InboxEntry(id: Long, remoteBoxId: Long, transactionId: Long, receivedImageCount: Long, totalImageCount: Long, lastUpdated: Long) extends Entity
 
-  case class InboxEntryInfo(id: Long, remoteBoxName: String, transactionId: Long, receivedImageCount: Long, totalImageCount: Long)
+  case class InboxEntryInfo(id: Long, remoteBoxName: String, transactionId: Long, receivedImageCount: Long, totalImageCount: Long, lastUpdated: Long)
   
   case class InboxImage(id: Long, inboxEntryId: Long, imageId: Long) extends Entity
   

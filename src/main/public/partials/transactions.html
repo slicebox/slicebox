@@ -31,6 +31,9 @@
                                 callbacks="callbacks.inboxTable"
                                 empty-message="Inbox is empty">
 
+                                <sbx-grid-column property="lastUpdated" title="Received" filter="date: yyyy-MM-dd HH:mm">
+                                </sbx-grid-column>
+
                                 <sbx-grid-column property="remoteBoxName" title="Remote Box Name">
                                 </sbx-grid-column>
 
@@ -104,6 +107,9 @@
                                 object-actions="objectActions"
                                 callbacks="callbacks.sentTable"
                                 empty-message="Sent is empty">
+
+                                <sbx-grid-column property="lastUpdated" title="Sent" filter="date: yyyy-MM-dd HH:mm">
+                                </sbx-grid-column>
 
                                 <sbx-grid-column property="remoteBoxName" title="Remote Box Name">
                                 </sbx-grid-column>

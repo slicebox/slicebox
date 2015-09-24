@@ -185,8 +185,8 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String, impli
           case GetInbox =>
             val inboxEntries = getInboxFromDb().map { inboxEntry =>
               boxById(inboxEntry.remoteBoxId) match {
-                case Some(box) => InboxEntryInfo(inboxEntry.id, box.name, inboxEntry.transactionId, inboxEntry.receivedImageCount, inboxEntry.totalImageCount)
-                case None      => InboxEntryInfo(inboxEntry.id, inboxEntry.remoteBoxId.toString, inboxEntry.transactionId, inboxEntry.receivedImageCount, inboxEntry.totalImageCount)
+                case Some(box) => InboxEntryInfo(inboxEntry.id, box.name, inboxEntry.transactionId, inboxEntry.receivedImageCount, inboxEntry.totalImageCount, inboxEntry.lastUpdated)
+                case None      => InboxEntryInfo(inboxEntry.id, inboxEntry.remoteBoxId.toString, inboxEntry.transactionId, inboxEntry.receivedImageCount, inboxEntry.totalImageCount, inboxEntry.lastUpdated)
               }
             }
             sender ! Inbox(inboxEntries)
@@ -206,8 +206,8 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String, impli
           case GetSent =>
             val sentEntries = getSentFromDb().map { sentEntry =>
               boxById(sentEntry.remoteBoxId) match {
-                case Some(box) => SentEntryInfo(sentEntry.id, box.name, sentEntry.transactionId, sentEntry.sentImageCount, sentEntry.totalImageCount)
-                case None      => SentEntryInfo(sentEntry.id, sentEntry.remoteBoxId.toString, sentEntry.transactionId, sentEntry.sentImageCount, sentEntry.totalImageCount)
+                case Some(box) => SentEntryInfo(sentEntry.id, box.name, sentEntry.transactionId, sentEntry.sentImageCount, sentEntry.totalImageCount, sentEntry.lastUpdated)
+                case None      => SentEntryInfo(sentEntry.id, sentEntry.remoteBoxId.toString, sentEntry.transactionId, sentEntry.sentImageCount, sentEntry.totalImageCount, sentEntry.lastUpdated)
               }
             }
             sender ! Sent(sentEntries)
