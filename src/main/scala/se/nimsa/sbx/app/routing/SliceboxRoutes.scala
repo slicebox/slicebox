@@ -34,8 +34,8 @@ trait SliceboxRoutes extends DirectoryRoutes
   with RemoteBoxRoutes
   with UserRoutes
   with LogRoutes
-  with SystemRoutes
   with UiRoutes
+  with GeneralRoutes
   with SeriesTypeRoutes { this: RestApi =>
 
   implicit val knownExceptionHandler =
@@ -63,7 +63,7 @@ trait SliceboxRoutes extends DirectoryRoutes
             outboxRoutes ~
             sentRoutes ~
             logRoutes ~
-            systemRoutes(authInfo) ~
+            generalRoutes(authInfo) ~
             seriesTypeRoutes(authInfo) ~
             forwardingRoutes(authInfo)
         }

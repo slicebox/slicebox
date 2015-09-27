@@ -48,8 +48,9 @@ class ForwardingServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extend
 
   def receive = LoggingReceive {
 
-    case ImageAdded =>
-
+    case ImageAdded(image) =>
+      maybeForwardImage(image)
+      
     case msg: ForwardingRequest =>
 
       msg match {
@@ -83,6 +84,24 @@ class ForwardingServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extend
       forwardingDao.removeForwardingRule(forwardingRuleId)
     }
 
+  def maybeForwardImage(image: Image): Unit = {
+    // get source of image
+//    val futureImageFileMaybe = storageService.ask(GetImageFile(image.id)).mapTo[Option[ImageFile]]
+//    futureImageFileMaybe.foreach(_.map(imageFile => {
+//      val sourceTypeId = imageFile.sourceTypeId
+//    }))
+    
+    // check if there is a forwarding rule for this source, if not exit
+    // if source is box, check if end of transaction, if not add to forwarding transaction and exit, if it is send transaction
+    // if source is not box, add to forwarding transaction
+  }
+  
+//  def forwardingRuleBySourceTypeAndId(sourceTypeId: SourceTypeId): Option[ForwardingRule] =
+//    db.withSession { implicit session =>
+//      //forwardingDao.forwardingRuleBySouceTypeAndId(sourceTypeId)
+//      null
+//    }
+    
   // TODO change
   def getAllSeries(): Future[Seq[Series]] =
     storageService.ask(GetAllSeries).mapTo[SeriesCollection].map(_.series)

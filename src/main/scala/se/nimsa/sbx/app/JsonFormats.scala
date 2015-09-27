@@ -53,6 +53,15 @@ trait JsonFormats extends DefaultJsonProtocol {
     }
   }
 
+  implicit object DestinationTypeFormat extends JsonFormat[DestinationType] {
+    def write(obj: DestinationType) = JsString(obj.toString)
+
+    def read(json: JsValue): DestinationType = json match {
+      case JsString(string) => DestinationType.withName(string)
+      case _                => deserializationError("Enumeration expected")
+    }
+  }
+
   implicit object BoxSendMethodFormat extends JsonFormat[BoxSendMethod] {
     def write(obj: BoxSendMethod) = JsString(obj.toString)
 
@@ -121,6 +130,8 @@ trait JsonFormats extends DefaultJsonProtocol {
   implicit val sourceFormat = jsonFormat3(Source)
   implicit val sourceTypeIdFormat = jsonFormat2(SourceTypeId)
   
+  implicit val destinationFormat = jsonFormat3(Destination)
+  
   implicit val seriesFormat = jsonFormat11(Series)
   implicit val flatSeriesFormat = jsonFormat4(FlatSeries)
 
@@ -171,5 +182,5 @@ trait JsonFormats extends DefaultJsonProtocol {
   
   implicit val seriesTypeRuleAttributeFormat = jsonFormat7(SeriesTypeRuleAttribute)
   
-  implicit val forwardingRuleFormat = jsonFormat5(ForwardingRule)
+  implicit val forwardingRuleFormat = jsonFormat4(ForwardingRule)
 }

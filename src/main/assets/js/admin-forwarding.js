@@ -47,7 +47,7 @@ angular.module('slicebox.adminForwarding', ['ngRoute'])
         sources: [],
         boxes: [],
         source: null,
-        target: null,
+        destination: null,
         keepImages: true
     };
 
@@ -59,9 +59,9 @@ angular.module('slicebox.adminForwarding', ['ngRoute'])
         });
     };
 
-    $scope.loadBoxes = function() {
-        return $http.get("/api/boxes").success(function (boxes) {
-            $scope.uiState.boxes = boxes;
+    $scope.loadDestinations = function() {
+        return $http.get("/api/metadata/destinations").success(function (destinations) {
+            $scope.uiState.destinations = destinations;
         });
     };
 
@@ -69,8 +69,7 @@ angular.module('slicebox.adminForwarding', ['ngRoute'])
         var rule = { 
             id: -1,
             source: $scope.uiState.source, 
-            targetBoxName: $scope.uiState.target.name,
-            targetBoxId: $scope.uiState.target.id, 
+            destination: $scope.uiState.destination, 
             keepImages: $scope.uiState.keepImages 
         };
 

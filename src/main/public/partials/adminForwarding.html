@@ -17,7 +17,10 @@
                         </sbx-grid-cell>
                     </sbx-grid-column>
 
-                    <sbx-grid-column property="targetBoxName" title="Target Box">
+                    <sbx-grid-column property="destination" title="Destination">
+                        <sbx-grid-cell>
+                            {{rowObject.destination.destinationName}} ({{rowObject.destination.destinationType}})
+                        </sbx-grid-cell>
                     </sbx-grid-column>
 
                     <sbx-grid-column property="keepImages" title="Keep Images">

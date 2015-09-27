@@ -231,19 +231,6 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
   }
 
-  it should "return a list of sources of the correct length" in {
-    PostAsAdmin("/api/users", ClearTextUser("name", ADMINISTRATOR, "password")) ~> routes ~> check {
-      status should be(Created)
-    }
-    PostAsAdmin("/api/boxes/createconnection", RemoteBoxName("remote box")) ~> routes ~> check {
-      status should be(Created)
-    }
-    GetAsUser("/api/metadata/sources") ~> routes ~> check {
-      status should be(OK)
-      responseAs[List[Source]].length should be(4) // admin + user users added by system and test class, name user, remote box
-    }
-  }
-
   it should "return 404 NotFound when trying to label a series which does not exist" in {
     PostAsUser(s"/api/metadata/series/666/seriestags", SeriesTag(-1, "Tag1")) ~> routes ~> check {
       status should be(NotFound)

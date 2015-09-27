@@ -22,6 +22,10 @@ angular.module('slicebox.home', ['ngRoute'])
                 action: confirmSendPatients
             },
             {
+                name: 'Send to SCP',
+                action: confirmSendPatientsToScp
+            },
+            {
                 name: 'Delete',
                 action: confirmDeletePatients
             },
@@ -44,6 +48,10 @@ angular.module('slicebox.home', ['ngRoute'])
             {
                 name: 'Send',
                 action: confirmSendStudies
+            },
+            {
+                name: 'Send to SCP',
+                action: confirmSendStudiesToScp
             },
             {
                 name: 'Delete',
@@ -70,8 +78,7 @@ angular.module('slicebox.home', ['ngRoute'])
                 action: confirmSendSeries
             },
             {
-                name: 'Send to PACS',
-                requiredSelectionCount: 1,
+                name: 'Send to SCP',
                 action: confirmSendSeriesToScp
             },   
             {
@@ -649,18 +656,26 @@ angular.module('slicebox.home', ['ngRoute'])
         });
     }
 
-    function confirmSendSeriesToScp(series) {
-        // check if flat series
-        series = series.map(function(s) {
-            return s.series ? s.series : s;
-        });
+    function confirmSendPatientsToScp(patients) {
+        imagesForPatients(patients).then(function (images) { confirmSendToScp(images); });
+    }
 
+    function confirmSendStudiesToScp(studies) {
+        imagesForStudies(studies).then(function (images) { confirmSendToScp(images); });
+    }
+
+    function confirmSendSeriesToScp(series) {
+        imagesForSeries(series).then(function (images) { confirmSendToScp(images); });
+    }
+
+    function confirmSendToScp(images) {
         return confirmSend('/api/scus', function(receiverId) {
-            return $http.post('/api/scus/' + receiverId + '/sendseries/' + series[0].id).success(function() {
+            var imageIds = images.map(function (image) { return image.id; });
+            return $http.post('/api/scus/' + receiverId + '/send', imageIds).success(function() {
                 $mdDialog.hide();
-                $scope.showInfoMessage("Series sent to PACS");
+                $scope.showInfoMessage("Series sent to SCP");
             }).error(function(data) {
-                $scope.showErrorMessage('Failed to send to PACS: ' + data);
+                $scope.showErrorMessage('Failed to send to SCP: ' + data);
             });
         });
     }

@@ -153,7 +153,7 @@ class Scu(ae: ApplicationEntity, scuData: ScuData) {
 
   }
 
-  def sendFiles(fileInfos: List[FileInfo]) = {
+  def sendFiles(fileInfos: Seq[FileInfo]) = {
     fileInfos.foreach(fileInfo =>
       if (as.isReadyForDataTransfer)
         send(fileInfo.file, fileInfo.endFmi, fileInfo.cuid, fileInfo.iuid, fileInfo.ts))
@@ -217,7 +217,7 @@ class Scu(ae: ApplicationEntity, scuData: ScuData) {
 
 object Scu {
 
-  def sendFiles(scuData: ScuData, files: List[Path]): Unit = {
+  def sendFiles(scuData: ScuData, files: Seq[Path]): Unit = {
     val device = new Device("slicebox-scu")
     val connection = new Connection()
     device.addConnection(connection)

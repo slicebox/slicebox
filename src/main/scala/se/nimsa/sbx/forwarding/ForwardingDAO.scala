@@ -24,20 +24,21 @@ import se.nimsa.sbx.storage.StorageProtocol._
 class ForwardingDAO(val driver: JdbcProfile) {
   import driver.simple._
 
-  private val toForwardingRule = (id: Long, sourceType: String, sourceName: String, sourceId: Long, targetBoxName: String, targetBoxId: Long, keepImages: Boolean) => ForwardingRule(id, Source(SourceType.withName(sourceType), sourceName, sourceId), targetBoxName, targetBoxId, keepImages)
+  private val toForwardingRule = (id: Long, sourceType: String, sourceName: String, sourceId: Long, destinationType: String, destinationName: String, destinationId: Long, keepImages: Boolean) => ForwardingRule(id, Source(SourceType.withName(sourceType), sourceName, sourceId), Destination(DestinationType.withName(destinationType), destinationName, destinationId), keepImages)
 
-  private val fromForwardingRule = (rule: ForwardingRule) => Option((rule.id, rule.source.sourceType.toString, rule.source.sourceName, rule.source.sourceId, rule.targetBoxName, rule.targetBoxId, rule.keepImages))
+  private val fromForwardingRule = (rule: ForwardingRule) => Option((rule.id, rule.source.sourceType.toString, rule.source.sourceName, rule.source.sourceId, rule.destination.destinationType.toString, rule.destination.destinationName, rule.destination.destinationId, rule.keepImages))
 
   class ForwardingRuleTable(tag: Tag) extends Table[ForwardingRule](tag, "ForwardingRules") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def sourceType = column[String]("sourcetype")
     def sourceName = column[String]("sourcename")
     def sourceId = column[Long]("sourceid")
-    def targetBoxName = column[String]("targetboxname")
-    def targetBoxId = column[Long]("targetboxid")
+    def destinationType = column[String]("destinationtype")
+    def destinationName = column[String]("destinationname")
+    def destinationId = column[Long]("destinationid")
     def keepImages = column[Boolean]("keepimages")
-    def idxUnique = index("idx_unique_forwarding_rule", (sourceType, sourceId, targetBoxId), unique = true)
-    def * = (id, sourceType, sourceName, sourceId, targetBoxName, targetBoxId, keepImages) <> (toForwardingRule.tupled, fromForwardingRule)
+    def idxUnique = index("idx_unique_forwarding_rule", (sourceType, sourceId, destinationType, destinationId), unique = true)
+    def * = (id, sourceType, sourceName, sourceId, destinationType, destinationName, destinationId, keepImages) <> (toForwardingRule.tupled, fromForwardingRule)
   }
 
   val ruleQuery = TableQuery[ForwardingRuleTable]
@@ -103,5 +104,7 @@ class ForwardingDAO(val driver: JdbcProfile) {
 
   def removeForwardingRule(forwardingRuleId: Long)(implicit session: Session): Unit =
     ruleQuery.filter(_.id === forwardingRuleId).delete
+
+  //def forwardingDao.forwardingRuleBySouceTypeAndId(sourceTypeId)
 
 }

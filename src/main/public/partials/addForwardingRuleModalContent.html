@@ -13,9 +13,9 @@
             </md-input-container>
 
             <md-input-container>
-                <label>Target box</label>
-                <md-select ng-model="uiState.target" md-on-open="loadBoxes()" placeholder="Select a box">
-                    <md-option ng-value="box" ng-repeat="box in uiState.boxes">{{ box.name }}</md-option>
+                <label>Destination</label>
+                <md-select ng-model="uiState.destination" md-on-open="loadDestinations()" placeholder="Select a destination">
+                    <md-option ng-value="destination" ng-repeat="destination in uiState.destinations">{{ destination.destinationName }} ({{ destination.destinationType }})</md-option>
                 </md-select>
             </md-input-container>
 
@@ -30,7 +30,7 @@
         <div class="md-actions" layout="row">
             <span flex></span>
             <md-button ng-click="cancelButtonClicked()">Cancel</md-button>
-            <md-button type="submit" class="md-primary" ng-disabled="!(uiState.source && uiState.target)">Add</md-button>
+            <md-button type="submit" class="md-primary" ng-disabled="!(uiState.source && uiState.destination)">Add</md-button>
         </div>
 
     </form>

@@ -34,6 +34,7 @@ import java.net.UnknownHostException
 import java.net.ConnectException
 import se.nimsa.sbx.lang.NotFoundException
 import se.nimsa.sbx.lang.BadGatewayException
+import java.net.NoRouteToHostException
 
 class ScuServiceActor(dbProps: DbProps, storage: Path) extends Actor with ExceptionCatching {
   val log = Logging(context.system, this)
@@ -91,11 +92,11 @@ class ScuServiceActor(dbProps: DbProps, storage: Path) extends Actor with Except
             val scus = getScus()
             sender ! Scus(scus)
 
-          case SendSeriesToScp(seriesId, scuId) =>
+          case SendImagesToScp(imageIds, scuId) =>
             scuForId(scuId).map(scu => {
-              val imageFiles = imageFilesForSeries(seriesId)
+              val imageFiles = imageFilesForImageIds(imageIds)
               if (imageFiles.isEmpty)
-                throw new NotFoundException(s"No images found for series is $seriesId")
+                throw new NotFoundException(s"No files found given ${imageIds.length} image ids")
               SbxLog.info("SCU", s"Sending ${imageFiles.length} images using SCU ${scu.name}")
               Future {
                 Scu.sendFiles(scu, imageFiles.map(imageFile => storage.resolve(imageFile.fileName.value)))
@@ -106,6 +107,8 @@ class ScuServiceActor(dbProps: DbProps, storage: Path) extends Actor with Except
                     throw new BadGatewayException(s"Unable to reach host ${scu.name}@${scu.host}:${scu.port}")
                   case e: ConnectException =>
                     throw new BadGatewayException(s"Connection refused on host ${scu.name}@${scu.host}:${scu.port}")
+                  case e: NoRouteToHostException =>
+                    throw new BadGatewayException(s"No route found to host ${scu.name}@${scu.host}:${scu.port}")
                 }
                 .pipeTo(sender)
             }).orElse(throw new NotFoundException(s"SCU with id $scuId not found"))
@@ -145,9 +148,9 @@ class ScuServiceActor(dbProps: DbProps, storage: Path) extends Actor with Except
       dao.allScuDatas
     }
 
-  def imageFilesForSeries(seriesId: Long) =
+  def imageFilesForImageIds(imageIds: Seq[Long]) =
     db.withSession { implicit session =>
-      propertiesDao.imageFilesForSeries(seriesId)
+      imageIds.map(propertiesDao.imageFileForImage(_)).flatten
     }
 
 }

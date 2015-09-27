@@ -31,30 +31,14 @@ import se.nimsa.sbx.scp.ScpProtocol._
 import se.nimsa.sbx.directory.DirectoryWatchProtocol._
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol.SeriesTypes
 import scala.concurrent.Future
+import se.nimsa.sbx.scu.ScuProtocol.GetScus
+import se.nimsa.sbx.scu.ScuProtocol.Scus
 
 trait MetadataRoutes { this: RestApi =>
 
   def metaDataRoutes: Route = {
     pathPrefix("metadata") {
-      path("sources") {
-        get {
-          def futureSources =
-            for {
-              users <- userService.ask(GetUsers).mapTo[Users]
-              boxes <- boxService.ask(GetBoxes).mapTo[Boxes]
-              scps <- scpService.ask(GetScps).mapTo[Scps]
-              dirs <- directoryService.ask(GetWatchedDirectories).mapTo[WatchedDirectories]
-            } yield {
-              users.users.map(user => Source(SourceType.USER, user.user, user.id)) ++
-                boxes.boxes.map(box => Source(SourceType.BOX, box.name, box.id)) ++
-                scps.scps.map(scp => Source(SourceType.SCP, scp.name, scp.id)) ++
-                dirs.directories.map(dir => Source(SourceType.DIRECTORY, dir.name, dir.id))
-            }
-          onSuccess(futureSources) {
-            complete(_)
-          }
-        }
-      } ~ path("seriestags") {
+      path("seriestags") {
         get {
           onSuccess(storageService.ask(GetSeriesTags)) {
             case SeriesTags(seriesTags) =>

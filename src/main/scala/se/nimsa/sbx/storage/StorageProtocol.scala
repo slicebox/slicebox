@@ -55,9 +55,31 @@ object StorageProtocol {
     }    
   }
       
+  sealed trait DestinationType {
+    override def toString(): String = this match {
+      case DestinationType.SCU => "scu"
+      case DestinationType.BOX => "box"
+      case _ => "unknown"
+    }
+  }
+
+  object DestinationType {
+    case object SCU extends DestinationType
+    case object BOX extends DestinationType
+    case object UNKNOWN extends DestinationType
+
+    def withName(string: String) = string match {
+      case "scu" => SCU
+      case "box" => BOX
+      case _ => UNKNOWN
+    }    
+  }
+      
   case class SourceTypeId(sourceType: SourceType, sourceId: Long)
   
   case class Source(sourceType: SourceType, sourceName: String, sourceId: Long)
+  
+  case class Destination(destinationType: DestinationType, destinationName: String, destinationId: Long)
   
   case class SeriesSource(id: Long, sourceTypeId: SourceTypeId) extends Entity
 

@@ -42,19 +42,19 @@ class ScuRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
   }
 
-  it should "return 404 NotFound when asking to send a series using an SCP that does not exist" in {
-    PostAsUser("/api/scus/666/sendseries/1") ~> routes ~> check {
+  it should "return 404 NotFound when asking to send an image using an SCP that does not exist" in {
+    PostAsUser("/api/scus/666/send", Array(1)) ~> routes ~> check {
       status should be(NotFound)
     }
   }
 
-  it should "return 404 NotFound when asking to send a series that does not exist" in {
-    PostAsUser("/api/scus/1/sendseries/666") ~> routes ~> check {
+  it should "return 404 NotFound when asking to send an image that does not exist" in {
+    PostAsUser("/api/scus/1/send", Array(666)) ~> routes ~> check {
       status should be(NotFound)
     }
   }
 
-  it should "return 404 NotFound when sending a series to an SCP that is unavailable" in {
+  it should "return 404 NotFound when sending an image to an SCP that is unavailable" in {
     val file = TestUtil.testImageFile
     val mfd = MultipartFormData(Seq(BodyPart(file, "file")))
     val image = PostAsUser("/api/images", mfd) ~> routes ~> check {
@@ -65,19 +65,19 @@ class ScuRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       status should be(Created)
       responseAs[ScuData]
     }
-    PostAsUser(s"/api/scus/${scu.id}/sendseries/${image.id}") ~> routes ~> check {
+    PostAsUser(s"/api/scus/${scu.id}/send", Array(image.id)) ~> routes ~> check {
       status should be(BadGateway)
     }
   }
 
-  it should "return 204 NoContent when asking to send a series using an SCU" in {
+  it should "return 204 NoContent when asking to send an image using an SCU" in {
     val scu = db.withSession { implicit session =>
       scuDao.allScuDatas.head
     }
     val image = db.withSession { implicit session =>
       metaDataDao.images.head
     }    
-    PostAsUser(s"/api/scus/${scu.id}/sendseries/${image.id}") ~> routes ~> check {
+    PostAsUser(s"/api/scus/${scu.id}/send", Array(image.id)) ~> routes ~> check {
       status should be(NoContent)
     }
   }

@@ -21,7 +21,7 @@ import se.nimsa.sbx.model.Entity
 
 object ForwardingProtocol {
 
-  case class ForwardingRule(id: Long, source: Source, targetBoxName: String, targetBoxId: Long, keepImages: Boolean) extends Entity
+  case class ForwardingRule(id: Long, source: Source, destination: Destination, keepImages: Boolean) extends Entity
   
   
   sealed trait ForwardingRequest

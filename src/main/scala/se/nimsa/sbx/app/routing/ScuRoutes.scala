@@ -58,10 +58,12 @@ trait ScuRoutes { this: RestApi =>
               }
             }
           }
-        } ~ path("sendseries" / LongNumber) { seriesId =>
+        } ~ path("send") {
           post {
-            onSuccess(scuService.ask(SendSeriesToScp(seriesId, scuDataId))) {
-              case ImagesSentToScp(scuDataId, imageIds) => complete(NoContent)
+            entity(as[Seq[Long]]) { imageIds =>
+              onSuccess(scuService.ask(SendImagesToScp(imageIds, scuDataId))) {
+                case ImagesSentToScp(scuDataId, imageIds) => complete(NoContent)
+              }
             }
           }
         }
