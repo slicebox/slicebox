@@ -15,6 +15,10 @@
   "basePath": "/api",
   "tags": [
     {
+      "name": "General",
+      "description": "General routes applicable to several aspects of the Slicebox API"
+    },
+    {
       "name": "Meta Data",
       "description": "Methods for handling DICOM meta data (attributes)"
     },
@@ -72,6 +76,42 @@
     "application/octet-stream"
   ],
   "paths": {
+
+    "/sources": {
+      "get": {
+        "description": "Returns a list of currently available data sources. Possible source types are user - data imported by an API call by a user, box - data received from a remote box, directory - data imported via a watched directory or scp - data received from a PACS.",
+        "tags": ["General"],
+        "responses": {
+          "200": {
+            "description": "currently available sources",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/source"
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "/destinations": {
+      "get": {
+        "description": "Returns a list of currently available destinations. Possible destinations are box - sending data to a remote box, and scu - sending data a receiving SCP.",
+        "tags": ["General"],
+        "responses": {
+          "200": {
+            "description": "currently available destinations",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/destination"
+              }
+            }
+          }
+        }
+      }
+    },
 
     "/metadata/patients": {
       "get": {
@@ -570,24 +610,6 @@
           },
           "404": {
             "description": "if no series with the supplied ID exists"
-          }
-        }
-      }
-    },
-
-    "/metadata/sources": {
-      "get": {
-        "description": "Returns a list of currently available data sources. Possible source types are user - data imported by an API call by a user, box - data received from a remote box, directory - data imported via a watched directory or scp - data received from a PACS.",
-        "tags": ["Meta Data"],
-        "responses": {
-          "200": {
-            "description": "currently available sources",
-            "schema": {
-              "type": "array",
-              "items": {
-                "$ref": "#/definitions/source"
-              }
-            }
           }
         }
       }
@@ -2065,9 +2087,9 @@
       }      
     },
 
-    "/scus/{id}/sendseries/{seriesid}": {
+    "/scus/{id}/send": {
       "post": {
-        "description": "send the series with the supplied series ID to a DICOM SCP using the the SCU with the supplied scu ID",
+        "description": "send the images with the supplied image IDs to a DICOM SCP using the the SCU with the supplied scu ID",
         "tags": ["SCUs"],
         "parameters": [
           {
@@ -2079,12 +2101,17 @@
             "format": "int64"
           },
           {
-            "name": "seriesid",
-            "description": "id of series to send",
-            "in": "path",
-            "required": true,            
-            "type": "integer",
-            "format": "int64"
+            "name": "imageids",
+            "description": "array of ids of images to send",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "format": "int64"
+              }
+            }
           }
         ],
         "responses": {
@@ -2421,6 +2448,19 @@
           "type": "string"
         },
         "sourceId": {
+          "type": "string"
+        }
+      }
+    },
+    "destination": {
+      "properties": {
+        "destinationType": {
+          "type": "string"
+        },
+        "destinationName": {
+          "type": "string"
+        },
+        "destinationId": {
           "type": "string"
         }
       }
