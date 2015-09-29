@@ -24,8 +24,9 @@ import spray.routing._
 import se.nimsa.sbx.app.RestApi
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.storage.StorageProtocol._
-import se.nimsa.sbx.storage.StorageProtocol.SourceType._
-import se.nimsa.sbx.app.UserProtocol._
+import se.nimsa.sbx.app.GeneralProtocol._
+import se.nimsa.sbx.app.GeneralProtocol.SourceType._
+import se.nimsa.sbx.user.UserProtocol._
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.scp.ScpProtocol._
 import se.nimsa.sbx.directory.DirectoryWatchProtocol._
@@ -154,7 +155,7 @@ trait MetadataRoutes { this: RestApi =>
             }
           } ~ path("source") {
             get {
-              onSuccess(storageService.ask(GetSeriesSource(seriesId)).mapTo[Option[SeriesSource]]) { seriesSourceMaybe =>
+              onSuccess(storageService.ask(GetSourceForSeries(seriesId)).mapTo[Option[SeriesSource]]) { seriesSourceMaybe =>
                 def futureSourceMaybe = seriesSourceMaybe.map(seriesSource => {
                   val futureNameMaybe = seriesSource.sourceTypeId.sourceType match {
                     case USER      => userService.ask(GetUser(seriesSource.sourceTypeId.sourceId)).mapTo[Option[ApiUser]].map(_.map(_.user))

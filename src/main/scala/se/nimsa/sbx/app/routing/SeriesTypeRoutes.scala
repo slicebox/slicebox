@@ -23,10 +23,10 @@ import spray.http.HttpEntity
 import spray.http.StatusCodes._
 import spray.httpx.SprayJsonSupport._
 import spray.routing._
-import se.nimsa.sbx.app.AuthInfo
+import se.nimsa.sbx.user.AuthInfo
 import se.nimsa.sbx.app.RestApi
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
-import se.nimsa.sbx.app.UserProtocol.UserRole
+import se.nimsa.sbx.user.UserProtocol.UserRole
 import se.nimsa.sbx.storage.StorageProtocol.GetSeriesTypesForSeries
 
 trait SeriesTypeRoutes { this: RestApi =>

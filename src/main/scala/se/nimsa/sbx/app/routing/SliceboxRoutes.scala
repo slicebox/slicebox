@@ -19,7 +19,7 @@ package se.nimsa.sbx.app.routing
 import spray.routing._
 import spray.http.StatusCodes._
 import se.nimsa.sbx.app.RestApi
-import se.nimsa.sbx.app.UserProtocol.UserRole
+import se.nimsa.sbx.user.UserProtocol.UserRole
 import spray.routing.ExceptionHandler
 import se.nimsa.sbx.lang.NotFoundException
 import se.nimsa.sbx.lang.BadGatewayException

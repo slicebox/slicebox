@@ -3,7 +3,7 @@ package se.nimsa.sbx.app.routing
 import scala.concurrent.Future
 import org.scalatest.FlatSpec
 import org.scalatest.Matchers
-import se.nimsa.sbx.app.UserProtocol.AuthToken
+import se.nimsa.sbx.user.UserProtocol.AuthToken
 import spray.http.BasicHttpCredentials
 import spray.http.StatusCodes._
 import spray.httpx.SprayJsonSupport._

@@ -16,6 +16,7 @@ import se.nimsa.sbx.util.TestUtil
 import se.nimsa.sbx.dicom.DicomUtil.loadDataset
 import StorageProtocol._
 import se.nimsa.sbx.seriestype.SeriesTypeDAO
+import se.nimsa.sbx.app.GeneralProtocol._
 
 class StorageServiceActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
     with WordSpecLike with Matchers with BeforeAndAfterAll {

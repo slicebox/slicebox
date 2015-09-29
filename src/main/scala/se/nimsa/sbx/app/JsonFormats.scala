@@ -27,9 +27,10 @@ import se.nimsa.sbx.scu.ScuProtocol._
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.log.LogProtocol._
-import se.nimsa.sbx.app.UserProtocol._
+import se.nimsa.sbx.user.UserProtocol._
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
 import se.nimsa.sbx.forwarding.ForwardingProtocol._
+import GeneralProtocol._
 import spray.routing.authentication.UserPass
 import se.nimsa.sbx.dicom.ImageAttribute
 

@@ -3,8 +3,8 @@ package se.nimsa.sbx.app.routing
 import scala.slick.driver.H2Driver
 import org.scalatest.FlatSpec
 import org.scalatest.Matchers
-import se.nimsa.sbx.app.UserProtocol._
-import se.nimsa.sbx.app.UserProtocol.UserRole._
+import se.nimsa.sbx.user.UserProtocol._
+import se.nimsa.sbx.user.UserProtocol.UserRole._
 import se.nimsa.sbx.box.BoxProtocol.RemoteBoxName
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomPropertyValue._
@@ -20,6 +20,7 @@ import spray.http.MultipartFormData
 import spray.http.BodyPart
 import se.nimsa.sbx.scu.ScuProtocol.ScuData
 import se.nimsa.sbx.scp.ScpProtocol.ScpData
+import se.nimsa.sbx.app.GeneralProtocol._
 
 class GeneralRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 

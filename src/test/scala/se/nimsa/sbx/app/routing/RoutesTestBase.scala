@@ -9,8 +9,8 @@ import org.scalatest.BeforeAndAfterEach
 import org.scalatest.Suite
 
 import se.nimsa.sbx.app.RestApi
-import se.nimsa.sbx.app.UserProtocol.ClearTextUser
-import se.nimsa.sbx.app.UserProtocol.UserRole
+import se.nimsa.sbx.user.UserProtocol.ClearTextUser
+import se.nimsa.sbx.user.UserProtocol.UserRole
 import se.nimsa.sbx.util.TestUtil
 import spray.http.BasicHttpCredentials
 import spray.http.HttpRequest

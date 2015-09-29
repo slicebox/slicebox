@@ -28,8 +28,7 @@ import akka.event.LoggingReceive
 import java.util.Date
 import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.storage.StorageProtocol.DatasetReceived
-import se.nimsa.sbx.storage.StorageProtocol.SourceType
-import se.nimsa.sbx.storage.StorageProtocol.SourceTypeId
+import se.nimsa.sbx.app.GeneralProtocol._
 import ScpProtocol._
 
 class ScpActor(scpData: ScpData, executor: Executor) extends Actor {

@@ -35,6 +35,7 @@ import java.net.ConnectException
 import se.nimsa.sbx.lang.NotFoundException
 import se.nimsa.sbx.lang.BadGatewayException
 import java.net.NoRouteToHostException
+import se.nimsa.sbx.app.GeneralProtocol.ImagesSent
 
 class ScuServiceActor(dbProps: DbProps, storage: Path) extends Actor with ExceptionCatching {
   val log = Logging(context.system, this)
@@ -101,7 +102,10 @@ class ScuServiceActor(dbProps: DbProps, storage: Path) extends Actor with Except
               Future {
                 Scu.sendFiles(scu, imageFiles.map(imageFile => storage.resolve(imageFile.fileName.value)))
               }
-                .map(r => ImagesSentToScp(scuId, imageFiles.map(_.id)))
+                .map(r => {
+                  context.system.eventStream.publish(ImagesSent(imageIds))
+                  ImagesSentToScp(scuId, imageFiles.map(_.id))
+                })
                 .recover {
                   case e: UnknownHostException =>
                     throw new BadGatewayException(s"Unable to reach host ${scu.name}@${scu.host}:${scu.port}")

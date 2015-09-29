@@ -17,11 +17,16 @@
 package se.nimsa.sbx.forwarding
 
 import se.nimsa.sbx.storage.StorageProtocol._
+import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.model.Entity
 
 object ForwardingProtocol {
 
   case class ForwardingRule(id: Long, source: Source, destination: Destination, keepImages: Boolean) extends Entity
+  
+  case class ForwardingTransaction(id: Long, forwardingRuleId: Long, lastUpdated: Long, processed: Boolean)
+  
+  case class ForwardingTransactionImage(id: Long, forwardingTransactionId: Long, imageId: Long)
   
   
   sealed trait ForwardingRequest

@@ -155,16 +155,16 @@ class MetaDataDAO(val driver: JdbcProfile) {
   // *** Get entities by id
 
   def patientById(id: Long)(implicit session: Session): Option[Patient] =
-    patientsQuery.filter(_.id === id).list.headOption
+    patientsQuery.filter(_.id === id).firstOption
 
   def studyById(id: Long)(implicit session: Session): Option[Study] =
-    studiesQuery.filter(_.id === id).list.headOption
+    studiesQuery.filter(_.id === id).firstOption
 
   def seriesById(id: Long)(implicit session: Session): Option[Series] =
-    seriesQuery.filter(_.id === id).list.headOption
+    seriesQuery.filter(_.id === id).firstOption
 
   def imageById(id: Long)(implicit session: Session): Option[Image] =
-    imagesQuery.filter(_.id === id).list.headOption
+    imagesQuery.filter(_.id === id).firstOption
 
   // *** Inserts ***
 
@@ -400,7 +400,7 @@ class MetaDataDAO(val driver: JdbcProfile) {
     implicit val getResult = flatSeriesGetResult
     val query = flatSeriesBasePart + s""" where "Series"."id" = $seriesId"""
 
-    Q.queryNA(query).list.headOption
+    Q.queryNA(query).firstOption
   }
 
   // *** Grouped listings ***
@@ -430,22 +430,22 @@ class MetaDataDAO(val driver: JdbcProfile) {
     patientsQuery
       .filter(_.patientName === patient.patientName.value)
       .filter(_.patientID === patient.patientID.value)
-      .list.headOption
+      .firstOption
 
   def studyByUid(study: Study)(implicit session: Session): Option[Study] =
     studiesQuery
       .filter(_.studyInstanceUID === study.studyInstanceUID.value)
-      .list.headOption
+      .firstOption
 
   def seriesByUid(series: Series)(implicit session: Session): Option[Series] =
     seriesQuery
       .filter(_.seriesInstanceUID === series.seriesInstanceUID.value)
-      .list.headOption
+      .firstOption
 
   def imageByUid(image: Image)(implicit session: Session): Option[Image] =
     imagesQuery
       .filter(_.sopInstanceUID === image.sopInstanceUID.value)
-      .list.headOption
+      .firstOption
 
   // *** Deletes ***
 

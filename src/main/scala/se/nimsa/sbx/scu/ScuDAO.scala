@@ -50,13 +50,13 @@ class ScuDAO(val driver: JdbcProfile) {
   }
   
   def scuDataForId(id: Long)(implicit session: Session): Option[ScuData] =
-    scuDataQuery.filter(_.id === id).list.headOption
+    scuDataQuery.filter(_.id === id).firstOption
   
   def scuDataForName(name: String)(implicit session: Session): Option[ScuData] =
-    scuDataQuery.filter(_.name === name).list.headOption
+    scuDataQuery.filter(_.name === name).firstOption
   
   def scuDataForHostAndPort(host: String, port: Int)(implicit session: Session): Option[ScuData] =
-    scuDataQuery.filter(_.host === host).filter(_.port === port).list.headOption
+    scuDataQuery.filter(_.host === host).filter(_.port === port).firstOption
   
   def allScuDatas(implicit session: Session): List[ScuData] = scuDataQuery.list
 }

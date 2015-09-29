@@ -44,6 +44,7 @@ import scala.concurrent.Future.sequence
 import akka.actor.Stash
 import org.dcm4che3.data.Attributes
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.TagValue
+import se.nimsa.sbx.app.GeneralProtocol.ImagesSent
 
 class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String, implicit val timeout: Timeout) extends Actor with Stash with ExceptionCatching {
 
@@ -144,8 +145,8 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String, impli
             boxById(remoteBoxId) match {
               case Some(box) =>
                 SbxLog.info("Box", s"Sending ${imageTagValuesSeq.length} images to box ${box.name}")
-                sendImages(remoteBoxId, imageTagValuesSeq)
-                sender ! ImagesSent(remoteBoxId, imageTagValuesSeq.map(_.imageId))
+                addImagesToOutbox(remoteBoxId, imageTagValuesSeq)
+                sender ! ImagesAddedToOutbox(remoteBoxId, imageTagValuesSeq.map(_.imageId))
               case None =>
                 sender ! BoxNotFound
             }
@@ -166,6 +167,7 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String, impli
                   updateSent(outboxEntry)
 
                   if (outboxEntry.sequenceNumber == outboxEntry.totalImageCount) {
+                    context.system.eventStream.publish(ImagesSent(sentImageIdsForTransactionId(outboxEntry.transactionId)))
                     removeTransactionTagValuesForTransactionId(outboxEntry.transactionId)
                     SbxLog.info("Box", s"Finished sending ${outboxEntry.totalImageCount} images to box ${box.name}")
                   }
@@ -238,6 +240,10 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String, impli
 
           case GetTransactionTagValues(imageId, transactionId) =>
             sender ! tagValuesForImageIdAndTransactionId(imageId, transactionId)
+
+          case GetInboxEntryForImageId(imageId) =>
+            sender ! inboxEntryForImageId(imageId)
+
         }
 
       }
@@ -350,7 +356,7 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String, impli
     // Maybe switch to using Strings as transaction id?
     abs(UUID.randomUUID().getMostSignificantBits())
 
-  def sendImages(remoteBoxId: Long, imageTagValuesSeq: Seq[ImageTagValues]) = {
+  def addImagesToOutbox(remoteBoxId: Long, imageTagValuesSeq: Seq[ImageTagValues]) = {
     val transactionId = generateTransactionId()
     imageTagValuesSeq.foreach(imageTagValues =>
       imageTagValues.tagValues.foreach(tagValue =>
@@ -457,6 +463,16 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String, impli
       imageIds.map(imageId =>
         storageService.ask(GetImage(imageId)).mapTo[Option[Image]]))
       .map(imageMaybes => Images(imageMaybes.flatten))
+
+  def inboxEntryForImageId(imageId: Long): Option[InboxEntry] =
+    db.withSession { implicit session =>
+      boxDao.inboxEntryByImageId(imageId)
+    }
+
+  def sentImageIdsForTransactionId(transactionId: Long): Seq[Long] =
+    db.withSession { implicit session =>
+      boxDao.sentImagesByTransactionId(transactionId).map(_.imageId)
+    }
 
 }
 

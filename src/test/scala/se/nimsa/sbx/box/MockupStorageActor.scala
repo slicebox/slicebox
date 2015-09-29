@@ -6,6 +6,7 @@ import se.nimsa.sbx.util.TestUtil
 import akka.actor.Status.Failure
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.DicomPropertyValue._
+import se.nimsa.sbx.app.GeneralProtocol._
 
 class MockupStorageActor extends Actor {
 

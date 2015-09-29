@@ -20,14 +20,11 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.concurrent.TimeUnit.MILLISECONDS
-
 import scala.slick.driver.H2Driver
 import scala.slick.jdbc.JdbcBackend.Database
-
 import com.mchange.v2.c3p0.ComboPooledDataSource
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
-
 import akka.actor.Actor
 import akka.util.Timeout
 import se.nimsa.sbx.anonymization.AnonymizationServiceActor
@@ -50,6 +47,9 @@ import se.nimsa.sbx.storage.MetaDataDAO
 import se.nimsa.sbx.storage.PropertiesDAO
 import se.nimsa.sbx.storage.StorageServiceActor
 import spray.routing.HttpService
+import se.nimsa.sbx.user.UserDAO
+import se.nimsa.sbx.user.Authenticator
+import se.nimsa.sbx.user.UserServiceActor
 
 class RestInterface extends Actor with RestApi {
 

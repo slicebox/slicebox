@@ -14,12 +14,11 @@
  * limitations under the License.
  */
 
-package se.nimsa.sbx.app
+package se.nimsa.sbx.user
 
 import scala.slick.driver.JdbcProfile
-import org.h2.jdbc.JdbcSQLException
 import scala.slick.jdbc.meta.MTable
-import se.nimsa.sbx.app.UserProtocol._
+import UserProtocol._
 
 class UserDAO(val driver: JdbcProfile) {
   import driver.simple._
@@ -50,25 +49,13 @@ class UserDAO(val driver: JdbcProfile) {
   }
   
   def userById(userId: Long)(implicit session: Session): Option[ApiUser] =
-    userQuery.filter(_.id === userId).list.headOption
+    userQuery.filter(_.id === userId).firstOption
     
   def userByName(user: String)(implicit session: Session): Option[ApiUser] =
-    userQuery.filter(_.user === user).list.headOption
+    userQuery.filter(_.user === user).firstOption
     
   def removeUser(userId: Long)(implicit session: Session): Unit =
     userQuery.filter(_.id === userId).delete
-
-//  def findUserByName(name: String)(implicit session: Session) =
-//    userQuery.filter(_.user === name).firstOption.map(row => row.user)
-//
-//  def findKeyByName(name: String)(implicit session: Session) =
-//    userQuery.filter(_.user === name).firstOption.map(row => row.key)
-//
-//  def removeByName(name: String)(implicit session: Session) =
-//    userQuery.filter(_.user === name).delete
-//
-//  def listUserNames(implicit session: Session): List[String] =
-//    userQuery.list.map(row => row.user.user)
 
   def listUsers(implicit session: Session): List[ApiUser] =
     userQuery.list

@@ -14,25 +14,24 @@
  * limitations under the License.
  */
 
-package se.nimsa.sbx.app
+package se.nimsa.sbx.user
 
 import scala.concurrent.ExecutionContext
 import spray.routing.authentication.BasicAuth
 import spray.routing.authentication.UserPass
 import spray.routing.directives.AuthMagnet
 import spray.routing.directives.AuthMagnet.fromContextAuthenticator
+import akka.pattern.ask
 import akka.actor.ActorRef
 import akka.util.Timeout
 import scala.concurrent.duration.DurationInt
-import scala.language.postfixOps
-import akka.pattern.ask
 import scala.concurrent.Future
 import spray.routing.Directives._
 import UserProtocol._
 
 class Authenticator(userService: ActorRef) {
 
-  implicit val timeout = Timeout(10 seconds)
+  implicit val timeout = Timeout(10.seconds)
 
   def basicUserAuthenticator(optionalAuthToken: Option[String])(implicit ec: ExecutionContext): AuthMagnet[AuthInfo] = {
 

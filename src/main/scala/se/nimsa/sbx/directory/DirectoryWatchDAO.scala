@@ -51,9 +51,9 @@ class DirectoryWatchDAO(val driver: JdbcProfile) {
   def allWatchedDirectories(implicit session: Session): List[WatchedDirectory] = watchedDirectoriesQuery.list
     
   def watchedDirectoryForId(id: Long)(implicit session: Session): Option[WatchedDirectory] =
-    watchedDirectoriesQuery.filter(_.id === id).list.headOption
+    watchedDirectoriesQuery.filter(_.id === id).firstOption
     
   def watchedDirectoryForPath(path: String)(implicit session: Session): Option[WatchedDirectory] =
-    watchedDirectoriesQuery.filter(_.path === path).list.headOption
+    watchedDirectoriesQuery.filter(_.path === path).firstOption
     
 }

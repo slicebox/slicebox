@@ -211,22 +211,22 @@ class BoxDAO(val driver: JdbcProfile) {
   }
 
   def boxById(boxId: Long)(implicit session: Session): Option[Box] =
-    boxQuery.filter(_.id === boxId).list.headOption
+    boxQuery.filter(_.id === boxId).firstOption
 
   def boxByName(name: String)(implicit session: Session): Option[Box] =
-    boxQuery.filter(_.name === name).list.headOption
+    boxQuery.filter(_.name === name).firstOption
 
   def pushBoxByBaseUrl(baseUrl: String)(implicit session: Session): Option[Box] =
     boxQuery
       .filter(_.sendMethod === BoxSendMethod.PUSH.toString)
       .filter(_.baseUrl === baseUrl)
-      .list.headOption
+      .firstOption
 
   def pollBoxByToken(token: String)(implicit session: Session): Option[Box] =
     boxQuery
       .filter(_.sendMethod === BoxSendMethod.POLL.toString)
       .filter(_.token === token)
-      .list.headOption
+      .firstOption
 
   def updateBoxOnlineStatus(boxId: Long, online: Boolean)(implicit session: Session): Unit =
     boxQuery
@@ -245,7 +245,7 @@ class BoxDAO(val driver: JdbcProfile) {
       .filter(_.remoteBoxId === remoteBoxId)
       .filter(_.failed === false)
       .sortBy(_.sequenceNumber.asc)
-      .list.headOption
+      .firstOption
 
   def markOutboxTransactionAsFailed(remoteBoxId: Long, transactionId: Long)(implicit session: Session): Unit =
     outboxQuery
@@ -256,11 +256,10 @@ class BoxDAO(val driver: JdbcProfile) {
 
   def updateInbox(remoteBoxId: Long, transactionId: Long, sequenceNumber: Long, totalImageCount: Long)(implicit session: Session): InboxEntry = {
     inboxEntryByTransactionId(remoteBoxId, transactionId) match {
-      case Some(inboxEntry) => {
+      case Some(inboxEntry) =>
         val updatedInboxEntry = inboxEntry.copy(receivedImageCount = sequenceNumber, totalImageCount = totalImageCount, lastUpdated = System.currentTimeMillis())
         updateInboxEntry(updatedInboxEntry)
         updatedInboxEntry
-      }
       case None => {
         val inboxEntry = InboxEntry(-1, remoteBoxId, transactionId, sequenceNumber, totalImageCount, System.currentTimeMillis())
         insertInboxEntry(inboxEntry)
@@ -286,25 +285,25 @@ class BoxDAO(val driver: JdbcProfile) {
     inboxQuery
       .filter(_.remoteBoxId === remoteBoxId)
       .filter(_.transactionId === transactionId)
-      .list.headOption
+      .firstOption
 
   def sentEntryByTransactionId(remoteBoxId: Long, transactionId: Long)(implicit session: Session): Option[SentEntry] =
     sentQuery
       .filter(_.remoteBoxId === remoteBoxId)
       .filter(_.transactionId === transactionId)
-      .list.headOption
+      .firstOption
 
   def outboxEntryById(outboxEntryId: Long)(implicit session: Session): Option[OutboxEntry] =
     outboxQuery
       .filter(_.id === outboxEntryId)
-      .list.headOption
+      .firstOption
 
   def outboxEntryByTransactionIdAndSequenceNumber(remoteBoxId: Long, transactionId: Long, sequenceNumber: Long)(implicit session: Session): Option[OutboxEntry] =
     outboxQuery
       .filter(_.remoteBoxId === remoteBoxId)
       .filter(_.transactionId === transactionId)
       .filter(_.sequenceNumber === sequenceNumber)
-      .list.headOption
+      .firstOption
 
   def removeInboxEntry(entryId: Long)(implicit session: Session): Unit =
     inboxQuery.filter(_.id === entryId).delete
@@ -341,4 +340,21 @@ class BoxDAO(val driver: JdbcProfile) {
 
   def listInboxImagesForInboxEntryId(inboxEntryId: Long)(implicit session: Session): List[InboxImage] =
     inboxImageQuery.filter(_.inboxEntryId === inboxEntryId).list
+
+  def inboxEntryByImageId(imageId: Long)(implicit session: Session): Option[InboxEntry] = {
+    val join = for {
+      inboxEntry <- inboxQuery
+      imageEntry <- inboxImageQuery if inboxEntry.id === imageEntry.inboxEntryId
+    } yield (inboxEntry, imageEntry)
+    join.filter(_._2.imageId === imageId).map(_._1).firstOption
+  }
+
+  def sentImagesByTransactionId(transactionId: Long)(implicit session: Session): List[SentImage] = {
+    val join = for {
+      sentEntry <- sentQuery
+      imageEntry <- sentImageQuery if sentEntry.id === imageEntry.sentEntryId
+    } yield (sentEntry, imageEntry)
+    join.filter(_._1.transactionId === transactionId).map(_._2).list
+  }
+
 }

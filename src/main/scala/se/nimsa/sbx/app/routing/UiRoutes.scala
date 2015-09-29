@@ -23,7 +23,7 @@ import spray.routing._
 import spray.routing.authentication.UserPass
 
 import se.nimsa.sbx.app.RestApi
-import se.nimsa.sbx.app.UserProtocol._
+import se.nimsa.sbx.user.UserProtocol._
 
 trait UiRoutes { this: RestApi =>
 

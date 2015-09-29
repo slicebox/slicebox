@@ -55,6 +55,7 @@ import akka.dispatch.ExecutionContexts
 import java.util.concurrent.Executors
 import se.nimsa.sbx.log.SbxLog
 import scala.slick.jdbc.JdbcBackend.Session
+import se.nimsa.sbx.app.GeneralProtocol._
 
 class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with ExceptionCatching {
 
@@ -154,12 +155,17 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
             sender ! SeriesTypesRemovedFromSeries(series)
           }
 
+        case GetSeriesTags =>
+        sender ! SeriesTags(getSeriesTags)
+        
+        case GetSourceForSeries(seriesId) =>
+        db.withSession { implicit session =>
+        sender ! propertiesDao.seriesSourceById(seriesId)
+        }
+        
         case GetSeriesTypesForSeries(seriesId) =>
           val seriesTypes = getSeriesTypesForSeries(seriesId)
           sender ! SeriesTypes(seriesTypes)
-
-        case GetSeriesTags =>
-          sender ! SeriesTags(getSeriesTags)
 
         case GetSeriesTagsForSeries(seriesId) =>
           val seriesTags = getSeriesTagsForSeries(seriesId)
@@ -281,11 +287,6 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
         case GetAllSeries =>
           db.withSession { implicit session =>
             sender ! SeriesCollection(dao.series)
-          }
-
-        case GetSeriesSource(seriesId) =>
-          db.withSession { implicit session =>
-            sender ! propertiesDao.seriesSourceById(seriesId)
           }
 
         case GetImage(imageId) =>

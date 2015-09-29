@@ -20,6 +20,7 @@ import se.nimsa.sbx.storage.MetaDataDAO
 import se.nimsa.sbx.storage.PropertiesDAO
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol.SeriesType
 import se.nimsa.sbx.seriestype.SeriesTypeDAO
+import se.nimsa.sbx.app.GeneralProtocol._
 
 object TestUtil {
 

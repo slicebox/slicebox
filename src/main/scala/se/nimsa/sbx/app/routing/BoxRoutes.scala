@@ -25,9 +25,9 @@ import spray.http.StatusCodes._
 import spray.httpx.SprayJsonSupport._
 import spray.routing._
 
-import se.nimsa.sbx.app.AuthInfo
+import se.nimsa.sbx.user.AuthInfo
 import se.nimsa.sbx.app.RestApi
-import se.nimsa.sbx.app.UserProtocol.UserRole
+import se.nimsa.sbx.user.UserProtocol.UserRole
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.dicom.DicomUtil
@@ -74,7 +74,7 @@ trait BoxRoutes { this: RestApi =>
         post {
           entity(as[Seq[ImageTagValues]]) { imageTagValuesSeq =>
             onSuccess(boxService.ask(SendToRemoteBox(remoteBoxId, imageTagValuesSeq))) {
-              case ImagesSent(remoteBoxId, imageIds) => complete(NoContent)
+              case ImagesAddedToOutbox(remoteBoxId, imageIds) => complete(NoContent)
               case BoxNotFound                       => complete(NotFound)
             }
           }

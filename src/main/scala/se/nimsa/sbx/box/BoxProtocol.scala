@@ -115,6 +115,8 @@ object BoxProtocol {
   
   case class GetImagesForSentEntry(sentEntryId: Long) extends BoxRequest
   
+  case class GetInboxEntryForImageId(imageId: Long) extends BoxRequest
+  
   
   case class InboxEntryRemoved(inboxEntryId: Long)
 
@@ -132,7 +134,7 @@ object BoxProtocol {
 
   case object OutboxEmpty
 
-  case class ImagesSent(remoteBoxId: Long, imageIds: Seq[Long])
+  case class ImagesAddedToOutbox(remoteBoxId: Long, imageIds: Seq[Long])
 
   case object OutboxEntryNotFound
 

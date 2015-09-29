@@ -14,9 +14,8 @@
  * limitations under the License.
  */
 
-package se.nimsa.sbx.app
+package se.nimsa.sbx.user
 
-import scala.language.postfixOps
 import UserProtocol._
 import akka.actor.Actor
 import akka.actor.Props
@@ -25,8 +24,9 @@ import akka.event.LoggingReceive
 import se.nimsa.sbx.util.ExceptionCatching
 import scala.collection.mutable.Map
 import scala.concurrent.duration.DurationInt
-import scala.concurrent.duration.FiniteDuration
 import java.util.UUID
+import akka.actor.actorRef2Scala
+import se.nimsa.sbx.app.DbProps
 
 class UserServiceActor(dbProps: DbProps, superUser: String, superPassword: String) extends Actor with ExceptionCatching {
   val log = Logging(context.system, this)

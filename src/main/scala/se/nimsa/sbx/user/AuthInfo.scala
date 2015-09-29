@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package se.nimsa.sbx.app
+package se.nimsa.sbx.user
 
 import UserProtocol._
 import UserProtocol.UserRole._

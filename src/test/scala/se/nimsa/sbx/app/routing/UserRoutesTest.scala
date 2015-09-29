@@ -3,8 +3,8 @@ package se.nimsa.sbx.app.routing
 import org.scalatest.FlatSpec
 import org.scalatest.Matchers
 import spray.httpx.SprayJsonSupport._
-import se.nimsa.sbx.app.UserProtocol._
-import se.nimsa.sbx.app.UserProtocol.UserRole._
+import se.nimsa.sbx.user.UserProtocol._
+import se.nimsa.sbx.user.UserProtocol.UserRole._
 
 import spray.http.StatusCodes._
 

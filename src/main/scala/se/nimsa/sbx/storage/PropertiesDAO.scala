@@ -23,6 +23,7 @@ import se.nimsa.sbx.dicom.DicomPropertyValue._
 import se.nimsa.sbx.seriestype.SeriesTypeDAO
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
 import scala.slick.jdbc.meta.MTable
+import se.nimsa.sbx.app.GeneralProtocol._
 import StorageProtocol._
 
 class PropertiesDAO(val driver: JdbcProfile) {
@@ -140,7 +141,7 @@ class PropertiesDAO(val driver: JdbcProfile) {
   // Functions
 
   def imageFileById(imageId: Long)(implicit session: Session): Option[ImageFile] =
-    imageFilesQuery.filter(_.id === imageId).list.headOption
+    imageFilesQuery.filter(_.id === imageId).firstOption
 
   def insertImageFile(imageFile: ImageFile)(implicit session: Session): ImageFile = {
     imageFilesQuery += imageFile
@@ -158,7 +159,7 @@ class PropertiesDAO(val driver: JdbcProfile) {
   def imageFileForImage(imageId: Long)(implicit session: Session): Option[ImageFile] =
     imageFilesQuery
       .filter(_.id === imageId)
-      .list.headOption
+      .firstOption
 
   def imageFilesForSeries(seriesId: Long)(implicit session: Session): List[ImageFile] =
     metaDataDao.imagesForSeries(0, 100000, seriesId)
@@ -178,7 +179,7 @@ class PropertiesDAO(val driver: JdbcProfile) {
   def imageFileByFileName(imageFile: ImageFile)(implicit session: Session): Option[ImageFile] =
     imageFilesQuery
       .filter(_.fileName === imageFile.fileName.value)
-      .list.headOption
+      .firstOption
 
   def deleteImageFile(imageId: Long)(implicit session: Session): Int = {
     imageFilesQuery
@@ -192,7 +193,7 @@ class PropertiesDAO(val driver: JdbcProfile) {
   }
 
   def seriesSourceById(seriesId: Long)(implicit session: Session): Option[SeriesSource] =
-    seriesSourceQuery.filter(_.id === seriesId).list.headOption
+    seriesSourceQuery.filter(_.id === seriesId).firstOption
 
   def seriesSources(implicit session: Session): List[SeriesSource] = seriesSourceQuery.list
 
@@ -202,7 +203,7 @@ class PropertiesDAO(val driver: JdbcProfile) {
   }
 
   def seriesTagForName(name: String)(implicit session: Session): Option[SeriesTag] =
-    seriesTagQuery.filter(_.name === name).list.headOption
+    seriesTagQuery.filter(_.name === name).firstOption
 
   def updateSeriesTag(seriesTag: SeriesTag)(implicit session: Session): Unit =
     seriesTagQuery.filter(_.id === seriesTag.id).update(seriesTag)
@@ -225,7 +226,7 @@ class PropertiesDAO(val driver: JdbcProfile) {
     seriesSeriesTagQuery.filter(_.seriesTagId === seriesTagId).list
 
   def seriesSeriesTagForSeriesTagIdAndSeriesId(seriesTagId: Long, seriesId: Long)(implicit session: Session): Option[SeriesSeriesTag] =
-    seriesSeriesTagQuery.filter(_.seriesTagId === seriesTagId).filter(_.seriesId === seriesId).list.headOption
+    seriesSeriesTagQuery.filter(_.seriesTagId === seriesTagId).filter(_.seriesId === seriesId).firstOption
 
   def removeSeriesSeriesTag(seriesTagId: Long, seriesId: Long)(implicit session: Session): Unit =
     seriesSeriesTagQuery.filter(_.seriesTagId === seriesTagId).filter(_.seriesId === seriesId).delete

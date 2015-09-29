@@ -20,11 +20,9 @@ import scala.concurrent.duration.DurationInt
 
 import akka.actor.ActorContext
 import akka.pattern.ask
-import se.nimsa.sbx.app.AuthInfo
+import se.nimsa.sbx.user.AuthInfo
 import se.nimsa.sbx.app.RestApi
-import se.nimsa.sbx.app.UserProtocol.GetUsers
-import se.nimsa.sbx.app.UserProtocol.UserRole
-import se.nimsa.sbx.app.UserProtocol.Users
+import se.nimsa.sbx.user.UserProtocol._
 import se.nimsa.sbx.box.BoxProtocol.Boxes
 import se.nimsa.sbx.box.BoxProtocol.GetBoxes
 import se.nimsa.sbx.directory.DirectoryWatchProtocol.GetWatchedDirectories
@@ -33,10 +31,7 @@ import se.nimsa.sbx.scp.ScpProtocol.GetScps
 import se.nimsa.sbx.scp.ScpProtocol.Scps
 import se.nimsa.sbx.scu.ScuProtocol.GetScus
 import se.nimsa.sbx.scu.ScuProtocol.Scus
-import se.nimsa.sbx.storage.StorageProtocol.Destination
-import se.nimsa.sbx.storage.StorageProtocol.DestinationType
-import se.nimsa.sbx.storage.StorageProtocol.Source
-import se.nimsa.sbx.storage.StorageProtocol.SourceType
+import se.nimsa.sbx.app.GeneralProtocol._
 import spray.httpx.SprayJsonSupport._
 import spray.routing.Route
 

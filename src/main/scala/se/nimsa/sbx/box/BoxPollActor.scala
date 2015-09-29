@@ -33,8 +33,7 @@ import spray.httpx.unmarshalling.FromResponseUnmarshaller
 import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.app.JsonFormats
 import se.nimsa.sbx.storage.StorageProtocol.DatasetReceived
-import se.nimsa.sbx.storage.StorageProtocol.SourceType
-import se.nimsa.sbx.storage.StorageProtocol.SourceTypeId
+import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.dicom.DicomUtil._
 import se.nimsa.sbx.dicom.DicomHierarchy.Image

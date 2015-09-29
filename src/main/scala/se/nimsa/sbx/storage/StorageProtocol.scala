@@ -19,6 +19,7 @@ package se.nimsa.sbx.storage
 import java.nio.file.Path
 import org.dcm4che3.data.Attributes
 import se.nimsa.sbx.dicom.DicomHierarchy._
+import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol.SeriesType
 
 object StorageProtocol {
@@ -28,58 +29,6 @@ object StorageProtocol {
   // domain objects
 
   case class SeriesSeriesType(seriesId: Long, seriesTypeId: Long)
-  
-  sealed trait SourceType {
-    override def toString(): String = this match {
-      case SourceType.SCP => "scp"
-      case SourceType.DIRECTORY => "directory"
-      case SourceType.BOX => "box"
-      case SourceType.USER => "user"
-      case _ => "unknown"
-    }
-  }
-
-  object SourceType {
-    case object SCP extends SourceType
-    case object DIRECTORY extends SourceType
-    case object BOX extends SourceType
-    case object USER extends SourceType
-    case object UNKNOWN extends SourceType
-
-    def withName(string: String) = string match {
-      case "scp" => SCP
-      case "directory" => DIRECTORY
-      case "box" => BOX
-      case "user" => USER
-      case _ => UNKNOWN
-    }    
-  }
-      
-  sealed trait DestinationType {
-    override def toString(): String = this match {
-      case DestinationType.SCU => "scu"
-      case DestinationType.BOX => "box"
-      case _ => "unknown"
-    }
-  }
-
-  object DestinationType {
-    case object SCU extends DestinationType
-    case object BOX extends DestinationType
-    case object UNKNOWN extends DestinationType
-
-    def withName(string: String) = string match {
-      case "scu" => SCU
-      case "box" => BOX
-      case _ => UNKNOWN
-    }    
-  }
-      
-  case class SourceTypeId(sourceType: SourceType, sourceId: Long)
-  
-  case class Source(sourceType: SourceType, sourceName: String, sourceId: Long)
-  
-  case class Destination(destinationType: DestinationType, destinationName: String, destinationId: Long)
   
   case class SeriesSource(id: Long, sourceTypeId: SourceTypeId) extends Entity
 
@@ -161,8 +110,6 @@ object StorageProtocol {
   
   case object GetAllSeries extends MetaDataQuery
   
-  case class GetSeriesSource(seriesId: Long) extends MetaDataQuery
-  
   case class GetImage(imageId: Long) extends MetaDataQuery
   
   case class GetSingleFlatSeries(seriesId: Long) extends MetaDataQuery
@@ -200,11 +147,13 @@ object StorageProtocol {
 
   case class RemoveSeriesTagFromSeries(seriesTagId: Long, seriesId: Long) extends PropertiesRequest
 
-  case class GetSeriesTypesForSeries(seriesId: Long) extends PropertiesRequest
-  
   case object GetSeriesTags extends PropertiesRequest
   
+  case class GetSourceForSeries(seriesId: Long) extends PropertiesRequest
+  
   case class GetSeriesTagsForSeries(seriesId: Long) extends PropertiesRequest
+  
+  case class GetSeriesTypesForSeries(seriesId: Long) extends PropertiesRequest
   
   
   case class AddDataset(dataset: Attributes, sourceTypeId: SourceTypeId)

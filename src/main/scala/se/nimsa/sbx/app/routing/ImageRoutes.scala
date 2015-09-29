@@ -27,7 +27,7 @@ import akka.actor.Actor
 import akka.pattern.ask
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.anonymization.AnonymizationUtil
-import se.nimsa.sbx.app.AuthInfo
+import se.nimsa.sbx.user.AuthInfo
 import se.nimsa.sbx.app.RestApi
 import se.nimsa.sbx.dicom.DicomUtil
 import se.nimsa.sbx.storage.StorageProtocol._
@@ -43,6 +43,7 @@ import java.nio.file.Paths
 import java.nio.file.Path
 import java.io.File
 import se.nimsa.sbx.dicom.ImageAttribute
+import se.nimsa.sbx.app.GeneralProtocol._
 
 trait ImageRoutes { this: RestApi =>
 
@@ -263,4 +264,3 @@ trait ImageRoutes { this: RestApi =>
     }
 
 }
-

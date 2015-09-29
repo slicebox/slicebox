@@ -27,8 +27,7 @@ import se.nimsa.sbx.dicom.DicomUtil._
 import org.dcm4che3.data.Tag
 import java.nio.file.Paths
 import se.nimsa.sbx.storage.StorageProtocol.FileReceived
-import se.nimsa.sbx.storage.StorageProtocol.SourceType
-import se.nimsa.sbx.storage.StorageProtocol.SourceTypeId
+import se.nimsa.sbx.app.GeneralProtocol._
 import DirectoryWatchProtocol._
 
 class DirectoryWatchActor(watchedDirectory: WatchedDirectory) extends Actor {

@@ -23,9 +23,9 @@ import spray.http.StatusCodes.Created
 import spray.httpx.SprayJsonSupport._
 import spray.routing._
 
-import se.nimsa.sbx.app.AuthInfo
+import se.nimsa.sbx.user.AuthInfo
 import se.nimsa.sbx.app.RestApi
-import se.nimsa.sbx.app.UserProtocol.UserRole
+import se.nimsa.sbx.user.UserProtocol.UserRole
 import se.nimsa.sbx.scp.ScpProtocol._
 
 trait ScpRoutes { this: RestApi =>

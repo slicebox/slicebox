@@ -23,6 +23,7 @@ import com.sun.istack.internal.NotNull
 import scala.concurrent.duration.DurationInt
 import org.dcm4che3.data.Keyword
 import se.nimsa.sbx.storage.PropertiesDAO
+import se.nimsa.sbx.app.GeneralProtocol._
 
 class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
     with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {

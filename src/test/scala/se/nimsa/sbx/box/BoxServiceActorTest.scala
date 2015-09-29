@@ -159,7 +159,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
         boxService ! SendToRemoteBox(remoteBox.id, imageTagValuesSeq)
 
         expectMsgPF() {
-          case ImagesSent(remoteBoxId, imageIds) =>
+          case ImagesAddedToOutbox(remoteBoxId, imageIds) =>
             remoteBoxId should be(remoteBox.id)
             imageIds should be(Seq(i1.id, i2.id, i3.id))
         }
@@ -212,7 +212,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
         boxService ! SendToRemoteBox(remoteBox.id, imageTagValuesSeq)
 
         expectMsgPF() {
-          case ImagesSent(remoteBoxId, imageIds) =>
+          case ImagesAddedToOutbox(remoteBoxId, imageIds) =>
             remoteBoxId should be(remoteBox.id)
             imageIds should be(Seq(i1.id, i2.id, i3.id))
         }
