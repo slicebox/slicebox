@@ -14,10 +14,10 @@ angular.module('slicebox.transactions', ['ngRoute'])
 .controller('TransactionsCtrl', function($scope, $http, $q, sbxMisc, openTagSeriesModal) {
     $scope.uiState = {};
 
-    $scope.openTagSeriesModalFunction = function() {
+    $scope.openTagSeriesModalFunction = function(urlPrefix) {
         return function(inboxEntries) {
             var inboxEntryIds = inboxEntries.map(function (inboxEntry) { return inboxEntry.id; });
-            var imagesPromises = inboxEntryIds.map(function (inboxEntryId) { return $http.get('/api/inbox/' + inboxEntryId + "/images").then(function (imagesData) { return imagesData.data; }); });
+            var imagesPromises = inboxEntryIds.map(function (inboxEntryId) { return $http.get(urlPrefix + inboxEntryId + "/images").then(function (imagesData) { return imagesData.data; }); });
             var imagesPromise = $q.all(imagesPromises).then(function (listOfImageLists) { return sbxMisc.flatten(listOfImageLists); });
             var seriesIdsPromise = imagesPromise.then(function (images) { return images.map(function (image) { return image.seriesId; }); });
             var uniqueSeriesIdsPromise = seriesIdsPromise.then(function (seriesIds) { return sbxMisc.unique(seriesIds); });
@@ -28,17 +28,17 @@ angular.module('slicebox.transactions', ['ngRoute'])
 
 })
 
-.controller('InboxCtrl', function($scope, $http, $interval, $mdDialog) {
+.controller('InboxCtrl', function($scope, $http, $interval, $mdDialog, openDeleteEntitiesModalFunction) {
     // Initialization
     $scope.objectActions =
         [
             {
                 name: 'Delete',
-                action: $scope.confirmDeleteEntitiesFunction('/api/inbox/', 'inbox entries')
+                action: openDeleteEntitiesModalFunction('/api/inbox/', 'inbox entries')
             },
             {
                 name: 'Tag Series',
-                action: $scope.openTagSeriesModalFunction()
+                action: $scope.openTagSeriesModalFunction('/api/inbox/')
             }
         ];
 
@@ -60,7 +60,7 @@ angular.module('slicebox.transactions', ['ngRoute'])
 
 })
 
-.controller('OutboxCtrl', function($scope, $http, $q, $interval, openConfirmActionModal) {
+.controller('OutboxCtrl', function($scope, $http, $q, $interval, openConfirmActionModal, sbxToast) {
     // Initialization
     $scope.objectActions =
         [
@@ -151,9 +151,9 @@ angular.module('slicebox.transactions', ['ngRoute'])
         deleteAllPromises = $q.all(deletePromises);
 
         deleteAllPromises.then(function() {
-            $scope.showInfoMessage(entities.length + " transaction(s) deleted");
+            sbxToast.showInfoMessage(entities.length + " transaction(s) deleted");
         }, function(response) {
-            $scope.showErrorMessage(response.data);
+            sbxToast.showErrorMessage(response.data);
         });
 
         return deleteAllPromises;
@@ -161,17 +161,17 @@ angular.module('slicebox.transactions', ['ngRoute'])
 
 })
 
-.controller('SentCtrl', function($scope, $http, $interval, $mdDialog) {
+.controller('SentCtrl', function($scope, $http, $interval, $mdDialog, openDeleteEntitiesModalFunction, openAddEntityModal) {
     // Initialization
     $scope.objectActions =
         [
             {
                 name: 'Delete',
-                action: $scope.confirmDeleteEntitiesFunction('/api/sent/', 'sent entries')
+                action: openDeleteEntitiesModalFunction('/api/sent/', 'sent entries')
             },
             {
                 name: 'Tag Series',
-                action: $scope.openTagSeriesModalFunction()
+                action: $scope.openTagSeriesModalFunction('/api/sent/')
             }
         ];
 
@@ -193,13 +193,13 @@ angular.module('slicebox.transactions', ['ngRoute'])
 
 })
 
-.controller('BoxLogCtrl', function($scope, $http, $interval) {
+.controller('BoxLogCtrl', function($scope, $http, $interval, openDeleteEntitiesModalFunction) {
     // Initialization
     $scope.actions =
         [
             {
                 name: 'Delete',
-                action: $scope.confirmDeleteEntitiesFunction('/api/log/', 'log message(s)')
+                action: openDeleteEntitiesModalFunction('/api/log/', 'log message(s)')
             }
         ];
 

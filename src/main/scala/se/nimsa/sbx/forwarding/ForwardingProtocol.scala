@@ -19,6 +19,7 @@ package se.nimsa.sbx.forwarding
 import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.model.Entity
+import se.nimsa.sbx.dicom.DicomHierarchy.Image
 
 object ForwardingProtocol {
 
@@ -43,4 +44,15 @@ object ForwardingProtocol {
   case class ForwardingRuleAdded(forwardingRule: ForwardingRule)
   
   case class ForwardingRuleRemoved(forwardingRuleId: Long)
+  
+  
+  case object PollTransactionQueue
+
+  case class MarkTransactionAsProcessed(forwardingTransaction: ForwardingTransaction, processed: Boolean)
+
+  case class MakeTransfer(forwardingRule: ForwardingRule, forwardingTransaction: ForwardingTransaction)
+
+  case class RemoveTransactionAndMaybeDeleteImages(imageIds: Seq[Long])
+  
+  case class MaybeAddImageToForwardingQueue(image: Image, sourceTypeAndId: SourceTypeId)
 }

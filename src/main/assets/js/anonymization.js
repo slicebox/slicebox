@@ -11,13 +11,13 @@ angular.module('slicebox.anonymization', ['ngRoute'])
   });
 })
 
-.controller('AnonymizationCtrl', function($scope, $http, $interval, openMessageModal) {
+.controller('AnonymizationCtrl', function($scope, $http, $interval, openMessageModal, openDeleteEntitiesModalFunction, sbxToast) {
     // Initialization
     $scope.actions =
         [
             {
                 name: 'Delete',
-                action: $scope.confirmDeleteEntitiesFunction('/api/images/anonymizationkeys/', 'anonymization key(s)')
+                action: openDeleteEntitiesModalFunction('/api/images/anonymizationkeys/', 'anonymization key(s)')
             },
             {
                 name: 'Export',
@@ -47,7 +47,7 @@ angular.module('slicebox.anonymization', ['ngRoute'])
         var loadPromise = $http.get(loadUrl);
 
         loadPromise.error(function(error) {
-            $scope.showErrorMessage('Failed to load anonymization keys: ' + error);
+            sbxToast.showErrorMessage('Failed to load anonymization keys: ' + error);
         });
 
         return loadPromise;

@@ -11,7 +11,7 @@ angular.module('slicebox.home', ['ngRoute'])
   });
 })
 
-.controller('HomeCtrl', function($scope, $http, $mdDialog, $q, openConfirmActionModal, openTagSeriesModal, sbxMisc, sbxMetaData) {
+.controller('HomeCtrl', function($scope, $http, $mdDialog, $q, openConfirmActionModal, openTagSeriesModal, sbxMisc, sbxMetaData, sbxToast) {
 
     // Initialization
 
@@ -140,7 +140,7 @@ angular.module('slicebox.home', ['ngRoute'])
         selectedSeriesTags: []
     };
 
-    $scope.uiState.advancedFiltering.sourcesPromise = $http.get('/api/metadata/sources').then(function(sourcesData) {
+    $scope.uiState.advancedFiltering.sourcesPromise = $http.get('/api/sources').then(function(sourcesData) {
         return sourcesData.data.map(function (source) {
             source.selected = false;
             return source;
@@ -223,7 +223,7 @@ angular.module('slicebox.home', ['ngRoute'])
             var loadPatientsPromise = $http.get(loadPatientsUrl);
 
             loadPatientsPromise.error(function(error) {
-                $scope.showErrorMessage('Failed to load patients: ' + error);
+                sbxToast.showErrorMessage('Failed to load patients: ' + error);
             });
 
             return loadPatientsPromise;
@@ -253,7 +253,7 @@ angular.module('slicebox.home', ['ngRoute'])
             var loadStudiesPromise = $http.get(loadStudiesUrl);
 
             loadStudiesPromise.error(function(error) {
-                $scope.showErrorMessage('Failed to load studies: ' + error);
+                sbxToast.showErrorMessage('Failed to load studies: ' + error);
             });
 
             return loadStudiesPromise;
@@ -284,7 +284,7 @@ angular.module('slicebox.home', ['ngRoute'])
         var loadSeriesPromise = $http.get(loadSeriesUrl);
 
         loadSeriesPromise.error(function(error) {
-            $scope.showErrorMessage('Failed to load series: ' + error);
+            sbxToast.showErrorMessage('Failed to load series: ' + error);
         });
 
         return loadSeriesPromise;
@@ -312,7 +312,7 @@ angular.module('slicebox.home', ['ngRoute'])
         var loadFlatSeriesPromise = $http.get(loadFlatSeriesUrl);
 
         loadFlatSeriesPromise.error(function(error) {
-            $scope.showErrorMessage('Failed to load series: ' + error);
+            sbxToast.showErrorMessage('Failed to load series: ' + error);
         });
 
         return loadFlatSeriesPromise;
@@ -368,7 +368,7 @@ angular.module('slicebox.home', ['ngRoute'])
         var imagesPromise = $http.get('/api/metadata/images?count=1&seriesid=' + $scope.uiState.selectedSeries.id);
 
         imagesPromise.error(function(reason) {
-            $scope.showErrorMessage('Failed to load images for series: ' + error);            
+            sbxToast.showErrorMessage('Failed to load images for series: ' + error);            
         });
 
         var attributesPromise = imagesPromise.then(function(images) {
@@ -387,7 +387,7 @@ angular.module('slicebox.home', ['ngRoute'])
                         return data.data;
                     }
                 }, function(error) {
-                    $scope.showErrorMessage('Failed to load image attributes: ' + error);
+                    sbxToast.showErrorMessage('Failed to load image attributes: ' + error);
                 });
             } else {
                 return [];
@@ -407,7 +407,7 @@ angular.module('slicebox.home', ['ngRoute'])
                 return { url: '/api/images/' + image.id };
             });
         }, function(error) {
-            $scope.showErrorMessage('Failed to load datasets: ' + error);
+            sbxToast.showErrorMessage('Failed to load datasets: ' + error);
         });
 
         return loadDatasetsPromise;
@@ -500,11 +500,11 @@ angular.module('slicebox.home', ['ngRoute'])
                                     $scope.uiState.loadPngImagesInProgress = false;
                                 }
                             }).error(function(error) {
-                                $scope.showErrorMessage('Failed to generate authentication tokens: ' + error);            
+                                sbxToast.showErrorMessage('Failed to generate authentication tokens: ' + error);            
                                 $scope.uiState.loadPngImagesInProgress = false;                                                                  
                             });
                         }).error(function(error) {
-                            $scope.showErrorMessage('Failed to load image information: ' + error);            
+                            sbxToast.showErrorMessage('Failed to load image information: ' + error);            
                             $scope.uiState.loadPngImagesInProgress = false;                                      
                         });
 
@@ -512,7 +512,7 @@ angular.module('slicebox.home', ['ngRoute'])
 
                 });
             }).error(function(reason) {
-                $scope.showErrorMessage('Failed to load images for series: ' + reason);          
+                sbxToast.showErrorMessage('Failed to load images for series: ' + reason);          
                 $scope.uiState.loadPngImagesInProgress = false;              
             });
 
@@ -522,7 +522,7 @@ angular.module('slicebox.home', ['ngRoute'])
     // Private functions
 
     function urlWithAdvancedFiltering(url) {
-        return sbxMisc.urlWithAdvancedFiltering(
+        return sbxMetaData.urlWithAdvancedFiltering(
             url, 
             $scope.uiState.advancedFiltering.selectedSources, 
             $scope.uiState.advancedFiltering.selectedSeriesTypes, 
@@ -673,16 +673,16 @@ angular.module('slicebox.home', ['ngRoute'])
             var imageIds = images.map(function (image) { return image.id; });
             return $http.post('/api/scus/' + receiverId + '/send', imageIds).success(function() {
                 $mdDialog.hide();
-                $scope.showInfoMessage("Series sent to SCP");
+                sbxToast.showInfoMessage("Series sent to SCP");
             }).error(function(data) {
-                $scope.showErrorMessage('Failed to send to SCP: ' + data);
+                sbxToast.showErrorMessage('Failed to send to SCP: ' + data);
             });
         });
     }
 
     function confirmDeletePatients(patients) {
         imagesForPatients(patients).then(function(images) {
-            var f = $scope.confirmDeleteEntitiesFunction('/api/images/', 'images');
+            var f = openDeleteEntitiesModalFunction('/api/images/', 'images');
             f(images).finally(function() {
                 $scope.patientSelected(null);        
                 $scope.callbacks.patientsTable.reset();
@@ -693,7 +693,7 @@ angular.module('slicebox.home', ['ngRoute'])
 
     function confirmDeleteStudies(studies) {
         imagesForStudies(studies).then(function(images) {
-            var f = $scope.confirmDeleteEntitiesFunction('/api/images/', 'images');
+            var f = openDeleteEntitiesModalFunction('/api/images/', 'images');
             f(images).finally(function() {
                 $scope.studySelected(null);        
                 $scope.callbacks.studiesTable.reset();
@@ -704,7 +704,7 @@ angular.module('slicebox.home', ['ngRoute'])
 
     function confirmDeleteSeries(series) {
         imagesForSeries(series).then(function(images) {
-            var f = $scope.confirmDeleteEntitiesFunction('/api/images/', 'images');
+            var f = openDeleteEntitiesModalFunction('/api/images/', 'images');
             f(images).finally(function() {
                 if ($scope.callbacks.flatSeriesTable) {
                     $scope.flatSeriesSelected(null);     
@@ -912,7 +912,7 @@ angular.module('slicebox.home', ['ngRoute'])
 
 })
 
-.controller('TagValuesCtrl', function($scope, $mdDialog, $http, imageIdToPatient, actionCallback, actionStringPastTense, actionString) {
+.controller('TagValuesCtrl', function($scope, $mdDialog, $http, sbxToast, imageIdToPatient, actionCallback, actionStringPastTense, actionString) {
     // Initialization
     $scope.title = 'Anonymization Options';
 
@@ -961,9 +961,9 @@ angular.module('slicebox.home', ['ngRoute'])
 
         actionPromise.then(function(data) {
             $mdDialog.hide();
-            $scope.showInfoMessage(imageIds.length + " images " + actionStringPastTense);
+            sbxToast.showInfoMessage(imageIds.length + " images " + actionStringPastTense);
         }, function(data) {
-            $scope.showErrorMessage('Failed to ' + actionString + ' images: ' + data);
+            sbxToast.showErrorMessage('Failed to ' + actionString + ' images: ' + data);
         });
 
         return actionPromise;
@@ -1009,10 +1009,10 @@ angular.module('slicebox.home', ['ngRoute'])
             });
 
         savePromise.then(function() {
-            $scope.showInfoMessage("Rule created");
+            sbxToast.showInfoMessage("Rule created");
             $mdDialog.hide();
         }, function(error) {
-            $scope.showErrorMessage('Failed to create rule: ' + error);
+            sbxToast.showErrorMessage('Failed to create rule: ' + error);
         });
 
         return savePromise;

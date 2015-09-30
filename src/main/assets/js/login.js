@@ -11,7 +11,7 @@ angular.module('slicebox.login', ['ngRoute'])
   });
 })
 
-.controller('LoginCtrl', function($scope, $rootScope, $location, authenticationService) {
+.controller('LoginCtrl', function($scope, $rootScope, $location, authenticationService, sbxToast) {
 
     // reset login status
     authenticationService.clearCredentials();
@@ -31,7 +31,7 @@ angular.module('slicebox.login', ['ngRoute'])
                 authenticationService.setCredentials($scope.username, $scope.password, response.role);
                 $location.path('/');
             } else {
-                $scope.showErrorMessage(response.message);
+                sbxToast.showErrorMessage(response.message);
                 $scope.uiState.loginInProgress = false;
             }
         });

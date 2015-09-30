@@ -14,13 +14,13 @@ angular.module('slicebox.adminPacs', ['ngRoute'])
 .controller('AdminPacsCtrl', function() {
 })
 
-.controller('AdminScpsCtrl', function($scope, $http) {
+.controller('AdminScpsCtrl', function($scope, $http, openAddEntityModal, openDeleteEntitiesModalFunction) {
     // Initialization
     $scope.objectActions =
         [
             {
                 name: 'Delete',
-                action: $scope.confirmDeleteEntitiesFunction('/api/scps/', 'SCP(s)')
+                action: openDeleteEntitiesModalFunction('/api/scps/', 'SCP(s)')
             }
         ];
 
@@ -34,7 +34,7 @@ angular.module('slicebox.adminPacs', ['ngRoute'])
     };
 
     $scope.addScpButtonClicked = function() {
-        $scope.addEntityButtonClicked('addScpModalContent.html', 'AddScpModalCtrl', '/api/scps', 'SCP', $scope.callbacks.scpsTable);
+        openAddEntityModal('addScpModalContent.html', 'AddScpModalCtrl', '/api/scps', 'SCP', $scope.callbacks.scpsTable);
     };
 
 })
@@ -51,13 +51,13 @@ angular.module('slicebox.adminPacs', ['ngRoute'])
     };
 })
 
-.controller('AdminScusCtrl', function($scope, $http) {
+.controller('AdminScusCtrl', function($scope, $http, openAddEntityModal, openDeleteEntitiesModalFunction) {
     // Initialization
     $scope.objectActions =
         [
             {
                 name: 'Delete',
-                action: $scope.confirmDeleteEntitiesFunction('/api/scus/', 'SCU(s)')
+                action: openDeleteEntitiesModalFunction('/api/scus/', 'SCU(s)')
             }
         ];
 
@@ -71,7 +71,7 @@ angular.module('slicebox.adminPacs', ['ngRoute'])
     };
 
     $scope.addScuButtonClicked = function() {
-        $scope.addEntityButtonClicked('addScuModalContent.html', 'AddScuModalCtrl', '/api/scus', 'SCU', $scope.callbacks.scusTable);
+        openAddEntityModal('addScuModalContent.html', 'AddScuModalCtrl', '/api/scus', 'SCU', $scope.callbacks.scusTable);
     };
 
 })

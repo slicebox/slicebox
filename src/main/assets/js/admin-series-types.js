@@ -11,13 +11,13 @@ angular.module('slicebox.adminSeriesTypes', ['ngRoute'])
   });
 })
 
-.controller('AdminSeriesTypesCtrl', function($scope, $http, $interval) {
+.controller('AdminSeriesTypesCtrl', function($scope, $http, $interval, openDeleteEntitiesModalFunction) {
 	// Initialization
 	$scope.objectActions =
 		[
 			{
 				name: 'Delete',
-				action: $scope.confirmDeleteEntitiesFunction('/api/seriestypes/', 'service type(s)')
+				action: openDeleteEntitiesModalFunction('/api/seriestypes/', 'service type(s)')
 			}
 		];
 
@@ -57,7 +57,7 @@ angular.module('slicebox.adminSeriesTypes', ['ngRoute'])
 	};
 })
 
-.controller('SeriesTypeDetailsCtrl', function($scope, $http, $mdDialog, $q) {
+.controller('SeriesTypeDetailsCtrl', function($scope, $http, $mdDialog, $q, sbxToast) {
 	// Initialization
 	$scope.callbacks.ruleAttributesTables = [];
 	$scope.state = {};
@@ -157,15 +157,15 @@ angular.module('slicebox.adminSeriesTypes', ['ngRoute'])
 
 		savePromise.then(function() {
 			if (isCreate) {
-				$scope.showInfoMessage("Series type added");
+				sbxToast.showInfoMessage("Series type added");
 			} else {
-				$scope.showInfoMessage("Series type updated");
+				sbxToast.showInfoMessage("Series type updated");
 			}
 
 			resetState();
 			$scope.callbacks.seriesTypesTable.reloadPage();
 		}, function(error) {
-			$scope.showErrorMessage(error);
+			sbxToast.showErrorMessage(error);
 		});
 
 		return savePromise;
@@ -200,7 +200,7 @@ angular.module('slicebox.adminSeriesTypes', ['ngRoute'])
 				handleLoadedRules(rules);
 			})
 			.error(function(error) {
-				$scope.showErrorMessage('Failed to load rules: ' + error);
+				sbxToast.showErrorMessage('Failed to load rules: ' + error);
 			});
 	}
 
@@ -221,7 +221,7 @@ angular.module('slicebox.adminSeriesTypes', ['ngRoute'])
 				rule.originalAttributes = angular.copy(attributes);
 			})
 			.error(function(error) {
-				$scope.showErrorMessage('Failed to load rule attributes: ' + error);
+				sbxToast.showErrorMessage('Failed to load rule attributes: ' + error);
 			});
 	}
 

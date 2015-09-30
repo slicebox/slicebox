@@ -25,16 +25,20 @@
                             <md-card-content>
 
                                 <h4>Imported files</h4>
-                                
-                                <sbx-grid
-                                    load-page="getImportedFiles()"
-                                    page-size="10000000"
-                                    callbacks="callbacks.importedFilesTable"
-                                    empty-message="No imported files">
+                        
+                                <md-content class="md-padding" style="height: 300px">
 
-                                    <sbx-grid-column property="name" title="File Name"></sbx-grid-column>
-                                
-                                </sbx-grid>
+                                    <sbx-grid
+                                        load-page="getImportedFiles()"
+                                        page-size="10000000"
+                                        callbacks="callbacks.importedFilesTable"
+                                        empty-message="No imported files">
+
+                                        <sbx-grid-column property="name" title="File Name"></sbx-grid-column>
+                                    
+                                    </sbx-grid>
+
+                                </md-content>
 
                             </md-card-content>
                         </md-card>
@@ -47,17 +51,21 @@
 
                                 <h4>Rejected files</h4>                                
 
-                                <sbx-grid
-                                    load-page="getRejectedFiles()"
-                                    page-size="10000000"
-                                    callbacks="callbacks.rejectedFilesTable"
-                                    empty-message="No rejected files">
+                                <md-content class="md-padding" style="height: 300px">
 
-                                    <sbx-grid-column property="name" title="File Name"></sbx-grid-column>
-                                    <sbx-grid-column property="status" title="Status Code"></sbx-grid-column>
-                                    <sbx-grid-column property="message" title="Message"></sbx-grid-column>
-                                
-                                </sbx-grid>
+                                    <sbx-grid
+                                        load-page="getRejectedFiles()"
+                                        page-size="10000000"
+                                        callbacks="callbacks.rejectedFilesTable"
+                                        empty-message="No rejected files">
+
+                                        <sbx-grid-column property="name" title="File Name"></sbx-grid-column>
+                                        <sbx-grid-column property="status" title="Status Code"></sbx-grid-column>
+                                        <sbx-grid-column property="message" title="Message"></sbx-grid-column>
+                                    
+                                    </sbx-grid>
+
+                                </md-content>
 
                             </md-card-content>
                         </md-card>

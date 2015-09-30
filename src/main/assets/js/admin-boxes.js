@@ -11,13 +11,13 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
   });
 })
 
-.controller('AdminBoxesCtrl', function($scope, $http, $interval, $mdDialog) {
+.controller('AdminBoxesCtrl', function($scope, $http, $interval, $mdDialog, sbxToast, openDeleteEntitiesModalFunction) {
     // Initialization
     $scope.objectActions =
         [
             {
                 name: 'Delete',
-                action: $scope.confirmDeleteEntitiesFunction('/api/boxes/', 'box(es)')
+                action: openDeleteEntitiesModalFunction('/api/boxes/', 'box(es)')
             }
         ];
 
@@ -45,13 +45,13 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
             scope: $scope.$new()
         });
         dialogPromise.then(function (response) {
-            $scope.showInfoMessage("Box added");                
+            sbxToast.showInfoMessage("Box added");                
             $scope.callbacks.boxesTable.reloadPage();
         });
     };
 })
 
-.controller('AddBoxModalCtrl', function($scope, $mdDialog, $http) {
+.controller('AddBoxModalCtrl', function($scope, $mdDialog, $http, sbxToast) {
 
     // Scope functions
     $scope.radioButtonChanged = function() {
@@ -71,7 +71,7 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
         });
 
         generateURLPromise.error(function(data) {
-            $scope.showErrorMessage(data);                
+            sbxToast.showErrorMessage(data);                
         });
 
         return generateURLPromise;
@@ -95,7 +95,7 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
         });
 
         connectPromise.error(function(data) {
-            $scope.showErrorMessage(data);
+            sbxToast.showErrorMessage(data);
         });
 
         return connectPromise;

@@ -11,13 +11,13 @@ angular.module('slicebox.adminWatchDirectories', ['ngRoute'])
     });
 })
 
-.controller('AdminWatchDirectoriesCtrl', function($scope, $http) {
+.controller('AdminWatchDirectoriesCtrl', function($scope, $http, openAddEntityModal, openDeleteEntitiesModalFunction) {
     // Initialization
     $scope.objectActions =
         [
             {
                 name: 'Delete',
-                action: $scope.confirmDeleteEntitiesFunction('/api/directorywatches/', 'directory watch(es)')
+                action: openDeleteEntitiesModalFunction('/api/directorywatches/', 'directory watch(es)')
             }
         ];
 
@@ -29,7 +29,7 @@ angular.module('slicebox.adminWatchDirectories', ['ngRoute'])
     };
 
     $scope.addDirectoryButtonClicked = function() {
-        $scope.addEntityButtonClicked('addWatchDirectoryModalContent.html', 'AddWatchDirectoryModalCtrl', '/api/directorywatches', 'Directory watch', $scope.callbacks.directoriesTable);
+        openAddEntityModal('addWatchDirectoryModalContent.html', 'AddWatchDirectoryModalCtrl', '/api/directorywatches', 'Directory watch', $scope.callbacks.directoriesTable);
     };
 
 })

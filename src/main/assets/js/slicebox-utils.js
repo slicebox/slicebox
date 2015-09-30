@@ -2,6 +2,99 @@ angular.module('slicebox.utils', [])
 
 .factory('sbxMisc', function($q) {
     return {
+        flatten: function(arrayOfArrays) {
+            return [].concat.apply([], arrayOfArrays);
+        },
+
+        unique: function(array) {
+            return array.filter(function (value, index, self) { return self.indexOf(value) === index; });
+        },
+
+        flattenPromises: function(arrayOfPromisesOfArrays) {
+            return $q.all(arrayOfPromisesOfArrays).then(this.flatten); 
+        }
+    };
+})
+
+.factory('sbxToast', function($mdToast) {
+    return {
+        showErrorMessage: function(errorMessage) {
+            var toast = $mdToast.simple()
+                .content(errorMessage)
+                .action('Dismiss')
+                .highlightAction(true)
+                .hideDelay(30000)
+                .theme('redTheme')
+                .position("bottom right");
+            $mdToast.show(toast);
+        },
+
+        showInfoMessage: function(infoMessage) {
+            var toast = {
+                template: '<md-toast>' + infoMessage + '</md-toast>',
+                position: 'top right'
+            };
+            var parent = angular.element(document.getElementById("content"));
+            if (parent) {
+                toast.parent = parent;
+            }
+            $mdToast.show(toast);
+        }
+    };
+})
+
+.factory('sbxMetaData', function($http, sbxMisc) {
+    return {
+        imagesForSeries: function(series, sources, seriesTypes, seriesTags) {
+            var self = this;
+            var promises = series.map(function(singleSeries) {
+                return $http.get(self.urlWithAdvancedFiltering('/api/metadata/images?startindex=0&count=1000000&seriesid=' + singleSeries.id, sources, seriesTypes, seriesTags)).then(function (imagesData) {
+                    return imagesData.data;
+                });
+            });
+            return sbxMisc.flattenPromises(promises);
+        },
+
+        imagesForStudies: function(studies, sources, seriesTypes, seriesTags) {
+            var self = this;
+            var promises = studies.map(function(study) {
+                return $http.get(self.urlWithAdvancedFiltering('/api/metadata/series?startindex=0&count=1000000&studyid=' + study.id, sources, seriesTypes, seriesTags)).then(function (seriesData) {
+                    return self.imagesForSeries(seriesData.data, sources, seriesTypes, seriesTags);
+                });
+            });
+            return sbxMisc.flattenPromises(promises);
+        },
+
+        imagesForPatients: function(patients, sources, seriesTypes, seriesTags) {
+            var self = this;
+            var promises = patients.map(function(patient) {
+                return $http.get(self.urlWithAdvancedFiltering('/api/metadata/studies?startindex=0&count=1000000&patientid=' + patient.id, sources, seriesTypes, seriesTags)).then(function (studiesData) {
+                    return self.imagesForStudies(studiesData.data, sources, seriesTypes, seriesTags);
+                });
+            });
+            return sbxMisc.flattenPromises(promises);
+        },
+
+        seriesForStudies: function(studies, sources, seriesTypes, seriesTags) {
+            var self = this;
+            var promises = studies.map(function(study) {
+                return $http.get(self.urlWithAdvancedFiltering('/api/metadata/series?startindex=0&count=1000000&studyid=' + study.id, sources, seriesTypes, seriesTags)).then(function (seriesData) {
+                    return seriesData.data;
+                });
+            });
+            return sbxMisc.flattenPromises(promises);            
+        },
+
+        seriesForPatients: function(patients, sources, seriesTypes, seriesTags) {
+            var self = this;
+            var promises = patients.map(function(patient) {
+                return $http.get(self.urlWithAdvancedFiltering('/api/metadata/studies?startindex=0&count=1000000&patientid=' + patient.id, sources, seriesTypes, seriesTags)).then(function (studiesData) {
+                    return self.seriesForStudies(studiesData.data, sources, seriesTypes, seriesTags);
+                });
+            });
+            return sbxMisc.flattenPromises(promises);
+        },
+
         urlWithAdvancedFiltering: function(baseUrl, sources, seriesTypes, seriesTags) {
             var url = baseUrl;
             if (sources && sources.length > 0) {
@@ -17,72 +110,70 @@ angular.module('slicebox.utils', [])
                 url = url + '&seriestags=' + seriesTagsPart;
             }
             return url;
-        },
-
-        flatten: function(arrayOfArrays) {
-            return [].concat.apply([], arrayOfArrays);
-        },
-
-        unique: function(array) {
-            return array.filter(function (value, index, self) { return self.indexOf(value) === index; });
-        },
-
-        flattenPromises: function(arrayOfPromisesOfArrays) {
-            return $q.all(arrayOfPromisesOfArrays).then(this.flatten); 
         }
     };
 })
 
-.factory('sbxMetaData', function($http, sbxMisc) {
-    return {
-        imagesForSeries: function(series, sources, seriesTypes, seriesTags) {
-            var promises = series.map(function(singleSeries) {
-                return $http.get(sbxMisc.urlWithAdvancedFiltering('/api/metadata/images?startindex=0&count=1000000&seriesid=' + singleSeries.id, sources, seriesTypes, seriesTags)).then(function (imagesData) {
-                    return imagesData.data;
-                });
-            });
-            return sbxMisc.flattenPromises(promises);
-        },
+.factory('openAddEntityModal', function($mdDialog) {
 
-        imagesForStudies: function(studies, sources, seriesTypes, seriesTags) {
-            var self = this;
-            var promises = studies.map(function(study) {
-                return $http.get(sbxMisc.urlWithAdvancedFiltering('/api/metadata/series?startindex=0&count=1000000&studyid=' + study.id, sources, seriesTypes, seriesTags)).then(function (seriesData) {
-                    return self.imagesForSeries(seriesData.data, sources, seriesTypes, seriesTags);
-                });
-            });
-            return sbxMisc.flattenPromises(promises);
-        },
+    return function(modalContentName, controllerName, url, entityName, table) {
+        var dialogPromise = $mdDialog.show({
+            templateUrl: '/assets/partials/' + modalContentName,
+            controller: controllerName
+        });
 
-        imagesForPatients: function(patients, sources, seriesTypes, seriesTags) {
-            var self = this;
-            var promises = patients.map(function(patient) {
-                return $http.get(sbxMisc.urlWithAdvancedFiltering('/api/metadata/studies?startindex=0&count=1000000&patientid=' + patient.id, sources, seriesTypes, seriesTags)).then(function (studiesData) {
-                    return self.imagesForStudies(studiesData.data, sources, seriesTypes, seriesTags);
-                });
-            });
-            return sbxMisc.flattenPromises(promises);
-        },
+        dialogPromise.then(function (entity) {
 
-        seriesForStudies: function(studies, sources, seriesTypes, seriesTags) {
-            var promises = studies.map(function(study) {
-                return $http.get(sbxMisc.urlWithAdvancedFiltering('/api/metadata/series?startindex=0&count=1000000&studyid=' + study.id, sources, seriesTypes, seriesTags)).then(function (seriesData) {
-                    return seriesData.data;
-                });
+            var addPromise = $http.post(url, entity);
+            addPromise.error(function(data) {
+                $scope.showErrorMessage(data);
             });
-            return sbxMisc.flattenPromises(promises);            
-        },
 
-        seriesForPatients: function(patients, sources, seriesTypes, seriesTags) {
-            var self = this;
-            var promises = patients.map(function(patient) {
-                return $http.get(sbxMisc.urlWithAdvancedFiltering('/api/metadata/studies?startindex=0&count=1000000&patientid=' + patient.id, sources, seriesTypes, seriesTags)).then(function (studiesData) {
-                    return self.seriesForStudies(studiesData.data, sources, seriesTypes, seriesTags);
-                });
+            addPromise.success(function() {
+                sbxToast.showInfoMessage(entityName + " added");                
             });
-            return sbxMisc.flattenPromises(promises);
-        }
+
+            addPromise.finally(function() {
+                table.reloadPage();
+            });
+        });
     };
+})
+
+.factory('openDeleteEntitiesModalFunction', function($mdDialog, $http, $q, openConfirmActionModal, sbxToast) {
+    return function(url, entitiesText) {
+
+        return function(entities) {
+            var deleteConfirmationText = 'Permanently delete ' + entities.length + ' ' + entitiesText + '?';
+
+            return openConfirmActionModal('Delete ' + entitiesText, deleteConfirmationText, 'Delete', function() {
+                return deleteEntities(url, entities, entitiesText);
+            });
+        };
+    };
+
+    function deleteEntities(url, entities, entitiesText) {
+
+        var removePromises = [];
+        var removePromise;
+        var deleteAllPromises;
+
+        angular.forEach(entities, function(entity) {
+            removePromise = $http.delete(url + entity.id);
+            removePromises.push(removePromise);
+        });
+
+        deleteAllPromises = $q.all(removePromises);
+
+        deleteAllPromises.then(function() {
+            sbxToast.showInfoMessage(entities.length + " " + entitiesText + " deleted");
+        }, function(response) {
+            sbxToast.showErrorMessage(response.data);
+        });
+
+        return deleteAllPromises;
+    }    
+
 })
 
 .factory('openConfirmActionModal', function($mdDialog) {
@@ -146,7 +237,7 @@ angular.module('slicebox.utils', [])
     };
 })
 
-.controller('TagSeriesModalCtrl', function($scope, $mdDialog, $http, $q, sbxMisc, seriesIds) {
+.controller('TagSeriesModalCtrl', function($scope, $mdDialog, $http, $q, sbxMisc, sbxToast, seriesIds) {
     $scope.uiState = {
         seriesIds: seriesIds,
         seriesTags: [],
@@ -168,6 +259,12 @@ angular.module('slicebox.utils', [])
                     })
                 )
             );
+
+        promise.then(function() {
+            sbxToast.showInfoMessage(seriesIds.length + " series tagged.");
+        }, function(response) {
+            sbxToast.showErrorMessage(response.data);
+        });
 
         promise.finally(function() {
             $mdDialog.hide();

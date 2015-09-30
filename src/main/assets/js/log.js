@@ -11,13 +11,13 @@ angular.module('slicebox.log', ['ngRoute'])
   });
 })
 
-.controller('LogCtrl', function($scope, $http, $q) {
+.controller('LogCtrl', function($scope, $http, $q, openDeleteEntitiesModalFunction) {
     // Initialization
     $scope.actions =
         [
             {
                 name: 'Delete',
-                action: $scope.confirmDeleteEntitiesFunction('/api/log/', 'log message(s)')
+                action: openDeleteEntitiesModalFunction('/api/log/', 'log message(s)')
             }
         ];
 

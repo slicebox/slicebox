@@ -71,8 +71,7 @@ angular.module('slicebox', [
 .controller('SliceboxCtrl', function($scope, $http, $q, $location, $mdSidenav, $mdToast, $mdDialog, authenticationService, openConfirmActionModal) {
 
     $scope.uiState = {
-        showMenu: true,
-        addEntityInProgress: false
+        showMenu: true
     };
 
     $scope.toggleLeftNav = function() {
@@ -96,85 +95,6 @@ angular.module('slicebox', [
     $scope.currentPathStartsWith = function(path) { 
         return $location.path().indexOf(path) === 0;
     };
-
-    $scope.showErrorMessage = function(errorMessage) {
-        var toast = $mdToast.simple()
-            .content(errorMessage)
-            .action('Dismiss')
-            .highlightAction(true)
-            .hideDelay(30000)
-            .theme('redTheme')
-            .position("bottom right");
-        $mdToast.show(toast);
-    };
-
-    $scope.showInfoMessage = function(infoMessage) {
-        var toast = {
-            parent: angular.element(document.getElementById("content")),
-            template: '<md-toast>' + infoMessage + '</md-toast>',
-            position: 'top right'
-        };
-        $mdToast.show(toast);
-    };
-
-    $scope.addEntityButtonClicked = function(modalContentName, controllerName, url, entityName, table) {
-        var dialogPromise = $mdDialog.show({
-            templateUrl: '/assets/partials/' + modalContentName,
-            controller: controllerName
-        });
-
-        dialogPromise.then(function (entity) {
-            $scope.uiState.addEntityInProgress = true;
-
-            var addPromise = $http.post(url, entity);
-            addPromise.error(function(data) {
-                $scope.showErrorMessage(data);
-            });
-
-            addPromise.success(function() {
-                $scope.showInfoMessage(entityName + " added");                
-            });
-
-            addPromise.finally(function() {
-                $scope.uiState.addEntityInProgress = false;
-                table.reloadPage();
-            });
-        });
-    };
-
-    $scope.confirmDeleteEntitiesFunction = function(url, entitiesText) {
-
-        return function(entities) {
-            var deleteConfirmationText = 'Permanently delete ' + entities.length + ' ' + entitiesText + '?';
-
-            return openConfirmActionModal('Delete ' + entitiesText, deleteConfirmationText, 'Delete', function() {
-                return deleteEntities(url, entities, entitiesText);
-            });
-        };
-    };
-
-    // private functions
-    function deleteEntities(url, entities, entitiesText) {
-
-        var removePromises = [];
-        var removePromise;
-        var deleteAllPromises;
-
-        angular.forEach(entities, function(entity) {
-            removePromise = $http.delete(url + entity.id);
-            removePromises.push(removePromise);
-        });
-
-        deleteAllPromises = $q.all(removePromises);
-
-        deleteAllPromises.then(function() {
-            $scope.showInfoMessage(entities.length + " " + entitiesText + " deleted");
-        }, function(response) {
-            $scope.showErrorMessage(response.data);
-        });
-
-        return deleteAllPromises;
-    }    
 })
 
 .run(function ($rootScope, $location, $cookieStore, $http) {

@@ -11,13 +11,13 @@ angular.module('slicebox.adminUsers', ['ngRoute'])
   });
 })
 
-.controller('AdminUsersCtrl', function($scope, $http) {
+.controller('AdminUsersCtrl', function($scope, $http, openAddEntityModal, openDeleteEntitiesModalFunction) {
     // Initialization
     $scope.objectActions =
         [
             {
                 name: 'Delete',
-                action: $scope.confirmDeleteEntitiesFunction('/api/users/', 'user(s)')
+                action: openDeleteEntitiesModalFunction('/api/users/', 'user(s)')
             }
         ];
 
@@ -29,7 +29,7 @@ angular.module('slicebox.adminUsers', ['ngRoute'])
     };
 
     $scope.addUserButtonClicked = function() {
-        $scope.addEntityButtonClicked('addUserModalContent.html', 'AddUserModalCtrl', '/api/users', 'User', $scope.callbacks.usersTable);
+        openAddEntityModal('addUserModalContent.html', 'AddUserModalCtrl', '/api/users', 'User', $scope.callbacks.usersTable);
     };
 })
 
