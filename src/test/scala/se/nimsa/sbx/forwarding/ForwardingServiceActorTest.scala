@@ -41,7 +41,7 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     TestUtil.deleteFolder(storage)
   }
 
-  val forwardingService = system.actorOf(Props(new ForwardingServiceActor(dbProps, 30.seconds)(Timeout(40.seconds))), name = "ForwardingService")
+  val forwardingService = system.actorOf(Props(new ForwardingServiceActor(dbProps, 1000.hours)(Timeout(30.seconds))), name = "ForwardingService")
 
   "A ForwardingServiceActor" should {
 
@@ -81,4 +81,5 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     }
   }
 
+  
 }

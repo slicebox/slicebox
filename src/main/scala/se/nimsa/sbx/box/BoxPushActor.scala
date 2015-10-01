@@ -44,7 +44,7 @@ import akka.actor.ReceiveTimeout
 import se.nimsa.sbx.log.SbxLog
 import akka.util.Timeout
 import se.nimsa.sbx.storage.StorageProtocol.GetDataset
-import se.nimsa.sbx.app.GeneralProtocol.ImagesSent
+import se.nimsa.sbx.app.GeneralProtocol._
 
 class BoxPushActor(box: Box,
                    dbProps: DbProps,
@@ -163,7 +163,7 @@ class BoxPushActor(box: Box,
     }
 
     if (outboxEntry.sequenceNumber == outboxEntry.totalImageCount) {
-      context.system.eventStream.publish(ImagesSent(sentImageIdsForTransactionId(outboxEntry.transactionId)))
+      context.system.eventStream.publish(ImagesSent(Destination(DestinationType.BOX, box.name, box.id), sentImageIdsForTransactionId(outboxEntry.transactionId)))
       SbxLog.info("Box", s"Finished sending ${outboxEntry.totalImageCount} images to box ${box.name}")
       removeTransactionTagValuesForTransactionId(outboxEntry.transactionId)
     }

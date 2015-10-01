@@ -70,6 +70,6 @@ object GeneralProtocol {
   
   case class Destination(destinationType: DestinationType, destinationName: String, destinationId: Long)
   
-  case class ImagesSent(imageIds: Seq[Long])
+  case class ImagesSent(destination: Destination, imageIds: Seq[Long])
 
 }

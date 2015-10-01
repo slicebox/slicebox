@@ -44,7 +44,7 @@ import scala.concurrent.Future.sequence
 import akka.actor.Stash
 import org.dcm4che3.data.Attributes
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.TagValue
-import se.nimsa.sbx.app.GeneralProtocol.ImagesSent
+import se.nimsa.sbx.app.GeneralProtocol._
 
 class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String, implicit val timeout: Timeout) extends Actor with Stash with ExceptionCatching {
 
@@ -167,7 +167,7 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String, impli
                   updateSent(outboxEntry)
 
                   if (outboxEntry.sequenceNumber == outboxEntry.totalImageCount) {
-                    context.system.eventStream.publish(ImagesSent(sentImageIdsForTransactionId(outboxEntry.transactionId)))
+                    context.system.eventStream.publish(ImagesSent(Destination(DestinationType.BOX, box.name, box.id), sentImageIdsForTransactionId(outboxEntry.transactionId)))
                     removeTransactionTagValuesForTransactionId(outboxEntry.transactionId)
                     SbxLog.info("Box", s"Finished sending ${outboxEntry.totalImageCount} images to box ${box.name}")
                   }

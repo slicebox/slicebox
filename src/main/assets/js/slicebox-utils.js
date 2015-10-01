@@ -114,7 +114,7 @@ angular.module('slicebox.utils', [])
     };
 })
 
-.factory('openAddEntityModal', function($mdDialog) {
+.factory('openAddEntityModal', function($http, $mdDialog, sbxToast) {
 
     return function(modalContentName, controllerName, url, entityName, table) {
         var dialogPromise = $mdDialog.show({
@@ -126,7 +126,7 @@ angular.module('slicebox.utils', [])
 
             var addPromise = $http.post(url, entity);
             addPromise.error(function(data) {
-                $scope.showErrorMessage(data);
+                sbxToast.showErrorMessage(data);
             });
 
             addPromise.success(function() {

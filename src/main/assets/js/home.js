@@ -11,7 +11,7 @@ angular.module('slicebox.home', ['ngRoute'])
   });
 })
 
-.controller('HomeCtrl', function($scope, $http, $mdDialog, $q, openConfirmActionModal, openTagSeriesModal, sbxMisc, sbxMetaData, sbxToast) {
+.controller('HomeCtrl', function($scope, $http, $mdDialog, $q, openConfirmActionModal, openDeleteEntitiesModalFunction, openTagSeriesModal, sbxMisc, sbxMetaData, sbxToast) {
 
     // Initialization
 
