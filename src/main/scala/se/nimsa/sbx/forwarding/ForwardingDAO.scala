@@ -102,6 +102,12 @@ class ForwardingDAO(val driver: JdbcProfile) {
   def listForwardingRules(implicit session: Session): List[ForwardingRule] =
     ruleQuery.list
 
+  def listForwardingTransactions(implicit session: Session): List[ForwardingTransaction] =
+    transactionQuery.list
+
+  def listForwardingTransactionImages(implicit session: Session): List[ForwardingTransactionImage] =
+    transactionImageQuery.list
+
   def removeForwardingRule(forwardingRuleId: Long)(implicit session: Session): Unit =
     ruleQuery.filter(_.id === forwardingRuleId).delete
 

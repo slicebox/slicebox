@@ -20,6 +20,7 @@ import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.model.Entity
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
+import akka.actor.ActorRef
 
 object ForwardingProtocol {
 
@@ -54,5 +55,14 @@ object ForwardingProtocol {
 
   case class MakeTransfer(forwardingRule: ForwardingRule, forwardingTransaction: ForwardingTransaction)
 
-  case class MaybeAddImageToForwardingQueue(image: Image, sourceTypeAndId: SourceTypeId)
+  case class MaybeAddImageToForwardingQueue(image: Image, sourceTypeAndId: SourceTypeId, origin: ActorRef)
+  
+  
+  case class ImagesAddedToForwardingQueue(transactionImages: List[ForwardingTransactionImage])
+  
+  case class TransactionsEnroute(transactions: List[ForwardingTransaction])
+  
+  case class TransactionMarkedAsDelivered(transactionMaybe: Option[ForwardingTransaction])
+  
+  case class TransactionsFinalized(transactionsToRemove: List[ForwardingTransaction], idsOfDeletedImages: List[Long])
 }
