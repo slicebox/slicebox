@@ -42,52 +42,55 @@ class BoxDAO(val driver: JdbcProfile) {
 
   val boxQuery = TableQuery[BoxTable]
 
-  val toOutboxEntry = (id: Long, remoteBoxId: Long, transactionId: Long, sequenceNumber: Long, totalImageCount: Long, imageId: Long, failed: Boolean) =>
-    OutboxEntry(id, remoteBoxId, transactionId, sequenceNumber, totalImageCount, imageId, failed)
-  val fromOutboxEntry = (entry: OutboxEntry) => Option((entry.id, entry.remoteBoxId, entry.transactionId, entry.sequenceNumber, entry.totalImageCount, entry.imageId, entry.failed))
+  val toOutboxEntry = (id: Long, remoteBoxId: Long, remoteBoxName: String, transactionId: Long, sequenceNumber: Long, totalImageCount: Long, imageId: Long, failed: Boolean) =>
+    OutboxEntry(id, remoteBoxId, remoteBoxName: String, transactionId, sequenceNumber, totalImageCount, imageId, failed)
+  val fromOutboxEntry = (entry: OutboxEntry) => Option((entry.id, entry.remoteBoxId, entry.remoteBoxName, entry.transactionId, entry.sequenceNumber, entry.totalImageCount, entry.imageId, entry.failed))
 
   // TODO: should probably add unique index on (remoteBoxId,transactionId)
   class OutboxTable(tag: Tag) extends Table[OutboxEntry](tag, "Outbox") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def remoteBoxId = column[Long]("remoteboxid")
+    def remoteBoxName = column[String]("remoteboxname")
     def transactionId = column[Long]("transactionid")
     def sequenceNumber = column[Long]("sequencenumber")
     def totalImageCount = column[Long]("totalimagecount")
     def imageId = column[Long]("imageid")
     def failed = column[Boolean]("failed")
-    def * = (id, remoteBoxId, transactionId, sequenceNumber, totalImageCount, imageId, failed) <> (toOutboxEntry.tupled, fromOutboxEntry)
+    def * = (id, remoteBoxId, remoteBoxName, transactionId, sequenceNumber, totalImageCount, imageId, failed) <> (toOutboxEntry.tupled, fromOutboxEntry)
   }
 
   val outboxQuery = TableQuery[OutboxTable]
 
-  val toInboxEntry = (id: Long, remoteBoxId: Long, transactionId: Long, receivedImageCount: Long, totalImageCount: Long, lastUpdated: Long) =>
-    InboxEntry(id, remoteBoxId, transactionId, receivedImageCount, totalImageCount, lastUpdated)
-  val fromInboxEntry = (entry: InboxEntry) => Option((entry.id, entry.remoteBoxId, entry.transactionId, entry.receivedImageCount, entry.totalImageCount, entry.lastUpdated))
+  val toInboxEntry = (id: Long, remoteBoxId: Long, remoteBoxName: String, transactionId: Long, receivedImageCount: Long, totalImageCount: Long, lastUpdated: Long) =>
+    InboxEntry(id, remoteBoxId, remoteBoxName, transactionId, receivedImageCount, totalImageCount, lastUpdated)
+  val fromInboxEntry = (entry: InboxEntry) => Option((entry.id, entry.remoteBoxId, entry.remoteBoxName, entry.transactionId, entry.receivedImageCount, entry.totalImageCount, entry.lastUpdated))
 
   class InboxTable(tag: Tag) extends Table[InboxEntry](tag, "Inbox") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def remoteBoxId = column[Long]("remoteboxid")
+    def remoteBoxName = column[String]("remoteboxname")
     def transactionId = column[Long]("transactionid")
     def receivedImageCount = column[Long]("receivedimagecount")
     def totalImageCount = column[Long]("totalimagecount")
     def lastUpdated = column[Long]("lastupdated")
-    def * = (id, remoteBoxId, transactionId, receivedImageCount, totalImageCount, lastUpdated) <> (toInboxEntry.tupled, fromInboxEntry)
+    def * = (id, remoteBoxId, remoteBoxName, transactionId, receivedImageCount, totalImageCount, lastUpdated) <> (toInboxEntry.tupled, fromInboxEntry)
   }
 
   val inboxQuery = TableQuery[InboxTable]
 
-  val toSentEntry = (id: Long, remoteBoxId: Long, transactionId: Long, sentImageCount: Long, totalImageCount: Long, lastUpdated: Long) =>
-    SentEntry(id, remoteBoxId, transactionId, sentImageCount, totalImageCount, lastUpdated)
-  val fromSentEntry = (entry: SentEntry) => Option((entry.id, entry.remoteBoxId, entry.transactionId, entry.sentImageCount, entry.totalImageCount, entry.lastUpdated))
+  val toSentEntry = (id: Long, remoteBoxId: Long, remoteBoxName: String, transactionId: Long, sentImageCount: Long, totalImageCount: Long, lastUpdated: Long) =>
+    SentEntry(id, remoteBoxId, remoteBoxName, transactionId, sentImageCount, totalImageCount, lastUpdated)
+  val fromSentEntry = (entry: SentEntry) => Option((entry.id, entry.remoteBoxId, entry.remoteBoxName, entry.transactionId, entry.sentImageCount, entry.totalImageCount, entry.lastUpdated))
 
   class SentTable(tag: Tag) extends Table[SentEntry](tag, "Sent") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def remoteBoxId = column[Long]("remoteboxid")
+    def remoteBoxName = column[String]("remoteboxname")
     def transactionId = column[Long]("transactionid")
     def sentImageCount = column[Long]("sentimagecount")
     def totalImageCount = column[Long]("totalimagecount")
     def lastUpdated = column[Long]("lastupdated")
-    def * = (id, remoteBoxId, transactionId, sentImageCount, totalImageCount, lastUpdated) <> (toSentEntry.tupled, fromSentEntry)
+    def * = (id, remoteBoxId, remoteBoxName, transactionId, sentImageCount, totalImageCount, lastUpdated) <> (toSentEntry.tupled, fromSentEntry)
   }
 
   val sentQuery = TableQuery[SentTable]
@@ -254,20 +257,20 @@ class BoxDAO(val driver: JdbcProfile) {
       .map(_.failed)
       .update(true)
 
-  def updateInbox(remoteBoxId: Long, transactionId: Long, sequenceNumber: Long, totalImageCount: Long)(implicit session: Session): InboxEntry = {
+  def updateInbox(remoteBoxId: Long, remoteBoxName: String, transactionId: Long, sequenceNumber: Long, totalImageCount: Long)(implicit session: Session): InboxEntry = {
     inboxEntryByTransactionId(remoteBoxId, transactionId) match {
       case Some(inboxEntry) =>
         val updatedInboxEntry = inboxEntry.copy(receivedImageCount = sequenceNumber, totalImageCount = totalImageCount, lastUpdated = System.currentTimeMillis())
         updateInboxEntry(updatedInboxEntry)
         updatedInboxEntry
       case None => {
-        val inboxEntry = InboxEntry(-1, remoteBoxId, transactionId, sequenceNumber, totalImageCount, System.currentTimeMillis())
+        val inboxEntry = InboxEntry(-1, remoteBoxId, remoteBoxName, transactionId, sequenceNumber, totalImageCount, System.currentTimeMillis())
         insertInboxEntry(inboxEntry)
       }
     }
   }
 
-  def updateSent(remoteBoxId: Long, transactionId: Long, sequenceNumber: Long, totalImageCount: Long)(implicit session: Session): SentEntry = {
+  def updateSent(remoteBoxId: Long, remoteBoxName: String, transactionId: Long, sequenceNumber: Long, totalImageCount: Long)(implicit session: Session): SentEntry = {
     sentEntryByTransactionId(remoteBoxId, transactionId) match {
       case Some(sentEntry) => {
         val updatedSentEntry = sentEntry.copy(sentImageCount = sequenceNumber, totalImageCount = totalImageCount, lastUpdated = System.currentTimeMillis())
@@ -275,7 +278,7 @@ class BoxDAO(val driver: JdbcProfile) {
         updatedSentEntry
       }
       case None => {
-        val sentEntry = SentEntry(-1, remoteBoxId, transactionId, sequenceNumber, totalImageCount, System.currentTimeMillis())
+        val sentEntry = SentEntry(-1, remoteBoxId, remoteBoxName, transactionId, sequenceNumber, totalImageCount, System.currentTimeMillis())
         insertSentEntry(sentEntry)
       }
     }

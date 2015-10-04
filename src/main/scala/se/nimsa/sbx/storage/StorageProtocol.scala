@@ -30,7 +30,7 @@ object StorageProtocol {
 
   case class SeriesSeriesType(seriesId: Long, seriesTypeId: Long)
   
-  case class SeriesSource(id: Long, sourceTypeId: SourceTypeId) extends Entity
+  case class SeriesSource(id: Long, source: Source) extends Entity
 
   case class SeriesTag(id: Long, name: String) extends Entity
   
@@ -41,7 +41,7 @@ object StorageProtocol {
   case class ImageFile(
     id: Long,
     fileName: FileName,
-    sourceTypeId: SourceTypeId) extends Entity {
+    source: Source) extends Entity {
     
     override def equals(o: Any): Boolean = o match {
       case that: ImageFile => that.fileName == fileName
@@ -90,13 +90,13 @@ object StorageProtocol {
 
   sealed trait MetaDataQuery
 
-  case class GetPatients(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String], sourceTypeIds: Array[SourceTypeId], seriesTypeIds: Array[Long], seriesTagIds: Array[Long]) extends MetaDataQuery
+  case class GetPatients(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String], sourceRefs: Array[SourceRef], seriesTypeIds: Array[Long], seriesTagIds: Array[Long]) extends MetaDataQuery
 
-  case class GetStudies(startIndex: Long, count: Long, patientId: Long, sourceTypeIds: Array[SourceTypeId], seriesTypeIds: Array[Long], seriesTagIds: Array[Long]) extends MetaDataQuery
+  case class GetStudies(startIndex: Long, count: Long, patientId: Long, sourceRefs: Array[SourceRef], seriesTypeIds: Array[Long], seriesTagIds: Array[Long]) extends MetaDataQuery
 
-  case class GetSeries(startIndex: Long, count: Long, studyId: Long, sourceTypeIds: Array[SourceTypeId], seriesTypeIds: Array[Long], seriesTagIds: Array[Long]) extends MetaDataQuery
+  case class GetSeries(startIndex: Long, count: Long, studyId: Long, sourceRefs: Array[SourceRef], seriesTypeIds: Array[Long], seriesTagIds: Array[Long]) extends MetaDataQuery
 
-  case class GetFlatSeries(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String], sourceTypeIds: Array[SourceTypeId], seriesTypeIds: Array[Long], seriesTagIds: Array[Long]) extends MetaDataQuery
+  case class GetFlatSeries(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String], sourceRefs: Array[SourceRef], seriesTypeIds: Array[Long], seriesTagIds: Array[Long]) extends MetaDataQuery
 
   case class GetImages(startIndex: Long, count: Long, seriesId: Long) extends MetaDataQuery
   
@@ -156,7 +156,7 @@ object StorageProtocol {
   case class GetSeriesTypesForSeries(seriesId: Long) extends PropertiesRequest
   
   
-  case class AddDataset(dataset: Attributes, sourceTypeId: SourceTypeId)
+  case class AddDataset(dataset: Attributes, source: Source)
   
     
   // ***to API***
@@ -171,8 +171,6 @@ object StorageProtocol {
 
   case class Images(images: Seq[Image]) 
 
-  case class ImageAdded(image: Image)
-  
   case class ImageDeleted(imageId: Long)
   
   case class SeriesTypeAddedToSeries(seriesSeriesType: SeriesSeriesType)
@@ -187,9 +185,9 @@ object StorageProtocol {
   
   // ***to storage***
 
-  case class DatasetReceived(dataset: Attributes, sourceTypeId: SourceTypeId)
+  case class DatasetReceived(dataset: Attributes, source: Source)
   
-  case class FileReceived(path: Path, sourceTypeId: SourceTypeId)
+  case class FileReceived(path: Path, source: Source)
   
   // ***from storage***
 

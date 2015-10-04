@@ -123,7 +123,7 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String, impli
 
           case UpdateInbox(token, transactionId, sequenceNumber, totalImageCount, imageId) =>
             pollBoxByToken(token).foreach(box =>
-              updateInbox(box.id, transactionId, sequenceNumber, totalImageCount, imageId))
+              updateInbox(box.id, box.name, transactionId, sequenceNumber, totalImageCount, imageId))
 
             // TODO: what should we do if no box was found for token?
 
@@ -145,7 +145,7 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String, impli
             boxById(remoteBoxId) match {
               case Some(box) =>
                 SbxLog.info("Box", s"Sending ${imageTagValuesSeq.length} images to box ${box.name}")
-                addImagesToOutbox(remoteBoxId, imageTagValuesSeq)
+                addImagesToOutbox(remoteBoxId, box.name, imageTagValuesSeq)
                 sender ! ImagesAddedToOutbox(remoteBoxId, imageTagValuesSeq.map(_.imageId))
               case None =>
                 sender ! BoxNotFound
@@ -185,34 +185,13 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String, impli
             })
 
           case GetInbox =>
-            val inboxEntries = getInboxFromDb().map { inboxEntry =>
-              boxById(inboxEntry.remoteBoxId) match {
-                case Some(box) => InboxEntryInfo(inboxEntry.id, box.name, inboxEntry.transactionId, inboxEntry.receivedImageCount, inboxEntry.totalImageCount, inboxEntry.lastUpdated)
-                case None      => InboxEntryInfo(inboxEntry.id, inboxEntry.remoteBoxId.toString, inboxEntry.transactionId, inboxEntry.receivedImageCount, inboxEntry.totalImageCount, inboxEntry.lastUpdated)
-              }
-            }
-            sender ! Inbox(inboxEntries)
+            sender ! Inbox(getInboxFromDb())
 
           case GetOutbox =>
-            val idToBox = getBoxesFromDb().map(box => box.id -> box).toMap
-            val outboxEntries = getOutboxFromDb().map { outboxEntry =>
-              idToBox.get(outboxEntry.remoteBoxId) match {
-                case Some(box) =>
-                  OutboxEntryInfo(outboxEntry.id, box.name, outboxEntry.transactionId, outboxEntry.sequenceNumber, outboxEntry.totalImageCount, outboxEntry.imageId, outboxEntry.failed)
-                case None =>
-                  OutboxEntryInfo(outboxEntry.id, "" + outboxEntry.remoteBoxId, outboxEntry.transactionId, outboxEntry.sequenceNumber, outboxEntry.totalImageCount, outboxEntry.imageId, outboxEntry.failed)
-              }
-            }
-            sender ! Outbox(outboxEntries)
+            sender ! Outbox(getOutboxFromDb())
 
           case GetSent =>
-            val sentEntries = getSentFromDb().map { sentEntry =>
-              boxById(sentEntry.remoteBoxId) match {
-                case Some(box) => SentEntryInfo(sentEntry.id, box.name, sentEntry.transactionId, sentEntry.sentImageCount, sentEntry.totalImageCount, sentEntry.lastUpdated)
-                case None      => SentEntryInfo(sentEntry.id, sentEntry.remoteBoxId.toString, sentEntry.transactionId, sentEntry.sentImageCount, sentEntry.totalImageCount, sentEntry.lastUpdated)
-              }
-            }
-            sender ! Sent(sentEntries)
+            sender ! Sent(getSentFromDb())
 
           case GetImagesForInboxEntry(inboxEntryId) =>
             val imageIds = getInboxImagesByInboxEntryId(inboxEntryId).map(_.imageId)
@@ -324,9 +303,9 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String, impli
       boxDao.nextOutboxEntryForRemoteBoxId(boxId)
     }
 
-  def updateInbox(remoteBoxId: Long, transactionId: Long, sequenceNumber: Long, totalImageCount: Long, imageId: Long): Unit = {
+  def updateInbox(remoteBoxId: Long, remoteBoxName: String, transactionId: Long, sequenceNumber: Long, totalImageCount: Long, imageId: Long): Unit = {
     db.withSession { implicit session =>
-      val inboxEntry = boxDao.updateInbox(remoteBoxId, transactionId, sequenceNumber, totalImageCount)
+      val inboxEntry = boxDao.updateInbox(remoteBoxId, remoteBoxName, transactionId, sequenceNumber, totalImageCount)
       boxDao.insertInboxImage(InboxImage(-1, inboxEntry.id, imageId))
     }
 
@@ -356,20 +335,20 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String, impli
     // Maybe switch to using Strings as transaction id?
     abs(UUID.randomUUID().getMostSignificantBits())
 
-  def addImagesToOutbox(remoteBoxId: Long, imageTagValuesSeq: Seq[ImageTagValues]) = {
+  def addImagesToOutbox(remoteBoxId: Long, remoteBoxName: String, imageTagValuesSeq: Seq[ImageTagValues]) = {
     val transactionId = generateTransactionId()
     imageTagValuesSeq.foreach(imageTagValues =>
       imageTagValues.tagValues.foreach(tagValue =>
         addTagValue(transactionId, imageTagValues.imageId, tagValue)))
-    addOutboxEntries(remoteBoxId, transactionId, imageTagValuesSeq.map(_.imageId))
+    addOutboxEntries(remoteBoxId, remoteBoxName, transactionId, imageTagValuesSeq.map(_.imageId))
   }
 
-  def addOutboxEntries(remoteBoxId: Long, transactionId: Long, imageIds: Seq[Long]): Unit = {
+  def addOutboxEntries(remoteBoxId: Long, remoteBoxName: String, transactionId: Long, imageIds: Seq[Long]): Unit = {
     val totalImageCount = imageIds.length
 
     db.withSession { implicit session =>
       for (sequenceNumber <- 1 to totalImageCount) {
-        boxDao.insertOutboxEntry(OutboxEntry(-1, remoteBoxId, transactionId, sequenceNumber, totalImageCount, imageIds(sequenceNumber - 1), false))
+        boxDao.insertOutboxEntry(OutboxEntry(-1, remoteBoxId, remoteBoxName, transactionId, sequenceNumber, totalImageCount, imageIds(sequenceNumber - 1), false))
       }
     }
   }
@@ -407,7 +386,7 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String, impli
 
   def updateSent(outboxEntry: OutboxEntry) =
     db.withSession { implicit session =>
-      val sentEntry = boxDao.updateSent(outboxEntry.remoteBoxId, outboxEntry.transactionId, outboxEntry.sequenceNumber, outboxEntry.totalImageCount)
+      val sentEntry = boxDao.updateSent(outboxEntry.remoteBoxId, outboxEntry.remoteBoxName, outboxEntry.transactionId, outboxEntry.sequenceNumber, outboxEntry.totalImageCount)
       boxDao.insertSentImage(SentImage(-1, sentEntry.id, outboxEntry.imageId))
     }
 

@@ -78,14 +78,14 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
 
   def receive = LoggingReceive {
 
-    case FileReceived(path, sourceTypeId) =>
+    case FileReceived(path, source) =>
       val dataset = loadDataset(path, true)
       if (dataset != null)
         if (checkSopClass(dataset)) {
           try {
-            val (image, overwrite) = storeDataset(dataset, sourceTypeId)
+            val (image, overwrite) = storeDataset(dataset, source)
             if (!overwrite) {
-              context.system.eventStream.publish(ImageAdded(image))
+              context.system.eventStream.publish(ImageAdded(image, source))
               SbxLog.info("Storage", s"Stored file ${path.toString} as ${dataset.getString(Tag.SOPInstanceUID)}")
             }
           } catch {
@@ -98,11 +98,11 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
       else
         SbxLog.info("Storage", s"File $path is not a DICOM file, skipping")
 
-    case DatasetReceived(dataset, sourceTypeId) =>
+    case DatasetReceived(dataset, source) =>
       try {
-        val (image, overwrite) = storeDataset(dataset, sourceTypeId)
+        val (image, overwrite) = storeDataset(dataset, source)
         if (!overwrite) {
-          context.system.eventStream.publish(ImageAdded(image))
+          context.system.eventStream.publish(ImageAdded(image, source))
           SbxLog.info("Storage", "Stored dataset: " + dataset.getString(Tag.SOPInstanceUID))
         }
       } catch {
@@ -110,14 +110,14 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
           SbxLog.error("Storage", e.getMessage)
       }
 
-    case AddDataset(dataset, sourceTypeId) =>
+    case AddDataset(dataset, source) =>
       catchAndReport {
         if (dataset == null)
           throw new IllegalArgumentException("Invalid dataset")
-        val (image, overwrite) = storeDatasetTryCatchThrow(dataset, sourceTypeId)
+        val (image, overwrite) = storeDatasetTryCatchThrow(dataset, source)
         if (!overwrite)
-          context.system.eventStream.publish(ImageAdded(image))
-        sender ! ImageAdded(image)
+          context.system.eventStream.publish(ImageAdded(image, source))
+        sender ! ImageAdded(image, source)
       }
 
     case DeleteImage(imageId) =>
@@ -244,14 +244,14 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
             sender ! Patients(propertiesDao.patients(startIndex, count, orderBy, orderAscending, filter, sourceIds, seriesTypeIds, seriesTagIds))
           }
 
-        case GetStudies(startIndex, count, patientId, sourceTypeIds, seriesTypeIds, seriesTagIds) =>
+        case GetStudies(startIndex, count, patientId, sourceRefs, seriesTypeIds, seriesTagIds) =>
           db.withSession { implicit session =>
-            sender ! Studies(propertiesDao.studiesForPatient(startIndex, count, patientId, sourceTypeIds, seriesTypeIds, seriesTagIds))
+            sender ! Studies(propertiesDao.studiesForPatient(startIndex, count, patientId, sourceRefs, seriesTypeIds, seriesTagIds))
           }
 
-        case GetSeries(startIndex, count, studyId, sourceTypeIds, seriesTypeIds, seriesTagIds) =>
+        case GetSeries(startIndex, count, studyId, sourceRefs, seriesTypeIds, seriesTagIds) =>
           db.withSession { implicit session =>
-            sender ! SeriesCollection(propertiesDao.seriesForStudy(startIndex, count, studyId, sourceTypeIds, seriesTypeIds, seriesTagIds))
+            sender ! SeriesCollection(propertiesDao.seriesForStudy(startIndex, count, studyId, sourceRefs, seriesTypeIds, seriesTagIds))
           }
 
         case GetImages(startIndex, count, seriesId) =>
@@ -264,9 +264,9 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
             sender ! propertiesDao.imageFileForImage(imageId)
           }
 
-        case GetFlatSeries(startIndex, count, orderBy, orderAscending, filter, sourceTypeIds, seriesTypeIds, seriesTagIds) =>
+        case GetFlatSeries(startIndex, count, orderBy, orderAscending, filter, sourceRefs, seriesTypeIds, seriesTagIds) =>
           db.withSession { implicit session =>
-            sender ! FlatSeriesCollection(propertiesDao.flatSeries(startIndex, count, orderBy, orderAscending, filter, sourceTypeIds, seriesTypeIds, seriesTagIds))
+            sender ! FlatSeriesCollection(propertiesDao.flatSeries(startIndex, count, orderBy, orderAscending, filter, sourceRefs, seriesTypeIds, seriesTagIds))
           }
 
         case GetPatient(patientId) =>
@@ -339,22 +339,22 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
       propertiesDao.seriesTagsForSeries(seriesId)
     }
 
-  def storeDatasetTryCatchThrow(dataset: Attributes, sourceTypeId: SourceTypeId): (Image, Boolean) =
+  def storeDatasetTryCatchThrow(dataset: Attributes, source: Source): (Image, Boolean) =
     try {
-      storeDataset(dataset, sourceTypeId)
+      storeDataset(dataset, source)
     } catch {
       case e: IllegalArgumentException =>
         SbxLog.error("Storage", e.getMessage)
         throw e
     }
 
-  def storeDataset(dataset: Attributes, sourceTypeId: SourceTypeId): (Image, Boolean) = {
+  def storeDataset(dataset: Attributes, source: Source): (Image, Boolean) = {
     val name = fileName(dataset)
     val storedPath = storage.resolve(name)
 
     val overwrite = Files.exists(storedPath)
 
-    val seriesSource = SeriesSource(-1, sourceTypeId)
+    val seriesSource = SeriesSource(-1, source)
 
     db.withSession { implicit session =>
 
@@ -362,7 +362,7 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
       val study = datasetToStudy(dataset)
       val series = datasetToSeries(dataset)
       val image = datasetToImage(dataset)
-      val imageFile = ImageFile(-1, FileName(name), sourceTypeId)
+      val imageFile = ImageFile(-1, FileName(name), source)
 
       val dbPatientMaybe = dao.patientByNameAndID(patient)
       val dbStudyMaybe = dao.studyByUid(study)

@@ -138,7 +138,7 @@ class BoxPollActor(box: Box,
 
   def waitForFileFetchedState: PartialFunction[Any, Unit] = LoggingReceive {
     case RemoteOutboxFileFetched(remoteOutboxEntry, imageId) =>
-      updateInbox(box.id, remoteOutboxEntry.transactionId, remoteOutboxEntry.sequenceNumber, remoteOutboxEntry.totalImageCount, imageId)
+      updateInbox(box.id, box.name, remoteOutboxEntry.transactionId, remoteOutboxEntry.sequenceNumber, remoteOutboxEntry.totalImageCount, imageId)
       sendRemoteOutboxFileCompleted(remoteOutboxEntry).foreach { response =>
         pollRemoteBox()
       }
@@ -192,10 +192,11 @@ class BoxPollActor(box: Box,
                 .onComplete {
 
                   case Success(reversedDataset) =>
-                    storageService.ask(AddDataset(reversedDataset, SourceTypeId(SourceType.BOX, remoteOutboxEntry.remoteBoxId)))
+                    val source = Source(SourceType.BOX, remoteOutboxEntry.remoteBoxName, remoteOutboxEntry.remoteBoxId)
+                    storageService.ask(AddDataset(reversedDataset, source))
                       .onComplete {
 
-                        case Success(ImageAdded(image)) =>
+                        case Success(ImageAdded(image, source)) =>
                           self ! RemoteOutboxFileFetched(remoteOutboxEntry, image.id)
                         case Success(_) =>
                           self ! HandlingFetchedFileFailed(remoteOutboxEntry, new Exception("Unexpected response when adding dataset"))
@@ -213,9 +214,9 @@ class BoxPollActor(box: Box,
           self ! FetchFileFailed(remoteOutboxEntry, exception)
       }
 
-  def updateInbox(remoteBoxId: Long, transactionId: Long, sequenceNumber: Long, totalImageCount: Long, imageId: Long): Unit = {
+  def updateInbox(remoteBoxId: Long, remoteBoxName: String, transactionId: Long, sequenceNumber: Long, totalImageCount: Long, imageId: Long): Unit = {
     db.withSession { implicit session =>
-      val inboxEntry = boxDao.updateInbox(remoteBoxId, transactionId, sequenceNumber, totalImageCount)
+      val inboxEntry = boxDao.updateInbox(remoteBoxId, remoteBoxName, transactionId, sequenceNumber, totalImageCount)
       boxDao.insertInboxImage(InboxImage(-1, inboxEntry.id, imageId))
     }
 

@@ -34,16 +34,17 @@ class PropertiesDAO(val driver: JdbcProfile) {
 
   // *** Files ***
 
-  private val toImageFile = (id: Long, fileName: String, sourceType: String, sourceId: Long) => ImageFile(id, FileName(fileName), SourceTypeId(SourceType.withName(sourceType), sourceId))
+  private val toImageFile = (id: Long, fileName: String, sourceType: String, sourceName: String, sourceId: Long) => ImageFile(id, FileName(fileName), Source(SourceType.withName(sourceType), sourceName, sourceId))
 
-  private val fromImageFile = (imageFile: ImageFile) => Option((imageFile.id, imageFile.fileName.value, imageFile.sourceTypeId.sourceType.toString, imageFile.sourceTypeId.sourceId))
+  private val fromImageFile = (imageFile: ImageFile) => Option((imageFile.id, imageFile.fileName.value, imageFile.source.sourceType.toString, imageFile.source.sourceName, imageFile.source.sourceId))
 
   private class ImageFiles(tag: Tag) extends Table[ImageFile](tag, "ImageFiles") {
     def id = column[Long]("id", O.PrimaryKey)
-    def fileName = column[String]("fileName")
-    def sourceType = column[String]("sourceType")
-    def sourceId = column[Long]("sourceId")
-    def * = (id, fileName, sourceType, sourceId) <> (toImageFile.tupled, fromImageFile)
+    def fileName = column[String]("filename")
+    def sourceType = column[String]("sourcetype")
+    def sourceName = column[String]("sourcename")
+    def sourceId = column[Long]("sourceid")
+    def * = (id, fileName, sourceType, sourceName, sourceId) <> (toImageFile.tupled, fromImageFile)
 
     def imageFileToImageFKey = foreignKey("imageFileToImageFKey", id, metaDataDao.imagesQuery)(_.id, onUpdate = ForeignKeyAction.Cascade, onDelete = ForeignKeyAction.Cascade)
     def imageIdJoin = metaDataDao.imagesQuery.filter(_.id === id)
@@ -53,15 +54,16 @@ class PropertiesDAO(val driver: JdbcProfile) {
 
   // *** Sources ***
 
-  private val toSeriesSource = (id: Long, sourceType: String, sourceId: Long) => SeriesSource(id, SourceTypeId(SourceType.withName(sourceType), sourceId))
+  private val toSeriesSource = (id: Long, sourceType: String, sourceName: String, sourceId: Long) => SeriesSource(id, Source(SourceType.withName(sourceType), sourceName, sourceId))
 
-  private val fromSeriesSource = (seriesSource: SeriesSource) => Option((seriesSource.id, seriesSource.sourceTypeId.sourceType.toString, seriesSource.sourceTypeId.sourceId))
+  private val fromSeriesSource = (seriesSource: SeriesSource) => Option((seriesSource.id, seriesSource.source.sourceType.toString, seriesSource.source.sourceName, seriesSource.source.sourceId))
 
   private class SeriesSources(tag: Tag) extends Table[SeriesSource](tag, "SeriesSources") {
     def id = column[Long]("id", O.PrimaryKey)
-    def sourceType = column[String]("sourceType")
-    def sourceId = column[Long]("sourceId")
-    def * = (id, sourceType, sourceId) <> (toSeriesSource.tupled, fromSeriesSource)
+    def sourceType = column[String]("sourcetype")
+    def sourceName = column[String]("sourcename")
+    def sourceId = column[Long]("sourceid")
+    def * = (id, sourceType, sourceName, sourceId) <> (toSeriesSource.tupled, fromSeriesSource)
 
     def seriesSourceToImageFKey = foreignKey("seriesSourceToImageFKey", id, metaDataDao.seriesQuery)(_.id, onUpdate = ForeignKeyAction.Cascade, onDelete = ForeignKeyAction.Cascade)
     def seriesIdJoin = metaDataDao.seriesQuery.filter(_.id === id)
@@ -286,9 +288,9 @@ class PropertiesDAO(val driver: JdbcProfile) {
     seriesSeriesTags.foreach(seriesTag => cleanupSeriesTag(seriesTag.id))
   }
   
-  def flatSeries(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String], sourceTypeIds: Array[SourceTypeId], seriesTypeIds: Array[Long], seriesTagIds: Array[Long])(implicit session: Session): List[FlatSeries] = {
+  def flatSeries(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String], sourceRefs: Array[SourceRef], seriesTypeIds: Array[Long], seriesTagIds: Array[Long])(implicit session: Session): List[FlatSeries] = {
 
-    if (isWithAdvancedFiltering(sourceTypeIds, seriesTypeIds, seriesTagIds)) {
+    if (isWithAdvancedFiltering(sourceRefs, seriesTypeIds, seriesTagIds)) {
 
       metaDataDao.checkOrderBy(orderBy, "Patients", "Studies", "Series")
 
@@ -296,14 +298,14 @@ class PropertiesDAO(val driver: JdbcProfile) {
 
       val query =
         metaDataDao.flatSeriesBasePart +
-          propertiesJoinPart(sourceTypeIds, seriesTypeIds, seriesTagIds) +
+          propertiesJoinPart(sourceRefs, seriesTypeIds, seriesTagIds) +
           " where" +
           metaDataDao.flatSeriesFilterPart(filter) +
-          andPart(filter, sourceTypeIds) +
-          sourcesPart(sourceTypeIds) +
-          andPart(filter, sourceTypeIds, seriesTypeIds) +
+          andPart(filter, sourceRefs) +
+          sourcesPart(sourceRefs) +
+          andPart(filter, sourceRefs, seriesTypeIds) +
           seriesTypesPart(seriesTypeIds) +
-          andPart(filter, sourceTypeIds, seriesTypeIds, seriesTagIds) +
+          andPart(filter, sourceRefs, seriesTypeIds, seriesTagIds) +
           seriesTagsPart(seriesTagIds) +
           metaDataDao.orderByPart(orderBy, orderAscending) +
           metaDataDao.pagePart(startIndex, count)
@@ -314,16 +316,16 @@ class PropertiesDAO(val driver: JdbcProfile) {
       metaDataDao.flatSeries(startIndex, count, orderBy, orderAscending, filter)
   }
 
-  def propertiesJoinPart(sourceTypeIds: Array[SourceTypeId], seriesTypeIds: Array[Long], seriesTagIds: Array[Long]) =
-    singlePropertyJoinPart(sourceTypeIds, """ inner join "SeriesSources" on "Series"."id" = "SeriesSources"."id"""") +
+  def propertiesJoinPart(sourceRefs: Array[SourceRef], seriesTypeIds: Array[Long], seriesTagIds: Array[Long]) =
+    singlePropertyJoinPart(sourceRefs, """ inner join "SeriesSources" on "Series"."id" = "SeriesSources"."id"""") +
       singlePropertyJoinPart(seriesTypeIds, """ inner join "SeriesSeriesTypes" on "Series"."id" = "SeriesSeriesTypes"."seriesid"""") +
       singlePropertyJoinPart(seriesTagIds, """ inner join "SeriesSeriesTags" on "Series"."id" = "SeriesSeriesTags"."seriesid"""")
 
   def singlePropertyJoinPart(property: Array[_ <: Any], part: String) = if (property.isEmpty) "" else part
 
-  def patients(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String], sourceTypeIds: Array[SourceTypeId], seriesTypeIds: Array[Long], seriesTagIds: Array[Long])(implicit session: Session): List[Patient] = {
+  def patients(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String], sourceRefs: Array[SourceRef], seriesTypeIds: Array[Long], seriesTagIds: Array[Long])(implicit session: Session): List[Patient] = {
 
-    if (isWithAdvancedFiltering(sourceTypeIds, seriesTypeIds, seriesTagIds)) {
+    if (isWithAdvancedFiltering(sourceRefs, seriesTypeIds, seriesTagIds)) {
 
       metaDataDao.checkOrderBy(orderBy, "Patients")
 
@@ -331,14 +333,14 @@ class PropertiesDAO(val driver: JdbcProfile) {
 
       val query =
         patientsBasePart +
-          propertiesJoinPart(sourceTypeIds, seriesTypeIds, seriesTagIds) +
+          propertiesJoinPart(sourceRefs, seriesTypeIds, seriesTagIds) +
           " where" +
           metaDataDao.patientsFilterPart(filter) +
-          andPart(filter, sourceTypeIds) +
-          sourcesPart(sourceTypeIds) +
-          andPart(filter, sourceTypeIds, seriesTypeIds) +
+          andPart(filter, sourceRefs) +
+          sourcesPart(sourceRefs) +
+          andPart(filter, sourceRefs, seriesTypeIds) +
           seriesTypesPart(seriesTypeIds) +
-          andPart(filter, sourceTypeIds, seriesTypeIds, seriesTagIds) +
+          andPart(filter, sourceRefs, seriesTypeIds, seriesTagIds) +
           seriesTagsPart(seriesTagIds) +
           metaDataDao.orderByPart(orderBy, orderAscending) +
           metaDataDao.pagePart(startIndex, count)
@@ -365,12 +367,12 @@ class PropertiesDAO(val driver: JdbcProfile) {
 
   def andPart(option: Option[Any], array1: Array[_ <: Any], array2: Array[_ <: Any], target: Array[_ <: Any]) = if ((option.isDefined || !array1.isEmpty || !array2.isEmpty) && !target.isEmpty) " and" else ""
 
-  def sourcesPart(sourceTypeIds: Array[SourceTypeId]) =
-    if (sourceTypeIds.isEmpty)
+  def sourcesPart(sourceRefs: Array[SourceRef]) =
+    if (sourceRefs.isEmpty)
       ""
     else
-      " (" + sourceTypeIds.map(sourceTypeId =>
-        s""""SeriesSources"."sourceType" = '${sourceTypeId.sourceType}' and "SeriesSources"."sourceId" = ${sourceTypeId.sourceId}""")
+      " (" + sourceRefs.map(sourceTypeId =>
+        s""""SeriesSources"."sourcetype" = '${sourceTypeId.sourceType}' and "SeriesSources"."sourceid" = ${sourceTypeId.sourceId}""")
         .mkString(" or ") + ")"
 
   def seriesTypesPart(seriesTypeIds: Array[Long]) =
@@ -392,9 +394,9 @@ class PropertiesDAO(val driver: JdbcProfile) {
   def studiesGetResult = GetResult(r =>
     Study(r.nextLong, r.nextLong, StudyInstanceUID(r.nextString), StudyDescription(r.nextString), StudyDate(r.nextString), StudyID(r.nextString), AccessionNumber(r.nextString), PatientAge(r.nextString)))
 
-  def studiesForPatient(startIndex: Long, count: Long, patientId: Long, sourceTypeIds: Array[SourceTypeId], seriesTypeIds: Array[Long], seriesTagIds: Array[Long])(implicit session: Session): List[Study] = {
+  def studiesForPatient(startIndex: Long, count: Long, patientId: Long, sourceRefs: Array[SourceRef], seriesTypeIds: Array[Long], seriesTagIds: Array[Long])(implicit session: Session): List[Study] = {
 
-    if (isWithAdvancedFiltering(sourceTypeIds, seriesTypeIds, seriesTagIds)) {
+    if (isWithAdvancedFiltering(sourceRefs, seriesTypeIds, seriesTagIds)) {
 
       implicit val getResult = studiesGetResult
 
@@ -408,10 +410,10 @@ class PropertiesDAO(val driver: JdbcProfile) {
         "Studies"."patientId" = $patientId"""
 
       val query = basePart +
-        propertiesJoinPart(sourceTypeIds, seriesTypeIds, seriesTagIds) +
+        propertiesJoinPart(sourceRefs, seriesTypeIds, seriesTagIds) +
         wherePart +
-        andPart(sourceTypeIds) +
-        sourcesPart(sourceTypeIds) +
+        andPart(sourceRefs) +
+        sourcesPart(sourceRefs) +
         andPart(seriesTypeIds) +
         seriesTypesPart(seriesTypeIds) +
         andPart(seriesTagIds) +
@@ -427,9 +429,9 @@ class PropertiesDAO(val driver: JdbcProfile) {
   def seriesGetResult = GetResult(r =>
     Series(r.nextLong, r.nextLong, SeriesInstanceUID(r.nextString), SeriesDescription(r.nextString), SeriesDate(r.nextString), Modality(r.nextString), ProtocolName(r.nextString), BodyPartExamined(r.nextString), Manufacturer(r.nextString), StationName(r.nextString), FrameOfReferenceUID(r.nextString)))
 
-  def seriesForStudy(startIndex: Long, count: Long, studyId: Long, sourceTypeIds: Array[SourceTypeId], seriesTypeIds: Array[Long], seriesTagIds: Array[Long])(implicit session: Session): List[Series] = {
+  def seriesForStudy(startIndex: Long, count: Long, studyId: Long, sourceRefs: Array[SourceRef], seriesTypeIds: Array[Long], seriesTagIds: Array[Long])(implicit session: Session): List[Series] = {
 
-    if (isWithAdvancedFiltering(sourceTypeIds, seriesTypeIds, seriesTagIds)) {
+    if (isWithAdvancedFiltering(sourceRefs, seriesTypeIds, seriesTagIds)) {
 
       implicit val getResult = seriesGetResult
 
@@ -442,10 +444,10 @@ class PropertiesDAO(val driver: JdbcProfile) {
         "Series"."studyId" = $studyId"""
 
       val query = basePart +
-        propertiesJoinPart(sourceTypeIds, seriesTypeIds, seriesTagIds) +
+        propertiesJoinPart(sourceRefs, seriesTypeIds, seriesTagIds) +
         wherePart +
-        andPart(sourceTypeIds) +
-        sourcesPart(sourceTypeIds) +
+        andPart(sourceRefs) +
+        sourcesPart(sourceRefs) +
         andPart(seriesTypeIds) +
         seriesTypesPart(seriesTypeIds) +
         andPart(seriesTagIds) +

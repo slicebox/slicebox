@@ -18,9 +18,7 @@ package se.nimsa.sbx.seriestype
 
 import scala.collection.JavaConversions._
 import scala.concurrent.Future
-
 import org.dcm4che3.data.Attributes
-
 import SeriesTypeProtocol._
 import akka.actor.Actor
 import akka.actor.ActorRef
@@ -33,6 +31,7 @@ import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomUtil
 import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.util.ExceptionCatching
+import se.nimsa.sbx.app.GeneralProtocol.ImageAdded
 
 class SeriesTypeUpdateActor(implicit val timeout: Timeout) extends Actor with ExceptionCatching {
 
@@ -69,7 +68,7 @@ class SeriesTypeUpdateActor(implicit val timeout: Timeout) extends Actor with Ex
     case MarkSeriesAsProcessed(seriesId) =>
       seriesBeingUpdated -= seriesId
 
-    case ImageAdded(image) =>
+    case ImageAdded(image, source) =>
       self ! UpdateSeriesTypesForSeries(Seq(image.seriesId))
 
     case PollSeriesTypesUpdateQueue => pollSeriesTypesUpdateQueue()

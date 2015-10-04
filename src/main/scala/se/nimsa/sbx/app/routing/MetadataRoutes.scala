@@ -156,20 +156,7 @@ trait MetadataRoutes { this: RestApi =>
           } ~ path("source") {
             get {
               onSuccess(storageService.ask(GetSourceForSeries(seriesId)).mapTo[Option[SeriesSource]]) { seriesSourceMaybe =>
-                def futureSourceMaybe = seriesSourceMaybe.map(seriesSource => {
-                  val futureNameMaybe = seriesSource.sourceTypeId.sourceType match {
-                    case USER      => userService.ask(GetUser(seriesSource.sourceTypeId.sourceId)).mapTo[Option[ApiUser]].map(_.map(_.user))
-                    case BOX       => boxService.ask(GetBoxById(seriesSource.sourceTypeId.sourceId)).mapTo[Option[Box]].map(_.map(_.name))
-                    case DIRECTORY => directoryService.ask(GetWatchedDirectoryById(seriesSource.sourceTypeId.sourceId)).mapTo[Option[WatchedDirectory]].map(_.map(_.name))
-                    case SCP       => scpService.ask(GetScpById(seriesSource.sourceTypeId.sourceId)).mapTo[Option[ScpData]].map(_.map(_.name))
-                    case UNKNOWN   => Future(None)
-                  }
-                  val futureName: Future[String] = futureNameMaybe.map(_.getOrElse("<source removed>"))
-                  futureName.map(name => Some(Source(seriesSource.sourceTypeId.sourceType, name, seriesSource.sourceTypeId.sourceId)))
-                }).getOrElse(Future(None))
-                onSuccess(futureSourceMaybe) {
-                  complete(_)
-                }
+                complete(seriesSourceMaybe.map(_.source))
               }
             }
           } ~ path("seriestypes") {
@@ -265,11 +252,11 @@ trait MetadataRoutes { this: RestApi =>
     }
   }
 
-  def parseSourcesString(sourcesString: String): Array[SourceTypeId] = {
+  def parseSourcesString(sourcesString: String): Array[SourceRef] = {
     try {
       sourcesString.split(",").map(typeIdString => {
         val typeIdArray = typeIdString.split(":")
-        SourceTypeId(SourceType.withName(typeIdArray(0)), typeIdArray(1).toLong)
+        SourceRef(SourceType.withName(typeIdArray(0)), typeIdArray(1).toLong)
       })
     } catch {
       case e: Exception =>

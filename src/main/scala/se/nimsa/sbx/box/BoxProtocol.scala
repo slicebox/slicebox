@@ -46,22 +46,16 @@ object BoxProtocol {
 
   case class Box(id: Long, name: String, token: String, baseUrl: String, sendMethod: BoxSendMethod, online: Boolean) extends Entity
 
-  case class OutboxEntry(id: Long, remoteBoxId: Long, transactionId: Long, sequenceNumber: Long, totalImageCount: Long, imageId: Long, failed: Boolean) extends Entity
-
-  case class OutboxEntryInfo(id: Long, remoteBoxName: String, transactionId: Long, sequenceNumber: Long, totalImageCount: Long, imageId: Long, failed: Boolean)
+  case class OutboxEntry(id: Long, remoteBoxId: Long, remoteBoxName: String, transactionId: Long, sequenceNumber: Long, totalImageCount: Long, imageId: Long, failed: Boolean) extends Entity
 
   case class FailedOutboxEntry(outboxEntry: OutboxEntry, message: String)
   
-  case class SentEntry(id: Long, remoteBoxId: Long, transactionId: Long, sentImageCount: Long, totalImageCount: Long, lastUpdated: Long) extends Entity
+  case class SentEntry(id: Long, remoteBoxId: Long, remoteBoxName: String, transactionId: Long, sentImageCount: Long, totalImageCount: Long, lastUpdated: Long) extends Entity
 
-  case class SentEntryInfo(id: Long, remoteBoxName: String, transactionId: Long, sentImageCount: Long, totalImageCount: Long, lastUpdated: Long)
-  
   case class SentImage(id: Long, sentEntryId: Long, imageId: Long) extends Entity
 
-  case class InboxEntry(id: Long, remoteBoxId: Long, transactionId: Long, receivedImageCount: Long, totalImageCount: Long, lastUpdated: Long) extends Entity
+  case class InboxEntry(id: Long, remoteBoxId: Long, remoteBoxName: String, transactionId: Long, receivedImageCount: Long, totalImageCount: Long, lastUpdated: Long) extends Entity
 
-  case class InboxEntryInfo(id: Long, remoteBoxName: String, transactionId: Long, receivedImageCount: Long, totalImageCount: Long, lastUpdated: Long)
-  
   case class InboxImage(id: Long, inboxEntryId: Long, imageId: Long) extends Entity
   
   case class ImageTagValues(imageId: Long, tagValues: Seq[TagValue])
@@ -142,11 +136,11 @@ object BoxProtocol {
 
   case object OutboxTransactionMarkedAsFailed
   
-  case class Inbox(entries: Seq[InboxEntryInfo])
+  case class Inbox(entries: Seq[InboxEntry])
 
-  case class Outbox(entries: Seq[OutboxEntryInfo])
+  case class Outbox(entries: Seq[OutboxEntry])
 
-  case class Sent(entries: Seq[SentEntryInfo])
+  case class Sent(entries: Seq[SentEntry])
   
   case object BoxNotFound
 

@@ -107,7 +107,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
     "remove processed outbox entry" in {
 
       db.withSession { implicit session =>
-        boxDao.insertOutboxEntry(OutboxEntry(1, testBox.id, testTransactionId, 1, 1, dbImage1.id, false))
+        boxDao.insertOutboxEntry(OutboxEntry(1, testBox.id, testBox.name, testTransactionId, 1, 1, dbImage1.id, false))
 
         boxPushActorRef ! PollOutbox
 
@@ -119,7 +119,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
     "should post file to correct URL" in {
 
-      val outboxEntry = OutboxEntry(1, testBox.id, testTransactionId, 2, 5, dbImage1.id, false)
+      val outboxEntry = OutboxEntry(1, testBox.id, testBox.name, testTransactionId, 2, 5, dbImage1.id, false)
       db.withSession { implicit session =>
         boxDao.insertOutboxEntry(outboxEntry)
       }
@@ -134,8 +134,8 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
     "should post file in correct order" in {
 
-      val outboxEntrySeq1 = OutboxEntry(1, testBox.id, testTransactionId, 1, 2, dbImage1.id, false)
-      val outboxEntrySeq2 = OutboxEntry(1, testBox.id, testTransactionId, 2, 2, dbImage2.id, false)
+      val outboxEntrySeq1 = OutboxEntry(1, testBox.id, testBox.name, testTransactionId, 1, 2, dbImage1.id, false)
+      val outboxEntrySeq2 = OutboxEntry(1, testBox.id, testBox.name, testTransactionId, 2, 2, dbImage2.id, false)
       db.withSession { implicit session =>
         // Insert outbox entries out of order
         boxDao.insertOutboxEntry(outboxEntrySeq2)
@@ -156,7 +156,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
       db.withSession { implicit session =>
         val invalidImageId = 666
-        boxDao.insertOutboxEntry(OutboxEntry(1, testBox.id, testTransactionId, 1, 1, invalidImageId, false))
+        boxDao.insertOutboxEntry(OutboxEntry(1, testBox.id, testBox.name, testTransactionId, 1, 1, invalidImageId, false))
 
         boxPushActorRef ! PollOutbox
 
@@ -174,8 +174,8 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
       db.withSession { implicit session =>
         val invalidImageId = 666
-        boxDao.insertOutboxEntry(OutboxEntry(1, testBox.id, testTransactionId, 1, 1, invalidImageId, false))
-        boxDao.insertOutboxEntry(OutboxEntry(1, testBox.id, testTransactionId, 2, 2, invalidImageId, false))
+        boxDao.insertOutboxEntry(OutboxEntry(1, testBox.id, testBox.name, testTransactionId, 1, 1, invalidImageId, false))
+        boxDao.insertOutboxEntry(OutboxEntry(1, testBox.id, testBox.name, testTransactionId, 2, 2, invalidImageId, false))
 
         boxPushActorRef ! PollOutbox
         boxPushActorRef ! PollOutbox
@@ -194,8 +194,8 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
       db.withSession { implicit session =>
         val invalidImageId = 666
-        boxDao.insertOutboxEntry(OutboxEntry(1, testBox.id, testTransactionId, 1, 1, invalidImageId, false))
-        val secondOutboxEntry = boxDao.insertOutboxEntry(OutboxEntry(1, 999, testTransactionId, 1, 1, dbImage1.id, false))
+        boxDao.insertOutboxEntry(OutboxEntry(1, testBox.id, testBox.name, testTransactionId, 1, 1, invalidImageId, false))
+        val secondOutboxEntry = boxDao.insertOutboxEntry(OutboxEntry(1, 999, "some box", testTransactionId, 1, 1, dbImage1.id, false))
 
         boxPushActorRef ! PollOutbox
         expectNoMsg()
@@ -213,12 +213,12 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
       db.withSession { implicit session =>
         val invalidImageId = 666
-        boxDao.insertOutboxEntry(OutboxEntry(1, testBox.id, testTransactionId, 1, 1, invalidImageId, false))
+        boxDao.insertOutboxEntry(OutboxEntry(1, testBox.id, testBox.name, testTransactionId, 1, 1, invalidImageId, false))
 
         boxPushActorRef ! PollOutbox
         expectNoMsg()
 
-        boxDao.insertOutboxEntry(OutboxEntry(1, testBox.id, testTransactionId2, 1, 1, dbImage2.id, false))
+        boxDao.insertOutboxEntry(OutboxEntry(1, testBox.id, testBox.name, testTransactionId2, 1, 1, dbImage2.id, false))
 
         boxPushActorRef ! PollOutbox
         expectNoMsg()
@@ -237,9 +237,9 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
     "pause outbox processing when remote server is not working, and resume once remote server is back up" in {
 
       db.withSession { implicit session =>
-        boxDao.insertOutboxEntry(OutboxEntry(1, testBox.id, testTransactionId, 1, 3, dbImage1.id, false))
-        boxDao.insertOutboxEntry(OutboxEntry(2, testBox.id, testTransactionId, 2, 3, dbImage2.id, false))
-        boxDao.insertOutboxEntry(OutboxEntry(3, testBox.id, testTransactionId, 3, 3, dbImage3.id, false))
+        boxDao.insertOutboxEntry(OutboxEntry(1, testBox.id, testBox.name, testTransactionId, 1, 3, dbImage1.id, false))
+        boxDao.insertOutboxEntry(OutboxEntry(2, testBox.id, testBox.name, testTransactionId, 2, 3, dbImage2.id, false))
+        boxDao.insertOutboxEntry(OutboxEntry(3, testBox.id, testBox.name, testTransactionId, 3, 3, dbImage3.id, false))
 
         val n = capturedFileSendRequests.size
         sendFailedResponseSequenceNumbers ++= Seq(n + 2, n + 3, n + 4, n + 5, n + 6)

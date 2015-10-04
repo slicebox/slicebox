@@ -195,7 +195,7 @@ class RemoteBoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     // check that sent table is empty at this stage
     GetAsUser("/api/sent") ~> routes ~> check {
       status should be(OK)
-      responseAs[List[SentEntryInfo]].size should be(0)
+      responseAs[List[SentEntry]].size should be(0)
     }
 
     // send done
@@ -211,7 +211,7 @@ class RemoteBoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     // check that sent table has an entry now
     val sentEntries =
       GetAsUser("/api/sent") ~> routes ~> check {
-        val sentEntries = responseAs[List[SentEntryInfo]]
+        val sentEntries = responseAs[List[SentEntry]]
         sentEntries.size should be(1)
         sentEntries
       }
@@ -255,7 +255,7 @@ class RemoteBoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
     // check contents of outbox, should contain one failed entry
     GetAsUser("/api/outbox") ~> routes ~> check {
-      val outboxEntries = responseAs[Seq[OutboxEntryInfo]]
+      val outboxEntries = responseAs[Seq[OutboxEntry]]
       outboxEntries.size should be(1)
       outboxEntries(0).failed should be(true)
     }

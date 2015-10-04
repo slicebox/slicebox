@@ -50,7 +50,7 @@ class DirectoryWatchActor(watchedDirectory: WatchedDirectory) extends Actor {
   def receive = LoggingReceive {
     case FileAddedToWatchedDirectory(path) =>
       if (Files.isRegularFile(path))
-        context.system.eventStream.publish(FileReceived(path, SourceTypeId(SourceType.DIRECTORY, watchedDirectory.id)))
+        context.system.eventStream.publish(FileReceived(path, Source(SourceType.DIRECTORY, watchedDirectory.name, watchedDirectory.id)))
   }
 
 }

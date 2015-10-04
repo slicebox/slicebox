@@ -54,8 +54,6 @@ object ForwardingProtocol {
   case class UpdateTransaction(forwardingTransaction: ForwardingTransaction, enroute: Boolean, delivered: Boolean)
 
   case class MakeTransfer(forwardingRule: ForwardingRule, forwardingTransaction: ForwardingTransaction)
-
-  case class MaybeAddImageToForwardingQueue(image: Image, sourceTypeAndId: SourceTypeId, origin: ActorRef)
   
   
   case class ImagesAddedToForwardingQueue(transactionImages: List[ForwardingTransactionImage])

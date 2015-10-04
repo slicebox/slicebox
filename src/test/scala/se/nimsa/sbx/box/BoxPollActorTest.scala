@@ -114,7 +114,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
     "call correct URL for getting remote outbox file" in {
       val transactionId = 999
-      val outboxEntry = OutboxEntry(123, 987, transactionId, 1, 2, 112233, false)
+      val outboxEntry = OutboxEntry(123, 987, "some box", transactionId, 1, 2, 112233, false)
 
       marshal(outboxEntry) match {
         case Right(entity) => mockHttpResponses += HttpResponse(StatusCodes.OK, entity)
@@ -130,7 +130,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
     "handle remote outbox file" in {
       val transactionId = 999
-      val outboxEntry = OutboxEntry(123, 987, transactionId, 1, 2, 2, false)
+      val outboxEntry = OutboxEntry(123, 987, "some box", transactionId, 1, 2, 2, false)
 
       marshal(outboxEntry) match {
         case Right(entity) => mockHttpResponses += HttpResponse(StatusCodes.OK, entity)
@@ -201,7 +201,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
     "keep trying to fetch remote file until fetching succeeds" in {
       val transactionId = 999
-      val outboxEntry = OutboxEntry(123, 987, transactionId, 1, 2, 2, false)
+      val outboxEntry = OutboxEntry(123, 987, "some box", transactionId, 1, 2, 2, false)
 
       marshal(outboxEntry) match {
         case Right(entity) => 
@@ -238,7 +238,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
     
     "should tell the box it is pulling images from that a transaction has failed due to receiving an invalid DICOM file" in {
       val transactionId = 999
-      val outboxEntry = OutboxEntry(123, 987, transactionId, 1, 2, 2, false)
+      val outboxEntry = OutboxEntry(123, 987, "some box", transactionId, 1, 2, 2, false)
 
       marshal(outboxEntry) match {
         case Right(entity) => mockHttpResponses += HttpResponse(StatusCodes.OK, entity)
@@ -263,7 +263,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       storageService ! ShowBadBehavior(new IllegalArgumentException("Pretending I cannot store dataset."))
       
       val transactionId = 999
-      val outboxEntry = OutboxEntry(123, 987, transactionId, 1, 2, 2, false)
+      val outboxEntry = OutboxEntry(123, 987, "some box", transactionId, 1, 2, 2, false)
 
       marshal(outboxEntry) match {
         case Right(entity) => mockHttpResponses += HttpResponse(StatusCodes.OK, entity)

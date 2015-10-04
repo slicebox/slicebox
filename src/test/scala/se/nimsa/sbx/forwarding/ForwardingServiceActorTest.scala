@@ -43,8 +43,6 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
   val storageService = system.actorOf(Props(new Actor {
     var deletedImages = Seq.empty[Long]
     def receive = {
-      case GetSourceForSeries(seriesId) =>
-        sender ! Some(SeriesSource(22, SourceTypeId(SourceType.USER, 35)))
       case DeleteImage(imageId) =>
         deletedImages = deletedImages :+ imageId
         sender ! ImageDeleted(imageId)
@@ -111,7 +109,7 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
   }
 
   "not forward an added image if there are no forwarding rules" in {
-    forwardingService ! ImageAdded(image1)
+    forwardingService ! ImageAdded(image1, source1)
     expectMsgPF() {
       case ImagesAddedToForwardingQueue(images) =>
         images should be(empty)
@@ -130,7 +128,7 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     forwardingService ! AddForwardingRule(rule)
     expectMsgType[ForwardingRuleAdded]
 
-    forwardingService ! ImageAdded(image1)
+    forwardingService ! ImageAdded(image1, source1)
     expectMsg(ImagesAddedToForwardingQueue(List.empty))
 
     db.withSession { implicit session =>
@@ -145,7 +143,7 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     forwardingService ! AddForwardingRule(rule)
     expectMsgType[ForwardingRuleAdded]
 
-    forwardingService ! ImageAdded(image1)
+    forwardingService ! ImageAdded(image1, source1)
     expectMsgPF() {
       case ImagesAddedToForwardingQueue(images) => images.length should be (1)
     }
@@ -162,7 +160,7 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     forwardingService ! AddForwardingRule(rule)
     expectMsgType[ForwardingRuleAdded]
 
-    forwardingService ! ImageAdded(image1)
+    forwardingService ! ImageAdded(image1, source1)
     expectMsgPF() {
       case ImagesAddedToForwardingQueue(images) => images.length should be (1)
     }
@@ -182,7 +180,7 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     forwardingService ! AddForwardingRule(rule)
     expectMsgType[ForwardingRuleAdded]
 
-    forwardingService ! ImageAdded(image1)
+    forwardingService ! ImageAdded(image1, source1)
     expectMsgPF() {
       case ImagesAddedToForwardingQueue(images) => images.length should be (1)
     }
@@ -210,7 +208,7 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     expectMsgType[ForwardingRuleAdded]
 
     val image = image1
-    forwardingService ! ImageAdded(image)
+    forwardingService ! ImageAdded(image, source1)
     expectMsgPF() {
       case ImagesAddedToForwardingQueue(images) => images.length should be (1)
     }
@@ -243,7 +241,7 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     expectMsgType[ForwardingRuleAdded]
 
     val image = image1
-    forwardingService ! ImageAdded(image)
+    forwardingService ! ImageAdded(image, source1)
     expectMsgPF() {
       case ImagesAddedToForwardingQueue(images) => images.length should be (1)
     }
@@ -282,7 +280,7 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     expectMsgType[ForwardingRuleAdded]
 
     val image = image1
-    forwardingService ! ImageAdded(image)
+    forwardingService ! ImageAdded(image, source1)
     expectMsgPF() {
       case ImagesAddedToForwardingQueue(images) => images.length should be (1)
     }
@@ -314,7 +312,8 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     expectMsg(Seq.empty)
   }
   
-  
+
+  def source1 = Source(SourceType.USER, "user", 35)
   def scpToBoxRule = ForwardingRule(-1, Source(SourceType.SCP, "My SCP", 1), Destination(DestinationType.BOX, "Remote box", 1), false)
   def userToBoxRule = ForwardingRule(-1, Source(SourceType.USER, "Admin", 35), Destination(DestinationType.BOX, "Remote box", 1), false)
   def userToBoxRuleKeepImages = ForwardingRule(-1, Source(SourceType.USER, "Admin", 35), Destination(DestinationType.BOX, "Remote box", 1), true)

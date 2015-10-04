@@ -121,13 +121,14 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
     "return first outbox entry when receiving poll message" in {
       db.withSession { implicit session =>
         val remoteBox = boxDao.insertBox(Box(-1, "some remote box", "abc", "https://someurl.com", BoxSendMethod.POLL, false))
-        boxDao.insertOutboxEntry(OutboxEntry(-1, remoteBox.id, 987, 1, 2, 123, false))
+        boxDao.insertOutboxEntry(OutboxEntry(-1, remoteBox.id, remoteBox.name, 987, 1, 2, 123, false))
 
         boxService ! PollOutbox(remoteBox.token)
 
         expectMsgPF() {
-          case OutboxEntry(id, remoteBoxId, transactionId, sequenceNumber, totalImageCount, imageId, failed) =>
+          case OutboxEntry(id, remoteBoxId, remoteBoxName, transactionId, sequenceNumber, totalImageCount, imageId, failed) =>
             remoteBoxId should be(remoteBox.id)
+            remoteBoxName should be("some remote box")
             transactionId should be(987)
             sequenceNumber should be(1)
             totalImageCount should be(2)
@@ -269,8 +270,8 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
     "add processed outbox entries to the list of sent entries, along with records of sent images" in {
       db.withSession { implicit session =>
         val remoteBox = boxDao.insertBox(Box(-1, "some remote box", "abc", "https://someurl.com", BoxSendMethod.POLL, false))
-        boxDao.insertOutboxEntry(OutboxEntry(-1, remoteBox.id, 123, 1, 100, 5, false))
-        boxDao.insertOutboxEntry(OutboxEntry(-1, remoteBox.id, 123, 2, 100, 33, false))
+        boxDao.insertOutboxEntry(OutboxEntry(-1, remoteBox.id, remoteBox.name, 123, 1, 100, 5, false))
+        boxDao.insertOutboxEntry(OutboxEntry(-1, remoteBox.id, remoteBox.name, 123, 2, 100, 33, false))
 
         boxService ! DeleteOutboxEntry("abc", 123, 1)
         expectMsg(OutboxEntryDeleted)
@@ -290,7 +291,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
 
     "remove sent images when the related sent entry is removed" in {
       db.withSession { implicit session =>
-        val se = boxDao.insertSentEntry(SentEntry(-1, 1, 123, 1, 2, System.currentTimeMillis()))
+        val se = boxDao.insertSentEntry(SentEntry(-1, 1, "some box", 123, 1, 2, System.currentTimeMillis()))
         boxDao.insertSentImage(SentImage(-1, se.id, 5))
         boxDao.insertSentImage(SentImage(-1, se.id, 33))
         

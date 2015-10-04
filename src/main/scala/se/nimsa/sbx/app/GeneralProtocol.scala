@@ -16,6 +16,8 @@
 
 package se.nimsa.sbx.app
 
+import se.nimsa.sbx.dicom.DicomHierarchy.Image
+
 object GeneralProtocol {
   
   sealed trait SourceType {
@@ -64,11 +66,13 @@ object GeneralProtocol {
     }    
   }
       
-  case class SourceTypeId(sourceType: SourceType, sourceId: Long)
-  
   case class Source(sourceType: SourceType, sourceName: String, sourceId: Long)
   
+  case class SourceRef(sourceType: SourceType, sourceId: Long)
+  
   case class Destination(destinationType: DestinationType, destinationName: String, destinationId: Long)
+  
+  case class ImageAdded(image: Image, source: Source)
   
   case class ImagesSent(destination: Destination, imageIds: Seq[Long])
 

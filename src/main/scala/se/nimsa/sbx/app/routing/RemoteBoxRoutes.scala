@@ -51,8 +51,9 @@ trait RemoteBoxRoutes { this: RestApi =>
                   entity(as[Array[Byte]]) { imageData =>
                     val dataset = loadDataset(imageData, true)
                     onSuccess(anonymizationService.ask(ReverseAnonymization(dataset)).mapTo[Attributes]) { reversedDataset =>
-                      onSuccess(storageService.ask(AddDataset(reversedDataset, SourceTypeId(SourceType.BOX, box.id)))) {
-                        case ImageAdded(image) =>
+                      val source = Source(SourceType.BOX, box.name, box.id)
+                      onSuccess(storageService.ask(AddDataset(reversedDataset, source))) {
+                        case ImageAdded(image, source) =>
                           onSuccess(boxService.ask(UpdateInbox(token, transactionId, sequenceNumber, totalImageCount, image.id))) {
                             case msg: InboxUpdated =>
                               complete(NoContent)

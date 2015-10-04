@@ -70,12 +70,9 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
 
   def receive = LoggingReceive {
 
-    case ImageAdded(image) =>
-      maybeAddImageToForwardingQueue(image, sender)
-
-    case MaybeAddImageToForwardingQueue(image, sourceTypeAndId, origin) =>
-      val addedImages = maybeAddImageToForwardingQueue(image, sourceTypeAndId)
-      origin ! ImagesAddedToForwardingQueue(addedImages)
+    case ImageAdded(image, source) =>
+      val addedImages = maybeAddImageToForwardingQueue(image, source)
+      sender ! ImagesAddedToForwardingQueue(addedImages)
 
     case PollForwardingQueue =>
       val transactions = maybeSendImagesForNonBoxSources()
@@ -128,45 +125,29 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
       forwardingDao.removeForwardingRule(forwardingRuleId)
     }
 
-  def maybeAddImageToForwardingQueue(image: Image, origin: ActorRef) =
+  def maybeAddImageToForwardingQueue(image: Image, source: Source) =
     if (hasForwardingRules) {
 
-      // get series source of image
-      val seriesTypeAndId = getSourceForSeries(image.seriesId).onComplete {
-        case Success(seriesSourceMaybe) =>
-          seriesSourceMaybe match {
-            case Some(seriesSource) =>
-              self ! MaybeAddImageToForwardingQueue(image, seriesSource.sourceTypeId, origin)
-            case None =>
-              SbxLog.error("Forwarding", s"No series source found for image with id ${image.id}. Not adding this image to forwarding queue.")
-          }
-        case Failure(e) =>
-          SbxLog.error("Forwarding", s"Error getting series source for image with id ${image.id}. Not adding this image to forwarding queue.")
-      }
+      // look for rules with this source
+      val rules = getForwardingRulesForSourceTypeAndId(source.sourceType, source.sourceId)
+
+      // look for transactions, create or update (timestamp)
+      val transactions = rules.map(createOrUpdateForwardingTransaction(_))
+
+      // add to queue
+      val addedImages = transactions.map(addImageToForwardingQueue(_, image))
+
+      // check if source is box, if so, maybe transfer
+      if (source.sourceType == SourceType.BOX)
+        rules.zip(transactions).map {
+          case (rule, transaction) =>
+            if (!transaction.enroute)
+              maybeSendImagesForBoxSource(image.id, transaction, rule)
+        }
+
+      addedImages
     } else
-      origin ! ImagesAddedToForwardingQueue(List.empty)
-
-  def maybeAddImageToForwardingQueue(image: Image, sourceTypeAndId: SourceTypeId) = {
-
-    // look for rules with this source
-    val rules = getForwardingRulesForSourceTypeAndId(sourceTypeAndId.sourceType, sourceTypeAndId.sourceId)
-
-    // look for transactions, create or update (timestamp)
-    val transactions = rules.map(createOrUpdateForwardingTransaction(_))
-
-    // add to queue
-    val addedImages = transactions.map(addImageToForwardingQueue(_, image))
-
-    // check if source is box, if so, maybe transfer
-    if (sourceTypeAndId.sourceType == SourceType.BOX)
-      rules.zip(transactions).map {
-        case (rule, transaction) =>
-          if (!transaction.enroute)
-            maybeSendImagesForBoxSource(image.id, transaction, rule)
-      }
-
-    addedImages
-  }
+      List.empty
 
   def hasForwardingRules(): Boolean =
     db.withSession { implicit session =>
