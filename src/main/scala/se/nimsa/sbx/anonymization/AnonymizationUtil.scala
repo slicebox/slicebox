@@ -364,7 +364,8 @@ object AnonymizationUtil {
           dataset.setString(Tag.AccessionNumber, VR.SH, studyKey.accessionNumber)
         })
       })
-      setAnonymous(dataset, false)
+      if (!keys.isEmpty)
+        setAnonymous(dataset, false)
     }
     dataset
   }
