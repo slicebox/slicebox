@@ -192,7 +192,7 @@ class BoxPollActor(box: Box,
                 .onComplete {
 
                   case Success(reversedDataset) =>
-                    val source = Source(SourceType.BOX, remoteOutboxEntry.remoteBoxName, remoteOutboxEntry.remoteBoxId)
+                    val source = Source(SourceType.BOX, box.name, box.id)
                     storageService.ask(AddDataset(reversedDataset, source))
                       .onComplete {
 
