@@ -84,10 +84,9 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
         if (checkSopClass(dataset)) {
           try {
             val (image, overwrite) = storeDataset(dataset, source)
-            if (!overwrite) {
-              context.system.eventStream.publish(ImageAdded(image, source))
-              SbxLog.info("Storage", s"Stored file ${path.toString} as ${dataset.getString(Tag.SOPInstanceUID)}")
-            }
+            if (!overwrite)
+              log.debug(s"Stored file ${path.toString} as ${dataset.getString(Tag.SOPInstanceUID)}")
+            context.system.eventStream.publish(ImageAdded(image, source))
           } catch {
             case e: IllegalArgumentException =>
               SbxLog.error("Storage", e.getMessage)
@@ -96,15 +95,14 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
           SbxLog.info("Storage", s"Received file ${path.toString} with unsupported SOP Class UID ${dataset.getString(Tag.SOPClassUID)}, skipping")
         }
       else
-        SbxLog.info("Storage", s"File $path is not a DICOM file, skipping")
+        log.debug("Storage", s"File $path is not a DICOM file, skipping")
 
     case DatasetReceived(dataset, source) =>
       try {
         val (image, overwrite) = storeDataset(dataset, source)
-        if (!overwrite) {
-          context.system.eventStream.publish(ImageAdded(image, source))
-          SbxLog.info("Storage", "Stored dataset: " + dataset.getString(Tag.SOPInstanceUID))
-        }
+        if (!overwrite)
+          log.debug("Storage", "Stored dataset: " + dataset.getString(Tag.SOPInstanceUID))
+        context.system.eventStream.publish(ImageAdded(image, source))
       } catch {
         case e: IllegalArgumentException =>
           SbxLog.error("Storage", e.getMessage)
@@ -115,9 +113,8 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
         if (dataset == null)
           throw new IllegalArgumentException("Invalid dataset")
         val (image, overwrite) = storeDatasetTryCatchThrow(dataset, source)
-        if (!overwrite)
-          context.system.eventStream.publish(ImageAdded(image, source))
         sender ! ImageAdded(image, source)
+        context.system.eventStream.publish(ImageAdded(image, source))
       }
 
     case DeleteImage(imageId) =>
@@ -130,7 +127,7 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
                   deleteFromStorage(imageFile)
                 } catch {
                   case e: NoSuchFileException =>
-                    SbxLog.info("Storage", s"DICOM file ${imageFile.fileName.value} for image with id ${image.id} could not be found, no need to delete.")
+                    log.debug("Storage", s"DICOM file ${imageFile.fileName.value} for image with id ${image.id} could not be found, no need to delete.")
                     null
                 }
               }
@@ -156,13 +153,13 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
           }
 
         case GetSeriesTags =>
-        sender ! SeriesTags(getSeriesTags)
-        
+          sender ! SeriesTags(getSeriesTags)
+
         case GetSourceForSeries(seriesId) =>
-        db.withSession { implicit session =>
-        sender ! propertiesDao.seriesSourceById(seriesId)
-        }
-        
+          db.withSession { implicit session =>
+            sender ! propertiesDao.seriesSourceById(seriesId)
+          }
+
         case GetSeriesTypesForSeries(seriesId) =>
           val seriesTypes = getSeriesTypesForSeries(seriesId)
           sender ! SeriesTypes(seriesTypes)

@@ -181,21 +181,32 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
 
   def maybeSendImagesForBoxSource(imageId: Long, transaction: ForwardingTransaction, forwardingRule: ForwardingRule): Unit = {
 
-    // get box information, are all images received?
-    val inboxEntry = boxService.ask(GetInboxEntryForImageId(imageId)).mapTo[Option[InboxEntry]]
-
-    inboxEntry.onComplete {
-      case Success(entryMaybe) =>
-        entryMaybe match {
+    /*
+     * This method is called as the result of the ImageAdded event. The same event updates the inbox entry
+     * and the order in which this happens is indeterminate. Therefore, we try getting the inbox entry for
+     * the added image a few times before either succeeding or giving up.
+     */
+    
+    def inboxEntryForImageId(imageId: Long, attempt: Int, maxAttempts: Int, attemptInterval: Long): Unit =
+      boxService.ask(GetInboxEntryForImageId(imageId)).mapTo[Option[InboxEntry]].onComplete {
+        case Success(entryMaybe) => entryMaybe match {
           case Some(entry) =>
             if (entry.receivedImageCount >= entry.totalImageCount)
               self ! MakeTransfer(forwardingRule, transaction)
           case None =>
-            SbxLog.error("Forwarding", s"No inbox entries found for image id $imageId when transferring from box ${forwardingRule.source.sourceName}. Cannot complete forwarding transfer.")
+            if (attempt < maxAttempts) {
+              Thread.sleep(attemptInterval)
+              inboxEntryForImageId(imageId, attempt + 1, maxAttempts, attemptInterval)
+            } else
+              SbxLog.error("Forwarding", s"No inbox entries found afer $attempt attempts for image id $imageId when transferring from box ${forwardingRule.source.sourceName}. Cannot complete forwarding transfer.")
         }
-      case Failure(e) =>
-        SbxLog.error("Forwarding", s"Error getting inbox entries for received image with id $imageId. Could not complete forwarding transfer.")
-    }
+        case Failure(e) =>
+          SbxLog.error("Forwarding", s"Error getting inbox entries for received image with id $imageId. Could not complete forwarding transfer.")
+      }
+
+    // get box information, are all images received?
+    inboxEntryForImageId(imageId, 1, 10, 500)
+    
   }
 
   def makeTransfer(rule: ForwardingRule, transaction: ForwardingTransaction) = {
