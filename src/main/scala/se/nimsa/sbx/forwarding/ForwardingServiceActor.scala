@@ -125,7 +125,7 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
       forwardingDao.removeForwardingRule(forwardingRuleId)
     }
 
-  def maybeAddImageToForwardingQueue(image: Image, source: Source) =
+  def maybeAddImageToForwardingQueue(image: Image, source: Source): List[ForwardingTransactionImage] =
     if (hasForwardingRules) {
 
       // look for rules with this source
@@ -141,8 +141,7 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
       if (source.sourceType == SourceType.BOX)
         rules.zip(transactions).map {
           case (rule, transaction) =>
-            if (!transaction.enroute)
-              maybeSendImagesForBoxSource(image.id, transaction, rule)
+            maybeSendImagesForBoxSource(image.id, transaction, rule)
         }
 
       addedImages
@@ -153,9 +152,6 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
     db.withSession { implicit session =>
       forwardingDao.getNumberOfForwardingRules > 0
     }
-
-  def getSourceForSeries(seriesId: Long): Future[Option[SeriesSource]] =
-    storageService.ask(GetSourceForSeries(seriesId)).mapTo[Option[SeriesSource]]
 
   def getForwardingRulesForSourceTypeAndId(sourceType: SourceType, sourceId: Long): List[ForwardingRule] =
     db.withSession { implicit session =>
@@ -192,7 +188,7 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
       case Success(entryMaybe) =>
         entryMaybe match {
           case Some(entry) =>
-            if (entry.receivedImageCount == entry.totalImageCount)
+            if (entry.receivedImageCount >= entry.totalImageCount)
               self ! MakeTransfer(forwardingRule, transaction)
           case None =>
             SbxLog.error("Forwarding", s"No inbox entries found for image id $imageId when transferring from box ${forwardingRule.source.sourceName}. Cannot complete forwarding transfer.")
