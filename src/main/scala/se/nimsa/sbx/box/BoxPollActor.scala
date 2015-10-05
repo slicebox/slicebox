@@ -222,7 +222,7 @@ class BoxPollActor(box: Box,
 
     if (sequenceNumber == totalImageCount)
       db.withSession { implicit session =>
-        SbxLog.info("Box", s"Received ${totalImageCount} files from box ${boxDao.boxById(remoteBoxId)}")
+        SbxLog.info("Box", s"Received ${totalImageCount} files from box $remoteBoxName")
       }
   }
 
