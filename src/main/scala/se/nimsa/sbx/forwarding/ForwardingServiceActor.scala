@@ -214,6 +214,8 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
     val imageIds = getTransactionImagesForTransactionId(transaction.id)
       .map(_.imageId)
 
+    SbxLog.info("Forwarding", s"Forwarding ${imageIds.length} images from ${rule.source.sourceType.toString} ${rule.source.sourceName} to ${rule.destination.destinationType.toString} ${rule.destination.destinationName}.")
+    
     updateTransaction(transaction, true, false)
 
     val destinationId = rule.destination.destinationId
@@ -289,6 +291,9 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
       .flatten.distinct
     transactionsToRemove.foreach(transaction => removeTransactionForId(transaction.id))
     deleteImages(imageIdsToDelete)
+    
+    SbxLog.info("Forwarding", s"Finalized ${transactionsToRemove.length} transactions. Deleted ${imageIdsToDelete.length} images.")
+    
     (transactionsToRemove, imageIdsToDelete)
   }
 

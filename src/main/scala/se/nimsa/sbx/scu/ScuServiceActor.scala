@@ -103,6 +103,7 @@ class ScuServiceActor(dbProps: DbProps, storage: Path) extends Actor with Except
                 Scu.sendFiles(scu, imageFiles.map(imageFile => storage.resolve(imageFile.fileName.value)))
               }
                 .map(r => {
+                  SbxLog.info("SCU", s"Finished sending ${imageFiles.length} images using SCU ${scu.name}")
                   context.system.eventStream.publish(ImagesSent(Destination(DestinationType.SCU, scu.name, scu.id), imageIds))
                   ImagesSentToScp(scuId, imageFiles.map(_.id))
                 })

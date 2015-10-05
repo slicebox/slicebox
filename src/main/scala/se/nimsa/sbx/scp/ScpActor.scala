@@ -59,7 +59,7 @@ class ScpActor(scpData: ScpData, executor: Executor) extends Actor {
 
   def receive = LoggingReceive {
     case DatasetReceivedByScp(dataset) =>
-      log.debug("SCP", "Dataset received")
+      log.debug("SCP", "Dataset received using SCP ${scpData.name}")
       context.system.eventStream.publish(DatasetReceived(dataset, Source(SourceType.SCP, scpData.name, scpData.id)))
   }
 
