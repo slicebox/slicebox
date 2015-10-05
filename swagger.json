@@ -16,7 +16,7 @@
   "tags": [
     {
       "name": "General",
-      "description": "General routes applicable to several aspects of the Slicebox API"
+      "description": "General routes applicable to multiple aspects of the Slicebox API and to the Slicebox system"
     },
     {
       "name": "Meta Data",
@@ -47,6 +47,10 @@
       "description": "Methods for handling watch directories for importing images stored as files"
     },
     {
+      "name": "Forwarding",
+      "description": "Methods for handling forwarding rules for automatically forwarding image data from sources to destinations."
+    },
+    {
       "name": "Series Types",
       "description": "Methods for defining and handling series types"
     },
@@ -57,10 +61,6 @@
     {
       "name": "Users",
       "description": "Methods for handling users"
-    },
-    {
-      "name": "System",
-      "description": "System management methods"
     }
   ],
   "schemes": [
@@ -108,6 +108,18 @@
                 "$ref": "#/definitions/destination"
               }
             }
+          }
+        }
+      }
+    },
+
+    "/system/stop": {
+      "post": {
+        "description": "stop and shut down slicebox",
+        "tags": ["General"],
+        "responses": {
+          "200": {
+            "description": "shutdown message"
           }
         }
       }
@@ -1377,18 +1389,6 @@
       }
     },
 
-    "/system/stop": {
-      "post": {
-        "description": "stop and shut down slicebox",
-        "tags": ["System"],
-        "responses": {
-          "200": {
-            "description": "shutdown message"
-          }
-        }
-      }
-    },
-
     "/boxes": {
       "get": {
         "description": "get a list of box connections",
@@ -2371,11 +2371,90 @@
           }
         }
       }
-    }
+    },
+
+    "/forwarding/rules": {
+      "get": {
+        "description": "get a list of all forwarding rules. A forwarding rule specifies the automatic forwarding of images from a source (SCP, BOX, etc.) to a destimation (BOX, SCU, etc.)",
+        "tags": ["Forwarding"],
+        "responses": {
+          "200": {
+            "description": "the list of forwarding rules",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/forwardingrule"
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "description": "add a new forwarding rule",
+        "tags": ["Forwarding"],
+        "parameters": [
+          {
+            "name": "FowardingRule",
+            "description": "The forwarding rule to add. The ID property is irrelevant, the ID of the inserted record is present in the returned data.",
+            "in": "body",
+            "schema": {
+              "$ref": "#/definitions/forwardingrule"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "the created forwarding rule",
+            "schema": {
+              "$ref": "#/definitions/forwardingrule"
+            }
+          }
+        }
+      }
+    },
+
+    "/forwarding/rule/{id}": {
+      "delete": {
+        "description": "remove the forwarding rule corresponding to the supplied ID",
+        "tags": ["Forwarding"],
+        "parameters": [
+          {
+            "name": "id",
+            "description": "id of forwarding rule to remove",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "forwarding rule removed"
+          }
+        }        
+      }      
+    },
 
   },
 
   "definitions": {
+    "forwardingrule": {
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "int64"          
+        },
+        "source": {
+          "$ref": "#/definitions/source"          
+        },
+        "destination": {
+          "$ref": "#/definitions/destination"          
+        },
+        "keepImages": {
+          "type": "boolean"
+        }
+      }
+    },
     "seriestype": {
       "properties": {
         "id": {
