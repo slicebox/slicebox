@@ -47,7 +47,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
   }
 
   val storageService = system.actorOf(Props(new StorageServiceActor(dbProps, storage)), name = "StorageService")
-  val boxService = system.actorOf(Props(new BoxServiceActor(dbProps, storage, "http://testhost:1234", Timeout(30.seconds))), name = "BoxService")
+  val boxService = system.actorOf(Props(new BoxServiceActor(dbProps, "http://testhost:1234", Timeout(30.seconds))), name = "BoxService")
 
   override def afterEach() =
     db.withSession { implicit session =>

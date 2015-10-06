@@ -25,14 +25,8 @@ object DicomHierarchy {
       patientName: PatientName,
       patientID: PatientID,
       patientBirthDate: PatientBirthDate,
-      patientSex: PatientSex) extends Entity {
-
-    override def equals(o: Any): Boolean = o match {
-      case that: Patient => that.patientName == patientName && that.patientID == patientID
-      case _             => false
-    }
-  }
-
+      patientSex: PatientSex) extends Entity
+      
   case class Study(
       id: Long,
       patientId: Long,
@@ -41,14 +35,8 @@ object DicomHierarchy {
       studyDate: StudyDate,
       studyID: StudyID,
       accessionNumber: AccessionNumber,
-      patientAge: PatientAge) extends Entity {
-
-    override def equals(o: Any): Boolean = o match {
-      case that: Study => that.studyInstanceUID == studyInstanceUID
-      case _           => false
-    }
-  }
-
+      patientAge: PatientAge) extends Entity
+      
   case class Series(
       id: Long,
       studyId: Long,
@@ -60,34 +48,19 @@ object DicomHierarchy {
       bodyPartExamined: BodyPartExamined,
       manufacturer: Manufacturer,
       stationName: StationName,
-      frameOfReferenceUID: FrameOfReferenceUID) extends Entity {
-    override def equals(o: Any): Boolean = o match {
-      case that: Series => that.seriesInstanceUID == seriesInstanceUID
-      case _            => false
-    }
-  }
+      frameOfReferenceUID: FrameOfReferenceUID) extends Entity
 
   case class Image(
       id: Long,
       seriesId: Long,
       sopInstanceUID: SOPInstanceUID,
       imageType: ImageType,
-      instanceNumber: InstanceNumber) extends Entity {
-    override def equals(o: Any): Boolean = o match {
-      case that: Image => that.sopInstanceUID == sopInstanceUID
-      case _           => false
-    }
-  }
+      instanceNumber: InstanceNumber) extends Entity
 
   case class FlatSeries(
       id: Long,
       patient: Patient,
       study: Study,
-      series: Series) extends Entity {
-    override def equals(o: Any): Boolean = o match {
-      case that: FlatSeries => that.series.seriesInstanceUID == series.seriesInstanceUID
-      case _                => false
-    }
-  }
+      series: Series) extends Entity
 
 }

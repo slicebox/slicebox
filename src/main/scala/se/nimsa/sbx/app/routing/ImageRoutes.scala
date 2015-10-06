@@ -75,17 +75,13 @@ trait ImageRoutes { this: RestApi =>
       } ~ pathPrefix(LongNumber) { imageId =>
         pathEndOrSingleSlash {
           get {
-            onSuccess(storageService.ask(GetImageFile(imageId)).mapTo[Option[ImageFile]]) {
-              case imageFileMaybe => imageFileMaybe.map(imageFile => {
-                val path = storage.resolve(imageFile.fileName.value)
-                if (Files.isRegularFile(path) && Files.isReadable(path))
-                  detach() {
-                    autoChunk(chunkSize) {
-                      complete(HttpEntity(`application/octet-stream`, HttpData(path.toFile)))
-                    }
+            onSuccess(storageService.ask(GetImagePath(imageId)).mapTo[Option[ImagePath]]) {
+              _.map(imagePath => {
+                detach() {
+                  autoChunk(chunkSize) {
+                    complete(HttpEntity(`application/octet-stream`, HttpData(imagePath.imagePath.toFile)))
                   }
-                else
-                  complete((BadRequest, "Dataset could not be read"))
+                }
               }).getOrElse {
                 complete((NotFound, s"No file found for image id $imageId"))
               }
@@ -114,27 +110,19 @@ trait ImageRoutes { this: RestApi =>
           post {
             import spray.httpx.SprayJsonSupport._
             entity(as[Seq[TagValue]]) { tagValues =>
-              onSuccess(storageService.ask(GetImageFile(imageId)).mapTo[Option[ImageFile]]) {
+              onSuccess(storageService.ask(GetDataset(imageId)).mapTo[Option[Attributes]]) {
                 _ match {
-                  case Some(imageFile) =>
-                    onSuccess(storageService.ask(GetDataset(imageId)).mapTo[Option[Attributes]]) {
-                      _ match {
 
-                        case Some(dataset) =>
-                          AnonymizationUtil.setAnonymous(dataset, false) // pretend not anonymized to force anonymization
-                          onSuccess(anonymizationService.ask(Anonymize(dataset, tagValues)).mapTo[Attributes]) { anonDataset =>
-                            onSuccess(storageService.ask(DeleteImage(imageId))) {
-                              case ImageDeleted(imageId) =>
-                                val source = Source(SourceType.USER, authInfo.user.user, authInfo.user.id)
-                                onSuccess(storageService.ask(AddDataset(anonDataset, source))) {
-                                  case ImageAdded(image, source) =>
-                                    complete(NoContent)
-                                }
-                            }
+                  case Some(dataset) =>
+                    AnonymizationUtil.setAnonymous(dataset, false) // pretend not anonymized to force anonymization
+                    onSuccess(anonymizationService.ask(Anonymize(dataset, tagValues)).mapTo[Attributes]) { anonDataset =>
+                      onSuccess(storageService.ask(DeleteImage(imageId))) {
+                        case ImageDeleted(imageId) =>
+                          val source = Source(SourceType.USER, authInfo.user.user, authInfo.user.id)
+                          onSuccess(storageService.ask(AddDataset(anonDataset, source))) {
+                            case ImageAdded(image, source) =>
+                              complete(NoContent)
                           }
-
-                        case None =>
-                          complete(NotFound)
                       }
                     }
 
@@ -211,11 +199,8 @@ trait ImageRoutes { this: RestApi =>
 
   def createTempZipFile(imageIds: Seq[Long]): Future[Path] = {
     val futurePaths = Future.sequence(imageIds.map(imageId =>
-      storageService.ask(GetImageFile(imageId)).mapTo[Option[ImageFile]]))
-      .map(_
-        .flatten
-        .map(imageFile => storage.resolve(imageFile.fileName.value))
-        .filter(file => Files.isRegularFile(file) && Files.isReadable(file)))
+      storageService.ask(GetImagePath(imageId)).mapTo[Option[ImagePath]]))
+      .map(_.flatten.map(_.imagePath))
 
     futurePaths.map(paths => {
       val tempFile = Files.createTempFile("slicebox-export-", ".zip")

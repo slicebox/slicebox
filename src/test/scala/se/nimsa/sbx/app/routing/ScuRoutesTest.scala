@@ -24,7 +24,7 @@ class ScuRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   val scuDao = new ScuDAO(H2Driver)
   val metaDataDao = new MetaDataDAO(H2Driver)
 
-  "SCU routes" should "return a success message when asked to setup a new SCP" in {
+  "SCU routes" should "return a success message when asked to setup a new SCP and SCU" in {
     PostAsAdmin("/api/scps", ScpData(-1, "ScpName", "TestAeTitle", 12347)) ~> routes ~> check {
       status should be(Created)
     }
@@ -54,7 +54,7 @@ class ScuRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
   }
 
-  it should "return 404 NotFound when sending an image to an SCP that is unavailable" in {
+  it should "return 502 BadGateway when sending an image to an SCP that is unavailable" in {
     val file = TestUtil.testImageFile
     val mfd = MultipartFormData(Seq(BodyPart(file, "file")))
     val image = PostAsUser("/api/images", mfd) ~> routes ~> check {

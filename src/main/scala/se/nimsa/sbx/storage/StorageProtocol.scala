@@ -38,17 +38,6 @@ object StorageProtocol {
   
   case class FileName(value: String)
 
-  case class ImageFile(
-    id: Long,
-    fileName: FileName,
-    source: Source) extends Entity {
-    
-    override def equals(o: Any): Boolean = o match {
-      case that: ImageFile => that.fileName == fileName
-      case _ => false
-    }
-  }
-  
   case class ImageInformation(
       numberOfFrames: Int,
       frameIndex: Int,
@@ -100,8 +89,6 @@ object StorageProtocol {
 
   case class GetImages(startIndex: Long, count: Long, seriesId: Long) extends MetaDataQuery
   
-  case class GetImageFile(imageId: Long) extends MetaDataQuery
-  
   case class GetPatient(patientId: Long) extends MetaDataQuery
   
   case class GetStudy(studyId: Long) extends MetaDataQuery
@@ -127,6 +114,8 @@ object StorageProtocol {
   
   
   sealed trait ImageRequest
+  
+  case class GetImagePath(imageId: Long) extends ImageRequest
   
   case class GetDataset(imageId: Long) extends ImageRequest
   
@@ -171,6 +160,8 @@ object StorageProtocol {
 
   case class Images(images: Seq[Image]) 
 
+  case class ImagePath(imagePath: Path)
+  
   case class ImageDeleted(imageId: Long)
   
   case class SeriesTypeAddedToSeries(seriesSeriesType: SeriesSeriesType)
@@ -189,10 +180,6 @@ object StorageProtocol {
   
   case class FileReceived(path: Path, source: Source)
   
-  // ***from storage***
-
-  case class ImageFiles(imageFiles: Seq[ImageFile])
-        
   // Series
   
   case class SeriesDataset(id: Long, url: String)

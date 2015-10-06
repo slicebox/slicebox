@@ -121,16 +121,13 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
       catchAndReport {
         db.withSession { implicit session =>
           dao.imageById(imageId).foreach { image =>
-            propertiesDao.imageFileForImage(image.id)
-              .foreach { imageFile =>
-                try {
-                  deleteFromStorage(imageFile)
-                } catch {
-                  case e: NoSuchFileException =>
-                    log.debug("Storage", s"DICOM file ${imageFile.fileName.value} for image with id ${image.id} could not be found, no need to delete.")
-                    null
-                }
-              }
+            try {
+              deleteFromStorage(image.id)
+            } catch {
+              case e: NoSuchFileException =>
+                log.debug("Storage", s"DICOM file for image with id $imageId could not be found, no need to delete.")
+                null
+            }
             propertiesDao.deleteFully(image)
           }
           sender ! ImageDeleted(imageId)
@@ -188,48 +185,26 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
     case msg: ImageRequest => catchAndReport {
       msg match {
 
+        case GetImagePath(imageId) =>
+          sender ! imagePathForId(imageId)
+
         case GetDataset(imageId) =>
-          db.withSession { implicit session =>
-            sender ! propertiesDao.imageFileForImage(imageId)
-              .flatMap(imageFile =>
-                Option(readDataset(imageFile.fileName.value, true)))
-          }
+          sender ! readDataset(imageId, true)
 
         case GetImageAttributes(imageId) =>
-          db.withSession { implicit session =>
-            propertiesDao.imageFileForImage(imageId) match {
-              case Some(imageFile) =>
-                Future {
-                  Some(readImageAttributes(imageFile.fileName.value))
-                }.pipeTo(sender)
-              case None =>
-                sender ! None
-            }
-          }
+          Future {
+            readImageAttributes(imageId)
+          }.pipeTo(sender)
 
         case GetImageInformation(imageId) =>
-          db.withSession { implicit session =>
-            propertiesDao.imageFileForImage(imageId) match {
-              case Some(imageFile) =>
-                Future {
-                  Some(readImageInformation(imageFile.fileName.value))
-                }.pipeTo(sender)
-              case None =>
-                sender ! None
-            }
-          }
+          Future {
+            readImageInformation(imageId)
+          }.pipeTo(sender)
 
         case GetImageFrame(imageId, frameNumber, windowMin, windowMax, imageHeight) =>
-          db.withSession { implicit session =>
-            propertiesDao.imageFileForImage(imageId) match {
-              case Some(imageFile) =>
-                Future {
-                  Some(readImageFrame(imageFile.fileName.value, frameNumber, windowMin, windowMax, imageHeight))
-                }.pipeTo(sender)
-              case None =>
-                sender ! None
-            }
-          }
+          Future {
+            readImageFrame(imageId, frameNumber, windowMin, windowMax, imageHeight)
+          }.pipeTo(sender)
 
       }
     }
@@ -254,11 +229,6 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
         case GetImages(startIndex, count, seriesId) =>
           db.withSession { implicit session =>
             sender ! Images(dao.imagesForSeries(startIndex, count, seriesId))
-          }
-
-        case GetImageFile(imageId) =>
-          db.withSession { implicit session =>
-            sender ! propertiesDao.imageFileForImage(imageId)
           }
 
         case GetFlatSeries(startIndex, count, orderBy, orderAscending, filter, sourceRefs, seriesTypeIds, seriesTagIds) =>
@@ -345,116 +315,109 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
         throw e
     }
 
-  def storeDataset(dataset: Attributes, source: Source): (Image, Boolean) = {
-    val name = fileName(dataset)
-    val storedPath = storage.resolve(name)
-
-    val overwrite = Files.exists(storedPath)
-
-    val seriesSource = SeriesSource(-1, source)
-
+  def storeDataset(dataset: Attributes, source: Source): (Image, Boolean) =
     db.withSession { implicit session =>
 
       val patient = datasetToPatient(dataset)
       val study = datasetToStudy(dataset)
       val series = datasetToSeries(dataset)
+      val seriesSource = SeriesSource(-1, source)
       val image = datasetToImage(dataset)
-      val imageFile = ImageFile(-1, FileName(name), source)
 
-      val dbPatientMaybe = dao.patientByNameAndID(patient)
-      val dbStudyMaybe = dao.studyByUid(study)
-      val dbSeriesMaybe = dao.seriesByUid(series)
-      val dbImageMaybe = dao.imageByUid(image)
-      val dbImageFileMaybe = propertiesDao.imageFileByFileName(imageFile)
-      val dbSeriesSourceMaybe = dbSeriesMaybe.flatMap(dbSeries => propertiesDao.seriesSourceById(dbSeries.id))
+      val dbPatient = dao.patientByNameAndID(patient)
+        .getOrElse(dao.insert(patient))
+      val dbStudy = dao.studyByUidAndPatient(study, dbPatient)
+        .getOrElse(dao.insert(study.copy(patientId = dbPatient.id)))
+      val dbSeries = dao.seriesByUidAndStudy(series, dbStudy)
+        .getOrElse(dao.insert(series.copy(studyId = dbStudy.id)))
+      val dbSeriesSource = propertiesDao.seriesSourceById(dbSeries.id)
+        .getOrElse(propertiesDao.insertSeriesSource(seriesSource.copy(id = dbSeries.id)))
+      val dbImage = dao.imageByUidAndSeries(image, dbSeries)
+        .getOrElse(dao.insert(image.copy(seriesId = dbSeries.id)))
 
-      // relationships are one to many from top to bottom. There must therefore not be a new instance followed by an existing
-      val hierarchyIsWellDefined = !(
-        dbPatientMaybe.isEmpty && dbStudyMaybe.isDefined ||
-        dbStudyMaybe.isEmpty && dbSeriesMaybe.isDefined ||
-        dbSeriesSourceMaybe.isEmpty && dbSeriesMaybe.isDefined ||
-        dbSeriesMaybe.isEmpty && dbImageMaybe.isDefined ||
-        dbImageMaybe.isEmpty && dbImageFileMaybe.isDefined)
+      if (dbSeriesSource.source.sourceType != source.sourceType || dbSeriesSource.source.sourceId != source.sourceId)
+        SbxLog.warn("Storage", s"Existing series source does not match source of added image (${dbSeriesSource.source} vs $source). Source of added image will be lost.")
 
-      if (hierarchyIsWellDefined) {
+      val storedPath = filePath(dbImage)
+      val overwrite = Files.exists(storedPath)
 
-        val dbPatient = dbPatientMaybe.getOrElse(dao.insert(patient))
-        val dbStudy = dbStudyMaybe.getOrElse(dao.insert(study.copy(patientId = dbPatient.id)))
-        val dbSeries = dbSeriesMaybe.getOrElse(dao.insert(series.copy(studyId = dbStudy.id)))
-        val dbSeriesSource = dbSeriesSourceMaybe.getOrElse(propertiesDao.insertSeriesSource(seriesSource.copy(id = dbSeries.id)))
-        val dbImage = dbImageMaybe.getOrElse(dao.insert(image.copy(seriesId = dbSeries.id)))
-        dbImageFileMaybe.getOrElse(propertiesDao.insertImageFile(imageFile.copy(id = dbImage.id)))
-
-        try {
-          saveDataset(dataset, storedPath)
-        } catch {
-          case e: Exception =>
-            SbxLog.error("Storage", "Dataset file could not be stored: " + e.getMessage)
-        }
-
-        (dbImage, overwrite)
-
-      } else
-
-        throw new IllegalArgumentException(s"Dataset already stored, but with different values for one or more DICOM attributes. Skipping.")
-
-    }
-  }
-
-  def fileName(dataset: Attributes): String = dataset.getString(Tag.SOPInstanceUID)
-
-  def deleteFromStorage(imageFiles: Seq[ImageFile]): Unit = imageFiles foreach (deleteFromStorage(_))
-  def deleteFromStorage(imageFile: ImageFile): Unit = deleteFromStorage(storage.resolve(imageFile.fileName.value))
-  def deleteFromStorage(filePath: Path): Unit = {
-    Files.delete(filePath)
-    log.debug("Deleted file " + filePath)
-  }
-
-  def readDataset(fileName: String, withPixelData: Boolean): Attributes = loadDataset(storage.resolve(fileName), withPixelData)
-
-  def readImageAttributes(fileName: String): List[ImageAttribute] = {
-    val filePath = storage.resolve(fileName)
-    val dataset = loadDataset(filePath, false)
-    DicomUtil.readImageAttributes(dataset)
-  }
-
-  def readImageInformation(fileName: String): ImageInformation = {
-    val path = storage.resolve(fileName)
-    val dataset = loadDataset(path, false)
-    val instanceNumber = dataset.getInt(Tag.InstanceNumber, 1)
-    val imageIndex = dataset.getInt(Tag.ImageIndex, 1)
-    val frameIndex = if (instanceNumber > imageIndex) instanceNumber else imageIndex
-    ImageInformation(
-      dataset.getInt(Tag.NumberOfFrames, 1),
-      frameIndex,
-      dataset.getInt(Tag.SmallestImagePixelValue, 0),
-      dataset.getInt(Tag.LargestImagePixelValue, 0))
-  }
-
-  def readImageFrame(fileName: String, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int): Array[Byte] = {
-    val file = storage.resolve(fileName).toFile
-    val iis = ImageIO.createImageInputStream(file)
-    try {
-      val imageReader = ImageIO.getImageReadersByFormatName("DICOM").next
-      imageReader.setInput(iis)
-      val param = imageReader.getDefaultReadParam().asInstanceOf[DicomImageReadParam]
-      if (windowMin < windowMax) {
-        param.setWindowCenter((windowMax - windowMin) / 2)
-        param.setWindowWidth(windowMax - windowMin)
-      }
-      val bi = try {
-        scaleImage(imageReader.read(frameNumber - 1, param), imageHeight)
+      try {
+        saveDataset(dataset, storedPath)
       } catch {
-        case e: Exception => throw new IllegalArgumentException(e.getMessage)
+        case e: Exception =>
+          SbxLog.error("Storage", "Dataset file could not be stored: " + e.getMessage)
       }
-      val baos = new ByteArrayOutputStream
-      ImageIO.write(bi, "png", baos)
-      baos.close()
-      baos.toByteArray
-    } finally {
-      iis.close()
+
+      (dbImage, overwrite)
     }
-  }
+
+  def filePath(image: Image) = storage.resolve(fileName(image))
+  def fileName(image: Image) = image.id.toString
+
+  def imagePathForId(imageId: Long): Option[ImagePath] =
+    db.withSession { implicit session =>
+      dao.imageById(imageId)
+        .map(filePath(_))
+        .filter(Files.exists(_))
+        .filter(Files.isReadable(_))
+        .map(ImagePath(_))
+    }
+
+  def deleteFromStorage(imageIds: Seq[Long]): Unit = imageIds foreach (deleteFromStorage(_))
+  def deleteFromStorage(imageId: Long): Unit =
+    imagePathForId(imageId).foreach(imagePath => {
+      Files.delete(imagePath.imagePath)
+      log.debug("Deleted file " + imagePath.imagePath)
+    })
+
+  def readDataset(imageId: Long, withPixelData: Boolean): Option[Attributes] =
+    imagePathForId(imageId).map(imagePath =>
+      loadDataset(imagePath.imagePath, withPixelData))
+
+  def readImageAttributes(imageId: Long): Option[List[ImageAttribute]] =
+    imagePathForId(imageId).map(imagePath => {
+      val dataset = loadDataset(imagePath.imagePath, false)
+      DicomUtil.readImageAttributes(dataset)
+    })
+
+  def readImageInformation(imageId: Long): Option[ImageInformation] =
+    imagePathForId(imageId).map(imagePath => {
+      val dataset = loadDataset(imagePath.imagePath, false)
+      val instanceNumber = dataset.getInt(Tag.InstanceNumber, 1)
+      val imageIndex = dataset.getInt(Tag.ImageIndex, 1)
+      val frameIndex = if (instanceNumber > imageIndex) instanceNumber else imageIndex
+      ImageInformation(
+        dataset.getInt(Tag.NumberOfFrames, 1),
+        frameIndex,
+        dataset.getInt(Tag.SmallestImagePixelValue, 0),
+        dataset.getInt(Tag.LargestImagePixelValue, 0))
+    })
+
+  def readImageFrame(imageId: Long, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int): Option[Array[Byte]] =
+    imagePathForId(imageId).map(imagePath => {
+      val file = imagePath.imagePath.toFile
+      val iis = ImageIO.createImageInputStream(file)
+      try {
+        val imageReader = ImageIO.getImageReadersByFormatName("DICOM").next
+        imageReader.setInput(iis)
+        val param = imageReader.getDefaultReadParam().asInstanceOf[DicomImageReadParam]
+        if (windowMin < windowMax) {
+          param.setWindowCenter((windowMax - windowMin) / 2)
+          param.setWindowWidth(windowMax - windowMin)
+        }
+        val bi = try {
+          scaleImage(imageReader.read(frameNumber - 1, param), imageHeight)
+        } catch {
+          case e: Exception => throw new IllegalArgumentException(e.getMessage)
+        }
+        val baos = new ByteArrayOutputStream
+        ImageIO.write(bi, "png", baos)
+        baos.close()
+        baos.toByteArray
+      } finally {
+        iis.close()
+      }
+    })
 
   def scaleImage(image: BufferedImage, imageHeight: Int): BufferedImage = {
     val ratio = imageHeight / image.getHeight.asInstanceOf[Double]

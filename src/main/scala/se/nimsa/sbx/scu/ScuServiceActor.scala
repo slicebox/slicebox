@@ -22,6 +22,7 @@ import scala.concurrent.Future
 import akka.actor.Actor
 import akka.actor.PoisonPill
 import akka.actor.Props
+import akka.pattern.ask
 import akka.event.Logging
 import akka.event.LoggingReceive
 import akka.pattern.pipe
@@ -36,16 +37,20 @@ import se.nimsa.sbx.lang.NotFoundException
 import se.nimsa.sbx.lang.BadGatewayException
 import java.net.NoRouteToHostException
 import se.nimsa.sbx.app.GeneralProtocol._
+import se.nimsa.sbx.storage.StorageProtocol.GetImagePath
+import se.nimsa.sbx.storage.StorageProtocol.ImagePath
+import akka.util.Timeout
 
-class ScuServiceActor(dbProps: DbProps, storage: Path) extends Actor with ExceptionCatching {
+class ScuServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extends Actor with ExceptionCatching {
   val log = Logging(context.system, this)
 
   val db = dbProps.db
   val dao = new ScuDAO(dbProps.driver)
-  val propertiesDao = new PropertiesDAO(dbProps.driver)
 
   import context.system
   implicit val ec = context.dispatcher
+
+  val storageService = context.actorSelection("../StorageService")
 
   log.info("SCU service started")
 
@@ -95,17 +100,16 @@ class ScuServiceActor(dbProps: DbProps, storage: Path) extends Actor with Except
 
           case SendImagesToScp(imageIds, scuId) =>
             scuForId(scuId).map(scu => {
-              val imageFiles = imageFilesForImageIds(imageIds)
-              if (imageFiles.isEmpty)
-                throw new NotFoundException(s"No files found given ${imageIds.length} image ids")
-              SbxLog.info("SCU", s"Sending ${imageFiles.length} images using SCU ${scu.name}")
-              Future {
-                Scu.sendFiles(scu, imageFiles.map(imageFile => storage.resolve(imageFile.fileName.value)))
-              }
+              imagePathsForImageIds(imageIds).map(imagePaths => {
+                if (imagePaths.isEmpty)
+                  throw new NotFoundException(s"No images found given ${imageIds.length} image ids")
+                SbxLog.info("SCU", s"Sending ${imagePaths.length} images using SCU ${scu.name}")
+                Scu.sendFiles(scu, imagePaths.map(_.imagePath))
+              })
                 .map(r => {
-                  SbxLog.info("SCU", s"Finished sending ${imageFiles.length} images using SCU ${scu.name}")
+                  SbxLog.info("SCU", s"Finished sending ${imageIds.length} images using SCU ${scu.name}")
                   context.system.eventStream.publish(ImagesSent(Destination(DestinationType.SCU, scu.name, scu.id), imageIds))
-                  ImagesSentToScp(scuId, imageFiles.map(_.id))
+                  ImagesSentToScp(scuId, imageIds)
                 })
                 .recover {
                   case e: UnknownHostException =>
@@ -153,13 +157,12 @@ class ScuServiceActor(dbProps: DbProps, storage: Path) extends Actor with Except
       dao.allScuDatas
     }
 
-  def imageFilesForImageIds(imageIds: Seq[Long]) =
-    db.withSession { implicit session =>
-      imageIds.map(propertiesDao.imageFileForImage(_)).flatten
-    }
-
+  def imagePathsForImageIds(imageIds: Seq[Long]) =
+    Future.sequence(imageIds.map(imageId =>
+      storageService.ask(GetImagePath(imageId)).mapTo[Option[ImagePath]]))
+      .map(_.flatten)
 }
 
 object ScuServiceActor {
-  def props(dbProps: DbProps, storage: Path): Props = Props(new ScuServiceActor(dbProps, storage))
+  def props(dbProps: DbProps, timeout: Timeout): Props = Props(new ScuServiceActor(dbProps)(timeout))
 }

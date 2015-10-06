@@ -61,29 +61,12 @@ object TestUtil {
   }
 
   def insertProperties(seriesTypeDao: SeriesTypeDAO, propertiesDao: PropertiesDAO, dbSeries1: Series, dbSeries2: Series, dbSeries3: Series, dbSeries4: Series, dbImage1: Image, dbImage2: Image, dbImage3: Image, dbImage4: Image, dbImage5: Image, dbImage6: Image, dbImage7: Image, dbImage8: Image)(implicit session: Session) = {
-    val imageFile1 = ImageFile(-1, FileName("file1"), Source(SourceType.USER, "user", 1))
-    val imageFile2 = ImageFile(-1, FileName("file2"), Source(SourceType.USER, "user", 1))
-    val imageFile3 = ImageFile(-1, FileName("file3"), Source(SourceType.BOX, "box", 1))
-    val imageFile4 = ImageFile(-1, FileName("file4"), Source(SourceType.BOX, "box", 1))
-    val imageFile5 = ImageFile(-1, FileName("file5"), Source(SourceType.DIRECTORY, "directory", 1))
-    val imageFile6 = ImageFile(-1, FileName("file6"), Source(SourceType.DIRECTORY, "directory", 1))
-    val imageFile7 = ImageFile(-1, FileName("file7"), Source(SourceType.SCP, "scp", 1))
-    val imageFile8 = ImageFile(-1, FileName("file8"), Source(SourceType.SCP, "scp", 1))
     val seriesSource1 = SeriesSource(-1, Source(SourceType.USER, "user", 1))
     val seriesSource2 = SeriesSource(-1, Source(SourceType.BOX, "box", 1))
     val seriesSource3 = SeriesSource(-1, Source(SourceType.DIRECTORY, "directory", 1))
     val seriesSource4 = SeriesSource(-1, Source(SourceType.SCP, "scp", 1))
     val seriesType1 = SeriesType(-1, "Test Type 1")
     val seriesType2 = SeriesType(-1, "Test Type 2")
-    
-    val dbImageFile1 = propertiesDao.insertImageFile(imageFile1.copy(id = dbImage1.id))
-    val dbImageFile2 = propertiesDao.insertImageFile(imageFile2.copy(id = dbImage2.id))
-    val dbImageFile3 = propertiesDao.insertImageFile(imageFile3.copy(id = dbImage3.id))
-    val dbImageFile4 = propertiesDao.insertImageFile(imageFile4.copy(id = dbImage4.id))
-    val dbImageFile5 = propertiesDao.insertImageFile(imageFile5.copy(id = dbImage5.id))
-    val dbImageFile6 = propertiesDao.insertImageFile(imageFile6.copy(id = dbImage6.id))
-    val dbImageFile7 = propertiesDao.insertImageFile(imageFile7.copy(id = dbImage7.id))
-    val dbImageFile8 = propertiesDao.insertImageFile(imageFile8.copy(id = dbImage8.id))
     
     val dbSeriesSource1 = propertiesDao.insertSeriesSource(seriesSource1.copy(id = dbSeries1.id))
     val dbSeriesSource2 = propertiesDao.insertSeriesSource(seriesSource2.copy(id = dbSeries2.id))
@@ -108,7 +91,7 @@ object TestUtil {
     val dbSeriesSeriesType3 = propertiesDao.insertSeriesSeriesType(seriesSeriesType3)
     val dbSeriesSeriesType4 = propertiesDao.insertSeriesSeriesType(seriesSeriesType4)
     
-    ((dbImageFile1, dbImageFile2, dbImageFile3, dbImageFile4, dbImageFile5, dbImageFile6, dbImageFile7, dbImageFile8), (dbSeriesSource1, dbSeriesSource2, dbSeriesSource3, dbSeriesSource4), (dbSeriesSeriesType1, dbSeriesSeriesType2, dbSeriesSeriesType3, dbSeriesSeriesType4))
+    ((dbSeriesSource1, dbSeriesSource2, dbSeriesSource3, dbSeriesSource4), (dbSeriesSeriesType1, dbSeriesSeriesType2, dbSeriesSeriesType3, dbSeriesSeriesType4))
   }
   
   def testImageFile = new File(getClass().getResource("test.dcm").toURI())

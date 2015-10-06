@@ -432,19 +432,22 @@ class MetaDataDAO(val driver: JdbcProfile) {
       .filter(_.patientID === patient.patientID.value)
       .firstOption
 
-  def studyByUid(study: Study)(implicit session: Session): Option[Study] =
+  def studyByUidAndPatient(study: Study, patient: Patient)(implicit session: Session): Option[Study] =
     studiesQuery
       .filter(_.studyInstanceUID === study.studyInstanceUID.value)
+      .filter(_.patientId === patient.id)
       .firstOption
 
-  def seriesByUid(series: Series)(implicit session: Session): Option[Series] =
+  def seriesByUidAndStudy(series: Series, study: Study)(implicit session: Session): Option[Series] =
     seriesQuery
       .filter(_.seriesInstanceUID === series.seriesInstanceUID.value)
+      .filter(_.studyId === study.id)
       .firstOption
 
-  def imageByUid(image: Image)(implicit session: Session): Option[Image] =
+  def imageByUidAndSeries(image: Image, series: Series)(implicit session: Session): Option[Image] =
     imagesQuery
       .filter(_.sopInstanceUID === image.sopInstanceUID.value)
+      .filter(_.seriesId === series.id)
       .firstOption
 
   // *** Deletes ***

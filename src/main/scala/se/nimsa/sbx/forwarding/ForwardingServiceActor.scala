@@ -186,7 +186,7 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
      * and the order in which this happens is indeterminate. Therefore, we try getting the inbox entry for
      * the added image a few times before either succeeding or giving up.
      */
-    
+
     def inboxEntryForImageId(imageId: Long, attempt: Int, maxAttempts: Int, attemptInterval: Long): Unit =
       boxService.ask(GetInboxEntryForImageId(imageId)).mapTo[Option[InboxEntry]].onComplete {
         case Success(entryMaybe) => entryMaybe match {
@@ -206,7 +206,7 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
 
     // get box information, are all images received?
     inboxEntryForImageId(imageId, 1, 10, 500)
-    
+
   }
 
   def makeTransfer(rule: ForwardingRule, transaction: ForwardingTransaction) = {
@@ -215,7 +215,7 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
       .map(_.imageId)
 
     SbxLog.info("Forwarding", s"Forwarding ${imageIds.length} images from ${rule.source.sourceType.toString} ${rule.source.sourceName} to ${rule.destination.destinationType.toString} ${rule.destination.destinationName}.")
-    
+
     updateTransaction(transaction, true, false)
 
     val destinationId = rule.destination.destinationId
@@ -291,9 +291,13 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
       .flatten.distinct
     transactionsToRemove.foreach(transaction => removeTransactionForId(transaction.id))
     deleteImages(imageIdsToDelete)
-    
-    SbxLog.info("Forwarding", s"Finalized ${transactionsToRemove.length} transactions. Deleted ${imageIdsToDelete.length} images.")
-    
+
+    if (!transactionsToRemove.isEmpty) {
+      SbxLog.info("Forwarding", s"Finalized ${transactionsToRemove.length} transactions.")
+      if (!imageIdsToDelete.isEmpty)
+        SbxLog.info("Forwarding", s"Deleted ${imageIdsToDelete.length} images after forwarding.")
+    }
+
     (transactionsToRemove, imageIdsToDelete)
   }
 

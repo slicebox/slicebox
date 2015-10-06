@@ -46,7 +46,7 @@ import org.dcm4che3.data.Attributes
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.TagValue
 import se.nimsa.sbx.app.GeneralProtocol._
 
-class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String, implicit val timeout: Timeout) extends Actor with Stash with ExceptionCatching {
+class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout: Timeout) extends Actor with Stash with ExceptionCatching {
 
   case object UpdatePollBoxesOnlineStatus
 
@@ -253,7 +253,7 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String, impli
   def maybeStartPushActor(box: Box): Unit = {
     val actorName = pushActorName(box)
     if (context.child(actorName).isEmpty)
-      context.actorOf(BoxPushActor.props(box, dbProps, storage, timeout), actorName)
+      context.actorOf(BoxPushActor.props(box, dbProps, timeout), actorName)
   }
 
   def maybeStartPollActor(box: Box): Unit = {
@@ -456,5 +456,5 @@ class BoxServiceActor(dbProps: DbProps, storage: Path, apiBaseURL: String, impli
 }
 
 object BoxServiceActor {
-  def props(dbProps: DbProps, storage: Path, apiBaseURL: String, timeout: Timeout): Props = Props(new BoxServiceActor(dbProps, storage, apiBaseURL, timeout))
+  def props(dbProps: DbProps, apiBaseURL: String, timeout: Timeout): Props = Props(new BoxServiceActor(dbProps, apiBaseURL, timeout))
 }

@@ -67,17 +67,6 @@ class ImageRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }    
   }
 
-  it should "return a BadRequest when adding a file leads to an ill-defined DICOM hierarchy" in {
-    // file already added once. Change some DICOM attributes in order to create an invalid hierarchy
-    val dataset = TestUtil.testImageDataset()
-    dataset.setString(Tag.StudyInstanceUID, VR.UI, "1.2.3.4") // leads to a new db study
-    dataset.setString(Tag.SOPInstanceUID, VR.UI, "5.6.7.8") // leads to a new db image
-    val bytes = DicomUtil.toByteArray(dataset)
-    PostAsUser("/api/images", HttpData(bytes)) ~> routes ~> check {
-      status should be (BadRequest)
-    }
-  }
-  
   it should "return a non-empty list of attributes when listing attributes for an image" in {
     GetAsUser("/api/images/1/attributes") ~> routes ~> check {
       status should be (OK)
