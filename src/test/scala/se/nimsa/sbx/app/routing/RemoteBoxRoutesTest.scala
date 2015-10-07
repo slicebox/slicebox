@@ -44,7 +44,7 @@ class RemoteBoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
 
   def addPushBox(name: String) =
-    PostAsAdmin("/api/boxes/connect", RemoteBox(name, "http://some.url/api/box/" + UUID.randomUUID())) ~> routes ~> check {
+    PostAsAdmin("/api/boxes/connect", RemoteBox(name, "http://some.url/api/box/" + UUID.randomUUID(), Some("secret"), true)) ~> routes ~> check {
       status should be(Created)
       val box = responseAs[Box]
       box.sendMethod should be(BoxSendMethod.PUSH)
