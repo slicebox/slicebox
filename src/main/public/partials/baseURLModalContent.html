@@ -2,9 +2,17 @@
   	<md-dialog-content>
     	<md-subheader class="md-sticky-no-effect">Box Connection URL</md-subheader>
 
-		<p>Click the URL below to email it to a Slicebox user.</p>
+		<p>A box connection to <i>{{name}}</i> with the following data has been created</p>
 
-	    <a href="mailto:?Subject=Connect%20to%20my%20Slicebox!&Body={{mailBody()}}">{{baseURL}}</a>
+		<dl>
+			<dt><strong>URL:</strong></dt>
+			<dd>{{baseURL}}</dd>
+			<dt><strong>Secret:</strong></dt>
+			<dd>{{secret}}</dd>
+		</dl>
+
+		<p>Click <a href="mailto:?Subject=Connect%20to%20my%20Slicebox&Body={{mailBody()}}">here</a> to send an email with this data to your collaborator.</p>
+	    
     </md-dialog-content>
 
     <div class="md-actions" layout="row">

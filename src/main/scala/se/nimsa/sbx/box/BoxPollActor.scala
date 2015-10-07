@@ -51,6 +51,7 @@ import scala.util.Success
 import scala.util.Failure
 
 class BoxPollActor(box: Box,
+                   boxTransferData: BoxTransferData,
                    dbProps: DbProps,
                    implicit val timeout: Timeout,
                    pollInterval: FiniteDuration = 5.seconds,
@@ -234,7 +235,8 @@ class BoxPollActor(box: Box,
 
 object BoxPollActor {
   def props(box: Box,
+            boxTransferData: BoxTransferData,
             dbProps: DbProps,
-            timeout: Timeout): Props = Props(new BoxPollActor(box, dbProps, timeout))
+            timeout: Timeout): Props = Props(new BoxPollActor(box, boxTransferData, dbProps, timeout))
 
 }

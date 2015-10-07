@@ -47,6 +47,7 @@ import se.nimsa.sbx.storage.StorageProtocol.GetDataset
 import se.nimsa.sbx.app.GeneralProtocol._
 
 class BoxPushActor(box: Box,
+                   boxTransferData: BoxTransferData,
                    dbProps: DbProps,
                    implicit val timeout: Timeout,
                    pollInterval: FiniteDuration = 5.seconds,
@@ -203,8 +204,9 @@ class BoxPushActor(box: Box,
 object BoxPushActor {
 
   def props(box: Box,
+            boxTransferData: BoxTransferData,
             dbProps: DbProps,
             timeout: Timeout): Props =
-    Props(new BoxPushActor(box, dbProps, timeout))
+    Props(new BoxPushActor(box, boxTransferData, dbProps, timeout))
 
 }

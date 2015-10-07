@@ -42,6 +42,19 @@ class BoxDAO(val driver: JdbcProfile) {
 
   val boxQuery = TableQuery[BoxTable]
 
+  val toBoxTransferData = (id: Long, secret: Option[String], compress: Boolean) => BoxTransferData(id, secret, compress)
+  val fromBoxTransferData = (box: BoxTransferData) => Option((box.id, box.secret, box.compress))
+
+  class BoxTransferDataTable(tag: Tag) extends Table[BoxTransferData](tag, "BoxTransferData") {
+    def id = column[Long]("id", O.PrimaryKey)
+    def secret = column[Option[String]]("secret")
+    def compress = column[Boolean]("compress")
+    def fkBox = foreignKey("fk_box", id, boxQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
+    def * = (id, secret, compress) <> (toBoxTransferData.tupled, fromBoxTransferData)
+  }
+
+  val boxTransferDataQuery = TableQuery[BoxTransferDataTable]
+
   val toOutboxEntry = (id: Long, remoteBoxId: Long, remoteBoxName: String, transactionId: Long, sequenceNumber: Long, totalImageCount: Long, imageId: Long, failed: Boolean) =>
     OutboxEntry(id, remoteBoxId, remoteBoxName: String, transactionId, sequenceNumber, totalImageCount, imageId, failed)
   val fromOutboxEntry = (entry: OutboxEntry) => Option((entry.id, entry.remoteBoxId, entry.remoteBoxName, entry.transactionId, entry.sequenceNumber, entry.totalImageCount, entry.imageId, entry.failed))
@@ -145,6 +158,7 @@ class BoxDAO(val driver: JdbcProfile) {
 
   def create(implicit session: Session): Unit = {
     if (MTable.getTables("Box").list.isEmpty) boxQuery.ddl.create
+    if (MTable.getTables("BoxTransferData").list.isEmpty) boxTransferDataQuery.ddl.create
     if (MTable.getTables("Outbox").list.isEmpty) outboxQuery.ddl.create
     if (MTable.getTables("Inbox").list.isEmpty) inboxQuery.ddl.create
     if (MTable.getTables("Sent").list.isEmpty) sentQuery.ddl.create
@@ -154,10 +168,11 @@ class BoxDAO(val driver: JdbcProfile) {
   }
 
   def drop(implicit session: Session): Unit =
-    (boxQuery.ddl ++ outboxQuery.ddl ++ inboxQuery.ddl ++ inboxImageQuery.ddl ++ sentQuery.ddl ++ sentImageQuery.ddl ++ transactionTagValueQuery.ddl).drop
+    (boxQuery.ddl ++ boxTransferDataQuery.ddl ++ outboxQuery.ddl ++ inboxQuery.ddl ++ inboxImageQuery.ddl ++ sentQuery.ddl ++ sentImageQuery.ddl ++ transactionTagValueQuery.ddl).drop
 
   def clear(implicit session: Session): Unit = {
     boxQuery.delete
+    boxTransferDataQuery.delete
     inboxQuery.delete
     outboxQuery.delete
     sentQuery.delete
@@ -187,6 +202,9 @@ class BoxDAO(val driver: JdbcProfile) {
     val generatedId = (boxQuery returning boxQuery.map(_.id)) += box
     box.copy(id = generatedId)
   }
+
+  def insertBoxTransferData(boxTransferData: BoxTransferData)(implicit session: Session): Unit =
+    boxTransferDataQuery += boxTransferData
 
   def insertOutboxEntry(entry: OutboxEntry)(implicit session: Session): OutboxEntry = {
     val generatedId = (outboxQuery returning outboxQuery.map(_.id)) += entry
@@ -230,6 +248,9 @@ class BoxDAO(val driver: JdbcProfile) {
       .filter(_.sendMethod === BoxSendMethod.POLL.toString)
       .filter(_.token === token)
       .firstOption
+
+  def boxTransferDataByBoxId(boxId: Long)(implicit session: Session): Option[BoxTransferData] =
+    boxTransferDataQuery.filter(_.id === boxId).firstOption
 
   def updateBoxOnlineStatus(boxId: Long, online: Boolean)(implicit session: Session): Unit =
     boxQuery
@@ -325,6 +346,9 @@ class BoxDAO(val driver: JdbcProfile) {
 
   def listBoxes(implicit session: Session): List[Box] =
     boxQuery.list
+
+  def listBoxTransferData(implicit session: Session): List[BoxTransferData] =
+    boxTransferDataQuery.list
 
   def listOutboxEntries(implicit session: Session): List[OutboxEntry] =
     outboxQuery.list

@@ -42,7 +42,7 @@ trait JsonFormats extends DefaultJsonProtocol {
   implicit val scpDataFormat = jsonFormat4(ScpData)
   implicit val scuDataFormat = jsonFormat5(ScuData)
 
-  implicit val remoteBoxFormat = jsonFormat2(RemoteBox)
+  implicit val remoteBoxFormat = jsonFormat4(RemoteBox)
   implicit val remoteBoxNameFormat = jsonFormat1(RemoteBoxName)
 
   implicit object SourceTypeFormat extends JsonFormat[SourceType] {
@@ -73,6 +73,7 @@ trait JsonFormats extends DefaultJsonProtocol {
   }
 
   implicit val boxFormat = jsonFormat6(Box)
+  implicit val boxTransferDataFormat = jsonFormat3(BoxTransferData)
 
   implicit val outboxEntryFormat = jsonFormat8(OutboxEntry)
   implicit val failedOutboxEntryFormat = jsonFormat2(FailedOutboxEntry)

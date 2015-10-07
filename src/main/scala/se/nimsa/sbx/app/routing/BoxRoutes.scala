@@ -48,7 +48,7 @@ trait BoxRoutes { this: RestApi =>
           post {
             entity(as[RemoteBoxName]) { remoteBoxName =>
               onSuccess(boxService.ask(CreateConnection(remoteBoxName.value))) {
-                case RemoteBoxAdded(box) =>
+                case RemoteBoxAdded(box, boxTransferData) =>
                   complete((Created, box))
               }
             }
@@ -57,16 +57,27 @@ trait BoxRoutes { this: RestApi =>
           post {
             entity(as[RemoteBox]) { remoteBox =>
               onSuccess(boxService.ask(Connect(remoteBox))) {
-                case RemoteBoxAdded(box) =>
+                case RemoteBoxAdded(box, boxTransferData) =>
                   complete((Created, box))
               }
             }
           }
-        } ~ path(LongNumber) { boxId =>
-          delete {
-            onSuccess(boxService.ask(RemoveBox(boxId))) {
-              case BoxRemoved(boxId) =>
-                complete(NoContent)
+        } ~ pathPrefix(LongNumber) { boxId =>
+          pathEndOrSingleSlash {
+            delete {
+              onSuccess(boxService.ask(RemoveBox(boxId))) {
+                case BoxRemoved(boxId) =>
+                  complete(NoContent)
+              }
+            }
+          } ~ path("transferdata") {
+            get {
+              onSuccess(boxService.ask(GetBoxTransferDataByBoxId(boxId)).mapTo[Option[BoxTransferData]]) {
+                case Some(transferData) if transferData.secret.isDefined =>
+                  complete(transferData)
+                case _ =>
+                  complete(NotFound)
+              }
             }
           }
         }
@@ -75,7 +86,7 @@ trait BoxRoutes { this: RestApi =>
           entity(as[Seq[ImageTagValues]]) { imageTagValuesSeq =>
             onSuccess(boxService.ask(SendToRemoteBox(remoteBoxId, imageTagValuesSeq))) {
               case ImagesAddedToOutbox(remoteBoxId, imageIds) => complete(NoContent)
-              case BoxNotFound                       => complete(NotFound)
+              case BoxNotFound                                => complete(NotFound)
             }
           }
         }
@@ -128,7 +139,7 @@ trait BoxRoutes { this: RestApi =>
         }
       }
     }
-  
+
   def sentRoutes: Route =
     pathPrefix("sent") {
       pathEndOrSingleSlash {
