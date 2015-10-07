@@ -30,7 +30,7 @@ class GeneralRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     PostAsAdmin("/api/users", ClearTextUser("name", ADMINISTRATOR, "password")) ~> routes ~> check {
       status should be(Created)
     }
-    PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData("remote box", true, true)) ~> routes ~> check {
+    PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData("remote box")) ~> routes ~> check {
       status should be(Created)
     }
     PostAsAdmin("/api/scps", ScpData(-1, "my scp", "AETITLE", 3000)) ~> routes ~> check {

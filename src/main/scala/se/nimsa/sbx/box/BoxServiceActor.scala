@@ -90,9 +90,8 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
             val baseUrl = s"$apiBaseURL/box/$token"
             val name = remoteBoxConnectionData.name
             val box = addBoxToDb(Box(-1, name, token, baseUrl, BoxSendMethod.POLL, false))
-            val secret = if (remoteBoxConnectionData.encrypt) Some(CryptoUtil.createBase64EncodedKey()) else None
-            val compress = remoteBoxConnectionData.compress
-            val transferData = addBoxTransferDataToDb(BoxTransferData(box.id, secret, compress))
+            val secret = CryptoUtil.createBase64EncodedKey
+            val transferData = addBoxTransferDataToDb(BoxTransferData(box.id, secret))
             sender ! RemoteBoxAdded(box, transferData)
 
           case Connect(remoteBox) =>
@@ -102,8 +101,7 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
             }
             val transferData = boxTransferDataByBoxId(box.id) getOrElse {
               val secret = remoteBox.secret
-              val compress = remoteBox.compress
-              addBoxTransferDataToDb(BoxTransferData(box.id, secret, compress))
+              addBoxTransferDataToDb(BoxTransferData(box.id, secret))
             }
             maybeStartPushActor(box, transferData)
             maybeStartPollActor(box, transferData)
@@ -253,7 +251,7 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
 
   def setupBoxes(): Unit =
     getBoxesFromDb foreach (box => {
-      val transferData = boxTransferDataByBoxId(box.id).getOrElse(BoxTransferData(-1, None, false))
+      boxTransferDataByBoxId(box.id) foreach (transferData =>
       box.sendMethod match {
         case BoxSendMethod.PUSH => {
           maybeStartPushActor(box, transferData)
@@ -261,7 +259,7 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
         }
         case BoxSendMethod.POLL =>
           pollBoxesLastPollTimestamp(box.id) = new Date(0)
-      }
+      })
     })
 
   def maybeStartPushActor(box: Box, boxTransferData: BoxTransferData): Unit = {

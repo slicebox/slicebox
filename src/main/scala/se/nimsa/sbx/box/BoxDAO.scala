@@ -42,15 +42,14 @@ class BoxDAO(val driver: JdbcProfile) {
 
   val boxQuery = TableQuery[BoxTable]
 
-  val toBoxTransferData = (id: Long, secret: Option[String], compress: Boolean) => BoxTransferData(id, secret, compress)
-  val fromBoxTransferData = (box: BoxTransferData) => Option((box.id, box.secret, box.compress))
+  val toBoxTransferData = (id: Long, secret: String) => BoxTransferData(id, secret)
+  val fromBoxTransferData = (box: BoxTransferData) => Option((box.id, box.secret))
 
   class BoxTransferDataTable(tag: Tag) extends Table[BoxTransferData](tag, "BoxTransferData") {
     def id = column[Long]("id", O.PrimaryKey)
-    def secret = column[Option[String]]("secret")
-    def compress = column[Boolean]("compress")
+    def secret = column[String]("secret")
     def fkBox = foreignKey("fk_box", id, boxQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
-    def * = (id, secret, compress) <> (toBoxTransferData.tupled, fromBoxTransferData)
+    def * = (id, secret) <> (toBoxTransferData.tupled, fromBoxTransferData)
   }
 
   val boxTransferDataQuery = TableQuery[BoxTransferDataTable]

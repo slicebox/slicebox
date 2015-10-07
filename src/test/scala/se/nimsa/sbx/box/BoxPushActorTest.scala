@@ -55,7 +55,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
   }
 
   val testBox = Box(1, "Test Box", "abc123", "testbox.com", BoxSendMethod.PUSH, false)
-  val testTransferData = BoxTransferData(testBox.id, Some("secret"), true)
+  val testTransferData = BoxTransferData(testBox.id, "secret")
 
   val testTransactionId = 888
   val testTransactionId2 = 999

@@ -58,7 +58,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
     db.withSession { implicit session =>
       boxDao.insertBox(Box(-1, "some remote box", "abc", remoteBoxBaseUrl, BoxSendMethod.PUSH, false))
     }
-  val transferData = BoxTransferData(remoteBox.id, Some("secret"), true)
+  val transferData = BoxTransferData(remoteBox.id, "secret")
   db.withSession { implicit session =>
     boxDao.insertBoxTransferData(transferData)
   }

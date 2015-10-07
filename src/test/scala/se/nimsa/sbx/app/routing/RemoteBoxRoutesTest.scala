@@ -37,14 +37,14 @@ class RemoteBoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   }
 
   def addPollBox(name: String) =
-    PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData(name, true, true)) ~> routes ~> check {
+    PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData(name)) ~> routes ~> check {
       status should be(Created)
       val response = responseAs[Box]
       response
     }
 
   def addPushBox(name: String) =
-    PostAsAdmin("/api/boxes/connect", RemoteBox(name, "http://some.url/api/box/" + UUID.randomUUID(), Some("secret"), true)) ~> routes ~> check {
+    PostAsAdmin("/api/boxes/connect", RemoteBox(name, "http://some.url/api/box/" + UUID.randomUUID(), "secret")) ~> routes ~> check {
       status should be(Created)
       val box = responseAs[Box]
       box.sendMethod should be(BoxSendMethod.PUSH)
@@ -56,7 +56,7 @@ class RemoteBoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
     // first, add a box on the poll (university) side
     val uniBox =
-      PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData("hosp", true, true)) ~> routes ~> check {
+      PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData("hosp")) ~> routes ~> check {
         status should be(Created)
         responseAs[Box]
       }
@@ -77,7 +77,7 @@ class RemoteBoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
     // first, add a box on the poll (university) side
     val uniBox =
-      PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData("hosp", true, true)) ~> routes ~> check {
+      PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData("hosp")) ~> routes ~> check {
         responseAs[Box]
       }
 
@@ -106,7 +106,7 @@ class RemoteBoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   it should "return not found when polling empty outbox" in {
     // first, add a box on the poll (university) side
     val uniBox =
-      PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData("hosp2", true, true)) ~> routes ~> check {
+      PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData("hosp2")) ~> routes ~> check {
         status should be(Created)
         responseAs[Box]
       }

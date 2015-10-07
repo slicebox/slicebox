@@ -35,14 +35,14 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   }
 
   def addPollBox(name: String) =
-    PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData(name, true, true)) ~> routes ~> check {
+    PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData(name)) ~> routes ~> check {
       status should be(Created)
       val response = responseAs[Box]
       response
     }
 
   def addPushBox(name: String) =
-    PostAsAdmin("/api/boxes/connect", RemoteBox(name, "http://some.url/api/box/" + UUID.randomUUID(), Some("secret"), true)) ~> routes ~> check {
+    PostAsAdmin("/api/boxes/connect", RemoteBox(name, "http://some.url/api/box/" + UUID.randomUUID(), "secret")) ~> routes ~> check {
       status should be(Created)
       val box = responseAs[Box]
       box.sendMethod should be(BoxSendMethod.PUSH)
@@ -55,14 +55,14 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   }
 
   it should "return a bad request message when asking to generate a new base url with a malformed request body" in {
-    PostAsAdmin("/api/boxes/createconnection", RemoteBox("name", "url", Some("secret"), true)) ~> sealRoute(routes) ~> check {
+    PostAsAdmin("/api/boxes/createconnection", RemoteBox("name", "url", "secret")) ~> sealRoute(routes) ~> check {
       status should be(BadRequest)
     }
   }
 
   it should "return a bad request message when adding two boxes with the same name" in {
     addPollBox("hosp")
-    PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData("hosp", true, true)) ~> sealRoute(routes) ~> check {
+    PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData("hosp")) ~> sealRoute(routes) ~> check {
       status should be(BadRequest)
     }
   }
@@ -71,10 +71,10 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   }
 
   it should "return a bad request message when asked to add a remote box with a malformed base url" in {
-    PostAsAdmin("/api/boxes/connect", RemoteBox("uni2", "", Some("secret"), true)) ~> sealRoute(routes) ~> check {
+    PostAsAdmin("/api/boxes/connect", RemoteBox("uni2", "", "secret")) ~> sealRoute(routes) ~> check {
       status should be(BadRequest)
     }
-    PostAsAdmin("/api/boxes/connect", RemoteBox("uni2", "malformed/url", Some("secret"), true)) ~> sealRoute(routes) ~> check {
+    PostAsAdmin("/api/boxes/connect", RemoteBox("uni2", "malformed/url", "secret")) ~> sealRoute(routes) ~> check {
       status should be(BadRequest)
     }
   }

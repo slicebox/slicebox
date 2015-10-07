@@ -40,13 +40,13 @@ object BoxProtocol {
     }
   }
 
-  case class RemoteBox(name: String, baseUrl: String, secret: Option[String], compress: Boolean)
+  case class RemoteBox(name: String, baseUrl: String, secret: String)
 
-  case class RemoteBoxConnectionData(name: String, encrypt: Boolean, compress: Boolean)
+  case class RemoteBoxConnectionData(name: String)
 
   case class Box(id: Long, name: String, token: String, baseUrl: String, sendMethod: BoxSendMethod, online: Boolean) extends Entity
 
-  case class BoxTransferData(id: Long, secret: Option[String], compress: Boolean) extends Entity
+  case class BoxTransferData(id: Long, secret: String) extends Entity
   
   case class OutboxEntry(id: Long, remoteBoxId: Long, remoteBoxName: String, transactionId: Long, sequenceNumber: Long, totalImageCount: Long, imageId: Long, failed: Boolean) extends Entity
 

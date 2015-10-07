@@ -42,8 +42,8 @@ trait JsonFormats extends DefaultJsonProtocol {
   implicit val scpDataFormat = jsonFormat4(ScpData)
   implicit val scuDataFormat = jsonFormat5(ScuData)
 
-  implicit val remoteBoxFormat = jsonFormat4(RemoteBox)
-  implicit val remoteBoxConnectionDataFormat = jsonFormat3(RemoteBoxConnectionData)
+  implicit val remoteBoxFormat = jsonFormat3(RemoteBox)
+  implicit val remoteBoxConnectionDataFormat = jsonFormat1(RemoteBoxConnectionData)
 
   implicit object SourceTypeFormat extends JsonFormat[SourceType] {
     def write(obj: SourceType) = JsString(obj.toString)
@@ -73,7 +73,7 @@ trait JsonFormats extends DefaultJsonProtocol {
   }
 
   implicit val boxFormat = jsonFormat6(Box)
-  implicit val boxTransferDataFormat = jsonFormat3(BoxTransferData)
+  implicit val boxTransferDataFormat = jsonFormat2(BoxTransferData)
 
   implicit val outboxEntryFormat = jsonFormat8(OutboxEntry)
   implicit val failedOutboxEntryFormat = jsonFormat2(FailedOutboxEntry)

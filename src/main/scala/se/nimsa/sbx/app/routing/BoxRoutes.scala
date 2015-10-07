@@ -73,9 +73,9 @@ trait BoxRoutes { this: RestApi =>
           } ~ path("transferdata") {
             get {
               onSuccess(boxService.ask(GetBoxTransferDataByBoxId(boxId)).mapTo[Option[BoxTransferData]]) {
-                case Some(transferData) if transferData.secret.isDefined =>
+                case Some(transferData) =>
                   complete(transferData)
-                case _ =>
+                case None =>
                   complete(NotFound)
               }
             }
