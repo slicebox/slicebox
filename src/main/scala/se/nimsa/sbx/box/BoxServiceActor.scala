@@ -85,11 +85,14 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
 
         msg match {
 
-          case CreateConnection(remoteBoxName) =>
+          case CreateConnection(remoteBoxConnectionData) =>
             val token = UUID.randomUUID().toString()
             val baseUrl = s"$apiBaseURL/box/$token"
-            val box = addBoxToDb(Box(-1, remoteBoxName, token, baseUrl, BoxSendMethod.POLL, false))
-            val transferData = addBoxTransferDataToDb(BoxTransferData(box.id, Some(CryptoUtil.createBase64EncodedKey()), true))
+            val name = remoteBoxConnectionData.name
+            val box = addBoxToDb(Box(-1, name, token, baseUrl, BoxSendMethod.POLL, false))
+            val secret = if (remoteBoxConnectionData.encrypt) Some(CryptoUtil.createBase64EncodedKey()) else None
+            val compress = remoteBoxConnectionData.compress
+            val transferData = addBoxTransferDataToDb(BoxTransferData(box.id, secret, compress))
             sender ! RemoteBoxAdded(box, transferData)
 
           case Connect(remoteBox) =>

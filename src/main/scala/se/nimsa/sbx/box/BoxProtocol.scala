@@ -42,7 +42,7 @@ object BoxProtocol {
 
   case class RemoteBox(name: String, baseUrl: String, secret: Option[String], compress: Boolean)
 
-  case class RemoteBoxName(value: String)
+  case class RemoteBoxConnectionData(name: String, encrypt: Boolean, compress: Boolean)
 
   case class Box(id: Long, name: String, token: String, baseUrl: String, sendMethod: BoxSendMethod, online: Boolean) extends Entity
 
@@ -69,7 +69,7 @@ object BoxProtocol {
   
   sealed trait BoxRequest
 
-  case class CreateConnection(remoteBoxName: String) extends BoxRequest
+  case class CreateConnection(remoteBoxConnectionData: RemoteBoxConnectionData) extends BoxRequest
 
   case class Connect(remoteBox: RemoteBox) extends BoxRequest
 

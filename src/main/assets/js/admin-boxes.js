@@ -86,7 +86,13 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
             return;
         }
 
-        var generateURLPromise = $http.post('/api/boxes/createconnection', {value: $scope.uiState.remoteBoxName});
+        var connectionData = {
+            name: $scope.uiState.remoteBoxName, 
+            encrypt: true, 
+            compress: true
+        };
+        
+        var generateURLPromise = $http.post('/api/boxes/createconnection', connectionData);
 
         generateURLPromise.success(function(box) {
             showBaseURLDialog(box);

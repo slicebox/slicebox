@@ -5,7 +5,6 @@ import org.scalatest.FlatSpec
 import org.scalatest.Matchers
 import se.nimsa.sbx.user.UserProtocol._
 import se.nimsa.sbx.user.UserProtocol.UserRole._
-import se.nimsa.sbx.box.BoxProtocol.RemoteBoxName
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomPropertyValue._
 import se.nimsa.sbx.storage.MetaDataDAO

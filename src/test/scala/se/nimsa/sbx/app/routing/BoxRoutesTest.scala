@@ -35,7 +35,7 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   }
 
   def addPollBox(name: String) =
-    PostAsAdmin("/api/boxes/createconnection", RemoteBoxName(name)) ~> routes ~> check {
+    PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData(name, true, true)) ~> routes ~> check {
       status should be(Created)
       val response = responseAs[Box]
       response
@@ -62,7 +62,7 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
   it should "return a bad request message when adding two boxes with the same name" in {
     addPollBox("hosp")
-    PostAsAdmin("/api/boxes/createconnection", RemoteBoxName("hosp")) ~> sealRoute(routes) ~> check {
+    PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData("hosp", true, true)) ~> sealRoute(routes) ~> check {
       status should be(BadRequest)
     }
   }

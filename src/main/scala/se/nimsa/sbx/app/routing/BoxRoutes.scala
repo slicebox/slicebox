@@ -46,8 +46,8 @@ trait BoxRoutes { this: RestApi =>
       } ~ authorize(authInfo.hasPermission(UserRole.ADMINISTRATOR)) {
         path("createconnection") {
           post {
-            entity(as[RemoteBoxName]) { remoteBoxName =>
-              onSuccess(boxService.ask(CreateConnection(remoteBoxName.value))) {
+            entity(as[RemoteBoxConnectionData]) { remoteBoxConnectionData =>
+              onSuccess(boxService.ask(CreateConnection(remoteBoxConnectionData))) {
                 case RemoteBoxAdded(box, boxTransferData) =>
                   complete((Created, box))
               }

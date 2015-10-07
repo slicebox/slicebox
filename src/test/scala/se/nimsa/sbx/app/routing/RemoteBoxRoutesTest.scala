@@ -37,7 +37,7 @@ class RemoteBoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   }
 
   def addPollBox(name: String) =
-    PostAsAdmin("/api/boxes/createconnection", RemoteBoxName(name)) ~> routes ~> check {
+    PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData(name, true, true)) ~> routes ~> check {
       status should be(Created)
       val response = responseAs[Box]
       response
@@ -56,7 +56,7 @@ class RemoteBoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
     // first, add a box on the poll (university) side
     val uniBox =
-      PostAsAdmin("/api/boxes/createconnection", RemoteBoxName("hosp")) ~> routes ~> check {
+      PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData("hosp", true, true)) ~> routes ~> check {
         status should be(Created)
         responseAs[Box]
       }
@@ -77,7 +77,7 @@ class RemoteBoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
     // first, add a box on the poll (university) side
     val uniBox =
-      PostAsAdmin("/api/boxes/createconnection", RemoteBoxName("hosp")) ~> routes ~> check {
+      PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData("hosp", true, true)) ~> routes ~> check {
         responseAs[Box]
       }
 
@@ -106,7 +106,7 @@ class RemoteBoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   it should "return not found when polling empty outbox" in {
     // first, add a box on the poll (university) side
     val uniBox =
-      PostAsAdmin("/api/boxes/createconnection", RemoteBoxName("hosp2")) ~> routes ~> check {
+      PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData("hosp2", true, true)) ~> routes ~> check {
         status should be(Created)
         responseAs[Box]
       }
