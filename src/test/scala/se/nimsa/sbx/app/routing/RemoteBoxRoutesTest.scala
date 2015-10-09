@@ -23,6 +23,7 @@ import spray.http.MultipartFormData
 import spray.http.StatusCodes._
 import spray.httpx.SprayJsonSupport._
 import spray.httpx.unmarshalling.BasicUnmarshallers.ByteArrayUnmarshaller
+import se.nimsa.sbx.util.CompressionUtil._
 
 class RemoteBoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
@@ -62,13 +63,13 @@ class RemoteBoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       }
 
     // then, push an image from the hospital to the uni box we just set up
-    val bytes = TestUtil.testImageByteArray
+    val compressedBytes = compress(TestUtil.testImageByteArray)
 
     val testTransactionId = abs(UUID.randomUUID().getMostSignificantBits())
     val sequenceNumber = 1L
     val totalImageCount = 1L
 
-    Post(s"/api/box/${uniBox.token}/image?transactionid=$testTransactionId&sequencenumber=$sequenceNumber&totalimagecount=$totalImageCount", HttpData(bytes)) ~> routes ~> check {
+    Post(s"/api/box/${uniBox.token}/image?transactionid=$testTransactionId&sequencenumber=$sequenceNumber&totalimagecount=$totalImageCount", HttpData(compressedBytes)) ~> routes ~> check {
       status should be(NoContent)
     }
   }
@@ -82,13 +83,13 @@ class RemoteBoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       }
 
     // then, push an image from the hospital to the uni box we just set up
-    val bytes = TestUtil.testImageByteArray
+    val compressedBytes = compress(TestUtil.testImageByteArray)
 
     val testTransactionId = abs(UUID.randomUUID().getMostSignificantBits())
     val sequenceNumber = 1L
     val totalImageCount = 1L
 
-    Post(s"/api/box/${uniBox.token}/image?transactionid=$testTransactionId&sequencenumber=$sequenceNumber&totalimagecount=$totalImageCount", HttpData(bytes)) ~> routes ~> check {
+    Post(s"/api/box/${uniBox.token}/image?transactionid=$testTransactionId&sequencenumber=$sequenceNumber&totalimagecount=$totalImageCount", HttpData(compressedBytes)) ~> routes ~> check {
       status should be(NoContent)
     }
 
@@ -166,7 +167,7 @@ class RemoteBoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
       contentType should be(ContentTypes.`application/octet-stream`)
 
-      val dataset = DicomUtil.loadDataset(responseAs[Array[Byte]], true)
+      val dataset = DicomUtil.loadDataset(decompress(responseAs[Array[Byte]]), true)
       dataset should not be (null)
     }
   }
@@ -296,11 +297,11 @@ class RemoteBoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     // get image
     val transactionId = outboxEntry.transactionId
     val sequenceNumber = outboxEntry.sequenceNumber
-    val byteArray = Get(s"/api/box/${uniBox.token}/outbox?transactionid=$transactionId&sequencenumber=$sequenceNumber") ~> routes ~> check {
+    val compressedArray = Get(s"/api/box/${uniBox.token}/outbox?transactionid=$transactionId&sequencenumber=$sequenceNumber") ~> routes ~> check {
       status should be(OK)
       responseAs[Array[Byte]]
     }
-    val dataset = DicomUtil.loadDataset(byteArray, false)
+    val dataset = DicomUtil.loadDataset(decompress(compressedArray), false)
     dataset.getString(PatientName.dicomTag) should be("TEST NAME") // mapped
     dataset.getString(PatientID.dicomTag) should be("TEST ID") // mapped
     dataset.getString(PatientBirthDate.dicomTag) should be("19601010") // mapped

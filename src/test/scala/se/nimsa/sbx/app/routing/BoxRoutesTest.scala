@@ -55,7 +55,7 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   }
 
   it should "return a bad request message when asking to generate a new base url with a malformed request body" in {
-    PostAsAdmin("/api/boxes/createconnection", RemoteBox("name", "url", "secret")) ~> sealRoute(routes) ~> check {
+    PostAsAdmin("/api/boxes/createconnection", BoxTransferData(23, "secret")) ~> sealRoute(routes) ~> check {
       status should be(BadRequest)
     }
   }

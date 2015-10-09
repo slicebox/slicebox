@@ -36,6 +36,7 @@ import akka.util.Timeout
 import se.nimsa.sbx.storage.StorageProtocol.GetDataset
 import se.nimsa.sbx.box.MockupStorageActor.ShowGoodBehavior
 import se.nimsa.sbx.box.MockupStorageActor.ShowBadBehavior
+import se.nimsa.sbx.util.CompressionUtil._
 
 class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
     with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach with JsonFormats {
@@ -141,9 +142,9 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
         case Left(e)       => fail(e)
       }
 
-      val dcmFile = TestUtil.testImageFile
+      val bytes = compress(TestUtil.testImageByteArray)
 
-      mockHttpResponses += HttpResponse(StatusCodes.OK, HttpEntity(ContentTypes.`application/octet-stream`, HttpData(dcmFile)))
+      mockHttpResponses += HttpResponse(StatusCodes.OK, HttpEntity(ContentTypes.`application/octet-stream`, HttpData(bytes)))
       mockHttpResponses += HttpResponse(StatusCodes.OK)
 
       pollBoxActorRef ! PollRemoteBox
@@ -217,9 +218,9 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
         case Left(e) => fail(e)
       }
 
-      val dcmFile = TestUtil.testImageFile
+      val bytes = compress(TestUtil.testImageByteArray)
 
-      mockHttpResponses += HttpResponse(StatusCodes.OK, HttpEntity(ContentTypes.`application/octet-stream`, HttpData(dcmFile)))
+      mockHttpResponses += HttpResponse(StatusCodes.OK, HttpEntity(ContentTypes.`application/octet-stream`, HttpData(bytes)))
       mockHttpResponses += HttpResponse(StatusCodes.NoContent)
 
       // poll box, outbox entry will be found and an attempt to fetch the file will fail
@@ -249,9 +250,9 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
         case Left(e)       => fail(e)
       }
 
-      val dcmFile = TestUtil.invalidImageFile
+      val bytes = compress(Array[Byte](1, 24, 45, 65, 4, 54, 33, 22))
 
-      mockHttpResponses += HttpResponse(StatusCodes.OK, HttpEntity(ContentTypes.`application/octet-stream`, HttpData(dcmFile)))
+      mockHttpResponses += HttpResponse(StatusCodes.OK, HttpEntity(ContentTypes.`application/octet-stream`, HttpData(bytes)))
       mockHttpResponses += HttpResponse(StatusCodes.NoContent)
 
       // poll box, reading the file will fail, failed message will be sent
@@ -274,9 +275,9 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
         case Left(e)       => fail(e)
       }
 
-      val dcmFile = TestUtil.testImageFile
+      val bytes = compress(TestUtil.testImageByteArray)
 
-      mockHttpResponses += HttpResponse(StatusCodes.OK, HttpEntity(ContentTypes.`application/octet-stream`, HttpData(dcmFile)))
+      mockHttpResponses += HttpResponse(StatusCodes.OK, HttpEntity(ContentTypes.`application/octet-stream`, HttpData(bytes)))
       mockHttpResponses += HttpResponse(StatusCodes.NoContent)
 
       // poll box, storing the file will fail, failed message will be sent

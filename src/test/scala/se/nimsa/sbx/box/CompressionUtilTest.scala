@@ -3,6 +3,7 @@ package se.nimsa.sbx.box
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.FlatSpec
 import org.scalatest.Matchers
+import se.nimsa.sbx.util.CompressionUtil
 
 class CompressionUtilTest extends FlatSpec with Matchers with BeforeAndAfterAll {
 

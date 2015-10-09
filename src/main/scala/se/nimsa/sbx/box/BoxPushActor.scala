@@ -45,6 +45,7 @@ import se.nimsa.sbx.log.SbxLog
 import akka.util.Timeout
 import se.nimsa.sbx.storage.StorageProtocol.GetDataset
 import se.nimsa.sbx.app.GeneralProtocol._
+import se.nimsa.sbx.util.CompressionUtil._
 
 class BoxPushActor(box: Box,
                    boxTransferData: BoxTransferData,
@@ -74,8 +75,8 @@ class BoxPushActor(box: Box,
       case Some(dataset) =>
         val futureAnonymizedDataset = anonymizationService.ask(Anonymize(dataset, tagValues.map(_.tagValue))).mapTo[Attributes]
         futureAnonymizedDataset flatMap { anonymizedDataset =>
-          val bytes = toByteArray(anonymizedDataset)
-          sendFilePipeline(Post(s"${box.baseUrl}/image?transactionid=${outboxEntry.transactionId}&sequencenumber=${outboxEntry.sequenceNumber}&totalimagecount=${outboxEntry.totalImageCount}", HttpData(bytes)))
+          val compressedBytes = compress(toByteArray(anonymizedDataset))
+          sendFilePipeline(Post(s"${box.baseUrl}/image?transactionid=${outboxEntry.transactionId}&sequencenumber=${outboxEntry.sequenceNumber}&totalimagecount=${outboxEntry.totalImageCount}", HttpData(compressedBytes)))
         }
       case None =>
         Future.failed(new IllegalArgumentException("No dataset found for image id " + outboxEntry.imageId))

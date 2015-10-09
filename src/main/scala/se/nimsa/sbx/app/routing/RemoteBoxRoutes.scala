@@ -34,6 +34,7 @@ import org.dcm4che3.data.Attributes
 import spray.httpx.SprayJsonSupport._
 import spray.httpx.unmarshalling.BasicUnmarshallers.ByteArrayUnmarshaller
 import se.nimsa.sbx.app.GeneralProtocol._
+import se.nimsa.sbx.util.CompressionUtil._
 
 trait RemoteBoxRoutes { this: RestApi =>
 
@@ -48,8 +49,9 @@ trait RemoteBoxRoutes { this: RestApi =>
             path("image") {
               parameters('transactionid.as[Long], 'sequencenumber.as[Long], 'totalimagecount.as[Long]) { (transactionId, sequenceNumber, totalImageCount) =>
                 post {
-                  entity(as[Array[Byte]]) { imageData =>
-                    val dataset = loadDataset(imageData, true)
+                  entity(as[Array[Byte]]) { compressedBytes =>
+                    val bytes = decompress(compressedBytes)
+                    val dataset = loadDataset(bytes, true)
                     onSuccess(anonymizationService.ask(ReverseAnonymization(dataset)).mapTo[Attributes]) { reversedDataset =>
                       val source = Source(SourceType.BOX, box.name, box.id)
                       onSuccess(storageService.ask(AddDataset(reversedDataset, source))) {
@@ -102,8 +104,8 @@ trait RemoteBoxRoutes { this: RestApi =>
 
                                   onSuccess(anonymizationService.ask(Anonymize(dataset, transactionTagValues.map(_.tagValue)))) {
                                     case anonymizedDataset: Attributes =>
-                                      val bytes = toByteArray(anonymizedDataset)
-                                      complete(HttpEntity(ContentTypes.`application/octet-stream`, HttpData(bytes)))
+                                      val compressedBytes = compress(toByteArray(anonymizedDataset))
+                                      complete(HttpEntity(ContentTypes.`application/octet-stream`, HttpData(compressedBytes)))
                                   }
                                 case None =>
 

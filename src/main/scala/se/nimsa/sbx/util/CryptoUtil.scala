@@ -1,10 +1,7 @@
-package se.nimsa.sbx.box
+package se.nimsa.sbx.util
 
 import javax.crypto.KeyGenerator
 import javax.crypto.Cipher
-import java.io.ByteArrayOutputStream
-import javax.crypto.CipherOutputStream
-import java.security.Key
 import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
 import java.util.Base64

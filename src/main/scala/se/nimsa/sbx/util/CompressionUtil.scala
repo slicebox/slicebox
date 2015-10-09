@@ -1,4 +1,4 @@
-package se.nimsa.sbx.box
+package se.nimsa.sbx.util
 
 import java.util.zip.Deflater
 import java.io.ByteArrayOutputStream
