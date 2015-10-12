@@ -91,22 +91,16 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
             val baseUrl = s"$apiBaseURL/box/$token"
             val name = remoteBoxConnectionData.name
             val box = addBoxToDb(Box(-1, name, token, baseUrl, BoxSendMethod.POLL, false))
-            val secret = CryptoUtil.createBase64EncodedKey
-            val transferData = addBoxTransferDataToDb(BoxTransferData(box.id, secret))
-            sender ! RemoteBoxAdded(box, transferData)
+            sender ! RemoteBoxAdded(box)
 
           case Connect(remoteBox) =>
             val box = pushBoxByBaseUrl(remoteBox.baseUrl) getOrElse {
               val token = baseUrlToToken(remoteBox.baseUrl)
               addBoxToDb(Box(-1, remoteBox.name, token, remoteBox.baseUrl, BoxSendMethod.PUSH, false))
             }
-            val transferData = boxTransferDataByBoxId(box.id) getOrElse {
-              val secret = remoteBox.secret
-              addBoxTransferDataToDb(BoxTransferData(box.id, secret))
-            }
-            maybeStartPushActor(box, transferData)
-            maybeStartPollActor(box, transferData)
-            sender ! RemoteBoxAdded(box, transferData)
+            maybeStartPushActor(box)
+            maybeStartPollActor(box)
+            sender ! RemoteBoxAdded(box)
 
           case RemoveBox(boxId) =>
             boxById(boxId).foreach(box => {
@@ -124,9 +118,6 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
 
           case GetBoxById(boxId) =>
             sender ! boxById(boxId)
-
-          case GetBoxTransferDataByBoxId(boxId) =>
-            sender ! boxTransferDataByBoxId(boxId)
 
           case GetBoxByToken(token) =>
             sender ! pollBoxByToken(token)
@@ -251,28 +242,25 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
     }
 
   def setupBoxes(): Unit =
-    getBoxesFromDb foreach (box => {
-      boxTransferDataByBoxId(box.id) foreach (transferData =>
+    getBoxesFromDb foreach (box =>
       box.sendMethod match {
-        case BoxSendMethod.PUSH => {
-          maybeStartPushActor(box, transferData)
-          maybeStartPollActor(box, transferData)
-        }
+        case BoxSendMethod.PUSH =>
+          maybeStartPushActor(box)
+          maybeStartPollActor(box)
         case BoxSendMethod.POLL =>
           pollBoxesLastPollTimestamp(box.id) = new Date(0)
       })
-    })
 
-  def maybeStartPushActor(box: Box, boxTransferData: BoxTransferData): Unit = {
+  def maybeStartPushActor(box: Box): Unit = {
     val actorName = pushActorName(box)
     if (context.child(actorName).isEmpty)
-      context.actorOf(BoxPushActor.props(box, boxTransferData, dbProps, timeout), actorName)
+      context.actorOf(BoxPushActor.props(box, dbProps, timeout), actorName)
   }
 
-  def maybeStartPollActor(box: Box, boxTransferData: BoxTransferData): Unit = {
+  def maybeStartPollActor(box: Box): Unit = {
     val actorName = pollActorName(box)
     if (context.child(actorName).isEmpty)
-      context.actorOf(BoxPollActor.props(box, boxTransferData, dbProps, timeout), actorName)
+      context.actorOf(BoxPollActor.props(box, dbProps, timeout), actorName)
   }
 
   def pushActorName(box: Box): String = BoxSendMethod.PUSH + "-" + box.id.toString
@@ -286,22 +274,9 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
       boxDao.insertBox(box)
     }
 
-  def addBoxTransferDataToDb(boxTransferData: BoxTransferData): BoxTransferData =
-    db.withSession { implicit session =>
-      if (boxDao.boxTransferDataByBoxId(boxTransferData.id).isDefined)
-        throw new IllegalArgumentException(s"Box tranfer data for box with id ${boxTransferData.id} already exists")
-      boxDao.insertBoxTransferData(boxTransferData)
-      boxTransferData
-    }
-
   def boxById(boxId: Long): Option[Box] =
     db.withSession { implicit session =>
       boxDao.boxById(boxId)
-    }
-
-  def boxTransferDataByBoxId(boxId: Long): Option[BoxTransferData] =
-    db.withSession { implicit session =>
-      boxDao.boxTransferDataByBoxId(boxId)
     }
 
   def pushBoxByBaseUrl(baseUrl: String): Option[Box] =

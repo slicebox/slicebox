@@ -42,7 +42,7 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
 
   def addPushBox(name: String) =
-    PostAsAdmin("/api/boxes/connect", RemoteBox(name, "http://some.url/api/box/" + UUID.randomUUID(), "secret")) ~> routes ~> check {
+    PostAsAdmin("/api/boxes/connect", RemoteBox(name, "http://some.url/api/box/" + UUID.randomUUID())) ~> routes ~> check {
       status should be(Created)
       val box = responseAs[Box]
       box.sendMethod should be(BoxSendMethod.PUSH)
@@ -55,7 +55,8 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   }
 
   it should "return a bad request message when asking to generate a new base url with a malformed request body" in {
-    PostAsAdmin("/api/boxes/createconnection", BoxTransferData(23, "secret")) ~> sealRoute(routes) ~> check {
+    val malformedEntity = Seq.empty[Box]
+    PostAsAdmin("/api/boxes/createconnection", malformedEntity) ~> sealRoute(routes) ~> check {
       status should be(BadRequest)
     }
   }
@@ -71,10 +72,10 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   }
 
   it should "return a bad request message when asked to add a remote box with a malformed base url" in {
-    PostAsAdmin("/api/boxes/connect", RemoteBox("uni2", "", "secret")) ~> sealRoute(routes) ~> check {
+    PostAsAdmin("/api/boxes/connect", RemoteBox("uni2", "")) ~> sealRoute(routes) ~> check {
       status should be(BadRequest)
     }
-    PostAsAdmin("/api/boxes/connect", RemoteBox("uni2", "malformed/url", "secret")) ~> sealRoute(routes) ~> check {
+    PostAsAdmin("/api/boxes/connect", RemoteBox("uni2", "malformed/url")) ~> sealRoute(routes) ~> check {
       status should be(BadRequest)
     }
   }

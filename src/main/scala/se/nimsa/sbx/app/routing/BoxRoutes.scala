@@ -48,7 +48,7 @@ trait BoxRoutes { this: RestApi =>
           post {
             entity(as[RemoteBoxConnectionData]) { remoteBoxConnectionData =>
               onSuccess(boxService.ask(CreateConnection(remoteBoxConnectionData))) {
-                case RemoteBoxAdded(box, boxTransferData) =>
+                case RemoteBoxAdded(box) =>
                   complete((Created, box))
               }
             }
@@ -57,7 +57,7 @@ trait BoxRoutes { this: RestApi =>
           post {
             entity(as[RemoteBox]) { remoteBox =>
               onSuccess(boxService.ask(Connect(remoteBox))) {
-                case RemoteBoxAdded(box, boxTransferData) =>
+                case RemoteBoxAdded(box) =>
                   complete((Created, box))
               }
             }
@@ -68,15 +68,6 @@ trait BoxRoutes { this: RestApi =>
               onSuccess(boxService.ask(RemoveBox(boxId))) {
                 case BoxRemoved(boxId) =>
                   complete(NoContent)
-              }
-            }
-          } ~ path("transferdata") {
-            get {
-              onSuccess(boxService.ask(GetBoxTransferDataByBoxId(boxId)).mapTo[Option[BoxTransferData]]) {
-                case Some(transferData) =>
-                  complete(transferData)
-                case None =>
-                  complete(NotFound)
               }
             }
           }

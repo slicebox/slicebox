@@ -8,8 +8,8 @@ import spray.io._
 trait SslConfiguration {
 
   implicit def sslContext: SSLContext = {
-    val keyStoreResource = "/ssl-keystore.jks"
-    val password = ""
+    val keyStoreResource = "/keystore.jks"
+    val password = "slicebox"
 
     val keyStore = KeyStore.getInstance("jks")
     keyStore.load(getClass.getResourceAsStream(keyStoreResource), password.toCharArray)
@@ -24,7 +24,6 @@ trait SslConfiguration {
 
   implicit def sslEngineProvider: ServerSSLEngineProvider = {
     ServerSSLEngineProvider { engine =>
-      engine.setEnabledCipherSuites(Array("TLS_RSA_WITH_AES_256_CBC_SHA"))
       engine.setEnabledProtocols(Array("SSLv3", "TLSv1"))
       engine
     }

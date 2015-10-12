@@ -18,11 +18,6 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
             {
                 name: 'Delete',
                 action: openDeleteEntitiesModalFunction('/api/boxes/', 'box(es)')
-            },
-            {
-                name: 'Show Secret',
-                action: showSecretModal,
-                requiredSelectionCount: 1
             }
         ];
 
@@ -54,17 +49,6 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
             $scope.callbacks.boxesTable.reloadPage();
         });
     };
-
-    function showSecretModal(boxes) {
-        if (boxes.length === 1) {
-            var box = boxes[0];
-            $http.get('/api/boxes/' + box.id + '/transferdata').success(function (transferData) {
-                openMessageModal("Box Secret", "The secret for box <i>" + box.name + "</i> is <strong>" + transferData.secret + "</strong>");
-            }).error(function (reason) {
-                openMessageModal("Box Secret", "Box <i>" + box.name + "</i> does not encrypt transfers. No secret available.");                
-            });
-        }
-    }
 
 })
 
@@ -114,8 +98,7 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
         var connectPromise = $http.post('/api/boxes/connect',
             {
                 name: $scope.uiState.remoteBoxName,
-                baseUrl: $scope.uiState.connectionURL,
-                secret: $scope.uiState.secret
+                baseUrl: $scope.uiState.connectionURL
             });
 
         connectPromise.success(function(box) {
@@ -135,28 +118,24 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
 
     // Private functions
     function showBaseURLDialog(box) {
-        var transferDataPromise = $http.get("/api/boxes/" + box.id + '/transferdata');
-
         $mdDialog.show({
                 templateUrl: '/assets/partials/baseURLModalContent.html',
                 controller: 'BaseURLModalCtrl',
                 locals: {
-                    box: box,
-                    transferData: transferDataPromise
+                    box: box
                 }
-            });
+        });
     }
 })
 
-.controller('BaseURLModalCtrl', function($scope, $mdDialog, box, transferData) {
+.controller('BaseURLModalCtrl', function($scope, $mdDialog, box) {
     // Initialization
     $scope.name = box.name;
     $scope.baseURL = box.baseUrl;
-    $scope.secret = transferData.data.secret;
 
     // Scope functions
     $scope.mailBody = function() {
-        var bodyText = 'Box connection URL:\n\n' + $scope.baseURL + '\n\nSecret:\n\n' + $scope.secret;
+        var bodyText = 'Box connection URL:\n\n' + $scope.baseURL;
 
         return encodeURIComponent(bodyText);
     };

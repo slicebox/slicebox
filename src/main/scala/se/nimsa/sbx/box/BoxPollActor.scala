@@ -52,7 +52,6 @@ import scala.util.Failure
 import se.nimsa.sbx.util.CompressionUtil._
 
 class BoxPollActor(box: Box,
-                   boxTransferData: BoxTransferData,
                    dbProps: DbProps,
                    implicit val timeout: Timeout,
                    pollInterval: FiniteDuration = 5.seconds,
@@ -237,8 +236,7 @@ class BoxPollActor(box: Box,
 
 object BoxPollActor {
   def props(box: Box,
-            boxTransferData: BoxTransferData,
             dbProps: DbProps,
-            timeout: Timeout): Props = Props(new BoxPollActor(box, boxTransferData, dbProps, timeout))
+            timeout: Timeout): Props = Props(new BoxPollActor(box, dbProps, timeout))
 
 }

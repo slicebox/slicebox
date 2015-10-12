@@ -59,10 +59,6 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
     db.withSession { implicit session =>
       boxDao.insertBox(Box(-1, "some remote box", "abc", remoteBoxBaseUrl, BoxSendMethod.PUSH, false))
     }
-  val transferData = BoxTransferData(remoteBox.id, "secret")
-  db.withSession { implicit session =>
-    boxDao.insertBoxTransferData(transferData)
-  }
 
   val notFoundResponse = HttpResponse(NotFound)
   var responseCounter = -1
@@ -71,7 +67,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
   val storageService = system.actorOf(Props[MockupStorageActor], name = "StorageService")
   val anonymizationService = system.actorOf(AnonymizationServiceActor.props(dbProps), name = "AnonymizationService")
-  val pollBoxActorRef = system.actorOf(Props(new BoxPollActor(remoteBox, transferData, dbProps, Timeout(30.seconds), 1.hour, 1000.hours, "../StorageService", "../AnonymizationService") {
+  val pollBoxActorRef = system.actorOf(Props(new BoxPollActor(remoteBox, dbProps, Timeout(30.seconds), 1.hour, 1000.hours, "../StorageService", "../AnonymizationService") {
 
     override def sendRequestToRemoteBoxPipeline = {
       (req: HttpRequest) =>

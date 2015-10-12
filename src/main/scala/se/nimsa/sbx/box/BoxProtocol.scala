@@ -40,14 +40,12 @@ object BoxProtocol {
     }
   }
 
-  case class RemoteBox(name: String, baseUrl: String, secret: String)
+  case class RemoteBox(name: String, baseUrl: String)
 
   case class RemoteBoxConnectionData(name: String)
 
   case class Box(id: Long, name: String, token: String, baseUrl: String, sendMethod: BoxSendMethod, online: Boolean) extends Entity
 
-  case class BoxTransferData(id: Long, secret: String) extends Entity
-  
   case class OutboxEntry(id: Long, remoteBoxId: Long, remoteBoxName: String, transactionId: Long, sequenceNumber: Long, totalImageCount: Long, imageId: Long, failed: Boolean) extends Entity
 
   case class FailedOutboxEntry(outboxEntry: OutboxEntry, message: String)
@@ -78,8 +76,6 @@ object BoxProtocol {
   case object GetBoxes extends BoxRequest
 
   case class GetBoxById(boxId: Long) extends BoxRequest
-  
-  case class GetBoxTransferDataByBoxId(boxId: Long) extends BoxRequest
   
   case class GetBoxByToken(token: String) extends BoxRequest
 
@@ -122,7 +118,7 @@ object BoxProtocol {
 
   case class SentEntryRemoved(sentEntryId: Long)
 
-  case class RemoteBoxAdded(box: Box, boxTransferData: BoxTransferData)
+  case class RemoteBoxAdded(box: Box)
   
   case class BoxRemoved(boxId: Long)
 
