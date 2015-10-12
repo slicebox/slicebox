@@ -77,7 +77,7 @@ There should now be a slicebox task in the list of active tasks. Restart the com
 
 We provide `.deb` and `.rpm` packages, both available on [Bintray](https://bintray.com/slicebox/slicebox/installers/_latestVersion). These installers set up slicebox to run as a background process, or service. Install `.deb` packages using the command
 ```
-sudo dpkg -i \<package name\>.deb
+sudo dpkg -i <package name>.deb
 ```
 Uninstall slicebox and remove all files including configuration with the command
 ```
