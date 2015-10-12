@@ -21,8 +21,11 @@ Slicebox provides a rich set of features for importing, exporting, managing and 
 * Upload and download of image data (DICOM datasets)
 * Viewing of images
 * Listing of DICOM attributes
+* Tagging series with arbitrary tags and filtering search results on one or more tags
+* Mapping sets of key-value pairs of DICOM attributes to user defined *series types* for easy integration with applications
 * Managing connections to other slicebox instances
-* Sending images to and receiving images from other slicebox instances
+* Sending images to and receiving images from other slicebox instances, with automatic anonymization of datasets
+* Listing and searching anonymization information to map anonymized patient information to real patient data
 * Setup of DICOM Service Class Providers (SCP). An SCP is a server accepting transfers of DICOM images. This functionality makes it possible to send images from a PACS (image archive) to Slicebox.
 * Setup of DICOM Service Class Users (SCU). This is the opposite of an SCP. An SCU client makes it possible to export DICOM encapsulated images and results to PACS.
 * Setup directory watches. DICOM files dropped into a directory watched by slicebox will import the image.
@@ -70,13 +73,22 @@ Slicebox does not (yet) provide an installer for Windows which configures sliceb
 
 There should now be a slicebox task in the list of active tasks. Restart the computer, or start it directly from the list of scheduled tasks
 
-### Linux - installation and configuration
+### Linux (Debian) - installation and configuration
 
-We provide `.deb` and `.rpm` packages, both available on [Bintray](https://bintray.com/slicebox/slicebox/installers/_latestVersion). These installers set up slicebox to run as a background process, or service. The following file structure is used:
+We provide `.deb` and `.rpm` packages, both available on [Bintray](https://bintray.com/slicebox/slicebox/installers/_latestVersion). These installers set up slicebox to run as a background process, or service. Install `.deb` packages using the command
+```
+sudo dpkg -i \<package name\>.deb
+```
+Uninstall slicebox and remove all files including configuration with the command
+```
+sudo apt-get purge slicebox
+```
+
+The following file structure is used:
 
 Folder                       | User     | Description
 ------                       | ----     | -----------
-`/usr/share/slicebox`        | root     | Installation directory. The database, logs, configureations and stored DICOM files reside here.
+`/usr/share/slicebox`        | root     | Installation directory
 `/etc/default/slicebox.conf` | root     | Config file for environment variables and other settings applied before the application starts
 `/etc/slicebox`              | root     | Sym-link to slicebox configuration folder
 `/var/log/slicebox`          | slicebox | Location of slicebox log files
