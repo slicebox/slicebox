@@ -16,36 +16,31 @@
 
 package se.nimsa.sbx.box
 
+import scala.concurrent.Future
+import scala.concurrent.duration.DurationInt
+import scala.concurrent.duration.FiniteDuration
+
+import org.dcm4che3.data.Attributes
+
+import BoxProtocol._
 import akka.actor.Actor
 import akka.actor.Props
+import akka.actor.ReceiveTimeout
 import akka.event.Logging
 import akka.event.LoggingReceive
 import akka.pattern.ask
-import BoxProtocol._
-import scala.concurrent.duration.DurationInt
-import scala.concurrent.duration.FiniteDuration
-import spray.client.pipelining._
-import org.dcm4che3.data.Attributes
-import spray.http.HttpData
-import java.nio.file.Path
-import spray.http.HttpRequest
-import spray.http.StatusCodes._
-import scala.concurrent.Future
-import spray.http.HttpResponse
-import se.nimsa.sbx.anonymization.AnonymizationProtocol._
-import se.nimsa.sbx.app.DbProps
-import se.nimsa.sbx.storage.MetaDataDAO
-import se.nimsa.sbx.storage.PropertiesDAO
-import spray.http.StatusCode
-import se.nimsa.sbx.dicom.DicomUtil._
-import java.io.ByteArrayOutputStream
-import java.util.Date
-import akka.actor.ReceiveTimeout
-import se.nimsa.sbx.log.SbxLog
 import akka.util.Timeout
-import se.nimsa.sbx.storage.StorageProtocol.GetDataset
+import se.nimsa.sbx.anonymization.AnonymizationProtocol.Anonymize
+import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.app.GeneralProtocol._
-import se.nimsa.sbx.util.CompressionUtil._
+import se.nimsa.sbx.dicom.DicomUtil.toByteArray
+import se.nimsa.sbx.log.SbxLog
+import se.nimsa.sbx.storage.StorageProtocol.GetDataset
+import se.nimsa.sbx.util.CompressionUtil.compress
+import spray.client.pipelining.Post
+import spray.client.pipelining.sendReceive
+import spray.http.HttpData
+import spray.http.HttpResponse
 
 class BoxPushActor(box: Box,
                    dbProps: DbProps,

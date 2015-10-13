@@ -90,25 +90,25 @@ During the installation a user and group named slicebox is created, as indicated
 * Change the following settings in the config file `/etc/slicebox/slicebox.conf`:
    * `slicebox.dicom-files.path = "/var/slicebox/dicom-files"`
    * `slicebox.database.path = "/var/slicebox/slicebox"`
-* Make other applicable changes to the configuration. You probably wish to override `http.host`, `http.port`, `slicebox.superuser.user` and `slicebox.superuser.password`.
+* Make other applicable changes to the configuration. You probably wish to override `slicebox.host`, `slicebox.port`, `slicebox.superuser.user` and `slicebox.superuser.password`.
 * Restart slicebox using `sudo restart slicebox`
 * The service should now be available at your specified host name and port number. Check the log to make sure the service is running as intended.
 
 
 ### Installation notes
 
-* Hospitals often restrict internet access to a limited set of ports, usually ports 80 and 443 (for SSL). Slicebox instances that should communicate with hospital instances may be required to run on port 80 for this reason. This is difficult to accompish on Linux servers as users other than root are not permitted to open ports below 1024. One possibility is to run slicebox on a high port number such as 5000, and set up a reverse proxy using e.g. Apache or Nginx which redirects incoming traffic to your site example.com:80 to slicebox running on localhost:5000. When running slicebox behind a reverse proxy the service is running on a local hostname (typically localhost:5000) while it is accessed via a public hostname. To separate these, the `host` and `port` configurations under the `http` group specifies the local hostname, while adding `host` and `port` under the `slicebox` group specifies the public hostname. The resulting example configuration is
+* Hospitals often restrict internet access to a limited set of ports, usually ports 80 and 443 (for SSL). Slicebox instances that should communicate with hospital instances may be required to run on port 80 for this reason. This is difficult to accompish on Linux servers as users other than root are not permitted to open ports below 1024. One possibility is to run slicebox on a high port number such as 5000, and set up a reverse proxy using e.g. Apache or Nginx which redirects incoming traffic to your site example.com:80 to slicebox running on localhost:5000. When running slicebox behind a reverse proxy the service is running on a local hostname (typically localhost:5000) while it is accessed via a public hostname. The public hostname and port are specified under the configuration path `slicebox.public` in `slicebox.conf`. The resulting example configuration is
 
 ```
-http {
-	host = "localhost" // local hostname
-	port = 5000        // local port
-}
-
 slicebox {
 
-	host = "slicebox.se" // public hostname
-	port = 80            // public port
+	host = "localhost" // local hostname
+	port = 5000        // local port
+
+	public {
+		host = "slicebox.se" // public hostname
+		port = 80            // public port
+	}
 
 	dicom-files {
 		path = "/var/slicebox"

@@ -30,8 +30,8 @@ import com.typesafe.scalalogging.LazyLogging
 
 object Main extends App with LazyLogging with SslConfiguration {
   val config = ConfigFactory.load()
-  val host = config.getString("http.host")
-  val port = config.getInt("http.port")
+  val host = config.getString("slicebox.host")
+  val port = config.getInt("slicebox.port")
 
   implicit val system = ActorSystem("slicebox")
 

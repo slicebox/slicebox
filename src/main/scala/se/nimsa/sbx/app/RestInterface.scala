@@ -103,29 +103,33 @@ trait RestApi extends HttpService with SliceboxRoutes with JsonFormats {
     new ScuDAO(dbProps.driver).create
     new BoxDAO(dbProps.driver).create
   }
-  
+
   val storage = createStorageDirectory()
 
-  val host = if (sliceboxConfig.hasPath("host"))
+  val host = if (sliceboxConfig.hasPath("public.host"))
+    sliceboxConfig.getString("public.host")
+  else
     sliceboxConfig.getString("host")
-  else
-    appConfig.getString("http.host")
 
-  val port = if (sliceboxConfig.hasPath("port"))
-    sliceboxConfig.getInt("port")
+  val port = if (sliceboxConfig.hasPath("public.port"))
+    sliceboxConfig.getInt("public.port")
   else
-    appConfig.getInt("http.port")
+    sliceboxConfig.getInt("port")
+
+  val useSsl = sliceboxConfig.getString("ssl-encryption") == "on"
 
   val clientTimeout = appConfig.getDuration("spray.can.client.request-timeout", MILLISECONDS)
   val serverTimeout = appConfig.getDuration("spray.can.server.request-timeout", MILLISECONDS)
 
   implicit val timeout = Timeout(math.max(clientTimeout, serverTimeout) + 10, MILLISECONDS)
 
-  val apiBaseURL = if (port == 80)
-    s"http://$host/api"
-  else
-    s"http://$host:$port/api"
-
+  val apiBaseURL = {
+    val ssl = if (useSsl) "s" else ""
+    if (port == 80)
+      s"http$ssl://$host/api"
+    s"http$ssl://$host:$port/api"
+  }
+  
   val superUser = sliceboxConfig.getString("superuser.user")
   val superPassword = sliceboxConfig.getString("superuser.password")
 
