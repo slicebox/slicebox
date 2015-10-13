@@ -119,18 +119,24 @@ trait RestApi extends HttpService with SliceboxRoutes with JsonFormats {
   else
     sliceboxConfig.getInt("port")
 
-  val useSsl = sliceboxConfig.getString("ssl.ssl-encryption") == "on"
-
   val clientTimeout = appConfig.getDuration("spray.can.client.request-timeout", MILLISECONDS)
   val serverTimeout = appConfig.getDuration("spray.can.server.request-timeout", MILLISECONDS)
 
   implicit val timeout = Timeout(math.max(clientTimeout, serverTimeout) + 10, MILLISECONDS)
 
   val apiBaseURL = {
+
+    val useSsl = if (sliceboxConfig.hasPath("public.ssl.ssl-encryption"))
+      sliceboxConfig.getString("public.ssl.ssl-encryption") == "on"
+    else
+      sliceboxConfig.getString("ssl.ssl-encryption") == "on"
+
     val ssl = if (useSsl) "s" else ""
+
     if (port == 80)
       s"http$ssl://$host/api"
-    s"http$ssl://$host:$port/api"
+    else
+      s"http$ssl://$host:$port/api"
   }
 
   val superUser = sliceboxConfig.getString("superuser.user")
