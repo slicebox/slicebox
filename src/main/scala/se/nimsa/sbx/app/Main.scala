@@ -19,14 +19,16 @@ package se.nimsa.sbx.app
 import scala.concurrent.duration.DurationInt
 import scala.util.Failure
 import scala.util.Success
+
+import com.typesafe.config.ConfigFactory
+import com.typesafe.scalalogging.LazyLogging
+
 import akka.actor.ActorSystem
 import akka.actor.Props
 import akka.io.IO
 import akka.pattern.ask
 import akka.util.Timeout
 import spray.can.Http
-import com.typesafe.config.ConfigFactory
-import com.typesafe.scalalogging.LazyLogging
 
 object Main extends App with LazyLogging with SslConfiguration {
   val config = ConfigFactory.load()

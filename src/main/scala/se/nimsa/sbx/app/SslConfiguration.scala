@@ -1,20 +1,27 @@
 package se.nimsa.sbx.app
 
-import java.security.{ SecureRandom, KeyStore }
-import javax.net.ssl.{ KeyManagerFactory, SSLContext, TrustManagerFactory }
-import spray.io._
+import java.security.KeyStore
+import java.security.SecureRandom
+import javax.net.ssl.KeyManagerFactory
+import javax.net.ssl.SSLContext
+import javax.net.ssl.TrustManagerFactory
+import spray.io.ServerSSLEngineProvider
+import com.typesafe.config.ConfigFactory
+import java.nio.file.Paths
+import java.nio.file.Files
 
-// for SSL support (if enabled in application.conf)
+// for SSL support (if enabled in config)
 trait SslConfiguration {
 
   implicit def sslContext: SSLContext = {
-    val keyStoreResource = "/keystore.jks"
-    val password = "slicebox"
+    val config = ConfigFactory.load()
+    val keystorePath = config.getString("slicebox.ssl.keystore.path")
+    val keystorePassword = config.getString("slicebox.ssl.keystore.password")
 
     val keyStore = KeyStore.getInstance("jks")
-    keyStore.load(getClass.getResourceAsStream(keyStoreResource), password.toCharArray)
+    keyStore.load(Files.newInputStream(Paths.get(keystorePath)), keystorePassword.toCharArray)
     val keyManagerFactory = KeyManagerFactory.getInstance("SunX509")
-    keyManagerFactory.init(keyStore, password.toCharArray)
+    keyManagerFactory.init(keyStore, keystorePassword.toCharArray)
     val trustManagerFactory = TrustManagerFactory.getInstance("SunX509")
     trustManagerFactory.init(keyStore)
     val context = SSLContext.getInstance("TLS")
