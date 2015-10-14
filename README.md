@@ -97,7 +97,7 @@ During the installation a user and group named slicebox is created, as indicated
 
 ### Installation notes
 
-* Hospitals often restrict internet access to a limited set of ports, usually ports 80 and 443 (for SSL). Slicebox instances that should communicate with hospital instances may be required to run on port 80 for this reason. This is difficult to accompish on Linux servers as users other than root are not permitted to open ports below 1024. One possibility is to run slicebox on a high port number such as 5000, and set up a reverse proxy using e.g. Apache or Nginx which redirects incoming traffic to your site example.com:80 to slicebox running on localhost:5000. When running slicebox behind a reverse proxy the service is running on a local hostname (typically localhost:5000) while it is accessed via a public hostname. The public hostname and port are specified under the configuration path `slicebox.public` in `slicebox.conf`. The resulting example configuration is
+* Hospitals often restrict internet access to a limited set of ports, usually ports 80 and 443 (for SSL). Slicebox instances that should communicate with hospital instances may therefore be required to run on either of these ports. This is difficult to accompish on Linux servers as users other than root are not permitted to open ports below 1024. One possibility is to run slicebox on a high port number such as 5000, and set up a reverse proxy using e.g. Apache or Nginx which redirects incoming traffic to your site example.com:80 to slicebox running on localhost:5000. When running slicebox behind a reverse proxy the service is running on a local hostname (typically localhost:5000) while it is accessed via a public hostname. The public hostname and port are specified under the configuration path `slicebox.public` in `slicebox.conf`. The resulting example configuration is
 
 ```
 slicebox {
@@ -105,9 +105,19 @@ slicebox {
 	host = "localhost" // local hostname
 	port = 5000        // local port
 
+	ssl {
+		ssl-encryption = off
+
+		keystore {
+			path = "slicebox.jks"
+			password = "slicebox"
+		}
+	}
+
 	public {
 		host = "slicebox.se" // public hostname
 		port = 80            // public port
+		with-ssl = false
 	}
 
 	dicom-files {
@@ -122,10 +132,50 @@ slicebox {
 		user = "admin"
 		password = "secret"
 	}
-
 }
 ```
 
+### Encryption using SSL/TLS
+
+Slicebox supports encryption of all traffic to and from the server using standard SSL (SSL is also known as TLS, think URLs with `https://` rather than `http://`). When running and accessing slicebox on a small internal network with trusted users it may be considered ok not to use SSL; see the section below on security and what sensitive information is communicated over the network. When setting up slicebox on a public server which is to be accessed over the Internet, using SSL is strongly encouraged. SSL can be enabled in slicebox using the setting `slicebox.ssl.ssl-encryption = on`. If slicebox is placed behind a reverse proxy, SSL can be enabled there instead (see the documentation of your particular reverse proxy). In that case, set `slicebox.ssl.ssl-encryption = off` and `slicebox.public.with-ssl = true`.
+
+In order for SSL to function, you need an SSL certificate. There is a range of trusted companies (certificate authorities) providing time-limited such certificates for a fee (see e.g. [www.ssls.com](http://www.ssls.com)). Slicebox loads SSL certificates from a Java Keystore (a `.jks` file) specified by the settings in `slicebox.ssl.keystore`. Here is a short description of how to create a keystore file from scratch.
+
+Keystores can be created and manipulated using the `keytool` command-line utility which is shipped with every Java installation (both JREs and JDKs). It is located in the `$JAVA_HOME/bin` folder. In the following, we assume that this folder is on your path such that the `keytool` command can be used from any location. We also assume that the domain running slicebox is `slicebox.se`. Change this to your domain.
+
+1. `keytool -genkey -alias slicebox -keyalg RSA -keysize 2048 -keystore slicebox.se.jks` Creates a new keystore containing your secret private key. You will be required to answer a series of questions. The first question is "What is your first and last name?". This is not a question for YOUR name, but rather the name of the domain to register. In this case the answer is "slicebox.se". Answer the other questions as carefully as possible.
+2. `keytool -certreq -alias slicebox -keyalg RSA -file slicebox.se.csr -keystore slicebox.se.jks` This will create a *certificate signing request* in the file `slicebox.se.csr`. This is a plaintext file containing a chunk of information about your site. When purchasing an SSL certificate, the certificate authority will ask for this information.
+3. Complete the purchase (which includes a series of verification steps) and download the certificate bundle. The bundle contains the new certificate for your site and usually intermediate certificates and a root certificate. Install the certificates from the root down to your new certificate:
+   1. `keytool -import -trustcacerts -alias root -file <name of root certificate>.crt -keystore slicebox.se.jks` This step may not be necessary as Java comes preinstalled with a range of root certificates contained in the keystore `$JAVA_HOME/lib/security/cacerts`. `keytool` with alert if this root certificate is already present and let you skip this step.
+   2. `keytool -import -trustcacerts -alias intermed -file <name of intermediate certificate>.crt -keystore slicebox.se.jks` Installs the intermediate certificate(s).
+   3. `keytool -import -trustcacerts -alias slicebox -file slicebox.se.crt -keystore slicebox.se.jks` Installs the certificate for your site.
+
+Put the keystore file in e.g. the `conf` folder of the slicebox installation directory and edit the `ssl` section of `slicebox.conf` to
+```
+ssl {
+	ssl-encryption = on
+	keystore {
+		path = "conf/slicebox.jks"
+		password = "<the password you entered for the keystore>"
+	}
+}
+```
+
+It is also possible to use a self-signed certificate, which is what you have after completing step 1 above and skipping all other steps. Another option is to create a local root certificate authority for your internal network, and issue SSL certificated based on that. In either case, all slicebox clients must have this self-signed or local root certificate installed to allow accessing slicebox over `https`. By "clients", we refer to browsers accessing the slicebox user interface, or slicebox itself when it communicates with other slicebox instances.
+
+* Browsers allow certificates to be installed. All browsers accessing the slicebox UI must install the certificate.
+* When slicebox acts as a client, it uses the list of root certificates in `$JAVA_HOME/lib/security/cacerts`. The certificate of the remote box (or the local root certificate) must be added to this keystore using `keytool` using the command `keytool -import -alias <domain> -keystore cacerts -file <name of certificate>.crt`.
+
+A Word on Security
+------------------
+
+Slicebox stores and communicates sensitive data. In particular, hospital installations will manage datasets containing patient information and when requesting and adding datasets, this information will be transported over the network.
+* Make sure the DICOM directory `slicebox.dicom-files.path` where datasets are stored is not accessible to third party users
+* Make sure the database `slicebox.database.path` is not accessible to third party users
+* Make sure the configuration file `slicebox.conf` is not accessible to third party users
+* Use SSL encryption. If not, datasets, usernames and passwords and other sensitive information can be intercepted without you noticing. If using SSL, be sure to protect the keystore.
+* When sending and receiving images from a slicebox instance on the Internet, a third party may intercept transmissions. Always use SSL when communicating over the Internet.
+* Usernames and passwords are sent in cleartext over the network when logging in; again, use SSL. Passwords are stored on the server as salted hashcodes. In other words, slicebox does not store cleartext passwords.
 
 Integration with Applications
 -----------------------------

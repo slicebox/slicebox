@@ -109,15 +109,18 @@ trait RestApi extends HttpService with SliceboxRoutes with JsonFormats {
 
   val storage = createStorageDirectory()
 
-  val host = if (sliceboxConfig.hasPath("public.host"))
-    sliceboxConfig.getString("public.host")
-  else
-    sliceboxConfig.getString("host")
+  val host = sliceboxConfig.getString("public.host")
+  val publicHost = sliceboxConfig.getString("public.host")
 
-  val port = if (sliceboxConfig.hasPath("public.port"))
-    sliceboxConfig.getInt("public.port")
-  else
-    sliceboxConfig.getInt("port")
+  val port = sliceboxConfig.getInt("port")
+  val publicPort = sliceboxConfig.getInt("public.port")
+
+  val withReverseProxy = (host != publicHost) || (port != publicPort)
+  val withSsl =
+    if (withReverseProxy)
+      sliceboxConfig.getBoolean("public.with-ssl")
+    else
+      sliceboxConfig.getString("ssl.ssl-encryption") == "on"
 
   val clientTimeout = appConfig.getDuration("spray.can.client.request-timeout", MILLISECONDS)
   val serverTimeout = appConfig.getDuration("spray.can.server.request-timeout", MILLISECONDS)
@@ -126,14 +129,9 @@ trait RestApi extends HttpService with SliceboxRoutes with JsonFormats {
 
   val apiBaseURL = {
 
-    val useSsl = if (sliceboxConfig.hasPath("public.ssl.ssl-encryption"))
-      sliceboxConfig.getString("public.ssl.ssl-encryption") == "on"
-    else
-      sliceboxConfig.getString("ssl.ssl-encryption") == "on"
+    val ssl = if (withSsl) "s" else ""
 
-    val ssl = if (useSsl) "s" else ""
-
-    if (port == 80)
+    if (!withSsl && (publicPort == 80) || withSsl && (publicPort == 443))
       s"http$ssl://$host/api"
     else
       s"http$ssl://$host:$port/api"
