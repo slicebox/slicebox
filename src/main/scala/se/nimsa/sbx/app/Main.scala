@@ -19,16 +19,15 @@ package se.nimsa.sbx.app
 import scala.concurrent.duration.DurationInt
 import scala.util.Failure
 import scala.util.Success
-
 import com.typesafe.config.ConfigFactory
 import com.typesafe.scalalogging.LazyLogging
-
 import akka.actor.ActorSystem
 import akka.actor.Props
 import akka.io.IO
 import akka.pattern.ask
 import akka.util.Timeout
 import spray.can.Http
+import se.nimsa.sbx.log.SbxLog
 
 object Main extends App with LazyLogging with SslConfiguration {
   val config = ConfigFactory.load()
@@ -42,7 +41,8 @@ object Main extends App with LazyLogging with SslConfiguration {
   val api = system.actorOf(Props(new RestInterface()), "httpInterface")
   IO(Http).ask(Http.Bind(listener = api, interface = host, port = port)) onComplete {
     case Success(message) =>
+      SbxLog.info("System", s"Slicebox started on $host:$port")
     case Failure(e) =>
-      logger.error(s"Could not bind to $host:$port, ${e.getMessage}")    
+      logger.error(s"Could not bind to $host:$port, ${e.getMessage}")
   }
 }

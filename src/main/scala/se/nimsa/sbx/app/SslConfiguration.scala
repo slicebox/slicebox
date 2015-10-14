@@ -14,19 +14,23 @@ import java.nio.file.Files
 trait SslConfiguration {
 
   implicit def sslContext: SSLContext = {
-    val config = ConfigFactory.load()
-    val keystorePath = config.getString("slicebox.ssl.keystore.path")
-    val keystorePassword = config.getString("slicebox.ssl.keystore.password")
+    try {
+      val config = ConfigFactory.load()
+      val keystorePath = config.getString("slicebox.ssl.keystore.path")
+      val keystorePassword = config.getString("slicebox.ssl.keystore.password")
 
-    val keyStore = KeyStore.getInstance("jks")
-    keyStore.load(Files.newInputStream(Paths.get(keystorePath)), keystorePassword.toCharArray)
-    val keyManagerFactory = KeyManagerFactory.getInstance("SunX509")
-    keyManagerFactory.init(keyStore, keystorePassword.toCharArray)
-    val trustManagerFactory = TrustManagerFactory.getInstance("SunX509")
-    trustManagerFactory.init(keyStore)
-    val context = SSLContext.getInstance("TLS")
-    context.init(keyManagerFactory.getKeyManagers, trustManagerFactory.getTrustManagers, new SecureRandom)
-    context
+      val keyStore = KeyStore.getInstance("jks")
+      keyStore.load(Files.newInputStream(Paths.get(keystorePath)), keystorePassword.toCharArray)
+      val keyManagerFactory = KeyManagerFactory.getInstance("SunX509")
+      keyManagerFactory.init(keyStore, keystorePassword.toCharArray)
+      val trustManagerFactory = TrustManagerFactory.getInstance("SunX509")
+      trustManagerFactory.init(keyStore)
+      val context = SSLContext.getInstance("TLS")
+      context.init(keyManagerFactory.getKeyManagers, trustManagerFactory.getTrustManagers, new SecureRandom)
+      context
+    } catch {
+      case e: Exception => SSLContext.getDefault
+    }
   }
 
   implicit def sslEngineProvider: ServerSSLEngineProvider = {

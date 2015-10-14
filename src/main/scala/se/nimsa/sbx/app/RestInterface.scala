@@ -73,8 +73,6 @@ class RestInterface extends Actor with RestApi {
 
   def receive = runRoute(routes)
   
-  SbxLog.info("System", s"Slicebox started on $host:$port, public base URL is $apiBaseURL.")(context.system)
-
 }
 
 trait RestApi extends HttpService with SliceboxRoutes with JsonFormats {

@@ -184,7 +184,7 @@ A Word on Security
 Slicebox stores and communicates sensitive data. In particular, hospital installations will manage datasets containing patient information and when requesting and adding datasets, this information will be transported over the network.
 * Make sure the DICOM directory `slicebox.dicom-files.path` where datasets are stored is not accessible to third party users
 * Make sure the database `slicebox.database.path` is not accessible to third party users
-* Make sure the configuration file `slicebox.conf` is not accessible to third party users
+* Make sure the configuration file `slicebox.conf` is not accessible to third party users. The superuser and keystore passwords are specified in cleartext in this file.
 * Use SSL encryption. If not, datasets, usernames and passwords and other sensitive information can be intercepted without you noticing. If using SSL, be sure to protect the keystore.
 * When sending and receiving images from a slicebox instance on the Internet, a third party may intercept transmissions. Always use SSL when communicating over the Internet.
 * Usernames and passwords are sent in cleartext over the network when logging in; again, use SSL. Passwords are stored on the server as salted hashcodes. In other words, slicebox does not store cleartext passwords.
