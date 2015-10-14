@@ -107,7 +107,7 @@ During the installation a user and group named slicebox is created, as indicated
 * The service should now be available at your specified host name and port number. Check the log to make sure the service is running as intended.
 
 
-### Installation notes
+### Running slicebox behind a reverse proxy
 
 * Hospitals often restrict internet access to a limited set of ports, usually ports 80 and 443 (for SSL). Slicebox instances that should communicate with hospital instances may therefore be required to run on either of these ports. This is difficult to accompish on Linux servers as users other than root are not permitted to open ports below 1024. One possibility is to run slicebox on a high port number such as 5000, and set up a reverse proxy using e.g. Apache or Nginx which redirects incoming traffic to your site example.com:80 to slicebox running on localhost:5000. When running slicebox behind a reverse proxy the service is running on a local hostname (typically localhost:5000) while it is accessed via a public hostname. The public hostname and port are specified under the configuration path `slicebox.public` in `slicebox.conf`. The resulting example configuration is
 

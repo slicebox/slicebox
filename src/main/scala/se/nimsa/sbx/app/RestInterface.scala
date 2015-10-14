@@ -20,14 +20,11 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.concurrent.TimeUnit.MILLISECONDS
-
 import scala.slick.driver.H2Driver
 import scala.slick.jdbc.JdbcBackend.Database
-
 import com.mchange.v2.c3p0.ComboPooledDataSource
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
-
 import akka.actor.Actor
 import akka.util.Timeout
 import se.nimsa.sbx.anonymization.AnonymizationServiceActor
@@ -53,6 +50,7 @@ import se.nimsa.sbx.user.Authenticator
 import se.nimsa.sbx.user.UserDAO
 import se.nimsa.sbx.user.UserServiceActor
 import spray.routing.HttpService
+import se.nimsa.sbx.log.SbxLog
 
 class RestInterface extends Actor with RestApi {
 
@@ -74,6 +72,8 @@ class RestInterface extends Actor with RestApi {
   }
 
   def receive = runRoute(routes)
+  
+  SbxLog.info("System", s"Slicebox started on $host:$port, public base URL is $apiBaseURL.")(context.system)
 
 }
 
@@ -109,7 +109,7 @@ trait RestApi extends HttpService with SliceboxRoutes with JsonFormats {
 
   val storage = createStorageDirectory()
 
-  val host = sliceboxConfig.getString("public.host")
+  val host = sliceboxConfig.getString("host")
   val publicHost = sliceboxConfig.getString("public.host")
 
   val port = sliceboxConfig.getInt("port")
@@ -132,9 +132,9 @@ trait RestApi extends HttpService with SliceboxRoutes with JsonFormats {
     val ssl = if (withSsl) "s" else ""
 
     if (!withSsl && (publicPort == 80) || withSsl && (publicPort == 443))
-      s"http$ssl://$host/api"
+      s"http$ssl://$publicHost/api"
     else
-      s"http$ssl://$host:$port/api"
+      s"http$ssl://$publicHost:$publicPort/api"
   }
 
   val superUser = sliceboxConfig.getString("superuser.user")
