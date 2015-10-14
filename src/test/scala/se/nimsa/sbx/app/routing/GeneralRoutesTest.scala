@@ -5,7 +5,7 @@ import org.scalatest.FlatSpec
 import org.scalatest.Matchers
 import se.nimsa.sbx.user.UserProtocol._
 import se.nimsa.sbx.user.UserProtocol.UserRole._
-import se.nimsa.sbx.box.BoxProtocol.RemoteBoxName
+import se.nimsa.sbx.box.BoxProtocol.RemoteBoxConnectionData
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomPropertyValue._
 import se.nimsa.sbx.storage.MetaDataDAO
@@ -30,7 +30,7 @@ class GeneralRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     PostAsAdmin("/api/users", ClearTextUser("name", ADMINISTRATOR, "password")) ~> routes ~> check {
       status should be(Created)
     }
-    PostAsAdmin("/api/boxes/createconnection", RemoteBoxName("remote box")) ~> routes ~> check {
+    PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData("remote box")) ~> routes ~> check {
       status should be(Created)
     }
     PostAsAdmin("/api/scps", ScpData(-1, "my scp", "AETITLE", 3000)) ~> routes ~> check {

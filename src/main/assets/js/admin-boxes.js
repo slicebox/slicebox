@@ -11,7 +11,7 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
   });
 })
 
-.controller('AdminBoxesCtrl', function($scope, $http, $interval, $mdDialog, sbxToast, openDeleteEntitiesModalFunction) {
+.controller('AdminBoxesCtrl', function($scope, $http, $interval, $mdDialog, sbxToast, openDeleteEntitiesModalFunction, openMessageModal) {
     // Initialization
     $scope.objectActions =
         [
@@ -49,9 +49,16 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
             $scope.callbacks.boxesTable.reloadPage();
         });
     };
+
 })
 
 .controller('AddBoxModalCtrl', function($scope, $mdDialog, $http, sbxToast) {
+
+    $scope.uiState = {
+        addChoice: '',
+        remoteBoxName: "",
+        connectionURL: ""
+    };
 
     // Scope functions
     $scope.radioButtonChanged = function() {
@@ -63,15 +70,19 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
             return;
         }
 
-        var generateURLPromise = $http.post('/api/boxes/createconnection', {value: $scope.uiState.remoteBoxName});
+        var connectionData = {
+            name: $scope.uiState.remoteBoxName
+        };
 
-        generateURLPromise.success(function(data) {
-            showBaseURLDialog(data.baseUrl);
+        var generateURLPromise = $http.post('/api/boxes/createconnection', connectionData);
+
+        generateURLPromise.success(function(box) {
+            showBaseURLDialog(box);
             $mdDialog.hide();
         });
 
-        generateURLPromise.error(function(data) {
-            sbxToast.showErrorMessage(data);                
+        generateURLPromise.error(function(reason) {
+            sbxToast.showErrorMessage(reason);                
         });
 
         return generateURLPromise;
@@ -90,12 +101,12 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
                 baseUrl: $scope.uiState.connectionURL
             });
 
-        connectPromise.success(function(data) {
+        connectPromise.success(function(box) {
             $mdDialog.hide();
         });
 
-        connectPromise.error(function(data) {
-            sbxToast.showErrorMessage(data);
+        connectPromise.error(function(reason) {
+            sbxToast.showErrorMessage(reason);
         });
 
         return connectPromise;
@@ -106,24 +117,25 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
     };
 
     // Private functions
-    function showBaseURLDialog(baseURL) {
+    function showBaseURLDialog(box) {
         $mdDialog.show({
                 templateUrl: '/assets/partials/baseURLModalContent.html',
                 controller: 'BaseURLModalCtrl',
                 locals: {
-                    baseURL: baseURL
+                    box: box
                 }
-            });
+        });
     }
 })
 
-.controller('BaseURLModalCtrl', function($scope, $mdDialog, baseURL) {
+.controller('BaseURLModalCtrl', function($scope, $mdDialog, box) {
     // Initialization
-    $scope.baseURL = baseURL;
+    $scope.name = box.name;
+    $scope.baseURL = box.baseUrl;
 
     // Scope functions
     $scope.mailBody = function() {
-        var bodyText = 'Box connection URL:\n\n' + baseURL;
+        var bodyText = 'Box connection URL:\n\n' + $scope.baseURL;
 
         return encodeURIComponent(bodyText);
     };

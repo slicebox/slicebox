@@ -36,9 +36,10 @@ import akka.util.Timeout
 import se.nimsa.sbx.storage.StorageProtocol.GetDataset
 import se.nimsa.sbx.box.MockupStorageActor.ShowGoodBehavior
 import se.nimsa.sbx.box.MockupStorageActor.ShowBadBehavior
+import se.nimsa.sbx.util.CompressionUtil._
 
 class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
-  with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach with JsonFormats {
+    with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach with JsonFormats {
 
   def this() = this(ActorSystem("BoxPollActorTestSystem"))
 
@@ -54,10 +55,10 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
   }
 
   val remoteBoxBaseUrl = "https://someurl.com"
-  var remoteBox: Box = null
-  db.withSession { implicit session =>
-    remoteBox = boxDao.insertBox(Box(-1, "some remote box", "abc", remoteBoxBaseUrl, BoxSendMethod.PUSH, false))
-  }
+  val remoteBox =
+    db.withSession { implicit session =>
+      boxDao.insertBox(Box(-1, "some remote box", "abc", remoteBoxBaseUrl, BoxSendMethod.PUSH, false))
+    }
 
   val notFoundResponse = HttpResponse(NotFound)
   var responseCounter = -1
@@ -83,7 +84,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
   override def beforeEach() {
     storageService ! ShowGoodBehavior(3)
-    
+
     capturedRequests.clear()
 
     mockHttpResponses.clear()
@@ -137,9 +138,9 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
         case Left(e)       => fail(e)
       }
 
-      val dcmFile = TestUtil.testImageFile
+      val bytes = compress(TestUtil.testImageByteArray)
 
-      mockHttpResponses += HttpResponse(StatusCodes.OK, HttpEntity(ContentTypes.`application/octet-stream`, HttpData(dcmFile)))
+      mockHttpResponses += HttpResponse(StatusCodes.OK, HttpEntity(ContentTypes.`application/octet-stream`, HttpData(bytes)))
       mockHttpResponses += HttpResponse(StatusCodes.OK)
 
       pollBoxActorRef ! PollRemoteBox
@@ -204,18 +205,18 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       val outboxEntry = OutboxEntry(123, 987, "some box", transactionId, 1, 2, 2, false)
 
       marshal(outboxEntry) match {
-        case Right(entity) => 
+        case Right(entity) =>
           mockHttpResponses += HttpResponse(StatusCodes.OK, entity)
           mockHttpResponses += HttpResponse(StatusCodes.BadGateway)
           mockHttpResponses += HttpResponse(StatusCodes.OK, entity)
           mockHttpResponses += HttpResponse(StatusCodes.BadGateway)
           mockHttpResponses += HttpResponse(StatusCodes.OK, entity)
-        case Left(e)       => fail(e)
+        case Left(e) => fail(e)
       }
-      
-      val dcmFile = TestUtil.testImageFile
 
-      mockHttpResponses += HttpResponse(StatusCodes.OK, HttpEntity(ContentTypes.`application/octet-stream`, HttpData(dcmFile)))
+      val bytes = compress(TestUtil.testImageByteArray)
+
+      mockHttpResponses += HttpResponse(StatusCodes.OK, HttpEntity(ContentTypes.`application/octet-stream`, HttpData(bytes)))
       mockHttpResponses += HttpResponse(StatusCodes.NoContent)
 
       // poll box, outbox entry will be found and an attempt to fetch the file will fail
@@ -225,17 +226,17 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       // poll box again, fetching the file will fail again
       pollBoxActorRef ! PollRemoteBox
       expectNoMsg
-      
+
       // poll box again, fetching the file will succeed, done message will be sent
       pollBoxActorRef ! PollRemoteBox
       expectNoMsg
-      
+
       // Check that requests are sent as expected
       capturedRequests.size should be(8)
       capturedRequests(6).uri.toString() should be(s"$remoteBoxBaseUrl/outbox/done")
       capturedRequests(7).uri.toString() should be(s"$remoteBoxBaseUrl/outbox/poll")
     }
-    
+
     "should tell the box it is pulling images from that a transaction has failed due to receiving an invalid DICOM file" in {
       val transactionId = 999
       val outboxEntry = OutboxEntry(123, 987, "some box", transactionId, 1, 2, 2, false)
@@ -244,16 +245,16 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
         case Right(entity) => mockHttpResponses += HttpResponse(StatusCodes.OK, entity)
         case Left(e)       => fail(e)
       }
-      
-      val dcmFile = TestUtil.invalidImageFile
 
-      mockHttpResponses += HttpResponse(StatusCodes.OK, HttpEntity(ContentTypes.`application/octet-stream`, HttpData(dcmFile)))
+      val bytes = compress(Array[Byte](1, 24, 45, 65, 4, 54, 33, 22))
+
+      mockHttpResponses += HttpResponse(StatusCodes.OK, HttpEntity(ContentTypes.`application/octet-stream`, HttpData(bytes)))
       mockHttpResponses += HttpResponse(StatusCodes.NoContent)
 
       // poll box, reading the file will fail, failed message will be sent
       pollBoxActorRef ! PollRemoteBox
       expectNoMsg
-      
+
       // Check that requests are sent as expected
       capturedRequests.size should be(3)
       capturedRequests(2).uri.toString() should be(s"$remoteBoxBaseUrl/outbox/failed")
@@ -261,7 +262,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
     "should tell the box it is pulling images from that a transaction has failed when an image cannot be stored" in {
       storageService ! ShowBadBehavior(new IllegalArgumentException("Pretending I cannot store dataset."))
-      
+
       val transactionId = 999
       val outboxEntry = OutboxEntry(123, 987, "some box", transactionId, 1, 2, 2, false)
 
@@ -269,16 +270,16 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
         case Right(entity) => mockHttpResponses += HttpResponse(StatusCodes.OK, entity)
         case Left(e)       => fail(e)
       }
-      
-      val dcmFile = TestUtil.testImageFile
 
-      mockHttpResponses += HttpResponse(StatusCodes.OK, HttpEntity(ContentTypes.`application/octet-stream`, HttpData(dcmFile)))
+      val bytes = compress(TestUtil.testImageByteArray)
+
+      mockHttpResponses += HttpResponse(StatusCodes.OK, HttpEntity(ContentTypes.`application/octet-stream`, HttpData(bytes)))
       mockHttpResponses += HttpResponse(StatusCodes.NoContent)
 
       // poll box, storing the file will fail, failed message will be sent
       pollBoxActorRef ! PollRemoteBox
       expectNoMsg
-      
+
       // Check that requests are sent as expected
       capturedRequests.size should be(3)
       capturedRequests(2).uri.toString() should be(s"$remoteBoxBaseUrl/outbox/failed")

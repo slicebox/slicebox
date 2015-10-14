@@ -20,11 +20,14 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.concurrent.TimeUnit.MILLISECONDS
+
 import scala.slick.driver.H2Driver
 import scala.slick.jdbc.JdbcBackend.Database
+
 import com.mchange.v2.c3p0.ComboPooledDataSource
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
+
 import akka.actor.Actor
 import akka.util.Timeout
 import se.nimsa.sbx.anonymization.AnonymizationServiceActor
@@ -33,6 +36,8 @@ import se.nimsa.sbx.box.BoxDAO
 import se.nimsa.sbx.box.BoxServiceActor
 import se.nimsa.sbx.directory.DirectoryWatchDAO
 import se.nimsa.sbx.directory.DirectoryWatchServiceActor
+import se.nimsa.sbx.forwarding.ForwardingDAO
+import se.nimsa.sbx.forwarding.ForwardingServiceActor
 import se.nimsa.sbx.log.LogDAO
 import se.nimsa.sbx.log.LogServiceActor
 import se.nimsa.sbx.scp.ScpDAO
@@ -41,15 +46,13 @@ import se.nimsa.sbx.scu.ScuDAO
 import se.nimsa.sbx.scu.ScuServiceActor
 import se.nimsa.sbx.seriestype.SeriesTypeDAO
 import se.nimsa.sbx.seriestype.SeriesTypeServiceActor
-import se.nimsa.sbx.forwarding.ForwardingDAO
-import se.nimsa.sbx.forwarding.ForwardingServiceActor
 import se.nimsa.sbx.storage.MetaDataDAO
 import se.nimsa.sbx.storage.PropertiesDAO
 import se.nimsa.sbx.storage.StorageServiceActor
-import spray.routing.HttpService
-import se.nimsa.sbx.user.UserDAO
 import se.nimsa.sbx.user.Authenticator
+import se.nimsa.sbx.user.UserDAO
 import se.nimsa.sbx.user.UserServiceActor
+import spray.routing.HttpService
 
 class RestInterface extends Actor with RestApi {
 
@@ -103,28 +106,36 @@ trait RestApi extends HttpService with SliceboxRoutes with JsonFormats {
     new ScuDAO(dbProps.driver).create
     new BoxDAO(dbProps.driver).create
   }
-  
+
   val storage = createStorageDirectory()
 
-  val host = if (sliceboxConfig.hasPath("host"))
-    sliceboxConfig.getString("host")
-  else
-    appConfig.getString("http.host")
+  val host = sliceboxConfig.getString("public.host")
+  val publicHost = sliceboxConfig.getString("public.host")
 
-  val port = if (sliceboxConfig.hasPath("port"))
-    sliceboxConfig.getInt("port")
-  else
-    appConfig.getInt("http.port")
+  val port = sliceboxConfig.getInt("port")
+  val publicPort = sliceboxConfig.getInt("public.port")
+
+  val withReverseProxy = (host != publicHost) || (port != publicPort)
+  val withSsl =
+    if (withReverseProxy)
+      sliceboxConfig.getBoolean("public.with-ssl")
+    else
+      sliceboxConfig.getString("ssl.ssl-encryption") == "on"
 
   val clientTimeout = appConfig.getDuration("spray.can.client.request-timeout", MILLISECONDS)
   val serverTimeout = appConfig.getDuration("spray.can.server.request-timeout", MILLISECONDS)
 
   implicit val timeout = Timeout(math.max(clientTimeout, serverTimeout) + 10, MILLISECONDS)
 
-  val apiBaseURL = if (port == 80)
-    s"http://$host/api"
-  else
-    s"http://$host:$port/api"
+  val apiBaseURL = {
+
+    val ssl = if (withSsl) "s" else ""
+
+    if (!withSsl && (publicPort == 80) || withSsl && (publicPort == 443))
+      s"http$ssl://$host/api"
+    else
+      s"http$ssl://$host:$port/api"
+  }
 
   val superUser = sliceboxConfig.getString("superuser.user")
   val superPassword = sliceboxConfig.getString("superuser.password")

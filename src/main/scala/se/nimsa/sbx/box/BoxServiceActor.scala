@@ -45,6 +45,7 @@ import akka.actor.Stash
 import org.dcm4che3.data.Attributes
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.TagValue
 import se.nimsa.sbx.app.GeneralProtocol._
+import se.nimsa.sbx.util.CryptoUtil
 
 class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout: Timeout) extends Actor with Stash with ExceptionCatching {
 
@@ -85,17 +86,17 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
 
         msg match {
 
-          case CreateConnection(remoteBoxName) =>
+          case CreateConnection(remoteBoxConnectionData) =>
             val token = UUID.randomUUID().toString()
             val baseUrl = s"$apiBaseURL/box/$token"
-            val box = addBoxToDb(Box(-1, remoteBoxName, token, baseUrl, BoxSendMethod.POLL, false))
+            val name = remoteBoxConnectionData.name
+            val box = addBoxToDb(Box(-1, name, token, baseUrl, BoxSendMethod.POLL, false))
             sender ! RemoteBoxAdded(box)
 
           case Connect(remoteBox) =>
             val box = pushBoxByBaseUrl(remoteBox.baseUrl) getOrElse {
               val token = baseUrlToToken(remoteBox.baseUrl)
-              val box = Box(-1, remoteBox.name, token, remoteBox.baseUrl, BoxSendMethod.PUSH, false)
-              addBoxToDb(box)
+              addBoxToDb(Box(-1, remoteBox.name, token, remoteBox.baseUrl, BoxSendMethod.PUSH, false))
             }
             maybeStartPushActor(box)
             maybeStartPollActor(box)
@@ -241,14 +242,14 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
     }
 
   def setupBoxes(): Unit =
-    getBoxesFromDb foreach (box => box.sendMethod match {
-      case BoxSendMethod.PUSH => {
-        maybeStartPushActor(box)
-        maybeStartPollActor(box)
-      }
-      case BoxSendMethod.POLL =>
-        pollBoxesLastPollTimestamp(box.id) = new Date(0)
-    })
+    getBoxesFromDb foreach (box =>
+      box.sendMethod match {
+        case BoxSendMethod.PUSH =>
+          maybeStartPushActor(box)
+          maybeStartPollActor(box)
+        case BoxSendMethod.POLL =>
+          pollBoxesLastPollTimestamp(box.id) = new Date(0)
+      })
 
   def maybeStartPushActor(box: Box): Unit = {
     val actorName = pushActorName(box)

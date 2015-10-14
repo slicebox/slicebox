@@ -2,14 +2,6 @@
 	<md-dialog-content>
     	<md-subheader class="md-sticky-no-effect">Add Box</md-subheader>
 
-		<md-card ng-if="uiState.errorMessage">
-			<md-toolbar class="md-warn" layout="row" layout-align="start center">
-				<div layout-padding layout-fill>
-					{{uiState.errorMessage}}
-				</div>
-			</md-toolbar>
-		</md-card>
-
 		<md-radio-group ng-model="uiState.addChoice" ng-change="radioButtonChanged()">
 			<md-radio-button value="generateURL">This is a publicly accessible server and I would like to create a new Slicebox URL to send to a collaborator.</md-radio-button>
 			<md-radio-button value="connect">I have received a Slicebox URL from a collaborator and would like to connect.</md-radio-button>
@@ -20,7 +12,6 @@
 				<label>Remote Slicebox name</label>
                 <input type="text"
 					ng-model="uiState.remoteBoxName"
-					ng-disabled="uiState.addInProgress"
 					name="remoteBoxName"
 					required></input>
 
@@ -38,7 +29,6 @@
 				<label>Connection URL</label>
                 <input type="text"
 					ng-model="uiState.connectionURL"
-					ng-disabled="uiState.addInProgress"
 					name="connectionURL"
 					required></input>
 
@@ -58,7 +48,7 @@
 			<div ng-if="uiState.addChoice == 'generateURL'">
 				<sbx-button button-class="md-raised md-primary"
 					button-type="submit"
-					button-title="Generate Connection URL"
+					button-title="Create Connection"
 					action="generateURLButtonClicked()"></sbx-button>
 			</div>
 		</form>

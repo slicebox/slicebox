@@ -15,3 +15,9 @@ project/activator*
 /*.sublime-project
 /*.sublime-workspace
 /logs
+/*.jks
+/*.der
+/*.cer
+/*.csr
+/*.crt
+

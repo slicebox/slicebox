@@ -46,8 +46,8 @@ trait BoxRoutes { this: RestApi =>
       } ~ authorize(authInfo.hasPermission(UserRole.ADMINISTRATOR)) {
         path("createconnection") {
           post {
-            entity(as[RemoteBoxName]) { remoteBoxName =>
-              onSuccess(boxService.ask(CreateConnection(remoteBoxName.value))) {
+            entity(as[RemoteBoxConnectionData]) { remoteBoxConnectionData =>
+              onSuccess(boxService.ask(CreateConnection(remoteBoxConnectionData))) {
                 case RemoteBoxAdded(box) =>
                   complete((Created, box))
               }
@@ -62,11 +62,13 @@ trait BoxRoutes { this: RestApi =>
               }
             }
           }
-        } ~ path(LongNumber) { boxId =>
-          delete {
-            onSuccess(boxService.ask(RemoveBox(boxId))) {
-              case BoxRemoved(boxId) =>
-                complete(NoContent)
+        } ~ pathPrefix(LongNumber) { boxId =>
+          pathEndOrSingleSlash {
+            delete {
+              onSuccess(boxService.ask(RemoveBox(boxId))) {
+                case BoxRemoved(boxId) =>
+                  complete(NoContent)
+              }
             }
           }
         }
@@ -75,7 +77,7 @@ trait BoxRoutes { this: RestApi =>
           entity(as[Seq[ImageTagValues]]) { imageTagValuesSeq =>
             onSuccess(boxService.ask(SendToRemoteBox(remoteBoxId, imageTagValuesSeq))) {
               case ImagesAddedToOutbox(remoteBoxId, imageIds) => complete(NoContent)
-              case BoxNotFound                       => complete(NotFound)
+              case BoxNotFound                                => complete(NotFound)
             }
           }
         }
@@ -128,7 +130,7 @@ trait BoxRoutes { this: RestApi =>
         }
       }
     }
-  
+
   def sentRoutes: Route =
     pathPrefix("sent") {
       pathEndOrSingleSlash {

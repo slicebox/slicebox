@@ -35,7 +35,7 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   }
 
   def addPollBox(name: String) =
-    PostAsAdmin("/api/boxes/createconnection", RemoteBoxName(name)) ~> routes ~> check {
+    PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData(name)) ~> routes ~> check {
       status should be(Created)
       val response = responseAs[Box]
       response
@@ -55,14 +55,15 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   }
 
   it should "return a bad request message when asking to generate a new base url with a malformed request body" in {
-    PostAsAdmin("/api/boxes/createconnection", RemoteBox("name", "url")) ~> sealRoute(routes) ~> check {
+    val malformedEntity = Seq.empty[Box]
+    PostAsAdmin("/api/boxes/createconnection", malformedEntity) ~> sealRoute(routes) ~> check {
       status should be(BadRequest)
     }
   }
 
   it should "return a bad request message when adding two boxes with the same name" in {
     addPollBox("hosp")
-    PostAsAdmin("/api/boxes/createconnection", RemoteBoxName("hosp")) ~> sealRoute(routes) ~> check {
+    PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData("hosp")) ~> sealRoute(routes) ~> check {
       status should be(BadRequest)
     }
   }

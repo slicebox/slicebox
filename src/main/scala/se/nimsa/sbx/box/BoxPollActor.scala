@@ -49,6 +49,7 @@ import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.storage.StorageProtocol._
 import scala.util.Success
 import scala.util.Failure
+import se.nimsa.sbx.util.CompressionUtil._
 
 class BoxPollActor(box: Box,
                    dbProps: DbProps,
@@ -182,7 +183,8 @@ class BoxPollActor(box: Box,
 
         case Success(response) =>
           if (response.status.intValue < 300) {
-            val dataset = loadDataset(response.entity.data.toByteArray, true)
+            val bytes = decompress(response.entity.data.toByteArray)
+            val dataset = loadDataset(bytes, true)
 
             if (dataset == null)
               self ! HandlingFetchedFileFailed(remoteOutboxEntry, new IllegalArgumentException("Dataset could not be read"))
