@@ -26,7 +26,6 @@ import akka.util.Timeout
 import akka.pattern.ask
 import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.util.ExceptionCatching
-import se.nimsa.sbx.util.SequentialPipeToSupport
 import se.nimsa.sbx.dicom.DicomUtil
 import se.nimsa.sbx.dicom.DicomHierarchy.Series
 import se.nimsa.sbx.storage.StorageProtocol.GetAllSeries
