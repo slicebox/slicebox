@@ -41,8 +41,8 @@ object Main extends App with LazyLogging with SslConfiguration {
   val api = system.actorOf(Props(new RestInterface()), "httpInterface")
   IO(Http).ask(Http.Bind(listener = api, interface = host, port = port)) onComplete {
     case Success(message) =>
-      SbxLog.info("System", s"Slicebox started on $host:$port")
+      SbxLog.info("System", s"Slicebox bound to $host:$port")
     case Failure(e) =>
-      logger.error(s"Could not bind to $host:$port, ${e.getMessage}")
+      SbxLog.error("System", s"Could not bind to $host:$port, ${e.getMessage}")
   }
 }

@@ -13,7 +13,7 @@ import java.nio.file.Files
 // for SSL support (if enabled in config)
 trait SslConfiguration {
 
-  implicit def sslContext: SSLContext = {
+  implicit def sslContext: SSLContext =
     try {
       val config = ConfigFactory.load()
       val keystorePath = config.getString("slicebox.ssl.keystore.path")
@@ -31,12 +31,11 @@ trait SslConfiguration {
     } catch {
       case e: Exception => SSLContext.getDefault
     }
-  }
 
-  implicit def sslEngineProvider: ServerSSLEngineProvider = {
+  implicit def sslEngineProvider: ServerSSLEngineProvider =
     ServerSSLEngineProvider { engine =>
       engine.setEnabledProtocols(Array("SSLv3", "TLSv1"))
       engine
     }
-  }
+
 }  
