@@ -52,16 +52,19 @@ trait RemoteBoxRoutes { this: RestApi =>
                   entity(as[Array[Byte]]) { compressedBytes =>
                     val bytes = decompress(compressedBytes)
                     val dataset = loadDataset(bytes, true)
-                    onSuccess(anonymizationService.ask(ReverseAnonymization(dataset)).mapTo[Attributes]) { reversedDataset =>
-                      val source = Source(SourceType.BOX, box.name, box.id)
-                      onSuccess(storageService.ask(AddDataset(reversedDataset, source))) {
-                        case ImageAdded(image, source) =>
-                          onSuccess(boxService.ask(UpdateInbox(token, transactionId, sequenceNumber, totalImageCount, image.id))) {
-                            case msg: InboxUpdated =>
-                              complete(NoContent)
-                          }
+                    if (dataset == null)
+                      complete((BadRequest, "Dataset could not be read"))
+                    else
+                      onSuccess(anonymizationService.ask(ReverseAnonymization(dataset)).mapTo[Attributes]) { reversedDataset =>
+                        val source = Source(SourceType.BOX, box.name, box.id)
+                        onSuccess(storageService.ask(AddDataset(reversedDataset, source))) {
+                          case ImageAdded(image, source) =>
+                            onSuccess(boxService.ask(UpdateInbox(token, transactionId, sequenceNumber, totalImageCount, image.id))) {
+                              case msg: InboxUpdated =>
+                                complete(NoContent)
+                            }
+                        }
                       }
-                    }
                   }
                 }
               }

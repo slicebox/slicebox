@@ -28,6 +28,7 @@
                                 load-page="loadInboxPage(startIndex, count, orderByProperty, orderByDirection)"
                                 page-size="10000000"
                                 object-actions="objectActions"
+                                sorting="false"
                                 callbacks="callbacks.inboxTable"
                                 empty-message="Inbox is empty">
 
@@ -64,6 +65,7 @@
                                 converter="convertOutboxPageData(pageData)"
                                 page-size="10000000"
                                 object-actions="objectActions"
+                                sorting="false"
                                 callbacks="callbacks.outboxTable"
                                 empty-message="Outbox is empty">
 
@@ -105,6 +107,7 @@
                                 load-page="loadSentPage(startIndex, count, orderByProperty, orderByDirection)"
                                 page-size="10000000"
                                 object-actions="objectActions"
+                                sorting="false"
                                 callbacks="callbacks.sentTable"
                                 empty-message="Sent is empty">
 

@@ -327,13 +327,19 @@ class BoxDAO(val driver: JdbcProfile) {
     boxQuery.list
 
   def listOutboxEntries(implicit session: Session): List[OutboxEntry] =
-    outboxQuery.list
+    outboxQuery
+      .sortBy(_.id.desc)
+      .list
 
   def listInboxEntries(implicit session: Session): List[InboxEntry] =
-    inboxQuery.list
+    inboxQuery
+      .sortBy(_.lastUpdated.desc)
+      .list
 
   def listSentEntries(implicit session: Session): List[SentEntry] =
-    sentQuery.list
+    sentQuery
+      .sortBy(_.lastUpdated.desc)
+      .list
 
   def listInboxImages(implicit session: Session): List[InboxImage] =
     inboxImageQuery.list
