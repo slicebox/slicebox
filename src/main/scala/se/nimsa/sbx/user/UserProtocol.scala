@@ -52,6 +52,8 @@ object UserProtocol {
     def passwordMatches(password: String): Boolean = hashedPassword.exists(hp => BCrypt.checkpw(password, hp))
   
   }
+
+  case class ApiSession(id: Long, userId: Long, token: String, ip: String, lastUpdated: Long) extends Entity
   
   case class AuthToken(token: String)
   

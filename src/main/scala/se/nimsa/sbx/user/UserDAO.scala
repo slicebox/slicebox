@@ -37,6 +37,21 @@ class UserDAO(val driver: JdbcProfile) {
 
   val userQuery = TableQuery[UserTable]
 
+  val toSession = (id: Long, userId: Long, token: String, ip: String, lastUpdated: Long) => ApiSession(id, userId, token, ip, lastUpdated)
+  val fromSession = (session: ApiSession) => Option((session.id, session.userId, session.token, session.ip, session.lastUpdated))
+
+  class SessionTable(tag: Tag) extends Table[ApiSession](tag, "ApiSession") {
+    def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
+    def userId = column[Long]("userid")
+    def token = column[String]("token")
+    def ip = column[String]("ip")
+    def lastUpdated = column[Long]("lastupdated")
+    def fkUser = foreignKey("fk_user", userId, userQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
+    def * = (id, userId, token, ip, lastUpdated) <> (toSession.tupled, fromSession)
+  }
+
+  val sessionQuery = TableQuery[SessionTable]
+
   def create(implicit session: Session) =
     if (MTable.getTables("User").list.isEmpty) userQuery.ddl.create
   
