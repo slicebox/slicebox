@@ -983,7 +983,7 @@ angular.module('slicebox.home', ['ngRoute'])
     
 })
 
-.controller('AddSeriesTypeRuleFromTagValuesModalCtrl', function($scope, $mdDialog, $http, $q, tagValues) {
+.controller('AddSeriesTypeRuleFromTagValuesModalCtrl', function($scope, $mdDialog, $http, $q, sbxToast, tagValues) {
     // Initialization
     $scope.tagValues = tagValues;
 
