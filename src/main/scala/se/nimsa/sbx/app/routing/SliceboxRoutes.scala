@@ -23,20 +23,21 @@ import se.nimsa.sbx.user.UserProtocol.UserRole
 import spray.routing.ExceptionHandler
 import se.nimsa.sbx.lang.NotFoundException
 import se.nimsa.sbx.lang.BadGatewayException
+import se.nimsa.sbx.user.UserProtocol.AuthToken
 
 trait SliceboxRoutes extends DirectoryRoutes
-  with ScpRoutes
-  with ScuRoutes
-  with MetadataRoutes
-  with ImageRoutes
-  with BoxRoutes
-  with ForwardingRoutes
-  with RemoteBoxRoutes
-  with UserRoutes
-  with LogRoutes
-  with UiRoutes
-  with GeneralRoutes
-  with SeriesTypeRoutes { this: RestApi =>
+    with ScpRoutes
+    with ScuRoutes
+    with MetadataRoutes
+    with ImageRoutes
+    with BoxRoutes
+    with ForwardingRoutes
+    with RemoteBoxRoutes
+    with UserRoutes
+    with LogRoutes
+    with UiRoutes
+    with GeneralRoutes
+    with SeriesTypeRoutes { this: RestApi =>
 
   implicit val knownExceptionHandler =
     ExceptionHandler {
@@ -49,9 +50,10 @@ trait SliceboxRoutes extends DirectoryRoutes
     }
 
   def sliceboxRoutes: Route =
-    pathPrefix("api") {
-      parameter('authtoken.?) { authToken =>
-        authenticate(authenticator.basicUserAuthenticator(authToken)) { authInfo =>
+    pathPrefix("api") { ctx =>
+      optionalCookie("slicebox-user") { optionalCookie =>
+        val optionalToken = optionalCookie.map(cookie => AuthToken(cookie.content, ctx.request.uri.path.toString))
+        authenticate(authenticator.basicUserAuthenticator(optionalToken)) { authInfo =>
           directoryRoutes(authInfo) ~
             scpRoutes(authInfo) ~
             scuRoutes(authInfo) ~

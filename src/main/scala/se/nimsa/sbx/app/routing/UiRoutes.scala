@@ -39,20 +39,6 @@ trait UiRoutes { this: RestApi =>
       getFromResource("public/index.html")
     }
 
-  def loginRoute: Route =
-    path("login") {
-      post {
-        entity(as[UserPass]) { userPass =>
-          onSuccess(userService.ask(GetUserByName(userPass.user)).mapTo[Option[ApiUser]]) {
-            case Some(repoUser) if (repoUser.passwordMatches(userPass.pass)) =>
-              complete(LoginResult(true, repoUser.role, s"User ${userPass.user} logged in"))
-            case _ =>
-              complete(LoginResult(false, UserRole.USER, "Incorrect username or password"))
-          }
-        }
-      }
-    }
-
   def faviconRoutes: Route =
     path("apple-touch-icon-57x57.png") {
       getFromResource("public/images/favicons/apple-touch-icon-57x57.png")

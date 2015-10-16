@@ -28,18 +28,19 @@ import scala.concurrent.duration.DurationInt
 import scala.concurrent.Future
 import spray.routing.Directives._
 import UserProtocol._
+import spray.http.HttpCookie
 
 class Authenticator(userService: ActorRef) {
 
   implicit val timeout = Timeout(10.seconds)
 
-  def basicUserAuthenticator(optionalAuthToken: Option[String])(implicit ec: ExecutionContext): AuthMagnet[AuthInfo] = {
+  def basicUserAuthenticator(optionalToken: Option[AuthToken])(implicit ec: ExecutionContext): AuthMagnet[AuthInfo] = {
 
     def validateUser(optionalUserPass: Option[UserPass]): Future[Option[AuthInfo]] = {
       val optionalFutureAuthInfo =
-        if (optionalAuthToken.isDefined)
-          optionalAuthToken.map(authToken =>
-            userService.ask(GetUserByAuthToken(AuthToken(authToken))).mapTo[Option[ApiUser]].map(_.map(AuthInfo(_))))
+        if (optionalToken.isDefined)
+          optionalToken.map(token =>
+            userService.ask(GetUserByToken(token)).mapTo[Option[ApiUser]].map(_.map(AuthInfo(_))))
         else
           optionalUserPass.map(userPass =>
             userService.ask(GetUserByName(userPass.user)).mapTo[Option[ApiUser]].map {

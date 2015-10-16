@@ -17,17 +17,33 @@
 package se.nimsa.sbx.app.routing
 
 import akka.pattern.ask
-
 import spray.http.StatusCodes.Created
 import spray.http.StatusCodes.NoContent
 import spray.httpx.SprayJsonSupport._
 import spray.routing._
-
 import se.nimsa.sbx.user.AuthInfo
 import se.nimsa.sbx.app.RestApi
 import se.nimsa.sbx.user.UserProtocol._
+import spray.routing.authentication.UserPass
+import spray.http.HttpCookie
 
 trait UserRoutes { this: RestApi =>
+
+  def loginRoute: Route =
+    path("login") {
+      post {
+        entity(as[UserPass]) { userPass =>
+          onSuccess(userService.ask(GetUserByName(userPass.user)).mapTo[Option[ApiUser]]) {
+            case Some(repoUser) if (repoUser.passwordMatches(userPass.pass)) =>
+              setCookie(HttpCookie("slicebox-user", content = repoUser.user)) {
+                complete(LoginResult(true, repoUser.role, s"User ${userPass.user} logged in"))
+              }
+            case _ =>
+              complete(LoginResult(false, UserRole.USER, "Incorrect username or password"))
+          }
+        }
+      }
+    }
 
   def userRoutes(authInfo: AuthInfo): Route =
     pathPrefix("users") {
@@ -54,17 +70,6 @@ trait UserRoutes { this: RestApi =>
             onSuccess(userService.ask(DeleteUser(userId))) {
               case UserDeleted(userId) =>
                 complete(NoContent)
-            }
-          }
-        }
-      } ~ path("generateauthtokens") {
-        parameter('n.?(1)) { n =>
-          post {
-            authenticate(authenticator.basicUserAuthenticator(None)) { authInfo2 => // may not generate tokens using token authentication
-              onSuccess(userService.ask(GenerateAuthTokens(authInfo.user, n)).mapTo[List[AuthToken]]) {
-                case authTokens =>
-                  complete((Created, authTokens))
-              }
             }
           }
         }

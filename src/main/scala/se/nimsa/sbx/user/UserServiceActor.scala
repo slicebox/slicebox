@@ -34,22 +34,13 @@ class UserServiceActor(dbProps: DbProps, superUser: String, superPassword: Strin
   val db = dbProps.db
   val dao = new UserDAO(dbProps.driver)
 
-  val authTokens = Map.empty[AuthToken, Tuple2[ApiUser, Long]]
-
   addSuperUser()
 
   implicit val system = context.system
   implicit val ec = context.dispatcher
 
-  val authTokenCleaner = system.scheduler.schedule(12.hours, 12.hours) {
-    self ! CleanupTokens
-  }
+  log.info("User service started")
 
-  override def postStop() =
-    authTokenCleaner.cancel()
-
-  log.info("User service started")    
-    
   def receive = LoggingReceive {
 
     case msg: UserRequest =>
@@ -75,6 +66,11 @@ class UserServiceActor(dbProps: DbProps, superUser: String, superPassword: Strin
               sender ! dao.userByName(user)
             }
 
+          case GetUserByToken(token) =>
+            db.withSession { implicit session =>
+              sender ! dao.userByTokenAndIp(token.token, token.ip)
+            }
+            
           case GetUsers =>
             db.withSession { implicit session =>
               sender ! Users(dao.listUsers)
@@ -90,18 +86,9 @@ class UserServiceActor(dbProps: DbProps, superUser: String, superPassword: Strin
               sender ! UserDeleted(userId)
             }
 
-          case GetUserByAuthToken(token) =>
-            sender ! authTokens.remove(token).map(_._1)
-
-          case GenerateAuthTokens(user, numberOfTokens) =>
-            val generatedTokens = generateNewTokens(user, numberOfTokens)
-            sender ! generatedTokens
-
         }
       }
 
-    case CleanupTokens =>
-      cleanupTokens()
   }
 
   def addSuperUser() =
@@ -113,23 +100,6 @@ class UserServiceActor(dbProps: DbProps, superUser: String, superPassword: Strin
       }
     }
 
-  def generateNewTokens(user: ApiUser, numberOfTokens: Int): List[AuthToken] = {
-    (1 to numberOfTokens).map(i => {
-      val authToken = AuthToken(UUID.randomUUID.toString)
-      authTokens += authToken -> ((user, System.currentTimeMillis))
-      authToken
-    }).toList
-  }
-
-  def cleanupTokens(): Unit = {
-    val timeNow = System.currentTimeMillis
-    val expiredKeys = authTokens.filter {
-      case (key, value) => (timeNow - value._2) > 24.hours.toMillis
-    }.map {
-      case (key, value) => key
-    }
-    authTokens --= expiredKeys
-  }
 }
 
 object UserServiceActor {

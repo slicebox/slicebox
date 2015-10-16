@@ -54,7 +54,7 @@ class UserDAO(val driver: JdbcProfile) {
 
   def create(implicit session: Session) =
     if (MTable.getTables("User").list.isEmpty) userQuery.ddl.create
-  
+
   def drop(implicit session: Session): Unit =
     (userQuery.ddl).drop
 
@@ -62,13 +62,16 @@ class UserDAO(val driver: JdbcProfile) {
     val generatedId = (userQuery returning userQuery.map(_.id)) += user
     user.copy(id = generatedId)
   }
-  
+
   def userById(userId: Long)(implicit session: Session): Option[ApiUser] =
     userQuery.filter(_.id === userId).firstOption
-    
+
   def userByName(user: String)(implicit session: Session): Option[ApiUser] =
     userQuery.filter(_.user === user).firstOption
-    
+
+  def userByTokenAndIp(token: String, ip: String): Option[ApiUser] =
+    null
+
   def removeUser(userId: Long)(implicit session: Session): Unit =
     userQuery.filter(_.id === userId).delete
 
