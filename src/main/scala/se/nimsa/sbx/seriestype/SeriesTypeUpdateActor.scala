@@ -109,7 +109,7 @@ class SeriesTypeUpdateActor(implicit val timeout: Timeout) extends Actor with Ex
 
     futureImageIdOpt.flatMap(_ match {
       case Some(imageId) =>
-        val futureDatasetMaybe = storageService.ask(GetDataset(imageId)).mapTo[Option[Attributes]]
+        val futureDatasetMaybe = storageService.ask(GetDataset(imageId, false)).mapTo[Option[Attributes]]
 
         val updateSeriesTypes = futureDatasetMaybe.flatMap(_.map(dataset => handleLoadedDataset(dataset, series)).getOrElse(Future.successful(Seq.empty)))
 

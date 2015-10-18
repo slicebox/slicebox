@@ -117,7 +117,7 @@ object StorageProtocol {
   
   case class GetImagePath(imageId: Long) extends ImageRequest
   
-  case class GetDataset(imageId: Long) extends ImageRequest
+  case class GetDataset(imageId: Long, withPixelData: Boolean) extends ImageRequest
   
   case class GetImageAttributes(imageId: Long) extends ImageRequest
   

@@ -188,8 +188,8 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
         case GetImagePath(imageId) =>
           sender ! imagePathForId(imageId)
 
-        case GetDataset(imageId) =>
-          sender ! readDataset(imageId, true)
+        case GetDataset(imageId, withPixelData) =>
+          sender ! readDataset(imageId, withPixelData)
 
         case GetImageAttributes(imageId) =>
           Future {
