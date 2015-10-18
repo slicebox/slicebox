@@ -62,12 +62,24 @@ class AnonymizationUtilTest extends FlatSpec with Matchers {
     reversedDataset1.getString(Tag.PatientName) should equal (key1.patientName)
     reversedDataset1.getString(Tag.PatientID) should equal (key1.patientID)
     reversedDataset1.getString(Tag.StudyInstanceUID) should equal (key1.studyInstanceUID)
+    reversedDataset1.getString(Tag.SeriesInstanceUID) should equal (key1.seriesInstanceUID)
+    reversedDataset1.getString(Tag.FrameOfReferenceUID) should equal (key1.frameOfReferenceUID)
     
-    val key2 = key1.copy(studyInstanceUID = "seuid2")
+    val key2 = key1.copy(anonSeriesInstanceUID = "another aseuid")
     val reversedDataset2 = reverseAnonymization(List(key2), createAnonymousDataset)
-    reversedDataset2.getString(Tag.PatientName) should be (dataset.getString(Tag.PatientName)) 
-    reversedDataset2.getString(Tag.PatientID) should be (dataset.getString(Tag.PatientID)) 
-    reversedDataset2.getString(Tag.StudyInstanceUID) should not be (dataset.getString(Tag.StudyInstanceUID)) 
+    reversedDataset2.getString(Tag.PatientName) should be (key1.patientName) 
+    reversedDataset2.getString(Tag.PatientID) should be (key1.patientID) 
+    reversedDataset2.getString(Tag.StudyInstanceUID) should be (key1.studyInstanceUID) 
+    reversedDataset2.getString(Tag.SeriesInstanceUID) should not be (key1.seriesInstanceUID)
+    reversedDataset2.getString(Tag.FrameOfReferenceUID) should not be (key1.frameOfReferenceUID)
+    
+    val key3 = key1.copy(anonStudyInstanceUID = "another stuid")
+    val reversedDataset3 = reverseAnonymization(List(key3), createAnonymousDataset)
+    reversedDataset3.getString(Tag.PatientName) should be (key1.patientName) 
+    reversedDataset3.getString(Tag.PatientID) should be (key1.patientID) 
+    reversedDataset3.getString(Tag.StudyInstanceUID) should not be (key1.studyInstanceUID) 
+    reversedDataset3.getString(Tag.SeriesInstanceUID) should not be (key1.seriesInstanceUID)
+    reversedDataset3.getString(Tag.FrameOfReferenceUID) should not be (key1.frameOfReferenceUID)
   }
   
   "The anonymization procedure" should "replace an existing accession number with a named based UID" in {

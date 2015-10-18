@@ -24,11 +24,16 @@ import AnonymizationProtocol._
 
 class AnonymizationDAO(val driver: JdbcProfile) {
   import driver.simple._
-  
-  val toAnonymizationKey = (id: Long, created: Long, patientName: String, anonPatientName: String, patientID: String, anonPatientID: String, patientBirthDate: String, studyInstanceUID: String, anonStudyInstanceUID: String, studyDescription: String, studyID: String, accessionNumber: String) =>
-    AnonymizationKey(id, created, patientName, anonPatientName, patientID, anonPatientID, patientBirthDate, studyInstanceUID, anonStudyInstanceUID, studyDescription, studyID, accessionNumber)
+
+  val toAnonymizationKey = (id: Long, created: Long,
+    patientName: String, anonPatientName: String, patientID: String, anonPatientID: String, patientBirthDate: String, studyInstanceUID: String, anonStudyInstanceUID: String, studyDescription: String, studyID: String, accessionNumber: String,
+    seriesInstanceUID: String, anonSeriesInstanceUID: String, seriesDescription: String, protocolName: String, frameOfReferenceUID: String, anonFrameOfReferenceUID: String) =>
+    AnonymizationKey(id, created, patientName, anonPatientName, patientID, anonPatientID, patientBirthDate, studyInstanceUID, anonStudyInstanceUID, studyDescription, studyID, accessionNumber, seriesInstanceUID, anonSeriesInstanceUID, seriesDescription, protocolName, frameOfReferenceUID, anonFrameOfReferenceUID)
   val fromAnonymizationKey = (entry: AnonymizationKey) =>
-    Option((entry.id, entry.created, entry.patientName, entry.anonPatientName, entry.patientID, entry.anonPatientID, entry.patientBirthDate, entry.studyInstanceUID, entry.anonStudyInstanceUID, entry.studyDescription, entry.studyID, entry.accessionNumber))
+    Option((entry.id, entry.created,
+      entry.patientName, entry.anonPatientName, entry.patientID, entry.anonPatientID, entry.patientBirthDate,
+      entry.studyInstanceUID, entry.anonStudyInstanceUID, entry.studyDescription, entry.studyID, entry.accessionNumber,
+      entry.seriesInstanceUID, entry.anonSeriesInstanceUID, entry.seriesDescription, entry.protocolName, entry.frameOfReferenceUID, entry.anonFrameOfReferenceUID))
 
   class AnonymizationKeyTable(tag: Tag) extends Table[AnonymizationKey](tag, "AnonymizationKey") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
@@ -43,7 +48,16 @@ class AnonymizationDAO(val driver: JdbcProfile) {
     def studyDescription = column[String]("studydescription")
     def studyID = column[String]("studyid")
     def accessionNumber = column[String]("accessionnumber")
-    def * = (id, created, patientName, anonPatientName, patientID, anonPatientID, patientBirthDate, studyInstanceUID, anonStudyInstanceUID, studyDescription, studyID, accessionNumber) <> (toAnonymizationKey.tupled, fromAnonymizationKey)
+    def seriesInstanceUID = column[String]("seriesinstanceuid")
+    def anonSeriesInstanceUID = column[String]("anonseriesinstanceuid")
+    def seriesDescription = column[String]("seriesdescription")
+    def protocolName = column[String]("protocolname")
+    def frameOfReferenceUID = column[String]("frameofreferenceuid")
+    def anonFrameOfReferenceUID = column[String]("anonframeofreferenceuid")
+    def * = (id, created,
+      patientName, anonPatientName, patientID, anonPatientID, patientBirthDate,
+      studyInstanceUID, anonStudyInstanceUID, studyDescription, studyID, accessionNumber,
+      seriesInstanceUID, anonSeriesInstanceUID, seriesDescription, protocolName, frameOfReferenceUID, anonFrameOfReferenceUID) <> (toAnonymizationKey.tupled, fromAnonymizationKey)
   }
 
   val anonymizationKeyQuery = TableQuery[AnonymizationKeyTable]
@@ -57,7 +71,7 @@ class AnonymizationDAO(val driver: JdbcProfile) {
   def clear(implicit session: Session): Unit = {
     anonymizationKeyQuery.delete
   }
-  
+
   def columnExists(tableName: String, columnName: String)(implicit session: Session): Boolean = {
     val tables = MTable.getTables(tableName).list
     if (tables.isEmpty)
@@ -71,13 +85,13 @@ class AnonymizationDAO(val driver: JdbcProfile) {
       if (!tableNames.exists(tableName =>
         columnExists(tableName, columnName)))
         throw new IllegalArgumentException(s"Property $columnName does not exist"))
-        
+
   def anonymizationKeys(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String])(implicit session: Session): List[AnonymizationKey] = {
 
     checkOrderBy(orderBy, "AnonymizationKey")
 
     implicit val getResult = GetResult(r =>
-      AnonymizationKey(r.nextLong, r.nextLong, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString))
+      AnonymizationKey(r.nextLong, r.nextLong, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString))
 
     var query = """select * from "AnonymizationKey""""
 
@@ -88,7 +102,10 @@ class AnonymizationDAO(val driver: JdbcProfile) {
           lcase("anonpatientname") like $filterValueLike or 
             lcase("patientid") like $filterValueLike or 
               lcase("anonpatientid") like $filterValueLike or
-                lcase("accessionnumber") like $filterValueLike"""
+                lcase("studydescription") like $filterValueLike or
+                  lcase("accessionnumber") like $filterValueLike or
+                    lcase("seriesdescription") like $filterValueLike or
+                      lcase("protocolname") like $filterValueLike"""
     })
 
     orderBy.foreach(orderByValue =>

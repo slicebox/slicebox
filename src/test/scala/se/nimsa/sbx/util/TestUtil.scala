@@ -114,6 +114,7 @@ object TestUtil {
     seriesDescription: String = "series description",
     stationName: String = "station name",
     manufacturer: String = "manufacturer",
+    protocolName: String = "protocol name",
     frameOfReferenceUID: String = "frame of reference uid",
     sopInstanceUID: String = "sop instance uid") = {
     val dataset = new Attributes()
@@ -127,8 +128,10 @@ object TestUtil {
     dataset.setString(Tag.StudyID, VR.LO, studyID)
     dataset.setString(Tag.AccessionNumber, VR.SH, accessionNumber)
     dataset.setString(Tag.SeriesInstanceUID, VR.UI, seriesInstanceUID)
+    dataset.setString(Tag.SeriesDescription, VR.UI, seriesDescription)
     dataset.setString(Tag.StationName, VR.LO, stationName)
     dataset.setString(Tag.Manufacturer, VR.LO, manufacturer)
+    dataset.setString(Tag.ProtocolName, VR.LO, protocolName)
     dataset.setString(Tag.FrameOfReferenceUID, VR.UI, frameOfReferenceUID)
     dataset.setString(Tag.SOPInstanceUID, VR.UI, sopInstanceUID)
     dataset
@@ -138,7 +141,9 @@ object TestUtil {
     dataset: Attributes,
     anonPatientName: String = "anon patient name",
     anonPatientID: String = "anon patient ID",
-    anonStudyInstanceUID: String = "anon study instance UID") =
+    anonStudyInstanceUID: String = "anon study instance UID",
+    anonSeriesInstanceUID: String = "anon series instance UID",
+    anonFrameOfReferenceUID: String = "anon frame of reference UID") =
     AnonymizationKey(-1, new Date().getTime,
       dataset.getString(Tag.PatientName), anonPatientName,
       dataset.getString(Tag.PatientID), anonPatientID,
@@ -146,7 +151,11 @@ object TestUtil {
       dataset.getString(Tag.StudyInstanceUID), anonStudyInstanceUID,
       dataset.getString(Tag.StudyDescription),
       dataset.getString(Tag.StudyID),
-      dataset.getString(Tag.AccessionNumber))
+      dataset.getString(Tag.AccessionNumber),
+      dataset.getString(Tag.SeriesInstanceUID), anonSeriesInstanceUID,
+      dataset.getString(Tag.SeriesDescription),
+      dataset.getString(Tag.ProtocolName),
+      dataset.getString(Tag.FrameOfReferenceUID), anonFrameOfReferenceUID)
 
   def deleteFolder(path: Path) =
     Files.walkFileTree(path, new SimpleFileVisitor[Path]() {
