@@ -99,6 +99,34 @@ angular.module('slicebox.home', ['ngRoute'])
             }
         ];
 
+    $scope.flatSeriesActions =
+        [
+            {
+                name: 'Send',
+                action: confirmSendFlatSeries
+            },
+            {
+                name: 'Send to SCP',
+                action: confirmSendSeriesToScp
+            },   
+            {
+                name: 'Delete',
+                action: confirmDeleteSeries
+            },
+            {
+                name: 'Tag',
+                action: tagSeries
+            },
+            {
+                name: 'Anonymize',
+                action: confirmAnonymizeFlatSeries
+            },
+            {
+                name: 'Export',
+                action: confirmExportSeries
+            }
+        ];
+
     $scope.imageAttributesActions =
         [
             {
@@ -642,13 +670,18 @@ angular.module('slicebox.home', ['ngRoute'])
     }
 
     function confirmSendSeries(series) {
-        // check if flat series
-        series = series.map(function(s) {
-            return s.series ? s.series : s;
-        });
-
         return confirmSend('/api/boxes', function(receiverId) {
             var imageIdToPatientPromise = createImageIdToPatientPromiseForSeries(series);
+
+            return showBoxSendTagValuesModal(imageIdToPatientPromise, function(imageTagValuesSeq) {
+                return $http.post('/api/boxes/' + receiverId + '/send', imageTagValuesSeq);
+            }, "sent", "send");
+        });
+    }
+
+    function confirmSendFlatSeries(flatSeries) {
+        return confirmSend('/api/boxes', function(receiverId) {
+            var imageIdToPatientPromise = createImageIdToPatientPromiseForFlatSeries(flatSeries);
 
             return showBoxSendTagValuesModal(imageIdToPatientPromise, function(imageTagValuesSeq) {
                 return $http.post('/api/boxes/' + receiverId + '/send', imageTagValuesSeq);
@@ -736,13 +769,16 @@ angular.module('slicebox.home', ['ngRoute'])
     } 
 
     function confirmAnonymizeSeries(series) {
-        // check if flat series
-        series = series.map(function(s) {
-            return s.series ? s.series : s;
-        });
-
         openConfirmActionModal('Anonymize', 'Force anonymization of ' + series.length + ' series? Patient information will be lost.', 'Ok', function() {
             var imageIdToPatientPromise = createImageIdToPatientPromiseForSeries(series);
+
+            return anonymizeImages(imageIdToPatientPromise);
+        });
+    }
+
+    function confirmAnonymizeFlatSeries(flatSeries) {
+        openConfirmActionModal('Anonymize', 'Force anonymization of ' + series.length + ' series? Patient information will be lost.', 'Ok', function() {
+            var imageIdToPatientPromise = createImageIdToPatientPromiseForFlatSeries(flatSeries);
 
             return anonymizeImages(imageIdToPatientPromise);
         });
@@ -807,6 +843,23 @@ angular.module('slicebox.home', ['ngRoute'])
                 });
             });
         });
+    }
+
+    function createImageIdToPatientPromiseForFlatSeries(flatSeries) {
+        var imageIdAndPatientsPromises = flatSeries.map(function (fs) {
+            return imagesForSeries([ fs.series ]).then(function (images) {
+                return images.map(function (image) {
+                    return { imageId: image.id, patient: fs.patient };
+                });
+            });        
+        });
+
+        return sbxMisc.flattenPromises(imageIdAndPatientsPromises).then(function(imageIdAndPatients) {
+            return imageIdAndPatients.reduce(function ( imageIdToPatient, imageIdAndPatient ) {
+                imageIdToPatient[ imageIdAndPatient.imageId ] = imageIdAndPatient.patient;
+                return imageIdToPatient;
+            }, {});                
+        });        
     }
 
     function tagSeriesForPatients(patients) {
@@ -923,10 +976,14 @@ angular.module('slicebox.home', ['ngRoute'])
         imageIds.push(parseInt(imageId));
         if (imageIdToPatient.hasOwnProperty(imageId)) {
             var patient = imageIdToPatient[imageId];
-            if ($scope.patients.indexOf(patient) < 0) {
+            if (isPatientPresent(patient, $scope.patients) === false) {
                 $scope.patients.push(patient);
             }
         }
+    }
+
+    function isPatientPresent(patient, patients) {
+        return $scope.patients.filter(function (aPatient) { return aPatient.id === patient.id; }).length > 0;
     }
 
     $scope.namePrefix = "anon";
