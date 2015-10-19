@@ -110,7 +110,7 @@ trait ImageRoutes { this: RestApi =>
           post {
             import spray.httpx.SprayJsonSupport._
             entity(as[Seq[TagValue]]) { tagValues =>
-              onSuccess(storageService.ask(GetDataset(imageId)).mapTo[Option[Attributes]]) {
+              onSuccess(storageService.ask(GetDataset(imageId, true)).mapTo[Option[Attributes]]) {
                 _ match {
 
                   case Some(dataset) =>

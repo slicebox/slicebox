@@ -59,8 +59,8 @@ class SeriesTypeUpdateActor(implicit val timeout: Timeout) extends Actor with Ex
   def receive = LoggingReceive {
 
     case UpdateSeriesTypesForSeries(seriesIds) =>
-      seriesIds.map(seriesId =>
-        updateSeriesTypesForSeriesWithId(seriesId))
+      seriesIds.map(addToUpdateQueueIfNotPresent(_))
+      self ! PollSeriesTypesUpdateQueue
 
     case GetUpdateSeriesTypesRunningStatus =>
       sender ! UpdateSeriesTypesRunningStatus(seriesToUpdate.size > 0 || seriesBeingUpdated.size > 0)
@@ -72,11 +72,6 @@ class SeriesTypeUpdateActor(implicit val timeout: Timeout) extends Actor with Ex
       self ! UpdateSeriesTypesForSeries(Seq(image.seriesId))
 
     case PollSeriesTypesUpdateQueue => pollSeriesTypesUpdateQueue()
-  }
-
-  def updateSeriesTypesForSeriesWithId(seriesId: Long) = {
-    addToUpdateQueueIfNotPresent(seriesId)
-    self ! PollSeriesTypesUpdateQueue
   }
 
   def addToUpdateQueueIfNotPresent(seriesId: Long) =
@@ -109,7 +104,7 @@ class SeriesTypeUpdateActor(implicit val timeout: Timeout) extends Actor with Ex
 
     futureImageIdOpt.flatMap(_ match {
       case Some(imageId) =>
-        val futureDatasetMaybe = storageService.ask(GetDataset(imageId)).mapTo[Option[Attributes]]
+        val futureDatasetMaybe = storageService.ask(GetDataset(imageId, false)).mapTo[Option[Attributes]]
 
         val updateSeriesTypes = futureDatasetMaybe.flatMap(_.map(dataset => handleLoadedDataset(dataset, series)).getOrElse(Future.successful(Seq.empty)))
 
@@ -125,7 +120,7 @@ class SeriesTypeUpdateActor(implicit val timeout: Timeout) extends Actor with Ex
     })
   }
 
-  def handleLoadedDataset(dataset: Attributes, series: Series) = {
+  def handleLoadedDataset(dataset: Attributes, series: Series): Future[Seq[Boolean]] = {
     getSeriesTypes().flatMap(allSeriesTypes =>
       updateSeriesTypesForDataset(dataset, series, allSeriesTypes))
   }

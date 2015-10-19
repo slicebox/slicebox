@@ -101,7 +101,7 @@ trait RemoteBoxRoutes { this: RestApi =>
                       case outboxEntry: OutboxEntry =>
                         onSuccess(boxService.ask(GetTransactionTagValues(outboxEntry.imageId, transactionId)).mapTo[Seq[TransactionTagValue]]) {
                           case transactionTagValues =>
-                            onSuccess(storageService.ask(GetDataset(outboxEntry.imageId)).mapTo[Option[Attributes]]) {
+                            onSuccess(storageService.ask(GetDataset(outboxEntry.imageId, true)).mapTo[Option[Attributes]]) {
                               _ match {
                                 case Some(dataset) =>
 

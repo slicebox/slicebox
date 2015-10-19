@@ -64,7 +64,7 @@ class BoxPushActor(box: Box,
   def sendFilePipeline = sendReceive
 
   def pushImagePipeline(outboxEntry: OutboxEntry, tagValues: Seq[TransactionTagValue]): Future[HttpResponse] = {
-    val futureDatasetMaybe = storageService.ask(GetDataset(outboxEntry.imageId)).mapTo[Option[Attributes]]
+    val futureDatasetMaybe = storageService.ask(GetDataset(outboxEntry.imageId, true)).mapTo[Option[Attributes]]
     futureDatasetMaybe.flatMap(_ match {
       case Some(dataset) =>
         val futureAnonymizedDataset = anonymizationService.ask(Anonymize(dataset, tagValues.map(_.tagValue))).mapTo[Attributes]

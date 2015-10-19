@@ -62,6 +62,8 @@ class AnonymizationServiceActorTest(_system: ActorSystem) extends TestKit(_syste
           case harmonized: Attributes =>
             harmonized.getString(Tag.PatientID) should be(key.anonPatientID)
             harmonized.getString(Tag.StudyInstanceUID) should be(key.anonStudyInstanceUID)
+            harmonized.getString(Tag.SeriesInstanceUID) should be(key.anonSeriesInstanceUID)
+            harmonized.getString(Tag.FrameOfReferenceUID) should be(key.anonFrameOfReferenceUID)
         }
       }
     }
@@ -73,7 +75,9 @@ class AnonymizationServiceActorTest(_system: ActorSystem) extends TestKit(_syste
         val anonymizedDataset = anonymizeDataset(dataset)
         anonymizedDataset.setString(Tag.PatientName, VR.PN, key.anonPatientName)
         anonymizedDataset.setString(Tag.PatientID, VR.SH, key.anonPatientID)
-        anonymizedDataset.setString(Tag.StudyInstanceUID, VR.SH, key.anonStudyInstanceUID)
+        anonymizedDataset.setString(Tag.StudyInstanceUID, VR.UI, key.anonStudyInstanceUID)
+        anonymizedDataset.setString(Tag.SeriesInstanceUID, VR.UI, key.anonSeriesInstanceUID)
+        anonymizedDataset.setString(Tag.FrameOfReferenceUID, VR.UI, key.anonFrameOfReferenceUID)
         anonymizationService ! ReverseAnonymization(anonymizedDataset)
 
         expectMsgPF() {
@@ -84,7 +88,10 @@ class AnonymizationServiceActorTest(_system: ActorSystem) extends TestKit(_syste
             reversed.getString(Tag.StudyDescription) should be(key.studyDescription)
             reversed.getString(Tag.StudyID) should be(key.studyID)
             reversed.getString(Tag.AccessionNumber) should be(key.accessionNumber)
-
+            reversed.getString(Tag.SeriesInstanceUID) should be(key.seriesInstanceUID)
+            reversed.getString(Tag.SeriesDescription) should be(key.seriesDescription)
+            reversed.getString(Tag.ProtocolName) should be(key.protocolName)
+            reversed.getString(Tag.FrameOfReferenceUID) should be(key.frameOfReferenceUID)
         }
       }
     }

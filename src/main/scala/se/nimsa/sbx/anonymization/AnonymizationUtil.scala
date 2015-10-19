@@ -337,17 +337,22 @@ object AnonymizationUtil {
     val series = datasetToSeries(dataset)
     val anonPatient = datasetToPatient(anonDataset)
     val anonStudy = datasetToStudy(anonDataset)
+    val anonSeries = datasetToSeries(anonDataset)
     AnonymizationKey(-1, new Date().getTime,
       patient.patientName.value, anonPatient.patientName.value,
       patient.patientID.value, anonPatient.patientID.value, patient.patientBirthDate.value,
       study.studyInstanceUID.value, anonStudy.studyInstanceUID.value,
-      study.studyDescription.value, study.studyID.value, study.accessionNumber.value)
+      study.studyDescription.value, study.studyID.value, study.accessionNumber.value,
+      series.seriesInstanceUID.value, anonSeries.seriesInstanceUID.value,
+      series.seriesDescription.value, series.protocolName.value, 
+      series.frameOfReferenceUID.value, anonSeries.frameOfReferenceUID.value)
   }
 
   def isEqual(key1: AnonymizationKey, key2: AnonymizationKey) =
     key1.patientName == key2.patientName && key1.anonPatientName == key2.anonPatientName &&
       key1.patientID == key2.patientID && key1.anonPatientID == key2.anonPatientID &&
-      key1.studyInstanceUID == key2.studyInstanceUID && key1.anonStudyInstanceUID == key2.anonStudyInstanceUID
+      key1.studyInstanceUID == key2.studyInstanceUID && key1.anonStudyInstanceUID == key2.anonStudyInstanceUID &&
+      key1.seriesInstanceUID == key2.seriesInstanceUID && key1.anonSeriesInstanceUID == key2.anonSeriesInstanceUID
 
   def reverseAnonymization(keys: List[AnonymizationKey], dataset: Attributes) = {
     if (isAnonymous(dataset)) {
@@ -362,6 +367,14 @@ object AnonymizationUtil {
           dataset.setString(Tag.StudyDescription, VR.LO, studyKey.studyDescription)
           dataset.setString(Tag.StudyID, VR.SH, studyKey.studyID)
           dataset.setString(Tag.AccessionNumber, VR.SH, studyKey.accessionNumber)
+          val anonSeries = datasetToSeries(dataset)
+          val seriesKeys = studyKeys.filter(_.anonSeriesInstanceUID == anonSeries.seriesInstanceUID.value)
+          seriesKeys.headOption.foreach(seriesKey => {
+            dataset.setString(Tag.SeriesInstanceUID, VR.UI, seriesKey.seriesInstanceUID)
+            dataset.setString(Tag.SeriesDescription, VR.LO, seriesKey.seriesDescription)
+            dataset.setString(Tag.ProtocolName, VR.LO, seriesKey.protocolName)
+            dataset.setString(Tag.FrameOfReferenceUID, VR.UI, seriesKey.frameOfReferenceUID)
+          })
         })
       })
       if (!keys.isEmpty)
@@ -378,6 +391,12 @@ object AnonymizationUtil {
         val studyKeys = keys.filter(_.studyInstanceUID == study.studyInstanceUID.value)
         studyKeys.headOption.foreach(studyKey => {
           anonDataset.setString(Tag.StudyInstanceUID, VR.UI, studyKey.anonStudyInstanceUID)
+          val series = datasetToSeries(dataset)
+          val seriesKeys = studyKeys.filter(_.seriesInstanceUID == series.seriesInstanceUID.value)
+          seriesKeys.headOption.foreach(seriesKey => {
+            anonDataset.setString(Tag.SeriesInstanceUID, VR.UI, seriesKey.anonSeriesInstanceUID)
+            anonDataset.setString(Tag.FrameOfReferenceUID, VR.UI, seriesKey.anonFrameOfReferenceUID)
+          })
         })
       })
     }

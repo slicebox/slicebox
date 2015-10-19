@@ -99,6 +99,34 @@ angular.module('slicebox.home', ['ngRoute'])
             }
         ];
 
+    $scope.flatSeriesActions =
+        [
+            {
+                name: 'Send',
+                action: confirmSendFlatSeries
+            },
+            {
+                name: 'Send to SCP',
+                action: confirmSendSeriesToScp
+            },   
+            {
+                name: 'Delete',
+                action: confirmDeleteSeries
+            },
+            {
+                name: 'Tag',
+                action: tagSeries
+            },
+            {
+                name: 'Anonymize',
+                action: confirmAnonymizeFlatSeries
+            },
+            {
+                name: 'Export',
+                action: confirmExportSeries
+            }
+        ];
+
     $scope.imageAttributesActions =
         [
             {
@@ -623,9 +651,9 @@ angular.module('slicebox.home', ['ngRoute'])
 
     function confirmSendPatients(patients) {
         return confirmSend('/api/boxes', function(receiverId) {
-            var imageIdToPatientPromise = createImageIdToPatientPromiseForPatients(patients);
+            var imageIdsAndPatientsPromise = createImageIdsAndPatientsPromiseForPatients(patients);
 
-            return showBoxSendTagValuesModal(imageIdToPatientPromise, function(imageTagValuesSeq) {
+            return showBoxSendTagValuesModal(imageIdsAndPatientsPromise, function(imageTagValuesSeq) {
                 return $http.post('/api/boxes/' + receiverId + '/send', imageTagValuesSeq);
             }, "sent", "send");
         });
@@ -633,24 +661,29 @@ angular.module('slicebox.home', ['ngRoute'])
 
     function confirmSendStudies(studies) {
         return confirmSend('/api/boxes', function(receiverId) {
-            var imageIdToPatientPromise = createImageIdToPatientPromiseForStudies(studies);
+            var imageIdsAndPatientsPromise = createImageIdsAndPatientsPromiseForStudies(studies);
 
-            return showBoxSendTagValuesModal(imageIdToPatientPromise, function (imageTagValuesSeq) {
+            return showBoxSendTagValuesModal(imageIdsAndPatientsPromise, function (imageTagValuesSeq) {
                 return $http.post('/api/boxes/' + receiverId + '/send', imageTagValuesSeq);
             }, "sent", "send");
         });
     }
 
     function confirmSendSeries(series) {
-        // check if flat series
-        series = series.map(function(s) {
-            return s.series ? s.series : s;
-        });
-
         return confirmSend('/api/boxes', function(receiverId) {
-            var imageIdToPatientPromise = createImageIdToPatientPromiseForSeries(series);
+            var imageIdsAndPatientsPromise = createImageIdsAndPatientsPromiseForSeries(series);
 
-            return showBoxSendTagValuesModal(imageIdToPatientPromise, function(imageTagValuesSeq) {
+            return showBoxSendTagValuesModal(imageIdsAndPatientsPromise, function(imageTagValuesSeq) {
+                return $http.post('/api/boxes/' + receiverId + '/send', imageTagValuesSeq);
+            }, "sent", "send");
+        });
+    }
+
+    function confirmSendFlatSeries(flatSeries) {
+        return confirmSend('/api/boxes', function(receiverId) {
+            var imageIdsAndPatientsPromise = createImageIdsAndPatientsPromiseForFlatSeries(flatSeries);
+
+            return showBoxSendTagValuesModal(imageIdsAndPatientsPromise, function(imageTagValuesSeq) {
                 return $http.post('/api/boxes/' + receiverId + '/send', imageTagValuesSeq);
             }, "sent", "send");
         });
@@ -721,35 +754,38 @@ angular.module('slicebox.home', ['ngRoute'])
 
     function confirmAnonymizePatients(patients) {
         openConfirmActionModal('Anonymize', 'Force anonymization of ' + patients.length + ' patient(s)? Patient information will be lost.', 'Ok', function() {
-            var imageIdToPatientPromise = createImageIdToPatientPromiseForPatients(patients);
+            var imageIdsAndPatientsPromise = createImageIdsAndPatientsPromiseForPatients(patients);
 
-            return anonymizeImages(imageIdToPatientPromise);
+            return anonymizeImages(imageIdsAndPatientsPromise);
         });
     }
 
     function confirmAnonymizeStudies(studies) {
         openConfirmActionModal('Anonymize', 'Force anonymization of ' + studies.length + ' study(s)? Patient information will be lost.', 'Ok', function() {
-            var imageIdToPatientPromise = createImageIdToPatientPromiseForStudies(studies);
+            var imageIdsAndPatientsPromise = createImageIdsAndPatientsPromiseForStudies(studies);
 
-            return anonymizeImages(imageIdToPatientPromise);
+            return anonymizeImages(imageIdsAndPatientsPromise);
         });
     } 
 
     function confirmAnonymizeSeries(series) {
-        // check if flat series
-        series = series.map(function(s) {
-            return s.series ? s.series : s;
-        });
-
         openConfirmActionModal('Anonymize', 'Force anonymization of ' + series.length + ' series? Patient information will be lost.', 'Ok', function() {
-            var imageIdToPatientPromise = createImageIdToPatientPromiseForSeries(series);
+            var imageIdsAndPatientsPromise = createImageIdsAndPatientsPromiseForSeries(series);
 
-            return anonymizeImages(imageIdToPatientPromise);
+            return anonymizeImages(imageIdsAndPatientsPromise);
         });
     }
 
-    function anonymizeImages(imageIdToPatientPromise) {
-        return showBoxSendTagValuesModal(imageIdToPatientPromise, function(imageTagValuesSeq) {
+    function confirmAnonymizeFlatSeries(flatSeries) {
+        openConfirmActionModal('Anonymize', 'Force anonymization of ' + series.length + ' series? Patient information will be lost.', 'Ok', function() {
+            var imageIdsAndPatientsPromise = createImageIdsAndPatientsPromiseForFlatSeries(flatSeries);
+
+            return anonymizeImages(imageIdsAndPatientsPromise);
+        });
+    }
+
+    function anonymizeImages(imageIdsAndPatientsPromise) {
+        return showBoxSendTagValuesModal(imageIdsAndPatientsPromise, function(imageTagValuesSeq) {
             var promises = imageTagValuesSeq.map(function(imageTagValues) {
                 return $http.post('/api/images/' + imageTagValues.imageId + '/anonymize', imageTagValues.tagValues);
             });
@@ -768,7 +804,7 @@ angular.module('slicebox.home', ['ngRoute'])
         }, "anonymized", "anonymize");
     }
 
-    function createImageIdToPatientPromiseForPatients(patients) {
+    function createImageIdsAndPatientsPromiseForPatients(patients) {
         var imageIdAndPatientsPromises = patients.map(function (patient) {
             return imagesForPatients([ patient ]).then(function (images) {
                 return images.map(function (image) {
@@ -777,36 +813,41 @@ angular.module('slicebox.home', ['ngRoute'])
             });
         });
 
-        return sbxMisc.flattenPromises(imageIdAndPatientsPromises).then(function(imageIdAndPatients) {
-            return imageIdAndPatients.reduce(function ( imageIdToPatient, imageIdAndPatient ) {
-                imageIdToPatient[ imageIdAndPatient.imageId ] = imageIdAndPatient.patient;
-                return imageIdToPatient;
-            }, {});                
-        });        
+        return sbxMisc.flattenPromises(imageIdAndPatientsPromises);
     }
 
-    function createImageIdToPatientPromiseForStudies(studies) {
+    function createImageIdsAndPatientsPromiseForStudies(studies) {
         return $http.get('/api/metadata/patients/' + studies[0].patientId).then(function (patient) {
             return imagesForStudies(studies).then(function (images) {
-                return images.reduce(function ( imageIdToPatient, image ) {
-                    imageIdToPatient[ image.id ] = patient.data;
-                    return imageIdToPatient;
-                }, {});                
-            });
-        });
-    }
-
-    function createImageIdToPatientPromiseForSeries(series) {
-        return $http.get('/api/metadata/studies/' + series[0].studyId).then(function (study) {
-            return $http.get('/api/metadata/patients/' + study.data.patientId).then(function (patient) {
-                return imagesForSeries(series).then(function (images) {
-                    return images.reduce(function ( imageIdToPatient, image ) {
-                        imageIdToPatient[ image.id ] = patient.data;
-                        return imageIdToPatient;
-                    }, {});                
+                return images.map(function (image) {
+                    return { imageId: image.id, patient: patient.data };
                 });
             });
         });
+    }
+
+    function createImageIdsAndPatientsPromiseForSeries(series) {
+        return $http.get('/api/metadata/studies/' + series[0].studyId).then(function (study) {
+            return $http.get('/api/metadata/patients/' + study.data.patientId).then(function (patient) {
+                return imagesForSeries(series).then(function (images) {
+                    return images.map(function (image) {
+                        return { imageId: image.id, patient: patient.data };
+                    });
+                });
+            });
+        });
+    }
+
+    function createImageIdsAndPatientsPromiseForFlatSeries(flatSeries) {
+        var imageIdAndPatientsPromises = flatSeries.map(function (fs) {
+            return imagesForSeries([ fs.series ]).then(function (images) {
+                return images.map(function (image) {
+                    return { imageId: image.id, patient: fs.patient };
+                });
+            });        
+        });
+
+        return sbxMisc.flattenPromises(imageIdAndPatientsPromises);
     }
 
     function tagSeriesForPatients(patients) {
@@ -824,13 +865,13 @@ angular.module('slicebox.home', ['ngRoute'])
         openTagSeriesModal($q.when(seriesIds)).then(function() { return updateSeriesTagsPromise(); });
     }
 
-    function showBoxSendTagValuesModal(imageIdToPatientPromise, actionCallback, actionStringPastTense, actionString) {
+    function showBoxSendTagValuesModal(imageIdsAndPatientsPromise, actionCallback, actionStringPastTense, actionString) {
         return $mdDialog.show({
                 templateUrl: '/assets/partials/tagValuesModalContent.html',
                 controller: 'TagValuesCtrl',
                 scope: $scope.$new(),
                 locals: {
-                    imageIdToPatient: imageIdToPatientPromise,
+                    imageIdsAndPatients: imageIdsAndPatientsPromise,
                     actionCallback: actionCallback,
                     actionStringPastTense: actionStringPastTense,
                     actionString: actionString
@@ -912,22 +953,23 @@ angular.module('slicebox.home', ['ngRoute'])
 
 })
 
-.controller('TagValuesCtrl', function($scope, $mdDialog, $http, sbxToast, imageIdToPatient, actionCallback, actionStringPastTense, actionString) {
+.controller('TagValuesCtrl', function($scope, $mdDialog, $http, sbxToast, imageIdsAndPatients, actionCallback, actionStringPastTense, actionString) {
     // Initialization
     $scope.title = 'Anonymization Options';
-
-    // get unique patients and an their respective indices
     $scope.patients = [];
     var imageIds = [];
-    for (var imageId in imageIdToPatient) {
-        imageIds.push(parseInt(imageId));
-        if (imageIdToPatient.hasOwnProperty(imageId)) {
-            var patient = imageIdToPatient[imageId];
-            if ($scope.patients.indexOf(patient) < 0) {
-                $scope.patients.push(patient);
-            }
+
+    // get unique patients and and their respective indices
+    imageIdsAndPatients.forEach(function (imageIdAndPatient) {
+        imageIds.push(imageIdAndPatient.imageId);
+
+        var patient = imageIdAndPatient.patient;
+        if ($scope.patients.filter(function (aPatient) { return aPatient.id === patient.id; }).length === 0) {
+            $scope.patients.push(patient);
         }
-    }
+    });
+
+    var patientIds = $scope.patients.map(function (patient) { return patient.id; });
 
     $scope.namePrefix = "anon";
     $scope.numberingLength = 3;
@@ -949,10 +991,10 @@ angular.module('slicebox.home', ['ngRoute'])
 
     $scope.actionButtonClicked = function() {
         var imageTagValuesSeq = [];
-        for (var i = 0; i < imageIds.length; i++) {
-            var imageId = imageIds[i];
-            var patient = imageIdToPatient[imageId];
-            var patientIndex = $scope.patients.indexOf(patient);
+        for (var i = 0; i < imageIdsAndPatients.length; i++) {
+            var imageId = imageIdsAndPatients[i].imageId;
+            var patient = imageIdsAndPatients[i].patient;
+            var patientIndex = patientIds.indexOf(patient.id);
             var anonName = $scope.anonymizedPatientNames[patientIndex];
             imageTagValuesSeq.push( { imageId: imageId, tagValues: [ { tag: 0x00100010, value: anonName } ] } );
         }
@@ -983,7 +1025,7 @@ angular.module('slicebox.home', ['ngRoute'])
     
 })
 
-.controller('AddSeriesTypeRuleFromTagValuesModalCtrl', function($scope, $mdDialog, $http, $q, tagValues) {
+.controller('AddSeriesTypeRuleFromTagValuesModalCtrl', function($scope, $mdDialog, $http, $q, sbxToast, tagValues) {
     // Initialization
     $scope.tagValues = tagValues;
 

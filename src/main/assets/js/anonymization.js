@@ -56,10 +56,12 @@ angular.module('slicebox.anonymization', ['ngRoute'])
     $scope.exportToCsv = function(keys) {
         var csv = 
             "Id;Created;Patient Birth Date;Patient Name;Anonymous Patient Name;Patient ID;Anonymous Patient ID;" + 
-            "Study Instance UID;Anonymous Study Instance UID;Study ID;Accession Number\n" +
+            "Study Instance UID;Anonymous Study Instance UID;Study Description;Study ID;Accession Number;" + 
+            "Series Instance UID;Anonymous Series Instance UID;Series Description;Protocol Name;Frame Of Reference UID;Anonymous Frame Of Reference UID\n" +
             keys.map(function (key) {
                 return key.id + ";" + key.created + ";" + key.patientBirthDate + ";" + key.patientName + ";" + key.anonPatientName + ";" + key.patientID + ";" + key.anonPatientID + ";" + 
-                    key.studyInstanceUID + ";" + key.anonStudyInstanceUID + ";" + key.studyID + ";" + key.accessionNumber;
+                    key.studyInstanceUID + ";" + key.anonStudyInstanceUID + ";" + key.studyDescription + ";" + key.studyID + ";" + key.accessionNumber + ";" +
+                    key.seriesInstanceUID + ";" + key.anonSeriesInstanceUID + ";" + key.seriesDescription + ";" + key.protocolName + ";" + key.frameOfReferenceUID + ";" + key.anonFrameOfReferenceUID;
             }).join("\n");
         var anchor = "<a class='md-button md-primary' href='data:text/csv;charset=UTF-8," + encodeURIComponent(csv) + "' download='slicebox-anonymization-keys.csv'>Download CSV</a>";
         var textBoxHeader = '<h4>...or copy these values to the clipboard:</h4>';
