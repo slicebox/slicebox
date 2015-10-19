@@ -28,7 +28,6 @@
             <md-select aria-label="Page Size" placeholder="Page Size" ng-model="$parent.pageSize" md-on-close="pageSizeChanged()">
                 <md-option ng-repeat="pSize in pageSizes" ng-value="pSize">{{pSize}}</md-option>
             </md-select>
-            <md-tooltip md-direction="top">Page Size</md-tooltip>
         </div>
 
         <md-button aria-label="Refresh" class="md-icon-button grid-menu-button" ng-if="refreshButtonEnabled()" ng-click="refresh()">
