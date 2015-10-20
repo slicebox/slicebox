@@ -74,6 +74,11 @@ trait UserRoutes { this: RestApi =>
           }
         }
       }
+    } ~ path("logout") {
+      post {
+            onSuccess(userService.ask(DeleteUser(userId))) {
+        
+      }
     }
 
 }

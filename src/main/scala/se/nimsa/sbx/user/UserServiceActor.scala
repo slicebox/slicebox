@@ -28,7 +28,7 @@ import java.util.UUID
 import akka.actor.actorRef2Scala
 import se.nimsa.sbx.app.DbProps
 
-class UserServiceActor(dbProps: DbProps, superUser: String, superPassword: String) extends Actor with ExceptionCatching {
+class UserServiceActor(dbProps: DbProps, superUser: String, superPassword: String, sessionTimeout: Long) extends Actor with ExceptionCatching {
   val log = Logging(context.system, this)
 
   val db = dbProps.db
@@ -68,9 +68,13 @@ class UserServiceActor(dbProps: DbProps, superUser: String, superPassword: Strin
 
           case GetUserByToken(token) =>
             db.withSession { implicit session =>
-              sender ! dao.userByTokenAndIp(token.token, token.ip)
+              sender ! dao.userSessionByTokenAndIp(token.token, token.ip)
+                .filter {
+                  case (user, session) =>
+                    session.lastUpdated > (System.currentTimeMillis() - sessionTimeout)
+                }.map(_._1)
             }
-            
+
           case GetUsers =>
             db.withSession { implicit session =>
               sender ! Users(dao.listUsers)
@@ -103,5 +107,5 @@ class UserServiceActor(dbProps: DbProps, superUser: String, superPassword: Strin
 }
 
 object UserServiceActor {
-  def props(dbProps: DbProps, superUser: String, superPassword: String): Props = Props(new UserServiceActor(dbProps, superUser, superPassword))
+  def props(dbProps: DbProps, superUser: String, superPassword: String, sessionTimeout: Long): Props = Props(new UserServiceActor(dbProps, superUser, superPassword, sessionTimeout))
 }

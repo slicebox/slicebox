@@ -69,8 +69,14 @@ class UserDAO(val driver: JdbcProfile) {
   def userByName(user: String)(implicit session: Session): Option[ApiUser] =
     userQuery.filter(_.user === user).firstOption
 
-  def userByTokenAndIp(token: String, ip: String): Option[ApiUser] =
-    null
+  def userSessionByTokenAndIp(token: String, ip: String)(implicit session: Session): Option[(ApiUser, ApiSession)] =
+    (for {
+      user <- userQuery
+      session <- sessionQuery if session.userId == user.id
+    } yield (user, session))
+      .filter(_._2.token === token)
+      .filter(_._2.ip === ip)
+      .firstOption
 
   def removeUser(userId: Long)(implicit session: Session): Unit =
     userQuery.filter(_.id === userId).delete
