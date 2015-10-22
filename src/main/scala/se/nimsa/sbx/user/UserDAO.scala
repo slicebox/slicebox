@@ -37,26 +37,29 @@ class UserDAO(val driver: JdbcProfile) {
 
   val userQuery = TableQuery[UserTable]
 
-  val toSession = (id: Long, userId: Long, token: String, ip: String, lastUpdated: Long) => ApiSession(id, userId, token, ip, lastUpdated)
-  val fromSession = (session: ApiSession) => Option((session.id, session.userId, session.token, session.ip, session.lastUpdated))
+  val toSession = (id: Long, userId: Long, token: String, ip: Option[String], userAgent: Option[String], lastUpdated: Long) => ApiSession(id, userId, token, ip, userAgent, lastUpdated)
+  val fromSession = (session: ApiSession) => Option((session.id, session.userId, session.token, session.ip, session.userAgent, session.lastUpdated))
 
   class SessionTable(tag: Tag) extends Table[ApiSession](tag, "ApiSession") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def userId = column[Long]("userid")
     def token = column[String]("token")
-    def ip = column[String]("ip")
+    def ip = column[Option[String]]("ip")
+    def userAgent = column[Option[String]]("ip")
     def lastUpdated = column[Long]("lastupdated")
     def fkUser = foreignKey("fk_user", userId, userQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
-    def * = (id, userId, token, ip, lastUpdated) <> (toSession.tupled, fromSession)
+    def * = (id, userId, token, ip, userAgent, lastUpdated) <> (toSession.tupled, fromSession)
   }
 
   val sessionQuery = TableQuery[SessionTable]
 
-  def create(implicit session: Session) =
+  
+  def create(implicit session: Session) = {
     if (MTable.getTables("User").list.isEmpty) userQuery.ddl.create
-
+    if (MTable.getTables("ApiSession").list.isEmpty) sessionQuery.ddl.create
+  }
   def drop(implicit session: Session): Unit =
-    (userQuery.ddl).drop
+    (userQuery.ddl ++ sessionQuery.ddl).drop
 
   def insert(user: ApiUser)(implicit session: Session) = {
     val generatedId = (userQuery returning userQuery.map(_.id)) += user
@@ -69,13 +72,14 @@ class UserDAO(val driver: JdbcProfile) {
   def userByName(user: String)(implicit session: Session): Option[ApiUser] =
     userQuery.filter(_.user === user).firstOption
 
-  def userSessionByTokenAndIp(token: String, ip: String)(implicit session: Session): Option[(ApiUser, ApiSession)] =
+  def userSessionByTokenIpAndUserAgent(token: String, ip: Option[String], userAgent: Option[String])(implicit session: Session): Option[(ApiUser, ApiSession)] =
     (for {
       user <- userQuery
       session <- sessionQuery if session.userId == user.id
     } yield (user, session))
       .filter(_._2.token === token)
       .filter(_._2.ip === ip)
+      .filter(_._2.userAgent === userAgent)
       .firstOption
 
   def removeUser(userId: Long)(implicit session: Session): Unit =
@@ -83,5 +87,16 @@ class UserDAO(val driver: JdbcProfile) {
 
   def listUsers(implicit session: Session): List[ApiUser] =
     userQuery.list
+
+  def userSessionByUserIdIpAndAgent(userId: Long, ip: Option[String], userAgent: Option[String])(implicit session: Session): Option[ApiSession] =
+    (for {
+      user <- userQuery
+      session <- sessionQuery if session.userId == user.id
+    } yield (user, session))
+      .filter(_._1.id === userId)
+      .filter(_._2.ip === ip)
+      .filter(_._2.userAgent === userAgent)
+      .map(_._2)
+      .firstOption
 
 }

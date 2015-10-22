@@ -26,6 +26,8 @@ import se.nimsa.sbx.app.RestApi
 import se.nimsa.sbx.user.UserProtocol._
 import spray.routing.authentication.UserPass
 import spray.http.HttpCookie
+import spray.http.HttpHeader
+import spray.http.HttpHeaders.`User-Agent`
 
 trait UserRoutes { this: RestApi =>
 
@@ -35,8 +37,14 @@ trait UserRoutes { this: RestApi =>
         entity(as[UserPass]) { userPass =>
           onSuccess(userService.ask(GetUserByName(userPass.user)).mapTo[Option[ApiUser]]) {
             case Some(repoUser) if (repoUser.passwordMatches(userPass.pass)) =>
-              setCookie(HttpCookie("slicebox-user", content = repoUser.user)) {
-                complete(LoginResult(true, repoUser.role, s"User ${userPass.user} logged in"))
+              clientIP { ip =>
+                optionalHeaderValue(extractUserAgent) { userAgent =>
+                  onSuccess(userService.ask(GetSessionForUserIpAndAgent(repoUser, ip.toOption.map(_.toString), userAgent)).mapTo[ApiSession]) { session =>
+                    setCookie(HttpCookie("slicebox-user", content = session.token)) {
+                      complete(LoginResult(true, repoUser.role, s"User ${userPass.user} logged in"))
+                    }
+                  }
+                }
               }
             case _ =>
               complete(LoginResult(false, UserRole.USER, "Incorrect username or password"))
@@ -44,6 +52,11 @@ trait UserRoutes { this: RestApi =>
         }
       }
     }
+
+  def extractUserAgent: HttpHeader => Option[String] = {
+    case a: `User-Agent` => Some(a.value)
+    case x               => None
+  }
 
   def userRoutes(authInfo: AuthInfo): Route =
     pathPrefix("users") {
@@ -76,8 +89,9 @@ trait UserRoutes { this: RestApi =>
       }
     } ~ path("logout") {
       post {
-            onSuccess(userService.ask(DeleteUser(userId))) {
-        
+        onSuccess(userService.ask(DeleteSessionForUser(authInfo.user))) {
+          case _ => complete(NoContent)
+        }
       }
     }
 

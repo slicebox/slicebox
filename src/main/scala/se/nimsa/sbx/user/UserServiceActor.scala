@@ -66,15 +66,26 @@ class UserServiceActor(dbProps: DbProps, superUser: String, superPassword: Strin
               sender ! dao.userByName(user)
             }
 
-          case GetUserByToken(token) =>
+          case GetUserByAuthKey(authKey) =>
             db.withSession { implicit session =>
-              sender ! dao.userSessionByTokenAndIp(token.token, token.ip)
+              sender ! dao.userSessionByTokenIpAndUserAgent(authKey.token, authKey.ip, authKey.userAgent)
                 .filter {
                   case (user, session) =>
                     session.lastUpdated > (System.currentTimeMillis() - sessionTimeout)
                 }.map(_._1)
             }
 
+          case GetSessionForUserIpAndAgent(apiUser, ip, userAgent) =>
+            db.withSession { implicit session =>
+              sender ! dao.userSessionByUserIdIpAndAgent(apiUser.id, ip, userAgent)
+            }
+            
+          case DeleteSessionForUser(apiUser) =>
+            db.withSession { implicit session =>
+              // TODO dao.deleteSessionForUserId(apiUser.id)
+              sender ! SessionDeleted(apiUser.id)
+            }
+            
           case GetUsers =>
             db.withSession { implicit session =>
               sender ! Users(dao.listUsers)

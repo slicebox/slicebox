@@ -20,6 +20,7 @@ import org.mindrot.jbcrypt.BCrypt
 import com.github.t3hnar.bcrypt.Password
 import com.github.t3hnar.bcrypt.generateSalt
 import se.nimsa.sbx.model.Entity
+import java.net.InetAddress
 
 object UserProtocol {
   
@@ -53,9 +54,9 @@ object UserProtocol {
   
   }
 
-  case class ApiSession(id: Long, userId: Long, token: String, ip: String, lastUpdated: Long) extends Entity
+  case class ApiSession(id: Long, userId: Long, token: String, ip: Option[String], userAgent: Option[String], lastUpdated: Long) extends Entity
   
-  case class AuthToken(token: String, ip: String)
+  case class AuthKey(token: String, ip: Option[String], userAgent: Option[String])
   
   case class LoginResult(success: Boolean, role: UserRole, message: String)
   
@@ -69,9 +70,12 @@ object UserProtocol {
   
   case class GetUser(userId: Long) extends UserRequest
   case class GetUserByName(user: String) extends UserRequest
-  case class GetUserByToken(token: AuthToken) extends UserRequest
-    
+  case class GetUserByAuthKey(token: AuthKey) extends UserRequest
+  case class GetSessionForUserIpAndAgent(apiUser: ApiUser, ip: Option[String], userAgent: Option[String]) extends UserRequest
+  case class DeleteSessionForUser(apiUser: ApiUser) extends UserRequest
   case class DeleteUser(userId: Long) extends UserRequest
+
   case class UserDeleted(userId: Long)
+  case class SessionDeleted(userId: Long)
   
 }

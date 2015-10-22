@@ -23,7 +23,11 @@ import se.nimsa.sbx.user.UserProtocol.UserRole
 import spray.routing.ExceptionHandler
 import se.nimsa.sbx.lang.NotFoundException
 import se.nimsa.sbx.lang.BadGatewayException
-import se.nimsa.sbx.user.UserProtocol.AuthToken
+import se.nimsa.sbx.user.UserProtocol.AuthKey
+import spray.http.HttpHeader
+import spray.http.HttpHeaders.`User-Agent`
+import spray.http.RemoteAddress
+import shapeless._
 
 trait SliceboxRoutes extends DirectoryRoutes
     with ScpRoutes
@@ -49,11 +53,16 @@ trait SliceboxRoutes extends DirectoryRoutes
         complete((BadGateway, e.getMessage()))
     }
 
+  val optionalAuthKey: Directive1[Option[AuthKey]] =
+    (optionalHeaderValue(extractUserAgent) & clientIP & optionalCookie("slicebox-session")).hmap {
+      case userAgent :: ip :: optionalCookie :: HNil =>
+        optionalCookie.map(cookie => AuthKey(cookie.content, ip.toOption.map(_.getHostAddress), userAgent))
+    }
+
   def sliceboxRoutes: Route =
-    pathPrefix("api") { ctx =>
-      optionalCookie("slicebox-user") { optionalCookie =>
-        val optionalToken = optionalCookie.map(cookie => AuthToken(cookie.content, ctx.request.uri.path.toString))
-        authenticate(authenticator.basicUserAuthenticator(optionalToken)) { authInfo =>
+    pathPrefix("api") {
+      optionalAuthKey { optionalAuthKey =>
+        authenticate(authenticator.basicUserAuthenticator(optionalAuthKey)) { authInfo =>
           directoryRoutes(authInfo) ~
             scpRoutes(authInfo) ~
             scuRoutes(authInfo) ~
