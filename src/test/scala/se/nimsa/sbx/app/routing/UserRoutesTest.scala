@@ -7,6 +7,7 @@ import se.nimsa.sbx.user.UserProtocol._
 import se.nimsa.sbx.user.UserProtocol.UserRole._
 
 import spray.http.StatusCodes._
+import spray.http.BasicHttpCredentials
 
 class UserRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
@@ -15,6 +16,8 @@ class UserRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   val user = ClearTextUser("name", ADMINISTRATOR, "password")
   var responseUser: ApiUser = null
   
+  val invalidCredentials = BasicHttpCredentials("john", "password")
+
   "The system" should "return the new user when a new user is added" in {
     PostAsAdmin("/api/users", user) ~> routes ~> check {
       responseUser = responseAs[ApiUser]
@@ -51,18 +54,22 @@ class UserRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
   }
   
-  it should "not be possible to generate tokens using token authentication" in {
-    val tokens = Post("/api/users/generateauthtokens?n=1") ~> addCredentials(userCredentials) ~> routes ~> check {
-      status should be (Created)
-      responseAs[List[AuthToken]]
-    }
-    
-    tokens.size should be (1)
-    val token = tokens(0).token
-    
-    Post(s"/api/users/generateauthtokens?authtoken=$token&n=1") ~> sealRoute(routes) ~> check {
+  it should "respond with Unautorized when requesting an arbitrary URL under /api without any credentials" in {
+    Get("/api/some/url") ~> sealRoute(routes) ~> check {
       status should be (Unauthorized)
-    }    
+    }   
+  }
+
+  it should "respond with Unautorized when requesting an arbitrary URL under /api with bad credentials" in {
+    Get("/api/some/url") ~> addCredentials(invalidCredentials) ~> sealRoute(routes) ~> check {
+      status should be (Unauthorized)
+    }   
+  }
+  
+  it should "respond with OK when using no auth token and valid credentials" in {
+    Get(s"/api/metadata/patients") ~> addCredentials(userCredentials) ~> routes ~> check {
+      status should be (OK)
+    }
   }
   
 }

@@ -58,6 +58,8 @@ import org.dcm4che3.net.pdu.CommonExtendedNegotiation
 import scala.collection.JavaConversions._
 import java.nio.file.Path
 import ScuProtocol.ScuData
+import se.nimsa.sbx.log.SbxLog
+import akka.actor.ActorSystem
 
 class RelatedGeneralSOPClasses {
 
@@ -78,7 +80,7 @@ class RelatedGeneralSOPClasses {
 
 case class FileInfo(iuid: String, cuid: String, ts: String, endFmi: Long, file: File)
 
-class Scu(ae: ApplicationEntity, scuData: ScuData) {
+class Scu(ae: ApplicationEntity, scuData: ScuData)(implicit system: ActorSystem) {
   val remote = new Connection()
   val rq = new AAssociateRQ()
 
@@ -204,20 +206,18 @@ class Scu(ae: ApplicationEntity, scuData: ScuData) {
       case Status.CoercionOfDataElements =>
       case Status.ElementsDiscarded      =>
       case Status.DataSetDoesNotMatchSOPClassWarning =>
-        System.err.println(MessageFormat.format("warning",
-          TagUtils.shortToHexString(status), f))
-        System.err.println(cmd)
+        SbxLog.warn("SCU", MessageFormat.format("warning",
+          TagUtils.shortToHexString(status) + "\n" + cmd.toString, f))
       case _ =>
-        System.err.println(MessageFormat.format("error",
-          TagUtils.shortToHexString(status), f))
-        System.err.println(cmd)
+        SbxLog.warn("SCU", MessageFormat.format("error",
+          TagUtils.shortToHexString(status) + "\n" + cmd.toString, f))
     }
   }
 }
 
 object Scu {
 
-  def sendFiles(scuData: ScuData, files: Seq[Path]): Unit = {
+  def sendFiles(scuData: ScuData, files: Seq[Path])(implicit system: ActorSystem): Unit = {
     val device = new Device("slicebox-scu")
     val connection = new Connection()
     device.addConnection(connection)

@@ -53,7 +53,8 @@ class UserServiceActor(dbProps: DbProps, superUser: String, superPassword: Strin
               throw new IllegalArgumentException("Superusers may not be added")
 
             db.withSession { implicit session =>
-              sender ! UserAdded(dao.userByName(apiUser.user).getOrElse(dao.insert(apiUser)))
+              val g = dao.userByName(apiUser.user).getOrElse(dao.insert(apiUser))
+              sender ! UserAdded(g)
             }
 
           case GetUser(userId) =>
@@ -66,26 +67,43 @@ class UserServiceActor(dbProps: DbProps, superUser: String, superPassword: Strin
               sender ! dao.userByName(user)
             }
 
-          case GetUserByAuthKey(authKey) =>
+          case GetAndRefreshUserByAuthKey(authKey) =>
             db.withSession { implicit session =>
-              sender ! dao.userSessionByTokenIpAndUserAgent(authKey.token, authKey.ip, authKey.userAgent)
-                .filter {
-                  case (user, session) =>
-                    session.lastUpdated > (System.currentTimeMillis() - sessionTimeout)
-                }.map(_._1)
+              val validUserAndSession =
+                authKey.token.flatMap(token =>
+                  dao.userSessionByTokenIpAndUserAgent(token, authKey.ip, authKey.userAgent))
+                  .filter {
+                    case (user, apiSession) =>
+                      apiSession.lastUpdated > (currentTime - sessionTimeout)
+                  }
+
+              validUserAndSession.foreach {
+                case (user, apiSession) =>
+                  dao.updateSession(apiSession.copy(lastUpdated = currentTime))
+              }
+
+              sender ! validUserAndSession.map(_._1)
             }
 
-          case GetSessionForUserIpAndAgent(apiUser, ip, userAgent) =>
+          case CreateOrUpdateSession(apiUser, ip, userAgent) =>
             db.withSession { implicit session =>
-              sender ! dao.userSessionByUserIdIpAndAgent(apiUser.id, ip, userAgent)
+              sender ! dao.userSessionByUserIdIpAndUserAgent(apiUser.id, ip, userAgent)
+                .map(apiSession => {
+                  val updatedSession = apiSession.copy(lastUpdated = currentTime)
+                  dao.updateSession(updatedSession)
+                  updatedSession
+                })
+                .getOrElse {
+                  dao.insertSession(ApiSession(-1, apiUser.id, newSessionToken, ip, userAgent, currentTime))
+                }
             }
-            
-          case DeleteSessionForUser(apiUser) =>
+
+          case DeleteSession(apiUser, ip, userAgent) =>
             db.withSession { implicit session =>
-              // TODO dao.deleteSessionForUserId(apiUser.id)
+              dao.deleteSessionByUserIdIpAndUserAgent(apiUser.id, ip, userAgent)
               sender ! SessionDeleted(apiUser.id)
             }
-            
+
           case GetUsers =>
             db.withSession { implicit session =>
               sender ! Users(dao.listUsers)
@@ -97,7 +115,7 @@ class UserServiceActor(dbProps: DbProps, superUser: String, superPassword: Strin
                 .filter(_.role == UserRole.SUPERUSER)
                 .foreach(superuser => throw new IllegalArgumentException("Superuser may not be deleted"))
 
-              dao.removeUser(userId)
+              dao.deleteUserByUserId(userId)
               sender ! UserDeleted(userId)
             }
 
@@ -110,11 +128,14 @@ class UserServiceActor(dbProps: DbProps, superUser: String, superPassword: Strin
     db.withSession { implicit session =>
       val superUsers = dao.listUsers.filter(_.role == UserRole.SUPERUSER)
       if (superUsers.isEmpty || superUsers(0).user != superUser || !superUsers(0).passwordMatches(superPassword)) {
-        superUsers.foreach(superUser => dao.removeUser(superUser.id))
+        superUsers.foreach(superUser => dao.deleteUserByUserId(superUser.id))
         dao.insert(ApiUser(-1, superUser, UserRole.SUPERUSER).withPassword(superPassword))
       }
     }
 
+  private def newSessionToken = UUID.randomUUID.toString
+
+  private def currentTime = System.currentTimeMillis
 }
 
 object UserServiceActor {

@@ -34,19 +34,24 @@ class Authenticator(userService: ActorRef) {
 
   implicit val timeout = Timeout(10.seconds)
 
-  def basicUserAuthenticator(optionalAuthKey: Option[AuthKey])(implicit ec: ExecutionContext): AuthMagnet[AuthInfo] = {
+  def sliceboxAuthenticator(authKey: AuthKey)(implicit ec: ExecutionContext): AuthMagnet[AuthInfo] = {
 
-    def validateUser(optionalUserPass: Option[UserPass]): Future[Option[AuthInfo]] =
-      optionalAuthKey
-        .map(authKey =>
-          userService.ask(GetUserByAuthKey(authKey)).mapTo[Option[ApiUser]].map(_.map(AuthInfo(_))))
-        .orElse(
-          optionalUserPass.map(userPass =>
-            userService.ask(GetUserByName(userPass.user)).mapTo[Option[ApiUser]].map {
-              case Some(repoUser) if (repoUser.passwordMatches(userPass.pass)) => Some(new AuthInfo(repoUser))
-              case _ => None
-            }))
-        .getOrElse(Future.successful(None))
+    println("creating authenticator with auth key " + authKey)
+    
+    def validateUser(optionalUserPass: Option[UserPass]): Future[Option[AuthInfo]] = optionalUserPass
+      .map(userPass => {
+        println("Doing basic auth: " + userPass)
+        userService.ask(GetUserByName(userPass.user)).mapTo[Option[ApiUser]].map(_ match {
+          case Some(repoUser) if (repoUser.passwordMatches(userPass.pass)) =>
+            Some(new AuthInfo(repoUser))
+          case _ =>
+            None
+        })})
+      .getOrElse {
+        println("Doing token auth: " + authKey)
+        userService.ask(GetAndRefreshUserByAuthKey(authKey)).mapTo[Option[ApiUser]].map(
+          _.map(AuthInfo(_)))
+      }
 
     def authenticator(userPass: Option[UserPass]): Future[Option[AuthInfo]] = validateUser(userPass)
 

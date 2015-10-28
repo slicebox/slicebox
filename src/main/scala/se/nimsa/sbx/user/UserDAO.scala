@@ -53,7 +53,6 @@ class UserDAO(val driver: JdbcProfile) {
 
   val sessionQuery = TableQuery[SessionTable]
 
-  
   def create(implicit session: Session) = {
     if (MTable.getTables("User").list.isEmpty) userQuery.ddl.create
     if (MTable.getTables("ApiSession").list.isEmpty) sessionQuery.ddl.create
@@ -61,7 +60,7 @@ class UserDAO(val driver: JdbcProfile) {
   def drop(implicit session: Session): Unit =
     (userQuery.ddl ++ sessionQuery.ddl).drop
 
-  def insert(user: ApiUser)(implicit session: Session) = {
+  def insert(user: ApiUser)(implicit session: Session): ApiUser = {
     val generatedId = (userQuery returning userQuery.map(_.id)) += user
     user.copy(id = generatedId)
   }
@@ -82,13 +81,13 @@ class UserDAO(val driver: JdbcProfile) {
       .filter(_._2.userAgent === userAgent)
       .firstOption
 
-  def removeUser(userId: Long)(implicit session: Session): Unit =
+  def deleteUserByUserId(userId: Long)(implicit session: Session): Unit =
     userQuery.filter(_.id === userId).delete
 
   def listUsers(implicit session: Session): List[ApiUser] =
     userQuery.list
 
-  def userSessionByUserIdIpAndAgent(userId: Long, ip: Option[String], userAgent: Option[String])(implicit session: Session): Option[ApiSession] =
+  def userSessionByUserIdIpAndUserAgent(userId: Long, ip: Option[String], userAgent: Option[String])(implicit session: Session): Option[ApiSession] =
     (for {
       user <- userQuery
       session <- sessionQuery if session.userId == user.id
@@ -98,5 +97,18 @@ class UserDAO(val driver: JdbcProfile) {
       .filter(_._2.userAgent === userAgent)
       .map(_._2)
       .firstOption
+
+  def insertSession(apiSession: ApiSession)(implicit session: Session) =
+    sessionQuery += apiSession
+
+  def updateSession(apiSession: ApiSession)(implicit session: Session) =
+    sessionQuery.filter(_.id === apiSession.id).update(apiSession)
+
+  def deleteSessionByUserIdIpAndUserAgent(userId: Long, ip: Option[String], userAgent: Option[String])(implicit session: Session) =
+    sessionQuery
+      .filter(_.userId === userId)
+      .filter(_.ip === ip)
+      .filter(_.userAgent === userAgent)
+      .delete
 
 }
