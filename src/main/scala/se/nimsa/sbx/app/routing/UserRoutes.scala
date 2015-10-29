@@ -19,6 +19,7 @@ package se.nimsa.sbx.app.routing
 import akka.pattern.ask
 import spray.http.StatusCodes.Created
 import spray.http.StatusCodes.NoContent
+import spray.http.StatusCodes.BadRequest
 import spray.httpx.SprayJsonSupport._
 import spray.routing._
 import se.nimsa.sbx.user.AuthInfo
@@ -33,10 +34,9 @@ import spray.http.HttpHeader
 import spray.http.HttpHeaders._
 import spray.http.RemoteAddress
 import shapeless._
+import se.nimsa.sbx.user.UserServiceActor
 
 trait UserRoutes { this: RestApi =>
-
-  val sessionField = "slicebox-session"
 
   val extractUserAgent: HttpHeader => Option[String] = {
     case a: `User-Agent` => Some(a.value)
@@ -49,9 +49,9 @@ trait UserRoutes { this: RestApi =>
       headerValuePF { case h if h.is("x-real-ip") => RemoteAddress(h.value) } |
       provide(RemoteAddress.Unknown)
 
-  val extractAuthKey: Directive1[AuthKey] =
-    (optionalHeaderValue(extractUserAgent) & extractIP & optionalCookie(sessionField)).hmap {
-      case optionalUserAgent :: ip :: optionalCookie :: HNil =>
+  def extractAuthKey: Directive1[AuthKey] =
+    (optionalCookie(sessionField) & extractIP & optionalHeaderValue(extractUserAgent)).hmap {
+      case optionalCookie :: ip :: optionalUserAgent :: HNil =>
         AuthKey(optionalCookie.map(_.content), ip.toOption.map(_.getHostAddress), optionalUserAgent)
     }
 
@@ -62,11 +62,13 @@ trait UserRoutes { this: RestApi =>
           onSuccess(userService.ask(GetUserByName(userPass.user)).mapTo[Option[ApiUser]]) {
             case Some(repoUser) if (repoUser.passwordMatches(userPass.pass)) =>
               extractAuthKey { authKey =>
-                onSuccess(userService.ask(CreateOrUpdateSession(repoUser, authKey.ip, authKey.userAgent)).mapTo[ApiSession]) { session =>
-                  setCookie(HttpCookie(sessionField, content = session.token)) {
-                    complete(LoginResult(true, repoUser.role, s"User ${userPass.user} logged in"))
-                  }
-                }
+                authKey.ip.flatMap(ip =>
+                  authKey.userAgent.map(userAgent =>
+                    onSuccess(userService.ask(CreateOrUpdateSession(repoUser, ip, userAgent)).mapTo[ApiSession]) { session =>
+                      setCookie(HttpCookie(sessionField, content = session.token)) {
+                        complete(LoginResult(true, repoUser.role, s"User ${userPass.user} logged in"))
+                      }
+                    })).getOrElse(complete(LoginResult(false, UserRole.USER, "IP address and user agent must be available in request.")))
               }
             case _ =>
               complete(LoginResult(false, UserRole.USER, "Incorrect username or password"))
@@ -75,13 +77,17 @@ trait UserRoutes { this: RestApi =>
       }
     }
 
-  def logoutRoute(authInfo: AuthInfo): Route =
+  def logoutRoute: Route =
     path("logout") {
-      post {
-        extractAuthKey { authKey =>
-          onSuccess(userService.ask(DeleteSession(authInfo.user, authKey.ip, authKey.userAgent))) {
-            case SessionDeleted(userId) =>
-              complete(NoContent)
+      extractAuthKey { authKey =>
+        authenticate(authenticator.sliceboxAuthenticator(authKey)) { authInfo =>
+          post {
+            onSuccess(userService.ask(DeleteSession(authInfo.user, authKey))) {
+              case SessionDeleted(userId) =>
+                deleteCookie(sessionField) {
+                  complete(NoContent)
+                }
+            }
           }
         }
       }

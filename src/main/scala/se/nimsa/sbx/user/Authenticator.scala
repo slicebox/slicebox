@@ -37,7 +37,7 @@ class Authenticator(userService: ActorRef) {
   def sliceboxAuthenticator(authKey: AuthKey)(implicit ec: ExecutionContext): AuthMagnet[AuthInfo] = {
 
     println("creating authenticator with auth key " + authKey)
-    
+
     def validateUser(optionalUserPass: Option[UserPass]): Future[Option[AuthInfo]] = optionalUserPass
       .map(userPass => {
         println("Doing basic auth: " + userPass)
@@ -46,7 +46,8 @@ class Authenticator(userService: ActorRef) {
             Some(new AuthInfo(repoUser))
           case _ =>
             None
-        })})
+        })
+      })
       .getOrElse {
         println("Doing token auth: " + authKey)
         userService.ask(GetAndRefreshUserByAuthKey(authKey)).mapTo[Option[ApiUser]].map(

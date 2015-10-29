@@ -37,18 +37,15 @@ class UserDAO(val driver: JdbcProfile) {
 
   val userQuery = TableQuery[UserTable]
 
-  val toSession = (id: Long, userId: Long, token: String, ip: Option[String], userAgent: Option[String], lastUpdated: Long) => ApiSession(id, userId, token, ip, userAgent, lastUpdated)
-  val fromSession = (session: ApiSession) => Option((session.id, session.userId, session.token, session.ip, session.userAgent, session.lastUpdated))
-
   class SessionTable(tag: Tag) extends Table[ApiSession](tag, "ApiSession") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def userId = column[Long]("userid")
     def token = column[String]("token")
-    def ip = column[Option[String]]("ip")
-    def userAgent = column[Option[String]]("ip")
+    def ip = column[String]("ip")
+    def userAgent = column[String]("useragent")
     def lastUpdated = column[Long]("lastupdated")
     def fkUser = foreignKey("fk_user", userId, userQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
-    def * = (id, userId, token, ip, userAgent, lastUpdated) <> (toSession.tupled, fromSession)
+    def * = (id, userId, token, ip, userAgent, lastUpdated) <> (ApiSession.tupled, ApiSession.unapply)
   }
 
   val sessionQuery = TableQuery[SessionTable]
@@ -59,6 +56,11 @@ class UserDAO(val driver: JdbcProfile) {
   }
   def drop(implicit session: Session): Unit =
     (userQuery.ddl ++ sessionQuery.ddl).drop
+
+  def clear(implicit session: Session): Unit = {
+    userQuery.delete
+    sessionQuery.delete
+  }
 
   def insert(user: ApiUser)(implicit session: Session): ApiUser = {
     val generatedId = (userQuery returning userQuery.map(_.id)) += user
@@ -71,11 +73,19 @@ class UserDAO(val driver: JdbcProfile) {
   def userByName(user: String)(implicit session: Session): Option[ApiUser] =
     userQuery.filter(_.user === user).firstOption
 
-  def userSessionByTokenIpAndUserAgent(token: String, ip: Option[String], userAgent: Option[String])(implicit session: Session): Option[(ApiUser, ApiSession)] =
+  def userSessionsByToken(token: String)(implicit session: Session): List[(ApiUser, ApiSession)] =
     (for {
-      user <- userQuery
-      session <- sessionQuery if session.userId == user.id
-    } yield (user, session))
+      users <- userQuery
+      sessions <- sessionQuery if sessions.userId === users.id
+    } yield (users, sessions))
+      .filter(_._2.token === token)
+      .list
+
+  def userSessionByTokenIpAndUserAgent(token: String, ip: String, userAgent: String)(implicit session: Session): Option[(ApiUser, ApiSession)] =
+    (for {
+      users <- userQuery
+      sessions <- sessionQuery if sessions.userId === users.id
+    } yield (users, sessions))
       .filter(_._2.token === token)
       .filter(_._2.ip === ip)
       .filter(_._2.userAgent === userAgent)
@@ -87,24 +97,29 @@ class UserDAO(val driver: JdbcProfile) {
   def listUsers(implicit session: Session): List[ApiUser] =
     userQuery.list
 
-  def userSessionByUserIdIpAndUserAgent(userId: Long, ip: Option[String], userAgent: Option[String])(implicit session: Session): Option[ApiSession] =
+  def listSessions(implicit session: Session): List[ApiSession] =
+    sessionQuery.list
+
+  def userSessionByUserIdIpAndUserAgent(userId: Long, ip: String, userAgent: String)(implicit session: Session): Option[ApiSession] =
     (for {
-      user <- userQuery
-      session <- sessionQuery if session.userId == user.id
-    } yield (user, session))
+      users <- userQuery
+      sessions <- sessionQuery if sessions.userId === users.id
+    } yield (users, sessions))
       .filter(_._1.id === userId)
       .filter(_._2.ip === ip)
       .filter(_._2.userAgent === userAgent)
       .map(_._2)
       .firstOption
 
-  def insertSession(apiSession: ApiSession)(implicit session: Session) =
-    sessionQuery += apiSession
+  def insertSession(apiSession: ApiSession)(implicit session: Session) = {
+    val generatedId = (sessionQuery returning sessionQuery.map(_.id)) += apiSession
+    apiSession.copy(id = generatedId)
+  }
 
   def updateSession(apiSession: ApiSession)(implicit session: Session) =
     sessionQuery.filter(_.id === apiSession.id).update(apiSession)
 
-  def deleteSessionByUserIdIpAndUserAgent(userId: Long, ip: Option[String], userAgent: Option[String])(implicit session: Session) =
+  def deleteSessionByUserIdIpAndUserAgent(userId: Long, ip: String, userAgent: String)(implicit session: Session) =
     sessionQuery
       .filter(_.userId === userId)
       .filter(_.ip === ip)

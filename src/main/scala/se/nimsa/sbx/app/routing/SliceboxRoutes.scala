@@ -65,18 +65,17 @@ trait SliceboxRoutes extends DirectoryRoutes
             logRoutes ~
             generalRoutes(authInfo) ~
             seriesTypeRoutes(authInfo) ~
-            forwardingRoutes(authInfo) ~
-            logoutRoute(authInfo)
+            forwardingRoutes(authInfo)
         }
-      } ~
-        remoteBoxRoutes ~
-        loginRoute
+      } ~ remoteBoxRoutes
     } ~ pathPrefixTest(!"api") {
-      pathPrefix("assets") {
-        staticResourcesRoute
-      } ~ pathPrefixTest(!"assets") {
-        faviconRoutes ~ angularRoute
-      }
+      loginRoute ~
+        logoutRoute ~
+        pathPrefix("assets") {
+          staticResourcesRoute
+        } ~ pathPrefixTest(!"assets") {
+          faviconRoutes ~ angularRoute
+        }
     }
 
 }

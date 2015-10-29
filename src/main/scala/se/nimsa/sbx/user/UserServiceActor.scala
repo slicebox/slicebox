@@ -27,6 +27,7 @@ import scala.concurrent.duration.DurationInt
 import java.util.UUID
 import akka.actor.actorRef2Scala
 import se.nimsa.sbx.app.DbProps
+import UserServiceActor._
 
 class UserServiceActor(dbProps: DbProps, superUser: String, superPassword: String, sessionTimeout: Long) extends Actor with ExceptionCatching {
   val log = Logging(context.system, this)
@@ -71,7 +72,9 @@ class UserServiceActor(dbProps: DbProps, superUser: String, superPassword: Strin
             db.withSession { implicit session =>
               val validUserAndSession =
                 authKey.token.flatMap(token =>
-                  dao.userSessionByTokenIpAndUserAgent(token, authKey.ip, authKey.userAgent))
+                  authKey.ip.flatMap(ip =>
+                    authKey.userAgent.flatMap(userAgent =>
+                      dao.userSessionByTokenIpAndUserAgent(token, ip, userAgent))))
                   .filter {
                     case (user, apiSession) =>
                       apiSession.lastUpdated > (currentTime - sessionTimeout)
@@ -87,20 +90,24 @@ class UserServiceActor(dbProps: DbProps, superUser: String, superPassword: Strin
 
           case CreateOrUpdateSession(apiUser, ip, userAgent) =>
             db.withSession { implicit session =>
-              sender ! dao.userSessionByUserIdIpAndUserAgent(apiUser.id, ip, userAgent)
+              val apiSession = dao.userSessionByUserIdIpAndUserAgent(apiUser.id, ip, userAgent)
                 .map(apiSession => {
                   val updatedSession = apiSession.copy(lastUpdated = currentTime)
                   dao.updateSession(updatedSession)
                   updatedSession
                 })
                 .getOrElse {
+                  println("Inserting session")
                   dao.insertSession(ApiSession(-1, apiUser.id, newSessionToken, ip, userAgent, currentTime))
                 }
+              sender ! apiSession
             }
 
-          case DeleteSession(apiUser, ip, userAgent) =>
+          case DeleteSession(apiUser, authKey) =>
             db.withSession { implicit session =>
-              dao.deleteSessionByUserIdIpAndUserAgent(apiUser.id, ip, userAgent)
+              authKey.ip.flatMap(ip =>
+                authKey.userAgent.map(userAgent =>
+                  dao.deleteSessionByUserIdIpAndUserAgent(apiUser.id, ip, userAgent)))
               sender ! SessionDeleted(apiUser.id)
             }
 
@@ -133,11 +140,12 @@ class UserServiceActor(dbProps: DbProps, superUser: String, superPassword: Strin
       }
     }
 
-  private def newSessionToken = UUID.randomUUID.toString
-
-  private def currentTime = System.currentTimeMillis
 }
 
 object UserServiceActor {
   def props(dbProps: DbProps, superUser: String, superPassword: String, sessionTimeout: Long): Props = Props(new UserServiceActor(dbProps, superUser, superPassword, sessionTimeout))
+
+  def newSessionToken = UUID.randomUUID.toString
+
+  def currentTime = System.currentTimeMillis
 }

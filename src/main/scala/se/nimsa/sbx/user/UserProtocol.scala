@@ -54,7 +54,7 @@ object UserProtocol {
   
   }
 
-  case class ApiSession(id: Long, userId: Long, token: String, ip: Option[String], userAgent: Option[String], lastUpdated: Long) extends Entity
+  case class ApiSession(id: Long, userId: Long, token: String, ip: String, userAgent: String, lastUpdated: Long) extends Entity
   
   case class AuthKey(token: Option[String], ip: Option[String], userAgent: Option[String])
   
@@ -67,8 +67,8 @@ object UserProtocol {
   case class GetUser(userId: Long) extends UserRequest
   case class GetUserByName(user: String) extends UserRequest
   case class GetAndRefreshUserByAuthKey(token: AuthKey) extends UserRequest
-  case class CreateOrUpdateSession(apiUser: ApiUser, ip: Option[String], userAgent: Option[String]) extends UserRequest
-  case class DeleteSession(apiUser: ApiUser, ip: Option[String], userAgent: Option[String]) extends UserRequest
+  case class CreateOrUpdateSession(apiUser: ApiUser, ip: String, userAgent: String) extends UserRequest
+  case class DeleteSession(apiUser: ApiUser, authKey: AuthKey) extends UserRequest
   case class DeleteUser(userId: Long) extends UserRequest
 
   case class Users(users: Seq[ApiUser])

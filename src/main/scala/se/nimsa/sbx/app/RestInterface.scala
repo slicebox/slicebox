@@ -139,6 +139,8 @@ trait RestApi extends HttpService with SliceboxRoutes with JsonFormats {
   val superPassword = sliceboxConfig.getString("superuser.password")
   val sessionTimeout = sliceboxConfig.getDuration("session-timeout", MILLISECONDS)
   
+  val sessionField = "slicebox-session"
+
   implicit def executionContext = actorRefFactory.dispatcher
 
   val userService = actorRefFactory.actorOf(UserServiceActor.props(dbProps, superUser, superPassword, sessionTimeout), name = "UserService")
