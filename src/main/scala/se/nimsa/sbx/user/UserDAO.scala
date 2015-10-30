@@ -126,4 +126,6 @@ class UserDAO(val driver: JdbcProfile) {
       .filter(_.userAgent === userAgent)
       .delete
 
+  def deleteSessionById(sessionId: Long)(implicit session: Session) =
+    sessionQuery.filter(_.id === sessionId).delete
 }

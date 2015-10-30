@@ -40,6 +40,10 @@ class UserServiceActor(dbProps: DbProps, superUser: String, superPassword: Strin
   implicit val system = context.system
   implicit val ec = context.dispatcher
 
+  val expiredSessionCleaner = system.scheduler.schedule(1.hour, 1.hour) {
+    self ! RemoveExpiredSessions
+  }
+
   log.info("User service started")
 
   def receive = LoggingReceive {
@@ -49,89 +53,52 @@ class UserServiceActor(dbProps: DbProps, superUser: String, superPassword: Strin
 
         msg match {
 
+          case Login(userPass, authKey) =>
+            userByName(userPass.user) match {
+              case Some(user) if user.passwordMatches(userPass.pass) =>
+                val result = authKey.ip.flatMap(ip =>
+                  authKey.userAgent.map(userAgent => {
+                    val session = createOrUpdateSession(user, ip, userAgent)
+                    LoggedIn(user, session)
+                  }))
+                  .getOrElse(LoginFailed)
+                sender ! result
+              case _ =>
+                sender ! LoginFailed
+            }
+
+          case Logout(apiUser, authKey) =>
+            deleteSession(apiUser, authKey)
+            sender ! LoggedOut
+
           case AddUser(apiUser) =>
             if (apiUser.role == UserRole.SUPERUSER)
               throw new IllegalArgumentException("Superusers may not be added")
-
-            db.withSession { implicit session =>
-              val g = dao.userByName(apiUser.user).getOrElse(dao.insert(apiUser))
-              sender ! UserAdded(g)
-            }
-
-          case GetUser(userId) =>
-            db.withSession { implicit session =>
-              sender ! dao.userById(userId)
-            }
+            sender ! UserAdded(getOrCreateUser(apiUser))
 
           case GetUserByName(user) =>
-            db.withSession { implicit session =>
-              sender ! dao.userByName(user)
-            }
+            sender ! userByName(user)
 
           case GetAndRefreshUserByAuthKey(authKey) =>
-            db.withSession { implicit session =>
-              val validUserAndSession =
-                authKey.token.flatMap(token =>
-                  authKey.ip.flatMap(ip =>
-                    authKey.userAgent.flatMap(userAgent =>
-                      dao.userSessionByTokenIpAndUserAgent(token, ip, userAgent))))
-                  .filter {
-                    case (user, apiSession) =>
-                      apiSession.lastUpdated > (currentTime - sessionTimeout)
-                  }
-
-              validUserAndSession.foreach {
-                case (user, apiSession) =>
-                  dao.updateSession(apiSession.copy(lastUpdated = currentTime))
-              }
-
-              sender ! validUserAndSession.map(_._1)
-            }
-
-          case CreateOrUpdateSession(apiUser, ip, userAgent) =>
-            db.withSession { implicit session =>
-              val apiSession = dao.userSessionByUserIdIpAndUserAgent(apiUser.id, ip, userAgent)
-                .map(apiSession => {
-                  val updatedSession = apiSession.copy(lastUpdated = currentTime)
-                  dao.updateSession(updatedSession)
-                  updatedSession
-                })
-                .getOrElse {
-                  println("Inserting session")
-                  dao.insertSession(ApiSession(-1, apiUser.id, newSessionToken, ip, userAgent, currentTime))
-                }
-              sender ! apiSession
-            }
-
-          case DeleteSession(apiUser, authKey) =>
-            db.withSession { implicit session =>
-              authKey.ip.flatMap(ip =>
-                authKey.userAgent.map(userAgent =>
-                  dao.deleteSessionByUserIdIpAndUserAgent(apiUser.id, ip, userAgent)))
-              sender ! SessionDeleted(apiUser.id)
-            }
+            val optionalUser = getAndRefreshUser(authKey)
+            sender ! optionalUser
 
           case GetUsers =>
-            db.withSession { implicit session =>
-              sender ! Users(dao.listUsers)
-            }
+            val users = listUsers
+            sender ! Users(users)
 
           case DeleteUser(userId) =>
-            db.withSession { implicit session =>
-              dao.userById(userId)
-                .filter(_.role == UserRole.SUPERUSER)
-                .foreach(superuser => throw new IllegalArgumentException("Superuser may not be deleted"))
-
-              dao.deleteUserByUserId(userId)
-              sender ! UserDeleted(userId)
-            }
+            deleteUser(userId)
+            sender ! UserDeleted(userId)
 
         }
       }
 
+    case RemoveExpiredSessions => removeExpiredSessions()
+
   }
 
-  def addSuperUser() =
+  def addSuperUser(): Unit =
     db.withSession { implicit session =>
       val superUsers = dao.listUsers.filter(_.role == UserRole.SUPERUSER)
       if (superUsers.isEmpty || superUsers(0).user != superUser || !superUsers(0).passwordMatches(superPassword)) {
@@ -140,6 +107,76 @@ class UserServiceActor(dbProps: DbProps, superUser: String, superPassword: Strin
       }
     }
 
+  def userByName(name: String): Option[ApiUser] =
+    db.withSession { implicit session =>
+      dao.userByName(name)
+    }
+
+  def createOrUpdateSession(user: ApiUser, ip: String, userAgent: String): ApiSession =
+    db.withSession { implicit session =>
+      dao.userSessionByUserIdIpAndUserAgent(user.id, ip, userAgent)
+        .map(apiSession => {
+          val updatedSession = apiSession.copy(lastUpdated = currentTime)
+          dao.updateSession(updatedSession)
+          updatedSession
+        })
+        .getOrElse(
+          dao.insertSession(ApiSession(-1, user.id, newSessionToken, ip, userAgent, currentTime)))
+    }
+
+  def deleteSession(user: ApiUser, authKey: AuthKey): Option[Int] =
+    db.withSession { implicit session =>
+      authKey.ip.flatMap(ip =>
+        authKey.userAgent.map(userAgent =>
+          dao.deleteSessionByUserIdIpAndUserAgent(user.id, ip, userAgent)))
+    }
+
+  def getAndRefreshUser(authKey: AuthKey): Option[ApiUser] =
+    db.withSession { implicit session =>
+      val validUserAndSession =
+        authKey.token.flatMap(token =>
+          authKey.ip.flatMap(ip =>
+            authKey.userAgent.flatMap(userAgent =>
+              dao.userSessionByTokenIpAndUserAgent(token, ip, userAgent))))
+          .filter {
+            case (user, apiSession) =>
+              apiSession.lastUpdated > (currentTime - sessionTimeout)
+          }
+
+      validUserAndSession.foreach {
+        case (user, apiSession) =>
+          dao.updateSession(apiSession.copy(lastUpdated = currentTime))
+      }
+
+      validUserAndSession.map(_._1)
+    }
+
+  def getOrCreateUser(user: ApiUser): ApiUser =
+    db.withSession { implicit session =>
+      dao.userByName(user.user).getOrElse(dao.insert(user))
+    }
+
+  def deleteUser(userId: Long): Unit =
+    db.withSession { implicit session =>
+      dao.userById(userId)
+        .filter(_.role == UserRole.SUPERUSER)
+        .foreach(superuser => throw new IllegalArgumentException("Superuser may not be deleted"))
+
+      dao.deleteUserByUserId(userId)
+      sender ! UserDeleted(userId)
+    }
+
+  def removeExpiredSessions(): Unit =
+    db.withSession { implicit session =>
+      dao.listSessions
+        .filter(_.lastUpdated < currentTime - sessionTimeout)
+        .foreach(expiredSession => dao.deleteSessionById(expiredSession.id))
+    }
+
+  def listUsers: List[ApiUser] =
+    db.withSession { implicit session =>
+      dao.listUsers
+    }
 }
 
 object UserServiceActor {

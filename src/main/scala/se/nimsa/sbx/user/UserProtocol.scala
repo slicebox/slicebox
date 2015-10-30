@@ -21,14 +21,15 @@ import com.github.t3hnar.bcrypt.Password
 import com.github.t3hnar.bcrypt.generateSalt
 import se.nimsa.sbx.model.Entity
 import java.net.InetAddress
+import spray.routing.authentication.UserPass
 
 object UserProtocol {
-  
+
   sealed trait UserRole {
     override def toString(): String = this match {
-      case UserRole.SUPERUSER => "SUPERUSER"
+      case UserRole.SUPERUSER     => "SUPERUSER"
       case UserRole.ADMINISTRATOR => "ADMINISTRATOR"
-      case UserRole.USER => "USER"
+      case UserRole.USER          => "USER"
     }
   }
 
@@ -38,42 +39,44 @@ object UserProtocol {
     case object USER extends UserRole
 
     def withName(string: String) = string match {
-      case "SUPERUSER" => SUPERUSER
+      case "SUPERUSER"     => SUPERUSER
       case "ADMINISTRATOR" => ADMINISTRATOR
-      case "USER" => USER
-    }    
+      case "USER"          => USER
+    }
   }
-  
+
   case class ClearTextUser(user: String, role: UserRole, password: String)
 
   case class ApiUser(id: Long, user: String, role: UserRole, hashedPassword: Option[String] = None) extends Entity {
-  
-    def withPassword(password: String) = copy (hashedPassword = Some(password.bcrypt(generateSalt)))
-  
+
+    def withPassword(password: String) = copy(hashedPassword = Some(password.bcrypt(generateSalt)))
+
     def passwordMatches(password: String): Boolean = hashedPassword.exists(hp => BCrypt.checkpw(password, hp))
-  
+
   }
 
   case class ApiSession(id: Long, userId: Long, token: String, ip: String, userAgent: String, lastUpdated: Long) extends Entity
-  
+
   case class AuthKey(token: Option[String], ip: Option[String], userAgent: Option[String])
-  
-  case class LoginResult(success: Boolean, role: UserRole, message: String)
-  
+
   sealed trait UserRequest
-  
+
+  case class Login(userPass: UserPass, authKey: AuthKey) extends UserRequest
+  case class Logout(user: ApiUser, authKey: AuthKey) extends UserRequest
   case class AddUser(user: ApiUser) extends UserRequest
-  case object GetUsers extends UserRequest  
-  case class GetUser(userId: Long) extends UserRequest
+  case object GetUsers extends UserRequest
   case class GetUserByName(user: String) extends UserRequest
   case class GetAndRefreshUserByAuthKey(token: AuthKey) extends UserRequest
-  case class CreateOrUpdateSession(apiUser: ApiUser, ip: String, userAgent: String) extends UserRequest
-  case class DeleteSession(apiUser: ApiUser, authKey: AuthKey) extends UserRequest
   case class DeleteUser(userId: Long) extends UserRequest
 
+  case object RemoveExpiredSessions
+
+  case class LoginResult(success: Boolean, role: UserRole, message: String)
+  case class LoggedIn(user: ApiUser, session: ApiSession)
+  case object LoginFailed
+  case object LoggedOut
   case class Users(users: Seq[ApiUser])
   case class UserAdded(user: ApiUser)
   case class UserDeleted(userId: Long)
-  case class SessionDeleted(userId: Long)
-  
+
 }

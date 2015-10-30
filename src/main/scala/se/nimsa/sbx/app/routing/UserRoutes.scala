@@ -59,19 +59,15 @@ trait UserRoutes { this: RestApi =>
     path("login") {
       post {
         entity(as[UserPass]) { userPass =>
-          onSuccess(userService.ask(GetUserByName(userPass.user)).mapTo[Option[ApiUser]]) {
-            case Some(repoUser) if (repoUser.passwordMatches(userPass.pass)) =>
-              extractAuthKey { authKey =>
-                authKey.ip.flatMap(ip =>
-                  authKey.userAgent.map(userAgent =>
-                    onSuccess(userService.ask(CreateOrUpdateSession(repoUser, ip, userAgent)).mapTo[ApiSession]) { session =>
-                      setCookie(HttpCookie(sessionField, content = session.token)) {
-                        complete(LoginResult(true, repoUser.role, s"User ${userPass.user} logged in"))
-                      }
-                    })).getOrElse(complete(LoginResult(false, UserRole.USER, "IP address and user agent must be available in request.")))
-              }
-            case _ =>
-              complete(LoginResult(false, UserRole.USER, "Incorrect username or password"))
+          extractAuthKey { authKey =>
+            onSuccess(userService.ask(Login(userPass, authKey))) {
+              case LoggedIn(user, session) =>
+                setCookie(HttpCookie(sessionField, content = session.token)) {
+                  complete(LoginResult(true, user.role, s"User ${userPass.user} logged in"))
+                }
+              case LoginFailed =>
+                complete(LoginResult(false, UserRole.USER, "IP address and user agent must be available in request."))
+            }
           }
         }
       }
@@ -82,8 +78,8 @@ trait UserRoutes { this: RestApi =>
       extractAuthKey { authKey =>
         authenticate(authenticator.sliceboxAuthenticator(authKey)) { authInfo =>
           post {
-            onSuccess(userService.ask(DeleteSession(authInfo.user, authKey))) {
-              case SessionDeleted(userId) =>
+            onSuccess(userService.ask(Logout(authInfo.user, authKey))) {
+              case LoggedOut =>
                 deleteCookie(sessionField) {
                   complete(NoContent)
                 }

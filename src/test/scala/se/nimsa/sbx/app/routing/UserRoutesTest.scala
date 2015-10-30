@@ -55,6 +55,15 @@ class UserRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
   }
 
+  it should "return BadRequest when trying to delete the super user" in {
+    val users = GetAsAdmin("/api/users") ~> routes ~> check {
+      responseAs[List[ApiUser]]
+    }
+    DeleteAsAdmin("/api/users/" + users.head.id) ~> sealRoute(routes) ~> check {
+      status should be(BadRequest)
+    }    
+  }
+  
   it should "return status NoContent when trying to delete an user that does not exist" in {
     DeleteAsAdmin("/api/users/999") ~> routes ~> check {
       status should be(NoContent)
@@ -86,8 +95,11 @@ class UserRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
   }
 
-  it should "respond with OK when using session auth cookie and valid credentials" in {
-    Get(s"/api/metadata/patients") ~> addCredentials(adminCredentials) ~> routes ~> check {
+  it should "respond with OK when using a bad session cookie but valid basic auth credentials" in {
+    Get(s"/api/metadata/patients") ~> addHeader(Cookie(HttpCookie(sessionField, "badtoken"))) ~> addCredentials(adminCredentials) ~> routes ~> check {
+      status should be(OK)
+    }
+    GetWithHeaders(s"/api/metadata/patients") ~> addHeader(Cookie(HttpCookie(sessionField, "badtoken"))) ~> addCredentials(adminCredentials) ~> routes ~> check {
       status should be(OK)
     }
   }
@@ -110,14 +122,34 @@ class UserRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       status should be(OK)
       headers.map { case `Set-Cookie`(x) => x }.head
     }
-    println(cookie)
     db.withSession { implicit session =>
-      println(userDao.listSessions)
       userDao.userSessionsByToken(cookie.content).length should be (1)      
     }
     GetWithHeaders(s"/api/metadata/patients") ~> addHeader(Cookie(cookie)) ~> routes ~> check {
       status should be(OK)
     }
+  }
+  
+  it should "not authorize users with clients not disclosing their ip and/or user agent" in {
+    val cookie = PostWithHeaders("/login", UserPass(superUser, superPassword)) ~> routes ~> check {
+      status should be(OK)
+      headers.map { case `Set-Cookie`(x) => x }.head
+    }
+    Get(s"/api/metadata/patients") ~> sealRoute(routes) ~> check {
+      status should be(Unauthorized)
+    }    
+    Get(s"/api/metadata/patients") ~> addHeader(Cookie(cookie)) ~> sealRoute(routes) ~> check {
+      status should be(Unauthorized)
+    }    
+    Get(s"/api/metadata/patients") ~> addHeader(Cookie(cookie)) ~> addHeader(`Remote-Address`("1.2.3.4")) ~> sealRoute(routes) ~> check {
+      status should be(Unauthorized)
+    }    
+    Get(s"/api/metadata/patients") ~> addHeader(Cookie(cookie)) ~> addHeader(`User-Agent`("spray-test")) ~> sealRoute(routes) ~> check {
+      status should be(Unauthorized)
+    }    
+    Get(s"/api/metadata/patients") ~> addHeader(`Remote-Address`("1.2.3.4")) ~> addHeader(`User-Agent`("spray-test")) ~> sealRoute(routes) ~> check {
+      status should be(Unauthorized)
+    }    
   }
   
 }
