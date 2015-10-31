@@ -110,6 +110,18 @@ class UserServiceActorTest(_system: ActorSystem) extends TestKit(_system) with I
         session2.lastUpdated shouldBe > (session1.lastUpdated)
       }
     }
+    
+    "remove a session based on user id, IP and user agent when logging out" in {
+      db.withSession { implicit session =>
+        val user = dao.insert(ApiUser(-1, "user", UserRole.USER))
+        val session1 = userActor.createOrUpdateSession(user, "ip", "userAgent")
+        dao.listSessions should have length 1
+        userActor.deleteSession(user, AuthKey(Some(session1.token), Some("Other IP"), Some(session1.userAgent)))
+        dao.listSessions should have length 1
+        userActor.deleteSession(user, AuthKey(Some(session1.token), Some(session1.ip), Some(session1.userAgent)))
+        dao.listSessions should have length 0
+      }      
+    }
 
   }
 

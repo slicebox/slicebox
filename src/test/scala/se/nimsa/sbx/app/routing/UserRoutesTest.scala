@@ -61,9 +61,9 @@ class UserRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
     DeleteAsAdmin("/api/users/" + users.head.id) ~> sealRoute(routes) ~> check {
       status should be(BadRequest)
-    }    
+    }
   }
-  
+
   it should "return status NoContent when trying to delete an user that does not exist" in {
     DeleteAsAdmin("/api/users/999") ~> routes ~> check {
       status should be(NoContent)
@@ -117,19 +117,35 @@ class UserRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
   }
 
+  it should "support logging out again such that subsequent API calls will return 401 Unauthorized" in {
+    val cookie = PostWithHeaders("/login", UserPass(superUser, superPassword)) ~> routes ~> check {
+      status should be(OK)
+      headers.map { case `Set-Cookie`(x) => x }.head
+    }
+    GetWithHeaders(s"/api/metadata/patients") ~> addHeader(Cookie(cookie)) ~> routes ~> check {
+      status should be(OK)
+    }
+    PostWithHeaders("/logout") ~> addHeader(Cookie(cookie)) ~> routes ~> check {
+      status should be(NoContent)
+    }
+    GetWithHeaders(s"/api/metadata/patients") ~> addHeader(Cookie(cookie)) ~> sealRoute(routes) ~> check {
+      status should be(Unauthorized)
+    }
+  }
+  
   it should "authorize a logged in user based on token only" in {
     val cookie = PostWithHeaders("/login", UserPass(superUser, superPassword)) ~> routes ~> check {
       status should be(OK)
       headers.map { case `Set-Cookie`(x) => x }.head
     }
     db.withSession { implicit session =>
-      userDao.userSessionsByToken(cookie.content).length should be (1)      
+      userDao.userSessionsByToken(cookie.content).length should be(1)
     }
     GetWithHeaders(s"/api/metadata/patients") ~> addHeader(Cookie(cookie)) ~> routes ~> check {
       status should be(OK)
     }
   }
-  
+
   it should "not authorize users with clients not disclosing their ip and/or user agent" in {
     val cookie = PostWithHeaders("/login", UserPass(superUser, superPassword)) ~> routes ~> check {
       status should be(OK)
@@ -137,19 +153,19 @@ class UserRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
     Get(s"/api/metadata/patients") ~> sealRoute(routes) ~> check {
       status should be(Unauthorized)
-    }    
+    }
     Get(s"/api/metadata/patients") ~> addHeader(Cookie(cookie)) ~> sealRoute(routes) ~> check {
       status should be(Unauthorized)
-    }    
+    }
     Get(s"/api/metadata/patients") ~> addHeader(Cookie(cookie)) ~> addHeader(`Remote-Address`("1.2.3.4")) ~> sealRoute(routes) ~> check {
       status should be(Unauthorized)
-    }    
+    }
     Get(s"/api/metadata/patients") ~> addHeader(Cookie(cookie)) ~> addHeader(`User-Agent`("spray-test")) ~> sealRoute(routes) ~> check {
       status should be(Unauthorized)
-    }    
+    }
     Get(s"/api/metadata/patients") ~> addHeader(`Remote-Address`("1.2.3.4")) ~> addHeader(`User-Agent`("spray-test")) ~> sealRoute(routes) ~> check {
       status should be(Unauthorized)
-    }    
+    }
   }
-  
+
 }
