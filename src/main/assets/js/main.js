@@ -95,8 +95,9 @@ angular.module('slicebox', [
     $scope.currentPathStartsWith = function(path) { 
         return $location.path().indexOf(path) === 0;
     };
-})
+});
 
+/*
 .run(function ($rootScope, $location, $cookieStore, $http) {
     // keep user logged in after page refresh
     $rootScope.globals = $cookieStore.get('globals') || {};
@@ -111,3 +112,4 @@ angular.module('slicebox', [
         }
     });
 });
+*/

@@ -9,11 +9,13 @@ import org.scalatest.Matchers
 import org.scalatest.WordSpecLike
 import akka.actor.ActorSystem
 import akka.actor.Props
+import akka.actor.Status.Failure
 import akka.testkit.ImplicitSender
 import akka.testkit.TestKit
 import akka.testkit.TestActorRef
 import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.util.TestUtil
+import spray.routing.authentication.UserPass
 import UserProtocol._
 
 class UserServiceActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
@@ -50,7 +52,7 @@ class UserServiceActorTest(_system: ActorSystem) extends TestKit(_system) with I
     "cleanup expired sessions regularly" in {
       db.withSession { implicit session =>
 
-        val user = dao.insert(ApiUser(-1, "user", UserRole.USER))
+        val user = dao.insert(ApiUser(-1, "user", UserRole.USER).withPassword("pass"))
         dao.insertSession(ApiSession(-1, user.id, "token1", "ip1", "user agent1", System.currentTimeMillis))
         dao.insertSession(ApiSession(-1, user.id, "token2", "ip2", "user agent2", 0))
 
@@ -66,7 +68,7 @@ class UserServiceActorTest(_system: ActorSystem) extends TestKit(_system) with I
     "refresh a non-expired session defined by a token, ip and user agent" in {
       db.withSession { implicit session =>
 
-        val user = dao.insert(ApiUser(-1, "user", UserRole.USER))
+        val user = dao.insert(ApiUser(-1, "user", UserRole.USER).withPassword("pass"))
         val sessionTime = System.currentTimeMillis - 1000
         dao.insertSession(ApiSession(-1, user.id, "token", "ip", "user agent", sessionTime))
 
@@ -81,7 +83,7 @@ class UserServiceActorTest(_system: ActorSystem) extends TestKit(_system) with I
     "not refresh an expired session defined by a token, ip and user agent" in {
       db.withSession { implicit session =>
 
-        val user = dao.insert(ApiUser(-1, "user", UserRole.USER))
+        val user = dao.insert(ApiUser(-1, "user", UserRole.USER).withPassword("pass"))
         val sessionTime = 1000
         dao.insertSession(ApiSession(-1, user.id, "token", "ip", "user agent", sessionTime))
 
@@ -96,33 +98,69 @@ class UserServiceActorTest(_system: ActorSystem) extends TestKit(_system) with I
     "create a session if none exists and update it if one exists" in {
       db.withSession { implicit session =>
 
-        val user = dao.insert(ApiUser(-1, "user", UserRole.USER))
+        val user = dao.insert(ApiUser(-1, "user", UserRole.USER).withPassword("pass"))
 
         dao.listSessions should have length 0
-        
+
         val session1 = userActor.createOrUpdateSession(user, "ip", "userAgent")
         dao.listSessions should have length 1
-        
+
         Thread.sleep(100)
-        
+
         val session2 = userActor.createOrUpdateSession(user, "ip", "userAgent")
         dao.listSessions should have length 1
-        session2.lastUpdated shouldBe > (session1.lastUpdated)
+        session2.lastUpdated shouldBe >(session1.lastUpdated)
       }
     }
-    
+
     "remove a session based on user id, IP and user agent when logging out" in {
       db.withSession { implicit session =>
-        val user = dao.insert(ApiUser(-1, "user", UserRole.USER))
+        val user = dao.insert(ApiUser(-1, "user", UserRole.USER).withPassword("pass"))
         val session1 = userActor.createOrUpdateSession(user, "ip", "userAgent")
         dao.listSessions should have length 1
         userActor.deleteSession(user, AuthKey(Some(session1.token), Some("Other IP"), Some(session1.userAgent)))
         dao.listSessions should have length 1
         userActor.deleteSession(user, AuthKey(Some(session1.token), Some(session1.ip), Some(session1.userAgent)))
         dao.listSessions should have length 0
-      }      
+      }
+    }
+
+    "not create more than one session when logging in twice" in {
+      db.withSession { implicit session =>
+        dao.insert(ApiUser(-1, "user", UserRole.USER).withPassword("pass"))
+
+        userService ! Login(UserPass("user", "pass"), AuthKey(None, Some("ip"), Some("userAgent")))
+        expectMsgType[LoggedIn]
+        dao.listUsers should have length 1
+        dao.listSessions should have length 1
+
+        userService ! Login(UserPass("user", "pass"), AuthKey(None, Some("ip"), Some("userAgent")))
+        expectMsgType[LoggedIn]
+        dao.listUsers should have length 1
+        dao.listSessions should have length 1
+      }
+    }
+
+    "not allow logging in if credentials are invalid" in {
+      db.withSession { implicit session =>
+        dao.insert(ApiUser(-1, "user", UserRole.USER).withPassword("pass"))
+        userService ! Login(UserPass("user", "incorrect password"), AuthKey(None, Some("ip"), Some("userAgent")))
+        expectMsg(LoginFailed)
+      }
+    }
+
+    "not allow logging in if information on IP address and/or user agent is missing" in {
+      db.withSession { implicit session =>
+        dao.insert(ApiUser(-1, "user", UserRole.USER).withPassword("pass"))
+        
+        userService ! Login(UserPass("user", "pass"), AuthKey(None, None, Some("userAgent")))
+        expectMsg(LoginFailed)
+        userService ! Login(UserPass("user", "pass"), AuthKey(None, Some("ip"), None))
+        expectMsg(LoginFailed)
+        userService ! Login(UserPass("user", "pass"), AuthKey(None, None, None))
+        expectMsg(LoginFailed)
+      }
     }
 
   }
-
 }

@@ -24,7 +24,7 @@ class UserDAO(val driver: JdbcProfile) {
   import driver.simple._
 
   val toUser = (id: Long, user: String, role: String, password: String) => ApiUser(id, user, UserRole.withName(role), Some(password))
-  val fromUser = (user: ApiUser) => Option((user.id, user.user, user.role.toString, user.hashedPassword.getOrElse("")))
+  val fromUser = (user: ApiUser) => Option((user.id, user.user, user.role.toString, user.hashedPassword.get))
 
   class UserTable(tag: Tag) extends Table[ApiUser](tag, "User") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
@@ -45,6 +45,7 @@ class UserDAO(val driver: JdbcProfile) {
     def userAgent = column[String]("useragent")
     def lastUpdated = column[Long]("lastupdated")
     def fkUser = foreignKey("fk_user", userId, userQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
+    def idxUniqueSession = index("idx_unique_session", (token, ip, userAgent), unique = true)
     def * = (id, userId, token, ip, userAgent, lastUpdated) <> (ApiSession.tupled, ApiSession.unapply)
   }
 
