@@ -17,9 +17,7 @@
 package se.nimsa.sbx.app.routing
 
 import akka.pattern.ask
-import spray.http.StatusCodes.Created
-import spray.http.StatusCodes.NoContent
-import spray.http.StatusCodes.BadRequest
+import spray.http.StatusCodes._
 import spray.httpx.SprayJsonSupport._
 import spray.routing._
 import se.nimsa.sbx.user.AuthInfo
@@ -55,42 +53,32 @@ trait UserRoutes { this: RestApi =>
         AuthKey(optionalCookie.map(_.content), ip.toOption.map(_.getHostAddress), optionalUserAgent)
     }
 
-  def loginRoute: Route =
-    path("login") {
+  def loginRoute(authKey: AuthKey): Route =
+    path("users" / "login") {
       post {
         entity(as[UserPass]) { userPass =>
-          extractAuthKey { authKey =>
-            onSuccess(userService.ask(Login(userPass, authKey))) {
-              case LoggedIn(user, session) =>
-                setCookie(HttpCookie(sessionField, content = session.token)) {
-                  complete(LoginResult(true, user.role, s"User ${userPass.user} logged in"))
-                }
-              case LoginFailed =>
-                complete(LoginResult(false, UserRole.USER, "IP address and user agent must be available in request."))
-            }
+          onSuccess(userService.ask(Login(userPass, authKey))) {
+            case LoggedIn(user, session) =>
+              setCookie(HttpCookie(sessionField, content = session.token, path = Some("/api"))) {
+                complete(NoContent)
+              }
+            case LoginFailed =>
+              complete(Unauthorized)
           }
         }
       }
     }
 
-  def logoutRoute: Route =
-    path("logout") {
-      extractAuthKey { authKey =>
-        authenticate(authenticator.sliceboxAuthenticator(authKey)) { authInfo =>
-          post {
-            onSuccess(userService.ask(Logout(authInfo.user, authKey))) {
-              case LoggedOut =>
-                deleteCookie(sessionField) {
-                  complete(NoContent)
-                }
-            }
-          }
+  def currentUserRoute(authKey: AuthKey): Route =
+    path("users" / "current") {
+      get {
+        onSuccess(userService.ask(GetAndRefreshUserByAuthKey(authKey)).mapTo[Option[ApiUser]]) { optionalUser =>
+          complete(optionalUser.map(user => UserInfo(user.id, user.user, user.role)))
         }
       }
-
     }
 
-  def userRoutes(authInfo: AuthInfo): Route =
+  def userRoutes(authInfo: AuthInfo, authKey: AuthKey): Route =
     pathPrefix("users") {
       pathEndOrSingleSlash {
         get {
@@ -116,6 +104,15 @@ trait UserRoutes { this: RestApi =>
               case UserDeleted(userId) =>
                 complete(NoContent)
             }
+          }
+        }
+      } ~ path("logout") {
+        post {
+          onSuccess(userService.ask(Logout(authInfo.user, authKey))) {
+            case LoggedOut =>
+              deleteCookie(sessionField) {
+                complete(NoContent)
+              }
           }
         }
       }

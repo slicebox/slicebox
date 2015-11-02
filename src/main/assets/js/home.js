@@ -506,31 +506,26 @@ angular.module('slicebox.home', ['ngRoute'])
                                 $scope.uiState.seriesDetails.windowMin = info.minimumPixelValue;
                                 $scope.uiState.seriesDetails.windowMax = info.maximumPixelValue;
                             }
-                            $http.post('/api/users/generateauthtokens?n=' + info.numberOfFrames).success(function(tokens) {
-                                for (var j = 0; j < info.numberOfFrames && generateMore; j++) {
+                            for (var j = 0; j < info.numberOfFrames && generateMore; j++) {
 
-                                    var url = '/api/images/' + image.id + '/png'+ '?authtoken=' + tokens[j].token + '&framenumber=' + (j + 1);
-                                    if ($scope.uiState.seriesDetails.isWindowManual) {
-                                        url = url + 
-                                            '&windowmin=' + $scope.uiState.seriesDetails.windowMin + 
-                                            '&windowmax=' + $scope.uiState.seriesDetails.windowMax;
-                                    }
-                                    if (!isNaN(parseInt($scope.uiState.seriesDetails.imageHeight))) {
-                                        url = url + 
-                                            '&imageheight=' + $scope.uiState.seriesDetails.imageHeight;
-                                    }
-                                    var frameIndex = Math.max(0, info.frameIndex - 1)*Math.max(1, info.numberOfFrames) + (j + 1);
-                                    $scope.uiState.seriesDetails.pngImageUrls.push({ url: url, frameIndex: frameIndex });
-                                    generateMore = $scope.uiState.seriesDetails.pngImageUrls.length < $scope.uiState.seriesDetails.images && 
-                                                    !(imageIndex === images.length - 1 && j == info.numberOfFrames - 1);
+                                var url = '/api/images/' + image.id + '/png' + '?framenumber=' + (j + 1);
+                                if ($scope.uiState.seriesDetails.isWindowManual) {
+                                    url = url + 
+                                        '&windowmin=' + $scope.uiState.seriesDetails.windowMin + 
+                                        '&windowmax=' + $scope.uiState.seriesDetails.windowMax;
                                 }
-                                if (!generateMore) {
-                                    $scope.uiState.loadPngImagesInProgress = false;
+                                if (!isNaN(parseInt($scope.uiState.seriesDetails.imageHeight))) {
+                                    url = url + 
+                                        '&imageheight=' + $scope.uiState.seriesDetails.imageHeight;
                                 }
-                            }).error(function(error) {
-                                sbxToast.showErrorMessage('Failed to generate authentication tokens: ' + error);            
-                                $scope.uiState.loadPngImagesInProgress = false;                                                                  
-                            });
+                                var frameIndex = Math.max(0, info.frameIndex - 1)*Math.max(1, info.numberOfFrames) + (j + 1);
+                                $scope.uiState.seriesDetails.pngImageUrls.push({ url: url, frameIndex: frameIndex });
+                                generateMore = $scope.uiState.seriesDetails.pngImageUrls.length < $scope.uiState.seriesDetails.images && 
+                                                !(imageIndex === images.length - 1 && j == info.numberOfFrames - 1);
+                            }
+                            if (!generateMore) {
+                                $scope.uiState.loadPngImagesInProgress = false;
+                            }
                         }).error(function(error) {
                             sbxToast.showErrorMessage('Failed to load image information: ' + error);            
                             $scope.uiState.loadPngImagesInProgress = false;                                      
@@ -905,10 +900,8 @@ angular.module('slicebox.home', ['ngRoute'])
             var imageIds = images.map(function (image) {
                 return image.id;
             });
-            return $http.post('/api/users/generateauthtokens?n=1').success(function(tokens) {
-                return $http.post('/api/images/export', imageIds).success(function (fileName) {
-                    location.href = '/api/images/export?authtoken=' + tokens[0].token + '&filename=' + fileName.value;
-                });
+            return $http.post('/api/images/export', imageIds).success(function (fileName) {
+                location.href = '/api/images/export?filename=' + fileName.value;
             });
         });
     }

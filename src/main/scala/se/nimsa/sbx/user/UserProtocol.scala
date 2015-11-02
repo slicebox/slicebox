@@ -47,6 +47,8 @@ object UserProtocol {
 
   case class ClearTextUser(user: String, role: UserRole, password: String)
 
+  case class UserInfo(id: Long, user: String, role: UserRole)
+  
   case class ApiUser(id: Long, user: String, role: UserRole, hashedPassword: Option[String] = None) extends Entity {
 
     def withPassword(password: String) = copy(hashedPassword = Some(password.bcrypt(generateSalt)))
@@ -66,12 +68,11 @@ object UserProtocol {
   case class AddUser(user: ApiUser) extends UserRequest
   case object GetUsers extends UserRequest
   case class GetUserByName(user: String) extends UserRequest
-  case class GetAndRefreshUserByAuthKey(token: AuthKey) extends UserRequest
+  case class GetAndRefreshUserByAuthKey(authKey: AuthKey) extends UserRequest
   case class DeleteUser(userId: Long) extends UserRequest
 
   case object RemoveExpiredSessions
 
-  case class LoginResult(success: Boolean, role: UserRole, message: String)
   case class LoggedIn(user: ApiUser, session: ApiSession)
   case object LoginFailed
   case object LoggedOut

@@ -96,7 +96,7 @@ trait JsonFormats extends DefaultJsonProtocol {
   implicit val clearTextUserFormat = jsonFormat3(ClearTextUser)
   implicit val apiUserFormat = jsonFormat4(ApiUser)
   implicit val userPassFormat = jsonFormat2(UserPass)
-  implicit val loginResultFormat = jsonFormat3(LoginResult)
+  implicit val userInfoFormat = jsonFormat3(UserInfo)
   
   implicit val patientNameFormat = jsonFormat1(PatientName)
   implicit val patientIdFormat = jsonFormat1(PatientID)

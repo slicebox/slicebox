@@ -105,27 +105,44 @@ class UserRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   }
 
   it should "support logging in and respond with the logged in user and a cookie containing a session token" in {
-    PostWithHeaders("/login", UserPass(superUser, superPassword)) ~> routes ~> check {
-      status should be(OK)
-      val result = responseAs[LoginResult]
-      result.success should be(true)
-      result.role should be(UserRole.SUPERUSER)
-      result.message should not be (empty)
+    PostWithHeaders("/api/users/login", UserPass(superUser, superPassword)) ~> routes ~> check {
+      status should be(NoContent)
       val cookies = headers.map { case `Set-Cookie`(x) => x }
       cookies.head.name should be(sessionField)
       UUID.fromString(cookies.head.content) should not be (null)
     }
   }
 
-  it should "support logging out again such that subsequent API calls will return 401 Unauthorized" in {
-    val cookie = PostWithHeaders("/login", UserPass(superUser, superPassword)) ~> routes ~> check {
+  it should "return 401 Unauthorized when logging in with invalid credentials" in {
+    PostWithHeaders("/api/users/login", UserPass(superUser, "incorrect password")) ~> routes ~> check {
+      status should be(Unauthorized)
+      val cookies = headers.map { case `Set-Cookie`(x) => x }
+      cookies shouldBe empty
+    }
+  }
+
+  it should "provide information on the currently logged in user when request is with auth cookie" in {
+    val cookie = PostWithHeaders("/api/users/login", UserPass(superUser, superPassword)) ~> routes ~> check {
+      status should be(NoContent)
+      headers.map { case `Set-Cookie`(x) => x }.head
+    }
+    GetWithHeaders(s"/api/users/current") ~> addHeader(Cookie(cookie)) ~> routes ~> check {
       status should be(OK)
+      val info = responseAs[UserInfo]
+      info.user shouldBe superUser
+      info.role shouldBe UserRole.SUPERUSER
+    }
+  }
+
+  it should "support logging out again such that subsequent API calls will return 401 Unauthorized" in {
+    val cookie = PostWithHeaders("/api/users/login", UserPass(superUser, superPassword)) ~> routes ~> check {
+      status should be(NoContent)
       headers.map { case `Set-Cookie`(x) => x }.head
     }
     GetWithHeaders(s"/api/metadata/patients") ~> addHeader(Cookie(cookie)) ~> routes ~> check {
       status should be(OK)
     }
-    PostWithHeaders("/logout") ~> addHeader(Cookie(cookie)) ~> routes ~> check {
+    PostWithHeaders("/api/users/logout") ~> addHeader(Cookie(cookie)) ~> routes ~> check {
       status should be(NoContent)
     }
     GetWithHeaders(s"/api/metadata/patients") ~> addHeader(Cookie(cookie)) ~> sealRoute(routes) ~> check {
@@ -134,8 +151,8 @@ class UserRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   }
   
   it should "authorize a logged in user based on token only" in {
-    val cookie = PostWithHeaders("/login", UserPass(superUser, superPassword)) ~> routes ~> check {
-      status should be(OK)
+    val cookie = PostWithHeaders("/api/users/login", UserPass(superUser, superPassword)) ~> routes ~> check {
+      status should be(NoContent)
       headers.map { case `Set-Cookie`(x) => x }.head
     }
     db.withSession { implicit session =>
@@ -147,8 +164,8 @@ class UserRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   }
 
   it should "not authorize users with clients not disclosing their ip and/or user agent" in {
-    val cookie = PostWithHeaders("/login", UserPass(superUser, superPassword)) ~> routes ~> check {
-      status should be(OK)
+    val cookie = PostWithHeaders("/api/users/login", UserPass(superUser, superPassword)) ~> routes ~> check {
+      status should be(NoContent)
       headers.map { case `Set-Cookie`(x) => x }.head
     }
     Get(s"/api/metadata/patients") ~> sealRoute(routes) ~> check {

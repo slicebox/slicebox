@@ -11,29 +11,32 @@ angular.module('slicebox.login', ['ngRoute'])
   });
 })
 
-.controller('LoginCtrl', function($scope, $rootScope, $location, authenticationService, sbxToast) {
+.controller('LoginCtrl', function($scope, $rootScope, $location, sbxToast, userService) {
 
-    // reset login status
-    authenticationService.clearCredentials();
-    $scope.uiState.showMenu = false;
-    
+    $scope.uiState = {
+        loginInProgress: false
+    };
+
     $scope.login = function () {
         if ($scope.loginForm.$invalid) {
             return;
         }
 
         $scope.uiState.loginInProgress = true;
-        authenticationService.login($scope.username, $scope.password, function(response) {
-            if(response.success) {
-                $scope.uiState.loginInProgress = false;
-                $scope.uiState.showMenu = true;
-                $scope.uiState.isAdmin = response.role !== 'USER';
-                authenticationService.setCredentials($scope.username, $scope.password, response.role);
-                $location.path('/');
-            } else {
-                sbxToast.showErrorMessage(response.message);
-                $scope.uiState.loginInProgress = false;
-            }
+        userService.login($scope.username, $scope.password).success(function () {
+            $scope.uiState.loginInProgress = false;
+            userService.updateCurrentUser().then(function () {
+                var url = '/';
+                try {
+                    if ($rootScope.requestedPage) {
+                        url = (new URL($rootScope.requestedPage)).pathname;
+                    }
+                } catch (error) {}
+                $location.path(url);
+            });
+        }).error(function() {
+            sbxToast.showErrorMessage(response.message);
+            $scope.uiState.loginInProgress = false;            
         });
     };
 

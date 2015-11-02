@@ -68,24 +68,35 @@ angular.module('slicebox', [
     };
 })
 
-.controller('SliceboxCtrl', function($scope, $http, $q, $location, $mdSidenav, $mdToast, $mdDialog, authenticationService, openConfirmActionModal) {
+.run(function ($rootScope, $location, userService) {  
+    $rootScope.$on('$locationChangeStart', function (event, next, current) {
+        // redirect to login page if not logged in
+        if (!userService.currentUser && $location.path() !== '/login') {
+            $rootScope.requestedPage = current;
+            $location.path('/login');
+        }
+    });
+})
 
-    $scope.uiState = {
-        showMenu: true
+.controller('SliceboxCtrl', function($scope, $location, $mdSidenav, userService) {
+
+    $scope.uiState = {};
+
+    userService.updateCurrentUser();
+
+    $scope.logout = function() {
+        userService.logout().finally(function() {
+            userService.currentUser = null;
+            $location.path('/login');
+        });
+    };
+
+    $scope.userSignedIn = function() {
+        return userService.currentUser;
     };
 
     $scope.toggleLeftNav = function() {
         $mdSidenav('leftNav').toggle();
-    };
-
-    $scope.logout = function() {
-        authenticationService.clearCredentials();
-        $scope.uiState.showMenu = false;
-        $location.url("/login");
-    };
-
-    $scope.userSignedIn = function() {
-        return authenticationService.userSignedIn();
     };
 
     $scope.isCurrentPath = function(path) { 
@@ -96,20 +107,3 @@ angular.module('slicebox', [
         return $location.path().indexOf(path) === 0;
     };
 });
-
-/*
-.run(function ($rootScope, $location, $cookieStore, $http) {
-    // keep user logged in after page refresh
-    $rootScope.globals = $cookieStore.get('globals') || {};
-    if ($rootScope.globals.currentUser) {
-        $http.defaults.headers.common['Authorization'] = 'Basic ' + $rootScope.globals.currentUser.authdata; // jshint ignore:line
-    }
-
-    $rootScope.$on('$locationChangeStart', function (event, next, current) {
-        // redirect to login page if not logged in
-        if ($location.path() !== '/login' && !$rootScope.globals.currentUser) {
-            $location.path('/login');
-        }
-    });
-});
-*/

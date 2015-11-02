@@ -51,31 +51,33 @@ trait SliceboxRoutes extends DirectoryRoutes
   def sliceboxRoutes: Route =
     pathPrefix("api") {
       extractAuthKey { authKey =>
+        loginRoute(authKey) ~
+        currentUserRoute(authKey) ~
         authenticate(authenticator.sliceboxAuthenticator(authKey)) { authInfo =>
+          userRoutes(authInfo, authKey) ~
           directoryRoutes(authInfo) ~
-            scpRoutes(authInfo) ~
-            scuRoutes(authInfo) ~
-            metaDataRoutes ~
-            imageRoutes(authInfo) ~
-            boxRoutes(authInfo) ~
-            userRoutes(authInfo) ~
-            inboxRoutes ~
-            outboxRoutes ~
-            sentRoutes ~
-            logRoutes ~
-            generalRoutes(authInfo) ~
-            seriesTypeRoutes(authInfo) ~
-            forwardingRoutes(authInfo)
+          scpRoutes(authInfo) ~
+          scuRoutes(authInfo) ~
+          metaDataRoutes ~
+          imageRoutes(authInfo) ~
+          boxRoutes(authInfo) ~
+          inboxRoutes ~
+          outboxRoutes ~
+          sentRoutes ~
+          logRoutes ~
+          generalRoutes(authInfo) ~
+          seriesTypeRoutes(authInfo) ~
+          forwardingRoutes(authInfo)
         }
       } ~ remoteBoxRoutes
-    } ~ pathPrefixTest(!"api") {
-      loginRoute ~
-        logoutRoute ~
-        pathPrefix("assets") {
-          staticResourcesRoute
-        } ~ pathPrefixTest(!"assets") {
-          faviconRoutes ~ angularRoute
-        }
+    } ~ 
+    pathPrefixTest(!"api") {
+      pathPrefix("assets") {
+        staticResourcesRoute
+      } ~ pathPrefixTest(!"assets") {
+        faviconRoutes ~ 
+        angularRoute
+      }
     }
 
 }
