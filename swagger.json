@@ -1266,7 +1266,7 @@
       }
     },
 
-    "users/current": {
+    "/users/current": {
       "get": {
         "description": "obtain information on the currently logged in user as specified by the supplied session cookie, IP address and user agent.",
         "tags": ["Users"],
