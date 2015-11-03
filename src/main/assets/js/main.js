@@ -68,26 +68,29 @@ angular.module('slicebox', [
     };
 })
 
-.run(function ($rootScope, $location, userService) {  
+.run(function ($rootScope, $location, userService) { 
     $rootScope.$on('$locationChangeStart', function (event, next, current) {
         // redirect to login page if not logged in
-        if (!userService.currentUser && $location.path() !== '/login') {
-            $rootScope.requestedPage = current;
-            $location.path('/login');
-        }
+        userService.currentUserPromise.then(function () {}, function () {
+            if ($location.path() !== '/login') {
+                $rootScope.requestedPage = current;
+                $location.path('/login');
+            }
+        });
     });
 })
 
 .controller('SliceboxCtrl', function($scope, $location, $mdSidenav, userService) {
 
     $scope.uiState = {};
-
+    
     userService.updateCurrentUser();
 
     $scope.logout = function() {
         userService.logout().finally(function() {
-            userService.currentUser = null;
-            $location.path('/login');
+            userService.updateCurrentUser().finally(function () {
+                $location.path('/login');
+            });
         });
     };
 

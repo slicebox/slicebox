@@ -302,15 +302,17 @@ angular.module('slicebox.utils', [])
 
 .factory('userService', function ($http) {
     var service = {
+        currentUserPromise: null,
         currentUser: null
     };
 
     service.updateCurrentUser = function() {
-        return $http.get('/api/users/current').success(function(user) {
+        service.currentUserPromise = $http.get('/api/users/current').success(function (user) {
             service.currentUser = user;
         }).error(function () {
             service.currentUser = null;
         });
+        return service.currentUserPromise;
     };
 
     service.login = function (username, password) {

@@ -33,6 +33,7 @@ import spray.http.HttpHeaders._
 import spray.http.RemoteAddress
 import shapeless._
 import se.nimsa.sbx.user.UserServiceActor
+import spray.http.DateTime
 
 trait UserRoutes { this: RestApi =>
 
@@ -59,7 +60,7 @@ trait UserRoutes { this: RestApi =>
         entity(as[UserPass]) { userPass =>
           onSuccess(userService.ask(Login(userPass, authKey))) {
             case LoggedIn(user, session) =>
-              setCookie(HttpCookie(sessionField, content = session.token, path = Some("/api"))) {
+              setCookie(HttpCookie(sessionField, content = session.token, path = Some("/api"), expires = Some(DateTime.now + sessionTimeout), httpOnly = true)) {
                 complete(NoContent)
               }
             case LoginFailed =>
