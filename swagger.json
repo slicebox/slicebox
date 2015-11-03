@@ -2481,7 +2481,7 @@
         },
         "role": {
           "type": "string"
-        },        
+        }        
       }
     },
     "userPass": {
