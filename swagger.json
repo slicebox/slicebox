@@ -1247,7 +1247,7 @@
             "description": "if the supplied credentials are valid. The response headers will contain Set-Cookie."
           },
           "401": {
-            "description": "if the supplied credentials are invalid.",
+            "description": "if the supplied credentials are invalid."
           }
         }        
       }
