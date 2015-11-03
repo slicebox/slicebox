@@ -1227,6 +1227,63 @@
       }
     },
 
+    "/users/login": {
+      "post": {
+        "description": "Obtain a session cookie that can be used to authenticate future API calls from the present IP address and with the present user agent.",
+        "tags": ["Users"],
+        "parameters": [
+          {
+            "name": "UserPass",
+            "in": "body",
+            "description": "username and password for user logging in",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/userPass"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "if the supplied credentials are valid. The response headers will contain Set-Cookie."
+          },
+          "401": {
+            "description": "if the supplied credentials are invalid.",
+          }
+        }        
+      }
+    },
+
+    "/users/logout": {
+      "post": {
+        "description": "Logout the current user by responding with a delete cookie header removing the session cookie for this user.",
+        "tags": ["Users"],
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "the user was logged out"
+          }
+        }        
+      }
+    },
+
+    "users/current": {
+      "get": {
+        "description": "obtain information on the currently logged in user as specified by the supplied session cookie, IP address and user agent.",
+        "tags": ["Users"],
+        "responses": {
+          "200": {
+            "description": "user information",
+            "schema": {
+              "$ref": "#/definitions/userInfo"              
+            }
+          },
+          "404": {
+            "description": "no user found for the supplied session cookie, IP address and user agent, or if any of the required headers are missing."
+          }
+        }
+      }
+    },
+
     "/users": {
       "get": {
         "description": "Returns all users of slicebox",
@@ -1284,31 +1341,6 @@
         "responses": {
           "204": {
             "description": "user deleted"
-          }
-        }
-      }
-    },
-    "/users/generateauthtokens": {
-      "post": {
-        "description": "generate authentication tokens for the current user. Each token makes it possible to submit a request with the token supplied as the query parameter 'authtoken' instead of providing the standard authentication headers. This is useful in html tags which fetch protected resources but does not allow headers to be specififed. Unused tokens are removed after 24 hours.",
-        "tags": ["Users"],
-        "parameters": [
-          {
-            "name": "n",
-            "in": "query",
-            "description": "number of tokens to generate",
-            "required": false,
-            "default": "1",
-            "type": "integer",
-            "format": "int32"
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": "authentication tokens",
-            "schema": {
-              "$ref": "#/definitions/authToken"
-            }
           }
         }
       }
@@ -2438,6 +2470,30 @@
   },
 
   "definitions": {
+    "userInfo": {
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "user": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        },        
+      }
+    },
+    "userPass": {
+      "properties": {
+        "user": {
+          "type": "string"
+        },        
+        "pass": {
+          "type": "string"
+        }        
+      }
+    },
     "forwardingrule": {
       "properties": {
         "id": {
@@ -3113,13 +3169,6 @@
         "password": {
           "type": "string"
         }
-      }
-    },
-    "authToken": {
-      "properties": {
-        "token": {
-          "type": "string"
-        }              
       }
     },
     "logEntry": {
