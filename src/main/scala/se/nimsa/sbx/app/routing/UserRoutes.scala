@@ -74,7 +74,9 @@ trait UserRoutes { this: RestApi =>
     path("users" / "current") {
       get {
         onSuccess(userService.ask(GetAndRefreshUserByAuthKey(authKey)).mapTo[Option[ApiUser]]) { optionalUser =>
-          complete(optionalUser.map(user => UserInfo(user.id, user.user, user.role)))
+          rejectEmptyResponse {
+            complete(optionalUser.map(user => UserInfo(user.id, user.user, user.role)))
+          }
         }
       }
     }
