@@ -134,6 +134,12 @@ class UserRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
   }
 
+  it should "return 404 NotFound when asking for information on the currently logged in user with invalid headers" in {
+    GetWithHeaders(s"/api/users/current") ~> sealRoute(routes) ~> check {
+      status should be(NotFound)
+    }
+  }
+
   it should "support logging out again such that subsequent API calls will return 401 Unauthorized" in {
     val cookie = PostWithHeaders("/api/users/login", UserPass(superUser, superPassword)) ~> routes ~> check {
       status should be(NoContent)

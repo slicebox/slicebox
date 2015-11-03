@@ -60,7 +60,7 @@ trait UserRoutes { this: RestApi =>
         entity(as[UserPass]) { userPass =>
           onSuccess(userService.ask(Login(userPass, authKey))) {
             case LoggedIn(user, session) =>
-              setCookie(HttpCookie(sessionField, content = session.token, path = Some("/api"), expires = Some(DateTime.now + sessionTimeout), httpOnly = true)) {
+              setCookie(HttpCookie(sessionField, content = session.token, path = Some("/api"), httpOnly = true)) {
                 complete(NoContent)
               }
             case LoginFailed =>
@@ -74,8 +74,9 @@ trait UserRoutes { this: RestApi =>
     path("users" / "current") {
       get {
         onSuccess(userService.ask(GetAndRefreshUserByAuthKey(authKey)).mapTo[Option[ApiUser]]) { optionalUser =>
-          rejectEmptyResponse {
-            complete(optionalUser.map(user => UserInfo(user.id, user.user, user.role)))
+          optionalUser.map(user => UserInfo(user.id, user.user, user.role)) match {
+            case Some(userInfo) => complete(userInfo)
+            case None           => complete(NotFound)
           }
         }
       }
