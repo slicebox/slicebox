@@ -48,36 +48,41 @@ trait SliceboxRoutes extends DirectoryRoutes
         complete((BadGateway, e.getMessage()))
     }
 
+  implicit val authRejectionHandler = RejectionHandler {
+    case AuthenticationFailedRejection(cause, headers) :: _ =>
+      complete((Unauthorized, "This resource requires authentication. Use either basic auth, or supply the session cookie obtained by logging in."))
+  }
+
   def sliceboxRoutes: Route =
     pathPrefix("api") {
       extractAuthKey { authKey =>
         loginRoute(authKey) ~
-        currentUserRoute(authKey) ~
-        authenticate(authenticator.newAuthenticator(authKey)) { apiUser =>
-          userRoutes(apiUser, authKey) ~
-          directoryRoutes(apiUser) ~
-          scpRoutes(apiUser) ~
-          scuRoutes(apiUser) ~
-          metaDataRoutes ~
-          imageRoutes(apiUser) ~
-          boxRoutes(apiUser) ~
-          inboxRoutes ~
-          outboxRoutes ~
-          sentRoutes ~
-          logRoutes ~
-          generalRoutes(apiUser) ~
-          seriesTypeRoutes(apiUser) ~
-          forwardingRoutes(apiUser)
-        }
+          currentUserRoute(authKey) ~
+          authenticate(authenticator.newAuthenticator(authKey)) { apiUser =>
+            userRoutes(apiUser, authKey) ~
+              directoryRoutes(apiUser) ~
+              scpRoutes(apiUser) ~
+              scuRoutes(apiUser) ~
+              metaDataRoutes ~
+              imageRoutes(apiUser) ~
+              boxRoutes(apiUser) ~
+              inboxRoutes ~
+              outboxRoutes ~
+              sentRoutes ~
+              logRoutes ~
+              generalRoutes(apiUser) ~
+              seriesTypeRoutes(apiUser) ~
+              forwardingRoutes(apiUser)
+          }
       } ~ remoteBoxRoutes
-    } ~ 
-    pathPrefixTest(!"api") {
-      pathPrefix("assets") {
-        staticResourcesRoute
-      } ~ pathPrefixTest(!"assets") {
-        faviconRoutes ~ 
-        angularRoute
+    } ~
+      pathPrefixTest(!"api") {
+        pathPrefix("assets") {
+          staticResourcesRoute
+        } ~ pathPrefixTest(!"assets") {
+          faviconRoutes ~
+            angularRoute
+        }
       }
-    }
 
 }

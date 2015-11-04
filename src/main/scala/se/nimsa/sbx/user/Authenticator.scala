@@ -16,23 +16,23 @@
 
 package se.nimsa.sbx.user
 
+import scala.Left
+import scala.Right
 import scala.concurrent.ExecutionContext
-import spray.routing.authentication._
-import spray.http.HttpHeaders._
-import akka.pattern.ask
-import akka.actor.ActorRef
-import akka.util.Timeout
-import scala.concurrent.duration.DurationInt
 import scala.concurrent.Future
-import spray.routing._
-import spray.routing.Directives._
+
 import UserProtocol._
-import spray.http.HttpCookie
-import spray.http.HttpChallenge
-import spray.http.HttpRequest
-import spray.http._
-import spray.util._
-import AuthenticationFailedRejection._
+import akka.actor.ActorRef
+import akka.pattern.ask
+import akka.util.Timeout
+import spray.http.BasicHttpCredentials
+import spray.http.HttpHeaders.Authorization
+import spray.routing._
+import spray.routing.AuthenticationFailedRejection._
+import spray.routing.RequestContext
+import spray.routing.authentication.ContextAuthenticator
+import spray.routing.authentication.UserPass
+import spray.util.pimpSeq
 
 class Authenticator(userService: ActorRef)(implicit ec: ExecutionContext, timeout: Timeout) {
 
@@ -49,12 +49,11 @@ class SliceboxAuthenticator(userService: ActorRef, authKey: AuthKey)(implicit ec
       case BasicHttpCredentials(user, pass) ⇒ Some(UserPass(user, pass))
       case _                                ⇒ None
     }
-    val isSession = optionalUserPass.isEmpty && authKey.isValid
     authenticate(optionalUserPass, ctx) map {
       case Some(user) => Right(user)
       case None =>
-        val cause = if (authHeader.isEmpty && !isSession) CredentialsMissing else CredentialsRejected
-        Left(AuthenticationFailedRejection(cause, getChallengeHeaders(ctx.request, isSession)))
+        val cause = if (authHeader.isEmpty) CredentialsMissing else CredentialsRejected
+        Left(AuthenticationFailedRejection(cause, Nil))
     }
   }
 
@@ -67,10 +66,4 @@ class SliceboxAuthenticator(userService: ActorRef, authKey: AuthKey)(implicit ec
         userService.ask(GetAndRefreshUserByAuthKey(authKey)).mapTo[Option[ApiUser]])
   }
 
-  def getChallengeHeaders(httpRequest: HttpRequest, isSession: Boolean): List[HttpHeader] =
-    if (isSession)
-      Nil
-    else
-      `WWW-Authenticate`(HttpChallenge(scheme = "Basic", realm = "Slicebox", params = Map.empty)) :: Nil
-      
 }
