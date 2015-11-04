@@ -25,16 +25,15 @@ import spray.http.StatusCodes._
 import spray.httpx.SprayJsonSupport._
 import spray.routing._
 
-import se.nimsa.sbx.user.AuthInfo
 import se.nimsa.sbx.app.RestApi
-import se.nimsa.sbx.user.UserProtocol.UserRole
+import se.nimsa.sbx.user.UserProtocol._
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.dicom.DicomUtil
 
 trait BoxRoutes { this: RestApi =>
 
-  def boxRoutes(authInfo: AuthInfo): Route =
+  def boxRoutes(apiUser: ApiUser): Route =
     pathPrefix("boxes") {
       pathEndOrSingleSlash {
         get {
@@ -43,7 +42,7 @@ trait BoxRoutes { this: RestApi =>
               complete(boxes)
           }
         }
-      } ~ authorize(authInfo.hasPermission(UserRole.ADMINISTRATOR)) {
+      } ~ authorize(apiUser.hasPermission(UserRole.ADMINISTRATOR)) {
         path("createconnection") {
           post {
             entity(as[RemoteBoxConnectionData]) { remoteBoxConnectionData =>

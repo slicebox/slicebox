@@ -23,14 +23,13 @@ import spray.http.StatusCodes.Created
 import spray.httpx.SprayJsonSupport._
 import spray.routing._
 
-import se.nimsa.sbx.user.AuthInfo
 import se.nimsa.sbx.app.RestApi
-import se.nimsa.sbx.user.UserProtocol.UserRole
+import se.nimsa.sbx.user.UserProtocol._
 import se.nimsa.sbx.scu.ScuProtocol._
 
 trait ScuRoutes { this: RestApi =>
 
-  def scuRoutes(authInfo: AuthInfo): Route =
+  def scuRoutes(apiUser: ApiUser): Route =
     pathPrefix("scus") {
       pathEndOrSingleSlash {
         get {
@@ -39,7 +38,7 @@ trait ScuRoutes { this: RestApi =>
               complete(scus)
           }
         } ~ post {
-          authorize(authInfo.hasPermission(UserRole.ADMINISTRATOR)) {
+          authorize(apiUser.hasPermission(UserRole.ADMINISTRATOR)) {
             entity(as[ScuData]) { scu =>
               onSuccess(scuService.ask(AddScu(scu))) {
                 case scuData: ScuData =>
@@ -51,7 +50,7 @@ trait ScuRoutes { this: RestApi =>
       } ~ pathPrefix(LongNumber) { scuDataId =>
         pathEndOrSingleSlash {
           delete {
-            authorize(authInfo.hasPermission(UserRole.ADMINISTRATOR)) {
+            authorize(apiUser.hasPermission(UserRole.ADMINISTRATOR)) {
               onSuccess(scuService.ask(RemoveScu(scuDataId))) {
                 case ScuRemoved(scuDataId) =>
                   complete(NoContent)

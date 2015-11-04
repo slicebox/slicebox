@@ -20,7 +20,6 @@ import scala.concurrent.duration.DurationInt
 
 import akka.actor.ActorContext
 import akka.pattern.ask
-import se.nimsa.sbx.user.AuthInfo
 import se.nimsa.sbx.app.RestApi
 import se.nimsa.sbx.user.UserProtocol._
 import se.nimsa.sbx.box.BoxProtocol.Boxes
@@ -37,11 +36,11 @@ import spray.routing.Route
 
 trait GeneralRoutes { this: RestApi =>
 
-  def generalRoutes(authInfo: AuthInfo): Route =
+  def generalRoutes(apiUser: ApiUser): Route =
     pathPrefix("system") {
       path("stop") {
         post {
-          authorize(authInfo.hasPermission(UserRole.ADMINISTRATOR)) {
+          authorize(apiUser.hasPermission(UserRole.ADMINISTRATOR)) {
             complete {
               val system = actorRefFactory.asInstanceOf[ActorContext].system
               system.scheduler.scheduleOnce(1.second)(system.shutdown())(system.dispatcher)

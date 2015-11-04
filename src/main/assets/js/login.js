@@ -29,12 +29,15 @@ angular.module('slicebox.login', ['ngRoute'])
                 var url = '/';
                 try {
                     if ($rootScope.requestedPage) {
-                        url = (new URL($rootScope.requestedPage)).pathname;
+                        var requestedPath = new URL($rootScope.requestedPage).pathname;
+                        if (requestedPath !== '/login') {
+                            url = requestedPath;
+                        }
                     }
                 } catch (error) {}
                 $location.path(url);
             });
-        }).error(function() {
+        }).error(function(response) {
             sbxToast.showErrorMessage(response.message);
             $scope.uiState.loginInProgress = false;            
         });

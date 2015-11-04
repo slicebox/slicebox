@@ -48,18 +48,27 @@ object UserProtocol {
   case class ClearTextUser(user: String, role: UserRole, password: String)
 
   case class UserInfo(id: Long, user: String, role: UserRole)
-  
+
   case class ApiUser(id: Long, user: String, role: UserRole, hashedPassword: Option[String] = None) extends Entity {
 
     def withPassword(password: String) = copy(hashedPassword = Some(password.bcrypt(generateSalt)))
 
     def passwordMatches(password: String): Boolean = hashedPassword.exists(hp => BCrypt.checkpw(password, hp))
 
-  }
+    def hasPermission(challengeRole: UserRole): Boolean = (role, challengeRole) match {
+      case (UserRole.SUPERUSER, _) => true
+      case (UserRole.ADMINISTRATOR, UserRole.ADMINISTRATOR) => true
+      case (UserRole.ADMINISTRATOR, UserRole.USER) => true
+      case (UserRole.USER, UserRole.USER) => true
+      case _ => false
+    }
+  } 
 
   case class ApiSession(id: Long, userId: Long, token: String, ip: String, userAgent: String, lastUpdated: Long) extends Entity
 
-  case class AuthKey(token: Option[String], ip: Option[String], userAgent: Option[String])
+  case class AuthKey(token: Option[String], ip: Option[String], userAgent: Option[String]) {
+    def isValid = List(token, ip, userAgent).flatten.length == 3
+  }
 
   sealed trait UserRequest
 

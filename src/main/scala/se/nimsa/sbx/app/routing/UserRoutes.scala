@@ -20,7 +20,6 @@ import akka.pattern.ask
 import spray.http.StatusCodes._
 import spray.httpx.SprayJsonSupport._
 import spray.routing._
-import se.nimsa.sbx.user.AuthInfo
 import se.nimsa.sbx.app.RestApi
 import se.nimsa.sbx.user.UserProtocol._
 import spray.routing.authentication.UserPass
@@ -82,7 +81,7 @@ trait UserRoutes { this: RestApi =>
       }
     }
 
-  def userRoutes(authInfo: AuthInfo, authKey: AuthKey): Route =
+  def userRoutes(apiUser: ApiUser, authKey: AuthKey): Route =
     pathPrefix("users") {
       pathEndOrSingleSlash {
         get {
@@ -91,7 +90,7 @@ trait UserRoutes { this: RestApi =>
               complete(users)
           }
         } ~ post {
-          authorize(authInfo.hasPermission(UserRole.ADMINISTRATOR)) {
+          authorize(apiUser.hasPermission(UserRole.ADMINISTRATOR)) {
             entity(as[ClearTextUser]) { user =>
               val apiUser = ApiUser(-1, user.user, user.role).withPassword(user.password)
               onSuccess(userService.ask(AddUser(apiUser))) {
@@ -103,7 +102,7 @@ trait UserRoutes { this: RestApi =>
         }
       } ~ path(LongNumber) { userId =>
         delete {
-          authorize(authInfo.hasPermission(UserRole.ADMINISTRATOR)) {
+          authorize(apiUser.hasPermission(UserRole.ADMINISTRATOR)) {
             onSuccess(userService.ask(DeleteUser(userId))) {
               case UserDeleted(userId) =>
                 complete(NoContent)
@@ -112,9 +111,9 @@ trait UserRoutes { this: RestApi =>
         }
       } ~ path("logout") {
         post {
-          onSuccess(userService.ask(Logout(authInfo.user, authKey))) {
+          onSuccess(userService.ask(Logout(apiUser, authKey))) {
             case LoggedOut =>
-              deleteCookie(sessionField) {
+              deleteCookie(sessionField, path = "/api") {
                 complete(NoContent)
               }
           }

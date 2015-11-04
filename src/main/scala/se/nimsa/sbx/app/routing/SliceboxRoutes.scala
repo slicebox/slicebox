@@ -19,7 +19,7 @@ package se.nimsa.sbx.app.routing
 import spray.routing._
 import spray.http.StatusCodes._
 import se.nimsa.sbx.app.RestApi
-import se.nimsa.sbx.user.UserProtocol.UserRole
+import se.nimsa.sbx.user.UserProtocol._
 import spray.routing.ExceptionHandler
 import se.nimsa.sbx.lang.NotFoundException
 import se.nimsa.sbx.lang.BadGatewayException
@@ -53,21 +53,21 @@ trait SliceboxRoutes extends DirectoryRoutes
       extractAuthKey { authKey =>
         loginRoute(authKey) ~
         currentUserRoute(authKey) ~
-        authenticate(authenticator.sliceboxAuthenticator(authKey)) { authInfo =>
-          userRoutes(authInfo, authKey) ~
-          directoryRoutes(authInfo) ~
-          scpRoutes(authInfo) ~
-          scuRoutes(authInfo) ~
+        authenticate(authenticator.newAuthenticator(authKey)) { apiUser =>
+          userRoutes(apiUser, authKey) ~
+          directoryRoutes(apiUser) ~
+          scpRoutes(apiUser) ~
+          scuRoutes(apiUser) ~
           metaDataRoutes ~
-          imageRoutes(authInfo) ~
-          boxRoutes(authInfo) ~
+          imageRoutes(apiUser) ~
+          boxRoutes(apiUser) ~
           inboxRoutes ~
           outboxRoutes ~
           sentRoutes ~
           logRoutes ~
-          generalRoutes(authInfo) ~
-          seriesTypeRoutes(authInfo) ~
-          forwardingRoutes(authInfo)
+          generalRoutes(apiUser) ~
+          seriesTypeRoutes(apiUser) ~
+          forwardingRoutes(apiUser)
         }
       } ~ remoteBoxRoutes
     } ~ 

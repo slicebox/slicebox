@@ -23,14 +23,13 @@ import spray.http.HttpEntity
 import spray.http.StatusCodes._
 import spray.httpx.SprayJsonSupport._
 import spray.routing._
-import se.nimsa.sbx.user.AuthInfo
 import se.nimsa.sbx.app.RestApi
-import se.nimsa.sbx.user.UserProtocol.UserRole
+import se.nimsa.sbx.user.UserProtocol._
 import se.nimsa.sbx.forwarding.ForwardingProtocol._
 
 trait ForwardingRoutes { this: RestApi =>
 
-  def forwardingRoutes(authInfo: AuthInfo): Route =
+  def forwardingRoutes(apiUser: ApiUser): Route =
     pathPrefix("forwarding") {
       pathPrefix("rules") {
         pathEndOrSingleSlash {
@@ -40,7 +39,7 @@ trait ForwardingRoutes { this: RestApi =>
                 complete(forwardingRules)
             }
           } ~ post {
-            authorize(authInfo.hasPermission(UserRole.ADMINISTRATOR)) {
+            authorize(apiUser.hasPermission(UserRole.ADMINISTRATOR)) {
               entity(as[ForwardingRule]) { forwardingRule =>
                 onSuccess(forwardingService.ask(AddForwardingRule(forwardingRule))) {
                   case ForwardingRuleAdded(forwardingRule) =>
@@ -52,7 +51,7 @@ trait ForwardingRoutes { this: RestApi =>
         } ~ pathPrefix(LongNumber) { forwardingRuleId =>
           pathEndOrSingleSlash {
             delete {
-              authorize(authInfo.hasPermission(UserRole.ADMINISTRATOR)) {
+              authorize(apiUser.hasPermission(UserRole.ADMINISTRATOR)) {
                 onSuccess(forwardingService.ask(RemoveForwardingRule(forwardingRuleId))) {
                   case ForwardingRuleRemoved(forwardingRuleId) =>
                     complete(NoContent)

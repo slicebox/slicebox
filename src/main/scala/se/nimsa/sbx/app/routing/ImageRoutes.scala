@@ -25,9 +25,9 @@ import org.dcm4che3.data.Attributes
 import akka.actor.Props
 import akka.actor.Actor
 import akka.pattern.ask
+import se.nimsa.sbx.user.UserProtocol._
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.anonymization.AnonymizationUtil
-import se.nimsa.sbx.user.AuthInfo
 import se.nimsa.sbx.app.RestApi
 import se.nimsa.sbx.dicom.DicomUtil
 import se.nimsa.sbx.storage.StorageProtocol._
@@ -50,13 +50,13 @@ trait ImageRoutes { this: RestApi =>
   val chunkSize = 524288
   val bufferSize = chunkSize
 
-  def imageRoutes(authInfo: AuthInfo): Route =
+  def imageRoutes(apiUser: ApiUser): Route =
     pathPrefix("images") {
       pathEndOrSingleSlash {
         post {
           formField('file.as[FormFile]) { file =>
             val dataset = DicomUtil.loadDataset(file.entity.data.toByteArray, true)
-            val source = Source(SourceType.USER, authInfo.user.user, authInfo.user.id)
+            val source = Source(SourceType.USER, apiUser.user, apiUser.id)
             onSuccess(storageService.ask(AddDataset(dataset, source))) {
               case ImageAdded(image, source) =>
                 import spray.httpx.SprayJsonSupport._
@@ -64,7 +64,7 @@ trait ImageRoutes { this: RestApi =>
             }
           } ~ entity(as[Array[Byte]]) { bytes =>
             val dataset = DicomUtil.loadDataset(bytes, true)
-            val source = Source(SourceType.USER, authInfo.user.user, authInfo.user.id)
+            val source = Source(SourceType.USER, apiUser.user, apiUser.id)
             onSuccess(storageService.ask(AddDataset(dataset, source))) {
               case ImageAdded(image, source) =>
                 import spray.httpx.SprayJsonSupport._
@@ -118,7 +118,7 @@ trait ImageRoutes { this: RestApi =>
                     onSuccess(anonymizationService.ask(Anonymize(dataset, tagValues)).mapTo[Attributes]) { anonDataset =>
                       onSuccess(storageService.ask(DeleteImage(imageId))) {
                         case ImageDeleted(imageId) =>
-                          val source = Source(SourceType.USER, authInfo.user.user, authInfo.user.id)
+                          val source = Source(SourceType.USER, apiUser.user, apiUser.id)
                           onSuccess(storageService.ask(AddDataset(anonDataset, source))) {
                             case ImageAdded(image, source) =>
                               complete(NoContent)

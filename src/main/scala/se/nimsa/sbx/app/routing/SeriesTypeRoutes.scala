@@ -23,15 +23,14 @@ import spray.http.HttpEntity
 import spray.http.StatusCodes._
 import spray.httpx.SprayJsonSupport._
 import spray.routing._
-import se.nimsa.sbx.user.AuthInfo
 import se.nimsa.sbx.app.RestApi
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
-import se.nimsa.sbx.user.UserProtocol.UserRole
+import se.nimsa.sbx.user.UserProtocol._
 import se.nimsa.sbx.storage.StorageProtocol.GetSeriesTypesForSeries
 
 trait SeriesTypeRoutes { this: RestApi =>
 
-  def seriesTypeRoutes(authInfo: AuthInfo): Route =
+  def seriesTypeRoutes(apiUser: ApiUser): Route =
     pathPrefix("seriestypes") {
       pathEndOrSingleSlash {
         get {
@@ -40,7 +39,7 @@ trait SeriesTypeRoutes { this: RestApi =>
               complete(seriesTypes)
           }
         } ~ post {
-          authorize(authInfo.hasPermission(UserRole.ADMINISTRATOR)) {
+          authorize(apiUser.hasPermission(UserRole.ADMINISTRATOR)) {
             entity(as[SeriesType]) { seriesType =>
               onSuccess(seriesTypeService.ask(AddSeriesType(seriesType))) {
                 case SeriesTypeAdded(seriesType) =>
@@ -53,7 +52,7 @@ trait SeriesTypeRoutes { this: RestApi =>
       } ~ pathPrefix(LongNumber) { seriesTypeId =>
         pathEndOrSingleSlash {
           put {
-            authorize(authInfo.hasPermission(UserRole.ADMINISTRATOR)) {
+            authorize(apiUser.hasPermission(UserRole.ADMINISTRATOR)) {
               entity(as[SeriesType]) { seriesType =>
                 onSuccess(seriesTypeService.ask(UpdateSeriesType(seriesType))) {
                   case SeriesTypeUpdated =>
@@ -62,7 +61,7 @@ trait SeriesTypeRoutes { this: RestApi =>
               }
             }
           } ~ delete {
-            authorize(authInfo.hasPermission(UserRole.ADMINISTRATOR)) {
+            authorize(apiUser.hasPermission(UserRole.ADMINISTRATOR)) {
               onSuccess(seriesTypeService.ask(RemoveSeriesType(seriesTypeId))) {
                 case SeriesTypeRemoved(seriesTypeId) =>
                   complete(NoContent)
@@ -88,7 +87,7 @@ trait SeriesTypeRoutes { this: RestApi =>
               }
             }
           } ~ post {
-            authorize(authInfo.hasPermission(UserRole.ADMINISTRATOR)) {
+            authorize(apiUser.hasPermission(UserRole.ADMINISTRATOR)) {
               entity(as[SeriesTypeRule]) { seriesTypeRule =>
                 onSuccess(seriesTypeService.ask(AddSeriesTypeRule(seriesTypeRule))) {
                   case SeriesTypeRuleAdded(seriesTypeRule) =>
@@ -100,7 +99,7 @@ trait SeriesTypeRoutes { this: RestApi =>
         } ~ pathPrefix(LongNumber) { seriesTypeRuleId =>
           pathEndOrSingleSlash {
             delete {
-              authorize(authInfo.hasPermission(UserRole.ADMINISTRATOR)) {
+              authorize(apiUser.hasPermission(UserRole.ADMINISTRATOR)) {
                 onSuccess(seriesTypeService.ask(RemoveSeriesTypeRule(seriesTypeRuleId))) {
                   case SeriesTypeRuleRemoved(seriesTypeRuleId) =>
                     complete(NoContent)
@@ -115,7 +114,7 @@ trait SeriesTypeRoutes { this: RestApi =>
                     complete(seriesTypeRuleAttributes)
                 }
               } ~ post {
-                authorize(authInfo.hasPermission(UserRole.ADMINISTRATOR)) {
+                authorize(apiUser.hasPermission(UserRole.ADMINISTRATOR)) {
                   entity(as[SeriesTypeRuleAttribute]) { seriesTypeRuleAttribute =>
                     onSuccess(seriesTypeService.ask(AddSeriesTypeRuleAttribute(seriesTypeRuleAttribute))) {
                       case SeriesTypeRuleAttributeAdded(seriesTypeRuleAttribute) =>
@@ -127,7 +126,7 @@ trait SeriesTypeRoutes { this: RestApi =>
             } ~ pathPrefix(LongNumber) { seriesTypeRuleAttributeId =>
               pathEndOrSingleSlash {
                 delete {
-                  authorize(authInfo.hasPermission(UserRole.ADMINISTRATOR)) {
+                  authorize(apiUser.hasPermission(UserRole.ADMINISTRATOR)) {
                     onSuccess(seriesTypeService.ask(RemoveSeriesTypeRuleAttribute(seriesTypeRuleAttributeId))) {
                       case SeriesTypeRuleAttributeRemoved(seriesTypeRuleAttributeId) =>
                         complete(NoContent)

@@ -22,12 +22,11 @@ import spray.routing._
 import spray.http.StatusCodes._
 import se.nimsa.sbx.app.RestApi
 import se.nimsa.sbx.directory.DirectoryWatchProtocol._
-import se.nimsa.sbx.user.AuthInfo
-import se.nimsa.sbx.user.UserProtocol.UserRole
+import se.nimsa.sbx.user.UserProtocol._
 
 trait DirectoryRoutes { this: RestApi =>
 
-  def directoryRoutes(authInfo: AuthInfo): Route =
+  def directoryRoutes(apiUser: ApiUser): Route =
     pathPrefix("directorywatches") {
       pathEndOrSingleSlash {
         get {
@@ -36,7 +35,7 @@ trait DirectoryRoutes { this: RestApi =>
               complete(directories)
           }
         } ~ post {
-          authorize(authInfo.hasPermission(UserRole.ADMINISTRATOR)) {
+          authorize(apiUser.hasPermission(UserRole.ADMINISTRATOR)) {
             entity(as[WatchedDirectory]) { directory =>
               onSuccess(directoryService.ask(WatchDirectory(directory))) {
                 case watchedDirectory: WatchedDirectory =>
@@ -47,7 +46,7 @@ trait DirectoryRoutes { this: RestApi =>
         }
       } ~ path(LongNumber) { watchDirectoryId =>
         delete {
-          authorize(authInfo.hasPermission(UserRole.ADMINISTRATOR)) {
+          authorize(apiUser.hasPermission(UserRole.ADMINISTRATOR)) {
             onSuccess(directoryService.ask(UnWatchDirectory(watchDirectoryId))) {
               case DirectoryUnwatched(watchedDirectoryId) =>
                 complete(NoContent)

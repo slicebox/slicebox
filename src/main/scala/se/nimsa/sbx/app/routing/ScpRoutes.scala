@@ -23,14 +23,13 @@ import spray.http.StatusCodes.Created
 import spray.httpx.SprayJsonSupport._
 import spray.routing._
 
-import se.nimsa.sbx.user.AuthInfo
 import se.nimsa.sbx.app.RestApi
-import se.nimsa.sbx.user.UserProtocol.UserRole
+import se.nimsa.sbx.user.UserProtocol._
 import se.nimsa.sbx.scp.ScpProtocol._
 
 trait ScpRoutes { this: RestApi =>
 
-def scpRoutes(authInfo: AuthInfo): Route =
+def scpRoutes(apiUser: ApiUser): Route =
     pathPrefix("scps") {
       pathEndOrSingleSlash {
         get {
@@ -39,7 +38,7 @@ def scpRoutes(authInfo: AuthInfo): Route =
               complete(scps)
           }
         } ~ post {
-          authorize(authInfo.hasPermission(UserRole.ADMINISTRATOR)) {
+          authorize(apiUser.hasPermission(UserRole.ADMINISTRATOR)) {
             entity(as[ScpData]) { scp =>
               onSuccess(scpService.ask(AddScp(scp))) {
                 case scpData: ScpData =>
@@ -50,7 +49,7 @@ def scpRoutes(authInfo: AuthInfo): Route =
         }
       } ~ path(LongNumber) { scpDataId =>
         delete {
-          authorize(authInfo.hasPermission(UserRole.ADMINISTRATOR)) {
+          authorize(apiUser.hasPermission(UserRole.ADMINISTRATOR)) {
             onSuccess(scpService.ask(RemoveScp(scpDataId))) {
               case ScpRemoved(scpDataId) =>
                 complete(NoContent)
