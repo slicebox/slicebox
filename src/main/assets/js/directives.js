@@ -19,8 +19,13 @@ angular.module('slicebox.directives', [])
     return {
         restrict: 'E',
         template: '<md-button type="{{buttonType}}" ng-class="buttonClass" ng-click="buttonClicked()" ng-disabled="buttonDisabled || disabled">' + 
-                    '<section layout="row" layout-align="center center">{{buttonTitle}}<md-progress-circular md-mode="indeterminate" md-diameter="12" ng-if="disabled && showSpinner"></md-progress-circular></section>' + 
-                    '</md-button>',
+                    '<div layout="row" layout-wrap layout-align="center center">' +
+                      '{{buttonTitle}}' + 
+                      '<div style="margin: -43px -35px -43px -35px;" ng-if="disabled && showSpinner">' +
+                        '<md-progress-circular md-mode="indeterminate" md-diameter="15" />' +
+                      '</div>' +
+                    '</div>' +
+                  '</md-button>',
         scope: {
             action: '&',
             buttonType: '@',
@@ -43,7 +48,7 @@ angular.module('slicebox.directives', [])
 
                 spinnerTimeoutPromise = $timeout(function() {
                    $scope.showSpinner = true;
-                }, 1000);
+                }, 700);
 
                 var action = $scope.action();
                 $q.when(action).finally(function() {

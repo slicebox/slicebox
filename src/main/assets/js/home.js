@@ -11,7 +11,7 @@ angular.module('slicebox.home', ['ngRoute'])
   });
 })
 
-.controller('HomeCtrl', function($scope, $http, $mdDialog, $q, openConfirmActionModal, openDeleteEntitiesModalFunction, openTagSeriesModal, sbxMisc, sbxMetaData, sbxToast) {
+.controller('HomeCtrl', function($timeout, $scope, $http, $mdDialog, $q, openConfirmActionModal, openDeleteEntitiesModalFunction, openTagSeriesModal, sbxMisc, sbxMetaData, sbxToast) {
 
     // Initialization
 
@@ -861,17 +861,19 @@ angular.module('slicebox.home', ['ngRoute'])
     }
 
     function showBoxSendTagValuesModal(imageIdsAndPatientsPromise, actionCallback, actionStringPastTense, actionString) {
-        return $mdDialog.show({
+        return imageIdsAndPatientsPromise.then(function(imageIdsAndPatients) {
+            return $mdDialog.show({
                 templateUrl: '/assets/partials/tagValuesModalContent.html',
                 controller: 'TagValuesCtrl',
                 scope: $scope.$new(),
                 locals: {
-                    imageIdsAndPatients: imageIdsAndPatientsPromise,
+                    imageIdsAndPatients: imageIdsAndPatients,
                     actionCallback: actionCallback,
                     actionStringPastTense: actionStringPastTense,
                     actionString: actionString
                 }
-        });                
+            });            
+        });
     }
 
     function confirmExportPatients(patients) {
@@ -937,7 +939,10 @@ angular.module('slicebox.home', ['ngRoute'])
     };
 
     $scope.selectButtonClicked = function() {
-        receiverSelectedCallback($scope.uiState.selectedReceiver.id);
+        return receiverSelectedCallback($scope.uiState.selectedReceiver.id).then(function(data) {
+            $mdDialog.hide();
+            return data;
+        });
     };
 
     $scope.cancelButtonClicked = function() {
