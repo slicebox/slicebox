@@ -291,6 +291,17 @@ class PropertiesDAO(val driver: JdbcProfile) {
   def parseQueryOrder(optionalOrder: Option[QueryOrder]) =
     (optionalOrder.map(_.orderBy), optionalOrder.map(_.orderAscending).getOrElse(true))
 
+  def queryPart(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, sourceRefs: Seq[SourceRef], seriesTypeIds: Seq[Long], seriesTagIds: Seq[Long], queryProperties: Seq[QueryProperty]) =
+    propertiesJoinPart(sourceRefs, seriesTypeIds, seriesTagIds) +
+      metaDataDao.wherePart(metaDataDao.queryPart(queryProperties)) +
+      sourcesPart(sourceRefs) +
+      andPart(sourceRefs, seriesTypeIds) +
+      seriesTypesPart(seriesTypeIds) +
+      andPart(sourceRefs, seriesTypeIds, seriesTagIds) +
+      seriesTagsPart(seriesTagIds) +
+      metaDataDao.orderByPart(orderBy, orderAscending) +
+      metaDataDao.pagePart(startIndex, count)
+
   def queryPatients(startIndex: Long, count: Long, optionalOrder: Option[QueryOrder], queryProperties: Seq[QueryProperty], optionalFilters: Option[QueryFilters])(implicit session: Session): List[Patient] = {
 
     val (orderBy, orderAscending) = parseQueryOrder(optionalOrder)
@@ -305,15 +316,7 @@ class PropertiesDAO(val driver: JdbcProfile) {
 
       val query =
         metaDataDao.queryPatientsSelectPart +
-          propertiesJoinPart(filters.sourceRefs, filters.seriesTypeIds, filters.seriesTagIds) +
-          metaDataDao.wherePart(metaDataDao.queryPart(queryProperties)) +
-          sourcesPart(filters.sourceRefs) +
-          andPart(filters.sourceRefs, filters.seriesTypeIds) +
-          seriesTypesPart(filters.seriesTypeIds) +
-          andPart(filters.sourceRefs, filters.seriesTypeIds, filters.seriesTagIds) +
-          seriesTagsPart(filters.seriesTagIds) +
-          metaDataDao.orderByPart(orderBy, orderAscending) +
-          metaDataDao.pagePart(startIndex, count)
+        queryPart(startIndex, count, orderBy, orderAscending, filters.sourceRefs, filters.seriesTypeIds, filters.seriesTagIds, queryProperties)
 
       Q.queryNA(query).list
 
@@ -337,15 +340,7 @@ class PropertiesDAO(val driver: JdbcProfile) {
 
       val query =
         metaDataDao.queryStudiesSelectPart +
-          propertiesJoinPart(filters.sourceRefs, filters.seriesTypeIds, filters.seriesTagIds) +
-          metaDataDao.wherePart(metaDataDao.queryPart(queryProperties)) +
-          sourcesPart(filters.sourceRefs) +
-          andPart(filters.sourceRefs, filters.seriesTypeIds) +
-          seriesTypesPart(filters.seriesTypeIds) +
-          andPart(filters.sourceRefs, filters.seriesTypeIds, filters.seriesTagIds) +
-          seriesTagsPart(filters.seriesTagIds) +
-          metaDataDao.orderByPart(orderBy, orderAscending) +
-          metaDataDao.pagePart(startIndex, count)
+        queryPart(startIndex, count, orderBy, orderAscending, filters.sourceRefs, filters.seriesTypeIds, filters.seriesTagIds, queryProperties)
 
       Q.queryNA(query).list
 
@@ -369,15 +364,7 @@ class PropertiesDAO(val driver: JdbcProfile) {
 
       val query =
         metaDataDao.querySeriesSelectPart +
-          propertiesJoinPart(filters.sourceRefs, filters.seriesTypeIds, filters.seriesTagIds) +
-          metaDataDao.wherePart(metaDataDao.queryPart(queryProperties)) +
-          sourcesPart(filters.sourceRefs) +
-          andPart(filters.sourceRefs, filters.seriesTypeIds) +
-          seriesTypesPart(filters.seriesTypeIds) +
-          andPart(filters.sourceRefs, filters.seriesTypeIds, filters.seriesTagIds) +
-          seriesTagsPart(filters.seriesTagIds) +
-          metaDataDao.orderByPart(orderBy, orderAscending) +
-          metaDataDao.pagePart(startIndex, count)
+        queryPart(startIndex, count, orderBy, orderAscending, filters.sourceRefs, filters.seriesTypeIds, filters.seriesTagIds, queryProperties)
 
       Q.queryNA(query).list
 
@@ -401,15 +388,7 @@ class PropertiesDAO(val driver: JdbcProfile) {
 
       val query =
         metaDataDao.queryImagesSelectPart +
-          propertiesJoinPart(filters.sourceRefs, filters.seriesTypeIds, filters.seriesTagIds) +
-          metaDataDao.wherePart(metaDataDao.queryPart(queryProperties)) +
-          sourcesPart(filters.sourceRefs) +
-          andPart(filters.sourceRefs, filters.seriesTypeIds) +
-          seriesTypesPart(filters.seriesTypeIds) +
-          andPart(filters.sourceRefs, filters.seriesTypeIds, filters.seriesTagIds) +
-          seriesTagsPart(filters.seriesTagIds) +
-          metaDataDao.orderByPart(orderBy, orderAscending) +
-          metaDataDao.pagePart(startIndex, count)
+        queryPart(startIndex, count, orderBy, orderAscending, filters.sourceRefs, filters.seriesTypeIds, filters.seriesTagIds, queryProperties)
 
       Q.queryNA(query).list
 
@@ -433,15 +412,7 @@ class PropertiesDAO(val driver: JdbcProfile) {
 
       val query =
         metaDataDao.flatSeriesBasePart +
-          propertiesJoinPart(filters.sourceRefs, filters.seriesTypeIds, filters.seriesTagIds) +
-          metaDataDao.wherePart(metaDataDao.queryPart(queryProperties)) +
-          sourcesPart(filters.sourceRefs) +
-          andPart(filters.sourceRefs, filters.seriesTypeIds) +
-          seriesTypesPart(filters.seriesTypeIds) +
-          andPart(filters.sourceRefs, filters.seriesTypeIds, filters.seriesTagIds) +
-          seriesTagsPart(filters.seriesTagIds) +
-          metaDataDao.orderByPart(orderBy, orderAscending) +
-          metaDataDao.pagePart(startIndex, count)
+        queryPart(startIndex, count, orderBy, orderAscending, filters.sourceRefs, filters.seriesTypeIds, filters.seriesTagIds, queryProperties)
 
       Q.queryNA(query).list
 
