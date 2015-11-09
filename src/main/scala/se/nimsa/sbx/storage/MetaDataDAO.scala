@@ -190,7 +190,7 @@ class MetaDataDAO(val driver: JdbcProfile) {
 
   // *** Listing all patients, studies etc ***
 
-  def patientsGetResult = GetResult(r =>
+  val patientsGetResult = GetResult(r =>
     Patient(r.nextLong, PatientName(r.nextString), PatientID(r.nextString), PatientBirthDate(r.nextString), PatientSex(r.nextString)))
 
   def patients(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String])(implicit session: Session): List[Patient] = {
@@ -231,13 +231,7 @@ class MetaDataDAO(val driver: JdbcProfile) {
 
   def pagePart(startIndex: Long, count: Long) = s""" limit $count offset $startIndex"""
 
-  def queryPatients(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, queryProperties: Seq[QueryProperty])(implicit session: Session): List[Patient] = {
-
-    checkOrderBy(orderBy, "Patients")
-
-    implicit val getResult = patientsGetResult
-
-    val querySelectPart = """select distinct("Patients"."id"),
+  val queryPatientsSelectPart = """select distinct("Patients"."id"),
       "Patients"."PatientName",
       "Patients"."PatientID",
       "Patients"."PatientBirthDate",
@@ -245,7 +239,13 @@ class MetaDataDAO(val driver: JdbcProfile) {
       left join "Studies" on "Studies"."patientId" = "Patients"."id"
       left join "Series" on "Series"."studyId" = "Studies"."id""""
 
-    val query = querySelectPart +
+  def queryPatients(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, queryProperties: Seq[QueryProperty])(implicit session: Session): List[Patient] = {
+
+    checkOrderBy(orderBy, "Patients")
+
+    implicit val getResult = patientsGetResult
+
+    val query = queryPatientsSelectPart +
       wherePart(queryPart(queryProperties)) +
       orderByPart(orderBy, orderAscending) +
       pagePart(startIndex, count)
@@ -255,14 +255,10 @@ class MetaDataDAO(val driver: JdbcProfile) {
 
   def studies(implicit session: Session): List[Study] = studiesQuery.list
 
-  def queryStudies(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, queryProperties: Seq[QueryProperty])(implicit session: Session): List[Study] = {
+  val studiesGetResult = GetResult(r =>
+    Study(r.nextLong, r.nextLong, StudyInstanceUID(r.nextString), StudyDescription(r.nextString), StudyDate(r.nextString), StudyID(r.nextString), AccessionNumber(r.nextString), PatientAge(r.nextString)))
 
-    checkOrderBy(orderBy, "Studies")
-
-    implicit val getResult = GetResult(r =>
-      Study(r.nextLong, r.nextLong, StudyInstanceUID(r.nextString), StudyDescription(r.nextString), StudyDate(r.nextString), StudyID(r.nextString), AccessionNumber(r.nextString), PatientAge(r.nextString)))
-
-    val querySelectPart = """select distinct("Studies"."id"),
+  val queryStudiesSelectPart = """select distinct("Studies"."id"),
       "Studies"."patientId",
       "Studies"."StudyInstanceUID",
       "Studies"."StudyDescription",
@@ -273,7 +269,13 @@ class MetaDataDAO(val driver: JdbcProfile) {
       left join "Patients" on "Patients"."id" = "Studies"."patientId"
       left join "Series" on "Series"."studyId" = "Studies"."id""""
 
-    val query = querySelectPart +
+  def queryStudies(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, queryProperties: Seq[QueryProperty])(implicit session: Session): List[Study] = {
+
+    implicit val getResult = studiesGetResult
+    
+    checkOrderBy(orderBy, "Studies")
+
+    val query = queryStudiesSelectPart +
       wherePart(queryPart(queryProperties)) +
       orderByPart(orderBy, orderAscending) +
       pagePart(startIndex, count)
@@ -281,14 +283,10 @@ class MetaDataDAO(val driver: JdbcProfile) {
     Q.queryNA(query).list
   }
 
-  def querySeries(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, queryProperties: Seq[QueryProperty])(implicit session: Session): List[Series] = {
-
-    checkOrderBy(orderBy, "Series")
-
-    implicit val getResult = GetResult(r =>
+  val seriesGetResult = GetResult(r =>
       Series(r.nextLong, r.nextLong, SeriesInstanceUID(r.nextString), SeriesDescription(r.nextString), SeriesDate(r.nextString), Modality(r.nextString), ProtocolName(r.nextString), BodyPartExamined(r.nextString), Manufacturer(r.nextString), StationName(r.nextString), FrameOfReferenceUID(r.nextString)))
 
-    val querySelectPart = """select distinct("Series"."id"),
+  val querySeriesSelectPart = """select distinct("Series"."id"),
       "Series"."studyId",
       "Series"."SeriesInstanceUID",
       "Series"."SeriesDescription",
@@ -302,7 +300,13 @@ class MetaDataDAO(val driver: JdbcProfile) {
       left join "Studies" on "Studies"."id" = "Series"."studyId"
       left join "Patients" on "Patients"."id" = "Studies"."patientId""""
 
-    val query = querySelectPart +
+  def querySeries(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, queryProperties: Seq[QueryProperty])(implicit session: Session): List[Series] = {
+
+    checkOrderBy(orderBy, "Series")
+
+    implicit val getResult = seriesGetResult
+
+    val query = querySeriesSelectPart +
       wherePart(queryPart(queryProperties)) +
       orderByPart(orderBy, orderAscending) +
       pagePart(startIndex, count)
@@ -310,14 +314,10 @@ class MetaDataDAO(val driver: JdbcProfile) {
     Q.queryNA(query).list
   }
 
-  def queryImages(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, queryProperties: Seq[QueryProperty])(implicit session: Session): List[Image] = {
-
-    checkOrderBy(orderBy, "Images")
-
-    implicit val getResult = GetResult(r =>
+  val imagesGetResult = GetResult(r =>
       Image(r.nextLong, r.nextLong, SOPInstanceUID(r.nextString), ImageType(r.nextString), InstanceNumber(r.nextString)))
-
-    val querySelectPart = """select distinct("Images"."id"),
+      
+  val queryImagesSelectPart = """select distinct("Images"."id"),
       "Images"."seriesId",
       "Images"."SOPInstanceUID",
       "Images"."ImageType",
@@ -326,7 +326,13 @@ class MetaDataDAO(val driver: JdbcProfile) {
       left join "Studies" on "Studies"."id" = "Series"."studyId"
       left join "Patients" on "Patients"."id" = "Studies"."patientId""""
 
-    val query = querySelectPart +
+  def queryImages(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, queryProperties: Seq[QueryProperty])(implicit session: Session): List[Image] = {
+
+    checkOrderBy(orderBy, "Images")
+
+    implicit val getResult = imagesGetResult
+
+    val query = queryImagesSelectPart +
       wherePart(queryPart(queryProperties)) +
       orderByPart(orderBy, orderAscending) +
       pagePart(startIndex, count)
@@ -369,7 +375,7 @@ class MetaDataDAO(val driver: JdbcProfile) {
        inner join "Studies" on "Series"."studyId" = "Studies"."id" 
        inner join "Patients" on "Studies"."patientId" = "Patients"."id""""
 
-  def flatSeriesGetResult = GetResult(r =>
+  val flatSeriesGetResult = GetResult(r =>
     FlatSeries(r.nextLong,
       Patient(r.nextLong, PatientName(r.nextString), PatientID(r.nextString), PatientBirthDate(r.nextString), PatientSex(r.nextString)),
       Study(r.nextLong, r.nextLong, StudyInstanceUID(r.nextString), StudyDescription(r.nextString), StudyDate(r.nextString), StudyID(r.nextString), AccessionNumber(r.nextString), PatientAge(r.nextString)),

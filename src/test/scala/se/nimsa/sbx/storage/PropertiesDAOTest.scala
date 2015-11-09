@@ -68,242 +68,242 @@ class PropertiesDAOTest extends FlatSpec with Matchers with BeforeAndAfterEach {
     db.withSession { implicit session =>
       insertMetaDataAndProperties
 
-      propertiesDao.flatSeries(0, 20, None, true, None, Array.empty, Array.empty, Array.empty).size should be(4)
-      propertiesDao.flatSeries(0, 20, None, true, None, Array(SourceRef(SourceType.BOX, 1)), Array.empty, Array.empty).size should be(1)
-      propertiesDao.flatSeries(0, 20, None, true, None, Array(SourceRef(SourceType.BOX, 2)), Array.empty, Array.empty).size should be(0)
+      propertiesDao.flatSeries(0, 20, None, true, None, Seq.empty, Seq.empty, Seq.empty).size should be(4)
+      propertiesDao.flatSeries(0, 20, None, true, None, Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq.empty).size should be(1)
+      propertiesDao.flatSeries(0, 20, None, true, None, Seq(SourceRef(SourceType.BOX, 2)), Seq.empty, Seq.empty).size should be(0)
     }
   }
 
   it should "support filtering patients by source" in {
     db.withSession { implicit session =>
       insertMetaDataAndProperties
-      propertiesDao.patients(0, 20, None, true, None, Array.empty, Array.empty, Array.empty).size should be(1)
-      propertiesDao.patients(0, 20, None, true, None, Array(SourceRef(SourceType.BOX, 1)), Array.empty, Array.empty).size should be(1)
-      propertiesDao.patients(0, 20, None, true, None, Array(SourceRef(SourceType.BOX, 2)), Array.empty, Array.empty).size should be(0)
-      propertiesDao.patients(0, 20, None, true, None, Array(SourceRef(SourceType.UNKNOWN, 1)), Array.empty, Array.empty).size should be(0)
+      propertiesDao.patients(0, 20, None, true, None, Seq.empty, Seq.empty, Seq.empty).size should be(1)
+      propertiesDao.patients(0, 20, None, true, None, Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq.empty).size should be(1)
+      propertiesDao.patients(0, 20, None, true, None, Seq(SourceRef(SourceType.BOX, 2)), Seq.empty, Seq.empty).size should be(0)
+      propertiesDao.patients(0, 20, None, true, None, Seq(SourceRef(SourceType.UNKNOWN, 1)), Seq.empty, Seq.empty).size should be(0)
     }
   }
 
   it should "support filtering studies by source" in {
     db.withSession { implicit session =>
       insertMetaDataAndProperties
-      propertiesDao.studiesForPatient(0, 20, 1, Array.empty, Array.empty, Array.empty).size should be(2)
-      propertiesDao.studiesForPatient(0, 20, 1, Array(SourceRef(SourceType.BOX, 1)), Array.empty, Array.empty).size should be(1)
-      propertiesDao.studiesForPatient(0, 20, 1, Array(SourceRef(SourceType.BOX, 2)), Array.empty, Array.empty).size should be(0)
-      propertiesDao.studiesForPatient(0, 20, 1, Array(SourceRef(SourceType.UNKNOWN, 1)), Array.empty, Array.empty).size should be(0)
+      propertiesDao.studiesForPatient(0, 20, 1, Seq.empty, Seq.empty, Seq.empty).size should be(2)
+      propertiesDao.studiesForPatient(0, 20, 1, Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq.empty).size should be(1)
+      propertiesDao.studiesForPatient(0, 20, 1, Seq(SourceRef(SourceType.BOX, 2)), Seq.empty, Seq.empty).size should be(0)
+      propertiesDao.studiesForPatient(0, 20, 1, Seq(SourceRef(SourceType.UNKNOWN, 1)), Seq.empty, Seq.empty).size should be(0)
     }
   }
 
   it should "support filtering series by source" in {
     db.withSession { implicit session =>
       insertMetaDataAndProperties
-      propertiesDao.seriesForStudy(0, 20, 1, Array.empty, Array.empty, Array.empty).size should be(2)
-      propertiesDao.seriesForStudy(0, 20, 1, Array(SourceRef(SourceType.BOX, 1)), Array.empty, Array.empty).size should be(1)
-      propertiesDao.seriesForStudy(0, 20, 2, Array(SourceRef(SourceType.SCP, 1)), Array.empty, Array.empty).size should be(1)
-      propertiesDao.seriesForStudy(0, 20, 2, Array(SourceRef(SourceType.DIRECTORY, 1)), Array.empty, Array.empty).size should be(1)
-      propertiesDao.seriesForStudy(0, 20, 1, Array(SourceRef(SourceType.BOX, 2)), Array.empty, Array.empty).size should be(0)
-      propertiesDao.seriesForStudy(0, 20, 1, Array(SourceRef(SourceType.SCP, 2)), Array.empty, Array.empty).size should be(0)
+      propertiesDao.seriesForStudy(0, 20, 1, Seq.empty, Seq.empty, Seq.empty).size should be(2)
+      propertiesDao.seriesForStudy(0, 20, 1, Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq.empty).size should be(1)
+      propertiesDao.seriesForStudy(0, 20, 2, Seq(SourceRef(SourceType.SCP, 1)), Seq.empty, Seq.empty).size should be(1)
+      propertiesDao.seriesForStudy(0, 20, 2, Seq(SourceRef(SourceType.DIRECTORY, 1)), Seq.empty, Seq.empty).size should be(1)
+      propertiesDao.seriesForStudy(0, 20, 1, Seq(SourceRef(SourceType.BOX, 2)), Seq.empty, Seq.empty).size should be(0)
+      propertiesDao.seriesForStudy(0, 20, 1, Seq(SourceRef(SourceType.SCP, 2)), Seq.empty, Seq.empty).size should be(0)
     }
   }
 
   it should "support filtering flat series by series tag" in {
     db.withSession { implicit session =>
       insertMetaDataAndProperties
-      propertiesDao.flatSeries(0, 20, None, true, None, Array.empty, Array.empty, Array(1, 2)).size should be(3)
-      propertiesDao.flatSeries(0, 20, None, true, None, Array.empty, Array.empty, Array(1)).size should be(2)
-      propertiesDao.flatSeries(0, 20, None, true, None, Array.empty, Array.empty, Array(1, 3)).size should be(2)
-      propertiesDao.flatSeries(0, 20, None, true, None, Array.empty, Array.empty, Array(3)).size should be(0)
+      propertiesDao.flatSeries(0, 20, None, true, None, Seq.empty, Seq.empty, Seq(1, 2)).size should be(3)
+      propertiesDao.flatSeries(0, 20, None, true, None, Seq.empty, Seq.empty, Seq(1)).size should be(2)
+      propertiesDao.flatSeries(0, 20, None, true, None, Seq.empty, Seq.empty, Seq(1, 3)).size should be(2)
+      propertiesDao.flatSeries(0, 20, None, true, None, Seq.empty, Seq.empty, Seq(3)).size should be(0)
     }
   }
 
   it should "support filtering patients by series tag" in {
     db.withSession { implicit session =>
       insertMetaDataAndProperties
-      propertiesDao.patients(0, 20, None, true, None, Array.empty, Array.empty, Array(1, 2)).size should be(1)
-      propertiesDao.patients(0, 20, None, true, None, Array.empty, Array.empty, Array(1)).size should be(1)
-      propertiesDao.patients(0, 20, None, true, None, Array.empty, Array.empty, Array(1, 3)).size should be(1)
-      propertiesDao.patients(0, 20, None, true, None, Array.empty, Array.empty, Array(3)).size should be(0)
+      propertiesDao.patients(0, 20, None, true, None, Seq.empty, Seq.empty, Seq(1, 2)).size should be(1)
+      propertiesDao.patients(0, 20, None, true, None, Seq.empty, Seq.empty, Seq(1)).size should be(1)
+      propertiesDao.patients(0, 20, None, true, None, Seq.empty, Seq.empty, Seq(1, 3)).size should be(1)
+      propertiesDao.patients(0, 20, None, true, None, Seq.empty, Seq.empty, Seq(3)).size should be(0)
     }
   }
 
   it should "support filtering studies by series tag" in {
     db.withSession { implicit session =>
       insertMetaDataAndProperties
-      propertiesDao.studiesForPatient(0, 20, 1, Array.empty, Array.empty, Array(1, 2)).size should be(2)
-      propertiesDao.studiesForPatient(0, 20, 1, Array.empty, Array.empty, Array(1)).size should be(1)
-      propertiesDao.studiesForPatient(0, 20, 1, Array.empty, Array.empty, Array(1, 3)).size should be(1)
-      propertiesDao.studiesForPatient(0, 20, 1, Array.empty, Array.empty, Array(3)).size should be(0)
+      propertiesDao.studiesForPatient(0, 20, 1, Seq.empty, Seq.empty, Seq(1, 2)).size should be(2)
+      propertiesDao.studiesForPatient(0, 20, 1, Seq.empty, Seq.empty, Seq(1)).size should be(1)
+      propertiesDao.studiesForPatient(0, 20, 1, Seq.empty, Seq.empty, Seq(1, 3)).size should be(1)
+      propertiesDao.studiesForPatient(0, 20, 1, Seq.empty, Seq.empty, Seq(3)).size should be(0)
     }
   }
 
   it should "support filtering series by series tag" in {
     db.withSession { implicit session =>
       insertMetaDataAndProperties
-      propertiesDao.seriesForStudy(0, 20, 1, Array.empty, Array.empty, Array(1, 2)).size should be(2)
-      propertiesDao.seriesForStudy(0, 20, 1, Array.empty, Array.empty, Array(1)).size should be(2)
-      propertiesDao.seriesForStudy(0, 20, 1, Array.empty, Array.empty, Array(1, 3)).size should be(2)
-      propertiesDao.seriesForStudy(0, 20, 1, Array.empty, Array.empty, Array(3)).size should be(0)
-      propertiesDao.seriesForStudy(0, 20, 2, Array.empty, Array.empty, Array(1, 2)).size should be(1)
-      propertiesDao.seriesForStudy(0, 20, 2, Array.empty, Array.empty, Array(1)).size should be(0)
-      propertiesDao.seriesForStudy(0, 20, 2, Array.empty, Array.empty, Array(3)).size should be(0)
+      propertiesDao.seriesForStudy(0, 20, 1, Seq.empty, Seq.empty, Seq(1, 2)).size should be(2)
+      propertiesDao.seriesForStudy(0, 20, 1, Seq.empty, Seq.empty, Seq(1)).size should be(2)
+      propertiesDao.seriesForStudy(0, 20, 1, Seq.empty, Seq.empty, Seq(1, 3)).size should be(2)
+      propertiesDao.seriesForStudy(0, 20, 1, Seq.empty, Seq.empty, Seq(3)).size should be(0)
+      propertiesDao.seriesForStudy(0, 20, 2, Seq.empty, Seq.empty, Seq(1, 2)).size should be(1)
+      propertiesDao.seriesForStudy(0, 20, 2, Seq.empty, Seq.empty, Seq(1)).size should be(0)
+      propertiesDao.seriesForStudy(0, 20, 2, Seq.empty, Seq.empty, Seq(3)).size should be(0)
     }
   }
 
   it should "support filtering patients by series type" in {
     db.withSession { implicit session =>
       insertMetaDataAndProperties
-      propertiesDao.patients(0, 20, None, true, None, Array.empty, Array(1), Array.empty).size should be(1)
-      propertiesDao.patients(0, 20, None, true, None, Array.empty, Array(1, 2), Array.empty).size should be(1)
-      propertiesDao.patients(0, 20, None, true, None, Array.empty, Array(1, 2, 3), Array.empty).size should be(1)
-      propertiesDao.patients(0, 20, None, true, None, Array.empty, Array(3), Array.empty).size should be(0)
+      propertiesDao.patients(0, 20, None, true, None, Seq.empty, Seq(1), Seq.empty).size should be(1)
+      propertiesDao.patients(0, 20, None, true, None, Seq.empty, Seq(1, 2), Seq.empty).size should be(1)
+      propertiesDao.patients(0, 20, None, true, None, Seq.empty, Seq(1, 2, 3), Seq.empty).size should be(1)
+      propertiesDao.patients(0, 20, None, true, None, Seq.empty, Seq(3), Seq.empty).size should be(0)
     }
   }
 
   it should "support filtering studies by series type" in {
     db.withSession { implicit session =>
       insertMetaDataAndProperties
-      propertiesDao.studiesForPatient(0, 20, 1, Array.empty, Array(1), Array.empty).size should be(1)
-      propertiesDao.studiesForPatient(0, 20, 1, Array.empty, Array(1, 2), Array.empty).size should be(2)
-      propertiesDao.studiesForPatient(0, 20, 1, Array.empty, Array(1, 2, 3), Array.empty).size should be(2)
-      propertiesDao.studiesForPatient(0, 20, 1, Array.empty, Array(3), Array.empty).size should be(0)
+      propertiesDao.studiesForPatient(0, 20, 1, Seq.empty, Seq(1), Seq.empty).size should be(1)
+      propertiesDao.studiesForPatient(0, 20, 1, Seq.empty, Seq(1, 2), Seq.empty).size should be(2)
+      propertiesDao.studiesForPatient(0, 20, 1, Seq.empty, Seq(1, 2, 3), Seq.empty).size should be(2)
+      propertiesDao.studiesForPatient(0, 20, 1, Seq.empty, Seq(3), Seq.empty).size should be(0)
     }
   }
 
   it should "support filtering series by series type" in {
     db.withSession { implicit session =>
       insertMetaDataAndProperties
-      propertiesDao.seriesForStudy(0, 20, 1, Array.empty, Array(1), Array.empty).size should be(2)
-      propertiesDao.seriesForStudy(0, 20, 1, Array.empty, Array(1, 2), Array.empty).size should be(2)
-      propertiesDao.seriesForStudy(0, 20, 1, Array.empty, Array(1, 2, 3), Array.empty).size should be(2)
-      propertiesDao.seriesForStudy(0, 20, 1, Array.empty, Array(3), Array.empty).size should be(0)
-      propertiesDao.seriesForStudy(0, 20, 2, Array.empty, Array(1), Array.empty).size should be(0)
-      propertiesDao.seriesForStudy(0, 20, 2, Array.empty, Array(1, 2), Array.empty).size should be(1)
-      propertiesDao.seriesForStudy(0, 20, 2, Array.empty, Array(1, 2, 3), Array.empty).size should be(1)
-      propertiesDao.seriesForStudy(0, 20, 2, Array.empty, Array(3), Array.empty).size should be(0)
+      propertiesDao.seriesForStudy(0, 20, 1, Seq.empty, Seq(1), Seq.empty).size should be(2)
+      propertiesDao.seriesForStudy(0, 20, 1, Seq.empty, Seq(1, 2), Seq.empty).size should be(2)
+      propertiesDao.seriesForStudy(0, 20, 1, Seq.empty, Seq(1, 2, 3), Seq.empty).size should be(2)
+      propertiesDao.seriesForStudy(0, 20, 1, Seq.empty, Seq(3), Seq.empty).size should be(0)
+      propertiesDao.seriesForStudy(0, 20, 2, Seq.empty, Seq(1), Seq.empty).size should be(0)
+      propertiesDao.seriesForStudy(0, 20, 2, Seq.empty, Seq(1, 2), Seq.empty).size should be(1)
+      propertiesDao.seriesForStudy(0, 20, 2, Seq.empty, Seq(1, 2, 3), Seq.empty).size should be(1)
+      propertiesDao.seriesForStudy(0, 20, 2, Seq.empty, Seq(3), Seq.empty).size should be(0)
     }
   }
 
   it should "support filtering flat series by series type" in {
     db.withSession { implicit session =>
       insertMetaDataAndProperties
-      propertiesDao.flatSeries(0, 20, None, true, None, Array.empty, Array(1), Array.empty).size should be(2)
-      propertiesDao.flatSeries(0, 20, None, true, None, Array.empty, Array(1, 2), Array.empty).size should be(3)
-      propertiesDao.flatSeries(0, 20, None, true, None, Array.empty, Array(1, 2, 3), Array.empty).size should be(3)
-      propertiesDao.flatSeries(0, 20, None, true, None, Array.empty, Array(3), Array.empty).size should be(0)
+      propertiesDao.flatSeries(0, 20, None, true, None, Seq.empty, Seq(1), Seq.empty).size should be(2)
+      propertiesDao.flatSeries(0, 20, None, true, None, Seq.empty, Seq(1, 2), Seq.empty).size should be(3)
+      propertiesDao.flatSeries(0, 20, None, true, None, Seq.empty, Seq(1, 2, 3), Seq.empty).size should be(3)
+      propertiesDao.flatSeries(0, 20, None, true, None, Seq.empty, Seq(3), Seq.empty).size should be(0)
     }
   }
 
   it should "create valid SQL queries (no SQL exceptions) with all combinations of input arguments when listing patients" in {
     db.withSession { implicit session =>
       insertMetaDataAndProperties
-      propertiesDao.patients(0, 20, None, true, None, Array.empty, Array.empty, Array.empty)
+      propertiesDao.patients(0, 20, None, true, None, Seq.empty, Seq.empty, Seq.empty)
 
-      propertiesDao.patients(0, 20, Some("PatientID"), true, None, Array.empty, Array.empty, Array.empty)
+      propertiesDao.patients(0, 20, Some("PatientID"), true, None, Seq.empty, Seq.empty, Seq.empty)
 
-      propertiesDao.patients(0, 20, None, true, Some("filter"), Array.empty, Array.empty, Array.empty)
-      propertiesDao.patients(0, 20, Some("PatientID"), true, Some("filter"), Array.empty, Array.empty, Array.empty)
+      propertiesDao.patients(0, 20, None, true, Some("filter"), Seq.empty, Seq.empty, Seq.empty)
+      propertiesDao.patients(0, 20, Some("PatientID"), true, Some("filter"), Seq.empty, Seq.empty, Seq.empty)
 
-      propertiesDao.patients(0, 20, None, true, None, Array(SourceRef(SourceType.BOX, 1)), Array.empty, Array.empty)
-      propertiesDao.patients(0, 20, Some("PatientID"), true, None, Array(SourceRef(SourceType.BOX, 1)), Array.empty, Array.empty)
-      propertiesDao.patients(0, 20, None, true, Some("filter"), Array(SourceRef(SourceType.BOX, 1)), Array.empty, Array.empty)
-      propertiesDao.patients(0, 20, Some("PatientID"), true, Some("filter"), Array(SourceRef(SourceType.BOX, 1)), Array.empty, Array.empty)
+      propertiesDao.patients(0, 20, None, true, None, Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq.empty)
+      propertiesDao.patients(0, 20, Some("PatientID"), true, None, Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq.empty)
+      propertiesDao.patients(0, 20, None, true, Some("filter"), Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq.empty)
+      propertiesDao.patients(0, 20, Some("PatientID"), true, Some("filter"), Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq.empty)
 
-      propertiesDao.patients(0, 20, None, true, None, Array.empty, Array(1), Array.empty)
-      propertiesDao.patients(0, 20, Some("PatientID"), true, None, Array.empty, Array(1), Array.empty)
-      propertiesDao.patients(0, 20, None, true, Some("filter"), Array.empty, Array(1), Array.empty)
-      propertiesDao.patients(0, 20, Some("PatientID"), true, Some("filter"), Array.empty, Array(1), Array.empty)
-      propertiesDao.patients(0, 20, None, true, None, Array(SourceRef(SourceType.BOX, 1)), Array(1), Array.empty)
-      propertiesDao.patients(0, 20, Some("PatientID"), true, None, Array(SourceRef(SourceType.BOX, 1)), Array(1), Array.empty)
-      propertiesDao.patients(0, 20, None, true, Some("filter"), Array(SourceRef(SourceType.BOX, 1)), Array(1), Array.empty)
-      propertiesDao.patients(0, 20, Some("PatientID"), true, Some("filter"), Array(SourceRef(SourceType.BOX, 1)), Array(1), Array.empty)
+      propertiesDao.patients(0, 20, None, true, None, Seq.empty, Seq(1), Seq.empty)
+      propertiesDao.patients(0, 20, Some("PatientID"), true, None, Seq.empty, Seq(1), Seq.empty)
+      propertiesDao.patients(0, 20, None, true, Some("filter"), Seq.empty, Seq(1), Seq.empty)
+      propertiesDao.patients(0, 20, Some("PatientID"), true, Some("filter"), Seq.empty, Seq(1), Seq.empty)
+      propertiesDao.patients(0, 20, None, true, None, Seq(SourceRef(SourceType.BOX, 1)), Seq(1), Seq.empty)
+      propertiesDao.patients(0, 20, Some("PatientID"), true, None, Seq(SourceRef(SourceType.BOX, 1)), Seq(1), Seq.empty)
+      propertiesDao.patients(0, 20, None, true, Some("filter"), Seq(SourceRef(SourceType.BOX, 1)), Seq(1), Seq.empty)
+      propertiesDao.patients(0, 20, Some("PatientID"), true, Some("filter"), Seq(SourceRef(SourceType.BOX, 1)), Seq(1), Seq.empty)
 
-      propertiesDao.patients(0, 20, None, true, None, Array.empty, Array.empty, Array(1))
-      propertiesDao.patients(0, 20, Some("PatientID"), true, None, Array.empty, Array.empty, Array(1))
-      propertiesDao.patients(0, 20, None, true, Some("filter"), Array.empty, Array.empty, Array(1))
-      propertiesDao.patients(0, 20, Some("PatientID"), true, Some("filter"), Array.empty, Array.empty, Array(1))
-      propertiesDao.patients(0, 20, None, true, None, Array(SourceRef(SourceType.BOX, 1)), Array.empty, Array(1))
-      propertiesDao.patients(0, 20, Some("PatientID"), true, None, Array(SourceRef(SourceType.BOX, 1)), Array.empty, Array(1))
-      propertiesDao.patients(0, 20, None, true, Some("filter"), Array(SourceRef(SourceType.BOX, 1)), Array.empty, Array(1))
-      propertiesDao.patients(0, 20, Some("PatientID"), true, Some("filter"), Array(SourceRef(SourceType.BOX, 1)), Array.empty, Array(1))
-      propertiesDao.patients(0, 20, None, true, None, Array.empty, Array(1), Array(1))
-      propertiesDao.patients(0, 20, Some("PatientID"), true, None, Array.empty, Array(1), Array(1))
-      propertiesDao.patients(0, 20, None, true, Some("filter"), Array.empty, Array(1), Array(1))
-      propertiesDao.patients(0, 20, Some("PatientID"), true, Some("filter"), Array.empty, Array(1), Array(1))
-      propertiesDao.patients(0, 20, None, true, None, Array(SourceRef(SourceType.BOX, 1)), Array(1), Array(1))
-      propertiesDao.patients(0, 20, Some("PatientID"), true, None, Array(SourceRef(SourceType.BOX, 1)), Array(1), Array(1))
-      propertiesDao.patients(0, 20, None, true, Some("filter"), Array(SourceRef(SourceType.BOX, 1)), Array(1), Array(1))
-      propertiesDao.patients(0, 20, Some("PatientID"), true, Some("filter"), Array(SourceRef(SourceType.BOX, 1)), Array(1), Array(1))
+      propertiesDao.patients(0, 20, None, true, None, Seq.empty, Seq.empty, Seq(1))
+      propertiesDao.patients(0, 20, Some("PatientID"), true, None, Seq.empty, Seq.empty, Seq(1))
+      propertiesDao.patients(0, 20, None, true, Some("filter"), Seq.empty, Seq.empty, Seq(1))
+      propertiesDao.patients(0, 20, Some("PatientID"), true, Some("filter"), Seq.empty, Seq.empty, Seq(1))
+      propertiesDao.patients(0, 20, None, true, None, Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq(1))
+      propertiesDao.patients(0, 20, Some("PatientID"), true, None, Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq(1))
+      propertiesDao.patients(0, 20, None, true, Some("filter"), Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq(1))
+      propertiesDao.patients(0, 20, Some("PatientID"), true, Some("filter"), Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq(1))
+      propertiesDao.patients(0, 20, None, true, None, Seq.empty, Seq(1), Seq(1))
+      propertiesDao.patients(0, 20, Some("PatientID"), true, None, Seq.empty, Seq(1), Seq(1))
+      propertiesDao.patients(0, 20, None, true, Some("filter"), Seq.empty, Seq(1), Seq(1))
+      propertiesDao.patients(0, 20, Some("PatientID"), true, Some("filter"), Seq.empty, Seq(1), Seq(1))
+      propertiesDao.patients(0, 20, None, true, None, Seq(SourceRef(SourceType.BOX, 1)), Seq(1), Seq(1))
+      propertiesDao.patients(0, 20, Some("PatientID"), true, None, Seq(SourceRef(SourceType.BOX, 1)), Seq(1), Seq(1))
+      propertiesDao.patients(0, 20, None, true, Some("filter"), Seq(SourceRef(SourceType.BOX, 1)), Seq(1), Seq(1))
+      propertiesDao.patients(0, 20, Some("PatientID"), true, Some("filter"), Seq(SourceRef(SourceType.BOX, 1)), Seq(1), Seq(1))
     }
   }
 
   it should "create valid SQL queries (no SQL exceptions) with all combinations of input arguments when listing studies" in {
     db.withSession { implicit session =>
       insertMetaDataAndProperties
-      propertiesDao.studiesForPatient(0, 20, 1, Array.empty, Array.empty, Array.empty)
-      propertiesDao.studiesForPatient(0, 20, 1, Array.empty, Array.empty, Array(1))
-      propertiesDao.studiesForPatient(0, 20, 1, Array.empty, Array(1), Array.empty)
-      propertiesDao.studiesForPatient(0, 20, 1, Array.empty, Array(1), Array(1))
-      propertiesDao.studiesForPatient(0, 20, 1, Array(SourceRef(SourceType.BOX, 1)), Array.empty, Array.empty)
-      propertiesDao.studiesForPatient(0, 20, 1, Array(SourceRef(SourceType.BOX, 1)), Array.empty, Array(1))
-      propertiesDao.studiesForPatient(0, 20, 1, Array(SourceRef(SourceType.BOX, 1)), Array(1), Array.empty)
-      propertiesDao.studiesForPatient(0, 20, 1, Array(SourceRef(SourceType.BOX, 1)), Array(1), Array(1))
+      propertiesDao.studiesForPatient(0, 20, 1, Seq.empty, Seq.empty, Seq.empty)
+      propertiesDao.studiesForPatient(0, 20, 1, Seq.empty, Seq.empty, Seq(1))
+      propertiesDao.studiesForPatient(0, 20, 1, Seq.empty, Seq(1), Seq.empty)
+      propertiesDao.studiesForPatient(0, 20, 1, Seq.empty, Seq(1), Seq(1))
+      propertiesDao.studiesForPatient(0, 20, 1, Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq.empty)
+      propertiesDao.studiesForPatient(0, 20, 1, Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq(1))
+      propertiesDao.studiesForPatient(0, 20, 1, Seq(SourceRef(SourceType.BOX, 1)), Seq(1), Seq.empty)
+      propertiesDao.studiesForPatient(0, 20, 1, Seq(SourceRef(SourceType.BOX, 1)), Seq(1), Seq(1))
     }
   }
 
   it should "create valid SQL queries (no SQL exceptions) with all combinations of input arguments when listing series" in {
     db.withSession { implicit session =>
       insertMetaDataAndProperties
-      propertiesDao.seriesForStudy(0, 20, 1, Array.empty, Array.empty, Array.empty)
-      propertiesDao.seriesForStudy(0, 20, 1, Array.empty, Array.empty, Array(1))
-      propertiesDao.seriesForStudy(0, 20, 1, Array.empty, Array(1), Array.empty)
-      propertiesDao.seriesForStudy(0, 20, 1, Array.empty, Array(1), Array(1))
-      propertiesDao.seriesForStudy(0, 20, 1, Array(SourceRef(SourceType.BOX, 1)), Array.empty, Array.empty)
-      propertiesDao.seriesForStudy(0, 20, 1, Array(SourceRef(SourceType.BOX, 1)), Array.empty, Array(1))
-      propertiesDao.seriesForStudy(0, 20, 1, Array(SourceRef(SourceType.BOX, 1)), Array(1), Array.empty)
-      propertiesDao.seriesForStudy(0, 20, 1, Array(SourceRef(SourceType.BOX, 1)), Array(1), Array(1))
+      propertiesDao.seriesForStudy(0, 20, 1, Seq.empty, Seq.empty, Seq.empty)
+      propertiesDao.seriesForStudy(0, 20, 1, Seq.empty, Seq.empty, Seq(1))
+      propertiesDao.seriesForStudy(0, 20, 1, Seq.empty, Seq(1), Seq.empty)
+      propertiesDao.seriesForStudy(0, 20, 1, Seq.empty, Seq(1), Seq(1))
+      propertiesDao.seriesForStudy(0, 20, 1, Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq.empty)
+      propertiesDao.seriesForStudy(0, 20, 1, Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq(1))
+      propertiesDao.seriesForStudy(0, 20, 1, Seq(SourceRef(SourceType.BOX, 1)), Seq(1), Seq.empty)
+      propertiesDao.seriesForStudy(0, 20, 1, Seq(SourceRef(SourceType.BOX, 1)), Seq(1), Seq(1))
     }
   }
 
   it should "create valid SQL queries (no SQL exceptions) with all combinations of input arguments when listing flat series" in {
     db.withSession { implicit session =>
       insertMetaDataAndProperties
-      propertiesDao.flatSeries(0, 20, None, true, None, Array.empty, Array.empty, Array.empty)
+      propertiesDao.flatSeries(0, 20, None, true, None, Seq.empty, Seq.empty, Seq.empty)
 
-      propertiesDao.flatSeries(0, 20, Some("PatientID"), true, None, Array.empty, Array.empty, Array.empty)
+      propertiesDao.flatSeries(0, 20, Some("PatientID"), true, None, Seq.empty, Seq.empty, Seq.empty)
 
-      propertiesDao.flatSeries(0, 20, None, true, Some("filter"), Array.empty, Array.empty, Array.empty)
-      propertiesDao.flatSeries(0, 20, Some("PatientID"), true, Some("filter"), Array.empty, Array.empty, Array.empty)
+      propertiesDao.flatSeries(0, 20, None, true, Some("filter"), Seq.empty, Seq.empty, Seq.empty)
+      propertiesDao.flatSeries(0, 20, Some("PatientID"), true, Some("filter"), Seq.empty, Seq.empty, Seq.empty)
 
-      propertiesDao.flatSeries(0, 20, None, true, None, Array(SourceRef(SourceType.BOX, 1)), Array.empty, Array.empty)
-      propertiesDao.flatSeries(0, 20, Some("PatientID"), true, None, Array(SourceRef(SourceType.BOX, 1)), Array.empty, Array.empty)
-      propertiesDao.flatSeries(0, 20, None, true, Some("filter"), Array(SourceRef(SourceType.BOX, 1)), Array.empty, Array.empty)
-      propertiesDao.flatSeries(0, 20, Some("PatientID"), true, Some("filter"), Array(SourceRef(SourceType.BOX, 1)), Array.empty, Array.empty)
+      propertiesDao.flatSeries(0, 20, None, true, None, Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq.empty)
+      propertiesDao.flatSeries(0, 20, Some("PatientID"), true, None, Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq.empty)
+      propertiesDao.flatSeries(0, 20, None, true, Some("filter"), Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq.empty)
+      propertiesDao.flatSeries(0, 20, Some("PatientID"), true, Some("filter"), Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq.empty)
 
-      propertiesDao.flatSeries(0, 20, None, true, None, Array.empty, Array(1), Array.empty)
-      propertiesDao.flatSeries(0, 20, Some("PatientID"), true, None, Array.empty, Array(1), Array.empty)
-      propertiesDao.flatSeries(0, 20, None, true, Some("filter"), Array.empty, Array(1), Array.empty)
-      propertiesDao.flatSeries(0, 20, Some("PatientID"), true, Some("filter"), Array.empty, Array(1), Array.empty)
-      propertiesDao.flatSeries(0, 20, None, true, None, Array(SourceRef(SourceType.BOX, 1)), Array(1), Array.empty)
-      propertiesDao.flatSeries(0, 20, Some("PatientID"), true, None, Array(SourceRef(SourceType.BOX, 1)), Array(1), Array.empty)
-      propertiesDao.flatSeries(0, 20, None, true, Some("filter"), Array(SourceRef(SourceType.BOX, 1)), Array(1), Array.empty)
-      propertiesDao.flatSeries(0, 20, Some("PatientID"), true, Some("filter"), Array(SourceRef(SourceType.BOX, 1)), Array(1), Array.empty)
+      propertiesDao.flatSeries(0, 20, None, true, None, Seq.empty, Seq(1), Seq.empty)
+      propertiesDao.flatSeries(0, 20, Some("PatientID"), true, None, Seq.empty, Seq(1), Seq.empty)
+      propertiesDao.flatSeries(0, 20, None, true, Some("filter"), Seq.empty, Seq(1), Seq.empty)
+      propertiesDao.flatSeries(0, 20, Some("PatientID"), true, Some("filter"), Seq.empty, Seq(1), Seq.empty)
+      propertiesDao.flatSeries(0, 20, None, true, None, Seq(SourceRef(SourceType.BOX, 1)), Seq(1), Seq.empty)
+      propertiesDao.flatSeries(0, 20, Some("PatientID"), true, None, Seq(SourceRef(SourceType.BOX, 1)), Seq(1), Seq.empty)
+      propertiesDao.flatSeries(0, 20, None, true, Some("filter"), Seq(SourceRef(SourceType.BOX, 1)), Seq(1), Seq.empty)
+      propertiesDao.flatSeries(0, 20, Some("PatientID"), true, Some("filter"), Seq(SourceRef(SourceType.BOX, 1)), Seq(1), Seq.empty)
 
-      propertiesDao.flatSeries(0, 20, None, true, None, Array.empty, Array.empty, Array(1))
-      propertiesDao.flatSeries(0, 20, Some("PatientID"), true, None, Array.empty, Array.empty, Array(1))
-      propertiesDao.flatSeries(0, 20, None, true, Some("filter"), Array.empty, Array.empty, Array(1))
-      propertiesDao.flatSeries(0, 20, Some("PatientID"), true, Some("filter"), Array.empty, Array.empty, Array(1))
-      propertiesDao.flatSeries(0, 20, None, true, None, Array(SourceRef(SourceType.BOX, 1)), Array.empty, Array(1))
-      propertiesDao.flatSeries(0, 20, Some("PatientID"), true, None, Array(SourceRef(SourceType.BOX, 1)), Array.empty, Array(1))
-      propertiesDao.flatSeries(0, 20, None, true, Some("filter"), Array(SourceRef(SourceType.BOX, 1)), Array.empty, Array(1))
-      propertiesDao.flatSeries(0, 20, Some("PatientID"), true, Some("filter"), Array(SourceRef(SourceType.BOX, 1)), Array.empty, Array(1))
-      propertiesDao.flatSeries(0, 20, None, true, None, Array.empty, Array(1), Array(1))
-      propertiesDao.flatSeries(0, 20, Some("PatientID"), true, None, Array.empty, Array(1), Array(1))
-      propertiesDao.flatSeries(0, 20, None, true, Some("filter"), Array.empty, Array(1), Array(1))
-      propertiesDao.flatSeries(0, 20, Some("PatientID"), true, Some("filter"), Array.empty, Array(1), Array(1))
-      propertiesDao.flatSeries(0, 20, None, true, None, Array(SourceRef(SourceType.BOX, 1)), Array(1), Array(1))
-      propertiesDao.flatSeries(0, 20, Some("PatientID"), true, None, Array(SourceRef(SourceType.BOX, 1)), Array(1), Array(1))
-      propertiesDao.flatSeries(0, 20, None, true, Some("filter"), Array(SourceRef(SourceType.BOX, 1)), Array(1), Array(1))
-      propertiesDao.flatSeries(0, 20, Some("PatientID"), true, Some("filter"), Array(SourceRef(SourceType.BOX, 1)), Array(1), Array(1))
+      propertiesDao.flatSeries(0, 20, None, true, None, Seq.empty, Seq.empty, Seq(1))
+      propertiesDao.flatSeries(0, 20, Some("PatientID"), true, None, Seq.empty, Seq.empty, Seq(1))
+      propertiesDao.flatSeries(0, 20, None, true, Some("filter"), Seq.empty, Seq.empty, Seq(1))
+      propertiesDao.flatSeries(0, 20, Some("PatientID"), true, Some("filter"), Seq.empty, Seq.empty, Seq(1))
+      propertiesDao.flatSeries(0, 20, None, true, None, Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq(1))
+      propertiesDao.flatSeries(0, 20, Some("PatientID"), true, None, Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq(1))
+      propertiesDao.flatSeries(0, 20, None, true, Some("filter"), Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq(1))
+      propertiesDao.flatSeries(0, 20, Some("PatientID"), true, Some("filter"), Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq(1))
+      propertiesDao.flatSeries(0, 20, None, true, None, Seq.empty, Seq(1), Seq(1))
+      propertiesDao.flatSeries(0, 20, Some("PatientID"), true, None, Seq.empty, Seq(1), Seq(1))
+      propertiesDao.flatSeries(0, 20, None, true, Some("filter"), Seq.empty, Seq(1), Seq(1))
+      propertiesDao.flatSeries(0, 20, Some("PatientID"), true, Some("filter"), Seq.empty, Seq(1), Seq(1))
+      propertiesDao.flatSeries(0, 20, None, true, None, Seq(SourceRef(SourceType.BOX, 1)), Seq(1), Seq(1))
+      propertiesDao.flatSeries(0, 20, Some("PatientID"), true, None, Seq(SourceRef(SourceType.BOX, 1)), Seq(1), Seq(1))
+      propertiesDao.flatSeries(0, 20, None, true, Some("filter"), Seq(SourceRef(SourceType.BOX, 1)), Seq(1), Seq(1))
+      propertiesDao.flatSeries(0, 20, Some("PatientID"), true, Some("filter"), Seq(SourceRef(SourceType.BOX, 1)), Seq(1), Seq(1))
     }
   }
 

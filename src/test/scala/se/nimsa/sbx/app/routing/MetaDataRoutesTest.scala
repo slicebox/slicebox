@@ -81,7 +81,7 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
     // then
     val queryProperties = Seq(QueryProperty("PatientName", QueryOperator.EQUALS, "p1"))
-    val query = Query(0, 10, None, false, queryProperties)
+    val query = Query(0, 10, None, queryProperties, None)
 
     PostAsUser("/api/metadata/patients/query", query) ~> routes ~> check {
       status should be(OK)
@@ -97,7 +97,7 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
 
     // then
-    val query = Query(0, 10, None, false, Seq(QueryProperty("PatientName", QueryOperator.LIKE, "%p%")))
+    val query = Query(0, 10, None, Seq(QueryProperty("PatientName", QueryOperator.LIKE, "%p%")), None)
 
     PostAsUser("/api/metadata/patients/query", query) ~> routes ~> check {
       status should be(OK)
@@ -117,7 +117,7 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
 
     // then
-    val query = Query(0, 10, Some("PatientName"), false, Seq[QueryProperty]())
+    val query = Query(0, 10, Some(QueryOrder("PatientName", false)), Seq[QueryProperty](), None)
 
     PostAsUser("/api/metadata/patients/query", query) ~> routes ~> check {
       status should be(OK)
@@ -137,7 +137,7 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
 
     // then
-    val query = Query(1, 1, Some("PatientName"), false, Seq[QueryProperty]())
+    val query = Query(1, 1, Some(QueryOrder("PatientName", false)), Seq[QueryProperty](), None)
 
     PostAsUser("/api/metadata/patients/query", query) ~> routes ~> check {
       status should be(OK)
@@ -156,7 +156,7 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
     // then
     val queryProperties = Seq(QueryProperty("StudyInstanceUID", QueryOperator.EQUALS, "stuid1"))
-    val query = Query(0, 10, None, false, queryProperties)
+    val query = Query(0, 10, None, queryProperties, None)
 
     PostAsUser("/api/metadata/studies/query", query) ~> routes ~> check {
       status should be(OK)
@@ -172,7 +172,7 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
     // then
     val queryProperties = Seq(QueryProperty("SeriesInstanceUID", QueryOperator.EQUALS, "seuid1"))
-    val query = Query(0, 10, None, false, queryProperties)
+    val query = Query(0, 10, None, queryProperties, None)
 
     PostAsUser("/api/metadata/series/query", query) ~> routes ~> check {
       status should be(OK)
@@ -188,7 +188,7 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
     // then
     val queryProperties = Seq(QueryProperty("InstanceNumber", QueryOperator.EQUALS, "1"))
-    val query = Query(0, 10, None, false, queryProperties)
+    val query = Query(0, 10, None, queryProperties, None)
 
     PostAsUser("/api/metadata/images/query", query) ~> routes ~> check {
       status should be(OK)
@@ -204,7 +204,7 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
     // then
     val queryProperties = Seq(QueryProperty("SeriesInstanceUID", QueryOperator.EQUALS, "seuid1"))
-    val query = Query(0, 10, None, false, queryProperties)
+    val query = Query(0, 10, None, queryProperties, None)
 
     PostAsUser("/api/metadata/flatseries/query", query) ~> sealRoute(routes) ~> check {
       status should be(OK)

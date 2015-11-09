@@ -106,7 +106,7 @@ class PropertiesDAO(val driver: JdbcProfile) {
     if (MTable.getTables("SeriesTags").list.isEmpty) seriesTagQuery.ddl.create
     if (MTable.getTables("SeriesSeriesTags").list.isEmpty) seriesSeriesTagQuery.ddl.create
   }
-  
+
   def drop(implicit session: Session) =
     if (MTable.getTables("SeriesTags").list.size > 0)
       (seriesSourceQuery.ddl ++ seriesSeriesTypeQuery.ddl ++ seriesTagQuery.ddl ++ seriesSeriesTagQuery.ddl).drop
@@ -224,8 +224,8 @@ class PropertiesDAO(val driver: JdbcProfile) {
     metaDataDao.deleteFully(series)
     seriesSeriesTags.foreach(seriesTag => cleanupSeriesTag(seriesTag.id))
   }
-  
-  def flatSeries(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String], sourceRefs: Array[SourceRef], seriesTypeIds: Array[Long], seriesTagIds: Array[Long])(implicit session: Session): List[FlatSeries] = {
+
+  def flatSeries(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String], sourceRefs: Seq[SourceRef], seriesTypeIds: Seq[Long], seriesTagIds: Seq[Long])(implicit session: Session): List[FlatSeries] = {
 
     if (isWithAdvancedFiltering(sourceRefs, seriesTypeIds, seriesTagIds)) {
 
@@ -253,14 +253,14 @@ class PropertiesDAO(val driver: JdbcProfile) {
       metaDataDao.flatSeries(startIndex, count, orderBy, orderAscending, filter)
   }
 
-  def propertiesJoinPart(sourceRefs: Array[SourceRef], seriesTypeIds: Array[Long], seriesTagIds: Array[Long]) =
+  def propertiesJoinPart(sourceRefs: Seq[SourceRef], seriesTypeIds: Seq[Long], seriesTagIds: Seq[Long]) =
     singlePropertyJoinPart(sourceRefs, """ inner join "SeriesSources" on "Series"."id" = "SeriesSources"."id"""") +
       singlePropertyJoinPart(seriesTypeIds, """ inner join "SeriesSeriesTypes" on "Series"."id" = "SeriesSeriesTypes"."seriesid"""") +
       singlePropertyJoinPart(seriesTagIds, """ inner join "SeriesSeriesTags" on "Series"."id" = "SeriesSeriesTags"."seriesid"""")
 
-  def singlePropertyJoinPart(property: Array[_ <: Any], part: String) = if (property.isEmpty) "" else part
+  def singlePropertyJoinPart(property: Seq[_ <: Any], part: String) = if (property.isEmpty) "" else part
 
-  def patients(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String], sourceRefs: Array[SourceRef], seriesTypeIds: Array[Long], seriesTagIds: Array[Long])(implicit session: Session): List[Patient] = {
+  def patients(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String], sourceRefs: Seq[SourceRef], seriesTypeIds: Seq[Long], seriesTagIds: Seq[Long])(implicit session: Session): List[Patient] = {
 
     if (isWithAdvancedFiltering(sourceRefs, seriesTypeIds, seriesTagIds)) {
 
@@ -288,7 +288,170 @@ class PropertiesDAO(val driver: JdbcProfile) {
       metaDataDao.patients(startIndex, count, orderBy, orderAscending, filter)
   }
 
-  def isWithAdvancedFiltering(arrays: Array[_ <: Any]*) = arrays.exists(!_.isEmpty)
+  def parseQueryOrder(optionalOrder: Option[QueryOrder]) =
+    (optionalOrder.map(_.orderBy), optionalOrder.map(_.orderAscending).getOrElse(true))
+
+  def queryPatients(startIndex: Long, count: Long, optionalOrder: Option[QueryOrder], queryProperties: Seq[QueryProperty], optionalFilters: Option[QueryFilters])(implicit session: Session): List[Patient] = {
+
+    val (orderBy, orderAscending) = parseQueryOrder(optionalOrder)
+
+    optionalFilters.filter { filters =>
+      isWithAdvancedFiltering(filters.seriesTagIds, filters.seriesTypeIds, filters.sourceRefs)
+    }.map { filters =>
+
+      metaDataDao.checkOrderBy(orderBy, "Patients")
+
+      implicit val getResult = metaDataDao.patientsGetResult
+
+      val query =
+        metaDataDao.queryPatientsSelectPart +
+          propertiesJoinPart(filters.sourceRefs, filters.seriesTypeIds, filters.seriesTagIds) +
+          metaDataDao.wherePart(metaDataDao.queryPart(queryProperties)) +
+          sourcesPart(filters.sourceRefs) +
+          andPart(filters.sourceRefs, filters.seriesTypeIds) +
+          seriesTypesPart(filters.seriesTypeIds) +
+          andPart(filters.sourceRefs, filters.seriesTypeIds, filters.seriesTagIds) +
+          seriesTagsPart(filters.seriesTagIds) +
+          metaDataDao.orderByPart(orderBy, orderAscending) +
+          metaDataDao.pagePart(startIndex, count)
+
+      Q.queryNA(query).list
+
+    }.getOrElse {
+      metaDataDao.queryPatients(startIndex, count, orderBy, orderAscending, queryProperties)
+    }
+
+  }
+
+  def queryStudies(startIndex: Long, count: Long, optionalOrder: Option[QueryOrder], queryProperties: Seq[QueryProperty], optionalFilters: Option[QueryFilters])(implicit session: Session): List[Study] = {
+
+    val (orderBy, orderAscending) = parseQueryOrder(optionalOrder)
+
+    optionalFilters.filter { filters =>
+      isWithAdvancedFiltering(filters.seriesTagIds, filters.seriesTypeIds, filters.sourceRefs)
+    }.map { filters =>
+
+      metaDataDao.checkOrderBy(orderBy, "Studies")
+
+      implicit val getResult = metaDataDao.studiesGetResult
+
+      val query =
+        metaDataDao.queryStudiesSelectPart +
+          propertiesJoinPart(filters.sourceRefs, filters.seriesTypeIds, filters.seriesTagIds) +
+          metaDataDao.wherePart(metaDataDao.queryPart(queryProperties)) +
+          sourcesPart(filters.sourceRefs) +
+          andPart(filters.sourceRefs, filters.seriesTypeIds) +
+          seriesTypesPart(filters.seriesTypeIds) +
+          andPart(filters.sourceRefs, filters.seriesTypeIds, filters.seriesTagIds) +
+          seriesTagsPart(filters.seriesTagIds) +
+          metaDataDao.orderByPart(orderBy, orderAscending) +
+          metaDataDao.pagePart(startIndex, count)
+
+      Q.queryNA(query).list
+
+    }.getOrElse {
+      metaDataDao.queryStudies(startIndex, count, orderBy, orderAscending, queryProperties)
+    }
+
+  }
+
+  def querySeries(startIndex: Long, count: Long, optionalOrder: Option[QueryOrder], queryProperties: Seq[QueryProperty], optionalFilters: Option[QueryFilters])(implicit session: Session): List[Series] = {
+
+    val (orderBy, orderAscending) = parseQueryOrder(optionalOrder)
+
+    optionalFilters.filter { filters =>
+      isWithAdvancedFiltering(filters.seriesTagIds, filters.seriesTypeIds, filters.sourceRefs)
+    }.map { filters =>
+
+      metaDataDao.checkOrderBy(orderBy, "Series")
+
+      implicit val getResult = metaDataDao.seriesGetResult
+
+      val query =
+        metaDataDao.querySeriesSelectPart +
+          propertiesJoinPart(filters.sourceRefs, filters.seriesTypeIds, filters.seriesTagIds) +
+          metaDataDao.wherePart(metaDataDao.queryPart(queryProperties)) +
+          sourcesPart(filters.sourceRefs) +
+          andPart(filters.sourceRefs, filters.seriesTypeIds) +
+          seriesTypesPart(filters.seriesTypeIds) +
+          andPart(filters.sourceRefs, filters.seriesTypeIds, filters.seriesTagIds) +
+          seriesTagsPart(filters.seriesTagIds) +
+          metaDataDao.orderByPart(orderBy, orderAscending) +
+          metaDataDao.pagePart(startIndex, count)
+
+      Q.queryNA(query).list
+
+    }.getOrElse {
+      metaDataDao.querySeries(startIndex, count, orderBy, orderAscending, queryProperties)
+    }
+
+  }
+
+  def queryImages(startIndex: Long, count: Long, optionalOrder: Option[QueryOrder], queryProperties: Seq[QueryProperty], optionalFilters: Option[QueryFilters])(implicit session: Session): List[Image] = {
+
+    val (orderBy, orderAscending) = parseQueryOrder(optionalOrder)
+
+    optionalFilters.filter { filters =>
+      isWithAdvancedFiltering(filters.seriesTagIds, filters.seriesTypeIds, filters.sourceRefs)
+    }.map { filters =>
+
+      metaDataDao.checkOrderBy(orderBy, "Images")
+
+      implicit val getResult = metaDataDao.imagesGetResult
+
+      val query =
+        metaDataDao.queryImagesSelectPart +
+          propertiesJoinPart(filters.sourceRefs, filters.seriesTypeIds, filters.seriesTagIds) +
+          metaDataDao.wherePart(metaDataDao.queryPart(queryProperties)) +
+          sourcesPart(filters.sourceRefs) +
+          andPart(filters.sourceRefs, filters.seriesTypeIds) +
+          seriesTypesPart(filters.seriesTypeIds) +
+          andPart(filters.sourceRefs, filters.seriesTypeIds, filters.seriesTagIds) +
+          seriesTagsPart(filters.seriesTagIds) +
+          metaDataDao.orderByPart(orderBy, orderAscending) +
+          metaDataDao.pagePart(startIndex, count)
+
+      Q.queryNA(query).list
+
+    }.getOrElse {
+      metaDataDao.queryImages(startIndex, count, orderBy, orderAscending, queryProperties)
+    }
+
+  }
+
+  def queryFlatSeries(startIndex: Long, count: Long, optionalOrder: Option[QueryOrder], queryProperties: Seq[QueryProperty], optionalFilters: Option[QueryFilters])(implicit session: Session): List[FlatSeries] = {
+
+    val (orderBy, orderAscending) = parseQueryOrder(optionalOrder)
+
+    optionalFilters.filter { filters =>
+      isWithAdvancedFiltering(filters.seriesTagIds, filters.seriesTypeIds, filters.sourceRefs)
+    }.map { filters =>
+
+      metaDataDao.checkOrderBy(orderBy, "Patients", "Studies", "Series")
+
+      implicit val getResult = metaDataDao.flatSeriesGetResult
+
+      val query =
+        metaDataDao.flatSeriesBasePart +
+          propertiesJoinPart(filters.sourceRefs, filters.seriesTypeIds, filters.seriesTagIds) +
+          metaDataDao.wherePart(metaDataDao.queryPart(queryProperties)) +
+          sourcesPart(filters.sourceRefs) +
+          andPart(filters.sourceRefs, filters.seriesTypeIds) +
+          seriesTypesPart(filters.seriesTypeIds) +
+          andPart(filters.sourceRefs, filters.seriesTypeIds, filters.seriesTagIds) +
+          seriesTagsPart(filters.seriesTagIds) +
+          metaDataDao.orderByPart(orderBy, orderAscending) +
+          metaDataDao.pagePart(startIndex, count)
+
+      Q.queryNA(query).list
+
+    }.getOrElse {
+      metaDataDao.queryFlatSeries(startIndex, count, orderBy, orderAscending, queryProperties)
+    }
+
+  }
+
+  def isWithAdvancedFiltering(arrays: Seq[_ <: Any]*) = arrays.exists(!_.isEmpty)
 
   def patientsBasePart = s"""select distinct("Patients"."id"),
        "Patients"."PatientName","Patients"."PatientID","Patients"."PatientBirthDate","Patients"."PatientSex"
@@ -296,15 +459,19 @@ class PropertiesDAO(val driver: JdbcProfile) {
        inner join "Patients" on "Studies"."patientId" = "Patients"."id"
        inner join "Studies" on "Series"."studyId" = "Studies"."id""""
 
-  def andPart(target: Array[_ <: Any]) = if (!target.isEmpty) " and" else ""
+  def andPart(target: Seq[_ <: Any]) = if (!target.isEmpty) " and" else ""
 
-  def andPart(option: Option[Any], target: Array[_ <: Any]) = if (option.isDefined && !target.isEmpty) " and" else ""
+  def andPart(array: Seq[_ <: Any], target: Seq[_ <: Any]) = if (!array.isEmpty && !target.isEmpty) " and" else ""
 
-  def andPart(option: Option[Any], array: Array[_ <: Any], target: Array[_ <: Any]) = if ((option.isDefined || !array.isEmpty) && !target.isEmpty) " and" else ""
+  def andPart(array1: Seq[_ <: Any], array2: Seq[_ <: Any], target: Seq[_ <: Any]) = if ((!array1.isEmpty || !array2.isEmpty) && !target.isEmpty) " and" else ""
 
-  def andPart(option: Option[Any], array1: Array[_ <: Any], array2: Array[_ <: Any], target: Array[_ <: Any]) = if ((option.isDefined || !array1.isEmpty || !array2.isEmpty) && !target.isEmpty) " and" else ""
+  def andPart(option: Option[Any], target: Seq[_ <: Any]) = if (option.isDefined && !target.isEmpty) " and" else ""
 
-  def sourcesPart(sourceRefs: Array[SourceRef]) =
+  def andPart(option: Option[Any], array: Seq[_ <: Any], target: Seq[_ <: Any]) = if ((option.isDefined || !array.isEmpty) && !target.isEmpty) " and" else ""
+
+  def andPart(option: Option[Any], array1: Seq[_ <: Any], array2: Seq[_ <: Any], target: Seq[_ <: Any]) = if ((option.isDefined || !array1.isEmpty || !array2.isEmpty) && !target.isEmpty) " and" else ""
+
+  def sourcesPart(sourceRefs: Seq[SourceRef]) =
     if (sourceRefs.isEmpty)
       ""
     else
@@ -312,7 +479,7 @@ class PropertiesDAO(val driver: JdbcProfile) {
         s""""SeriesSources"."sourcetype" = '${sourceTypeId.sourceType}' and "SeriesSources"."sourceid" = ${sourceTypeId.sourceId}""")
         .mkString(" or ") + ")"
 
-  def seriesTypesPart(seriesTypeIds: Array[Long]) =
+  def seriesTypesPart(seriesTypeIds: Seq[Long]) =
     if (seriesTypeIds.isEmpty)
       ""
     else
@@ -320,7 +487,7 @@ class PropertiesDAO(val driver: JdbcProfile) {
         s""""SeriesSeriesTypes"."seriestypeid" = $seriesTypeId""")
         .mkString(" or ") + ")"
 
-  def seriesTagsPart(seriesTagIds: Array[Long]) =
+  def seriesTagsPart(seriesTagIds: Seq[Long]) =
     if (seriesTagIds.isEmpty)
       ""
     else
@@ -331,7 +498,7 @@ class PropertiesDAO(val driver: JdbcProfile) {
   def studiesGetResult = GetResult(r =>
     Study(r.nextLong, r.nextLong, StudyInstanceUID(r.nextString), StudyDescription(r.nextString), StudyDate(r.nextString), StudyID(r.nextString), AccessionNumber(r.nextString), PatientAge(r.nextString)))
 
-  def studiesForPatient(startIndex: Long, count: Long, patientId: Long, sourceRefs: Array[SourceRef], seriesTypeIds: Array[Long], seriesTagIds: Array[Long])(implicit session: Session): List[Study] = {
+  def studiesForPatient(startIndex: Long, count: Long, patientId: Long, sourceRefs: Seq[SourceRef], seriesTypeIds: Seq[Long], seriesTagIds: Seq[Long])(implicit session: Session): List[Study] = {
 
     if (isWithAdvancedFiltering(sourceRefs, seriesTypeIds, seriesTagIds)) {
 
@@ -366,7 +533,7 @@ class PropertiesDAO(val driver: JdbcProfile) {
   def seriesGetResult = GetResult(r =>
     Series(r.nextLong, r.nextLong, SeriesInstanceUID(r.nextString), SeriesDescription(r.nextString), SeriesDate(r.nextString), Modality(r.nextString), ProtocolName(r.nextString), BodyPartExamined(r.nextString), Manufacturer(r.nextString), StationName(r.nextString), FrameOfReferenceUID(r.nextString)))
 
-  def seriesForStudy(startIndex: Long, count: Long, studyId: Long, sourceRefs: Array[SourceRef], seriesTypeIds: Array[Long], seriesTagIds: Array[Long])(implicit session: Session): List[Series] = {
+  def seriesForStudy(startIndex: Long, count: Long, studyId: Long, sourceRefs: Seq[SourceRef], seriesTypeIds: Seq[Long], seriesTagIds: Seq[Long])(implicit session: Session): List[Series] = {
 
     if (isWithAdvancedFiltering(sourceRefs, seriesTypeIds, seriesTagIds)) {
 

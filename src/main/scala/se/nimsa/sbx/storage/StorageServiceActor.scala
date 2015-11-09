@@ -268,27 +268,27 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
 
         case QueryPatients(query) =>
           db.withSession { implicit session =>
-            sender ! Patients(dao.queryPatients(query.startIndex, query.count, query.orderBy, query.orderAscending, query.queryProperties))
+            sender ! Patients(propertiesDao.queryPatients(query.startIndex, query.count, query.order, query.queryProperties, query.filters))
           }
 
         case QueryStudies(query) =>
           db.withSession { implicit session =>
-            sender ! Studies(dao.queryStudies(query.startIndex, query.count, query.orderBy, query.orderAscending, query.queryProperties))
+            sender ! Studies(propertiesDao.queryStudies(query.startIndex, query.count, query.order, query.queryProperties, query.filters))
           }
 
         case QuerySeries(query) =>
           db.withSession { implicit session =>
-            sender ! SeriesCollection(dao.querySeries(query.startIndex, query.count, query.orderBy, query.orderAscending, query.queryProperties))
+            sender ! SeriesCollection(propertiesDao.querySeries(query.startIndex, query.count, query.order, query.queryProperties, query.filters))
           }
 
         case QueryImages(query) =>
           db.withSession { implicit session =>
-            sender ! Images(dao.queryImages(query.startIndex, query.count, query.orderBy, query.orderAscending, query.queryProperties))
+            sender ! Images(propertiesDao.queryImages(query.startIndex, query.count, query.order, query.queryProperties, query.filters))
           }
 
         case QueryFlatSeries(query) =>
           db.withSession { implicit session =>
-            sender ! FlatSeriesCollection(dao.queryFlatSeries(query.startIndex, query.count, query.orderBy, query.orderAscending, query.queryProperties))
+            sender ! FlatSeriesCollection(propertiesDao.queryFlatSeries(query.startIndex, query.count, query.order, query.queryProperties, query.filters))
           }
 
       }
