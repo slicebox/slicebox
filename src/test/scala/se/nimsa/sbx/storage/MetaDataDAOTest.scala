@@ -245,6 +245,36 @@ class MetaDataDAOTest extends FlatSpec with Matchers {
     }
   }
 
+  it should "return the correct number of flat series for flat series queries" in {
+    db.withSession { implicit session =>
+      // Queries on Series properties
+      dao.queryFlatSeries(0, 10, None, true, Seq(QueryProperty("SeriesInstanceUID", QueryOperator.EQUALS, "seuid1"))).size should be(1)
+      
+      // Check that query returns Studies with all data
+      dao.queryFlatSeries(0, 1, None, true, Seq(QueryProperty("SeriesInstanceUID", QueryOperator.EQUALS, "seuid1"))).foreach(dbFlatSeries => {
+          dbFlatSeries.id should be >= (0L)
+          dbFlatSeries.series.studyId should be >= (0L)
+          dbFlatSeries.series.seriesDescription.value should be("sedesc1")
+          dbFlatSeries.series.seriesDate.value should be("19990101")
+          dbFlatSeries.series.modality.value should be("NM")
+          dbFlatSeries.series.protocolName.value should be("prot1")
+          dbFlatSeries.series.bodyPartExamined.value should be("bodypart1")
+        })
+        
+      // Queries on Patient properties
+      dao.queryFlatSeries(0, 10, None, true, Seq(QueryProperty("PatientName", QueryOperator.EQUALS, "p1"))).size should be(4)
+      
+      // Queries on Studies properties
+      dao.queryFlatSeries(0, 10, None, true, Seq(QueryProperty("StudyInstanceUID", QueryOperator.EQUALS, "stuid1"))).size should be(2)
+      
+      // Queries on Equipments properties
+      dao.queryFlatSeries(0, 10, None, true, Seq(QueryProperty("Manufacturer", QueryOperator.EQUALS, "manu2"))).size should be(1)
+      
+      // Queries on FrameOfReferences properties
+      dao.queryFlatSeries(0, 10, None, true, Seq(QueryProperty("FrameOfReferenceUID", QueryOperator.EQUALS, "frid1"))).size should be(2)
+    }
+  }
+
   it should "support listing flat series complete with series, study and patient information" in {
     db.withSession { implicit session =>
       val flatSeries = dao.flatSeries(0, 20, None, true, None)

@@ -220,7 +220,7 @@ trait MetadataRoutes { this: RestApi =>
             }
           }
         }
-      } ~ path("flatseries") {
+      } ~ pathPrefix("flatseries") {
         pathEndOrSingleSlash {
           get {
             parameters(
@@ -240,6 +240,15 @@ trait MetadataRoutes { this: RestApi =>
                     complete(flatSeries)
                 }
               }
+          }
+        } ~ path("query") {
+          post {
+            entity(as[Query]) { query =>
+              onSuccess(storageService.ask(QueryFlatSeries(query))) {
+                case FlatSeriesCollection(series) =>
+                  complete(series)
+              }
+            }
           }
         } ~ path(LongNumber) { seriesId =>
           get {

@@ -245,7 +245,10 @@ class MetaDataDAO(val driver: JdbcProfile) {
       left join "Studies" on "Studies"."patientId" = "Patients"."id"
       left join "Series" on "Series"."studyId" = "Studies"."id""""
 
-    val query = buildMetaDataQuery(querySelectPart, startIndex, count, orderBy, orderAscending, queryProperties)
+    val query = querySelectPart +
+      wherePart(queryPart(queryProperties)) +
+      orderByPart(orderBy, orderAscending) +
+      pagePart(startIndex, count)
 
     Q.queryNA(query).list
   }
@@ -270,7 +273,10 @@ class MetaDataDAO(val driver: JdbcProfile) {
       left join "Patients" on "Patients"."id" = "Studies"."patientId"
       left join "Series" on "Series"."studyId" = "Studies"."id""""
 
-    val query = buildMetaDataQuery(querySelectPart, startIndex, count, orderBy, orderAscending, queryProperties)
+    val query = querySelectPart +
+      wherePart(queryPart(queryProperties)) +
+      orderByPart(orderBy, orderAscending) +
+      pagePart(startIndex, count)
 
     Q.queryNA(query).list
   }
@@ -296,7 +302,10 @@ class MetaDataDAO(val driver: JdbcProfile) {
       left join "Studies" on "Studies"."id" = "Series"."studyId"
       left join "Patients" on "Patients"."id" = "Studies"."patientId""""
 
-    val query = buildMetaDataQuery(querySelectPart, startIndex, count, orderBy, orderAscending, queryProperties)
+    val query = querySelectPart +
+      wherePart(queryPart(queryProperties)) +
+      orderByPart(orderBy, orderAscending) +
+      pagePart(startIndex, count)
 
     Q.queryNA(query).list
   }
@@ -317,27 +326,36 @@ class MetaDataDAO(val driver: JdbcProfile) {
       left join "Studies" on "Studies"."id" = "Series"."studyId"
       left join "Patients" on "Patients"."id" = "Studies"."patientId""""
 
-    val query = buildMetaDataQuery(querySelectPart, startIndex, count, orderBy, orderAscending, queryProperties)
+    val query = querySelectPart +
+      wherePart(queryPart(queryProperties)) +
+      orderByPart(orderBy, orderAscending) +
+      pagePart(startIndex, count)
 
     Q.queryNA(query).list
   }
 
-  def buildMetaDataQuery(selectPart: String, startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, queryProperties: Seq[QueryProperty]): String = {
-    var query = selectPart
+  def queryFlatSeries(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, queryProperties: Seq[QueryProperty])(implicit session: Session): List[FlatSeries] = {
 
-    val wherePart = queryProperties.map(queryPropertyToPart(_)).mkString(" and ")
-    if (wherePart.length > 0) query += s" where $wherePart"
+    checkOrderBy(orderBy, "Patients", "Studies", "Series")
 
-    orderBy.foreach(orderByValue =>
-      query += s""" order by "$orderByValue" ${if (orderAscending) "asc" else "desc"}""")
+    implicit val getResult = flatSeriesGetResult
 
-    query += s""" limit $count offset $startIndex"""
+    val query = flatSeriesBasePart +
+      wherePart(queryPart(queryProperties)) +
+      orderByPart(orderBy, orderAscending) +
+      pagePart(startIndex, count)
 
-    query
+    Q.queryNA(query).list
   }
+
+  def queryPart(queryProperties: Seq[QueryProperty]): String =
+    queryProperties.map(queryPropertyToPart).mkString(" and ")
 
   def queryPropertyToPart(queryProperty: QueryProperty) =
     s""""${queryProperty.propertyName}" ${queryProperty.operator.toString()} '${queryProperty.propertyValue}'"""
+
+  def wherePart(part: String): String =
+    if (part.length > 0) s" where $part" else ""
 
   def series(implicit session: Session): List[Series] = seriesQuery.list
 

@@ -109,6 +109,8 @@ object StorageProtocol {
   
   case class QueryImages(query: Query) extends MetaDataQuery
   
+  case class QueryFlatSeries(query: Query) extends MetaDataQuery
+  
 
   case class DeleteImage(imageId: Long)
   

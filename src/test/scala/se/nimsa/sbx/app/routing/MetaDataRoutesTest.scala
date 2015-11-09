@@ -196,6 +196,22 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
   }
 
+  it should "return 200 OK and return flat series when querying flat series" in {
+    // given
+    db.withSession { implicit session =>
+      TestUtil.insertMetaData(dao)
+    }
+
+    // then
+    val queryProperties = Seq(QueryProperty("SeriesInstanceUID", QueryOperator.EQUALS, "seuid1"))
+    val query = Query(0, 10, None, false, queryProperties)
+
+    PostAsUser("/api/metadata/flatseries/query", query) ~> sealRoute(routes) ~> check {
+      status should be(OK)
+      responseAs[List[FlatSeries]].size should be(1)
+    }
+  }
+
   it should "return 200 OK when listing flat series" in {
     // given
     db.withSession { implicit session =>
