@@ -20,4 +20,6 @@ project/activator*
 /*.cer
 /*.csr
 /*.crt
+/.cache-main
+/.cache-tests
 
