@@ -45,34 +45,25 @@ class ForwardingDAO(val driver: JdbcProfile) {
 
   val ruleQuery = TableQuery[ForwardingRuleTable]
 
-  private val toForwardingTransaction = (id: Long, forwardingRuleId: Long, lastUpdated: Long, enroute: Boolean, delivered: Boolean) =>
-    ForwardingTransaction(id, forwardingRuleId, lastUpdated, enroute, delivered)
-
-  private val fromForwardingTransaction = (transaction: ForwardingTransaction) =>
-    Option((transaction.id, transaction.forwardingRuleId, transaction.lastUpdated, transaction.enroute, transaction.delivered))
-
   class ForwardingTransactionTable(tag: Tag) extends Table[ForwardingTransaction](tag, "ForwardingTransactions") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def forwardingRuleId = column[Long]("forwardingruleid")
+    def batchId = column[Long]("batchid")
     def lastUpdated = column[Long]("lastupdated")
     def enroute = column[Boolean]("enroute")
     def delivered = column[Boolean]("delivered")
     def fkForwardingRule = foreignKey("fk_forwarding_rule", forwardingRuleId, ruleQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
-    def * = (id, forwardingRuleId, lastUpdated, enroute, delivered) <> (toForwardingTransaction.tupled, fromForwardingTransaction)
+    def * = (id, forwardingRuleId, batchId, lastUpdated, enroute, delivered) <> (ForwardingTransaction.tupled, ForwardingTransaction.unapply)
   }
 
   val transactionQuery = TableQuery[ForwardingTransactionTable]
-
-  private val toForwardingTransactionImage = (id: Long, forwardingTransactionId: Long, imageId: Long) => ForwardingTransactionImage(id, forwardingTransactionId, imageId)
-
-  private val fromForwardingTransactionImage = (transactionImage: ForwardingTransactionImage) => Option((transactionImage.id, transactionImage.forwardingTransactionId, transactionImage.imageId))
 
   class ForwardingTransactionImageTable(tag: Tag) extends Table[ForwardingTransactionImage](tag, "ForwardingTransactionImages") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def forwardingTransactionId = column[Long]("forwardingtransactionid")
     def imageId = column[Long]("imageid")
     def fkForwardingTransaction = foreignKey("fk_forwarding_transaction", forwardingTransactionId, transactionQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
-    def * = (id, forwardingTransactionId, imageId) <> (toForwardingTransactionImage.tupled, fromForwardingTransactionImage)
+    def * = (id, forwardingTransactionId, imageId) <> (ForwardingTransactionImage.tupled, ForwardingTransactionImage.unapply)
   }
 
   val transactionImageQuery = TableQuery[ForwardingTransactionImageTable]
@@ -117,19 +108,20 @@ class ForwardingDAO(val driver: JdbcProfile) {
       .filter(_.sourceId === sourceId)
       .list
 
-  def createOrUpdateForwardingTransaction(forwardingRule: ForwardingRule)(implicit session: Session): ForwardingTransaction =
-    getFreshTransactionForRule(forwardingRule) match {
+  def createOrUpdateForwardingTransaction(forwardingRule: ForwardingRule, batchId: Long)(implicit session: Session): ForwardingTransaction =
+    getFreshTransactionForRuleAndBatchId(forwardingRule, batchId) match {
       case Some(transaction) =>
         val updatedTransaction = transaction.copy(lastUpdated = System.currentTimeMillis())
         updateForwardingTransaction(updatedTransaction)
         updatedTransaction
       case None =>
-        insertForwardingTransaction(ForwardingTransaction(-1, forwardingRule.id, System.currentTimeMillis, false, false))
+        insertForwardingTransaction(ForwardingTransaction(-1, forwardingRule.id, batchId, System.currentTimeMillis, false, false))
     }
 
-  def getFreshTransactionForRule(forwardingRule: ForwardingRule)(implicit session: Session): Option[ForwardingTransaction] =
+  def getFreshTransactionForRuleAndBatchId(forwardingRule: ForwardingRule, batchId: Long)(implicit session: Session): Option[ForwardingTransaction] =
     transactionQuery
       .filter(_.forwardingRuleId === forwardingRule.id)
+      .filter(_.batchId === batchId)
       .filter(_.enroute === false)
       .filter(_.delivered === false)
       .firstOption

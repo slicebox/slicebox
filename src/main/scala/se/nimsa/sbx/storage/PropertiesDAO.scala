@@ -291,13 +291,21 @@ class PropertiesDAO(val driver: JdbcProfile) {
   def parseQueryOrder(optionalOrder: Option[QueryOrder]) =
     (optionalOrder.map(_.orderBy), optionalOrder.map(_.orderAscending).getOrElse(true))
 
+  def wherePart(arrays: Seq[_ <: Any]*) =
+    if (arrays.exists(!_.isEmpty))
+      " where "
+    else
+      ""
+
   def queryPart(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, sourceRefs: Seq[SourceRef], seriesTypeIds: Seq[Long], seriesTagIds: Seq[Long], queryProperties: Seq[QueryProperty]) =
     propertiesJoinPart(sourceRefs, seriesTypeIds, seriesTagIds) +
-      metaDataDao.wherePart(metaDataDao.queryPart(queryProperties)) +
+      wherePart(queryProperties, sourceRefs, seriesTypeIds, seriesTagIds) +
+      metaDataDao.queryPart(queryProperties) +
+      andPart(queryProperties, sourceRefs) +
       sourcesPart(sourceRefs) +
-      andPart(sourceRefs, seriesTypeIds) +
+      andPart(queryProperties, sourceRefs, seriesTypeIds) +
       seriesTypesPart(seriesTypeIds) +
-      andPart(sourceRefs, seriesTypeIds, seriesTagIds) +
+      andPart(queryProperties, sourceRefs, seriesTypeIds, seriesTagIds) +
       seriesTagsPart(seriesTagIds) +
       metaDataDao.orderByPart(orderBy, orderAscending) +
       metaDataDao.pagePart(startIndex, count)
@@ -316,7 +324,7 @@ class PropertiesDAO(val driver: JdbcProfile) {
 
       val query =
         metaDataDao.queryPatientsSelectPart +
-        queryPart(startIndex, count, orderBy, orderAscending, filters.sourceRefs, filters.seriesTypeIds, filters.seriesTagIds, queryProperties)
+          queryPart(startIndex, count, orderBy, orderAscending, filters.sourceRefs, filters.seriesTypeIds, filters.seriesTagIds, queryProperties)
 
       Q.queryNA(query).list
 
@@ -340,7 +348,7 @@ class PropertiesDAO(val driver: JdbcProfile) {
 
       val query =
         metaDataDao.queryStudiesSelectPart +
-        queryPart(startIndex, count, orderBy, orderAscending, filters.sourceRefs, filters.seriesTypeIds, filters.seriesTagIds, queryProperties)
+          queryPart(startIndex, count, orderBy, orderAscending, filters.sourceRefs, filters.seriesTypeIds, filters.seriesTagIds, queryProperties)
 
       Q.queryNA(query).list
 
@@ -364,7 +372,7 @@ class PropertiesDAO(val driver: JdbcProfile) {
 
       val query =
         metaDataDao.querySeriesSelectPart +
-        queryPart(startIndex, count, orderBy, orderAscending, filters.sourceRefs, filters.seriesTypeIds, filters.seriesTagIds, queryProperties)
+          queryPart(startIndex, count, orderBy, orderAscending, filters.sourceRefs, filters.seriesTypeIds, filters.seriesTagIds, queryProperties)
 
       Q.queryNA(query).list
 
@@ -388,7 +396,7 @@ class PropertiesDAO(val driver: JdbcProfile) {
 
       val query =
         metaDataDao.queryImagesSelectPart +
-        queryPart(startIndex, count, orderBy, orderAscending, filters.sourceRefs, filters.seriesTypeIds, filters.seriesTagIds, queryProperties)
+          queryPart(startIndex, count, orderBy, orderAscending, filters.sourceRefs, filters.seriesTypeIds, filters.seriesTagIds, queryProperties)
 
       Q.queryNA(query).list
 
@@ -412,7 +420,7 @@ class PropertiesDAO(val driver: JdbcProfile) {
 
       val query =
         metaDataDao.flatSeriesBasePart +
-        queryPart(startIndex, count, orderBy, orderAscending, filters.sourceRefs, filters.seriesTypeIds, filters.seriesTagIds, queryProperties)
+          queryPart(startIndex, count, orderBy, orderAscending, filters.sourceRefs, filters.seriesTypeIds, filters.seriesTagIds, queryProperties)
 
       Q.queryNA(query).list
 
@@ -435,6 +443,8 @@ class PropertiesDAO(val driver: JdbcProfile) {
   def andPart(array: Seq[_ <: Any], target: Seq[_ <: Any]) = if (!array.isEmpty && !target.isEmpty) " and" else ""
 
   def andPart(array1: Seq[_ <: Any], array2: Seq[_ <: Any], target: Seq[_ <: Any]) = if ((!array1.isEmpty || !array2.isEmpty) && !target.isEmpty) " and" else ""
+
+  def andPart(array1: Seq[_ <: Any], array2: Seq[_ <: Any], array3: Seq[_ <: Any], target: Seq[_ <: Any]) = if ((!array1.isEmpty || !array2.isEmpty || !array3.isEmpty) && !target.isEmpty) " and" else ""
 
   def andPart(option: Option[Any], target: Seq[_ <: Any]) = if (option.isDefined && !target.isEmpty) " and" else ""
 

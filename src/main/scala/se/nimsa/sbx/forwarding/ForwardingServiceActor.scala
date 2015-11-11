@@ -54,6 +54,8 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
   val boxService = context.actorSelection("../BoxService")
   val scuService = context.actorSelection("../ScuService")
 
+  val nonBoxBatchId = 1L
+
   override def preStart {
     context.system.eventStream.subscribe(context.self, classOf[ImageAdded])
     context.system.eventStream.subscribe(context.self, classOf[ImagesSent])
@@ -68,21 +70,40 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
 
   log.info("Forwarding service started")
 
+  /**
+   * Happy flow for BOX sources:
+   * ImageAdded (ImageRegisteredForForwarding to sender)
+   * AddImageToForwardingQueue (one per applicable rule) (ImageAddedToForwardingQueue to sender of ImageAdded)
+   * (transfer is made if batch is complete)
+   * ImagesSent (TransactionMarkedAsDelivered to sender (box, scu))
+   * FinalizeSentTransactions (TransactionsFinalized to sender (self))
+   * 
+   * Happy flow for non-BOX sources:
+   * ImageAdded (ImageRegisteredForForwarding to sender)
+   * AddImageToForwardingQueue (one per applicable rule) (ImageAddedToForwardingQueue to sender of ImageAdded)
+   * PollForwardingQueue (until transaction update period expires) (TransactionsEnroute to sender (self))
+   * (transfer is made)
+   * ImagesSent (TransactionMarkedAsDelivered to sender (box, scu))
+   * FinalizeSentTransactions (TransactionsFinalized to sender (self))
+   */
   def receive = LoggingReceive {
 
     case ImageAdded(image, source) =>
-      val addedImages = maybeAddImageToForwardingQueue(image, source)
-      sender ! ImagesAddedToForwardingQueue(addedImages)
-
+      val applicableRules = maybeAddImageToForwardingQueue(image, source, sender)
+      sender ! ImageRegisteredForForwarding(image, applicableRules)
+      
+    case AddImageToForwardingQueue(image, rule, batchId, transferNow, origin) =>
+      val (transaction, transactionImage) = addImageToForwardingQueue(image, rule, batchId)
+      origin ! ImageAddedToForwardingQueue(transactionImage)
+      if (transferNow)
+    	  makeTransfer(rule, transaction)
+    	  
     case PollForwardingQueue =>
       val transactions = maybeSendImagesForNonBoxSources()
       sender ! TransactionsEnroute(transactions)
 
     case UpdateTransaction(transaction, enroute, delivered) =>
       updateTransaction(transaction, enroute, delivered)
-
-    case MakeTransfer(rule, transaction) =>
-      makeTransfer(rule, transaction)
 
     case ImagesSent(destination, imageIds) =>
       val transactionMaybe = markTransactionAsDelivered(destination, imageIds)
@@ -125,28 +146,31 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
       forwardingDao.removeForwardingRule(forwardingRuleId)
     }
 
-  def maybeAddImageToForwardingQueue(image: Image, source: Source): List[ForwardingTransactionImage] =
+  def maybeAddImageToForwardingQueue(image: Image, source: Source, origin: ActorRef): List[ForwardingRule] =
     if (hasForwardingRules) {
 
       // look for rules with this source
       val rules = getForwardingRulesForSourceTypeAndId(source.sourceType, source.sourceId)
 
-      // look for transactions, create or update (timestamp)
-      val transactions = rules.map(createOrUpdateForwardingTransaction(_))
-
-      // add to queue
-      val addedImages = transactions.map(addImageToForwardingQueue(_, image))
-
       // check if source is box, if so, maybe transfer
       if (source.sourceType == SourceType.BOX)
-        rules.zip(transactions).map {
-          case (rule, transaction) =>
-            maybeSendImagesForBoxSource(image.id, transaction, rule)
-        }
+        rules.map(rule => addImageToForwardingQueueForBoxSource(image, rule, origin))
+      else
+        rules.map(rule => self ! AddImageToForwardingQueue(image, rule, nonBoxBatchId, false, origin))
 
-      addedImages
+      rules
     } else
       List.empty
+
+  def addImageToForwardingQueue(image: Image, rule: ForwardingRule, batchId: Long): (ForwardingTransaction, ForwardingTransactionImage) = {
+    // look for transactions, create or update (timestamp)
+    val transaction = createOrUpdateForwardingTransaction(rule, batchId)
+
+    // add to queue
+    val addedImage = addImageToForwardingQueue(transaction, image)
+
+    (transaction, addedImage)
+  }
 
   def hasForwardingRules(): Boolean =
     db.withSession { implicit session =>
@@ -158,9 +182,9 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
       forwardingDao.getForwardingRulesForSourceTypeAndId(sourceType, sourceId)
     }
 
-  def createOrUpdateForwardingTransaction(forwardingRule: ForwardingRule): ForwardingTransaction =
+  def createOrUpdateForwardingTransaction(forwardingRule: ForwardingRule, batchId: Long): ForwardingTransaction =
     db.withSession { implicit session =>
-      forwardingDao.createOrUpdateForwardingTransaction(forwardingRule)
+      forwardingDao.createOrUpdateForwardingTransaction(forwardingRule, batchId)
     }
 
   def addImageToForwardingQueue(forwardingTransaction: ForwardingTransaction, image: Image) =
@@ -179,7 +203,7 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
     rulesAndTransactions.map(_._2)
   }
 
-  def maybeSendImagesForBoxSource(imageId: Long, transaction: ForwardingTransaction, forwardingRule: ForwardingRule): Unit = {
+  def addImageToForwardingQueueForBoxSource(image: Image, forwardingRule: ForwardingRule, origin: ActorRef): Unit = {
 
     /*
      * This method is called as the result of the ImageAdded event. The same event updates the inbox entry
@@ -187,25 +211,24 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
      * the added image a few times before either succeeding or giving up.
      */
 
-    def inboxEntryForImageId(imageId: Long, attempt: Int, maxAttempts: Int, attemptInterval: Long): Unit =
-      boxService.ask(GetInboxEntryForImageId(imageId)).mapTo[Option[InboxEntry]].onComplete {
+    def inboxEntryForImage(image: Image, attempt: Int, maxAttempts: Int, attemptInterval: Long): Unit =
+      boxService.ask(GetInboxEntryForImageId(image.id)).mapTo[Option[InboxEntry]].onComplete {
         case Success(entryMaybe) => entryMaybe match {
           case Some(entry) =>
-            if (entry.receivedImageCount >= entry.totalImageCount)
-              self ! MakeTransfer(forwardingRule, transaction)
+            self ! AddImageToForwardingQueue(image, forwardingRule, entry.id, entry.receivedImageCount >= entry.totalImageCount, origin)
           case None =>
             if (attempt < maxAttempts) {
               Thread.sleep(attemptInterval)
-              inboxEntryForImageId(imageId, attempt + 1, maxAttempts, attemptInterval)
+              inboxEntryForImage(image, attempt + 1, maxAttempts, attemptInterval)
             } else
-              SbxLog.error("Forwarding", s"No inbox entries found afer $attempt attempts for image id $imageId when transferring from box ${forwardingRule.source.sourceName}. Cannot complete forwarding transfer.")
+              SbxLog.error("Forwarding", s"No inbox entries found afer $attempt attempts for image id ${image.id} when transferring from box ${forwardingRule.source.sourceName}. Cannot complete forwarding transfer.")
         }
         case Failure(e) =>
-          SbxLog.error("Forwarding", s"Error getting inbox entries for received image with id $imageId. Could not complete forwarding transfer.")
+          SbxLog.error("Forwarding", s"Error getting inbox entries for received image with id ${image.id}. Could not complete forwarding transfer.")
       }
 
     // get box information, are all images received?
-    inboxEntryForImageId(imageId, 1, 10, 500)
+    inboxEntryForImage(image, 1, 10, 500)
 
   }
 
