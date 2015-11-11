@@ -28,25 +28,29 @@
             <md-card-content>
                 <form name="loginForm" ng-submit="login()" role="loginForm" novalidate>
                     
-                    <md-input-container md-is-error="loginForm.$submitted && loginForm.username.$error.required">
-                        <label>Username</label>
-                        <input type="text" name="username" ng-model="username" required>
-                        <div ng-messages="loginForm.username.$error"
-                            ng-show="loginForm.$submitted && loginForm.username.$error.required">
+                    <div layout="column">
 
-                            <div ng-message="required">This is required!</div>
-                        </div>
-                    </md-input-container>
+                        <md-input-container md-is-error="loginForm.$submitted && loginForm.username.$error.required">
+                            <label>Username</label>
+                            <input type="text" name="username" ng-model="username" required>
+                            <div ng-messages="loginForm.username.$error"
+                                ng-show="loginForm.$submitted && loginForm.username.$error.required">
 
-                    <md-input-container md-is-error="loginForm.$submitted && loginForm.password.$error.required">
-                        <label>Password</label>
-                        <input type="password" name="password" ng-model="password" required />
-                        <div ng-messages="loginForm.password.$error"
-                            ng-show="loginForm.$submitted && loginForm.password.$error.required">
+                                <div ng-message="required">This is required!</div>
+                            </div>
+                        </md-input-container>
 
-                            <div ng-message="required">This is required!</div>
-                        </div>
-                    </md-input-container>
+                        <md-input-container md-is-error="loginForm.$submitted && loginForm.password.$error.required">
+                            <label>Password</label>
+                            <input type="password" name="password" ng-model="password" required />
+                            <div ng-messages="loginForm.password.$error"
+                                ng-show="loginForm.$submitted && loginForm.password.$error.required">
+
+                                <div ng-message="required">This is required!</div>
+                            </div>
+                        </md-input-container>
+
+                    </div>
 
                     <div layout="row">
                         <div flex></div>

@@ -3,26 +3,30 @@
     <md-dialog-content>
         <md-subheader class="md-sticky-no-effect">Add Forwarding Rule</md-subheader>
 
-        <md-input-container>
-            <label>Source</label>
-            <md-select name="source" ng-model="uiState.source" md-on-open="loadSources()" placeholder="Select a source">
-                <md-option ng-value="source" ng-repeat="source in uiState.sources">{{ source.sourceName }} ({{ source.sourceType }})</md-option>
-            </md-select>
-        </md-input-container>
+        <div layout="column">
 
-        <md-input-container>
-            <label>Destination</label>
-            <md-select ng-model="uiState.destination" md-on-open="loadDestinations()" placeholder="Select a destination">
-                <md-option ng-value="destination" ng-repeat="destination in uiState.destinations">{{ destination.destinationName }} ({{ destination.destinationType }})</md-option>
-            </md-select>
-        </md-input-container>
+            <md-input-container>
+                <label>Source</label>
+                <md-select name="source" ng-model="uiState.source" md-on-open="loadSources()" placeholder="Select a source">
+                    <md-option ng-value="source" ng-repeat="source in uiState.sources">{{ source.sourceName }} ({{ source.sourceType }})</md-option>
+                </md-select>
+            </md-input-container>
 
-        <md-input-container>
-            <md-checkbox ng-model="uiState.keepImages" aria-label="Keep images after forwarding">
-                Keep images after forwarding
-            </md-checkbox>            
-        </md-input-container>
+            <md-input-container>
+                <label>Destination</label>
+                <md-select ng-model="uiState.destination" md-on-open="loadDestinations()" placeholder="Select a destination">
+                    <md-option ng-value="destination" ng-repeat="destination in uiState.destinations">{{ destination.destinationName }} ({{ destination.destinationType }})</md-option>
+                </md-select>
+            </md-input-container>
 
+            <md-input-container>
+                <md-checkbox ng-model="uiState.keepImages" aria-label="Keep images after forwarding">
+                    Keep images after forwarding
+                </md-checkbox>            
+            </md-input-container>
+
+        </div>
+        
     </md-dialog-content>
 
     <div class="md-actions" layout="row">

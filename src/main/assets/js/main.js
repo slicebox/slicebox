@@ -24,7 +24,7 @@ angular.module('slicebox', [
     'slicebox.adminSeriesTypes'
 ])
 
-.config(function($locationProvider, $routeProvider, $mdThemingProvider, $animateProvider, $filterProvider) {
+.config(function($locationProvider, $routeProvider, $mdThemingProvider, $animateProvider, $filterProvider, $httpProvider) {
     $locationProvider.html5Mode(true);
     $routeProvider.otherwise({redirectTo: '/'});
 
@@ -58,6 +58,18 @@ angular.module('slicebox', [
             }
 
             return returnValue;
+        };
+    });
+
+    $httpProvider.interceptors.push(function($q, $location) {
+        return {
+            'responseError': function(rejection) {
+                if (rejection.status === 401) {
+                    $location.path('/login');
+                } else {
+                    return $q.reject(rejection);
+                }
+            }
         };
     });
 })

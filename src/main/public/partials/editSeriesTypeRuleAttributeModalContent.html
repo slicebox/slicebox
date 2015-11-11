@@ -1,4 +1,4 @@
-<md-dialog aria-label="Add Box" flex="50">
+<md-dialog aria-label="Add Box">
 	<form name="editAttributeForm" ng-submit="saveAttribute()" novalidate>
 
 		<md-dialog-content>
@@ -7,8 +7,9 @@
 	  			<span ng-if="!attribute.id">Add Attribute</span>
 	  		</md-subheader>
 
-	  		<div layout="row">
-		  		<md-input-container flex>
+	  		<div layout="column">
+
+		  		<md-input-container>
 		  			<label>Tag (hex)</label>
 					<input
 						sbx-dicom-hex-value
@@ -26,7 +27,7 @@
 			        </div>
 				</md-input-container>
 
-				<md-input-container flex>
+				<md-input-container>
 					<label>Value</label>
 					<input
 						ng-model="attribute.values"
@@ -41,6 +42,7 @@
 			            	ng-show="editAttributeForm.values.$error.required">value is required</div>
 			        </div>
 			    </md-input-container>
+
 			</div>
 
 	  	</md-dialog-content>

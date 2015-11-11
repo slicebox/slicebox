@@ -13,6 +13,8 @@ angular.module('slicebox.login', ['ngRoute'])
 
 .controller('LoginCtrl', function($scope, $rootScope, $location, sbxToast, userService) {
 
+    userService.updateCurrentUser();
+    
     $scope.uiState = {
         loginInProgress: false
     };

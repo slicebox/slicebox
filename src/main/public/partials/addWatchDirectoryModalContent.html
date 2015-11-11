@@ -5,15 +5,19 @@
         <md-dialog-content>
             <md-subheader class="md-sticky-no-effect">Add Watch Directory</md-subheader>
 
-            <md-input-container>
-                <label>Name</label>
-                <input type="text" ng-model="name" required />
-            </md-input-container>
+            <div layout="column">
 
-            <md-input-container>
-                <label>Directory path</label>
-                <input type="text" ng-model="path" required />
-            </md-input-container>
+                <md-input-container>
+                    <label>Name</label>
+                    <input type="text" ng-model="name" required />
+                </md-input-container>
+
+                <md-input-container>
+                    <label>Directory path</label>
+                    <input type="text" ng-model="path" required />
+                </md-input-container>
+
+            </div>
 
         </md-dialog-content>
 
