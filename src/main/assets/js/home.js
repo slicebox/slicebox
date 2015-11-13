@@ -11,7 +11,7 @@ angular.module('slicebox.home', ['ngRoute'])
   });
 })
 
-.controller('HomeCtrl', function($timeout, $scope, $http, $mdDialog, $q, openConfirmActionModal, openDeleteEntitiesModalFunction, openTagSeriesModal, sbxMisc, sbxMetaData, sbxToast) {
+.controller('HomeCtrl', function($timeout, $scope, $http, $mdDialog, $q, openMessageModal, openConfirmActionModal, openDeleteEntitiesModalFunction, openTagSeriesModal, sbxMisc, sbxMetaData, sbxToast) {
 
     // Initialization
 
@@ -40,6 +40,10 @@ angular.module('slicebox.home', ['ngRoute'])
             {
                 name: 'Export',
                 action: confirmExportPatients
+            },
+            {
+                name: "Summary",
+                action: summaryForPatients
             }
         ];
 
@@ -68,6 +72,10 @@ angular.module('slicebox.home', ['ngRoute'])
             {
                 name: 'Export',
                 action: confirmExportStudies
+            },
+            {
+                name: "Summary",
+                action: summaryForStudies
             }
         ];
 
@@ -96,6 +104,10 @@ angular.module('slicebox.home', ['ngRoute'])
             {
                 name: 'Export',
                 action: confirmExportSeries
+            },
+            {
+                name: "Summary",
+                action: summaryForSeries
             }
         ];
 
@@ -124,6 +136,10 @@ angular.module('slicebox.home', ['ngRoute'])
             {
                 name: 'Export',
                 action: confirmExportSeries
+            },
+            {
+                name: "Summary",
+                action: summaryForSeries
             }
         ];
 
@@ -552,9 +568,33 @@ angular.module('slicebox.home', ['ngRoute'])
             $scope.uiState.advancedFiltering.selectedSeriesTags);        
     }
 
+    function studiesForPatients(patients) {
+        return sbxMetaData.studiesForPatients(
+            patients,
+            $scope.uiState.advancedFiltering.selectedSources, 
+            $scope.uiState.advancedFiltering.selectedSeriesTypes, 
+            $scope.uiState.advancedFiltering.selectedSeriesTags);
+    }
+
+    function seriesForPatients(patients) {
+        return sbxMetaData.seriesForPatients(
+            patients,
+            $scope.uiState.advancedFiltering.selectedSources, 
+            $scope.uiState.advancedFiltering.selectedSeriesTypes, 
+            $scope.uiState.advancedFiltering.selectedSeriesTags);
+    }
+
     function imagesForPatients(patients) {
         return sbxMetaData.imagesForPatients(
             patients,
+            $scope.uiState.advancedFiltering.selectedSources, 
+            $scope.uiState.advancedFiltering.selectedSeriesTypes, 
+            $scope.uiState.advancedFiltering.selectedSeriesTags);
+    }
+
+    function seriesForStudies(studies) {
+        return sbxMetaData.seriesForStudies(
+            studies,
             $scope.uiState.advancedFiltering.selectedSources, 
             $scope.uiState.advancedFiltering.selectedSeriesTypes, 
             $scope.uiState.advancedFiltering.selectedSeriesTags);
@@ -571,22 +611,6 @@ angular.module('slicebox.home', ['ngRoute'])
     function imagesForSeries(series) {
         return sbxMetaData.imagesForSeries(
             series,
-            $scope.uiState.advancedFiltering.selectedSources, 
-            $scope.uiState.advancedFiltering.selectedSeriesTypes, 
-            $scope.uiState.advancedFiltering.selectedSeriesTags);
-    }
-
-    function seriesForPatients(patients) {
-        return sbxMetaData.seriesForPatients(
-            patients,
-            $scope.uiState.advancedFiltering.selectedSources, 
-            $scope.uiState.advancedFiltering.selectedSeriesTypes, 
-            $scope.uiState.advancedFiltering.selectedSeriesTags);
-    }
-
-    function seriesForStudies(studies) {
-        return sbxMetaData.seriesForStudies(
-            studies,
             $scope.uiState.advancedFiltering.selectedSources, 
             $scope.uiState.advancedFiltering.selectedSeriesTypes, 
             $scope.uiState.advancedFiltering.selectedSeriesTags);
@@ -905,6 +929,61 @@ angular.module('slicebox.home', ['ngRoute'])
             return $http.post('/api/images/export', imageIds).success(function (fileName) {
                 location.href = '/api/images/export?filename=' + fileName.value;
             });
+        });
+    }
+
+    function summaryForPatients(patients) {
+        studiesForPatients(patients).then(function (st) { 
+            seriesForStudies(st).then(function (se) { 
+                summaryStringForSeries(se).then(function (summaryString) {
+                    var summary = 
+                        '<ul>' +
+                            '<li>' + patients.length + ' patients</li>' + 
+                            '<li>' + st.length + ' studies</li>' + summaryString +
+                        '</ul>';
+                    openMessageModal('Patients Summary', summary);
+                });
+            });
+        });
+    }
+
+    function summaryForStudies(studies) {
+        seriesForStudies(studies).then(function (se) { 
+            summaryStringForSeries(se).then(function (summaryString) {
+                var summary = 
+                    '<ul>' +
+                        '<li>' + studies.length + ' studies</li>' + summaryString +
+                    '</ul>';
+                openMessageModal('Studies Summary', summary);
+            });
+        });
+    }
+
+    function summaryForSeries(series) {
+        if (series.length > 0 && series[0].patient) { series = series.map(function (s) { return s.series; }); }
+        summaryStringForSeries(series).then(function (summaryString) {
+            var summary = '<ul>' + summaryString + '</ul>';
+            openMessageModal('Series Summary', summary);
+        });
+    }
+
+    function summaryStringForSeries(series) {
+        return imagesForSeries(series).then(function (im) {
+
+            var modalities = series.reduce(function (map, s) {
+                if (map[s.modality.value]) {
+                    map[s.modality.value] += 1;
+                } else {
+                    map[s.modality.value] = 1;
+                }
+                return map;
+            }, {});
+            var modalitiesString = JSON.stringify(modalities).replace(/\"/g,'');
+            modalitiesString = modalitiesString.substring(1, modalitiesString.length - 1);
+
+            return '<li>' + series.length + ' series</li>' + 
+                   '<li>' + im.length + ' images</li>' + 
+                   '<li>Modalities (# series): ' + modalitiesString + '</li>';
         });
     }
 

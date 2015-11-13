@@ -85,12 +85,20 @@ angular.module('slicebox.utils', [])
             return sbxMisc.flattenPromises(promises);            
         },
 
-        seriesForPatients: function(patients, sources, seriesTypes, seriesTags) {
+        studiesForPatients: function(patients, sources, seriesTypes, seriesTags) {
             var self = this;
             var promises = patients.map(function(patient) {
                 return $http.get(self.urlWithAdvancedFiltering('/api/metadata/studies?startindex=0&count=1000000&patientid=' + patient.id, sources, seriesTypes, seriesTags)).then(function (studiesData) {
-                    return self.seriesForStudies(studiesData.data, sources, seriesTypes, seriesTags);
+                    return studiesData.data;
                 });
+            });
+            return sbxMisc.flattenPromises(promises);
+        },
+
+        seriesForPatients: function(patients, sources, seriesTypes, seriesTags) {
+            var self = this;
+            var promises = self.studiesForPatients(patients, sources, seriesTypes, seriesTags).then(function (studiesData) {
+                return self.seriesForStudies(studiesData.data, sources, seriesTypes, seriesTags);
             });
             return sbxMisc.flattenPromises(promises);
         },
