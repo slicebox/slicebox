@@ -150,9 +150,9 @@ object DicomUtil {
     else
       values.tail.foldLeft(values.head)((result, part) => result + "/" + part)
 
-  def checkSopClass(dataset: Attributes) =
+  def checkSopClass(dataset: Attributes, allowSecondaryCapture: Boolean) =
     SopClasses.sopClasses
-      .filter(_.included)
+      .filter(sopClass => sopClass.included || (allowSecondaryCapture && sopClass.sopClassUID == "1.2.840.10008.5.1.4.1.1.7"))
       .map(_.sopClassUID)
       .contains(dataset.getString(Tag.SOPClassUID))
 

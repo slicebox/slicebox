@@ -81,7 +81,7 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
     case FileReceived(path, source) =>
       val dataset = loadDataset(path, true)
       if (dataset != null)
-        if (checkSopClass(dataset)) {
+        if (checkSopClass(dataset, false)) {
           try {
             val (image, overwrite) = storeDataset(dataset, source)
             if (!overwrite)
@@ -91,32 +91,37 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
             case e: IllegalArgumentException =>
               SbxLog.error("Storage", e.getMessage)
           }
-        } else {
+        } else
           SbxLog.info("Storage", s"Received file ${path.toString} with unsupported SOP Class UID ${dataset.getString(Tag.SOPClassUID)}, skipping")
-        }
       else
         log.debug("Storage", s"File $path is not a DICOM file, skipping")
 
     case DatasetReceived(dataset, source) =>
       try {
-        val (image, overwrite) = storeDataset(dataset, source)
-        if (!overwrite)
-          log.debug("Storage", "Stored dataset: " + dataset.getString(Tag.SOPInstanceUID))
-        context.system.eventStream.publish(ImageAdded(image, source))
+        if (checkSopClass(dataset, false)) {
+          val (image, overwrite) = storeDataset(dataset, source)
+          if (!overwrite)
+            log.debug("Storage", "Stored dataset: " + dataset.getString(Tag.SOPInstanceUID))
+          context.system.eventStream.publish(ImageAdded(image, source))
+        } else
+          SbxLog.info("Storage", s"Received dataset from source ${source.sourceName} with unsupported SOP Class UID ${dataset.getString(Tag.SOPClassUID)}, skipping")
       } catch {
         case e: IllegalArgumentException =>
           SbxLog.error("Storage", e.getMessage)
       }
 
-    case AddDataset(dataset, source) =>
+    case AddDataset(dataset, source, allowSecondaryCapture) =>
       catchAndReport {
         if (dataset == null)
           throw new IllegalArgumentException("Invalid dataset")
-        val (image, overwrite) = storeDatasetTryCatchThrow(dataset, source)
-        sender ! ImageAdded(image, source)
-        context.system.eventStream.publish(ImageAdded(image, source))
+        if (checkSopClass(dataset, allowSecondaryCapture)) {
+          val (image, overwrite) = storeDatasetTryCatchThrow(dataset, source)
+          sender ! ImageAdded(image, source)
+          context.system.eventStream.publish(ImageAdded(image, source))
+        } else
+          SbxLog.info("Storage", s"Received dataset from source ${source.sourceName} with unsupported SOP Class UID ${dataset.getString(Tag.SOPClassUID)}, skipping")
       }
-
+      
     case DeleteImage(imageId) =>
       catchAndReport {
         db.withSession { implicit session =>

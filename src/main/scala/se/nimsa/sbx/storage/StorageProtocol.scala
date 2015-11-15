@@ -150,7 +150,7 @@ object StorageProtocol {
 
   case class GetSeriesTypesForSeries(seriesId: Long) extends PropertiesRequest
 
-  case class AddDataset(dataset: Attributes, source: Source)
+  case class AddDataset(dataset: Attributes, source: Source, allowSecondaryCapture: Boolean)
 
   // ***to API***
 

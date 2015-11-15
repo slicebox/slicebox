@@ -53,7 +53,7 @@ class StorageServiceActorTest(_system: ActorSystem) extends TestKit(_system) wit
 
     "return a notification that the dataset has been added when adding a dataset" in {
       val source = Source(SourceType.UNKNOWN, "unknown", -1)
-      storageActorRef ! AddDataset(dataset, source)
+      storageActorRef ! AddDataset(dataset, source, false)
       expectMsgPF() {
         case ImageAdded(image, source) => true
       }
@@ -68,7 +68,7 @@ class StorageServiceActorTest(_system: ActorSystem) extends TestKit(_system) wit
 
     "return a notification that the dataset has been added when adding an already added dataset" in {
       val source = Source(SourceType.UNKNOWN, "unknown", -1)
-      storageActorRef ! AddDataset(dataset, source)
+      storageActorRef ! AddDataset(dataset, source, false)
       expectMsgPF() {
         case ImageAdded(image, source) => true
       }

@@ -173,7 +173,7 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
       patientSex = patientSex)
 
     val source = Source(SourceType.UNKNOWN, "unknown source", -1)
-    storageService ! AddDataset(dataset, source)
+    storageService ! AddDataset(dataset, source, false)
     expectMsgPF() {
       case ImageAdded(image, source) => true
     }
