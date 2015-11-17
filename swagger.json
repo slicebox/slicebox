@@ -857,6 +857,35 @@
       }
     },
 
+    "/metadata/flatseries/query": {
+      "post": {
+        "description": "submit a query for flat series",
+        "tags": ["Meta Data"],
+        "parameters": [
+          {
+            "name": "query",
+            "in": "body",
+            "description": "parameters of flat series query",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/query"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "flat series",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/flatSeries"
+              }
+            }
+          }
+        }
+      }
+    },
+
     "/images": {
       "post": {
         "description": "add a DICOM dataset to slicebox",
@@ -2588,6 +2617,17 @@
         }
       }
     },
+    "sourceRef": {
+      "properties": {
+        "sourceType": {
+          "type": "string"
+        },
+        "sourceId": {
+          "type": "integer",
+          "format": "int64"
+        }
+      }
+    },
     "destination": {
       "properties": {
         "destinationType": {
@@ -3112,6 +3152,40 @@
         }
       }
     },
+    "queryOrder": {
+      "properties": {
+        "orderBy": {
+          "type": "string"
+        },
+        "orderAscending": {
+          "type": "boolean"
+        }
+      }
+    },
+    "queryFilters": {
+      "properties": {
+        "sourceRefs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/sourceRef"
+          }
+        },
+        "seriesTypeIds": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "seriesTagIds": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      }
+    },
     "query": {
       "properties": {
         "startindex": {
@@ -3122,17 +3196,17 @@
           "type": "integer",
           "format": "int64"
         },
-        "orderby": {
-          "type": "string"
-        },
-        "orderascending": {
-          "type": "boolean"
+        "order": {
+          "$ref": "#/definitions/queryOrder"
         },
         "queryProperties": {
           "type": "array",
           "items": {
             "$ref": "#/definitions/queryProperty"
           }
+        },
+        "filters": {
+          "$ref": "#/definitions/queryFilters"          
         }
       }
     },
