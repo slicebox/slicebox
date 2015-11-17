@@ -3187,8 +3187,13 @@
       }
     },
     "query": {
+      "required": [
+        "startIndex",
+        "count",
+        "queryProperties"
+      ],
       "properties": {
-        "startindex": {
+        "startIndex": {
           "type": "integer",
           "format": "int64"
         },
