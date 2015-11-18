@@ -48,6 +48,7 @@ object Jpg2Dcm {
     try {
 
       val attrs = new Attributes()
+      attrs.setString(Tag.SOPClassUID, VR.UI, "1.2.840.10008.5.1.4.1.1.7")
       attrs.setString(Tag.PatientName, VR.PN, patient.patientName.value)
       attrs.setString(Tag.PatientID, VR.LO, patient.patientID.value)
       attrs.setString(Tag.PatientSex, VR.CS, patient.patientSex.value)
@@ -73,6 +74,7 @@ object Jpg2Dcm {
       val now = new Date()
       attrs.setDate(Tag.InstanceCreationDate, VR.DA, now)
       attrs.setDate(Tag.InstanceCreationTime, VR.TM, now)
+      attrs.setDate(Tag.SeriesDate, VR.DA, now)
       val fmi = attrs.createFileMetaInformation(transferSyntax)
       val dos = new DicomOutputStream(dcmFile)
       try {

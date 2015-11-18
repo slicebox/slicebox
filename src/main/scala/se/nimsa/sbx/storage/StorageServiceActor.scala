@@ -56,6 +56,7 @@ import java.util.concurrent.Executors
 import se.nimsa.sbx.log.SbxLog
 import scala.slick.jdbc.JdbcBackend.Session
 import se.nimsa.sbx.app.GeneralProtocol._
+import se.nimsa.sbx.dicom.Jpg2Dcm
 
 class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with ExceptionCatching {
 
@@ -121,7 +122,23 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
         } else
           SbxLog.info("Storage", s"Received dataset from source ${source.sourceName} with unsupported SOP Class UID ${dataset.getString(Tag.SOPClassUID)}, skipping")
       }
-      
+
+    case EncapsulateJpeg(jpegBytes, studyId, isMpeg, source) =>
+      catchAndReport {
+        db.withSession { implicit session =>
+          val attributes = dao.studyById(studyId).flatMap(study =>
+            dao.patientById(study.patientId).map(patient => {
+              val dcmTempPath = Files.createTempFile("slicebox-sc-", "")
+              val attributes = Jpg2Dcm(jpegBytes, isMpeg, patient, study, dcmTempPath.toFile)
+              val series = datasetToSeries(attributes)
+              val image = datasetToImage(attributes)
+              storeEncapsulated(patient, study, series, image, source, dcmTempPath)
+              sender ! ImageAdded(image, source)
+            }))
+            .getOrElse(throw new NotFoundException(s"No study found for study id $studyId"))
+        }
+      }
+
     case DeleteImage(imageId) =>
       catchAndReport {
         db.withSession { implicit session =>
@@ -359,6 +376,34 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
       }
 
       (dbImage, overwrite)
+    }
+
+  def storeEncapsulated(
+    dbPatient: Patient, dbStudy: Study,
+    series: Series, image: Image,
+    source: Source,
+    dcmTempPath: Path): Image =
+    db.withSession { implicit session =>
+
+      val seriesSource = SeriesSource(-1, source)
+
+      val dbSeries = dao.seriesByUidAndStudy(series, dbStudy)
+        .getOrElse(dao.insert(series.copy(studyId = dbStudy.id)))
+      val dbSeriesSource = propertiesDao.seriesSourceById(dbSeries.id)
+        .getOrElse(propertiesDao.insertSeriesSource(seriesSource.copy(id = dbSeries.id)))
+      val dbImage = dao.imageByUidAndSeries(image, dbSeries)
+        .getOrElse(dao.insert(image.copy(seriesId = dbSeries.id)))
+
+      val storedPath = filePath(dbImage)
+
+      try
+        Files.move(dcmTempPath, storedPath)
+      catch {
+        case e: Exception =>
+          SbxLog.error("Storage", "Encapsulated dataset file could not be stored: " + e.getMessage)
+      }
+
+      dbImage
     }
 
   def filePath(image: Image) = storage.resolve(fileName(image))

@@ -194,6 +194,19 @@ trait ImageRoutes { this: RestApi =>
             }
           }
         }
+      } ~ path("jpeg") {
+        parameters('studyid.as[Long], 'mpeg.as[Boolean] ? false) { (studyId, isMpeg) =>
+          post {
+            entity(as[Array[Byte]]) { jpegBytes =>
+              val source = Source(SourceType.USER, apiUser.user, apiUser.id)
+              onSuccess(storageService.ask(EncapsulateJpeg(jpegBytes, studyId, isMpeg, source))) {
+                case ImageAdded(image, source) =>
+                  import spray.httpx.SprayJsonSupport._
+                  complete((Created, image))
+              }
+            }
+          }
+        }
       }
     }
 
