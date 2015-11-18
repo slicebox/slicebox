@@ -572,6 +572,76 @@ class PropertiesDAOTest extends FlatSpec with Matchers with BeforeAndAfterEach {
     }
   }
 
+  it should "throw IllegalArgumentException when querying patients for properties (columns) that does not exist" in {
+    db.withSession { implicit session =>
+      insertMetaDataAndProperties
+      val qf = Some(QueryFilters(Seq(SourceRef(SourceType.USER, 1)), Seq.empty, Seq.empty))
+      val qp = Seq(QueryProperty("misspelled property", QueryOperator.EQUALS, "value"))
+      intercept[IllegalArgumentException] {
+        propertiesDao.queryPatients(0, 20, None, qp, None)
+      }
+      intercept[IllegalArgumentException] {
+        propertiesDao.queryPatients(0, 20, None, qp, qf)
+      }
+    }
+  }
+
+  it should "throw IllegalArgumentException when querying studies for properties (columns) that does not exist" in {
+    db.withSession { implicit session =>
+      insertMetaDataAndProperties
+      val qf = Some(QueryFilters(Seq(SourceRef(SourceType.USER, 1)), Seq.empty, Seq.empty))
+      val qp = Seq(QueryProperty("misspelled property", QueryOperator.EQUALS, "value"))
+      intercept[IllegalArgumentException] {
+        propertiesDao.queryStudies(0, 20, None, qp, None)
+      }
+      intercept[IllegalArgumentException] {
+        propertiesDao.queryStudies(0, 20, None, qp, qf)
+      }
+    }
+  }
+
+  it should "throw IllegalArgumentException when querying series for properties (columns) that does not exist" in {
+    db.withSession { implicit session =>
+      insertMetaDataAndProperties
+      val qf = Some(QueryFilters(Seq(SourceRef(SourceType.USER, 1)), Seq.empty, Seq.empty))
+      val qp = Seq(QueryProperty("misspelled property", QueryOperator.EQUALS, "value"))
+      intercept[IllegalArgumentException] {
+        propertiesDao.querySeries(0, 20, None, qp, None)
+      }
+      intercept[IllegalArgumentException] {
+        propertiesDao.querySeries(0, 20, None, qp, qf)
+      }
+    }
+  }
+
+  it should "throw IllegalArgumentException when querying flat series for properties (columns) that does not exist" in {
+    db.withSession { implicit session =>
+      insertMetaDataAndProperties
+      val qf = Some(QueryFilters(Seq(SourceRef(SourceType.USER, 1)), Seq.empty, Seq.empty))
+      val qp = Seq(QueryProperty("misspelled property", QueryOperator.EQUALS, "value"))
+      intercept[IllegalArgumentException] {
+        propertiesDao.queryFlatSeries(0, 20, None, qp, None)
+      }
+      intercept[IllegalArgumentException] {
+        propertiesDao.queryFlatSeries(0, 20, None, qp, qf)
+      }
+    }
+  }
+
+  it should "throw IllegalArgumentException when querying images for properties (columns) that does not exist" in {
+    db.withSession { implicit session =>
+      insertMetaDataAndProperties
+      val qf = Some(QueryFilters(Seq(SourceRef(SourceType.USER, 1)), Seq.empty, Seq.empty))
+      val qp = Seq(QueryProperty("misspelled property", QueryOperator.EQUALS, "value"))
+      intercept[IllegalArgumentException] {
+        propertiesDao.queryImages(0, 20, None, qp, None)
+      }
+      intercept[IllegalArgumentException] {
+        propertiesDao.queryImages(0, 20, None, qp, qf)
+      }
+    }
+  }
+
   it should "remove a series tag when the last occurrence of it has been removed" in {
     db.withSession { implicit session =>
       val (dbPatient1, (dbStudy1, dbStudy2), (dbSeries1, dbSeries2, dbSeries3, dbSeries4), (dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)) =

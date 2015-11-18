@@ -99,6 +99,9 @@ class SeriesTypeDAO(val driver: JdbcProfile) {
     seriesTypeRuleAttribute.copy(id = generatedId)
   }
 
+  def seriesTypeForName(seriesTypeName: String)(implicit session: Session): Option[SeriesType] =
+    seriesTypeQuery.filter(_.name === seriesTypeName).firstOption
+
   def updateSeriesType(seriesType: SeriesType)(implicit session: Session): Unit =
     seriesTypeQuery.filter(_.id === seriesType.id).update(seriesType)
 

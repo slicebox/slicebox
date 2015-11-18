@@ -146,11 +146,9 @@ class MetaDataDAO(val driver: JdbcProfile) {
       !tables(0).getColumns.list.filter(_.name == columnName).isEmpty
   }
 
-  def checkOrderBy(orderBy: Option[String], tableNames: String*)(implicit session: Session) =
-    orderBy.foreach(columnName =>
-      if (!tableNames.exists(tableName =>
-        columnExists(tableName, columnName)))
-        throw new IllegalArgumentException(s"Property $columnName does not exist"))
+  def checkColumnExists(columnName: String, tableNames: String*)(implicit session: Session) =
+    if (!tableNames.exists(tableName => columnExists(tableName, columnName)))
+      throw new IllegalArgumentException(s"Property $columnName does not exist")
 
   // *** Get entities by id
 
@@ -195,7 +193,7 @@ class MetaDataDAO(val driver: JdbcProfile) {
 
   def patients(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String])(implicit session: Session): List[Patient] = {
 
-    checkOrderBy(orderBy, "Patients")
+    orderBy.foreach(checkColumnExists(_, "Patients"))
 
     implicit val getResult = patientsGetResult
 
@@ -241,7 +239,8 @@ class MetaDataDAO(val driver: JdbcProfile) {
 
   def queryPatients(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, queryProperties: Seq[QueryProperty])(implicit session: Session): List[Patient] = {
 
-    checkOrderBy(orderBy, "Patients")
+    orderBy.foreach(checkColumnExists(_, "Patients"))
+    queryProperties.foreach(qp => checkColumnExists(qp.propertyName, "Patients", "Studies", "Series"))
 
     implicit val getResult = patientsGetResult
 
@@ -272,8 +271,9 @@ class MetaDataDAO(val driver: JdbcProfile) {
   def queryStudies(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, queryProperties: Seq[QueryProperty])(implicit session: Session): List[Study] = {
 
     implicit val getResult = studiesGetResult
-    
-    checkOrderBy(orderBy, "Studies")
+
+    orderBy.foreach(checkColumnExists(_, "Studies"))
+    queryProperties.foreach(qp => checkColumnExists(qp.propertyName, "Patients", "Studies", "Series"))
 
     val query = queryStudiesSelectPart +
       wherePart(queryPart(queryProperties)) +
@@ -284,7 +284,7 @@ class MetaDataDAO(val driver: JdbcProfile) {
   }
 
   val seriesGetResult = GetResult(r =>
-      Series(r.nextLong, r.nextLong, SeriesInstanceUID(r.nextString), SeriesDescription(r.nextString), SeriesDate(r.nextString), Modality(r.nextString), ProtocolName(r.nextString), BodyPartExamined(r.nextString), Manufacturer(r.nextString), StationName(r.nextString), FrameOfReferenceUID(r.nextString)))
+    Series(r.nextLong, r.nextLong, SeriesInstanceUID(r.nextString), SeriesDescription(r.nextString), SeriesDate(r.nextString), Modality(r.nextString), ProtocolName(r.nextString), BodyPartExamined(r.nextString), Manufacturer(r.nextString), StationName(r.nextString), FrameOfReferenceUID(r.nextString)))
 
   val querySeriesSelectPart = """select distinct("Series"."id"),
       "Series"."studyId",
@@ -302,7 +302,8 @@ class MetaDataDAO(val driver: JdbcProfile) {
 
   def querySeries(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, queryProperties: Seq[QueryProperty])(implicit session: Session): List[Series] = {
 
-    checkOrderBy(orderBy, "Series")
+    orderBy.foreach(checkColumnExists(_, "Series"))
+    queryProperties.foreach(qp => checkColumnExists(qp.propertyName, "Patients", "Studies", "Series"))
 
     implicit val getResult = seriesGetResult
 
@@ -315,8 +316,8 @@ class MetaDataDAO(val driver: JdbcProfile) {
   }
 
   val imagesGetResult = GetResult(r =>
-      Image(r.nextLong, r.nextLong, SOPInstanceUID(r.nextString), ImageType(r.nextString), InstanceNumber(r.nextString)))
-      
+    Image(r.nextLong, r.nextLong, SOPInstanceUID(r.nextString), ImageType(r.nextString), InstanceNumber(r.nextString)))
+
   val queryImagesSelectPart = """select distinct("Images"."id"),
       "Images"."seriesId",
       "Images"."SOPInstanceUID",
@@ -328,7 +329,8 @@ class MetaDataDAO(val driver: JdbcProfile) {
 
   def queryImages(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, queryProperties: Seq[QueryProperty])(implicit session: Session): List[Image] = {
 
-    checkOrderBy(orderBy, "Images")
+    orderBy.foreach(checkColumnExists(_, "Images"))
+    queryProperties.foreach(qp => checkColumnExists(qp.propertyName, "Patients", "Studies", "Series"))
 
     implicit val getResult = imagesGetResult
 
@@ -342,7 +344,8 @@ class MetaDataDAO(val driver: JdbcProfile) {
 
   def queryFlatSeries(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, queryProperties: Seq[QueryProperty])(implicit session: Session): List[FlatSeries] = {
 
-    checkOrderBy(orderBy, "Patients", "Studies", "Series")
+    orderBy.foreach(checkColumnExists(_, "Patients", "Studies", "Series"))
+    queryProperties.foreach(qp => checkColumnExists(qp.propertyName, "Patients", "Studies", "Series"))
 
     implicit val getResult = flatSeriesGetResult
 
@@ -383,7 +386,7 @@ class MetaDataDAO(val driver: JdbcProfile) {
 
   def flatSeries(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String])(implicit session: Session): List[FlatSeries] = {
 
-    checkOrderBy(orderBy, "Patients", "Studies", "Series")
+    orderBy.foreach(checkColumnExists(_, "Patients", "Studies", "Series"))
 
     implicit val getResult = flatSeriesGetResult
 

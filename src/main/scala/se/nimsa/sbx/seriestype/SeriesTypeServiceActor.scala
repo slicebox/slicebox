@@ -114,6 +114,8 @@ class SeriesTypeServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extend
 
   def addSeriesTypeToDb(seriesType: SeriesType): SeriesType =
     db.withSession { implicit session =>
+      seriesTypeDao.seriesTypeForName(seriesType.name).foreach(st =>
+        throw new IllegalArgumentException(s"A series type with name ${seriesType.name} already exists"))
       seriesTypeDao.insertSeriesType(seriesType)
     }
 

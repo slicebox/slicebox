@@ -29,6 +29,7 @@ class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
   db.withSession { implicit session =>
     metaDataDao.create
     seriesTypeDao.create
+      seriesTypeDao.create
   }
 
   val seriesTypeService = system.actorOf(SeriesTypeServiceActor.props(dbProps, 1.minute), name = "SeriesTypeService")
@@ -37,15 +38,9 @@ class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     TestKit.shutdownActorSystem(system)
   }
 
-  override def beforeEach() {
-    db.withSession { implicit session =>
-      seriesTypeDao.create
-    }
-  }
-
   override def afterEach() {
     db.withSession { implicit session =>
-      seriesTypeDao.drop
+      seriesTypeDao.clear
     }
   }
 
@@ -95,7 +90,7 @@ class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
 
       seriesTypeService ! AddSeriesType(seriesType)
       expectMsgPF() {
-        case Failure(_) => true
+        case Failure(e) if e.isInstanceOf[IllegalArgumentException] => true
       }
 
       seriesTypeService ! GetSeriesTypes

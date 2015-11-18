@@ -229,7 +229,7 @@ class PropertiesDAO(val driver: JdbcProfile) {
 
     if (isWithAdvancedFiltering(sourceRefs, seriesTypeIds, seriesTagIds)) {
 
-      metaDataDao.checkOrderBy(orderBy, "Patients", "Studies", "Series")
+      orderBy.foreach(metaDataDao.checkColumnExists(_, "Patients", "Studies", "Series"))
 
       implicit val getResult = metaDataDao.flatSeriesGetResult
 
@@ -264,7 +264,7 @@ class PropertiesDAO(val driver: JdbcProfile) {
 
     if (isWithAdvancedFiltering(sourceRefs, seriesTypeIds, seriesTagIds)) {
 
-      metaDataDao.checkOrderBy(orderBy, "Patients")
+      orderBy.foreach(metaDataDao.checkColumnExists(_, "Patients"))
 
       implicit val getResult = metaDataDao.patientsGetResult
 
@@ -318,7 +318,8 @@ class PropertiesDAO(val driver: JdbcProfile) {
       isWithAdvancedFiltering(filters.seriesTagIds, filters.seriesTypeIds, filters.sourceRefs)
     }.map { filters =>
 
-      metaDataDao.checkOrderBy(orderBy, "Patients")
+      orderBy.foreach(metaDataDao.checkColumnExists(_, "Patients"))
+      queryProperties.foreach(qp => metaDataDao.checkColumnExists(qp.propertyName, "Patients", "Studies", "Series"))
 
       implicit val getResult = metaDataDao.patientsGetResult
 
@@ -342,7 +343,8 @@ class PropertiesDAO(val driver: JdbcProfile) {
       isWithAdvancedFiltering(filters.seriesTagIds, filters.seriesTypeIds, filters.sourceRefs)
     }.map { filters =>
 
-      metaDataDao.checkOrderBy(orderBy, "Studies")
+      orderBy.foreach(metaDataDao.checkColumnExists(_, "Studies"))
+      queryProperties.foreach(qp => metaDataDao.checkColumnExists(qp.propertyName, "Patients", "Studies", "Series"))
 
       implicit val getResult = metaDataDao.studiesGetResult
 
@@ -366,7 +368,8 @@ class PropertiesDAO(val driver: JdbcProfile) {
       isWithAdvancedFiltering(filters.seriesTagIds, filters.seriesTypeIds, filters.sourceRefs)
     }.map { filters =>
 
-      metaDataDao.checkOrderBy(orderBy, "Series")
+      orderBy.foreach(metaDataDao.checkColumnExists(_, "Series"))
+      queryProperties.foreach(qp => metaDataDao.checkColumnExists(qp.propertyName, "Patients", "Studies", "Series"))
 
       implicit val getResult = metaDataDao.seriesGetResult
 
@@ -390,7 +393,8 @@ class PropertiesDAO(val driver: JdbcProfile) {
       isWithAdvancedFiltering(filters.seriesTagIds, filters.seriesTypeIds, filters.sourceRefs)
     }.map { filters =>
 
-      metaDataDao.checkOrderBy(orderBy, "Images")
+      orderBy.foreach(metaDataDao.checkColumnExists(_, "Images"))
+      queryProperties.foreach(qp => metaDataDao.checkColumnExists(qp.propertyName, "Patients", "Studies", "Series"))
 
       implicit val getResult = metaDataDao.imagesGetResult
 
@@ -414,7 +418,8 @@ class PropertiesDAO(val driver: JdbcProfile) {
       isWithAdvancedFiltering(filters.seriesTagIds, filters.seriesTypeIds, filters.sourceRefs)
     }.map { filters =>
 
-      metaDataDao.checkOrderBy(orderBy, "Patients", "Studies", "Series")
+      orderBy.foreach(metaDataDao.checkColumnExists(_, "Patients", "Studies", "Series"))
+      queryProperties.foreach(qp => metaDataDao.checkColumnExists(qp.propertyName, "Patients", "Studies", "Series"))
 
       implicit val getResult = metaDataDao.flatSeriesGetResult
 
