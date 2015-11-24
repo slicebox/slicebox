@@ -132,8 +132,8 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
               val attributes = Jpg2Dcm(jpegBytes, isMpeg, patient, study, dcmTempPath.toFile)
               val series = datasetToSeries(attributes)
               val image = datasetToImage(attributes)
-              storeEncapsulated(patient, study, series, image, source, dcmTempPath)
-              sender ! ImageAdded(image, source)
+              val dbImage = storeEncapsulated(patient, study, series, image, source, dcmTempPath)
+              sender ! ImageAdded(dbImage, source)
             }))
             .getOrElse(throw new NotFoundException(s"No study found for study id $studyId"))
         }
