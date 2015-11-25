@@ -928,10 +928,7 @@
             "in": "body",
             "description": "The jpeg image data",
             "required": true,
-            "type": "array",
-            "items": {
-              "type": "binary"
-            }
+            "type": "string"
           }
         ],
         "responses": {
