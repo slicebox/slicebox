@@ -910,6 +910,38 @@
       }
     },
 
+    "/images/jpeg": {
+      "post": {
+        "description": "add a JPEG image to slicebox. The image data will be wrapped in a DICOM file and added as a new series belonging to the study with the supplied ID",
+        "tags": ["Images"],
+        "parameters": [
+          {
+            "name": "studyid",
+            "in": "query",
+            "description": "ID of study to add new series to",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "jpeg bytes",
+            "in": "body",
+            "description": "The jpeg image data",
+            "required": true,
+            "type": "binary"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "meta data for added dataset on the image level of the DICOM hierarchy",
+            "schema": {
+              "$ref": "#/definitions/image"
+            }
+          }
+        }
+      }
+    },
+
     "/images/{id}": {
       "get": {
         "description": "fetch dataset corresponding to the supplied image ID",
