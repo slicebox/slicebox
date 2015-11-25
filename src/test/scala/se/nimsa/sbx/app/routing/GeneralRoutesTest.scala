@@ -24,7 +24,7 @@ import se.nimsa.sbx.app.GeneralProtocol._
 
 class GeneralRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
-  def dbUrl() = "jdbc:h2:mem:metadataroutestest;DB_CLOSE_DELAY=-1"
+  def dbUrl() = "jdbc:h2:mem:generalroutestest;DB_CLOSE_DELAY=-1"
 
   "General routes" should "return a list of sources of the correct length" in {
     PostAsAdmin("/api/users", ClearTextUser("name", ADMINISTRATOR, "password")) ~> routes ~> check {
@@ -33,7 +33,7 @@ class GeneralRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData("remote box")) ~> routes ~> check {
       status should be(Created)
     }
-    PostAsAdmin("/api/scps", ScpData(-1, "my scp", "AETITLE", 3000)) ~> routes ~> check {
+    PostAsAdmin("/api/scps", ScpData(-1, "my scp", "MYAETITLE", 5002)) ~> routes ~> check {
       status should be(Created)
     }
     GetAsUser("/api/sources") ~> routes ~> check {
@@ -43,7 +43,7 @@ class GeneralRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   }
 
   it should "return a list of destinations of the correct length" in {
-    PostAsAdmin("/api/scus", ScuData(-1, "my scu", "AETITLE", "123.123.123.1", 4000)) ~> routes ~> check {
+    PostAsAdmin("/api/scus", ScuData(-1, "my scu", "AETITLE", "123.123.123.1", 5003)) ~> routes ~> check {
       status should be(Created)
     }
     GetAsUser("/api/destinations") ~> routes ~> check {

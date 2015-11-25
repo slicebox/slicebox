@@ -330,7 +330,7 @@ class MetaDataDAO(val driver: JdbcProfile) {
   def queryImages(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, queryProperties: Seq[QueryProperty])(implicit session: Session): List[Image] = {
 
     orderBy.foreach(checkColumnExists(_, "Images"))
-    queryProperties.foreach(qp => checkColumnExists(qp.propertyName, "Patients", "Studies", "Series"))
+    queryProperties.foreach(qp => checkColumnExists(qp.propertyName, "Patients", "Studies", "Series", "Images"))
 
     implicit val getResult = imagesGetResult
 

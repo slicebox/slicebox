@@ -394,7 +394,7 @@ class PropertiesDAO(val driver: JdbcProfile) {
     }.map { filters =>
 
       orderBy.foreach(metaDataDao.checkColumnExists(_, "Images"))
-      queryProperties.foreach(qp => metaDataDao.checkColumnExists(qp.propertyName, "Patients", "Studies", "Series"))
+      queryProperties.foreach(qp => metaDataDao.checkColumnExists(qp.propertyName, "Patients", "Studies", "Series", "Images"))
 
       implicit val getResult = metaDataDao.imagesGetResult
 
