@@ -199,7 +199,7 @@ trait ImageRoutes { this: RestApi =>
           post {
             entity(as[Array[Byte]]) { jpegBytes =>
               val source = Source(SourceType.USER, apiUser.user, apiUser.id)
-              onSuccess(storageService.ask(EncapsulateJpeg(jpegBytes, studyId, source))) {
+              onSuccess(storageService.ask(AddJpeg(jpegBytes, studyId, source))) {
                 case ImageAdded(image, source) =>
                   import spray.httpx.SprayJsonSupport._
                   complete((Created, image))

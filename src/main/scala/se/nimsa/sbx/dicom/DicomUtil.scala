@@ -43,6 +43,9 @@ import java.util.Date
 import scala.collection.mutable.ListBuffer
 import org.dcm4che3.util.TagUtils
 import org.dcm4che3.data.Keyword
+import org.dcm4che3.data.Fragments
+import org.dcm4che3.data.BulkData
+import org.dcm4che3.io.BulkDataDescriptor
 
 object DicomUtil {
 
@@ -78,12 +81,13 @@ object DicomUtil {
       dis = new DicomInputStream(inputStream)
 
       val dataset =
-        if (withPixelData)
+        if (withPixelData) {
           dis.readDataset(-1, -1)
-        else {
+        } else {
           dis.setIncludeBulkData(IncludeBulkData.NO)
           dis.readDataset(-1, Tag.PixelData);
         }
+
       dataset
     } catch {
       case _: Exception => null
@@ -92,6 +96,22 @@ object DicomUtil {
     }
   }
 
+  def loadJpegDataset(path: Path): Attributes =
+    loadJpegDataset(new BufferedInputStream(Files.newInputStream(path)))
+
+  def loadJpegDataset(inputStream: InputStream): Attributes = {
+    var dis: DicomInputStream = null
+    try {
+      dis = new DicomInputStream(inputStream)
+      dis.setIncludeBulkData(IncludeBulkData.URI)
+      dis.setBulkDataDescriptor(BulkDataDescriptor.PIXELDATA)
+      dis.readDataset(-1, -1)
+    } catch {
+      case _: Exception => null
+    } finally {
+      SafeClose.close(dis)
+    }
+  }
   def toByteArray(path: Path): Array[Byte] = toByteArray(loadDataset(path, true))
 
   def toByteArray(dataset: Attributes): Array[Byte] = {
@@ -189,7 +209,7 @@ object DicomUtil {
           }
 
           val multiplicity = values.length
-          
+
           attributesBuffer += ImageAttribute(
             tag,
             group,
@@ -231,5 +251,5 @@ object DicomUtil {
     val name = Keyword.valueOf(tag)
     if (name == null) "" else name
   }
-  
+
 }

@@ -152,7 +152,7 @@ object StorageProtocol {
 
   case class AddDataset(dataset: Attributes, source: Source, allowSecondaryCapture: Boolean)
 
-  case class EncapsulateJpeg(jpegBytes: Array[Byte], studyId: Long, source: Source)
+  case class AddJpeg(jpegBytes: Array[Byte], studyId: Long, source: Source)
   
   // ***to API***
 

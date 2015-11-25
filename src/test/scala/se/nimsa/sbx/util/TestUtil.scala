@@ -99,6 +99,9 @@ object TestUtil {
   def testImageDataset(withPixelData: Boolean = true) = DicomUtil.loadDataset(testImageFile.toPath, withPixelData)
   def testImageByteArray = DicomUtil.toByteArray(testImageFile.toPath)
 
+  def jpegFile = new File(getClass().getResource("cat.jpg").toURI())
+  def jpegByteArray = Files.readAllBytes(jpegFile.toPath)
+  
   def invalidImageFile = new File(getClass().getResource("invalid.dcm").toURI())
   
   def createDataset(

@@ -58,6 +58,9 @@ import scala.slick.jdbc.JdbcBackend.Session
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.dicom.Jpg2Dcm
 import scala.util.control.NonFatal
+import org.dcm4che3.data.Fragments
+import org.dcm4che3.data.BulkData
+import java.io.ByteArrayInputStream
 
 class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with ExceptionCatching {
 
@@ -124,7 +127,7 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
           SbxLog.info("Storage", s"Received dataset from source ${source.sourceName} with unsupported SOP Class UID ${dataset.getString(Tag.SOPClassUID)}, skipping")
       }
 
-    case EncapsulateJpeg(jpegBytes, studyId, source) =>
+    case AddJpeg(jpegBytes, studyId, source) =>
       catchAndReport {
         db.withSession { implicit session =>
           val attributes = dao.studyById(studyId).flatMap(study =>
@@ -205,38 +208,39 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
       }
     }
 
-    case msg: ImageRequest => catchAndReport {
-      msg match {
+    case msg: ImageRequest =>
+      catchAndReport {
+        msg match {
 
-        case GetImagePath(imageId) =>
-          sender ! imagePathForId(imageId)
+          case GetImagePath(imageId) =>
+            sender ! imagePathForId(imageId)
 
-        case GetDataset(imageId, withPixelData) =>
-          sender ! readDataset(imageId, withPixelData)
+          case GetDataset(imageId, withPixelData) =>
+            sender ! readDataset(imageId, withPixelData)
 
-        case GetImageAttributes(imageId) =>
-          Future {
-            readImageAttributes(imageId)
-          }.pipeTo(sender)
+          case GetImageAttributes(imageId) =>
+            Future {
+              readImageAttributes(imageId)
+            }.pipeTo(sender)
 
-        case GetImageInformation(imageId) =>
-          Future {
-            readImageInformation(imageId)
-          }.pipeTo(sender)
+          case GetImageInformation(imageId) =>
+            Future {
+              readImageInformation(imageId)
+            }.pipeTo(sender)
 
-        case GetImageFrame(imageId, frameNumber, windowMin, windowMax, imageHeight) =>
-          Future {
-            try
-              readImageFrame(imageId, frameNumber, windowMin, windowMax, imageHeight)
-            catch {
-              case NonFatal(e) =>
-                e.printStackTrace()
-                throw new IllegalArgumentException(e)
-            }
-          }.pipeTo(sender)
+          case GetImageFrame(imageId, frameNumber, windowMin, windowMax, imageHeight) =>
+            Future {
+              try
+                readImageFrame(imageId, frameNumber, windowMin, windowMax, imageHeight)
+              catch {
+                case NonFatal(e) =>
+                  imagePathForId(imageId).map(imagePath =>
+                    readSecondaryCaptureJpeg(imagePath.imagePath, imageHeight))
+              }
+            }.pipeTo(sender)
 
+        }
       }
-    }
 
     case msg: MetaDataQuery => catchAndReport {
       msg match {
@@ -480,6 +484,26 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
         iis.close()
       }
     })
+
+  def readSecondaryCaptureJpeg(path: Path, imageHeight: Int) = {
+    val ds = loadJpegDataset(path)
+    val pd = ds.getValue(Tag.PixelData)
+    if (pd != null && pd.isInstanceOf[Fragments]) {
+      val fragments = pd.asInstanceOf[Fragments]
+      if (fragments.size == 2) {
+        val f1 = fragments.get(1)
+        if (f1.isInstanceOf[BulkData]) {
+          val bd = f1.asInstanceOf[BulkData]
+          val bytes = bd.toBytes(null, bd.bigEndian)
+          val bi = scaleImage(ImageIO.read(new ByteArrayInputStream(bytes)), imageHeight)
+          val baos = new ByteArrayOutputStream
+          ImageIO.write(bi, "png", baos)
+          baos.close()
+          baos.toByteArray
+        } else throw new IllegalArgumentException("JPEG bytes not an instance of BulkData")
+      } else throw new IllegalArgumentException(s"JPEG fragements are expected to contain 2 entries, contained ${fragments.size}")
+    } else throw new IllegalArgumentException("JPEG bytes not contained in Fragments")
+  }
 
   def scaleImage(image: BufferedImage, imageHeight: Int): BufferedImage = {
     val ratio = imageHeight / image.getHeight.asInstanceOf[Double]
