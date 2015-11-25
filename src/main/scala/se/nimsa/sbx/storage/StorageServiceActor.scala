@@ -57,6 +57,7 @@ import se.nimsa.sbx.log.SbxLog
 import scala.slick.jdbc.JdbcBackend.Session
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.dicom.Jpg2Dcm
+import scala.util.control.NonFatal
 
 class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with ExceptionCatching {
 
@@ -123,13 +124,13 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
           SbxLog.info("Storage", s"Received dataset from source ${source.sourceName} with unsupported SOP Class UID ${dataset.getString(Tag.SOPClassUID)}, skipping")
       }
 
-    case EncapsulateJpeg(jpegBytes, studyId, isMpeg, source) =>
+    case EncapsulateJpeg(jpegBytes, studyId, source) =>
       catchAndReport {
         db.withSession { implicit session =>
           val attributes = dao.studyById(studyId).flatMap(study =>
             dao.patientById(study.patientId).map(patient => {
               val dcmTempPath = Files.createTempFile("slicebox-sc-", "")
-              val attributes = Jpg2Dcm(jpegBytes, isMpeg, patient, study, dcmTempPath.toFile)
+              val attributes = Jpg2Dcm(jpegBytes, patient, study, dcmTempPath.toFile)
               val series = datasetToSeries(attributes)
               val image = datasetToImage(attributes)
               val dbImage = storeEncapsulated(patient, study, series, image, source, dcmTempPath)
@@ -225,7 +226,13 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
 
         case GetImageFrame(imageId, frameNumber, windowMin, windowMax, imageHeight) =>
           Future {
-            readImageFrame(imageId, frameNumber, windowMin, windowMax, imageHeight)
+            try
+              readImageFrame(imageId, frameNumber, windowMin, windowMax, imageHeight)
+            catch {
+              case NonFatal(e) =>
+                e.printStackTrace()
+                throw new IllegalArgumentException(e)
+            }
           }.pipeTo(sender)
 
       }
@@ -463,7 +470,7 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
         val bi = try {
           scaleImage(imageReader.read(frameNumber - 1, param), imageHeight)
         } catch {
-          case e: Exception => throw new IllegalArgumentException(e.getMessage)
+          case e: Exception => throw new IllegalArgumentException(e)
         }
         val baos = new ByteArrayOutputStream
         ImageIO.write(bi, "png", baos)

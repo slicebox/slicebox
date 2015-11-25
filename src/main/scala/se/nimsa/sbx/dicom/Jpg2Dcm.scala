@@ -41,7 +41,7 @@ object Jpg2Dcm {
 
   private val transferSyntax = UID.JPEGBaseline1
 
-  def apply(bytes: Array[Byte], isMpeg: Boolean, patient: Patient, study: Study, dcmFile: File): Attributes = {
+  def apply(bytes: Array[Byte], patient: Patient, study: Study, dcmFile: File): Attributes = {
 
     val jpgInput = new DataInputStream(new ByteArrayInputStream(bytes))
 
@@ -80,19 +80,16 @@ object Jpg2Dcm {
       try {
         dos.writeDataset(fmi, attrs)
         dos.writeHeader(Tag.PixelData, VR.OB, -1)
-        if (!isMpeg) {
-          dos.writeHeader(Tag.Item, null, 0)
-          dos.writeHeader(Tag.Item, null, (jpgLen + 1) & ~1)
-          dos.write(buffer, 0, jpgHeaderLen)
-        }
+        dos.writeHeader(Tag.Item, null, 0)
+        dos.writeHeader(Tag.Item, null, (jpgLen + 1) & ~1)
+        dos.write(buffer, 0, jpgHeaderLen)
         var r = jpgInput.read(buffer)
         while (r > 0) {
           dos.write(buffer, 0, r)
           r = jpgInput.read(buffer)
         }
-        if (!isMpeg)
-          if ((jpgLen & 1) != 0)
-            dos.write(0)
+        if ((jpgLen & 1) != 0)
+          dos.write(0)
         dos.writeHeader(Tag.SequenceDelimitationItem, null, 0)
         attrs
       } finally {
