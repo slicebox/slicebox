@@ -928,7 +928,8 @@
             "in": "body",
             "description": "The jpeg image data",
             "required": true,
-            "type": "string"
+            "schema": {
+            }
           }
         ],
         "responses": {
