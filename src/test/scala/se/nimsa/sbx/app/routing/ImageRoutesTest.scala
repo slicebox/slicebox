@@ -155,6 +155,20 @@ class ImageRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
   }
   
+  it should "return 404 NotFound when adding a jpeg image to a study that does not exist" in {
+    PostAsUser("/api/images/jpeg?studyid=666", HttpData(TestUtil.jpegByteArray)) ~> routes ~> check {
+      status shouldBe NotFound
+    }    
+  }
+  
+  it should "return 400 BadRequest when adding an invalid jpeg image" in {
+    val patient = GetAsUser("/api/metadata/patients/2") ~> routes ~> check { responseAs[Patient] }
+    val studies = GetAsUser(s"/api/metadata/studies?patientid=${patient.id}") ~> routes ~> check { responseAs[List[Study]] }
+    PostAsUser(s"/api/images/jpeg?studyid=${studies.head.id}", HttpData(Array[Byte](1,2,3,4))) ~> routes ~> check {
+      status shouldBe BadRequest
+    }        
+  }
+  
   it should "return 200 OK and a non-empty array of bytes when requesting png data for a secondary capture jpeg image" in {
     GetAsUser("/api/images/2/png") ~> routes ~> check {
       status should be (OK)
