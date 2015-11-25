@@ -928,7 +928,7 @@
             "in": "body",
             "description": "The jpeg image data",
             "required": true,
-            "type": "binary"
+            "type": "array"
           }
         ],
         "responses": {
