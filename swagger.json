@@ -930,8 +930,7 @@
             "required": true,
             "type": "array",
             "items": {
-              "type": "string",
-              "format": "binary"
+              "type": "binary"
             }
           }
         ],
