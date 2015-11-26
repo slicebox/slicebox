@@ -993,6 +993,33 @@
       }
     },
 
+    "/images/delete": {
+      "post": {
+        "description": "bulk delete a sequence of images according to the supplied image IDs. This is the same as a sequence of DELETE requests to /images/{id}",
+        "tags": ["Images"],
+        "parameters": [
+          {
+            "name": "image IDs",
+            "in": "body",
+            "description": "IDs of images to delete",
+            "required": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "format": "int64"
+              }            
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Images deleted"
+          }
+        }
+      }
+    },
+
     "/images/{id}/attributes": {
       "get": {
         "description": "list all DICOM attributes of the dataset corresponding to the supplied image ID",
