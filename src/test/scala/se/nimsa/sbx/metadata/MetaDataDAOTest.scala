@@ -1,4 +1,4 @@
-package se.nimsa.sbx.storage
+package se.nimsa.sbx.metadata
 
 import scala.slick.driver.H2Driver
 import scala.slick.jdbc.JdbcBackend.Database
@@ -7,7 +7,7 @@ import org.scalatest.Matchers
 import se.nimsa.sbx.dicom.DicomPropertyValue._
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import org.h2.jdbc.JdbcSQLException
-import StorageProtocol._
+import MetaDataProtocol._
 
 class MetaDataDAOTest extends FlatSpec with Matchers {
 

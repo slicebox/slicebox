@@ -27,7 +27,6 @@ import akka.event.Logging
 import akka.event.LoggingReceive
 import akka.pattern.pipe
 import se.nimsa.sbx.app.DbProps
-import se.nimsa.sbx.storage.PropertiesDAO
 import se.nimsa.sbx.util.ExceptionCatching
 import se.nimsa.sbx.log.SbxLog
 import ScuProtocol._

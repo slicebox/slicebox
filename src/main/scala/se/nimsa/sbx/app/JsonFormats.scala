@@ -20,6 +20,7 @@ import spray.json._
 import se.nimsa.sbx.dicom.DicomProperty
 import se.nimsa.sbx.dicom.DicomPropertyValue._
 import se.nimsa.sbx.dicom.DicomHierarchy._
+import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.directory.DirectoryWatchProtocol._
 import se.nimsa.sbx.scp.ScpProtocol._
@@ -157,8 +158,6 @@ trait JsonFormats extends DefaultJsonProtocol {
   }
   
   implicit val logEntryFormat = jsonFormat5(LogEntry)
-  
-  implicit val seriesDatasetFormat = jsonFormat2(SeriesDataset)
   
   implicit object QueryOperatorFormat extends JsonFormat[QueryOperator] {
     def write(obj: QueryOperator) = JsString(obj.toString)

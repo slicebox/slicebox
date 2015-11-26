@@ -13,7 +13,7 @@ import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.scp.ScpProtocol.ScpData
 import se.nimsa.sbx.scp.ScpDAO
 import se.nimsa.sbx.scu.ScuDAO
-import se.nimsa.sbx.storage.MetaDataDAO
+import se.nimsa.sbx.metadata.MetaDataDAO
 import scala.slick.driver.H2Driver
 
 class ScuRoutesTest extends FlatSpec with Matchers with RoutesTestBase {

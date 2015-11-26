@@ -1,29 +1,31 @@
 package se.nimsa.sbx.seriestype
 
-import akka.testkit.TestKit
-import org.scalatest.BeforeAndAfterEach
-import akka.testkit.ImplicitSender
-import org.scalatest.BeforeAndAfterAll
-import akka.actor.ActorSystem
-import org.scalatest.Matchers
-import org.scalatest.WordSpecLike
+import java.nio.file.Files
+
+import scala.concurrent.duration.DurationInt
 import scala.slick.driver.H2Driver
 import scala.slick.jdbc.JdbcBackend.Database
-import se.nimsa.sbx.app.DbProps
-import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
-import se.nimsa.sbx.storage.MetaDataDAO
-import se.nimsa.sbx.storage.StorageServiceActor
-import java.nio.file.Files
-import se.nimsa.sbx.util.TestUtil
-import se.nimsa.sbx.storage.StorageProtocol._
-import se.nimsa.sbx.dicom.DicomHierarchy._
-import org.dcm4che3.util.TagUtils
-import org.dcm4che3.data.Tag
-import com.sun.istack.internal.NotNull
-import scala.concurrent.duration.DurationInt
+
 import org.dcm4che3.data.Keyword
-import se.nimsa.sbx.storage.PropertiesDAO
+import org.dcm4che3.data.Tag
+
+import org.scalatest._
+
+import akka.actor.ActorSelection.toScala
+import akka.actor.ActorSystem
+import akka.testkit.ImplicitSender
+import akka.testkit.TestKit
+import akka.util.Timeout.durationToTimeout
+import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.app.GeneralProtocol._
+import se.nimsa.sbx.dicom.DicomHierarchy.Series
+import se.nimsa.sbx.metadata.MetaDataDAO
+import se.nimsa.sbx.metadata.MetaDataProtocol.SeriesSeriesType
+import se.nimsa.sbx.metadata.MetaDataServiceActor
+import se.nimsa.sbx.metadata.PropertiesDAO
+import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
+import se.nimsa.sbx.storage.StorageServiceActor
+import se.nimsa.sbx.util.TestUtil
 
 class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
     with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {
@@ -45,7 +47,8 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
     propertiesDao.create
   }
 
-  val storageService = system.actorOf(StorageServiceActor.props(dbProps, storage), name = "StorageService")
+  val storageService = system.actorOf(StorageServiceActor.props(storage, 5.minutes), name = "StorageService")
+  val metaDataService = system.actorOf(MetaDataServiceActor.props(dbProps), name = "MetaDataService")
   val seriesTypeServiceActor = system.actorOf(SeriesTypeServiceActor.props(dbProps, 1.minute), name = "SeriesTypeService")
   val seriesTypeUpdateService = system.actorSelection("user/SeriesTypeService/SeriesTypeUpdate")
 
@@ -173,7 +176,7 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
       patientSex = patientSex)
 
     val source = Source(SourceType.UNKNOWN, "unknown source", -1)
-    storageService ! AddDataset(dataset, source, false)
+    storageService ! AddDataset(dataset, source)
     expectMsgPF() {
       case ImageAdded(image, source) => true
     }

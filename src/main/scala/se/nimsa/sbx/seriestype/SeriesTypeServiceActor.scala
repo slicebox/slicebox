@@ -28,8 +28,7 @@ import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.util.ExceptionCatching
 import se.nimsa.sbx.dicom.DicomUtil
 import se.nimsa.sbx.dicom.DicomHierarchy.Series
-import se.nimsa.sbx.storage.StorageProtocol.GetAllSeries
-import se.nimsa.sbx.storage.StorageProtocol.SeriesCollection
+import se.nimsa.sbx.metadata.MetaDataProtocol._
 import scala.concurrent.Future
 
 class SeriesTypeServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extends Actor with ExceptionCatching {
@@ -42,7 +41,7 @@ class SeriesTypeServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extend
   val db = dbProps.db
   val seriesTypeDao = new SeriesTypeDAO(dbProps.driver)
 
-  val storageService = context.actorSelection("../StorageService")
+  val metaDataService = context.actorSelection("../MetaDataService")
   val seriesTypeUpdateService = context.actorOf(SeriesTypeUpdateActor.props(timeout), name = "SeriesTypeUpdate")
 
   log.info("Series type service started")
@@ -168,7 +167,7 @@ class SeriesTypeServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extend
       seriesTypeUpdateService ! UpdateSeriesTypesForSeries(allSeries.map(_.id)))
 
   def getAllSeries(): Future[Seq[Series]] =
-    storageService.ask(GetAllSeries).mapTo[SeriesCollection].map(_.series)
+    metaDataService.ask(GetAllSeries).mapTo[SeriesCollection].map(_.series)
 
 }
 

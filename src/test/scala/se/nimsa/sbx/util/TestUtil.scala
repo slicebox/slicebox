@@ -16,8 +16,9 @@ import se.nimsa.sbx.dicom.DicomPropertyValue._
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import scala.slick.jdbc.JdbcBackend.Session
 import se.nimsa.sbx.storage.StorageProtocol._
-import se.nimsa.sbx.storage.MetaDataDAO
-import se.nimsa.sbx.storage.PropertiesDAO
+import se.nimsa.sbx.metadata.MetaDataProtocol._
+import se.nimsa.sbx.metadata.MetaDataDAO
+import se.nimsa.sbx.metadata.PropertiesDAO
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol.SeriesType
 import se.nimsa.sbx.seriestype.SeriesTypeDAO
 import se.nimsa.sbx.app.GeneralProtocol._

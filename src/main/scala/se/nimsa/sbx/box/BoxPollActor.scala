@@ -195,7 +195,7 @@ class BoxPollActor(box: Box,
 
                   case Success(reversedDataset) =>
                     val source = Source(SourceType.BOX, box.name, box.id)
-                    storageService.ask(AddDataset(reversedDataset, source, false))
+                    storageService.ask(AddDataset(reversedDataset, source))
                       .onComplete {
 
                         case Success(ImageAdded(image, source)) =>

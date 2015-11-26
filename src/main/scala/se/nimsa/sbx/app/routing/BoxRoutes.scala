@@ -28,7 +28,7 @@ import spray.routing._
 import se.nimsa.sbx.app.RestApi
 import se.nimsa.sbx.user.UserProtocol._
 import se.nimsa.sbx.box.BoxProtocol._
-import se.nimsa.sbx.storage.StorageProtocol._
+import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.dicom.DicomUtil
 
 trait BoxRoutes { this: RestApi =>

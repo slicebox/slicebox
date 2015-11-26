@@ -29,6 +29,7 @@ import akka.pattern.ask
 import akka.util.Timeout
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomUtil
+import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.util.ExceptionCatching
 import se.nimsa.sbx.app.GeneralProtocol.ImageAdded
@@ -41,6 +42,7 @@ class SeriesTypeUpdateActor(implicit val timeout: Timeout) extends Actor with Ex
   implicit val ec = context.dispatcher
 
   val storageService = context.actorSelection("../../StorageService")
+  val metaDataService = context.actorSelection("../../MetaDataService")
   val seriesTypeService = context.parent
 
   val seriesToUpdate = scala.collection.mutable.Set.empty[Long]
@@ -174,10 +176,10 @@ class SeriesTypeUpdateActor(implicit val timeout: Timeout) extends Actor with Ex
   }
 
   def getSeries(seriesId: Long): Future[Option[Series]] =
-    storageService.ask(GetSingleSeries(seriesId)).mapTo[Option[Series]]
+    metaDataService.ask(GetSingleSeries(seriesId)).mapTo[Option[Series]]
 
   def getImageIdForSeries(series: Series): Future[Option[Long]] =
-    storageService.ask(GetImages(0, 1, series.id)).mapTo[Images]
+    metaDataService.ask(GetImages(0, 1, series.id)).mapTo[Images]
       .map(_.images.headOption.map(_.id))
 
   def getSeriesTypes(): Future[Seq[SeriesType]] =
@@ -190,10 +192,10 @@ class SeriesTypeUpdateActor(implicit val timeout: Timeout) extends Actor with Ex
     seriesTypeService.ask(GetSeriesTypeRuleAttributes(seriesTypeRule.id)).mapTo[SeriesTypeRuleAttributes].map(_.seriesTypeRuleAttributes)
 
   def addSeriesTypeForSeries(seriesType: SeriesType, series: Series): Future[SeriesTypeAddedToSeries] =
-    storageService.ask(AddSeriesTypeToSeries(seriesType, series)).mapTo[SeriesTypeAddedToSeries]
+    metaDataService.ask(AddSeriesTypeToSeries(seriesType, series)).mapTo[SeriesTypeAddedToSeries]
 
   def removeAllSeriesTypesForSeries(series: Series): Future[SeriesTypesRemovedFromSeries] =
-    storageService.ask(RemoveSeriesTypesFromSeries(series)).mapTo[SeriesTypesRemovedFromSeries]
+    metaDataService.ask(RemoveSeriesTypesFromSeries(series)).mapTo[SeriesTypesRemovedFromSeries]
 
 }
 

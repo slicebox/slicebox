@@ -1,32 +1,27 @@
 package se.nimsa.sbx.box
 
 import java.nio.file.Files
+
+import scala.concurrent.duration.DurationInt
 import scala.slick.driver.H2Driver
 import scala.slick.jdbc.JdbcBackend.Database
-import org.dcm4che3.data.Attributes
-import org.dcm4che3.data.Tag
-import org.dcm4che3.data.VR
-import org.scalatest.BeforeAndAfterAll
-import org.scalatest.BeforeAndAfterEach
-import org.scalatest.Matchers
-import org.scalatest.WordSpecLike
+
+import org.scalatest._
+
 import akka.actor.ActorSystem
 import akka.actor.Props
 import akka.actor.actorRef2Scala
 import akka.testkit.ImplicitSender
 import akka.testkit.TestKit
-import se.nimsa.sbx.anonymization.AnonymizationProtocol._
+import akka.util.Timeout.durationToTimeout
+import se.nimsa.sbx.anonymization.AnonymizationProtocol.TagValue
 import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomPropertyValue._
-import se.nimsa.sbx.storage.MetaDataDAO
-import se.nimsa.sbx.storage.PropertiesDAO
-import se.nimsa.sbx.storage.StorageProtocol._
+import se.nimsa.sbx.metadata.MetaDataDAO
 import se.nimsa.sbx.storage.StorageServiceActor
 import se.nimsa.sbx.util.TestUtil
-import akka.util.Timeout
-import scala.concurrent.duration.DurationInt
 
 class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
     with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {
@@ -46,8 +41,8 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
     metaDataDao.create
   }
 
-  val storageService = system.actorOf(Props(new StorageServiceActor(dbProps, storage)), name = "StorageService")
-  val boxService = system.actorOf(Props(new BoxServiceActor(dbProps, "http://testhost:1234", Timeout(30.seconds))), name = "BoxService")
+  val storageService = system.actorOf(Props(new StorageServiceActor(storage, 5.minutes)), name = "StorageService")
+  val boxService = system.actorOf(Props(new BoxServiceActor(dbProps, "http://testhost:1234", 5.minutes)), name = "BoxService")
 
   override def afterEach() =
     db.withSession { implicit session =>

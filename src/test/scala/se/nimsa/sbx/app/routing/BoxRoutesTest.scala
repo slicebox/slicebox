@@ -19,7 +19,7 @@ import spray.http.HttpData
 import spray.http.MultipartFormData
 import spray.http.StatusCodes._
 import spray.httpx.SprayJsonSupport._
-import se.nimsa.sbx.storage.MetaDataDAO
+import se.nimsa.sbx.metadata.MetaDataDAO
 
 class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 

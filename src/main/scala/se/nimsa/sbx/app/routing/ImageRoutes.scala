@@ -30,6 +30,7 @@ import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.anonymization.AnonymizationUtil
 import se.nimsa.sbx.app.RestApi
 import se.nimsa.sbx.dicom.DicomUtil
+import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.storage.StorageProtocol._
 import spray.http.FormFile
 import spray.http.HttpData
@@ -57,7 +58,7 @@ trait ImageRoutes { this: RestApi =>
           formField('file.as[FormFile]) { file =>
             val dataset = DicomUtil.loadDataset(file.entity.data.toByteArray, true)
             val source = Source(SourceType.USER, apiUser.user, apiUser.id)
-            onSuccess(storageService.ask(AddDataset(dataset, source, false))) {
+            onSuccess(storageService.ask(AddDataset(dataset, source))) {
               case ImageAdded(image, source) =>
                 import spray.httpx.SprayJsonSupport._
                 complete((Created, image))
@@ -65,7 +66,7 @@ trait ImageRoutes { this: RestApi =>
           } ~ entity(as[Array[Byte]]) { bytes =>
             val dataset = DicomUtil.loadDataset(bytes, true)
             val source = Source(SourceType.USER, apiUser.user, apiUser.id)
-            onSuccess(storageService.ask(AddDataset(dataset, source, false))) {
+            onSuccess(storageService.ask(AddDataset(dataset, source))) {
               case ImageAdded(image, source) =>
                 import spray.httpx.SprayJsonSupport._
                 complete((Created, image))
@@ -119,7 +120,7 @@ trait ImageRoutes { this: RestApi =>
                       onSuccess(storageService.ask(DeleteImage(imageId))) {
                         case ImageDeleted(imageId) =>
                           val source = Source(SourceType.USER, apiUser.user, apiUser.id)
-                          onSuccess(storageService.ask(AddDataset(anonDataset, source, false))) {
+                          onSuccess(storageService.ask(AddDataset(anonDataset, source))) {
                             case ImageAdded(image, source) =>
                               complete(NoContent)
                           }
@@ -211,10 +212,14 @@ trait ImageRoutes { this: RestApi =>
           post {
             entity(as[Array[Byte]]) { jpegBytes =>
               val source = Source(SourceType.USER, apiUser.user, apiUser.id)
-              onSuccess(storageService.ask(AddJpeg(jpegBytes, studyId, source))) {
-                case ImageAdded(image, source) =>
-                  import spray.httpx.SprayJsonSupport._
-                  complete((Created, image))
+              onSuccess(storageService.ask(AddJpeg(jpegBytes, studyId, source)).mapTo[Option[Image]]) {
+                _ match {
+                  case Some(image) =>
+                    import spray.httpx.SprayJsonSupport._
+                    complete((Created, image))
+                  case _ =>
+                    complete(NotFound)
+                }
               }
             }
           }

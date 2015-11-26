@@ -17,6 +17,7 @@
 package se.nimsa.sbx.app
 
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
+import org.dcm4che3.data.Attributes
 
 object GeneralProtocol {
   
@@ -66,6 +67,10 @@ object GeneralProtocol {
     }    
   }
       
+  case class AddDataset(dataset: Attributes, source: Source)
+  
+  case class DeleteImage(imageId: Long)
+
   case class Source(sourceType: SourceType, sourceName: String, sourceId: Long)
   
   case class SourceRef(sourceType: SourceType, sourceId: Long)
@@ -75,5 +80,7 @@ object GeneralProtocol {
   case class ImageAdded(image: Image, source: Source)
   
   case class ImagesSent(destination: Destination, imageIds: Seq[Long])
+
+  case class ImageDeleted(imageId: Long)
 
 }

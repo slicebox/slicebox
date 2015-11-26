@@ -23,7 +23,7 @@ import spray.httpx.SprayJsonSupport._
 import spray.routing._
 import se.nimsa.sbx.app.RestApi
 import se.nimsa.sbx.dicom.DicomHierarchy._
-import se.nimsa.sbx.storage.StorageProtocol._
+import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.app.GeneralProtocol.SourceType._
 import se.nimsa.sbx.user.UserProtocol._
@@ -41,7 +41,7 @@ trait MetadataRoutes { this: RestApi =>
     pathPrefix("metadata") {
       path("seriestags") {
         get {
-          onSuccess(storageService.ask(GetSeriesTags)) {
+          onSuccess(metaDataService.ask(GetSeriesTags)) {
             case SeriesTags(seriesTags) =>
               complete(seriesTags)
           }
@@ -61,7 +61,7 @@ trait MetadataRoutes { this: RestApi =>
                 val sources = sourcesString.map(parseSourcesString(_)).getOrElse(Array.empty)
                 val seriesTypes = seriesTypesString.map(parseIdsString(_)).getOrElse(Array.empty)
                 val seriesTags = seriesTagsString.map(parseIdsString(_)).getOrElse(Array.empty)
-                onSuccess(storageService.ask(GetPatients(startIndex, count, orderBy, orderAscending, filter, sources, seriesTypes, seriesTags))) {
+                onSuccess(metaDataService.ask(GetPatients(startIndex, count, orderBy, orderAscending, filter, sources, seriesTypes, seriesTags))) {
                   case Patients(patients) =>
                     complete(patients)
                 }
@@ -70,7 +70,7 @@ trait MetadataRoutes { this: RestApi =>
         } ~ path("query") {
           post {
             entity(as[Query]) { query =>
-              onSuccess(storageService.ask(QueryPatients(query))) {
+              onSuccess(metaDataService.ask(QueryPatients(query))) {
                 case Patients(patients) =>
                   complete(patients)
               }
@@ -79,7 +79,7 @@ trait MetadataRoutes { this: RestApi =>
         } ~ pathPrefix(LongNumber) { patientId =>
           pathEndOrSingleSlash {
             get {
-              onSuccess(storageService.ask(GetPatient(patientId)).mapTo[Option[Patient]]) {
+              onSuccess(metaDataService.ask(GetPatient(patientId)).mapTo[Option[Patient]]) {
                 complete(_)
               }
             }
@@ -91,7 +91,7 @@ trait MetadataRoutes { this: RestApi =>
                 val sources = sourcesString.map(parseSourcesString(_)).getOrElse(Array.empty)
                 val seriesTypes = seriesTypesString.map(parseIdsString(_)).getOrElse(Array.empty)
                 val seriesTags = seriesTagsString.map(parseIdsString(_)).getOrElse(Array.empty)
-                onSuccess(storageService.ask(GetImagesForPatient(patientId, sources, seriesTypes, seriesTags))) {
+                onSuccess(metaDataService.ask(GetImagesForPatient(patientId, sources, seriesTypes, seriesTags))) {
                   case Images(images) =>
                     complete(images)
                 }
@@ -111,7 +111,7 @@ trait MetadataRoutes { this: RestApi =>
                 val sources = sourcesString.map(parseSourcesString(_)).getOrElse(Array.empty)
                 val seriesTypes = seriesTypesString.map(parseIdsString(_)).getOrElse(Array.empty)
                 val seriesTags = seriesTagsString.map(parseIdsString(_)).getOrElse(Array.empty)
-                onSuccess(storageService.ask(GetStudies(startIndex, count, patientId, sources, seriesTypes, seriesTags))) {
+                onSuccess(metaDataService.ask(GetStudies(startIndex, count, patientId, sources, seriesTypes, seriesTags))) {
                   case Studies(studies) =>
                     complete(studies)
                 }
@@ -120,7 +120,7 @@ trait MetadataRoutes { this: RestApi =>
         } ~ path("query") {
           post {
             entity(as[Query]) { query =>
-              onSuccess(storageService.ask(QueryStudies(query))) {
+              onSuccess(metaDataService.ask(QueryStudies(query))) {
                 case Studies(studies) =>
                   complete(studies)
               }
@@ -129,7 +129,7 @@ trait MetadataRoutes { this: RestApi =>
         } ~ pathPrefix(LongNumber) { studyId =>
           pathEndOrSingleSlash {
             get {
-              onSuccess(storageService.ask(GetStudy(studyId)).mapTo[Option[Study]]) {
+              onSuccess(metaDataService.ask(GetStudy(studyId)).mapTo[Option[Study]]) {
                 complete(_)
               }
             }
@@ -141,7 +141,7 @@ trait MetadataRoutes { this: RestApi =>
                 val sources = sourcesString.map(parseSourcesString(_)).getOrElse(Array.empty)
                 val seriesTypes = seriesTypesString.map(parseIdsString(_)).getOrElse(Array.empty)
                 val seriesTags = seriesTagsString.map(parseIdsString(_)).getOrElse(Array.empty)
-                onSuccess(storageService.ask(GetImagesForStudy(studyId, sources, seriesTypes, seriesTags))) {
+                onSuccess(metaDataService.ask(GetImagesForStudy(studyId, sources, seriesTypes, seriesTags))) {
                   case Images(images) =>
                     complete(images)
                 }
@@ -161,7 +161,7 @@ trait MetadataRoutes { this: RestApi =>
                 val sources = sourcesString.map(parseSourcesString(_)).getOrElse(Array.empty)
                 val seriesTypes = seriesTypesString.map(parseIdsString(_)).getOrElse(Array.empty)
                 val seriesTags = seriesTagsString.map(parseIdsString(_)).getOrElse(Array.empty)
-                onSuccess(storageService.ask(GetSeries(startIndex, count, studyId, sources, seriesTypes, seriesTags))) {
+                onSuccess(metaDataService.ask(GetSeries(startIndex, count, studyId, sources, seriesTypes, seriesTags))) {
                   case SeriesCollection(series) =>
                     complete(series)
                 }
@@ -170,7 +170,7 @@ trait MetadataRoutes { this: RestApi =>
         } ~ path("query") {
           post {
             entity(as[Query]) { query =>
-              onSuccess(storageService.ask(QuerySeries(query))) {
+              onSuccess(metaDataService.ask(QuerySeries(query))) {
                 case SeriesCollection(series) =>
                   complete(series)
               }
@@ -179,19 +179,19 @@ trait MetadataRoutes { this: RestApi =>
         } ~ pathPrefix(LongNumber) { seriesId =>
           pathEndOrSingleSlash {
             get {
-              onSuccess(storageService.ask(GetSingleSeries(seriesId)).mapTo[Option[Series]]) {
+              onSuccess(metaDataService.ask(GetSingleSeries(seriesId)).mapTo[Option[Series]]) {
                 complete(_)
               }
             }
           } ~ path("source") {
             get {
-              onSuccess(storageService.ask(GetSourceForSeries(seriesId)).mapTo[Option[SeriesSource]]) { seriesSourceMaybe =>
+              onSuccess(metaDataService.ask(GetSourceForSeries(seriesId)).mapTo[Option[SeriesSource]]) { seriesSourceMaybe =>
                 complete(seriesSourceMaybe.map(_.source))
               }
             }
           } ~ path("seriestypes") {
             get {
-              onSuccess(storageService.ask(GetSeriesTypesForSeries(seriesId))) {
+              onSuccess(metaDataService.ask(GetSeriesTypesForSeries(seriesId))) {
                 case SeriesTypes(seriesTypes) =>
                   complete(seriesTypes)
               }
@@ -199,13 +199,13 @@ trait MetadataRoutes { this: RestApi =>
           } ~ pathPrefix("seriestags") {
             pathEndOrSingleSlash {
               get {
-                onSuccess(storageService.ask(GetSeriesTagsForSeries(seriesId))) {
+                onSuccess(metaDataService.ask(GetSeriesTagsForSeries(seriesId))) {
                   case SeriesTags(seriesTags) =>
                     complete(seriesTags)
                 }
               } ~ post {
                 entity(as[SeriesTag]) { seriesTag =>
-                  onSuccess(storageService.ask(AddSeriesTagToSeries(seriesTag, seriesId))) {
+                  onSuccess(metaDataService.ask(AddSeriesTagToSeries(seriesTag, seriesId))) {
                     case SeriesTagAddedToSeries(seriesTag) =>
                       complete((Created, seriesTag))
                   }
@@ -213,7 +213,7 @@ trait MetadataRoutes { this: RestApi =>
               }
             } ~ path(LongNumber) { seriesTagId =>
               delete {
-                onSuccess(storageService.ask(RemoveSeriesTagFromSeries(seriesTagId, seriesId))) {
+                onSuccess(metaDataService.ask(RemoveSeriesTagFromSeries(seriesTagId, seriesId))) {
                   case SeriesTagRemovedFromSeries(seriesId) =>
                     complete(NoContent)
                 }
@@ -228,7 +228,7 @@ trait MetadataRoutes { this: RestApi =>
               'startindex.as[Long] ? 0,
               'count.as[Long] ? 20,
               'seriesid.as[Long]) { (startIndex, count, seriesId) =>
-                onSuccess(storageService.ask(GetImages(startIndex, count, seriesId))) {
+                onSuccess(metaDataService.ask(GetImages(startIndex, count, seriesId))) {
                   case Images(images) =>
                     complete(images)
                 }
@@ -237,7 +237,7 @@ trait MetadataRoutes { this: RestApi =>
         } ~ path("query") {
           post {
             entity(as[Query]) { query =>
-              onSuccess(storageService.ask(QueryImages(query))) {
+              onSuccess(metaDataService.ask(QueryImages(query))) {
                 case Images(images) =>
                   complete(images)
               }
@@ -245,7 +245,7 @@ trait MetadataRoutes { this: RestApi =>
           }
         } ~ path(LongNumber) { imageId =>
           get {
-            onSuccess(storageService.ask(GetImage(imageId)).mapTo[Option[Image]]) {
+            onSuccess(metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]]) {
               complete(_)
             }
           }
@@ -265,7 +265,7 @@ trait MetadataRoutes { this: RestApi =>
                 val sources = sourcesString.map(parseSourcesString(_)).getOrElse(Array.empty)
                 val seriesTypes = seriesTypesString.map(parseIdsString(_)).getOrElse(Array.empty)
                 val seriesTags = seriesTagsString.map(parseIdsString(_)).getOrElse(Array.empty)
-                onSuccess(storageService.ask(GetFlatSeries(startIndex, count, orderBy, orderAscending, filter, sources, seriesTypes, seriesTags))) {
+                onSuccess(metaDataService.ask(GetFlatSeries(startIndex, count, orderBy, orderAscending, filter, sources, seriesTypes, seriesTags))) {
                   case FlatSeriesCollection(flatSeries) =>
                     complete(flatSeries)
                 }
@@ -274,7 +274,7 @@ trait MetadataRoutes { this: RestApi =>
         } ~ path("query") {
           post {
             entity(as[Query]) { query =>
-              onSuccess(storageService.ask(QueryFlatSeries(query))) {
+              onSuccess(metaDataService.ask(QueryFlatSeries(query))) {
                 case FlatSeriesCollection(series) =>
                   complete(series)
               }
@@ -282,7 +282,7 @@ trait MetadataRoutes { this: RestApi =>
           }
         } ~ path(LongNumber) { seriesId =>
           get {
-            onSuccess(storageService.ask(GetSingleFlatSeries(seriesId)).mapTo[Option[FlatSeries]]) {
+            onSuccess(metaDataService.ask(GetSingleFlatSeries(seriesId)).mapTo[Option[FlatSeries]]) {
               complete(_)
             }
           }

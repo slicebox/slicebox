@@ -20,29 +20,21 @@ class DicomUtilTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     val scSopClassUid = "1.2.840.10008.5.1.4.1.1.7" // secondary capture, not supported
     val dataset = new Attributes()
     dataset.setString(Tag.SOPClassUID, VR.UI, scSopClassUid)
-    checkSopClass(dataset, false) should be(false)
+    checkSopClass(dataset) should be(false)
   }
 
   it should "return true for a supported UID" in {
     val nmSopClassUid = "1.2.840.10008.5.1.4.1.1.20" // nm image storage, supported
     val dataset = new Attributes()
     dataset.setString(Tag.SOPClassUID, VR.UI, nmSopClassUid)
-    checkSopClass(dataset, false) should be(true)
+    checkSopClass(dataset) should be(true)
   }
 
-  it should "return true and false respectively for a secondary capture depending on whether it is allowed or not" in {
-    val scSopClassUid = "1.2.840.10008.5.1.4.1.1.7" // secondary capture
-    val dataset = new Attributes()
-    dataset.setString(Tag.SOPClassUID, VR.UI, scSopClassUid)
-    checkSopClass(dataset, true) should be(true)
-    checkSopClass(dataset, false) should be(false)
-  }
-  
   it should "return false for an unknown UID" in {
     val notASopClassUid = "this is now a known UID" // any non-SopClassUID string is fine
     val dataset = new Attributes()
     dataset.setString(Tag.SOPClassUID, VR.UI, notASopClassUid)
-    checkSopClass(dataset, false) should be(false)
+    checkSopClass(dataset) should be(false)
   }
 
   val tempDir = Files.createTempDirectory("slicebox-temp-dir-")

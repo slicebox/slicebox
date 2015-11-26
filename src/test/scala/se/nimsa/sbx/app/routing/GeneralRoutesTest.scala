@@ -8,14 +8,15 @@ import se.nimsa.sbx.user.UserProtocol.UserRole._
 import se.nimsa.sbx.box.BoxProtocol.RemoteBoxConnectionData
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomPropertyValue._
-import se.nimsa.sbx.storage.MetaDataDAO
+import se.nimsa.sbx.metadata.MetaDataDAO
+import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
 import se.nimsa.sbx.util.TestUtil
 import spray.http.StatusCodes._
 import spray.httpx.SprayJsonSupport._
 import se.nimsa.sbx.seriestype.SeriesTypeDAO
-import se.nimsa.sbx.storage.PropertiesDAO
+import se.nimsa.sbx.metadata.PropertiesDAO
 import spray.http.MultipartFormData
 import spray.http.BodyPart
 import se.nimsa.sbx.scu.ScuProtocol.ScuData

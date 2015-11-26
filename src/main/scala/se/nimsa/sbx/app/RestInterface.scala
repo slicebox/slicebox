@@ -43,8 +43,9 @@ import se.nimsa.sbx.scu.ScuDAO
 import se.nimsa.sbx.scu.ScuServiceActor
 import se.nimsa.sbx.seriestype.SeriesTypeDAO
 import se.nimsa.sbx.seriestype.SeriesTypeServiceActor
-import se.nimsa.sbx.storage.MetaDataDAO
-import se.nimsa.sbx.storage.PropertiesDAO
+import se.nimsa.sbx.metadata.MetaDataDAO
+import se.nimsa.sbx.metadata.PropertiesDAO
+import se.nimsa.sbx.metadata.MetaDataServiceActor
 import se.nimsa.sbx.storage.StorageServiceActor
 import se.nimsa.sbx.user.Authenticator
 import se.nimsa.sbx.user.UserDAO
@@ -145,7 +146,8 @@ trait RestApi extends HttpService with SliceboxRoutes with JsonFormats {
 
   val userService = actorRefFactory.actorOf(UserServiceActor.props(dbProps, superUser, superPassword, sessionTimeout), name = "UserService")
   val logService = actorRefFactory.actorOf(LogServiceActor.props(dbProps), name = "LogService")
-  val storageService = actorRefFactory.actorOf(StorageServiceActor.props(dbProps, storage).withDispatcher("akka.prio-dispatcher"), name = "StorageService")
+  val metaDataService = actorRefFactory.actorOf(MetaDataServiceActor.props(dbProps), name = "MetaDataService")
+  val storageService = actorRefFactory.actorOf(StorageServiceActor.props(storage, timeout), name = "StorageService")
   val anonymizationService = actorRefFactory.actorOf(AnonymizationServiceActor.props(dbProps), name = "AnonymizationService")
   val boxService = actorRefFactory.actorOf(BoxServiceActor.props(dbProps, apiBaseURL, timeout), name = "BoxService")
   val scpService = actorRefFactory.actorOf(ScpServiceActor.props(dbProps), name = "ScpService")

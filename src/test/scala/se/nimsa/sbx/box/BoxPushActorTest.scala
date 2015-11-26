@@ -1,40 +1,28 @@
 package se.nimsa.sbx.box
 
-import akka.testkit.TestKit
-import akka.testkit.ImplicitSender
-import org.scalatest._
-import akka.actor.Actor
-import akka.actor.ActorSystem
-import akka.actor.Props
-import org.scalatest.Matchers
-import org.scalatest.WordSpecLike
+import java.nio.file.Files
+
+import scala.collection.mutable.ArrayBuffer
+import scala.concurrent.Future
+import scala.concurrent.duration.DurationInt
 import scala.slick.driver.H2Driver
 import scala.slick.jdbc.JdbcBackend.Database
-import se.nimsa.sbx.app.DbProps
-import java.nio.file.Files
-import se.nimsa.sbx.util.TestUtil
-import akka.testkit.TestActorRef
-import spray.http.HttpRequest
-import spray.client.pipelining._
-import spray.http.HttpData
-import scala.concurrent.Promise
-import scala.concurrent.Future
-import spray.http.HttpResponse
-import se.nimsa.sbx.box.BoxProtocol._
-import se.nimsa.sbx.dicom.DicomPropertyValue._
-import se.nimsa.sbx.dicom.DicomHierarchy._
-import se.nimsa.sbx.storage.StorageProtocol._
-import se.nimsa.sbx.storage.MetaDataDAO
-import se.nimsa.sbx.storage.PropertiesDAO
-import spray.http.StatusCodes._
-import scala.collection.mutable.ArrayBuffer
-import scala.concurrent.duration.DurationInt
-import se.nimsa.sbx.storage.StorageServiceActor
-import se.nimsa.sbx.anonymization.AnonymizationServiceActor
-import org.dcm4che3.data.Attributes
-import org.dcm4che3.data.Tag
-import org.dcm4che3.data.VR
+
+import org.scalatest._
+
+import akka.actor.ActorSystem
+import akka.actor.Props
+import akka.testkit.ImplicitSender
+import akka.testkit.TestKit
 import akka.util.Timeout
+import se.nimsa.sbx.anonymization.AnonymizationServiceActor
+import se.nimsa.sbx.app.DbProps
+import se.nimsa.sbx.box.BoxProtocol._
+import se.nimsa.sbx.metadata.MetaDataDAO
+import se.nimsa.sbx.util.TestUtil
+import spray.http.HttpRequest
+import spray.http.HttpResponse
+import spray.http.StatusCodes.InternalServerError
 
 class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
     with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {

@@ -1,19 +1,19 @@
 package se.nimsa.sbx.seriestype
 
-import akka.testkit.TestKit
-import org.scalatest.BeforeAndAfterEach
-import akka.testkit.ImplicitSender
-import se.nimsa.sbx.app.DbProps
-import org.scalatest.BeforeAndAfterAll
-import akka.actor.ActorSystem
-import scala.slick.driver.H2Driver
-import org.scalatest.Matchers
-import org.scalatest.WordSpecLike
-import scala.slick.jdbc.JdbcBackend.Database
-import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
-import akka.actor.Status.Failure
 import scala.concurrent.duration.DurationInt
-import se.nimsa.sbx.storage.MetaDataDAO
+import scala.slick.driver.H2Driver
+import scala.slick.jdbc.JdbcBackend.Database
+
+import org.scalatest._
+
+import akka.actor.ActorSystem
+import akka.actor.Status.Failure
+import akka.testkit.ImplicitSender
+import akka.testkit.TestKit
+import akka.util.Timeout.durationToTimeout
+import se.nimsa.sbx.app.DbProps
+import se.nimsa.sbx.metadata.MetaDataDAO
+import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
 
 class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
     with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {

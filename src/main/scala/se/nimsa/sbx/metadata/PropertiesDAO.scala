@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package se.nimsa.sbx.storage
+package se.nimsa.sbx.metadata
 
 import scala.slick.driver.JdbcProfile
 import scala.slick.jdbc.{ GetResult, StaticQuery => Q }
@@ -24,7 +24,7 @@ import se.nimsa.sbx.seriestype.SeriesTypeDAO
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
 import scala.slick.jdbc.meta.MTable
 import se.nimsa.sbx.app.GeneralProtocol._
-import StorageProtocol._
+import MetaDataProtocol._
 
 class PropertiesDAO(val driver: JdbcProfile) {
   import driver.simple._

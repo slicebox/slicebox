@@ -14,18 +14,18 @@
  * limitations under the License.
  */
 
-package se.nimsa.sbx.storage
+package se.nimsa.sbx.metadata
 
 import akka.dispatch.PriorityGenerator
 import akka.dispatch.UnboundedPriorityMailbox
 import com.typesafe.config.Config
-import StorageProtocol._
+import MetaDataProtocol._
 import akka.actor.ActorSystem
 
-class StorageServiceMailbox(settings: ActorSystem.Settings, config: Config)
+class MetaDataServiceMailbox(settings: ActorSystem.Settings, config: Config)
   extends UnboundedPriorityMailbox(
     PriorityGenerator {
-      case msg: FileReceived    => 2 // low
-      case msg: DatasetReceived => 1 // low but higher than FileReceived
+//      case msg: FileReceived    => 2 // low
+//      case msg: DatasetReceived => 1 // low but higher than FileReceived
       case _                    => 0 // normal
     })

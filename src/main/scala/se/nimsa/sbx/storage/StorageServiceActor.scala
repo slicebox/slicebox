@@ -16,63 +16,51 @@
 
 package se.nimsa.sbx.storage
 
+import java.awt.RenderingHints
+import java.awt.image.BufferedImage
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
 import java.nio.file.Files
-import java.nio.file.Path
-import java.nio.file.Paths
 import java.nio.file.NoSuchFileException
-import scala.collection.mutable.ListBuffer
+import java.nio.file.Path
+import java.util.concurrent.Executors
 import scala.concurrent.Future
+import scala.util.Failure
+import scala.util.Success
+import scala.util.control.NonFatal
+import org.dcm4che3.data.Attributes
+import org.dcm4che3.data.BulkData
+import org.dcm4che3.data.Fragments
+import org.dcm4che3.data.Tag
+import org.dcm4che3.imageio.plugins.dcm.DicomImageReadParam
 import akka.actor.Actor
 import akka.actor.Props
+import akka.dispatch.ExecutionContexts
 import akka.event.Logging
 import akka.event.LoggingReceive
+import akka.pattern.ask
 import akka.pattern.pipe
-import org.dcm4che3.data.Attributes
-import org.dcm4che3.data.Attributes.Visitor
-import org.dcm4che3.data.Tag
-import org.dcm4che3.data.VR
-import org.dcm4che3.imageio.plugins.dcm.DicomImageReadParam
-import org.dcm4che3.data.Keyword
-import org.dcm4che3.util.TagUtils
-import se.nimsa.sbx.app.DbProps
-import se.nimsa.sbx.util.ExceptionCatching
-import java.awt.image.BufferedImage
-import java.awt.Color
-import java.awt.RenderingHints
+import akka.util.Timeout
 import javax.imageio.ImageIO
-import java.io.ByteArrayOutputStream
-import java.io.File
-import java.util.Date
-import se.nimsa.sbx.storage.StorageProtocol._
-import se.nimsa.sbx.seriestype.SeriesTypeProtocol.SeriesTypes
+import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy._
-import se.nimsa.sbx.dicom.DicomPropertyValue._
 import se.nimsa.sbx.dicom.DicomUtil
 import se.nimsa.sbx.dicom.DicomUtil._
 import se.nimsa.sbx.dicom.ImageAttribute
-import se.nimsa.sbx.lang.NotFoundException
-import akka.dispatch.ExecutionContexts
-import java.util.concurrent.Executors
-import se.nimsa.sbx.log.SbxLog
-import scala.slick.jdbc.JdbcBackend.Session
-import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.dicom.Jpg2Dcm
-import scala.util.control.NonFatal
-import org.dcm4che3.data.Fragments
-import org.dcm4che3.data.BulkData
-import java.io.ByteArrayInputStream
+import se.nimsa.sbx.log.SbxLog
+import se.nimsa.sbx.metadata.MetaDataProtocol._
+import se.nimsa.sbx.storage.StorageProtocol._
+import se.nimsa.sbx.util.SbxExtensions._
 
-class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with ExceptionCatching {
+class StorageServiceActor(storage: Path, implicit val timeout: Timeout) extends Actor {
 
   import context.system
-
   val log = Logging(context.system, this)
 
-  val db = dbProps.db
-  val dao = new MetaDataDAO(dbProps.driver)
-  val propertiesDao = new PropertiesDAO(dbProps.driver)
-
   implicit val ec = ExecutionContexts.fromExecutor(Executors.newWorkStealingPool())
+
+  val metaDataService = context.actorSelection("../MetaDataService")
 
   override def preStart {
     context.system.eventStream.subscribe(context.self, classOf[DatasetReceived])
@@ -84,439 +72,231 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
   def receive = LoggingReceive {
 
     case FileReceived(path, source) =>
-      val dataset = loadDataset(path, true)
-      if (dataset != null)
-        if (checkSopClass(dataset, false)) {
-          try {
-            val (image, overwrite) = storeDataset(dataset, source)
-            if (!overwrite)
-              log.debug(s"Stored file ${path.toString} as ${dataset.getString(Tag.SOPInstanceUID)}")
-            context.system.eventStream.publish(ImageAdded(image, source))
-          } catch {
-            case e: IllegalArgumentException =>
-              SbxLog.error("Storage", e.getMessage)
-          }
-        } else
-          SbxLog.info("Storage", s"Received file ${path.toString} with unsupported SOP Class UID ${dataset.getString(Tag.SOPClassUID)}, skipping")
-      else
-        log.debug("Storage", s"File $path is not a DICOM file, skipping")
+      tryToStoreDataset(loadDataset(path, true), source)
 
     case DatasetReceived(dataset, source) =>
-      try {
-        if (checkSopClass(dataset, false)) {
-          val (image, overwrite) = storeDataset(dataset, source)
-          if (!overwrite)
-            log.debug("Storage", "Stored dataset: " + dataset.getString(Tag.SOPInstanceUID))
-          context.system.eventStream.publish(ImageAdded(image, source))
-        } else
-          SbxLog.info("Storage", s"Received dataset from source ${source.sourceName} with unsupported SOP Class UID ${dataset.getString(Tag.SOPClassUID)}, skipping")
-      } catch {
-        case e: IllegalArgumentException =>
-          SbxLog.error("Storage", e.getMessage)
-      }
+      tryToStoreDataset(dataset, source)
 
-    case AddDataset(dataset, source, allowSecondaryCapture) =>
-      catchAndReport {
+    case AddDataset(dataset, source) =>
+
+      val imageAdded: Future[ImageAdded] =
         if (dataset == null)
-          throw new IllegalArgumentException("Invalid dataset")
-        if (checkSopClass(dataset, allowSecondaryCapture)) {
-          val (image, overwrite) = storeDatasetTryCatchThrow(dataset, source)
-          sender ! ImageAdded(image, source)
-          context.system.eventStream.publish(ImageAdded(image, source))
-        } else
-          SbxLog.info("Storage", s"Received dataset from source ${source.sourceName} with unsupported SOP Class UID ${dataset.getString(Tag.SOPClassUID)}, skipping")
+          Future.failed(new IllegalArgumentException("Invalid dataset"))
+        else if (!checkSopClass(dataset))
+          Future.failed(new IllegalArgumentException(s"Unsupported SOP Class UID ${dataset.getString(Tag.SOPClassUID)}"))
+        else
+          storeDataset(dataset, source)
+            .map { case (image, overwrite) => ImageAdded(image, source) }
+
+      imageAdded foreach {
+        context.system.eventStream.publish(_)
       }
+      
+      imageAdded.pipeTo(sender)
 
     case AddJpeg(jpegBytes, studyId, source) =>
-      catchAndReport {
-        db.withSession { implicit session =>
-          val attributes = dao.studyById(studyId).flatMap(study =>
-            dao.patientById(study.patientId).map(patient => {
-              val dcmTempPath = Files.createTempFile("slicebox-sc-", "")
-              val attributes = Jpg2Dcm(jpegBytes, patient, study, dcmTempPath.toFile)
-              val series = datasetToSeries(attributes)
-              val image = datasetToImage(attributes)
-              val dbImage = storeEncapsulated(patient, study, series, image, source, dcmTempPath)
-              sender ! ImageAdded(dbImage, source)
-            }))
-            .getOrElse(throw new NotFoundException(s"No study found for study id $studyId"))
-        }
-      }
+      val image: Future[Option[Image]] =
+        studyById(studyId).flatMap { optionalStudy =>
+          optionalStudy.map { study =>
+            patientById(study.patientId).map { optionalPatient =>
+              optionalPatient.map { patient =>
+                val dcmTempPath = Files.createTempFile("slicebox-sc-", "")
+                val attributes = Jpg2Dcm(jpegBytes, patient, study, dcmTempPath.toFile)
+                val series = datasetToSeries(attributes)
+                val image = datasetToImage(attributes)
+                storeEncapsulated(patient, study, series, image, source, dcmTempPath)
+              }
+            }
+          }.unwrap
+        }.unwrap
+      image.pipeTo(sender)
 
     case DeleteImage(imageId) =>
-      catchAndReport {
-        db.withSession { implicit session =>
-          dao.imageById(imageId).foreach { image =>
-            try {
-              deleteFromStorage(image.id)
-            } catch {
-              case e: NoSuchFileException =>
-                log.debug("Storage", s"DICOM file for image with id $imageId could not be found, no need to delete.")
-                null
+      val imageDeleted: Future[ImageDeleted] =
+        imageById(imageId).flatMap { optionalImage =>
+          optionalImage.map { image =>
+            try deleteFromStorage(image.id) catch {
+              case e: NoSuchFileException => log.debug("Storage", s"DICOM file for image with id $imageId could not be found, no need to delete.")
             }
-            propertiesDao.deleteFully(image)
+            deleteMetaData(image)
           }
-          sender ! ImageDeleted(imageId)
+            .getOrElse(Future.successful {})
+            .map(i => ImageDeleted(imageId))
         }
-      }
-
-    case msg: PropertiesRequest => catchAndReport {
-      msg match {
-
-        case AddSeriesTypeToSeries(seriesType, series) =>
-          db.withSession { implicit session =>
-            val seriesSeriesType = propertiesDao.insertSeriesSeriesType(SeriesSeriesType(series.id, seriesType.id))
-            sender ! SeriesTypeAddedToSeries(seriesSeriesType)
-          }
-
-        case RemoveSeriesTypesFromSeries(series) =>
-          db.withSession { implicit session =>
-            propertiesDao.removeSeriesTypesForSeriesId(series.id)
-            sender ! SeriesTypesRemovedFromSeries(series)
-          }
-
-        case GetSeriesTags =>
-          sender ! SeriesTags(getSeriesTags)
-
-        case GetSourceForSeries(seriesId) =>
-          db.withSession { implicit session =>
-            sender ! propertiesDao.seriesSourceById(seriesId)
-          }
-
-        case GetSeriesTypesForSeries(seriesId) =>
-          val seriesTypes = getSeriesTypesForSeries(seriesId)
-          sender ! SeriesTypes(seriesTypes)
-
-        case GetSeriesTagsForSeries(seriesId) =>
-          val seriesTags = getSeriesTagsForSeries(seriesId)
-          sender ! SeriesTags(seriesTags)
-
-        case AddSeriesTagToSeries(seriesTag, seriesId) =>
-          db.withSession { implicit session =>
-            dao.seriesById(seriesId).getOrElse {
-              throw new NotFoundException("Series not found")
-            }
-            val dbSeriesTag = propertiesDao.addAndInsertSeriesTagForSeriesId(seriesTag, seriesId)
-            sender ! SeriesTagAddedToSeries(dbSeriesTag)
-          }
-
-        case RemoveSeriesTagFromSeries(seriesTagId, seriesId) =>
-          db.withSession { implicit session =>
-            propertiesDao.removeAndCleanupSeriesTagForSeriesId(seriesTagId, seriesId)
-            sender ! SeriesTagRemovedFromSeries(seriesId)
-          }
-      }
-    }
+      imageDeleted.pipeTo(sender)
 
     case msg: ImageRequest =>
-      catchAndReport {
-        msg match {
-
-          case GetImagePath(imageId) =>
-            sender ! imagePathForId(imageId)
-
-          case GetDataset(imageId, withPixelData) =>
-            sender ! readDataset(imageId, withPixelData)
-
-          case GetImageAttributes(imageId) =>
-            Future {
-              readImageAttributes(imageId)
-            }.pipeTo(sender)
-
-          case GetImageInformation(imageId) =>
-            Future {
-              readImageInformation(imageId)
-            }.pipeTo(sender)
-
-          case GetImageFrame(imageId, frameNumber, windowMin, windowMax, imageHeight) =>
-            Future {
-              try
-                readImageFrame(imageId, frameNumber, windowMin, windowMax, imageHeight)
-              catch {
-                case NonFatal(e) =>
-                  imagePathForId(imageId).map(imagePath =>
-                    readSecondaryCaptureJpeg(imagePath.imagePath, imageHeight))
-              }
-            }.pipeTo(sender)
-
-        }
-      }
-
-    case msg: MetaDataQuery => catchAndReport {
       msg match {
-        case GetPatients(startIndex, count, orderBy, orderAscending, filter, sourceIds, seriesTypeIds, seriesTagIds) =>
-          db.withSession { implicit session =>
-            sender ! Patients(propertiesDao.patients(startIndex, count, orderBy, orderAscending, filter, sourceIds, seriesTypeIds, seriesTagIds))
-          }
 
-        case GetStudies(startIndex, count, patientId, sourceRefs, seriesTypeIds, seriesTagIds) =>
-          db.withSession { implicit session =>
-            sender ! Studies(propertiesDao.studiesForPatient(startIndex, count, patientId, sourceRefs, seriesTypeIds, seriesTagIds))
-          }
+        case GetImagePath(imageId) =>
+          imagePathForId(imageId)
+            .map(_.map(ImagePath(_)))
+            .pipeTo(sender)
 
-        case GetSeries(startIndex, count, studyId, sourceRefs, seriesTypeIds, seriesTagIds) =>
-          db.withSession { implicit session =>
-            sender ! SeriesCollection(propertiesDao.seriesForStudy(startIndex, count, studyId, sourceRefs, seriesTypeIds, seriesTagIds))
-          }
+        case GetDataset(imageId, withPixelData) =>
+          readDataset(imageId, withPixelData)
+            .pipeTo(sender)
 
-        case GetImages(startIndex, count, seriesId) =>
-          db.withSession { implicit session =>
-            sender ! Images(dao.imagesForSeries(startIndex, count, seriesId))
-          }
+        case GetImageAttributes(imageId) =>
+          readImageAttributes(imageId)
+            .pipeTo(sender)
 
-        case GetFlatSeries(startIndex, count, orderBy, orderAscending, filter, sourceRefs, seriesTypeIds, seriesTagIds) =>
-          db.withSession { implicit session =>
-            sender ! FlatSeriesCollection(propertiesDao.flatSeries(startIndex, count, orderBy, orderAscending, filter, sourceRefs, seriesTypeIds, seriesTagIds))
-          }
+        case GetImageInformation(imageId) =>
+          readImageInformation(imageId)
+            .pipeTo(sender)
 
-        case GetPatient(patientId) =>
-          db.withSession { implicit session =>
-            sender ! dao.patientById(patientId)
-          }
-
-        case GetStudy(studyId) =>
-          db.withSession { implicit session =>
-            sender ! dao.studyById(studyId)
-          }
-
-        case GetSingleSeries(seriesId) =>
-          db.withSession { implicit session =>
-            sender ! dao.seriesById(seriesId)
-          }
-
-        case GetAllSeries =>
-          db.withSession { implicit session =>
-            sender ! SeriesCollection(dao.series)
-          }
-
-        case GetImage(imageId) =>
-          db.withSession { implicit session =>
-            sender ! dao.imageById(imageId)
-          }
-
-        case GetSingleFlatSeries(seriesId) =>
-          db.withSession { implicit session =>
-            sender ! dao.flatSeriesById(seriesId)
-          }
-
-        case QueryPatients(query) =>
-          db.withSession { implicit session =>
-            sender ! Patients(propertiesDao.queryPatients(query.startIndex, query.count, query.order, query.queryProperties, query.filters))
-          }
-
-        case QueryStudies(query) =>
-          db.withSession { implicit session =>
-            sender ! Studies(propertiesDao.queryStudies(query.startIndex, query.count, query.order, query.queryProperties, query.filters))
-          }
-
-        case QuerySeries(query) =>
-          db.withSession { implicit session =>
-            sender ! SeriesCollection(propertiesDao.querySeries(query.startIndex, query.count, query.order, query.queryProperties, query.filters))
-          }
-
-        case QueryImages(query) =>
-          db.withSession { implicit session =>
-            sender ! Images(propertiesDao.queryImages(query.startIndex, query.count, query.order, query.queryProperties, query.filters))
-          }
-
-        case QueryFlatSeries(query) =>
-          db.withSession { implicit session =>
-            sender ! FlatSeriesCollection(propertiesDao.queryFlatSeries(query.startIndex, query.count, query.order, query.queryProperties, query.filters))
-          }
-
-        case GetImagesForStudy(studyId, sourceRefs, seriesTypeIds, seriesTagIds) =>
-          db.withSession { implicit session =>
-            sender ! Images(propertiesDao.seriesForStudy(0, 100000000, studyId, sourceRefs, seriesTypeIds, seriesTagIds)
-              .flatMap(series => dao.imagesForSeries(0, 100000000, series.id)))
-          }
-
-        case GetImagesForPatient(patientId, sourceRefs, seriesTypeIds, seriesTagIds) =>
-          db.withSession { implicit session =>
-            sender ! Images(propertiesDao.studiesForPatient(0, 100000000, patientId, sourceRefs, seriesTypeIds, seriesTagIds)
-              .flatMap(study => propertiesDao.seriesForStudy(0, 100000000, study.id, sourceRefs, seriesTypeIds, seriesTagIds)
-                .flatMap(series => dao.imagesForSeries(0, 100000000, series.id))))
-          }
+        case GetImageFrame(imageId, frameNumber, windowMin, windowMax, imageHeight) =>
+          val imageBytes: Future[Option[Array[Byte]]] =
+            readImageFrame(imageId, frameNumber, windowMin, windowMax, imageHeight)
+              .recoverWith {
+                case NonFatal(e) =>
+                  readSecondaryCaptureJpeg(imageId, imageHeight)
+              }
+          imageBytes.pipeTo(sender)
 
       }
-    }
 
   }
 
-  def getSeriesTags =
-    db.withSession { implicit session =>
-      propertiesDao.listSeriesTags
-    }
+  def tryToStoreDataset(dataset: Attributes, source: Source) =
+    if (dataset != null)
+      if (checkSopClass(dataset)) {
+        storeDataset(dataset, source) onComplete {
+          case Success((image, overwrite)) =>
+            if (!overwrite) log.debug(s"Stored file with image id ${image.id}")
+            context.system.eventStream.publish(ImageAdded(image, source))
+          case Failure(e) =>
+            SbxLog.error("Storage", "Dataset file could not be stored: " + e.getMessage)
+        }
+      } else
+        SbxLog.info("Storage", s"Received dataset with unsupported SOP Class UID ${dataset.getString(Tag.SOPClassUID)}, skipping")
+    else
+      log.debug("Storage", s"Dataset could not be read, skipping")
 
-  def getSeriesTypesForSeries(seriesId: Long) =
-    db.withSession { implicit session =>
-      propertiesDao.seriesTypesForSeries(seriesId)
-    }
-
-  def getSeriesTagsForSeries(seriesId: Long) =
-    db.withSession { implicit session =>
-      propertiesDao.seriesTagsForSeries(seriesId)
-    }
-
-  def storeDatasetTryCatchThrow(dataset: Attributes, source: Source): (Image, Boolean) =
-    try {
-      storeDataset(dataset, source)
-    } catch {
-      case e: IllegalArgumentException =>
-        SbxLog.error("Storage", e.getMessage)
-        throw e
-    }
-
-  def storeDataset(dataset: Attributes, source: Source): (Image, Boolean) =
-    db.withSession { implicit session =>
-
-      val patient = datasetToPatient(dataset)
-      val study = datasetToStudy(dataset)
-      val series = datasetToSeries(dataset)
-      val seriesSource = SeriesSource(-1, source)
-      val image = datasetToImage(dataset)
-
-      val dbPatient = dao.patientByNameAndID(patient)
-        .getOrElse(dao.insert(patient))
-      val dbStudy = dao.studyByUidAndPatient(study, dbPatient)
-        .getOrElse(dao.insert(study.copy(patientId = dbPatient.id)))
-      val dbSeries = dao.seriesByUidAndStudy(series, dbStudy)
-        .getOrElse(dao.insert(series.copy(studyId = dbStudy.id)))
-      val dbSeriesSource = propertiesDao.seriesSourceById(dbSeries.id)
-        .getOrElse(propertiesDao.insertSeriesSource(seriesSource.copy(id = dbSeries.id)))
-      val dbImage = dao.imageByUidAndSeries(image, dbSeries)
-        .getOrElse(dao.insert(image.copy(seriesId = dbSeries.id)))
-
-      if (dbSeriesSource.source.sourceType != source.sourceType || dbSeriesSource.source.sourceId != source.sourceId)
-        SbxLog.warn("Storage", s"Existing series source does not match source of added image (${dbSeriesSource.source} vs $source). Source of added image will be lost.")
-
-      val storedPath = filePath(dbImage)
+  def storeDataset(dataset: Attributes, source: Source): Future[(Image, Boolean)] =
+    addMetadata(dataset, source).map { image =>
+      val storedPath = filePath(image)
       val overwrite = Files.exists(storedPath)
-
-      try {
-        saveDataset(dataset, storedPath)
-      } catch {
-        case e: Exception =>
-          SbxLog.error("Storage", "Dataset file could not be stored: " + e.getMessage)
+      try saveDataset(dataset, storedPath) catch {
+        case NonFatal(e) =>
+          deleteMetaData(image) // try to clean up, not interested in whether it worked or not        
+          throw new IllegalArgumentException("Dataset file could not be stored", e)
       }
-
-      (dbImage, overwrite)
+      (image, overwrite)
     }
 
   def storeEncapsulated(
     dbPatient: Patient, dbStudy: Study,
     series: Series, image: Image,
-    source: Source,
-    dcmTempPath: Path): Image =
-    db.withSession { implicit session =>
-
-      val seriesSource = SeriesSource(-1, source)
-
-      val dbSeries = dao.seriesByUidAndStudy(series, dbStudy)
-        .getOrElse(dao.insert(series.copy(studyId = dbStudy.id)))
-      val dbSeriesSource = propertiesDao.seriesSourceById(dbSeries.id)
-        .getOrElse(propertiesDao.insertSeriesSource(seriesSource.copy(id = dbSeries.id)))
-      val dbImage = dao.imageByUidAndSeries(image, dbSeries)
-        .getOrElse(dao.insert(image.copy(seriesId = dbSeries.id)))
-
+    source: Source, dcmTempPath: Path): Future[Image] =
+    addMetadata(createDataset(dbPatient, dbStudy, series, image), source).map { dbImage =>
       val storedPath = filePath(dbImage)
-
-      try
-        Files.move(dcmTempPath, storedPath)
-      catch {
-        case e: Exception =>
-          SbxLog.error("Storage", "Encapsulated dataset file could not be stored: " + e.getMessage)
-      }
-
+      Files.move(dcmTempPath, storedPath)
       dbImage
     }
 
   def filePath(image: Image) = storage.resolve(fileName(image))
   def fileName(image: Image) = image.id.toString
 
-  def imagePathForId(imageId: Long): Option[ImagePath] =
-    db.withSession { implicit session =>
-      dao.imageById(imageId)
-        .map(filePath(_))
+  def imagePathForId(imageId: Long): Future[Option[Path]] =
+    imageById(imageId).map {
+      _.map(filePath(_))
         .filter(Files.exists(_))
         .filter(Files.isReadable(_))
-        .map(ImagePath(_))
     }
 
-  def deleteFromStorage(imageIds: Seq[Long]): Unit = imageIds foreach (deleteFromStorage(_))
-  def deleteFromStorage(imageId: Long): Unit =
-    imagePathForId(imageId).foreach(imagePath => {
-      Files.delete(imagePath.imagePath)
-      log.debug("Deleted file " + imagePath.imagePath)
-    })
+  def deleteFromStorage(imageIds: Seq[Long]): Future[Seq[Unit]] =
+    Future.sequence {
+      imageIds map (deleteFromStorage(_))
+    }
 
-  def readDataset(imageId: Long, withPixelData: Boolean): Option[Attributes] =
-    imagePathForId(imageId).map(imagePath =>
-      loadDataset(imagePath.imagePath, withPixelData))
-
-  def readImageAttributes(imageId: Long): Option[List[ImageAttribute]] =
-    imagePathForId(imageId).map(imagePath => {
-      val dataset = loadDataset(imagePath.imagePath, false)
-      DicomUtil.readImageAttributes(dataset)
-    })
-
-  def readImageInformation(imageId: Long): Option[ImageInformation] =
-    imagePathForId(imageId).map(imagePath => {
-      val dataset = loadDataset(imagePath.imagePath, false)
-      val instanceNumber = dataset.getInt(Tag.InstanceNumber, 1)
-      val imageIndex = dataset.getInt(Tag.ImageIndex, 1)
-      val frameIndex = if (instanceNumber > imageIndex) instanceNumber else imageIndex
-      ImageInformation(
-        dataset.getInt(Tag.NumberOfFrames, 1),
-        frameIndex,
-        dataset.getInt(Tag.SmallestImagePixelValue, 0),
-        dataset.getInt(Tag.LargestImagePixelValue, 0))
-    })
-
-  def readImageFrame(imageId: Long, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int): Option[Array[Byte]] =
-    imagePathForId(imageId).map(imagePath => {
-      val file = imagePath.imagePath.toFile
-      val iis = ImageIO.createImageInputStream(file)
-      try {
-        val imageReader = ImageIO.getImageReadersByFormatName("DICOM").next
-        imageReader.setInput(iis)
-        val param = imageReader.getDefaultReadParam().asInstanceOf[DicomImageReadParam]
-        if (windowMin < windowMax) {
-          param.setWindowCenter((windowMax - windowMin) / 2)
-          param.setWindowWidth(windowMax - windowMin)
-        }
-        val bi = try {
-          scaleImage(imageReader.read(frameNumber - 1, param), imageHeight)
-        } catch {
-          case e: Exception => throw new IllegalArgumentException(e)
-        }
-        val baos = new ByteArrayOutputStream
-        ImageIO.write(bi, "png", baos)
-        baos.close()
-        baos.toByteArray
-      } finally {
-        iis.close()
+  def deleteFromStorage(imageId: Long): Future[Unit] =
+    imagePathForId(imageId).map { optionalImagePath =>
+      optionalImagePath.map { imagePath =>
+        Files.delete(imagePath)
+        log.debug("Deleted file " + imagePath)
       }
-    })
+    }
 
-  def readSecondaryCaptureJpeg(path: Path, imageHeight: Int) = {
-    val ds = loadJpegDataset(path)
-    val pd = ds.getValue(Tag.PixelData)
-    if (pd != null && pd.isInstanceOf[Fragments]) {
-      val fragments = pd.asInstanceOf[Fragments]
-      if (fragments.size == 2) {
-        val f1 = fragments.get(1)
-        if (f1.isInstanceOf[BulkData]) {
-          val bd = f1.asInstanceOf[BulkData]
-          val bytes = bd.toBytes(null, bd.bigEndian)
-          val bi = scaleImage(ImageIO.read(new ByteArrayInputStream(bytes)), imageHeight)
+  def readDataset(imageId: Long, withPixelData: Boolean): Future[Option[Attributes]] =
+    imagePathForId(imageId).map { optionalImagePath =>
+      optionalImagePath.map { imagePath =>
+        loadDataset(imagePath, withPixelData)
+      }
+    }
+
+  def readImageAttributes(imageId: Long): Future[Option[List[ImageAttribute]]] =
+    imagePathForId(imageId).map { optionalImagePath =>
+      optionalImagePath.map { imagePath =>
+        DicomUtil.readImageAttributes(loadDataset(imagePath, false))
+      }
+    }
+
+  def readImageInformation(imageId: Long): Future[Option[ImageInformation]] =
+    imagePathForId(imageId).map { optionalImagePath =>
+      optionalImagePath.map { imagePath =>
+        val dataset = loadDataset(imagePath, false)
+        val instanceNumber = dataset.getInt(Tag.InstanceNumber, 1)
+        val imageIndex = dataset.getInt(Tag.ImageIndex, 1)
+        val frameIndex = if (instanceNumber > imageIndex) instanceNumber else imageIndex
+        ImageInformation(
+          dataset.getInt(Tag.NumberOfFrames, 1),
+          frameIndex,
+          dataset.getInt(Tag.SmallestImagePixelValue, 0),
+          dataset.getInt(Tag.LargestImagePixelValue, 0))
+      }
+    }
+
+  def readImageFrame(imageId: Long, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int): Future[Option[Array[Byte]]] =
+    imagePathForId(imageId).map { optionalImagePath =>
+      optionalImagePath.map { imagePath =>
+        val file = imagePath.toFile
+        val iis = ImageIO.createImageInputStream(file)
+        try {
+          val imageReader = ImageIO.getImageReadersByFormatName("DICOM").next
+          imageReader.setInput(iis)
+          val param = imageReader.getDefaultReadParam().asInstanceOf[DicomImageReadParam]
+          if (windowMin < windowMax) {
+            param.setWindowCenter((windowMax - windowMin) / 2)
+            param.setWindowWidth(windowMax - windowMin)
+          }
+          val bi = try
+            scaleImage(imageReader.read(frameNumber - 1, param), imageHeight)
+          catch {
+            case e: Exception => throw new IllegalArgumentException(e)
+          }
           val baos = new ByteArrayOutputStream
           ImageIO.write(bi, "png", baos)
           baos.close()
           baos.toByteArray
-        } else throw new IllegalArgumentException("JPEG bytes not an instance of BulkData")
-      } else throw new IllegalArgumentException(s"JPEG fragements are expected to contain 2 entries, contained ${fragments.size}")
-    } else throw new IllegalArgumentException("JPEG bytes not contained in Fragments")
-  }
+        } finally {
+          iis.close()
+        }
+      }
+    }
+
+  def readSecondaryCaptureJpeg(imageId: Long, imageHeight: Int) =
+    imagePathForId(imageId).map { optionalImagePath =>
+      optionalImagePath.map { imagePath =>
+        val ds = loadJpegDataset(imagePath)
+        val pd = ds.getValue(Tag.PixelData)
+        if (pd != null && pd.isInstanceOf[Fragments]) {
+          val fragments = pd.asInstanceOf[Fragments]
+          if (fragments.size == 2) {
+            val f1 = fragments.get(1)
+            if (f1.isInstanceOf[BulkData]) {
+              val bd = f1.asInstanceOf[BulkData]
+              val bytes = bd.toBytes(null, bd.bigEndian)
+              val bi = scaleImage(ImageIO.read(new ByteArrayInputStream(bytes)), imageHeight)
+              val baos = new ByteArrayOutputStream
+              ImageIO.write(bi, "png", baos)
+              baos.close()
+              baos.toByteArray
+            } else throw new IllegalArgumentException("JPEG bytes not an instance of BulkData")
+          } else throw new IllegalArgumentException(s"JPEG fragements are expected to contain 2 entries, contained ${fragments.size}")
+        } else throw new IllegalArgumentException("JPEG bytes not contained in Fragments")
+      }
+    }
 
   def scaleImage(image: BufferedImage, imageHeight: Int): BufferedImage = {
     val ratio = imageHeight / image.getHeight.asInstanceOf[Double]
@@ -532,8 +312,23 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
       image
   }
 
+  def patientById(patientId: Long): Future[Option[Patient]] =
+    metaDataService.ask(GetPatient(patientId)).mapTo[Option[Patient]]
+
+  def studyById(studyId: Long): Future[Option[Study]] =
+    metaDataService.ask(GetStudy(studyId)).mapTo[Option[Study]]
+
+  def imageById(imageId: Long): Future[Option[Image]] =
+    metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]]
+
+  def addMetadata(dataset: Attributes, source: Source): Future[Image] =
+    metaDataService.ask(AddDataset(dataset, source)).mapTo[ImageAdded].map(_.image)
+
+  def deleteMetaData(image: Image): Future[Unit] =
+    metaDataService.ask(DeleteImage(image.id)).map(any => {})
+
 }
 
 object StorageServiceActor {
-  def props(dbProps: DbProps, storage: Path): Props = Props(new StorageServiceActor(dbProps, storage))
+  def props(storage: Path, timeout: Timeout): Props = Props(new StorageServiceActor(storage, timeout))
 }

@@ -23,7 +23,7 @@ import akka.event.LoggingReceive
 import akka.pattern.ask
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.log.SbxLog
-import se.nimsa.sbx.storage.StorageProtocol._
+import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.dicom.DicomUtil._
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import akka.pattern.pipe
@@ -61,7 +61,7 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
   val pollBoxOnlineStatusTimeoutMillis: Long = 15000
   val pollBoxesLastPollTimestamp = collection.mutable.Map.empty[Long, Date]
 
-  val storageService = context.actorSelection("../StorageService")
+  val metaDataService = context.actorSelection("../MetaDataService")
 
   setupBoxes()
 
@@ -440,7 +440,7 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
   def getImagesFromStorage(imageIds: List[Long]): Future[Images] =
     Future.sequence(
       imageIds.map(imageId =>
-        storageService.ask(GetImage(imageId)).mapTo[Option[Image]]))
+        metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]]))
       .map(imageMaybes => Images(imageMaybes.flatten))
 
   def inboxEntryForImageId(imageId: Long): Option[InboxEntry] =

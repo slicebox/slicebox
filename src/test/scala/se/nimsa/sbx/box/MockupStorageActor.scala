@@ -1,12 +1,12 @@
 package se.nimsa.sbx.box
 
 import akka.actor.Actor
-import se.nimsa.sbx.storage.StorageProtocol._
-import se.nimsa.sbx.util.TestUtil
 import akka.actor.Status.Failure
+import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.DicomPropertyValue._
-import se.nimsa.sbx.app.GeneralProtocol._
+import se.nimsa.sbx.storage.StorageProtocol.GetDataset
+import se.nimsa.sbx.util.TestUtil
 
 class MockupStorageActor extends Actor {
 
@@ -26,7 +26,7 @@ class MockupStorageActor extends Actor {
       badBehavior = false
       nStoredDatasets = n
 
-    case AddDataset(dataset, source, allowSecondaryCapture) =>
+    case AddDataset(dataset, source) =>
       if (badBehavior) {
         sender ! Failure(exception)
       } else {

@@ -1,4 +1,4 @@
-package se.nimsa.sbx.storage
+package se.nimsa.sbx.metadata
 
 import scala.slick.driver.H2Driver
 import scala.slick.jdbc.JdbcBackend.{ Database, Session }
@@ -8,12 +8,12 @@ import org.scalatest.BeforeAndAfterEach
 import se.nimsa.sbx.dicom.DicomPropertyValue._
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import org.h2.jdbc.JdbcSQLException
-import StorageProtocol._
 import se.nimsa.sbx.util.TestUtil._
 import se.nimsa.sbx.seriestype.SeriesTypeDAO
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol.SeriesType
-import se.nimsa.sbx.storage.StorageProtocol.SeriesSeriesType
+import se.nimsa.sbx.metadata.MetaDataProtocol.SeriesSeriesType
 import se.nimsa.sbx.app.GeneralProtocol._
+import MetaDataProtocol._
 
 class PropertiesDAOTest extends FlatSpec with Matchers with BeforeAndAfterEach {
 

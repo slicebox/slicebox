@@ -121,6 +121,32 @@ object DicomUtil {
     bos.toByteArray()
   }
 
+  def createDataset(patient: Patient, study: Study, series: Series, image: Image): Attributes = {
+    val dataset = new Attributes()
+    dataset.setString(Tag.PatientName, VR.PN, patient.patientName.value)
+    dataset.setString(Tag.PatientID, VR.LO, patient.patientID.value)
+    dataset.setString(Tag.PatientBirthDate, VR.DA, patient.patientBirthDate.value)
+    dataset.setString(Tag.PatientSex, VR.CS, patient.patientSex.value)
+    dataset.setString(Tag.StudyInstanceUID, VR.UI, study.studyInstanceUID.value)
+    dataset.setString(Tag.StudyDescription, VR.LO, study.studyDescription.value)
+    dataset.setString(Tag.StudyID, VR.LO, study.studyID.value)
+    dataset.setString(Tag.AccessionNumber, VR.SH, study.accessionNumber.value)
+    dataset.setString(Tag.PatientAge, VR.AS, study.patientAge.value)
+    dataset.setString(Tag.StudyDate, VR.DA, study.studyDate.value)
+    dataset.setString(Tag.BodyPartExamined, VR.CS, series.bodyPartExamined.value)
+    dataset.setString(Tag.SeriesInstanceUID, VR.UI, series.seriesInstanceUID.value)
+    dataset.setString(Tag.SeriesDescription, VR.UI, series.seriesDescription.value)
+    dataset.setString(Tag.StationName, VR.LO, series.stationName.value)
+    dataset.setString(Tag.Manufacturer, VR.LO, series.manufacturer.value)
+    dataset.setString(Tag.Modality, VR.CS, series.modality.value)
+    dataset.setString(Tag.ProtocolName, VR.LO, series.protocolName.value)
+    dataset.setString(Tag.FrameOfReferenceUID, VR.UI, series.frameOfReferenceUID.value)
+    dataset.setString(Tag.SeriesDate, VR.DA, series.seriesDate.value)
+    dataset.setString(Tag.ImageType, VR.CS, image.imageType.value)
+    dataset.setString(Tag.InstanceNumber, VR.IS, image.instanceNumber.value)
+    dataset.setString(Tag.SOPInstanceUID, VR.UI, image.sopInstanceUID.value)
+    dataset
+  }
   def datasetToPatient(dataset: Attributes): Patient =
     Patient(
       -1,
@@ -170,9 +196,9 @@ object DicomUtil {
     else
       values.tail.foldLeft(values.head)((result, part) => result + "/" + part)
 
-  def checkSopClass(dataset: Attributes, allowSecondaryCapture: Boolean) =
+  def checkSopClass(dataset: Attributes) =
     SopClasses.sopClasses
-      .filter(sopClass => sopClass.included || (allowSecondaryCapture && sopClass.sopClassUID == "1.2.840.10008.5.1.4.1.1.7"))
+      .filter(sopClass => sopClass.included)
       .map(_.sopClassUID)
       .contains(dataset.getString(Tag.SOPClassUID))
 
