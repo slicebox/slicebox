@@ -263,6 +263,55 @@
       }
     },
 
+    "/metadata/patients/{id}/images": {
+      "get": {
+        "description": "Returns all images for the patient with the supplied patient ID",
+        "tags": ["Meta Data"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of patient",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "sources",
+            "in": "query",
+            "description": "filter the results by matching on one or more series sources. Examples of sources are user, box, directory or scp. The list of sources to filter results by must have the form TYPE1:ID1,TYPE2:ID2,...,TYPEN:IDN. For instance, the argument sources=box:1,user:5 shows results either sent from (slice)box with id 1 or uploaded by user with id 5.",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "seriestypes",
+            "in": "query",
+            "description": "filter the results by matching on one or more series types. The supplied list of series types must be a comma separated list of series type ids. For instance, the argument seriestypes=3,7,22 shows series assigned to either of the series types with ids 3, 7 and 22.",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "seriestags",
+            "in": "query",
+            "description": "filter the results by matching on one or more series tags. The supplied list of series tags must be a comma separated list of series tag ids. For instance, the argument seriestags=6,2,11 shows series with either of the series tags with ids 6, 2 and 11.",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "list of images",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/image"
+              }
+            }
+          }
+        }          
+      }
+    },
+
     "/metadata/studies": {
       "get": {
         "description": "Returns a list of metadata on the study level of the DICOM hierarchy",
@@ -384,6 +433,55 @@
             "description": "study not found (invalid ID)"
           }
         }
+      }
+    },
+
+    "/metadata/studies/{id}/images": {
+      "get": {
+        "description": "Returns all images for the study with the supplied study ID",
+        "tags": ["Meta Data"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of study",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "sources",
+            "in": "query",
+            "description": "filter the results by matching on one or more series sources. Examples of sources are user, box, directory or scp. The list of sources to filter results by must have the form TYPE1:ID1,TYPE2:ID2,...,TYPEN:IDN. For instance, the argument sources=box:1,user:5 shows results either sent from (slice)box with id 1 or uploaded by user with id 5.",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "seriestypes",
+            "in": "query",
+            "description": "filter the results by matching on one or more series types. The supplied list of series types must be a comma separated list of series type ids. For instance, the argument seriestypes=3,7,22 shows series assigned to either of the series types with ids 3, 7 and 22.",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "seriestags",
+            "in": "query",
+            "description": "filter the results by matching on one or more series tags. The supplied list of series tags must be a comma separated list of series tag ids. For instance, the argument seriestags=6,2,11 shows series with either of the series tags with ids 6, 2 and 11.",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "list of images",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/image"
+              }
+            }
+          }
+        }          
       }
     },
 
@@ -933,104 +1031,6 @@
           }
         }          
       },
-
-    "/metadata/images": {
-      "get": {
-        "description": "Returns all images for the study with the supplied study ID",
-        "tags": ["Meta Data"],
-        "parameters": [
-          {
-            "name": "studyid",
-            "in": "query",
-            "description": "reference to study to list images for",
-            "required": true,
-            "type": "integer",
-            "format": "int64"
-          },
-          {
-            "name": "sources",
-            "in": "query",
-            "description": "filter the results by matching on one or more series sources. Examples of sources are user, box, directory or scp. The list of sources to filter results by must have the form TYPE1:ID1,TYPE2:ID2,...,TYPEN:IDN. For instance, the argument sources=box:1,user:5 shows results either sent from (slice)box with id 1 or uploaded by user with id 5.",
-            "required": false,
-            "type": "string"
-          },
-          {
-            "name": "seriestypes",
-            "in": "query",
-            "description": "filter the results by matching on one or more series types. The supplied list of series types must be a comma separated list of series type ids. For instance, the argument seriestypes=3,7,22 shows series assigned to either of the series types with ids 3, 7 and 22.",
-            "required": false,
-            "type": "string"
-          },
-          {
-            "name": "seriestags",
-            "in": "query",
-            "description": "filter the results by matching on one or more series tags. The supplied list of series tags must be a comma separated list of series tag ids. For instance, the argument seriestags=6,2,11 shows series with either of the series tags with ids 6, 2 and 11.",
-            "required": false,
-            "type": "string"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "list of images",
-            "schema": {
-              "type": "array",
-              "items": {
-                "$ref": "#/definitions/image"
-              }
-            }
-          }
-        }          
-      }
-    },
-
-    "/metadata/images": {
-      "get": {
-        "description": "Returns all images for the patient with the supplied patient ID",
-        "tags": ["Meta Data"],
-        "parameters": [
-          {
-            "name": "patientid",
-            "in": "query",
-            "description": "reference to patient to list images for",
-            "required": true,
-            "type": "integer",
-            "format": "int64"
-          },
-          {
-            "name": "sources",
-            "in": "query",
-            "description": "filter the results by matching on one or more series sources. Examples of sources are user, box, directory or scp. The list of sources to filter results by must have the form TYPE1:ID1,TYPE2:ID2,...,TYPEN:IDN. For instance, the argument sources=box:1,user:5 shows results either sent from (slice)box with id 1 or uploaded by user with id 5.",
-            "required": false,
-            "type": "string"
-          },
-          {
-            "name": "seriestypes",
-            "in": "query",
-            "description": "filter the results by matching on one or more series types. The supplied list of series types must be a comma separated list of series type ids. For instance, the argument seriestypes=3,7,22 shows series assigned to either of the series types with ids 3, 7 and 22.",
-            "required": false,
-            "type": "string"
-          },
-          {
-            "name": "seriestags",
-            "in": "query",
-            "description": "filter the results by matching on one or more series tags. The supplied list of series tags must be a comma separated list of series tag ids. For instance, the argument seriestags=6,2,11 shows series with either of the series tags with ids 6, 2 and 11.",
-            "required": false,
-            "type": "string"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "list of images",
-            "schema": {
-              "type": "array",
-              "items": {
-                "$ref": "#/definitions/image"
-              }
-            }
-          }
-        }          
-      }
-    },
 
     "/images": {
       "post": {
