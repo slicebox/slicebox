@@ -146,7 +146,7 @@ trait RestApi extends HttpService with SliceboxRoutes with JsonFormats {
 
   val userService = actorRefFactory.actorOf(UserServiceActor.props(dbProps, superUser, superPassword, sessionTimeout), name = "UserService")
   val logService = actorRefFactory.actorOf(LogServiceActor.props(dbProps), name = "LogService")
-  val metaDataService = actorRefFactory.actorOf(MetaDataServiceActor.props(dbProps), name = "MetaDataService")
+  val metaDataService = actorRefFactory.actorOf(MetaDataServiceActor.props(dbProps).withDispatcher("akka.prio-dispatcher"), name = "MetaDataService")
   val storageService = actorRefFactory.actorOf(StorageServiceActor.props(storage, timeout), name = "StorageService")
   val anonymizationService = actorRefFactory.actorOf(AnonymizationServiceActor.props(dbProps), name = "AnonymizationService")
   val boxService = actorRefFactory.actorOf(BoxServiceActor.props(dbProps, apiBaseURL, timeout), name = "BoxService")

@@ -21,11 +21,12 @@ import akka.dispatch.UnboundedPriorityMailbox
 import com.typesafe.config.Config
 import MetaDataProtocol._
 import akka.actor.ActorSystem
+import se.nimsa.sbx.app.GeneralProtocol._
 
 class MetaDataServiceMailbox(settings: ActorSystem.Settings, config: Config)
   extends UnboundedPriorityMailbox(
     PriorityGenerator {
-//      case msg: FileReceived    => 2 // low
-//      case msg: DatasetReceived => 1 // low but higher than FileReceived
-      case _                    => 0 // normal
+      case msg: AddDataset  => 2 // low
+      case msg: DeleteImage => 1 // low but higher than FileReceived
+      case _                => 0 // normal
     })
