@@ -76,11 +76,26 @@ trait MetadataRoutes { this: RestApi =>
               }
             }
           }
-        } ~ path(LongNumber) { patientId =>
-          get {
-            onSuccess(storageService.ask(GetPatient(patientId)).mapTo[Option[Patient]]) {
-              complete(_)
+        } ~ pathPrefix(LongNumber) { patientId =>
+          pathEndOrSingleSlash {
+            get {
+              onSuccess(storageService.ask(GetPatient(patientId)).mapTo[Option[Patient]]) {
+                complete(_)
+              }
             }
+          } ~ path("images") {
+            parameters(
+              'sources.as[String].?,
+              'seriestypes.as[String].?,
+              'seriestags.as[String].?) { (sourcesString, seriesTypesString, seriesTagsString) =>
+                val sources = sourcesString.map(parseSourcesString(_)).getOrElse(Array.empty)
+                val seriesTypes = seriesTypesString.map(parseIdsString(_)).getOrElse(Array.empty)
+                val seriesTags = seriesTagsString.map(parseIdsString(_)).getOrElse(Array.empty)
+                onSuccess(storageService.ask(GetImagesForPatient(patientId, sources, seriesTypes, seriesTags))) {
+                  case Images(images) =>
+                    complete(images)
+                }
+              }
           }
         }
       } ~ pathPrefix("studies") {
@@ -111,11 +126,26 @@ trait MetadataRoutes { this: RestApi =>
               }
             }
           }
-        } ~ path(LongNumber) { studyId =>
-          get {
-            onSuccess(storageService.ask(GetStudy(studyId)).mapTo[Option[Study]]) {
-              complete(_)
+        } ~ pathPrefix(LongNumber) { studyId =>
+          pathEndOrSingleSlash {
+            get {
+              onSuccess(storageService.ask(GetStudy(studyId)).mapTo[Option[Study]]) {
+                complete(_)
+              }
             }
+          } ~ path("images") {
+            parameters(
+              'sources.as[String].?,
+              'seriestypes.as[String].?,
+              'seriestags.as[String].?) { (sourcesString, seriesTypesString, seriesTagsString) =>
+                val sources = sourcesString.map(parseSourcesString(_)).getOrElse(Array.empty)
+                val seriesTypes = seriesTypesString.map(parseIdsString(_)).getOrElse(Array.empty)
+                val seriesTags = seriesTagsString.map(parseIdsString(_)).getOrElse(Array.empty)
+                onSuccess(storageService.ask(GetImagesForStudy(studyId, sources, seriesTypes, seriesTags))) {
+                  case Images(images) =>
+                    complete(images)
+                }
+              }
           }
         }
       } ~ pathPrefix("series") {

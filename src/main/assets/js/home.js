@@ -11,7 +11,7 @@ angular.module('slicebox.home', ['ngRoute'])
   });
 })
 
-.controller('HomeCtrl', function($timeout, $scope, $http, $mdDialog, $q, openMessageModal, openConfirmActionModal, openDeleteEntitiesModalFunction, openTagSeriesModal, sbxMisc, sbxMetaData, sbxToast) {
+.controller('HomeCtrl', function($timeout, $scope, $http, $mdDialog, $q, openMessageModal, openConfirmActionModal, openBulkDeleteEntitiesModalFunction, openTagSeriesModal, sbxMisc, sbxMetaData, sbxToast) {
 
     // Initialization
 
@@ -609,11 +609,7 @@ angular.module('slicebox.home', ['ngRoute'])
     }
 
     function imagesForSeries(series) {
-        return sbxMetaData.imagesForSeries(
-            series,
-            $scope.uiState.advancedFiltering.selectedSources, 
-            $scope.uiState.advancedFiltering.selectedSeriesTypes, 
-            $scope.uiState.advancedFiltering.selectedSeriesTags);
+        return sbxMetaData.imagesForSeries(series);
     }
 
     function updateSeriesTagsPromise() {
@@ -734,8 +730,9 @@ angular.module('slicebox.home', ['ngRoute'])
 
     function confirmDeletePatients(patients) {
         imagesForPatients(patients).then(function(images) {
-            var f = openDeleteEntitiesModalFunction('/api/images/', 'images');
-            f(images).finally(function() {
+            var imageIds = images.map(function (image) { return image.id; });
+            var f = openBulkDeleteEntitiesModalFunction('/api/images/delete', 'images');
+            f(imageIds).finally(function() {
                 $scope.patientSelected(null);        
                 $scope.callbacks.patientsTable.reset();
                 updateSeriesTagsPromise();
@@ -745,8 +742,9 @@ angular.module('slicebox.home', ['ngRoute'])
 
     function confirmDeleteStudies(studies) {
         imagesForStudies(studies).then(function(images) {
-            var f = openDeleteEntitiesModalFunction('/api/images/', 'images');
-            f(images).finally(function() {
+            var imageIds = images.map(function (image) { return image.id; });
+            var f = openBulkDeleteEntitiesModalFunction('/api/images/delete', 'images');
+            f(imageIds).finally(function() {
                 $scope.studySelected(null);        
                 $scope.callbacks.studiesTable.reset();
                 updateSeriesTagsPromise();
@@ -756,8 +754,9 @@ angular.module('slicebox.home', ['ngRoute'])
 
     function confirmDeleteSeries(series) {
         imagesForSeries(series).then(function(images) {
-            var f = openDeleteEntitiesModalFunction('/api/images/', 'images');
-            f(images).finally(function() {
+            var imageIds = images.map(function (image) { return image.id; });
+            var f = openBulkDeleteEntitiesModalFunction('/api/images/delete', 'images');
+            f(imageIds).finally(function() {
                 if ($scope.callbacks.flatSeriesTable) {
                     $scope.flatSeriesSelected(null);     
                     $scope.callbacks.flatSeriesTable.reset();

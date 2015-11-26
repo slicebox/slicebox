@@ -45,10 +45,10 @@ angular.module('slicebox.utils', [])
 
 .factory('sbxMetaData', function($http, sbxMisc) {
     return {
-        imagesForSeries: function(series, sources, seriesTypes, seriesTags) {
+        imagesForSeries: function(series) {
             var self = this;
             var promises = series.map(function(singleSeries) {
-                return $http.get(self.urlWithAdvancedFiltering('/api/metadata/images?startindex=0&count=1000000&seriesid=' + singleSeries.id, sources, seriesTypes, seriesTags)).then(function (imagesData) {
+                return $http.get('/api/metadata/images?startindex=0&count=100000000&seriesid=' + singleSeries.id).then(function (imagesData) {
                     return imagesData.data;
                 });
             });
@@ -58,8 +58,8 @@ angular.module('slicebox.utils', [])
         imagesForStudies: function(studies, sources, seriesTypes, seriesTags) {
             var self = this;
             var promises = studies.map(function(study) {
-                return $http.get(self.urlWithAdvancedFiltering('/api/metadata/series?startindex=0&count=1000000&studyid=' + study.id, sources, seriesTypes, seriesTags)).then(function (seriesData) {
-                    return self.imagesForSeries(seriesData.data, sources, seriesTypes, seriesTags);
+                return $http.get(self.urlWithAdvancedFiltering('/api/metadata/studies/' + study.id + '/images', sources, seriesTypes, seriesTags)).then(function (imagesData) {
+                    return imagesData.data;
                 });
             });
             return sbxMisc.flattenPromises(promises);
@@ -68,8 +68,8 @@ angular.module('slicebox.utils', [])
         imagesForPatients: function(patients, sources, seriesTypes, seriesTags) {
             var self = this;
             var promises = patients.map(function(patient) {
-                return $http.get(self.urlWithAdvancedFiltering('/api/metadata/studies?startindex=0&count=1000000&patientid=' + patient.id, sources, seriesTypes, seriesTags)).then(function (studiesData) {
-                    return self.imagesForStudies(studiesData.data, sources, seriesTypes, seriesTags);
+                return $http.get(self.urlWithAdvancedFiltering('/api/metadata/patients/' + patient.id + '/images', sources, seriesTypes, seriesTags)).then(function (imagesData) {
+                    return imagesData.data;
                 });
             });
             return sbxMisc.flattenPromises(promises);
@@ -78,7 +78,7 @@ angular.module('slicebox.utils', [])
         seriesForStudies: function(studies, sources, seriesTypes, seriesTags) {
             var self = this;
             var promises = studies.map(function(study) {
-                return $http.get(self.urlWithAdvancedFiltering('/api/metadata/series?startindex=0&count=1000000&studyid=' + study.id, sources, seriesTypes, seriesTags)).then(function (seriesData) {
+                return $http.get(self.urlWithAdvancedFiltering('/api/metadata/series?startindex=0&count=100000000&studyid=' + study.id, sources, seriesTypes, seriesTags)).then(function (seriesData) {
                     return seriesData.data;
                 });
             });
@@ -180,6 +180,28 @@ angular.module('slicebox.utils', [])
         });
 
         return deleteAllPromises;
+    }    
+
+})
+
+.factory('openBulkDeleteEntitiesModalFunction', function($mdDialog, $http, $q, openConfirmActionModal, sbxToast) {
+    return function(url, entitiesText) {
+
+        return function(entities) {
+            var deleteConfirmationText = 'Permanently delete ' + entities.length + ' ' + entitiesText + '?';
+
+            return openConfirmActionModal('Delete ' + entitiesText, deleteConfirmationText, 'Delete', function() {
+                return deleteEntities(url, entities, entitiesText);
+            });
+        };
+    };
+
+    function deleteEntities(url, entities, entitiesText) {
+        return $http.post(url, entities).then(function() {
+            sbxToast.showInfoMessage(entities.length + " " + entitiesText + " deleted");
+        }, function(response) {
+            sbxToast.showErrorMessage(response.data);
+        });
     }    
 
 })

@@ -324,6 +324,19 @@ class StorageServiceActor(dbProps: DbProps, storage: Path) extends Actor with Ex
             sender ! FlatSeriesCollection(propertiesDao.queryFlatSeries(query.startIndex, query.count, query.order, query.queryProperties, query.filters))
           }
 
+        case GetImagesForStudy(studyId, sourceRefs, seriesTypeIds, seriesTagIds) =>
+          db.withSession { implicit session =>
+            sender ! Images(propertiesDao.seriesForStudy(0, 100000000, studyId, sourceRefs, seriesTypeIds, seriesTagIds)
+              .flatMap(series => dao.imagesForSeries(0, 100000000, series.id)))
+          }
+
+        case GetImagesForPatient(patientId, sourceRefs, seriesTypeIds, seriesTagIds) =>
+          db.withSession { implicit session =>
+            sender ! Images(propertiesDao.studiesForPatient(0, 100000000, patientId, sourceRefs, seriesTypeIds, seriesTagIds)
+              .flatMap(study => propertiesDao.seriesForStudy(0, 100000000, study.id, sourceRefs, seriesTypeIds, seriesTagIds)
+                .flatMap(series => dao.imagesForSeries(0, 100000000, series.id))))
+          }
+
       }
     }
 

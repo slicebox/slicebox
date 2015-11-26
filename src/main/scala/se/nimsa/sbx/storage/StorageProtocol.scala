@@ -96,6 +96,10 @@ object StorageProtocol {
 
   case class GetImages(startIndex: Long, count: Long, seriesId: Long) extends MetaDataQuery
 
+  case class GetImagesForStudy(studyId: Long, sourceRefs: Array[SourceRef], seriesTypeIds: Array[Long], seriesTagIds: Array[Long]) extends MetaDataQuery
+  
+  case class GetImagesForPatient(patientId: Long, sourceRefs: Array[SourceRef], seriesTypeIds: Array[Long], seriesTagIds: Array[Long]) extends MetaDataQuery
+  
   case class GetPatient(patientId: Long) extends MetaDataQuery
 
   case class GetStudy(studyId: Long) extends MetaDataQuery

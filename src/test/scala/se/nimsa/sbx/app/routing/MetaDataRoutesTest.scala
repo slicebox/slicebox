@@ -38,7 +38,7 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   "Meta data routes" should "return 200 OK and return an empty list of images when asking for all images" in {
     GetAsUser("/api/metadata/patients") ~> routes ~> check {
       status should be(OK)
-      responseAs[List[Patient]].size should be(0)
+      responseAs[List[Patient]] shouldBe empty
     }
   }
 
@@ -51,7 +51,7 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     // then    
     GetAsUser("/api/metadata/patients?orderby=PatientID") ~> routes ~> check {
       status should be(OK)
-      responseAs[List[Patient]].size should be(1)
+      responseAs[List[Patient]] should have size 1
     }
   }
 
@@ -88,7 +88,7 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
     PostAsUser("/api/metadata/patients/query", query) ~> routes ~> check {
       status should be(OK)
-      responseAs[List[Patient]].size should be(1)
+      responseAs[List[Patient]] should have size 1
     }
   }
 
@@ -106,7 +106,7 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       status should be(OK)
       val patients = responseAs[List[Patient]]
 
-      patients.size should be(2)
+      patients should have size 2
       patients(0).patientName.value should be("p1")
       patients(1).patientName.value should be("p2")
     }
@@ -126,7 +126,7 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       status should be(OK)
       val patients = responseAs[List[Patient]]
 
-      patients.size should be(2)
+      patients should have size 2
       patients(0).patientName.value should be("p2")
       patients(1).patientName.value should be("p1")
     }
@@ -146,7 +146,7 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       status should be(OK)
       val patients = responseAs[List[Patient]]
 
-      patients.size should be(1)
+      patients should have size 1
       patients(0).patientName.value should be("p1")
     }
   }
@@ -447,4 +447,48 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
   }
 
+  it should "return 200 OK and all images for a study" in {
+    val studies =
+      db.withSession { implicit session =>
+        insertMetaData(dao)
+        dao.studies
+      }
+
+    GetAsUser(s"/api/metadata/studies/${studies.head.id}/images") ~> routes ~> check {
+      status shouldBe OK
+      val images = responseAs[List[Image]]
+      images should have size 4
+      val sopUids = images.map(_.sopInstanceUID.value)
+      Seq("souid1", "souid2", "souid3", "souid4").forall(sopUid => sopUids.contains(sopUid)) shouldBe true
+    }
+  }
+
+  it should "return 200 OK and an empty list when listing all images for a study with an invalid study id" in {
+    GetAsUser(s"/api/metadata/studies/666/images") ~> routes ~> check {
+      status shouldBe OK
+      responseAs[List[Image]] shouldBe empty
+    }    
+  }
+  
+  it should "return 200 OK and all images for a patient" in {
+    val patients =
+      db.withSession { implicit session =>
+        insertMetaData(dao)
+        dao.patients
+      }
+
+    GetAsUser(s"/api/metadata/patients/${patients.head.id}/images") ~> routes ~> check {
+      status shouldBe OK
+      val images = responseAs[List[Image]]
+      images should have size 8
+    }
+  }
+
+  it should "return 200 OK and an empty list when listing all images for a patient with an invalid patient id" in {
+    GetAsUser(s"/api/metadata/patients/666/images") ~> routes ~> check {
+      status shouldBe OK
+      responseAs[List[Image]] shouldBe empty
+    }    
+  }
+  
 }

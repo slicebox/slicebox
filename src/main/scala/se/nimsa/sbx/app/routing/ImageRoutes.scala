@@ -148,6 +148,18 @@ trait ImageRoutes { this: RestApi =>
               }
             }
         }
+      } ~ path("delete") {
+        post {
+          import spray.httpx.SprayJsonSupport._
+          entity(as[Seq[Long]]) { imageIds =>
+            val futureDeleted = Future.sequence {
+              imageIds.map(imageId => storageService.ask(DeleteImage(imageId)))
+            }
+            onSuccess(futureDeleted) { m =>
+              complete(NoContent)
+            }
+          }
+        }
       } ~ pathPrefix("anonymizationkeys") {
         pathEndOrSingleSlash {
           get {

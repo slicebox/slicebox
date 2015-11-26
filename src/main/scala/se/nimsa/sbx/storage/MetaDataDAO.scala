@@ -150,6 +150,16 @@ class MetaDataDAO(val driver: JdbcProfile) {
     if (!tableNames.exists(tableName => columnExists(tableName, columnName)))
       throw new IllegalArgumentException(s"Property $columnName does not exist")
 
+  // *** Complete listings
+  
+  def patients(implicit session: Session): List[Patient] = patientsQuery.list
+
+  def studies(implicit session: Session): List[Study] = studiesQuery.list
+  
+  def series(implicit session: Session): List[Series] = seriesQuery.list
+
+  def images(implicit session: Session): List[Image] = imagesQuery.list
+
   // *** Get entities by id
 
   def patientById(id: Long)(implicit session: Session): Option[Patient] =
@@ -251,8 +261,6 @@ class MetaDataDAO(val driver: JdbcProfile) {
 
     Q.queryNA(query).list
   }
-
-  def studies(implicit session: Session): List[Study] = studiesQuery.list
 
   val studiesGetResult = GetResult(r =>
     Study(r.nextLong, r.nextLong, StudyInstanceUID(r.nextString), StudyDescription(r.nextString), StudyDate(r.nextString), StudyID(r.nextString), AccessionNumber(r.nextString), PatientAge(r.nextString)))
@@ -365,10 +373,6 @@ class MetaDataDAO(val driver: JdbcProfile) {
 
   def wherePart(part: String): String =
     if (part.length > 0) s" where $part" else ""
-
-  def series(implicit session: Session): List[Series] = seriesQuery.list
-
-  def images(implicit session: Session): List[Image] = imagesQuery.list
 
   val flatSeriesBasePart = """select distinct("Series"."id"), 
       "Patients"."id","Patients"."PatientName","Patients"."PatientID","Patients"."PatientBirthDate","Patients"."PatientSex", 
