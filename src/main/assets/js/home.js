@@ -1061,6 +1061,10 @@ angular.module('slicebox.home', ['ngRoute'])
         });
     };
 
+    $scope.clearButtonClicked = function() {
+        $scope.anonymizedPatientNames = $scope.patients.map(function() { return ""; });
+    };
+
     $scope.cancelButtonClicked = function() {
         $mdDialog.cancel();
     };
@@ -1072,7 +1076,11 @@ angular.module('slicebox.home', ['ngRoute'])
             var patient = imageIdsAndPatients[i].patient;
             var patientIndex = patientIds.indexOf(patient.id);
             var anonName = $scope.anonymizedPatientNames[patientIndex];
-            imageTagValuesSeq.push( { imageId: imageId, tagValues: [ { tag: 0x00100010, value: anonName } ] } );
+            if (anonName && anonName.length > 0) {
+                imageTagValuesSeq.push( { imageId: imageId, tagValues: [ { tag: 0x00100010, value: anonName } ] } );
+            } else {
+                imageTagValuesSeq.push( { imageId: imageId, tagValues: [ ] } );                
+            }
         }
 
         var actionPromise = actionCallback(imageTagValuesSeq);
