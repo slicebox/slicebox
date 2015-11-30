@@ -2,7 +2,7 @@ import de.heikoseeberger.sbtheader.license.Apache2_0
 
 	name := "slicebox"
 
-	version := "0.11-SNAPSHOT"
+	version := "0.11"
 
 	organization := "se.nimsa"
 
