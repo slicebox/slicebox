@@ -50,6 +50,10 @@ object StorageProtocol {
 
   case class AddJpeg(jpegBytes: Array[Byte], studyId: Long, source: Source)
   
+  case class CreateTempZipFile(imageIds: Seq[Long])
+  
+  case class DeleteTempZipFile(path: Path)
+  
   // ***to API***
 
   case class ImagePath(imagePath: Path)

@@ -25,6 +25,7 @@ import java.nio.file.NoSuchFileException
 import java.nio.file.Path
 import java.util.concurrent.Executors
 import scala.concurrent.Future
+import scala.concurrent.duration.DurationInt
 import scala.util.Failure
 import scala.util.Success
 import scala.util.control.NonFatal
@@ -52,8 +53,14 @@ import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.util.SbxExtensions._
+import java.nio.file.Paths
+import java.util.zip.ZipOutputStream
+import java.util.zip.ZipEntry
+import se.nimsa.sbx.util.FutureUtil
 
 class StorageServiceActor(storage: Path, implicit val timeout: Timeout) extends Actor {
+
+  val bufferSize = 524288
 
   import context.system
   val log = Logging(context.system, this)
@@ -91,7 +98,7 @@ class StorageServiceActor(storage: Path, implicit val timeout: Timeout) extends 
       imageAdded foreach {
         context.system.eventStream.publish(_)
       }
-      
+
       imageAdded.pipeTo(sender)
 
     case AddJpeg(jpegBytes, studyId, source) =>
@@ -124,6 +131,14 @@ class StorageServiceActor(storage: Path, implicit val timeout: Timeout) extends 
             .map(i => ImageDeleted(imageId))
         }
       imageDeleted.pipeTo(sender)
+
+    case CreateTempZipFile(imageIds) =>
+      createTempZipFile(imageIds)
+        .map(path => FileName(path.getFileName.toString))
+        .pipeTo(sender)
+
+    case DeleteTempZipFile(path) =>
+      Files.deleteIfExists(path)
 
     case msg: ImageRequest =>
       msg match {
@@ -312,6 +327,68 @@ class StorageServiceActor(storage: Path, implicit val timeout: Timeout) extends 
       image
   }
 
+  def createTempZipFile(imageIds: Seq[Long]): Future[Path] = {
+
+    val tempFile = Files.createTempFile("slicebox-export-", ".zip")
+    val fos = Files.newOutputStream(tempFile)
+    val zos = new ZipOutputStream(fos);
+
+    // Add the files to the zip archive strictly sequentially (no concurrency) to 
+    // reduce load on meta data service and to keep memory consumption bounded
+    val futureAddedFiles = FutureUtil.traverseSequentially(imageIds) { imageId =>
+      val pathImageAndFlatSeries =
+        imagePathForId(imageId).flatMap(_.map { path =>
+          imageById(imageId).flatMap(_.map { image =>
+            flatSeriesById(image.seriesId).map(_.map { flatSeries =>
+              (path, image, flatSeries)
+            })
+          }.unwrap)
+        }.unwrap)
+      pathImageAndFlatSeries.map(_.map {
+        case (path, image, flatSeries) =>
+          addToZipFile(path, image, flatSeries, zos)
+      })
+    }
+
+    def cleanup = {
+      zos.close
+      fos.close
+      scheduleDeleteTempFile(tempFile)
+    }
+
+    futureAddedFiles.recover { case _ => cleanup }
+    
+    futureAddedFiles.map { u => cleanup; tempFile }
+  }
+
+  def addToZipFile(path: Path, image: Image, flatSeries: FlatSeries, zos: ZipOutputStream): Unit = {
+
+    def sanitize(string: String) = string.replace('/', '-').replace('\\', '-')
+
+    val is = Files.newInputStream(path)
+    val patientFolder = sanitize(s"${flatSeries.patient.id}_${flatSeries.patient.patientName.value}-${flatSeries.patient.patientID.value}")
+    val studyFolder = sanitize(s"${flatSeries.study.id}_${flatSeries.study.studyDate.value}")
+    val seriesFolder = sanitize(s"${flatSeries.series.id}_${flatSeries.series.seriesDate.value}_${flatSeries.series.modality.value}")
+    val imageName = s"${image.id}.dcm"
+    val entryName = s"$patientFolder/$studyFolder/$seriesFolder/$imageName"
+    val zipEntry = new ZipEntry(entryName)
+    zos.putNextEntry(zipEntry)
+
+    val bytes = new Array[Byte](bufferSize)
+    var bytesLeft = true
+    while (bytesLeft) {
+      val length = is.read(bytes)
+      bytesLeft = length > 0
+      if (bytesLeft) zos.write(bytes, 0, length)
+    }
+
+    zos.closeEntry
+    is.close
+  }
+
+  def scheduleDeleteTempFile(tempFile: Path) =
+    context.system.scheduler.scheduleOnce(12.hours, self, tempFile)
+
   def patientById(patientId: Long): Future[Option[Patient]] =
     metaDataService.ask(GetPatient(patientId)).mapTo[Option[Patient]]
 
@@ -320,6 +397,9 @@ class StorageServiceActor(storage: Path, implicit val timeout: Timeout) extends 
 
   def imageById(imageId: Long): Future[Option[Image]] =
     metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]]
+
+  def flatSeriesById(seriesId: Long): Future[Option[FlatSeries]] =
+    metaDataService.ask(GetSingleFlatSeries(seriesId)).mapTo[Option[FlatSeries]]
 
   def addMetadata(dataset: Attributes, source: Source): Future[Image] =
     metaDataService.ask(AddDataset(dataset, source)).mapTo[ImageAdded].map(_.image)

@@ -16,35 +16,31 @@
 
 package se.nimsa.sbx.app.routing
 
-import java.nio.file.Files
-import java.util.zip.ZipEntry
-import java.util.zip.ZipOutputStream
+import java.io.File
+
 import scala.concurrent.Future
-import scala.concurrent.duration.DurationInt
+
 import org.dcm4che3.data.Attributes
-import akka.actor.Props
-import akka.actor.Actor
+
 import akka.pattern.ask
-import se.nimsa.sbx.user.UserProtocol._
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.anonymization.AnonymizationUtil
+import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.app.RestApi
-import se.nimsa.sbx.dicom.DicomUtil
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
+import se.nimsa.sbx.dicom.DicomUtil
+import se.nimsa.sbx.dicom.ImageAttribute
 import se.nimsa.sbx.storage.StorageProtocol._
+import se.nimsa.sbx.user.UserProtocol.ApiUser
+import spray.http.ContentType.apply
 import spray.http.FormFile
 import spray.http.HttpData
 import spray.http.HttpEntity
+import spray.http.HttpHeaders._
 import spray.http.MediaTypes._
 import spray.http.StatusCodes._
 import spray.routing.Route
-import spray.http.MediaType
-import spray.http.HttpHeaders.`Content-Disposition`
-import java.nio.file.Paths
-import java.nio.file.Path
-import java.io.File
-import se.nimsa.sbx.dicom.ImageAttribute
-import se.nimsa.sbx.app.GeneralProtocol._
+import spray.routing.directives._
 
 trait ImageRoutes { this: RestApi =>
 
@@ -192,9 +188,7 @@ trait ImageRoutes { this: RestApi =>
             if (imageIds.isEmpty)
               complete(NoContent)
             else
-              onSuccess(createTempZipFile(imageIds)) { file =>
-                complete(FileName(file.getFileName.toString))
-              }
+              complete(storageService.ask(CreateTempZipFile(imageIds)).mapTo[FileName])
           }
         } ~ get {
           parameter('filename) { fileName =>
@@ -222,60 +216,6 @@ trait ImageRoutes { this: RestApi =>
                 }
               }
             }
-          }
-        }
-      }
-    }
-
-  def createTempZipFile(imageIds: Seq[Long]): Future[Path] = {
-    val futurePaths = Future.sequence(imageIds.map(imageId =>
-      storageService.ask(GetImagePath(imageId)).mapTo[Option[ImagePath]]))
-      .map(_.flatten.map(_.imagePath))
-
-    futurePaths.map(paths => {
-      val tempFile = Files.createTempFile("slicebox-export-", ".zip")
-
-      val fos = Files.newOutputStream(tempFile)
-      val zos = new ZipOutputStream(fos);
-
-      paths.foreach(path => addToZipFile(path.toString, zos))
-
-      zos.close
-      fos.close
-
-      scheduleDeleteTempFile(tempFile)
-
-      tempFile
-    })
-  }
-
-  def addToZipFile(fileName: String, zos: ZipOutputStream): Unit = {
-    val path = Paths.get(fileName)
-    val is = Files.newInputStream(path)
-    val zipEntry = new ZipEntry(path.getFileName.toString + ".dcm")
-    zos.putNextEntry(zipEntry)
-
-    val bytes = new Array[Byte](bufferSize)
-    var bytesLeft = true
-    while (bytesLeft) {
-      val length = is.read(bytes)
-      bytesLeft = length > 0
-      if (bytesLeft) zos.write(bytes, 0, length)
-    }
-
-    zos.closeEntry
-    is.close
-  }
-
-  def scheduleDeleteTempFile(tempFile: Path) =
-    actorRefFactory.actorOf {
-      Props {
-        new Actor {
-          context.system.scheduler.scheduleOnce(12.hours, self, tempFile)
-          def receive = {
-            case file: Path =>
-              Files.deleteIfExists(file)
-              context.stop(self)
           }
         }
       }

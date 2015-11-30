@@ -16,8 +16,8 @@
 
 package se.nimsa.sbx.util
 
-import scala.concurrent.Future
 import scala.concurrent.ExecutionContext
+import scala.concurrent.Future
 
 object SbxExtensions {
 

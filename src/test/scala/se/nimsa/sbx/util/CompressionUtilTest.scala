@@ -1,10 +1,9 @@
 package se.nimsa.sbx.util
 
-import org.scalatest.BeforeAndAfterAll
 import org.scalatest.FlatSpec
 import org.scalatest.Matchers
 
-class CompressionUtilTest extends FlatSpec with Matchers with BeforeAndAfterAll {
+class CompressionUtilTest extends FlatSpec with Matchers {
 
   "Compressing a byte array with redundant data" should "decrease the size of the array" in {
     val data = new Array[Byte](10000)
