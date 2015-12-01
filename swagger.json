@@ -2850,6 +2850,24 @@
         },
         "accessionNumber": {
           "type": "string"
+        },
+        "seriesInstanceUID": {
+          "type": "string"
+        },
+        "anonSeriesInstanceUID": {
+          "type": "string"
+        },
+        "seriesDescription": {
+          "type": "string"
+        },
+        "protocolName": {
+          "type": "string"
+        },
+        "frameOfReferenceUID": {
+          "type": "string"
+        },
+        "anonFrameOfReferenceUID": {
+          "type": "string"
         }
       }
     },
