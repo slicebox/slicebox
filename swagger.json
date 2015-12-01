@@ -27,6 +27,10 @@
       "description": "Methods concerning images and datasets"
     },
     {
+      "name": "Anonymization",
+      "description": "Methods concerning anonymization and de-anonymization of images and the associated anonymization data"
+    },
+    {
       "name": "Boxes",
       "description": "Methods for handling box-to-box connections and issuing box commands"
     },
@@ -1242,9 +1246,9 @@
     },
 
     "/images/{id}/anonymize": {
-      "post": {
+      "put": {
         "description": "delete the selected image and replace it with an anonymized version",
-        "tags": ["Images"],
+        "tags": ["Anonymization", "Images"],
         "parameters": [
           {
             "name": "id",
@@ -1278,10 +1282,64 @@
       }
     },
 
-    "/images/anonymizationkeys": {
+    "/images/export": {
+      "post": {
+        "description": "create a zip archive containing the selected images. The archive is available for downloading for 12 hours before it is automatically deleted.",
+        "tags": ["Images"],
+        "parameters": [
+          {
+            "name": "image ids",
+            "in": "body",
+            "description": "ids of images to export",
+            "required": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "format": "int64"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "if the supplied list of image ids is empty or no if images could be found"
+          },
+          "200": {
+            "description": "file name of created zip archive. To be used with the below GET method for downloading.",
+            "schema": {
+              "$ref": "#/definitions/fileName"
+            }
+          }
+        }
+      },
+      "get": {
+        "description": "download the export zip archive with the supplied file name",
+        "produces": [
+          "application/zip"
+        ],
+        "tags": ["Images"],
+        "parameters": [
+          {
+            "name": "filename",
+            "in": "query",
+            "description": "file name of zip archive to download",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "zip archive of images"
+          }
+        }
+      }
+    },
+
+    "/anonymization/keys": {
       "get": {
         "description": "get a list of anonymization keys, each specifying how vital DICOM attributes have been anonymized for a particular image",
-        "tags": ["Images"],
+        "tags": ["Anonymization"],
         "parameters": [
           {
             "name": "startindex",
@@ -1338,10 +1396,10 @@
       }
     },
 
-    "/images/anonymizationkeys/{id}": {
+    "/anonymization/keys/{id}": {
       "delete": {        
         "description": "delete an anonymization key that is no longer of interest",
-        "tags": ["Images"],
+        "tags": ["Anonymization"],
         "parameters": [
           {
             "name": "id",
@@ -1355,60 +1413,6 @@
         "responses": {
           "204": {
             "description": "anonymization key deleted"
-          }
-        }
-      }
-    },
-
-    "/images/export": {
-      "post": {
-        "description": "create a zip archive containing the selected images. The archive is available for downloading for 12 hours before it is automatically deleted.",
-        "tags": ["Images"],
-        "parameters": [
-          {
-            "name": "image ids",
-            "in": "body",
-            "description": "ids of images to export",
-            "required": true,
-            "schema": {
-              "type": "array",
-              "items": {
-                "type": "integer",
-                "format": "int64"
-              }
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": "if the supplied list of image ids is empty or no if images could be found"
-          },
-          "200": {
-            "description": "file name of created zip archive. To be used with the below GET method for downloading.",
-            "schema": {
-              "$ref": "#/definitions/fileName"
-            }
-          }
-        }
-      },
-      "get": {
-        "description": "download the export zip archive with the supplied file name",
-        "produces": [
-          "application/zip"
-        ],
-        "tags": ["Images"],
-        "parameters": [
-          {
-            "name": "filename",
-            "in": "query",
-            "description": "file name of zip archive to download",
-            "required": true,
-            "type": "string"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "zip archive of images"
           }
         }
       }
