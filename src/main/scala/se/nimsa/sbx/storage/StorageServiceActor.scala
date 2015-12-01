@@ -356,7 +356,7 @@ class StorageServiceActor(storage: Path, implicit val timeout: Timeout) extends 
       scheduleDeleteTempFile(tempFile)
     }
 
-    futureAddedFiles.recover { case _ => cleanup }
+    futureAddedFiles.onFailure { case _ => cleanup }
     
     futureAddedFiles.map { u => cleanup; tempFile }
   }
