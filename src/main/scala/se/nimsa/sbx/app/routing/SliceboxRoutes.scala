@@ -29,6 +29,7 @@ trait SliceboxRoutes extends DirectoryRoutes
     with ScuRoutes
     with MetadataRoutes
     with ImageRoutes
+    with AnonymizationRoutes
     with BoxRoutes
     with ForwardingRoutes
     with RemoteBoxRoutes
@@ -65,6 +66,7 @@ trait SliceboxRoutes extends DirectoryRoutes
               scuRoutes(apiUser) ~
               metaDataRoutes ~
               imageRoutes(apiUser) ~
+              anonymizationRoutes(apiUser) ~
               boxRoutes(apiUser) ~
               inboxRoutes ~
               outboxRoutes ~

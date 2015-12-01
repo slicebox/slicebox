@@ -805,7 +805,7 @@ angular.module('slicebox.home', ['ngRoute'])
     function anonymizeImages(imageIdsAndPatientsPromise) {
         return showBoxSendTagValuesModal(imageIdsAndPatientsPromise, function(imageTagValuesSeq) {
             var promises = imageTagValuesSeq.map(function(imageTagValues) {
-                return $http.post('/api/images/' + imageTagValues.imageId + '/anonymize', imageTagValues.tagValues);
+                return $http.put('/api/images/' + imageTagValues.imageId + '/anonymize', imageTagValues.tagValues);
             });
             var allPromise = $q.all(promises);
 

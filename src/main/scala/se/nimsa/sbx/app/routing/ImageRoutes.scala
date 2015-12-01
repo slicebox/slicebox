@@ -103,32 +103,6 @@ trait ImageRoutes { this: RestApi =>
               complete(_)
             }
           }
-        } ~ path("anonymize") {
-          post {
-            import spray.httpx.SprayJsonSupport._
-            entity(as[Seq[TagValue]]) { tagValues =>
-              onSuccess(storageService.ask(GetDataset(imageId, true)).mapTo[Option[Attributes]]) {
-                _ match {
-
-                  case Some(dataset) =>
-                    AnonymizationUtil.setAnonymous(dataset, false) // pretend not anonymized to force anonymization
-                    onSuccess(anonymizationService.ask(Anonymize(dataset, tagValues)).mapTo[Attributes]) { anonDataset =>
-                      onSuccess(storageService.ask(DeleteImage(imageId))) {
-                        case ImageDeleted(imageId) =>
-                          val source = Source(SourceType.USER, apiUser.user, apiUser.id)
-                          onSuccess(storageService.ask(AddDataset(anonDataset, source))) {
-                            case ImageAdded(image, source) =>
-                              complete(NoContent)
-                          }
-                      }
-                    }
-
-                  case None =>
-                    complete(NotFound)
-                }
-              }
-            }
-          }
         } ~ path("png") {
           parameters(
             'framenumber.as[Int] ? 1,
@@ -154,30 +128,6 @@ trait ImageRoutes { this: RestApi =>
             }
             onSuccess(futureDeleted) { m =>
               complete(NoContent)
-            }
-          }
-        }
-      } ~ pathPrefix("anonymizationkeys") {
-        pathEndOrSingleSlash {
-          get {
-            parameters(
-              'startindex.as[Long] ? 0,
-              'count.as[Long] ? 20,
-              'orderby.as[String].?,
-              'orderascending.as[Boolean] ? true,
-              'filter.as[String].?) { (startIndex, count, orderBy, orderAscending, filter) =>
-                onSuccess(anonymizationService.ask(GetAnonymizationKeys(startIndex, count, orderBy, orderAscending, filter))) {
-                  case AnonymizationKeys(anonymizationKeys) =>
-                    import spray.httpx.SprayJsonSupport._
-                    complete(anonymizationKeys)
-                }
-              }
-          }
-        } ~ path(LongNumber) { anonymizationKeyId =>
-          delete {
-            onSuccess(anonymizationService.ask(RemoveAnonymizationKey(anonymizationKeyId))) {
-              case AnonymizationKeyRemoved(anonymizationKeyId) =>
-                complete(NoContent)
             }
           }
         }

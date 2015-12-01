@@ -27,14 +27,6 @@ class ImageRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
   def dbUrl() = "jdbc:h2:mem:imageroutestest;DB_CLOSE_DELAY=-1"
 
-  val dao = new AnonymizationDAO(H2Driver)
-
-  override def afterEach() {
-    db.withSession { implicit session =>
-      dao.clear
-    }
-  }
-
   "Image routes" should "return 201 Created when adding an image using multipart form data" in {
     val file = TestUtil.testImageFile
     val mfd = MultipartFormData(Seq(BodyPart(file, "file")))
@@ -101,52 +93,8 @@ class ImageRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
   }
 
-  it should "return 200 OK and anonymize the data by removing the old data and inserting new anonymized data upon manual anonymization" in {
-    val patient = GetAsUser("/api/metadata/patients/1") ~> routes ~> check {
-      status should be(OK)
-      responseAs[Patient]
-    }
-    PostAsUser("/api/images/1/anonymize", Seq.empty[TagValue]) ~> routes ~> check {
-      status should be(NoContent)
-    }
-    GetAsUser("/api/metadata/patients/1") ~> routes ~> check {
-      status should be(NotFound)
-    }
-    GetAsUser("/api/metadata/patients/2") ~> routes ~> check {
-      status should be(OK)
-      val anonPatient = responseAs[Patient]
-      anonPatient.patientName should not be (patient.patientName)
-      anonPatient.patientID should not be (patient.patientID)
-      anonPatient.patientSex should be(patient.patientSex)
-    }
-    GetAsUser("/api/metadata/studies/1") ~> routes ~> check {
-      status should be(NotFound)
-    }
-    GetAsUser("/api/metadata/studies/2") ~> routes ~> check {
-      status should be(OK)
-    }
-    GetAsUser("/api/metadata/series/1") ~> routes ~> check {
-      status should be(NotFound)
-    }
-    GetAsUser("/api/metadata/series/2") ~> routes ~> check {
-      status should be(OK)
-    }
-    GetAsUser("/api/metadata/images/1") ~> routes ~> check {
-      status should be(NotFound)
-    }
-    GetAsUser("/api/metadata/images/2") ~> routes ~> check {
-      status should be(OK)
-    }
-  }
-
-  it should "return 404 NotFound when manually anonymizing an image that does not exist" in {
-    PostAsUser("/api/images/666/anonymize", Seq.empty[TagValue]) ~> routes ~> check {
-      status should be(NotFound)
-    }
-  }
-
   it should "return 201 Created when adding a jpeg image to a study" in {
-    val patient = GetAsUser("/api/metadata/patients/2") ~> routes ~> check { responseAs[Patient] }
+    val patient = GetAsUser("/api/metadata/patients/1") ~> routes ~> check { responseAs[Patient] }
     val studies = GetAsUser(s"/api/metadata/studies?patientid=${patient.id}") ~> routes ~> check { responseAs[List[Study]] }
     PostAsUser(s"/api/images/jpeg?studyid=${studies.head.id}", HttpData(TestUtil.jpegByteArray)) ~> routes ~> check {
       status shouldBe Created
@@ -162,7 +110,7 @@ class ImageRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   }
 
   it should "return 400 BadRequest when adding an invalid jpeg image" in {
-    val patient = GetAsUser("/api/metadata/patients/2") ~> routes ~> check { responseAs[Patient] }
+    val patient = GetAsUser("/api/metadata/patients/1") ~> routes ~> check { responseAs[Patient] }
     val studies = GetAsUser(s"/api/metadata/studies?patientid=${patient.id}") ~> routes ~> check { responseAs[List[Study]] }
     PostAsUser(s"/api/images/jpeg?studyid=${studies.head.id}", HttpData(Array[Byte](1, 2, 3, 4))) ~> routes ~> check {
       status shouldBe BadRequest
@@ -185,42 +133,6 @@ class ImageRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
     GetAsUser("/api/metadata/images/2") ~> routes ~> check {
       status should be(NotFound)
-    }
-  }
-
-  it should "provide a list of anonymization keys" in {
-    db.withSession { implicit session =>
-      val dataset = TestUtil.createDataset()
-      val key1 = TestUtil.createAnonymizationKey(dataset)
-      val key2 = key1.copy(patientName = "pat name 2", anonPatientName = "anon pat name 2")
-      val insertedKey1 = dao.insertAnonymizationKey(key1)
-      val insertedKey2 = dao.insertAnonymizationKey(key2)
-      GetAsUser("/api/images/anonymizationkeys") ~> routes ~> check {
-        status should be(OK)
-        responseAs[List[AnonymizationKey]] should be(List(insertedKey1, insertedKey2))
-      }
-    }
-  }
-
-  it should "provide a list of sorted anonymization keys supporting startindex and count" in {
-    db.withSession { implicit session =>
-      val dataset = TestUtil.createDataset(patientName = "B")
-      val key1 = TestUtil.createAnonymizationKey(dataset, anonPatientName = "anon B")
-      val key2 = key1.copy(patientName = "A", anonPatientName = "anon A")
-      val insertedKey1 = dao.insertAnonymizationKey(key1)
-      val insertedKey2 = dao.insertAnonymizationKey(key2)
-      GetAsUser("/api/images/anonymizationkeys?startindex=0&count=1&orderby=patientname&orderascending=true") ~> routes ~> check {
-        status should be(OK)
-        val keys = responseAs[List[AnonymizationKey]]
-        keys.length should be(1)
-        keys(0) should be(insertedKey2)
-      }
-    }
-  }
-
-  it should "return 400 Bad Request when sorting anonymization keys by a non-existing property" in {
-    GetAsUser("/api/images/anonymizationkeys?orderby=xyz") ~> routes ~> check {
-      status should be(BadRequest)
     }
   }
 

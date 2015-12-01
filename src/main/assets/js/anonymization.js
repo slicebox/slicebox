@@ -17,7 +17,7 @@ angular.module('slicebox.anonymization', ['ngRoute'])
         [
             {
                 name: 'Delete',
-                action: openDeleteEntitiesModalFunction('/api/images/anonymizationkeys/', 'anonymization key(s)')
+                action: openDeleteEntitiesModalFunction('/api/anonymization/keys/', 'anonymization key(s)')
             },
             {
                 name: 'Export',
@@ -29,7 +29,7 @@ angular.module('slicebox.anonymization', ['ngRoute'])
 
     // Scope functions
     $scope.loadAnonymizationKeyPage = function(startIndex, count, orderByProperty, orderByDirection, filter) {
-        var loadUrl = '/api/images/anonymizationkeys?startindex=' + startIndex + '&count=' + count;
+        var loadUrl = '/api/anonymization/keys?startindex=' + startIndex + '&count=' + count;
         if (orderByProperty) {
             loadUrl = loadUrl + '&orderby=' + orderByProperty.toLowerCase();
             
