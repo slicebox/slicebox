@@ -4,6 +4,7 @@ import java.util.Date
 
 import scala.slick.driver.H2Driver
 import scala.slick.jdbc.JdbcBackend.Database
+import scala.concurrent.duration.DurationInt
 
 import org.dcm4che3.data.Attributes
 import org.dcm4che3.data.Tag
@@ -40,7 +41,7 @@ class AnonymizationServiceActorTest(_system: ActorSystem) extends TestKit(_syste
     anonymizationDao.create
   }
 
-  val anonymizationService = system.actorOf(Props(new AnonymizationServiceActor(dbProps)), name = "AnonymizationService")
+  val anonymizationService = system.actorOf(Props(new AnonymizationServiceActor(dbProps, 5.minutes)), name = "AnonymizationService")
 
   override def afterEach() =
     db.withSession { implicit session =>

@@ -18,9 +18,17 @@ package se.nimsa.sbx.anonymization
 
 import se.nimsa.sbx.model.Entity
 import org.dcm4che3.data.Attributes
+import se.nimsa.sbx.metadata.MetaDataProtocol.QueryOrder
+import se.nimsa.sbx.metadata.MetaDataProtocol.QueryProperty
 
 object AnonymizationProtocol {
 
+  case class AnonymizationKeyQuery(
+    startIndex: Long,
+    count: Long,
+    order: Option[QueryOrder],
+    queryProperties: Seq[QueryProperty])
+    
   case class AnonymizationParameters(
       imageId: Long,
       tagValues: Seq[TagValue])
@@ -60,6 +68,12 @@ object AnonymizationProtocol {
 
   case class GetAnonymizationKeys(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String]) extends AnonymizationRequest
 
+  case class GetAnonymizationKey(anonymizationKeyId: Long) extends AnonymizationRequest
+  
+  case class GetImagesForAnonymizationKey(anonymizationKeyId: Long) extends AnonymizationRequest
+  
+  case class QueryAnonymizationKeys(query: AnonymizationKeyQuery) extends AnonymizationRequest
+  
   case class RemoveAnonymizationKey(anonymizationKeyId: Long) extends AnonymizationRequest
 
   case class AnonymizationKeyRemoved(anonymizationKeyId: Long)

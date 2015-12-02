@@ -17,11 +17,8 @@
 package se.nimsa.sbx.app.routing
 
 import java.io.File
-
 import scala.concurrent.Future
-
 import org.dcm4che3.data.Attributes
-
 import akka.pattern.ask
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.anonymization.AnonymizationUtil
@@ -43,6 +40,7 @@ import spray.http.StatusCodes._
 import spray.routing.Route
 import spray.routing.directives._
 import spray.httpx.SprayJsonSupport._
+import se.nimsa.sbx.metadata.MetaDataProtocol.Images
 
 trait AnonymizationRoutes { this: SliceboxService =>
 
@@ -88,11 +86,32 @@ trait AnonymizationRoutes { this: SliceboxService =>
                 }
               }
           }
-        } ~ path(LongNumber) { anonymizationKeyId =>
-          delete {
-            onSuccess(anonymizationService.ask(RemoveAnonymizationKey(anonymizationKeyId))) {
-              case AnonymizationKeyRemoved(anonymizationKeyId) =>
-                complete(NoContent)
+        } ~ pathPrefix(LongNumber) { anonymizationKeyId =>
+          pathEndOrSingleSlash {
+            get {
+              rejectEmptyResponse {
+                complete(anonymizationService.ask(GetAnonymizationKey(anonymizationKeyId)).mapTo[Option[AnonymizationKey]])
+              }
+            } ~ delete {
+              onSuccess(anonymizationService.ask(RemoveAnonymizationKey(anonymizationKeyId))) {
+                case AnonymizationKeyRemoved(anonymizationKeyId) =>
+                  complete(NoContent)
+              }
+            }
+          } ~ path("images") {
+            get {
+              onSuccess(anonymizationService.ask(GetImagesForAnonymizationKey(anonymizationKeyId))) {
+                case Images(images) =>
+                  complete(images)
+              }
+            }
+          }
+        } ~ path("query") {
+          post {
+            entity(as[AnonymizationKeyQuery]) { query =>
+              complete {
+                anonymizationService.ask(QueryAnonymizationKeys(query)).mapTo[List[AnonymizationKey]]
+              }
             }
           }
         }

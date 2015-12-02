@@ -255,6 +255,20 @@ angular.module('slicebox.utils', [])
     };
 })
 
+.factory('openTagSeriesModalFunction', function($http, $q, openTagSeriesModal, sbxMisc) {
+    return function(urlPrefix) {
+        return function(entries) {
+            var entryIds = entries.map(function (entry) { return entry.id; });
+            var imagesPromises = entryIds.map(function (entryId) { return $http.get(urlPrefix + entryId + "/images").then(function (imagesData) { return imagesData.data; }); });
+            var imagesPromise = $q.all(imagesPromises).then(function (listOfImageLists) { return sbxMisc.flatten(listOfImageLists); });
+            var seriesIdsPromise = imagesPromise.then(function (images) { return images.map(function (image) { return image.seriesId; }); });
+            var uniqueSeriesIdsPromise = seriesIdsPromise.then(function (seriesIds) { return sbxMisc.unique(seriesIds); });
+
+            return openTagSeriesModal(uniqueSeriesIdsPromise);
+        };
+    };
+})
+
 .factory('openTagSeriesModal', function($mdDialog) {
     return function(seriesIdsPromise) {
         return $mdDialog.show({

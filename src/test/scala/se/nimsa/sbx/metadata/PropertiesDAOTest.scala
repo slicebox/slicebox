@@ -17,7 +17,7 @@ import MetaDataProtocol._
 
 class PropertiesDAOTest extends FlatSpec with Matchers with BeforeAndAfterEach {
 
-  private val db = Database.forURL("jdbc:h2:mem:dicompropertiesdaotest;DB_CLOSE_DELAY=-1", driver = "org.h2.Driver")
+  private val db = Database.forURL("jdbc:h2:mem:propertiesdaotest;DB_CLOSE_DELAY=-1", driver = "org.h2.Driver")
 
   val metaDataDao = new MetaDataDAO(H2Driver)
   val propertiesDao = new PropertiesDAO(H2Driver)

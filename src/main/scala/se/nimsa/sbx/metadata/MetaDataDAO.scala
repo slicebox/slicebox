@@ -23,9 +23,11 @@ import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomPropertyValue._
 import scala.slick.jdbc.meta.MTable
 import MetaDataProtocol._
+import MetaDataProtocol.QueryOperator._
 
 class MetaDataDAO(val driver: JdbcProfile) {
   import driver.simple._
+  import MetaDataDAO._
 
   // *** Patient *** 
 
@@ -151,11 +153,11 @@ class MetaDataDAO(val driver: JdbcProfile) {
       throw new IllegalArgumentException(s"Property $columnName does not exist")
 
   // *** Complete listings
-  
+
   def patients(implicit session: Session): List[Patient] = patientsQuery.list
 
   def studies(implicit session: Session): List[Study] = studiesQuery.list
-  
+
   def series(implicit session: Session): List[Series] = seriesQuery.list
 
   def images(implicit session: Session): List[Image] = imagesQuery.list
@@ -219,9 +221,6 @@ class MetaDataDAO(val driver: JdbcProfile) {
 
   val patientsBasePart = """select * from "Patients""""
 
-  def wherePart(whereParts: Option[String]*) =
-    if (whereParts.exists(_.isDefined)) " where" else ""
-
   def patientsFilterPart(filter: Option[String]) =
     filter.map(filterValue => {
       val filterValueLike = s"'%$filterValue%'".toLowerCase
@@ -231,13 +230,6 @@ class MetaDataDAO(val driver: JdbcProfile) {
            lcase("patientSex") like $filterValueLike)"""
     })
       .getOrElse("")
-
-  def orderByPart(orderBy: Option[String], orderAscending: Boolean) =
-    orderBy.map(orderByValue =>
-      s""" order by "$orderByValue" ${if (orderAscending) "asc" else "desc"}""")
-      .getOrElse("")
-
-  def pagePart(startIndex: Long, count: Long) = s""" limit $count offset $startIndex"""
 
   val queryPatientsSelectPart = """select distinct("Patients"."id"),
       "Patients"."patientName",
@@ -364,15 +356,6 @@ class MetaDataDAO(val driver: JdbcProfile) {
 
     Q.queryNA(query).list
   }
-
-  def queryPart(queryProperties: Seq[QueryProperty]): String =
-    queryProperties.map(queryPropertyToPart).mkString(" and ")
-
-  def queryPropertyToPart(queryProperty: QueryProperty) =
-    s""""${queryProperty.propertyName}" ${queryProperty.operator.toString()} '${queryProperty.propertyValue}'"""
-
-  def wherePart(part: String): String =
-    if (part.length > 0) s" where $part" else ""
 
   val flatSeriesBasePart = """select distinct("Series"."id"), 
       "Patients"."id","Patients"."patientName","Patients"."patientID","Patients"."patientBirthDate","Patients"."patientSex", 
@@ -526,6 +509,35 @@ class MetaDataDAO(val driver: JdbcProfile) {
     patientById(study.patientId).foreach(patient =>
       if (studiesForPatient(0, 2, patient.id).isEmpty)
         deletePatient(patient.id))
+  }
+
+}
+
+object MetaDataDAO {
+
+  def wherePart(whereParts: Option[String]*) =
+    if (whereParts.exists(_.isDefined)) " where" else ""
+
+  def orderByPart(orderBy: Option[String], orderAscending: Boolean) =
+    orderBy.map(orderByValue =>
+      s""" order by "$orderByValue" ${if (orderAscending) "asc" else "desc"}""")
+      .getOrElse("")
+
+  def pagePart(startIndex: Long, count: Long) = s""" limit $count offset $startIndex"""
+
+  def wherePart(part: String): String =
+    if (part.length > 0) s" where $part" else ""
+
+  def queryPart(queryProperties: Seq[QueryProperty]): String =
+    queryProperties.map(queryPropertyToPart).mkString(" and ")
+
+  def queryPropertyToPart(queryProperty: QueryProperty) = {
+    val valuePart =
+      if (queryProperty.operator == EQUALS)
+        s"'${queryProperty.propertyValue}'"
+      else
+        s"'%${queryProperty.propertyValue}%'"
+    s""""${queryProperty.propertyName}" ${queryProperty.operator.toString} $valuePart"""
   }
 
 }

@@ -11,24 +11,11 @@ angular.module('slicebox.transactions', ['ngRoute'])
   });
 })
 
-.controller('TransactionsCtrl', function($scope, $http, $q, sbxMisc, openTagSeriesModal) {
+.controller('TransactionsCtrl', function($scope) {
     $scope.uiState = {};
-
-    $scope.openTagSeriesModalFunction = function(urlPrefix) {
-        return function(inboxEntries) {
-            var inboxEntryIds = inboxEntries.map(function (inboxEntry) { return inboxEntry.id; });
-            var imagesPromises = inboxEntryIds.map(function (inboxEntryId) { return $http.get(urlPrefix + inboxEntryId + "/images").then(function (imagesData) { return imagesData.data; }); });
-            var imagesPromise = $q.all(imagesPromises).then(function (listOfImageLists) { return sbxMisc.flatten(listOfImageLists); });
-            var seriesIdsPromise = imagesPromise.then(function (images) { return images.map(function (image) { return image.seriesId; }); });
-            var uniqueSeriesIdsPromise = seriesIdsPromise.then(function (seriesIds) { return sbxMisc.unique(seriesIds); });
-
-            return openTagSeriesModal(uniqueSeriesIdsPromise);
-        };
-    };
-
 })
 
-.controller('InboxCtrl', function($scope, $http, $interval, $mdDialog, openDeleteEntitiesModalFunction) {
+.controller('InboxCtrl', function($scope, $http, $interval, $mdDialog, openDeleteEntitiesModalFunction, openTagSeriesModalFunction) {
     // Initialization
     $scope.objectActions =
         [
@@ -38,7 +25,7 @@ angular.module('slicebox.transactions', ['ngRoute'])
             },
             {
                 name: 'Tag Series',
-                action: $scope.openTagSeriesModalFunction('/api/inbox/')
+                action: openTagSeriesModalFunction('/api/inbox/')
             }
         ];
 
@@ -161,7 +148,7 @@ angular.module('slicebox.transactions', ['ngRoute'])
 
 })
 
-.controller('SentCtrl', function($scope, $http, $interval, $mdDialog, openDeleteEntitiesModalFunction, openAddEntityModal) {
+.controller('SentCtrl', function($scope, $http, $interval, $mdDialog, openDeleteEntitiesModalFunction, openAddEntityModal, openTagSeriesModalFunction) {
     // Initialization
     $scope.objectActions =
         [
@@ -171,7 +158,7 @@ angular.module('slicebox.transactions', ['ngRoute'])
             },
             {
                 name: 'Tag Series',
-                action: $scope.openTagSeriesModalFunction('/api/sent/')
+                action: openTagSeriesModalFunction('/api/sent/')
             }
         ];
 

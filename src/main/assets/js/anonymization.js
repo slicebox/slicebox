@@ -11,7 +11,7 @@ angular.module('slicebox.anonymization', ['ngRoute'])
   });
 })
 
-.controller('AnonymizationCtrl', function($scope, $http, $interval, openMessageModal, openDeleteEntitiesModalFunction, sbxToast) {
+.controller('AnonymizationCtrl', function($scope, $http, $interval, openMessageModal, openDeleteEntitiesModalFunction, openTagSeriesModalFunction, sbxToast) {
     // Initialization
     $scope.actions =
         [
@@ -22,7 +22,11 @@ angular.module('slicebox.anonymization', ['ngRoute'])
             {
                 name: 'Export',
                 action: $scope.exportToCsv
-            }
+            },
+            {
+                name: 'Tag Series',
+                action: openTagSeriesModalFunction('/api/anonymization/keys/')
+            }            
         ];
 
     $scope.callbacks = {};

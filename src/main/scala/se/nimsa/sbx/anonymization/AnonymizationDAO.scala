@@ -21,6 +21,7 @@ import org.h2.jdbc.JdbcSQLException
 import scala.slick.jdbc.meta.MTable
 import scala.slick.jdbc.{ GetResult, StaticQuery => Q }
 import se.nimsa.sbx.dicom.DicomProperty
+import se.nimsa.sbx.metadata.MetaDataProtocol._
 import AnonymizationProtocol._
 
 class AnonymizationDAO(val driver: JdbcProfile) {
@@ -84,11 +85,19 @@ class AnonymizationDAO(val driver: JdbcProfile) {
       !tables(0).getColumns.list.filter(_.name == columnName).isEmpty
   }
 
+  def checkColumnExists(columnName: String, tableNames: String*)(implicit session: Session) =
+    if (!tableNames.exists(tableName => columnExists(tableName, columnName)))
+      throw new IllegalArgumentException(s"Property $columnName does not exist")
+
   def checkOrderBy(orderBy: Option[String], tableNames: String*)(implicit session: Session) =
     orderBy.foreach(columnName =>
       if (!tableNames.exists(tableName =>
         columnExists(tableName, columnName)))
         throw new IllegalArgumentException(s"Property $columnName does not exist"))
+
+  def listAnonymizationKeys(implicit session: Session) = anonymizationKeyQuery.list
+
+  def listAnonymizationKeyImages(implicit session: Session) = anonymizationKeyImageQuery.list
 
   def anonymizationKeys(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String])(implicit session: Session): List[AnonymizationKey] = {
 
@@ -119,6 +128,9 @@ class AnonymizationDAO(val driver: JdbcProfile) {
 
     Q.queryNA(query).list
   }
+
+  def anonymizationKeyForId(id: Long)(implicit session: Session): Option[AnonymizationKey] =
+    anonymizationKeyQuery.filter(_.id === id).firstOption
 
   def insertAnonymizationKey(entry: AnonymizationKey)(implicit session: Session): AnonymizationKey = {
     val generatedId = (anonymizationKeyQuery returning anonymizationKeyQuery.map(_.id)) += entry
@@ -153,10 +165,31 @@ class AnonymizationDAO(val driver: JdbcProfile) {
       key <- anonymizationKeyQuery
       image <- anonymizationKeyImageQuery if image.anonymizationKeyId === key.id
     } yield (key, image)
-    join.filter(_._2.imageId === imageId).map(_._1).list    
+    join.filter(_._2.imageId === imageId).map(_._1).list
   }
-  
-  def removeAnonymizationKeyImagesForImageId(imageId: Long)(implicit session: Session) = 
+
+  def removeAnonymizationKeyImagesForImageId(imageId: Long)(implicit session: Session) =
     anonymizationKeyImageQuery.filter(_.imageId === imageId).delete
-  
+
+  val anonymizationKeysGetResult = GetResult(r =>
+    AnonymizationKey(r.nextLong, r.nextLong, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString))
+
+  val queryAnonymizationKeysSelectPart = """select * from "AnonymizationKeys""""
+
+  def queryAnonymizationKeys(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, queryProperties: Seq[QueryProperty])(implicit session: Session): List[AnonymizationKey] = {
+    import se.nimsa.sbx.metadata.MetaDataDAO._
+
+    orderBy.foreach(checkColumnExists(_, "AnonymizationKeys"))
+    queryProperties.foreach(qp => checkColumnExists(qp.propertyName, "AnonymizationKeys"))
+
+    implicit val getResult = anonymizationKeysGetResult
+
+    val query = queryAnonymizationKeysSelectPart +
+      wherePart(queryPart(queryProperties)) +
+      orderByPart(orderBy, orderAscending) +
+      pagePart(startIndex, count)
+
+    Q.queryNA(query).list
+  }
+
 }

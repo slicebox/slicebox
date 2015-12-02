@@ -174,6 +174,8 @@ trait JsonFormats extends DefaultJsonProtocol {
   implicit val queryFiltersFormat = jsonFormat3(QueryFilters)
   implicit val queryFormat = jsonFormat5(Query)
   
+  implicit val anonymizationKeyQueryFormat = jsonFormat4(AnonymizationKeyQuery)
+  
   implicit val seriesTypeFormat = jsonFormat2(SeriesType)
   
   implicit val seriesTagFormat = jsonFormat2(SeriesTag)

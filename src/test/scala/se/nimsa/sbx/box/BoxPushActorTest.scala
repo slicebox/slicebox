@@ -59,7 +59,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
   val failResponse = HttpResponse(InternalServerError)
 
   val storageService = system.actorOf(Props[MockupStorageActor], name = "StorageService")
-  val anonymizationService = system.actorOf(AnonymizationServiceActor.props(dbProps), name = "AnonymizationService")
+  val anonymizationService = system.actorOf(AnonymizationServiceActor.props(dbProps, 5.minutes), name = "AnonymizationService")
   val boxPushActorRef = system.actorOf(Props(new BoxPushActor(testBox, dbProps, Timeout(30.seconds), 1000.hours, 1000.hours, "../StorageService", "../AnonymizationService") {
 
     override def sendFilePipeline = {
