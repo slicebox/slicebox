@@ -1276,6 +1276,7 @@
             "description": "the newly created anonymous image",
             "schema": {
               "$ref": "#/definitions/image"
+            }
           },
           "404": {
             "description": "image or corresponding dataset not found"
