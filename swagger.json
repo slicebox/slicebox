@@ -1397,7 +1397,7 @@
     },
 
     "/anonymization/keys/{id}": {
-      "get" {
+      "get": {
         "description": "get the anonymization key with the supplied ID",
         "tags": ["Anonymization"],
         "parameters": [
@@ -1420,6 +1420,7 @@
           "404": {
             "description": "if no anonymization key could be found for the supplied ID"
           }
+        }
       },
       "delete": {        
         "description": "delete an anonymization key that is no longer of interest",
