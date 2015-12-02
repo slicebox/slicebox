@@ -438,7 +438,7 @@ class PropertiesDAO(val driver: JdbcProfile) {
   def isWithAdvancedFiltering(arrays: Seq[_ <: Any]*) = arrays.exists(!_.isEmpty)
 
   def patientsBasePart = s"""select distinct("Patients"."id"),
-       "Patients"."PatientName","Patients"."PatientID","Patients"."PatientBirthDate","Patients"."PatientSex"
+       "Patients"."patientName","Patients"."patientID","Patients"."patientBirthDate","Patients"."patientSex"
        from "Series" 
        inner join "Patients" on "Studies"."patientId" = "Patients"."id"
        inner join "Studies" on "Series"."studyId" = "Studies"."id""""
@@ -491,7 +491,7 @@ class PropertiesDAO(val driver: JdbcProfile) {
       implicit val getResult = studiesGetResult
 
       val basePart = s"""select distinct("Studies"."id"),
-        "Studies"."patientId","Studies"."StudyInstanceUID","Studies"."StudyDescription","Studies"."StudyDate","Studies"."StudyID","Studies"."AccessionNumber","Studies"."PatientAge"
+        "Studies"."patientId","Studies"."studyInstanceUID","Studies"."studyDescription","Studies"."studyDate","Studies"."studyID","Studies"."accessionNumber","Studies"."patientAge"
         from "Series" 
         inner join "Studies" on "Series"."studyId" = "Studies"."id""""
 
@@ -526,7 +526,7 @@ class PropertiesDAO(val driver: JdbcProfile) {
       implicit val getResult = seriesGetResult
 
       val basePart = s"""select distinct("Series"."id"),
-        "Series"."studyId","Series"."SeriesInstanceUID","Series"."SeriesDescription","Series"."SeriesDate","Series"."Modality","Series"."ProtocolName","Series"."BodyPartExamined","Series"."Manufacturer","Series"."StationName","Series"."FrameOfReferenceUID"
+        "Series"."studyId","Series"."seriesInstanceUID","Series"."seriesDescription","Series"."seriesDate","Series"."modality","Series"."protocolName","Series"."bodyPartExamined","Series"."manufacturer","Series"."stationName","Series"."frameOfReferenceUID"
         from "Series""""
 
       val wherePart = s"""

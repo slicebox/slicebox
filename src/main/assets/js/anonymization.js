@@ -31,7 +31,7 @@ angular.module('slicebox.anonymization', ['ngRoute'])
     $scope.loadAnonymizationKeyPage = function(startIndex, count, orderByProperty, orderByDirection, filter) {
         var loadUrl = '/api/anonymization/keys?startindex=' + startIndex + '&count=' + count;
         if (orderByProperty) {
-            loadUrl = loadUrl + '&orderby=' + orderByProperty.toLowerCase();
+            loadUrl = loadUrl + '&orderby=' + orderByProperty;
             
             if (orderByDirection === 'ASCENDING') {
                 loadUrl = loadUrl + '&orderascending=true';
@@ -69,4 +69,9 @@ angular.module('slicebox.anonymization', ['ngRoute'])
         var body = anchor + textBoxHeader + textBox;
         openMessageModal("Download or copy CSV", body);
     };
+
+    function capitalizeFirst(string) {
+        return string.charAt(0).toUpperCase() + string.substring(1);        
+    }
+
 });

@@ -30,21 +30,21 @@ class AnonymizationDAO(val driver: JdbcProfile) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def created = column[Long]("created")
     def patientName = column[String](DicomProperty.PatientName.name)
-    def anonPatientName = column[String]("anon" + DicomProperty.PatientName.name)
+    def anonPatientName = column[String]("anonPatientName")
     def patientID = column[String](DicomProperty.PatientID.name)
-    def anonPatientID = column[String]("anon" + DicomProperty.PatientID.name)
+    def anonPatientID = column[String]("anonPatientID")
     def patientBirthDate = column[String](DicomProperty.PatientBirthDate.name)
     def studyInstanceUID = column[String](DicomProperty.StudyInstanceUID.name)
-    def anonStudyInstanceUID = column[String]("anon" + DicomProperty.StudyInstanceUID.name)
+    def anonStudyInstanceUID = column[String]("anonStudyInstanceUID")
     def studyDescription = column[String](DicomProperty.StudyDescription.name)
     def studyID = column[String](DicomProperty.StudyID.name)
     def accessionNumber = column[String](DicomProperty.AccessionNumber.name)
     def seriesInstanceUID = column[String](DicomProperty.SeriesInstanceUID.name)
-    def anonSeriesInstanceUID = column[String]("anon" + DicomProperty.SeriesInstanceUID.name)
+    def anonSeriesInstanceUID = column[String]("anonSeriesInstanceUID")
     def seriesDescription = column[String](DicomProperty.SeriesDescription.name)
     def protocolName = column[String](DicomProperty.ProtocolName.name)
     def frameOfReferenceUID = column[String](DicomProperty.FrameOfReferenceUID.name)
-    def anonFrameOfReferenceUID = column[String]("anon" + DicomProperty.FrameOfReferenceUID.name)
+    def anonFrameOfReferenceUID = column[String]("anonFrameOfReferenceUID")
     def * = (id, created,
       patientName, anonPatientName, patientID, anonPatientID, patientBirthDate,
       studyInstanceUID, anonStudyInstanceUID, studyDescription, studyID, accessionNumber,
@@ -102,14 +102,14 @@ class AnonymizationDAO(val driver: JdbcProfile) {
     filter.foreach(filterValue => {
       val filterValueLike = s"'%$filterValue%'".toLowerCase
       query += s""" where 
-        lcase("PatientName") like $filterValueLike or 
+        lcase("patientName") like $filterValueLike or 
           lcase("anonPatientName") like $filterValueLike or 
-            lcase("PatientID") like $filterValueLike or 
+            lcase("patientID") like $filterValueLike or 
               lcase("anonPatientID") like $filterValueLike or
-                lcase("StudyDescription") like $filterValueLike or
-                  lcase("AccessionNumber") like $filterValueLike or
-                    lcase("SeriesDescription") like $filterValueLike or
-                      lcase("ProtocolName") like $filterValueLike"""
+                lcase("studyDescription") like $filterValueLike or
+                  lcase("accessionNumber") like $filterValueLike or
+                    lcase("seriesDescription") like $filterValueLike or
+                      lcase("protocolName") like $filterValueLike"""
     })
 
     orderBy.foreach(orderByValue =>

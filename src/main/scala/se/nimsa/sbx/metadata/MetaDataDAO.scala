@@ -225,10 +225,10 @@ class MetaDataDAO(val driver: JdbcProfile) {
   def patientsFilterPart(filter: Option[String]) =
     filter.map(filterValue => {
       val filterValueLike = s"'%$filterValue%'".toLowerCase
-      s""" (lcase("PatientName") like $filterValueLike or 
-           lcase("PatientID") like $filterValueLike or 
-           lcase("PatientBirthDate") like $filterValueLike or 
-           lcase("PatientSex") like $filterValueLike)"""
+      s""" (lcase("patientName") like $filterValueLike or 
+           lcase("patientID") like $filterValueLike or 
+           lcase("patientBirthDate") like $filterValueLike or 
+           lcase("patientSex") like $filterValueLike)"""
     })
       .getOrElse("")
 
@@ -240,10 +240,10 @@ class MetaDataDAO(val driver: JdbcProfile) {
   def pagePart(startIndex: Long, count: Long) = s""" limit $count offset $startIndex"""
 
   val queryPatientsSelectPart = """select distinct("Patients"."id"),
-      "Patients"."PatientName",
-      "Patients"."PatientID",
-      "Patients"."PatientBirthDate",
-      "Patients"."PatientSex" from "Patients"
+      "Patients"."patientName",
+      "Patients"."patientID",
+      "Patients"."patientBirthDate",
+      "Patients"."patientSex" from "Patients"
       left join "Studies" on "Studies"."patientId" = "Patients"."id"
       left join "Series" on "Series"."studyId" = "Studies"."id""""
 
@@ -267,12 +267,12 @@ class MetaDataDAO(val driver: JdbcProfile) {
 
   val queryStudiesSelectPart = """select distinct("Studies"."id"),
       "Studies"."patientId",
-      "Studies"."StudyInstanceUID",
-      "Studies"."StudyDescription",
-      "Studies"."StudyDate",
-      "Studies"."StudyID",
-      "Studies"."AccessionNumber",
-      "Studies"."PatientAge" from "Studies"
+      "Studies"."studyInstanceUID",
+      "Studies"."studyDescription",
+      "Studies"."studyDate",
+      "Studies"."studyID",
+      "Studies"."accessionNumber",
+      "Studies"."patientAge" from "Studies"
       left join "Patients" on "Patients"."id" = "Studies"."patientId"
       left join "Series" on "Series"."studyId" = "Studies"."id""""
 
@@ -296,15 +296,15 @@ class MetaDataDAO(val driver: JdbcProfile) {
 
   val querySeriesSelectPart = """select distinct("Series"."id"),
       "Series"."studyId",
-      "Series"."SeriesInstanceUID",
-      "Series"."SeriesDescription",
-      "Series"."SeriesDate",
-      "Series"."Modality",
-      "Series"."ProtocolName",
-      "Series"."BodyPartExamined",
-      "Series"."Manufacturer",
-      "Series"."StationName",
-      "Series"."FrameOfReferenceUID" from "Series"
+      "Series"."seriesInstanceUID",
+      "Series"."seriesDescription",
+      "Series"."seriesDate",
+      "Series"."modality",
+      "Series"."protocolName",
+      "Series"."bodyPartExamined",
+      "Series"."manufacturer",
+      "Series"."stationName",
+      "Series"."frameOfReferenceUID" from "Series"
       left join "Studies" on "Studies"."id" = "Series"."studyId"
       left join "Patients" on "Patients"."id" = "Studies"."patientId""""
 
@@ -328,9 +328,9 @@ class MetaDataDAO(val driver: JdbcProfile) {
 
   val queryImagesSelectPart = """select distinct("Images"."id"),
       "Images"."seriesId",
-      "Images"."SOPInstanceUID",
-      "Images"."ImageType",
-      "Images"."InstanceNumber" from "Images"
+      "Images"."sopInstanceUID",
+      "Images"."imageType",
+      "Images"."instanceNumber" from "Images"
       left join "Series" on "Series"."id" = "Images"."seriesId"
       left join "Studies" on "Studies"."id" = "Series"."studyId"
       left join "Patients" on "Patients"."id" = "Studies"."patientId""""
@@ -375,9 +375,9 @@ class MetaDataDAO(val driver: JdbcProfile) {
     if (part.length > 0) s" where $part" else ""
 
   val flatSeriesBasePart = """select distinct("Series"."id"), 
-      "Patients"."id","Patients"."PatientName","Patients"."PatientID","Patients"."PatientBirthDate","Patients"."PatientSex", 
-      "Studies"."id","Studies"."patientId","Studies"."StudyInstanceUID","Studies"."StudyDescription","Studies"."StudyDate","Studies"."StudyID","Studies"."AccessionNumber","Studies"."PatientAge",
-      "Series"."id","Series"."studyId","Series"."SeriesInstanceUID","Series"."SeriesDescription","Series"."SeriesDate","Series"."Modality","Series"."ProtocolName","Series"."BodyPartExamined","Series"."Manufacturer","Series"."StationName","Series"."FrameOfReferenceUID"
+      "Patients"."id","Patients"."patientName","Patients"."patientID","Patients"."patientBirthDate","Patients"."patientSex", 
+      "Studies"."id","Studies"."patientId","Studies"."studyInstanceUID","Studies"."studyDescription","Studies"."studyDate","Studies"."studyID","Studies"."accessionNumber","Studies"."patientAge",
+      "Series"."id","Series"."studyId","Series"."seriesInstanceUID","Series"."seriesDescription","Series"."seriesDate","Series"."modality","Series"."protocolName","Series"."bodyPartExamined","Series"."manufacturer","Series"."stationName","Series"."frameOfReferenceUID"
        from "Series" 
        inner join "Studies" on "Series"."studyId" = "Studies"."id" 
        inner join "Patients" on "Studies"."patientId" = "Patients"."id""""
@@ -407,22 +407,22 @@ class MetaDataDAO(val driver: JdbcProfile) {
     filter.map(filterValue => {
       val filterValueLike = s"'%$filterValue%'".toLowerCase
       s""" (lcase("Series"."id") like $filterValueLike or
-           lcase("PatientName") like $filterValueLike or 
-           lcase("PatientID") like $filterValueLike or 
-           lcase("PatientBirthDate") like $filterValueLike or 
-           lcase("PatientSex") like $filterValueLike or
-             lcase("StudyDescription") like $filterValueLike or
-             lcase("StudyDate") like $filterValueLike or
-             lcase("StudyID") like $filterValueLike or
-             lcase("AccessionNumber") like $filterValueLike or
-             lcase("PatientAge") like $filterValueLike or
-                 lcase("SeriesDescription") like $filterValueLike or
-                 lcase("SeriesDate") like $filterValueLike or
-                 lcase("Modality") like $filterValueLike or
-                 lcase("ProtocolName") like $filterValueLike or
-                 lcase("BodyPartExamined") like $filterValueLike or
-                 lcase("Manufacturer") like $filterValueLike or
-                 lcase("StationName") like $filterValueLike)"""
+           lcase("patientName") like $filterValueLike or 
+           lcase("patientID") like $filterValueLike or 
+           lcase("patientBirthDate") like $filterValueLike or 
+           lcase("patientSex") like $filterValueLike or
+             lcase("studyDescription") like $filterValueLike or
+             lcase("studyDate") like $filterValueLike or
+             lcase("studyID") like $filterValueLike or
+             lcase("accessionNumber") like $filterValueLike or
+             lcase("patientAge") like $filterValueLike or
+                 lcase("seriesDescription") like $filterValueLike or
+                 lcase("seriesDate") like $filterValueLike or
+                 lcase("modality") like $filterValueLike or
+                 lcase("protocolName") like $filterValueLike or
+                 lcase("bodyPartExamined") like $filterValueLike or
+                 lcase("manufacturer") like $filterValueLike or
+                 lcase("stationName") like $filterValueLike)"""
     })
       .getOrElse("")
 

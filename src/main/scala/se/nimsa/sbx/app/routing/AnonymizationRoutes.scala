@@ -32,6 +32,7 @@ import se.nimsa.sbx.dicom.DicomUtil
 import se.nimsa.sbx.dicom.ImageAttribute
 import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.user.UserProtocol.ApiUser
+import se.nimsa.sbx.util.SbxExtensions._
 import spray.http.ContentType.apply
 import spray.http.FormFile
 import spray.http.HttpData
@@ -49,30 +50,29 @@ trait AnonymizationRoutes { this: RestApi =>
     path("images" / LongNumber / "anonymize") { imageId =>
       put {
         entity(as[Seq[TagValue]]) { tagValues =>
-          onSuccess(storageService.ask(GetDataset(imageId, true)).mapTo[Option[Attributes]]) {
-            _ match {
-
-              case Some(dataset) =>
-                AnonymizationUtil.setAnonymous(dataset, false) // pretend not anonymized to force anonymization
-                onSuccess(anonymizationService.ask(Anonymize(imageId, dataset, tagValues)).mapTo[Attributes]) { anonDataset =>
-                  onSuccess(storageService.ask(DeleteImage(imageId))) {
-                    case ImageDeleted(imageId) =>
-                      val source = Source(SourceType.USER, apiUser.user, apiUser.id)
-                      onSuccess(storageService.ask(AddDataset(anonDataset, source))) {
-                        case ImageAdded(image, source) =>
-                          complete(NoContent)
-                      }
-                  }
-                }
-
-              case None =>
-                complete(NotFound)
-            }
+          onSuccess(anonymizeOne(apiUser, imageId, tagValues)) {
+            case Some(_) => complete(NoContent)
+            case None    => complete(NotFound)
           }
         }
       }
     } ~ pathPrefix("anonymization") {
-      pathPrefix("keys") {
+      path("anonymize") {
+        post {
+          entity(as[Seq[AnonymizationParameters]]) { anonParams =>
+            onSuccess {
+              Future.sequence {
+                anonParams.map(param => anonymizeOne(apiUser, param.imageId, param.tagValues))
+              }
+            } { result =>
+              result match {
+                case result if result.forall(_.isEmpty) => complete(NotFound)
+                case result                             => complete(NoContent)
+              }
+            }
+          }
+        }
+      } ~ pathPrefix("keys") {
         pathEndOrSingleSlash {
           get {
             parameters(
@@ -98,5 +98,20 @@ trait AnonymizationRoutes { this: RestApi =>
         }
       }
     }
+
+  def anonymizeOne(apiUser: ApiUser, imageId: Long, tagValues: Seq[TagValue]) =
+    storageService.ask(GetDataset(imageId, true)).mapTo[Option[Attributes]].map { optionalDataset =>
+      optionalDataset.map { dataset =>
+        AnonymizationUtil.setAnonymous(dataset, false) // pretend not anonymized to force anonymization
+        anonymizationService.ask(Anonymize(imageId, dataset, tagValues)).flatMap {
+          case anonDataset: Attributes =>
+            storageService.ask(DeleteImage(imageId)).flatMap {
+              case ImageDeleted(imageId) =>
+                val source = Source(SourceType.USER, apiUser.user, apiUser.id)
+                storageService.ask(AddDataset(anonDataset, source)).mapTo[ImageAdded]
+            }
+        }
+      }
+    }.unwrap
 
 }

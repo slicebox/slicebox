@@ -108,7 +108,7 @@ class AnonymizationRoutesTest extends FlatSpec with Matchers with RoutesTestBase
       val key2 = key1.copy(patientName = "A", anonPatientName = "anon A")
       val insertedKey1 = dao.insertAnonymizationKey(key1)
       val insertedKey2 = dao.insertAnonymizationKey(key2)
-      GetAsUser("/api/anonymization/keys?startindex=0&count=1&orderby=PatientName&orderascending=true") ~> routes ~> check {
+      GetAsUser("/api/anonymization/keys?startindex=0&count=1&orderby=patientName&orderascending=true") ~> routes ~> check {
         status should be(OK)
         val keys = responseAs[List[AnonymizationKey]]
         keys.length should be(1)

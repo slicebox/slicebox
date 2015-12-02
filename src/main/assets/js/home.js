@@ -248,7 +248,7 @@ angular.module('slicebox.home', ['ngRoute'])
         } else {
             var loadPatientsUrl = '/api/metadata/patients?startindex=' + startIndex + '&count=' + count;
             if (orderByProperty) {
-                var orderByPropertyName = orderByProperty === "id" ? orderByProperty : capitalizeFirst(orderByProperty.substring(0, orderByProperty.indexOf('[')));
+                var orderByPropertyName = orderByProperty === "id" ? orderByProperty : orderByProperty.substring(0, orderByProperty.indexOf('['));
                 loadPatientsUrl = loadPatientsUrl + '&orderby=' + orderByPropertyName;
                 
                 if (orderByDirection === 'ASCENDING') {
@@ -337,7 +337,7 @@ angular.module('slicebox.home', ['ngRoute'])
     $scope.loadFlatSeries = function(startIndex, count, orderByProperty, orderByDirection, filter) {
         var loadFlatSeriesUrl = '/api/metadata/flatseries?startindex=' + startIndex + '&count=' + count;
         if (orderByProperty) {
-            var orderByPropertyName = orderByProperty == "id" ? orderByProperty : capitalizeFirst(orderByProperty.substring(orderByProperty.indexOf('.') + 1, orderByProperty.indexOf('[')));
+            var orderByPropertyName = orderByProperty == "id" ? orderByProperty : orderByProperty.substring(orderByProperty.indexOf('.') + 1, orderByProperty.indexOf('['));
             loadFlatSeriesUrl = loadFlatSeriesUrl + '&orderby=' + orderByPropertyName;
             
             if (orderByDirection === 'ASCENDING') {
@@ -648,10 +648,6 @@ angular.module('slicebox.home', ['ngRoute'])
         });
     }
 
-    function capitalizeFirst(string) {
-        return string.charAt(0).toUpperCase() + string.substring(1);        
-    }
-
     function confirmSend(receiversUrl, receiverSelectedCallback) {
         return $mdDialog.show({
                 templateUrl: '/assets/partials/sendImageFilesModalContent.html',
@@ -804,12 +800,9 @@ angular.module('slicebox.home', ['ngRoute'])
 
     function anonymizeImages(imageIdsAndPatientsPromise) {
         return showBoxSendTagValuesModal(imageIdsAndPatientsPromise, function(imageTagValuesSeq) {
-            var promises = imageTagValuesSeq.map(function(imageTagValues) {
-                return $http.put('/api/images/' + imageTagValues.imageId + '/anonymize', imageTagValues.tagValues);
-            });
-            var allPromise = $q.all(promises);
+            var promise = $http.post('/api/anonymization/anonymize', imageTagValuesSeq);
 
-            allPromise.finally(function () {
+            promise.finally(function () {
                 $scope.patientSelected(null);        
                 $scope.callbacks.patientsTable.reset();
                 if ($scope.callbacks.flatSeriesTable) {
@@ -818,7 +811,7 @@ angular.module('slicebox.home', ['ngRoute'])
                 updateSeriesTagsPromise();
             });
 
-            return allPromise;
+            return promise;
         }, "anonymized", "anonymize");
     }
 

@@ -50,7 +50,7 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
 
     // then    
-    GetAsUser("/api/metadata/patients?orderby=PatientID") ~> routes ~> check {
+    GetAsUser("/api/metadata/patients?orderby=patientID") ~> routes ~> check {
       status should be(OK)
       responseAs[List[Patient]] should have size 1
     }
@@ -84,7 +84,7 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
 
     // then
-    val queryProperties = Seq(QueryProperty("PatientName", QueryOperator.EQUALS, "p1"))
+    val queryProperties = Seq(QueryProperty("patientName", QueryOperator.EQUALS, "p1"))
     val query = Query(0, 10, None, queryProperties, None)
 
     PostAsUser("/api/metadata/patients/query", query) ~> routes ~> check {
@@ -101,7 +101,7 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
 
     // then
-    val query = Query(0, 10, None, Seq(QueryProperty("PatientName", QueryOperator.LIKE, "%p%")), None)
+    val query = Query(0, 10, None, Seq(QueryProperty("patientName", QueryOperator.LIKE, "%p%")), None)
 
     PostAsUser("/api/metadata/patients/query", query) ~> routes ~> check {
       status should be(OK)
@@ -121,7 +121,7 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
 
     // then
-    val query = Query(0, 10, Some(QueryOrder("PatientName", false)), Seq[QueryProperty](), None)
+    val query = Query(0, 10, Some(QueryOrder("patientName", false)), Seq[QueryProperty](), None)
 
     PostAsUser("/api/metadata/patients/query", query) ~> routes ~> check {
       status should be(OK)
@@ -141,7 +141,7 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
 
     // then
-    val query = Query(1, 1, Some(QueryOrder("PatientName", false)), Seq[QueryProperty](), None)
+    val query = Query(1, 1, Some(QueryOrder("patientName", false)), Seq[QueryProperty](), None)
 
     PostAsUser("/api/metadata/patients/query", query) ~> routes ~> check {
       status should be(OK)
@@ -246,7 +246,7 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
 
     // then
-    val queryProperties = Seq(QueryProperty("StudyInstanceUID", QueryOperator.EQUALS, "stuid1"))
+    val queryProperties = Seq(QueryProperty("studyInstanceUID", QueryOperator.EQUALS, "stuid1"))
     val query = Query(0, 10, None, queryProperties, None)
 
     PostAsUser("/api/metadata/studies/query", query) ~> routes ~> check {
@@ -262,7 +262,7 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
 
     // then
-    val queryProperties = Seq(QueryProperty("SeriesInstanceUID", QueryOperator.EQUALS, "seuid1"))
+    val queryProperties = Seq(QueryProperty("seriesInstanceUID", QueryOperator.EQUALS, "seuid1"))
     val query = Query(0, 10, None, queryProperties, None)
 
     PostAsUser("/api/metadata/series/query", query) ~> routes ~> check {
@@ -278,7 +278,7 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
 
     // then
-    val queryProperties = Seq(QueryProperty("InstanceNumber", QueryOperator.EQUALS, "1"))
+    val queryProperties = Seq(QueryProperty("instanceNumber", QueryOperator.EQUALS, "1"))
     val query = Query(0, 10, None, queryProperties, None)
 
     PostAsUser("/api/metadata/images/query", query) ~> routes ~> check {
@@ -294,7 +294,7 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
 
     // then
-    val queryProperties = Seq(QueryProperty("SeriesInstanceUID", QueryOperator.EQUALS, "seuid1"))
+    val queryProperties = Seq(QueryProperty("seriesInstanceUID", QueryOperator.EQUALS, "seuid1"))
     val query = Query(0, 10, None, queryProperties, None)
 
     PostAsUser("/api/metadata/flatseries/query", query) ~> sealRoute(routes) ~> check {
@@ -323,7 +323,7 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
 
     // then    
-    GetAsUser("/api/metadata/flatseries?orderby=PatientID") ~> routes ~> check {
+    GetAsUser("/api/metadata/flatseries?orderby=patientID") ~> routes ~> check {
       status should be(OK)
       responseAs[List[FlatSeries]].size should be(4)
     }
