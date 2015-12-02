@@ -1336,6 +1336,35 @@
       }
     },
 
+    "/anonymization/anonymize": {
+      "post": {
+        "description": "anonymize the images corresponding to the supplied list of image IDs (each paired with a list of DICOM tag translation). This route corresponds to repeated use of the route /images/{id}/anonymize.",
+        "tags": ["Anonymization"],
+        "parameters": [
+          {
+            "name": "query",
+            "in": "body",
+            "description": "parameters of anonymization key query",
+            "required": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/imageTagValues"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "if at least one image was found and anonymized given the supplied image IDs",
+          },
+          "404": {
+            "description": "if no images could be found given the supplied image IDs"
+          }
+        }
+      }
+    },
+
     "/anonymization/keys": {
       "get": {
         "description": "get a list of anonymization keys, each specifying how vital DICOM attributes have been anonymized for a particular image",
@@ -1469,6 +1498,35 @@
           },          
           "404": {
             "description": "if no anonymization key could be found for the supplied ID"
+          }
+        }
+      }
+    },
+
+    "/anonymization/keys/query": {
+      "post": {
+        "description": "submit a query for anonymization keys",
+        "tags": ["Anonymization"],
+        "parameters": [
+          {
+            "name": "query",
+            "in": "body",
+            "description": "parameters of anonymization key query",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/anonymizationKeyQuery"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "anonymization keys",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/anonymizationKey"
+              }
+            }
           }
         }
       }
@@ -2944,6 +3002,32 @@
         "imageId": {
           "type": "integer",
           "format": "int64"          
+        }
+      }
+    },
+    "anonymizationKeyQuery": {
+      "required": [
+        "startIndex",
+        "count",
+        "queryProperties"
+      ],
+      "properties": {
+        "startIndex": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "count": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "order": {
+          "$ref": "#/definitions/queryOrder"
+        },
+        "queryProperties": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/queryProperty"
+          }
         }
       }
     },
