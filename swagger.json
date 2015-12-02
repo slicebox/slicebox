@@ -1364,6 +1364,7 @@
               "items": {
                 "$ref": "#/definitions/image"
               }
+            }
           }
         }
       }
