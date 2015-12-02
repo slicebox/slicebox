@@ -1397,6 +1397,30 @@
     },
 
     "/anonymization/keys/{id}": {
+      "get" {
+        "description": "get the anonymization key with the supplied ID",
+        "tags": ["Anonymization"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of anonymization key",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "anonymization key for the supplied ID",
+            "schema": {
+              "$ref": "#/definitions/anonymizationKey"
+            }
+          },          
+          "404": {
+            "description": "if no anonymization key could be found for the supplied ID"
+          }
+      },
       "delete": {        
         "description": "delete an anonymization key that is no longer of interest",
         "tags": ["Anonymization"],
