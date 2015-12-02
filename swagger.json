@@ -3262,9 +3262,6 @@
     },
     "dicomPropertyValue": {
       "properties": {
-        "property": {
-          "$ref": "#/definitions/dicomProperty"
-        },
         "value": {
           "type": "string"
         }
