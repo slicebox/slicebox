@@ -1356,7 +1356,7 @@
         ],
         "responses": {
           "204": {
-            "description": "if at least one image was found and anonymized given the supplied image IDs",
+            "description": "if at least one image was found and anonymized given the supplied image IDs"
           },
           "404": {
             "description": "if no images could be found given the supplied image IDs"
