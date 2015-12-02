@@ -1272,8 +1272,10 @@
           }
         ],
         "responses": {
-          "201": {
-            "description": "image anonymized"
+          "200": {
+            "description": "the newly created anonymous image",
+            "schema": {
+              "$ref": "#/definitions/image"
           },
           "404": {
             "description": "image or corresponding dataset not found"
@@ -1355,11 +1357,13 @@
           }
         ],
         "responses": {
-          "204": {
-            "description": "if at least one image was found and anonymized given the supplied image IDs"
-          },
-          "404": {
-            "description": "if no images could be found given the supplied image IDs"
+          "200": {
+            "description": "the list of newly created anonymous images",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/image"
+              }
           }
         }
       }
