@@ -23,12 +23,12 @@ import spray.http.HttpEntity
 import spray.http.StatusCodes._
 import spray.httpx.SprayJsonSupport._
 import spray.routing._
-import se.nimsa.sbx.app.RestApi
+import se.nimsa.sbx.app.SliceboxService
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
 import se.nimsa.sbx.user.UserProtocol._
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 
-trait SeriesTypeRoutes { this: RestApi =>
+trait SeriesTypeRoutes { this: SliceboxService =>
 
   def seriesTypeRoutes(apiUser: ApiUser): Route =
     pathPrefix("seriestypes") {

@@ -20,7 +20,7 @@ import scala.concurrent.duration.DurationInt
 
 import akka.actor.ActorContext
 import akka.pattern.ask
-import se.nimsa.sbx.app.RestApi
+import se.nimsa.sbx.app.SliceboxService
 import se.nimsa.sbx.user.UserProtocol._
 import se.nimsa.sbx.box.BoxProtocol.Boxes
 import se.nimsa.sbx.box.BoxProtocol.GetBoxes
@@ -34,7 +34,7 @@ import se.nimsa.sbx.app.GeneralProtocol._
 import spray.httpx.SprayJsonSupport._
 import spray.routing.Route
 
-trait GeneralRoutes { this: RestApi =>
+trait GeneralRoutes { this: SliceboxService =>
 
   def generalRoutes(apiUser: ApiUser): Route =
     pathPrefix("system") {

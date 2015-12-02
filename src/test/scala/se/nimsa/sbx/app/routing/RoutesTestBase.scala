@@ -8,7 +8,7 @@ import org.scalatest.BeforeAndAfterAll
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.Suite
 
-import se.nimsa.sbx.app.RestApi
+import se.nimsa.sbx.app.SliceboxService
 import se.nimsa.sbx.user.UserProtocol.ClearTextUser
 import se.nimsa.sbx.user.UserProtocol.UserRole
 import se.nimsa.sbx.util.TestUtil
@@ -21,7 +21,7 @@ import spray.testkit.ScalatestRouteTest
 import spray.http.HttpHeaders.`Remote-Address`
 import spray.http.HttpHeaders.`User-Agent`
 
-trait RoutesTestBase extends ScalatestRouteTest with RestApi with BeforeAndAfterAll with BeforeAndAfterEach { this: Suite =>
+trait RoutesTestBase extends ScalatestRouteTest with SliceboxService with BeforeAndAfterAll with BeforeAndAfterEach { this: Suite =>
 
   implicit val routeTestTimeout = RouteTestTimeout(10.seconds)
 

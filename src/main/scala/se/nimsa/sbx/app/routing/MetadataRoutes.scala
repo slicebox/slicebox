@@ -21,7 +21,7 @@ import spray.http.StatusCodes.NoContent
 import spray.http.StatusCodes.Created
 import spray.httpx.SprayJsonSupport._
 import spray.routing._
-import se.nimsa.sbx.app.RestApi
+import se.nimsa.sbx.app.SliceboxService
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.app.GeneralProtocol._
@@ -35,7 +35,7 @@ import scala.concurrent.Future
 import se.nimsa.sbx.scu.ScuProtocol.GetScus
 import se.nimsa.sbx.scu.ScuProtocol.Scus
 
-trait MetadataRoutes { this: RestApi =>
+trait MetadataRoutes { this: SliceboxService =>
 
   def metaDataRoutes: Route = {
     pathPrefix("metadata") {

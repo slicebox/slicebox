@@ -53,7 +53,7 @@ import se.nimsa.sbx.user.UserServiceActor
 import spray.routing.HttpService
 import se.nimsa.sbx.log.SbxLog
 
-class RestInterface extends Actor with RestApi {
+class SliceboxServiceActor extends Actor with SliceboxService {
 
   def actorRefFactory = context
 
@@ -76,7 +76,7 @@ class RestInterface extends Actor with RestApi {
   
 }
 
-trait RestApi extends HttpService with SliceboxRoutes with JsonFormats {
+trait SliceboxService extends HttpService with SliceboxRoutes with JsonFormats {
 
   val appConfig: Config = ConfigFactory.load()
   val sliceboxConfig: Config = appConfig.getConfig("slicebox")

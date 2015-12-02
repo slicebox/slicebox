@@ -26,7 +26,7 @@ import akka.pattern.ask
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.anonymization.AnonymizationUtil
 import se.nimsa.sbx.app.GeneralProtocol._
-import se.nimsa.sbx.app.RestApi
+import se.nimsa.sbx.app.SliceboxService
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.DicomUtil
 import se.nimsa.sbx.dicom.ImageAttribute
@@ -42,7 +42,7 @@ import spray.http.StatusCodes._
 import spray.routing.Route
 import spray.routing.directives._
 
-trait ImageRoutes { this: RestApi =>
+trait ImageRoutes { this: SliceboxService =>
 
   val chunkSize = 524288
   val bufferSize = chunkSize

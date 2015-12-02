@@ -26,7 +26,7 @@ import akka.pattern.ask
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.anonymization.AnonymizationUtil
 import se.nimsa.sbx.app.GeneralProtocol._
-import se.nimsa.sbx.app.RestApi
+import se.nimsa.sbx.app.SliceboxService
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.DicomUtil
 import se.nimsa.sbx.dicom.ImageAttribute
@@ -44,7 +44,7 @@ import spray.routing.Route
 import spray.routing.directives._
 import spray.httpx.SprayJsonSupport._
 
-trait AnonymizationRoutes { this: RestApi =>
+trait AnonymizationRoutes { this: SliceboxService =>
 
   def anonymizationRoutes(apiUser: ApiUser): Route =
     path("images" / LongNumber / "anonymize") { imageId =>

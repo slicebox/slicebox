@@ -38,7 +38,7 @@ object Main extends App with LazyLogging with SslConfiguration {
 
   implicit val timeout = Timeout(70.seconds)
   implicit val ec = system.dispatcher
-  val api = system.actorOf(Props(new RestInterface()), "httpInterface")
+  val api = system.actorOf(Props(new SliceboxServiceActor()), "SliceboxService")
   IO(Http).ask(Http.Bind(listener = api, interface = host, port = port)) onComplete {
     case Success(message) =>
       SbxLog.info("System", s"Slicebox bound to $host:$port")

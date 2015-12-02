@@ -20,7 +20,7 @@ import akka.pattern.ask
 import spray.http.StatusCodes._
 import spray.httpx.SprayJsonSupport._
 import spray.routing._
-import se.nimsa.sbx.app.RestApi
+import se.nimsa.sbx.app.SliceboxService
 import se.nimsa.sbx.user.UserProtocol._
 import spray.routing.authentication.UserPass
 import spray.http.HttpCookie
@@ -34,7 +34,7 @@ import shapeless._
 import se.nimsa.sbx.user.UserServiceActor
 import spray.http.DateTime
 
-trait UserRoutes { this: RestApi =>
+trait UserRoutes { this: SliceboxService =>
 
   val extractUserAgent: HttpHeader => Option[String] = {
     case a: `User-Agent` => Some(a.value)

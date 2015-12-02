@@ -23,11 +23,11 @@ import spray.http.StatusCodes.Created
 import spray.httpx.SprayJsonSupport._
 import spray.routing._
 
-import se.nimsa.sbx.app.RestApi
+import se.nimsa.sbx.app.SliceboxService
 import se.nimsa.sbx.user.UserProtocol._
 import se.nimsa.sbx.scu.ScuProtocol._
 
-trait ScuRoutes { this: RestApi =>
+trait ScuRoutes { this: SliceboxService =>
 
   def scuRoutes(apiUser: ApiUser): Route =
     pathPrefix("scus") {

@@ -25,13 +25,13 @@ import spray.http.StatusCodes._
 import spray.httpx.SprayJsonSupport._
 import spray.routing._
 
-import se.nimsa.sbx.app.RestApi
+import se.nimsa.sbx.app.SliceboxService
 import se.nimsa.sbx.user.UserProtocol._
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.dicom.DicomUtil
 
-trait BoxRoutes { this: RestApi =>
+trait BoxRoutes { this: SliceboxService =>
 
   def boxRoutes(apiUser: ApiUser): Route =
     pathPrefix("boxes") {

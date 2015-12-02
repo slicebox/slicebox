@@ -22,10 +22,10 @@ import spray.httpx.SprayJsonSupport._
 import spray.routing._
 import spray.http.StatusCodes._
 
-import se.nimsa.sbx.app.RestApi
+import se.nimsa.sbx.app.SliceboxService
 import se.nimsa.sbx.log.LogProtocol._
 
-trait LogRoutes { this: RestApi =>
+trait LogRoutes { this: SliceboxService =>
 
   def logRoutes: Route =
     pathPrefix("log") {

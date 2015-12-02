@@ -22,7 +22,7 @@ import spray.http.HttpData
 import spray.http.HttpEntity
 import spray.http.StatusCodes._
 import spray.routing._
-import se.nimsa.sbx.app.RestApi
+import se.nimsa.sbx.app.SliceboxService
 import se.nimsa.sbx.user.UserProtocol.UserRole
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.storage.StorageProtocol._
@@ -35,7 +35,7 @@ import spray.httpx.unmarshalling.BasicUnmarshallers.ByteArrayUnmarshaller
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.util.CompressionUtil._
 
-trait RemoteBoxRoutes { this: RestApi =>
+trait RemoteBoxRoutes { this: SliceboxService =>
 
   def remoteBoxRoutes: Route =
     pathPrefix("box") {

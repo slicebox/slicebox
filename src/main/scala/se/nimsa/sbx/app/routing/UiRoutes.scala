@@ -22,10 +22,10 @@ import spray.httpx.SprayJsonSupport._
 import spray.routing._
 import spray.routing.authentication.UserPass
 
-import se.nimsa.sbx.app.RestApi
+import se.nimsa.sbx.app.SliceboxService
 import se.nimsa.sbx.user.UserProtocol._
 
-trait UiRoutes { this: RestApi =>
+trait UiRoutes { this: SliceboxService =>
 
   def staticResourcesRoute =
     get {

@@ -23,11 +23,11 @@ import spray.http.StatusCodes.Created
 import spray.httpx.SprayJsonSupport._
 import spray.routing._
 
-import se.nimsa.sbx.app.RestApi
+import se.nimsa.sbx.app.SliceboxService
 import se.nimsa.sbx.user.UserProtocol._
 import se.nimsa.sbx.scp.ScpProtocol._
 
-trait ScpRoutes { this: RestApi =>
+trait ScpRoutes { this: SliceboxService =>
 
 def scpRoutes(apiUser: ApiUser): Route =
     pathPrefix("scps") {

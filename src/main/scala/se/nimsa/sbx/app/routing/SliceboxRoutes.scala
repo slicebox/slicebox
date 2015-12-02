@@ -18,7 +18,7 @@ package se.nimsa.sbx.app.routing
 
 import spray.routing._
 import spray.http.StatusCodes._
-import se.nimsa.sbx.app.RestApi
+import se.nimsa.sbx.app.SliceboxService
 import se.nimsa.sbx.user.UserProtocol._
 import spray.routing.ExceptionHandler
 import se.nimsa.sbx.lang.NotFoundException
@@ -37,7 +37,7 @@ trait SliceboxRoutes extends DirectoryRoutes
     with LogRoutes
     with UiRoutes
     with GeneralRoutes
-    with SeriesTypeRoutes { this: RestApi =>
+    with SeriesTypeRoutes { this: SliceboxService =>
 
   implicit val knownExceptionHandler =
     ExceptionHandler {
