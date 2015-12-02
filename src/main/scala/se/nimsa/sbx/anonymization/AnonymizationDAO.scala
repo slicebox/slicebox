@@ -20,56 +20,60 @@ import scala.slick.driver.JdbcProfile
 import org.h2.jdbc.JdbcSQLException
 import scala.slick.jdbc.meta.MTable
 import scala.slick.jdbc.{ GetResult, StaticQuery => Q }
+import se.nimsa.sbx.dicom.DicomProperty
 import AnonymizationProtocol._
 
 class AnonymizationDAO(val driver: JdbcProfile) {
   import driver.simple._
 
-  val toAnonymizationKey = (id: Long, created: Long,
-    patientName: String, anonPatientName: String, patientID: String, anonPatientID: String, patientBirthDate: String, studyInstanceUID: String, anonStudyInstanceUID: String, studyDescription: String, studyID: String, accessionNumber: String,
-    seriesInstanceUID: String, anonSeriesInstanceUID: String, seriesDescription: String, protocolName: String, frameOfReferenceUID: String, anonFrameOfReferenceUID: String) =>
-    AnonymizationKey(id, created, patientName, anonPatientName, patientID, anonPatientID, patientBirthDate, studyInstanceUID, anonStudyInstanceUID, studyDescription, studyID, accessionNumber, seriesInstanceUID, anonSeriesInstanceUID, seriesDescription, protocolName, frameOfReferenceUID, anonFrameOfReferenceUID)
-  val fromAnonymizationKey = (entry: AnonymizationKey) =>
-    Option((entry.id, entry.created,
-      entry.patientName, entry.anonPatientName, entry.patientID, entry.anonPatientID, entry.patientBirthDate,
-      entry.studyInstanceUID, entry.anonStudyInstanceUID, entry.studyDescription, entry.studyID, entry.accessionNumber,
-      entry.seriesInstanceUID, entry.anonSeriesInstanceUID, entry.seriesDescription, entry.protocolName, entry.frameOfReferenceUID, entry.anonFrameOfReferenceUID))
-
-  class AnonymizationKeyTable(tag: Tag) extends Table[AnonymizationKey](tag, "AnonymizationKey") {
+  class AnonymizationKeyTable(tag: Tag) extends Table[AnonymizationKey](tag, "AnonymizationKeys") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def created = column[Long]("created")
-    def patientName = column[String]("patientname")
-    def anonPatientName = column[String]("anonpatientname")
-    def patientID = column[String]("patientid")
-    def anonPatientID = column[String]("anonpatientid")
-    def patientBirthDate = column[String]("patientbirthdate")
-    def studyInstanceUID = column[String]("studyinstanceuid")
-    def anonStudyInstanceUID = column[String]("anonstudyinstanceuid")
-    def studyDescription = column[String]("studydescription")
-    def studyID = column[String]("studyid")
-    def accessionNumber = column[String]("accessionnumber")
-    def seriesInstanceUID = column[String]("seriesinstanceuid")
-    def anonSeriesInstanceUID = column[String]("anonseriesinstanceuid")
-    def seriesDescription = column[String]("seriesdescription")
-    def protocolName = column[String]("protocolname")
-    def frameOfReferenceUID = column[String]("frameofreferenceuid")
-    def anonFrameOfReferenceUID = column[String]("anonframeofreferenceuid")
+    def patientName = column[String](DicomProperty.PatientName.name)
+    def anonPatientName = column[String]("anon" + DicomProperty.PatientName.name)
+    def patientID = column[String](DicomProperty.PatientID.name)
+    def anonPatientID = column[String]("anon" + DicomProperty.PatientID.name)
+    def patientBirthDate = column[String](DicomProperty.PatientBirthDate.name)
+    def studyInstanceUID = column[String](DicomProperty.StudyInstanceUID.name)
+    def anonStudyInstanceUID = column[String]("anon" + DicomProperty.StudyInstanceUID.name)
+    def studyDescription = column[String](DicomProperty.StudyDescription.name)
+    def studyID = column[String](DicomProperty.StudyID.name)
+    def accessionNumber = column[String](DicomProperty.AccessionNumber.name)
+    def seriesInstanceUID = column[String](DicomProperty.SeriesInstanceUID.name)
+    def anonSeriesInstanceUID = column[String]("anon" + DicomProperty.SeriesInstanceUID.name)
+    def seriesDescription = column[String](DicomProperty.SeriesDescription.name)
+    def protocolName = column[String](DicomProperty.ProtocolName.name)
+    def frameOfReferenceUID = column[String](DicomProperty.FrameOfReferenceUID.name)
+    def anonFrameOfReferenceUID = column[String]("anon" + DicomProperty.FrameOfReferenceUID.name)
     def * = (id, created,
       patientName, anonPatientName, patientID, anonPatientID, patientBirthDate,
       studyInstanceUID, anonStudyInstanceUID, studyDescription, studyID, accessionNumber,
-      seriesInstanceUID, anonSeriesInstanceUID, seriesDescription, protocolName, frameOfReferenceUID, anonFrameOfReferenceUID) <> (toAnonymizationKey.tupled, fromAnonymizationKey)
+      seriesInstanceUID, anonSeriesInstanceUID, seriesDescription, protocolName, frameOfReferenceUID, anonFrameOfReferenceUID) <> (AnonymizationKey.tupled, AnonymizationKey.unapply)
   }
 
   val anonymizationKeyQuery = TableQuery[AnonymizationKeyTable]
 
-  def create(implicit session: Session): Unit =
-    if (MTable.getTables("AnonymizationKey").list.isEmpty) anonymizationKeyQuery.ddl.create
+  class AnonymizationKeyImageTable(tag: Tag) extends Table[AnonymizationKeyImage](tag, "AnonymizationKeyImages") {
+    def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
+    def anonymizationKeyId = column[Long]("anonymizationkeyid")
+    def imageId = column[Long]("imageid")
+    def fkAnonymizationKey = foreignKey("fk_anonymization_key", anonymizationKeyId, anonymizationKeyQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
+    def * = (id, anonymizationKeyId, imageId) <> (AnonymizationKeyImage.tupled, AnonymizationKeyImage.unapply)
+  }
+
+  val anonymizationKeyImageQuery = TableQuery[AnonymizationKeyImageTable]
+
+  def create(implicit session: Session): Unit = {
+    if (MTable.getTables("AnonymizationKeys").list.isEmpty) anonymizationKeyQuery.ddl.create
+    if (MTable.getTables("AnonymizationKeyImages").list.isEmpty) anonymizationKeyImageQuery.ddl.create
+  }
 
   def drop(implicit session: Session): Unit =
-    anonymizationKeyQuery.ddl.drop
+    (anonymizationKeyQuery.ddl ++ anonymizationKeyImageQuery.ddl).drop
 
   def clear(implicit session: Session): Unit = {
     anonymizationKeyQuery.delete
+    anonymizationKeyImageQuery.delete
   }
 
   def columnExists(tableName: String, columnName: String)(implicit session: Session): Boolean = {
@@ -88,24 +92,24 @@ class AnonymizationDAO(val driver: JdbcProfile) {
 
   def anonymizationKeys(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String])(implicit session: Session): List[AnonymizationKey] = {
 
-    checkOrderBy(orderBy, "AnonymizationKey")
+    checkOrderBy(orderBy, "AnonymizationKeys")
 
     implicit val getResult = GetResult(r =>
       AnonymizationKey(r.nextLong, r.nextLong, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString))
 
-    var query = """select * from "AnonymizationKey""""
+    var query = """select * from "AnonymizationKeys""""
 
     filter.foreach(filterValue => {
       val filterValueLike = s"'%$filterValue%'".toLowerCase
       query += s""" where 
-        lcase("patientname") like $filterValueLike or 
-          lcase("anonpatientname") like $filterValueLike or 
-            lcase("patientid") like $filterValueLike or 
-              lcase("anonpatientid") like $filterValueLike or
-                lcase("studydescription") like $filterValueLike or
-                  lcase("accessionnumber") like $filterValueLike or
-                    lcase("seriesdescription") like $filterValueLike or
-                      lcase("protocolname") like $filterValueLike"""
+        lcase("PatientName") like $filterValueLike or 
+          lcase("anonPatientName") like $filterValueLike or 
+            lcase("PatientID") like $filterValueLike or 
+              lcase("anonPatientID") like $filterValueLike or
+                lcase("StudyDescription") like $filterValueLike or
+                  lcase("AccessionNumber") like $filterValueLike or
+                    lcase("SeriesDescription") like $filterValueLike or
+                      lcase("ProtocolName") like $filterValueLike"""
     })
 
     orderBy.foreach(orderByValue =>
@@ -118,6 +122,11 @@ class AnonymizationDAO(val driver: JdbcProfile) {
 
   def insertAnonymizationKey(entry: AnonymizationKey)(implicit session: Session): AnonymizationKey = {
     val generatedId = (anonymizationKeyQuery returning anonymizationKeyQuery.map(_.id)) += entry
+    entry.copy(id = generatedId)
+  }
+
+  def insertAnonymizationKeyImage(entry: AnonymizationKeyImage)(implicit session: Session): AnonymizationKeyImage = {
+    val generatedId = (anonymizationKeyImageQuery returning anonymizationKeyImageQuery.map(_.id)) += entry
     entry.copy(id = generatedId)
   }
 
@@ -136,4 +145,18 @@ class AnonymizationDAO(val driver: JdbcProfile) {
       .filter(_.patientID === patientID)
       .list
 
+  def anonymizationKeyImagesForAnonymizationKeyId(anonymizationKeyId: Long)(implicit session: Session): List[AnonymizationKeyImage] =
+    anonymizationKeyImageQuery.filter(_.anonymizationKeyId === anonymizationKeyId).list
+
+  def anonymizationKeysForImageId(imageId: Long)(implicit session: Session): List[AnonymizationKey] = {
+    val join = for {
+      key <- anonymizationKeyQuery
+      image <- anonymizationKeyImageQuery if image.anonymizationKeyId === key.id
+    } yield (key, image)
+    join.filter(_._2.imageId === imageId).map(_._1).list    
+  }
+  
+  def removeAnonymizationKeyImagesForImageId(imageId: Long)(implicit session: Session) = 
+    anonymizationKeyImageQuery.filter(_.imageId === imageId).delete
+  
 }

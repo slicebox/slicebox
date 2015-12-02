@@ -71,6 +71,10 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
 
   log.info("Box service started")
 
+  override def preStart {
+    context.system.eventStream.subscribe(context.self, classOf[ImageDeleted])
+  }
+
   override def postStop() =
     pollBoxesOnlineStatusSchedule.cancel()
 
@@ -78,6 +82,9 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
 
     case UpdatePollBoxesOnlineStatus =>
       updatePollBoxesOnlineStatus()
+
+    case ImageDeleted(imageId) =>
+      removeImageFromBoxDb(imageId)
 
     case msg: BoxRequest =>
 
@@ -226,7 +233,7 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
         }
 
       }
-
+      
   }
 
   def baseUrlToToken(url: String): String =
@@ -453,6 +460,14 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
       boxDao.sentImagesByTransactionId(transactionId).map(_.imageId)
     }
 
+  def removeImageFromBoxDb(imageId: Long) =
+    db.withSession { implicit session =>
+      boxDao.removeOutboxEntriesForImageId(imageId)
+      boxDao.removeInboxImagesForImageId(imageId)
+      boxDao.removeSentImagesForImageId(imageId)
+      boxDao.removeTransactionTagValuesForImageId(imageId)
+    }
+  
 }
 
 object BoxServiceActor {

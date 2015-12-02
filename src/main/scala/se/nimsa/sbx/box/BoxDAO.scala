@@ -366,4 +366,16 @@ class BoxDAO(val driver: JdbcProfile) {
     join.filter(_._1.transactionId === transactionId).map(_._2).list
   }
 
+  def removeOutboxEntriesForImageId(imageId: Long)(implicit session: Session) =
+    outboxQuery.filter(_.imageId === imageId).delete
+
+  def removeInboxImagesForImageId(imageId: Long)(implicit session: Session) =
+    inboxImageQuery.filter(_.imageId === imageId).delete
+
+  def removeSentImagesForImageId(imageId: Long)(implicit session: Session) =
+    sentImageQuery.filter(_.imageId === imageId).delete
+
+  def removeTransactionTagValuesForImageId(imageId: Long)(implicit session: Session) =
+    transactionTagValueQuery.filter(_.imageId === imageId).delete
+
 }

@@ -184,4 +184,7 @@ class ForwardingDAO(val driver: JdbcProfile) {
       .list
   }
 
+  def removeTransactionImagesForImageId(imageId: Long)(implicit session: Session) =
+    transactionImageQuery.filter(_.imageId === imageId).delete
+    
 }

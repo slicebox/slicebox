@@ -130,6 +130,7 @@ class StorageServiceActor(storage: Path, implicit val timeout: Timeout) extends 
             .getOrElse(Future.successful {})
             .map(i => ImageDeleted(imageId))
         }
+      imageDeleted.foreach(context.system.eventStream.publish(_))
       imageDeleted.pipeTo(sender)
 
     case CreateTempZipFile(imageIds) =>

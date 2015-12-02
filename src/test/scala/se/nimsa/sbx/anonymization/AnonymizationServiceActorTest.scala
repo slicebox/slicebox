@@ -57,7 +57,7 @@ class AnonymizationServiceActorTest(_system: ActorSystem) extends TestKit(_syste
       db.withSession { implicit session =>
         val dataset = createDataset()
         val key = insertAnonymizationKey(dataset)
-        anonymizationService ! Anonymize(dataset, Seq.empty)
+        anonymizationService ! Anonymize(1, dataset, Seq.empty)
         expectMsgPF() {
           case harmonized: Attributes =>
             harmonized.getString(Tag.PatientID) should be(key.anonPatientID)

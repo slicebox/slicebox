@@ -43,11 +43,16 @@ object AnonymizationProtocol {
     frameOfReferenceUID: String,
     anonFrameOfReferenceUID: String) extends Entity
 
+  case class AnonymizationKeyImage(
+      id: Long,
+      anonymizationKeyId: Long,
+      imageId: Long) extends Entity
+      
   trait AnonymizationRequest
 
   case class ReverseAnonymization(dataset: Attributes) extends AnonymizationRequest
 
-  case class Anonymize(dataset: Attributes, tagValues: Seq[TagValue]) extends AnonymizationRequest
+  case class Anonymize(imageId: Long, dataset: Attributes, tagValues: Seq[TagValue]) extends AnonymizationRequest
 
   case class GetAnonymizationKeys(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String]) extends AnonymizationRequest
 

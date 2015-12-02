@@ -58,6 +58,7 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
 
   override def preStart {
     context.system.eventStream.subscribe(context.self, classOf[ImageAdded])
+    context.system.eventStream.subscribe(context.self, classOf[ImageDeleted])
     context.system.eventStream.subscribe(context.self, classOf[ImagesSent])
   }
 
@@ -91,6 +92,9 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
     case ImageAdded(image, source) =>
       val applicableRules = maybeAddImageToForwardingQueue(image, source, sender)
       sender ! ImageRegisteredForForwarding(image, applicableRules)
+      
+    case ImageDeleted(imageId) =>
+      removeImageFromTransactions(imageId)
       
     case AddImageToForwardingQueue(image, rule, batchId, transferNow, origin) =>
       val (transaction, transactionImage) = addImageToForwardingQueue(image, rule, batchId)
@@ -360,6 +364,10 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
     futureDeletedImageIds
   }
 
+  def removeImageFromTransactions(imageId: Long) = 
+    db.withSession { implicit session =>
+      forwardingDao.removeTransactionImagesForImageId(imageId)
+    }
 }
 
 object ForwardingServiceActor {

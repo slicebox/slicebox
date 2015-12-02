@@ -54,7 +54,7 @@ trait AnonymizationRoutes { this: RestApi =>
 
               case Some(dataset) =>
                 AnonymizationUtil.setAnonymous(dataset, false) // pretend not anonymized to force anonymization
-                onSuccess(anonymizationService.ask(Anonymize(dataset, tagValues)).mapTo[Attributes]) { anonDataset =>
+                onSuccess(anonymizationService.ask(Anonymize(imageId, dataset, tagValues)).mapTo[Attributes]) { anonDataset =>
                   onSuccess(storageService.ask(DeleteImage(imageId))) {
                     case ImageDeleted(imageId) =>
                       val source = Source(SourceType.USER, apiUser.user, apiUser.id)

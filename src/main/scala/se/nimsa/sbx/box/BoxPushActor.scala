@@ -67,7 +67,7 @@ class BoxPushActor(box: Box,
     val futureDatasetMaybe = storageService.ask(GetDataset(outboxEntry.imageId, true)).mapTo[Option[Attributes]]
     futureDatasetMaybe.flatMap(_ match {
       case Some(dataset) =>
-        val futureAnonymizedDataset = anonymizationService.ask(Anonymize(dataset, tagValues.map(_.tagValue))).mapTo[Attributes]
+        val futureAnonymizedDataset = anonymizationService.ask(Anonymize(outboxEntry.imageId, dataset, tagValues.map(_.tagValue))).mapTo[Attributes]
         futureAnonymizedDataset flatMap { anonymizedDataset =>
           val compressedBytes = compress(toByteArray(anonymizedDataset))
           sendFilePipeline(Post(s"${box.baseUrl}/image?transactionid=${outboxEntry.transactionId}&sequencenumber=${outboxEntry.sequenceNumber}&totalimagecount=${outboxEntry.totalImageCount}", HttpData(compressedBytes)))

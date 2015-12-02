@@ -22,6 +22,7 @@ import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.util.ExceptionCatching
 import akka.actor.Props
 import se.nimsa.sbx.dicom.DicomUtil._
+import se.nimsa.sbx.app.GeneralProtocol.ImageDeleted
 import AnonymizationProtocol._
 import AnonymizationUtil._
 import org.dcm4che3.data.Attributes
@@ -30,20 +31,27 @@ import akka.event.Logging
 class AnonymizationServiceActor(dbProps: DbProps) extends Actor with ExceptionCatching {
 
   val log = Logging(context.system, this)
-  
+
   val db = dbProps.db
   val dao = new AnonymizationDAO(dbProps.driver)
 
   setupDb()
 
+  override def preStart {
+    context.system.eventStream.subscribe(context.self, classOf[ImageDeleted])
+  }
+
   log.info("Anonymization service started")
 
   def receive = LoggingReceive {
 
-    case msg: AnonymizationRequest =>
+    case ImageDeleted(imageId) =>
+      removeImageFromAnonymizationKeyImages(imageId)
 
+    case msg: AnonymizationRequest =>
+    
       catchAndReport {
-      
+
         msg match {
           case RemoveAnonymizationKey(anonymizationKeyId) =>
             removeAnonymizationKey(anonymizationKeyId)
@@ -57,19 +65,21 @@ class AnonymizationServiceActor(dbProps: DbProps) extends Actor with ExceptionCa
             reverseAnonymization(anonymizationKeysForAnonPatient(clonedDataset), clonedDataset)
             sender ! clonedDataset
 
-          case Anonymize(dataset, tagValues) =>
+          case Anonymize(imageId, dataset, tagValues) =>
             val anonymizationKeys = anonymizationKeysForPatient(dataset)
             val anonDataset = anonymizeDataset(dataset)
             val harmonizedDataset = harmonizeAnonymization(anonymizationKeys, dataset, anonDataset)
             applyTagValues(harmonizedDataset, tagValues)
 
             val anonymizationKey = createAnonymizationKey(dataset, harmonizedDataset)
-            if (!anonymizationKeys.exists(isEqual(_, anonymizationKey)))
-              addAnonymizationKey(anonymizationKey)
+            if (!anonymizationKeys.exists(isEqual(_, anonymizationKey))) {
+              val key = addAnonymizationKey(anonymizationKey)
+              addAnonymizationKeyImage(AnonymizationKeyImage(-1, key.id, imageId))
+            }
 
             sender ! harmonizedDataset
         }
-        
+
       }
   }
 
@@ -83,6 +93,11 @@ class AnonymizationServiceActor(dbProps: DbProps) extends Actor with ExceptionCa
       dao.insertAnonymizationKey(anonymizationKey)
     }
 
+  def addAnonymizationKeyImage(anonymizationKeyImage: AnonymizationKeyImage): AnonymizationKeyImage =
+    db.withSession { implicit session =>
+      dao.insertAnonymizationKeyImage(anonymizationKeyImage)
+    }
+
   def removeAnonymizationKey(anonymizationKeyId: Long) =
     db.withSession { implicit session =>
       dao.removeAnonymizationKey(anonymizationKeyId)
@@ -93,19 +108,22 @@ class AnonymizationServiceActor(dbProps: DbProps) extends Actor with ExceptionCa
       dao.anonymizationKeys(startIndex, count, orderBy, orderAscending, filter)
     }
 
-  def anonymizationKeysForAnonPatient(dataset: Attributes) = {
+  def anonymizationKeysForAnonPatient(dataset: Attributes) =
     db.withSession { implicit session =>
       val anonPatient = datasetToPatient(dataset)
       dao.anonymizationKeysForAnonPatient(anonPatient.patientName.value, anonPatient.patientID.value)
     }
-  }
 
-  def anonymizationKeysForPatient(dataset: Attributes) = {
+  def anonymizationKeysForPatient(dataset: Attributes) =
     db.withSession { implicit session =>
       val patient = datasetToPatient(dataset)
       dao.anonymizationKeysForPatient(patient.patientName.value, patient.patientID.value)
     }
-  }
+  
+  def removeImageFromAnonymizationKeyImages(imageId: Long) = 
+    db.withSession { implicit session =>
+      dao.removeAnonymizationKeyImagesForImageId(imageId)
+    }
 
 }
 

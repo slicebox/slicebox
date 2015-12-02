@@ -104,7 +104,7 @@ trait RemoteBoxRoutes { this: RestApi =>
                               _ match {
                                 case Some(dataset) =>
 
-                                  onSuccess(anonymizationService.ask(Anonymize(dataset, transactionTagValues.map(_.tagValue)))) {
+                                  onSuccess(anonymizationService.ask(Anonymize(outboxEntry.imageId, dataset, transactionTagValues.map(_.tagValue)))) {
                                     case anonymizedDataset: Attributes =>
                                       val compressedBytes = compress(toByteArray(anonymizedDataset))
                                       complete(HttpEntity(ContentTypes.`application/octet-stream`, HttpData(compressedBytes)))

@@ -27,10 +27,8 @@ class FutureUtilTest extends FlatSpec with Matchers {
 
     val list = Await.result(futureList, 20.seconds)
 
-    integers.foreach { i =>
-      finishedFutures(i) shouldBe (7 - i)
-      list(i) shouldBe i
-    }
+    list shouldBe integers
+    finishedFutures should not be integers
   }
 
   "traversing a collection with FutureUtil.traverseSequentially" should "complete futures one after the other" in {
