@@ -17,18 +17,17 @@
 package se.nimsa.sbx.app.routing
 
 import akka.pattern.ask
-
 import spray.http.ContentTypes
 import spray.http.HttpData
 import spray.http.HttpEntity
 import spray.http.StatusCodes._
 import spray.httpx.SprayJsonSupport._
 import spray.routing._
-
 import se.nimsa.sbx.app.SliceboxService
 import se.nimsa.sbx.user.UserProtocol._
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.metadata.MetaDataProtocol._
+import se.nimsa.sbx.anonymization.AnonymizationProtocol.ImageTagValues
 import se.nimsa.sbx.dicom.DicomUtil
 
 trait BoxRoutes { this: SliceboxService =>

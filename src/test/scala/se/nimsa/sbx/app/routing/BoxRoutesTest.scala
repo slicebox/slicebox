@@ -5,7 +5,7 @@ import scala.math.abs
 import scala.slick.driver.H2Driver
 import org.scalatest.FlatSpec
 import org.scalatest.Matchers
-import se.nimsa.sbx.anonymization.AnonymizationProtocol.TagValue
+import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.box.BoxDAO
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy.Patient
@@ -20,6 +20,7 @@ import spray.http.MultipartFormData
 import spray.http.StatusCodes._
 import spray.httpx.SprayJsonSupport._
 import se.nimsa.sbx.metadata.MetaDataDAO
+import org.dcm4che3.data.Tag
 
 class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
@@ -204,13 +205,13 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
         val inboxImage2 = boxDao.insertInboxImage(InboxImage(-1, inboxEntry.id, dbImage2.id))
         inboxEntry
       }
-    
+
     GetAsUser(s"/api/inbox/${inboxEntry.id}/images") ~> routes ~> check {
       status should be(OK)
       responseAs[List[Image]].length should be(2)
     }
   }
-  
+
   it should "only list images corresponding to an inbox entry that exists" in {
     val inboxEntry =
       db.withSession { implicit session =>
@@ -222,11 +223,11 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
         val inboxImage3 = boxDao.insertInboxImage(InboxImage(-1, inboxEntry.id, 666))
         inboxEntry
       }
-    
+
     GetAsUser(s"/api/inbox/${inboxEntry.id}/images") ~> routes ~> check {
       status should be(OK)
       responseAs[List[Image]].length should be(2)
-    }    
+    }
   }
 
   it should "support listing images corresponding to a sent entry" in {
@@ -239,13 +240,13 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
         val sentImage2 = boxDao.insertSentImage(SentImage(-1, sentEntry.id, dbImage2.id))
         sentEntry
       }
-    
+
     GetAsUser(s"/api/sent/${sentEntry.id}/images") ~> routes ~> check {
       status should be(OK)
       responseAs[List[Image]].length should be(2)
     }
   }
-  
+
   it should "only list images corresponding to a sent entry that exists" in {
     val sentEntry =
       db.withSession { implicit session =>
@@ -257,11 +258,117 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
         val sentImage3 = boxDao.insertSentImage(SentImage(-1, sentEntry.id, 666))
         sentEntry
       }
-    
+
     GetAsUser(s"/api/sent/${sentEntry.id}/images") ~> routes ~> check {
       status should be(OK)
       responseAs[List[Image]].length should be(2)
-    }    
+    }
+  }
+
+  it should "remove related image record in inbox when an image is deleted" in {
+    val file = TestUtil.testImageFile
+    val mfd = MultipartFormData(Seq(BodyPart(file, "file")))
+    val image =
+      PostAsUser("/api/images", mfd) ~> routes ~> check {
+        status shouldBe Created
+        responseAs[Image]
+      }
+
+    val (inboxEntry, inboxImage) =
+      db.withSession { implicit session =>
+        val inboxEntry = boxDao.insertInboxEntry(InboxEntry(-1, 1, "some box", 2, 3, 4, System.currentTimeMillis()))
+        val inboxImage = boxDao.insertInboxImage(InboxImage(-1, inboxEntry.id, image.id))
+        (inboxEntry, inboxImage)
+      }
+
+    GetAsUser(s"/api/inbox/${inboxEntry.id}/images") ~> routes ~> check {
+      status shouldBe OK
+      responseAs[List[Image]] should have length 1
+    }
+
+    DeleteAsUser(s"/api/images/${image.id}") ~> routes ~> check {
+      status shouldBe NoContent
+    }
+
+    Thread.sleep(1000) // wait for ImageDeleted event to reach BoxServiceActor
+
+    GetAsUser(s"/api/sent/${inboxEntry.id}/images") ~> routes ~> check {
+      status shouldBe OK
+      responseAs[List[Image]] shouldBe empty
+    }
+  }
+
+  it should "remove related image record in sent when an image is deleted" in {
+    val file = TestUtil.testImageFile
+    val mfd = MultipartFormData(Seq(BodyPart(file, "file")))
+    val image =
+      PostAsUser("/api/images", mfd) ~> routes ~> check {
+        status shouldBe Created
+        responseAs[Image]
+      }
+
+    val (sentEntry, sentImage) =
+      db.withSession { implicit session =>
+        val sentEntry = boxDao.insertSentEntry(SentEntry(-1, 1, "some box", 2, 3, 4, System.currentTimeMillis()))
+        val sentImage = boxDao.insertSentImage(SentImage(-1, sentEntry.id, image.id))
+        (sentEntry, sentImage)
+      }
+
+    GetAsUser(s"/api/sent/${sentEntry.id}/images") ~> routes ~> check {
+      status shouldBe OK
+      responseAs[List[Image]] should have length 1
+    }
+
+    DeleteAsUser(s"/api/images/${image.id}") ~> routes ~> check {
+      status shouldBe NoContent
+    }
+
+    Thread.sleep(1000) // wait for ImageDeleted event to reach BoxServiceActor
+
+    GetAsUser(s"/api/sent/${sentEntry.id}/images") ~> routes ~> check {
+      status shouldBe OK
+      responseAs[List[Image]] shouldBe empty
+    }
+  }
+
+  it should "remove related outbox entry and associated transaction tag values when an image is deleted" in {
+    val file = TestUtil.testImageFile
+    val mfd = MultipartFormData(Seq(BodyPart(file, "file")))
+    val image =
+      PostAsUser("/api/images", mfd) ~> routes ~> check {
+        status shouldBe Created
+        responseAs[Image]
+      }
+
+    val box1 = addPollBox("hosp")
+    PostAsAdmin(s"/api/boxes/${box1.id}/send", Seq(ImageTagValues(image.id, Seq(TagValue(Tag.PatientName, "mapped patient name"))))) ~> routes ~> check {
+      status should be(NoContent)
+    }
+
+    GetAsUser(s"/api/outbox") ~> routes ~> check {
+      status shouldBe OK
+      responseAs[List[OutboxEntry]] should have length 1
+    }
+
+    db.withSession { implicit session =>
+      boxDao.listTransactionTagValues should have size 1
+    }
+
+    DeleteAsUser(s"/api/images/${image.id}") ~> routes ~> check {
+      status shouldBe NoContent
+    }
+
+    Thread.sleep(1000) // wait for ImageDeleted event to reach BoxServiceActor
+
+    GetAsUser(s"/api/outbox") ~> routes ~> check {
+      status shouldBe OK
+      responseAs[List[OutboxEntry]] shouldBe empty
+    }
+
+    db.withSession { implicit session =>
+      boxDao.listTransactionTagValues shouldBe empty
+    }
+
   }
 
 }

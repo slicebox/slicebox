@@ -19,6 +19,7 @@ package se.nimsa.sbx.box
 import se.nimsa.sbx.model.Entity
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.TagValue
+import se.nimsa.sbx.anonymization.AnonymizationProtocol.ImageTagValues
 import org.dcm4che3.data.Attributes
 
 object BoxProtocol {
@@ -57,8 +58,6 @@ object BoxProtocol {
   case class InboxEntry(id: Long, remoteBoxId: Long, remoteBoxName: String, transactionId: Long, receivedImageCount: Long, totalImageCount: Long, lastUpdated: Long) extends Entity
 
   case class InboxImage(id: Long, inboxEntryId: Long, imageId: Long) extends Entity
-  
-  case class ImageTagValues(imageId: Long, tagValues: Seq[TagValue])
   
   case class PushImageData(transactionId: Long, sequenceNumber: Long, totalImageCount: Long, dataset: Attributes)
 

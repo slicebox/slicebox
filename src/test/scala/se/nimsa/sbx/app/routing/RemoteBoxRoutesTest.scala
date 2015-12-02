@@ -8,7 +8,7 @@ import scala.slick.driver.H2Driver
 import org.scalatest.FlatSpec
 import org.scalatest.Matchers
 
-import se.nimsa.sbx.anonymization.AnonymizationProtocol.TagValue
+import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.box.BoxDAO
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy.Patient

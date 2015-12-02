@@ -146,7 +146,7 @@ class MetaDataDAOTest extends FlatSpec with Matchers {
       dao.queryPatients(0, 10, None, true, Seq(QueryProperty("frameOfReferenceUID", QueryOperator.EQUALS, "frid1"))).size should be(1)
       
       // Test like query
-      dao.queryPatients(0, 10, None, true, Seq(QueryProperty("studyDescription", QueryOperator.LIKE, "%desc%"))).size should be(1)
+      dao.queryPatients(0, 10, None, true, Seq(QueryProperty("studyDescription", QueryOperator.LIKE, "desc"))).size should be(1)
       
       // Test paging
       dao.queryPatients(1, 1, None, true, Seq(QueryProperty("manufacturer", QueryOperator.EQUALS, "manu1"))).size should be(0)

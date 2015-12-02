@@ -24,6 +24,8 @@ import akka.pattern.ask
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.metadata.MetaDataProtocol._
+import se.nimsa.sbx.anonymization.AnonymizationProtocol._
+import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.dicom.DicomUtil._
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import akka.pattern.pipe
@@ -43,8 +45,6 @@ import scala.concurrent.Future
 import scala.concurrent.Future.sequence
 import akka.actor.Stash
 import org.dcm4che3.data.Attributes
-import se.nimsa.sbx.anonymization.AnonymizationProtocol.TagValue
-import se.nimsa.sbx.app.GeneralProtocol._
 
 class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout: Timeout) extends Actor with Stash with ExceptionCatching {
 

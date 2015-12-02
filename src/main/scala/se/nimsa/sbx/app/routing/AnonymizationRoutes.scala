@@ -48,25 +48,20 @@ trait AnonymizationRoutes { this: SliceboxService =>
     path("images" / LongNumber / "anonymize") { imageId =>
       put {
         entity(as[Seq[TagValue]]) { tagValues =>
-          onSuccess(anonymizeOne(apiUser, imageId, tagValues)) {
-            case Some(_) => complete(NoContent)
-            case None    => complete(NotFound)
+          complete {
+            anonymizeOne(apiUser, imageId, tagValues).map(_.map(_.image))
           }
         }
       }
     } ~ pathPrefix("anonymization") {
       path("anonymize") {
         post {
-          entity(as[Seq[AnonymizationParameters]]) { anonParams =>
-            onSuccess {
+          entity(as[Seq[ImageTagValues]]) { imageTagValuesSeq =>
+            complete {
               Future.sequence {
-                anonParams.map(param => anonymizeOne(apiUser, param.imageId, param.tagValues))
-              }
-            } { result =>
-              result match {
-                case result if result.forall(_.isEmpty) => complete(NotFound)
-                case result                             => complete(NoContent)
-              }
+                imageTagValuesSeq.map(imageTagValues =>
+                  anonymizeOne(apiUser, imageTagValues.imageId, imageTagValues.tagValues))
+              }.map(_.map(_.map(_.image)).flatten)
             }
           }
         }
@@ -118,7 +113,7 @@ trait AnonymizationRoutes { this: SliceboxService =>
       }
     }
 
-  def anonymizeOne(apiUser: ApiUser, imageId: Long, tagValues: Seq[TagValue]) =
+  def anonymizeOne(apiUser: ApiUser, imageId: Long, tagValues: Seq[TagValue]): Future[Option[ImageAdded]] =
     storageService.ask(GetDataset(imageId, true)).mapTo[Option[Attributes]].map { optionalDataset =>
       optionalDataset.map { dataset =>
         AnonymizationUtil.setAnonymous(dataset, false) // pretend not anonymized to force anonymization

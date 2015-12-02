@@ -16,7 +16,6 @@
 
 package se.nimsa.sbx.forwarding
 
-import ForwardingProtocol._
 import akka.actor.Actor
 import akka.actor.Props
 import akka.event.Logging
@@ -27,18 +26,17 @@ import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.storage.StorageProtocol._
+import se.nimsa.sbx.anonymization.AnonymizationProtocol._
+import se.nimsa.sbx.scu.ScuProtocol._
+import se.nimsa.sbx.box.BoxProtocol._
+import se.nimsa.sbx.app.GeneralProtocol._
 import scala.util.Success
 import scala.util.Failure
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.duration.DurationInt
-import se.nimsa.sbx.scu.ScuProtocol.SendImagesToScp
-import se.nimsa.sbx.box.BoxProtocol.SendToRemoteBox
-import se.nimsa.sbx.box.BoxProtocol.ImageTagValues
-import se.nimsa.sbx.box.BoxProtocol.InboxEntry
-import se.nimsa.sbx.box.BoxProtocol.GetInboxEntryForImageId
-import se.nimsa.sbx.app.GeneralProtocol._
 import akka.actor.ActorRef
+import ForwardingProtocol._
 
 class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30.seconds)(implicit timeout: Timeout) extends Actor {
 

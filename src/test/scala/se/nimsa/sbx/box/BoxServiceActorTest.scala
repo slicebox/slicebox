@@ -14,7 +14,7 @@ import akka.actor.actorRef2Scala
 import akka.testkit.ImplicitSender
 import akka.testkit.TestKit
 import akka.util.Timeout.durationToTimeout
-import se.nimsa.sbx.anonymization.AnonymizationProtocol.TagValue
+import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy._

@@ -18,6 +18,7 @@ import akka.util.Timeout
 import se.nimsa.sbx.anonymization.AnonymizationServiceActor
 import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.box.BoxProtocol._
+import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.metadata.MetaDataDAO
 import se.nimsa.sbx.util.TestUtil
 import spray.http.HttpRequest

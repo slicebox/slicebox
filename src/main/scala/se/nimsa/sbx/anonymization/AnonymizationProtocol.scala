@@ -29,9 +29,7 @@ object AnonymizationProtocol {
     order: Option[QueryOrder],
     queryProperties: Seq[QueryProperty])
     
-  case class AnonymizationParameters(
-      imageId: Long,
-      tagValues: Seq[TagValue])
+  case class ImageTagValues(imageId: Long, tagValues: Seq[TagValue])  
       
   case class TagValue(tag: Int, value: String)
 

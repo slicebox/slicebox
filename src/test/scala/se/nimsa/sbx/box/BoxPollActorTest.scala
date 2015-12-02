@@ -12,6 +12,7 @@ import scala.slick.driver.H2Driver
 import se.nimsa.sbx.app.DbProps
 import scala.slick.jdbc.JdbcBackend.Database
 import se.nimsa.sbx.box.BoxProtocol._
+import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.storage.StorageProtocol.DatasetReceived
 import se.nimsa.sbx.util.TestUtil
 import akka.actor.Actor

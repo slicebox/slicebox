@@ -97,10 +97,9 @@ angular.module('slicebox.utils', [])
 
         seriesForPatients: function(patients, sources, seriesTypes, seriesTags) {
             var self = this;
-            var promises = self.studiesForPatients(patients, sources, seriesTypes, seriesTags).then(function (studiesData) {
-                return self.seriesForStudies(studiesData.data, sources, seriesTypes, seriesTags);
+            return self.studiesForPatients(patients, sources, seriesTypes, seriesTags).then(function (studies) {
+                return self.seriesForStudies(studies, sources, seriesTypes, seriesTags);
             });
-            return sbxMisc.flattenPromises(promises);
         },
 
         urlWithAdvancedFiltering: function(baseUrl, sources, seriesTypes, seriesTags) {
