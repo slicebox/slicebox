@@ -29,7 +29,7 @@ Slicebox provides a rich set of features for importing, exporting, managing and 
 * Setup of DICOM Service Class Providers (SCP). An SCP is a server accepting transfers of DICOM images. This functionality makes it possible to send images from a PACS (image archive) to Slicebox.
 * Setup of DICOM Service Class Users (SCU). This is the opposite of an SCP. An SCU client makes it possible to export DICOM encapsulated images and results to PACS.
 * Setup directory watches. DICOM files dropped into a directory watched by slicebox will import the image.
-* Protection of resources and routes using authentication and authorization. Users with certain priviliges can be added and removed.
+* Protection of resources and routes using authentication and authorization. Users with certain privileges can be added and removed.
 
 Example Usage
 -------------

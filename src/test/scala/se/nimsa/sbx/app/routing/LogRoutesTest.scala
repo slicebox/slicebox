@@ -31,8 +31,8 @@ class LogRoutesTest extends FlatSpec with Matchers with RoutesTestBase with Befo
   
   "Log routes" should "support listing log messages" in {
     GetAsUser("/api/log?startindex=0&count=1000") ~> routes ~> check {
-      status should be(OK)
-      responseAs[List[LogEntry]].size should be(6)
+      status shouldBe OK
+      responseAs[List[LogEntry]] should have length 6
     }
   }
   

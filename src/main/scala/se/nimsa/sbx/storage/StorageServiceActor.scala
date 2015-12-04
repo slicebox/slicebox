@@ -116,6 +116,11 @@ class StorageServiceActor(storage: Path, implicit val timeout: Timeout) extends 
             }
           }.unwrap
         }.unwrap
+
+      image.foreach(_.foreach { image =>
+        context.system.eventStream.publish(ImageAdded(image, source))
+      })
+
       image.pipeTo(sender)
 
     case DeleteImage(imageId) =>
@@ -358,7 +363,7 @@ class StorageServiceActor(storage: Path, implicit val timeout: Timeout) extends 
     }
 
     futureAddedFiles.onFailure { case _ => cleanup }
-    
+
     futureAddedFiles.map { u => cleanup; tempFile }
   }
 
