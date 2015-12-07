@@ -116,9 +116,9 @@ class AnonymizationServiceActorTest(_system: ActorSystem) extends TestKit(_syste
         dataset1.setString(Tag.SOPInstanceUID, VR.UI, "sopuid1")
         dataset2.setString(Tag.SOPInstanceUID, VR.UI, "sopuid2")
         dataset3.setString(Tag.SOPInstanceUID, VR.UI, "sopuid3")
-        val image1 = datasetToImage(dataset1)
-        val image2 = datasetToImage(dataset2)
-        val image3 = datasetToImage(dataset3)
+        val image1 = datasetToImage(dataset1).copy(id = 1)
+        val image2 = datasetToImage(dataset2).copy(id = 2)
+        val image3 = datasetToImage(dataset3).copy(id = 3)
         metaDataService ! AddImage(image1)
         expectMsgType[ImageAdded]
         metaDataService ! AddImage(image2)

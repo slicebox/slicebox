@@ -160,6 +160,12 @@ class AnonymizationDAO(val driver: JdbcProfile) {
   def anonymizationKeyImagesForAnonymizationKeyId(anonymizationKeyId: Long)(implicit session: Session): List[AnonymizationKeyImage] =
     anonymizationKeyImageQuery.filter(_.anonymizationKeyId === anonymizationKeyId).list
 
+  def anonymizationKeyImageForAnonymizationKeyIdAndImageId(anonymizationKeyId: Long, imageId: Long)(implicit session: Session): Option[AnonymizationKeyImage] =
+    anonymizationKeyImageQuery
+    .filter(_.anonymizationKeyId === anonymizationKeyId)
+    .filter(_.imageId === imageId)
+    .firstOption
+    
   def anonymizationKeysForImageId(imageId: Long)(implicit session: Session): List[AnonymizationKey] = {
     val join = for {
       key <- anonymizationKeyQuery

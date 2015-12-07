@@ -91,10 +91,10 @@ class AnonymizationServiceActor(dbProps: DbProps, implicit val timeout: Timeout)
             applyTagValues(harmonizedDataset, tagValues)
 
             val anonymizationKey = createAnonymizationKey(dataset, harmonizedDataset)
-            if (!anonymizationKeys.exists(isEqual(_, anonymizationKey))) {
-              val key = addAnonymizationKey(anonymizationKey)
-              addAnonymizationKeyImage(AnonymizationKeyImage(-1, key.id, imageId))
-            }
+            val dbAnonymizationKey = anonymizationKeys.find(isEqual(_, anonymizationKey))
+              .getOrElse(addAnonymizationKey(anonymizationKey))
+
+            maybeAddAnonymizationKeyImage(dbAnonymizationKey.id, imageId)
 
             sender ! harmonizedDataset
 
@@ -115,9 +115,12 @@ class AnonymizationServiceActor(dbProps: DbProps, implicit val timeout: Timeout)
       dao.insertAnonymizationKey(anonymizationKey)
     }
 
-  def addAnonymizationKeyImage(anonymizationKeyImage: AnonymizationKeyImage): AnonymizationKeyImage =
+  def maybeAddAnonymizationKeyImage(anonymizationKeyId: Long, imageId: Long): AnonymizationKeyImage =
     db.withSession { implicit session =>
-      dao.insertAnonymizationKeyImage(anonymizationKeyImage)
+      dao.anonymizationKeyImageForAnonymizationKeyIdAndImageId(anonymizationKeyId, imageId)
+        .getOrElse(
+          dao.insertAnonymizationKeyImage(
+            AnonymizationKeyImage(-1, anonymizationKeyId, imageId)))
     }
 
   def removeAnonymizationKey(anonymizationKeyId: Long) =
