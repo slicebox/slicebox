@@ -3,9 +3,7 @@ package se.nimsa.sbx.seriestype
 import scala.concurrent.duration.DurationInt
 import scala.slick.driver.H2Driver
 import scala.slick.jdbc.JdbcBackend.Database
-
 import org.scalatest._
-
 import akka.actor.ActorSystem
 import akka.actor.Status.Failure
 import akka.testkit.ImplicitSender
@@ -14,6 +12,7 @@ import akka.util.Timeout.durationToTimeout
 import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.metadata.MetaDataDAO
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
+import se.nimsa.sbx.metadata.MetaDataProtocol.SeriesDeleted
 
 class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
     with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {
@@ -29,7 +28,7 @@ class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
   db.withSession { implicit session =>
     metaDataDao.create
     seriesTypeDao.create
-      seriesTypeDao.create
+    seriesTypeDao.create
   }
 
   val seriesTypeService = system.actorOf(SeriesTypeServiceActor.props(dbProps, 1.minute), name = "SeriesTypeService")
@@ -268,7 +267,7 @@ class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
       }
     }
 
-    "deletes series type rule attributes when a series type rule is deleted" in {
+    "delete series type rule attributes when a series type rule is deleted" in {
       val addedSeriesType = db.withSession { implicit session =>
         seriesTypeDao.insertSeriesType(SeriesType(-1, "st1"))
       }
@@ -292,6 +291,24 @@ class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
         case SeriesTypeRuleAttributes(seriesTypeRuleAttributes) =>
           seriesTypeRuleAttributes.size should be(0)
       }
+    }
+
+    "delete series type to series connection when series is deleted" in {
+      val addedSeriesType = db.withSession { implicit session =>
+        seriesTypeDao.insertSeriesType(SeriesType(-1, "st1"))
+      }
+
+      val seriesId = 45
+      val addedSeriesSeriesType = db.withSession { implicit session =>
+        seriesTypeDao.insertSeriesSeriesType(SeriesSeriesType(seriesId, addedSeriesType.id))
+      }
+      
+      seriesTypeService ! SeriesDeleted(seriesId)
+      expectMsgType[SeriesTypesRemovedFromSeries]
+      
+      db.withSession { implicit session =>
+        seriesTypeDao.listSeriesSeriesTypes shouldBe empty
+      }      
     }
   }
 }

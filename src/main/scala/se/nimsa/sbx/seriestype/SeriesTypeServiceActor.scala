@@ -44,12 +44,20 @@ class SeriesTypeServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extend
   val metaDataService = context.actorSelection("../MetaDataService")
   val seriesTypeUpdateService = context.actorOf(SeriesTypeUpdateActor.props(timeout), name = "SeriesTypeUpdate")
 
+  override def preStart {
+    system.eventStream.subscribe(context.self, classOf[SeriesDeleted])
+  }
+
   log.info("Series type service started")
 
   updateSeriesTypesForAllSeries()
 
   def receive = LoggingReceive {
 
+    case SeriesDeleted(seriesId) =>
+      removeSeriesTypesFromSeries(seriesId)
+      sender ! SeriesTypesRemovedFromSeries(seriesId)
+      
     case msg: SeriesTypeRequest =>
 
       catchAndReport {
@@ -104,9 +112,9 @@ class SeriesTypeServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extend
             val seriesSeriesType = addSeriesTypeToSeries(SeriesSeriesType(series.id, seriesType.id))
             sender ! SeriesTypeAddedToSeries(seriesSeriesType)
 
-          case RemoveSeriesTypesFromSeries(series) =>
-            removeSeriesTypesFromSeries(series.id)
-            sender ! SeriesTypesRemovedFromSeries(series)
+          case RemoveSeriesTypesFromSeries(seriesId) =>
+            removeSeriesTypesFromSeries(seriesId)
+            sender ! SeriesTypesRemovedFromSeries(seriesId)
 
           case GetSeriesTypesForSeries(seriesId) =>
             val seriesTypes = getSeriesTypesForSeries(seriesId)

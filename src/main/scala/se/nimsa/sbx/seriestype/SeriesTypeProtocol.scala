@@ -86,13 +86,13 @@ object SeriesTypeProtocol {
   
   case class AddSeriesTypeToSeries(seriesType: SeriesType, series: Series) extends SeriesTypeRequest
 
-  case class RemoveSeriesTypesFromSeries(series: Series) extends SeriesTypeRequest
+  case class RemoveSeriesTypesFromSeries(seriesId: Long) extends SeriesTypeRequest
   
   case class GetSeriesTypesForSeries(seriesId: Long) extends SeriesTypeRequest
   
   case class SeriesTypeAddedToSeries(seriesSeriesType: SeriesSeriesType)
   
-  case class SeriesTypesRemovedFromSeries(series: Series)
+  case class SeriesTypesRemovedFromSeries(seriesId: Long)
   
 
   
