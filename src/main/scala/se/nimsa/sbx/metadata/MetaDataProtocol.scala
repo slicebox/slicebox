@@ -140,6 +140,8 @@ object MetaDataProtocol {
   
   case class ImageAdded(image: Image, source: Source)
   
+  case class MetaDataDeleted(deletedPatient: Option[Patient], deletedStudy: Option[Study], deletedSeries: Option[Series], deletedImage: Option[Image])
+  
   case class PatientDeleted(patientId: Long)
   
   case class StudyDeleted(studyId: Long)

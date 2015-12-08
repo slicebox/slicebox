@@ -44,7 +44,7 @@ class MetaDataServiceActor(dbProps: DbProps) extends Actor with ExceptionCatchin
 
     case AddMetaData(patient, study, series, image, source) =>
       catchAndReport {
-        val (dbPatient, dbStudy, dbSeries, dbImage, dbSeriesSource) = 
+        val (dbPatient, dbStudy, dbSeries, dbImage, dbSeriesSource) =
           addMetaData(patient, study, series, image, source)
         sender ! MetaDataAdded(dbPatient, dbStudy, dbSeries, dbImage, dbSeriesSource)
       }
@@ -52,14 +52,16 @@ class MetaDataServiceActor(dbProps: DbProps) extends Actor with ExceptionCatchin
     case DeleteMetaData(imageId) =>
       catchAndReport {
         db.withSession { implicit session =>
-          dao.imageById(imageId).foreach { image =>
-            val (pMaybe, stMaybe, seMaybe, iMaybe) = propertiesDao.deleteFully(image)
-            pMaybe.foreach(patient => system.eventStream.publish(PatientDeleted(patient.id)))
-            stMaybe.foreach(study => system.eventStream.publish(StudyDeleted(study.id)))
-            seMaybe.foreach(series => system.eventStream.publish(SeriesDeleted(series.id)))
-            iMaybe.foreach(image => system.eventStream.publish(ImageDeleted(image.id)))
-          }
-          sender ! ImageDeleted(imageId)
+
+          val (deletedPatient, deletedStudy, deletedSeries, deletedImage) =
+            dao.imageById(imageId).map(propertiesDao.deleteFully).getOrElse((None, None, None, None))
+
+          deletedPatient.foreach(patient => system.eventStream.publish(PatientDeleted(patient.id)))
+          deletedStudy.foreach(study => system.eventStream.publish(StudyDeleted(study.id)))
+          deletedSeries.foreach(series => system.eventStream.publish(SeriesDeleted(series.id)))
+          deletedImage.foreach(image => system.eventStream.publish(ImageDeleted(image.id)))
+
+          sender ! MetaDataDeleted(deletedPatient, deletedStudy, deletedSeries, deletedImage)
         }
       }
 
@@ -225,7 +227,7 @@ class MetaDataServiceActor(dbProps: DbProps) extends Actor with ExceptionCatchin
         context.system.eventStream.publish(SeriesAdded(result, source))
         result
       }
-      val dbImage = dao.imageByUidAndSeries(image, dbSeries).getOrElse { 
+      val dbImage = dao.imageByUidAndSeries(image, dbSeries).getOrElse {
         val result = dao.insert(image.copy(seriesId = dbSeries.id))
         context.system.eventStream.publish(ImageAdded(result, source))
         result
