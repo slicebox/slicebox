@@ -57,7 +57,7 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
   val nonBoxBatchId = 1L
 
   override def preStart {
-    context.system.eventStream.subscribe(context.self, classOf[ImageAdded])
+    context.system.eventStream.subscribe(context.self, classOf[DatasetAdded])
     context.system.eventStream.subscribe(context.self, classOf[ImageDeleted])
     context.system.eventStream.subscribe(context.self, classOf[ImagesSent])
   }
@@ -89,7 +89,7 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
    */
   def receive = LoggingReceive {
 
-    case ImageAdded(image, source) =>
+    case DatasetAdded(image, source) =>
       val applicableRules = maybeAddImageToForwardingQueue(image, source, sender)
       sender ! ImageRegisteredForForwarding(image, applicableRules)
       
