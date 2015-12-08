@@ -52,23 +52,6 @@ class PropertiesDAO(val driver: JdbcProfile) {
 
   private val seriesSourceQuery = TableQuery[SeriesSources]
 
-  // *** Series types ***
-
-  private val toSeriesSeriesTypesRule = (seriesId: Long, seriesTypeId: Long) => SeriesSeriesType(seriesId, seriesTypeId)
-
-  private val fromSeriesSeriesTypesRule = (seriesSeriesType: SeriesSeriesType) => Option((seriesSeriesType.seriesId, seriesSeriesType.seriesTypeId))
-
-  private class SeriesSeriesTypeTable(tag: Tag) extends Table[SeriesSeriesType](tag, "SeriesSeriesTypes") {
-    def seriesId = column[Long]("seriesid")
-    def seriesTypeId = column[Long]("seriestypeid")
-    def pk = primaryKey("pk_seriestype", (seriesId, seriesTypeId))
-    def fkSeries = foreignKey("fk_series_seriesseriestype", seriesId, metaDataDao.seriesQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
-    def fkSeriesType = foreignKey("fk_seriestype_seriesseriestype", seriesTypeId, seriesTypeDao.seriesTypeQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
-    def * = (seriesId, seriesTypeId) <> (toSeriesSeriesTypesRule.tupled, fromSeriesSeriesTypesRule)
-  }
-
-  private val seriesSeriesTypeQuery = TableQuery[SeriesSeriesTypeTable]
-
   // *** Tags ***
 
   private val toSeriesTag = (id: Long, name: String) => SeriesTag(id, name)
@@ -103,18 +86,16 @@ class PropertiesDAO(val driver: JdbcProfile) {
 
   def create(implicit session: Session) = {
     if (MTable.getTables("SeriesSources").list.isEmpty) seriesSourceQuery.ddl.create
-    if (MTable.getTables("SeriesSeriesTypes").list.isEmpty) seriesSeriesTypeQuery.ddl.create
     if (MTable.getTables("SeriesTags").list.isEmpty) seriesTagQuery.ddl.create
     if (MTable.getTables("SeriesSeriesTags").list.isEmpty) seriesSeriesTagQuery.ddl.create
   }
 
   def drop(implicit session: Session) =
     if (MTable.getTables("SeriesTags").list.size > 0)
-      (seriesSourceQuery.ddl ++ seriesSeriesTypeQuery.ddl ++ seriesTagQuery.ddl ++ seriesSeriesTagQuery.ddl).drop
+      (seriesSourceQuery.ddl ++ seriesTagQuery.ddl ++ seriesSeriesTagQuery.ddl).drop
 
   def clear(implicit session: Session) = {
     seriesSourceQuery.delete
-    seriesSeriesTypeQuery.delete
     seriesTagQuery.delete
     seriesSeriesTagQuery.delete
   }
@@ -148,9 +129,6 @@ class PropertiesDAO(val driver: JdbcProfile) {
   def listSeriesTags(implicit session: Session): List[SeriesTag] =
     seriesTagQuery.list
 
-  def listSeriesSeriesTypes(implicit session: Session): List[SeriesSeriesType] =
-    seriesSeriesTypeQuery.list
-
   def removeSeriesTag(seriesTagId: Long)(implicit session: Session): Unit =
     seriesTagQuery.filter(_.id === seriesTagId).delete
 
@@ -176,22 +154,6 @@ class PropertiesDAO(val driver: JdbcProfile) {
       .innerJoin(seriesTagQuery).on(_.seriesTagId === _.id)
       .map(_._2).list
   }
-
-  def insertSeriesSeriesType(seriesSeriesType: SeriesSeriesType)(implicit session: Session): SeriesSeriesType = {
-    seriesSeriesTypeQuery += seriesSeriesType
-    seriesSeriesType
-  }
-
-  def listSeriesSeriesTypesForSeriesId(seriesId: Long)(implicit session: Session): List[SeriesSeriesType] =
-    seriesSeriesTypeQuery.filter(_.seriesId === seriesId).list
-
-  def removeSeriesTypesForSeriesId(seriesId: Long)(implicit session: Session): Unit =
-    seriesSeriesTypeQuery.filter(_.seriesId === seriesId).delete
-
-  def seriesTypesForSeries(seriesId: Long)(implicit session: Session) =
-    seriesSeriesTypeQuery.filter(_.seriesId === seriesId)
-      .innerJoin(seriesTypeDao.seriesTypeQuery).on(_.seriesTypeId === _.id)
-      .map(_._2).list
 
   def addAndInsertSeriesTagForSeriesId(seriesTag: SeriesTag, seriesId: Long)(implicit session: Session): SeriesTag = {
     val dbSeriesTag = seriesTagForName(seriesTag.name).getOrElse(insertSeriesTag(seriesTag))

@@ -28,6 +28,8 @@ object SeriesTypeProtocol {
   
   case class SeriesTypeRule(id: Long, seriesTypeId: Long) extends Entity
   
+  case class SeriesSeriesType(seriesId: Long, seriesTypeId: Long)
+
   case class SeriesTypeRuleAttribute(
       id: Long,
       seriesTypeRuleId: Long,
@@ -52,6 +54,7 @@ object SeriesTypeProtocol {
   
   case class RemoveSeriesType(seriesTypeId: Long) extends SeriesTypeRequest
   
+
   case class SeriesTypeAdded(seriesType: SeriesType)
   
   case object SeriesTypeUpdated
@@ -80,6 +83,18 @@ object SeriesTypeProtocol {
   
   case class SeriesTypeRuleAttributeRemoved(seriesTypeRuleAttributeId: Long)
   
+  
+  case class AddSeriesTypeToSeries(seriesType: SeriesType, series: Series) extends SeriesTypeRequest
+
+  case class RemoveSeriesTypesFromSeries(series: Series) extends SeriesTypeRequest
+  
+  case class GetSeriesTypesForSeries(seriesId: Long) extends SeriesTypeRequest
+  
+  case class SeriesTypeAddedToSeries(seriesSeriesType: SeriesSeriesType)
+  
+  case class SeriesTypesRemovedFromSeries(series: Series)
+  
+
   
   sealed trait SeriesTypesUpdateRequest
   

@@ -23,37 +23,23 @@ import SeriesTypeProtocol._
 class SeriesTypeDAO(val driver: JdbcProfile) {
   import driver.simple._
 
-  private val toSeriesType = (id: Long, name: String) => SeriesType(id, name)
-
-  private val fromSeriesType = (seriesType: SeriesType) => Option((seriesType.id, seriesType.name))
-
   class SeriesTypeTable(tag: Tag) extends Table[SeriesType](tag, "SeriesTypes") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def name = column[String]("name")
     def idxUniqueName = index("idx_unique_series_type_name", name, unique = true)
-    def * = (id, name) <> (toSeriesType.tupled, fromSeriesType)
+    def * = (id, name) <> (SeriesType.tupled, SeriesType.unapply)
   }
 
   val seriesTypeQuery = TableQuery[SeriesTypeTable]
-
-  private val toSeriesTypeRule = (id: Long, seriesTypeId: Long) => SeriesTypeRule(id, seriesTypeId)
-
-  private val fromSeriesTypeRule = (seriesTypeRule: SeriesTypeRule) => Option((seriesTypeRule.id, seriesTypeRule.seriesTypeId))
 
   class SeriesTypeRuleTable(tag: Tag) extends Table[SeriesTypeRule](tag, "SeriesTypeRules") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def seriesTypeId = column[Long]("seriestypeid")
     def fkSeriesType = foreignKey("fk_series_type", seriesTypeId, seriesTypeQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
-    def * = (id, seriesTypeId) <> (toSeriesTypeRule.tupled, fromSeriesTypeRule)
+    def * = (id, seriesTypeId) <> (SeriesTypeRule.tupled, SeriesTypeRule.unapply)
   }
 
   val seriesTypeRuleQuery = TableQuery[SeriesTypeRuleTable]
-
-  private val toSeriesTypeRuleAttribute = (id: Long, seriesTypeRuleId: Long, tag: Int, name: String, tagPath: Option[String], namePath: Option[String], values: String) =>
-    SeriesTypeRuleAttribute(id, seriesTypeRuleId, tag, name, tagPath, namePath, values)
-
-  private val fromSeriesTypeRuleAttribute = (seriesTypeRuleAttribute: SeriesTypeRuleAttribute) =>
-    Option((seriesTypeRuleAttribute.id, seriesTypeRuleAttribute.seriesTypeRuleId, seriesTypeRuleAttribute.tag, seriesTypeRuleAttribute.name, seriesTypeRuleAttribute.tagPath, seriesTypeRuleAttribute.namePath, seriesTypeRuleAttribute.values))
 
   class SeriesTypeRuleAttributeTable(tag: Tag) extends Table[SeriesTypeRuleAttribute](tag, "SeriesTypeRuleAttributes") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
@@ -64,24 +50,36 @@ class SeriesTypeDAO(val driver: JdbcProfile) {
     def namePath = column[Option[String]]("namepath")
     def values = column[String]("values")
     def fkSeriesTypeRule = foreignKey("fk_series_type_rule", seriesTypeRuleId, seriesTypeRuleQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
-    def * = (id, seriesTypeRuleId, dicomTag, name, tagPath, namePath, values) <> (toSeriesTypeRuleAttribute.tupled, fromSeriesTypeRuleAttribute)
+    def * = (id, seriesTypeRuleId, dicomTag, name, tagPath, namePath, values) <> (SeriesTypeRuleAttribute.tupled, SeriesTypeRuleAttribute.unapply)
   }
 
   val seriesTypeRuleAttributeQuery = TableQuery[SeriesTypeRuleAttributeTable]
+
+  private class SeriesSeriesTypeTable(tag: Tag) extends Table[SeriesSeriesType](tag, "SeriesSeriesTypes") {
+    def seriesId = column[Long]("seriesid")
+    def seriesTypeId = column[Long]("seriestypeid")
+    def pk = primaryKey("pk_seriestype", (seriesId, seriesTypeId))
+    def fkSeriesType = foreignKey("fk_seriestype_seriesseriestype", seriesTypeId, seriesTypeQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
+    def * = (seriesId, seriesTypeId) <> (SeriesSeriesType.tupled, SeriesSeriesType.unapply)
+  }
+
+  private val seriesSeriesTypeQuery = TableQuery[SeriesSeriesTypeTable]
 
   def create(implicit session: Session): Unit = {
     if (MTable.getTables("SeriesTypes").list.isEmpty) seriesTypeQuery.ddl.create
     if (MTable.getTables("SeriesTypeRules").list.isEmpty) seriesTypeRuleQuery.ddl.create
     if (MTable.getTables("SeriesTypeRuleAttributes").list.isEmpty) seriesTypeRuleAttributeQuery.ddl.create
+    if (MTable.getTables("SeriesSeriesTypes").list.isEmpty) seriesSeriesTypeQuery.ddl.create
   }
 
   def drop(implicit session: Session): Unit =
-    (seriesTypeQuery.ddl ++ seriesTypeRuleQuery.ddl ++ seriesTypeRuleAttributeQuery.ddl).drop
+    (seriesTypeQuery.ddl ++ seriesTypeRuleQuery.ddl ++ seriesTypeRuleAttributeQuery.ddl ++ seriesSeriesTypeQuery.ddl).drop
 
   def clear(implicit session: Session) = {
     seriesTypeQuery.delete
     seriesTypeRuleQuery.delete
     seriesTypeRuleAttributeQuery.delete
+    seriesSeriesTypeQuery.delete
   }
 
   def insertSeriesType(seriesType: SeriesType)(implicit session: Session): SeriesType = {
@@ -120,6 +118,9 @@ class SeriesTypeDAO(val driver: JdbcProfile) {
   def listSeriesTypeRuleAttributesForSeriesTypeRuleId(seriesTypeRuleId: Long)(implicit session: Session): List[SeriesTypeRuleAttribute] =
     seriesTypeRuleAttributeQuery.filter(_.seriesTypeRuleId === seriesTypeRuleId).list
 
+  def listSeriesSeriesTypes(implicit session: Session): List[SeriesSeriesType] =
+    seriesSeriesTypeQuery.list
+
   def removeSeriesType(seriesTypeId: Long)(implicit session: Session): Unit =
     seriesTypeQuery.filter(_.id === seriesTypeId).delete
 
@@ -128,5 +129,21 @@ class SeriesTypeDAO(val driver: JdbcProfile) {
 
   def removeSeriesTypeRuleAttribute(seriesTypeRuleAttributeId: Long)(implicit session: Session): Unit =
     seriesTypeRuleAttributeQuery.filter(_.id === seriesTypeRuleAttributeId).delete
+
+  def insertSeriesSeriesType(seriesSeriesType: SeriesSeriesType)(implicit session: Session): SeriesSeriesType = {
+    seriesSeriesTypeQuery += seriesSeriesType
+    seriesSeriesType
+  }
+
+  def listSeriesSeriesTypesForSeriesId(seriesId: Long)(implicit session: Session): List[SeriesSeriesType] =
+    seriesSeriesTypeQuery.filter(_.seriesId === seriesId).list
+
+  def removeSeriesTypesForSeriesId(seriesId: Long)(implicit session: Session): Unit =
+    seriesSeriesTypeQuery.filter(_.seriesId === seriesId).delete
+
+  def seriesTypesForSeries(seriesId: Long)(implicit session: Session) =
+    seriesSeriesTypeQuery.filter(_.seriesId === seriesId)
+      .innerJoin(seriesTypeQuery).on(_.seriesTypeId === _.id)
+      .map(_._2).list
 
 }

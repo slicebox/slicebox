@@ -22,14 +22,11 @@ import akka.actor.Props
 import akka.event.Logging
 import akka.event.LoggingReceive
 import se.nimsa.sbx.app.DbProps
-import se.nimsa.sbx.lang.NotFoundException
-import se.nimsa.sbx.seriestype.SeriesTypeProtocol.SeriesTypes
-import se.nimsa.sbx.util.ExceptionCatching
-import se.nimsa.sbx.app.GeneralProtocol._
-import se.nimsa.sbx.storage.StorageProtocol._
+import se.nimsa.sbx.app.GeneralProtocol.Source
 import se.nimsa.sbx.dicom.DicomHierarchy._
-import se.nimsa.sbx.dicom.DicomUtil._
+import se.nimsa.sbx.lang.NotFoundException
 import se.nimsa.sbx.log.SbxLog
+import se.nimsa.sbx.util.ExceptionCatching
 
 class MetaDataServiceActor(dbProps: DbProps) extends Actor with ExceptionCatching {
 
@@ -69,18 +66,6 @@ class MetaDataServiceActor(dbProps: DbProps) extends Actor with ExceptionCatchin
     case msg: PropertiesRequest => catchAndReport {
       msg match {
 
-        case AddSeriesTypeToSeries(seriesType, series) =>
-          db.withSession { implicit session =>
-            val seriesSeriesType = propertiesDao.insertSeriesSeriesType(SeriesSeriesType(series.id, seriesType.id))
-            sender ! SeriesTypeAddedToSeries(seriesSeriesType)
-          }
-
-        case RemoveSeriesTypesFromSeries(series) =>
-          db.withSession { implicit session =>
-            propertiesDao.removeSeriesTypesForSeriesId(series.id)
-            sender ! SeriesTypesRemovedFromSeries(series)
-          }
-
         case GetSeriesTags =>
           sender ! SeriesTags(getSeriesTags)
 
@@ -88,10 +73,6 @@ class MetaDataServiceActor(dbProps: DbProps) extends Actor with ExceptionCatchin
           db.withSession { implicit session =>
             sender ! propertiesDao.seriesSourceById(seriesId)
           }
-
-        case GetSeriesTypesForSeries(seriesId) =>
-          val seriesTypes = getSeriesTypesForSeries(seriesId)
-          sender ! SeriesTypes(seriesTypes)
 
         case GetSeriesTagsForSeries(seriesId) =>
           val seriesTags = getSeriesTagsForSeries(seriesId)
@@ -217,11 +198,6 @@ class MetaDataServiceActor(dbProps: DbProps) extends Actor with ExceptionCatchin
   def getSeriesTags =
     db.withSession { implicit session =>
       propertiesDao.listSeriesTags
-    }
-
-  def getSeriesTypesForSeries(seriesId: Long) =
-    db.withSession { implicit session =>
-      propertiesDao.seriesTypesForSeries(seriesId)
     }
 
   def getSeriesTagsForSeries(seriesId: Long) =

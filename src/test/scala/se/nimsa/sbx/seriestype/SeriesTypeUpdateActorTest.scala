@@ -23,7 +23,6 @@ import se.nimsa.sbx.app.GeneralProtocol.Source
 import se.nimsa.sbx.app.GeneralProtocol.SourceType
 import se.nimsa.sbx.dicom.DicomHierarchy.Series
 import se.nimsa.sbx.metadata.MetaDataDAO
-import se.nimsa.sbx.metadata.MetaDataProtocol.SeriesSeriesType
 import se.nimsa.sbx.metadata.MetaDataServiceActor
 import se.nimsa.sbx.metadata.PropertiesDAO
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
@@ -112,7 +111,7 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
       val series = addTestDataset()
 
       db.withSession { implicit session =>
-        propertiesDao.insertSeriesSeriesType(SeriesSeriesType(series.id, seriesType.id))
+        seriesTypeDao.insertSeriesSeriesType(SeriesSeriesType(series.id, seriesType.id))
       }
 
       seriesTypeUpdateService ! UpdateSeriesTypesForSeries(Seq(series.id))
@@ -244,6 +243,6 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
 
   def seriesSeriesTypesForSeries(series: Series): Seq[SeriesSeriesType] =
     db.withSession { implicit session =>
-      propertiesDao.listSeriesSeriesTypesForSeriesId(series.id)
+      seriesTypeDao.listSeriesSeriesTypesForSeriesId(series.id)
     }
 }

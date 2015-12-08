@@ -47,7 +47,7 @@ class SeriesTypeServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extend
   log.info("Series type service started")
 
   updateSeriesTypesForAllSeries()
-  
+
   def receive = LoggingReceive {
 
     case msg: SeriesTypeRequest =>
@@ -99,6 +99,18 @@ class SeriesTypeServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extend
             removeSeriesTypeRuleAttributeFromDb(seriesTypeRuleAttributeId)
             updateSeriesTypesForAllSeries()
             sender ! SeriesTypeRuleAttributeRemoved(seriesTypeRuleAttributeId)
+
+          case AddSeriesTypeToSeries(seriesType, series) =>
+            val seriesSeriesType = addSeriesTypeToSeries(SeriesSeriesType(series.id, seriesType.id))
+            sender ! SeriesTypeAddedToSeries(seriesSeriesType)
+
+          case RemoveSeriesTypesFromSeries(series) =>
+            removeSeriesTypesFromSeries(series.id)
+            sender ! SeriesTypesRemovedFromSeries(series)
+
+          case GetSeriesTypesForSeries(seriesId) =>
+            val seriesTypes = getSeriesTypesForSeries(seriesId)
+            sender ! SeriesTypes(seriesTypes)
 
           case GetUpdateSeriesTypesRunningStatus =>
             seriesTypeUpdateService.forward(GetUpdateSeriesTypesRunningStatus)
@@ -160,6 +172,21 @@ class SeriesTypeServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extend
   def removeSeriesTypeRuleAttributeFromDb(seriesTypeRuleAttributeId: Long): Unit =
     db.withSession { implicit session =>
       seriesTypeDao.removeSeriesTypeRuleAttribute(seriesTypeRuleAttributeId)
+    }
+
+  def getSeriesTypesForSeries(seriesId: Long) =
+    db.withSession { implicit session =>
+      seriesTypeDao.seriesTypesForSeries(seriesId)
+    }
+
+  def addSeriesTypeToSeries(seriesSeriesType: SeriesSeriesType) =
+    db.withSession { implicit session =>
+      seriesTypeDao.insertSeriesSeriesType(seriesSeriesType)
+    }
+
+  def removeSeriesTypesFromSeries(seriesId: Long) =
+    db.withSession { implicit session =>
+      seriesTypeDao.removeSeriesTypesForSeriesId(seriesId)
     }
 
   def updateSeriesTypesForAllSeries() =

@@ -27,8 +27,6 @@ object MetaDataProtocol {
   
   // domain objects
 
-  case class SeriesSeriesType(seriesId: Long, seriesTypeId: Long)
-
   case class SeriesSource(id: Long, source: Source) extends Entity
 
   case class SeriesTag(id: Long, name: String) extends Entity
@@ -119,11 +117,7 @@ object MetaDataProtocol {
 
   sealed trait PropertiesRequest
 
-  case class AddSeriesTypeToSeries(seriesType: SeriesType, series: Series) extends PropertiesRequest
-
   case class AddSeriesTagToSeries(seriesTag: SeriesTag, seriesId: Long) extends PropertiesRequest
-
-  case class RemoveSeriesTypesFromSeries(series: Series) extends PropertiesRequest
 
   case class RemoveSeriesTagFromSeries(seriesTagId: Long, seriesId: Long) extends PropertiesRequest
 
@@ -133,7 +127,6 @@ object MetaDataProtocol {
 
   case class GetSeriesTagsForSeries(seriesId: Long) extends PropertiesRequest
 
-  case class GetSeriesTypesForSeries(seriesId: Long) extends PropertiesRequest
 
   // ***to API***
 
@@ -165,11 +158,7 @@ object MetaDataProtocol {
 
   case class Images(images: Seq[Image])
 
-  case class SeriesTypeAddedToSeries(seriesSeriesType: SeriesSeriesType)
-
   case class SeriesTagAddedToSeries(seriesTag: SeriesTag)
-
-  case class SeriesTypesRemovedFromSeries(series: Series)
 
   case class SeriesTagRemovedFromSeries(seriesId: Long)
 
