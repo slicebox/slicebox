@@ -16,10 +16,10 @@
 
 package se.nimsa.sbx.metadata
 
+import se.nimsa.sbx.app.GeneralProtocol.Source
+import se.nimsa.sbx.app.GeneralProtocol.SourceRef
 import se.nimsa.sbx.dicom.DicomHierarchy._
-import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol.SeriesType
-import org.dcm4che3.data.Attributes
 
 object MetaDataProtocol {
   
@@ -75,6 +75,10 @@ object MetaDataProtocol {
 
   // messages
 
+  case class AddMetaData(patient: Patient, study: Study, series: Series, image: Image, source: Source)
+  
+  case class DeleteMetaData(imageId: Long)  
+    
   sealed trait MetaDataQuery
 
   case class GetPatients(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String], sourceRefs: Array[SourceRef], seriesTypeIds: Array[Long], seriesTagIds: Array[Long]) extends MetaDataQuery
@@ -133,6 +137,24 @@ object MetaDataProtocol {
 
   // ***to API***
 
+  case class MetaDataAdded(patient: Patient, study: Study, series: Series, image: Image, seriesSource: SeriesSource)
+  
+  case class PatientAdded(patient: Patient, source: Source)
+  
+  case class StudyAdded(study: Study, source: Source)
+  
+  case class SeriesAdded(series: Series, source: Source)
+  
+  case class ImageAdded(image: Image, source: Source)
+  
+  case class PatientDeleted(patientId: Long)
+  
+  case class StudyDeleted(studyId: Long)
+  
+  case class SeriesDeleted(seriesId: Long)
+  
+  case class ImageDeleted(imageId: Long)
+  
   case class Patients(patients: Seq[Patient])
 
   case class Studies(studies: Seq[Study])

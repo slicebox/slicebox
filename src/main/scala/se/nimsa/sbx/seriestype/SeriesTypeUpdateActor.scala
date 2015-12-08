@@ -16,23 +16,23 @@
 
 package se.nimsa.sbx.seriestype
 
-import scala.collection.JavaConversions._
 import scala.concurrent.Future
+
 import org.dcm4che3.data.Attributes
+
 import SeriesTypeProtocol._
 import akka.actor.Actor
-import akka.actor.ActorRef
 import akka.actor.Props
 import akka.event.Logging
 import akka.event.LoggingReceive
 import akka.pattern.ask
 import akka.util.Timeout
-import se.nimsa.sbx.dicom.DicomHierarchy._
+import se.nimsa.sbx.dicom.DicomHierarchy.Series
 import se.nimsa.sbx.dicom.DicomUtil
 import se.nimsa.sbx.metadata.MetaDataProtocol._
-import se.nimsa.sbx.storage.StorageProtocol._
+import se.nimsa.sbx.storage.StorageProtocol.GetDataset
+import se.nimsa.sbx.storage.StorageProtocol.DatasetAdded
 import se.nimsa.sbx.util.ExceptionCatching
-import se.nimsa.sbx.app.GeneralProtocol.ImageAdded
 
 class SeriesTypeUpdateActor(implicit val timeout: Timeout) extends Actor with ExceptionCatching {
 
@@ -53,7 +53,7 @@ class SeriesTypeUpdateActor(implicit val timeout: Timeout) extends Actor with Ex
   case object PollSeriesTypesUpdateQueue
 
   override def preStart {
-    context.system.eventStream.subscribe(context.self, classOf[ImageAdded])
+    context.system.eventStream.subscribe(context.self, classOf[DatasetAdded])
   }
 
   log.info("Series type update service started")
@@ -70,7 +70,7 @@ class SeriesTypeUpdateActor(implicit val timeout: Timeout) extends Actor with Ex
     case MarkSeriesAsProcessed(seriesId) =>
       seriesBeingUpdated -= seriesId
 
-    case ImageAdded(image, source) =>
+    case DatasetAdded(image, source) =>
       self ! UpdateSeriesTypesForSeries(Seq(image.seriesId))
 
     case PollSeriesTypesUpdateQueue => pollSeriesTypesUpdateQueue()

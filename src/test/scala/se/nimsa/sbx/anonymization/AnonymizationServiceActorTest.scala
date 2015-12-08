@@ -1,9 +1,9 @@
 package se.nimsa.sbx.anonymization
 
-import java.util.Date
+import scala.concurrent.duration.DurationInt
 import scala.slick.driver.H2Driver
 import scala.slick.jdbc.JdbcBackend.Database
-import scala.concurrent.duration.DurationInt
+
 import org.dcm4che3.data.Attributes
 import org.dcm4che3.data.Tag
 import org.dcm4che3.data.VR
@@ -11,20 +11,23 @@ import org.scalatest.BeforeAndAfterAll
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.Matchers
 import org.scalatest.WordSpecLike
+
+import AnonymizationProtocol.Anonymize
+import AnonymizationProtocol.ReverseAnonymization
+import AnonymizationUtil.anonymizeDataset
+import akka.actor.Actor
 import akka.actor.ActorSystem
 import akka.actor.Props
-import akka.actor.actorRef2Scala
 import akka.testkit.ImplicitSender
 import akka.testkit.TestKit
+import akka.util.Timeout.durationToTimeout
 import se.nimsa.sbx.app.DbProps
-import se.nimsa.sbx.util.TestUtil._
-import se.nimsa.sbx.dicom.DicomUtil.datasetToImage
-import AnonymizationProtocol._
-import AnonymizationUtil.anonymizeDataset
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
-import akka.actor.Actor
+import se.nimsa.sbx.dicom.DicomUtil.datasetToImage
 import se.nimsa.sbx.metadata.MetaDataProtocol.GetImage
-import se.nimsa.sbx.app.GeneralProtocol.ImageAdded
+import se.nimsa.sbx.metadata.MetaDataProtocol.ImageAdded
+import se.nimsa.sbx.util.TestUtil.createAnonymizationKey
+import se.nimsa.sbx.util.TestUtil.createDataset
 
 class AnonymizationServiceActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
     with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {

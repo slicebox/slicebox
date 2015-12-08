@@ -18,6 +18,7 @@ package se.nimsa.sbx.storage
 
 import java.nio.file.Path
 import org.dcm4che3.data.Attributes
+import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.app.GeneralProtocol._
 
 object StorageProtocol {
@@ -48,13 +49,21 @@ object StorageProtocol {
 
   case class GetImageFrame(imageId: Long, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int) extends ImageRequest
 
+  case class AddDataset(dataset: Attributes, source: Source)
+  
   case class AddJpeg(jpegBytes: Array[Byte], studyId: Long, source: Source)
   
+  case class DeleteDataset(imageId: Long)
+
   case class CreateTempZipFile(imageIds: Seq[Long])
   
   case class DeleteTempZipFile(path: Path)
   
   // ***to API***
+
+  case class DatasetAdded(image: Image, source: Source)
+  
+  case class DatasetDeleted(imageId: Long)
 
   case class ImagePath(imagePath: Path)
 

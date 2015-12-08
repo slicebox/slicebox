@@ -21,6 +21,7 @@ import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.TagValue
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.ImageTagValues
 import org.dcm4che3.data.Attributes
+import se.nimsa.sbx.app.GeneralProtocol.Destination
 
 object BoxProtocol {
 

@@ -212,18 +212,21 @@ class PropertiesDAO(val driver: JdbcProfile) {
     cleanupSeriesTag(seriesTagId)
   }
 
-  def deleteFully(image: Image)(implicit session: Session): Unit = {
-    metaDataDao.deleteImage(image.id)
-    metaDataDao.seriesById(image.seriesId).foreach(series =>
-      if (metaDataDao.imagesForSeries(0, 2, series.id).isEmpty) {
-        deleteFully(series)
-      })
+  def deleteFully(image: Image)(implicit session: Session): (Option[Patient], Option[Study], Option[Series], Option[Image]) = {
+    val imagesDeleted = metaDataDao.deleteImage(image.id)
+    val pssMaybe = metaDataDao.seriesById(image.seriesId)
+      .filter(series => metaDataDao.imagesForSeries(0, 2, series.id).isEmpty)
+      .map(series => deleteFully(series))
+      .getOrElse((None, None, None))
+    val imageMaybe = if (imagesDeleted == 0) None else Some(image)
+    (pssMaybe._1, pssMaybe._2, pssMaybe._3, imageMaybe)
   }
 
-  def deleteFully(series: Series)(implicit session: Session): Unit = {
+  def deleteFully(series: Series)(implicit session: Session): (Option[Patient], Option[Study], Option[Series]) = {
     val seriesSeriesTags = seriesTagsForSeries(series.id)
-    metaDataDao.deleteFully(series)
+    val (pMaybe, stMaybe, seMaybe) = metaDataDao.deleteFully(series)
     seriesSeriesTags.foreach(seriesTag => cleanupSeriesTag(seriesTag.id))
+    (pMaybe, stMaybe, seMaybe)
   }
 
   def flatSeries(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String], sourceRefs: Seq[SourceRef], seriesTypeIds: Seq[Long], seriesTagIds: Seq[Long])(implicit session: Session): List[FlatSeries] = {

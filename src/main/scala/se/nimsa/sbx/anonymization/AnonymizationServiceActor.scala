@@ -16,24 +16,25 @@
 
 package se.nimsa.sbx.anonymization
 
+import scala.concurrent.Future
+
+import org.dcm4che3.data.Attributes
+
+import AnonymizationProtocol._
+import AnonymizationUtil._
 import akka.actor.Actor
-import akka.event.LoggingReceive
-import akka.event.Logging
 import akka.actor.Props
+import akka.event.Logging
+import akka.event.LoggingReceive
 import akka.pattern.ask
 import akka.pattern.pipe
 import akka.util.Timeout
-import scala.concurrent.Future
 import se.nimsa.sbx.app.DbProps
-import se.nimsa.sbx.util.ExceptionCatching
-import se.nimsa.sbx.dicom.DicomUtil._
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
-import se.nimsa.sbx.app.GeneralProtocol.ImageDeleted
-import se.nimsa.sbx.metadata.MetaDataProtocol.Images
-import se.nimsa.sbx.metadata.MetaDataProtocol.GetImage
-import org.dcm4che3.data.Attributes
-import AnonymizationProtocol._
-import AnonymizationUtil._
+import se.nimsa.sbx.dicom.DicomUtil.cloneDataset
+import se.nimsa.sbx.dicom.DicomUtil.datasetToPatient
+import se.nimsa.sbx.metadata.MetaDataProtocol._
+import se.nimsa.sbx.util.ExceptionCatching
 
 class AnonymizationServiceActor(dbProps: DbProps, implicit val timeout: Timeout) extends Actor with ExceptionCatching {
 

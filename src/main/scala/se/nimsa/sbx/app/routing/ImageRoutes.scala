@@ -55,7 +55,7 @@ trait ImageRoutes { this: SliceboxService =>
             val dataset = DicomUtil.loadDataset(file.entity.data.toByteArray, true)
             val source = Source(SourceType.USER, apiUser.user, apiUser.id)
             onSuccess(storageService.ask(AddDataset(dataset, source))) {
-              case ImageAdded(image, source) =>
+              case DatasetAdded(image, source) =>
                 import spray.httpx.SprayJsonSupport._
                 complete((Created, image))
             }
@@ -63,7 +63,7 @@ trait ImageRoutes { this: SliceboxService =>
             val dataset = DicomUtil.loadDataset(bytes, true)
             val source = Source(SourceType.USER, apiUser.user, apiUser.id)
             onSuccess(storageService.ask(AddDataset(dataset, source))) {
-              case ImageAdded(image, source) =>
+              case DatasetAdded(image, source) =>
                 import spray.httpx.SprayJsonSupport._
                 complete((Created, image))
             }
@@ -84,8 +84,8 @@ trait ImageRoutes { this: SliceboxService =>
               }
             }
           } ~ delete {
-            onSuccess(storageService.ask(DeleteImage(imageId))) {
-              case ImageDeleted(imageId) =>
+            onSuccess(storageService.ask(DeleteDataset(imageId))) {
+              case DatasetDeleted(imageId) =>
                 complete(NoContent)
             }
           }
@@ -124,7 +124,7 @@ trait ImageRoutes { this: SliceboxService =>
           import spray.httpx.SprayJsonSupport._
           entity(as[Seq[Long]]) { imageIds =>
             val futureDeleted = Future.sequence {
-              imageIds.map(imageId => storageService.ask(DeleteImage(imageId)))
+              imageIds.map(imageId => storageService.ask(DeleteDataset(imageId)))
             }
             onSuccess(futureDeleted) { m =>
               complete(NoContent)

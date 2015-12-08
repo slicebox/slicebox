@@ -25,8 +25,8 @@ import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.lang.NotFoundException
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol.SeriesTypes
 import se.nimsa.sbx.util.ExceptionCatching
-import org.dcm4che3.data.Attributes
 import se.nimsa.sbx.app.GeneralProtocol._
+import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomUtil._
 import se.nimsa.sbx.log.SbxLog
@@ -45,16 +45,23 @@ class MetaDataServiceActor(dbProps: DbProps) extends Actor with ExceptionCatchin
 
   def receive = LoggingReceive {
 
-    case AddDataset(dataset, source) =>
+    case AddMetaData(patient, study, series, image, source) =>
       catchAndReport {
-        val image = addDataset(dataset, source)
-        sender ! ImageAdded(image, source)
+        val (dbPatient, dbStudy, dbSeries, dbImage, dbSeriesSource) = 
+          addMetaData(patient, study, series, image, source)
+        sender ! MetaDataAdded(dbPatient, dbStudy, dbSeries, dbImage, dbSeriesSource)
       }
 
-    case DeleteImage(imageId) =>
+    case DeleteMetaData(imageId) =>
       catchAndReport {
         db.withSession { implicit session =>
-          dao.imageById(imageId).foreach(propertiesDao.deleteFully(_))
+          dao.imageById(imageId).foreach { image =>
+            val (pMaybe, stMaybe, seMaybe, iMaybe) = propertiesDao.deleteFully(image)
+            pMaybe.foreach(patient => system.eventStream.publish(PatientDeleted(patient.id)))
+            stMaybe.foreach(study => system.eventStream.publish(StudyDeleted(study.id)))
+            seMaybe.foreach(series => system.eventStream.publish(SeriesDeleted(series.id)))
+            iMaybe.foreach(image => system.eventStream.publish(ImageDeleted(image.id)))
+          }
           sender ! ImageDeleted(imageId)
         }
       }
@@ -222,30 +229,38 @@ class MetaDataServiceActor(dbProps: DbProps) extends Actor with ExceptionCatchin
       propertiesDao.seriesTagsForSeries(seriesId)
     }
 
-  def addDataset(dataset: Attributes, source: Source): Image =
+  def addMetaData(patient: Patient, study: Study, series: Series, image: Image, source: Source): (Patient, Study, Series, Image, SeriesSource) =
     db.withSession { implicit session =>
 
-      val patient = datasetToPatient(dataset)
-      val study = datasetToStudy(dataset)
-      val series = datasetToSeries(dataset)
       val seriesSource = SeriesSource(-1, source)
-      val image = datasetToImage(dataset)
 
-      val dbPatient = dao.patientByNameAndID(patient)
-        .getOrElse(dao.insert(patient))
-      val dbStudy = dao.studyByUidAndPatient(study, dbPatient)
-        .getOrElse(dao.insert(study.copy(patientId = dbPatient.id)))
-      val dbSeries = dao.seriesByUidAndStudy(series, dbStudy)
-        .getOrElse(dao.insert(series.copy(studyId = dbStudy.id)))
+      val dbPatient = dao.patientByNameAndID(patient).getOrElse {
+        val result = dao.insert(patient)
+        context.system.eventStream.publish(PatientAdded(result, source))
+        result
+      }
+      val dbStudy = dao.studyByUidAndPatient(study, dbPatient).getOrElse {
+        val result = dao.insert(study.copy(patientId = dbPatient.id))
+        context.system.eventStream.publish(StudyAdded(result, source))
+        result
+      }
+      val dbSeries = dao.seriesByUidAndStudy(series, dbStudy).getOrElse {
+        val result = dao.insert(series.copy(studyId = dbStudy.id))
+        context.system.eventStream.publish(SeriesAdded(result, source))
+        result
+      }
+      val dbImage = dao.imageByUidAndSeries(image, dbSeries).getOrElse { 
+        val result = dao.insert(image.copy(seriesId = dbSeries.id))
+        context.system.eventStream.publish(ImageAdded(result, source))
+        result
+      }
       val dbSeriesSource = propertiesDao.seriesSourceById(dbSeries.id)
         .getOrElse(propertiesDao.insertSeriesSource(seriesSource.copy(id = dbSeries.id)))
-      val dbImage = dao.imageByUidAndSeries(image, dbSeries)
-        .getOrElse(dao.insert(image.copy(seriesId = dbSeries.id)))
 
       if (dbSeriesSource.source.sourceType != source.sourceType || dbSeriesSource.source.sourceId != source.sourceId)
         SbxLog.warn("Storage", s"Existing series source does not match source of added image (${dbSeriesSource.source} vs $source). Source of added image will be lost.")
 
-      dbImage
+      (dbPatient, dbStudy, dbSeries, dbImage, dbSeriesSource)
     }
 }
 

@@ -16,35 +16,30 @@
 
 package se.nimsa.sbx.box
 
-import se.nimsa.sbx.app.DbProps
+import java.util.Date
+import java.util.UUID
+
+import scala.concurrent.Future
+import scala.concurrent.duration.DurationInt
+import scala.math.abs
+
 import akka.actor.Actor
+import akka.actor.PoisonPill
+import akka.actor.Props
+import akka.actor.Stash
 import akka.event.Logging
 import akka.event.LoggingReceive
 import akka.pattern.ask
+import akka.pattern.pipe
+import akka.util.Timeout
+import se.nimsa.sbx.anonymization.AnonymizationProtocol._
+import se.nimsa.sbx.app.DbProps
+import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.box.BoxProtocol._
+import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.metadata.MetaDataProtocol._
-import se.nimsa.sbx.anonymization.AnonymizationProtocol._
-import se.nimsa.sbx.app.GeneralProtocol._
-import se.nimsa.sbx.dicom.DicomUtil._
-import se.nimsa.sbx.dicom.DicomHierarchy.Image
-import akka.pattern.pipe
-import akka.actor.Props
-import akka.actor.PoisonPill
-import java.util.UUID
-import akka.actor.Status.Failure
 import se.nimsa.sbx.util.ExceptionCatching
-import java.nio.file.Path
-import scala.math.abs
-import java.util.Date
-import scala.concurrent.duration.DurationInt
-import scala.concurrent.duration.FiniteDuration
-import akka.actor.ActorSelection
-import akka.util.Timeout
-import scala.concurrent.Future
-import scala.concurrent.Future.sequence
-import akka.actor.Stash
-import org.dcm4che3.data.Attributes
 
 class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout: Timeout) extends Actor with Stash with ExceptionCatching {
 

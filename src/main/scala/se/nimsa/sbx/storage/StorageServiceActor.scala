@@ -24,16 +24,19 @@ import java.nio.file.Files
 import java.nio.file.NoSuchFileException
 import java.nio.file.Path
 import java.util.concurrent.Executors
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
+
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
-import scala.util.Failure
-import scala.util.Success
 import scala.util.control.NonFatal
+
 import org.dcm4che3.data.Attributes
 import org.dcm4che3.data.BulkData
 import org.dcm4che3.data.Fragments
 import org.dcm4che3.data.Tag
 import org.dcm4che3.imageio.plugins.dcm.DicomImageReadParam
+
 import akka.actor.Actor
 import akka.actor.Props
 import akka.dispatch.ExecutionContexts
@@ -43,7 +46,7 @@ import akka.pattern.ask
 import akka.pattern.pipe
 import akka.util.Timeout
 import javax.imageio.ImageIO
-import se.nimsa.sbx.app.GeneralProtocol._
+import se.nimsa.sbx.app.GeneralProtocol.Source
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomUtil
 import se.nimsa.sbx.dicom.DicomUtil._
@@ -52,11 +55,8 @@ import se.nimsa.sbx.dicom.Jpg2Dcm
 import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.storage.StorageProtocol._
-import se.nimsa.sbx.util.SbxExtensions._
-import java.nio.file.Paths
-import java.util.zip.ZipOutputStream
-import java.util.zip.ZipEntry
 import se.nimsa.sbx.util.FutureUtil
+import se.nimsa.sbx.util.SbxExtensions._
 
 class StorageServiceActor(storage: Path, implicit val timeout: Timeout) extends Actor {
 
@@ -79,27 +79,46 @@ class StorageServiceActor(storage: Path, implicit val timeout: Timeout) extends 
   def receive = LoggingReceive {
 
     case FileReceived(path, source) =>
-      tryToStoreDataset(loadDataset(path, true), source)
+      val dataset = loadDataset(path, true)
+      if (dataset != null)
+        if (checkSopClass(dataset))
+          addMetadata(dataset, source).map { image =>
+            val overwrite = storeDataset(dataset, image, source)
+            if (!overwrite) log.debug(s"Stored file with image id ${image.id}")
+            context.system.eventStream.publish(DatasetAdded(image, source))
+          }
+        else
+          SbxLog.info("Storage", s"Received dataset with unsupported SOP Class UID ${dataset.getString(Tag.SOPClassUID)}, skipping")
+      else
+        log.debug("Storage", s"Dataset could not be read, skipping")
 
     case DatasetReceived(dataset, source) =>
-      tryToStoreDataset(dataset, source)
+      if (dataset != null)
+        if (checkSopClass(dataset))
+          addMetadata(dataset, source).map { image =>
+            val overwrite = storeDataset(dataset, image, source)
+            if (!overwrite) log.debug(s"Stored file with image id ${image.id}")
+            context.system.eventStream.publish(DatasetAdded(image, source))
+          }
+        else
+          SbxLog.info("Storage", s"Received dataset with unsupported SOP Class UID ${dataset.getString(Tag.SOPClassUID)}, skipping")
+      else
+        log.debug("Storage", s"Dataset could not be read, skipping")
 
     case AddDataset(dataset, source) =>
-
-      val imageAdded: Future[ImageAdded] =
+      val datasetAdded: Future[DatasetAdded] =
         if (dataset == null)
           Future.failed(new IllegalArgumentException("Invalid dataset"))
         else if (!checkSopClass(dataset))
           Future.failed(new IllegalArgumentException(s"Unsupported SOP Class UID ${dataset.getString(Tag.SOPClassUID)}"))
         else
-          storeDataset(dataset, source)
-            .map { case (image, overwrite) => ImageAdded(image, source) }
-
-      imageAdded foreach {
-        context.system.eventStream.publish(_)
-      }
-
-      imageAdded.pipeTo(sender)
+          addMetadata(dataset, source).map { image =>
+            storeDataset(dataset, image, source)
+            val datasetAdded = DatasetAdded(image, source)
+            context.system.eventStream.publish(datasetAdded)
+            datasetAdded
+          }
+      datasetAdded.pipeTo(sender)
 
     case AddJpeg(jpegBytes, studyId, source) =>
       val image: Future[Option[Image]] =
@@ -118,13 +137,13 @@ class StorageServiceActor(storage: Path, implicit val timeout: Timeout) extends 
         }.unwrap
 
       image.foreach(_.foreach { image =>
-        context.system.eventStream.publish(ImageAdded(image, source))
+        context.system.eventStream.publish(DatasetAdded(image, source))
       })
 
       image.pipeTo(sender)
 
-    case DeleteImage(imageId) =>
-      val imageDeleted: Future[ImageDeleted] =
+    case DeleteDataset(imageId) =>
+      val datasetDeleted: Future[DatasetDeleted] =
         imageById(imageId).flatMap { optionalImage =>
           optionalImage.map { image =>
             try deleteFromStorage(image.id) catch {
@@ -133,10 +152,10 @@ class StorageServiceActor(storage: Path, implicit val timeout: Timeout) extends 
             deleteMetaData(image)
           }
             .getOrElse(Future.successful {})
-            .map(i => ImageDeleted(imageId))
+            .map(i => DatasetDeleted(imageId))
         }
-      imageDeleted.foreach(context.system.eventStream.publish(_))
-      imageDeleted.pipeTo(sender)
+      datasetDeleted.foreach(context.system.eventStream.publish(_))
+      datasetDeleted.pipeTo(sender)
 
     case CreateTempZipFile(imageIds) =>
       createTempZipFile(imageIds)
@@ -179,32 +198,16 @@ class StorageServiceActor(storage: Path, implicit val timeout: Timeout) extends 
 
   }
 
-  def tryToStoreDataset(dataset: Attributes, source: Source) =
-    if (dataset != null)
-      if (checkSopClass(dataset)) {
-        storeDataset(dataset, source) onComplete {
-          case Success((image, overwrite)) =>
-            if (!overwrite) log.debug(s"Stored file with image id ${image.id}")
-            context.system.eventStream.publish(ImageAdded(image, source))
-          case Failure(e) =>
-            SbxLog.error("Storage", "Dataset file could not be stored: " + e.getMessage)
-        }
-      } else
-        SbxLog.info("Storage", s"Received dataset with unsupported SOP Class UID ${dataset.getString(Tag.SOPClassUID)}, skipping")
-    else
-      log.debug("Storage", s"Dataset could not be read, skipping")
-
-  def storeDataset(dataset: Attributes, source: Source): Future[(Image, Boolean)] =
-    addMetadata(dataset, source).map { image =>
-      val storedPath = filePath(image)
-      val overwrite = Files.exists(storedPath)
-      try saveDataset(dataset, storedPath) catch {
-        case NonFatal(e) =>
-          deleteMetaData(image) // try to clean up, not interested in whether it worked or not        
-          throw new IllegalArgumentException("Dataset file could not be stored", e)
-      }
-      (image, overwrite)
+  def storeDataset(dataset: Attributes, image: Image, source: Source): Boolean = {
+    val storedPath = filePath(image)
+    val overwrite = Files.exists(storedPath)
+    try saveDataset(dataset, storedPath) catch {
+      case NonFatal(e) =>
+        deleteMetaData(image) // try to clean up, not interested in whether it worked or not        
+        throw new IllegalArgumentException("Dataset file could not be stored", e)
     }
+    overwrite
+  }
 
   def storeEncapsulated(
     dbPatient: Patient, dbStudy: Study,
@@ -408,10 +411,17 @@ class StorageServiceActor(storage: Path, implicit val timeout: Timeout) extends 
     metaDataService.ask(GetSingleFlatSeries(seriesId)).mapTo[Option[FlatSeries]]
 
   def addMetadata(dataset: Attributes, source: Source): Future[Image] =
-    metaDataService.ask(AddDataset(dataset, source)).mapTo[ImageAdded].map(_.image)
+    metaDataService.ask(
+      AddMetaData(
+        datasetToPatient(dataset),
+        datasetToStudy(dataset),
+        datasetToSeries(dataset),
+        datasetToImage(dataset), source))
+      .mapTo[MetaDataAdded]
+      .map(_.image)
 
   def deleteMetaData(image: Image): Future[Unit] =
-    metaDataService.ask(DeleteImage(image.id)).map(any => {})
+    metaDataService.ask(DeleteMetaData(image.id)).map(any => {})
 
 }
 

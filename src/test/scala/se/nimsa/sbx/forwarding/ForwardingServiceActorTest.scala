@@ -1,24 +1,31 @@
 package se.nimsa.sbx.forwarding
 
 import java.nio.file.Files
+
+import scala.concurrent.duration.DurationInt
 import scala.slick.driver.H2Driver
 import scala.slick.jdbc.JdbcBackend.Database
-import org.scalatest._
+
+import org.scalatest.BeforeAndAfterAll
+import org.scalatest.BeforeAndAfterEach
+import org.scalatest.Matchers
+import org.scalatest.WordSpecLike
+
+import ForwardingProtocol._
+import akka.actor.Actor
 import akka.actor.ActorSystem
+import akka.actor.Props
 import akka.testkit.ImplicitSender
 import akka.testkit.TestKit
-import se.nimsa.sbx.app.DbProps
-import se.nimsa.sbx.util.TestUtil
-import akka.actor.Actor
-import akka.actor.Props
 import akka.util.Timeout
-import scala.concurrent.duration.DurationInt
+import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.box.BoxProtocol._
-import se.nimsa.sbx.storage.StorageProtocol._
-import se.nimsa.sbx.dicom.DicomHierarchy._
+import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.DicomPropertyValue._
-import ForwardingProtocol._
+import se.nimsa.sbx.metadata.MetaDataProtocol.ImageAdded
+import se.nimsa.sbx.storage.StorageProtocol._
+import se.nimsa.sbx.util.TestUtil
 
 class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
     with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {
@@ -43,9 +50,9 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
   val storageService = system.actorOf(Props(new Actor {
     var deletedImages = Seq.empty[Long]
     def receive = {
-      case DeleteImage(imageId) =>
+      case DeleteDataset(imageId) =>
         deletedImages = deletedImages :+ imageId
-        sender ! ImageDeleted(imageId)
+        sender ! DatasetDeleted(imageId)
       case ResetDeletedImages =>
         deletedImages = Seq.empty[Long]
       case GetDeletedImages =>

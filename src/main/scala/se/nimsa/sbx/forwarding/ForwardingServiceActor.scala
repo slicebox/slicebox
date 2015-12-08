@@ -16,27 +16,29 @@
 
 package se.nimsa.sbx.forwarding
 
+import scala.concurrent.Future
+import scala.concurrent.duration.DurationInt
+import scala.concurrent.duration.FiniteDuration
+import scala.util.Failure
+import scala.util.Success
+
+import ForwardingProtocol._
 import akka.actor.Actor
+import akka.actor.ActorRef
 import akka.actor.Props
 import akka.event.Logging
 import akka.event.LoggingReceive
-import akka.util.Timeout
 import akka.pattern.ask
-import se.nimsa.sbx.log.SbxLog
-import se.nimsa.sbx.app.DbProps
-import se.nimsa.sbx.dicom.DicomHierarchy._
-import se.nimsa.sbx.storage.StorageProtocol._
+import akka.util.Timeout
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
-import se.nimsa.sbx.scu.ScuProtocol._
-import se.nimsa.sbx.box.BoxProtocol._
+import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.app.GeneralProtocol._
-import scala.util.Success
-import scala.util.Failure
-import scala.concurrent.Future
-import scala.concurrent.duration.FiniteDuration
-import scala.concurrent.duration.DurationInt
-import akka.actor.ActorRef
-import ForwardingProtocol._
+import se.nimsa.sbx.box.BoxProtocol._
+import se.nimsa.sbx.dicom.DicomHierarchy.Image
+import se.nimsa.sbx.log.SbxLog
+import se.nimsa.sbx.metadata.MetaDataProtocol._
+import se.nimsa.sbx.scu.ScuProtocol._
+import se.nimsa.sbx.storage.StorageProtocol._
 
 class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30.seconds)(implicit timeout: Timeout) extends Actor {
 
@@ -351,7 +353,7 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
 
   def deleteImages(imageIds: List[Long]): Future[Seq[Long]] = {
     val futureDeletedImageIds = Future.sequence(imageIds.map(imageId =>
-      storageService.ask(DeleteImage(imageId)).mapTo[ImageDeleted]))
+      storageService.ask(DeleteDataset(imageId)).mapTo[DatasetDeleted]))
       .map(_.map(_.imageId))
 
     futureDeletedImageIds.onFailure {

@@ -1,18 +1,25 @@
 package se.nimsa.sbx.metadata
 
 import java.nio.file.Files
+
 import scala.slick.driver.H2Driver
 import scala.slick.jdbc.JdbcBackend.Database
-import org.scalatest._
+
+import org.scalatest.BeforeAndAfterAll
+import org.scalatest.Matchers
+import org.scalatest.WordSpecLike
+
 import MetaDataProtocol._
 import akka.actor.ActorSystem
 import akka.testkit.ImplicitSender
 import akka.testkit.TestActorRef
 import akka.testkit.TestKit
 import se.nimsa.sbx.app.DbProps
+import se.nimsa.sbx.app.GeneralProtocol.Source
+import se.nimsa.sbx.app.GeneralProtocol.SourceType
+import se.nimsa.sbx.dicom.DicomUtil._
 import se.nimsa.sbx.seriestype.SeriesTypeDAO
 import se.nimsa.sbx.util.TestUtil
-import se.nimsa.sbx.app.GeneralProtocol._
 
 class MetaDataServiceActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
     with WordSpecLike with Matchers with BeforeAndAfterAll {
@@ -48,10 +55,14 @@ class MetaDataServiceActorTest(_system: ActorSystem) extends TestKit(_system) wi
     }
 
     "return a list of one object when asking for all patients" in {
-    	val source = Source(SourceType.UNKNOWN, "unknown", -1)
-      metaDataActorRef ! AddDataset(dataset, source)
-      expectMsgType[ImageAdded]
-      
+      val source = Source(SourceType.UNKNOWN, "unknown", -1)
+      metaDataActorRef ! AddMetaData(
+        datasetToPatient(dataset),
+        datasetToStudy(dataset),
+        datasetToSeries(dataset),
+        datasetToImage(dataset), source)
+      expectMsgType[MetaDataAdded]
+
       metaDataActorRef ! GetPatients(0, 10000, None, true, None, Array.empty, Array.empty, Array.empty)
       expectMsgPF() {
         case Patients(list) if (list.size == 1) => true

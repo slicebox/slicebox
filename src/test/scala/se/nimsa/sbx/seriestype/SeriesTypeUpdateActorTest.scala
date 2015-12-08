@@ -8,8 +8,10 @@ import scala.slick.jdbc.JdbcBackend.Database
 
 import org.dcm4che3.data.Keyword
 import org.dcm4che3.data.Tag
-
-import org.scalatest._
+import org.scalatest.BeforeAndAfterAll
+import org.scalatest.BeforeAndAfterEach
+import org.scalatest.Matchers
+import org.scalatest.WordSpecLike
 
 import akka.actor.ActorSelection.toScala
 import akka.actor.ActorSystem
@@ -17,13 +19,16 @@ import akka.testkit.ImplicitSender
 import akka.testkit.TestKit
 import akka.util.Timeout.durationToTimeout
 import se.nimsa.sbx.app.DbProps
-import se.nimsa.sbx.app.GeneralProtocol._
+import se.nimsa.sbx.app.GeneralProtocol.Source
+import se.nimsa.sbx.app.GeneralProtocol.SourceType
 import se.nimsa.sbx.dicom.DicomHierarchy.Series
 import se.nimsa.sbx.metadata.MetaDataDAO
 import se.nimsa.sbx.metadata.MetaDataProtocol.SeriesSeriesType
 import se.nimsa.sbx.metadata.MetaDataServiceActor
 import se.nimsa.sbx.metadata.PropertiesDAO
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
+import se.nimsa.sbx.storage.StorageProtocol.AddDataset
+import se.nimsa.sbx.storage.StorageProtocol.DatasetAdded
 import se.nimsa.sbx.storage.StorageServiceActor
 import se.nimsa.sbx.util.TestUtil
 
@@ -178,7 +183,7 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
     val source = Source(SourceType.UNKNOWN, "unknown source", -1)
     storageService ! AddDataset(dataset, source)
     expectMsgPF() {
-      case ImageAdded(image, source) => true
+      case DatasetAdded(image, source) => true
     }
 
     val series = db.withSession { implicit session =>

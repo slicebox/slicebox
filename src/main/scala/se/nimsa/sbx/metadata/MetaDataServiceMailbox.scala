@@ -16,17 +16,18 @@
 
 package se.nimsa.sbx.metadata
 
+import com.typesafe.config.Config
+
+import akka.actor.ActorSystem
 import akka.dispatch.PriorityGenerator
 import akka.dispatch.UnboundedPriorityMailbox
-import com.typesafe.config.Config
-import MetaDataProtocol._
-import akka.actor.ActorSystem
-import se.nimsa.sbx.app.GeneralProtocol._
+import se.nimsa.sbx.metadata.MetaDataProtocol.AddMetaData
+import se.nimsa.sbx.metadata.MetaDataProtocol.DeleteMetaData
 
 class MetaDataServiceMailbox(settings: ActorSystem.Settings, config: Config)
   extends UnboundedPriorityMailbox(
     PriorityGenerator {
-      case msg: AddDataset  => 2 // low
-      case msg: DeleteImage => 1 // low but higher than FileReceived
-      case _                => 0 // normal
+      case msg: AddMetaData    => 2 // low
+      case msg: DeleteMetaData => 1 // low but higher than AddMetaData
+      case _                   => 0 // normal
     })

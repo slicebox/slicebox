@@ -198,7 +198,7 @@ class BoxPollActor(box: Box,
                     storageService.ask(AddDataset(reversedDataset, source))
                       .onComplete {
 
-                        case Success(ImageAdded(image, source)) =>
+                        case Success(DatasetAdded(image, source)) =>
                           self ! RemoteOutboxFileFetched(remoteOutboxEntry, image.id)
                         case Success(_) =>
                           self ! HandlingFetchedFileFailed(remoteOutboxEntry, new Exception("Unexpected response when adding dataset"))
