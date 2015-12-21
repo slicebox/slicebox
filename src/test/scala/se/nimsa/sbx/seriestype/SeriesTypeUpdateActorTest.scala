@@ -230,14 +230,16 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
     }
 
   def waitForSeriesTypesUpdateCompletion(): Unit = {
+    val nAttempts = 10
+    var attempt = 1
     var statusUpdateRunning = true
-    while (statusUpdateRunning) {
+    while (statusUpdateRunning && attempt <= nAttempts) {
       seriesTypeUpdateService ! GetUpdateSeriesTypesRunningStatus
 
-      expectMsgPF() {
-        case UpdateSeriesTypesRunningStatus(running) => statusUpdateRunning = running
-      }
-      Thread.sleep(10)
+      expectMsgPF() { case UpdateSeriesTypesRunningStatus(running) => statusUpdateRunning = running }
+      
+      Thread.sleep(200)
+      attempt += 1
     }
   }
 
