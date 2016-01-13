@@ -43,10 +43,10 @@ trait RemoteBoxRoutes { this: SliceboxService =>
 
         onSuccess(boxService.ask(GetBoxByToken(token)).mapTo[Option[Box]]) {
           case None =>
-            complete((Unauthorized, "Invalid token"))
+            complete((NotFound, s"No box found for token $token"))
           case Some(box) =>
             path("image") {
-              parameters('transactionid.as[Long], 'sequencenumber.as[Long], 'totalimagecount.as[Long]) { (transactionId, sequenceNumber, totalImageCount) =>
+              parameters('transactionid.as[Long], 'totalimagecount.as[Long]) { (transactionId, totalImageCount) =>
                 post {
                   entity(as[Array[Byte]]) { compressedBytes =>
                     val bytes = decompress(compressedBytes)
@@ -58,65 +58,66 @@ trait RemoteBoxRoutes { this: SliceboxService =>
                         val source = Source(SourceType.BOX, box.name, box.id)
                         onSuccess(storageService.ask(AddDataset(reversedDataset, source))) {
                           case DatasetAdded(image, source) =>
-                            onSuccess(boxService.ask(UpdateInbox(token, transactionId, sequenceNumber, totalImageCount, image.id))) {
-                              case msg: InboxUpdated =>
-                                complete(NoContent)
+                            onSuccess(boxService.ask(UpdateIncoming(box, transactionId, totalImageCount, image.id))) {
+                              case IncomingUpdated(_) => complete(NoContent)
                             }
                         }
                       }
                   }
                 }
               }
-            } ~ pathPrefix("outbox") {
+            } ~ pathPrefix("outgoing") {
               path("poll") {
                 get {
-                  onSuccess(boxService.ask(PollOutbox(token))) {
-                    case outboxEntry: OutboxEntry =>
-                      complete(outboxEntry)
-                    case OutboxEmpty =>
+                  onSuccess(boxService.ask(PollOutgoing(box))) {
+                    case outgoingEntryAndImage: OutgoingEntryAndImage =>
+                      complete(outgoingEntryAndImage)
+                    case OutgoingEmpty =>
                       complete(NotFound)
                   }
                 }
               } ~ path("done") {
                 post {
-                  entity(as[OutboxEntry]) { outboxEntry =>
-                    onSuccess(boxService.ask(DeleteOutboxEntry(token, outboxEntry.transactionId, outboxEntry.sequenceNumber))) {
-                      case OutboxEntryDeleted => complete(NoContent)
+                  entity(as[OutgoingEntryAndImage]) { outgoingEntryAndImage =>
+                    onSuccess(boxService.ask(MarkOutgoingImageAsSent(box, outgoingEntryAndImage))) {
+                      case OutgoingImageMarkedAsSent => complete(NoContent)
                     }
                   }
                 }
               } ~ path("failed") {
                 post {
-                  entity(as[FailedOutboxEntry]) { failedOutboxEntry =>
-                    onSuccess(boxService.ask(MarkOutboxTransactionAsFailed(token, failedOutboxEntry.outboxEntry.transactionId, failedOutboxEntry.message))) {
-                      case OutboxTransactionMarkedAsFailed => complete(NoContent)
+                  entity(as[FailedOutgoingEntry]) { failedOutgoingEntry =>
+                    onSuccess(boxService.ask(MarkOutgoingTransactionAsFailed(box, failedOutgoingEntry.outgoingEntryAndImage.outgoingEntry.transactionId, failedOutgoingEntry.message))) {
+                      case OutgoingTransactionMarkedAsFailed => complete(NoContent)
                     }
                   }
                 }
               } ~ pathEndOrSingleSlash {
                 get {
-                  parameters('transactionid.as[Long], 'sequencenumber.as[Long]) { (transactionId, sequenceNumber) =>
-                    onSuccess(boxService.ask(GetOutboxEntry(token, transactionId, sequenceNumber))) {
-                      case outboxEntry: OutboxEntry =>
-                        onSuccess(boxService.ask(GetTransactionTagValues(outboxEntry.imageId, transactionId)).mapTo[Seq[TransactionTagValue]]) {
-                          case transactionTagValues =>
-                            onSuccess(storageService.ask(GetDataset(outboxEntry.imageId, true)).mapTo[Option[Attributes]]) {
-                              _ match {
-                                case Some(dataset) =>
+                  parameters('transactionid.as[Long], 'imageid.as[Long]) { (transactionId, imageId) =>
+                    onSuccess(boxService.ask(GetOutgoingEntryAndImage(box, transactionId, imageId)).mapTo[Option[OutgoingEntryAndImage]]) {
+                      _ match {
+                        case Some(outgoingEntryAndImage) =>
+                          onSuccess(boxService.ask(GetTransactionTagValues(outgoingEntryAndImage.outgoingImage.imageId, transactionId)).mapTo[Seq[TransactionTagValue]]) {
+                            case transactionTagValues =>
+                              onSuccess(storageService.ask(GetDataset(outgoingEntryAndImage.outgoingImage.imageId, true)).mapTo[Option[Attributes]]) {
+                                _ match {
+                                  case Some(dataset) =>
 
-                                  onSuccess(anonymizationService.ask(Anonymize(outboxEntry.imageId, dataset, transactionTagValues.map(_.tagValue)))) {
-                                    case anonymizedDataset: Attributes =>
-                                      val compressedBytes = compress(toByteArray(anonymizedDataset))
-                                      complete(HttpEntity(ContentTypes.`application/octet-stream`, HttpData(compressedBytes)))
-                                  }
-                                case None =>
+                                    onSuccess(anonymizationService.ask(Anonymize(outgoingEntryAndImage.outgoingImage.imageId, dataset, transactionTagValues.map(_.tagValue)))) {
+                                      case anonymizedDataset: Attributes =>
+                                        val compressedBytes = compress(toByteArray(anonymizedDataset))
+                                        complete(HttpEntity(ContentTypes.`application/octet-stream`, HttpData(compressedBytes)))
+                                    }
+                                  case None =>
 
-                                  complete((NotFound, s"File not found for image id ${outboxEntry.imageId}"))
+                                    complete((NotFound, s"File not found for image id ${outgoingEntryAndImage.outgoingImage.imageId}"))
+                                }
                               }
-                            }
-                        }
-                      case OutboxEntryNotFound =>
-                        complete(NotFound)
+                          }
+                        case None =>
+                          complete((NotFound, s"No outgoing image found for transaction id $transactionId and image id $imageId"))
+                      }
                     }
                   }
                 }

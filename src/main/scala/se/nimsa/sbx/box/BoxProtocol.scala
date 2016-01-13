@@ -42,25 +42,54 @@ object BoxProtocol {
     }
   }
 
+  sealed trait TransactionStatus {
+    override def toString(): String = this match {
+      case TransactionStatus.SENDING => "SENDING"
+      case TransactionStatus.WAITING => "WAITING"
+      case TransactionStatus.FAILED => "FAILED"
+      case TransactionStatus.FINISHED => "FINISHED"
+    }
+  }
+
+  object TransactionStatus {
+    case object SENDING extends TransactionStatus
+    case object WAITING extends TransactionStatus
+    case object FAILED extends TransactionStatus
+    case object FINISHED extends TransactionStatus
+
+    def withName(string: String) = string match {
+      case "SENDING" => SENDING
+      case "WAITING" => WAITING
+      case "FAILED" => FAILED
+      case "FINISHED" => FINISHED
+    }
+  }
+
   case class RemoteBox(name: String, baseUrl: String)
 
   case class RemoteBoxConnectionData(name: String)
 
   case class Box(id: Long, name: String, token: String, baseUrl: String, sendMethod: BoxSendMethod, online: Boolean) extends Entity
 
-  case class OutboxEntry(id: Long, remoteBoxId: Long, remoteBoxName: String, transactionId: Long, sequenceNumber: Long, totalImageCount: Long, imageId: Long, failed: Boolean) extends Entity
+  case class OutgoingEntry(id: Long, remoteBoxId: Long, remoteBoxName: String, transactionId: Long, sentImageCount: Long, totalImageCount: Long, lastUpdated: Long, status: TransactionStatus) extends Entity {
+    def incrementSent = copy(sentImageCount = this.sentImageCount + 1)
+    def updateTimestamp = copy(lastUpdated = System.currentTimeMillis)
+  }
 
-  case class FailedOutboxEntry(outboxEntry: OutboxEntry, message: String)
+  case class OutgoingImage(id: Long, outgoingEntryId: Long, imageId: Long, sent: Boolean) extends Entity
+
+  case class OutgoingEntryAndImage(outgoingEntry: OutgoingEntry, outgoingImage: OutgoingImage)
   
-  case class SentEntry(id: Long, remoteBoxId: Long, remoteBoxName: String, transactionId: Long, sentImageCount: Long, totalImageCount: Long, lastUpdated: Long) extends Entity
+  case class IncomingEntry(id: Long, remoteBoxId: Long, remoteBoxName: String, transactionId: Long, receivedImageCount: Long, totalImageCount: Long, lastUpdated: Long, status: TransactionStatus) extends Entity {
+    def incrementReceived = copy(receivedImageCount = this.receivedImageCount + 1)
+    def updateTimestamp = copy(lastUpdated = System.currentTimeMillis)
+  }
 
-  case class SentImage(id: Long, sentEntryId: Long, imageId: Long) extends Entity
-
-  case class InboxEntry(id: Long, remoteBoxId: Long, remoteBoxName: String, transactionId: Long, receivedImageCount: Long, totalImageCount: Long, lastUpdated: Long) extends Entity
-
-  case class InboxImage(id: Long, inboxEntryId: Long, imageId: Long) extends Entity
+  case class IncomingImage(id: Long, incomingEntryId: Long, imageId: Long) extends Entity
   
-  case class PushImageData(transactionId: Long, sequenceNumber: Long, totalImageCount: Long, dataset: Attributes)
+  case class FailedOutgoingEntry(outgoingEntryAndImage: OutgoingEntryAndImage, message: String)
+  
+  case class PushImageData(transactionId: Long, imageId: Long, totalImageCount: Long, dataset: Attributes)
 
   case class TransactionTagValue(id: Long, transactionId: Long, imageId: Long, tagValue: TagValue) extends Entity
   
@@ -79,44 +108,38 @@ object BoxProtocol {
   
   case class GetBoxByToken(token: String) extends BoxRequest
 
-  case class UpdateInbox(token: String, transactionId: Long, sequenceNumber: Long, totalImageCount: Long, imageId: Long) extends BoxRequest
+  case class UpdateIncoming(box: Box, transactionId: Long, totalImageCount: Long, imageId: Long) extends BoxRequest
 
-  case class PollOutbox(token: String) extends BoxRequest
+  case class PollOutgoing(box: Box) extends BoxRequest
 
-  case class SendToRemoteBox(remoteBoxId: Long, imageTagValuesSeq: Seq[ImageTagValues]) extends BoxRequest
+  case class SendToRemoteBox(box: Box, imageTagValuesSeq: Seq[ImageTagValues]) extends BoxRequest
 
-  case class GetOutboxEntry(token: String, transactionId: Long, sequenceNumber: Long) extends BoxRequest
+  case class GetOutgoingEntryAndImage(box: Box, transactionId: Long, imageId: Long) extends BoxRequest
 
   case class GetTransactionTagValues(imageId: Long, transactionId: Long) extends BoxRequest
 
-  case class DeleteOutboxEntry(token: String, transactionId: Long, sequenceNumber: Long) extends BoxRequest
+  case class MarkOutgoingImageAsSent(box: Box, outgoingEntryAndImage: OutgoingEntryAndImage) extends BoxRequest
 
-  case class MarkOutboxTransactionAsFailed(token: String, transactionId: Long, message: String) extends BoxRequest
+  case class MarkOutgoingTransactionAsFailed(box: Box, transactionId: Long, message: String) extends BoxRequest
   
-  case object GetInbox extends BoxRequest
+  case object GetIncoming extends BoxRequest
 
-  case object GetOutbox extends BoxRequest
+  case object GetOutgoing extends BoxRequest
 
-  case object GetSent extends BoxRequest
+  case class RemoveIncomingEntry(incomingEntryId: Long) extends BoxRequest
   
-  case class RemoveInboxEntry(inboxEntryId: Long) extends BoxRequest
-  
-  case class RemoveOutboxEntry(outboxEntryId: Long) extends BoxRequest
+  case class RemoveOutgoingEntry(outgoingEntryId: Long) extends BoxRequest
 
-  case class RemoveSentEntry(sentEntryId: Long) extends BoxRequest
+  case class GetImagesForIncomingEntry(incomingEntryId: Long) extends BoxRequest
   
-  case class GetImagesForInboxEntry(inboxEntryId: Long) extends BoxRequest
+  case class GetImagesForOutgoingEntry(outgoingEntryId: Long) extends BoxRequest
   
-  case class GetImagesForSentEntry(sentEntryId: Long) extends BoxRequest
-  
-  case class GetInboxEntryForImageId(imageId: Long) extends BoxRequest
+  case class GetIncomingEntryForImageId(imageId: Long) extends BoxRequest
   
   
-  case class InboxEntryRemoved(inboxEntryId: Long)
+  case class IncomingEntryRemoved(incomingEntryId: Long)
 
-  case class OutboxEntryRemoved(outboxEntryId: Long)
-
-  case class SentEntryRemoved(sentEntryId: Long)
+  case class OutgoingEntryRemoved(outgoingEntryId: Long)
 
   case class RemoteBoxAdded(box: Box)
   
@@ -124,47 +147,41 @@ object BoxProtocol {
 
   case class Boxes(boxes: Seq[Box])
 
-  case class InboxUpdated(token: String, transactionId: Long, sequenceNumber: Long, totalImageCount: Long)
+  case class IncomingUpdated(entry: IncomingEntry)
 
-  case object OutboxEmpty
+  case object OutgoingEmpty
 
-  case class ImagesAddedToOutbox(remoteBoxId: Long, imageIds: Seq[Long])
+  case class ImagesAddedToOutgoing(remoteBoxId: Long, imageIds: Seq[Long])
 
-  case object OutboxEntryNotFound
+  case object OutgoingImageMarkedAsSent
 
-  case object OutboxEntryDeleted
-
-  case object OutboxTransactionMarkedAsFailed
+  case object OutgoingTransactionMarkedAsFailed
   
-  case class Inbox(entries: Seq[InboxEntry])
+  case class Incoming(entries: Seq[IncomingEntry])
 
-  case class Outbox(entries: Seq[OutboxEntry])
-
-  case class Sent(entries: Seq[SentEntry])
-  
-  case object BoxNotFound
+  case class Outgoing(entries: Seq[OutgoingEntry])
 
   // box push actor internal messages
 
-  case object PollOutbox
+  case object PollOutgoing
 
-  case class FileSent(outboxEntry: OutboxEntry)
+  case class FileSent(outgoingEntryAndImage: OutgoingEntryAndImage)
 
-  case class FileSendFailed(outboxEntry: OutboxEntry, statusCode: Int, e: Exception)
+  case class FileSendFailed(outgoingEntryAndImage: OutgoingEntryAndImage, statusCode: Int, e: Exception)
 
   // box poll actor internal messages
 
   case object PollRemoteBox
 
-  case object RemoteOutboxEmpty
+  case object RemoteOutgoingEmpty
 
-  case class RemoteOutboxEntryFound(remoteOutboxEntry: OutboxEntry)
+  case class RemoteOutgoingEntryAndImageFound(remoteOutgoingEntryAndImage: OutgoingEntryAndImage)
 
   case class PollRemoteBoxFailed(e: Throwable)
 
-  case class RemoteOutboxFileFetched(remoteOutboxEntry: OutboxEntry, imageId: Long)
+  case class RemoteOutgoingFileFetched(remoteOutgoingEntryAndImage: OutgoingEntryAndImage, imageId: Long)
 
-  case class FetchFileFailed(remoteOutboxEntry: OutboxEntry, e: Throwable)
+  case class FetchFileFailed(remoteOutgoingEntryAndImage: OutgoingEntryAndImage, e: Throwable)
 
-  case class HandlingFetchedFileFailed(remoteOutboxEntry: OutboxEntry, e: Throwable)
+  case class HandlingFetchedFileFailed(remoteOutgoingEntryAndImage: OutgoingEntryAndImage, e: Throwable)
 }

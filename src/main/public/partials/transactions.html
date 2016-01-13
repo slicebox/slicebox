@@ -1,135 +1,70 @@
-<div layout="column" flex="60" layout-margin>
+<div layout="column" flex layout-margin>
 
-    <md-tabs md-selected="uiState.selectedTabIndex">
-        <md-tab id="Inbox" aria-controls="inbox-content">
-            Inbox
-        </md-tab>
-        <md-tab id="Outbox" aria-controls="outbox-content">
-            Outbox
-        </md-tab>
-        <md-tab id="Sent" aria-controls="sent-content">
-            Sent
-        </md-tab>
-    </md-tabs>
+    <div layout="row" layout-margin>
 
-    <ng-switch on="uiState.selectedTabIndex" class="tabpanel-container">
+        <div flex="50" ng-controller="IncomingCtrl">
+            <md-card>
+                <md-card-content>
+                    <h4 class="md-flex">Incoming</h4>
+                    <md-content class="md-padding" style="height: 300px">
+                        <sbx-grid
+                            load-page="loadIncomingPage(startIndex, count, orderByProperty, orderByDirection)"
+                            page-size="10000000"
+                            object-actions="objectActions"
+                            sorting="false"
+                            callbacks="callbacks.incomingTable"
+                            empty-message="There are no incoming transactions">
 
-        <div role="tabpanel"
-            id="inbox-content"
-            aria-labelledby="inbox-content"
-            ng-switch-when="0"
-            class="tab-content">
-            <div flex ng-controller="InboxCtrl">
-                <md-card>
-                    <md-card-content>
-                        <h4 class="md-flex">Inbox</h4>
-                        <md-content class="md-padding" style="height: 300px">
-                            <sbx-grid
-                                load-page="loadInboxPage(startIndex, count, orderByProperty, orderByDirection)"
-                                page-size="10000000"
-                                object-actions="objectActions"
-                                sorting="false"
-                                callbacks="callbacks.inboxTable"
-                                empty-message="Inbox is empty">
+                            <sbx-grid-column property="lastUpdated" title="Received" filter="date: yyyy-MM-dd HH:mm">
+                            </sbx-grid-column>
 
-                                <sbx-grid-column property="lastUpdated" title="Received" filter="date: yyyy-MM-dd HH:mm">
-                                </sbx-grid-column>
+                            <sbx-grid-column property="remoteBoxName" title="Remote Box Name">
+                            </sbx-grid-column>
 
-                                <sbx-grid-column property="remoteBoxName" title="Remote Box Name">
-                                </sbx-grid-column>
+                            <sbx-grid-column property="receivedImageCount" title="Received Images">
+                            </sbx-grid-column>
 
-                                <sbx-grid-column property="receivedImageCount" title="Received Images">
-                                </sbx-grid-column>
-
-                                <sbx-grid-column property="totalImageCount" title="Total Images">
-                                </sbx-grid-column>
-                            </sbx-grid>
-                        </md-content>
-                    </md-card-content>
-                </md-card>
-            </div>
+                            <sbx-grid-column property="totalImageCount" title="Total Images">
+                            </sbx-grid-column>
+                        </sbx-grid>
+                    </md-content>
+                </md-card-content>
+            </md-card>
         </div>
 
-        <div role="tabpanel"
-            id="outbox-content"
-            aria-labelledby="outbox-content"
-            ng-switch-when="1"
-            class="tab-content">
-            <div flex ng-controller="OutboxCtrl">
-                <md-card>
-                    <md-card-content>
-                        <h4 class="md-flex">Outbox</h4>
-                        <md-content class="md-padding" style="height: 300px">
-                            <sbx-grid
-                                load-page="loadOutboxPage(startIndex, count, orderByProperty, orderByDirection)"
-                                converter="convertOutboxPageData(pageData)"
-                                page-size="10000000"
-                                object-actions="objectActions"
-                                sorting="false"
-                                callbacks="callbacks.outboxTable"
-                                empty-message="Outbox is empty">
+        <div flex="50" ng-controller="OutgoingCtrl">
+            <md-card>
+                <md-card-content>
+                    <h4 class="md-flex">Outgoing</h4>
+                    <md-content class="md-padding" style="height: 300px">
+                        <sbx-grid
+                            load-page="loadOutgoingPage(startIndex, count, orderByProperty, orderByDirection)"
+                            page-size="10000000"
+                            object-actions="objectActions"
+                            sorting="false"
+                            callbacks="callbacks.outgoingTable"
+                            empty-message="There are no outgoing transactions">
 
-                                <sbx-grid-column property="remoteBoxName" title="Remote Box Name">
-                                </sbx-grid-column>
+                            <sbx-grid-column property="remoteBoxName" title="Remote Box Name">
+                            </sbx-grid-column>
 
-                                <sbx-grid-column property="sequenceNumber" title="Progress">
-                                    <sbx-grid-cell>
-                                        <md-progress-linear md-mode="determinate" ng-value="calculateProgress(rowObject)"></md-progress-linear>
-                                        <p>{{rowObject.totalImageCount - rowObject.imagesLeft}} / {{rowObject.totalImageCount}}</p>
-                                    </sbx-grid-cell>
-                                </sbx-grid-column>
+                            <sbx-grid-column property="deliveredImageCount" title="Delivered">
+                            </sbx-grid-column>
 
-                                <sbx-grid-column property="failed" title="Status">
-                                    <sbx-grid-cell>
-                                        <sbx-chip ng-if="rowObject.failed" chip-class="sbx-chip-warn">Failed</sbx-chip>
-                                        <sbx-chip ng-if="!rowObject.failed">Sending</sbx-chip>
-                                    </sbx-grid-cell>
-                                </sbx-grid-column>
+                            <sbx-grid-column property="failed" title="Status">
+                                <sbx-grid-cell>
+                                    <sbx-chip ng-if="rowObject.failed" chip-class="sbx-chip-warn">Failed</sbx-chip>
+                                    <sbx-chip ng-if="!rowObject.failed">Sending</sbx-chip>
+                                </sbx-grid-cell>
+                            </sbx-grid-column>
 
-                            </sbx-grid>
-                        </md-content>
-                    </md-card-content>
-                </md-card>
-            </div>
+                        </sbx-grid>
+                    </md-content>
+                </md-card-content>
+            </md-card>
         </div>
 
-        <div role="tabpanel"
-            id="sent-content"
-            aria-labelledby="sent-content"
-            ng-switch-when="2"
-            class="tab-content">
-            <div flex ng-controller="SentCtrl">
-                <md-card>
-                    <md-card-content>
-                        <h4 class="md-flex">Sent</h4>
-                        <md-content class="md-padding" style="height: 300px">
-                            <sbx-grid
-                                load-page="loadSentPage(startIndex, count, orderByProperty, orderByDirection)"
-                                page-size="10000000"
-                                object-actions="objectActions"
-                                sorting="false"
-                                callbacks="callbacks.sentTable"
-                                empty-message="Sent is empty">
-
-                                <sbx-grid-column property="lastUpdated" title="Sent" filter="date: yyyy-MM-dd HH:mm">
-                                </sbx-grid-column>
-
-                                <sbx-grid-column property="remoteBoxName" title="Remote Box Name">
-                                </sbx-grid-column>
-
-                                <sbx-grid-column property="sentImageCount" title="Sent Images">
-                                </sbx-grid-column>
-
-                                <sbx-grid-column property="totalImageCount" title="Total Images">
-                                </sbx-grid-column>
-                            </sbx-grid>
-                        </md-content>
-                    </md-card-content>
-                </md-card>
-            </div>
-        </div>
-
-    </ng-switch>
+    </div>
 
     <div flex ng-controller="BoxLogCtrl">
         <md-card>

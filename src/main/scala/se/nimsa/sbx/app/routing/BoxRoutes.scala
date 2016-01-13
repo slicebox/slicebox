@@ -73,35 +73,42 @@ trait BoxRoutes { this: SliceboxService =>
       } ~ path(LongNumber / "send") { remoteBoxId =>
         post {
           entity(as[Seq[ImageTagValues]]) { imageTagValuesSeq =>
-            onSuccess(boxService.ask(SendToRemoteBox(remoteBoxId, imageTagValuesSeq))) {
-              case ImagesAddedToOutbox(remoteBoxId, imageIds) => complete(NoContent)
-              case BoxNotFound                                => complete(NotFound)
+            onSuccess(boxService.ask(GetBoxById(remoteBoxId)).mapTo[Option[Box]]) {
+              _ match {
+                case Some(box) =>
+                  onSuccess(boxService.ask(SendToRemoteBox(box, imageTagValuesSeq))) {
+                    case ImagesAddedToOutgoing(_, _) =>
+                      complete(NoContent)
+                  }
+                case None =>
+                  complete((NotFound, s"No box found for id $remoteBoxId"))
+              }
             }
           }
         }
-      }
+      } ~ incomingRoutes ~ outgoingRoutes
     }
 
-  def inboxRoutes: Route =
-    pathPrefix("inbox") {
+  def incomingRoutes: Route =
+    pathPrefix("incoming") {
       pathEndOrSingleSlash {
         get {
-          onSuccess(boxService.ask(GetInbox)) {
-            case Inbox(entries) =>
+          onSuccess(boxService.ask(GetIncoming)) {
+            case Incoming(entries) =>
               complete(entries)
           }
         }
-      } ~ pathPrefix(LongNumber) { inboxEntryId =>
+      } ~ pathPrefix(LongNumber) { incomingEntryId =>
         pathEndOrSingleSlash {
           delete {
-            onSuccess(boxService.ask(RemoveInboxEntry(inboxEntryId))) {
-              case InboxEntryRemoved(inboxEntryId) =>
+            onSuccess(boxService.ask(RemoveIncomingEntry(incomingEntryId))) {
+              case IncomingEntryRemoved(incomingEntryId) =>
                 complete(NoContent)
             }
           }
         } ~ path("images") {
           get {
-            onSuccess(boxService.ask(GetImagesForInboxEntry(inboxEntryId))) {
+            onSuccess(boxService.ask(GetImagesForIncomingEntry(incomingEntryId))) {
               case Images(images) =>
                 complete(images)
             }
@@ -110,45 +117,26 @@ trait BoxRoutes { this: SliceboxService =>
       }
     }
 
-  def outboxRoutes: Route =
-    pathPrefix("outbox") {
+  def outgoingRoutes: Route =
+    pathPrefix("outgoing") {
       pathEndOrSingleSlash {
         get {
-          onSuccess(boxService.ask(GetOutbox)) {
-            case Outbox(entries) =>
+          onSuccess(boxService.ask(GetOutgoing)) {
+            case Outgoing(entries) =>
               complete(entries)
           }
         }
-      } ~ path(LongNumber) { outboxEntryId =>
-        delete {
-          onSuccess(boxService.ask(RemoveOutboxEntry(outboxEntryId))) {
-            case OutboxEntryRemoved(outboxEntryId) =>
-              complete(NoContent)
-          }
-        }
-      }
-    }
-
-  def sentRoutes: Route =
-    pathPrefix("sent") {
-      pathEndOrSingleSlash {
-        get {
-          onSuccess(boxService.ask(GetSent)) {
-            case Sent(entries) =>
-              complete(entries)
-          }
-        }
-      } ~ pathPrefix(LongNumber) { sentEntryId =>
+      } ~ pathPrefix(LongNumber) { outgoingEntryId =>
         pathEndOrSingleSlash {
           delete {
-            onSuccess(boxService.ask(RemoveSentEntry(sentEntryId))) {
-              case SentEntryRemoved(sentEntryId) =>
+            onSuccess(boxService.ask(RemoveOutgoingEntry(outgoingEntryId))) {
+              case OutgoingEntryRemoved(outgoingEntryId) =>
                 complete(NoContent)
             }
           }
         } ~ path("images") {
           get {
-            onSuccess(boxService.ask(GetImagesForSentEntry(sentEntryId))) {
+            onSuccess(boxService.ask(GetImagesForOutgoingEntry(outgoingEntryId))) {
               case Images(images) =>
                 complete(images)
             }

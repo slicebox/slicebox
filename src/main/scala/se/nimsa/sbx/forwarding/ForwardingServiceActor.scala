@@ -216,7 +216,7 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
      */
 
     def inboxEntryForImage(image: Image, attempt: Int, maxAttempts: Int, attemptInterval: Long): Unit =
-      boxService.ask(GetInboxEntryForImageId(image.id)).mapTo[Option[InboxEntry]].onComplete {
+      boxService.ask(GetIncomingEntryForImageId(image.id)).mapTo[Option[IncomingEntry]].onComplete {
         case Success(entryMaybe) => entryMaybe match {
           case Some(entry) =>
             self ! AddImageToForwardingQueue(image, forwardingRule, entry.id, entry.receivedImageCount >= entry.totalImageCount, origin)
@@ -246,10 +246,12 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
     updateTransaction(transaction, true, false)
 
     val destinationId = rule.destination.destinationId
-
+    val destinationName = rule.destination.destinationName
+    val box = Box(destinationId, destinationName, "", "", null, false)
+    
     rule.destination.destinationType match {
       case DestinationType.BOX =>
-        boxService.ask(SendToRemoteBox(destinationId, imageIds.map(ImageTagValues(_, Seq.empty))))
+        boxService.ask(SendToRemoteBox(box, imageIds.map(ImageTagValues(_, Seq.empty))))
           .onFailure {
             case e: Throwable => SbxLog.error("Forwarding", "Could not forward images to remote box " + rule.destination.destinationName + ": " + e.getMessage)
           }

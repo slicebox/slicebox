@@ -68,9 +68,6 @@ trait SliceboxRoutes extends DirectoryRoutes
               imageRoutes(apiUser) ~
               anonymizationRoutes(apiUser) ~
               boxRoutes(apiUser) ~
-              inboxRoutes ~
-              outboxRoutes ~
-              sentRoutes ~
               logRoutes ~
               generalRoutes(apiUser) ~
               seriesTypeRoutes(apiUser) ~
