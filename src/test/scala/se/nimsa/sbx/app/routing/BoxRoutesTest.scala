@@ -127,41 +127,41 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
   }
 
-  it should "return a non-empty result when listing outbox entries for sent images" in {
+  it should "return a non-empty result when listing outgoing entries" in {
     val box1 = addPollBox("hosp")
     PostAsAdmin(s"/api/boxes/${box1.id}/send", Seq(ImageTagValues(1, Seq.empty))) ~> routes ~> check {
       status should be(NoContent)
     }
-    GetAsUser("/api/outbox") ~> routes ~> check {
+    GetAsUser("/api/boxes/outgoing") ~> routes ~> check {
       status should be(OK)
-      responseAs[List[OutboxEntry]].length should be > 0
+      responseAs[List[OutgoingEntry]].length should be > 0
     }
   }
 
-  it should "support listing sent entries" in {
+  it should "support listing incoming entries" in {
     val sentEntry =
       db.withSession { implicit session =>
-        boxDao.insertSentEntry(SentEntry(-1, 1, "some box", 1, 3, 4, System.currentTimeMillis()))
-        boxDao.insertSentEntry(SentEntry(-1, 1, "some box", 2, 3, 5, System.currentTimeMillis()))
+        boxDao.insertIncomingEntry(IncomingEntry(-1, 1, "some box", 1, 3, 4, System.currentTimeMillis(), TransactionStatus.SENDING))
+        boxDao.insertIncomingEntry(IncomingEntry(-1, 1, "some box", 2, 3, 5, System.currentTimeMillis(), TransactionStatus.SENDING))
       }
 
-    GetAsUser("/api/sent") ~> routes ~> check {
-      responseAs[List[SentEntry]].size should be(2)
+    GetAsUser("/api/boxes/incoming") ~> routes ~> check {
+      responseAs[List[IncomingEntry]].size should be(2)
     }
   }
 
-  it should "support removing inbox entries" in {
-    val inboxEntry =
+  it should "support removing incoming entries" in {
+    val entry =
       db.withSession { implicit session =>
-        boxDao.insertInboxEntry(InboxEntry(-1, 1, "some box", 2, 3, 4, System.currentTimeMillis()))
+        boxDao.insertIncomingEntry(IncomingEntry(-1, 1, "some box", 2, 3, 4, System.currentTimeMillis(), TransactionStatus.SENDING))
       }
 
-    DeleteAsUser(s"/api/inbox/${inboxEntry.id}") ~> routes ~> check {
+    DeleteAsUser(s"/api/boxes/incoming/${entry.id}") ~> routes ~> check {
       status should be(NoContent)
     }
 
-    GetAsUser("/api/inbox") ~> routes ~> check {
-      responseAs[List[InboxEntry]].size should be(0)
+    GetAsUser("/api/boxes/incoming") ~> routes ~> check {
+      responseAs[List[IncomingEntry]].size should be(0)
     }
   }
 

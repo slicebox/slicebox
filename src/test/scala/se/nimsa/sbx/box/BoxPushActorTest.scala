@@ -54,7 +54,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
     }
 
   val capturedFileSendRequests = ArrayBuffer.empty[HttpRequest]
-  val sendFailedResponseSequenceNumbers = ArrayBuffer.empty[Int]
+  var sendFailedResponse = false
 
   val okResponse = HttpResponse()
   val failResponse = HttpResponse(InternalServerError)
@@ -68,7 +68,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
         {
           capturedFileSendRequests += req
           Future {
-            if (sendFailedResponseSequenceNumbers.contains(capturedFileSendRequests.size))
+            if (sendFailedResponse)
               failResponse
             else
               okResponse
@@ -93,107 +93,135 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
   "A BoxPushActor" should {
 
-    "remove processed outbox entry" in {
-
-      db.withSession { implicit session =>
-        boxDao.insertOutboxEntry(OutboxEntry(1, testBox.id, testBox.name, testTransactionId, 1, 1, dbImage1.id, false))
-
-        boxPushActorRef ! PollOutbox
-
-        expectNoMsg()
-
-        boxDao.listOutboxEntries.size should be(0)
-      }
-    }
+    //    "remove processed outbox entry" in {
+    //
+    //      db.withSession { implicit session =>
+    //        val entry = boxDao.insertOutgoingEntry(OutgoingEntry(1, testBox.id, testBox.name, testTransactionId, 0, 1, dbImage1.id, TransactionStatus.WAITING))
+    //        val image = boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, 1, false))
+    //            
+    //        boxPushActorRef ! PollOutgoing
+    //
+    //        expectNoMsg()
+    //
+    //        boxDao.listOutgoingImages.size should be(0)
+    //      }
+    //    }
 
     "should post file to correct URL" in {
 
-      val outboxEntry = OutboxEntry(1, testBox.id, testBox.name, testTransactionId, 2, 5, dbImage1.id, false)
-      db.withSession { implicit session =>
-        boxDao.insertOutboxEntry(outboxEntry)
-      }
+      val (entry, image) =
+        db.withSession { implicit session =>
+          val entry = boxDao.insertOutgoingEntry(OutgoingEntry(1, testBox.id, testBox.name, testTransactionId, 0, 1, 1000, TransactionStatus.WAITING))
+          val image = boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, dbImage1.id, false))
+          (entry, image)
+        }
 
-      boxPushActorRef ! PollOutbox
+      boxPushActorRef ! PollOutgoing
 
       expectNoMsg()
 
       capturedFileSendRequests.size should be(1)
-      capturedFileSendRequests(0).uri.toString() should be(s"${testBox.baseUrl}/image?transactionid=${outboxEntry.transactionId}&sequencenumber=${outboxEntry.sequenceNumber}&totalimagecount=${outboxEntry.totalImageCount}")
+      capturedFileSendRequests(0).uri.toString() should be(s"${testBox.baseUrl}/image?transactionid=${entry.transactionId}&totalimagecount=${entry.totalImageCount}")
     }
 
-    "should post file in correct order" in {
-
-      val outboxEntrySeq1 = OutboxEntry(1, testBox.id, testBox.name, testTransactionId, 1, 2, dbImage1.id, false)
-      val outboxEntrySeq2 = OutboxEntry(1, testBox.id, testBox.name, testTransactionId, 2, 2, dbImage2.id, false)
+    "should mark outgoing entry as finished when all files have been sent" in {
       db.withSession { implicit session =>
-        // Insert outbox entries out of order
-        boxDao.insertOutboxEntry(outboxEntrySeq2)
-        boxDao.insertOutboxEntry(outboxEntrySeq1)
+
+        val entry = boxDao.insertOutgoingEntry(OutgoingEntry(1, testBox.id, testBox.name, testTransactionId, 2, 5, 1000, TransactionStatus.WAITING))
+        val image1 = boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, dbImage1.id, false))
+        val image2 = boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, dbImage2.id, false))
+
+        boxDao.listOutgoingEntries.head.status shouldBe TransactionStatus.WAITING
+        
+        boxPushActorRef ! PollOutgoing
+        expectNoMsg()
+
+        boxDao.listOutgoingEntries.head.status shouldBe TransactionStatus.SENDING
+        
+        boxPushActorRef ! PollOutgoing
+        expectNoMsg()
+        
+        boxDao.listOutgoingEntries.head.status shouldBe TransactionStatus.FINISHED
       }
-
-      boxPushActorRef ! PollOutbox
-      expectNoMsg()
-      boxPushActorRef ! PollOutbox
-      expectNoMsg()
-
-      capturedFileSendRequests.size should be(2)
-      capturedFileSendRequests(0).uri.toString() should be(s"${testBox.baseUrl}/image?transactionid=${outboxEntrySeq1.transactionId}&sequencenumber=${outboxEntrySeq1.sequenceNumber}&totalimagecount=${outboxEntrySeq1.totalImageCount}")
-      capturedFileSendRequests(1).uri.toString() should be(s"${testBox.baseUrl}/image?transactionid=${outboxEntrySeq2.transactionId}&sequencenumber=${outboxEntrySeq2.sequenceNumber}&totalimagecount=${outboxEntrySeq2.totalImageCount}")
     }
+    //    "should post file in correct order" in {
+    //
+    //      val (entry, image1, image2) =
+    //        db.withSession { implicit session =>
+    //          // Insert outbox entries out of order
+    //          val entry = boxDao.insertOutgoingEntry(OutgoingEntry(1, testBox.id, testBox.name, testTransactionId, 2, 5, 1000, TransactionStatus.WAITING))
+    //          val image1 = boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, dbImage1.id, false))
+    //          val image2 = boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, dbImage2.id, false))
+    //          (entry, image1, image2)
+    //        }
+    //
+    //      boxPushActorRef ! PollOutgoing
+    //      expectNoMsg()
+    //      boxPushActorRef ! PollOutgoing
+    //      expectNoMsg()
+    //
+    //      capturedFileSendRequests.size should be(2)
+    //      capturedFileSendRequests(0).uri.toString() should be(s"${testBox.baseUrl}/image?transactionid=${entry.transactionId}&totalimagecount=${entry.totalImageCount}")
+    //      capturedFileSendRequests(1).uri.toString() should be(s"${testBox.baseUrl}/image?transactionid=${entry.transactionId}&totalimagecount=${entry.totalImageCount}")
+    //    }
 
-    "mark outbox entry as failed when file send fails" in {
+    "mark outgoing entry as failed when file send fails" in {
 
       db.withSession { implicit session =>
         val invalidImageId = 666
-        boxDao.insertOutboxEntry(OutboxEntry(1, testBox.id, testBox.name, testTransactionId, 1, 1, invalidImageId, false))
 
-        boxPushActorRef ! PollOutbox
+        val entry = boxDao.insertOutgoingEntry(OutgoingEntry(1, testBox.id, testBox.name, testTransactionId, 0, 1, 1000, TransactionStatus.WAITING))
+        val image = boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, invalidImageId, false))
+
+        boxPushActorRef ! PollOutgoing
 
         expectNoMsg()
 
-        val outboxEntries = boxDao.listOutboxEntries
-        outboxEntries.size should be(1)
-        outboxEntries.foreach(outboxEntry => {
-          outboxEntry.failed should be(true)
-        })
+        val outgoingEntries = boxDao.listOutgoingEntries
+        outgoingEntries.size should be(1)
+        outgoingEntries.foreach(_.status shouldBe TransactionStatus.FAILED)
       }
     }
 
-    "mark all outbox entries for transaction as failed when file send fails" in {
+    //    "mark all outbox entries for transaction as failed when file send fails" in {
+    //
+    //      db.withSession { implicit session =>
+    //        val invalidImageId = 666
+    //        boxDao.insertOutboxEntry(OutboxEntry(1, testBox.id, testBox.name, testTransactionId, 1, 1, invalidImageId, false))
+    //        boxDao.insertOutboxEntry(OutboxEntry(1, testBox.id, testBox.name, testTransactionId, 2, 2, invalidImageId, false))
+    //
+    //        boxPushActorRef ! PollOutbox
+    //        boxPushActorRef ! PollOutbox
+    //        expectNoMsg()
+    //        expectNoMsg()
+    //
+    //        val outboxEntries = boxDao.listOutboxEntries
+    //        outboxEntries.size should be(2)
+    //        outboxEntries.foreach(outboxEntry => {
+    //          outboxEntry.failed should be(true)
+    //        })
+    //      }
+    //    }
+
+    "not mark wrong outgoing entry as failed when transaction id is not unique" in {
 
       db.withSession { implicit session =>
         val invalidImageId = 666
-        boxDao.insertOutboxEntry(OutboxEntry(1, testBox.id, testBox.name, testTransactionId, 1, 1, invalidImageId, false))
-        boxDao.insertOutboxEntry(OutboxEntry(1, testBox.id, testBox.name, testTransactionId, 2, 2, invalidImageId, false))
+        val entry1 = boxDao.insertOutgoingEntry(OutgoingEntry(1, testBox.id, testBox.name, testTransactionId, 0, 1, 1000, TransactionStatus.WAITING))
+        val image11 = boxDao.insertOutgoingImage(OutgoingImage(-1, entry1.id, invalidImageId, false))
+        val entry2 = boxDao.insertOutgoingEntry(OutgoingEntry(1, testBox.id, testBox.name, testTransactionId, 0, 1, 1000, TransactionStatus.WAITING))
+        val image21 = boxDao.insertOutgoingImage(OutgoingImage(-1, entry2.id, dbImage1.id, false))
 
-        boxPushActorRef ! PollOutbox
-        boxPushActorRef ! PollOutbox
-        expectNoMsg()
-        expectNoMsg()
-
-        val outboxEntries = boxDao.listOutboxEntries
-        outboxEntries.size should be(2)
-        outboxEntries.foreach(outboxEntry => {
-          outboxEntry.failed should be(true)
-        })
-      }
-    }
-
-    "not mark wrong outbox entry as failed when transaction id is not unique" in {
-
-      db.withSession { implicit session =>
-        val invalidImageId = 666
-        boxDao.insertOutboxEntry(OutboxEntry(1, testBox.id, testBox.name, testTransactionId, 1, 1, invalidImageId, false))
-        val secondOutboxEntry = boxDao.insertOutboxEntry(OutboxEntry(1, 999, "some box", testTransactionId, 1, 1, dbImage1.id, false))
-
-        boxPushActorRef ! PollOutbox
+        boxPushActorRef ! PollOutgoing
         expectNoMsg()
 
-        val outboxEntries = boxDao.listOutboxEntries
-        outboxEntries.size should be(2)
-        outboxEntries.foreach(outboxEntry => {
-          if (outboxEntry.id == secondOutboxEntry.id)
-            outboxEntry.failed should be(false)
+        val outgoingEntries = boxDao.listOutgoingEntries
+        outgoingEntries.size should be(2)
+        outgoingEntries.foreach(entry => {
+          if (entry.id == entry1.id)
+            entry.status shouldBe TransactionStatus.FAILED
+          else
+            entry.status shouldBe TransactionStatus.WAITING
         })
       }
     }
@@ -202,62 +230,68 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
       db.withSession { implicit session =>
         val invalidImageId = 666
-        boxDao.insertOutboxEntry(OutboxEntry(1, testBox.id, testBox.name, testTransactionId, 1, 1, invalidImageId, false))
 
-        boxPushActorRef ! PollOutbox
+        val entry1 = boxDao.insertOutgoingEntry(OutgoingEntry(1, testBox.id, testBox.name, testTransactionId, 0, 1, 1000, TransactionStatus.WAITING))
+        val image1 = boxDao.insertOutgoingImage(OutgoingImage(-1, entry1.id, invalidImageId, false))
+
+        boxPushActorRef ! PollOutgoing
         expectNoMsg()
 
-        boxDao.insertOutboxEntry(OutboxEntry(1, testBox.id, testBox.name, testTransactionId2, 1, 1, dbImage2.id, false))
+        val entry2 = boxDao.insertOutgoingEntry(OutgoingEntry(1, testBox.id, testBox.name, testTransactionId2, 0, 1, 1000, TransactionStatus.WAITING))
+        val image2 = boxDao.insertOutgoingImage(OutgoingImage(-1, entry2.id, dbImage2.id, false))
 
-        boxPushActorRef ! PollOutbox
+        boxPushActorRef ! PollOutgoing
         expectNoMsg()
 
         capturedFileSendRequests.size should be(1)
 
-        val outboxEntries = boxDao.listOutboxEntries
-        outboxEntries.size should be(1)
-        outboxEntries.foreach(outboxEntry => {
-          outboxEntry.transactionId should be(testTransactionId)
-          outboxEntry.failed should be(true)
-        })
+        val outgoingEntries = boxDao.listOutgoingEntries
+        outgoingEntries.size should be(2)
+        outgoingEntries.foreach(entry =>
+          if (entry.id == entry1.id) {
+            entry.transactionId should be(testTransactionId)
+            entry.status shouldBe TransactionStatus.FAILED
+          } else {
+            entry.transactionId should be(testTransactionId2)
+            entry.status shouldBe TransactionStatus.FINISHED
+          })
       }
     }
 
     "pause outbox processing when remote server is not working, and resume once remote server is back up" in {
 
       db.withSession { implicit session =>
-        boxDao.insertOutboxEntry(OutboxEntry(1, testBox.id, testBox.name, testTransactionId, 1, 3, dbImage1.id, false))
-        boxDao.insertOutboxEntry(OutboxEntry(2, testBox.id, testBox.name, testTransactionId, 2, 3, dbImage2.id, false))
-        boxDao.insertOutboxEntry(OutboxEntry(3, testBox.id, testBox.name, testTransactionId, 3, 3, dbImage3.id, false))
+        val entry = boxDao.insertOutgoingEntry(OutgoingEntry(-1, testBox.id, testBox.name, testTransactionId, 0, 3, 1000, TransactionStatus.WAITING))
+        val image1 = boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, dbImage1.id, false))
+        val image2 = boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, dbImage2.id, false))
+        val image3 = boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, dbImage3.id, false))
 
-        val n = capturedFileSendRequests.size
-        sendFailedResponseSequenceNumbers ++= Seq(n + 2, n + 3, n + 4, n + 5, n + 6)
-
-        boxPushActorRef ! PollOutbox
+        boxPushActorRef ! PollOutgoing
         expectNoMsg()
 
-        boxDao.listOutboxEntries.size should be(2)
+        boxDao.listOutgoingImagesForOutgoingEntryId(entry.id).filter(_.sent == false).size should be(2)
 
         // remote server is now down
+        sendFailedResponse = true
 
-        boxPushActorRef ! PollOutbox
-        boxPushActorRef ! PollOutbox
-        boxPushActorRef ! PollOutbox
+        boxPushActorRef ! PollOutgoing
+        boxPushActorRef ! PollOutgoing
+        boxPushActorRef ! PollOutgoing
         expectNoMsg()
         expectNoMsg()
         expectNoMsg()
 
-        boxDao.listOutboxEntries.size should be(2)
+        boxDao.listOutgoingImagesForOutgoingEntryId(entry.id).filter(_.sent == false).size should be(2)
 
         // server back up
-        sendFailedResponseSequenceNumbers.clear
+        sendFailedResponse = false
 
-        boxPushActorRef ! PollOutbox
-        boxPushActorRef ! PollOutbox
+        boxPushActorRef ! PollOutgoing
+        boxPushActorRef ! PollOutgoing
         expectNoMsg()
         expectNoMsg()
 
-        boxDao.listOutboxEntries.size should be(0)
+        boxDao.listOutgoingImagesForOutgoingEntryId(entry.id).filter(_.sent == false).size should be(0)
       }
     }
   }
