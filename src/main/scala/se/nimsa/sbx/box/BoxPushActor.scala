@@ -63,17 +63,17 @@ class BoxPushActor(box: Box,
 
   def sendFilePipeline = sendReceive
 
-  def pushImagePipeline(outgoingEntryAndImage: OutgoingEntryAndImage, tagValues: Seq[TransactionTagValue]): Future[HttpResponse] = {
-    val futureDatasetMaybe = storageService.ask(GetDataset(outgoingEntryAndImage.outgoingImage.imageId, true)).mapTo[Option[Attributes]]
+  def pushImagePipeline(entryImage: OutgoingEntryImage, tagValues: Seq[TransactionTagValue]): Future[HttpResponse] = {
+    val futureDatasetMaybe = storageService.ask(GetDataset(entryImage.image.imageId, true)).mapTo[Option[Attributes]]
     futureDatasetMaybe.flatMap(_ match {
       case Some(dataset) =>
-        val futureAnonymizedDataset = anonymizationService.ask(Anonymize(outgoingEntryAndImage.outgoingImage.imageId, dataset, tagValues.map(_.tagValue))).mapTo[Attributes]
+        val futureAnonymizedDataset = anonymizationService.ask(Anonymize(entryImage.image.imageId, dataset, tagValues.map(_.tagValue))).mapTo[Attributes]
         futureAnonymizedDataset flatMap { anonymizedDataset =>
           val compressedBytes = compress(toByteArray(anonymizedDataset))
-          sendFilePipeline(Post(s"${box.baseUrl}/image?transactionid=${outgoingEntryAndImage.outgoingEntry.transactionId}&totalimagecount=${outgoingEntryAndImage.outgoingEntry.totalImageCount}", HttpData(compressedBytes)))
+          sendFilePipeline(Post(s"${box.baseUrl}/image?transactionid=${entryImage.entry.transactionId}&totalimagecount=${entryImage.entry.totalImageCount}", HttpData(compressedBytes)))
         }
       case None =>
-        Future.failed(new IllegalArgumentException("No dataset found for image id " + outgoingEntryAndImage.outgoingImage.imageId))
+        Future.failed(new IllegalArgumentException("No dataset found for image id " + entryImage.image.imageId))
     })
   }
 
@@ -103,25 +103,25 @@ class BoxPushActor(box: Box,
 
   def waitForFileSentState: Receive = LoggingReceive {
 
-    case FileSent(outgoingEntryAndImage) =>
-      handleFileDeliveredForOutgoingEntry(outgoingEntryAndImage)
+    case FileSent(entryImage) =>
+      handleFileSentForOutgoingEntry(entryImage)
 
-    case FileSendFailed(outgoingEntryAndImage, statusCode, exception) =>
-      handleFileDeliveryFailedForOutgoingEntry(outgoingEntryAndImage, statusCode, exception)
+    case FileSendFailed(entryImage, statusCode, exception) =>
+      handleFileSendFailedForOutgoingEntry(entryImage, statusCode, exception)
 
     case ReceiveTimeout =>
       log.error("Processing next outgoing entry timed out")
       context.unbecome
   }
 
-  def nextOutgoingEntry: Option[OutgoingEntryAndImage] =
+  def nextOutgoingEntry: Option[OutgoingEntryImage] =
     db.withSession { implicit session =>
-      boxDao.nextOutgoingEntryAndImageForRemoteBoxId(box.id)
+      boxDao.nextOutgoingEntryImageForRemoteBoxId(box.id)
     }
 
-  def sendFileForOutgoingEntry(outgoingEntryAndImage: OutgoingEntryAndImage) = {
-    val transactionTagValues = tagValuesForImageIdAndTransactionId(outgoingEntryAndImage.outgoingImage.imageId, outgoingEntryAndImage.outgoingEntry.transactionId)
-    sendFile(outgoingEntryAndImage, transactionTagValues)
+  def sendFileForOutgoingEntry(entryImage: OutgoingEntryImage) = {
+    val transactionTagValues = tagValuesForImageIdAndTransactionId(entryImage.image.imageId, entryImage.entry.transactionId)
+    sendFile(entryImage, transactionTagValues)
   }
 
   def tagValuesForImageIdAndTransactionId(imageId: Long, transactionId: Long): Seq[TransactionTagValue] =
@@ -129,32 +129,32 @@ class BoxPushActor(box: Box,
       boxDao.tagValuesByImageIdAndTransactionId(imageId, transactionId)
     }
 
-  def sendFile(outgoingEntryAndImage: OutgoingEntryAndImage, tagValues: Seq[TransactionTagValue]) = {
-    pushImagePipeline(outgoingEntryAndImage, tagValues)
+  def sendFile(entryImage: OutgoingEntryImage, tagValues: Seq[TransactionTagValue]) = {
+    pushImagePipeline(entryImage, tagValues)
       .map(response => {
         val statusCode = response.status.intValue
         if (statusCode >= 200 && statusCode < 300)
-          self ! FileSent(outgoingEntryAndImage)
+          self ! FileSent(entryImage)
         else {
           val errorMessage = response.entity.asString
-          self ! FileSendFailed(outgoingEntryAndImage, statusCode, new Exception(s"File send failed with status code $statusCode: $errorMessage"))
+          self ! FileSendFailed(entryImage, statusCode, new Exception(s"File send failed with status code $statusCode: $errorMessage"))
         }
       })
       .recover {
         case exception: IllegalArgumentException =>
-          self ! FileSendFailed(outgoingEntryAndImage, 400, exception)
+          self ! FileSendFailed(entryImage, 400, exception)
         case exception: Exception =>
-          self ! FileSendFailed(outgoingEntryAndImage, 500, exception)
+          self ! FileSendFailed(entryImage, 500, exception)
       }
   }
 
-  def handleFileDeliveredForOutgoingEntry(outgoingEntryAndImage: OutgoingEntryAndImage) = {
-    log.debug(s"File sent for outgoing entry ${outgoingEntryAndImage.outgoingEntry.id}")
+  def handleFileSentForOutgoingEntry(entryImage: OutgoingEntryImage) = {
+    log.debug(s"File sent for outgoing entry ${entryImage.entry.id}")
 
     db.withSession { implicit session =>
-      boxDao.removeOutgoingEntry(outgoingEntryAndImage.outgoingEntry.id)
-      boxDao.updateOutgoingImage(outgoingEntryAndImage.outgoingImage.copy(sent = true))
-      val sentEntry = outgoingEntryAndImage.outgoingEntry.incrementSent.updateTimestamp
+      boxDao.removeOutgoingEntry(entryImage.entry.id)
+      boxDao.updateOutgoingImage(entryImage.image.copy(sent = true))
+      val sentEntry = entryImage.entry.incrementSent.updateTimestamp
       boxDao.updateOutgoingEntry(sentEntry)
 
       if (sentEntry.sentImageCount == sentEntry.totalImageCount) {
@@ -169,13 +169,13 @@ class BoxPushActor(box: Box,
     processNextOutgoingEntry
   }
 
-  def handleFileDeliveryFailedForOutgoingEntry(outgoingEntryAndImage: OutgoingEntryAndImage, statusCode: Int, exception: Exception) = {
+  def handleFileSendFailedForOutgoingEntry(entryImage: OutgoingEntryImage, statusCode: Int, exception: Exception) = {
     log.debug(s"Failed to send file to box ${box.name}: ${exception.getMessage}")
     statusCode match {
       case code if code >= 500 =>
       // server-side error, remote box is most likely down
       case _ =>
-        markOutgoingTransactionAsFailed(outgoingEntryAndImage.outgoingEntry, s"Cannot send file to box ${box.name}: ${exception.getMessage}")
+        markOutgoingTransactionAsFailed(entryImage.entry, s"Cannot send file to box ${box.name}: ${exception.getMessage}")
     }
     context.unbecome
   }

@@ -77,30 +77,30 @@ class BoxPollActor(box: Box,
     }
 
   def sendRequestToRemoteBoxPipeline = sendReceive
-  def pollRemoteBoxOutgoingPipeline = sendRequestToRemoteBoxPipeline ~> convertOption[OutgoingEntryAndImage]
+  def pollRemoteBoxOutgoingPipeline = sendRequestToRemoteBoxPipeline ~> convertOption[OutgoingEntryImage]
 
-  def sendPollRequestToRemoteBox: Future[Option[OutgoingEntryAndImage]] =
+  def sendPollRequestToRemoteBox: Future[Option[OutgoingEntryImage]] =
     pollRemoteBoxOutgoingPipeline(Get(s"${box.baseUrl}/outgoing/poll"))
 
-  def getRemoteOutgoingFile(remoteOutgoingEntryAndImage: OutgoingEntryAndImage): Future[HttpResponse] =
-    sendRequestToRemoteBoxPipeline(Get(s"${box.baseUrl}/outgoing?transactionid=${remoteOutgoingEntryAndImage.outgoingEntry.transactionId}&imageid=${remoteOutgoingEntryAndImage.outgoingImage.imageId}"))
+  def getRemoteOutgoingFile(entryImage: OutgoingEntryImage): Future[HttpResponse] =
+    sendRequestToRemoteBoxPipeline(Get(s"${box.baseUrl}/outgoing?transactionid=${entryImage.entry.transactionId}&imageid=${entryImage.image.imageId}"))
 
   // We don't need to wait for done message to be sent since it is not criticalf that it is received by the remote box
-  def sendRemoteOutgoingFileCompleted(remoteOutgoingEntryAndImage: OutgoingEntryAndImage): Future[HttpResponse] =
-    marshal(remoteOutgoingEntryAndImage) match {
+  def sendRemoteOutgoingFileCompleted(entryImage: OutgoingEntryImage): Future[HttpResponse] =
+    marshal(entryImage) match {
       case Right(entity) =>
         sendRequestToRemoteBoxPipeline(Post(s"${box.baseUrl}/outgoing/done", entity))
       case Left(e) =>
-        SbxLog.error("Box", s"Failed to send done message to remote box (${box.name},${remoteOutgoingEntryAndImage.outgoingEntry.transactionId},${remoteOutgoingEntryAndImage.outgoingImage.imageId})")
+        SbxLog.error("Box", s"Failed to send done message to remote box (${box.name},${entryImage.entry.transactionId},${entryImage.image.imageId})")
         Future.failed(e)
     }
 
-  def sendRemoteOutgoingFileFailed(failedOutgoingEntry: FailedOutgoingEntry): Future[HttpResponse] =
-    marshal(failedOutgoingEntry) match {
+  def sendRemoteOutgoingFileFailed(failedEntryImage: FailedOutgoingEntryImage): Future[HttpResponse] =
+    marshal(failedEntryImage) match {
       case Right(entity) =>
         sendRequestToRemoteBoxPipeline(Post(s"${box.baseUrl}/outgoing/failed", entity))
       case Left(e) =>
-        SbxLog.error("Box", s"Failed to send failed message to remote box (${box.name},${failedOutgoingEntry.outgoingEntryAndImage.outgoingEntry.transactionId},${failedOutgoingEntry.outgoingEntryAndImage.outgoingImage.imageId})")
+        SbxLog.error("Box", s"Failed to send failed message to remote box (${box.name},${failedEntryImage.entryImage.entry.transactionId},${failedEntryImage.entryImage.image.imageId})")
         Future.failed(e)
     }
 
@@ -122,11 +122,11 @@ class BoxPollActor(box: Box,
       log.debug("Remote outgoing is empty")
       context.unbecome
 
-    case RemoteOutgoingEntryAndImageFound(remoteOutgoingEntryAndImage) =>
-      log.debug(s"Received outgoing entry ${remoteOutgoingEntryAndImage}")
+    case RemoteOutgoingEntryImageFound(entryImage) =>
+      log.debug(s"Received outgoing entry ${entryImage}")
 
       context.become(waitForFileFetchedState)
-      fetchFileForRemoteOutgoingEntry(remoteOutgoingEntryAndImage)
+      fetchFileForRemoteOutgoingEntry(entryImage)
 
     case PollRemoteBoxFailed(exception) =>
       log.debug("Failed to poll remote box: " + exception.getMessage)
@@ -138,18 +138,18 @@ class BoxPollActor(box: Box,
   }
 
   def waitForFileFetchedState: PartialFunction[Any, Unit] = LoggingReceive {
-    case RemoteOutgoingFileFetched(remoteOutgoingEntryAndImage, imageId) =>
-      updateIncoming(box.id, box.name, remoteOutgoingEntryAndImage.outgoingEntry.transactionId, remoteOutgoingEntryAndImage.outgoingEntry.totalImageCount, imageId)
-      sendRemoteOutgoingFileCompleted(remoteOutgoingEntryAndImage).foreach { response =>
+    case RemoteOutgoingFileFetched(entryImage, imageId) =>
+      updateIncoming(box.id, box.name, entryImage.entry.transactionId, entryImage.entry.totalImageCount, imageId)
+      sendRemoteOutgoingFileCompleted(entryImage).foreach { response =>
         pollRemoteBox()
       }
 
-    case FetchFileFailed(remoteOutgoingEntry, exception) =>
+    case FetchFileFailed(entryImage, exception) =>
       SbxLog.info("Box", s"Failed to fetch file from box ${box.name}: " + exception.getMessage)
       context.unbecome
 
-    case HandlingFetchedFileFailed(remoteOutgoingEntry, exception) =>
-      sendRemoteOutgoingFileFailed(FailedOutgoingEntry(remoteOutgoingEntry, exception.getMessage))
+    case HandlingFetchedFileFailed(entryImage, exception) =>
+      sendRemoteOutgoingFileFailed(FailedOutgoingEntryImage(entryImage, exception.getMessage))
       SbxLog.error("Box", s"Failed to handle fetched file from box ${box.name}: " + exception.getMessage)
       context.unbecome
 
@@ -162,12 +162,12 @@ class BoxPollActor(box: Box,
     context.become(waitForPollRemoteOutgoingState)
 
     sendPollRequestToRemoteBox
-      .map(outgoingEntryAndImageMaybe => {
+      .map(entryImageMaybe => {
         updateBoxOnlineStatus(true)
 
-        outgoingEntryAndImageMaybe match {
-          case Some(outgoingEntryAndImage) =>
-            self ! RemoteOutgoingEntryAndImageFound(outgoingEntryAndImage)
+        entryImageMaybe match {
+          case Some(entryImage) =>
+            self ! RemoteOutgoingEntryImageFound(entryImage)
           case None =>
             self ! RemoteOutgoingEmpty
         }
@@ -179,8 +179,8 @@ class BoxPollActor(box: Box,
       }
   }
 
-  def fetchFileForRemoteOutgoingEntry(remoteOutgoingEntryAndImage: OutgoingEntryAndImage): Unit =
-    getRemoteOutgoingFile(remoteOutgoingEntryAndImage)
+  def fetchFileForRemoteOutgoingEntry(entryImage: OutgoingEntryImage): Unit =
+    getRemoteOutgoingFile(entryImage)
       .onComplete {
 
         case Success(response) =>
@@ -189,7 +189,7 @@ class BoxPollActor(box: Box,
             val dataset = loadDataset(bytes, true)
 
             if (dataset == null)
-              self ! HandlingFetchedFileFailed(remoteOutgoingEntryAndImage, new IllegalArgumentException("Dataset could not be read"))
+              self ! HandlingFetchedFileFailed(entryImage, new IllegalArgumentException("Dataset could not be read"))
 
             else
               anonymizationService.ask(ReverseAnonymization(dataset)).mapTo[Attributes]
@@ -201,21 +201,21 @@ class BoxPollActor(box: Box,
                       .onComplete {
 
                         case Success(DatasetAdded(image, source)) =>
-                          self ! RemoteOutgoingFileFetched(remoteOutgoingEntryAndImage, image.id)
+                          self ! RemoteOutgoingFileFetched(entryImage, image.id)
                         case Success(_) =>
-                          self ! HandlingFetchedFileFailed(remoteOutgoingEntryAndImage, new Exception("Unexpected response when adding dataset"))
+                          self ! HandlingFetchedFileFailed(entryImage, new Exception("Unexpected response when adding dataset"))
                         case Failure(exception) =>
-                          self ! HandlingFetchedFileFailed(remoteOutgoingEntryAndImage, exception)
+                          self ! HandlingFetchedFileFailed(entryImage, exception)
                       }
 
                   case Failure(exception) =>
-                    self ! HandlingFetchedFileFailed(remoteOutgoingEntryAndImage, exception)
+                    self ! HandlingFetchedFileFailed(entryImage, exception)
                 }
           } else
-            self ! FetchFileFailed(remoteOutgoingEntryAndImage, new RuntimeException("Server responded with status code " + response.status.intValue))
+            self ! FetchFileFailed(entryImage, new RuntimeException("Server responded with status code " + response.status.intValue))
 
         case Failure(exception) =>
-          self ! FetchFileFailed(remoteOutgoingEntryAndImage, exception)
+          self ! FetchFileFailed(entryImage, exception)
       }
 
   def updateIncoming(remoteBoxId: Long, remoteBoxName: String, transactionId: Long, totalImageCount: Long, imageId: Long): Unit = {

@@ -82,7 +82,7 @@ import de.heikoseeberger.sbtheader.license.Apache2_0
 			"io.spray" 						%% "spray-testkit"			% sprayVersion		% "test",
 			"com.typesafe.akka" 			%% "akka-testkit"			% akkaVersion		% "test",
 			"org.webjars" 					%  "angularjs"				% "1.4.7",
-			"org.webjars"					%  "angular-material"		% "1.0.0",
+			"org.webjars"					%  "angular-material"		% "1.0.1",
 			"org.webjars"                   %  "angular-file-upload"    % "5.0.0"
 		)
 	}

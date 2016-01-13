@@ -70,24 +70,24 @@ trait RemoteBoxRoutes { this: SliceboxService =>
               path("poll") {
                 get {
                   onSuccess(boxService.ask(PollOutgoing(box))) {
-                    case outgoingEntryAndImage: OutgoingEntryAndImage =>
-                      complete(outgoingEntryAndImage)
+                    case entryImage: OutgoingEntryImage =>
+                      complete(entryImage)
                     case OutgoingEmpty =>
                       complete(NotFound)
                   }
                 }
               } ~ path("done") {
                 post {
-                  entity(as[OutgoingEntryAndImage]) { outgoingEntryAndImage =>
-                    onSuccess(boxService.ask(MarkOutgoingImageAsSent(box, outgoingEntryAndImage))) {
+                  entity(as[OutgoingEntryImage]) { entryImage =>
+                    onSuccess(boxService.ask(MarkOutgoingImageAsSent(box, entryImage))) {
                       case OutgoingImageMarkedAsSent => complete(NoContent)
                     }
                   }
                 }
               } ~ path("failed") {
                 post {
-                  entity(as[FailedOutgoingEntry]) { failedOutgoingEntry =>
-                    onSuccess(boxService.ask(MarkOutgoingTransactionAsFailed(box, failedOutgoingEntry.outgoingEntryAndImage.outgoingEntry.transactionId, failedOutgoingEntry.message))) {
+                  entity(as[FailedOutgoingEntryImage]) { failedEntryImage =>
+                    onSuccess(boxService.ask(MarkOutgoingTransactionAsFailed(box, failedEntryImage.entryImage.entry.transactionId, failedEntryImage.message))) {
                       case OutgoingTransactionMarkedAsFailed => complete(NoContent)
                     }
                   }
@@ -95,23 +95,23 @@ trait RemoteBoxRoutes { this: SliceboxService =>
               } ~ pathEndOrSingleSlash {
                 get {
                   parameters('transactionid.as[Long], 'imageid.as[Long]) { (transactionId, imageId) =>
-                    onSuccess(boxService.ask(GetOutgoingEntryAndImage(box, transactionId, imageId)).mapTo[Option[OutgoingEntryAndImage]]) {
+                    onSuccess(boxService.ask(GetOutgoingEntryImage(box, transactionId, imageId)).mapTo[Option[OutgoingEntryImage]]) {
                       _ match {
-                        case Some(outgoingEntryAndImage) =>
-                          onSuccess(boxService.ask(GetTransactionTagValues(outgoingEntryAndImage.outgoingImage.imageId, transactionId)).mapTo[Seq[TransactionTagValue]]) {
+                        case Some(entryImage) =>
+                          onSuccess(boxService.ask(GetTransactionTagValues(imageId, transactionId)).mapTo[Seq[TransactionTagValue]]) {
                             case transactionTagValues =>
-                              onSuccess(storageService.ask(GetDataset(outgoingEntryAndImage.outgoingImage.imageId, true)).mapTo[Option[Attributes]]) {
+                              onSuccess(storageService.ask(GetDataset(imageId, true)).mapTo[Option[Attributes]]) {
                                 _ match {
                                   case Some(dataset) =>
 
-                                    onSuccess(anonymizationService.ask(Anonymize(outgoingEntryAndImage.outgoingImage.imageId, dataset, transactionTagValues.map(_.tagValue)))) {
+                                    onSuccess(anonymizationService.ask(Anonymize(imageId, dataset, transactionTagValues.map(_.tagValue)))) {
                                       case anonymizedDataset: Attributes =>
                                         val compressedBytes = compress(toByteArray(anonymizedDataset))
                                         complete(HttpEntity(ContentTypes.`application/octet-stream`, HttpData(compressedBytes)))
                                     }
                                   case None =>
 
-                                    complete((NotFound, s"File not found for image id ${outgoingEntryAndImage.outgoingImage.imageId}"))
+                                    complete((NotFound, s"File not found for image id $imageId"))
                                 }
                               }
                           }

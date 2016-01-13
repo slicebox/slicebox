@@ -139,8 +139,8 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
           case PollOutgoing(box) =>
             pollBoxesLastPollTimestamp(box.id) = System.currentTimeMillis
 
-            val response = nextOutgoingEntryAndImage(box.id) match {
-              case Some(outgoingEntryAndImage) => outgoingEntryAndImage
+            val response = nextOutgoingEntryImage(box.id) match {
+              case Some(entryImage) => entryImage
               case None                        => OutgoingEmpty
             }
 
@@ -151,12 +151,12 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
             addImagesToOutgoing(box.id, box.name, imageTagValuesSeq)
             sender ! ImagesAddedToOutgoing(box.id, imageTagValuesSeq.map(_.imageId))
 
-          case GetOutgoingEntryAndImage(box, transactionId, imageId) =>
-            sender ! outgoingEntryAndImageByTransactionIdAndImageId(box.id, transactionId, imageId)
+          case GetOutgoingEntryImage(box, transactionId, imageId) =>
+            sender ! outgoingEntryImageByTransactionIdAndImageId(box.id, transactionId, imageId)
 
-          case MarkOutgoingImageAsSent(box, outgoingEntryAndImage) =>
-            updateOutgoingImage(outgoingEntryAndImage.outgoingImage.copy(sent = true))
-            val updatedEntry = updateOutgoingEntry(outgoingEntryAndImage.outgoingEntry.incrementSent.updateTimestamp)
+          case MarkOutgoingImageAsSent(box, entryImage) =>
+            updateOutgoingImage(entryImage.image.copy(sent = true))
+            val updatedEntry = updateOutgoingEntry(entryImage.entry.incrementSent.updateTimestamp)
 
             if (updatedEntry.sentImageCount == updatedEntry.totalImageCount) {
               context.system.eventStream.publish(ImagesSent(Destination(DestinationType.BOX, box.name, box.id), outgoingImageIdsForTransactionId(updatedEntry.transactionId)))
@@ -274,9 +274,9 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
       boxDao.pollBoxByToken(token)
     }
 
-  def nextOutgoingEntryAndImage(boxId: Long): Option[OutgoingEntryAndImage] =
+  def nextOutgoingEntryImage(boxId: Long): Option[OutgoingEntryImage] =
     db.withSession { implicit session =>
-      boxDao.nextOutgoingEntryAndImageForRemoteBoxId(boxId)
+      boxDao.nextOutgoingEntryImageForRemoteBoxId(boxId)
     }
 
   def updateIncomingEntry(entry: IncomingEntry): IncomingEntry = {
@@ -343,9 +343,9 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
       boxDao.outgoingEntryById(outgoingEntryId)
     }
 
-  def outgoingEntryAndImageByTransactionIdAndImageId(remoteBoxId: Long, transactionId: Long, imageId: Long): Option[OutgoingEntryAndImage] =
+  def outgoingEntryImageByTransactionIdAndImageId(remoteBoxId: Long, transactionId: Long, imageId: Long): Option[OutgoingEntryImage] =
     db.withSession { implicit session =>
-      boxDao.outgoingEntryAndImageByTransactionIdAndImageId(remoteBoxId, transactionId, imageId)
+      boxDao.outgoingEntryImageByTransactionIdAndImageId(remoteBoxId, transactionId, imageId)
     }
 
   def removeIncomingEntryFromDb(incomingEntryId: Long) =
