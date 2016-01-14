@@ -31,8 +31,8 @@ trait SliceboxRoutes extends DirectoryRoutes
     with ImageRoutes
     with AnonymizationRoutes
     with BoxRoutes
+    with TransactionRoutes
     with ForwardingRoutes
-    with RemoteBoxRoutes
     with UserRoutes
     with LogRoutes
     with UiRoutes
@@ -73,7 +73,7 @@ trait SliceboxRoutes extends DirectoryRoutes
               seriesTypeRoutes(apiUser) ~
               forwardingRoutes(apiUser)
           }
-      } ~ remoteBoxRoutes
+      } ~ transactionRoutes
     } ~
       pathPrefixTest(!"api") {
         pathPrefix("assets") {

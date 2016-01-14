@@ -61,22 +61,6 @@ class BoxPushActor(box: Box,
   implicit val system = context.system
   implicit val ec = context.dispatcher
 
-  def sendFilePipeline = sendReceive
-
-  def pushImagePipeline(entryImage: OutgoingEntryImage, tagValues: Seq[TransactionTagValue]): Future[HttpResponse] = {
-    val futureDatasetMaybe = storageService.ask(GetDataset(entryImage.image.imageId, true)).mapTo[Option[Attributes]]
-    futureDatasetMaybe.flatMap(_ match {
-      case Some(dataset) =>
-        val futureAnonymizedDataset = anonymizationService.ask(Anonymize(entryImage.image.imageId, dataset, tagValues.map(_.tagValue))).mapTo[Attributes]
-        futureAnonymizedDataset flatMap { anonymizedDataset =>
-          val compressedBytes = compress(toByteArray(anonymizedDataset))
-          sendFilePipeline(Post(s"${box.baseUrl}/image?transactionid=${entryImage.entry.transactionId}&totalimagecount=${entryImage.entry.totalImageCount}", HttpData(compressedBytes)))
-        }
-      case None =>
-        Future.failed(new IllegalArgumentException("No dataset found for image id " + entryImage.image.imageId))
-    })
-  }
-
   val poller = system.scheduler.schedule(pollInterval, pollInterval) {
     self ! PollOutgoing
   }
@@ -124,10 +108,21 @@ class BoxPushActor(box: Box,
     sendFile(entryImage, transactionTagValues)
   }
 
-  def tagValuesForImageIdAndTransactionId(imageId: Long, transactionId: Long): Seq[TransactionTagValue] =
-    db.withSession { implicit session =>
-      boxDao.tagValuesByImageIdAndTransactionId(imageId, transactionId)
-    }
+  def sendFilePipeline = sendReceive
+
+  def pushImagePipeline(entryImage: OutgoingEntryImage, tagValues: Seq[TransactionTagValue]): Future[HttpResponse] = {
+    val futureDatasetMaybe = storageService.ask(GetDataset(entryImage.image.imageId, true)).mapTo[Option[Attributes]]
+    futureDatasetMaybe.flatMap(_ match {
+      case Some(dataset) =>
+        val futureAnonymizedDataset = anonymizationService.ask(Anonymize(entryImage.image.imageId, dataset, tagValues.map(_.tagValue))).mapTo[Attributes]
+        futureAnonymizedDataset flatMap { anonymizedDataset =>
+          val compressedBytes = compress(toByteArray(anonymizedDataset))
+          sendFilePipeline(Post(s"${box.baseUrl}/transactions/image?transactionid=${entryImage.entry.transactionId}&totalimagecount=${entryImage.entry.totalImageCount}", HttpData(compressedBytes)))
+        }
+      case None =>
+        Future.failed(new IllegalArgumentException("No dataset found for image id " + entryImage.image.imageId))
+    })
+  }
 
   def sendFile(entryImage: OutgoingEntryImage, tagValues: Seq[TransactionTagValue]) = {
     pushImagePipeline(entryImage, tagValues)
@@ -148,25 +143,26 @@ class BoxPushActor(box: Box,
       }
   }
 
+  def tagValuesForImageIdAndTransactionId(imageId: Long, transactionId: Long): Seq[TransactionTagValue] =
+    db.withSession { implicit session =>
+      boxDao.tagValuesByImageIdAndTransactionId(imageId, transactionId)
+    }
+
   def handleFileSentForOutgoingEntry(entryImage: OutgoingEntryImage) = {
     log.debug(s"File sent for outgoing entry ${entryImage.entry.id}")
 
-    db.withSession { implicit session =>
-      boxDao.removeOutgoingEntry(entryImage.entry.id)
-      boxDao.updateOutgoingImage(entryImage.image.copy(sent = true))
-      val sentEntry = entryImage.entry.incrementSent.updateTimestamp
-      boxDao.updateOutgoingEntry(sentEntry)
+    markOutgoingImageAsSent(entryImage.image)
+    val updatedEntry = updateOutgoingEntryAfterSendingFile(entryImage.entry)
 
-      if (sentEntry.sentImageCount == sentEntry.totalImageCount) {
-        context.system.eventStream.publish(ImagesSent(Destination(DestinationType.BOX, box.name, box.id), outgoingImageIdsForTransactionId(sentEntry.transactionId)))
-        SbxLog.info("Box", s"Finished sending ${sentEntry.totalImageCount} images to box ${box.name}")
-        markOutgoingTransactionAsFinished(sentEntry)
-        removeTransactionTagValuesForTransactionId(sentEntry.transactionId)
-      }
-
+    if (updatedEntry.sentImageCount == updatedEntry.totalImageCount) {
+      context.system.eventStream.publish(ImagesSent(Destination(DestinationType.BOX, box.name, box.id), outgoingImageIdsForTransactionId(updatedEntry.transactionId)))
+      SbxLog.info("Box", s"Finished sending ${updatedEntry.totalImageCount} images to box ${box.name}")
+      markOutgoingEntryAsFinished(updatedEntry)
+      removeTransactionTagValuesForTransactionId(updatedEntry.transactionId)
     }
 
-    processNextOutgoingEntry
+    context.unbecome
+    self ! PollOutgoing
   }
 
   def handleFileSendFailedForOutgoingEntry(entryImage: OutgoingEntryImage, statusCode: Int, exception: Exception) = {
@@ -175,21 +171,33 @@ class BoxPushActor(box: Box,
       case code if code >= 500 =>
       // server-side error, remote box is most likely down
       case _ =>
-        markOutgoingTransactionAsFailed(entryImage.entry, s"Cannot send file to box ${box.name}: ${exception.getMessage}")
+        markOutgoingEntryAsFailed(entryImage.entry, s"Cannot send file to box ${box.name}: ${exception.getMessage}")
     }
     context.unbecome
   }
 
-  def markOutgoingTransactionAsFailed(entry: OutgoingEntry, logMessage: String) = {
+  def updateOutgoingEntryAfterSendingFile(entry: OutgoingEntry) =
     db.withSession { implicit session =>
-      boxDao.setOutgoingTransactionStatus(box.id, entry.transactionId, TransactionStatus.FAILED)
+      val updatedEntry = entry.incrementSent.updateTimestamp
+      boxDao.updateOutgoingEntry(updatedEntry)
+      updatedEntry
+    }
+
+  def markOutgoingEntryAsFinished(entry: OutgoingEntry) =
+    db.withSession { implicit session =>
+      boxDao.setOutgoingEntryStatus(entry.id, TransactionStatus.FINISHED)
+    }
+
+  def markOutgoingEntryAsFailed(entry: OutgoingEntry, logMessage: String) = {
+    db.withSession { implicit session =>
+      boxDao.setOutgoingEntryStatus(entry.id, TransactionStatus.FAILED)
     }
     SbxLog.error("Box", logMessage)
   }
 
-  def markOutgoingTransactionAsFinished(entry: OutgoingEntry) =
+  def markOutgoingImageAsSent(image: OutgoingImage) =
     db.withSession { implicit session =>
-      boxDao.setOutgoingTransactionStatus(box.id, entry.transactionId, TransactionStatus.FINISHED)
+      boxDao.updateOutgoingImage(image.copy(sent = true))
     }
 
   def removeTransactionTagValuesForTransactionId(transactionId: Long) =

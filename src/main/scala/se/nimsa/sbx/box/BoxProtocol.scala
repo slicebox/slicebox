@@ -71,27 +71,27 @@ object BoxProtocol {
 
   case class Box(id: Long, name: String, token: String, baseUrl: String, sendMethod: BoxSendMethod, online: Boolean) extends Entity
 
-  case class OutgoingEntry(id: Long, remoteBoxId: Long, remoteBoxName: String, transactionId: Long, sentImageCount: Long, totalImageCount: Long, lastUpdated: Long, status: TransactionStatus) extends Entity {
+  case class OutgoingTransaction(id: Long, remoteBoxId: Long, remoteBoxName: String, sentImageCount: Long, totalImageCount: Long, lastUpdated: Long, status: TransactionStatus) extends Entity {
     def incrementSent = copy(sentImageCount = this.sentImageCount + 1)
     def updateTimestamp = copy(lastUpdated = System.currentTimeMillis)
   }
 
-  case class OutgoingImage(id: Long, outgoingEntryId: Long, imageId: Long, sent: Boolean) extends Entity
-
-  case class OutgoingEntryImage(entry: OutgoingEntry, image: OutgoingImage)
+  case class OutgoingImage(id: Long, outgoingTransactionId: Long, imageId: Long, sent: Boolean) extends Entity
   
-  case class IncomingEntry(id: Long, remoteBoxId: Long, remoteBoxName: String, transactionId: Long, receivedImageCount: Long, totalImageCount: Long, lastUpdated: Long, status: TransactionStatus) extends Entity {
+  case class OutgoingTagValue(id: Long, outgoingImageId: Long, tagValue: TagValue) extends Entity
+  
+  case class OutgoingTransactionImage(transaction: OutgoingTransaction, image: OutgoingImage)
+  
+  case class IncomingTransaction(id: Long, remoteBoxId: Long, remoteBoxName: String, remoteTransactionId: Long, receivedImageCount: Long, totalImageCount: Long, lastUpdated: Long, status: TransactionStatus) extends Entity {
     def incrementReceived = copy(receivedImageCount = this.receivedImageCount + 1)
     def updateTimestamp = copy(lastUpdated = System.currentTimeMillis)
   }
 
-  case class IncomingImage(id: Long, incomingEntryId: Long, imageId: Long) extends Entity
+  case class IncomingImage(id: Long, incomingTransactionId: Long, imageId: Long) extends Entity
   
-  case class FailedOutgoingEntryImage(entryImage: OutgoingEntryImage, message: String)
+  case class FailedOutgoingEntryImage(transactionImage: OutgoingTransactionImage, message: String)
   
-  case class PushImageData(transactionId: Long, imageId: Long, totalImageCount: Long, dataset: Attributes)
-
-  case class TransactionTagValue(id: Long, transactionId: Long, imageId: Long, tagValue: TagValue) extends Entity
+  // case class PushImageData(transactionId: Long, imageId: Long, totalImageCount: Long, dataset: Attributes)
   
   
   sealed trait BoxRequest
@@ -118,9 +118,9 @@ object BoxProtocol {
 
   case class GetTransactionTagValues(imageId: Long, transactionId: Long) extends BoxRequest
 
-  case class MarkOutgoingImageAsSent(box: Box, entryImage: OutgoingEntryImage) extends BoxRequest
+  case class MarkOutgoingImageAsSent(box: Box, transactionImage: OutgoingTransactionImage) extends BoxRequest
 
-  case class MarkOutgoingTransactionAsFailed(box: Box, transactionId: Long, message: String) extends BoxRequest
+  case class MarkOutgoingTransactionAsFailed(box: Box, failedEntryImage: FailedOutgoingEntryImage) extends BoxRequest
   
   case object GetIncoming extends BoxRequest
 
@@ -147,7 +147,7 @@ object BoxProtocol {
 
   case class Boxes(boxes: Seq[Box])
 
-  case class IncomingUpdated(entry: IncomingEntry)
+  case class IncomingUpdated(transaction: IncomingTransaction)
 
   case object OutgoingEmpty
 
@@ -157,17 +157,17 @@ object BoxProtocol {
 
   case object OutgoingTransactionMarkedAsFailed
   
-  case class Incoming(entries: Seq[IncomingEntry])
+  case class Incoming(transactions: Seq[IncomingTransaction])
 
-  case class Outgoing(entries: Seq[OutgoingEntry])
+  case class Outgoing(transactions: Seq[OutgoingTransaction])
 
   // box push actor internal messages
 
   case object PollOutgoing
 
-  case class FileSent(entryImage: OutgoingEntryImage)
+  case class FileSent(transactionImage: OutgoingTransactionImage)
 
-  case class FileSendFailed(entryImage: OutgoingEntryImage, statusCode: Int, e: Exception)
+  case class FileSendFailed(transactionImage: OutgoingTransactionImage, statusCode: Int, e: Exception)
 
   // box poll actor internal messages
 
@@ -175,13 +175,13 @@ object BoxProtocol {
 
   case object RemoteOutgoingEmpty
 
-  case class RemoteOutgoingEntryImageFound(entryImage: OutgoingEntryImage)
+  case class RemoteOutgoingEntryImageFound(transactionImage: OutgoingTransactionImage)
 
   case class PollRemoteBoxFailed(e: Throwable)
 
-  case class RemoteOutgoingFileFetched(entryImage: OutgoingEntryImage, imageId: Long)
+  case class RemoteOutgoingFileFetched(transactionImage: OutgoingTransactionImage, imageId: Long)
 
-  case class FetchFileFailed(entryImage: OutgoingEntryImage, e: Throwable)
+  case class FetchFileFailed(transactionImage: OutgoingTransactionImage, e: Throwable)
 
-  case class HandlingFetchedFileFailed(entryImage: OutgoingEntryImage, e: Throwable)
+  case class HandlingFetchedFileFailed(transactionImage: OutgoingTransactionImage, e: Throwable)
 }

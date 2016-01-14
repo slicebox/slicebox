@@ -115,8 +115,11 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
 
     "return first outgoing entry when receiving poll message" in {
       db.withSession { implicit session =>
+        val transactionId = 987
+        val imageId = 123
         val remoteBox = boxDao.insertBox(Box(-1, "some remote box", "abc", "https://someurl.com", BoxSendMethod.POLL, false))
-        boxDao.insertOutgoingEntry(OutgoingEntry(-1, remoteBox.id, remoteBox.name, 987, 1, 2, 123, TransactionStatus.WAITING))
+        val entry = boxDao.insertOutgoingEntry(OutgoingEntry(-1, remoteBox.id, remoteBox.name, transactionId, 0, 1, 123, TransactionStatus.WAITING))
+        val image = boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, imageId, false))
 
         boxService ! PollOutgoing(remoteBox)
 
@@ -124,16 +127,17 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
           case OutgoingEntryImage(entry, image) =>
             entry.remoteBoxId should be(remoteBox.id)
             entry.remoteBoxName should be("some remote box")
-            entry.transactionId should be(987)
-            entry.totalImageCount should be(2)
-            image.imageId should be(123)
+            entry.transactionId should be(transactionId)
+            entry.sentImageCount should be(0)
+            entry.totalImageCount should be(1)
+            image.imageId should be(imageId)
             image.sent should be(false)
             image.outgoingEntryId should be(entry.id)
         }
       }
     }
 
-    "remove all box tag values when all outgoing entries for a transaction have been removed" in {
+    "remove all related box tag values when an outgoing entry for a transaction is removed" in {
       db.withSession { implicit session =>
         val remoteBox = boxDao.insertBox(Box(-1, "some remote box", "abc", "https://someurl.com", BoxSendMethod.POLL, false))
 
@@ -162,8 +166,10 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
         }
 
         val outgoingEntries = boxDao.listOutgoingEntries
-        outgoingEntries.size should be(3)
-
+        outgoingEntries should have length 1
+        val outgoingImages = boxDao.listOutgoingImagesForOutgoingEntryId(outgoingEntries.head.id)
+        outgoingImages should have length 3
+        
         val transactionId = outgoingEntries(0).transactionId
         outgoingEntries.map(_.transactionId).forall(_ == transactionId) should be(true)
 
@@ -174,8 +180,6 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
 
         outgoingEntries.map(_.id).foreach(id => boxService ! RemoveOutgoingEntry(id))
 
-        expectMsgType[OutgoingEntryRemoved]
-        expectMsgType[OutgoingEntryRemoved]
         expectMsgType[OutgoingEntryRemoved]
 
         boxDao.listTransactionTagValues.isEmpty should be(true)

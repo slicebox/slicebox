@@ -90,7 +90,7 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
 
           case CreateConnection(remoteBoxConnectionData) =>
             val token = UUID.randomUUID().toString()
-            val baseUrl = s"$apiBaseURL/box/$token"
+            val baseUrl = s"$apiBaseURL/boxes/$token"
             val name = remoteBoxConnectionData.name
             val box = addBoxToDb(Box(-1, name, token, baseUrl, BoxSendMethod.POLL, false))
             sender ! RemoteBoxAdded(box)
@@ -141,7 +141,7 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
 
             val response = nextOutgoingEntryImage(box.id) match {
               case Some(entryImage) => entryImage
-              case None                        => OutgoingEmpty
+              case None             => OutgoingEmpty
             }
 
             sender ! response
@@ -160,15 +160,16 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
 
             if (updatedEntry.sentImageCount == updatedEntry.totalImageCount) {
               context.system.eventStream.publish(ImagesSent(Destination(DestinationType.BOX, box.name, box.id), outgoingImageIdsForTransactionId(updatedEntry.transactionId)))
-              markOutgoingTransactionAsFinished(box, updatedEntry.transactionId)
+              markOutgoingEntryAsFinished(entryImage.entry)
               removeTransactionTagValuesForTransactionId(updatedEntry.transactionId)
               SbxLog.info("Box", s"Finished sending ${updatedEntry.totalImageCount} images to box ${box.name}")
             }
 
             sender ! OutgoingImageMarkedAsSent
 
-          case MarkOutgoingTransactionAsFailed(box, transactionId, message) =>
-            markOutgoingTransactionAsFailed(box, transactionId, message)
+          case MarkOutgoingTransactionAsFailed(box, failedEntryImage) =>
+            markOutgoingEntryAsFailed(failedEntryImage.entryImage.entry)
+            SbxLog.error("Box", failedEntryImage.message)
             sender ! OutgoingTransactionMarkedAsFailed
 
           case GetIncoming =>
@@ -188,7 +189,7 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
           case RemoveOutgoingEntry(outgoingEntryId) =>
             removeOutgoingEntryFromDb(outgoingEntryId)
             sender ! OutgoingEntryRemoved(outgoingEntryId)
-            
+
           case RemoveIncomingEntry(incomingEntryId) =>
             removeIncomingEntryFromDb(incomingEntryId)
             sender ! IncomingEntryRemoved(incomingEntryId)
@@ -308,13 +309,13 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
 
   def addImagesToOutgoing(remoteBoxId: Long, remoteBoxName: String, imageTagValuesSeq: Seq[ImageTagValues]) = {
     val transactionId = generateTransactionId()
+    addOutgoingEntryAndImages(remoteBoxId, remoteBoxName, transactionId, imageTagValuesSeq.map(_.imageId))
     imageTagValuesSeq.foreach(imageTagValues =>
       imageTagValues.tagValues.foreach(tagValue =>
         addTagValue(transactionId, imageTagValues.imageId, tagValue)))
-    addOutgoingEntries(remoteBoxId, remoteBoxName, transactionId, imageTagValuesSeq.map(_.imageId))
   }
 
-  def addOutgoingEntries(remoteBoxId: Long, remoteBoxName: String, transactionId: Long, imageIds: Seq[Long]): Unit =
+  def addOutgoingEntryAndImages(remoteBoxId: Long, remoteBoxName: String, transactionId: Long, imageIds: Seq[Long]): Unit =
     db.withSession { implicit session =>
       val entry = boxDao.insertOutgoingEntry(OutgoingEntry(-1, remoteBoxId, remoteBoxName, transactionId, 0, imageIds.length, System.currentTimeMillis, TransactionStatus.WAITING))
       imageIds foreach { imageId =>
@@ -370,16 +371,14 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
       boxDao.removeOutgoingEntry(outgoingEntryId)
     }
 
-  def markOutgoingTransactionAsFailed(box: Box, transactionId: Long, message: String) = {
+  def markOutgoingEntryAsFailed(entry: OutgoingEntry) =
     db.withSession { implicit session =>
-      boxDao.setOutgoingTransactionStatus(box.id, transactionId, TransactionStatus.FAILED)
+      boxDao.setOutgoingEntryStatus(entry.id, TransactionStatus.FAILED)
     }
-    SbxLog.error("Box", message)
-  }
 
-  def markOutgoingTransactionAsFinished(box: Box, transactionId: Long) =
+  def markOutgoingEntryAsFinished(entry: OutgoingEntry) =
     db.withSession { implicit session =>
-      boxDao.setOutgoingTransactionStatus(box.id, transactionId, TransactionStatus.FINISHED)
+      boxDao.setOutgoingEntryStatus(entry.id, TransactionStatus.FINISHED)
     }
 
   def getIncomingFromDb() =

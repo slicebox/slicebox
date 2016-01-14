@@ -80,16 +80,16 @@ class BoxPollActor(box: Box,
   def pollRemoteBoxOutgoingPipeline = sendRequestToRemoteBoxPipeline ~> convertOption[OutgoingEntryImage]
 
   def sendPollRequestToRemoteBox: Future[Option[OutgoingEntryImage]] =
-    pollRemoteBoxOutgoingPipeline(Get(s"${box.baseUrl}/outgoing/poll"))
+    pollRemoteBoxOutgoingPipeline(Get(s"${box.baseUrl}/transactions/outgoing/poll"))
 
   def getRemoteOutgoingFile(entryImage: OutgoingEntryImage): Future[HttpResponse] =
-    sendRequestToRemoteBoxPipeline(Get(s"${box.baseUrl}/outgoing?transactionid=${entryImage.entry.transactionId}&imageid=${entryImage.image.imageId}"))
+    sendRequestToRemoteBoxPipeline(Get(s"${box.baseUrl}/transactions/outgoing?transactionid=${entryImage.entry.transactionId}&imageid=${entryImage.image.imageId}"))
 
   // We don't need to wait for done message to be sent since it is not criticalf that it is received by the remote box
   def sendRemoteOutgoingFileCompleted(entryImage: OutgoingEntryImage): Future[HttpResponse] =
     marshal(entryImage) match {
       case Right(entity) =>
-        sendRequestToRemoteBoxPipeline(Post(s"${box.baseUrl}/outgoing/done", entity))
+        sendRequestToRemoteBoxPipeline(Post(s"${box.baseUrl}/transactions/outgoing/done", entity))
       case Left(e) =>
         SbxLog.error("Box", s"Failed to send done message to remote box (${box.name},${entryImage.entry.transactionId},${entryImage.image.imageId})")
         Future.failed(e)
@@ -98,7 +98,7 @@ class BoxPollActor(box: Box,
   def sendRemoteOutgoingFileFailed(failedEntryImage: FailedOutgoingEntryImage): Future[HttpResponse] =
     marshal(failedEntryImage) match {
       case Right(entity) =>
-        sendRequestToRemoteBoxPipeline(Post(s"${box.baseUrl}/outgoing/failed", entity))
+        sendRequestToRemoteBoxPipeline(Post(s"${box.baseUrl}/transactions/outgoing/failed", entity))
       case Left(e) =>
         SbxLog.error("Box", s"Failed to send failed message to remote box (${box.name},${failedEntryImage.entryImage.entry.transactionId},${failedEntryImage.entryImage.image.imageId})")
         Future.failed(e)
@@ -229,7 +229,7 @@ class BoxPollActor(box: Box,
 
       if (incomingEntry.receivedImageCount == incomingEntry.totalImageCount)
         db.withSession { implicit session =>
-          boxDao.setOutgoingTransactionStatus(remoteBoxId, transactionId, TransactionStatus.FINISHED)
+          boxDao.setIncomingEntryStatus(incomingEntry.id, TransactionStatus.FINISHED)
           SbxLog.info("Box", s"Received ${totalImageCount} files from box $remoteBoxName")
         }
     }
