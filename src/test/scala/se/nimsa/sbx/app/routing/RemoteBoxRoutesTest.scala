@@ -74,7 +74,7 @@ class RemoteBoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
   }
 
-  it should "add a record of the received image connected to the inbox entry" in {
+  it should "add a record of the received image connected to the incoming entry" in {
 
     // first, add a box on the poll (university) side
     val uniBox =
@@ -94,17 +94,17 @@ class RemoteBoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
 
     db.withSession { implicit session =>
-      boxDao.listInboxImages.length should be(1)
+      boxDao.listIncomingImages should have length 1
     }
   }
 
-  it should "return unauthorized when polling outbox with unvalid token" in {
-    Get(s"/api/box/abc/outbox/poll") ~> sealRoute(routes) ~> check {
+  it should "return unauthorized when polling outgoing with unvalid token" in {
+    Get(s"/api/box/abc/outgoing/poll") ~> sealRoute(routes) ~> check {
       status should be(Unauthorized)
     }
   }
 
-  it should "return not found when polling empty outbox" in {
+  it should "return not found when polling empty outgoing" in {
     // first, add a box on the poll (university) side
     val uniBox =
       PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData("hosp2")) ~> routes ~> check {
@@ -112,35 +112,35 @@ class RemoteBoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
         responseAs[Box]
       }
 
-    Get(s"/api/box/${uniBox.token}/outbox/poll") ~> sealRoute(routes) ~> check {
+    Get(s"/api/box/${uniBox.token}/outgoing/poll") ~> sealRoute(routes) ~> check {
       status should be(NotFound)
     }
   }
 
-  it should "return OutboxEntry when polling non empty outbox" in {
+  it should "return OutgoingEntryImage when polling non empty outgoing" in {
     // first, add a box on the poll (university) side
     val uniBox = addPollBox("hosp3")
 
-    // send image which adds outbox entry
+    // send image which adds outgoing entry
     PostAsUser(s"/api/boxes/${uniBox.id}/send", Seq(ImageTagValues(1, Seq.empty))) ~> routes ~> check {
       status should be(NoContent)
     }
 
-    // poll outbox
-    Get(s"/api/box/${uniBox.token}/outbox/poll") ~> routes ~> check {
+    // poll outgoing
+    Get(s"/api/box/${uniBox.token}/outgoing/poll") ~> routes ~> check {
       status should be(OK)
 
-      val outboxEntry = responseAs[OutboxEntry]
+      val entryImage = responseAs[OutgoingEntryImage]
 
-      outboxEntry.remoteBoxId should be(uniBox.id)
-      outboxEntry.sequenceNumber should be(1)
-      outboxEntry.totalImageCount should be(1)
-      outboxEntry.failed should be(false)
-      outboxEntry.transactionId should not be (0)
+      entryImage.entry.remoteBoxId should be(uniBox.id)
+      entryImage.entry.transactionId should not be (0)
+      entryImage.entry.sentImageCount shouldBe 0
+      entryImage.entry.totalImageCount should be(1)
+      entryImage.entry.status shouldBe TransactionStatus.WAITING
     }
   }
 
-  it should "return an image file when requesting outbox entry" in {
+  it should "return an image file when requesting outgoing entry" in {
     // add image (image will get id 1)
     val file = TestUtil.testImageFile
     val mfd = MultipartFormData(Seq(BodyPart(file, "file")))
@@ -149,20 +149,20 @@ class RemoteBoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     // first, add a box on the poll (university) side
     val uniBox = addPollBox("hosp4")
 
-    // send image which adds outbox entry
+    // send image which adds outgoing entry
     PostAsUser(s"/api/boxes/${uniBox.id}/send", Seq(ImageTagValues(1, Seq.empty))) ~> routes ~> check {
       status should be(NoContent)
     }
 
-    // poll outbox
-    val outboxEntry =
-      Get(s"/api/box/${uniBox.token}/outbox/poll") ~> routes ~> check {
+    // poll outgoing
+    val entryImage =
+      Get(s"/api/box/${uniBox.token}/outgoing/poll") ~> routes ~> check {
         status should be(OK)
-        responseAs[OutboxEntry]
+        responseAs[OutgoingEntryImage]
       }
 
     // get image
-    Get(s"/api/box/${uniBox.token}/outbox?transactionid=${outboxEntry.transactionId}&sequencenumber=1") ~> routes ~> check {
+    Get(s"/api/box/${uniBox.token}/outgoing?transactionid=${entryImage.entry.transactionId}") ~> routes ~> check {
       status should be(OK)
 
       contentType should be(ContentTypes.`application/octet-stream`)
@@ -172,7 +172,7 @@ class RemoteBoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
   }
 
-  it should "remove outbox entry and add sent entry when done is received" in {
+  it should "mark outgoing image as sent when done is received" in {
     // add image (image will get id 1)
     val file = TestUtil.testImageFile
     val mfd = MultipartFormData(Seq(BodyPart(file, "file")))
@@ -181,45 +181,38 @@ class RemoteBoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     // first, add a box on the poll (university) side
     val uniBox = addPollBox("hosp5")
 
-    // send image which adds outbox entry
+    // send image which adds outgoing entry
     PostAsUser(s"/api/boxes/${uniBox.id}/send", Seq(ImageTagValues(1, Seq.empty))) ~> routes ~> check {
       status should be(NoContent)
     }
 
-    // poll outbox
-    val outboxEntry =
-      Get(s"/api/box/${uniBox.token}/outbox/poll") ~> routes ~> check {
+    // poll outgoing
+    val entryImage =
+      Get(s"/api/box/${uniBox.token}/outgoing/poll") ~> routes ~> check {
         status should be(OK)
-        responseAs[OutboxEntry]
+        responseAs[OutgoingEntryImage]
       }
 
-    // check that sent table is empty at this stage
-    GetAsUser("/api/sent") ~> routes ~> check {
-      status should be(OK)
-      responseAs[List[SentEntry]].size should be(0)
-    }
+    // check that outgoing image is not marked as sent at this stage
+    entryImage.image.sent shouldBe false
 
     // send done
-    Post(s"/api/box/${uniBox.token}/outbox/done", outboxEntry) ~> routes ~> check {
+    Post(s"/api/box/${uniBox.token}/outgoing/done", entryImage) ~> routes ~> check {
       status should be(NoContent)
     }
 
-    // poll outbox to check that outbox is empty
-    Get(s"/api/box/${uniBox.token}/outbox/poll") ~> routes ~> check {
+    // poll outgoing to check that outgoing is empty
+    Get(s"/api/box/${uniBox.token}/outgoing/poll") ~> routes ~> check {
       status should be(NotFound)
     }
 
-    // check that sent table has an entry now
-    val sentEntries =
-      GetAsUser("/api/sent") ~> routes ~> check {
-        val sentEntries = responseAs[List[SentEntry]]
-        sentEntries.size should be(1)
-        sentEntries
-      }
+        db.withSession { implicit session =>
+      boxDao.listOutgoingImages.head.sent shouldBe true
+    }
 
-    GetAsUser(s"/api/sent/${sentEntries.head.id}/images") ~> routes ~> check {
-      status should be(OK)
-      responseAs[List[Image]].size should be(1)
+    GetAsUser(s"/api/sent/${entryImage.entry.id}/images") ~> routes ~> check {
+      status shouldBe OK
+      responseAs[List[Image]] should have length 1
     }
   }
 
@@ -232,33 +225,33 @@ class RemoteBoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     // first, add a box on the poll (university) side
     val uniBox = addPollBox("hosp5")
 
-    // send image which adds outbox entry
+    // send image which adds outgoing entry
     PostAsUser(s"/api/boxes/${uniBox.id}/send", Seq(ImageTagValues(1, Seq.empty))) ~> routes ~> check {
       status should be(NoContent)
     }
 
-    // poll outbox
-    val outboxEntry =
-      Get(s"/api/box/${uniBox.token}/outbox/poll") ~> routes ~> check {
+    // poll outgoing
+    val entryImage =
+      Get(s"/api/box/${uniBox.token}/outgoing/poll") ~> routes ~> check {
         status should be(OK)
-        responseAs[OutboxEntry]
+        responseAs[OutgoingEntryImage]
       }
 
     // send failed
-    Post(s"/api/box/${uniBox.token}/outbox/failed", FailedOutboxEntry(outboxEntry, "error message")) ~> routes ~> check {
+    Post(s"/api/box/${uniBox.token}/outgoing/failed", FailedOutgoingEntryImage(entryImage, "error message")) ~> routes ~> check {
       status should be(NoContent)
     }
 
-    // poll outbox to check that outbox contains no valid entries
-    Get(s"/api/box/${uniBox.token}/outbox/poll") ~> routes ~> check {
+    // poll outgoing to check that outgoing contains no valid entries
+    Get(s"/api/box/${uniBox.token}/outgoing/poll") ~> routes ~> check {
       status should be(NotFound)
     }
 
-    // check contents of outbox, should contain one failed entry
-    GetAsUser("/api/outbox") ~> routes ~> check {
-      val outboxEntries = responseAs[Seq[OutboxEntry]]
-      outboxEntries.size should be(1)
-      outboxEntries(0).failed should be(true)
+    // check contents of outgoing, should contain one failed entry
+    GetAsUser("/api/boxes/outgoing") ~> routes ~> check {
+      val outgoingEntries = responseAs[Seq[OutgoingEntry]]
+      outgoingEntries should have length 1
+      outgoingEntries(0).status shouldBe TransactionStatus.FAILED
     }
 
   }
@@ -282,22 +275,21 @@ class RemoteBoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       TagValue(PatientID.dicomTag, "TEST ID"),
       TagValue(PatientBirthDate.dicomTag, "19601010")))
 
-    // send image which adds outbox entry
+    // send image which adds outgoing entry
     PostAsUser(s"/api/boxes/${uniBox.id}/send", Seq(imageTagValues)) ~> routes ~> check {
       status should be(NoContent)
     }
 
-    // poll outbox
-    val outboxEntry =
-      Get(s"/api/box/${uniBox.token}/outbox/poll") ~> routes ~> check {
+    // poll outgoing
+    val entryImage =
+      Get(s"/api/box/${uniBox.token}/outgoing/poll") ~> routes ~> check {
         status should be(OK)
-        responseAs[OutboxEntry]
+        responseAs[OutgoingEntryImage]
       }
 
     // get image
-    val transactionId = outboxEntry.transactionId
-    val sequenceNumber = outboxEntry.sequenceNumber
-    val compressedArray = Get(s"/api/box/${uniBox.token}/outbox?transactionid=$transactionId&sequencenumber=$sequenceNumber") ~> routes ~> check {
+    val transactionId = entryImage.entry.transactionId
+    val compressedArray = Get(s"/api/box/${uniBox.token}/outgoing?transactionid=$transactionId") ~> routes ~> check {
       status should be(OK)
       responseAs[Array[Byte]]
     }
@@ -308,7 +300,7 @@ class RemoteBoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     dataset.getString(PatientSex.dicomTag) should be(patient.patientSex.value) // not mapped
 
     // send done
-    Post(s"/api/box/${uniBox.token}/outbox/done", outboxEntry) ~> routes ~> check {
+    Post(s"/api/box/${uniBox.token}/outgoing/done", entryImage) ~> routes ~> check {
       status should be(NoContent)
     }
   }

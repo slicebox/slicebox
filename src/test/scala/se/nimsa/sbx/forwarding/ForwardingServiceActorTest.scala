@@ -64,14 +64,14 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
   val boxService = system.actorOf(Props(new Actor {
     var receivedImageCount = 0
     def receive = {
-      case SendToRemoteBox(remoteBoxId, tagValues) =>
-        sender ! ImagesAddedToOutbox(remoteBoxId, tagValues.map(_.imageId))
-      case GetInboxEntryForImageId(imageId) =>
+      case SendToRemoteBox(box, tagValues) =>
+        sender ! ImagesAddedToOutgoing(box.id, tagValues.map(_.imageId))
+      case GetIncomingEntryForImageId(imageId) =>
         if (imageId <= 2) {
           receivedImageCount += 1
-          sender ! Some(InboxEntry(1, 11, "Source box", 1234, receivedImageCount, 2, System.currentTimeMillis))
+          sender ! Some(IncomingEntry(1, 11, "Source box", 1234, receivedImageCount, 2, System.currentTimeMillis, TransactionStatus.WAITING))
         } else
-          sender ! Some(InboxEntry(2, 11, "Source box", 1234, 1, 2, System.currentTimeMillis))
+          sender ! Some(IncomingEntry(2, 11, "Source box", 1234, 1, 2, System.currentTimeMillis, TransactionStatus.WAITING))
       case ResetReceivedImageCount =>
         receivedImageCount = 0
     }

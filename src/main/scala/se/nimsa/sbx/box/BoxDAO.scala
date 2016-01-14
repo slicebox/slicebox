@@ -280,6 +280,9 @@ class BoxDAO(val driver: JdbcProfile) {
       .sortBy(_.id.desc)
       .list
 
+  def listOutgoingImages(implicit session: Session): List[OutgoingImage] =
+    outgoingImageQuery.list
+
   def listIncomingEntries(implicit session: Session): List[IncomingEntry] =
     incomingQuery
       .sortBy(_.lastUpdated.desc)

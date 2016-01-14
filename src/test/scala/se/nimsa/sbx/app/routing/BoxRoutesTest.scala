@@ -165,107 +165,94 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
   }
 
-  it should "support removing outbox entries" in {
-    val outboxEntry =
-      db.withSession { implicit session =>
-        boxDao.insertOutboxEntry(OutboxEntry(-1, 1, "some box", 2, 3, 4, 5, false))
+  it should "support removing outgoing entries" in {
+    db.withSession { implicit session =>
+      val entry = boxDao.insertOutgoingEntry(OutgoingEntry(1, 1, "some box", 1234, 0, 1, 1000, TransactionStatus.WAITING))
+      val image = boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, 1, false))
+
+      DeleteAsUser(s"/api/boxes/outgoing/${entry.id}") ~> routes ~> check {
+        status should be(NoContent)
       }
 
-    DeleteAsUser(s"/api/outbox/${outboxEntry.id}") ~> routes ~> check {
-      status should be(NoContent)
-    }
-
-    GetAsUser("/api/outbox") ~> routes ~> check {
-      responseAs[List[OutboxEntry]].size should be(0)
+      GetAsUser("/api/boxes/outgoing") ~> routes ~> check {
+        responseAs[List[OutgoingEntry]].size should be(0)
+      }
+      
+      boxDao.listOutgoingImages shouldBe empty
     }
   }
 
-  it should "support removing sent entries" in {
-    val sentEntry =
-      db.withSession { implicit session =>
-        boxDao.insertSentEntry(SentEntry(-1, 1, "some box", 2, 3, 4, System.currentTimeMillis()))
-      }
-
-    DeleteAsUser(s"/api/sent/${sentEntry.id}") ~> routes ~> check {
-      status should be(NoContent)
-    }
-
-    GetAsUser("/api/sent") ~> routes ~> check {
-      responseAs[List[InboxEntry]].size should be(0)
-    }
-  }
-
-  it should "support listing images corresponding to an inbox entry" in {
-    val inboxEntry =
+  it should "support listing images corresponding to an incoming entry" in {
+    val entry =
       db.withSession { implicit session =>
         val (dbPatient1, (dbStudy1, dbStudy2), (dbSeries1, dbSeries2, dbSeries3, dbSeries4), (dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)) =
           TestUtil.insertMetaData(metaDataDao)
-        val inboxEntry = boxDao.insertInboxEntry(InboxEntry(-1, 1, "some box", 2, 3, 4, System.currentTimeMillis()))
-        val inboxImage1 = boxDao.insertInboxImage(InboxImage(-1, inboxEntry.id, dbImage1.id))
-        val inboxImage2 = boxDao.insertInboxImage(InboxImage(-1, inboxEntry.id, dbImage2.id))
-        inboxEntry
+        val entry = boxDao.insertIncomingEntry(IncomingEntry(-1, 1, "some box", 2, 3, 4, System.currentTimeMillis(), TransactionStatus.WAITING))
+        val image1 = boxDao.insertIncomingImage(IncomingImage(-1, entry.id, dbImage1.id))
+        val image2 = boxDao.insertIncomingImage(IncomingImage(-1, entry.id, dbImage2.id))
+        entry
       }
 
-    GetAsUser(s"/api/inbox/${inboxEntry.id}/images") ~> routes ~> check {
+    GetAsUser(s"/api/boxes/incoming/${entry.id}/images") ~> routes ~> check {
       status should be(OK)
       responseAs[List[Image]].length should be(2)
     }
   }
 
-  it should "only list images corresponding to an inbox entry that exists" in {
-    val inboxEntry =
+  it should "only list images corresponding to an incoming entry that exists" in {
+    val entry =
       db.withSession { implicit session =>
         val (dbPatient1, (dbStudy1, dbStudy2), (dbSeries1, dbSeries2, dbSeries3, dbSeries4), (dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)) =
           TestUtil.insertMetaData(metaDataDao)
-        val inboxEntry = boxDao.insertInboxEntry(InboxEntry(-1, 1, "some box", 2, 3, 4, System.currentTimeMillis()))
-        val inboxImage1 = boxDao.insertInboxImage(InboxImage(-1, inboxEntry.id, dbImage1.id))
-        val inboxImage2 = boxDao.insertInboxImage(InboxImage(-1, inboxEntry.id, dbImage2.id))
-        val inboxImage3 = boxDao.insertInboxImage(InboxImage(-1, inboxEntry.id, 666))
-        inboxEntry
+        val entry = boxDao.insertIncomingEntry(IncomingEntry(-1, 1, "some box", 2, 3, 4, System.currentTimeMillis(), TransactionStatus.WAITING))
+        val image1 = boxDao.insertIncomingImage(IncomingImage(-1, entry.id, dbImage1.id))
+        val image2 = boxDao.insertIncomingImage(IncomingImage(-1, entry.id, dbImage2.id))
+        val image3 = boxDao.insertIncomingImage(IncomingImage(-1, entry.id, 666))
+        entry
       }
 
-    GetAsUser(s"/api/inbox/${inboxEntry.id}/images") ~> routes ~> check {
+    GetAsUser(s"/api/boxes/incoming/${entry.id}/images") ~> routes ~> check {
       status should be(OK)
       responseAs[List[Image]].length should be(2)
     }
   }
 
-  it should "support listing images corresponding to a sent entry" in {
-    val sentEntry =
+  it should "support listing images corresponding to an outgoing entry" in {
+    val entry =
       db.withSession { implicit session =>
         val (dbPatient1, (dbStudy1, dbStudy2), (dbSeries1, dbSeries2, dbSeries3, dbSeries4), (dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)) =
           TestUtil.insertMetaData(metaDataDao)
-        val sentEntry = boxDao.insertSentEntry(SentEntry(-1, 1, "some box", 2, 3, 4, System.currentTimeMillis()))
-        val sentImage1 = boxDao.insertSentImage(SentImage(-1, sentEntry.id, dbImage1.id))
-        val sentImage2 = boxDao.insertSentImage(SentImage(-1, sentEntry.id, dbImage2.id))
-        sentEntry
+        val entry = boxDao.insertOutgoingEntry(OutgoingEntry(-1, 1, "some box", 2, 3, 4, System.currentTimeMillis(), TransactionStatus.WAITING))
+        val image1 = boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, dbImage1.id, false))
+        val image2 = boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, dbImage2.id, false))
+        entry
       }
 
-    GetAsUser(s"/api/sent/${sentEntry.id}/images") ~> routes ~> check {
+    GetAsUser(s"/api/boxes/outgoing/${entry.id}/images") ~> routes ~> check {
       status should be(OK)
       responseAs[List[Image]].length should be(2)
     }
   }
 
-  it should "only list images corresponding to a sent entry that exists" in {
-    val sentEntry =
+  it should "only list images corresponding to an outgoing entry that exists" in {
+    val entry =
       db.withSession { implicit session =>
         val (dbPatient1, (dbStudy1, dbStudy2), (dbSeries1, dbSeries2, dbSeries3, dbSeries4), (dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)) =
           TestUtil.insertMetaData(metaDataDao)
-        val sentEntry = boxDao.insertSentEntry(SentEntry(-1, 1, "some box", 2, 3, 4, System.currentTimeMillis()))
-        val sentImage1 = boxDao.insertSentImage(SentImage(-1, sentEntry.id, dbImage1.id))
-        val sentImage2 = boxDao.insertSentImage(SentImage(-1, sentEntry.id, dbImage2.id))
-        val sentImage3 = boxDao.insertSentImage(SentImage(-1, sentEntry.id, 666))
-        sentEntry
+        val entry = boxDao.insertOutgoingEntry(OutgoingEntry(-1, 1, "some box", 2, 3, 4, System.currentTimeMillis(), TransactionStatus.WAITING))
+        val image1 = boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, dbImage1.id, false))
+        val image2 = boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, dbImage2.id, false))
+        val image3 = boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, 666, false))
+        entry
       }
 
-    GetAsUser(s"/api/sent/${sentEntry.id}/images") ~> routes ~> check {
+    GetAsUser(s"/api/boxes/outgoing/${entry.id}/images") ~> routes ~> check {
       status should be(OK)
       responseAs[List[Image]].length should be(2)
     }
   }
 
-  it should "remove related image record in inbox when an image is deleted" in {
+  it should "remove related image record in incoming when an image is deleted" in {
     val file = TestUtil.testImageFile
     val mfd = MultipartFormData(Seq(BodyPart(file, "file")))
     val image =
@@ -274,31 +261,31 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
         responseAs[Image]
       }
 
-    val (inboxEntry, inboxImage) =
+    val (entry, imageEntry) =
       db.withSession { implicit session =>
-        val inboxEntry = boxDao.insertInboxEntry(InboxEntry(-1, 1, "some box", 2, 3, 4, System.currentTimeMillis()))
-        val inboxImage = boxDao.insertInboxImage(InboxImage(-1, inboxEntry.id, image.id))
-        (inboxEntry, inboxImage)
+        val entry = boxDao.insertIncomingEntry(IncomingEntry(-1, 1, "some box", 2, 3, 4, System.currentTimeMillis(), TransactionStatus.WAITING))
+        val imageEntry = boxDao.insertIncomingImage(IncomingImage(-1, entry.id, image.id))
+        (entry, imageEntry)
       }
 
-    GetAsUser(s"/api/inbox/${inboxEntry.id}/images") ~> routes ~> check {
+    GetAsUser(s"/api/boxes/incoming/${entry.id}/images") ~> routes ~> check {
       status shouldBe OK
       responseAs[List[Image]] should have length 1
     }
 
-    DeleteAsUser(s"/api/images/${image.id}") ~> routes ~> check {
+    DeleteAsUser(s"/api/images/${imageEntry.id}") ~> routes ~> check {
       status shouldBe NoContent
     }
 
     Thread.sleep(1000) // wait for ImageDeleted event to reach BoxServiceActor
 
-    GetAsUser(s"/api/sent/${inboxEntry.id}/images") ~> routes ~> check {
+    GetAsUser(s"/api/boxes/incoming/${entry.id}/images") ~> routes ~> check {
       status shouldBe OK
       responseAs[List[Image]] shouldBe empty
     }
   }
 
-  it should "remove related image record in sent when an image is deleted" in {
+  it should "remove related image record in outgoing when an image is deleted" in {
     val file = TestUtil.testImageFile
     val mfd = MultipartFormData(Seq(BodyPart(file, "file")))
     val image =
@@ -307,68 +294,28 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
         responseAs[Image]
       }
 
-    val (sentEntry, sentImage) =
+    val (entry, imageEntry) =
       db.withSession { implicit session =>
-        val sentEntry = boxDao.insertSentEntry(SentEntry(-1, 1, "some box", 2, 3, 4, System.currentTimeMillis()))
-        val sentImage = boxDao.insertSentImage(SentImage(-1, sentEntry.id, image.id))
-        (sentEntry, sentImage)
+        val entry = boxDao.insertOutgoingEntry(OutgoingEntry(-1, 1, "some box", 2, 3, 4, System.currentTimeMillis(), TransactionStatus.WAITING))
+        val imageEntry = boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, image.id, false))
+        (entry, imageEntry)
       }
 
-    GetAsUser(s"/api/sent/${sentEntry.id}/images") ~> routes ~> check {
+    GetAsUser(s"/api/boxes/outgoing/${entry.id}/images") ~> routes ~> check {
       status shouldBe OK
       responseAs[List[Image]] should have length 1
     }
 
-    DeleteAsUser(s"/api/images/${image.id}") ~> routes ~> check {
+    DeleteAsUser(s"/api/images/${imageEntry.id}") ~> routes ~> check {
       status shouldBe NoContent
     }
 
     Thread.sleep(1000) // wait for ImageDeleted event to reach BoxServiceActor
 
-    GetAsUser(s"/api/sent/${sentEntry.id}/images") ~> routes ~> check {
+    GetAsUser(s"/api/boxes/outgoing/${entry.id}/images") ~> routes ~> check {
       status shouldBe OK
       responseAs[List[Image]] shouldBe empty
     }
-  }
-
-  it should "remove related outbox entry and associated transaction tag values when an image is deleted" in {
-    val file = TestUtil.testImageFile
-    val mfd = MultipartFormData(Seq(BodyPart(file, "file")))
-    val image =
-      PostAsUser("/api/images", mfd) ~> routes ~> check {
-        status shouldBe Created
-        responseAs[Image]
-      }
-
-    val box1 = addPollBox("hosp")
-    PostAsAdmin(s"/api/boxes/${box1.id}/send", Seq(ImageTagValues(image.id, Seq(TagValue(Tag.PatientName, "mapped patient name"))))) ~> routes ~> check {
-      status should be(NoContent)
-    }
-
-    GetAsUser(s"/api/outbox") ~> routes ~> check {
-      status shouldBe OK
-      responseAs[List[OutboxEntry]] should have length 1
-    }
-
-    db.withSession { implicit session =>
-      boxDao.listTransactionTagValues should have size 1
-    }
-
-    DeleteAsUser(s"/api/images/${image.id}") ~> routes ~> check {
-      status shouldBe NoContent
-    }
-
-    Thread.sleep(1000) // wait for ImageDeleted event to reach BoxServiceActor
-
-    GetAsUser(s"/api/outbox") ~> routes ~> check {
-      status shouldBe OK
-      responseAs[List[OutboxEntry]] shouldBe empty
-    }
-
-    db.withSession { implicit session =>
-      boxDao.listTransactionTagValues shouldBe empty
-    }
-
   }
 
 }
