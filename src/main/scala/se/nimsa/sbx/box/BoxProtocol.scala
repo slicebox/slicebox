@@ -71,7 +71,7 @@ object BoxProtocol {
 
   case class Box(id: Long, name: String, token: String, baseUrl: String, sendMethod: BoxSendMethod, online: Boolean) extends Entity
 
-  case class OutgoingTransaction(id: Long, remoteBoxId: Long, remoteBoxName: String, sentImageCount: Long, totalImageCount: Long, lastUpdated: Long, status: TransactionStatus) extends Entity {
+  case class OutgoingTransaction(id: Long, boxId: Long, boxName: String, sentImageCount: Long, totalImageCount: Long, lastUpdated: Long, status: TransactionStatus) extends Entity {
     def incrementSent = copy(sentImageCount = this.sentImageCount + 1)
     def updateTimestamp = copy(lastUpdated = System.currentTimeMillis)
   }
@@ -82,21 +82,21 @@ object BoxProtocol {
   
   case class OutgoingTransactionImage(transaction: OutgoingTransaction, image: OutgoingImage)
   
-  case class IncomingTransaction(id: Long, remoteBoxId: Long, remoteBoxName: String, remoteTransactionId: Long, receivedImageCount: Long, totalImageCount: Long, lastUpdated: Long, status: TransactionStatus) extends Entity {
+  case class IncomingTransaction(id: Long, boxId: Long, boxName: String, outgoingTransactionId: Long, receivedImageCount: Long, totalImageCount: Long, lastUpdated: Long, status: TransactionStatus) extends Entity {
     def incrementReceived = copy(receivedImageCount = this.receivedImageCount + 1)
     def updateTimestamp = copy(lastUpdated = System.currentTimeMillis)
   }
 
   case class IncomingImage(id: Long, incomingTransactionId: Long, imageId: Long) extends Entity
   
-  case class FailedOutgoingEntryImage(transactionImage: OutgoingTransactionImage, message: String)
+  case class FailedOutgoingTransactionImage(transactionImage: OutgoingTransactionImage, message: String)
   
   // case class PushImageData(transactionId: Long, imageId: Long, totalImageCount: Long, dataset: Attributes)
   
   
   sealed trait BoxRequest
 
-  case class CreateConnection(remoteBoxConnectionData: RemoteBoxConnectionData) extends BoxRequest
+  case class CreateConnection(remoteoxConnectionData: RemoteBoxConnectionData) extends BoxRequest
 
   case class Connect(remoteBox: RemoteBox) extends BoxRequest
 
@@ -114,32 +114,32 @@ object BoxProtocol {
 
   case class SendToRemoteBox(box: Box, imageTagValuesSeq: Seq[ImageTagValues]) extends BoxRequest
 
-  case class GetOutgoingEntryImage(box: Box, transactionId: Long, imageId: Long) extends BoxRequest
+  case class GetOutgoingTransactionImage(box: Box, outgoingTransactionId: Long, outgoingImageId: Long) extends BoxRequest
 
-  case class GetTransactionTagValues(imageId: Long, transactionId: Long) extends BoxRequest
+  case class GetOutgoingTagValues(transactionImage: OutgoingTransactionImage) extends BoxRequest
 
   case class MarkOutgoingImageAsSent(box: Box, transactionImage: OutgoingTransactionImage) extends BoxRequest
 
-  case class MarkOutgoingTransactionAsFailed(box: Box, failedEntryImage: FailedOutgoingEntryImage) extends BoxRequest
+  case class MarkOutgoingTransactionAsFailed(box: Box, failedTransactionImage: FailedOutgoingTransactionImage) extends BoxRequest
   
   case object GetIncoming extends BoxRequest
 
   case object GetOutgoing extends BoxRequest
 
-  case class RemoveIncomingEntry(incomingEntryId: Long) extends BoxRequest
+  case class RemoveIncomingTransaction(incomingTransactionId: Long) extends BoxRequest
   
-  case class RemoveOutgoingEntry(outgoingEntryId: Long) extends BoxRequest
+  case class RemoveOutgoingTransaction(outgoingTransactionId: Long) extends BoxRequest
 
-  case class GetImagesForIncomingEntry(incomingEntryId: Long) extends BoxRequest
+  case class GetImagesForIncomingTransaction(incomingTransactionId: Long) extends BoxRequest
   
-  case class GetImagesForOutgoingEntry(outgoingEntryId: Long) extends BoxRequest
+  case class GetImagesForOutgoingTransaction(outgoingTransactionId: Long) extends BoxRequest
   
-  case class GetIncomingEntryForImageId(imageId: Long) extends BoxRequest
+  case class GetIncomingTransactionForImageId(imageId: Long) extends BoxRequest
   
   
-  case class IncomingEntryRemoved(incomingEntryId: Long)
+  case class IncomingTransactionRemoved(incomingTransactionId: Long)
 
-  case class OutgoingEntryRemoved(outgoingEntryId: Long)
+  case class OutgoingTransactionRemoved(outgoingTransactionId: Long)
 
   case class RemoteBoxAdded(box: Box)
   
@@ -151,7 +151,7 @@ object BoxProtocol {
 
   case object OutgoingEmpty
 
-  case class ImagesAddedToOutgoing(remoteBoxId: Long, imageIds: Seq[Long])
+  case class ImagesAddedToOutgoing(boxId: Long, imageIds: Seq[Long])
 
   case object OutgoingImageMarkedAsSent
 
@@ -175,7 +175,7 @@ object BoxProtocol {
 
   case object RemoteOutgoingEmpty
 
-  case class RemoteOutgoingEntryImageFound(transactionImage: OutgoingTransactionImage)
+  case class RemoteOutgoingTransactionImageFound(transactionImage: OutgoingTransactionImage)
 
   case class PollRemoteBoxFailed(e: Throwable)
 

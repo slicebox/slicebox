@@ -49,13 +49,13 @@ class BoxDAO(val driver: JdbcProfile) {
 
   class OutgoingTransactionTable(tag: Tag) extends Table[OutgoingTransaction](tag, "OutgoingTransaction") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
-    def remoteBoxId = column[Long]("remoteboxid")
-    def remoteBoxName = column[String]("remoteboxname")
+    def boxId = column[Long]("boxid")
+    def boxName = column[String]("boxname")
     def sentImageCount = column[Long]("sentimagecount")
     def totalImageCount = column[Long]("totalimagecount")
     def lastUpdated = column[Long]("lastupdated")
     def status = column[TransactionStatus]("status")
-    def * = (id, remoteBoxId, remoteBoxName, sentImageCount, totalImageCount, lastUpdated, status) <> (OutgoingTransaction.tupled, OutgoingTransaction.unapply)
+    def * = (id, boxId, boxName, sentImageCount, totalImageCount, lastUpdated, status) <> (OutgoingTransaction.tupled, OutgoingTransaction.unapply)
   }
 
   val outgoingTransactionQuery = TableQuery[OutgoingTransactionTable]
@@ -87,14 +87,14 @@ class BoxDAO(val driver: JdbcProfile) {
 
   class IncomingTransactionTable(tag: Tag) extends Table[IncomingTransaction](tag, "IncomingTransaction") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
-    def remoteBoxId = column[Long]("remoteboxid")
-    def remoteBoxName = column[String]("remoteboxname")
-    def remoteTransactionId = column[Long]("remotetransactionid")
+    def boxId = column[Long]("boxid")
+    def boxName = column[String]("boxname")
+    def outgoingTransactionId = column[Long]("outgoingtransactionid")
     def receivedImageCount = column[Long]("receivedimagecount")
     def totalImageCount = column[Long]("totalimagecount")
     def lastUpdated = column[Long]("lastupdated")
     def status = column[TransactionStatus]("status")
-    def * = (id, remoteBoxId, remoteBoxName, remoteTransactionId, receivedImageCount, totalImageCount, lastUpdated, status) <> (IncomingTransaction.tupled, IncomingTransaction.unapply)
+    def * = (id, boxId, boxName, outgoingTransactionId, receivedImageCount, totalImageCount, lastUpdated, status) <> (IncomingTransaction.tupled, IncomingTransaction.unapply)
   }
 
   val incomingTransactionQuery = TableQuery[IncomingTransactionTable]
@@ -141,19 +141,23 @@ class BoxDAO(val driver: JdbcProfile) {
   def listOutgoingTagValues(implicit session: Session): List[OutgoingTagValue] =
     outgoingTagValueQuery.list
 
-  def insertTransactionTagValue(tagValue: OutgoingTagValue)(implicit session: Session): OutgoingTagValue = {
+  def insertOutgoingTagValue(tagValue: OutgoingTagValue)(implicit session: Session): OutgoingTagValue = {
     val generatedId = (outgoingTagValueQuery returning outgoingTagValueQuery.map(_.id)) += tagValue
     tagValue.copy(id = generatedId)
   }
 
-  def tagValuesByOutgoingTransactionIdAndImageId(outgoingTransactionId: Long, imageId: Long)(implicit session: Session): List[OutgoingTagValue] =
-    outgoingTagValueQuery.filter(_.imageId === imageId).filter(_.transactionId === transactionId).list // TODO join
-
-  def removeOutgoingTagValue(outgoingTagValueId: Long)(implicit session: Session): Unit =
-    outgoingTagValueQuery.filter(_.id === outgoingTagValueId).delete
-
-//  def removeTransactionTagValuesByTransactionId(transactionId: Long)(implicit session: Session): Unit =
-//    transactionTagValueQuery.filter(_.transactionId === transactionId).delete
+  def tagValuesByOutgoingTransactionIdAndImageId(outgoingTransactionId: Long, outgoingImageId: Long)(implicit session: Session): List[OutgoingTagValue] = {
+    val join = for {
+      transaction <- outgoingTransactionQuery
+      image <- outgoingImageQuery if transaction.id === image.outgoingTransactionId
+      tagValue <- outgoingTagValueQuery if image.id === tagValue.outgoingImageId
+    } yield (transaction, image, tagValue)
+    join
+      .filter(_._1.id === outgoingTransactionId)
+      .filter(_._2.id === outgoingImageId)
+      .map(_._3)
+      .list
+  }
 
   def insertBox(box: Box)(implicit session: Session): Box = {
     val generatedId = (boxQuery returning boxQuery.map(_.id)) += box
@@ -213,13 +217,13 @@ class BoxDAO(val driver: JdbcProfile) {
   def updateOutgoingImage(image: OutgoingImage)(implicit session: Session): Unit =
     outgoingImageQuery.filter(_.id === image.id).update(image)
 
-  def nextOutgoingTransactionImageForRemoteBoxId(remoteBoxId: Long)(implicit session: Session): Option[OutgoingTransactionImage] = {
+  def nextOutgoingTransactionImageForBoxId(boxId: Long)(implicit session: Session): Option[OutgoingTransactionImage] = {
     val join = for {
       transaction <- outgoingTransactionQuery
       image <- outgoingImageQuery if transaction.id === image.outgoingTransactionId
     } yield (transaction, image)
     join
-      .filter(_._1.remoteBoxId === remoteBoxId)
+      .filter(_._1.boxId === boxId)
       .filterNot(_._1.status === (FAILED: TransactionStatus))
       .filterNot(_._1.status === (FINISHED: TransactionStatus))
       .filter(_._2.sent === false)
@@ -227,16 +231,15 @@ class BoxDAO(val driver: JdbcProfile) {
       .map(OutgoingTransactionImage.tupled)
   }
 
-  def outgoingTransactionImageByOutgoingTransactionIdAndImageId(remoteBoxId: Long, outgoingTransactionId: Long, imageId: Long)(implicit session: Session): Option[OutgoingTransactionImage] = {
+  def outgoingTransactionImageByOutgoingTransactionIdAndOutgoingImageId(boxId: Long, outgoingTransactionId: Long, outgoingImageId: Long)(implicit session: Session): Option[OutgoingTransactionImage] = {
     val join = for {
       transaction <- outgoingTransactionQuery
       image <- outgoingImageQuery if transaction.id === image.outgoingTransactionId
     } yield (transaction, image)
     join
-      .filter(_._1.remoteBoxId === remoteBoxId)
+      .filter(_._1.boxId === boxId)
       .filter(_._1.id === outgoingTransactionId)
-      .filterNot(_._1.status === (FAILED: TransactionStatus))
-      .filterNot(_._1.status === (FINISHED: TransactionStatus))
+      .filter(_._2.id === outgoingImageId)
       .firstOption
       .map(OutgoingTransactionImage.tupled)
   }
@@ -253,10 +256,10 @@ class BoxDAO(val driver: JdbcProfile) {
       .map(_.status)
       .update(status)
 
-  def incomingTransactionByRemoteTransactionId(remoteBoxId: Long, remoteTransactionId: Long)(implicit session: Session): Option[IncomingTransaction] =
+  def incomingTransactionByOutgoingTransactionId(boxId: Long, outgoingTransactionId: Long)(implicit session: Session): Option[IncomingTransaction] =
     incomingTransactionQuery
-      .filter(_.remoteBoxId === remoteBoxId)
-      .filter(_.remoteTransactionId === remoteTransactionId)
+      .filter(_.boxId === boxId)
+      .filter(_.outgoingTransactionId === outgoingTransactionId)
       .firstOption
 
   def outgoingTransactionById(outgoingTransactionId: Long)(implicit session: Session): Option[OutgoingTransaction] =
@@ -273,7 +276,7 @@ class BoxDAO(val driver: JdbcProfile) {
   def removeOutgoingTransaction(outgoingTransactionId: Long)(implicit session: Session): Unit =
     outgoingTransactionQuery.filter(_.id === outgoingTransactionId).delete
 
-  def removeOutgoingEntries(outgoingTransactionIds: Seq[Long])(implicit session: Session): Unit =
+  def removeOutgoingTransactions(outgoingTransactionIds: Seq[Long])(implicit session: Session): Unit =
     outgoingTransactionQuery.filter(_.id inSet outgoingTransactionIds).delete
 
   def listBoxes(implicit session: Session): List[Box] =
@@ -322,8 +325,5 @@ class BoxDAO(val driver: JdbcProfile) {
 
   def removeIncomingImagesForImageId(imageId: Long)(implicit session: Session) =
     incomingImageQuery.filter(_.imageId === imageId).delete
-
-  def removeTransactionTagValuesForOutgoingTransactionIdAndImageId(outgoingTransactionId: Long, imageId: Long)(implicit session: Session) =
-    outgoingTagValueQuery.filter(_.imageId === imageId).delete // TODO join
 
 }

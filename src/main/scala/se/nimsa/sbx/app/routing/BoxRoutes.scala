@@ -97,17 +97,17 @@ trait BoxRoutes { this: SliceboxService =>
               complete(entries)
           }
         }
-      } ~ pathPrefix(LongNumber) { incomingEntryId =>
+      } ~ pathPrefix(LongNumber) { incomingTransactionId =>
         pathEndOrSingleSlash {
           delete {
-            onSuccess(boxService.ask(RemoveIncomingEntry(incomingEntryId))) {
-              case IncomingEntryRemoved(incomingEntryId) =>
+            onSuccess(boxService.ask(RemoveIncomingTransaction(incomingTransactionId))) {
+              case IncomingTransactionRemoved(incomingTransactionId) =>
                 complete(NoContent)
             }
           }
         } ~ path("images") {
           get {
-            onSuccess(boxService.ask(GetImagesForIncomingEntry(incomingEntryId))) {
+            onSuccess(boxService.ask(GetImagesForIncomingTransaction(incomingTransactionId))) {
               case Images(images) =>
                 complete(images)
             }
@@ -125,17 +125,17 @@ trait BoxRoutes { this: SliceboxService =>
               complete(entries)
           }
         }
-      } ~ pathPrefix(LongNumber) { outgoingEntryId =>
+      } ~ pathPrefix(LongNumber) { outgoingTransactionId =>
         pathEndOrSingleSlash {
           delete {
-            onSuccess(boxService.ask(RemoveOutgoingEntry(outgoingEntryId))) {
-              case OutgoingEntryRemoved(outgoingEntryId) =>
+            onSuccess(boxService.ask(RemoveOutgoingTransaction(outgoingTransactionId))) {
+              case OutgoingTransactionRemoved(outgoingEntryId) =>
                 complete(NoContent)
             }
           }
         } ~ path("images") {
           get {
-            onSuccess(boxService.ask(GetImagesForOutgoingEntry(outgoingEntryId))) {
+            onSuccess(boxService.ask(GetImagesForOutgoingTransaction(outgoingTransactionId))) {
               case Images(images) =>
                 complete(images)
             }

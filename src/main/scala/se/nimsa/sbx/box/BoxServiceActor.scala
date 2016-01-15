@@ -124,24 +124,24 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
           case GetBoxByToken(token) =>
             sender ! pollBoxByToken(token)
 
-          case UpdateIncoming(box, transactionId, totalImageCount, imageId) =>
-            val existingEntry = incomingEntryByTransactionId(box.id, transactionId)
-              .getOrElse(addIncomingEntry(IncomingEntry(-1, box.id, box.name, transactionId, 0, totalImageCount, System.currentTimeMillis, TransactionStatus.WAITING)))
-            val incomingEntry = updateIncomingEntry(existingEntry.incrementReceived.updateTimestamp.copy(totalImageCount = totalImageCount))
-            addIncomingImage(IncomingImage(-1, incomingEntry.id, imageId))
+          case UpdateIncoming(box, outgoingTransactionId, totalImageCount, imageId) =>
+            val existingTransaction = incomingTransactionByOutgoingTransactionId(box.id, outgoingTransactionId)
+              .getOrElse(addIncomingTransaction(IncomingTransaction(-1, box.id, box.name, outgoingTransactionId, 0, totalImageCount, System.currentTimeMillis, TransactionStatus.WAITING)))
+            val incomingTransaction = updateIncomingTransaction(existingTransaction.incrementReceived.updateTimestamp.copy(totalImageCount = totalImageCount))
+            addIncomingImage(IncomingImage(-1, incomingTransaction.id, imageId))
 
-            if (incomingEntry.receivedImageCount == totalImageCount) {
+            if (incomingTransaction.receivedImageCount == totalImageCount) {
               SbxLog.info("Box", s"Receiving $totalImageCount images from box ${box.name} completed.")
             }
 
-            sender ! IncomingUpdated(incomingEntry)
+            sender ! IncomingUpdated(incomingTransaction)
 
           case PollOutgoing(box) =>
             pollBoxesLastPollTimestamp(box.id) = System.currentTimeMillis
 
-            val response = nextOutgoingEntryImage(box.id) match {
-              case Some(entryImage) => entryImage
-              case None             => OutgoingEmpty
+            val response = nextOutgoingTransactionImage(box.id) match {
+              case Some(transactionImage) => transactionImage
+              case None                   => OutgoingEmpty
             }
 
             sender ! response
@@ -151,25 +151,24 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
             addImagesToOutgoing(box.id, box.name, imageTagValuesSeq)
             sender ! ImagesAddedToOutgoing(box.id, imageTagValuesSeq.map(_.imageId))
 
-          case GetOutgoingEntryImage(box, transactionId, imageId) =>
-            sender ! outgoingEntryImageByTransactionIdAndImageId(box.id, transactionId, imageId)
+          case GetOutgoingTransactionImage(box, outgoingTransactionId, outgoingImageId) =>
+            sender ! outgoingTransactionImageById(box.id, outgoingTransactionId, outgoingImageId)
 
-          case MarkOutgoingImageAsSent(box, entryImage) =>
-            updateOutgoingImage(entryImage.image.copy(sent = true))
-            val updatedEntry = updateOutgoingEntry(entryImage.entry.incrementSent.updateTimestamp)
+          case MarkOutgoingImageAsSent(box, transactionImage) =>
+            updateOutgoingImage(transactionImage.image.copy(sent = true))
+            val updatedTransaction = updateOutgoingTransaction(transactionImage.transaction.incrementSent.updateTimestamp)
 
-            if (updatedEntry.sentImageCount == updatedEntry.totalImageCount) {
-              context.system.eventStream.publish(ImagesSent(Destination(DestinationType.BOX, box.name, box.id), outgoingImageIdsForTransactionId(updatedEntry.transactionId)))
-              markOutgoingEntryAsFinished(entryImage.entry)
-              removeTransactionTagValuesForTransactionId(updatedEntry.transactionId)
-              SbxLog.info("Box", s"Finished sending ${updatedEntry.totalImageCount} images to box ${box.name}")
+            if (updatedTransaction.sentImageCount == updatedTransaction.totalImageCount) {
+              context.system.eventStream.publish(ImagesSent(Destination(DestinationType.BOX, box.name, box.id), outgoingImageIdsForTransactionId(updatedTransaction.id)))
+              markOutgoingTransactionAsFinished(transactionImage.transaction)
+              SbxLog.info("Box", s"Finished sending ${updatedTransaction.totalImageCount} images to box ${box.name}")
             }
 
             sender ! OutgoingImageMarkedAsSent
 
-          case MarkOutgoingTransactionAsFailed(box, failedEntryImage) =>
-            markOutgoingEntryAsFailed(failedEntryImage.entryImage.entry)
-            SbxLog.error("Box", failedEntryImage.message)
+          case MarkOutgoingTransactionAsFailed(box, failedTransactionImage) =>
+            markOutgoingTransactionAsFailed(failedTransactionImage.transactionImage.transaction)
+            SbxLog.error("Box", failedTransactionImage.message)
             sender ! OutgoingTransactionMarkedAsFailed
 
           case GetIncoming =>
@@ -178,27 +177,27 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
           case GetOutgoing =>
             sender ! Outgoing(getOutgoingFromDb())
 
-          case GetImagesForIncomingEntry(incomingEntryId) =>
-            val imageIds = getIncomingImagesByIncomingEntryId(incomingEntryId).map(_.imageId)
+          case GetImagesForIncomingTransaction(incomingTransactionId) =>
+            val imageIds = getIncomingImagesByIncomingTransactionId(incomingTransactionId).map(_.imageId)
             getImageMetaData(imageIds).pipeTo(sender)
 
-          case GetImagesForOutgoingEntry(outgoingEntryId) =>
-            val imageIds = getOutgoingImagesByOutgoingEntryId(outgoingEntryId).map(_.imageId)
+          case GetImagesForOutgoingTransaction(outgoingTransactionId) =>
+            val imageIds = getOutgoingImagesByOutgoingTransactionId(outgoingTransactionId).map(_.imageId)
             getImageMetaData(imageIds).pipeTo(sender)
 
-          case RemoveOutgoingEntry(outgoingEntryId) =>
-            removeOutgoingEntryFromDb(outgoingEntryId)
-            sender ! OutgoingEntryRemoved(outgoingEntryId)
+          case RemoveOutgoingTransaction(outgoingTransactionId) =>
+            removeOutgoingTransactionFromDb(outgoingTransactionId)
+            sender ! OutgoingTransactionRemoved(outgoingTransactionId)
 
-          case RemoveIncomingEntry(incomingEntryId) =>
-            removeIncomingEntryFromDb(incomingEntryId)
-            sender ! IncomingEntryRemoved(incomingEntryId)
+          case RemoveIncomingTransaction(incomingTransactionId) =>
+            removeIncomingTransactionFromDb(incomingTransactionId)
+            sender ! IncomingTransactionRemoved(incomingTransactionId)
 
-          case GetTransactionTagValues(imageId, transactionId) =>
-            sender ! tagValuesForImageIdAndTransactionId(imageId, transactionId)
+          case GetOutgoingTagValues(transactionImage) =>
+            sender ! tagValuesForOutgoingTransactionImage(transactionImage)
 
-          case GetIncomingEntryForImageId(imageId) =>
-            sender ! incomingEntryForImageId(imageId)
+          case GetIncomingTransactionForImageId(imageId) =>
+            sender ! incomingTransactionForImageId(imageId)
 
         }
 
@@ -275,15 +274,15 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
       boxDao.pollBoxByToken(token)
     }
 
-  def nextOutgoingEntryImage(boxId: Long): Option[OutgoingEntryImage] =
+  def nextOutgoingTransactionImage(boxId: Long): Option[OutgoingTransactionImage] =
     db.withSession { implicit session =>
-      boxDao.nextOutgoingEntryImageForRemoteBoxId(boxId)
+      boxDao.nextOutgoingTransactionImageForBoxId(boxId)
     }
 
-  def updateIncomingEntry(entry: IncomingEntry): IncomingEntry = {
+  def updateIncomingTransaction(transaction: IncomingTransaction): IncomingTransaction = {
     db.withSession { implicit session =>
-      boxDao.updateIncomingEntry(entry)
-      entry
+      boxDao.updateIncomingTransaction(transaction)
+      transaction
     }
   }
 
@@ -302,30 +301,34 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
     }
   }
 
-  def generateTransactionId(): Long =
-    // Must be a positive number for the generated id to work in URLs which is very strange
-    // Maybe switch to using Strings as transaction id?
-    abs(UUID.randomUUID().getMostSignificantBits())
-
-  def addImagesToOutgoing(remoteBoxId: Long, remoteBoxName: String, imageTagValuesSeq: Seq[ImageTagValues]) = {
-    val transactionId = generateTransactionId()
-    addOutgoingEntryAndImages(remoteBoxId, remoteBoxName, transactionId, imageTagValuesSeq.map(_.imageId))
-    imageTagValuesSeq.foreach(imageTagValues =>
-      imageTagValues.tagValues.foreach(tagValue =>
-        addTagValue(transactionId, imageTagValues.imageId, tagValue)))
-  }
-
-  def addOutgoingEntryAndImages(remoteBoxId: Long, remoteBoxName: String, transactionId: Long, imageIds: Seq[Long]): Unit =
-    db.withSession { implicit session =>
-      val entry = boxDao.insertOutgoingEntry(OutgoingEntry(-1, remoteBoxId, remoteBoxName, transactionId, 0, imageIds.length, System.currentTimeMillis, TransactionStatus.WAITING))
-      imageIds foreach { imageId =>
-        boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, imageId, false))
+  def addImagesToOutgoing(boxId: Long, boxName: String, imageTagValuesSeq: Seq[ImageTagValues]) = {
+    val outgoingTransaction = addOutgoingTransaction(boxId, boxName, imageTagValuesSeq.length)
+    imageTagValuesSeq.foreach { imageTagValues =>
+      val outgoingImage = addOutgoingImage(outgoingTransaction, imageTagValues.imageId)
+      imageTagValues.tagValues.foreach { tagValue =>
+        addOutgoingTagValue(outgoingImage, tagValue)
       }
     }
+  }
 
-  def addIncomingEntry(entry: IncomingEntry): IncomingEntry =
+  def addOutgoingTransaction(boxId: Long, boxName: String, totalImageCount: Int): OutgoingTransaction =
     db.withSession { implicit session =>
-      boxDao.insertIncomingEntry(entry)
+      boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, boxId, boxName, 0, totalImageCount, System.currentTimeMillis, TransactionStatus.WAITING))
+    }
+
+  def addOutgoingImage(outgoingTransaction: OutgoingTransaction, imageId: Long): OutgoingImage =
+    db.withSession { implicit session =>
+      boxDao.insertOutgoingImage(OutgoingImage(-1, outgoingTransaction.id, imageId, false))
+    }
+
+  def addOutgoingTagValue(outgoingImage: OutgoingImage, tagValue: TagValue): OutgoingTagValue =
+    db.withSession { implicit session =>
+      boxDao.insertOutgoingTagValue(OutgoingTagValue(-1, outgoingImage.id, tagValue))
+    }
+
+  def addIncomingTransaction(transaction: IncomingTransaction): IncomingTransaction =
+    db.withSession { implicit session =>
+      boxDao.insertIncomingTransaction(transaction)
     }
 
   def addIncomingImage(image: IncomingImage): IncomingImage =
@@ -333,31 +336,25 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
       boxDao.insertIncomingImage(image)
     }
 
-  def addTagValue(transactionId: Long, imageId: Long, tagValue: TagValue) =
+  def outgoingTransactionById(outgoingTransactionId: Long): Option[OutgoingTransaction] =
     db.withSession { implicit session =>
-      boxDao.insertTransactionTagValue(
-        TransactionTagValue(-1, transactionId, imageId, tagValue))
+      boxDao.outgoingTransactionById(outgoingTransactionId)
     }
 
-  def outgoingEntryById(outgoingEntryId: Long): Option[OutgoingEntry] =
+  def outgoingTransactionImageById(boxId: Long, outgoingTransactionId: Long, outgoingImageId: Long): Option[OutgoingTransactionImage] =
     db.withSession { implicit session =>
-      boxDao.outgoingEntryById(outgoingEntryId)
+      boxDao.outgoingTransactionImageByOutgoingTransactionIdAndOutgoingImageId(boxId, outgoingTransactionId, outgoingImageId)
     }
 
-  def outgoingEntryImageByTransactionIdAndImageId(remoteBoxId: Long, transactionId: Long, imageId: Long): Option[OutgoingEntryImage] =
+  def removeIncomingTransactionFromDb(incomingTransactionId: Long) =
     db.withSession { implicit session =>
-      boxDao.outgoingEntryImageByTransactionIdAndImageId(remoteBoxId, transactionId, imageId)
+      boxDao.removeIncomingTransaction(incomingTransactionId)
     }
 
-  def removeIncomingEntryFromDb(incomingEntryId: Long) =
+  def updateOutgoingTransaction(outgoingTransaction: OutgoingTransaction) =
     db.withSession { implicit session =>
-      boxDao.removeIncomingEntry(incomingEntryId)
-    }
-
-  def updateOutgoingEntry(outgoingEntry: OutgoingEntry) =
-    db.withSession { implicit session =>
-      boxDao.updateOutgoingEntry(outgoingEntry)
-      outgoingEntry
+      boxDao.updateOutgoingTransaction(outgoingTransaction)
+      outgoingTransaction
     }
 
   def updateOutgoingImage(outgoingImage: OutgoingImage) =
@@ -366,19 +363,19 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
       outgoingImage
     }
 
-  def removeOutgoingEntryFromDb(outgoingEntryId: Long) =
+  def removeOutgoingTransactionFromDb(outgoingTransactionId: Long) =
     db.withSession { implicit session =>
-      boxDao.removeOutgoingEntry(outgoingEntryId)
+      boxDao.removeOutgoingTransaction(outgoingTransactionId)
     }
 
-  def markOutgoingEntryAsFailed(entry: OutgoingEntry) =
+  def markOutgoingTransactionAsFailed(transaction: OutgoingTransaction) =
     db.withSession { implicit session =>
-      boxDao.setOutgoingEntryStatus(entry.id, TransactionStatus.FAILED)
+      boxDao.setOutgoingTransactionStatus(transaction.id, TransactionStatus.FAILED)
     }
 
-  def markOutgoingEntryAsFinished(entry: OutgoingEntry) =
+  def markOutgoingTransactionAsFinished(transaction: OutgoingTransaction) =
     db.withSession { implicit session =>
-      boxDao.setOutgoingEntryStatus(entry.id, TransactionStatus.FINISHED)
+      boxDao.setOutgoingTransactionStatus(transaction.id, TransactionStatus.FINISHED)
     }
 
   def getIncomingFromDb() =
@@ -391,14 +388,14 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
       boxDao.listOutgoingEntries
     }
 
-  def getIncomingImagesByIncomingEntryId(incomingEntryId: Long) =
+  def getIncomingImagesByIncomingTransactionId(incomingTransactionId: Long) =
     db.withSession { implicit session =>
-      boxDao.listIncomingImagesForIncomingEntryId(incomingEntryId)
+      boxDao.listIncomingImagesForIncomingTransactionId(incomingTransactionId)
     }
 
-  def getOutgoingImagesByOutgoingEntryId(outgoingEntryId: Long) =
+  def getOutgoingImagesByOutgoingTransactionId(outgoingTransactionId: Long) =
     db.withSession { implicit session =>
-      boxDao.listOutgoingImagesForOutgoingEntryId(outgoingEntryId)
+      boxDao.listOutgoingImagesForOutgoingTransactionId(outgoingTransactionId)
     }
 
   def updateBoxOnlineStatusInDb(boxId: Long, online: Boolean): Unit =
@@ -406,14 +403,9 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
       boxDao.updateBoxOnlineStatus(boxId, online)
     }
 
-  def tagValuesForImageIdAndTransactionId(imageId: Long, transactionId: Long): Seq[TransactionTagValue] =
+  def tagValuesForOutgoingTransactionImage(transactionImage: OutgoingTransactionImage): Seq[OutgoingTagValue] =
     db.withSession { implicit session =>
-      boxDao.tagValuesByImageIdAndTransactionId(imageId, transactionId)
-    }
-
-  def removeTransactionTagValuesForTransactionId(transactionId: Long) =
-    db.withSession { implicit session =>
-      boxDao.removeTransactionTagValuesByTransactionId(transactionId)
+      boxDao.tagValuesByOutgoingTransactionIdAndImageId(transactionImage.transaction.id, transactionImage.image.id)
     }
 
   def getImageMetaData(imageIds: List[Long]): Future[Images] =
@@ -422,19 +414,19 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
         metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]]))
       .map(imageMaybes => Images(imageMaybes.flatten))
 
-  def incomingEntryForImageId(imageId: Long): Option[IncomingEntry] =
+  def incomingTransactionForImageId(imageId: Long): Option[IncomingTransaction] =
     db.withSession { implicit session =>
-      boxDao.incomingEntryByImageId(imageId)
+      boxDao.incomingTransactionByImageId(imageId)
     }
 
-  def incomingEntryByTransactionId(remoteBoxId: Long, transactionId: Long): Option[IncomingEntry] =
+  def incomingTransactionByOutgoingTransactionId(boxId: Long, outgoingTransactionId: Long): Option[IncomingTransaction] =
     db.withSession { implicit session =>
-      boxDao.incomingEntryByTransactionId(remoteBoxId, transactionId)
+      boxDao.incomingTransactionByOutgoingTransactionId(boxId, outgoingTransactionId)
     }
 
   def outgoingImageIdsForTransactionId(transactionId: Long): Seq[Long] =
     db.withSession { implicit session =>
-      boxDao.outgoingImagesByTransactionId(transactionId).map(_.imageId)
+      boxDao.outgoingImagesByOutgoingTransactionId(transactionId).map(_.imageId)
     }
 
   def removeImageFromBoxDb(imageId: Long) =
@@ -442,7 +434,6 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
       // TODO fail transfers in progress
       boxDao.removeOutgoingImagesForImageId(imageId)
       boxDao.removeIncomingImagesForImageId(imageId)
-      boxDao.removeTransactionTagValuesForImageId(imageId)
     }
 
 }

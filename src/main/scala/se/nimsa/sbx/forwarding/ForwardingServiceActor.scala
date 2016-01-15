@@ -216,7 +216,7 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
      */
 
     def incomingEntryForImage(image: Image, attempt: Int, maxAttempts: Int, attemptInterval: Long): Unit =
-      boxService.ask(GetIncomingEntryForImageId(image.id)).mapTo[Option[IncomingEntry]].onComplete {
+      boxService.ask(GetIncomingTransactionForImageId(image.id)).mapTo[Option[IncomingTransaction]].onComplete {
         case Success(entryMaybe) => entryMaybe match {
           case Some(entry) =>
             self ! AddImageToForwardingQueue(image, forwardingRule, entry.id, entry.receivedImageCount >= entry.totalImageCount, origin)

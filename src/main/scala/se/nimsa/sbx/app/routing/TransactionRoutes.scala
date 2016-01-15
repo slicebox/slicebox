@@ -45,7 +45,7 @@ trait TransactionRoutes { this: SliceboxService =>
           complete((NotFound, s"No box found for token $token"))
         case Some(box) =>
           path("image") {
-            parameters('transactionid.as[Long], 'totalimagecount.as[Long]) { (transactionId, totalImageCount) =>
+            parameters('transactionid.as[Long], 'totalimagecount.as[Long]) { (outgoingTransactionId, totalImageCount) =>
               post {
                 entity(as[Array[Byte]]) { compressedBytes =>
                   val bytes = decompress(compressedBytes)
@@ -57,7 +57,7 @@ trait TransactionRoutes { this: SliceboxService =>
                       val source = Source(SourceType.BOX, box.name, box.id)
                       onSuccess(storageService.ask(AddDataset(reversedDataset, source))) {
                         case DatasetAdded(image, source) =>
-                          onSuccess(boxService.ask(UpdateIncoming(box, transactionId, totalImageCount, image.id))) {
+                          onSuccess(boxService.ask(UpdateIncoming(box, outgoingTransactionId, totalImageCount, image.id))) {
                             case IncomingUpdated(_) => complete(NoContent)
                           }
                       }
@@ -69,53 +69,53 @@ trait TransactionRoutes { this: SliceboxService =>
             path("poll") {
               get {
                 onSuccess(boxService.ask(PollOutgoing(box))) {
-                  case entryImage: OutgoingEntryImage =>
-                    complete(entryImage)
+                  case transactionImage: OutgoingTransactionImage =>
+                    complete(transactionImage)
                   case OutgoingEmpty =>
                     complete(NotFound)
                 }
               }
             } ~ path("done") {
               post {
-                entity(as[OutgoingEntryImage]) { entryImage =>
-                  onSuccess(boxService.ask(MarkOutgoingImageAsSent(box, entryImage))) {
+                entity(as[OutgoingTransactionImage]) { transactionImage =>
+                  onSuccess(boxService.ask(MarkOutgoingImageAsSent(box, transactionImage))) {
                     case OutgoingImageMarkedAsSent => complete(NoContent)
                   }
                 }
               }
             } ~ path("failed") {
               post {
-                entity(as[FailedOutgoingEntryImage]) { failedEntryImage =>
-                  onSuccess(boxService.ask(MarkOutgoingTransactionAsFailed(box, failedEntryImage))) {
+                entity(as[FailedOutgoingTransactionImage]) { failedTransactionImage =>
+                  onSuccess(boxService.ask(MarkOutgoingTransactionAsFailed(box, failedTransactionImage))) {
                     case OutgoingTransactionMarkedAsFailed => complete(NoContent)
                   }
                 }
               }
             } ~ pathEndOrSingleSlash {
               get {
-                parameters('transactionid.as[Long], 'imageid.as[Long]) { (transactionId, imageId) =>
-                  onSuccess(boxService.ask(GetOutgoingEntryImage(box, transactionId, imageId)).mapTo[Option[OutgoingEntryImage]]) {
+                parameters('transactionid.as[Long], 'outgoingImageid.as[Long]) { (outgoingTransactionId, outgoingImageId) =>
+                  onSuccess(boxService.ask(GetOutgoingTransactionImage(box, outgoingTransactionId, outgoingImageId)).mapTo[Option[OutgoingTransactionImage]]) {
                     _ match {
-                      case Some(entryImage) =>
-                        onSuccess(boxService.ask(GetTransactionTagValues(imageId, transactionId)).mapTo[Seq[TransactionTagValue]]) {
+                      case Some(transactionImage) =>
+                        onSuccess(boxService.ask(GetOutgoingTagValues(transactionImage)).mapTo[Seq[OutgoingTagValue]]) {
                           case transactionTagValues =>
-                            onSuccess(storageService.ask(GetDataset(imageId, true)).mapTo[Option[Attributes]]) {
+                            onSuccess(storageService.ask(GetDataset(outgoingImageId, true)).mapTo[Option[Attributes]]) {
                               _ match {
                                 case Some(dataset) =>
 
-                                  onSuccess(anonymizationService.ask(Anonymize(imageId, dataset, transactionTagValues.map(_.tagValue)))) {
+                                  onSuccess(anonymizationService.ask(Anonymize(outgoingImageId, dataset, transactionTagValues.map(_.tagValue)))) {
                                     case anonymizedDataset: Attributes =>
                                       val compressedBytes = compress(toByteArray(anonymizedDataset))
                                       complete(HttpEntity(ContentTypes.`application/octet-stream`, HttpData(compressedBytes)))
                                   }
                                 case None =>
 
-                                  complete((NotFound, s"File not found for image id $imageId"))
+                                  complete((NotFound, s"File not found for image id ${outgoingImageId}"))
                               }
                             }
                         }
                       case None =>
-                        complete((NotFound, s"No outgoing image found for transaction id $transactionId and image id $imageId"))
+                        complete((NotFound, s"No outgoing image found for transaction id $outgoingTransactionId and image id ${outgoingImageId}"))
                     }
                   }
                 }
