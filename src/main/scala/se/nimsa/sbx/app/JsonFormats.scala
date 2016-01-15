@@ -73,12 +73,24 @@ trait JsonFormats extends DefaultJsonProtocol {
     }
   }
 
+  implicit object TransactionStatusFormat extends JsonFormat[TransactionStatus] {
+    def write(obj: TransactionStatus) = JsString(obj.toString)
+
+    def read(json: JsValue): TransactionStatus = json match {
+      case JsString(string) => TransactionStatus.withName(string)
+      case _                => deserializationError("Enumeration expected")
+    }
+  }
+
   implicit val boxFormat = jsonFormat6(Box)
 
-  implicit val outboxEntryFormat = jsonFormat8(OutboxEntry)
-  implicit val failedOutboxEntryFormat = jsonFormat2(FailedOutboxEntry)
-  implicit val inboxEntryFormat = jsonFormat7(InboxEntry)
-  implicit val sentEntryFormat = jsonFormat7(SentEntry)
+  implicit val outgoingEntryFormat = jsonFormat7(OutgoingTransaction)
+  implicit val outgoingImageFormat = jsonFormat4(OutgoingImage)
+  implicit val outgoingEntryImageFormat = jsonFormat2(OutgoingTransactionImage)
+  
+  implicit val failedOutgoingEntryFormat = jsonFormat2(FailedOutgoingTransactionImage)
+  
+  implicit val incomingEntryFormat = jsonFormat8(IncomingTransaction)
 
   implicit val tagValueFormat = jsonFormat2(TagValue)
   implicit val anonymizationKeyFormat = jsonFormat18(AnonymizationKey)

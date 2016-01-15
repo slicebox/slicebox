@@ -1,4 +1,4 @@
-angular.module('slicebox.utils', [])
+angular.module('slicebox.utils', ['ngSanitize'])
 
 .factory('sbxMisc', function($q) {
     return {
@@ -228,7 +228,7 @@ angular.module('slicebox.utils', [])
 
         return $mdDialog.show($mdDialog.alert({
             title: title,
-            content: message,
+            htmlContent: message,
             ok: 'Close'
         }));
     };

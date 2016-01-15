@@ -2,7 +2,6 @@
     color: rgba(255,255,255,0.87);
     background-color: rgb(84,110,122);
     border-radius: 8px; 
-    box-shadow: 0 2px 5px 0 rgba(0, 0, 0, 0.26);
     padding: 4px 6px;
     -webkit-user-select: none;
     margin: 3px 6px;
@@ -17,6 +16,12 @@
     -webkit-font-smoothing: antialiased;
 }
 
+.sbx-chip-waiting {
+    background: #F57F17;
+}
+.sbx-chip-processing {
+    background: #4CAF50;
+}
 .sbx-chip-warn {
     background: #B71C1C;
 }

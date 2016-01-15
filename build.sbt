@@ -45,7 +45,7 @@ import de.heikoseeberger.sbtheader.license.Apache2_0
 	
 	// for automatic license stub generation
 
-	val licenceYear = "2015"
+	val licenceYear = "2016"
 	val licencedTo = "Lars Edenbrandt"
 
 	headers := Map(
@@ -67,23 +67,23 @@ import de.heikoseeberger.sbtheader.license.Apache2_0
 		val sprayVersion			= "1.3.3"
 		Seq(
 			"com.typesafe.scala-logging"	%% "scala-logging"			% "3.1.0",
-			"com.typesafe.akka" 			%% "akka-actor"				% akkaVersion,
+			"com.typesafe.akka"				%% "akka-actor"				% akkaVersion,
 			"io.spray"						%% "spray-can"				% sprayVersion,
 			"io.spray"						%% "spray-routing"			% sprayVersion,
-			"io.spray" 						%% "spray-client"			% sprayVersion,
-			"io.spray" 						%% "spray-json"				% "1.3.1",
-			"com.typesafe.akka" 			%% "akka-slf4j"				% akkaVersion,
+			"io.spray"						%% "spray-client"			% sprayVersion,
+			"io.spray"						%% "spray-json"				% "1.3.1",
+			"com.typesafe.akka"				%% "akka-slf4j"				% akkaVersion,
 			"ch.qos.logback"				%  "logback-classic" 		% "1.1.2",
 			"com.typesafe.slick" 			%% "slick"					% "2.1.0",
-			"com.h2database" 				%  "h2"						% "1.3.170",
+			"com.h2database"				%  "h2"						% "1.3.170",
 			"com.mchange"					%  "c3p0"					% "0.9.5",
-			"com.github.t3hnar" 			%% "scala-bcrypt"			% "2.4",
+			"com.github.t3hnar"				%% "scala-bcrypt"			% "2.4",
 			"org.scalatest"					%% "scalatest"				% "2.2.4"			% "test",
-			"io.spray" 						%% "spray-testkit"			% sprayVersion		% "test",
-			"com.typesafe.akka" 			%% "akka-testkit"			% akkaVersion		% "test",
-			"org.webjars" 					%  "angularjs"				% "1.4.7",
-			"org.webjars"					%  "angular-material"		% "1.0.0-rc2",
-			"org.webjars"                   %  "angular-file-upload"    % "5.0.0"
+			"io.spray"						%% "spray-testkit"			% sprayVersion		% "test",
+			"com.typesafe.akka"				%% "akka-testkit"			% akkaVersion		% "test",
+			"org.webjars"					%  "angularjs"				% "1.4.7",
+			"org.webjars"					%  "angular-material"		% "1.0.1",
+			"org.webjars"					%  "angular-file-upload"	% "5.0.0"
 		)
 	}
 

@@ -19,6 +19,7 @@ package se.nimsa.sbx.box
 import java.util.Date
 import java.util.UUID
 
+import scala.collection.mutable
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 import scala.math.abs
@@ -54,7 +55,7 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
   implicit val ec = context.dispatcher
 
   val pollBoxOnlineStatusTimeoutMillis: Long = 15000
-  val pollBoxesLastPollTimestamp = collection.mutable.Map.empty[Long, Date]
+  val pollBoxesLastPollTimestamp = mutable.Map.empty[Long, Long] // box id to timestamp
 
   val metaDataService = context.actorSelection("../MetaDataService")
 
@@ -89,7 +90,7 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
 
           case CreateConnection(remoteBoxConnectionData) =>
             val token = UUID.randomUUID().toString()
-            val baseUrl = s"$apiBaseURL/box/$token"
+            val baseUrl = s"$apiBaseURL/transactions/$token"
             val name = remoteBoxConnectionData.name
             val box = addBoxToDb(Box(-1, name, token, baseUrl, BoxSendMethod.POLL, false))
             sender ! RemoteBoxAdded(box)
@@ -123,112 +124,80 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
           case GetBoxByToken(token) =>
             sender ! pollBoxByToken(token)
 
-          case UpdateInbox(token, transactionId, sequenceNumber, totalImageCount, imageId) =>
-            pollBoxByToken(token).foreach(box =>
-              updateInbox(box.id, box.name, transactionId, sequenceNumber, totalImageCount, imageId))
+          case UpdateIncoming(box, outgoingTransactionId, totalImageCount, imageId) =>
+            val existingTransaction = incomingTransactionByOutgoingTransactionId(box.id, outgoingTransactionId)
+              .getOrElse(addIncomingTransaction(IncomingTransaction(-1, box.id, box.name, outgoingTransactionId, 0, totalImageCount, System.currentTimeMillis, TransactionStatus.WAITING)))
+            val incomingTransaction = updateIncomingTransaction(existingTransaction.incrementReceived.updateTimestamp.copy(totalImageCount = totalImageCount, status = TransactionStatus.PROCESSING))
+            addIncomingImage(IncomingImage(-1, incomingTransaction.id, imageId))
 
-            // TODO: what should we do if no box was found for token?
-
-            sender ! InboxUpdated(token, transactionId, sequenceNumber, totalImageCount)
-
-          case PollOutbox(token) =>
-            pollBoxByToken(token).foreach(box => {
-              pollBoxesLastPollTimestamp(box.id) = new Date()
-
-              nextOutboxEntry(box.id) match {
-                case Some(outboxEntry) => sender ! outboxEntry
-                case None              => sender ! OutboxEmpty
-              }
-            })
-
-          // TODO: what should we do if no box was found for token?
-
-          case SendToRemoteBox(remoteBoxId, imageTagValuesSeq) =>
-            boxById(remoteBoxId) match {
-              case Some(box) =>
-                SbxLog.info("Box", s"Sending ${imageTagValuesSeq.length} images to box ${box.name}")
-                addImagesToOutbox(remoteBoxId, box.name, imageTagValuesSeq)
-                sender ! ImagesAddedToOutbox(remoteBoxId, imageTagValuesSeq.map(_.imageId))
-              case None =>
-                sender ! BoxNotFound
+            if (incomingTransaction.receivedImageCount == totalImageCount) {
+              setIncomingTransactionStatus(incomingTransaction, TransactionStatus.FINISHED)
+              SbxLog.info("Box", s"Receiving $totalImageCount images from box ${box.name} completed.")
             }
 
-          case GetOutboxEntry(token, transactionId, sequenceNumber) =>
-            pollBoxByToken(token).foreach(box => {
-              outboxEntryByTransactionIdAndSequenceNumber(box.id, transactionId, sequenceNumber) match {
-                case Some(outboxEntry) => sender ! outboxEntry
-                case None              => sender ! OutboxEntryNotFound
-              }
-            })
+            sender ! IncomingUpdated(incomingTransaction)
 
-          case DeleteOutboxEntry(token, transactionId, sequenceNumber) =>
-            pollBoxByToken(token).foreach(box => {
-              outboxEntryByTransactionIdAndSequenceNumber(box.id, transactionId, sequenceNumber) match {
-                case Some(outboxEntry) =>
-                  removeOutboxEntryFromDb(outboxEntry.id)
-                  updateSent(outboxEntry)
+          case PollOutgoing(box) =>
+            pollBoxesLastPollTimestamp(box.id) = System.currentTimeMillis
+            sender ! nextOutgoingTransactionImage(box.id)
 
-                  if (outboxEntry.sequenceNumber == outboxEntry.totalImageCount) {
-                    context.system.eventStream.publish(ImagesSent(Destination(DestinationType.BOX, box.name, box.id), sentImageIdsForTransactionId(outboxEntry.transactionId)))
-                    removeTransactionTagValuesForTransactionId(outboxEntry.transactionId)
-                    SbxLog.info("Box", s"Finished sending ${outboxEntry.totalImageCount} images to box ${box.name}")
-                  }
+          case SendToRemoteBox(box, imageTagValuesSeq) =>
+            SbxLog.info("Box", s"Sending ${imageTagValuesSeq.length} images to box ${box.name}")
+            addImagesToOutgoing(box.id, box.name, imageTagValuesSeq)
+            sender ! ImagesAddedToOutgoing(box.id, imageTagValuesSeq.map(_.imageId))
 
-                  sender ! OutboxEntryDeleted
-                case None =>
-                  sender ! OutboxEntryDeleted
-              }
-            })
+          case GetOutgoingTransactionImage(box, outgoingTransactionId, outgoingImageId) =>
+            sender ! outgoingTransactionImageById(box.id, outgoingTransactionId, outgoingImageId)
 
-          case MarkOutboxTransactionAsFailed(token, transactionId, message) =>
-            pollBoxByToken(token).foreach(box => {
-              markOutboxTransactionAsFailed(box, transactionId, message)
-              sender ! OutboxTransactionMarkedAsFailed
-            })
+          case MarkOutgoingImageAsSent(box, transactionImage) =>
+            updateOutgoingImage(transactionImage.image.copy(sent = true))
+            val updatedTransaction = updateOutgoingTransaction(transactionImage.transaction.incrementSent.updateTimestamp.copy(status = TransactionStatus.PROCESSING))
 
-          case GetInbox =>
-            sender ! Inbox(getInboxFromDb())
+            if (updatedTransaction.sentImageCount == updatedTransaction.totalImageCount) {
+              context.system.eventStream.publish(ImagesSent(Destination(DestinationType.BOX, box.name, box.id), outgoingImageIdsForTransactionId(updatedTransaction.id)))
+              setOutgoingTransactionStatus(transactionImage.transaction, TransactionStatus.FINISHED)
+              SbxLog.info("Box", s"Finished sending ${updatedTransaction.totalImageCount} images to box ${box.name}")
+            }
 
-          case GetOutbox =>
-            sender ! Outbox(getOutboxFromDb())
+            sender ! OutgoingImageMarkedAsSent
 
-          case GetSent =>
-            sender ! Sent(getSentFromDb())
+          case MarkOutgoingTransactionAsFailed(box, failedTransactionImage) =>
+            setOutgoingTransactionStatus(failedTransactionImage.transactionImage.transaction, TransactionStatus.FAILED)
+            SbxLog.error("Box", failedTransactionImage.message)
+            sender ! OutgoingTransactionMarkedAsFailed
 
-          case GetImagesForInboxEntry(inboxEntryId) =>
-            val imageIds = getInboxImagesByInboxEntryId(inboxEntryId).map(_.imageId)
-            getImagesFromStorage(imageIds).pipeTo(sender)
+          case GetIncomingTransactions =>
+            sender ! IncomingTransactions(getIncomingTransactions)
 
-          case GetImagesForSentEntry(sentEntryId) =>
-            val imageIds = getSentImagesBySentEntryId(sentEntryId).map(_.imageId)
-            getImagesFromStorage(imageIds).pipeTo(sender)
+          case GetOutgoingTransactions =>
+            sender ! OutgoingTransactions(getOutgoingTransactions)
 
-          case RemoveOutboxEntry(outboxEntryId) =>
-            outboxEntryById(outboxEntryId)
-              .filter(outboxEntry => outboxEntry.sequenceNumber == outboxEntry.totalImageCount)
-              .foreach(outboxEntry =>
-                removeTransactionTagValuesForTransactionId(outboxEntry.transactionId))
-            removeOutboxEntryFromDb(outboxEntryId)
-            sender ! OutboxEntryRemoved(outboxEntryId)
+          case GetImagesForIncomingTransaction(incomingTransactionId) =>
+            val imageIds = getIncomingImagesByIncomingTransactionId(incomingTransactionId).map(_.imageId)
+            getImageMetaData(imageIds).pipeTo(sender)
 
-          case RemoveInboxEntry(inboxEntryId) =>
-            removeInboxEntryFromDb(inboxEntryId)
-            sender ! InboxEntryRemoved(inboxEntryId)
+          case GetImagesForOutgoingTransaction(outgoingTransactionId) =>
+            val imageIds = getOutgoingImagesByOutgoingTransactionId(outgoingTransactionId).map(_.imageId)
+            getImageMetaData(imageIds).pipeTo(sender)
 
-          case RemoveSentEntry(sentEntryId) =>
-            removeSentEntryFromDb(sentEntryId)
-            sender ! SentEntryRemoved(sentEntryId)
+          case RemoveOutgoingTransaction(outgoingTransactionId) =>
+            removeOutgoingTransactionFromDb(outgoingTransactionId)
+            sender ! OutgoingTransactionRemoved(outgoingTransactionId)
 
-          case GetTransactionTagValues(imageId, transactionId) =>
-            sender ! tagValuesForImageIdAndTransactionId(imageId, transactionId)
+          case RemoveIncomingTransaction(incomingTransactionId) =>
+            removeIncomingTransactionFromDb(incomingTransactionId)
+            sender ! IncomingTransactionRemoved(incomingTransactionId)
 
-          case GetInboxEntryForImageId(imageId) =>
-            sender ! inboxEntryForImageId(imageId)
+          case GetOutgoingTagValues(transactionImage) =>
+            sender ! tagValuesForOutgoingTransactionImage(transactionImage)
+
+          case GetIncomingTransactionForImageId(imageId) =>
+            sender ! incomingTransactionForImageId(imageId)
 
         }
 
       }
-      
+
   }
 
   def baseUrlToToken(url: String): String =
@@ -249,7 +218,7 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
           maybeStartPushActor(box)
           maybeStartPollActor(box)
         case BoxSendMethod.POLL =>
-          pollBoxesLastPollTimestamp(box.id) = new Date(0)
+          pollBoxesLastPollTimestamp(box.id) = 0
       })
 
   def maybeStartPushActor(box: Box): Unit = {
@@ -300,128 +269,148 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
       boxDao.pollBoxByToken(token)
     }
 
-  def nextOutboxEntry(boxId: Long): Option[OutboxEntry] =
+  def nextOutgoingTransactionImage(boxId: Long): Option[OutgoingTransactionImage] =
     db.withSession { implicit session =>
-      boxDao.nextOutboxEntryForRemoteBoxId(boxId)
+      boxDao.nextOutgoingTransactionImageForBoxId(boxId)
     }
 
-  def updateInbox(remoteBoxId: Long, remoteBoxName: String, transactionId: Long, sequenceNumber: Long, totalImageCount: Long, imageId: Long): Unit = {
+  def updateIncomingTransaction(transaction: IncomingTransaction): IncomingTransaction = {
     db.withSession { implicit session =>
-      val inboxEntry = boxDao.updateInbox(remoteBoxId, remoteBoxName, transactionId, sequenceNumber, totalImageCount)
-      boxDao.insertInboxImage(InboxImage(-1, inboxEntry.id, imageId))
-    }
-
-    if (sequenceNumber == totalImageCount) {
-      val boxName = boxById(remoteBoxId).map(_.name).getOrElse(remoteBoxId.toString)
-      SbxLog.info("Box", s"Receiving ${totalImageCount} images from box $boxName completed.")
+      boxDao.updateIncomingTransaction(transaction)
+      transaction
     }
   }
 
   def updatePollBoxesOnlineStatus(): Unit = {
-    val now = new Date()
+    val now = System.currentTimeMillis
 
     pollBoxesLastPollTimestamp.foreach {
       case (boxId, lastPollTime) =>
         val online =
-          if (now.getTime - lastPollTime.getTime < pollBoxOnlineStatusTimeoutMillis)
+          if (now - lastPollTime < pollBoxOnlineStatusTimeoutMillis)
             true
           else
             false
 
         updateBoxOnlineStatusInDb(boxId, online)
     }
+
+    getIncomingTransactionsInProcess.foreach { transaction =>
+      if (now - transaction.lastUpdated < pollBoxOnlineStatusTimeoutMillis)
+        setIncomingTransactionStatus(transaction, TransactionStatus.WAITING)
+    }
+    
+    getOutgoingTransactionsInProcess.foreach { transaction =>
+      if (now - transaction.lastUpdated < pollBoxOnlineStatusTimeoutMillis)
+        setOutgoingTransactionStatus(transaction, TransactionStatus.WAITING)
+    }
   }
 
-  def generateTransactionId(): Long =
-    // Must be a positive number for the generated id to work in URLs which is very strange
-    // Maybe switch to using Strings as transaction id?
-    abs(UUID.randomUUID().getMostSignificantBits())
-
-  def addImagesToOutbox(remoteBoxId: Long, remoteBoxName: String, imageTagValuesSeq: Seq[ImageTagValues]) = {
-    val transactionId = generateTransactionId()
-    imageTagValuesSeq.foreach(imageTagValues =>
-      imageTagValues.tagValues.foreach(tagValue =>
-        addTagValue(transactionId, imageTagValues.imageId, tagValue)))
-    addOutboxEntries(remoteBoxId, remoteBoxName, transactionId, imageTagValuesSeq.map(_.imageId))
-  }
-
-  def addOutboxEntries(remoteBoxId: Long, remoteBoxName: String, transactionId: Long, imageIds: Seq[Long]): Unit = {
-    val totalImageCount = imageIds.length
-
-    db.withSession { implicit session =>
-      for (sequenceNumber <- 1 to totalImageCount) {
-        boxDao.insertOutboxEntry(OutboxEntry(-1, remoteBoxId, remoteBoxName, transactionId, sequenceNumber, totalImageCount, imageIds(sequenceNumber - 1), false))
+  def addImagesToOutgoing(boxId: Long, boxName: String, imageTagValuesSeq: Seq[ImageTagValues]) = {
+    val outgoingTransaction = addOutgoingTransaction(OutgoingTransaction(-1, boxId, boxName, 0, imageTagValuesSeq.length, System.currentTimeMillis, TransactionStatus.WAITING))
+    imageTagValuesSeq.foreach { imageTagValues =>
+      val outgoingImage = addOutgoingImage(OutgoingImage(-1, outgoingTransaction.id, imageTagValues.imageId, false))
+      imageTagValues.tagValues.foreach { tagValue =>
+        addOutgoingTagValue(OutgoingTagValue(-1, outgoingImage.id, tagValue))
       }
     }
   }
 
-  def addTagValue(transactionId: Long, imageId: Long, tagValue: TagValue) =
+  def addOutgoingTransaction(outgoingTransaction: OutgoingTransaction): OutgoingTransaction =
     db.withSession { implicit session =>
-      boxDao.insertTransactionTagValue(
-        TransactionTagValue(-1, transactionId, imageId, tagValue))
+      boxDao.insertOutgoingTransaction(outgoingTransaction)
     }
 
-  def outboxEntryById(outboxEntryId: Long): Option[OutboxEntry] =
+  def addOutgoingImage(outgoingImage: OutgoingImage): OutgoingImage =
     db.withSession { implicit session =>
-      boxDao.outboxEntryById(outboxEntryId)
+      boxDao.insertOutgoingImage(outgoingImage)
     }
 
-  def outboxEntryByTransactionIdAndSequenceNumber(remoteBoxId: Long, transactionId: Long, sequenceNumber: Long): Option[OutboxEntry] =
+  def addOutgoingTagValue(outgoingTagValue: OutgoingTagValue): OutgoingTagValue =
     db.withSession { implicit session =>
-      boxDao.outboxEntryByTransactionIdAndSequenceNumber(remoteBoxId, transactionId, sequenceNumber)
+      boxDao.insertOutgoingTagValue(outgoingTagValue)
     }
 
-  def removeInboxEntryFromDb(inboxEntryId: Long) =
+  def addIncomingTransaction(transaction: IncomingTransaction): IncomingTransaction =
     db.withSession { implicit session =>
-      boxDao.removeInboxEntry(inboxEntryId)
+      boxDao.insertIncomingTransaction(transaction)
     }
 
-  def removeOutboxEntryFromDb(outboxEntryId: Long) =
+  def addIncomingImage(image: IncomingImage): IncomingImage =
     db.withSession { implicit session =>
-      boxDao.removeOutboxEntry(outboxEntryId)
+      boxDao.insertIncomingImage(image)
     }
 
-  def removeSentEntryFromDb(sentEntryId: Long) =
+  def outgoingTransactionById(outgoingTransactionId: Long): Option[OutgoingTransaction] =
     db.withSession { implicit session =>
-      boxDao.removeSentEntry(sentEntryId)
+      boxDao.outgoingTransactionById(outgoingTransactionId)
     }
 
-  def updateSent(outboxEntry: OutboxEntry) =
+  def outgoingTransactionImageById(boxId: Long, outgoingTransactionId: Long, outgoingImageId: Long): Option[OutgoingTransactionImage] =
     db.withSession { implicit session =>
-      val sentEntry = boxDao.updateSent(outboxEntry.remoteBoxId, outboxEntry.remoteBoxName, outboxEntry.transactionId, outboxEntry.sequenceNumber, outboxEntry.totalImageCount)
-      boxDao.insertSentImage(SentImage(-1, sentEntry.id, outboxEntry.imageId))
+      boxDao.outgoingTransactionImageByOutgoingTransactionIdAndOutgoingImageId(boxId, outgoingTransactionId, outgoingImageId)
     }
 
-  def markOutboxTransactionAsFailed(box: Box, transactionId: Long, message: String) = {
+  def removeIncomingTransactionFromDb(incomingTransactionId: Long) =
     db.withSession { implicit session =>
-      boxDao.markOutboxTransactionAsFailed(box.id, transactionId)
-    }
-    SbxLog.error("Box", message)
-  }
-
-  def getInboxFromDb() =
-    db.withSession { implicit session =>
-      boxDao.listInboxEntries
+      boxDao.removeIncomingTransaction(incomingTransactionId)
     }
 
-  def getOutboxFromDb() =
+  def updateOutgoingTransaction(outgoingTransaction: OutgoingTransaction) =
     db.withSession { implicit session =>
-      boxDao.listOutboxEntries
+      boxDao.updateOutgoingTransaction(outgoingTransaction)
+      outgoingTransaction
     }
 
-  def getSentFromDb() =
+  def updateOutgoingImage(outgoingImage: OutgoingImage) =
     db.withSession { implicit session =>
-      boxDao.listSentEntries
+      boxDao.updateOutgoingImage(outgoingImage)
+      outgoingImage
     }
 
-  def getInboxImagesByInboxEntryId(inboxEntryId: Long) =
+  def removeOutgoingTransactionFromDb(outgoingTransactionId: Long) =
     db.withSession { implicit session =>
-      boxDao.listInboxImagesForInboxEntryId(inboxEntryId)
+      boxDao.removeOutgoingTransaction(outgoingTransactionId)
     }
 
-  def getSentImagesBySentEntryId(sentEntryId: Long) =
+  def setOutgoingTransactionStatus(transaction: OutgoingTransaction, status: TransactionStatus) =
     db.withSession { implicit session =>
-      boxDao.listSentImagesForSentEntryId(sentEntryId)
+      boxDao.setOutgoingTransactionStatus(transaction.id, status)
+    }
+
+  def setIncomingTransactionStatus(transaction: IncomingTransaction, status: TransactionStatus) =
+    db.withSession { implicit session =>
+      boxDao.setIncomingTransactionStatus(transaction.id, status)
+    }
+
+  def getIncomingTransactions =
+    db.withSession { implicit session =>
+      boxDao.listIncomingTransactions
+    }
+
+  def getOutgoingTransactions =
+    db.withSession { implicit session =>
+      boxDao.listOutgoingTransactions
+    }
+
+  def getIncomingTransactionsInProcess =
+    db.withSession { implicit session =>
+      boxDao.listIncomingTransactionsInProcess
+    }
+
+  def getOutgoingTransactionsInProcess =
+    db.withSession { implicit session =>
+      boxDao.listOutgoingTransactionsInProcess
+    }
+
+  def getIncomingImagesByIncomingTransactionId(incomingTransactionId: Long) =
+    db.withSession { implicit session =>
+      boxDao.listIncomingImagesForIncomingTransactionId(incomingTransactionId)
+    }
+
+  def getOutgoingImagesByOutgoingTransactionId(outgoingTransactionId: Long) =
+    db.withSession { implicit session =>
+      boxDao.listOutgoingImagesForOutgoingTransactionId(outgoingTransactionId)
     }
 
   def updateBoxOnlineStatusInDb(boxId: Long, online: Boolean): Unit =
@@ -429,40 +418,39 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
       boxDao.updateBoxOnlineStatus(boxId, online)
     }
 
-  def tagValuesForImageIdAndTransactionId(imageId: Long, transactionId: Long): Seq[TransactionTagValue] =
+  def tagValuesForOutgoingTransactionImage(transactionImage: OutgoingTransactionImage): Seq[OutgoingTagValue] =
     db.withSession { implicit session =>
-      boxDao.tagValuesByImageIdAndTransactionId(imageId, transactionId)
+      boxDao.tagValuesByOutgoingTransactionImage(transactionImage.transaction.id, transactionImage.image.id)
     }
 
-  def removeTransactionTagValuesForTransactionId(transactionId: Long) =
-    db.withSession { implicit session =>
-      boxDao.removeTransactionTagValuesByTransactionId(transactionId)
-    }
-
-  def getImagesFromStorage(imageIds: List[Long]): Future[Images] =
+  def getImageMetaData(imageIds: List[Long]): Future[Images] =
     Future.sequence(
       imageIds.map(imageId =>
         metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]]))
       .map(imageMaybes => Images(imageMaybes.flatten))
 
-  def inboxEntryForImageId(imageId: Long): Option[InboxEntry] =
+  def incomingTransactionForImageId(imageId: Long): Option[IncomingTransaction] =
     db.withSession { implicit session =>
-      boxDao.inboxEntryByImageId(imageId)
+      boxDao.incomingTransactionByImageId(imageId)
     }
 
-  def sentImageIdsForTransactionId(transactionId: Long): Seq[Long] =
+  def incomingTransactionByOutgoingTransactionId(boxId: Long, outgoingTransactionId: Long): Option[IncomingTransaction] =
     db.withSession { implicit session =>
-      boxDao.sentImagesByTransactionId(transactionId).map(_.imageId)
+      boxDao.incomingTransactionByOutgoingTransactionId(boxId, outgoingTransactionId)
+    }
+
+  def outgoingImageIdsForTransactionId(transactionId: Long): Seq[Long] =
+    db.withSession { implicit session =>
+      boxDao.outgoingImagesByOutgoingTransactionId(transactionId).map(_.imageId)
     }
 
   def removeImageFromBoxDb(imageId: Long) =
     db.withSession { implicit session =>
-      boxDao.removeOutboxEntriesForImageId(imageId)
-      boxDao.removeInboxImagesForImageId(imageId)
-      boxDao.removeSentImagesForImageId(imageId)
-      boxDao.removeTransactionTagValuesForImageId(imageId)
+      // TODO fail transfers in progress
+      boxDao.removeOutgoingImagesForImageId(imageId)
+      boxDao.removeIncomingImagesForImageId(imageId)
     }
-  
+
 }
 
 object BoxServiceActor {
