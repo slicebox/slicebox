@@ -34,7 +34,7 @@ class BoxDAO(val driver: JdbcProfile) {
   implicit val sendMethodColumnType =
     MappedColumnType.base[BoxSendMethod, String](bsm => bsm.toString, BoxSendMethod.withName)
 
-  class BoxTable(tag: Tag) extends Table[Box](tag, "Box") {
+  class BoxTable(tag: Tag) extends Table[Box](tag, "Boxes") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def name = column[String]("name")
     def token = column[String]("token")
@@ -47,7 +47,7 @@ class BoxDAO(val driver: JdbcProfile) {
 
   val boxQuery = TableQuery[BoxTable]
 
-  class OutgoingTransactionTable(tag: Tag) extends Table[OutgoingTransaction](tag, "OutgoingTransaction") {
+  class OutgoingTransactionTable(tag: Tag) extends Table[OutgoingTransaction](tag, "OutgoingTransactions") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def boxId = column[Long]("boxid")
     def boxName = column[String]("boxname")
@@ -74,7 +74,7 @@ class BoxDAO(val driver: JdbcProfile) {
   val toOutgoingTagValue = (id: Long, outgoingImageId: Long, tag: Int, value: String) => OutgoingTagValue(id, outgoingImageId, TagValue(tag, value))
   val fromOutgoingTagValue = (tagValue: OutgoingTagValue) => Option((tagValue.id, tagValue.outgoingImageId, tagValue.tagValue.tag, tagValue.tagValue.value))
 
-  class OutgoingTagValueTable(tag: Tag) extends Table[OutgoingTagValue](tag, "OutgoingTagValue") {
+  class OutgoingTagValueTable(tag: Tag) extends Table[OutgoingTagValue](tag, "OutgoingTagValues") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def outgoingImageId = column[Long]("outgoingimageid")
     def dicomTag = column[Int]("tag")
@@ -85,7 +85,7 @@ class BoxDAO(val driver: JdbcProfile) {
 
   val outgoingTagValueQuery = TableQuery[OutgoingTagValueTable]
 
-  class IncomingTransactionTable(tag: Tag) extends Table[IncomingTransaction](tag, "IncomingTransaction") {
+  class IncomingTransactionTable(tag: Tag) extends Table[IncomingTransaction](tag, "IncomingTransactions") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def boxId = column[Long]("boxid")
     def boxName = column[String]("boxname")
@@ -118,11 +118,11 @@ class BoxDAO(val driver: JdbcProfile) {
   }
 
   def create(implicit session: Session): Unit = {
-    if (MTable.getTables("Box").list.isEmpty) boxQuery.ddl.create
-    if (MTable.getTables("Outgoing").list.isEmpty) outgoingTransactionQuery.ddl.create
-    if (MTable.getTables("Incoming").list.isEmpty) incomingTransactionQuery.ddl.create
+    if (MTable.getTables("Boxes").list.isEmpty) boxQuery.ddl.create
+    if (MTable.getTables("OutgoingTransactions").list.isEmpty) outgoingTransactionQuery.ddl.create
     if (MTable.getTables("OutgoingImages").list.isEmpty) outgoingImageQuery.ddl.create
-    if (MTable.getTables("OutgoingTagValue").list.isEmpty) outgoingTagValueQuery.ddl.create
+    if (MTable.getTables("OutgoingTagValues").list.isEmpty) outgoingTagValueQuery.ddl.create
+    if (MTable.getTables("IncomingTransactions").list.isEmpty) incomingTransactionQuery.ddl.create
     if (MTable.getTables("IncomingImages").list.isEmpty) incomingImageQuery.ddl.create
   }
 
@@ -294,6 +294,16 @@ class BoxDAO(val driver: JdbcProfile) {
 
   def listIncomingImages(implicit session: Session): List[IncomingImage] =
     incomingImageQuery.list
+
+  def listOutgoingTransactionsInProcess(implicit session: Session): List[OutgoingTransaction] =
+    outgoingTransactionQuery
+      .filter(_.status === (PROCESSING: TransactionStatus))
+      .list
+
+  def listIncomingTransactionsInProcess(implicit session: Session): List[IncomingTransaction] =
+    incomingTransactionQuery
+      .filter(_.status === (PROCESSING: TransactionStatus))
+      .list
 
   def listOutgoingImagesForOutgoingTransactionId(outgoingTransactionId: Long)(implicit session: Session): List[OutgoingImage] =
     outgoingImageQuery.filter(_.outgoingTransactionId === outgoingTransactionId).list

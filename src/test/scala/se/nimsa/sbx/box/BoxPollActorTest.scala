@@ -115,10 +115,10 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
     }
 
     "call correct URL for getting remote outgoing file" in {
-      val transactionId = 999
-      val imageId = 33
-      val transaction = OutgoingTransaction(transactionId, 987, "some box", 1, 2, 112233, TransactionStatus.WAITING)
-      val image = OutgoingImage(456, transactionId, imageId, false)
+      val outgoingTransactionId = 999
+      val outgoingImageId = 33
+      val transaction = OutgoingTransaction(outgoingTransactionId, 987, "some box", 1, 2, 112233, TransactionStatus.WAITING)
+      val image = OutgoingImage(outgoingImageId, outgoingTransactionId, 666, false)
       val transactionImage = OutgoingTransactionImage(transaction, image)
       
       marshal(transactionImage) match {
@@ -130,14 +130,14 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
       expectNoMsg
 
-      capturedRequests(1).uri.toString() should be(s"$remoteBoxBaseUrl/outgoing?transactionid=$transactionId&imageid=$imageId")
+      capturedRequests(1).uri.toString() should be(s"$remoteBoxBaseUrl/outgoing?transactionid=$outgoingTransactionId&imageid=$outgoingImageId")
     }
 
     "handle remote outgoing file" in {
-      val transactionId = 999
-      val imageId = 33
-      val transaction = OutgoingTransaction(transactionId, 987, "some box", 1, 2, 2, TransactionStatus.WAITING)
-      val image = OutgoingImage(456, transactionId, imageId, false)
+      val outgoingTransactionId = 999
+      val outgoingImageId = 33
+      val transaction = OutgoingTransaction(outgoingTransactionId, 987, "some box", 1, 2, 2, TransactionStatus.WAITING)
+      val image = OutgoingImage(outgoingImageId, outgoingTransactionId, 666, false)
       val transactionImage = OutgoingTransactionImage(transaction, image)
 
       marshal(transactionImage) match {
@@ -160,7 +160,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
         incomingTransactions should have length 1
 
         incomingTransactions.foreach(incomingTransaction => {
-          incomingTransaction.outgoingTransactionId should be(transactionId)
+          incomingTransaction.outgoingTransactionId should be(outgoingTransactionId)
           incomingTransaction.boxId should be(remoteBox.id)
           incomingTransaction.receivedImageCount should be(1)
           incomingTransaction.totalImageCount should be(2)
@@ -208,9 +208,9 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
     }
 
     "keep trying to fetch remote file until fetching succeeds" in {
-      val transactionId = 999
-      val transaction = OutgoingTransaction(transactionId, 987, "some box", 1, 2, 2, TransactionStatus.WAITING)
-      val image = OutgoingImage(456, transactionId, 33, false)
+      val outgoingTransactionId = 999
+      val transaction = OutgoingTransaction(outgoingTransactionId, 987, "some box", 1, 2, 2, TransactionStatus.WAITING)
+      val image = OutgoingImage(456, outgoingTransactionId, 33, false)
       val transactionImage = OutgoingTransactionImage(transaction, image)
 
       marshal(transactionImage) match {
@@ -247,9 +247,9 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
     }
 
     "should tell the box it is pulling images from that a transaction has failed due to receiving an invalid DICOM file" in {
-      val transactionId = 999
-      val transaction = OutgoingTransaction(transactionId, 987, "some box", 1, 2, 2, TransactionStatus.WAITING)
-      val image = OutgoingImage(456, transactionId, 33, false)
+      val outgoingTransactionId = 999
+      val transaction = OutgoingTransaction(outgoingTransactionId, 987, "some box", 1, 2, 2, TransactionStatus.WAITING)
+      val image = OutgoingImage(456, outgoingTransactionId, 33, false)
       val transactionImage = OutgoingTransactionImage(transaction, image)
 
       marshal(transactionImage) match {
@@ -274,9 +274,9 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
     "should tell the box it is pulling images from that a transaction has failed when an image cannot be stored" in {
       storageService ! ShowBadBehavior(new IllegalArgumentException("Pretending I cannot store dataset."))
 
-      val transactionId = 999
-      val transaction = OutgoingTransaction(transactionId, 987, "some box", 1, 2, 2, TransactionStatus.WAITING)
-      val image = OutgoingImage(456, transactionId, 33, false)
+      val outgoingTransactionId = 999
+      val transaction = OutgoingTransaction(outgoingTransactionId, 987, "some box", 1, 2, 2, TransactionStatus.WAITING)
+      val image = OutgoingImage(456, outgoingTransactionId, 33, false)
       val transactionImage = OutgoingTransactionImage(transaction, image)
 
       marshal(transactionImage) match {

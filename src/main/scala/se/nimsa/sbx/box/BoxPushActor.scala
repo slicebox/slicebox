@@ -98,11 +98,6 @@ class BoxPushActor(box: Box,
       context.unbecome
   }
 
-  def nextOutgoingTransaction: Option[OutgoingTransactionImage] =
-    db.withSession { implicit session =>
-      boxDao.nextOutgoingTransactionImageForBoxId(box.id)
-    }
-
   def sendFileForOutgoingTransaction(transactionImage: OutgoingTransactionImage) = {
     val transactionTagValues = tagValuesForImageIdAndTransactionId(transactionImage)
     sendFile(transactionImage, transactionTagValues)
@@ -143,11 +138,6 @@ class BoxPushActor(box: Box,
       }
   }
 
-  def tagValuesForImageIdAndTransactionId(transactionImage: OutgoingTransactionImage): Seq[OutgoingTagValue] =
-    db.withSession { implicit session =>
-      boxDao.tagValuesByOutgoingTransactionImage(transactionImage.transaction.id, transactionImage.image.id)
-    }
-
   def handleFileSentForOutgoingTransaction(transactionImage: OutgoingTransactionImage) = {
     log.debug(s"File sent for outgoing transaction ${transactionImage.transaction.id}")
 
@@ -157,7 +147,7 @@ class BoxPushActor(box: Box,
     if (updatedTransaction.sentImageCount == updatedTransaction.totalImageCount) {
       context.system.eventStream.publish(ImagesSent(Destination(DestinationType.BOX, box.name, box.id), outgoingImageIdsForTransactionId(updatedTransaction.id)))
       SbxLog.info("Box", s"Finished sending ${updatedTransaction.totalImageCount} images to box ${box.name}")
-      markOutgoingTransactionAsFinished(updatedTransaction)
+      setOutgoingTransactionStatus(updatedTransaction, TransactionStatus.FINISHED)
     }
 
     context.unbecome
@@ -168,31 +158,37 @@ class BoxPushActor(box: Box,
     log.debug(s"Failed to send file to box ${box.name}: ${exception.getMessage}")
     statusCode match {
       case code if code >= 500 =>
-      // server-side error, remote box is most likely down
+        // server-side error, remote box is most likely down
+        setOutgoingTransactionStatus(transactionImage.transaction, TransactionStatus.WAITING)
+
       case _ =>
-        markOutgoingTransactionAsFailed(transactionImage.transaction, s"Cannot send file to box ${box.name}: ${exception.getMessage}")
+        setOutgoingTransactionStatus(transactionImage.transaction, TransactionStatus.FAILED)
+        SbxLog.error("Box", s"Cannot send file to box ${box.name}: ${exception.getMessage}")
     }
     context.unbecome
   }
 
+  def nextOutgoingTransaction: Option[OutgoingTransactionImage] =
+    db.withSession { implicit session =>
+      boxDao.nextOutgoingTransactionImageForBoxId(box.id)
+    }
+
+  def tagValuesForImageIdAndTransactionId(transactionImage: OutgoingTransactionImage): Seq[OutgoingTagValue] =
+    db.withSession { implicit session =>
+      boxDao.tagValuesByOutgoingTransactionImage(transactionImage.transaction.id, transactionImage.image.id)
+    }
+
   def updateOutgoingTransactionAfterSendingFile(transaction: OutgoingTransaction) =
     db.withSession { implicit session =>
-      val updatedTransaction = transaction.incrementSent.updateTimestamp
+      val updatedTransaction = transaction.incrementSent.updateTimestamp.copy(status = TransactionStatus.PROCESSING)
       boxDao.updateOutgoingTransaction(updatedTransaction)
       updatedTransaction
     }
 
-  def markOutgoingTransactionAsFinished(transaction: OutgoingTransaction) =
+  def setOutgoingTransactionStatus(transaction: OutgoingTransaction, status: TransactionStatus) =
     db.withSession { implicit session =>
-      boxDao.setOutgoingTransactionStatus(transaction.id, TransactionStatus.FINISHED)
+      boxDao.setOutgoingTransactionStatus(transaction.id, status)
     }
-
-  def markOutgoingTransactionAsFailed(transaction: OutgoingTransaction, logMessage: String) = {
-    db.withSession { implicit session =>
-      boxDao.setOutgoingTransactionStatus(transaction.id, TransactionStatus.FAILED)
-    }
-    SbxLog.error("Box", logMessage)
-  }
 
   def markOutgoingImageAsSent(image: OutgoingImage) =
     db.withSession { implicit session =>

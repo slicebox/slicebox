@@ -26,7 +26,7 @@ import akka.event.LoggingReceive
 import akka.pattern.ask
 import spray.client.pipelining._
 import spray.http.HttpResponse
-import spray.http.StatusCodes
+import spray.http.StatusCodes._
 import spray.httpx.SprayJsonSupport._
 import spray.httpx.marshalling.marshal
 import spray.httpx.unmarshalling.FromResponseUnmarshaller
@@ -72,7 +72,7 @@ class BoxPollActor(box: Box,
 
   def convertOption[T](implicit unmarshaller: FromResponseUnmarshaller[T]): Future[HttpResponse] => Future[Option[T]] =
     (futureResponse: Future[HttpResponse]) => futureResponse.map { response =>
-      if (response.status == StatusCodes.NotFound) None
+      if (response.status == NotFound) None
       else Some(unmarshal[T](unmarshaller)(response))
     }
 
@@ -83,15 +83,15 @@ class BoxPollActor(box: Box,
     pollRemoteBoxOutgoingPipeline(Get(s"${box.baseUrl}/outgoing/poll"))
 
   def getRemoteOutgoingFile(transactionImage: OutgoingTransactionImage): Future[HttpResponse] =
-    sendRequestToRemoteBoxPipeline(Get(s"${box.baseUrl}/outgoing?transactionid=${transactionImage.transaction.id}&imageid=${transactionImage.image.imageId}"))
+    sendRequestToRemoteBoxPipeline(Get(s"${box.baseUrl}/outgoing?transactionid=${transactionImage.transaction.id}&imageid=${transactionImage.image.id}"))
 
-  // We don't need to wait for done message to be sent since it is not criticalf that it is received by the remote box
+  // We don't need to wait for done message to be sent since it is not critical that it is received by the remote box
   def sendRemoteOutgoingFileCompleted(transactionImage: OutgoingTransactionImage): Future[HttpResponse] =
     marshal(transactionImage) match {
       case Right(entity) =>
         sendRequestToRemoteBoxPipeline(Post(s"${box.baseUrl}/outgoing/done", entity))
       case Left(e) =>
-        SbxLog.error("Box", s"Failed to send done message to remote box (${box.name},${transactionImage.transaction.id},${transactionImage.image.imageId})")
+        SbxLog.error("Box", s"Failed to send done message to box ${box.name}, data=$transactionImage")
         Future.failed(e)
     }
 
@@ -100,7 +100,7 @@ class BoxPollActor(box: Box,
       case Right(entity) =>
         sendRequestToRemoteBoxPipeline(Post(s"${box.baseUrl}/outgoing/failed", entity))
       case Left(e) =>
-        SbxLog.error("Box", s"Failed to send failed message to remote box (${box.name},${failedTransactionImage.transactionImage.transaction.id},${failedTransactionImage.transactionImage.image.imageId})")
+        SbxLog.error("Box", s"Failed to send failed message to box ${box.name}, data=$failedTransactionImage")
         Future.failed(e)
     }
 
@@ -144,13 +144,17 @@ class BoxPollActor(box: Box,
         pollRemoteBox()
       }
 
-    case FetchFileFailed(transactionImage, exception) =>
+    case FetchFileFailedTemporarily(transactionImage, exception) =>
       SbxLog.info("Box", s"Failed to fetch file from box ${box.name}: " + exception.getMessage)
+      incomingTransactionByOutgoingTransactionId(box.id, transactionImage.transaction.id).foreach(incomingTransaction =>
+        setIncomingTransactionStatus(incomingTransaction, TransactionStatus.WAITING))
       context.unbecome
 
-    case HandlingFetchedFileFailed(transactionImage, exception) =>
+    case FetchFileFailedPermanently(transactionImage, exception) =>
       sendRemoteOutgoingFileFailed(FailedOutgoingTransactionImage(transactionImage, exception.getMessage))
       SbxLog.error("Box", s"Failed to handle fetched file from box ${box.name}: " + exception.getMessage)
+      incomingTransactionByOutgoingTransactionId(box.id, transactionImage.transaction.id).foreach(incomingTransaction =>
+        setIncomingTransactionStatus(incomingTransaction, TransactionStatus.WAITING))
       context.unbecome
 
     case ReceiveTimeout =>
@@ -189,7 +193,7 @@ class BoxPollActor(box: Box,
             val dataset = loadDataset(bytes, true)
 
             if (dataset == null)
-              self ! HandlingFetchedFileFailed(transactionImage, new IllegalArgumentException("Dataset could not be read"))
+              self ! FetchFileFailedPermanently(transactionImage, new IllegalArgumentException("Dataset could not be read"))
 
             else
               anonymizationService.ask(ReverseAnonymization(dataset)).mapTo[Attributes]
@@ -203,35 +207,37 @@ class BoxPollActor(box: Box,
                         case Success(DatasetAdded(image, source)) =>
                           self ! RemoteOutgoingFileFetched(transactionImage, image.id)
                         case Success(_) =>
-                          self ! HandlingFetchedFileFailed(transactionImage, new Exception("Unexpected response when adding dataset"))
+                          self ! FetchFileFailedPermanently(transactionImage, new Exception("Unexpected response when adding dataset"))
                         case Failure(exception) =>
-                          self ! HandlingFetchedFileFailed(transactionImage, exception)
+                          self ! FetchFileFailedPermanently(transactionImage, exception)
                       }
 
                   case Failure(exception) =>
-                    self ! HandlingFetchedFileFailed(transactionImage, exception)
+                    self ! FetchFileFailedPermanently(transactionImage, exception)
                 }
           } else
-            self ! FetchFileFailed(transactionImage, new RuntimeException("Server responded with status code " + response.status.intValue))
+            response.status.intValue match {
+              case s if s < 500 =>
+                self ! FetchFileFailedPermanently(transactionImage, new RuntimeException(s"Server responded with status code ${response.status.intValue} and message ${response.message.entity.asString}"))
+              case _ =>
+                self ! FetchFileFailedTemporarily(transactionImage, new RuntimeException(s"Server responded with status code ${response.status.intValue} and message ${response.message.entity.asString}"))
+            }
 
         case Failure(exception) =>
-          self ! FetchFileFailed(transactionImage, exception)
+          self ! FetchFileFailedTemporarily(transactionImage, exception)
       }
 
   def updateIncoming(boxId: Long, boxName: String, outgoingTransactionId: Long, totalImageCount: Long, imageId: Long): Unit = {
-    db.withSession { implicit session =>
 
-      val existingTransaction = boxDao.incomingTransactionByOutgoingTransactionId(boxId, outgoingTransactionId)
-        .getOrElse(boxDao.insertIncomingTransaction(IncomingTransaction(-1, boxId, boxName, outgoingTransactionId, 0, totalImageCount, System.currentTimeMillis, TransactionStatus.WAITING)))
-      val incomingTransaction = existingTransaction.incrementReceived.updateTimestamp.copy(totalImageCount = totalImageCount)
-      boxDao.updateIncomingTransaction(incomingTransaction)
-      boxDao.insertIncomingImage(IncomingImage(-1, incomingTransaction.id, imageId))
+    val existingTransaction = incomingTransactionByOutgoingTransactionId(boxId, outgoingTransactionId)
+      .getOrElse(insertIncomingTransaction(IncomingTransaction(-1, boxId, boxName, outgoingTransactionId, 0, totalImageCount, System.currentTimeMillis, TransactionStatus.WAITING)))
+    val incomingTransaction = existingTransaction.incrementReceived.updateTimestamp.copy(totalImageCount = totalImageCount, status = TransactionStatus.PROCESSING)
+    updateIncomingTransaction(incomingTransaction)
+    insertIncomingImage(IncomingImage(-1, incomingTransaction.id, imageId))
 
-      if (incomingTransaction.receivedImageCount == incomingTransaction.totalImageCount)
-        db.withSession { implicit session =>
-          boxDao.setIncomingTransactionStatus(incomingTransaction.id, TransactionStatus.FINISHED)
-          SbxLog.info("Box", s"Received ${totalImageCount} files from box boxName")
-        }
+    if (incomingTransaction.receivedImageCount == incomingTransaction.totalImageCount) {
+      SbxLog.info("Box", s"Received ${totalImageCount} files from box $boxName")
+      setIncomingTransactionStatus(incomingTransaction, TransactionStatus.FINISHED)
     }
   }
 
@@ -239,6 +245,32 @@ class BoxPollActor(box: Box,
     db.withSession { implicit session =>
       boxDao.updateBoxOnlineStatus(box.id, online)
     }
+
+  def incomingTransactionByOutgoingTransactionId(boxId: Long, outgoingTransactionId: Long): Option[IncomingTransaction] =
+    db.withSession { implicit session =>
+      boxDao.incomingTransactionByOutgoingTransactionId(boxId, outgoingTransactionId)
+    }
+
+  def insertIncomingTransaction(incomingTransaction: IncomingTransaction) =
+    db.withSession { implicit session =>
+      boxDao.insertIncomingTransaction(incomingTransaction)
+    }
+
+  def insertIncomingImage(incomingImage: IncomingImage) =
+    db.withSession { implicit session =>
+      boxDao.insertIncomingImage(incomingImage)
+    }
+
+  def updateIncomingTransaction(incomingTransaction: IncomingTransaction) =
+    db.withSession { implicit session =>
+      boxDao.updateIncomingTransaction(incomingTransaction)
+    }
+
+  def setIncomingTransactionStatus(transaction: IncomingTransaction, status: TransactionStatus) =
+    db.withSession { implicit session =>
+      boxDao.setIncomingTransactionStatus(transaction.id, status)
+    }
+
 }
 
 object BoxPollActor {

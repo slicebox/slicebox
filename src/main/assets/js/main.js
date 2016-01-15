@@ -5,7 +5,6 @@
 // Declare app level module which depends on views, and components
 angular.module('slicebox', [
     'ngRoute',
-    'ngCookies',
     'ngAnimate',
     'ngMaterial',
     'slicebox.utils',
@@ -24,7 +23,7 @@ angular.module('slicebox', [
     'slicebox.adminSeriesTypes'
 ])
 
-.config(function($locationProvider, $routeProvider, $mdThemingProvider, $animateProvider, $filterProvider, $httpProvider) {
+.config(function($locationProvider, $routeProvider, $mdThemingProvider, $filterProvider, $httpProvider) {
     $locationProvider.html5Mode(true);
     $routeProvider.otherwise({redirectTo: '/'});
 

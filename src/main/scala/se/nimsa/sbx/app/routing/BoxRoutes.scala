@@ -92,9 +92,9 @@ trait BoxRoutes { this: SliceboxService =>
     pathPrefix("incoming") {
       pathEndOrSingleSlash {
         get {
-          onSuccess(boxService.ask(GetIncoming)) {
-            case Incoming(entries) =>
-              complete(entries)
+          onSuccess(boxService.ask(GetIncomingTransactions)) {
+            case IncomingTransactions(transactions) =>
+              complete(transactions)
           }
         }
       } ~ pathPrefix(LongNumber) { incomingTransactionId =>
@@ -120,9 +120,9 @@ trait BoxRoutes { this: SliceboxService =>
     pathPrefix("outgoing") {
       pathEndOrSingleSlash {
         get {
-          onSuccess(boxService.ask(GetOutgoing)) {
-            case Outgoing(entries) =>
-              complete(entries)
+          onSuccess(boxService.ask(GetOutgoingTransactions)) {
+            case OutgoingTransactions(transactions) =>
+              complete(transactions)
           }
         }
       } ~ pathPrefix(LongNumber) { outgoingTransactionId =>

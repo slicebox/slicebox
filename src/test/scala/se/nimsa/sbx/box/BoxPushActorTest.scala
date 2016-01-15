@@ -91,20 +91,6 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
   "A BoxPushActor" should {
 
-    //    "remove processed outgoing transaction" in {
-    //
-    //      db.withSession { implicit session =>
-    //        val transaction = boxDao.insertOutgoingTransaction(OutgoingTransaction(1, testBox.id, testBox.name, testTransactionId, 0, 1, dbImage1.id, TransactionStatus.WAITING))
-    //        val image = boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, 1, false))
-    //            
-    //        boxPushActorRef ! PollOutgoing
-    //
-    //        expectNoMsg()
-    //
-    //        boxDao.listOutgoingImages.size should be(0)
-    //      }
-    //    }
-
     "should post file to correct URL" in {
 
       val (transaction, image) =
@@ -138,26 +124,6 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
         boxDao.listOutgoingTransactions.head.status shouldBe TransactionStatus.FINISHED
       }
     }
-    //    "should post file in correct order" in {
-    //
-    //      val (transaction, image1, image2) =
-    //        db.withSession { implicit session =>
-    //          // Insert outgoing entries out of order
-    //          val transaction = boxDao.insertOutgoingTransaction(OutgoingTransaction(1, testBox.id, testBox.name, testTransactionId, 2, 5, 1000, TransactionStatus.WAITING))
-    //          val image1 = boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage1.id, false))
-    //          val image2 = boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage2.id, false))
-    //          (transaction, image1, image2)
-    //        }
-    //
-    //      boxPushActorRef ! PollOutgoing
-    //      expectNoMsg()
-    //      boxPushActorRef ! PollOutgoing
-    //      expectNoMsg()
-    //
-    //      capturedFileSendRequests.size should be(2)
-    //      capturedFileSendRequests(0).uri.toString() should be(s"${testBox.baseUrl}/image?transactionid=${transaction.transactionId}&totalimagecount=${transaction.totalImageCount}")
-    //      capturedFileSendRequests(1).uri.toString() should be(s"${testBox.baseUrl}/image?transactionid=${transaction.transactionId}&totalimagecount=${transaction.totalImageCount}")
-    //    }
 
     "mark outgoing transaction as failed when file send fails" in {
 
@@ -176,26 +142,6 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
         outgoingTransactions.foreach(_.status shouldBe TransactionStatus.FAILED)
       }
     }
-
-    //    "mark all outgoing entries for transaction as failed when file send fails" in {
-    //
-    //      db.withSession { implicit session =>
-    //        val invalidImageId = 666
-    //        boxDao.insertOutgoingTransaction(OutgoingTransaction(1, testBox.id, testBox.name, testTransactionId, 1, 1, invalidImageId, false))
-    //        boxDao.insertOutgoingTransaction(OutgoingTransaction(1, testBox.id, testBox.name, testTransactionId, 2, 2, invalidImageId, false))
-    //
-    //        boxPushActorRef ! PollOutgoing
-    //        boxPushActorRef ! PollOutgoing
-    //        expectNoMsg()
-    //        expectNoMsg()
-    //
-    //        val outgoingTransactions = boxDao.listOutgoingTransactions
-    //        outgoingTransactions.size should be(2)
-    //        outgoingTransactions.foreach(outgoingTransaction => {
-    //          outgoingTransaction.failed should be(true)
-    //        })
-    //      }
-    //    }
 
     "not mark wrong outgoing transaction as failed when transaction id is not unique" in {
 

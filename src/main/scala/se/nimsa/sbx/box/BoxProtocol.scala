@@ -44,7 +44,7 @@ object BoxProtocol {
 
   sealed trait TransactionStatus {
     override def toString(): String = this match {
-      case TransactionStatus.SENDING => "SENDING"
+      case TransactionStatus.PROCESSING => "PROCESSING"
       case TransactionStatus.WAITING => "WAITING"
       case TransactionStatus.FAILED => "FAILED"
       case TransactionStatus.FINISHED => "FINISHED"
@@ -52,13 +52,13 @@ object BoxProtocol {
   }
 
   object TransactionStatus {
-    case object SENDING extends TransactionStatus
+    case object PROCESSING extends TransactionStatus
     case object WAITING extends TransactionStatus
     case object FAILED extends TransactionStatus
     case object FINISHED extends TransactionStatus
 
     def withName(string: String) = string match {
-      case "SENDING" => SENDING
+      case "PROCESSING" => PROCESSING
       case "WAITING" => WAITING
       case "FAILED" => FAILED
       case "FINISHED" => FINISHED
@@ -122,9 +122,9 @@ object BoxProtocol {
 
   case class MarkOutgoingTransactionAsFailed(box: Box, failedTransactionImage: FailedOutgoingTransactionImage) extends BoxRequest
   
-  case object GetIncoming extends BoxRequest
+  case object GetIncomingTransactions extends BoxRequest
 
-  case object GetOutgoing extends BoxRequest
+  case object GetOutgoingTransactions extends BoxRequest
 
   case class RemoveIncomingTransaction(incomingTransactionId: Long) extends BoxRequest
   
@@ -155,9 +155,9 @@ object BoxProtocol {
 
   case object OutgoingTransactionMarkedAsFailed
   
-  case class Incoming(transactions: Seq[IncomingTransaction])
+  case class IncomingTransactions(transactions: Seq[IncomingTransaction])
 
-  case class Outgoing(transactions: Seq[OutgoingTransaction])
+  case class OutgoingTransactions(transactions: Seq[OutgoingTransaction])
 
   // box push actor internal messages
 
@@ -179,7 +179,7 @@ object BoxProtocol {
 
   case class RemoteOutgoingFileFetched(transactionImage: OutgoingTransactionImage, imageId: Long)
 
-  case class FetchFileFailed(transactionImage: OutgoingTransactionImage, e: Throwable)
+  case class FetchFileFailedTemporarily(transactionImage: OutgoingTransactionImage, e: Throwable)
 
-  case class HandlingFetchedFileFailed(transactionImage: OutgoingTransactionImage, e: Throwable)
+  case class FetchFileFailedPermanently(transactionImage: OutgoingTransactionImage, e: Throwable)
 }

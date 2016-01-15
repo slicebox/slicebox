@@ -141,8 +141,8 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   it should "support listing incoming entries" in {
     val sentTransaction =
       db.withSession { implicit session =>
-        boxDao.insertIncomingTransaction(IncomingTransaction(-1, 1, "some box", 1, 3, 4, System.currentTimeMillis(), TransactionStatus.SENDING))
-        boxDao.insertIncomingTransaction(IncomingTransaction(-1, 1, "some box", 2, 3, 5, System.currentTimeMillis(), TransactionStatus.SENDING))
+        boxDao.insertIncomingTransaction(IncomingTransaction(-1, 1, "some box", 1, 3, 4, System.currentTimeMillis(), TransactionStatus.WAITING))
+        boxDao.insertIncomingTransaction(IncomingTransaction(-1, 1, "some box", 2, 3, 5, System.currentTimeMillis(), TransactionStatus.WAITING))
       }
 
     GetAsUser("/api/boxes/incoming") ~> routes ~> check {
@@ -153,7 +153,7 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   it should "support removing incoming entries" in {
     val entry =
       db.withSession { implicit session =>
-        boxDao.insertIncomingTransaction(IncomingTransaction(-1, 1, "some box", 2, 3, 4, System.currentTimeMillis(), TransactionStatus.SENDING))
+        boxDao.insertIncomingTransaction(IncomingTransaction(-1, 1, "some box", 2, 3, 4, System.currentTimeMillis(), TransactionStatus.WAITING))
       }
 
     DeleteAsUser(s"/api/boxes/incoming/${entry.id}") ~> routes ~> check {

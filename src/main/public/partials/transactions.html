@@ -15,17 +15,27 @@
                             callbacks="callbacks.incomingTable"
                             empty-message="There are no incoming transactions">
 
-                            <sbx-grid-column property="lastUpdated" title="Received" filter="date: yyyy-MM-dd HH:mm">
+                            <sbx-grid-column property="lastUpdated" title="Updated" filter="date: yyyy-MM-dd HH:mm">
                             </sbx-grid-column>
 
-                            <sbx-grid-column property="remoteBoxName" title="Remote Box Name">
+                            <sbx-grid-column property="boxName" title="Box">
                             </sbx-grid-column>
 
-                            <sbx-grid-column property="receivedImageCount" title="Received Images">
+                            <sbx-grid-column property="receivedImageCount" title="Received">
                             </sbx-grid-column>
 
-                            <sbx-grid-column property="totalImageCount" title="Total Images">
+                            <sbx-grid-column property="totalImageCount" title="Total">
                             </sbx-grid-column>
+
+                            <sbx-grid-column property="status" title="Status">
+                                <sbx-grid-cell>
+                                    <sbx-chip ng-if="rawPropertyValue == 'WAITING'" chip-class="sbx-chip-waiting">waiting</sbx-chip>
+                                    <sbx-chip ng-if="rawPropertyValue == 'PROCESSING'" chip-class="sbx-chip-processing">receiving</sbx-chip>
+                                    <sbx-chip ng-if="rawPropertyValue == 'FAILED'" chip-class="sbx-chip-warn">failed</sbx-chip>
+                                    <sbx-chip ng-if="rawPropertyValue == 'FINISHED'">finished</sbx-chip>
+                                </sbx-grid-cell>                            
+                            </sbx-grid-column>
+
                         </sbx-grid>
                     </md-content>
                 </md-card-content>
@@ -45,17 +55,25 @@
                             callbacks="callbacks.outgoingTable"
                             empty-message="There are no outgoing transactions">
 
-                            <sbx-grid-column property="remoteBoxName" title="Remote Box Name">
+                            <sbx-grid-column property="lastUpdated" title="Updated" filter="date: yyyy-MM-dd HH:mm">
                             </sbx-grid-column>
 
-                            <sbx-grid-column property="deliveredImageCount" title="Delivered">
+                            <sbx-grid-column property="boxName" title="Box">
                             </sbx-grid-column>
 
-                            <sbx-grid-column property="failed" title="Status">
+                            <sbx-grid-column property="sentImageCount" title="Sent">
+                            </sbx-grid-column>
+
+                            <sbx-grid-column property="totalImageCount" title="Total">
+                            </sbx-grid-column>
+
+                            <sbx-grid-column property="status" title="Status">
                                 <sbx-grid-cell>
-                                    <sbx-chip ng-if="rowObject.failed" chip-class="sbx-chip-warn">Failed</sbx-chip>
-                                    <sbx-chip ng-if="!rowObject.failed">Sending</sbx-chip>
-                                </sbx-grid-cell>
+                                    <sbx-chip ng-if="rawPropertyValue == 'WAITING'" chip-class="sbx-chip-waiting">waiting</sbx-chip>
+                                    <sbx-chip ng-if="rawPropertyValue == 'PROCESSING'" chip-class="sbx-chip-processing">sending</sbx-chip>
+                                    <sbx-chip ng-if="rawPropertyValue == 'FAILED'" chip-class="sbx-chip-warn">failed</sbx-chip>
+                                    <sbx-chip ng-if="rawPropertyValue == 'FINISHED'">finished</sbx-chip>
+                                </sbx-grid-cell>                            
                             </sbx-grid-column>
 
                         </sbx-grid>
