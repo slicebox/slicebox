@@ -114,7 +114,7 @@ object BoxProtocol {
 
   case class SendToRemoteBox(box: Box, imageTagValuesSeq: Seq[ImageTagValues]) extends BoxRequest
 
-  case class GetOutgoingTransactionImage(box: Box, outgoingTransactionId: Long, outgoingImageId: Long) extends BoxRequest
+  case class GetOutgoingTransactionImage(box: Box, outgoingTransactionId: Long, imageId: Long) extends BoxRequest
 
   case class GetOutgoingTagValues(transactionImage: OutgoingTransactionImage) extends BoxRequest
 
@@ -148,8 +148,6 @@ object BoxProtocol {
   case class Boxes(boxes: Seq[Box])
 
   case class IncomingUpdated(transaction: IncomingTransaction)
-
-  case object OutgoingEmpty
 
   case class ImagesAddedToOutgoing(boxId: Long, imageIds: Seq[Long])
 

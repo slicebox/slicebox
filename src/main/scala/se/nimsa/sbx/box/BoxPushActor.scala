@@ -104,7 +104,7 @@ class BoxPushActor(box: Box,
     }
 
   def sendFileForOutgoingTransaction(transactionImage: OutgoingTransactionImage) = {
-    val transactionTagValues = tagValuesForImageIdAndTransactionId(transactionImage.transaction.id, transactionImage.image.imageId)
+    val transactionTagValues = tagValuesForImageIdAndTransactionId(transactionImage)
     sendFile(transactionImage, transactionTagValues)
   }
 
@@ -117,7 +117,7 @@ class BoxPushActor(box: Box,
         val futureAnonymizedDataset = anonymizationService.ask(Anonymize(transactionImage.image.imageId, dataset, tagValues.map(_.tagValue))).mapTo[Attributes]
         futureAnonymizedDataset flatMap { anonymizedDataset =>
           val compressedBytes = compress(toByteArray(anonymizedDataset))
-          sendFilePipeline(Post(s"${box.baseUrl}/transactions/image?transactionid=${transactionImage.transaction.id}&totalimagecount=${transactionImage.transaction.totalImageCount}", HttpData(compressedBytes)))
+          sendFilePipeline(Post(s"${box.baseUrl}/image?transactionid=${transactionImage.transaction.id}&totalimagecount=${transactionImage.transaction.totalImageCount}", HttpData(compressedBytes)))
         }
       case None =>
         Future.failed(new IllegalArgumentException("No dataset found for image id " + transactionImage.image.imageId))
@@ -143,9 +143,9 @@ class BoxPushActor(box: Box,
       }
   }
 
-  def tagValuesForImageIdAndTransactionId(transactionId: Long, imageId: Long): Seq[OutgoingTagValue] =
+  def tagValuesForImageIdAndTransactionId(transactionImage: OutgoingTransactionImage): Seq[OutgoingTagValue] =
     db.withSession { implicit session =>
-      boxDao.tagValuesByOutgoingTransactionIdAndImageId(transactionId, imageId)
+      boxDao.tagValuesByOutgoingTransactionImage(transactionImage.transaction.id, transactionImage.image.id)
     }
 
   def handleFileSentForOutgoingTransaction(transactionImage: OutgoingTransactionImage) = {

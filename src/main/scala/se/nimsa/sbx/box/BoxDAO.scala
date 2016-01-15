@@ -65,7 +65,7 @@ class BoxDAO(val driver: JdbcProfile) {
     def outgoingTransactionId = column[Long]("outgoingtransactionid")
     def imageId = column[Long]("imageid")
     def sent = column[Boolean]("sent")
-    def fkOutgoingTransaction = foreignKey("fk_transaction_id", outgoingTransactionId, outgoingTransactionQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
+    def fkOutgoingTransaction = foreignKey("fk_outgoing_transaction_id", outgoingTransactionId, outgoingTransactionQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
     def * = (id, outgoingTransactionId, imageId, sent) <> (OutgoingImage.tupled, OutgoingImage.unapply)
   }
 
@@ -79,7 +79,7 @@ class BoxDAO(val driver: JdbcProfile) {
     def outgoingImageId = column[Long]("outgoingimageid")
     def dicomTag = column[Int]("tag")
     def value = column[String]("value")
-    def fkOutgoingImage = foreignKey("fk_outgoing_image", outgoingImageId, outgoingImageQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
+    def fkOutgoingImage = foreignKey("fk_outgoing_image_id", outgoingImageId, outgoingImageQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
     def * = (id, outgoingImageId, dicomTag, value) <> (toOutgoingTagValue.tupled, fromOutgoingTagValue)
   }
 
@@ -103,7 +103,7 @@ class BoxDAO(val driver: JdbcProfile) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def incomingTransactionId = column[Long]("incomingtransactionid")
     def imageId = column[Long]("imageid")
-    def fkIncomingTransaction = foreignKey("fk_transaction_id", incomingTransactionId, incomingTransactionQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
+    def fkIncomingTransaction = foreignKey("fk_incoming_transaction_id", incomingTransactionId, incomingTransactionQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
     def * = (id, incomingTransactionId, imageId) <> (IncomingImage.tupled, IncomingImage.unapply)
   }
 
@@ -131,11 +131,8 @@ class BoxDAO(val driver: JdbcProfile) {
 
   def clear(implicit session: Session): Unit = {
     boxQuery.delete
-    incomingTransactionQuery.delete
-    outgoingTransactionQuery.delete
-    outgoingImageQuery.delete
-    outgoingTagValueQuery.delete
-    incomingImageQuery.delete
+    outgoingTransactionQuery.delete // cascade deletes images and tag values
+    incomingTransactionQuery.delete // cascade deletes images
   }
 
   def listOutgoingTagValues(implicit session: Session): List[OutgoingTagValue] =
@@ -146,7 +143,7 @@ class BoxDAO(val driver: JdbcProfile) {
     tagValue.copy(id = generatedId)
   }
 
-  def tagValuesByOutgoingTransactionIdAndImageId(outgoingTransactionId: Long, outgoingImageId: Long)(implicit session: Session): List[OutgoingTagValue] = {
+  def tagValuesByOutgoingTransactionImage(outgoingTransactionId: Long, outgoingImageId: Long)(implicit session: Session): List[OutgoingTagValue] = {
     val join = for {
       transaction <- outgoingTransactionQuery
       image <- outgoingImageQuery if transaction.id === image.outgoingTransactionId
@@ -282,7 +279,7 @@ class BoxDAO(val driver: JdbcProfile) {
   def listBoxes(implicit session: Session): List[Box] =
     boxQuery.list
 
-  def listOutgoingEntries(implicit session: Session): List[OutgoingTransaction] =
+  def listOutgoingTransactions(implicit session: Session): List[OutgoingTransaction] =
     outgoingTransactionQuery
       .sortBy(_.lastUpdated.desc)
       .list
@@ -290,7 +287,7 @@ class BoxDAO(val driver: JdbcProfile) {
   def listOutgoingImages(implicit session: Session): List[OutgoingImage] =
     outgoingImageQuery.list
 
-  def listIncomingEntries(implicit session: Session): List[IncomingTransaction] =
+  def listIncomingTransactions(implicit session: Session): List[IncomingTransaction] =
     incomingTransactionQuery
       .sortBy(_.lastUpdated.desc)
       .list

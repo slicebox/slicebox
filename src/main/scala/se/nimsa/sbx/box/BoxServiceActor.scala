@@ -90,7 +90,7 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
 
           case CreateConnection(remoteBoxConnectionData) =>
             val token = UUID.randomUUID().toString()
-            val baseUrl = s"$apiBaseURL/boxes/$token"
+            val baseUrl = s"$apiBaseURL/transactions/$token"
             val name = remoteBoxConnectionData.name
             val box = addBoxToDb(Box(-1, name, token, baseUrl, BoxSendMethod.POLL, false))
             sender ! RemoteBoxAdded(box)
@@ -136,16 +136,10 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
 
             sender ! IncomingUpdated(incomingTransaction)
 
-          case PollOutgoing(box) =>
+          case PollOutgoing(box) =>            
             pollBoxesLastPollTimestamp(box.id) = System.currentTimeMillis
-
-            val response = nextOutgoingTransactionImage(box.id) match {
-              case Some(transactionImage) => transactionImage
-              case None                   => OutgoingEmpty
-            }
-
-            sender ! response
-
+            sender ! nextOutgoingTransactionImage(box.id)
+            
           case SendToRemoteBox(box, imageTagValuesSeq) =>
             SbxLog.info("Box", s"Sending ${imageTagValuesSeq.length} images to box ${box.name}")
             addImagesToOutgoing(box.id, box.name, imageTagValuesSeq)
@@ -380,12 +374,12 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
 
   def getIncomingFromDb() =
     db.withSession { implicit session =>
-      boxDao.listIncomingEntries
+      boxDao.listIncomingTransactions
     }
 
   def getOutgoingFromDb() =
     db.withSession { implicit session =>
-      boxDao.listOutgoingEntries
+      boxDao.listOutgoingTransactions
     }
 
   def getIncomingImagesByIncomingTransactionId(incomingTransactionId: Long) =
@@ -405,7 +399,7 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
 
   def tagValuesForOutgoingTransactionImage(transactionImage: OutgoingTransactionImage): Seq[OutgoingTagValue] =
     db.withSession { implicit session =>
-      boxDao.tagValuesByOutgoingTransactionIdAndImageId(transactionImage.transaction.id, transactionImage.image.id)
+      boxDao.tagValuesByOutgoingTransactionImage(transactionImage.transaction.id, transactionImage.image.id)
     }
 
   def getImageMetaData(imageIds: List[Long]): Future[Images] =

@@ -134,26 +134,26 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
     GetAsUser("/api/boxes/outgoing") ~> routes ~> check {
       status should be(OK)
-      responseAs[List[OutgoingEntry]].length should be > 0
+      responseAs[List[OutgoingTransaction]].length should be > 0
     }
   }
 
   it should "support listing incoming entries" in {
-    val sentEntry =
+    val sentTransaction =
       db.withSession { implicit session =>
-        boxDao.insertIncomingEntry(IncomingEntry(-1, 1, "some box", 1, 3, 4, System.currentTimeMillis(), TransactionStatus.SENDING))
-        boxDao.insertIncomingEntry(IncomingEntry(-1, 1, "some box", 2, 3, 5, System.currentTimeMillis(), TransactionStatus.SENDING))
+        boxDao.insertIncomingTransaction(IncomingTransaction(-1, 1, "some box", 1, 3, 4, System.currentTimeMillis(), TransactionStatus.SENDING))
+        boxDao.insertIncomingTransaction(IncomingTransaction(-1, 1, "some box", 2, 3, 5, System.currentTimeMillis(), TransactionStatus.SENDING))
       }
 
     GetAsUser("/api/boxes/incoming") ~> routes ~> check {
-      responseAs[List[IncomingEntry]].size should be(2)
+      responseAs[List[IncomingTransaction]].size should be(2)
     }
   }
 
   it should "support removing incoming entries" in {
     val entry =
       db.withSession { implicit session =>
-        boxDao.insertIncomingEntry(IncomingEntry(-1, 1, "some box", 2, 3, 4, System.currentTimeMillis(), TransactionStatus.SENDING))
+        boxDao.insertIncomingTransaction(IncomingTransaction(-1, 1, "some box", 2, 3, 4, System.currentTimeMillis(), TransactionStatus.SENDING))
       }
 
     DeleteAsUser(s"/api/boxes/incoming/${entry.id}") ~> routes ~> check {
@@ -161,13 +161,13 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
 
     GetAsUser("/api/boxes/incoming") ~> routes ~> check {
-      responseAs[List[IncomingEntry]].size should be(0)
+      responseAs[List[IncomingTransaction]].size should be(0)
     }
   }
 
   it should "support removing outgoing entries" in {
     db.withSession { implicit session =>
-      val entry = boxDao.insertOutgoingEntry(OutgoingEntry(1, 1, "some box", 1234, 0, 1, 1000, TransactionStatus.WAITING))
+      val entry = boxDao.insertOutgoingTransaction(OutgoingTransaction(1, 1, "some box", 0, 1, 1000, TransactionStatus.WAITING))
       val image = boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, 1, false))
 
       DeleteAsUser(s"/api/boxes/outgoing/${entry.id}") ~> routes ~> check {
@@ -175,7 +175,7 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       }
 
       GetAsUser("/api/boxes/outgoing") ~> routes ~> check {
-        responseAs[List[OutgoingEntry]].size should be(0)
+        responseAs[List[OutgoingTransaction]].size should be(0)
       }
       
       boxDao.listOutgoingImages shouldBe empty
@@ -187,7 +187,7 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       db.withSession { implicit session =>
         val (dbPatient1, (dbStudy1, dbStudy2), (dbSeries1, dbSeries2, dbSeries3, dbSeries4), (dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)) =
           TestUtil.insertMetaData(metaDataDao)
-        val entry = boxDao.insertIncomingEntry(IncomingEntry(-1, 1, "some box", 2, 3, 4, System.currentTimeMillis(), TransactionStatus.WAITING))
+        val entry = boxDao.insertIncomingTransaction(IncomingTransaction(-1, 1, "some box", 2, 3, 4, System.currentTimeMillis(), TransactionStatus.WAITING))
         val image1 = boxDao.insertIncomingImage(IncomingImage(-1, entry.id, dbImage1.id))
         val image2 = boxDao.insertIncomingImage(IncomingImage(-1, entry.id, dbImage2.id))
         entry
@@ -204,7 +204,7 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       db.withSession { implicit session =>
         val (dbPatient1, (dbStudy1, dbStudy2), (dbSeries1, dbSeries2, dbSeries3, dbSeries4), (dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)) =
           TestUtil.insertMetaData(metaDataDao)
-        val entry = boxDao.insertIncomingEntry(IncomingEntry(-1, 1, "some box", 2, 3, 4, System.currentTimeMillis(), TransactionStatus.WAITING))
+        val entry = boxDao.insertIncomingTransaction(IncomingTransaction(-1, 1, "some box", 2, 3, 4, System.currentTimeMillis(), TransactionStatus.WAITING))
         val image1 = boxDao.insertIncomingImage(IncomingImage(-1, entry.id, dbImage1.id))
         val image2 = boxDao.insertIncomingImage(IncomingImage(-1, entry.id, dbImage2.id))
         val image3 = boxDao.insertIncomingImage(IncomingImage(-1, entry.id, 666))
@@ -222,7 +222,7 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       db.withSession { implicit session =>
         val (dbPatient1, (dbStudy1, dbStudy2), (dbSeries1, dbSeries2, dbSeries3, dbSeries4), (dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)) =
           TestUtil.insertMetaData(metaDataDao)
-        val entry = boxDao.insertOutgoingEntry(OutgoingEntry(-1, 1, "some box", 2, 3, 4, System.currentTimeMillis(), TransactionStatus.WAITING))
+        val entry = boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, 1, "some box", 3, 4, System.currentTimeMillis(), TransactionStatus.WAITING))
         val image1 = boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, dbImage1.id, false))
         val image2 = boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, dbImage2.id, false))
         entry
@@ -239,7 +239,7 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       db.withSession { implicit session =>
         val (dbPatient1, (dbStudy1, dbStudy2), (dbSeries1, dbSeries2, dbSeries3, dbSeries4), (dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)) =
           TestUtil.insertMetaData(metaDataDao)
-        val entry = boxDao.insertOutgoingEntry(OutgoingEntry(-1, 1, "some box", 2, 3, 4, System.currentTimeMillis(), TransactionStatus.WAITING))
+        val entry = boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, 1, "some box", 3, 4, System.currentTimeMillis(), TransactionStatus.WAITING))
         val image1 = boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, dbImage1.id, false))
         val image2 = boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, dbImage2.id, false))
         val image3 = boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, 666, false))
@@ -261,11 +261,11 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
         responseAs[Image]
       }
 
-    val (entry, imageEntry) =
+    val (entry, imageTransaction) =
       db.withSession { implicit session =>
-        val entry = boxDao.insertIncomingEntry(IncomingEntry(-1, 1, "some box", 2, 3, 4, System.currentTimeMillis(), TransactionStatus.WAITING))
-        val imageEntry = boxDao.insertIncomingImage(IncomingImage(-1, entry.id, image.id))
-        (entry, imageEntry)
+        val entry = boxDao.insertIncomingTransaction(IncomingTransaction(-1, 1, "some box", 2, 3, 4, System.currentTimeMillis(), TransactionStatus.WAITING))
+        val imageTransaction = boxDao.insertIncomingImage(IncomingImage(-1, entry.id, image.id))
+        (entry, imageTransaction)
       }
 
     GetAsUser(s"/api/boxes/incoming/${entry.id}/images") ~> routes ~> check {
@@ -273,7 +273,7 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       responseAs[List[Image]] should have length 1
     }
 
-    DeleteAsUser(s"/api/images/${imageEntry.id}") ~> routes ~> check {
+    DeleteAsUser(s"/api/images/${imageTransaction.imageId}") ~> routes ~> check {
       status shouldBe NoContent
     }
 
@@ -294,11 +294,11 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
         responseAs[Image]
       }
 
-    val (entry, imageEntry) =
+    val (entry, imageTransaction) =
       db.withSession { implicit session =>
-        val entry = boxDao.insertOutgoingEntry(OutgoingEntry(-1, 1, "some box", 2, 3, 4, System.currentTimeMillis(), TransactionStatus.WAITING))
-        val imageEntry = boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, image.id, false))
-        (entry, imageEntry)
+        val entry = boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, 1, "some box", 3, 4, System.currentTimeMillis(), TransactionStatus.WAITING))
+        val imageTransaction = boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, image.id, false))
+        (entry, imageTransaction)
       }
 
     GetAsUser(s"/api/boxes/outgoing/${entry.id}/images") ~> routes ~> check {
@@ -306,7 +306,7 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       responseAs[List[Image]] should have length 1
     }
 
-    DeleteAsUser(s"/api/images/${imageEntry.id}") ~> routes ~> check {
+    DeleteAsUser(s"/api/images/${imageTransaction.imageId}") ~> routes ~> check {
       status shouldBe NoContent
     }
 

@@ -111,17 +111,17 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       expectNoMsg
 
       capturedRequests.size should be(1)
-      capturedRequests(0).uri.toString() should be(s"$remoteBoxBaseUrl/transactions/outgoing/poll")
+      capturedRequests(0).uri.toString() should be(s"$remoteBoxBaseUrl/outgoing/poll")
     }
 
     "call correct URL for getting remote outgoing file" in {
       val transactionId = 999
       val imageId = 33
-      val entry = OutgoingEntry(123, 987, "some box", transactionId, 1, 2, 112233, TransactionStatus.WAITING)
-      val image = OutgoingImage(456, 123, imageId, false)
-      val entryImage = OutgoingEntryImage(entry, image)
+      val transaction = OutgoingTransaction(transactionId, 987, "some box", 1, 2, 112233, TransactionStatus.WAITING)
+      val image = OutgoingImage(456, transactionId, imageId, false)
+      val transactionImage = OutgoingTransactionImage(transaction, image)
       
-      marshal(entryImage) match {
+      marshal(transactionImage) match {
         case Right(entity) => mockHttpResponses += HttpResponse(StatusCodes.OK, entity)
         case Left(e)       => fail(e)
       }
@@ -130,17 +130,17 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
       expectNoMsg
 
-      capturedRequests(1).uri.toString() should be(s"$remoteBoxBaseUrl/transactions/outgoing?transactionid=$transactionId&imageid=$imageId")
+      capturedRequests(1).uri.toString() should be(s"$remoteBoxBaseUrl/outgoing?transactionid=$transactionId&imageid=$imageId")
     }
 
     "handle remote outgoing file" in {
       val transactionId = 999
       val imageId = 33
-      val entry = OutgoingEntry(123, 987, "some box", transactionId, 1, 2, 2, TransactionStatus.WAITING)
-      val image = OutgoingImage(456, 123, imageId, false)
-      val entryImage = OutgoingEntryImage(entry, image)
+      val transaction = OutgoingTransaction(transactionId, 987, "some box", 1, 2, 2, TransactionStatus.WAITING)
+      val image = OutgoingImage(456, transactionId, imageId, false)
+      val transactionImage = OutgoingTransactionImage(transaction, image)
 
-      marshal(entryImage) match {
+      marshal(transactionImage) match {
         case Right(entity) => mockHttpResponses += HttpResponse(StatusCodes.OK, entity)
         case Left(e)       => fail(e)
       }
@@ -154,23 +154,23 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
       expectNoMsg
 
-      // Check that incoming entry has been created
+      // Check that incoming transaction has been created
       db.withSession { implicit session =>
-        val incomingEntries = boxDao.listIncomingEntries
-        incomingEntries should have length 1
+        val incomingTransactions = boxDao.listIncomingTransactions
+        incomingTransactions should have length 1
 
-        incomingEntries.foreach(incomingEntry => {
-          incomingEntry.transactionId should be(transactionId)
-          incomingEntry.remoteBoxId should be(remoteBox.id)
-          incomingEntry.receivedImageCount should be(1)
-          incomingEntry.totalImageCount should be(2)
+        incomingTransactions.foreach(incomingTransaction => {
+          incomingTransaction.outgoingTransactionId should be(transactionId)
+          incomingTransaction.boxId should be(remoteBox.id)
+          incomingTransaction.receivedImageCount should be(1)
+          incomingTransaction.totalImageCount should be(2)
         })
       }
 
       // Check that poll + get image + done + poll message is sent
 
       capturedRequests.size should be(4)
-      capturedRequests(2).uri.toString() should be(s"$remoteBoxBaseUrl/transactions/outgoing/done")
+      capturedRequests(2).uri.toString() should be(s"$remoteBoxBaseUrl/outgoing/done")
     }
 
     "go back to polling state when poll request returns 404" in {
@@ -183,8 +183,8 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       expectNoMsg
 
       capturedRequests.size should be(2)
-      capturedRequests(0).uri.toString() should be(s"$remoteBoxBaseUrl/transactions/outgoing/poll")
-      capturedRequests(1).uri.toString() should be(s"$remoteBoxBaseUrl/transactions/outgoing/poll")
+      capturedRequests(0).uri.toString() should be(s"$remoteBoxBaseUrl/outgoing/poll")
+      capturedRequests(1).uri.toString() should be(s"$remoteBoxBaseUrl/outgoing/poll")
     }
 
     "go back to polling state if a step in the polling sequence exceeds the PollBoxActor's timeout limit" in {
@@ -192,10 +192,10 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       pollBoxActorRef ! PollRemoteBox
       pollBoxActorRef ! ReceiveTimeout // waiting for remote server timeout triggers this message 
 
-      // Check that no incoming entry was created since the poll request timed out
+      // Check that no incoming transaction was created since the poll request timed out
       db.withSession { implicit session =>
-        val incomingEntries = boxDao.listIncomingEntries
-        incomingEntries shouldBe empty
+        val incomingTransactions = boxDao.listIncomingTransactions
+        incomingTransactions shouldBe empty
       }
 
       pollBoxActorRef ! PollRemoteBox
@@ -203,17 +203,17 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
       // make sure we are back in the polling state. If we are, there should be two polling requests
       capturedRequests.size should be(2)
-      capturedRequests(0).uri.toString() should be(s"$remoteBoxBaseUrl/transactions/outgoing/poll")
-      capturedRequests(1).uri.toString() should be(s"$remoteBoxBaseUrl/transactions/outgoing/poll")
+      capturedRequests(0).uri.toString() should be(s"$remoteBoxBaseUrl/outgoing/poll")
+      capturedRequests(1).uri.toString() should be(s"$remoteBoxBaseUrl/outgoing/poll")
     }
 
     "keep trying to fetch remote file until fetching succeeds" in {
       val transactionId = 999
-      val entry = OutgoingEntry(123, 987, "some box", transactionId, 1, 2, 2, TransactionStatus.WAITING)
-      val image = OutgoingImage(456, 123, 33, false)
-      val entryImage = OutgoingEntryImage(entry, image)
+      val transaction = OutgoingTransaction(transactionId, 987, "some box", 1, 2, 2, TransactionStatus.WAITING)
+      val image = OutgoingImage(456, transactionId, 33, false)
+      val transactionImage = OutgoingTransactionImage(transaction, image)
 
-      marshal(entryImage) match {
+      marshal(transactionImage) match {
         case Right(entity) =>
           mockHttpResponses += HttpResponse(StatusCodes.OK, entity)
           mockHttpResponses += HttpResponse(StatusCodes.BadGateway)
@@ -228,7 +228,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       mockHttpResponses += HttpResponse(StatusCodes.OK, HttpEntity(ContentTypes.`application/octet-stream`, HttpData(bytes)))
       mockHttpResponses += HttpResponse(StatusCodes.NoContent)
 
-      // poll box, outgoing entry will be found and an attempt to fetch the file will fail
+      // poll box, outgoing transaction will be found and an attempt to fetch the file will fail
       pollBoxActorRef ! PollRemoteBox
       expectNoMsg
 
@@ -242,17 +242,17 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
       // Check that requests are sent as expected
       capturedRequests.size should be(8)
-      capturedRequests(6).uri.toString() should be(s"$remoteBoxBaseUrl/transactions/outgoing/done")
-      capturedRequests(7).uri.toString() should be(s"$remoteBoxBaseUrl/transactions/outgoing/poll")
+      capturedRequests(6).uri.toString() should be(s"$remoteBoxBaseUrl/outgoing/done")
+      capturedRequests(7).uri.toString() should be(s"$remoteBoxBaseUrl/outgoing/poll")
     }
 
     "should tell the box it is pulling images from that a transaction has failed due to receiving an invalid DICOM file" in {
       val transactionId = 999
-      val entry = OutgoingEntry(123, 987, "some box", transactionId, 1, 2, 2, TransactionStatus.WAITING)
-      val image = OutgoingImage(456, 123, 33, false)
-      val entryImage = OutgoingEntryImage(entry, image)
+      val transaction = OutgoingTransaction(transactionId, 987, "some box", 1, 2, 2, TransactionStatus.WAITING)
+      val image = OutgoingImage(456, transactionId, 33, false)
+      val transactionImage = OutgoingTransactionImage(transaction, image)
 
-      marshal(entryImage) match {
+      marshal(transactionImage) match {
         case Right(entity) => mockHttpResponses += HttpResponse(StatusCodes.OK, entity)
         case Left(e)       => fail(e)
       }
@@ -268,18 +268,18 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
       // Check that requests are sent as expected
       capturedRequests.size should be(3)
-      capturedRequests(2).uri.toString() should be(s"$remoteBoxBaseUrl/transactions/outgoing/failed")
+      capturedRequests(2).uri.toString() should be(s"$remoteBoxBaseUrl/outgoing/failed")
     }
 
     "should tell the box it is pulling images from that a transaction has failed when an image cannot be stored" in {
       storageService ! ShowBadBehavior(new IllegalArgumentException("Pretending I cannot store dataset."))
 
       val transactionId = 999
-      val entry = OutgoingEntry(123, 987, "some box", transactionId, 1, 2, 2, TransactionStatus.WAITING)
-      val image = OutgoingImage(456, 123, 33, false)
-      val entryImage = OutgoingEntryImage(entry, image)
+      val transaction = OutgoingTransaction(transactionId, 987, "some box", 1, 2, 2, TransactionStatus.WAITING)
+      val image = OutgoingImage(456, transactionId, 33, false)
+      val transactionImage = OutgoingTransactionImage(transaction, image)
 
-      marshal(entryImage) match {
+      marshal(transactionImage) match {
         case Right(entity) => mockHttpResponses += HttpResponse(StatusCodes.OK, entity)
         case Left(e)       => fail(e)
       }
@@ -295,7 +295,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
       // Check that requests are sent as expected
       capturedRequests.size should be(3)
-      capturedRequests(2).uri.toString() should be(s"$remoteBoxBaseUrl/transactions/outgoing/failed")
+      capturedRequests(2).uri.toString() should be(s"$remoteBoxBaseUrl/outgoing/failed")
     }
 
   }

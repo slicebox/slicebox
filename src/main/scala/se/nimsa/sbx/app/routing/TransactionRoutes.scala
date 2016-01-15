@@ -38,11 +38,11 @@ import se.nimsa.sbx.util.CompressionUtil._
 trait TransactionRoutes { this: SliceboxService =>
 
   def transactionRoutes: Route =
-    pathPrefix("boxes" / Segment / "transactions") { token =>
+    pathPrefix("transactions" / Segment) { token =>
 
       onSuccess(boxService.ask(GetBoxByToken(token)).mapTo[Option[Box]]) {
         case None =>
-          complete((NotFound, s"No box found for token $token"))
+          complete((Unauthorized, s"No box found for token $token"))
         case Some(box) =>
           path("image") {
             parameters('transactionid.as[Long], 'totalimagecount.as[Long]) { (outgoingTransactionId, totalImageCount) =>
@@ -68,12 +68,7 @@ trait TransactionRoutes { this: SliceboxService =>
           } ~ pathPrefix("outgoing") {
             path("poll") {
               get {
-                onSuccess(boxService.ask(PollOutgoing(box))) {
-                  case transactionImage: OutgoingTransactionImage =>
-                    complete(transactionImage)
-                  case OutgoingEmpty =>
-                    complete(NotFound)
-                }
+                complete(boxService.ask(PollOutgoing(box)).mapTo[Option[OutgoingTransactionImage]])
               }
             } ~ path("done") {
               post {
@@ -93,29 +88,30 @@ trait TransactionRoutes { this: SliceboxService =>
               }
             } ~ pathEndOrSingleSlash {
               get {
-                parameters('transactionid.as[Long], 'outgoingImageid.as[Long]) { (outgoingTransactionId, outgoingImageId) =>
+                parameters('transactionid.as[Long], 'imageid.as[Long]) { (outgoingTransactionId, outgoingImageId) =>
                   onSuccess(boxService.ask(GetOutgoingTransactionImage(box, outgoingTransactionId, outgoingImageId)).mapTo[Option[OutgoingTransactionImage]]) {
                     _ match {
                       case Some(transactionImage) =>
+                        val imageId = transactionImage.image.imageId
                         onSuccess(boxService.ask(GetOutgoingTagValues(transactionImage)).mapTo[Seq[OutgoingTagValue]]) {
                           case transactionTagValues =>
-                            onSuccess(storageService.ask(GetDataset(outgoingImageId, true)).mapTo[Option[Attributes]]) {
+                            onSuccess(storageService.ask(GetDataset(imageId, true)).mapTo[Option[Attributes]]) {
                               _ match {
                                 case Some(dataset) =>
 
-                                  onSuccess(anonymizationService.ask(Anonymize(outgoingImageId, dataset, transactionTagValues.map(_.tagValue)))) {
+                                  onSuccess(anonymizationService.ask(Anonymize(imageId, dataset, transactionTagValues.map(_.tagValue)))) {
                                     case anonymizedDataset: Attributes =>
                                       val compressedBytes = compress(toByteArray(anonymizedDataset))
                                       complete(HttpEntity(ContentTypes.`application/octet-stream`, HttpData(compressedBytes)))
                                   }
                                 case None =>
 
-                                  complete((NotFound, s"File not found for image id ${outgoingImageId}"))
+                                  complete((NotFound, s"File not found for image id ${imageId}"))
                               }
                             }
                         }
                       case None =>
-                        complete((NotFound, s"No outgoing image found for transaction id $outgoingTransactionId and image id ${outgoingImageId}"))
+                        complete((NotFound, s"No outgoing image found for transaction id $outgoingTransactionId and outgoing image id ${outgoingImageId}"))
                     }
                   }
                 }

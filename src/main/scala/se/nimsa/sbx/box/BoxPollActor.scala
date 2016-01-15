@@ -80,16 +80,16 @@ class BoxPollActor(box: Box,
   def pollRemoteBoxOutgoingPipeline = sendRequestToRemoteBoxPipeline ~> convertOption[OutgoingTransactionImage]
 
   def sendPollRequestToRemoteBox: Future[Option[OutgoingTransactionImage]] =
-    pollRemoteBoxOutgoingPipeline(Get(s"${box.baseUrl}/transactions/outgoing/poll"))
+    pollRemoteBoxOutgoingPipeline(Get(s"${box.baseUrl}/outgoing/poll"))
 
   def getRemoteOutgoingFile(transactionImage: OutgoingTransactionImage): Future[HttpResponse] =
-    sendRequestToRemoteBoxPipeline(Get(s"${box.baseUrl}/transactions/outgoing?transactionid=${transactionImage.transaction.id}&imageid=${transactionImage.image.imageId}"))
+    sendRequestToRemoteBoxPipeline(Get(s"${box.baseUrl}/outgoing?transactionid=${transactionImage.transaction.id}&imageid=${transactionImage.image.imageId}"))
 
   // We don't need to wait for done message to be sent since it is not criticalf that it is received by the remote box
   def sendRemoteOutgoingFileCompleted(transactionImage: OutgoingTransactionImage): Future[HttpResponse] =
     marshal(transactionImage) match {
       case Right(entity) =>
-        sendRequestToRemoteBoxPipeline(Post(s"${box.baseUrl}/transactions/outgoing/done", entity))
+        sendRequestToRemoteBoxPipeline(Post(s"${box.baseUrl}/outgoing/done", entity))
       case Left(e) =>
         SbxLog.error("Box", s"Failed to send done message to remote box (${box.name},${transactionImage.transaction.id},${transactionImage.image.imageId})")
         Future.failed(e)
@@ -98,7 +98,7 @@ class BoxPollActor(box: Box,
   def sendRemoteOutgoingFileFailed(failedTransactionImage: FailedOutgoingTransactionImage): Future[HttpResponse] =
     marshal(failedTransactionImage) match {
       case Right(entity) =>
-        sendRequestToRemoteBoxPipeline(Post(s"${box.baseUrl}/transactions/outgoing/failed", entity))
+        sendRequestToRemoteBoxPipeline(Post(s"${box.baseUrl}/outgoing/failed", entity))
       case Left(e) =>
         SbxLog.error("Box", s"Failed to send failed message to remote box (${box.name},${failedTransactionImage.transactionImage.transaction.id},${failedTransactionImage.transactionImage.image.imageId})")
         Future.failed(e)

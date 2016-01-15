@@ -66,12 +66,12 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     def receive = {
       case SendToRemoteBox(box, tagValues) =>
         sender ! ImagesAddedToOutgoing(box.id, tagValues.map(_.imageId))
-      case GetIncomingEntryForImageId(imageId) =>
+      case GetIncomingTransactionForImageId(imageId) =>
         if (imageId <= 2) {
           receivedImageCount += 1
-          sender ! Some(IncomingEntry(1, 11, "Source box", 1234, receivedImageCount, 2, System.currentTimeMillis, TransactionStatus.WAITING))
+          sender ! Some(IncomingTransaction(1, 11, "Source box", 1234, receivedImageCount, 2, System.currentTimeMillis, TransactionStatus.WAITING))
         } else
-          sender ! Some(IncomingEntry(2, 11, "Source box", 1234, 1, 2, System.currentTimeMillis, TransactionStatus.WAITING))
+          sender ! Some(IncomingTransaction(2, 11, "Source box", 1234, 1, 2, System.currentTimeMillis, TransactionStatus.WAITING))
       case ResetReceivedImageCount =>
         receivedImageCount = 0
     }
