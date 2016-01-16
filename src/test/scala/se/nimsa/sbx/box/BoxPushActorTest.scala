@@ -83,7 +83,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
   override def beforeEach() {
     capturedFileSendRequests.clear()
     failedResponseSendIndices.clear()
-  
+
     db.withSession { implicit session =>
       boxDao.clear
     }
@@ -108,6 +108,23 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       capturedFileSendRequests(0).uri.toString() should be(s"${testBox.baseUrl}/image?transactionid=${transaction.id}&sequencenumber=${image.sequenceNumber}&totalimagecount=${transaction.totalImageCount}")
     }
 
+    "should post file in correct order" in {
+      db.withSession { implicit session =>
+
+        // Insert outbox entries out of order
+        val transaction = boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, testBox.id, testBox.name, 0, 2, 1000, TransactionStatus.WAITING))
+        val image1 = boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage1.id, 2, false))
+        val image2 = boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage2.id, 1, false))
+
+        boxPushActorRef ! PollOutgoing
+        expectNoMsg()
+
+        capturedFileSendRequests.size should be(2)
+        capturedFileSendRequests(0).uri.toString() should be(s"${testBox.baseUrl}/image?transactionid=${transaction.id}&sequencenumber=${image2.sequenceNumber}&totalimagecount=${transaction.totalImageCount}")
+        capturedFileSendRequests(1).uri.toString() should be(s"${testBox.baseUrl}/image?transactionid=${transaction.id}&sequencenumber=${image1.sequenceNumber}&totalimagecount=${transaction.totalImageCount}")
+      }
+    }
+
     "should mark outgoing transaction as finished when all files have been sent" in {
       db.withSession { implicit session =>
 
@@ -116,11 +133,11 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
         val image2 = boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage2.id, 2, false))
 
         boxDao.listOutgoingTransactions.head.status shouldBe TransactionStatus.WAITING
-        
-        boxPushActorRef ! PollOutgoing 
-        
+
+        boxPushActorRef ! PollOutgoing
+
         expectNoMsg() // both images will be sent
-             
+
         boxDao.listOutgoingTransactions.head.status shouldBe TransactionStatus.FINISHED
       }
     }
@@ -204,8 +221,8 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
         val image2 = boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage2.id, 2, false))
         val image3 = boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage3.id, 3, false))
 
-        failedResponseSendIndices ++= Seq(2,3)
-        
+        failedResponseSendIndices ++= Seq(2, 3)
+
         boxPushActorRef ! PollOutgoing
         expectNoMsg()
 

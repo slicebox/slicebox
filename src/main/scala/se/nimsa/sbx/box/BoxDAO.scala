@@ -225,6 +225,7 @@ class BoxDAO(val driver: JdbcProfile) {
       .filterNot(_._1.status === (FAILED: TransactionStatus))
       .filterNot(_._1.status === (FINISHED: TransactionStatus))
       .filter(_._2.sent === false)
+      .sortBy(_._2.sequenceNumber.asc)
       .firstOption
       .map(OutgoingTransactionImage.tupled)
   }
