@@ -112,7 +112,7 @@ class BoxPushActor(box: Box,
         val futureAnonymizedDataset = anonymizationService.ask(Anonymize(transactionImage.image.imageId, dataset, tagValues.map(_.tagValue))).mapTo[Attributes]
         futureAnonymizedDataset flatMap { anonymizedDataset =>
           val compressedBytes = compress(toByteArray(anonymizedDataset))
-          sendFilePipeline(Post(s"${box.baseUrl}/image?transactionid=${transactionImage.transaction.id}&totalimagecount=${transactionImage.transaction.totalImageCount}", HttpData(compressedBytes)))
+          sendFilePipeline(Post(s"${box.baseUrl}/image?transactionid=${transactionImage.transaction.id}&sequencenumber=${transactionImage.image.sequenceNumber}&totalimagecount=${transactionImage.transaction.totalImageCount}", HttpData(compressedBytes)))
         }
       case None =>
         Future.failed(new IllegalArgumentException("No dataset found for image id " + transactionImage.image.imageId))
@@ -142,7 +142,7 @@ class BoxPushActor(box: Box,
     log.debug(s"File sent for outgoing transaction ${transactionImage.transaction.id}")
 
     markOutgoingImageAsSent(transactionImage.image)
-    val updatedTransaction = updateOutgoingTransactionAfterSendingFile(transactionImage.transaction)
+    val updatedTransaction = updateOutgoingTransactionAfterSendingFile(transactionImage)
 
     if (updatedTransaction.sentImageCount == updatedTransaction.totalImageCount) {
       context.system.eventStream.publish(ImagesSent(Destination(DestinationType.BOX, box.name, box.id), outgoingImageIdsForTransactionId(updatedTransaction.id)))
@@ -178,9 +178,12 @@ class BoxPushActor(box: Box,
       boxDao.tagValuesByOutgoingTransactionImage(transactionImage.transaction.id, transactionImage.image.id)
     }
 
-  def updateOutgoingTransactionAfterSendingFile(transaction: OutgoingTransaction) =
+  def updateOutgoingTransactionAfterSendingFile(transactionImage: OutgoingTransactionImage) =
     db.withSession { implicit session =>
-      val updatedTransaction = transaction.incrementSent.updateTimestamp.copy(status = TransactionStatus.PROCESSING)
+      val updatedTransaction = transactionImage.transaction.copy(
+          sentImageCount = transactionImage.image.sequenceNumber,
+          lastUpdated = System.currentTimeMillis, 
+          status = TransactionStatus.PROCESSING)
       boxDao.updateOutgoingTransaction(updatedTransaction)
       updatedTransaction
     }

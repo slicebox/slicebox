@@ -64,9 +64,10 @@ class BoxDAO(val driver: JdbcProfile) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def outgoingTransactionId = column[Long]("outgoingtransactionid")
     def imageId = column[Long]("imageid")
+    def sequenceNumber = column[Long]("sequencenumber")
     def sent = column[Boolean]("sent")
     def fkOutgoingTransaction = foreignKey("fk_outgoing_transaction_id", outgoingTransactionId, outgoingTransactionQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
-    def * = (id, outgoingTransactionId, imageId, sent) <> (OutgoingImage.tupled, OutgoingImage.unapply)
+    def * = (id, outgoingTransactionId, imageId, sequenceNumber, sent) <> (OutgoingImage.tupled, OutgoingImage.unapply)
   }
 
   val outgoingImageQuery = TableQuery[OutgoingImageTable]

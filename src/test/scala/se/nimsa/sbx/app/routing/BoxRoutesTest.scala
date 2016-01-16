@@ -168,7 +168,7 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   it should "support removing outgoing entries" in {
     db.withSession { implicit session =>
       val entry = boxDao.insertOutgoingTransaction(OutgoingTransaction(1, 1, "some box", 0, 1, 1000, TransactionStatus.WAITING))
-      val image = boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, 1, false))
+      val image = boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, 1, 1, false))
 
       DeleteAsUser(s"/api/boxes/outgoing/${entry.id}") ~> routes ~> check {
         status should be(NoContent)
@@ -223,8 +223,8 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
         val (dbPatient1, (dbStudy1, dbStudy2), (dbSeries1, dbSeries2, dbSeries3, dbSeries4), (dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)) =
           TestUtil.insertMetaData(metaDataDao)
         val entry = boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, 1, "some box", 3, 4, System.currentTimeMillis(), TransactionStatus.WAITING))
-        val image1 = boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, dbImage1.id, false))
-        val image2 = boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, dbImage2.id, false))
+        val image1 = boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, dbImage1.id, 1, false))
+        val image2 = boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, dbImage2.id, 2, false))
         entry
       }
 
@@ -240,9 +240,9 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
         val (dbPatient1, (dbStudy1, dbStudy2), (dbSeries1, dbSeries2, dbSeries3, dbSeries4), (dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)) =
           TestUtil.insertMetaData(metaDataDao)
         val entry = boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, 1, "some box", 3, 4, System.currentTimeMillis(), TransactionStatus.WAITING))
-        val image1 = boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, dbImage1.id, false))
-        val image2 = boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, dbImage2.id, false))
-        val image3 = boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, 666, false))
+        val image1 = boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, dbImage1.id, 1, false))
+        val image2 = boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, dbImage2.id, 2, false))
+        val image3 = boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, 666, 3, false))
         entry
       }
 
@@ -297,7 +297,7 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     val (entry, imageTransaction) =
       db.withSession { implicit session =>
         val entry = boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, 1, "some box", 3, 4, System.currentTimeMillis(), TransactionStatus.WAITING))
-        val imageTransaction = boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, image.id, false))
+        val imageTransaction = boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, image.id, 1, false))
         (entry, imageTransaction)
       }
 

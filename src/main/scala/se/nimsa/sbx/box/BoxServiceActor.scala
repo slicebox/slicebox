@@ -44,8 +44,6 @@ import se.nimsa.sbx.util.ExceptionCatching
 
 class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout: Timeout) extends Actor with Stash with ExceptionCatching {
 
-  case object UpdatePollBoxesOnlineStatus
-
   val log = Logging(context.system, this)
 
   val db = dbProps.db
@@ -62,7 +60,7 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
   setupBoxes()
 
   val pollBoxesOnlineStatusSchedule = system.scheduler.schedule(100.milliseconds, 5.seconds) {
-    self ! UpdatePollBoxesOnlineStatus
+    self ! UpdateStatusForBoxesAndTransactions
   }
 
   log.info("Box service started")
@@ -76,8 +74,9 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
 
   def receive = LoggingReceive {
 
-    case UpdatePollBoxesOnlineStatus =>
+    case UpdateStatusForBoxesAndTransactions =>
       updatePollBoxesOnlineStatus()
+      updateTransactionsStatus
 
     case ImageDeleted(imageId) =>
       removeImageFromBoxDb(imageId)
@@ -124,10 +123,14 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
           case GetBoxByToken(token) =>
             sender ! pollBoxByToken(token)
 
-          case UpdateIncoming(box, outgoingTransactionId, totalImageCount, imageId) =>
+          case UpdateIncoming(box, outgoingTransactionId, sequenceNumber, totalImageCount, imageId) =>
             val existingTransaction = incomingTransactionByOutgoingTransactionId(box.id, outgoingTransactionId)
               .getOrElse(addIncomingTransaction(IncomingTransaction(-1, box.id, box.name, outgoingTransactionId, 0, totalImageCount, System.currentTimeMillis, TransactionStatus.WAITING)))
-            val incomingTransaction = updateIncomingTransaction(existingTransaction.incrementReceived.updateTimestamp.copy(totalImageCount = totalImageCount, status = TransactionStatus.PROCESSING))
+            val incomingTransaction = updateIncomingTransaction(existingTransaction.copy(
+              receivedImageCount = sequenceNumber,
+              totalImageCount = totalImageCount,
+              lastUpdated = System.currentTimeMillis,
+              status = TransactionStatus.PROCESSING))
             addIncomingImage(IncomingImage(-1, incomingTransaction.id, imageId))
 
             if (incomingTransaction.receivedImageCount == totalImageCount) {
@@ -151,7 +154,10 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
 
           case MarkOutgoingImageAsSent(box, transactionImage) =>
             updateOutgoingImage(transactionImage.image.copy(sent = true))
-            val updatedTransaction = updateOutgoingTransaction(transactionImage.transaction.incrementSent.updateTimestamp.copy(status = TransactionStatus.PROCESSING))
+            val updatedTransaction = updateOutgoingTransaction(transactionImage.transaction.copy(
+              sentImageCount = transactionImage.image.sequenceNumber,
+              lastUpdated = System.currentTimeMillis,
+              status = TransactionStatus.PROCESSING))
 
             if (updatedTransaction.sentImageCount == updatedTransaction.totalImageCount) {
               context.system.eventStream.publish(ImagesSent(Destination(DestinationType.BOX, box.name, box.id), outgoingImageIdsForTransactionId(updatedTransaction.id)))
@@ -294,12 +300,16 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
 
         updateBoxOnlineStatusInDb(boxId, online)
     }
+  }
+
+  def updateTransactionsStatus(): Unit = {
+    val now = System.currentTimeMillis
 
     getIncomingTransactionsInProcess.foreach { transaction =>
       if (now - transaction.lastUpdated < pollBoxOnlineStatusTimeoutMillis)
         setIncomingTransactionStatus(transaction, TransactionStatus.WAITING)
     }
-    
+
     getOutgoingTransactionsInProcess.foreach { transaction =>
       if (now - transaction.lastUpdated < pollBoxOnlineStatusTimeoutMillis)
         setOutgoingTransactionStatus(transaction, TransactionStatus.WAITING)
@@ -308,11 +318,13 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
 
   def addImagesToOutgoing(boxId: Long, boxName: String, imageTagValuesSeq: Seq[ImageTagValues]) = {
     val outgoingTransaction = addOutgoingTransaction(OutgoingTransaction(-1, boxId, boxName, 0, imageTagValuesSeq.length, System.currentTimeMillis, TransactionStatus.WAITING))
-    imageTagValuesSeq.foreach { imageTagValues =>
-      val outgoingImage = addOutgoingImage(OutgoingImage(-1, outgoingTransaction.id, imageTagValues.imageId, false))
-      imageTagValues.tagValues.foreach { tagValue =>
-        addOutgoingTagValue(OutgoingTagValue(-1, outgoingImage.id, tagValue))
-      }
+    imageTagValuesSeq.zipWithIndex.foreach {
+      case (imageTagValues, index) =>
+        val sequenceNumber = index + 1
+        val outgoingImage = addOutgoingImage(OutgoingImage(-1, outgoingTransaction.id, imageTagValues.imageId, sequenceNumber, false))
+        imageTagValues.tagValues.foreach { tagValue =>
+          addOutgoingTagValue(OutgoingTagValue(-1, outgoingImage.id, tagValue))
+        }
     }
   }
 

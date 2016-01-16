@@ -85,7 +85,7 @@ trait JsonFormats extends DefaultJsonProtocol {
   implicit val boxFormat = jsonFormat6(Box)
 
   implicit val outgoingEntryFormat = jsonFormat7(OutgoingTransaction)
-  implicit val outgoingImageFormat = jsonFormat4(OutgoingImage)
+  implicit val outgoingImageFormat = jsonFormat5(OutgoingImage)
   implicit val outgoingEntryImageFormat = jsonFormat2(OutgoingTransactionImage)
   
   implicit val failedOutgoingEntryFormat = jsonFormat2(FailedOutgoingTransactionImage)

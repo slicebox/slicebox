@@ -139,7 +139,7 @@ class BoxPollActor(box: Box,
 
   def waitForFileFetchedState: PartialFunction[Any, Unit] = LoggingReceive {
     case RemoteOutgoingFileFetched(transactionImage, imageId) =>
-      updateIncoming(box.id, box.name, transactionImage.transaction.id, transactionImage.transaction.totalImageCount, imageId)
+      updateIncoming(box.id, box.name, transactionImage.transaction.id, transactionImage.image.sequenceNumber, transactionImage.transaction.totalImageCount, imageId)
       sendRemoteOutgoingFileCompleted(transactionImage).foreach { response =>
         pollRemoteBox()
       }
@@ -227,11 +227,11 @@ class BoxPollActor(box: Box,
           self ! FetchFileFailedTemporarily(transactionImage, exception)
       }
 
-  def updateIncoming(boxId: Long, boxName: String, outgoingTransactionId: Long, totalImageCount: Long, imageId: Long): Unit = {
+  def updateIncoming(boxId: Long, boxName: String, outgoingTransactionId: Long, sequenceNumber: Long, totalImageCount: Long, imageId: Long): Unit = {
 
     val existingTransaction = incomingTransactionByOutgoingTransactionId(boxId, outgoingTransactionId)
       .getOrElse(insertIncomingTransaction(IncomingTransaction(-1, boxId, boxName, outgoingTransactionId, 0, totalImageCount, System.currentTimeMillis, TransactionStatus.WAITING)))
-    val incomingTransaction = existingTransaction.incrementReceived.updateTimestamp.copy(totalImageCount = totalImageCount, status = TransactionStatus.PROCESSING)
+    val incomingTransaction = existingTransaction.copy(receivedImageCount = sequenceNumber, totalImageCount = totalImageCount, lastUpdated = System.currentTimeMillis, status = TransactionStatus.PROCESSING)
     updateIncomingTransaction(incomingTransaction)
     insertIncomingImage(IncomingImage(-1, incomingTransaction.id, imageId))
 

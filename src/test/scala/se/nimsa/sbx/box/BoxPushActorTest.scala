@@ -96,7 +96,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       val (transaction, image) =
         db.withSession { implicit session =>
           val transaction = boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, testBox.id, testBox.name, 0, 1, 1000, TransactionStatus.WAITING))
-          val image = boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage1.id, false))
+          val image = boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage1.id, 1, false))
           (transaction, image)
         }
 
@@ -105,15 +105,15 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       expectNoMsg()
 
       capturedFileSendRequests.size should be(1)
-      capturedFileSendRequests(0).uri.toString() should be(s"${testBox.baseUrl}/image?transactionid=${transaction.id}&totalimagecount=${transaction.totalImageCount}")
+      capturedFileSendRequests(0).uri.toString() should be(s"${testBox.baseUrl}/image?transactionid=${transaction.id}&sequencenumber=${image.sequenceNumber}&totalimagecount=${transaction.totalImageCount}")
     }
 
     "should mark outgoing transaction as finished when all files have been sent" in {
       db.withSession { implicit session =>
 
         val transaction = boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, testBox.id, testBox.name, 0, 2, 1000, TransactionStatus.WAITING))
-        val image1 = boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage1.id, false))
-        val image2 = boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage2.id, false))
+        val image1 = boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage1.id, 1, false))
+        val image2 = boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage2.id, 2, false))
 
         boxDao.listOutgoingTransactions.head.status shouldBe TransactionStatus.WAITING
         
@@ -131,7 +131,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
         val invalidImageId = 666
 
         val transaction = boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, testBox.id, testBox.name, 0, 1, 1000, TransactionStatus.WAITING))
-        val image = boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, invalidImageId, false))
+        val image = boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, invalidImageId, 1, false))
 
         boxPushActorRef ! PollOutgoing
 
@@ -148,9 +148,9 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       db.withSession { implicit session =>
         val invalidImageId = 666
         val transaction1 = boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, testBox.id, testBox.name, 0, 1, 1000, TransactionStatus.WAITING))
-        val image11 = boxDao.insertOutgoingImage(OutgoingImage(-1, transaction1.id, invalidImageId, false))
+        val image11 = boxDao.insertOutgoingImage(OutgoingImage(-1, transaction1.id, invalidImageId, 1, false))
         val transaction2 = boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, testBox.id, testBox.name, 0, 1, 1000, TransactionStatus.WAITING))
-        val image21 = boxDao.insertOutgoingImage(OutgoingImage(-1, transaction2.id, dbImage1.id, false))
+        val image21 = boxDao.insertOutgoingImage(OutgoingImage(-1, transaction2.id, dbImage1.id, 1, false))
 
         boxPushActorRef ! PollOutgoing
         expectNoMsg()
@@ -172,13 +172,13 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
         val invalidImageId = 666
 
         val transaction1 = boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, testBox.id, testBox.name, 0, 1, 1000, TransactionStatus.WAITING))
-        val image1 = boxDao.insertOutgoingImage(OutgoingImage(-1, transaction1.id, invalidImageId, false))
+        val image1 = boxDao.insertOutgoingImage(OutgoingImage(-1, transaction1.id, invalidImageId, 1, false))
 
         boxPushActorRef ! PollOutgoing
         expectNoMsg()
 
         val transaction2 = boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, testBox.id, testBox.name, 0, 1, 1000, TransactionStatus.WAITING))
-        val image2 = boxDao.insertOutgoingImage(OutgoingImage(-1, transaction2.id, dbImage2.id, false))
+        val image2 = boxDao.insertOutgoingImage(OutgoingImage(-1, transaction2.id, dbImage2.id, 1, false))
 
         boxPushActorRef ! PollOutgoing
         expectNoMsg()
@@ -200,9 +200,9 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
       db.withSession { implicit session =>
         val transaction = boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, testBox.id, testBox.name, 0, 3, 1000, TransactionStatus.WAITING))
-        val image1 = boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage1.id, false))
-        val image2 = boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage2.id, false))
-        val image3 = boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage3.id, false))
+        val image1 = boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage1.id, 1, false))
+        val image2 = boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage2.id, 2, false))
+        val image3 = boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage3.id, 3, false))
 
         failedResponseSendIndices ++= Seq(2,3)
         

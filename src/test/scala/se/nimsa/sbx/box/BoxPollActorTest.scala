@@ -118,7 +118,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       val outgoingTransactionId = 999
       val outgoingImageId = 33
       val transaction = OutgoingTransaction(outgoingTransactionId, 987, "some box", 1, 2, 112233, TransactionStatus.WAITING)
-      val image = OutgoingImage(outgoingImageId, outgoingTransactionId, 666, false)
+      val image = OutgoingImage(outgoingImageId, outgoingTransactionId, 666, 1, false)
       val transactionImage = OutgoingTransactionImage(transaction, image)
       
       marshal(transactionImage) match {
@@ -137,7 +137,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       val outgoingTransactionId = 999
       val outgoingImageId = 33
       val transaction = OutgoingTransaction(outgoingTransactionId, 987, "some box", 1, 2, 2, TransactionStatus.WAITING)
-      val image = OutgoingImage(outgoingImageId, outgoingTransactionId, 666, false)
+      val image = OutgoingImage(outgoingImageId, outgoingTransactionId, 666, 1, false)
       val transactionImage = OutgoingTransactionImage(transaction, image)
 
       marshal(transactionImage) match {
@@ -210,7 +210,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
     "keep trying to fetch remote file until fetching succeeds" in {
       val outgoingTransactionId = 999
       val transaction = OutgoingTransaction(outgoingTransactionId, 987, "some box", 1, 2, 2, TransactionStatus.WAITING)
-      val image = OutgoingImage(456, outgoingTransactionId, 33, false)
+      val image = OutgoingImage(456, outgoingTransactionId, 33, 1, false)
       val transactionImage = OutgoingTransactionImage(transaction, image)
 
       marshal(transactionImage) match {
@@ -249,7 +249,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
     "should tell the box it is pulling images from that a transaction has failed due to receiving an invalid DICOM file" in {
       val outgoingTransactionId = 999
       val transaction = OutgoingTransaction(outgoingTransactionId, 987, "some box", 1, 2, 2, TransactionStatus.WAITING)
-      val image = OutgoingImage(456, outgoingTransactionId, 33, false)
+      val image = OutgoingImage(456, outgoingTransactionId, 33, 1, false)
       val transactionImage = OutgoingTransactionImage(transaction, image)
 
       marshal(transactionImage) match {
@@ -276,7 +276,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
       val outgoingTransactionId = 999
       val transaction = OutgoingTransaction(outgoingTransactionId, 987, "some box", 1, 2, 2, TransactionStatus.WAITING)
-      val image = OutgoingImage(456, outgoingTransactionId, 33, false)
+      val image = OutgoingImage(456, outgoingTransactionId, 33, 1, false)
       val transactionImage = OutgoingTransactionImage(transaction, image)
 
       marshal(transactionImage) match {

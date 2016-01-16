@@ -65,10 +65,11 @@ class TransactionRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     // then, push an image from the hospital to the uni box we just set up
     val compressedBytes = compress(TestUtil.testImageByteArray)
 
-    val testTransactionId = abs(UUID.randomUUID().getMostSignificantBits())
+    val testTransactionId = 1L
+    val sequenceNumber = 1L
     val totalImageCount = 1L
 
-    Post(s"/api/transactions/${uniBox.token}/image?transactionid=$testTransactionId&totalimagecount=$totalImageCount", HttpData(compressedBytes)) ~> routes ~> check {
+    Post(s"/api/transactions/${uniBox.token}/image?transactionid=$testTransactionId&sequencenumber=$sequenceNumber&totalimagecount=$totalImageCount", HttpData(compressedBytes)) ~> routes ~> check {
       status should be(NoContent)
     }
   }
@@ -84,10 +85,11 @@ class TransactionRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     // then, push an image from the hospital to the uni box we just set up
     val compressedBytes = compress(TestUtil.testImageByteArray)
 
-    val testTransactionId = abs(UUID.randomUUID().getMostSignificantBits())
+    val testTransactionId = 1L
+    val sequenceNumber = 1L
     val totalImageCount = 1L
 
-    Post(s"/api/transactions/${uniBox.token}/image?transactionid=$testTransactionId&totalimagecount=$totalImageCount", HttpData(compressedBytes)) ~> routes ~> check {
+    Post(s"/api/transactions/${uniBox.token}/image?transactionid=$testTransactionId&sequencenumber=$sequenceNumber&totalimagecount=$totalImageCount", HttpData(compressedBytes)) ~> routes ~> check {
       status should be(NoContent)
     }
 

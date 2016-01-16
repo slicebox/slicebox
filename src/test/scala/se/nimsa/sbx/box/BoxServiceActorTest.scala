@@ -62,7 +62,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
 
         val box = boxDao.insertBox(Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, false))
 
-        boxService ! UpdateIncoming(box, 123, 2, 2)
+        boxService ! UpdateIncoming(box, 123, 1, 2, 2)
 
         expectMsgType[IncomingUpdated]
 
@@ -86,10 +86,10 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
 
         val box = boxDao.insertBox(Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, false))
 
-        boxService ! UpdateIncoming(box, 123, 3, 4)
+        boxService ! UpdateIncoming(box, 123, 1, 3, 4)
         expectMsgType[IncomingUpdated]
 
-        boxService ! UpdateIncoming(box, 123, 3, 5)
+        boxService ! UpdateIncoming(box, 123, 2, 3, 5)
         expectMsgType[IncomingUpdated]
 
         val incomingTransactions = boxDao.listIncomingTransactions
@@ -128,7 +128,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
         val imageId = 123
         val box = boxDao.insertBox(Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, false))
         val transaction = boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, box.id, box.name, 0, 1, 123, TransactionStatus.WAITING))
-        val image = boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, imageId, false))
+        val image = boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, imageId, 1, false))
 
         boxService ! PollOutgoing(box)
 
@@ -195,10 +195,10 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
       db.withSession { implicit session =>
         val box = boxDao.insertBox(Box(-1, "some remote box", "abc", "https://someurl.com", BoxSendMethod.POLL, false))
 
-        boxService ! UpdateIncoming(box, 123, 3, 4)
+        boxService ! UpdateIncoming(box, 123, 1, 3, 4)
         expectMsgType[IncomingUpdated]
 
-        boxService ! UpdateIncoming(box, 123, 3, 5)
+        boxService ! UpdateIncoming(box, 123, 2, 3, 5)
         expectMsgType[IncomingUpdated]
 
         val incomingTransactions = boxDao.listIncomingTransactions

@@ -45,7 +45,7 @@ trait TransactionRoutes { this: SliceboxService =>
           complete((Unauthorized, s"No box found for token $token"))
         case Some(box) =>
           path("image") {
-            parameters('transactionid.as[Long], 'totalimagecount.as[Long]) { (outgoingTransactionId, totalImageCount) =>
+            parameters('transactionid.as[Long], 'sequencenumber.as[Long], 'totalimagecount.as[Long]) { (outgoingTransactionId, sequenceNumber, totalImageCount) =>
               post {
                 entity(as[Array[Byte]]) { compressedBytes =>
                   val bytes = decompress(compressedBytes)
@@ -57,7 +57,7 @@ trait TransactionRoutes { this: SliceboxService =>
                       val source = Source(SourceType.BOX, box.name, box.id)
                       onSuccess(storageService.ask(AddDataset(reversedDataset, source))) {
                         case DatasetAdded(image, source) =>
-                          onSuccess(boxService.ask(UpdateIncoming(box, outgoingTransactionId, totalImageCount, image.id))) {
+                          onSuccess(boxService.ask(UpdateIncoming(box, outgoingTransactionId, sequenceNumber, totalImageCount, image.id))) {
                             case IncomingUpdated(_) => complete(NoContent)
                           }
                       }

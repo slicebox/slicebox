@@ -71,21 +71,15 @@ object BoxProtocol {
 
   case class Box(id: Long, name: String, token: String, baseUrl: String, sendMethod: BoxSendMethod, online: Boolean) extends Entity
 
-  case class OutgoingTransaction(id: Long, boxId: Long, boxName: String, sentImageCount: Long, totalImageCount: Long, lastUpdated: Long, status: TransactionStatus) extends Entity {
-    def incrementSent = copy(sentImageCount = this.sentImageCount + 1)
-    def updateTimestamp = copy(lastUpdated = System.currentTimeMillis)
-  }
+  case class OutgoingTransaction(id: Long, boxId: Long, boxName: String, sentImageCount: Long, totalImageCount: Long, lastUpdated: Long, status: TransactionStatus) extends Entity
 
-  case class OutgoingImage(id: Long, outgoingTransactionId: Long, imageId: Long, sent: Boolean) extends Entity
+  case class OutgoingImage(id: Long, outgoingTransactionId: Long, imageId: Long, sequenceNumber: Long, sent: Boolean) extends Entity
   
   case class OutgoingTagValue(id: Long, outgoingImageId: Long, tagValue: TagValue) extends Entity
   
   case class OutgoingTransactionImage(transaction: OutgoingTransaction, image: OutgoingImage)
   
-  case class IncomingTransaction(id: Long, boxId: Long, boxName: String, outgoingTransactionId: Long, receivedImageCount: Long, totalImageCount: Long, lastUpdated: Long, status: TransactionStatus) extends Entity {
-    def incrementReceived = copy(receivedImageCount = this.receivedImageCount + 1)
-    def updateTimestamp = copy(lastUpdated = System.currentTimeMillis)
-  }
+  case class IncomingTransaction(id: Long, boxId: Long, boxName: String, outgoingTransactionId: Long, receivedImageCount: Long, totalImageCount: Long, lastUpdated: Long, status: TransactionStatus) extends Entity
 
   case class IncomingImage(id: Long, incomingTransactionId: Long, imageId: Long) extends Entity
   
@@ -108,7 +102,7 @@ object BoxProtocol {
   
   case class GetBoxByToken(token: String) extends BoxRequest
 
-  case class UpdateIncoming(box: Box, transactionId: Long, totalImageCount: Long, imageId: Long) extends BoxRequest
+  case class UpdateIncoming(box: Box, transactionId: Long, sequenceNumber: Long, totalImageCount: Long, imageId: Long) extends BoxRequest
 
   case class PollOutgoing(box: Box) extends BoxRequest
 
@@ -182,4 +176,7 @@ object BoxProtocol {
   case class FetchFileFailedTemporarily(transactionImage: OutgoingTransactionImage, e: Throwable)
 
   case class FetchFileFailedPermanently(transactionImage: OutgoingTransactionImage, e: Throwable)
+  
+  case object UpdateStatusForBoxesAndTransactions
+
 }
