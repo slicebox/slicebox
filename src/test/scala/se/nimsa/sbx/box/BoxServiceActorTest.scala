@@ -127,8 +127,11 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
         val transactionId = 987
         val imageId = 123
         val box = boxDao.insertBox(Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, false))
+        
+        // insert images with sequence numbers out of order
         val transaction = boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, box.id, box.name, 0, 1, 123, TransactionStatus.WAITING))
-        val image = boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, imageId, 1, false))
+        val image1 = boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, imageId, 2, false))
+        val image2 = boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, imageId, 1, false))
 
         boxService ! PollOutgoing(box)
 
@@ -139,6 +142,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
             transaction.sentImageCount should be(0)
             transaction.totalImageCount should be(1)
             image.imageId should be(imageId)
+            image.sequenceNumber should be(1)
             image.sent should be(false)
             image.outgoingTransactionId should be(transaction.id)
         }
