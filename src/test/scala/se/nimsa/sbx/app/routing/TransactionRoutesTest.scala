@@ -27,7 +27,7 @@ import se.nimsa.sbx.util.CompressionUtil._
 
 class TransactionRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
-  def dbUrl() = "jdbc:h2:mem:transactionroutestest;DB_CLOSE_DELAY=-1"
+  def dbUrl() = "jdbc:h2:mem:transactionroutestest;DB_CLOSE_DELAY=-1;DEFAULT_LOCK_TIMEOUT=10000"
 
   val boxDao = new BoxDAO(H2Driver)
 

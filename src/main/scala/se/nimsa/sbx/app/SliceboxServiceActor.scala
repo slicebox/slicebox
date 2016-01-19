@@ -22,9 +22,10 @@ import java.nio.file.Paths
 import java.util.concurrent.TimeUnit.MILLISECONDS
 import scala.slick.driver.H2Driver
 import scala.slick.jdbc.JdbcBackend.Database
-import com.mchange.v2.c3p0.ComboPooledDataSource
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
+import com.zaxxer.hikari.HikariDataSource
+import com.zaxxer.hikari.HikariConfig
 import akka.actor.Actor
 import akka.util.Timeout
 import se.nimsa.sbx.anonymization.AnonymizationServiceActor
@@ -73,7 +74,7 @@ class SliceboxServiceActor extends Actor with SliceboxService {
   }
 
   def receive = runRoute(routes)
-  
+
 }
 
 trait SliceboxService extends HttpService with SliceboxRoutes with JsonFormats {
@@ -85,10 +86,9 @@ trait SliceboxService extends HttpService with SliceboxRoutes with JsonFormats {
   def dbUrl(): String
 
   def db = {
-    val ds = new ComboPooledDataSource
-    ds.setDriverClass("org.h2.Driver")
-    ds.setJdbcUrl(dbUrl)
-    Database.forDataSource(ds)
+    val config = new HikariConfig()
+    config.setJdbcUrl(dbUrl)
+    Database.forDataSource(new HikariDataSource(config))
   }
 
   val dbProps = DbProps(db, H2Driver)
@@ -139,7 +139,7 @@ trait SliceboxService extends HttpService with SliceboxRoutes with JsonFormats {
   val superUser = sliceboxConfig.getString("superuser.user")
   val superPassword = sliceboxConfig.getString("superuser.password")
   val sessionTimeout = sliceboxConfig.getDuration("session-timeout", MILLISECONDS)
-  
+
   val sessionField = "slicebox-session"
 
   implicit def executionContext = actorRefFactory.dispatcher

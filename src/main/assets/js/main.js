@@ -91,7 +91,7 @@ angular.module('slicebox', [
     });
 })
 
-.controller('SliceboxCtrl', function($scope, $location, $mdSidenav, userService) {
+.controller('SliceboxCtrl', function($scope, $http, $location, $mdSidenav, userService, openConfirmActionModal, openMessageModal) {
 
     $scope.uiState = {};
     
@@ -120,4 +120,13 @@ angular.module('slicebox', [
     $scope.currentPathStartsWith = function(path) { 
         return $location.path().indexOf(path) === 0;
     };
+
+    $scope.shutdown = function() {
+        openConfirmActionModal('System', 'This command will wait for ongoing requests to finish and then stop the Slicebox service. Proceed?', 'Ok', function() {
+            return $http.post('/api/system/stop').then(function() {
+                openMessageModal('System', 'The Slicebox service has been stopped.');
+            });
+        });
+    };
+
 });

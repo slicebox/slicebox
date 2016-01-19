@@ -104,17 +104,25 @@ angular.module('slicebox.utils', ['ngSanitize'])
 
         urlWithAdvancedFiltering: function(baseUrl, sources, seriesTypes, seriesTags) {
             var url = baseUrl;
+            var queryPartEmpty = baseUrl.indexOf("?") < 0;
+            var queryChar;
             if (sources && sources.length > 0) {
                 var sourcesPart = sources.map(function (source) { return source.sourceType + ':' + source.sourceId; }).join();
-                url = url + '&sources=' + sourcesPart;
+                queryChar = queryPartEmpty ? '?' : '&';
+                url = url + queryChar + 'sources=' + sourcesPart;
+                queryPartEmpty = false;
             }
             if (seriesTypes && seriesTypes.length > 0) {
                 var seriesTypesPart = seriesTypes.map(function (seriesType) { return seriesType.id; }).join();
-                url = url + '&seriestypes=' + seriesTypesPart;
+                queryChar = queryPartEmpty ? '?' : '&';
+                url = url + queryChar + 'seriestypes=' + seriesTypesPart;
+                queryPartEmpty = false;
             }
             if (seriesTags && seriesTags.length > 0) {
                 var seriesTagsPart = seriesTags.map(function (seriesTag) { return seriesTag.id; }).join();
-                url = url + '&seriestags=' + seriesTagsPart;
+                queryChar = queryPartEmpty ? '?' : '&';
+                url = url + queryChar + 'seriestags=' + seriesTagsPart;
+                queryPartEmpty = false;
             }
             return url;
         }

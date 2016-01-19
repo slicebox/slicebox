@@ -51,18 +51,17 @@ class MetaDataServiceActor(dbProps: DbProps) extends Actor with ExceptionCatchin
 
     case DeleteMetaData(imageId) =>
       catchAndReport {
-        db.withSession { implicit session =>
-
-          val (deletedPatient, deletedStudy, deletedSeries, deletedImage) =
+        val (deletedPatient, deletedStudy, deletedSeries, deletedImage) =
+          db.withTransaction { implicit session =>
             dao.imageById(imageId).map(propertiesDao.deleteFully).getOrElse((None, None, None, None))
+          }
 
-          deletedPatient.foreach(patient => system.eventStream.publish(PatientDeleted(patient.id)))
-          deletedStudy.foreach(study => system.eventStream.publish(StudyDeleted(study.id)))
-          deletedSeries.foreach(series => system.eventStream.publish(SeriesDeleted(series.id)))
-          deletedImage.foreach(image => system.eventStream.publish(ImageDeleted(image.id)))
+        deletedPatient.foreach(patient => system.eventStream.publish(PatientDeleted(patient.id)))
+        deletedStudy.foreach(study => system.eventStream.publish(StudyDeleted(study.id)))
+        deletedSeries.foreach(series => system.eventStream.publish(SeriesDeleted(series.id)))
+        deletedImage.foreach(image => system.eventStream.publish(ImageDeleted(image.id)))
 
-          sender ! MetaDataDeleted(deletedPatient, deletedStudy, deletedSeries, deletedImage)
-        }
+        sender ! MetaDataDeleted(deletedPatient, deletedStudy, deletedSeries, deletedImage)
       }
 
     case msg: PropertiesRequest => catchAndReport {
@@ -208,7 +207,7 @@ class MetaDataServiceActor(dbProps: DbProps) extends Actor with ExceptionCatchin
     }
 
   def addMetaData(patient: Patient, study: Study, series: Series, image: Image, source: Source): (Patient, Study, Series, Image, SeriesSource) =
-    db.withSession { implicit session =>
+    db.withTransaction { implicit session =>
 
       val seriesSource = SeriesSource(-1, source)
 
