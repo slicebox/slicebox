@@ -89,7 +89,7 @@ class MetaDataServiceActorTest(_system: ActorSystem) extends TestKit(_system) wi
     }
   }))
 
-  "The meta data service" must {
+  "The meta data service" should {
 
     "return an empty list of patients when no metadata exists" in {
       metaDataActorRef ! GetPatients(0, 10000, None, true, None, Array.empty, Array.empty, Array.empty)

@@ -188,8 +188,8 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
         val (dbPatient1, (dbStudy1, dbStudy2), (dbSeries1, dbSeries2, dbSeries3, dbSeries4), (dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)) =
           TestUtil.insertMetaData(metaDataDao)
         val entry = boxDao.insertIncomingTransaction(IncomingTransaction(-1, 1, "some box", 2, 3, 4, System.currentTimeMillis(), TransactionStatus.WAITING))
-        val image1 = boxDao.insertIncomingImage(IncomingImage(-1, entry.id, dbImage1.id))
-        val image2 = boxDao.insertIncomingImage(IncomingImage(-1, entry.id, dbImage2.id))
+        val image1 = boxDao.insertIncomingImage(IncomingImage(-1, entry.id, dbImage1.id, 1))
+        val image2 = boxDao.insertIncomingImage(IncomingImage(-1, entry.id, dbImage2.id, 2))
         entry
       }
 
@@ -205,9 +205,9 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
         val (dbPatient1, (dbStudy1, dbStudy2), (dbSeries1, dbSeries2, dbSeries3, dbSeries4), (dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)) =
           TestUtil.insertMetaData(metaDataDao)
         val entry = boxDao.insertIncomingTransaction(IncomingTransaction(-1, 1, "some box", 2, 3, 4, System.currentTimeMillis(), TransactionStatus.WAITING))
-        val image1 = boxDao.insertIncomingImage(IncomingImage(-1, entry.id, dbImage1.id))
-        val image2 = boxDao.insertIncomingImage(IncomingImage(-1, entry.id, dbImage2.id))
-        val image3 = boxDao.insertIncomingImage(IncomingImage(-1, entry.id, 666))
+        val image1 = boxDao.insertIncomingImage(IncomingImage(-1, entry.id, dbImage1.id, 1))
+        val image2 = boxDao.insertIncomingImage(IncomingImage(-1, entry.id, dbImage2.id, 2))
+        val image3 = boxDao.insertIncomingImage(IncomingImage(-1, entry.id, 666, 3))
         entry
       }
 
@@ -264,7 +264,7 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     val (entry, imageTransaction) =
       db.withSession { implicit session =>
         val entry = boxDao.insertIncomingTransaction(IncomingTransaction(-1, 1, "some box", 2, 3, 4, System.currentTimeMillis(), TransactionStatus.WAITING))
-        val imageTransaction = boxDao.insertIncomingImage(IncomingImage(-1, entry.id, image.id))
+        val imageTransaction = boxDao.insertIncomingImage(IncomingImage(-1, entry.id, image.id, 1))
         (entry, imageTransaction)
       }
 
