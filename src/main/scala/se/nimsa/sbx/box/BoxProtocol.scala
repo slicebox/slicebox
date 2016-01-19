@@ -81,7 +81,7 @@ object BoxProtocol {
   
   case class IncomingTransaction(id: Long, boxId: Long, boxName: String, outgoingTransactionId: Long, receivedImageCount: Long, totalImageCount: Long, lastUpdated: Long, status: TransactionStatus) extends Entity
 
-  case class IncomingImage(id: Long, incomingTransactionId: Long, imageId: Long) extends Entity
+  case class IncomingImage(id: Long, incomingTransactionId: Long, imageId: Long, sequenceNumber: Long) extends Entity
   
   case class FailedOutgoingTransactionImage(transactionImage: OutgoingTransactionImage, message: String)
   

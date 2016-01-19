@@ -79,16 +79,21 @@ class BoxPollActor(box: Box,
   def sendRequestToRemoteBoxPipeline = sendReceive
   def pollRemoteBoxOutgoingPipeline = sendRequestToRemoteBoxPipeline ~> convertOption[OutgoingTransactionImage]
 
-  def sendPollRequestToRemoteBox: Future[Option[OutgoingTransactionImage]] =
+  def sendPollRequestToRemoteBox: Future[Option[OutgoingTransactionImage]] = {
+    log.debug(s"Polling remote box ${box.name}")
     pollRemoteBoxOutgoingPipeline(Get(s"${box.baseUrl}/outgoing/poll"))
+  }
 
-  def getRemoteOutgoingFile(transactionImage: OutgoingTransactionImage): Future[HttpResponse] =
+  def getRemoteOutgoingFile(transactionImage: OutgoingTransactionImage): Future[HttpResponse] = {
+    log.debug(s"Fetching remote outgoing image $transactionImage")
     sendRequestToRemoteBoxPipeline(Get(s"${box.baseUrl}/outgoing?transactionid=${transactionImage.transaction.id}&imageid=${transactionImage.image.id}"))
-
+  }
+  
   // We don't need to wait for done message to be sent since it is not critical that it is received by the remote box
   def sendRemoteOutgoingFileCompleted(transactionImage: OutgoingTransactionImage): Future[HttpResponse] =
     marshal(transactionImage) match {
       case Right(entity) =>
+        log.debug(s"Sending done for remote outgoing image $transactionImage")
         sendRequestToRemoteBoxPipeline(Post(s"${box.baseUrl}/outgoing/done", entity))
       case Left(e) =>
         SbxLog.error("Box", s"Failed to send done message to box ${box.name}, data=$transactionImage")
@@ -145,16 +150,20 @@ class BoxPollActor(box: Box,
       }
 
     case FetchFileFailedTemporarily(transactionImage, exception) =>
-      SbxLog.info("Box", s"Failed to fetch file from box ${box.name}: " + exception.getMessage)
-      incomingTransactionByOutgoingTransactionId(box.id, transactionImage.transaction.id).foreach(incomingTransaction =>
-        setIncomingTransactionStatus(incomingTransaction, TransactionStatus.WAITING))
+      log.info("Box", s"Failed to fetch file from box ${box.name}: " + exception.getMessage)
+      db.withSession { implicit session =>
+        boxDao.incomingTransactionByOutgoingTransactionId(box.id, transactionImage.transaction.id).foreach(incomingTransaction =>
+          boxDao.setIncomingTransactionStatus(incomingTransaction.id, TransactionStatus.WAITING))
+      }
       context.unbecome
 
     case FetchFileFailedPermanently(transactionImage, exception) =>
       sendRemoteOutgoingFileFailed(FailedOutgoingTransactionImage(transactionImage, exception.getMessage))
       SbxLog.error("Box", s"Failed to handle fetched file from box ${box.name}: " + exception.getMessage)
-      incomingTransactionByOutgoingTransactionId(box.id, transactionImage.transaction.id).foreach(incomingTransaction =>
-        setIncomingTransactionStatus(incomingTransaction, TransactionStatus.WAITING))
+      db.withSession { implicit session =>
+        boxDao.incomingTransactionByOutgoingTransactionId(box.id, transactionImage.transaction.id).foreach(incomingTransaction =>
+          boxDao.setIncomingTransactionStatus(incomingTransaction.id, TransactionStatus.WAITING))
+      }
       context.unbecome
 
     case ReceiveTimeout =>
@@ -167,6 +176,8 @@ class BoxPollActor(box: Box,
 
     sendPollRequestToRemoteBox
       .map(transactionImageMaybe => {
+        log.debug(s"Remote box answered poll request with outgoing transaction $transactionImageMaybe")
+        
         updateBoxOnlineStatus(true)
 
         transactionImageMaybe match {
@@ -228,47 +239,27 @@ class BoxPollActor(box: Box,
       }
 
   def updateIncoming(boxId: Long, boxName: String, outgoingTransactionId: Long, sequenceNumber: Long, totalImageCount: Long, imageId: Long): Unit = {
+    db.withTransaction { implicit session =>
 
-    val existingTransaction = incomingTransactionByOutgoingTransactionId(boxId, outgoingTransactionId)
-      .getOrElse(insertIncomingTransaction(IncomingTransaction(-1, boxId, boxName, outgoingTransactionId, 0, totalImageCount, System.currentTimeMillis, TransactionStatus.WAITING)))
-    val incomingTransaction = existingTransaction.copy(receivedImageCount = sequenceNumber, totalImageCount = totalImageCount, lastUpdated = System.currentTimeMillis, status = TransactionStatus.PROCESSING)
-    updateIncomingTransaction(incomingTransaction)
-    insertIncomingImage(IncomingImage(-1, incomingTransaction.id, imageId))
+      val existingTransaction = boxDao.incomingTransactionByOutgoingTransactionId(boxId, outgoingTransactionId)
+        .getOrElse(boxDao.insertIncomingTransaction(IncomingTransaction(-1, boxId, boxName, outgoingTransactionId, 0, totalImageCount, System.currentTimeMillis, TransactionStatus.WAITING)))
+      val incomingTransaction = existingTransaction.copy(receivedImageCount = sequenceNumber, totalImageCount = totalImageCount, lastUpdated = System.currentTimeMillis, status = TransactionStatus.PROCESSING)
+      boxDao.updateIncomingTransaction(incomingTransaction)
+      boxDao.incomingImageByIncomingTransactionIdAndSequenceNumber(incomingTransaction.id, sequenceNumber) match {
+        case Some(image) => boxDao.updateIncomingImage(image.copy(imageId = imageId))
+        case None => boxDao.insertIncomingImage(IncomingImage(-1, incomingTransaction.id, imageId, sequenceNumber))
+      }
 
-    if (incomingTransaction.receivedImageCount == incomingTransaction.totalImageCount) {
-      SbxLog.info("Box", s"Received ${totalImageCount} files from box $boxName")
-      setIncomingTransactionStatus(incomingTransaction, TransactionStatus.FINISHED)
+      if (incomingTransaction.receivedImageCount == incomingTransaction.totalImageCount) {
+        SbxLog.info("Box", s"Received ${totalImageCount} files from box $boxName")
+        boxDao.setIncomingTransactionStatus(incomingTransaction.id, TransactionStatus.FINISHED)
+      }
     }
   }
 
   def updateBoxOnlineStatus(online: Boolean): Unit =
     db.withSession { implicit session =>
       boxDao.updateBoxOnlineStatus(box.id, online)
-    }
-
-  def incomingTransactionByOutgoingTransactionId(boxId: Long, outgoingTransactionId: Long): Option[IncomingTransaction] =
-    db.withSession { implicit session =>
-      boxDao.incomingTransactionByOutgoingTransactionId(boxId, outgoingTransactionId)
-    }
-
-  def insertIncomingTransaction(incomingTransaction: IncomingTransaction) =
-    db.withSession { implicit session =>
-      boxDao.insertIncomingTransaction(incomingTransaction)
-    }
-
-  def insertIncomingImage(incomingImage: IncomingImage) =
-    db.withSession { implicit session =>
-      boxDao.insertIncomingImage(incomingImage)
-    }
-
-  def updateIncomingTransaction(incomingTransaction: IncomingTransaction) =
-    db.withSession { implicit session =>
-      boxDao.updateIncomingTransaction(incomingTransaction)
-    }
-
-  def setIncomingTransactionStatus(transaction: IncomingTransaction, status: TransactionStatus) =
-    db.withSession { implicit session =>
-      boxDao.setIncomingTransactionStatus(transaction.id, status)
     }
 
 }

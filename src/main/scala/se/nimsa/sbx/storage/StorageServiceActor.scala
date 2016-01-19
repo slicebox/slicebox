@@ -114,6 +114,7 @@ class StorageServiceActor(storage: Path, implicit val timeout: Timeout) extends 
         else
           addMetadata(dataset, source).map { image =>
             storeDataset(dataset, image, source)
+            log.debug(s"Stored file for image $image")
             val datasetAdded = DatasetAdded(image, source)
             context.system.eventStream.publish(datasetAdded)
             datasetAdded

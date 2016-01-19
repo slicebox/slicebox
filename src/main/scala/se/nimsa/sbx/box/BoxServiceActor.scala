@@ -136,19 +136,25 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
                 lastUpdated = System.currentTimeMillis,
                 status = TransactionStatus.PROCESSING)
               boxDao.updateIncomingTransaction(incomingTransaction)
-              boxDao.insertIncomingImage(IncomingImage(-1, incomingTransaction.id, imageId))
+              boxDao.incomingImageByIncomingTransactionIdAndSequenceNumber(incomingTransaction.id, sequenceNumber) match {
+                case Some(image) => boxDao.updateIncomingImage(image.copy(imageId = imageId))
+                case None        => boxDao.insertIncomingImage(IncomingImage(-1, incomingTransaction.id, imageId, sequenceNumber))
+              }
 
               if (incomingTransaction.receivedImageCount == totalImageCount) {
                 boxDao.setIncomingTransactionStatus(incomingTransaction.id, TransactionStatus.FINISHED)
                 SbxLog.info("Box", s"Receiving $totalImageCount images from box ${box.name} completed.")
               }
 
+              log.debug(s"Received pushed file and updated incoming transaction $incomingTransaction")
               sender ! IncomingUpdated(incomingTransaction)
             }
 
           case PollOutgoing(box) =>
             pollBoxesLastPollTimestamp(box.id) = System.currentTimeMillis
-            sender ! nextOutgoingTransactionImage(box.id)
+            val outgoingTransaction = nextOutgoingTransactionImage(box.id)
+            log.debug(s"Received poll request, responding with outgoing transaction $outgoingTransaction")
+            sender ! outgoingTransaction
 
           case SendToRemoteBox(box, imageTagValuesSeq) =>
             SbxLog.info("Box", s"Sending ${imageTagValuesSeq.length} images to box ${box.name}")
@@ -156,11 +162,14 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
             sender ! ImagesAddedToOutgoing(box.id, imageTagValuesSeq.map(_.imageId))
 
           case GetOutgoingTransactionImage(box, outgoingTransactionId, outgoingImageId) =>
-            sender ! outgoingTransactionImageById(box.id, outgoingTransactionId, outgoingImageId)
+            val outgoingTransactionImage = outgoingTransactionImageById(box.id, outgoingTransactionId, outgoingImageId)
+            log.debug(s"Received image file request, responding with outgoing transaction image $outgoingTransactionImage")
+            sender ! outgoingTransactionImage
 
           case MarkOutgoingImageAsSent(box, transactionImage) =>
             db.withTransaction { implicit session =>
-              boxDao.updateOutgoingImage(transactionImage.image.copy(sent = true))
+              val updatedTransactionImage = transactionImage.image.copy(sent = true)
+              boxDao.updateOutgoingImage(updatedTransactionImage)
               val updatedTransaction = transactionImage.transaction.copy(
                 sentImageCount = transactionImage.image.sequenceNumber,
                 lastUpdated = System.currentTimeMillis,
@@ -172,7 +181,8 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
                 boxDao.setOutgoingTransactionStatus(transactionImage.transaction.id, TransactionStatus.FINISHED)
                 SbxLog.info("Box", s"Finished sending ${updatedTransaction.totalImageCount} images to box ${box.name}")
               }
-
+              
+              log.debug(s"Marked outgoing transaction image updatedTransactionImage as sent")
               sender ! OutgoingImageMarkedAsSent
             }
 

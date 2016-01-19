@@ -120,6 +120,8 @@ class BoxPushActor(box: Box,
   }
 
   def sendFile(transactionImage: OutgoingTransactionImage, tagValues: Seq[OutgoingTagValue]) = {
+    log.debug(s"Pushing transaction image $transactionImage with tag values $tagValues")
+
     pushImagePipeline(transactionImage, tagValues)
       .map(response => {
         val statusCode = response.status.intValue
@@ -139,15 +141,21 @@ class BoxPushActor(box: Box,
   }
 
   def handleFileSentForOutgoingTransaction(transactionImage: OutgoingTransactionImage) = {
-    log.debug(s"File sent for outgoing transaction ${transactionImage.transaction.id}")
+    log.debug(s"File sent for outgoing transaction $transactionImage")
+    db.withTransaction { implicit session =>
 
-    markOutgoingImageAsSent(transactionImage.image)
-    val updatedTransaction = updateOutgoingTransactionAfterSendingFile(transactionImage)
+      val updatedTransaction = transactionImage.transaction.copy(
+        sentImageCount = transactionImage.image.sequenceNumber,
+        lastUpdated = System.currentTimeMillis,
+        status = TransactionStatus.PROCESSING)
+      boxDao.updateOutgoingTransaction(updatedTransaction)
+      boxDao.updateOutgoingImage(transactionImage.image.copy(sent = true))
 
-    if (updatedTransaction.sentImageCount == updatedTransaction.totalImageCount) {
-      context.system.eventStream.publish(ImagesSent(Destination(DestinationType.BOX, box.name, box.id), outgoingImageIdsForTransactionId(updatedTransaction.id)))
-      SbxLog.info("Box", s"Finished sending ${updatedTransaction.totalImageCount} images to box ${box.name}")
-      setOutgoingTransactionStatus(updatedTransaction, TransactionStatus.FINISHED)
+      if (updatedTransaction.sentImageCount == updatedTransaction.totalImageCount) {
+        context.system.eventStream.publish(ImagesSent(Destination(DestinationType.BOX, box.name, box.id), outgoingImageIdsForTransactionId(updatedTransaction.id)))
+        SbxLog.info("Box", s"Finished sending ${updatedTransaction.totalImageCount} images to box ${box.name}")
+        boxDao.setOutgoingTransactionStatus(updatedTransaction.id, TransactionStatus.FINISHED)
+      }
     }
 
     context.unbecome
@@ -178,24 +186,9 @@ class BoxPushActor(box: Box,
       boxDao.tagValuesByOutgoingTransactionImage(transactionImage.transaction.id, transactionImage.image.id)
     }
 
-  def updateOutgoingTransactionAfterSendingFile(transactionImage: OutgoingTransactionImage) =
-    db.withSession { implicit session =>
-      val updatedTransaction = transactionImage.transaction.copy(
-          sentImageCount = transactionImage.image.sequenceNumber,
-          lastUpdated = System.currentTimeMillis, 
-          status = TransactionStatus.PROCESSING)
-      boxDao.updateOutgoingTransaction(updatedTransaction)
-      updatedTransaction
-    }
-
   def setOutgoingTransactionStatus(transaction: OutgoingTransaction, status: TransactionStatus) =
     db.withSession { implicit session =>
       boxDao.setOutgoingTransactionStatus(transaction.id, status)
-    }
-
-  def markOutgoingImageAsSent(image: OutgoingImage) =
-    db.withSession { implicit session =>
-      boxDao.updateOutgoingImage(image.copy(sent = true))
     }
 
   def outgoingImageIdsForTransactionId(transactionId: Long): Seq[Long] =

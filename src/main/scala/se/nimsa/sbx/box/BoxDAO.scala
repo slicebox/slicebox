@@ -67,6 +67,7 @@ class BoxDAO(val driver: JdbcProfile) {
     def sequenceNumber = column[Long]("sequencenumber")
     def sent = column[Boolean]("sent")
     def fkOutgoingTransaction = foreignKey("fk_outgoing_transaction_id", outgoingTransactionId, outgoingTransactionQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
+    def idxUniqueTransactionAndNumber = index("idx_unique_outgoing_image", (outgoingTransactionId, sequenceNumber), unique = true)    
     def * = (id, outgoingTransactionId, imageId, sequenceNumber, sent) <> (OutgoingImage.tupled, OutgoingImage.unapply)
   }
 
@@ -104,8 +105,10 @@ class BoxDAO(val driver: JdbcProfile) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def incomingTransactionId = column[Long]("incomingtransactionid")
     def imageId = column[Long]("imageid")
+    def sequenceNumber = column[Long]("sequencenumber")
     def fkIncomingTransaction = foreignKey("fk_incoming_transaction_id", incomingTransactionId, incomingTransactionQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
-    def * = (id, incomingTransactionId, imageId) <> (IncomingImage.tupled, IncomingImage.unapply)
+    def idxUniqueTransactionAndNumber = index("idx_unique_incoming_image", (incomingTransactionId, sequenceNumber), unique = true)    
+    def * = (id, incomingTransactionId, imageId, sequenceNumber) <> (IncomingImage.tupled, IncomingImage.unapply)
   }
 
   val incomingImageQuery = TableQuery[IncomingImageTable]
@@ -215,6 +218,9 @@ class BoxDAO(val driver: JdbcProfile) {
   def updateOutgoingImage(image: OutgoingImage)(implicit session: Session): Unit =
     outgoingImageQuery.filter(_.id === image.id).update(image)
 
+  def updateIncomingImage(image: IncomingImage)(implicit session: Session): Unit =
+    incomingImageQuery.filter(_.id === image.id).update(image)
+
   def nextOutgoingTransactionImageForBoxId(boxId: Long)(implicit session: Session): Option[OutgoingTransactionImage] = {
     val join = for {
       transaction <- outgoingTransactionQuery
@@ -259,6 +265,12 @@ class BoxDAO(val driver: JdbcProfile) {
     incomingTransactionQuery
       .filter(_.boxId === boxId)
       .filter(_.outgoingTransactionId === outgoingTransactionId)
+      .firstOption
+
+  def incomingImageByIncomingTransactionIdAndSequenceNumber(incomingTransactionId: Long, sequenceNumber: Long)(implicit session: Session): Option[IncomingImage] =
+    incomingImageQuery
+      .filter(_.incomingTransactionId === incomingTransactionId)
+      .filter(_.sequenceNumber === sequenceNumber)
       .firstOption
 
   def outgoingTransactionById(outgoingTransactionId: Long)(implicit session: Session): Option[OutgoingTransaction] =

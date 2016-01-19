@@ -44,9 +44,9 @@ class MetaDataServiceActor(dbProps: DbProps) extends Actor with ExceptionCatchin
 
     case AddMetaData(patient, study, series, image, source) =>
       catchAndReport {
-        val (dbPatient, dbStudy, dbSeries, dbImage, dbSeriesSource) =
-          addMetaData(patient, study, series, image, source)
-        sender ! MetaDataAdded(dbPatient, dbStudy, dbSeries, dbImage, dbSeriesSource)
+        val metaDataAdded = MetaDataAdded.tupled(addMetaData(patient, study, series, image, source))
+        log.debug(s"Added metadata $metaDataAdded")
+        sender ! metaDataAdded
       }
 
     case DeleteMetaData(imageId) =>
