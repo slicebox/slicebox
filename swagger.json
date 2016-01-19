@@ -2015,7 +2015,7 @@
           {
             "name": "transactionid",
             "in": "query",
-            "description": "the ID of this transaction",
+            "description": "the ID of the client's outgoing transaction",
             "required": true,
             "type": "integer",
             "format": "int64"
@@ -2046,7 +2046,7 @@
           }
         ],
         "responses": {
-          "201": {
+          "204": {
             "description": "image data received"
           },
           "401": {
@@ -2056,9 +2056,9 @@
       }
     },
 
-    "/transactions/{token}/outbox/poll": {
+    "/transactions/{token}/outgoing/poll": {
       "get": {
-        "description": "get next outbox entry (next image that the connected box wishes to send to you), if any. This method is used when sending images using the poll method from a public slicebox.",
+        "description": "get next outgoing transaction and image (information on the next image that the connected box wishes to send to you), if any. This method is used when sending images using the poll method from a public slicebox.",
         "tags": ["Transactions"],
         "parameters": [
           {
@@ -2071,22 +2071,22 @@
         ],
         "responses": {
           "200": {
-            "description": "next outbox entry",
+            "description": "next outgoing transaction and image information block",
             "schema": {
-              "$ref": "#/definitions/outboxEntry"
+              "$ref": "#/definitions/outgoingTransactionImage"
             }
           },
           "401": {
             "description": "unauthorized, invalid token"
           },
           "404": {
-            "description": "outbox of connected box is empty"
+            "description": "there are currently no outgoing transactions to fetch for the box connection with the supplied token"
           }
         }                
       }
     },
 
-    "/transactions/{token}/outbox": {
+    "/transactions/{token}/outgoing": {
       "get": {
         "description": "fetch an image from the connected box as part of a transaction. This method is used when sending images using the poll method from a public slicebox.",
         "tags": ["Transactions"],
@@ -2104,15 +2104,15 @@
           {
             "name": "transactionid",
             "in": "query",
-            "description": "the ID of this transaction",
+            "description": "the ID of the outgoing transaction",
             "required": true,
             "type": "integer",
             "format": "int64"
           },
           {
-            "name": "sequencenumber",
+            "name": "imageid",
             "in": "query",
-            "description": "the index of this image in the transaction",
+            "description": "the ID of the outgoing transaction image",
             "required": true,
             "type": "integer",
             "format": "int64"
@@ -2126,15 +2126,15 @@
             "description": "unauthorized, invalid token"
           },
           "404": {
-            "description": "no outbox entry found for the supplied transaction id and sequence number"
+            "description": "no outgoing trensaction and/or image found for the supplied transaction id and transaction image id"
           }
         }
       }
     },
 
-    "/transactions/{token}/outbox/done": {
+    "/transactions/{token}/outgoing/done": {
       "post": {
-        "description": "signal that the supplied outbox entry was successfully received and can be removed. This method is used when sending images using the poll method from a public slicebox.",
+        "description": "signal that the supplied outgoing transaction and image was successfully received and can be marked as sent. This method is used when sending images using the poll method from a public slicebox.",
         "tags": ["Transactions"],
         "parameters": [
           {
@@ -2145,17 +2145,17 @@
             "type": "string"
           },
           {
-            "name": "outbox entry",
+            "name": "outgoing entry and image information block",
             "in": "body",
-            "description": "outbox entry that has been successfully received",
+            "description": "outgoing transaction and image that has been successfully received",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/outboxEntry"              
+              "$ref": "#/definitions/outgoingTransactionImage"              
             }
           }
         ],
         "responses": {
-          "201": {
+          "204": {
             "description": "done message received"
           },
           "401": {
@@ -2165,9 +2165,9 @@
       }
     },
 
-    "/transactions/{token}/outbox/failed": {
+    "/transactions/{token}/outgoing/failed": {
       "post": {
-        "description": "signal that the image corresponding to the supplied outbox entry could not be read or stored properly on the receiving side, and that the transaction should be marked as failed.",
+        "description": "signal that the image corresponding to the supplied outgoing transaction and image could not be read or stored properly on the receiving side, and that the transaction should be marked as failed.",
         "tags": ["Transactions"],
         "parameters": [
           {
@@ -2178,17 +2178,17 @@
             "type": "string"
           },
           {
-            "name": "outbox entry and error message",
+            "name": "outgoing transaction and image, and error message",
             "in": "body",
-            "description": "the outbox entry corresponding to the failed image transfer, along with the associated error message",
+            "description": "the outgoing transaction and image information block corresponding to the failed image transfer, along with the associated error message",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/failedOutboxEntry"              
+              "$ref": "#/definitions/failedOutgoingTransactionImage"
             }
           }
         ],
         "responses": {
-          "201": {
+          "204": {
             "description": "failed message received"
           },
           "401": {
@@ -3053,15 +3053,14 @@
           "type": "integer",
           "format": "int64"
         },
-        "remoteBoxId": {
+        "boxId": {
           "type": "integer",
           "format": "int64"
         },
-        "transactionId": {
-          "type": "integer",
-          "format": "int64"
+        "boxName": {
+          "type": "string"
         },
-        "sequenceNumber": {
+        "sentImageCount": {
           "type": "integer",
           "format": "int64"
         },
@@ -3069,19 +3068,52 @@
           "type": "integer",
           "format": "int64"
         },
-        "imageId": {
+        "lastUpdated": {
           "type": "integer",
           "format": "int64"          
         },
-        "failed": {
+        "status": {
+          "type": "string"
+        }
+      }
+    },
+    "outgoingImage": {
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "outgoingTransactionId": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "imageId": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "sequenceNumber": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "sent": {
           "type": "boolean"
         }
       }
     },
-    "failedOutboxEntry": {
+    "outgoingTransactionImage": {
       "properties": {
-        "outboxEntry": {
-          "$ref": "#/definitions/outboxEntry"
+        "transaction": {
+          "$ref": "#/definitions/outgoingTransaction"
+        },
+        "image": {
+          "$ref": "#/definitions/outgoingImage"
+        }
+      }
+    },
+    "failedoutgoingTransactionImage": {
+      "properties": {
+        "transactionImage": {
+          "$ref": "#/definitions/outgoingTransactionImage"
         },
         "message" : {
           "type": "string"
@@ -3094,11 +3126,14 @@
           "type": "integer",
           "format": "int64"
         },
-        "remoteBoxId": {
+        "boxId": {
           "type": "integer",
           "format": "int64"
         },
-        "transactionId": {
+        "boxName": {
+          "type": "string"
+        },
+        "outgoingTransactionId": {
           "type": "integer",
           "format": "int64"
         },
@@ -3113,35 +3148,10 @@
         "lastUpdated": {
           "type": "integer",
           "format": "int64"
-        }        
-      }
-    },
-    "sentEntryInfo": {
-      "properties": {
-        "id": {
-          "type": "integer",
-          "format": "int64"
         },
-        "remoteBoxId": {
-          "type": "integer",
-          "format": "int64"
-        },
-        "transactionId": {
-          "type": "integer",
-          "format": "int64"
-        },
-        "sentImageCount": {
-          "type": "integer",
-          "format": "int64"
-        },
-        "totalImageCount": {
-          "type": "integer",
-          "format": "int64"
-        },
-        "lastUpdated": {
-          "type": "integer",
-          "format": "int64"
-        }        
+        "status": {
+          "type": "string"
+        }
       }
     },
     "tagValue" : {
