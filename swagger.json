@@ -3110,7 +3110,7 @@
         }
       }
     },
-    "failedoutgoingTransactionImage": {
+    "failedOutgoingTransactionImage": {
       "properties": {
         "transactionImage": {
           "$ref": "#/definitions/outgoingTransactionImage"
