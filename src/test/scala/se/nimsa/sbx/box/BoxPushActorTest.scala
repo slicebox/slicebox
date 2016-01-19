@@ -111,7 +111,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
     "should post file in correct order" in {
       db.withSession { implicit session =>
 
-        // Insert outbox entries out of order
+        // Insert outgoing images out of order
         val transaction = boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, testBox.id, testBox.name, 0, 2, 1000, TransactionStatus.WAITING))
         val image1 = boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage1.id, 2, false))
         val image2 = boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage2.id, 1, false))

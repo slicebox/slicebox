@@ -69,10 +69,10 @@ trait BoxRoutes { this: SliceboxService =>
             }
           }
         }
-      } ~ path(LongNumber / "send") { remoteBoxId =>
+      } ~ path(LongNumber / "send") { boxId =>
         post {
           entity(as[Seq[ImageTagValues]]) { imageTagValuesSeq =>
-            onSuccess(boxService.ask(GetBoxById(remoteBoxId)).mapTo[Option[Box]]) {
+            onSuccess(boxService.ask(GetBoxById(boxId)).mapTo[Option[Box]]) {
               _ match {
                 case Some(box) =>
                   onSuccess(boxService.ask(SendToRemoteBox(box, imageTagValuesSeq))) {
@@ -80,7 +80,7 @@ trait BoxRoutes { this: SliceboxService =>
                       complete(NoContent)
                   }
                 case None =>
-                  complete((NotFound, s"No box found for id $remoteBoxId"))
+                  complete((NotFound, s"No box found for id $boxId"))
               }
             }
           }
