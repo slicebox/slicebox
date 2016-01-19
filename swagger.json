@@ -35,7 +35,7 @@
       "description": "Methods for handling box-to-box connections and issuing box commands"
     },
     {
-      "name": "Remote Boxes",
+      "name": "Transactions",
       "description": "Methods for handling box-to-box transactions of images (primarily for internal Slicebox use)"
     },
     {
@@ -1861,17 +1861,17 @@
       }
     },
 
-    "/inbox": {
+    "/boxes/incoming": {
       "get": {        
-        "description": "get contents of inbox (records of received images)",
+        "description": "get incoming transactions (finished, currently receiving, waiting or failed)",
         "tags": ["Boxes"],
         "responses": {
           "200": {
-            "description": "incoming transactions, handled and in progress",
+            "description": "incoming transactions, sorted from most to least recently updated",
             "schema": {
               "type": "array",
               "items": {
-                "$ref": "#/definitions/inboxEntryInfo"
+                "$ref": "#/definitions/incomingTransaction"
               }
             }
           }
@@ -1879,15 +1879,15 @@
       }
     },
 
-    "/inbox/{id}": {
+    "/boxes/incoming/{id}": {
       "delete": {        
-        "description": "delete a transaction from the inbox",
+        "description": "delete an incoming transaction. If a currently active transaction is deleted, a new transaction with the remainder of the images is created when receiving the next incoming image.",
         "tags": ["Boxes"],
         "parameters": [
           {
             "name": "id",
             "in": "path",
-            "description": "ID of inbox entry",
+            "description": "ID of incoming transaction",
             "required": true,
             "type": "integer",
             "format": "int64"
@@ -1895,21 +1895,21 @@
         ],
         "responses": {
           "204": {
-            "description": "inbox entry deleted"
+            "description": "incoming transaction deleted"
           }
         }
       }
     },
 
-    "/inbox/{id}/images": {
+    "/boxes/incoming/{id}/images": {
       "get": {        
-        "description": "get the received images corresponding to the inbox entry with the supplied ID",
+        "description": "get the received images corresponding to the incoming transaction with the supplied ID",
         "tags": ["Boxes"],
         "parameters": [
           {
             "name": "id",
             "in": "path",
-            "description": "ID of inbox entry",
+            "description": "ID of incoming transaction",
             "required": true,
             "type": "integer",
             "format": "int64"
@@ -1917,7 +1917,7 @@
         ],
         "responses": {
           "200": {
-            "description": "images received corresponding to the specified inbox entry",
+            "description": "images received corresponding to the specified incoming transaction",
             "schema": {
               "type": "array",
               "items": {
@@ -1929,17 +1929,17 @@
       }
     },
 
-    "/outbox": {
+    "/boxes/outgoing": {
       "get": {        
-        "description": "get contents of outbox (records of outgoing transactions, failed or in progress)",
+        "description": "get outgoing transactions (finished, currently sending, waiting or failed)",
         "tags": ["Boxes"],
         "responses": {
           "200": {
-            "description": "outgoing transactions, failed or in progress",
+            "description": "outgoing transactions, finished, sending, waiting or failed",
             "schema": {
               "type": "array",
               "items": {
-                "$ref": "#/definitions/outboxEntryInfo"
+                "$ref": "#/definitions/outgoingTransaction"
               }
             }
           }
@@ -1947,15 +1947,15 @@
       }
     },
 
-    "/outbox/{id}": {
+    "/boxes/outgoing/{id}": {
       "delete": {        
-        "description": "delete a transaction from the outbox, thus cancelling sending the corresponding image",
+        "description": "delete an outgoing transaction. This will stop ongoing transactions.",
         "tags": ["Boxes"],
         "parameters": [
           {
             "name": "id",
             "in": "path",
-            "description": "ID of outbox entry",
+            "description": "ID of outgoing transaction",
             "required": true,
             "type": "integer",
             "format": "int64"
@@ -1963,61 +1963,21 @@
         ],
         "responses": {
           "204": {
-            "description": "outbox entry deleted"
+            "description": "outgoing transaction deleted"
           }
         }
       }
     },
 
-    "/sent": {
+    "/boxes/outgoing/{id}/images": {
       "get": {        
-        "description": "get a list of sent transactions",
-        "tags": ["Boxes"],
-        "responses": {
-          "200": {
-            "description": "sent transactions",
-            "schema": {
-              "type": "array",
-              "items": {
-                "$ref": "#/definitions/sentEntryInfo"
-              }
-            }
-          }
-        }        
-      }
-    },
-
-    "/sent/{id}": {
-      "delete": {        
-        "description": "delete a transaction from sent",
+        "description": "get the sent images corresponding to the outgoing transaction with the supplied ID",
         "tags": ["Boxes"],
         "parameters": [
           {
             "name": "id",
             "in": "path",
-            "description": "ID of sent entry",
-            "required": true,
-            "type": "integer",
-            "format": "int64"
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "sent entry deleted"
-          }
-        }
-      }
-    },
-
-    "/sent/{id}/images": {
-      "get": {        
-        "description": "get the images that were sent during the transaction corresponding to the sent entry with the supplied ID",
-        "tags": ["Boxes"],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "description": "ID of sent entry",
+            "description": "ID of outgoing transaction",
             "required": true,
             "type": "integer",
             "format": "int64"
@@ -2025,7 +1985,7 @@
         ],
         "responses": {
           "200": {
-            "description": "images sent corresponding to the specified sent entry",
+            "description": "images sent corresponding to the specified outgoing transaction",
             "schema": {
               "type": "array",
               "items": {
@@ -2037,10 +1997,10 @@
       }
     },
 
-    "/box/{token}/image": {
+    "/transactions/{token}/image": {
       "post": {
         "description": "add an image (dataset) as part of a transaction. This method is used when sending images using the push method to a public slicebox.",
-        "tags": ["Remote Boxes"],
+        "tags": ["Transactions"],
         "consumes": [
           "application/octet-stream"
         ],
@@ -2096,10 +2056,10 @@
       }
     },
 
-    "/box/{token}/outbox/poll": {
+    "/transactions/{token}/outbox/poll": {
       "get": {
         "description": "get next outbox entry (next image that the connected box wishes to send to you), if any. This method is used when sending images using the poll method from a public slicebox.",
-        "tags": ["Remote Boxes"],
+        "tags": ["Transactions"],
         "parameters": [
           {
             "name": "token",
@@ -2126,10 +2086,10 @@
       }
     },
 
-    "/box/{token}/outbox": {
+    "/transactions/{token}/outbox": {
       "get": {
         "description": "fetch an image from the connected box as part of a transaction. This method is used when sending images using the poll method from a public slicebox.",
-        "tags": ["Remote Boxes"],
+        "tags": ["Transactions"],
         "produces": [
           "application/octet-stream"
         ],
@@ -2172,10 +2132,10 @@
       }
     },
 
-    "/box/{token}/outbox/done": {
+    "/transactions/{token}/outbox/done": {
       "post": {
         "description": "signal that the supplied outbox entry was successfully received and can be removed. This method is used when sending images using the poll method from a public slicebox.",
-        "tags": ["Remote Boxes"],
+        "tags": ["Transactions"],
         "parameters": [
           {
             "name": "token",
@@ -2205,10 +2165,10 @@
       }
     },
 
-    "/box/{token}/outbox/failed": {
+    "/transactions/{token}/outbox/failed": {
       "post": {
         "description": "signal that the image corresponding to the supplied outbox entry could not be read or stored properly on the receiving side, and that the transaction should be marked as failed.",
-        "tags": ["Remote Boxes"],
+        "tags": ["Transactions"],
         "parameters": [
           {
             "name": "token",
@@ -3087,7 +3047,7 @@
         }
       }
     },
-    "outboxEntryInfo": {
+    "outgoingTransaction": {
       "properties": {
         "id": {
           "type": "integer",
@@ -3128,7 +3088,7 @@
         }
       }
     },
-    "inboxEntryInfo": {
+    "incomingTransaction": {
       "properties": {
         "id": {
           "type": "integer",
