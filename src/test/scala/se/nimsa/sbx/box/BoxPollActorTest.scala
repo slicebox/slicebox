@@ -207,6 +207,76 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       capturedRequests(1).uri.toString() should be(s"$remoteBoxBaseUrl/outgoing/poll")
     }
 
+    "mark incoming transaction as finished when all files have been received" in {
+      val outgoingTransactionId = 999
+      val transaction = OutgoingTransaction(outgoingTransactionId, 987, "some box", 0, 2, 112233, TransactionStatus.WAITING)
+      val image1 = OutgoingImage(1, outgoingTransactionId, 1, 1, false)
+      val image2 = OutgoingImage(2, outgoingTransactionId, 2, 2, false)
+      val transactionImage1 = OutgoingTransactionImage(transaction.copy(sentImageCount = 1), image1)
+      val transactionImage2 = OutgoingTransactionImage(transaction.copy(sentImageCount = 2), image2)
+  
+      val bytes = compress(TestUtil.testImageByteArray)
+      
+      // insert mock responses for fetching two images
+      marshal(transactionImage1) match {
+        case Right(entity) => mockHttpResponses += HttpResponse(StatusCodes.OK, entity)
+        case Left(e)       => fail(e)
+      }
+      mockHttpResponses += HttpResponse(StatusCodes.OK, HttpEntity(ContentTypes.`application/octet-stream`, HttpData(bytes)))
+      mockHttpResponses += HttpResponse(StatusCodes.NoContent) // done reply
+      marshal(transactionImage2) match {
+        case Right(entity) => mockHttpResponses += HttpResponse(StatusCodes.OK, entity)
+        case Left(e)       => fail(e)
+      }
+      mockHttpResponses += HttpResponse(StatusCodes.OK, HttpEntity(ContentTypes.`application/octet-stream`, HttpData(bytes)))
+      mockHttpResponses += HttpResponse(StatusCodes.NoContent) // done reply
+
+      pollBoxActorRef ! PollRemoteBox
+
+      expectNoMsg
+
+      db.withSession { implicit session =>
+        val incomingTransactions = boxDao.listIncomingTransactions
+        incomingTransactions should have length 1
+        incomingTransactions(0).status shouldBe TransactionStatus.FINISHED
+      }
+    }
+    
+    "mark incoming transaction as failed if the number of received files does not match the number of images in the transaction (the highest sequence number)" in {
+      val outgoingTransactionId = 999
+      val transaction = OutgoingTransaction(outgoingTransactionId, 987, "some box", 0, 3, 112233, TransactionStatus.WAITING)
+      val image1 = OutgoingImage(1, outgoingTransactionId, 1, 1, false)
+      val image2 = OutgoingImage(3, outgoingTransactionId, 2, 3, false)
+      val transactionImage1 = OutgoingTransactionImage(transaction.copy(sentImageCount = 1), image1)
+      val transactionImage2 = OutgoingTransactionImage(transaction.copy(sentImageCount = 3), image2)
+  
+      val bytes = compress(TestUtil.testImageByteArray)
+      
+      // insert mock responses for fetching two images
+      marshal(transactionImage1) match {
+        case Right(entity) => mockHttpResponses += HttpResponse(StatusCodes.OK, entity)
+        case Left(e)       => fail(e)
+      }
+      mockHttpResponses += HttpResponse(StatusCodes.OK, HttpEntity(ContentTypes.`application/octet-stream`, HttpData(bytes)))
+      mockHttpResponses += HttpResponse(StatusCodes.NoContent) // done reply
+      marshal(transactionImage2) match {
+        case Right(entity) => mockHttpResponses += HttpResponse(StatusCodes.OK, entity)
+        case Left(e)       => fail(e)
+      }
+      mockHttpResponses += HttpResponse(StatusCodes.OK, HttpEntity(ContentTypes.`application/octet-stream`, HttpData(bytes)))
+      mockHttpResponses += HttpResponse(StatusCodes.NoContent) // done reply
+
+      pollBoxActorRef ! PollRemoteBox
+
+      expectNoMsg
+
+      db.withSession { implicit session =>
+        val incomingTransactions = boxDao.listIncomingTransactions
+        incomingTransactions should have length 1
+        incomingTransactions(0).status shouldBe TransactionStatus.FAILED
+      }
+    }
+    
     "keep trying to fetch remote file until fetching succeeds" in {
       val outgoingTransactionId = 999
       val transaction = OutgoingTransaction(outgoingTransactionId, 987, "some box", 1, 2, 2, TransactionStatus.WAITING)

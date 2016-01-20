@@ -67,7 +67,7 @@ class BoxDAO(val driver: JdbcProfile) {
     def sequenceNumber = column[Long]("sequencenumber")
     def sent = column[Boolean]("sent")
     def fkOutgoingTransaction = foreignKey("fk_outgoing_transaction_id", outgoingTransactionId, outgoingTransactionQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
-    def idxUniqueTransactionAndNumber = index("idx_unique_outgoing_image", (outgoingTransactionId, sequenceNumber), unique = true)    
+    def idxUniqueTransactionAndNumber = index("idx_unique_outgoing_image", (outgoingTransactionId, sequenceNumber), unique = true)
     def * = (id, outgoingTransactionId, imageId, sequenceNumber, sent) <> (OutgoingImage.tupled, OutgoingImage.unapply)
   }
 
@@ -107,7 +107,7 @@ class BoxDAO(val driver: JdbcProfile) {
     def imageId = column[Long]("imageid")
     def sequenceNumber = column[Long]("sequencenumber")
     def fkIncomingTransaction = foreignKey("fk_incoming_transaction_id", incomingTransactionId, incomingTransactionQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
-    def idxUniqueTransactionAndNumber = index("idx_unique_incoming_image", (incomingTransactionId, sequenceNumber), unique = true)    
+    def idxUniqueTransactionAndNumber = index("idx_unique_incoming_image", (incomingTransactionId, sequenceNumber), unique = true)
     def * = (id, incomingTransactionId, imageId, sequenceNumber) <> (IncomingImage.tupled, IncomingImage.unapply)
   }
 
@@ -319,8 +319,14 @@ class BoxDAO(val driver: JdbcProfile) {
       .filter(_.status === (PROCESSING: TransactionStatus))
       .list
 
+  def countOutgoingImagesForOutgoingTransactionId(outgoingTransactionId: Long)(implicit session: Session): Int =
+    outgoingImageQuery.filter(_.outgoingTransactionId === outgoingTransactionId).length.run
+
   def listOutgoingImagesForOutgoingTransactionId(outgoingTransactionId: Long)(implicit session: Session): List[OutgoingImage] =
     outgoingImageQuery.filter(_.outgoingTransactionId === outgoingTransactionId).list
+
+  def countIncomingImagesForIncomingTransactionId(incomingTransactionId: Long)(implicit session: Session): Int =
+    incomingImageQuery.filter(_.incomingTransactionId === incomingTransactionId).length.run
 
   def listIncomingImagesForIncomingTransactionId(incomingTransactionId: Long)(implicit session: Session): List[IncomingImage] =
     incomingImageQuery.filter(_.incomingTransactionId === incomingTransactionId).list

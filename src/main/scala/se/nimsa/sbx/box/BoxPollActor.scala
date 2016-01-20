@@ -88,7 +88,7 @@ class BoxPollActor(box: Box,
     log.debug(s"Fetching remote outgoing image $transactionImage")
     sendRequestToRemoteBoxPipeline(Get(s"${box.baseUrl}/outgoing?transactionid=${transactionImage.transaction.id}&imageid=${transactionImage.image.id}"))
   }
-  
+
   // We don't need to wait for done message to be sent since it is not critical that it is received by the remote box
   def sendRemoteOutgoingFileCompleted(transactionImage: OutgoingTransactionImage): Future[HttpResponse] =
     marshal(transactionImage) match {
@@ -177,7 +177,7 @@ class BoxPollActor(box: Box,
     sendPollRequestToRemoteBox
       .map(transactionImageMaybe => {
         log.debug(s"Remote box answered poll request with outgoing transaction $transactionImageMaybe")
-        
+
         updateBoxOnlineStatus(true)
 
         transactionImageMaybe match {
@@ -247,12 +247,18 @@ class BoxPollActor(box: Box,
       boxDao.updateIncomingTransaction(incomingTransaction)
       boxDao.incomingImageByIncomingTransactionIdAndSequenceNumber(incomingTransaction.id, sequenceNumber) match {
         case Some(image) => boxDao.updateIncomingImage(image.copy(imageId = imageId))
-        case None => boxDao.insertIncomingImage(IncomingImage(-1, incomingTransaction.id, imageId, sequenceNumber))
+        case None        => boxDao.insertIncomingImage(IncomingImage(-1, incomingTransaction.id, imageId, sequenceNumber))
       }
 
-      if (incomingTransaction.receivedImageCount == incomingTransaction.totalImageCount) {
-        SbxLog.info("Box", s"Received ${totalImageCount} files from box $boxName")
-        boxDao.setIncomingTransactionStatus(incomingTransaction.id, TransactionStatus.FINISHED)
+      if (sequenceNumber == totalImageCount) {
+        val nIncomingImages = boxDao.countIncomingImagesForIncomingTransactionId(incomingTransaction.id)
+        if (nIncomingImages == totalImageCount) {
+          SbxLog.info("Box", s"Received ${totalImageCount} files from box $boxName")
+          boxDao.setIncomingTransactionStatus(incomingTransaction.id, TransactionStatus.FINISHED)
+        } else {
+          SbxLog.error("Box", s"Finished receiving ${totalImageCount} files from box $boxName, but only $nIncomingImages files can be found at this time.")
+          boxDao.setIncomingTransactionStatus(incomingTransaction.id, TransactionStatus.FAILED)
+        }
       }
     }
   }

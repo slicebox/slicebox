@@ -127,7 +127,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
         val transactionId = 987
         val imageId = 123
         val box = boxDao.insertBox(Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, false))
-        
+
         // insert images with sequence numbers out of order
         val transaction = boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, box.id, box.name, 0, 1, 123, TransactionStatus.WAITING))
         val image1 = boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, imageId, 2, false))
@@ -147,6 +147,76 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
             image.outgoingTransactionId should be(transaction.id)
         }
       }
+    }
+
+    "create incoming transaction when receiving the first incoming file in a transaction" in {
+
+      val box = Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, false)
+
+      val sequenceNumber = 1
+      val totalImageCount = 55
+      boxService ! UpdateIncoming(box, 32, sequenceNumber, totalImageCount, 33)
+
+      expectMsgPF() {
+        case IncomingUpdated(transaction) =>
+          transaction.receivedImageCount shouldBe sequenceNumber
+          transaction.totalImageCount shouldBe totalImageCount
+          transaction.status shouldBe TransactionStatus.PROCESSING
+      }
+      
+      db.withSession { implicit session =>
+        boxDao.listIncomingTransactions should have length 1
+        boxDao.listIncomingImages should have length 1
+      }
+      
+    }
+
+    "mark incoming transaction as finished when receiving the UpdateIncoming message for the last file of the transaction" in {
+
+      val box = Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, false)
+
+      val totalImageCount = 2
+      boxService ! UpdateIncoming(box, 32, sequenceNumber = 1, totalImageCount, 33)
+
+      expectMsgPF() {
+        case IncomingUpdated(transaction) =>
+          transaction.receivedImageCount shouldBe 1
+          transaction.totalImageCount shouldBe totalImageCount
+          transaction.status shouldBe TransactionStatus.PROCESSING
+      }
+      
+      boxService ! UpdateIncoming(box, 32, sequenceNumber = 2, totalImageCount, 33)
+      
+      expectMsgPF() {
+        case IncomingUpdated(transaction) =>
+          transaction.receivedImageCount shouldBe 2
+          transaction.totalImageCount shouldBe totalImageCount
+          transaction.status shouldBe TransactionStatus.FINISHED
+      }
+      
+      db.withSession { implicit session =>
+        boxDao.listIncomingTransactions should have length 1
+        boxDao.listIncomingImages should have length 2
+      }
+    }
+
+    "mark incoming transaction as failed when receiving the UpdateIncoming message for the last file of the transaction and the number of images in the transactions does not match the number of incoming images stored in the database" in {
+
+      val box = Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, false)
+
+      val totalImageCount = 3
+      
+      boxService ! UpdateIncoming(box, 32, sequenceNumber = 1, totalImageCount, 33)
+      expectMsgType[IncomingUpdated]
+      
+      boxService ! UpdateIncoming(box, 32, sequenceNumber = 3, totalImageCount, 33)
+
+      expectMsgPF() {
+        case IncomingUpdated(transaction) =>
+          transaction.receivedImageCount shouldBe 3
+          transaction.totalImageCount shouldBe totalImageCount
+          transaction.status shouldBe TransactionStatus.FAILED
+      }      
     }
 
     "remove all related box tag values when an outgoing transaction is removed" in {

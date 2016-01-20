@@ -141,13 +141,24 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
                 case None        => boxDao.insertIncomingImage(IncomingImage(-1, incomingTransaction.id, imageId, sequenceNumber))
               }
 
-              if (incomingTransaction.receivedImageCount == totalImageCount) {
-                boxDao.setIncomingTransactionStatus(incomingTransaction.id, TransactionStatus.FINISHED)
-                SbxLog.info("Box", s"Receiving $totalImageCount images from box ${box.name} completed.")
-              }
+              val incomingTransactionWithStatus =
+                if (sequenceNumber == totalImageCount) {
+                  val nIncomingImages = boxDao.countIncomingImagesForIncomingTransactionId(incomingTransaction.id)
+                  val status =
+                    if (nIncomingImages == totalImageCount) {
+                      SbxLog.info("Box", s"Received ${totalImageCount} files from box ${box.name}")
+                      TransactionStatus.FINISHED
+                    } else {
+                      SbxLog.error("Box", s"Finished receiving ${totalImageCount} files from box ${box.name}, but only $nIncomingImages files can be found at this time.")
+                      TransactionStatus.FAILED
+                    }
+                  boxDao.setIncomingTransactionStatus(incomingTransaction.id, status)
+                  incomingTransaction.copy(status = status)
+                } else
+                  incomingTransaction
 
-              log.debug(s"Received pushed file and updated incoming transaction $incomingTransaction")
-              sender ! IncomingUpdated(incomingTransaction)
+              log.debug(s"Received pushed file and updated incoming transaction $incomingTransactionWithStatus")
+              sender ! IncomingUpdated(incomingTransactionWithStatus)
             }
 
           case PollOutgoing(box) =>
@@ -181,7 +192,7 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
                 boxDao.setOutgoingTransactionStatus(transactionImage.transaction.id, TransactionStatus.FINISHED)
                 SbxLog.info("Box", s"Finished sending ${updatedTransaction.totalImageCount} images to box ${box.name}")
               }
-              
+
               log.debug(s"Marked outgoing transaction image updatedTransactionImage as sent")
               sender ! OutgoingImageMarkedAsSent
             }
