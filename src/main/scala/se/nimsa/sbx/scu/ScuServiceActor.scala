@@ -112,11 +112,11 @@ class ScuServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extends Actor
                 })
                 .recover {
                   case e: UnknownHostException =>
-                    throw new BadGatewayException(s"Unable to reach host ${scu.name}@${scu.host}:${scu.port}")
+                    throw new BadGatewayException(s"Unable to reach host ${scu.aeTitle}@${scu.host}:${scu.port}")
                   case e: ConnectException =>
-                    throw new BadGatewayException(s"Connection refused on host ${scu.name}@${scu.host}:${scu.port}")
+                    throw new BadGatewayException(s"Connection refused on host ${scu.aeTitle}@${scu.host}:${scu.port}")
                   case e: NoRouteToHostException =>
-                    throw new BadGatewayException(s"No route found to host ${scu.name}@${scu.host}:${scu.port}")
+                    throw new BadGatewayException(s"No route found to host ${scu.aeTitle}@${scu.host}:${scu.port}")
                 }
                 .pipeTo(sender)
             }).orElse(throw new NotFoundException(s"SCU with id $scuId not found"))
