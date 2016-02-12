@@ -11,12 +11,29 @@ angular.module('slicebox.import', ['ngRoute', 'ngFileUpload'])
   });  
 })
 
-.controller('ImportCtrl', function($scope, Upload, $q) {
+.controller('ImportCtrl', function($scope, Upload, $q, sbxToast) {
     
-    var importedFiles = [];
-    var rejectedFiles = [];
+    $scope.uiState.selectedSession = null;
 
     $scope.callbacks = {};
+
+    var importSessions = []; // temporary
+
+    $scope.loadImportSessions = function(startIndex, count) {
+        return importSessions;
+    };
+
+    $scope.newImportSessionButtonClicked = function() {
+        var id = importSessions.length === 0 ? 1 : importSessions[importSessions.length - 1].id + 1;
+        var newSession = { id: id, name: "My Session " + id, created: new Date().getTime(), filesImported: 0, filesRejected: 0 };
+        importSessions.push(newSession);
+        $scope.uiState.selectedSeriesType = newSession;
+        $scope.callbacks.importSessionsTable.reloadPage();
+    };
+
+    $scope.importSessionSelected = function(importSession) {
+        $scope.uiState.selectedSession = importSession;
+    };
 
     function importFirst(files) {
         if (files && files.length) {
@@ -24,14 +41,13 @@ angular.module('slicebox.import', ['ngRoute', 'ngFileUpload'])
                 url: '/api/images',
                 file: files[0]
             }).success(function (data, status, headers, config) {
-                importedFiles.push({ name: config.file.name });
-                $scope.callbacks.importedFilesTable.reset();
+                //importedFiles.push({ name: config.file.name });
                 files.shift();
                 importFirst(files);
             }).error(function (message, status, headers, config) {
-                var errorMessage = status === 400 ? "Not a valid DICOM file" : message;
-                rejectedFiles.push({ name: config.file.name, status: status, message: errorMessage });
-                $scope.callbacks.rejectedFilesTable.reset();
+                if (status >= 300 && status !== 400) {
+                    sbxToast.showErrorMessage('Error importing file: ' + message);
+                }
                 files.shift();
                 importFirst(files);
             });
@@ -40,14 +56,6 @@ angular.module('slicebox.import', ['ngRoute', 'ngFileUpload'])
 
     $scope.import = function(files) {
         importFirst(files);
-    };
-
-    $scope.getImportedFiles = function() {
-        return $q.when(importedFiles);
-    };
-
-    $scope.getRejectedFiles = function() {
-        return $q.when(rejectedFiles);
     };
 
 });
