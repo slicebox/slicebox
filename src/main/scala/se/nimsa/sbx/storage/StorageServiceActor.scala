@@ -84,7 +84,10 @@ class StorageServiceActor(storage: Path, implicit val timeout: Timeout) extends 
         if (checkSopClass(dataset))
           addMetadata(dataset, source).map { image =>
             val overwrite = storeDataset(dataset, image, source)
-            if (!overwrite) log.debug(s"Stored file with image id ${image.id}")
+            if (overwrite)
+              log.info(s"Updated existing file with image id ${image.id}")
+            else
+              log.info(s"Stored file with image id ${image.id}")
             context.system.eventStream.publish(DatasetAdded(image, source))
           }
         else
@@ -97,7 +100,10 @@ class StorageServiceActor(storage: Path, implicit val timeout: Timeout) extends 
         if (checkSopClass(dataset))
           addMetadata(dataset, source).map { image =>
             val overwrite = storeDataset(dataset, image, source)
-            if (!overwrite) log.debug(s"Stored file with image id ${image.id}")
+            if (overwrite)
+              log.info(s"Updated existing file with image id ${image.id}")
+            else
+              log.info(s"Stored file with image id ${image.id}")
             context.system.eventStream.publish(DatasetAdded(image, source))
           }
         else
@@ -113,8 +119,11 @@ class StorageServiceActor(storage: Path, implicit val timeout: Timeout) extends 
           Future.failed(new IllegalArgumentException(s"Unsupported SOP Class UID ${dataset.getString(Tag.SOPClassUID)}"))
         else
           addMetadata(dataset, source).map { image =>
-            storeDataset(dataset, image, source)
-            log.debug(s"Stored file for image $image")
+            val overwrite = storeDataset(dataset, image, source)
+            if (overwrite)
+              log.info(s"Updated existing file with image id ${image.id}")
+            else
+              log.info(s"Stored file with image id ${image.id}")
             val datasetAdded = DatasetAdded(image, source)
             context.system.eventStream.publish(datasetAdded)
             datasetAdded
@@ -138,6 +147,7 @@ class StorageServiceActor(storage: Path, implicit val timeout: Timeout) extends 
         }.unwrap
 
       image.foreach(_.foreach { image =>
+        log.info(s"Stored encapsulated JPEG with image id ${image.id}")
         context.system.eventStream.publish(DatasetAdded(image, source))
       })
 
@@ -148,14 +158,17 @@ class StorageServiceActor(storage: Path, implicit val timeout: Timeout) extends 
         imageById(imageId).flatMap { optionalImage =>
           optionalImage.map { image =>
             try deleteFromStorage(image.id) catch {
-              case e: NoSuchFileException => log.debug("Storage", s"DICOM file for image with id $imageId could not be found, no need to delete.")
+              case e: NoSuchFileException => log.info(s"DICOM file for image with id $imageId could not be found, no need to delete.")
             }
             deleteMetaData(image)
           }
             .getOrElse(Future.successful {})
             .map(i => DatasetDeleted(imageId))
         }
-      datasetDeleted.foreach(context.system.eventStream.publish(_))
+      datasetDeleted.foreach {
+        log.info(s"Deleted dataset with image id $imageId")
+        context.system.eventStream.publish(_)
+      }
       datasetDeleted.pipeTo(sender)
 
     case CreateTempZipFile(imageIds) =>
