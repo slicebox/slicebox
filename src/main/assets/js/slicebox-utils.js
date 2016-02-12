@@ -349,6 +349,10 @@ angular.module('slicebox.utils', ['ngSanitize'])
         return theTag;
     };
 
+    $scope.hasSeriesTags = function() {
+        return $scope.uiState.seriesTags.length > 0;
+    };
+
 })
 
 .factory('userService', function ($http) {
