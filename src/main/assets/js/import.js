@@ -11,7 +11,7 @@ angular.module('slicebox.import', ['ngRoute', 'ngFileUpload'])
   });  
 })
 
-.controller('ImportCtrl', function($scope, Upload, $q, sbxToast, openAddEntityModal) {
+.controller('ImportCtrl', function($scope, Upload, $q, $interval, sbxToast, openAddEntityModal) {
     
     $scope.uiState.selectedSession = null;
     $scope.uiState.currentFileSet = {
@@ -23,8 +23,18 @@ angular.module('slicebox.import', ['ngRoute', 'ngFileUpload'])
 
     $scope.callbacks = {};
 
-    var importSessions = [];
+    var importSessions = []; // TODO remove
 
+    var timer = $interval(function() {
+        if ($scope.uiState.currentFileSet.processing) {
+            $scope.callbacks.importSessionsTable.reloadPage();
+        }
+    }, 3000);
+
+    $scope.$on('$destroy', function() {
+        $interval.cancel(timer);
+    });
+  
     $scope.loadImportSessions = function(startIndex, count) {
         return importSessions;
     };
@@ -49,6 +59,7 @@ angular.module('slicebox.import', ['ngRoute', 'ngFileUpload'])
     function importFirst(files) {
         if (files && files.length) {
             $scope.uiState.currentFileSet.index++;
+            $scope.uiState.selectedSession.lastUpdated = new Date().getTime(); // TODO move to server
             $scope.uiState.currentFileSet.progress = Math.round(100 * $scope.uiState.currentFileSet.index / $scope.uiState.currentFileSet.total);
             Upload.upload({
                 url: '/api/images',
@@ -56,16 +67,19 @@ angular.module('slicebox.import', ['ngRoute', 'ngFileUpload'])
             }).success(function (data, status, headers, config) {
                 //importedFiles.push({ name: config.file.name });
                 files.shift();
+                $scope.uiState.selectedSession.filesImported++; // TODO move to server
                 importFirst(files);
             }).error(function (message, status, headers, config) {
                 if (status >= 300 && status !== 400) {
                     sbxToast.showErrorMessage('Error importing file: ' + message);
                 }
                 files.shift();
+                $scope.uiState.selectedSession.filesRejected++; // TODO move to server
                 importFirst(files);
             });
         } else {
             $scope.uiState.currentFileSet.processing = false;
+            $scope.callbacks.importSessionsTable.reloadPage();
         }
     }
 

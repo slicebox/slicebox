@@ -1,4 +1,4 @@
-<div layout="column" layout-margin>
+<div layout="column" layout-margin class="import">
 
     <div layout="row" layout-margin>
 
@@ -19,13 +19,16 @@
                             <sbx-grid-column property="name" title="Name">
                             </sbx-grid-column>
 
-                            <sbx-grid-column property="created" title="Created" filter="date: yyyy-MM-dd HH:mm">
-                            </sbx-grid-column>
-
                             <sbx-grid-column property="filesImported" title="Imported">
                             </sbx-grid-column>
 
                             <sbx-grid-column property="filesRejected" title="Rejected">
+                            </sbx-grid-column>
+
+                            <sbx-grid-column property="created" title="Created" filter="date: yyyy-MM-dd HH:mm">
+                            </sbx-grid-column>
+
+                            <sbx-grid-column property="lastUpdated" title="Updated" filter="date: yyyy-MM-dd HH:mm">
                             </sbx-grid-column>
                         </sbx-grid>
 
@@ -55,16 +58,16 @@
                              ng-disabled="uiState.currentFileSet.processing"
                              class="import-drop-box-container">
                             <div layout="row" layout-align="center center" style="height: 300px"> 
-                                <h3>Drop DICOM files or folders here</h3>
+                                <h3 ng-if="!uiState.currentFileSet.processing">Drop DICOM files or folders here</h3>
+                                <div class="column" ng-hide="!uiState.currentFileSet.processing">
+                                    <h4>Importing {{uiState.currentFileSet.total}} files...</h4>
+                                    <md-progress-linear md-mode="determinate" ng-value="uiState.currentFileSet.progress"></md-progress-linear>
+                                </div>
                             </div>
                         </div>
             
                         <div ngf-no-file-drop>Drag/Drop is not supported for this browser</div>
 
-                        <div class="column" ng-hide="!uiState.currentFileSet.processing">
-                            <h4>Importing {{uiState.currentFileSet.total}} files...</h4>
-                            <md-progress-linear md-mode="determinate" ng-value="uiState.currentFileSet.progress"></md-progress-linear>
-                        </div>
 
                    </md-content>
                 </md-card-content>
