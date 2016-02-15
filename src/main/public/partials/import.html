@@ -41,30 +41,56 @@
         </div>
 
         <div flex ng-controller="ImportSessionCtrl">
-            <form name="importSessionForm" role="importSessionForm" ng-submit="saveServiceType()" novalidate>
-            <div flex>
+            <form name="importSessionForm" role="importSessionForm" ng-submit="saveImportSession()" novalidate>
 
-            <md-card ng-if="uiState.selectedSession">
-                <md-card-content>
-                    <h4 class="md-flex">Add files to <i>{{uiState.selectedSession.name}}</i></h4>
-                    <md-content>
+                <md-card ng-if="uiState.selectedImportSession">
+                    <md-card-content>
+                        <md-content>
+                            <div class="row">
+                                <md-input-container md-no-float md-is-error="importSessionForm.$submitted && importSessionForm.name.$error.required">
+                                    <input type="text" name="name" placeholder="Import session name" ng-model="uiState.selectedImportSession.name" required>
+                                    <div ng-messages="importSessionForm.name.$error"
+                                        ng-show="importSessionForm.$submitted && importSessionForm.name.$error.required">
 
-                        <div ngf-drop 
-                             ngf-change="import($files)" 
-                             class="import-drop-box-container" 
-                             ngf-drag-over-class="import-drop-box-dragover" 
-                             ngf-multiple="true" 
-                             ngf-allow-dir="true"> 
-                            <div layout="row" layout-align="center center" style="height: 300px"> 
-                                <h3>Drop DICOM files or folders here</h3>
+                                        <div ng-message="required">This is required!</div>
+                                    </div>
+                                </md-input-container>
                             </div>
-                        </div>
-            
-                        <div ngf-no-file-drop>Drag/Drop is not supported for this browser</div>
 
-                   </md-content>
-                </md-card-content>
-            </md-card>
+                            <sbx-button button-class="md-raised md-primary"
+                                button-type="submit"
+                                button-disabled="!uiState.selectedImportSession.name || uiState.selectedImportSession.id > 0"
+                                button-title="Create"
+                                action="createButtonClicked()">
+                            </sbx-button>
+
+                            <md-card ng-if="uiState.selectedSession">
+                                <md-card-content>
+                                    <h4 class="md-flex">Add files to <i>{{uiState.selectedSession.name}}</i></h4>
+                                    <md-content>
+
+                                        <div ngf-drop 
+                                             ngf-change="import($files)" 
+                                             class="import-drop-box-container" 
+                                             ngf-drag-over-class="import-drop-box-dragover" 
+                                             ngf-multiple="true" 
+                                             ngf-allow-dir="true"> 
+                                            <div layout="row" layout-align="center center" style="height: 300px"> 
+                                                <h3>Drop DICOM files or folders here</h3>
+                                            </div>
+                                        </div>
+                            
+                                        <div ngf-no-file-drop>Drag/Drop is not supported for this browser</div>
+
+                                   </md-content>
+                                </md-card-content>
+                            </md-card>
+
+                        </md-content>
+                    </md-card-content>
+                </md-card>
+
+            </form>
          </div>
 
     </div>

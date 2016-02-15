@@ -17,18 +17,22 @@ angular.module('slicebox.import', ['ngRoute', 'ngFileUpload'])
 
     $scope.callbacks = {};
 
-    var importSessions = []; // temporary
+    var importSessions = [];
 
     $scope.loadImportSessions = function(startIndex, count) {
         return importSessions;
     };
 
     $scope.newImportSessionButtonClicked = function() {
-        var id = importSessions.length === 0 ? 1 : importSessions[importSessions.length - 1].id + 1;
-        var newSession = { id: id, name: "My Session " + id, created: new Date().getTime(), filesImported: 0, filesRejected: 0 };
-        importSessions.push(newSession);
-        $scope.uiState.selectedSeriesType = newSession;
-        $scope.callbacks.importSessionsTable.reloadPage();
+        $scope.callbacks.importSessionsTable.clearSelection();
+        
+        $scope.uiState.selectedImportSession = { 
+            id: -1, 
+            name: undefined,
+            created: new Date().getTime(), 
+            filesImported: 0, 
+            filesRejected: 0 
+        };
     };
 
     $scope.importSessionSelected = function(importSession) {
@@ -56,6 +60,39 @@ angular.module('slicebox.import', ['ngRoute', 'ngFileUpload'])
 
     $scope.import = function(files) {
         importFirst(files);
+    };
+
+})
+
+.controller('ImportSessionCtrl', function($scope, $http, $mdDialog, $q, sbxToast) {
+    // Initialization
+
+    $scope.createButtonClicked = function () {
+        var savePromise;
+
+        if ($scope.importSessionForm.$invalid) {
+            return;
+        }
+
+        if ($scope.uiState.selectedImportSession.id === -1) {
+            savePromise = $http.post('/api/importsessions', $scope.uiState.selectedImportSession);
+        }
+        
+        savePromise = savePromise.then(function(response) {
+            if (response.data.id) {
+                $scope.uiState.selectedImportSession.id = response.data.id;
+            }
+            
+        });
+
+        savePromise.then(function() {
+            sbxToast.showInfoMessage("Import session created");
+            $scope.callbacks.importSessionsTable.reloadPage();
+        }, function(error) {
+            sbxToast.showErrorMessage(error);
+        });
+
+        return savePromise;
     };
 
 });
