@@ -152,6 +152,8 @@ angular.module('slicebox.utils', ['ngSanitize'])
                 table.reloadPage();
             });
         });
+
+        return dialogPromise;
     };
 })
 

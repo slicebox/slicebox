@@ -30,8 +30,8 @@
                         </sbx-grid>
 
                         <div layout="row" class="button-row">
-                            <md-button class="md-primary md-raised" ng-click="newImportSessionButtonClicked()">
-                                New Import Session
+                            <md-button class="md-primary md-raised" ng-click="addImportSessionButtonClicked()">
+                                Add Import Session
                             </md-button>
                             <div flex></div>
                         </div>
@@ -40,57 +40,36 @@
             </md-card>
         </div>
 
-        <div flex ng-controller="ImportSessionCtrl">
-            <form name="importSessionForm" role="importSessionForm" ng-submit="saveImportSession()" novalidate>
+        <div flex>
 
-                <md-card ng-if="uiState.selectedImportSession">
-                    <md-card-content>
-                        <md-content>
-                            <div class="row">
-                                <md-input-container md-no-float md-is-error="importSessionForm.$submitted && importSessionForm.name.$error.required">
-                                    <input type="text" name="name" placeholder="Import session name" ng-model="uiState.selectedImportSession.name" required>
-                                    <div ng-messages="importSessionForm.name.$error"
-                                        ng-show="importSessionForm.$submitted && importSessionForm.name.$error.required">
+            <md-card ng-if="uiState.selectedSession">
+                <md-card-content>
+                    <h4 class="md-flex">Add files to <i>{{uiState.selectedSession.name}}</i></h4>
+                    <md-content>
 
-                                        <div ng-message="required">This is required!</div>
-                                    </div>
-                                </md-input-container>
+                        <div ngf-drop 
+                             ngf-change="import($files)" 
+                             ngf-drag-over-class="import-drop-box-dragover" 
+                             ngf-multiple="true" 
+                             ngf-allow-dir="true"
+                             ng-disabled="uiState.currentFileSet.processing"
+                             class="import-drop-box-container">
+                            <div layout="row" layout-align="center center" style="height: 300px"> 
+                                <h3>Drop DICOM files or folders here</h3>
                             </div>
+                        </div>
+            
+                        <div ngf-no-file-drop>Drag/Drop is not supported for this browser</div>
 
-                            <sbx-button button-class="md-raised md-primary"
-                                button-type="submit"
-                                button-disabled="!uiState.selectedImportSession.name || uiState.selectedImportSession.id > 0"
-                                button-title="Create"
-                                action="createButtonClicked()">
-                            </sbx-button>
+                        <div class="column" ng-hide="!uiState.currentFileSet.processing">
+                            <h4>Importing {{uiState.currentFileSet.total}} files...</h4>
+                            <md-progress-linear md-mode="determinate" ng-value="uiState.currentFileSet.progress"></md-progress-linear>
+                        </div>
 
-                            <md-card ng-if="uiState.selectedSession">
-                                <md-card-content>
-                                    <h4 class="md-flex">Add files to <i>{{uiState.selectedSession.name}}</i></h4>
-                                    <md-content>
+                   </md-content>
+                </md-card-content>
+            </md-card>
 
-                                        <div ngf-drop 
-                                             ngf-change="import($files)" 
-                                             class="import-drop-box-container" 
-                                             ngf-drag-over-class="import-drop-box-dragover" 
-                                             ngf-multiple="true" 
-                                             ngf-allow-dir="true"> 
-                                            <div layout="row" layout-align="center center" style="height: 300px"> 
-                                                <h3>Drop DICOM files or folders here</h3>
-                                            </div>
-                                        </div>
-                            
-                                        <div ngf-no-file-drop>Drag/Drop is not supported for this browser</div>
-
-                                   </md-content>
-                                </md-card-content>
-                            </md-card>
-
-                        </md-content>
-                    </md-card-content>
-                </md-card>
-
-            </form>
          </div>
 
     </div>

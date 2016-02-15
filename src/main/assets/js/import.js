@@ -11,9 +11,15 @@ angular.module('slicebox.import', ['ngRoute', 'ngFileUpload'])
   });  
 })
 
-.controller('ImportCtrl', function($scope, Upload, $q, sbxToast) {
+.controller('ImportCtrl', function($scope, Upload, $q, sbxToast, openAddEntityModal) {
     
     $scope.uiState.selectedSession = null;
+    $scope.uiState.currentFileSet = {
+        processing: false,
+        index: 0,
+        total: 0,
+        progress: 0
+    };
 
     $scope.callbacks = {};
 
@@ -23,16 +29,17 @@ angular.module('slicebox.import', ['ngRoute', 'ngFileUpload'])
         return importSessions;
     };
 
-    $scope.newImportSessionButtonClicked = function() {
-        $scope.callbacks.importSessionsTable.clearSelection();
-        
-        $scope.uiState.selectedImportSession = { 
-            id: -1, 
-            name: undefined,
-            created: new Date().getTime(), 
-            filesImported: 0, 
-            filesRejected: 0 
-        };
+    $scope.addImportSessionButtonClicked = function() {
+        openAddEntityModal(
+            'addImportSessionModalContent.html', 
+            'AddImportSessionModalCtrl', 
+            '/api/imports', 
+            'Import session', 
+            $scope.callbacks.importSessionsTable)
+        .then(function (importSession) {
+            importSessions.push(importSession);
+            $scope.callbacks.importSessionsTable.selectObject(importSession);
+        });
     };
 
     $scope.importSessionSelected = function(importSession) {
@@ -41,6 +48,8 @@ angular.module('slicebox.import', ['ngRoute', 'ngFileUpload'])
 
     function importFirst(files) {
         if (files && files.length) {
+            $scope.uiState.currentFileSet.index++;
+            $scope.uiState.currentFileSet.progress = Math.round(100 * $scope.uiState.currentFileSet.index / $scope.uiState.currentFileSet.total);
             Upload.upload({
                 url: '/api/images',
                 file: files[0]
@@ -55,44 +64,36 @@ angular.module('slicebox.import', ['ngRoute', 'ngFileUpload'])
                 files.shift();
                 importFirst(files);
             });
+        } else {
+            $scope.uiState.currentFileSet.processing = false;
         }
     }
 
     $scope.import = function(files) {
+        $scope.uiState.currentFileSet.processing = true;
+        $scope.uiState.currentFileSet.index = 0;
+        $scope.uiState.currentFileSet.total = files.length;
+        $scope.uiState.currentFileSet.progress = 0;
         importFirst(files);
     };
 
 })
 
-.controller('ImportSessionCtrl', function($scope, $http, $mdDialog, $q, sbxToast) {
-    // Initialization
+.controller('AddImportSessionModalCtrl', function($scope, $mdDialog) {
 
-    $scope.createButtonClicked = function () {
-        var savePromise;
-
-        if ($scope.importSessionForm.$invalid) {
-            return;
-        }
-
-        if ($scope.uiState.selectedImportSession.id === -1) {
-            savePromise = $http.post('/api/importsessions', $scope.uiState.selectedImportSession);
-        }
-        
-        savePromise = savePromise.then(function(response) {
-            if (response.data.id) {
-                $scope.uiState.selectedImportSession.id = response.data.id;
-            }
-            
+    // Scope functions
+    $scope.addButtonClicked = function() {
+        return $mdDialog.hide({ 
+            id: new Date().getTime(), // change to -1 later... 
+            name: $scope.name,
+            filesImported: 0, 
+            filesRejected: 0,
+            created: new Date().getTime(),
+            lastUpdated: new Date().getTime()
         });
-
-        savePromise.then(function() {
-            sbxToast.showInfoMessage("Import session created");
-            $scope.callbacks.importSessionsTable.reloadPage();
-        }, function(error) {
-            sbxToast.showErrorMessage(error);
-        });
-
-        return savePromise;
     };
 
+    $scope.cancelButtonClicked = function() {
+        $mdDialog.cancel();
+    };
 });

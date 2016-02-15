@@ -1,0 +1,27 @@
+<md-dialog aria-label="Add Import Session" class="add-importsession">
+
+    <form name="importSessionForm">
+
+        <md-dialog-content>
+            <md-subheader class="md-sticky-no-effect">Add Import Session</md-subheader>
+
+            <div layout="column">
+
+                <md-input-container>
+                    <label>Name</label>
+                    <input type="text" ng-model="name" required />
+                </md-input-container>
+
+            </div>
+
+        </md-dialog-content>
+
+        <md-dialog-actions layout="row">
+            <span flex></span>
+            <md-button ng-click="cancelButtonClicked()">Cancel</md-button>
+            <md-button type="submit" class="md-primary" ng-click="addButtonClicked()" ng-disabled="importSessionForm.$invalid">Add</md-button>
+        </md-dialog-actions>
+        
+    </form>
+
+</md-dialog>

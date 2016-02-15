@@ -122,7 +122,8 @@ angular.module('slicebox.directives', [])
                     reset: reset,
                     reloadPage: loadPageData,
                     selectedActionObjects: selectedActionObjects,
-                    clearSelection: clearSelection
+                    clearSelection: clearSelection,
+                    selectObject: selectObject
                 };
             }
 
