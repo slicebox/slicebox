@@ -70,7 +70,7 @@ class SeriesTypeUpdateActor(implicit val timeout: Timeout) extends Actor with Ex
     case MarkSeriesAsProcessed(seriesId) =>
       seriesBeingUpdated -= seriesId
 
-    case DatasetAdded(image, source) =>
+    case DatasetAdded(image, source, overwrite) =>
       self ! UpdateSeriesTypesForSeries(Seq(image.seriesId))
 
     case PollSeriesTypesUpdateQueue => pollSeriesTypesUpdateQueue()

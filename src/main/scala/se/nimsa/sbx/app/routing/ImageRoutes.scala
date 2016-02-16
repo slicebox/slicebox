@@ -55,17 +55,23 @@ trait ImageRoutes { this: SliceboxService =>
             val dataset = DicomUtil.loadDataset(file.entity.data.toByteArray, true)
             val source = Source(SourceType.USER, apiUser.user, apiUser.id)
             onSuccess(storageService.ask(AddDataset(dataset, source))) {
-              case DatasetAdded(image, source) =>
+              case DatasetAdded(image, source, overwrite) =>
                 import spray.httpx.SprayJsonSupport._
-                complete((Created, image))
+                if (overwrite)
+                  complete((OK, image))
+                else
+                  complete((Created, image))
             }
           } ~ entity(as[Array[Byte]]) { bytes =>
             val dataset = DicomUtil.loadDataset(bytes, true)
             val source = Source(SourceType.USER, apiUser.user, apiUser.id)
             onSuccess(storageService.ask(AddDataset(dataset, source))) {
-              case DatasetAdded(image, source) =>
+              case DatasetAdded(image, source, overwrite) =>
                 import spray.httpx.SprayJsonSupport._
-                complete((Created, image))
+                if (overwrite)
+                  complete((OK, image))
+                else
+                  complete((Created, image))
             }
           }
         }

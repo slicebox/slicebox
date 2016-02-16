@@ -33,7 +33,7 @@ class MockupStorageActor extends Actor {
       if (badBehavior) {
         sender ! Failure(exception)
       } else {
-        sender ! DatasetAdded(Image((math.random * 1000).toLong, (math.random * 1000).toLong, SOPInstanceUID("sop uid"), ImageType("image type"), InstanceNumber("instance number")), source)
+        sender ! DatasetAdded(Image((math.random * 1000).toLong, (math.random * 1000).toLong, SOPInstanceUID("sop uid"), ImageType("image type"), InstanceNumber("instance number")), source, false)
       }
 
     case GetDataset(imageId, withPixelData) =>

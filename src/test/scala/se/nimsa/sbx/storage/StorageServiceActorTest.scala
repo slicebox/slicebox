@@ -61,7 +61,7 @@ class StorageServiceActorTest(_system: ActorSystem) extends TestKit(_system) wit
       val source = Source(SourceType.UNKNOWN, "unknown", -1)
       storageActorRef ! AddDataset(dataset, source)
       expectMsgPF() {
-        case DatasetAdded(image, source) => true
+        case DatasetAdded(image, source, overwrite) => true
       }
     }
 
@@ -69,7 +69,7 @@ class StorageServiceActorTest(_system: ActorSystem) extends TestKit(_system) wit
       val source = Source(SourceType.UNKNOWN, "unknown", -1)
       storageActorRef ! AddDataset(dataset, source)
       expectMsgPF() {
-        case DatasetAdded(image, source) => true
+        case DatasetAdded(image, source, overwrite) => true
       }
     }
 

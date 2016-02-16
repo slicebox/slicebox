@@ -143,8 +143,8 @@ class BoxPollActor(box: Box,
   }
 
   def waitForFileFetchedState: PartialFunction[Any, Unit] = LoggingReceive {
-    case RemoteOutgoingFileFetched(transactionImage, imageId) =>
-      updateIncoming(box.id, box.name, transactionImage.transaction.id, transactionImage.image.sequenceNumber, transactionImage.transaction.totalImageCount, imageId)
+    case RemoteOutgoingFileFetched(transactionImage, imageId, overwrite) =>
+      updateIncoming(box.id, box.name, transactionImage.transaction.id, transactionImage.image.sequenceNumber, transactionImage.transaction.totalImageCount, imageId, overwrite)
       sendRemoteOutgoingFileCompleted(transactionImage).foreach { response =>
         pollRemoteBox()
       }
@@ -215,8 +215,8 @@ class BoxPollActor(box: Box,
                     storageService.ask(AddDataset(reversedDataset, source))
                       .onComplete {
 
-                        case Success(DatasetAdded(image, source)) =>
-                          self ! RemoteOutgoingFileFetched(transactionImage, image.id)
+                        case Success(DatasetAdded(image, source, overwrite)) =>
+                          self ! RemoteOutgoingFileFetched(transactionImage, image.id, overwrite)
                         case Success(_) =>
                           self ! FetchFileFailedPermanently(transactionImage, new Exception("Unexpected response when adding dataset"))
                         case Failure(exception) =>
@@ -238,19 +238,28 @@ class BoxPollActor(box: Box,
           self ! FetchFileFailedTemporarily(transactionImage, exception)
       }
 
-  def updateIncoming(boxId: Long, boxName: String, outgoingTransactionId: Long, sequenceNumber: Long, totalImageCount: Long, imageId: Long): Unit = {
+  def updateIncoming(
+      boxId: Long, 
+      boxName: String, 
+      outgoingTransactionId: Long, 
+      sequenceNumber: Long, 
+      totalImageCount: Long, 
+      imageId: Long, 
+      overwrite: Boolean): Unit = {
     db.withTransaction { implicit session =>
 
       val existingTransaction = boxDao.incomingTransactionByOutgoingTransactionId(boxId, outgoingTransactionId)
-        .getOrElse(boxDao.insertIncomingTransaction(IncomingTransaction(-1, boxId, boxName, outgoingTransactionId, 0, totalImageCount, System.currentTimeMillis, TransactionStatus.WAITING)))
-      val incomingTransaction = existingTransaction.copy(receivedImageCount = sequenceNumber, totalImageCount = totalImageCount, lastUpdated = System.currentTimeMillis, status = TransactionStatus.PROCESSING)
+        .getOrElse(boxDao.insertIncomingTransaction(IncomingTransaction(-1, boxId, boxName, outgoingTransactionId, 0, 0, totalImageCount, System.currentTimeMillis, System.currentTimeMillis, TransactionStatus.WAITING)))
+      val addedImageCount = if (overwrite) existingTransaction.addedImageCount else existingTransaction.addedImageCount + 1        
+      val incomingTransaction = existingTransaction.copy(receivedImageCount = sequenceNumber, addedImageCount = addedImageCount, totalImageCount = totalImageCount, lastUpdated = System.currentTimeMillis, status = TransactionStatus.PROCESSING)
       boxDao.updateIncomingTransaction(incomingTransaction)
       boxDao.incomingImageByIncomingTransactionIdAndSequenceNumber(incomingTransaction.id, sequenceNumber) match {
         case Some(image) => boxDao.updateIncomingImage(image.copy(imageId = imageId))
-        case None        => boxDao.insertIncomingImage(IncomingImage(-1, incomingTransaction.id, imageId, sequenceNumber))
+        case None        => boxDao.insertIncomingImage(IncomingImage(-1, incomingTransaction.id, imageId, sequenceNumber, overwrite))
       }
 
       if (sequenceNumber == totalImageCount) {
+        // make a final count of added images here?
         val nIncomingImages = boxDao.countIncomingImagesForIncomingTransactionId(incomingTransaction.id)
         if (nIncomingImages == totalImageCount) {
           SbxLog.info("Box", s"Received ${totalImageCount} files from box $boxName")

@@ -53,9 +53,10 @@ class BoxDAO(val driver: JdbcProfile) {
     def boxName = column[String]("boxname")
     def sentImageCount = column[Long]("sentimagecount")
     def totalImageCount = column[Long]("totalimagecount")
+    def created = column[Long]("created")
     def lastUpdated = column[Long]("lastupdated")
     def status = column[TransactionStatus]("status")
-    def * = (id, boxId, boxName, sentImageCount, totalImageCount, lastUpdated, status) <> (OutgoingTransaction.tupled, OutgoingTransaction.unapply)
+    def * = (id, boxId, boxName, sentImageCount, totalImageCount, created, lastUpdated, status) <> (OutgoingTransaction.tupled, OutgoingTransaction.unapply)
   }
 
   val outgoingTransactionQuery = TableQuery[OutgoingTransactionTable]
@@ -93,10 +94,12 @@ class BoxDAO(val driver: JdbcProfile) {
     def boxName = column[String]("boxname")
     def outgoingTransactionId = column[Long]("outgoingtransactionid")
     def receivedImageCount = column[Long]("receivedimagecount")
+    def addedImageCount = column[Long]("addedimagecount")
     def totalImageCount = column[Long]("totalimagecount")
+    def created = column[Long]("created")
     def lastUpdated = column[Long]("lastupdated")
     def status = column[TransactionStatus]("status")
-    def * = (id, boxId, boxName, outgoingTransactionId, receivedImageCount, totalImageCount, lastUpdated, status) <> (IncomingTransaction.tupled, IncomingTransaction.unapply)
+    def * = (id, boxId, boxName, outgoingTransactionId, receivedImageCount, addedImageCount, totalImageCount, created, lastUpdated, status) <> (IncomingTransaction.tupled, IncomingTransaction.unapply)
   }
 
   val incomingTransactionQuery = TableQuery[IncomingTransactionTable]
@@ -106,9 +109,10 @@ class BoxDAO(val driver: JdbcProfile) {
     def incomingTransactionId = column[Long]("incomingtransactionid")
     def imageId = column[Long]("imageid")
     def sequenceNumber = column[Long]("sequencenumber")
+    def overwrite = column[Boolean]("overwrite")
     def fkIncomingTransaction = foreignKey("fk_incoming_transaction_id", incomingTransactionId, incomingTransactionQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
     def idxUniqueTransactionAndNumber = index("idx_unique_incoming_image", (incomingTransactionId, sequenceNumber), unique = true)
-    def * = (id, incomingTransactionId, imageId, sequenceNumber) <> (IncomingImage.tupled, IncomingImage.unapply)
+    def * = (id, incomingTransactionId, imageId, sequenceNumber, overwrite) <> (IncomingImage.tupled, IncomingImage.unapply)
   }
 
   val incomingImageQuery = TableQuery[IncomingImageTable]

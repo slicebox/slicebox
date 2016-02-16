@@ -61,7 +61,7 @@ object StorageProtocol {
   
   // ***to API***
 
-  case class DatasetAdded(image: Image, source: Source)
+  case class DatasetAdded(image: Image, source: Source, overwrite: Boolean)
   
   case class DatasetDeleted(imageId: Long)
 

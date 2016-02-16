@@ -68,9 +68,9 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
       case GetIncomingTransactionForImageId(imageId) =>
         if (imageId <= 2) {
           receivedImageCount += 1
-          sender ! Some(IncomingTransaction(1, 11, "Source box", 1234, receivedImageCount, 2, System.currentTimeMillis, TransactionStatus.WAITING))
+          sender ! Some(IncomingTransaction(1, 11, "Source box", 1234, receivedImageCount, 2, 2, System.currentTimeMillis, System.currentTimeMillis, TransactionStatus.WAITING))
         } else
-          sender ! Some(IncomingTransaction(2, 11, "Source box", 1234, 1, 2, System.currentTimeMillis, TransactionStatus.WAITING))
+          sender ! Some(IncomingTransaction(2, 11, "Source box", 1234, 1, 1, 2, System.currentTimeMillis, System.currentTimeMillis, TransactionStatus.WAITING))
       case ResetReceivedImageCount =>
         receivedImageCount = 0
     }
@@ -126,7 +126,7 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
   }
 
   "not forward an added image if there are no forwarding rules" in {
-    forwardingService ! DatasetAdded(image1, null)
+    forwardingService ! DatasetAdded(image1, null, false)
     expectMsgPF() {
       case ImageRegisteredForForwarding(image, applicableRules) =>
         image shouldBe image1
@@ -146,7 +146,7 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     forwardingService ! AddForwardingRule(rule)
     expectMsgType[ForwardingRuleAdded]
 
-    forwardingService ! DatasetAdded(image1, Source(SourceType.UNKNOWN, "unknown", -1))
+    forwardingService ! DatasetAdded(image1, Source(SourceType.UNKNOWN, "unknown", -1), false)
     expectMsgPF() {
       case ImageRegisteredForForwarding(image, applicableRules) =>
         image shouldBe image1
@@ -165,7 +165,7 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     forwardingService ! AddForwardingRule(rule)
     expectMsgType[ForwardingRuleAdded]
 
-    forwardingService ! DatasetAdded(image1, rule.source)
+    forwardingService ! DatasetAdded(image1, rule.source, false)
     expectMsgPF() {
       case ImageRegisteredForForwarding(image, applicableRules) =>
         image shouldBe image1
@@ -188,7 +188,7 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     expectMsgType[ForwardingRuleAdded]
     expectMsgType[ForwardingRuleAdded]
 
-    forwardingService ! DatasetAdded(image1, rule1.source)
+    forwardingService ! DatasetAdded(image1, rule1.source, false)
     expectMsgPF() {
       case ImageRegisteredForForwarding(image, applicableRules) =>
         image shouldBe image1
@@ -209,7 +209,7 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     forwardingService ! AddForwardingRule(rule)
     expectMsgType[ForwardingRuleAdded]
 
-    forwardingService ! DatasetAdded(image1, rule.source)
+    forwardingService ! DatasetAdded(image1, rule.source, false)
     expectMsgType[ImageRegisteredForForwarding]
     expectMsgType[ImageAddedToForwardingQueue]
 
@@ -228,7 +228,7 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     forwardingService ! AddForwardingRule(rule)
     expectMsgType[ForwardingRuleAdded]
 
-    forwardingService ! DatasetAdded(image1, rule.source)
+    forwardingService ! DatasetAdded(image1, rule.source, false)
     expectMsgType[ImageRegisteredForForwarding]
     expectMsgType[ImageAddedToForwardingQueue]
 
@@ -255,7 +255,7 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     expectMsgType[ForwardingRuleAdded]
 
     val image = image1
-    forwardingService ! DatasetAdded(image, rule.source)
+    forwardingService ! DatasetAdded(image, rule.source, false)
     expectMsgType[ImageRegisteredForForwarding]
     expectMsgType[ImageAddedToForwardingQueue]
 
@@ -287,7 +287,7 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     expectMsgType[ForwardingRuleAdded]
 
     val image = image1
-    forwardingService ! DatasetAdded(image, rule.source)
+    forwardingService ! DatasetAdded(image, rule.source, false)
     expectMsgType[ImageRegisteredForForwarding]
     expectMsgType[ImageAddedToForwardingQueue]
 
@@ -325,7 +325,7 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     expectMsgType[ForwardingRuleAdded]
 
     val image = image1
-    forwardingService ! DatasetAdded(image, rule.source)
+    forwardingService ! DatasetAdded(image, rule.source, false)
     expectMsgType[ImageRegisteredForForwarding]
     expectMsgType[ImageAddedToForwardingQueue]
 
@@ -362,7 +362,7 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     forwardingService ! AddForwardingRule(rule)
     expectMsgType[ForwardingRuleAdded]
 
-    forwardingService ! DatasetAdded(image1, rule.source)
+    forwardingService ! DatasetAdded(image1, rule.source, false)
     expectMsgType[ImageRegisteredForForwarding]
     expectMsgType[ImageAddedToForwardingQueue]
 
@@ -375,7 +375,7 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
       transaction.enroute should be(false)
     }
 
-    forwardingService ! DatasetAdded(image2, rule.source)
+    forwardingService ! DatasetAdded(image2, rule.source, false)
     expectMsgType[ImageRegisteredForForwarding]
     expectMsgType[ImageAddedToForwardingQueue]
 
@@ -396,7 +396,7 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     forwardingService ! AddForwardingRule(rule)
     expectMsgType[ForwardingRuleAdded]
 
-    forwardingService ! DatasetAdded(image1, rule.source)
+    forwardingService ! DatasetAdded(image1, rule.source, false)
     expectMsgType[ImageRegisteredForForwarding]
     expectMsgType[ImageAddedToForwardingQueue]
 
@@ -407,7 +407,7 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
       case TransactionsEnroute(transactions) => transactions.length should be(1)
     }
 
-    forwardingService ! DatasetAdded(image2, rule.source)
+    forwardingService ! DatasetAdded(image2, rule.source, false)
     expectMsgType[ImageRegisteredForForwarding]
     expectMsgType[ImageAddedToForwardingQueue]
 
@@ -430,11 +430,11 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     forwardingService ! AddForwardingRule(rule)
     expectMsgType[ForwardingRuleAdded]
 
-    forwardingService ! DatasetAdded(image3, rule.source)
+    forwardingService ! DatasetAdded(image3, rule.source, false)
     expectMsgType[ImageRegisteredForForwarding]
     expectMsgType[ImageAddedToForwardingQueue]
 
-    forwardingService ! DatasetAdded(image1, rule.source)
+    forwardingService ! DatasetAdded(image1, rule.source, false)
     expectMsgType[ImageRegisteredForForwarding]
     expectMsgType[ImageAddedToForwardingQueue]
 
@@ -450,15 +450,15 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     forwardingService ! AddForwardingRule(rule)
     expectMsgType[ForwardingRuleAdded]
 
-    forwardingService ! DatasetAdded(image3, rule.source)
+    forwardingService ! DatasetAdded(image3, rule.source, false)
     expectMsgType[ImageRegisteredForForwarding]
     expectMsgType[ImageAddedToForwardingQueue]
 
-    forwardingService ! DatasetAdded(image1, rule.source)
+    forwardingService ! DatasetAdded(image1, rule.source, false)
     expectMsgType[ImageRegisteredForForwarding]
     expectMsgType[ImageAddedToForwardingQueue]
 
-    forwardingService ! DatasetAdded(image2, rule.source)
+    forwardingService ! DatasetAdded(image2, rule.source, false)
     expectMsgType[ImageRegisteredForForwarding]
     expectMsgType[ImageAddedToForwardingQueue]
 
