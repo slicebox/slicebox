@@ -11,7 +11,7 @@
                             load-page="loadImportSessions(startIndex, count)"
                             page-size="1000000"
                             sorting="false"
-                            object-actions="objectActions"
+                            object-actions="sessionActions"
                             object-selected="importSessionSelected(object)"
                             callbacks="callbacks.importSessionsTable"
                             empty-message="No recorded import sessions">
@@ -20,6 +20,9 @@
                             </sbx-grid-column>
 
                             <sbx-grid-column property="filesImported" title="Imported">
+                            </sbx-grid-column>
+
+                            <sbx-grid-column property="filesAdded" title="Added">
                             </sbx-grid-column>
 
                             <sbx-grid-column property="filesRejected" title="Rejected">

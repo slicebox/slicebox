@@ -11,8 +11,20 @@ angular.module('slicebox.import', ['ngRoute', 'ngFileUpload'])
   });  
 })
 
-.controller('ImportCtrl', function($scope, Upload, $q, $interval, sbxToast, openAddEntityModal) {
+.controller('ImportCtrl', function($scope, Upload, $q, $interval, sbxToast, openAddEntityModal, openDeleteEntitiesModalFunction, openTagSeriesModalFunction) {
     
+    $scope.sessionActions =
+        [
+            {
+                name: 'Delete',
+                action: openDeleteEntitiesModalFunction('/api/imports/', 'import sessions')
+            },
+            {
+                name: 'Tag Series',
+                action: openTagSeriesModalFunction('/api/imports/')
+            }
+        ];
+
     $scope.uiState.selectedSession = null;
     $scope.uiState.currentFileSet = {
         processing: false,
@@ -68,6 +80,9 @@ angular.module('slicebox.import', ['ngRoute', 'ngFileUpload'])
                 //importedFiles.push({ name: config.file.name });
                 files.shift();
                 $scope.uiState.selectedSession.filesImported++; // TODO move to server
+                if (status == 201) {
+                    $scope.uiState.selectedSession.filesAdded++; // TODO move to server
+                }
                 importFirst(files);
             }).error(function (message, status, headers, config) {
                 if (status >= 300 && status !== 400) {
@@ -101,6 +116,7 @@ angular.module('slicebox.import', ['ngRoute', 'ngFileUpload'])
             id: new Date().getTime(), // change to -1 later... 
             name: $scope.name,
             filesImported: 0, 
+            filesAdded: 0,
             filesRejected: 0,
             created: new Date().getTime(),
             lastUpdated: new Date().getTime()
