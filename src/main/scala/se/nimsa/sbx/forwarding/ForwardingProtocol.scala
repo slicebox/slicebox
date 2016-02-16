@@ -26,7 +26,7 @@ object ForwardingProtocol {
 
   case class ForwardingRule(id: Long, source: Source, destination: Destination, keepImages: Boolean) extends Entity
   
-  case class ForwardingTransaction(id: Long, forwardingRuleId: Long, batchId: Long, lastUpdated: Long, enroute: Boolean, delivered: Boolean)
+  case class ForwardingTransaction(id: Long, forwardingRuleId: Long, batchId: Long, created: Long, lastUpdated: Long, enroute: Boolean, delivered: Boolean)
   
   case class ForwardingTransactionImage(id: Long, forwardingTransactionId: Long, imageId: Long)
   
