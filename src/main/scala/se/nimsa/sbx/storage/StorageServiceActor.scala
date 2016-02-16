@@ -88,7 +88,7 @@ class StorageServiceActor(storage: Path, implicit val timeout: Timeout) extends 
               log.info(s"Updated existing file with image id ${image.id}")
             else
               log.info(s"Stored file with image id ${image.id}")
-            context.system.eventStream.publish(DatasetAdded(image, source))
+            context.system.eventStream.publish(DatasetAdded(image, source, overwrite))
           }
         else
           SbxLog.info("Storage", s"Received dataset with unsupported SOP Class UID ${dataset.getString(Tag.SOPClassUID)}, skipping")
@@ -104,7 +104,7 @@ class StorageServiceActor(storage: Path, implicit val timeout: Timeout) extends 
               log.info(s"Updated existing file with image id ${image.id}")
             else
               log.info(s"Stored file with image id ${image.id}")
-            context.system.eventStream.publish(DatasetAdded(image, source))
+            context.system.eventStream.publish(DatasetAdded(image, source, overwrite))
           }
         else
           SbxLog.info("Storage", s"Received dataset with unsupported SOP Class UID ${dataset.getString(Tag.SOPClassUID)}, skipping")
@@ -124,7 +124,7 @@ class StorageServiceActor(storage: Path, implicit val timeout: Timeout) extends 
               log.info(s"Updated existing file with image id ${image.id}")
             else
               log.info(s"Stored file with image id ${image.id}")
-            val datasetAdded = DatasetAdded(image, source)
+            val datasetAdded = DatasetAdded(image, source, overwrite)
             context.system.eventStream.publish(datasetAdded)
             datasetAdded
           }
@@ -148,7 +148,7 @@ class StorageServiceActor(storage: Path, implicit val timeout: Timeout) extends 
 
       image.foreach(_.foreach { image =>
         log.info(s"Stored encapsulated JPEG with image id ${image.id}")
-        context.system.eventStream.publish(DatasetAdded(image, source))
+        context.system.eventStream.publish(DatasetAdded(image, source, false))
       })
 
       image.pipeTo(sender)

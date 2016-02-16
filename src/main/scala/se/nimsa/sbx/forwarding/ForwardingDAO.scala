@@ -49,11 +49,12 @@ class ForwardingDAO(val driver: JdbcProfile) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def forwardingRuleId = column[Long]("forwardingruleid")
     def batchId = column[Long]("batchid")
+    def created = column[Long]("created")
     def lastUpdated = column[Long]("lastupdated")
     def enroute = column[Boolean]("enroute")
     def delivered = column[Boolean]("delivered")
     def fkForwardingRule = foreignKey("fk_forwarding_rule", forwardingRuleId, ruleQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
-    def * = (id, forwardingRuleId, batchId, lastUpdated, enroute, delivered) <> (ForwardingTransaction.tupled, ForwardingTransaction.unapply)
+    def * = (id, forwardingRuleId, batchId, created, lastUpdated, enroute, delivered) <> (ForwardingTransaction.tupled, ForwardingTransaction.unapply)
   }
 
   val transactionQuery = TableQuery[ForwardingTransactionTable]
@@ -115,7 +116,7 @@ class ForwardingDAO(val driver: JdbcProfile) {
         updateForwardingTransaction(updatedTransaction)
         updatedTransaction
       case None =>
-        insertForwardingTransaction(ForwardingTransaction(-1, forwardingRule.id, batchId, System.currentTimeMillis, false, false))
+        insertForwardingTransaction(ForwardingTransaction(-1, forwardingRule.id, batchId, System.currentTimeMillis, System.currentTimeMillis, false, false))
     }
 
   def getFreshTransactionForRuleAndBatchId(forwardingRule: ForwardingRule, batchId: Long)(implicit session: Session): Option[ForwardingTransaction] =
@@ -152,6 +153,12 @@ class ForwardingDAO(val driver: JdbcProfile) {
   def getTransactionImagesForTransactionId(transactionId: Long)(implicit session: Session) =
     transactionImageQuery.filter(_.forwardingTransactionId === transactionId).list
 
+  def getTransactionImageForTransactionIdAndImageId(transactionId: Long, imageId: Long)(implicit session: Session) =
+    transactionImageQuery
+    .filter(_.forwardingTransactionId === transactionId)
+    .filter(_.imageId === imageId)
+    .firstOption
+    
   def removeTransactionForId(transactionId: Long)(implicit session: Session) =
     transactionQuery.filter(_.id === transactionId).delete
 

@@ -56,8 +56,8 @@ trait TransactionRoutes { this: SliceboxService =>
                     onSuccess(anonymizationService.ask(ReverseAnonymization(dataset)).mapTo[Attributes]) { reversedDataset =>
                       val source = Source(SourceType.BOX, box.name, box.id)
                       onSuccess(storageService.ask(AddDataset(reversedDataset, source))) {
-                        case DatasetAdded(image, source) =>
-                          onSuccess(boxService.ask(UpdateIncoming(box, outgoingTransactionId, sequenceNumber, totalImageCount, image.id))) {
+                        case DatasetAdded(image, source, overwrite) =>
+                          onSuccess(boxService.ask(UpdateIncoming(box, outgoingTransactionId, sequenceNumber, totalImageCount, image.id, overwrite))) {
                             case IncomingUpdated(_) => complete(NoContent)
                           }
                       }

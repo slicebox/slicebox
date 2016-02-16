@@ -78,7 +78,7 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
    * (transfer is made if batch is complete)
    * ImagesSent (TransactionMarkedAsDelivered to sender (box, scu))
    * FinalizeSentTransactions (TransactionsFinalized to sender (self))
-   * 
+   *
    * Happy flow for non-BOX sources:
    * ImageAdded (ImageRegisteredForForwarding to sender)
    * AddImageToForwardingQueue (one per applicable rule) (ImageAddedToForwardingQueue to sender of ImageAdded)
@@ -89,19 +89,19 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
    */
   def receive = LoggingReceive {
 
-    case DatasetAdded(image, source) =>
+    case DatasetAdded(image, source, overwrite) =>
       val applicableRules = maybeAddImageToForwardingQueue(image, source, sender)
       sender ! ImageRegisteredForForwarding(image, applicableRules)
-      
+
     case ImageDeleted(imageId) =>
       removeImageFromTransactions(imageId)
-      
+
     case AddImageToForwardingQueue(image, rule, batchId, transferNow, origin) =>
       val (transaction, transactionImage) = addImageToForwardingQueue(image, rule, batchId)
       origin ! ImageAddedToForwardingQueue(transactionImage)
       if (transferNow)
-    	  makeTransfer(rule, transaction)
-    	  
+        makeTransfer(rule, transaction)
+
     case PollForwardingQueue =>
       val transactions = maybeSendImagesForNonBoxSources()
       sender ! TransactionsEnroute(transactions)
@@ -192,8 +192,11 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
     }
 
   def addImageToForwardingQueue(forwardingTransaction: ForwardingTransaction, image: Image) =
-    db.withSession { implicit session =>
-      forwardingDao.insertForwardingTransactionImage(ForwardingTransactionImage(-1, forwardingTransaction.id, image.id))
+    db.withTransaction { implicit session =>
+      // a dataset may be added multiple times (with overwrite), check if it has been added before
+      forwardingDao.getTransactionImageForTransactionIdAndImageId(forwardingTransaction.id, image.id)
+        .getOrElse(
+          forwardingDao.insertForwardingTransactionImage(ForwardingTransactionImage(-1, forwardingTransaction.id, image.id)))
     }
 
   def maybeSendImagesForNonBoxSources(): List[ForwardingTransaction] = {
@@ -248,7 +251,7 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
     val destinationId = rule.destination.destinationId
     val destinationName = rule.destination.destinationName
     val box = Box(destinationId, destinationName, "", "", null, false)
-    
+
     rule.destination.destinationType match {
       case DestinationType.BOX =>
         boxService.ask(SendToRemoteBox(box, imageIds.map(ImageTagValues(_, Seq.empty))))
@@ -366,7 +369,7 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
     futureDeletedImageIds
   }
 
-  def removeImageFromTransactions(imageId: Long) = 
+  def removeImageFromTransactions(imageId: Long) =
     db.withSession { implicit session =>
       forwardingDao.removeTransactionImagesForImageId(imageId)
     }

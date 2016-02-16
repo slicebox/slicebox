@@ -182,7 +182,7 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
     val source = Source(SourceType.UNKNOWN, "unknown source", -1)
     storageService ! AddDataset(dataset, source)
     expectMsgPF() {
-      case DatasetAdded(image, source) => true
+      case DatasetAdded(image, source, overwrite) => true
     }
 
     val series = db.withSession { implicit session =>

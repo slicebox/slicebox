@@ -62,7 +62,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
 
         val box = boxDao.insertBox(Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, false))
 
-        boxService ! UpdateIncoming(box, 123, 1, 2, 2)
+        boxService ! UpdateIncoming(box, 123, 1, 2, 2, false)
 
         expectMsgType[IncomingUpdated]
 
@@ -86,10 +86,10 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
 
         val box = boxDao.insertBox(Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, false))
 
-        boxService ! UpdateIncoming(box, 123, 1, 3, 4)
+        boxService ! UpdateIncoming(box, 123, 1, 3, 4, false)
         expectMsgType[IncomingUpdated]
 
-        boxService ! UpdateIncoming(box, 123, 2, 3, 5)
+        boxService ! UpdateIncoming(box, 123, 2, 3, 5, false)
         expectMsgType[IncomingUpdated]
 
         val incomingTransactions = boxDao.listIncomingTransactions
@@ -129,7 +129,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
         val box = boxDao.insertBox(Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, false))
 
         // insert images with sequence numbers out of order
-        val transaction = boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, box.id, box.name, 0, 1, 123, TransactionStatus.WAITING))
+        val transaction = boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, box.id, box.name, 0, 1, 123, 123, TransactionStatus.WAITING))
         val image1 = boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, imageId, 2, false))
         val image2 = boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, imageId, 1, false))
 
@@ -155,7 +155,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
 
       val sequenceNumber = 1
       val totalImageCount = 55
-      boxService ! UpdateIncoming(box, 32, sequenceNumber, totalImageCount, 33)
+      boxService ! UpdateIncoming(box, 32, sequenceNumber, totalImageCount, 33, false)
 
       expectMsgPF() {
         case IncomingUpdated(transaction) =>
@@ -176,7 +176,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
       val box = Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, false)
 
       val totalImageCount = 2
-      boxService ! UpdateIncoming(box, 32, sequenceNumber = 1, totalImageCount, 33)
+      boxService ! UpdateIncoming(box, 32, sequenceNumber = 1, totalImageCount, 33, false)
 
       expectMsgPF() {
         case IncomingUpdated(transaction) =>
@@ -185,7 +185,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
           transaction.status shouldBe TransactionStatus.PROCESSING
       }
       
-      boxService ! UpdateIncoming(box, 32, sequenceNumber = 2, totalImageCount, 33)
+      boxService ! UpdateIncoming(box, 32, sequenceNumber = 2, totalImageCount, 33, false)
       
       expectMsgPF() {
         case IncomingUpdated(transaction) =>
@@ -206,10 +206,10 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
 
       val totalImageCount = 3
       
-      boxService ! UpdateIncoming(box, 32, sequenceNumber = 1, totalImageCount, 33)
+      boxService ! UpdateIncoming(box, 32, sequenceNumber = 1, totalImageCount, 33, false)
       expectMsgType[IncomingUpdated]
       
-      boxService ! UpdateIncoming(box, 32, sequenceNumber = 3, totalImageCount, 33)
+      boxService ! UpdateIncoming(box, 32, sequenceNumber = 3, totalImageCount, 33, false)
 
       expectMsgPF() {
         case IncomingUpdated(transaction) =>
@@ -269,10 +269,10 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
       db.withSession { implicit session =>
         val box = boxDao.insertBox(Box(-1, "some remote box", "abc", "https://someurl.com", BoxSendMethod.POLL, false))
 
-        boxService ! UpdateIncoming(box, 123, 1, 3, 4)
+        boxService ! UpdateIncoming(box, 123, 1, 3, 4, false)
         expectMsgType[IncomingUpdated]
 
-        boxService ! UpdateIncoming(box, 123, 2, 3, 5)
+        boxService ! UpdateIncoming(box, 123, 2, 3, 5, false)
         expectMsgType[IncomingUpdated]
 
         val incomingTransactions = boxDao.listIncomingTransactions

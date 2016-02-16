@@ -71,7 +71,7 @@ object BoxProtocol {
 
   case class Box(id: Long, name: String, token: String, baseUrl: String, sendMethod: BoxSendMethod, online: Boolean) extends Entity
 
-  case class OutgoingTransaction(id: Long, boxId: Long, boxName: String, sentImageCount: Long, totalImageCount: Long, lastUpdated: Long, status: TransactionStatus) extends Entity
+  case class OutgoingTransaction(id: Long, boxId: Long, boxName: String, sentImageCount: Long, totalImageCount: Long, created: Long, lastUpdated: Long, status: TransactionStatus) extends Entity
 
   case class OutgoingImage(id: Long, outgoingTransactionId: Long, imageId: Long, sequenceNumber: Long, sent: Boolean) extends Entity
   
@@ -79,9 +79,9 @@ object BoxProtocol {
   
   case class OutgoingTransactionImage(transaction: OutgoingTransaction, image: OutgoingImage)
   
-  case class IncomingTransaction(id: Long, boxId: Long, boxName: String, outgoingTransactionId: Long, receivedImageCount: Long, totalImageCount: Long, lastUpdated: Long, status: TransactionStatus) extends Entity
+  case class IncomingTransaction(id: Long, boxId: Long, boxName: String, outgoingTransactionId: Long, receivedImageCount: Long, addedImageCount: Long, totalImageCount: Long, created: Long, lastUpdated: Long, status: TransactionStatus) extends Entity
 
-  case class IncomingImage(id: Long, incomingTransactionId: Long, imageId: Long, sequenceNumber: Long) extends Entity
+  case class IncomingImage(id: Long, incomingTransactionId: Long, imageId: Long, sequenceNumber: Long, overwrite: Boolean) extends Entity
   
   case class FailedOutgoingTransactionImage(transactionImage: OutgoingTransactionImage, message: String)
   
@@ -102,7 +102,7 @@ object BoxProtocol {
   
   case class GetBoxByToken(token: String) extends BoxRequest
 
-  case class UpdateIncoming(box: Box, transactionId: Long, sequenceNumber: Long, totalImageCount: Long, imageId: Long) extends BoxRequest
+  case class UpdateIncoming(box: Box, transactionId: Long, sequenceNumber: Long, totalImageCount: Long, imageId: Long, overwrite: Boolean) extends BoxRequest
 
   case class PollOutgoing(box: Box) extends BoxRequest
 
@@ -171,7 +171,7 @@ object BoxProtocol {
 
   case class PollRemoteBoxFailed(e: Throwable)
 
-  case class RemoteOutgoingFileFetched(transactionImage: OutgoingTransactionImage, imageId: Long)
+  case class RemoteOutgoingFileFetched(transactionImage: OutgoingTransactionImage, imageId: Long, overwrite: Boolean)
 
   case class FetchFileFailedTemporarily(transactionImage: OutgoingTransactionImage, e: Throwable)
 
