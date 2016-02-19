@@ -292,29 +292,125 @@ angular.module('slicebox.utils', ['ngSanitize'])
 
 .controller('TagSeriesModalCtrl', function($scope, $mdDialog, $http, $q, sbxMisc, sbxToast, seriesIds) {
     $scope.uiState = {
+        gatheringTags: true,
+        hasChanges: false,
         seriesIds: seriesIds,
+        originalSeriesTags: [],
         seriesTags: [],
         tagState: {
             searchText: ""
         }
     };
 
-    var seriesTagsPromise = $http.get('/api/metadata/seriestags').then(function (seriesTagsData) { return seriesTagsData.data; });
+    var allTagsPromise = $http.get('/api/metadata/seriestags').then(function (seriesTagsData) { return seriesTagsData.data; });
+    
+    var tagIdToTagPromise = allTagsPromise.then(function (allTags) {
+        return allTags.reduce(function(map, tag) {
+            map[tag.id] = tag;
+            return map;
+        }, {});
+    });
+
+    var idTagsPromise = $q.all(seriesIds.map(function (seriesId) {
+        return $http.get('/api/metadata/series/' + seriesId + '/seriestags').then(function (tagsData) {
+            return { seriesId: seriesId, tags: tagsData.data };
+        });
+    }));
+
+    var existingTagIdsPromise = idTagsPromise.then(function (idTags) {
+        return sbxMisc.unique(sbxMisc.flatten(idTags.map(function (idTag) {
+            return idTag.tags.map(function (tag) { 
+                return tag.id; 
+            });
+        })));
+    });
+
+    var tagIdToSeriesIdsPromise = existingTagIdsPromise.then(function (tagIds) {
+        return idTagsPromise.then(function (idTags) {
+            return tagIds.reduce(function (map, tagId) {
+                var seriesIdsForTagId = idTags.filter(function (idTag) { 
+                    return idTag.tags.map(function (tag) { return tag.id; }).indexOf(tagId) >= 0; 
+                }).map(function (idTag) { 
+                    return idTag.seriesId; 
+                });
+                map[tagId] = seriesIdsForTagId;
+                return map;
+            }, {});
+        });
+    });
+
+    var tagInfoPromise = tagIdToTagPromise.then(function (tagIdToTag) {
+        return tagIdToSeriesIdsPromise.then(function (tagIdToSeriesIds) {
+            return { tagIdToTag: tagIdToTag, tagIdToSeriesIds: tagIdToSeriesIds };
+        });
+    });
+
+    tagInfoPromise.then(function (tagInfo) {
+        for (var tagId in tagInfo.tagIdToSeriesIds) {
+            var tag = tagInfo.tagIdToTag[tagId];
+            tag.nSeries = tagInfo.tagIdToSeriesIds[tagId].length;
+            $scope.uiState.seriesTags.push(tag);
+            $scope.uiState.originalSeriesTags.push(tag);
+        }
+        $scope.uiState.gatheringTags = false;
+    });
+
+    $scope.findSeriesTags = function(searchText) {
+        var lcSearchText = angular.lowercase(searchText);
+        var seriesTagNames = $scope.uiState.seriesTags.map(function (seriesTag) { return seriesTag.name; });
+        return searchText ? allTagsPromise.then(function (seriesTags) { 
+            return seriesTags.filter(function (seriesTag) {
+                var lcName = angular.lowercase(seriesTag.name);
+                return lcName.indexOf(lcSearchText) === 0;
+            }).filter(function (seriesTag) {
+                return seriesTagNames.indexOf(seriesTag.name) < 0;
+            });
+        }) : [];
+    };
+
+    $scope.seriesTagAdded = function(tag) {
+        var theTag = tag.name ? { id: tag.id, name: tag.name } : { id: -1, name: tag };
+        var existingTagArray = $scope.uiState.seriesTags.filter(function (seriesTag) { return seriesTag.name === theTag.name; });
+        if (existingTagArray.length === 0) {
+            $scope.uiState.hasChanges = true;
+            theTag.nSeries = $scope.uiState.seriesIds.length;
+            $scope.uiState.seriesTags.push(theTag);
+            return theTag;
+        }
+        return existingTagArray[0];
+    };
+
+    $scope.seriesTagRemoved = function(tag) {
+        $scope.uiState.hasChanges = true;
+        return tag;
+    };
 
     $scope.okButtonClicked = function() {
-        var promise = 
-            $q.all(
-                sbxMisc.flatten(
-                    $scope.uiState.seriesTags.map(function (seriesTag) {
-                        return $scope.uiState.seriesIds.map(function (seriesId) {
-                            return $http.post('/api/metadata/series/' + seriesId + '/seriestags', seriesTag);
-                        });
-                    })
-                )
-            );
+        var added = getAddedTags($scope.uiState.seriesTags, $scope.uiState.originalSeriesTags);
+        var removed = getRemovedTags($scope.uiState.seriesTags, $scope.uiState.originalSeriesTags);
 
-        promise.then(function() {
-            sbxToast.showInfoMessage(seriesIds.length + " series tagged.");
+        var addPromise = $q.all(sbxMisc.flatten(
+            added.map(function (seriesTag) {
+                return $scope.uiState.seriesIds.map(function (seriesId) {
+                    return $http.post('/api/metadata/series/' + seriesId + '/seriestags', seriesTag);
+                });
+            })));
+        var removePromise = $q.all(sbxMisc.flatten(
+            removed.map(function (seriesTag) {
+                return $scope.uiState.seriesIds.map(function (seriesId) {
+                    return $http.delete('/api/metadata/series/' + seriesId + '/seriestags/' + seriesTag.id);
+                });
+            })));
+
+        var promise = $q.all([addPromise, removePromise]);
+
+        promise.then(function () {
+            var addedMsg = added.length > 0 ? added.length + " tag(s) added to " + $scope.uiState.seriesIds.length + " series" : "";
+            var removedMsg = removed.length > 0 ? removed.length + " tag(s) removed" : "";
+            var msg = addedMsg + (addedMsg.length > 0 ? ", " : "") + removedMsg;
+            if (msg.length > 0) {
+                sbxToast.showInfoMessage(msg);
+            }
         }, function(response) {
             sbxToast.showErrorMessage(response.data);
         });
@@ -330,31 +426,23 @@ angular.module('slicebox.utils', ['ngSanitize'])
         $mdDialog.cancel();
     };
 
-    $scope.findSeriesTags = function(searchText) {
-        var lcSearchText = angular.lowercase(searchText);
-        var selectedTagNames = $scope.uiState.seriesTags.map(function (seriesTag) { return seriesTag.name; });
-        return searchText ? seriesTagsPromise.then(function (seriesTags) { 
-            return seriesTags.filter(function (seriesTag) {
-                var lcName = angular.lowercase(seriesTag.name);
-                return lcName.indexOf(lcSearchText) === 0;
-            }).filter(function (seriesTag) {
-                return selectedTagNames.indexOf(seriesTag.name) < 0;
-            });
-        }) : [];
-    };
+    function getAddedTags(tags, originalTags) {
+        return tags.filter(function (tag) { 
+            for (var i = 0; i < originalTags.length; i++) {
+                var originalTag = originalTags[i];
+                if (originalTag.name === tag.name && originalTag.nSeries === tag.nSeries) {
+                    return false;
+                }
+            }
+            return true;
+        });
+    }
 
-    $scope.seriesTagAdded = function(tag) {
-        var theTag = tag.name ? tag : { id: -1, name: tag };
-        if ($scope.uiState.seriesTags.filter(function (seriesTag) { return seriesTag.name === tag.name; }).length === 0) {
-            $scope.uiState.seriesTags.push(theTag);
-        }
-        return theTag;
-    };
-
-    $scope.hasSeriesTags = function() {
-        return $scope.uiState.seriesTags.length > 0;
-    };
-
+    function getRemovedTags(tags, originalTags) {
+        return originalTags.filter(function (originalTag) { 
+            return tags.map(function (tag) { return tag.name; }).indexOf(originalTag.name) < 0;
+        });
+    }
 })
 
 .factory('userService', function ($http) {

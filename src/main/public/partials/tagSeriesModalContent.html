@@ -2,32 +2,39 @@
 
     <md-dialog-content>
         <md-subheader class="md-sticky-no-effect">Add Tags to {{ uiState.seriesIds.length }} Series</md-subheader>
-
-        <md-chips 
-            ng-model="uiState.seriesTags" 
-            md-autocomplete-snap 
-            md-require-match="false"
-            md-on-append="seriesTagAdded($chip)">
-            <md-autocomplete
-                md-search-text="uiState.tagState.searchText"
-                md-items="item in findSeriesTags(uiState.tagState.searchText)"
-                md-item-text="item.name"
-                md-min-length="1"
-                md-no-cache
-                placeholder="+tag">
-                <span md-highlight-text="uiState.tagState.searchText">{{item.name}}</span>
-            </md-autocomplete>
-            <md-chip-template>
-                <span>{{$chip.name}} </span>
-            </md-chip-template>
-        </md-chips>
+        <div ng-if="uiState.gatheringTags">
+            <h4>Getting tags for selected series</h4>
+            <md-progress-circular md-mode="indeterminate"></md-progress-circular>
+        </div>
+        <div ng-if="!uiState.gatheringTags">
+            <p><i>Trailing numbers show the number of currently tagged series. Adding or deleting a tag will apply to all series.</i></p>
+            <md-chips
+                ng-model="uiState.seriesTags" 
+                md-autocomplete-snap 
+                md-require-match="false"
+                md-transform-chip="seriesTagAdded($chip)"
+                md-on-remove="seriesTagRemoved($chip)">
+                <md-autocomplete
+                    md-search-text="uiState.tagState.searchText"
+                    md-items="item in findSeriesTags(uiState.tagState.searchText)"
+                    md-item-text="item.name"
+                    md-min-length="1"
+                    md-no-cache
+                    placeholder="+tag">
+                    <span md-highlight-text="uiState.tagState.searchText">{{item.name}}</span>
+                </md-autocomplete>
+                <md-chip-template>
+                    <span>{{$chip.name}} <i>({{$chip.nSeries}})</i></span>
+                </md-chip-template>
+            </md-chips>
+        </div>
 
     </md-dialog-content>
 
     <md-dialog-actions layout="row">
         <span flex></span>
         <md-button ng-click="cancelButtonClicked()">Cancel</md-button>
-        <sbx-button button-class="md-primary" button-title="Ok" button-disabled="!hasSeriesTags()" action="okButtonClicked()"></sbx-button>
+        <sbx-button button-class="md-primary" button-title="Ok" button-disabled="!uiState.hasChanges" action="okButtonClicked()"></sbx-button>
     </md-dialog-actions>
 
 </md-dialog>
