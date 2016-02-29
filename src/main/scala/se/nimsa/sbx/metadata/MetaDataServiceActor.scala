@@ -52,7 +52,7 @@ class MetaDataServiceActor(dbProps: DbProps) extends Actor with ExceptionCatchin
     case DeleteMetaData(imageId) =>
       catchAndReport {
         val (deletedPatient, deletedStudy, deletedSeries, deletedImage) =
-          db.withTransaction { implicit session =>
+          db.withSession { implicit session =>
             dao.imageById(imageId).map(propertiesDao.deleteFully).getOrElse((None, None, None, None))
           }
 
@@ -206,39 +206,49 @@ class MetaDataServiceActor(dbProps: DbProps) extends Actor with ExceptionCatchin
       propertiesDao.seriesTagsForSeries(seriesId)
     }
 
-  def addMetaData(patient: Patient, study: Study, series: Series, image: Image, source: Source): (Patient, Study, Series, Image, SeriesSource) =
-    db.withTransaction { implicit session =>
+  def addMetaData(patient: Patient, study: Study, series: Series, image: Image, source: Source): (Patient, Study, Series, Image, SeriesSource) = {
+    var patientAdded = false
+    var studyAdded = false
+    var seriesAdded = false
+    var imageAdded = false
 
-      val seriesSource = SeriesSource(-1, source)
+    val (dbPatient, dbStudy, dbSeries, dbImage, dbSeriesSource) =
+      db.withTransaction { implicit session =>
 
-      val dbPatient = dao.patientByNameAndID(patient).getOrElse {
-        val result = dao.insert(patient)
-        context.system.eventStream.publish(PatientAdded(result, source))
-        result
-      }
-      val dbStudy = dao.studyByUidAndPatient(study, dbPatient).getOrElse {
-        val result = dao.insert(study.copy(patientId = dbPatient.id))
-        context.system.eventStream.publish(StudyAdded(result, source))
-        result
-      }
-      val dbSeries = dao.seriesByUidAndStudy(series, dbStudy).getOrElse {
-        val result = dao.insert(series.copy(studyId = dbStudy.id))
-        context.system.eventStream.publish(SeriesAdded(result, source))
-        result
-      }
-      val dbImage = dao.imageByUidAndSeries(image, dbSeries).getOrElse {
-        val result = dao.insert(image.copy(seriesId = dbSeries.id))
-        context.system.eventStream.publish(ImageAdded(result, source))
-        result
-      }
-      val dbSeriesSource = propertiesDao.seriesSourceById(dbSeries.id)
-        .getOrElse(propertiesDao.insertSeriesSource(seriesSource.copy(id = dbSeries.id)))
+        val seriesSource = SeriesSource(-1, source)
 
-      if (dbSeriesSource.source.sourceType != source.sourceType || dbSeriesSource.source.sourceId != source.sourceId)
-        SbxLog.warn("Storage", s"Existing series source does not match source of added image (${dbSeriesSource.source} vs $source). Source of added image will be lost.")
+        val dbPatient = dao.patientByNameAndID(patient).getOrElse {
+        	patientAdded = true
+          dao.insert(patient)
+        }
+        val dbStudy = dao.studyByUidAndPatient(study, dbPatient).getOrElse {
+        	studyAdded = true
+          dao.insert(study.copy(patientId = dbPatient.id))
+        }
+        val dbSeries = dao.seriesByUidAndStudy(series, dbStudy).getOrElse {
+        	seriesAdded = true
+          dao.insert(series.copy(studyId = dbStudy.id))
+        }
+        val dbImage = dao.imageByUidAndSeries(image, dbSeries).getOrElse {
+        	imageAdded = true
+          dao.insert(image.copy(seriesId = dbSeries.id))
+        }
+        val dbSeriesSource = propertiesDao.seriesSourceById(dbSeries.id)
+          .getOrElse(propertiesDao.insertSeriesSource(seriesSource.copy(id = dbSeries.id)))
 
-      (dbPatient, dbStudy, dbSeries, dbImage, dbSeriesSource)
-    }
+        if (dbSeriesSource.source.sourceType != source.sourceType || dbSeriesSource.source.sourceId != source.sourceId)
+          SbxLog.warn("Storage", s"Existing series source does not match source of added image (${dbSeriesSource.source} vs $source). Source of added image will be lost.")
+
+        (dbPatient, dbStudy, dbSeries, dbImage, dbSeriesSource)
+      }
+
+    if (patientAdded) context.system.eventStream.publish(PatientAdded(dbPatient, source))
+    if (studyAdded) context.system.eventStream.publish(StudyAdded(dbStudy, source))
+    if (seriesAdded) context.system.eventStream.publish(SeriesAdded(dbSeries, source))
+    if (imageAdded) context.system.eventStream.publish(ImageAdded(dbImage, source))
+
+    (dbPatient, dbStudy, dbSeries, dbImage, dbSeriesSource)
+  }
 }
 
 object MetaDataServiceActor {
