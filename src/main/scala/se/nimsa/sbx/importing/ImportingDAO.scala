@@ -2,7 +2,6 @@ package se.nimsa.sbx.importing
 
 import scala.slick.driver.JdbcProfile
 import scala.slick.jdbc.meta.MTable
-import scala.slick.lifted.ProvenShape.proveShapeOf
 
 import ImportingProtocol._
 
