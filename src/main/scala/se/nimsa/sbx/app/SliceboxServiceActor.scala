@@ -36,6 +36,7 @@ import se.nimsa.sbx.directory.DirectoryWatchDAO
 import se.nimsa.sbx.directory.DirectoryWatchServiceActor
 import se.nimsa.sbx.forwarding.ForwardingDAO
 import se.nimsa.sbx.forwarding.ForwardingServiceActor
+import se.nimsa.sbx.importing.ImportServiceActor
 import se.nimsa.sbx.log.LogDAO
 import se.nimsa.sbx.log.LogServiceActor
 import se.nimsa.sbx.scp.ScpDAO
@@ -56,11 +57,11 @@ import se.nimsa.sbx.log.SbxLog
 
 class SliceboxServiceActor extends Actor with SliceboxService {
 
-  def actorRefFactory = context
+  override def actorRefFactory = context
 
-  def dbUrl = "jdbc:h2:" + sliceboxConfig.getString("database.path")
+  override def dbUrl = "jdbc:h2:" + sliceboxConfig.getString("database.path")
 
-  def createStorageDirectory = {
+  override def createStorageDirectory = {
     val storagePath = Paths.get(sliceboxConfig.getString("dicom-files.path"))
     if (!Files.exists(storagePath))
       try {
@@ -73,7 +74,7 @@ class SliceboxServiceActor extends Actor with SliceboxService {
     storagePath
   }
 
-  def receive = runRoute(routes)
+  override def receive = runRoute(routes)
 
 }
 
@@ -155,6 +156,7 @@ trait SliceboxService extends HttpService with SliceboxRoutes with JsonFormats {
   val directoryService = actorRefFactory.actorOf(DirectoryWatchServiceActor.props(dbProps, storage), name = "DirectoryService")
   val seriesTypeService = actorRefFactory.actorOf(SeriesTypeServiceActor.props(dbProps, timeout), name = "SeriesTypeService")
   val forwardingService = actorRefFactory.actorOf(ForwardingServiceActor.props(dbProps, timeout), name = "ForwardingService")
+  val importService = actorRefFactory.actorOf(ImportServiceActor.props(dbProps), name = "ImportService")
 
   val authenticator = new Authenticator(userService)
 
