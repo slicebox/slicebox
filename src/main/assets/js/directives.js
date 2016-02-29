@@ -20,10 +20,7 @@ angular.module('slicebox.directives', [])
         restrict: 'E',
         template: '<md-button type="{{buttonType}}" ng-class="buttonClass" ng-click="buttonClicked()" ng-disabled="buttonDisabled || disabled">' + 
                     '<div layout="row" layout-wrap layout-align="center center">' +
-                      '{{buttonTitle}}' + 
-                      '<div style="margin: -43px -35px -43px -35px;" ng-if="disabled && showSpinner">' +
-                        '<md-progress-circular md-mode="indeterminate" md-diameter="15" />' +
-                      '</div>' +
+                      '{{buttonTitle}}&nbsp;<md-progress-circular md-mode="indeterminate" md-diameter="25" ng-if="disabled && showSpinner" />' +
                     '</div>' +
                   '</md-button>',
         scope: {
@@ -125,7 +122,8 @@ angular.module('slicebox.directives', [])
                     reset: reset,
                     reloadPage: loadPageData,
                     selectedActionObjects: selectedActionObjects,
-                    clearSelection: clearSelection
+                    clearSelection: clearSelection,
+                    selectObject: selectObject
                 };
             }
 

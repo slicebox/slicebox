@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Lars Edenbrandt
+ * Copyright 2016 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -113,16 +113,16 @@ trait AnonymizationRoutes { this: SliceboxService =>
       }
     }
 
-  def anonymizeOne(apiUser: ApiUser, imageId: Long, tagValues: Seq[TagValue]): Future[Option[ImageAdded]] =
+  def anonymizeOne(apiUser: ApiUser, imageId: Long, tagValues: Seq[TagValue]): Future[Option[DatasetAdded]] =
     storageService.ask(GetDataset(imageId, true)).mapTo[Option[Attributes]].map { optionalDataset =>
       optionalDataset.map { dataset =>
         AnonymizationUtil.setAnonymous(dataset, false) // pretend not anonymized to force anonymization
         anonymizationService.ask(Anonymize(imageId, dataset, tagValues)).flatMap {
           case anonDataset: Attributes =>
-            storageService.ask(DeleteImage(imageId)).flatMap {
-              case ImageDeleted(imageId) =>
+            storageService.ask(DeleteDataset(imageId)).flatMap {
+              case DatasetDeleted(imageId) =>
                 val source = Source(SourceType.USER, apiUser.user, apiUser.id)
-                storageService.ask(AddDataset(anonDataset, source)).mapTo[ImageAdded]
+                storageService.ask(AddDataset(anonDataset, source)).mapTo[DatasetAdded]
             }
         }
       }

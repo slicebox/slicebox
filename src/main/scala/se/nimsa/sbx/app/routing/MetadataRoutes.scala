@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Lars Edenbrandt
+ * Copyright 2016 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,10 +34,11 @@ import se.nimsa.sbx.seriestype.SeriesTypeProtocol.SeriesTypes
 import scala.concurrent.Future
 import se.nimsa.sbx.scu.ScuProtocol.GetScus
 import se.nimsa.sbx.scu.ScuProtocol.Scus
+import se.nimsa.sbx.seriestype.SeriesTypeProtocol.GetSeriesTypesForSeries
 
 trait MetadataRoutes { this: SliceboxService =>
 
-  def metaDataRoutes: Route = {
+  def metaDataRoutes: Route =
     pathPrefix("metadata") {
       path("seriestags") {
         get {
@@ -191,7 +192,7 @@ trait MetadataRoutes { this: SliceboxService =>
             }
           } ~ path("seriestypes") {
             get {
-              onSuccess(metaDataService.ask(GetSeriesTypesForSeries(seriesId))) {
+              onSuccess(seriesTypeService.ask(GetSeriesTypesForSeries(seriesId))) {
                 case SeriesTypes(seriesTypes) =>
                   complete(seriesTypes)
               }
@@ -289,7 +290,6 @@ trait MetadataRoutes { this: SliceboxService =>
         }
       }
     }
-  }
 
   def parseSourcesString(sourcesString: String): Array[SourceRef] = {
     try {

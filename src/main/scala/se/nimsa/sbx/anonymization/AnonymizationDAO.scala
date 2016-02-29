@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Lars Edenbrandt
+ * Copyright 2016 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -160,6 +160,12 @@ class AnonymizationDAO(val driver: JdbcProfile) {
   def anonymizationKeyImagesForAnonymizationKeyId(anonymizationKeyId: Long)(implicit session: Session): List[AnonymizationKeyImage] =
     anonymizationKeyImageQuery.filter(_.anonymizationKeyId === anonymizationKeyId).list
 
+  def anonymizationKeyImageForAnonymizationKeyIdAndImageId(anonymizationKeyId: Long, imageId: Long)(implicit session: Session): Option[AnonymizationKeyImage] =
+    anonymizationKeyImageQuery
+    .filter(_.anonymizationKeyId === anonymizationKeyId)
+    .filter(_.imageId === imageId)
+    .firstOption
+    
   def anonymizationKeysForImageId(imageId: Long)(implicit session: Session): List[AnonymizationKey] = {
     val join = for {
       key <- anonymizationKeyQuery

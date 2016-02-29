@@ -11,7 +11,7 @@ import org.h2.jdbc.JdbcSQLException
 import se.nimsa.sbx.util.TestUtil._
 import se.nimsa.sbx.seriestype.SeriesTypeDAO
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol.SeriesType
-import se.nimsa.sbx.metadata.MetaDataProtocol.SeriesSeriesType
+import se.nimsa.sbx.seriestype.SeriesTypeProtocol.SeriesSeriesType
 import se.nimsa.sbx.app.GeneralProtocol._
 import MetaDataProtocol._
 
@@ -41,7 +41,7 @@ class PropertiesDAOTest extends FlatSpec with Matchers with BeforeAndAfterEach {
     db.withSession { implicit session =>
       propertiesDao.listSeriesSources should be(empty)
       propertiesDao.listSeriesTags should be(empty)
-      propertiesDao.listSeriesSeriesTypes should be(empty)
+      seriesTypeDao.listSeriesSeriesTypes should be(empty)
     }
   }
 

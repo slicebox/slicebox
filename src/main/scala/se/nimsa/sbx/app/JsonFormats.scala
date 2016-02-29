@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Lars Edenbrandt
+ * Copyright 2016 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -73,12 +73,24 @@ trait JsonFormats extends DefaultJsonProtocol {
     }
   }
 
+  implicit object TransactionStatusFormat extends JsonFormat[TransactionStatus] {
+    def write(obj: TransactionStatus) = JsString(obj.toString)
+
+    def read(json: JsValue): TransactionStatus = json match {
+      case JsString(string) => TransactionStatus.withName(string)
+      case _                => deserializationError("Enumeration expected")
+    }
+  }
+
   implicit val boxFormat = jsonFormat6(Box)
 
-  implicit val outboxEntryFormat = jsonFormat8(OutboxEntry)
-  implicit val failedOutboxEntryFormat = jsonFormat2(FailedOutboxEntry)
-  implicit val inboxEntryFormat = jsonFormat7(InboxEntry)
-  implicit val sentEntryFormat = jsonFormat7(SentEntry)
+  implicit val outgoingEntryFormat = jsonFormat8(OutgoingTransaction)
+  implicit val outgoingImageFormat = jsonFormat5(OutgoingImage)
+  implicit val outgoingEntryImageFormat = jsonFormat2(OutgoingTransactionImage)
+  
+  implicit val failedOutgoingEntryFormat = jsonFormat2(FailedOutgoingTransactionImage)
+  
+  implicit val incomingEntryFormat = jsonFormat10(IncomingTransaction)
 
   implicit val tagValueFormat = jsonFormat2(TagValue)
   implicit val anonymizationKeyFormat = jsonFormat18(AnonymizationKey)

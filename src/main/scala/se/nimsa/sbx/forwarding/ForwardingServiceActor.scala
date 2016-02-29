@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Lars Edenbrandt
+ * Copyright 2016 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,27 +16,29 @@
 
 package se.nimsa.sbx.forwarding
 
+import scala.concurrent.Future
+import scala.concurrent.duration.DurationInt
+import scala.concurrent.duration.FiniteDuration
+import scala.util.Failure
+import scala.util.Success
+
+import ForwardingProtocol._
 import akka.actor.Actor
+import akka.actor.ActorRef
 import akka.actor.Props
 import akka.event.Logging
 import akka.event.LoggingReceive
-import akka.util.Timeout
 import akka.pattern.ask
-import se.nimsa.sbx.log.SbxLog
-import se.nimsa.sbx.app.DbProps
-import se.nimsa.sbx.dicom.DicomHierarchy._
-import se.nimsa.sbx.storage.StorageProtocol._
+import akka.util.Timeout
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
-import se.nimsa.sbx.scu.ScuProtocol._
-import se.nimsa.sbx.box.BoxProtocol._
+import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.app.GeneralProtocol._
-import scala.util.Success
-import scala.util.Failure
-import scala.concurrent.Future
-import scala.concurrent.duration.FiniteDuration
-import scala.concurrent.duration.DurationInt
-import akka.actor.ActorRef
-import ForwardingProtocol._
+import se.nimsa.sbx.box.BoxProtocol._
+import se.nimsa.sbx.dicom.DicomHierarchy.Image
+import se.nimsa.sbx.log.SbxLog
+import se.nimsa.sbx.metadata.MetaDataProtocol._
+import se.nimsa.sbx.scu.ScuProtocol._
+import se.nimsa.sbx.storage.StorageProtocol._
 
 class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30.seconds)(implicit timeout: Timeout) extends Actor {
 
@@ -55,7 +57,7 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
   val nonBoxBatchId = 1L
 
   override def preStart {
-    context.system.eventStream.subscribe(context.self, classOf[ImageAdded])
+    context.system.eventStream.subscribe(context.self, classOf[DatasetAdded])
     context.system.eventStream.subscribe(context.self, classOf[ImageDeleted])
     context.system.eventStream.subscribe(context.self, classOf[ImagesSent])
   }
@@ -76,7 +78,7 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
    * (transfer is made if batch is complete)
    * ImagesSent (TransactionMarkedAsDelivered to sender (box, scu))
    * FinalizeSentTransactions (TransactionsFinalized to sender (self))
-   * 
+   *
    * Happy flow for non-BOX sources:
    * ImageAdded (ImageRegisteredForForwarding to sender)
    * AddImageToForwardingQueue (one per applicable rule) (ImageAddedToForwardingQueue to sender of ImageAdded)
@@ -87,19 +89,19 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
    */
   def receive = LoggingReceive {
 
-    case ImageAdded(image, source) =>
+    case DatasetAdded(image, source, overwrite) =>
       val applicableRules = maybeAddImageToForwardingQueue(image, source, sender)
       sender ! ImageRegisteredForForwarding(image, applicableRules)
-      
+
     case ImageDeleted(imageId) =>
       removeImageFromTransactions(imageId)
-      
+
     case AddImageToForwardingQueue(image, rule, batchId, transferNow, origin) =>
       val (transaction, transactionImage) = addImageToForwardingQueue(image, rule, batchId)
       origin ! ImageAddedToForwardingQueue(transactionImage)
       if (transferNow)
-    	  makeTransfer(rule, transaction)
-    	  
+        makeTransfer(rule, transaction)
+
     case PollForwardingQueue =>
       val transactions = maybeSendImagesForNonBoxSources()
       sender ! TransactionsEnroute(transactions)
@@ -190,8 +192,11 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
     }
 
   def addImageToForwardingQueue(forwardingTransaction: ForwardingTransaction, image: Image) =
-    db.withSession { implicit session =>
-      forwardingDao.insertForwardingTransactionImage(ForwardingTransactionImage(-1, forwardingTransaction.id, image.id))
+    db.withTransaction { implicit session =>
+      // a dataset may be added multiple times (with overwrite), check if it has been added before
+      forwardingDao.getTransactionImageForTransactionIdAndImageId(forwardingTransaction.id, image.id)
+        .getOrElse(
+          forwardingDao.insertForwardingTransactionImage(ForwardingTransactionImage(-1, forwardingTransaction.id, image.id)))
     }
 
   def maybeSendImagesForNonBoxSources(): List[ForwardingTransaction] = {
@@ -208,29 +213,29 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
   def addImageToForwardingQueueForBoxSource(image: Image, forwardingRule: ForwardingRule, origin: ActorRef): Unit = {
 
     /*
-     * This method is called as the result of the ImageAdded event. The same event updates the inbox entry
-     * and the order in which this happens is indeterminate. Therefore, we try getting the inbox entry for
+     * This method is called as the result of the ImageAdded event. The same event updates the incoming entry
+     * and the order in which this happens is indeterminate. Therefore, we try getting the incoming entry for
      * the added image a few times before either succeeding or giving up.
      */
 
-    def inboxEntryForImage(image: Image, attempt: Int, maxAttempts: Int, attemptInterval: Long): Unit =
-      boxService.ask(GetInboxEntryForImageId(image.id)).mapTo[Option[InboxEntry]].onComplete {
+    def incomingEntryForImage(image: Image, attempt: Int, maxAttempts: Int, attemptInterval: Long): Unit =
+      boxService.ask(GetIncomingTransactionForImageId(image.id)).mapTo[Option[IncomingTransaction]].onComplete {
         case Success(entryMaybe) => entryMaybe match {
           case Some(entry) =>
             self ! AddImageToForwardingQueue(image, forwardingRule, entry.id, entry.receivedImageCount >= entry.totalImageCount, origin)
           case None =>
             if (attempt < maxAttempts) {
               Thread.sleep(attemptInterval)
-              inboxEntryForImage(image, attempt + 1, maxAttempts, attemptInterval)
+              incomingEntryForImage(image, attempt + 1, maxAttempts, attemptInterval)
             } else
-              SbxLog.error("Forwarding", s"No inbox entries found afer $attempt attempts for image id ${image.id} when transferring from box ${forwardingRule.source.sourceName}. Cannot complete forwarding transfer.")
+              SbxLog.error("Forwarding", s"No incoming entries found after $attempt attempts for image id ${image.id} when transferring from box ${forwardingRule.source.sourceName}. Cannot complete forwarding transfer.")
         }
         case Failure(e) =>
-          SbxLog.error("Forwarding", s"Error getting inbox entries for received image with id ${image.id}. Could not complete forwarding transfer.")
+          SbxLog.error("Forwarding", s"Error getting incoming entries for received image with id ${image.id}. Could not complete forwarding transfer.")
       }
 
     // get box information, are all images received?
-    inboxEntryForImage(image, 1, 10, 500)
+    incomingEntryForImage(image, 1, 10, 500)
 
   }
 
@@ -244,10 +249,12 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
     updateTransaction(transaction, true, false)
 
     val destinationId = rule.destination.destinationId
+    val destinationName = rule.destination.destinationName
+    val box = Box(destinationId, destinationName, "", "", null, false)
 
     rule.destination.destinationType match {
       case DestinationType.BOX =>
-        boxService.ask(SendToRemoteBox(destinationId, imageIds.map(ImageTagValues(_, Seq.empty))))
+        boxService.ask(SendToRemoteBox(box, imageIds.map(ImageTagValues(_, Seq.empty))))
           .onFailure {
             case e: Throwable => SbxLog.error("Forwarding", "Could not forward images to remote box " + rule.destination.destinationName + ": " + e.getMessage)
           }
@@ -351,7 +358,7 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
 
   def deleteImages(imageIds: List[Long]): Future[Seq[Long]] = {
     val futureDeletedImageIds = Future.sequence(imageIds.map(imageId =>
-      storageService.ask(DeleteImage(imageId)).mapTo[ImageDeleted]))
+      storageService.ask(DeleteDataset(imageId)).mapTo[DatasetDeleted]))
       .map(_.map(_.imageId))
 
     futureDeletedImageIds.onFailure {
@@ -362,7 +369,7 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
     futureDeletedImageIds
   }
 
-  def removeImageFromTransactions(imageId: Long) = 
+  def removeImageFromTransactions(imageId: Long) =
     db.withSession { implicit session =>
       forwardingDao.removeTransactionImagesForImageId(imageId)
     }

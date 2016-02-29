@@ -10,6 +10,7 @@ project/activator*
 /bin/
 /dicom
 /*.h2.db
+/*.mv.db
 /*.trace.db
 /*.lock.db
 /*.sublime-project

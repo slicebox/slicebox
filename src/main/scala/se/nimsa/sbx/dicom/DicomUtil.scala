@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Lars Edenbrandt
+ * Copyright 2016 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,7 +37,7 @@ import org.dcm4che3.imageio.plugins.dcm.DicomImageReadParam
 import java.io.ByteArrayOutputStream
 import org.dcm4che3.data.Attributes.Visitor
 import org.dcm4che3.data.VR
-import se.nimsa.sbx.box.BoxProtocol.TransactionTagValue
+import se.nimsa.sbx.box.BoxProtocol.OutgoingTagValue
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.AnonymizationKey
 import java.util.Date
 import scala.collection.mutable.ListBuffer

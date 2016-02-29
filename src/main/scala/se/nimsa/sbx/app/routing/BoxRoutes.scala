@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Lars Edenbrandt
+ * Copyright 2016 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,18 +17,17 @@
 package se.nimsa.sbx.app.routing
 
 import akka.pattern.ask
-import spray.http.ContentTypes
-import spray.http.HttpData
-import spray.http.HttpEntity
-import spray.http.StatusCodes._
-import spray.httpx.SprayJsonSupport._
-import spray.routing._
-import se.nimsa.sbx.app.SliceboxService
-import se.nimsa.sbx.user.UserProtocol._
-import se.nimsa.sbx.box.BoxProtocol._
-import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.ImageTagValues
-import se.nimsa.sbx.dicom.DicomUtil
+import se.nimsa.sbx.app.SliceboxService
+import se.nimsa.sbx.box.BoxProtocol._
+import se.nimsa.sbx.metadata.MetaDataProtocol.Images
+import se.nimsa.sbx.user.UserProtocol.ApiUser
+import se.nimsa.sbx.user.UserProtocol.UserRole
+import spray.http.StatusCodes.Created
+import spray.http.StatusCodes.NoContent
+import spray.http.StatusCodes.NotFound
+import spray.httpx.SprayJsonSupport._
+import spray.routing.Route
 
 trait BoxRoutes { this: SliceboxService =>
 
@@ -70,38 +69,45 @@ trait BoxRoutes { this: SliceboxService =>
             }
           }
         }
-      } ~ path(LongNumber / "send") { remoteBoxId =>
+      } ~ path(LongNumber / "send") { boxId =>
         post {
           entity(as[Seq[ImageTagValues]]) { imageTagValuesSeq =>
-            onSuccess(boxService.ask(SendToRemoteBox(remoteBoxId, imageTagValuesSeq))) {
-              case ImagesAddedToOutbox(remoteBoxId, imageIds) => complete(NoContent)
-              case BoxNotFound                                => complete(NotFound)
+            onSuccess(boxService.ask(GetBoxById(boxId)).mapTo[Option[Box]]) {
+              _ match {
+                case Some(box) =>
+                  onSuccess(boxService.ask(SendToRemoteBox(box, imageTagValuesSeq))) {
+                    case ImagesAddedToOutgoing(_, _) =>
+                      complete(NoContent)
+                  }
+                case None =>
+                  complete((NotFound, s"No box found for id $boxId"))
+              }
             }
           }
         }
-      }
+      } ~ incomingRoutes ~ outgoingRoutes
     }
 
-  def inboxRoutes: Route =
-    pathPrefix("inbox") {
+  def incomingRoutes: Route =
+    pathPrefix("incoming") {
       pathEndOrSingleSlash {
         get {
-          onSuccess(boxService.ask(GetInbox)) {
-            case Inbox(entries) =>
-              complete(entries)
+          onSuccess(boxService.ask(GetIncomingTransactions)) {
+            case IncomingTransactions(transactions) =>
+              complete(transactions)
           }
         }
-      } ~ pathPrefix(LongNumber) { inboxEntryId =>
+      } ~ pathPrefix(LongNumber) { incomingTransactionId =>
         pathEndOrSingleSlash {
           delete {
-            onSuccess(boxService.ask(RemoveInboxEntry(inboxEntryId))) {
-              case InboxEntryRemoved(inboxEntryId) =>
+            onSuccess(boxService.ask(RemoveIncomingTransaction(incomingTransactionId))) {
+              case IncomingTransactionRemoved(incomingTransactionId) =>
                 complete(NoContent)
             }
           }
         } ~ path("images") {
           get {
-            onSuccess(boxService.ask(GetImagesForInboxEntry(inboxEntryId))) {
+            onSuccess(boxService.ask(GetImagesForIncomingTransaction(incomingTransactionId))) {
               case Images(images) =>
                 complete(images)
             }
@@ -110,45 +116,26 @@ trait BoxRoutes { this: SliceboxService =>
       }
     }
 
-  def outboxRoutes: Route =
-    pathPrefix("outbox") {
+  def outgoingRoutes: Route =
+    pathPrefix("outgoing") {
       pathEndOrSingleSlash {
         get {
-          onSuccess(boxService.ask(GetOutbox)) {
-            case Outbox(entries) =>
-              complete(entries)
+          onSuccess(boxService.ask(GetOutgoingTransactions)) {
+            case OutgoingTransactions(transactions) =>
+              complete(transactions)
           }
         }
-      } ~ path(LongNumber) { outboxEntryId =>
-        delete {
-          onSuccess(boxService.ask(RemoveOutboxEntry(outboxEntryId))) {
-            case OutboxEntryRemoved(outboxEntryId) =>
-              complete(NoContent)
-          }
-        }
-      }
-    }
-
-  def sentRoutes: Route =
-    pathPrefix("sent") {
-      pathEndOrSingleSlash {
-        get {
-          onSuccess(boxService.ask(GetSent)) {
-            case Sent(entries) =>
-              complete(entries)
-          }
-        }
-      } ~ pathPrefix(LongNumber) { sentEntryId =>
+      } ~ pathPrefix(LongNumber) { outgoingTransactionId =>
         pathEndOrSingleSlash {
           delete {
-            onSuccess(boxService.ask(RemoveSentEntry(sentEntryId))) {
-              case SentEntryRemoved(sentEntryId) =>
+            onSuccess(boxService.ask(RemoveOutgoingTransaction(outgoingTransactionId))) {
+              case OutgoingTransactionRemoved(outgoingEntryId) =>
                 complete(NoContent)
             }
           }
         } ~ path("images") {
           get {
-            onSuccess(boxService.ask(GetImagesForSentEntry(sentEntryId))) {
+            onSuccess(boxService.ask(GetImagesForOutgoingTransaction(outgoingTransactionId))) {
               case Images(images) =>
                 complete(images)
             }

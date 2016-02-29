@@ -57,84 +57,171 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
 
   "A BoxServiceActor" should {
 
-    "create inbox entry for first file in transaction" in {
+    "create incoming transaction for first file in transaction" in {
       db.withSession { implicit session =>
 
-        val remoteBox = boxDao.insertBox(Box(-1, "some remote box", "abc", "https://someurl.com", BoxSendMethod.POLL, false))
+        val box = boxDao.insertBox(Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, false))
 
-        boxService ! UpdateInbox(remoteBox.token, 123, 1, 2, 2)
+        boxService ! UpdateIncoming(box, 123, 1, 2, 2, false)
 
-        expectMsg(InboxUpdated(remoteBox.token, 123, 1, 2))
+        expectMsgType[IncomingUpdated]
 
-        val inboxEntries = boxDao.listInboxEntries
+        val incomingTransactions = boxDao.listIncomingTransactions
 
-        inboxEntries.size should be(1)
-        inboxEntries.foreach(inboxEntry => {
-          inboxEntry.remoteBoxId should be(remoteBox.id)
-          inboxEntry.transactionId should be(123)
-          inboxEntry.receivedImageCount should be(1)
-          inboxEntry.totalImageCount should be(2)
+        incomingTransactions should have length 1
+        incomingTransactions.foreach { incomingTransaction =>
+          incomingTransaction.boxId should be(box.id)
+          incomingTransaction.outgoingTransactionId should be(123)
+          incomingTransaction.receivedImageCount should be(1)
+          incomingTransaction.totalImageCount should be(2)
+        }
 
-        })
+        val incomingImages = boxDao.listIncomingImages
+        incomingImages should have length 1
       }
     }
 
-    "update inbox entry for next file in transaction" in {
+    "update incoming transaction for next file in transaction" in {
       db.withSession { implicit session =>
 
-        val remoteBox = boxDao.insertBox(Box(-1, "some remote box", "abc", "https://someurl.com", BoxSendMethod.POLL, false))
+        val box = boxDao.insertBox(Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, false))
 
-        boxService ! UpdateInbox(remoteBox.token, 123, 1, 3, 4)
-        expectMsg(InboxUpdated(remoteBox.token, 123, 1, 3))
+        boxService ! UpdateIncoming(box, 123, 1, 3, 4, false)
+        expectMsgType[IncomingUpdated]
 
-        boxService ! UpdateInbox(remoteBox.token, 123, 2, 3, 5)
-        expectMsg(InboxUpdated(remoteBox.token, 123, 2, 3))
+        boxService ! UpdateIncoming(box, 123, 2, 3, 5, false)
+        expectMsgType[IncomingUpdated]
 
-        val inboxEntries = boxDao.listInboxEntries
+        val incomingTransactions = boxDao.listIncomingTransactions
 
-        inboxEntries.size should be(1)
-        inboxEntries.foreach(inboxEntry => {
-          inboxEntry.remoteBoxId should be(remoteBox.id)
-          inboxEntry.transactionId should be(123)
-          inboxEntry.receivedImageCount should be(2)
-          inboxEntry.totalImageCount should be(3)
+        incomingTransactions.size should be(1)
+        incomingTransactions.foreach { incomingTransaction =>
+          incomingTransaction.boxId should be(box.id)
+          incomingTransaction.outgoingTransactionId should be(123)
+          incomingTransaction.receivedImageCount should be(2)
+          incomingTransaction.totalImageCount should be(3)
+        }
 
-        })
+        val incomingImages = boxDao.listIncomingImages
+        incomingImages should have length 2
+
       }
     }
 
-    "return OuboxEmpty for poll message when outbox is empty" in {
+    "return no outgoing transaction when polling and outgoing is empty" in {
       db.withSession { implicit session =>
-        val remoteBox = boxDao.insertBox(Box(-1, "some remote box", "abc", "https://someurl.com", BoxSendMethod.POLL, false))
+        val box = boxDao.insertBox(Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, false))
 
-        boxService ! PollOutbox(remoteBox.token)
+        db.withSession { implicit session =>
+          boxDao.listOutgoingTransactions shouldBe empty
+        }
 
-        expectMsg(OutboxEmpty)
+        boxService ! PollOutgoing(box)
+
+        expectMsg(None)
       }
     }
 
-    "return first outbox entry when receiving poll message" in {
+    "return first outgoing transaction when receiving poll message" in {
       db.withSession { implicit session =>
-        val remoteBox = boxDao.insertBox(Box(-1, "some remote box", "abc", "https://someurl.com", BoxSendMethod.POLL, false))
-        boxDao.insertOutboxEntry(OutboxEntry(-1, remoteBox.id, remoteBox.name, 987, 1, 2, 123, false))
+        val transactionId = 987
+        val imageId = 123
+        val box = boxDao.insertBox(Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, false))
 
-        boxService ! PollOutbox(remoteBox.token)
+        // insert images with sequence numbers out of order
+        val transaction = boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, box.id, box.name, 0, 1, 123, 123, TransactionStatus.WAITING))
+        val image1 = boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, imageId, 2, false))
+        val image2 = boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, imageId, 1, false))
+
+        boxService ! PollOutgoing(box)
 
         expectMsgPF() {
-          case OutboxEntry(id, remoteBoxId, remoteBoxName, transactionId, sequenceNumber, totalImageCount, imageId, failed) =>
-            remoteBoxId should be(remoteBox.id)
-            remoteBoxName should be("some remote box")
-            transactionId should be(987)
-            sequenceNumber should be(1)
-            totalImageCount should be(2)
-            imageId should be(123)
+          case Some(OutgoingTransactionImage(transaction, image)) =>
+            transaction.boxId should be(box.id)
+            transaction.boxName should be("some box")
+            transaction.sentImageCount should be(0)
+            transaction.totalImageCount should be(1)
+            image.imageId should be(imageId)
+            image.sequenceNumber should be(1)
+            image.sent should be(false)
+            image.outgoingTransactionId should be(transaction.id)
         }
       }
     }
 
-    "remove all box tag values when all outbox entries for a transaction have been removed" in {
+    "create incoming transaction when receiving the first incoming file in a transaction" in {
+
+      val box = Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, false)
+
+      val sequenceNumber = 1
+      val totalImageCount = 55
+      boxService ! UpdateIncoming(box, 32, sequenceNumber, totalImageCount, 33, false)
+
+      expectMsgPF() {
+        case IncomingUpdated(transaction) =>
+          transaction.receivedImageCount shouldBe sequenceNumber
+          transaction.totalImageCount shouldBe totalImageCount
+          transaction.status shouldBe TransactionStatus.PROCESSING
+      }
+      
       db.withSession { implicit session =>
-        val remoteBox = boxDao.insertBox(Box(-1, "some remote box", "abc", "https://someurl.com", BoxSendMethod.POLL, false))
+        boxDao.listIncomingTransactions should have length 1
+        boxDao.listIncomingImages should have length 1
+      }
+      
+    }
+
+    "mark incoming transaction as finished when receiving the UpdateIncoming message for the last file of the transaction" in {
+
+      val box = Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, false)
+
+      val totalImageCount = 2
+      boxService ! UpdateIncoming(box, 32, sequenceNumber = 1, totalImageCount, 33, false)
+
+      expectMsgPF() {
+        case IncomingUpdated(transaction) =>
+          transaction.receivedImageCount shouldBe 1
+          transaction.totalImageCount shouldBe totalImageCount
+          transaction.status shouldBe TransactionStatus.PROCESSING
+      }
+      
+      boxService ! UpdateIncoming(box, 32, sequenceNumber = 2, totalImageCount, 33, false)
+      
+      expectMsgPF() {
+        case IncomingUpdated(transaction) =>
+          transaction.receivedImageCount shouldBe 2
+          transaction.totalImageCount shouldBe totalImageCount
+          transaction.status shouldBe TransactionStatus.FINISHED
+      }
+      
+      db.withSession { implicit session =>
+        boxDao.listIncomingTransactions should have length 1
+        boxDao.listIncomingImages should have length 2
+      }
+    }
+
+    "mark incoming transaction as failed when receiving the UpdateIncoming message for the last file of the transaction and the number of images in the transactions does not match the number of incoming images stored in the database" in {
+
+      val box = Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, false)
+
+      val totalImageCount = 3
+      
+      boxService ! UpdateIncoming(box, 32, sequenceNumber = 1, totalImageCount, 33, false)
+      expectMsgType[IncomingUpdated]
+      
+      boxService ! UpdateIncoming(box, 32, sequenceNumber = 3, totalImageCount, 33, false)
+
+      expectMsgPF() {
+        case IncomingUpdated(transaction) =>
+          transaction.receivedImageCount shouldBe 3
+          transaction.totalImageCount shouldBe totalImageCount
+          transaction.status shouldBe TransactionStatus.FAILED
+      }      
+    }
+
+    "remove all related box tag values when an outgoing transaction is removed" in {
+      db.withSession { implicit session =>
+        val box = boxDao.insertBox(Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, false))
 
         val (p1, s1, r1, i1, i2, i3) = insertMetadata
 
@@ -152,152 +239,54 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
             TagValue(0x00101012, "D"),
             TagValue(0x00101014, "F"))))
 
-        boxService ! SendToRemoteBox(remoteBox.id, imageTagValuesSeq)
+        boxService ! SendToRemoteBox(box, imageTagValuesSeq)
 
         expectMsgPF() {
-          case ImagesAddedToOutbox(remoteBoxId, imageIds) =>
-            remoteBoxId should be(remoteBox.id)
+          case ImagesAddedToOutgoing(boxId, imageIds) =>
+            boxId should be(box.id)
             imageIds should be(Seq(i1.id, i2.id, i3.id))
         }
 
-        val outboxEntries = boxDao.listOutboxEntries
-        outboxEntries.size should be(3)
+        val outgoingTransactions = boxDao.listOutgoingTransactions
+        outgoingTransactions should have length 1
+        val outgoingImages = boxDao.listOutgoingImages
+        outgoingImages should have length 3
 
-        val transactionId = outboxEntries(0).transactionId
-        outboxEntries.map(_.transactionId).forall(_ == transactionId) should be(true)
+        boxDao.listOutgoingTagValues.size should be(3 * 3)
+        boxDao.tagValuesByOutgoingTransactionImage(outgoingTransactions(0).id, outgoingImages(0).id) should have length 3
+        boxDao.tagValuesByOutgoingTransactionImage(outgoingTransactions(0).id, outgoingImages(1).id) should have length 3
+        boxDao.tagValuesByOutgoingTransactionImage(outgoingTransactions(0).id, outgoingImages(2).id) should have length 3
 
-        boxDao.listTransactionTagValues.size should be(3 * 3)
-        boxDao.tagValuesByImageIdAndTransactionId(i1.id, transactionId).size should be(3)
-        boxDao.tagValuesByImageIdAndTransactionId(i2.id, transactionId).size should be(3)
-        boxDao.tagValuesByImageIdAndTransactionId(i3.id, transactionId).size should be(3)
+        boxService ! RemoveOutgoingTransaction(outgoingTransactions(0).id)
 
-        outboxEntries.map(_.id).foreach(id => boxService ! RemoveOutboxEntry(id))
+        expectMsgType[OutgoingTransactionRemoved]
 
-        expectMsgType[OutboxEntryRemoved]
-        expectMsgType[OutboxEntryRemoved]
-        expectMsgType[OutboxEntryRemoved]
-
-        boxDao.listTransactionTagValues.isEmpty should be(true)
-        boxDao.tagValuesByImageIdAndTransactionId(i1.id, transactionId).isEmpty should be(true)
-        boxDao.tagValuesByImageIdAndTransactionId(i2.id, transactionId).isEmpty should be(true)
-        boxDao.tagValuesByImageIdAndTransactionId(i3.id, transactionId).isEmpty should be(true)
+        boxDao.listOutgoingTagValues shouldBe empty
       }
     }
 
-    "remove all box tag values when last outbox entry has been processed" in {
+    "remove incoming images when the related incoming transaction is removed" in {
       db.withSession { implicit session =>
-        val token = "abc"
-        val remoteBox = boxDao.insertBox(Box(-1, "some remote box", token, "https://someurl.com", BoxSendMethod.POLL, false))
+        val box = boxDao.insertBox(Box(-1, "some remote box", "abc", "https://someurl.com", BoxSendMethod.POLL, false))
 
-        val (p1, s1, r1, i1, i2, i3) = insertMetadata
+        boxService ! UpdateIncoming(box, 123, 1, 3, 4, false)
+        expectMsgType[IncomingUpdated]
 
-        val imageTagValuesSeq = Seq(
-          ImageTagValues(i1.id, Seq(
-            TagValue(0x00101010, "B"),
-            TagValue(0x00101012, "D"),
-            TagValue(0x00101014, "F"))),
-          ImageTagValues(i2.id, Seq(
-            TagValue(0x00101010, "B"),
-            TagValue(0x00101012, "D"),
-            TagValue(0x00101014, "F"))),
-          ImageTagValues(i3.id, Seq(
-            TagValue(0x00101010, "B"),
-            TagValue(0x00101012, "D"),
-            TagValue(0x00101014, "F"))))
+        boxService ! UpdateIncoming(box, 123, 2, 3, 5, false)
+        expectMsgType[IncomingUpdated]
 
-        boxService ! SendToRemoteBox(remoteBox.id, imageTagValuesSeq)
+        val incomingTransactions = boxDao.listIncomingTransactions
+        incomingTransactions.size should be(1)
 
-        expectMsgPF() {
-          case ImagesAddedToOutbox(remoteBoxId, imageIds) =>
-            remoteBoxId should be(remoteBox.id)
-            imageIds should be(Seq(i1.id, i2.id, i3.id))
-        }
+        val incomingTransaction = incomingTransactions.head
+        val incomingImages = boxDao.listIncomingImagesForIncomingTransactionId(incomingTransaction.id)
+        incomingImages.size should be(2)
 
-        val outboxEntries = boxDao.listOutboxEntries
-        outboxEntries.size should be(3)
+        boxService ! RemoveIncomingTransaction(incomingTransaction.id)
+        expectMsg(IncomingTransactionRemoved(incomingTransaction.id))
 
-        val transactionId = outboxEntries(0).transactionId
-        outboxEntries.map(_.transactionId).forall(_ == transactionId) should be(true)
-
-        boxDao.listTransactionTagValues.size should be(3 * 3)
-        boxDao.tagValuesByImageIdAndTransactionId(i1.id, transactionId).size should be(3)
-        boxDao.tagValuesByImageIdAndTransactionId(i2.id, transactionId).size should be(3)
-        boxDao.tagValuesByImageIdAndTransactionId(i3.id, transactionId).size should be(3)
-
-        outboxEntries.foreach(entry => boxService ! DeleteOutboxEntry(token, entry.transactionId, entry.sequenceNumber))
-
-        expectMsg(OutboxEntryDeleted)
-        expectMsg(OutboxEntryDeleted)
-        expectMsg(OutboxEntryDeleted)
-
-        boxDao.listTransactionTagValues.isEmpty should be(true)
-        boxDao.tagValuesByImageIdAndTransactionId(i1.id, transactionId).isEmpty should be(true)
-        boxDao.tagValuesByImageIdAndTransactionId(i2.id, transactionId).isEmpty should be(true)
-        boxDao.tagValuesByImageIdAndTransactionId(i3.id, transactionId).isEmpty should be(true)
-      }
-    }
-
-    "remove inbox images when the related inbox entry is removed" in {
-      db.withSession { implicit session =>
-        val remoteBox = boxDao.insertBox(Box(-1, "some remote box", "abc", "https://someurl.com", BoxSendMethod.POLL, false))
-
-        boxService ! UpdateInbox(remoteBox.token, 123, 1, 3, 4)
-        expectMsg(InboxUpdated(remoteBox.token, 123, 1, 3))
-
-        boxService ! UpdateInbox(remoteBox.token, 123, 2, 3, 5)
-        expectMsg(InboxUpdated(remoteBox.token, 123, 2, 3))
-
-        val inboxEntries = boxDao.listInboxEntries
-        inboxEntries.size should be(1)
-
-        val inboxEntry = inboxEntries.head
-        val inboxImages = boxDao.listInboxImagesForInboxEntryId(inboxEntry.id)
-        inboxImages.size should be(2)
-
-        boxService ! RemoveInboxEntry(inboxEntry.id)
-        expectMsg(InboxEntryRemoved(inboxEntry.id))
-
-        boxDao.listInboxImagesForInboxEntryId(inboxEntry.id).size should be(0)
-        boxDao.listInboxImages.size should be(0)
-      }
-    }
-
-    "add processed outbox entries to the list of sent entries, along with records of sent images" in {
-      db.withSession { implicit session =>
-        val remoteBox = boxDao.insertBox(Box(-1, "some remote box", "abc", "https://someurl.com", BoxSendMethod.POLL, false))
-        boxDao.insertOutboxEntry(OutboxEntry(-1, remoteBox.id, remoteBox.name, 123, 1, 100, 5, false))
-        boxDao.insertOutboxEntry(OutboxEntry(-1, remoteBox.id, remoteBox.name, 123, 2, 100, 33, false))
-
-        boxService ! DeleteOutboxEntry("abc", 123, 1)
-        expectMsg(OutboxEntryDeleted)
-
-        var sentEntries = boxDao.listSentEntries
-        sentEntries.size should be(1)
-        boxDao.listSentImagesForSentEntryId(sentEntries.head.id).map(_.imageId) should be(List(5))
-
-        boxService ! DeleteOutboxEntry("abc", 123, 2)
-        expectMsg(OutboxEntryDeleted)
-
-        sentEntries = boxDao.listSentEntries
-        sentEntries.size should be(1)
-        boxDao.listSentImagesForSentEntryId(sentEntries.head.id).map(_.imageId) should be(List(5, 33))
-      }
-    }
-
-    "remove sent images when the related sent entry is removed" in {
-      db.withSession { implicit session =>
-        val se = boxDao.insertSentEntry(SentEntry(-1, 1, "some box", 123, 1, 2, System.currentTimeMillis()))
-        boxDao.insertSentImage(SentImage(-1, se.id, 5))
-        boxDao.insertSentImage(SentImage(-1, se.id, 33))
-        
-        boxDao.listSentEntries.size should be (1)
-        boxDao.listSentImagesForSentEntryId(se.id).size should be (2)
-        
-        boxService ! RemoveSentEntry(se.id)
-        expectMsg(SentEntryRemoved(se.id))        
-        
-        boxDao.listSentEntries.size should be (0)
-        boxDao.listSentImagesForSentEntryId(se.id).size should be (0)        
+        boxDao.listIncomingImagesForIncomingTransactionId(incomingTransaction.id).size should be(0)
+        boxDao.listIncomingImages.size should be(0)
       }
     }
   }

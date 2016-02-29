@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Lars Edenbrandt
+ * Copyright 2016 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -55,17 +55,23 @@ trait ImageRoutes { this: SliceboxService =>
             val dataset = DicomUtil.loadDataset(file.entity.data.toByteArray, true)
             val source = Source(SourceType.USER, apiUser.user, apiUser.id)
             onSuccess(storageService.ask(AddDataset(dataset, source))) {
-              case ImageAdded(image, source) =>
+              case DatasetAdded(image, source, overwrite) =>
                 import spray.httpx.SprayJsonSupport._
-                complete((Created, image))
+                if (overwrite)
+                  complete((OK, image))
+                else
+                  complete((Created, image))
             }
           } ~ entity(as[Array[Byte]]) { bytes =>
             val dataset = DicomUtil.loadDataset(bytes, true)
             val source = Source(SourceType.USER, apiUser.user, apiUser.id)
             onSuccess(storageService.ask(AddDataset(dataset, source))) {
-              case ImageAdded(image, source) =>
+              case DatasetAdded(image, source, overwrite) =>
                 import spray.httpx.SprayJsonSupport._
-                complete((Created, image))
+                if (overwrite)
+                  complete((OK, image))
+                else
+                  complete((Created, image))
             }
           }
         }
@@ -84,8 +90,8 @@ trait ImageRoutes { this: SliceboxService =>
               }
             }
           } ~ delete {
-            onSuccess(storageService.ask(DeleteImage(imageId))) {
-              case ImageDeleted(imageId) =>
+            onSuccess(storageService.ask(DeleteDataset(imageId))) {
+              case DatasetDeleted(imageId) =>
                 complete(NoContent)
             }
           }
@@ -124,7 +130,7 @@ trait ImageRoutes { this: SliceboxService =>
           import spray.httpx.SprayJsonSupport._
           entity(as[Seq[Long]]) { imageIds =>
             val futureDeleted = Future.sequence {
-              imageIds.map(imageId => storageService.ask(DeleteImage(imageId)))
+              imageIds.map(imageId => storageService.ask(DeleteDataset(imageId)))
             }
             onSuccess(futureDeleted) { m =>
               complete(NoContent)

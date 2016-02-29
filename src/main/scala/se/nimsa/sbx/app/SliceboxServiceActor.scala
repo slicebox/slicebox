@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Lars Edenbrandt
+ * Copyright 2016 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,9 +22,10 @@ import java.nio.file.Paths
 import java.util.concurrent.TimeUnit.MILLISECONDS
 import scala.slick.driver.H2Driver
 import scala.slick.jdbc.JdbcBackend.Database
-import com.mchange.v2.c3p0.ComboPooledDataSource
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
+import com.zaxxer.hikari.HikariDataSource
+import com.zaxxer.hikari.HikariConfig
 import akka.actor.Actor
 import akka.util.Timeout
 import se.nimsa.sbx.anonymization.AnonymizationServiceActor
@@ -35,6 +36,7 @@ import se.nimsa.sbx.directory.DirectoryWatchDAO
 import se.nimsa.sbx.directory.DirectoryWatchServiceActor
 import se.nimsa.sbx.forwarding.ForwardingDAO
 import se.nimsa.sbx.forwarding.ForwardingServiceActor
+import se.nimsa.sbx.importing.ImportServiceActor
 import se.nimsa.sbx.log.LogDAO
 import se.nimsa.sbx.log.LogServiceActor
 import se.nimsa.sbx.scp.ScpDAO
@@ -55,11 +57,11 @@ import se.nimsa.sbx.log.SbxLog
 
 class SliceboxServiceActor extends Actor with SliceboxService {
 
-  def actorRefFactory = context
+  override def actorRefFactory = context
 
-  def dbUrl = "jdbc:h2:" + sliceboxConfig.getString("database.path")
+  override def dbUrl = "jdbc:h2:" + sliceboxConfig.getString("database.path")
 
-  def createStorageDirectory = {
+  override def createStorageDirectory = {
     val storagePath = Paths.get(sliceboxConfig.getString("dicom-files.path"))
     if (!Files.exists(storagePath))
       try {
@@ -72,8 +74,8 @@ class SliceboxServiceActor extends Actor with SliceboxService {
     storagePath
   }
 
-  def receive = runRoute(routes)
-  
+  override def receive = runRoute(routes)
+
 }
 
 trait SliceboxService extends HttpService with SliceboxRoutes with JsonFormats {
@@ -85,10 +87,9 @@ trait SliceboxService extends HttpService with SliceboxRoutes with JsonFormats {
   def dbUrl(): String
 
   def db = {
-    val ds = new ComboPooledDataSource
-    ds.setDriverClass("org.h2.Driver")
-    ds.setJdbcUrl(dbUrl)
-    Database.forDataSource(ds)
+    val config = new HikariConfig()
+    config.setJdbcUrl(dbUrl)
+    Database.forDataSource(new HikariDataSource(config))
   }
 
   val dbProps = DbProps(db, H2Driver)
@@ -139,7 +140,7 @@ trait SliceboxService extends HttpService with SliceboxRoutes with JsonFormats {
   val superUser = sliceboxConfig.getString("superuser.user")
   val superPassword = sliceboxConfig.getString("superuser.password")
   val sessionTimeout = sliceboxConfig.getDuration("session-timeout", MILLISECONDS)
-  
+
   val sessionField = "slicebox-session"
 
   implicit def executionContext = actorRefFactory.dispatcher
@@ -155,6 +156,7 @@ trait SliceboxService extends HttpService with SliceboxRoutes with JsonFormats {
   val directoryService = actorRefFactory.actorOf(DirectoryWatchServiceActor.props(dbProps, storage), name = "DirectoryService")
   val seriesTypeService = actorRefFactory.actorOf(SeriesTypeServiceActor.props(dbProps, timeout), name = "SeriesTypeService")
   val forwardingService = actorRefFactory.actorOf(ForwardingServiceActor.props(dbProps, timeout), name = "ForwardingService")
+  val importService = actorRefFactory.actorOf(ImportServiceActor.props(dbProps), name = "ImportSerivce")
 
   val authenticator = new Authenticator(userService)
 

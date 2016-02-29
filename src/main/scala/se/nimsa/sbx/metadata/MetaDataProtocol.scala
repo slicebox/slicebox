@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Lars Edenbrandt
+ * Copyright 2016 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,18 +16,16 @@
 
 package se.nimsa.sbx.metadata
 
+import se.nimsa.sbx.app.GeneralProtocol.Source
+import se.nimsa.sbx.app.GeneralProtocol.SourceRef
 import se.nimsa.sbx.dicom.DicomHierarchy._
-import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol.SeriesType
-import org.dcm4che3.data.Attributes
 
 object MetaDataProtocol {
   
   import se.nimsa.sbx.model.Entity
   
   // domain objects
-
-  case class SeriesSeriesType(seriesId: Long, seriesTypeId: Long)
 
   case class SeriesSource(id: Long, source: Source) extends Entity
 
@@ -75,6 +73,10 @@ object MetaDataProtocol {
 
   // messages
 
+  case class AddMetaData(patient: Patient, study: Study, series: Series, image: Image, source: Source)
+  
+  case class DeleteMetaData(imageId: Long)  
+    
   sealed trait MetaDataQuery
 
   case class GetPatients(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String], sourceRefs: Array[SourceRef], seriesTypeIds: Array[Long], seriesTagIds: Array[Long]) extends MetaDataQuery
@@ -115,11 +117,7 @@ object MetaDataProtocol {
 
   sealed trait PropertiesRequest
 
-  case class AddSeriesTypeToSeries(seriesType: SeriesType, series: Series) extends PropertiesRequest
-
   case class AddSeriesTagToSeries(seriesTag: SeriesTag, seriesId: Long) extends PropertiesRequest
-
-  case class RemoveSeriesTypesFromSeries(series: Series) extends PropertiesRequest
 
   case class RemoveSeriesTagFromSeries(seriesTagId: Long, seriesId: Long) extends PropertiesRequest
 
@@ -129,10 +127,29 @@ object MetaDataProtocol {
 
   case class GetSeriesTagsForSeries(seriesId: Long) extends PropertiesRequest
 
-  case class GetSeriesTypesForSeries(seriesId: Long) extends PropertiesRequest
 
   // ***to API***
 
+  case class MetaDataAdded(patient: Patient, study: Study, series: Series, image: Image, seriesSource: SeriesSource)
+  
+  case class PatientAdded(patient: Patient, source: Source)
+  
+  case class StudyAdded(study: Study, source: Source)
+  
+  case class SeriesAdded(series: Series, source: Source)
+  
+  case class ImageAdded(image: Image, source: Source)
+  
+  case class MetaDataDeleted(deletedPatient: Option[Patient], deletedStudy: Option[Study], deletedSeries: Option[Series], deletedImage: Option[Image])
+  
+  case class PatientDeleted(patientId: Long)
+  
+  case class StudyDeleted(studyId: Long)
+  
+  case class SeriesDeleted(seriesId: Long)
+  
+  case class ImageDeleted(imageId: Long)
+  
   case class Patients(patients: Seq[Patient])
 
   case class Studies(studies: Seq[Study])
@@ -143,11 +160,7 @@ object MetaDataProtocol {
 
   case class Images(images: Seq[Image])
 
-  case class SeriesTypeAddedToSeries(seriesSeriesType: SeriesSeriesType)
-
   case class SeriesTagAddedToSeries(seriesTag: SeriesTag)
-
-  case class SeriesTypesRemovedFromSeries(series: Series)
 
   case class SeriesTagRemovedFromSeries(seriesId: Long)
 

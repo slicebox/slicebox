@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Lars Edenbrandt
+ * Copyright 2016 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,14 +22,11 @@ import akka.actor.Props
 import akka.event.Logging
 import akka.event.LoggingReceive
 import se.nimsa.sbx.app.DbProps
-import se.nimsa.sbx.lang.NotFoundException
-import se.nimsa.sbx.seriestype.SeriesTypeProtocol.SeriesTypes
-import se.nimsa.sbx.util.ExceptionCatching
-import org.dcm4che3.data.Attributes
-import se.nimsa.sbx.app.GeneralProtocol._
+import se.nimsa.sbx.app.GeneralProtocol.Source
 import se.nimsa.sbx.dicom.DicomHierarchy._
-import se.nimsa.sbx.dicom.DicomUtil._
+import se.nimsa.sbx.lang.NotFoundException
 import se.nimsa.sbx.log.SbxLog
+import se.nimsa.sbx.util.ExceptionCatching
 
 class MetaDataServiceActor(dbProps: DbProps) extends Actor with ExceptionCatching {
 
@@ -45,34 +42,30 @@ class MetaDataServiceActor(dbProps: DbProps) extends Actor with ExceptionCatchin
 
   def receive = LoggingReceive {
 
-    case AddDataset(dataset, source) =>
+    case AddMetaData(patient, study, series, image, source) =>
       catchAndReport {
-        val image = addDataset(dataset, source)
-        sender ! ImageAdded(image, source)
+        val metaDataAdded = MetaDataAdded.tupled(addMetaData(patient, study, series, image, source))
+        log.debug(s"Added metadata $metaDataAdded")
+        sender ! metaDataAdded
       }
 
-    case DeleteImage(imageId) =>
+    case DeleteMetaData(imageId) =>
       catchAndReport {
-        db.withSession { implicit session =>
-          dao.imageById(imageId).foreach(propertiesDao.deleteFully(_))
-          sender ! ImageDeleted(imageId)
-        }
+        val (deletedPatient, deletedStudy, deletedSeries, deletedImage) =
+          db.withTransaction { implicit session =>
+            dao.imageById(imageId).map(propertiesDao.deleteFully).getOrElse((None, None, None, None))
+          }
+
+        deletedPatient.foreach(patient => system.eventStream.publish(PatientDeleted(patient.id)))
+        deletedStudy.foreach(study => system.eventStream.publish(StudyDeleted(study.id)))
+        deletedSeries.foreach(series => system.eventStream.publish(SeriesDeleted(series.id)))
+        deletedImage.foreach(image => system.eventStream.publish(ImageDeleted(image.id)))
+
+        sender ! MetaDataDeleted(deletedPatient, deletedStudy, deletedSeries, deletedImage)
       }
 
     case msg: PropertiesRequest => catchAndReport {
       msg match {
-
-        case AddSeriesTypeToSeries(seriesType, series) =>
-          db.withSession { implicit session =>
-            val seriesSeriesType = propertiesDao.insertSeriesSeriesType(SeriesSeriesType(series.id, seriesType.id))
-            sender ! SeriesTypeAddedToSeries(seriesSeriesType)
-          }
-
-        case RemoveSeriesTypesFromSeries(series) =>
-          db.withSession { implicit session =>
-            propertiesDao.removeSeriesTypesForSeriesId(series.id)
-            sender ! SeriesTypesRemovedFromSeries(series)
-          }
 
         case GetSeriesTags =>
           sender ! SeriesTags(getSeriesTags)
@@ -81,10 +74,6 @@ class MetaDataServiceActor(dbProps: DbProps) extends Actor with ExceptionCatchin
           db.withSession { implicit session =>
             sender ! propertiesDao.seriesSourceById(seriesId)
           }
-
-        case GetSeriesTypesForSeries(seriesId) =>
-          val seriesTypes = getSeriesTypesForSeries(seriesId)
-          sender ! SeriesTypes(seriesTypes)
 
         case GetSeriesTagsForSeries(seriesId) =>
           val seriesTags = getSeriesTagsForSeries(seriesId)
@@ -212,40 +201,43 @@ class MetaDataServiceActor(dbProps: DbProps) extends Actor with ExceptionCatchin
       propertiesDao.listSeriesTags
     }
 
-  def getSeriesTypesForSeries(seriesId: Long) =
-    db.withSession { implicit session =>
-      propertiesDao.seriesTypesForSeries(seriesId)
-    }
-
   def getSeriesTagsForSeries(seriesId: Long) =
     db.withSession { implicit session =>
       propertiesDao.seriesTagsForSeries(seriesId)
     }
 
-  def addDataset(dataset: Attributes, source: Source): Image =
-    db.withSession { implicit session =>
+  def addMetaData(patient: Patient, study: Study, series: Series, image: Image, source: Source): (Patient, Study, Series, Image, SeriesSource) =
+    db.withTransaction { implicit session =>
 
-      val patient = datasetToPatient(dataset)
-      val study = datasetToStudy(dataset)
-      val series = datasetToSeries(dataset)
       val seriesSource = SeriesSource(-1, source)
-      val image = datasetToImage(dataset)
 
-      val dbPatient = dao.patientByNameAndID(patient)
-        .getOrElse(dao.insert(patient))
-      val dbStudy = dao.studyByUidAndPatient(study, dbPatient)
-        .getOrElse(dao.insert(study.copy(patientId = dbPatient.id)))
-      val dbSeries = dao.seriesByUidAndStudy(series, dbStudy)
-        .getOrElse(dao.insert(series.copy(studyId = dbStudy.id)))
+      val dbPatient = dao.patientByNameAndID(patient).getOrElse {
+        val result = dao.insert(patient)
+        context.system.eventStream.publish(PatientAdded(result, source))
+        result
+      }
+      val dbStudy = dao.studyByUidAndPatient(study, dbPatient).getOrElse {
+        val result = dao.insert(study.copy(patientId = dbPatient.id))
+        context.system.eventStream.publish(StudyAdded(result, source))
+        result
+      }
+      val dbSeries = dao.seriesByUidAndStudy(series, dbStudy).getOrElse {
+        val result = dao.insert(series.copy(studyId = dbStudy.id))
+        context.system.eventStream.publish(SeriesAdded(result, source))
+        result
+      }
+      val dbImage = dao.imageByUidAndSeries(image, dbSeries).getOrElse {
+        val result = dao.insert(image.copy(seriesId = dbSeries.id))
+        context.system.eventStream.publish(ImageAdded(result, source))
+        result
+      }
       val dbSeriesSource = propertiesDao.seriesSourceById(dbSeries.id)
         .getOrElse(propertiesDao.insertSeriesSource(seriesSource.copy(id = dbSeries.id)))
-      val dbImage = dao.imageByUidAndSeries(image, dbSeries)
-        .getOrElse(dao.insert(image.copy(seriesId = dbSeries.id)))
 
       if (dbSeriesSource.source.sourceType != source.sourceType || dbSeriesSource.source.sourceId != source.sourceId)
         SbxLog.warn("Storage", s"Existing series source does not match source of added image (${dbSeriesSource.source} vs $source). Source of added image will be lost.")
 
-      dbImage
+      (dbPatient, dbStudy, dbSeries, dbImage, dbSeriesSource)
     }
 }
 

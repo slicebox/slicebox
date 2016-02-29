@@ -1,27 +1,26 @@
 package se.nimsa.sbx.util
 
-import java.nio.file.Files
-import java.nio.file.SimpleFileVisitor
-import java.nio.file.Path
-import java.nio.file.FileVisitResult
-import java.nio.file.attribute.BasicFileAttributes
-import java.io.IOException
-import org.dcm4che3.data.{ Attributes, Tag, VR }
-import se.nimsa.sbx.anonymization.AnonymizationProtocol.AnonymizationKey
-import java.util.Date
-import se.nimsa.sbx.dicom.DicomUtil
-import java.nio.file.Paths
 import java.io.File
-import se.nimsa.sbx.dicom.DicomPropertyValue._
-import se.nimsa.sbx.dicom.DicomHierarchy._
+import java.io.IOException
+import java.nio.file._
+import java.nio.file.attribute.BasicFileAttributes
+import java.util.Date
 import scala.slick.jdbc.JdbcBackend.Session
-import se.nimsa.sbx.storage.StorageProtocol._
-import se.nimsa.sbx.metadata.MetaDataProtocol._
-import se.nimsa.sbx.metadata.MetaDataDAO
-import se.nimsa.sbx.metadata.PropertiesDAO
-import se.nimsa.sbx.seriestype.SeriesTypeProtocol.SeriesType
-import se.nimsa.sbx.seriestype.SeriesTypeDAO
+import org.dcm4che3.data.Attributes
+import org.dcm4che3.data.Tag
+import org.dcm4che3.data.VR
+import se.nimsa.sbx.anonymization.AnonymizationProtocol.AnonymizationKey
 import se.nimsa.sbx.app.GeneralProtocol._
+import se.nimsa.sbx.dicom.DicomHierarchy._
+import se.nimsa.sbx.dicom.DicomPropertyValue._
+import se.nimsa.sbx.dicom.DicomUtil
+import se.nimsa.sbx.metadata.MetaDataDAO
+import se.nimsa.sbx.metadata.MetaDataProtocol.SeriesSource
+import se.nimsa.sbx.metadata.MetaDataProtocol.SeriesTag
+import se.nimsa.sbx.metadata.PropertiesDAO
+import se.nimsa.sbx.seriestype.SeriesTypeDAO
+import se.nimsa.sbx.seriestype.SeriesTypeProtocol.SeriesSeriesType
+import se.nimsa.sbx.seriestype.SeriesTypeProtocol.SeriesType
 
 object TestUtil {
 
@@ -87,10 +86,10 @@ object TestUtil {
     val seriesSeriesType3 = SeriesSeriesType(dbSeries2.id, dbSeriesType2.id)
     val seriesSeriesType4 = SeriesSeriesType(dbSeries3.id, dbSeriesType2.id)
 
-    val dbSeriesSeriesType1 = propertiesDao.insertSeriesSeriesType(seriesSeriesType1)
-    val dbSeriesSeriesType2 = propertiesDao.insertSeriesSeriesType(seriesSeriesType2)
-    val dbSeriesSeriesType3 = propertiesDao.insertSeriesSeriesType(seriesSeriesType3)
-    val dbSeriesSeriesType4 = propertiesDao.insertSeriesSeriesType(seriesSeriesType4)
+    val dbSeriesSeriesType1 = seriesTypeDao.insertSeriesSeriesType(seriesSeriesType1)
+    val dbSeriesSeriesType2 = seriesTypeDao.insertSeriesSeriesType(seriesSeriesType2)
+    val dbSeriesSeriesType3 = seriesTypeDao.insertSeriesSeriesType(seriesSeriesType3)
+    val dbSeriesSeriesType4 = seriesTypeDao.insertSeriesSeriesType(seriesSeriesType4)
     
     ((dbSeriesSource1, dbSeriesSource2, dbSeriesSource3, dbSeriesSource4), (dbSeriesSeriesType1, dbSeriesSeriesType2, dbSeriesSeriesType3, dbSeriesSeriesType4))
   }

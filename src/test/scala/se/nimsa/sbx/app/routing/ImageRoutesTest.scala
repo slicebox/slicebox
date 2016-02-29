@@ -1,14 +1,11 @@
 package se.nimsa.sbx.app.routing
 
 import java.io.File
-
 import scala.slick.driver.H2Driver
-
 import org.dcm4che3.data.Tag
 import org.dcm4che3.data.VR
 import org.scalatest.FlatSpec
 import org.scalatest.Matchers
-
 import se.nimsa.sbx.anonymization.AnonymizationDAO
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy._
@@ -22,11 +19,20 @@ import spray.http.MultipartFormData
 import spray.http.StatusCodes._
 import spray.httpx.SprayJsonSupport._
 import spray.httpx.unmarshalling.BasicUnmarshallers.ByteArrayUnmarshaller
+import se.nimsa.sbx.metadata.MetaDataDAO
 
 class ImageRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
   def dbUrl() = "jdbc:h2:mem:imageroutestest;DB_CLOSE_DELAY=-1"
 
+  val metaDataDao = new MetaDataDAO(H2Driver)
+  
+  override def afterEach() {
+    db.withSession { implicit session =>
+      metaDataDao.clear
+    }
+  }
+  
   "Image routes" should "return 201 Created when adding an image using multipart form data" in {
     val file = TestUtil.testImageFile
     val mfd = MultipartFormData(Seq(BodyPart(file, "file")))
@@ -41,12 +47,22 @@ class ImageRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     PostAsUser("/api/images", HttpData(TestUtil.testImageByteArray)) ~> routes ~> check {
       status should be(Created)
       val image = responseAs[Image]
-      image.id should be(1)
+      image.id should be(2)
+    }
+  }
+
+  it should "return 200 OK when adding an image that has already been added" in {
+    PostAsUser("/api/images", HttpData(TestUtil.testImageByteArray)) ~> routes ~> check {
+      status should be(Created)
+    }
+    PostAsUser("/api/images", HttpData(TestUtil.testImageByteArray)) ~> routes ~> check {
+      status should be(OK)
     }
   }
 
   it should "allow fetching the image again" in {
-    GetAsUser("/api/images/1") ~> routes ~> check {
+    val image = PostAsUser("/api/images", HttpData(TestUtil.testImageByteArray)) ~> routes ~> check { responseAs[Image] }
+    GetAsUser(s"/api/images/${image.id}") ~> routes ~> check {
       contentType should be(ContentTypes.`application/octet-stream`)
       val dataset = DicomUtil.loadDataset(responseAs[Array[Byte]], true)
       dataset should not be (null)
@@ -68,7 +84,8 @@ class ImageRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   }
 
   it should "return 200 OK and a non-empty list of attributes when listing attributes for an image" in {
-    GetAsUser("/api/images/1/attributes") ~> routes ~> check {
+    val image = PostAsUser("/api/images", HttpData(TestUtil.testImageByteArray)) ~> routes ~> check { responseAs[Image] }
+    GetAsUser(s"/api/images/${image.id}/attributes") ~> routes ~> check {
       status should be(OK)
       responseAs[List[ImageAttribute]].size should be > (0)
     }
@@ -81,7 +98,8 @@ class ImageRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   }
 
   it should "return 200 OK and a non-empty array of bytes when requesting a png represenation of an image" in {
-    GetAsUser("/api/images/1/png") ~> routes ~> check {
+    val image = PostAsUser("/api/images", HttpData(TestUtil.testImageByteArray)) ~> routes ~> check { responseAs[Image] }
+    GetAsUser(s"/api/images/${image.id}/png") ~> routes ~> check {
       status should be(OK)
       responseAs[Array[Byte]] should not be empty
     }
@@ -94,9 +112,10 @@ class ImageRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   }
 
   it should "return 201 Created when adding a jpeg image to a study" in {
-    val patient = GetAsUser("/api/metadata/patients/1") ~> routes ~> check { responseAs[Patient] }
-    val studies = GetAsUser(s"/api/metadata/studies?patientid=${patient.id}") ~> routes ~> check { responseAs[List[Study]] }
-    PostAsUser(s"/api/images/jpeg?studyid=${studies.head.id}", HttpData(TestUtil.jpegByteArray)) ~> routes ~> check {
+    val image = PostAsUser("/api/images", HttpData(TestUtil.testImageByteArray)) ~> routes ~> check { responseAs[Image] }
+    val series = GetAsUser(s"/api/metadata/series/${image.seriesId}") ~> routes ~> check { responseAs[Series] }
+    val study = GetAsUser(s"/api/metadata/studies/${series.studyId}") ~> routes ~> check { responseAs[Study] }
+    PostAsUser(s"/api/images/jpeg?studyid=${study.id}", HttpData(TestUtil.jpegByteArray)) ~> routes ~> check {
       status shouldBe Created
       val image = responseAs[Image]
       image shouldNot be(null)
@@ -110,28 +129,34 @@ class ImageRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   }
 
   it should "return 400 BadRequest when adding an invalid jpeg image" in {
-    val patient = GetAsUser("/api/metadata/patients/1") ~> routes ~> check { responseAs[Patient] }
-    val studies = GetAsUser(s"/api/metadata/studies?patientid=${patient.id}") ~> routes ~> check { responseAs[List[Study]] }
-    PostAsUser(s"/api/images/jpeg?studyid=${studies.head.id}", HttpData(Array[Byte](1, 2, 3, 4))) ~> routes ~> check {
+    val image = PostAsUser("/api/images", HttpData(TestUtil.testImageByteArray)) ~> routes ~> check { responseAs[Image] }
+    val series = GetAsUser(s"/api/metadata/series/${image.seriesId}") ~> routes ~> check { responseAs[Series] }
+    val study = GetAsUser(s"/api/metadata/studies/${series.studyId}") ~> routes ~> check { responseAs[Study] }
+    PostAsUser(s"/api/images/jpeg?studyid=${study.id}", HttpData(Array[Byte](1, 2, 3, 4))) ~> routes ~> check {
       status shouldBe BadRequest
     }
   }
 
   it should "return 200 OK and a non-empty array of bytes when requesting png data for a secondary capture jpeg image" in {
-    GetAsUser("/api/images/2/png") ~> routes ~> check {
+    val image = PostAsUser("/api/images", HttpData(TestUtil.testImageByteArray)) ~> routes ~> check { responseAs[Image] }
+    val series = GetAsUser(s"/api/metadata/series/${image.seriesId}") ~> routes ~> check { responseAs[Series] }
+    val study = GetAsUser(s"/api/metadata/studies/${series.studyId}") ~> routes ~> check { responseAs[Study] }
+    val pngImage = PostAsUser(s"/api/images/jpeg?studyid=${study.id}", HttpData(TestUtil.jpegByteArray)) ~> routes ~> check { responseAs[Image] }
+    GetAsUser(s"/api/images/${pngImage.id}/png") ~> routes ~> check {
       status should be(OK)
       responseAs[Array[Byte]] should not be empty
     }
   }
 
   it should "support deleting an image" in {
-    GetAsUser("/api/metadata/images/2") ~> routes ~> check {
+    val image = PostAsUser("/api/images", HttpData(TestUtil.testImageByteArray)) ~> routes ~> check { responseAs[Image] }
+    GetAsUser(s"/api/metadata/images/${image.id}") ~> routes ~> check {
       status should be(OK)
     }
-    DeleteAsUser("/api/images/2") ~> routes ~> check {
+    DeleteAsUser(s"/api/images/${image.id}") ~> routes ~> check {
       status should be(NoContent)
     }
-    GetAsUser("/api/metadata/images/2") ~> routes ~> check {
+    GetAsUser(s"/api/metadata/images/${image.id}") ~> routes ~> check {
       status should be(NotFound)
     }
   }

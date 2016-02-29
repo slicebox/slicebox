@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Lars Edenbrandt
+ * Copyright 2016 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,24 +16,25 @@
 
 package se.nimsa.sbx.anonymization
 
+import scala.concurrent.Future
+
+import org.dcm4che3.data.Attributes
+
+import AnonymizationProtocol._
+import AnonymizationUtil._
 import akka.actor.Actor
-import akka.event.LoggingReceive
-import akka.event.Logging
 import akka.actor.Props
+import akka.event.Logging
+import akka.event.LoggingReceive
 import akka.pattern.ask
 import akka.pattern.pipe
 import akka.util.Timeout
-import scala.concurrent.Future
 import se.nimsa.sbx.app.DbProps
-import se.nimsa.sbx.util.ExceptionCatching
-import se.nimsa.sbx.dicom.DicomUtil._
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
-import se.nimsa.sbx.app.GeneralProtocol.ImageDeleted
-import se.nimsa.sbx.metadata.MetaDataProtocol.Images
-import se.nimsa.sbx.metadata.MetaDataProtocol.GetImage
-import org.dcm4che3.data.Attributes
-import AnonymizationProtocol._
-import AnonymizationUtil._
+import se.nimsa.sbx.dicom.DicomUtil.cloneDataset
+import se.nimsa.sbx.dicom.DicomUtil.datasetToPatient
+import se.nimsa.sbx.metadata.MetaDataProtocol._
+import se.nimsa.sbx.util.ExceptionCatching
 
 class AnonymizationServiceActor(dbProps: DbProps, implicit val timeout: Timeout) extends Actor with ExceptionCatching {
 
@@ -91,10 +92,10 @@ class AnonymizationServiceActor(dbProps: DbProps, implicit val timeout: Timeout)
             applyTagValues(harmonizedDataset, tagValues)
 
             val anonymizationKey = createAnonymizationKey(dataset, harmonizedDataset)
-            if (!anonymizationKeys.exists(isEqual(_, anonymizationKey))) {
-              val key = addAnonymizationKey(anonymizationKey)
-              addAnonymizationKeyImage(AnonymizationKeyImage(-1, key.id, imageId))
-            }
+            val dbAnonymizationKey = anonymizationKeys.find(isEqual(_, anonymizationKey))
+              .getOrElse(addAnonymizationKey(anonymizationKey))
+
+            maybeAddAnonymizationKeyImage(dbAnonymizationKey.id, imageId)
 
             sender ! harmonizedDataset
 
@@ -115,9 +116,12 @@ class AnonymizationServiceActor(dbProps: DbProps, implicit val timeout: Timeout)
       dao.insertAnonymizationKey(anonymizationKey)
     }
 
-  def addAnonymizationKeyImage(anonymizationKeyImage: AnonymizationKeyImage): AnonymizationKeyImage =
+  def maybeAddAnonymizationKeyImage(anonymizationKeyId: Long, imageId: Long): AnonymizationKeyImage =
     db.withSession { implicit session =>
-      dao.insertAnonymizationKeyImage(anonymizationKeyImage)
+      dao.anonymizationKeyImageForAnonymizationKeyIdAndImageId(anonymizationKeyId, imageId)
+        .getOrElse(
+          dao.insertAnonymizationKeyImage(
+            AnonymizationKeyImage(-1, anonymizationKeyId, imageId)))
     }
 
   def removeAnonymizationKey(anonymizationKeyId: Long) =

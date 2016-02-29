@@ -11,7 +11,7 @@ import org.h2.jdbc.JdbcSQLException
 import se.nimsa.sbx.util.TestUtil._
 import se.nimsa.sbx.seriestype.SeriesTypeDAO
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol.SeriesType
-import se.nimsa.sbx.metadata.MetaDataProtocol.SeriesSeriesType
+import se.nimsa.sbx.seriestype.SeriesTypeProtocol.SeriesSeriesType
 import se.nimsa.sbx.app.GeneralProtocol._
 import AnonymizationProtocol._
 import se.nimsa.sbx.metadata.MetaDataProtocol._

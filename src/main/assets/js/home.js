@@ -30,7 +30,7 @@ angular.module('slicebox.home', ['ngRoute'])
                 action: confirmDeletePatients
             },
             {
-                name: 'Tag',
+                name: 'Tag Series',
                 action: tagSeriesForPatients
             },
             {
@@ -62,7 +62,7 @@ angular.module('slicebox.home', ['ngRoute'])
                 action: confirmDeleteStudies
             },
             {
-                name: 'Tag',
+                name: 'Tag Series',
                 action: tagSeriesForStudies
             },
             {
@@ -94,7 +94,7 @@ angular.module('slicebox.home', ['ngRoute'])
                 action: confirmDeleteSeries
             },
             {
-                name: 'Tag',
+                name: 'Tag Series',
                 action: tagSeries
             },
             {
@@ -126,7 +126,7 @@ angular.module('slicebox.home', ['ngRoute'])
                 action: confirmDeleteSeries
             },
             {
-                name: 'Tag',
+                name: 'Tag Series',
                 action: tagSeries
             },
             {

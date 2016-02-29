@@ -1,5 +1,5 @@
 <div layout="column" layout-margin>
-    <div class="admin-series-types">
+    <div class="admin-series-types">	
 
 	    <div layout="row" layout-margin>
 	        <div flex>
@@ -43,15 +43,15 @@
 	        </div>
 
 	        <div flex ng-controller="SeriesTypeDetailsCtrl">
-	        	<form name="serviceTypeForm" role="serviceTypeForm" ng-submit="saveServiceType()" novalidate>
+	        	<form name="seriesTypeForm" role="seriesTypeForm" ng-submit="saveSeriesType()" novalidate>
 
 	            <md-card ng-if="uiState.selectedSeriesType">
 	                <md-card-content>
 	                	<md-content>
-			                <md-input-container md-no-float md-is-error="serviceTypeForm.$submitted && serviceTypeForm.name.$error.required">
+			                <md-input-container md-no-float md-is-error="seriesTypeForm.$submitted && seriesTypeForm.name.$error.required">
 		                        <input type="text" name="name" placeholder="Series type name" ng-model="uiState.selectedSeriesType.name" required>
-		                        <div ng-messages="serviceTypeForm.name.$error"
-		                            ng-show="serviceTypeForm.$submitted && serviceTypeForm.name.$error.required">
+		                        <div ng-messages="seriesTypeForm.name.$error"
+		                            ng-show="seriesTypeForm.$submitted && seriesTypeForm.name.$error.required">
 
 		                            <div ng-message="required">This is required!</div>
 		                        </div>

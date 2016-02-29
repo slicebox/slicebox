@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Lars Edenbrandt
+ * Copyright 2016 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -165,14 +165,28 @@ class Scu(ae: ApplicationEntity, scuData: ScuData)(implicit system: ActorSystem)
   def send(f: File, fmiEndPos: Long, cuid: String, iuid: String, filets: String): Unit = {
     val ts = selectTransferSyntax(cuid, filets)
 
-    val in = new FileInputStream(f)
-    try {
-      in.skip(fmiEndPos) // skip meta information
-      val data = new InputStreamDataWriter(in)
-      as.cstore(cuid, iuid, priority, data, ts,
-        rspHandlerFactory.createDimseRSPHandler(f))
-    } finally {
-      SafeClose.close(in)
+    if (ts == filets) {
+      val in = new FileInputStream(f)
+      try {
+        in.skip(fmiEndPos) // skip meta information
+        val data = new InputStreamDataWriter(in)
+        as.cstore(cuid, iuid, priority, data, ts,
+          rspHandlerFactory.createDimseRSPHandler(f))
+      } finally {
+        SafeClose.close(in)
+      }
+    } else {
+      val in = new DicomInputStream(f)
+      try {
+        in.setIncludeBulkData(IncludeBulkData.URI)
+        val data = in.readDataset(-1, -1)
+        Decompressor.decompress(data, filets)
+        as.cstore(cuid, iuid, priority,
+          new DataWriterAdapter(data), ts,
+          rspHandlerFactory.createDimseRSPHandler(f))
+      } finally {
+        SafeClose.close(in)
+      }
     }
   }
 
@@ -220,6 +234,8 @@ object Scu {
   def sendFiles(scuData: ScuData, files: Seq[Path])(implicit system: ActorSystem): Unit = {
     val device = new Device("slicebox-scu")
     val connection = new Connection()
+    connection.setMaxOpsInvoked(0)
+    connection.setMaxOpsPerformed(0)
     device.addConnection(connection)
     val ae = new ApplicationEntity("SLICEBOX-SCU")
     device.addApplicationEntity(ae)

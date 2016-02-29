@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Lars Edenbrandt
+ * Copyright 2016 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -44,12 +44,20 @@ class SeriesTypeServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extend
   val metaDataService = context.actorSelection("../MetaDataService")
   val seriesTypeUpdateService = context.actorOf(SeriesTypeUpdateActor.props(timeout), name = "SeriesTypeUpdate")
 
+  override def preStart {
+    system.eventStream.subscribe(context.self, classOf[SeriesDeleted])
+  }
+
   log.info("Series type service started")
 
   updateSeriesTypesForAllSeries()
-  
+
   def receive = LoggingReceive {
 
+    case SeriesDeleted(seriesId) =>
+      removeSeriesTypesFromSeries(seriesId)
+      sender ! SeriesTypesRemovedFromSeries(seriesId)
+      
     case msg: SeriesTypeRequest =>
 
       catchAndReport {
@@ -99,6 +107,18 @@ class SeriesTypeServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extend
             removeSeriesTypeRuleAttributeFromDb(seriesTypeRuleAttributeId)
             updateSeriesTypesForAllSeries()
             sender ! SeriesTypeRuleAttributeRemoved(seriesTypeRuleAttributeId)
+
+          case AddSeriesTypeToSeries(seriesType, series) =>
+            val seriesSeriesType = addSeriesTypeToSeries(SeriesSeriesType(series.id, seriesType.id))
+            sender ! SeriesTypeAddedToSeries(seriesSeriesType)
+
+          case RemoveSeriesTypesFromSeries(seriesId) =>
+            removeSeriesTypesFromSeries(seriesId)
+            sender ! SeriesTypesRemovedFromSeries(seriesId)
+
+          case GetSeriesTypesForSeries(seriesId) =>
+            val seriesTypes = getSeriesTypesForSeries(seriesId)
+            sender ! SeriesTypes(seriesTypes)
 
           case GetUpdateSeriesTypesRunningStatus =>
             seriesTypeUpdateService.forward(GetUpdateSeriesTypesRunningStatus)
@@ -160,6 +180,21 @@ class SeriesTypeServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extend
   def removeSeriesTypeRuleAttributeFromDb(seriesTypeRuleAttributeId: Long): Unit =
     db.withSession { implicit session =>
       seriesTypeDao.removeSeriesTypeRuleAttribute(seriesTypeRuleAttributeId)
+    }
+
+  def getSeriesTypesForSeries(seriesId: Long) =
+    db.withSession { implicit session =>
+      seriesTypeDao.seriesTypesForSeries(seriesId)
+    }
+
+  def addSeriesTypeToSeries(seriesSeriesType: SeriesSeriesType) =
+    db.withSession { implicit session =>
+      seriesTypeDao.insertSeriesSeriesType(seriesSeriesType)
+    }
+
+  def removeSeriesTypesFromSeries(seriesId: Long) =
+    db.withSession { implicit session =>
+      seriesTypeDao.removeSeriesTypesForSeriesId(seriesId)
     }
 
   def updateSeriesTypesForAllSeries() =

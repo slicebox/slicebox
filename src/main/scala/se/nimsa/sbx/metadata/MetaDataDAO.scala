@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Lars Edenbrandt
+ * Copyright 2016 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -490,25 +490,33 @@ class MetaDataDAO(val driver: JdbcProfile) {
       .delete
   }
 
-  def deleteFully(image: Image)(implicit session: Session): Unit = {
-    deleteImage(image.id)
-    seriesById(image.seriesId).foreach(series =>
-      if (imagesForSeries(0, 2, series.id).isEmpty)
-        deleteFully(series))
+  def deleteFully(image: Image)(implicit session: Session): (Option[Patient], Option[Study], Option[Series], Option[Image]) = {
+    val imagesDeleted = deleteImage(image.id)
+    val pssMaybe = seriesById(image.seriesId)
+      .filter(series => imagesForSeries(0, 2, series.id).isEmpty)
+      .map(series => deleteFully(series))
+      .getOrElse((None, None, None))
+    val imageMaybe = if (imagesDeleted == 0) None else Some(image)
+    (pssMaybe._1, pssMaybe._2, pssMaybe._3, imageMaybe)
   }
 
-  def deleteFully(series: Series)(implicit session: Session): Unit = {
-    deleteSeries(series.id)
-    studyById(series.studyId).foreach(study =>
-      if (seriesForStudy(0, 2, study.id).isEmpty)
-        deleteFully(study))
+  def deleteFully(series: Series)(implicit session: Session): (Option[Patient], Option[Study], Option[Series]) = {
+    val seriesDeleted = deleteSeries(series.id)
+    val psMaybe = studyById(series.studyId)
+      .filter(study => seriesForStudy(0, 2, study.id).isEmpty)
+      .map(study => deleteFully(study))
+      .getOrElse((None, None))
+    val seriesMaybe = if (seriesDeleted == 0) None else Some(series)
+    (psMaybe._1, psMaybe._2, seriesMaybe)
   }
 
-  def deleteFully(study: Study)(implicit session: Session): Unit = {
-    deleteStudy(study.id)
-    patientById(study.patientId).foreach(patient =>
-      if (studiesForPatient(0, 2, patient.id).isEmpty)
-        deletePatient(patient.id))
+  def deleteFully(study: Study)(implicit session: Session): (Option[Patient], Option[Study]) = {
+    val studiesDeleted = deleteStudy(study.id)
+    val patientMaybe = patientById(study.patientId)
+      .filter(patient => studiesForPatient(0, 2, patient.id).isEmpty)
+      .map(patient => { deletePatient(patient.id); patient })
+    val studyMaybe = if (studiesDeleted == 0) None else Some(study)
+    (patientMaybe, studyMaybe)
   }
 
 }
