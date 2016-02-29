@@ -156,7 +156,7 @@ trait SliceboxService extends HttpService with SliceboxRoutes with JsonFormats {
   val directoryService = actorRefFactory.actorOf(DirectoryWatchServiceActor.props(dbProps, storage), name = "DirectoryService")
   val seriesTypeService = actorRefFactory.actorOf(SeriesTypeServiceActor.props(dbProps, timeout), name = "SeriesTypeService")
   val forwardingService = actorRefFactory.actorOf(ForwardingServiceActor.props(dbProps, timeout), name = "ForwardingService")
-  val importService = actorRefFactory.actorOf(ImportServiceActor.props(dbProps), name = "ImportSerivce")
+  val importService = actorRefFactory.actorOf(ImportServiceActor.props(dbProps), name = "ImportService")
 
   val authenticator = new Authenticator(userService)
 
