@@ -79,7 +79,8 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
       val series = addTestDataset()
 
       seriesTypeUpdateService ! UpdateSeriesTypesForSeries(Seq(series.id))
-
+      expectNoMsg
+      
       waitForSeriesTypesUpdateCompletion()
 
       val seriesSeriesTypes = seriesSeriesTypesForSeries(series)
@@ -96,6 +97,7 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
       val series = addTestDataset()
 
       seriesTypeUpdateService ! UpdateSeriesTypesForSeries(Seq(series.id))
+      expectNoMsg
 
       waitForSeriesTypesUpdateCompletion()
 
@@ -115,6 +117,7 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
       }
 
       seriesTypeUpdateService ! UpdateSeriesTypesForSeries(Seq(series.id))
+      expectNoMsg
 
       waitForSeriesTypesUpdateCompletion()
 
@@ -129,6 +132,7 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
       addMatchingRuleToSeriesType(seriesType)
 
       seriesTypeUpdateService ! UpdateSeriesTypesForSeries(Seq(series1.id, series2.id))
+      expectNoMsg
 
       waitForSeriesTypesUpdateCompletion()
 
@@ -145,6 +149,7 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
       val series = addTestDataset(patientName = "xyz", patientSex = "M")
 
       seriesTypeUpdateService ! UpdateSeriesTypesForSeries(Seq(series.id))
+      expectNoMsg
 
       waitForSeriesTypesUpdateCompletion()
 
@@ -160,6 +165,7 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
       val series = addTestDataset(patientName = "xyz", patientSex = "F")
 
       seriesTypeUpdateService ! UpdateSeriesTypesForSeries(Seq(series.id))
+      expectNoMsg
 
       waitForSeriesTypesUpdateCompletion()
 
@@ -238,7 +244,7 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
 
       expectMsgPF() { case UpdateSeriesTypesRunningStatus(running) => statusUpdateRunning = running }
       
-      Thread.sleep(200)
+      Thread.sleep(500)
       attempt += 1
     }
   }
