@@ -28,8 +28,12 @@ import de.heikoseeberger.sbtheader.license.Apache2_0
     	val conf = (resourceDirectory in Compile).value / "slicebox.conf"
     	conf -> "conf/slicebox.conf"
 	}
+	mappings in Universal += {
+    	val conf = (resourceDirectory in Compile).value / "logback.xml"
+    	conf -> "conf/logback.xml"
+	}
 
-	batScriptExtraDefines += """set _JAVA_OPTS=%_JAVA_OPTS% -Xmx1024m -Dconfig.file=%SLICEBOX_HOME%\\conf\\slicebox.conf"""
+	batScriptExtraDefines += """set _JAVA_OPTS=%_JAVA_OPTS% -Xmx1024m -Dconfig.file=%SLICEBOX_HOME%\\conf\\slicebox.conf -Dlogback.configurationFile=%SLICEBOX_HOME%\\conf\\logback.xml"""
 
 	// native packaging - linux
 
@@ -37,7 +41,9 @@ import de.heikoseeberger.sbtheader.license.Apache2_0
 
 	daemonGroup in Linux := (daemonUser in Linux).value // group which will execute the application
 
-	bashScriptExtraDefines += """addJava "-Dconfig.file=${app_home}/../conf/slicebox.conf" """
+	bashScriptExtraDefines ++= Seq(
+		"""addJava "-Dconfig.file=${app_home}/../conf/slicebox.conf" """,
+		"""addJava "-Dlogback.configurationFile=${app_home}/../conf/logback.xml" """)
 
 	rpmVendor := maintainer.value
 
