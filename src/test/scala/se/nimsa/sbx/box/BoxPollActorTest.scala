@@ -68,7 +68,8 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
   val storageService = system.actorOf(Props[MockupStorageActor], name = "StorageService")
   val anonymizationService = system.actorOf(AnonymizationServiceActor.props(dbProps, 5.minutes), name = "AnonymizationService")
-  val pollBoxActorRef = system.actorOf(Props(new BoxPollActor(remoteBox, dbProps, Timeout(30.seconds), 1.hour, 1000.hours, "../StorageService", "../AnonymizationService") {
+  val boxService = system.actorOf(BoxServiceActor.props(dbProps, "http://testhost:1234", 1.minute), name = "BoxService")
+  val pollBoxActorRef = system.actorOf(Props(new BoxPollActor(remoteBox, Timeout(30.seconds), 1.hour, 1000.hours, "../BoxService", "../StorageService", "../AnonymizationService") {
 
     override def sendRequestToRemoteBoxPipeline = {
       (req: HttpRequest) =>

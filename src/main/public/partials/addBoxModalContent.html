@@ -8,7 +8,10 @@
 		</md-radio-group>
 
 		<form name="addBoxForm" layout="column" novalidate>
-			<md-input-container md-is-error="addBoxForm.remoteBoxName.$error.required && addBoxForm.$submitted">
+			<md-input-container 
+				md-is-error="addBoxForm.remoteBoxName.$error.required && addBoxForm.$submitted"
+				ng-if="uiState.addChoice == 'connect' || uiState.addChoice == 'generateURL'">
+				
 				<label>Remote Slicebox name</label>
                 <input type="text"
 					ng-model="uiState.remoteBoxName"

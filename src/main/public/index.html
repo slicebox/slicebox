@@ -68,23 +68,23 @@
 			<md-content>	
 				<ul>
 					<li>
-						<md-button ng-class="{ active: isCurrentPath('/')}" href="/">Home</md-button>
+						<md-button ng-class="{ active: isCurrentPath('/')}" ng-click="closeLeftNav()" href="/">Home</md-button>
 					</li>
 
 					<li>
-						<md-button ng-class="{ active: isCurrentPath('/import')}" href="/import">Import</md-button>
+						<md-button ng-class="{ active: isCurrentPath('/import')}" ng-click="closeLeftNav()" href="/import">Import</md-button>
 					</li>
 
 					<li>
-						<md-button ng-class="{ active: isCurrentPath('/anonymization')}" href="/anonymization">Anonymization</md-button>
+						<md-button ng-class="{ active: isCurrentPath('/anonymization')}" ng-click="closeLeftNav()" href="/anonymization">Anonymization</md-button>
 					</li>
 
 					<li>
-						<md-button ng-class="{ active: isCurrentPath('/transactions')}" href="/transactions">Transactions</md-button>
+						<md-button ng-class="{ active: isCurrentPath('/transactions')}" ng-click="closeLeftNav()" href="/transactions">Transactions</md-button>
 					</li>
 
 					<li>
-						<md-button ng-class="{ active: isCurrentPath('/log')}" href="/log">Log</md-button>
+						<md-button ng-class="{ active: isCurrentPath('/log')}" ng-click="closeLeftNav()" href="/log">Log</md-button>
 					</li>
 
 					<li ng-if="userSignedIn() && userSignedIn().role !== 'USER'" class="admin-section">
@@ -97,22 +97,22 @@
 
 						<ul>
 							<li>
-								<md-button ng-class="{ active: isCurrentPath('/admin/users')}" href="/admin/users">Users</md-button>
+								<md-button ng-class="{ active: isCurrentPath('/admin/users')}" ng-click="closeLeftNav()" href="/admin/users">Users</md-button>
 							</li>
 							<li>
-								<md-button ng-class="{ active: isCurrentPath('/admin/boxes')}" href="/admin/boxes">Boxes</md-button>
+								<md-button ng-class="{ active: isCurrentPath('/admin/boxes')}" ng-click="closeLeftNav()" href="/admin/boxes">Boxes</md-button>
 							</li>
 							<li>
-								<md-button ng-class="{ active: isCurrentPath('/admin/pacs')}" href="/admin/pacs">SCP / SCU</md-button>
+								<md-button ng-class="{ active: isCurrentPath('/admin/pacs')}" ng-click="closeLeftNav()" href="/admin/pacs">SCP / SCU</md-button>
 							</li>
 							<li>
-								<md-button ng-class="{ active: isCurrentPath('/admin/watchdirectories')}" href="/admin/watchdirectories">Directories</md-button>
+								<md-button ng-class="{ active: isCurrentPath('/admin/watchdirectories')}" ng-click="closeLeftNav()" href="/admin/watchdirectories">Directories</md-button>
 							</li>
 							<li>
-								<md-button ng-class="{ active: isCurrentPath('/admin/forwarding')}" href="/admin/forwarding">Forwarding</md-button>
+								<md-button ng-class="{ active: isCurrentPath('/admin/forwarding')}" ng-click="closeLeftNav()" href="/admin/forwarding">Forwarding</md-button>
 							</li>
 							<li>
-								<md-button ng-class="{ active: isCurrentPath('/admin/seriestypes')}" href="/admin/seriestypes">Apps</md-button>
+								<md-button ng-class="{ active: isCurrentPath('/admin/seriestypes')}" ng-click="closeLeftNav()" href="/admin/seriestypes">Apps</md-button>
 							</li>
 							<li>
 								<md-button href="" ng-click="shutdown()">Shutdown</md-button>
