@@ -142,20 +142,26 @@ class BoxPushActor(box: Box,
 
   def handleFileSentForOutgoingTransaction(transactionImage: OutgoingTransactionImage) = {
     log.debug(s"File sent for outgoing transaction $transactionImage")
-    db.withTransaction { implicit session =>
 
-      val updatedTransaction = transactionImage.transaction.copy(
-        sentImageCount = transactionImage.image.sequenceNumber,
-        lastUpdated = System.currentTimeMillis,
-        status = TransactionStatus.PROCESSING)
-      boxDao.updateOutgoingTransaction(updatedTransaction)
-      boxDao.updateOutgoingImage(transactionImage.image.copy(sent = true))
+    val updatedTransaction =
+      db.withTransaction { implicit session =>
 
-      if (updatedTransaction.sentImageCount == updatedTransaction.totalImageCount) {
-        context.system.eventStream.publish(ImagesSent(Destination(DestinationType.BOX, box.name, box.id), outgoingImageIdsForTransactionId(updatedTransaction.id)))
-        SbxLog.info("Box", s"Finished sending ${updatedTransaction.totalImageCount} images to box ${box.name}")
-        boxDao.setOutgoingTransactionStatus(updatedTransaction.id, TransactionStatus.FINISHED)
+        val updatedTransaction = transactionImage.transaction.copy(
+          sentImageCount = transactionImage.image.sequenceNumber,
+          lastUpdated = System.currentTimeMillis,
+          status = TransactionStatus.PROCESSING)
+        boxDao.updateOutgoingTransaction(updatedTransaction)
+        boxDao.updateOutgoingImage(transactionImage.image.copy(sent = true))
+
+        if (updatedTransaction.sentImageCount == updatedTransaction.totalImageCount) {
+          boxDao.setOutgoingTransactionStatus(updatedTransaction.id, TransactionStatus.FINISHED)
+        }
+        updatedTransaction
       }
+
+    if (updatedTransaction.sentImageCount == updatedTransaction.totalImageCount) {
+      SbxLog.info("Box", s"Finished sending ${updatedTransaction.totalImageCount} images to box ${box.name}")
+      context.system.eventStream.publish(ImagesSent(Destination(DestinationType.BOX, box.name, box.id), outgoingImageIdsForTransactionId(updatedTransaction.id)))
     }
 
     context.unbecome
