@@ -113,6 +113,10 @@ angular.module('slicebox', [
         $mdSidenav('leftNav').toggle();
     };
 
+    $scope.closeLeftNav = function() {
+        $mdSidenav('leftNav').close();
+    };
+
     $scope.isCurrentPath = function(path) { 
         return $location.path() === path;
     };
