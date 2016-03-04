@@ -115,6 +115,8 @@ angular.module('slicebox.import', ['ngRoute', 'ngFileUpload'])
         return $mdDialog.hide({ 
             id: new Date().getTime(), // change to -1 later... 
             name: $scope.name,
+            userId: -1,
+            user: "user",
             filesImported: 0, 
             filesAdded: 0,
             filesRejected: 0,
