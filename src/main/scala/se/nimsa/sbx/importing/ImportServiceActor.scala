@@ -10,7 +10,7 @@ class ImportServiceActor(dbPrbops: DbProps) extends Actor {
   val log = Logging(context.system, this)
 
   val db = dbProps.db;
-  val dao = new ImportingDAO(dbProps.driver)
+  val dao = new ImportDAO(dbProps.driver)
 
   log.info("Import service started")
 

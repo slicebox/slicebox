@@ -58,23 +58,24 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
   val storageService = system.actorOf(Props[MockupStorageActor], name = "StorageService")
   val anonymizationService = system.actorOf(AnonymizationServiceActor.props(dbProps, 5.minutes), name = "AnonymizationService")
-  val boxPushActorRef = system.actorOf(Props(new BoxPushActor(testBox, dbProps, Timeout(30.seconds), 1000.hours, 1000.hours, "../StorageService", "../AnonymizationService") {
+  val boxService = system.actorOf(BoxServiceActor.props(dbProps, "http://testhost:1234", 1.minute), name = "BoxService")
+  val boxPushActorRef = system.actorOf(Props(new BoxPushActor(testBox, Timeout(30.seconds), 1000.hours, 1000.hours, "../BoxService", "../StorageService", "../AnonymizationService") {
 
-    override def sendFilePipeline = {
-      (req: HttpRequest) =>
-        {
-          capturedFileSendRequests += req
-          Future {
-            if (failedResponseSendIndices.contains(capturedFileSendRequests.size))
-              failResponse
-            else
-              okResponse
+      override def sendFilePipeline = {
+        (req: HttpRequest) =>
+          {
+            capturedFileSendRequests += req
+            Future {
+              if (failedResponseSendIndices.contains(capturedFileSendRequests.size))
+                failResponse
+              else
+                okResponse
+            }
           }
-        }
-    }
+      }
 
-  }))
-
+    }), name = "PushBox")
+  
   override def afterAll {
     TestKit.shutdownActorSystem(system)
     TestUtil.deleteFolder(storage)

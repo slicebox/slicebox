@@ -96,17 +96,20 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor 
 
   }
 
-  def setupWatches() =
-    db.withTransaction { implicit session =>
-      val watchedDirectories = dao.allWatchedDirectories
-      watchedDirectories foreach (watchedDirectory => {
-        val path = Paths.get(watchedDirectory.path)
-        if (Files.isDirectory(path))
-          context.actorOf(DirectoryWatchActor.props(watchedDirectory), watchedDirectory.id.toString)
-        else
-          deleteDirectory(watchedDirectory.id)
-      })
-    }
+  def setupWatches() = {
+    val watchedDirectories =
+      db.withSession { implicit session =>
+        dao.allWatchedDirectories
+      }
+    
+    watchedDirectories foreach (watchedDirectory => {
+      val path = Paths.get(watchedDirectory.path)
+      if (Files.isDirectory(path))
+        context.actorOf(DirectoryWatchActor.props(watchedDirectory), watchedDirectory.id.toString)
+      else
+        deleteDirectory(watchedDirectory.id)
+    })
+  }
 
   def addDirectory(directory: WatchedDirectory): WatchedDirectory =
     db.withSession { implicit session =>

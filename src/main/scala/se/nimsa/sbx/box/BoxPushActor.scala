@@ -43,20 +43,18 @@ import spray.http.HttpData
 import spray.http.HttpResponse
 
 class BoxPushActor(box: Box,
-                   dbProps: DbProps,
                    implicit val timeout: Timeout,
                    pollInterval: FiniteDuration = 5.seconds,
                    receiveTimeout: FiniteDuration = 1.minute,
+                   boxServicePath: String = "../../BoxService",
                    storageServicePath: String = "../../StorageService",
                    anonymizationServicePath: String = "../../AnonymizationService") extends Actor {
 
   val log = Logging(context.system, this)
 
-  val db = dbProps.db
-  val boxDao = new BoxDAO(dbProps.driver)
-
   val storageService = context.actorSelection(storageServicePath)
   val anonymizationService = context.actorSelection(anonymizationServicePath)
+  val boxService = context.actorSelection(boxServicePath)
 
   implicit val system = context.system
   implicit val ec = context.dispatcher
@@ -76,14 +74,15 @@ class BoxPushActor(box: Box,
   }
 
   def processNextOutgoingTransaction(): Unit =
-    nextOutgoingTransaction match {
-      case Some(transaction) =>
-        context.become(waitForFileSentState)
-        sendFileForOutgoingTransaction(transaction)
+    boxService.ask(GetNextOutgoingTransactionImage(box.id)).mapTo[Option[OutgoingTransactionImage]]
+      .map {
+        case Some(transactionImage) =>
+          context.become(waitForFileSentState)
+          sendFileForOutgoingTransactionImage(transactionImage)
 
-      case None =>
-        context.unbecome
-    }
+        case None =>
+          context.unbecome
+      }
 
   def waitForFileSentState: Receive = LoggingReceive {
 
@@ -98,10 +97,10 @@ class BoxPushActor(box: Box,
       context.unbecome
   }
 
-  def sendFileForOutgoingTransaction(transactionImage: OutgoingTransactionImage) = {
-    val transactionTagValues = tagValuesForImageIdAndTransactionId(transactionImage)
-    sendFile(transactionImage, transactionTagValues)
-  }
+  def sendFileForOutgoingTransactionImage(transactionImage: OutgoingTransactionImage) =
+    boxService.ask(GetOutgoingTagValues(transactionImage)).mapTo[Seq[OutgoingTagValue]]
+      .flatMap(transactionTagValues =>
+        sendFile(transactionImage, transactionTagValues))
 
   def sendFilePipeline = sendReceive
 
@@ -142,24 +141,23 @@ class BoxPushActor(box: Box,
 
   def handleFileSentForOutgoingTransaction(transactionImage: OutgoingTransactionImage) = {
     log.debug(s"File sent for outgoing transaction $transactionImage")
-    db.withTransaction { implicit session =>
 
-      val updatedTransaction = transactionImage.transaction.copy(
-        sentImageCount = transactionImage.image.sequenceNumber,
-        lastUpdated = System.currentTimeMillis,
-        status = TransactionStatus.PROCESSING)
-      boxDao.updateOutgoingTransaction(updatedTransaction)
-      boxDao.updateOutgoingImage(transactionImage.image.copy(sent = true))
+    boxService.ask(UpdateOutgoingTransaction(transactionImage))
+      .mapTo[OutgoingTransaction]
+      .foreach { updatedTransaction =>
+        boxService.ask(GetOutgoingImageIdsForTransaction(updatedTransaction))
+          .mapTo[Seq[Long]]
+          .foreach { imageIds =>
+            if (updatedTransaction.sentImageCount == updatedTransaction.totalImageCount) {
+              SbxLog.info("Box", s"Finished sending ${updatedTransaction.totalImageCount} images to box ${box.name}")
+              context.system.eventStream.publish(ImagesSent(Destination(DestinationType.BOX, box.name, box.id), imageIds))
+            }
 
-      if (updatedTransaction.sentImageCount == updatedTransaction.totalImageCount) {
-        context.system.eventStream.publish(ImagesSent(Destination(DestinationType.BOX, box.name, box.id), outgoingImageIdsForTransactionId(updatedTransaction.id)))
-        SbxLog.info("Box", s"Finished sending ${updatedTransaction.totalImageCount} images to box ${box.name}")
-        boxDao.setOutgoingTransactionStatus(updatedTransaction.id, TransactionStatus.FINISHED)
+            context.unbecome
+            self ! PollOutgoing
+          }
       }
-    }
 
-    context.unbecome
-    self ! PollOutgoing
   }
 
   def handleFileSendFailedForOutgoingTransaction(transactionImage: OutgoingTransactionImage, statusCode: Int, exception: Exception) = {
@@ -167,42 +165,18 @@ class BoxPushActor(box: Box,
     statusCode match {
       case code if code >= 500 =>
         // server-side error, remote box is most likely down
-        setOutgoingTransactionStatus(transactionImage.transaction, TransactionStatus.WAITING)
+        boxService ! SetOutgoingTransactionStatus(transactionImage.transaction, TransactionStatus.WAITING)
 
       case _ =>
-        setOutgoingTransactionStatus(transactionImage.transaction, TransactionStatus.FAILED)
+        boxService ! SetOutgoingTransactionStatus(transactionImage.transaction, TransactionStatus.FAILED)
         SbxLog.error("Box", s"Cannot send file to box ${box.name}: ${exception.getMessage}")
     }
     context.unbecome
   }
 
-  def nextOutgoingTransaction: Option[OutgoingTransactionImage] =
-    db.withSession { implicit session =>
-      boxDao.nextOutgoingTransactionImageForBoxId(box.id)
-    }
-
-  def tagValuesForImageIdAndTransactionId(transactionImage: OutgoingTransactionImage): Seq[OutgoingTagValue] =
-    db.withSession { implicit session =>
-      boxDao.tagValuesByOutgoingTransactionImage(transactionImage.transaction.id, transactionImage.image.id)
-    }
-
-  def setOutgoingTransactionStatus(transaction: OutgoingTransaction, status: TransactionStatus) =
-    db.withSession { implicit session =>
-      boxDao.setOutgoingTransactionStatus(transaction.id, status)
-    }
-
-  def outgoingImageIdsForTransactionId(transactionId: Long): Seq[Long] =
-    db.withSession { implicit session =>
-      boxDao.outgoingImagesByOutgoingTransactionId(transactionId).map(_.imageId)
-    }
-
 }
 
 object BoxPushActor {
-
-  def props(box: Box,
-            dbProps: DbProps,
-            timeout: Timeout): Props =
-    Props(new BoxPushActor(box, dbProps, timeout))
+  def props(box: Box, timeout: Timeout): Props = Props(new BoxPushActor(box, timeout))
 
 }

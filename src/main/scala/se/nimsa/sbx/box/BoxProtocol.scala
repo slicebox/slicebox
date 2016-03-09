@@ -106,6 +106,8 @@ object BoxProtocol {
 
   case class PollOutgoing(box: Box) extends BoxRequest
 
+  case class UpdateOutgoingTransaction(transactionImage: OutgoingTransactionImage) extends BoxRequest
+  
   case class SendToRemoteBox(box: Box, imageTagValuesSeq: Seq[ImageTagValues]) extends BoxRequest
 
   case class GetOutgoingTransactionImage(box: Box, outgoingTransactionId: Long, imageId: Long) extends BoxRequest
@@ -119,7 +121,17 @@ object BoxProtocol {
   case object GetIncomingTransactions extends BoxRequest
 
   case object GetOutgoingTransactions extends BoxRequest
+  
+  case class GetNextOutgoingTransactionImage(boxId: Long) extends BoxRequest
 
+  case class GetOutgoingImageIdsForTransaction(transaction: OutgoingTransaction) extends BoxRequest
+  
+  case class SetOutgoingTransactionStatus(transaction: OutgoingTransaction, status: TransactionStatus) extends BoxRequest
+
+  case class SetIncomingTransactionStatus(boxId: Long, transactionImage: OutgoingTransactionImage, status: TransactionStatus) extends BoxRequest
+
+  case class UpdateBoxOnlineStatus(boxId: Long, online: Boolean) extends BoxRequest
+  
   case class RemoveIncomingTransaction(incomingTransactionId: Long) extends BoxRequest
   
   case class RemoveOutgoingTransaction(outgoingTransactionId: Long) extends BoxRequest
