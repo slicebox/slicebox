@@ -6,7 +6,7 @@ import akka.event.Logging
 import akka.actor.Props
 import akka.event.LoggingReceive
 
-class ImportServiceActor(dbProps: DbProps) extends Actor {
+class ImportServiceActor(dbPrbops: DbProps) extends Actor {
   val log = Logging(context.system, this)
 
   val db = dbProps.db;
