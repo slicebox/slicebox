@@ -23,30 +23,22 @@ import se.nimsa.sbx.metadata.MetaDataDAO
 
 class ImportRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
-  override def dbUrl() = "jdbc:h2:mem:imageroutestest;DB_CLOSE_DELAY=-1"
+  override def dbUrl() = "jdbc:h2:mem:importroutestest;DB_CLOSE_DELAY=-1"
 
-  val metaDataDao = new MetaDataDAO(H2Driver)
-
-  override def afterEach() {
-    db.withSession { implicit session =>
-      metaDataDao.clear
-    }
-  }
-
-  "Import routes" should "return 201 Created when calling post" in {
-    PostAsUser("/importing/session") ~> routes ~> check {
-      status should be(Created)
-    }
-  }
-
-  it should "return 200 Created when calling get" in {
-    GetAsUser("/importing/session") ~> routes ~> check {
+  it should "return 200 OK when calling get" in {
+    GetAsUser("/api/importing/session") ~> routes ~> check {
       status should be(OK)
     }
   }
 
-  it should "return 200 Created when calling delete" in {
-    DeleteAsUser("/importing/session") ~> routes ~> check {
+  it should "return 201 Created when calling post" in {
+    PostAsUser("/api/importing/session") ~> routes ~> check {
+      status should be(Created)
+    }
+  }
+
+  it should "return 200 OK when calling delete" in {
+    GetAsUser("/api/importing/session") ~> routes ~> check {
       status should be(OK)
     }
   }

@@ -55,9 +55,7 @@ trait ImportRoutes { this: SliceboxService =>
           } ~ delete {
             complete(OK)
           }
-
         }
       }
     }
-
 }
