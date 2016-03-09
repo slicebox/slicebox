@@ -46,14 +46,18 @@ trait ImportRoutes { this: SliceboxService =>
 
   def importRoutes(apiUser: ApiUser): Route =
     pathPrefix("importing") {
-      path("session") {
+      pathPrefix("sessions") {
         pathEndOrSingleSlash {
           get {
             complete(OK)
           } ~ post {
             complete(Created)
-          } ~ delete {
+          }
+        } ~ path(LongNumber) { id =>
+          get {
             complete(OK)
+          } ~ delete {
+            complete(NoContent)
           }
         }
       }

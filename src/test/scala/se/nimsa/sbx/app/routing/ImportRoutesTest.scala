@@ -25,22 +25,27 @@ class ImportRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
   override def dbUrl() = "jdbc:h2:mem:importroutestest;DB_CLOSE_DELAY=-1"
 
-  it should "return 200 OK when calling get" in {
-    GetAsUser("/api/importing/session") ~> routes ~> check {
+  it should "return 200 OK and a list of import sessions ..." in {
+    GetAsUser("/api/importing/sessions") ~> routes ~> check {
       status should be(OK)
     }
   }
 
   it should "return 201 Created when calling post" in {
-    PostAsUser("/api/importing/session") ~> routes ~> check {
+    PostAsUser("/api/importing/sessions") ~> routes ~> check {
       status should be(Created)
     }
   }
 
-  it should "return 200 OK when calling delete" in {
-    GetAsUser("/api/importing/session") ~> routes ~> check {
-      status should be(OK)
+  it should "return 204 NoContent when calling delete" in {
+    DeleteAsUser("/api/importing/sessions/123456789") ~> routes ~> check {
+      status should be(NoContent)
     }
   }
 
+  it should "return 200 OK when calling get with id" in {
+    GetAsUser("/api/importing/sessions/123456789") ~> routes ~> check {
+      status should be(OK)
+    }
+  }
 }
