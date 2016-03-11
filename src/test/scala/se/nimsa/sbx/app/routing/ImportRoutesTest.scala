@@ -25,7 +25,7 @@ class ImportRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
   override def dbUrl() = "jdbc:h2:mem:importroutestest;DB_CLOSE_DELAY=-1"
 
-  it should "return 200 OK and a list of import sessions ..." in {
+  it should "return 200 OK" in {
     GetAsUser("/api/importing/sessions") ~> routes ~> check {
       status should be(OK)
     }
