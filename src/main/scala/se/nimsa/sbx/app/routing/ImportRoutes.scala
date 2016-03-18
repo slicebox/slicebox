@@ -17,11 +17,8 @@
 package se.nimsa.sbx.app.routing
 
 import java.io.File
-
 import scala.concurrent.Future
-
 import org.dcm4che3.data.Attributes
-
 import akka.pattern.ask
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.anonymization.AnonymizationUtil
@@ -41,25 +38,66 @@ import spray.http.MediaTypes._
 import spray.http.StatusCodes._
 import spray.routing.Route
 import spray.routing.directives._
+import se.nimsa.sbx.metadata.MetaDataProtocol.Images
+import se.nimsa.sbx.dicom.DicomHierarchy.Image
+import se.nimsa.sbx.dicom.DicomPropertyValue._
+import se.nimsa.sbx.importing.ImportProtocol._
+import akka.util.ByteString
 
 trait ImportRoutes { this: SliceboxService =>
 
-  def importRoutes(apiUser: ApiUser): Route =
+  def importRoutes: Route =
     pathPrefix("importing") {
       pathPrefix("sessions") {
         pathEndOrSingleSlash {
+          import spray.httpx.SprayJsonSupport._
           get {
-            complete(OK)
+            complete(Seq(ImportSession(-1, "my import", 34, "user", 0, 0, System.currentTimeMillis, System.currentTimeMillis)))
           } ~ post {
-            complete(Created)
+            complete((Created, ImportSession(-1, "my import", 34, "user", 0, 0, System.currentTimeMillis, System.currentTimeMillis)))
           }
-        } ~ path(LongNumber) { id =>
-          get {
-            complete(OK)
-          } ~ delete {
-            complete(NoContent)
+        } ~ pathPrefix(LongNumber) { id =>
+          pathEndOrSingleSlash {
+            import spray.httpx.SprayJsonSupport._
+            get {
+              complete(ImportSession(-1, "my import", 34, "user", 0, 0, System.currentTimeMillis, System.currentTimeMillis))
+            } ~ delete {
+              complete(NoContent)
+            }
+          } ~ path("images") {
+            get {
+              import spray.httpx.SprayJsonSupport._
+              complete(Seq(Image(-1, -1, SOPInstanceUID("souid1"), ImageType("PRIMARY/RECON/TOMO"), InstanceNumber("1"))))
+            } ~ post {
+              formField('file.as[FormFile]) { file =>
+                storeDataSetRoute(file.entity.data.toByteArray, id)
+              } ~ entity(as[Array[Byte]]) { bytes =>
+                storeDataSetRoute(bytes, id)
+              }
+            }
+
           }
         }
       }
+
     }
+
+  def storeDataSetRoute(bytes: Array[Byte], importSessionId: Long): Route = {
+    val dataset = DicomUtil.loadDataset(bytes, true)
+    onSuccess(importService.ask(GetImportSession(importSessionId))) {
+      case Some(ImportSession(_, name, _, _, _, _, _, _)) =>
+        val source = Source(SourceType.IMPORT, name, importSessionId)
+        onSuccess(storageService.ask(AddDataset(dataset, source))) {
+          case DatasetAdded(image, source, overwrite) =>
+            import spray.httpx.SprayJsonSupport._
+            if (overwrite)
+              complete((OK, image))
+            else
+              complete((Created, image))
+        }
+      case None =>
+        complete(NotFound)
+    }
+  }
+
 }

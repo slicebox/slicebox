@@ -52,27 +52,9 @@ trait ImageRoutes { this: SliceboxService =>
       pathEndOrSingleSlash {
         post {
           formField('file.as[FormFile]) { file =>
-            val dataset = DicomUtil.loadDataset(file.entity.data.toByteArray, true)
-            val source = Source(SourceType.USER, apiUser.user, apiUser.id)
-            onSuccess(storageService.ask(AddDataset(dataset, source))) {
-              case DatasetAdded(image, source, overwrite) =>
-                import spray.httpx.SprayJsonSupport._
-                if (overwrite)
-                  complete((OK, image))
-                else
-                  complete((Created, image))
-            }
+            storeDataSetRoute(file.entity.data.toByteArray, apiUser)
           } ~ entity(as[Array[Byte]]) { bytes =>
-            val dataset = DicomUtil.loadDataset(bytes, true)
-            val source = Source(SourceType.USER, apiUser.user, apiUser.id)
-            onSuccess(storageService.ask(AddDataset(dataset, source))) {
-              case DatasetAdded(image, source, overwrite) =>
-                import spray.httpx.SprayJsonSupport._
-                if (overwrite)
-                  complete((OK, image))
-                else
-                  complete((Created, image))
-            }
+            storeDataSetRoute(bytes, apiUser)
           }
         }
       } ~ pathPrefix(LongNumber) { imageId =>
@@ -176,5 +158,18 @@ trait ImageRoutes { this: SliceboxService =>
         }
       }
     }
+
+  def storeDataSetRoute(bytes: Array[Byte], apiUser: ApiUser): Route = {
+    val dataset = DicomUtil.loadDataset(bytes, true)
+    val source = Source(SourceType.USER, apiUser.user, apiUser.id)
+    onSuccess(storageService.ask(AddDataset(dataset, source))) {
+      case DatasetAdded(image, source, overwrite) =>
+        import spray.httpx.SprayJsonSupport._
+        if (overwrite)
+          complete((OK, image))
+        else
+          complete((Created, image))
+    }
+  }
 
 }
