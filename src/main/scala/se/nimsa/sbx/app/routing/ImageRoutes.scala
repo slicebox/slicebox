@@ -48,16 +48,33 @@ trait ImageRoutes { this: SliceboxService =>
   val bufferSize = chunkSize
 
   def imageRoutes(apiUser: ApiUser): Route =
-    pathPrefix("images") {
-      pathEndOrSingleSlash {
+    path("images") {
+      post {
+        formField('file.as[FormFile]) { file =>
+          storeDataSetRoute(file.entity.data.toByteArray, apiUser)
+        } ~ entity(as[Array[Byte]]) { bytes =>
+          storeDataSetRoute(bytes, apiUser)
+        }
+      }
+    } ~ path("images" / "jpeg") {
+      parameters('studyid.as[Long]) { studyId =>
         post {
-          formField('file.as[FormFile]) { file =>
-            storeDataSetRoute(file.entity.data.toByteArray, apiUser)
-          } ~ entity(as[Array[Byte]]) { bytes =>
-            storeDataSetRoute(bytes, apiUser)
+          entity(as[Array[Byte]]) { jpegBytes =>
+            val source = Source(SourceType.USER, apiUser.user, apiUser.id)
+            onSuccess(storageService.ask(AddJpeg(jpegBytes, studyId, source)).mapTo[Option[Image]]) {
+              case Some(image) =>
+                import spray.httpx.SprayJsonSupport._
+                complete((Created, image))
+              case _ =>
+                complete(NotFound)
+            }
           }
         }
-      } ~ pathPrefix(LongNumber) { imageId =>
+      }
+    } ~ pathPrefix("images") {
+      import spray.httpx.SprayJsonSupport._
+
+      pathPrefix(LongNumber) { imageId =>
         pathEndOrSingleSlash {
           get {
             onSuccess(storageService.ask(GetImagePath(imageId)).mapTo[Option[ImagePath]]) {
@@ -80,14 +97,12 @@ trait ImageRoutes { this: SliceboxService =>
         } ~ path("attributes") {
           get {
             onSuccess(storageService.ask(GetImageAttributes(imageId)).mapTo[Option[List[ImageAttribute]]]) {
-              import spray.httpx.SprayJsonSupport._
               complete(_)
             }
           }
         } ~ path("imageinformation") {
           get {
             onSuccess(storageService.ask(GetImageInformation(imageId)).mapTo[Option[ImageInformation]]) {
-              import spray.httpx.SprayJsonSupport._
               complete(_)
             }
           }
@@ -99,17 +114,14 @@ trait ImageRoutes { this: SliceboxService =>
             'imageheight.as[Int] ? 0) { (frameNumber, min, max, height) =>
               get {
                 onSuccess(storageService.ask(GetImageFrame(imageId, frameNumber, min, max, height)).mapTo[Option[Array[Byte]]]) {
-                  _ match {
-                    case Some(bytes) => complete(HttpEntity(`image/png`, HttpData(bytes)))
-                    case None        => complete(NotFound)
-                  }
+                  case Some(bytes) => complete(HttpEntity(`image/png`, HttpData(bytes)))
+                  case None        => complete(NotFound)
                 }
               }
             }
         }
       } ~ path("delete") {
         post {
-          import spray.httpx.SprayJsonSupport._
           entity(as[Seq[Long]]) { imageIds =>
             val futureDeleted = Future.sequence {
               imageIds.map(imageId => storageService.ask(DeleteDataset(imageId)))
@@ -121,7 +133,6 @@ trait ImageRoutes { this: SliceboxService =>
         }
       } ~ path("export") {
         post {
-          import spray.httpx.SprayJsonSupport._
           entity(as[Seq[Long]]) { imageIds =>
             if (imageIds.isEmpty)
               complete(NoContent)
@@ -134,23 +145,6 @@ trait ImageRoutes { this: SliceboxService =>
               autoChunk(chunkSize) {
                 respondWithHeader(`Content-Disposition`("attachment; filename=\"slicebox-export.zip\"")) {
                   complete(HttpEntity(`application/zip`, HttpData(new File(System.getProperty("java.io.tmpdir"), fileName))))
-                }
-              }
-            }
-          }
-        }
-      } ~ path("jpeg") {
-        parameters('studyid.as[Long]) { studyId =>
-          post {
-            entity(as[Array[Byte]]) { jpegBytes =>
-              val source = Source(SourceType.USER, apiUser.user, apiUser.id)
-              onSuccess(storageService.ask(AddJpeg(jpegBytes, studyId, source)).mapTo[Option[Image]]) {
-                _ match {
-                  case Some(image) =>
-                    import spray.httpx.SprayJsonSupport._
-                    complete((Created, image))
-                  case _ =>
-                    complete(NotFound)
                 }
               }
             }

@@ -47,53 +47,68 @@ import akka.util.ByteString
 trait ImportRoutes { this: SliceboxService =>
 
   def importRoutes: Route =
-    pathPrefix("importing") {
+    pathPrefix("importing" / "sessions" / LongNumber / "images") { id =>
+      post {
+        if (id == 12)
+          formField('file.as[FormFile]) { file =>
+            addImageToImportSessionRoute(file.entity.data.toByteArray, id)
+          } ~ entity(as[Array[Byte]]) { bytes =>
+            addImageToImportSessionRoute(bytes, id)
+          }
+        else
+          complete(NotFound)
+      }
+    } ~ pathPrefix("importing") {
+      import spray.httpx.SprayJsonSupport._
+      
       pathPrefix("sessions") {
         pathEndOrSingleSlash {
-          import spray.httpx.SprayJsonSupport._
           get {
-            complete(Seq(ImportSession(-1, "my import", 34, "user", 0, 0, System.currentTimeMillis, System.currentTimeMillis)))
+            complete(Seq(ImportSession(12, "my import", 34, "user", 0, 0, System.currentTimeMillis, System.currentTimeMillis)))
           } ~ post {
-            complete((Created, ImportSession(-1, "my import", 34, "user", 0, 0, System.currentTimeMillis, System.currentTimeMillis)))
+            complete((Created, ImportSession(12, "my import", 34, "user", 0, 0, System.currentTimeMillis, System.currentTimeMillis)))
           }
         } ~ pathPrefix(LongNumber) { id =>
           pathEndOrSingleSlash {
-            import spray.httpx.SprayJsonSupport._
             get {
-              complete(ImportSession(-1, "my import", 34, "user", 0, 0, System.currentTimeMillis, System.currentTimeMillis))
+              if (id == 12)
+                complete(ImportSession(12, "my import", 34, "user", 0, 0, System.currentTimeMillis, System.currentTimeMillis))
+              else
+                complete(NotFound)
             } ~ delete {
               complete(NoContent)
             }
           } ~ path("images") {
             get {
-              import spray.httpx.SprayJsonSupport._
-              complete(Seq(Image(-1, -1, SOPInstanceUID("souid1"), ImageType("PRIMARY/RECON/TOMO"), InstanceNumber("1"))))
-            } ~ post {
-              formField('file.as[FormFile]) { file =>
-                storeDataSetRoute(file.entity.data.toByteArray, id)
-              } ~ entity(as[Array[Byte]]) { bytes =>
-                storeDataSetRoute(bytes, id)
-              }
+              if (id == 12)
+                complete(Seq(Image(6, -1, SOPInstanceUID("souid1"), ImageType("PRIMARY/RECON/TOMO"), InstanceNumber("1"))))
+              else
+                complete(NotFound)
             }
-
           }
         }
       }
 
     }
 
-  def storeDataSetRoute(bytes: Array[Byte], importSessionId: Long): Route = {
+  def addImageToImportSessionRoute(bytes: Array[Byte], importSessionId: Long): Route = {
+    import spray.httpx.SprayJsonSupport._
+
     val dataset = DicomUtil.loadDataset(bytes, true)
     onSuccess(importService.ask(GetImportSession(importSessionId))) {
       case Some(ImportSession(_, name, _, _, _, _, _, _)) =>
         val source = Source(SourceType.IMPORT, name, importSessionId)
         onSuccess(storageService.ask(AddDataset(dataset, source))) {
           case DatasetAdded(image, source, overwrite) =>
-            import spray.httpx.SprayJsonSupport._
-            if (overwrite)
-              complete((OK, image))
-            else
-              complete((Created, image))
+            onSuccess(importService.ask(AddImageToSession(importSessionId, image))) {
+              case Some(ImageAddedToSession(importSessionImage)) =>
+                if (overwrite)
+                  complete((OK, image))
+                else
+                  complete((Created, image))
+              case None =>
+                complete(NotFound)
+            }
         }
       case None =>
         complete(NotFound)

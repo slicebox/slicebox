@@ -54,6 +54,7 @@ import se.nimsa.sbx.user.UserDAO
 import se.nimsa.sbx.user.UserServiceActor
 import spray.routing.HttpService
 import se.nimsa.sbx.log.SbxLog
+import se.nimsa.sbx.importing.ImportDAO
 
 class SliceboxServiceActor extends Actor with SliceboxService {
 
@@ -105,6 +106,7 @@ trait SliceboxService extends HttpService with SliceboxRoutes with JsonFormats {
     new ScpDAO(dbProps.driver).create
     new ScuDAO(dbProps.driver).create
     new BoxDAO(dbProps.driver).create
+    new ImportDAO(dbProps.driver).create
   }
 
   val storage = createStorageDirectory()

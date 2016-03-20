@@ -1,6 +1,7 @@
 package se.nimsa.sbx.importing
 
 import se.nimsa.sbx.model.Entity
+import se.nimsa.sbx.dicom.DicomHierarchy.Image
 
 object ImportProtocol {
 
@@ -17,5 +18,9 @@ object ImportProtocol {
   case class ImportSessionImage(id: Long, importSessionId: Long, imageId: Long) extends Entity
 
   case class GetImportSession(id: Long)
+
+  case class AddImageToSession(importSessionId: Long, image: Image)
+  
+  case class ImageAddedToSession(importSessionImage: ImportSessionImage)
   
 }
