@@ -215,13 +215,6 @@ then series mathing one or both rules will be labelled `RENO`. Series can have z
 The maker of the renography application can now ask Slicebox to list patients, studies and series associated with the `RENO` series type. When the application is moved to another hospital or starts receiving images from another camera, this may mean that image attributes look different. It is then simple to define new rules for the `RENO` series type that make sure these new images are also labelled correctly.
 
 
-Integration with Matlab
------------------------
-
-Slicebox integrates smoothly with Matlab such that a research team can store and manage their entire collection of DICOM images on a central Slicebox instance and access these images using simple Matab commands. This has major benefits. All team members have access to the same images, code becomes easier to move between computers and image data will be properly ordered and can be searched, queried and labelled. To reduce network traffic, increase speed and make it possible to work also in situations when the Slicebox instance cannot be reached, images are cached locally. 
-
-The Matlab integration library for Slicebox resides in the branch [matlab-integration](https://github.com/slicebox/slicebox/tree/matlab-integration). The [README](https://github.com/slicebox/slicebox/blob/matlab-integration/README.md) file of that branch provides more information.
-
 API
 ---
 
