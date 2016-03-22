@@ -7,10 +7,10 @@ import ImportProtocol._
 
 class ImportDAO(val driver: JdbcProfile) {
   import driver.simple._
-  val ImportSessionTableName = "ImportSessions"
-  val ImportSessionImageTableName = "ImportSessionImages"
+  val importSessionTableName = "ImportSessions"
+  val importSessionImageTableName = "ImportSessionImages"
 
-  class ImportSessionTable(tag: Tag) extends Table[ImportSession](tag, ImportSessionImageTableName) {
+  class ImportSessionTable(tag: Tag) extends Table[ImportSession](tag, importSessionTableName) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def name = column[String]("name")
     def userId = column[Long]("userid")
@@ -24,7 +24,7 @@ class ImportDAO(val driver: JdbcProfile) {
 
   val importSessionQuery = TableQuery[ImportSessionTable]
 
-  class ImportSessionImageTable(tag: Tag) extends Table[ImportSessionImage](tag, ImportSessionImageTableName) {
+  class ImportSessionImageTable(tag: Tag) extends Table[ImportSessionImage](tag, importSessionImageTableName) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def importSessionId = column[Long]("importsessionid")
     def imageId = column[Long]("imageid")
@@ -35,8 +35,8 @@ class ImportDAO(val driver: JdbcProfile) {
   val importSessionImageQuery = TableQuery[ImportSessionImageTable]
 
   def create(implicit session: Session): Unit = {
-    if (MTable.getTables(ImportSessionTableName).list.isEmpty) importSessionQuery.ddl.create
-    if (MTable.getTables(ImportSessionImageTableName).list.isEmpty) importSessionImageQuery.ddl.create
+    if (MTable.getTables(importSessionTableName).list.isEmpty) importSessionQuery.ddl.create
+    if (MTable.getTables(importSessionImageTableName).list.isEmpty) importSessionImageQuery.ddl.create
   }
 
   def drop(implicit session: Session): Unit =
