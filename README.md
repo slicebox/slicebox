@@ -1,4 +1,4 @@
-![](./docs/logo_white_framed.png "Slicebox") Slicebox
+![](./docs/images/logo_white_framed.png "Slicebox") Slicebox
 =====================================================
 
 Service | Status | Description
@@ -36,7 +36,7 @@ Example Usage
 
 Our canonical use case is a hospital research group collaborating with researchers in medical image analysis at a university. Slicebox instances are installed at both sites and are setup to communicate with each other. Furthermore, the hospital instance is setup to receive images from the hospital PACS system as shown in the image below.
 
-![example slicebox setup](./docs/hospital-uni.png "Example use case setup")
+![example slicebox setup](./docs/images/hospital-uni.png "Example use case setup")
 
 Images can now be exported from PACS to the local slicebox instance easily. Exported images can be browsed and handled using slicebox's intuitive web interface. From here, images can be sent to the slicebox instance installed at the university. Slicebox will handle anonymization according to the DICOM standard before images leave the hosptial. On the university side, researchers can now access these images both using the web interface as well as an extensive REST api. We provide tight integration with Matlab, but using slicebox from other environments for technical computing is straight-forward. Benefits of storing image data in slicebox as opposed to local files include
 
