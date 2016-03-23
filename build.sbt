@@ -82,7 +82,7 @@ import de.heikoseeberger.sbtheader.license.Apache2_0
 			"ch.qos.logback"				%  "logback-classic" 		% "1.1.2",
 			"com.typesafe.slick" 			%% "slick"					% "2.1.0",
 			"com.h2database"				%  "h2"						% "1.4.190",
-			"com.zaxxer"					%  "HikariCP"				% "2.4.3",
+			"com.zaxxer"					%  "HikariCP"				% "2.4.5",
 			"com.github.t3hnar"				%% "scala-bcrypt"			% "2.4",
 			"org.scalatest"					%% "scalatest"				% "2.2.4"			% "test",
 			"io.spray"						%% "spray-testkit"			% sprayVersion		% "test",
