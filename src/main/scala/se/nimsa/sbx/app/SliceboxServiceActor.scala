@@ -21,6 +21,8 @@ import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.concurrent.TimeUnit.MILLISECONDS
 import scala.slick.driver.H2Driver
+import scala.slick.driver.PostgresDriver
+import scala.slick.driver.MySQLDriver
 import scala.slick.jdbc.JdbcBackend.Database
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
@@ -58,7 +60,7 @@ class SliceboxServiceActor extends Actor with SliceboxService {
 
   def actorRefFactory = context
 
-  def dbUrl = "jdbc:h2:" + sliceboxConfig.getString("database.path")
+  def dbUrl = sliceboxConfig.getString("database.path")
 
   def createStorageDirectory = {
     val storagePath = Paths.get(sliceboxConfig.getString("dicom-files.path"))
@@ -83,6 +85,7 @@ trait SliceboxService extends HttpService with SliceboxRoutes with JsonFormats {
   val sliceboxConfig: Config = appConfig.getConfig("slicebox")
 
   def createStorageDirectory(): Path
+
   def dbUrl(): String
 
   def db = {
@@ -91,7 +94,19 @@ trait SliceboxService extends HttpService with SliceboxRoutes with JsonFormats {
     Database.forDataSource(new HikariDataSource(config))
   }
 
-  val dbProps = DbProps(db, H2Driver)
+  val driver = {
+    val pattern = "jdbc:(.*?):".r
+    val driverString = pattern.findFirstMatchIn(dbUrl).map(_ group 1)
+    if (driverString.isEmpty)
+      throw new IllegalArgumentException(s"Malformed database URL: $dbUrl")
+    driverString.get.toLowerCase match {
+      case "h2" => H2Driver
+      case "mysql" => MySQLDriver
+      case "postgresql" => PostgresDriver
+      case s => throw new IllegalArgumentException(s"Database not supported: $s")
+    }
+  }
+  val dbProps = DbProps(db, driver)
 
   db.withSession { implicit session =>
     new LogDAO(dbProps.driver).create
