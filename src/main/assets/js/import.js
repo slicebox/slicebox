@@ -35,8 +35,6 @@ angular.module('slicebox.import', ['ngRoute', 'ngFileUpload'])
 
     $scope.callbacks = {};
 
-    var importSessions = []; // TODO remove
-
     var timer = $interval(function() {
         if ($scope.uiState.currentFileSet.processing) {
             $scope.callbacks.importSessionsTable.reloadPage();
@@ -48,7 +46,8 @@ angular.module('slicebox.import', ['ngRoute', 'ngFileUpload'])
     });
   
     $scope.loadImportSessions = function(startIndex, count) {
-        return importSessions;
+        var sessionsPromise = $http.get('/api/importing/sessions');
+        return sessionsPromise;
     };
 
     $scope.addImportSessionButtonClicked = function() {
@@ -59,8 +58,9 @@ angular.module('slicebox.import', ['ngRoute', 'ngFileUpload'])
             'Import session', 
             $scope.callbacks.importSessionsTable)
         .then(function (importSession) {
-            importSessions.push(importSession);
-            $scope.callbacks.importSessionsTable.selectObject(importSession);
+            $http.post('/api/importing/sessions', importSession).then(function(data) {
+                $scope.callbacks.importSessionsTable.selectObject(data.importSession);
+            })
         });
     };
 
@@ -74,7 +74,7 @@ angular.module('slicebox.import', ['ngRoute', 'ngFileUpload'])
             $scope.uiState.selectedSession.lastUpdated = new Date().getTime(); // TODO move to server
             $scope.uiState.currentFileSet.progress = Math.round(100 * $scope.uiState.currentFileSet.index / $scope.uiState.currentFileSet.total);
             Upload.upload({
-                url: '/api/images',
+                url: '/api/importing/sessions/' + $scope.uiState.selectedSession.id + '/images',
                 file: files[0]
             }).success(function (data, status, headers, config) {
                 //importedFiles.push({ name: config.file.name });

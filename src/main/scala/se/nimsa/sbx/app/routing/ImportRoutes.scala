@@ -64,26 +64,43 @@ trait ImportRoutes { this: SliceboxService =>
       pathPrefix("sessions") {
         pathEndOrSingleSlash {
           get {
-            complete(Seq(ImportSession(12, "my import", 34, "user", 0, 0, System.currentTimeMillis, System.currentTimeMillis)))
+            onSuccess(importService.ask(GetImportSessions())){
+              case ImportSessions(importSessions) => {
+                complete(importSessions)
+              }
+            }
           } ~ post {
-            complete((Created, ImportSession(12, "my import", 34, "user", 0, 0, System.currentTimeMillis, System.currentTimeMillis)))
+            entity(as[ImportSession]) { importSession =>
+              onSuccess(importService.ask(importSession)) {
+                case is: ImportSession => {
+                  complete((Created, is))
+                }
+              }
+
+            }
+            //complete((Created, ImportSession(12, "my import", 34, "user", 0, 0, System.currentTimeMillis, System.currentTimeMillis)))
           }
         } ~ pathPrefix(LongNumber) { id =>
           pathEndOrSingleSlash {
             get {
-              if (id == 12)
-                complete(ImportSession(12, "my import", 34, "user", 0, 0, System.currentTimeMillis, System.currentTimeMillis))
-              else
-                complete(NotFound)
+              onSuccess(importService.ask(GetImportSession(id)).mapTo[Option[ImportSession]]) {
+                case Some(importSession) =>
+                  complete(importSession)
+                case _ =>
+                  complete(NotFound)
+              }
             } ~ delete {
-              complete(NoContent)
+              onSuccess(importService.ask(DeleteImportSession(id))) {
+                case _ =>
+                  complete(NoContent)
+              }
             }
           } ~ path("images") {
             get {
-              if (id == 12)
-                complete(Seq(Image(6, -1, SOPInstanceUID("souid1"), ImageType("PRIMARY/RECON/TOMO"), InstanceNumber("1"))))
-              else
-                complete(NotFound)
+              onSuccess(importService.ask(GetImportSessionImages(id))) {
+                case ImportSessionImages(importSessionImages) =>
+                  complete(importSessionImages.map(_.imageId))
+              }
             }
           }
         }
