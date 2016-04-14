@@ -43,20 +43,19 @@ import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.DicomPropertyValue._
 import se.nimsa.sbx.importing.ImportProtocol._
 import akka.util.ByteString
+import scala.util.{Try, Success, Failure}
 
 trait ImportRoutes { this: SliceboxService =>
 
-  def importRoutes: Route =
+  def importRoutes(apiUser: ApiUser): Route =
     pathPrefix("importing" / "sessions" / LongNumber / "images") { id =>
       post {
-        if (id == 12)
-          formField('file.as[FormFile]) { file =>
-            addImageToImportSessionRoute(file.entity.data.toByteArray, id)
-          } ~ entity(as[Array[Byte]]) { bytes =>
-            addImageToImportSessionRoute(bytes, id)
-          }
-        else
-          complete(NotFound)
+        formField('file.as[FormFile]) { file =>
+          file.
+          addImageToImportSessionRoute(file.entity.data.toByteArray, id)
+        } ~ entity(as[Array[Byte]]) { bytes =>
+          addImageToImportSessionRoute(bytes, id)
+        }
       }
     } ~ pathPrefix("importing") {
       import spray.httpx.SprayJsonSupport._
@@ -71,7 +70,7 @@ trait ImportRoutes { this: SliceboxService =>
             }
           } ~ post {
             entity(as[ImportSession]) { importSession =>
-              onSuccess(importService.ask(importSession)) {
+              onSuccess(importService.ask(AddImportSession(importSession.copy(user = apiUser.user, userId = apiUser.id)))) {
                 case is: ImportSession => {
                   complete((Created, is))
                 }
@@ -112,20 +111,27 @@ trait ImportRoutes { this: SliceboxService =>
     import spray.httpx.SprayJsonSupport._
 
     val dataset = DicomUtil.loadDataset(bytes, true)
-    onSuccess(importService.ask(GetImportSession(importSessionId))) {
-      case Some(ImportSession(_, name, _, _, _, _, _, _)) =>
-        val source = Source(SourceType.IMPORT, name, importSessionId)
-        onSuccess(storageService.ask(AddDataset(dataset, source))) {
-          case DatasetAdded(image, source, overwrite) =>
-            onSuccess(importService.ask(AddImageToSession(importSessionId, image))) {
+    onSuccess(importService.ask(GetImportSession(importSessionId)).mapTo[Option[ImportSession]]) {
+      case Some(importSession) =>
+        val source = Source(SourceType.IMPORT, importSession.name, importSessionId)
+        onComplete(storageService.ask(AddDataset(dataset, source))) {
+
+          case Success(DatasetAdded(image, source, overwrite)) =>
+            onSuccess(importService.ask(AddImageToSession(importSession, image, overwrite))) {
+
               case Some(ImageAddedToSession(importSessionImage)) =>
                 if (overwrite)
                   complete((OK, image))
                 else
                   complete((Created, image))
+
               case None =>
                 complete(NotFound)
             }
+
+          case Failure(e) =>
+            importService.ask(UpdateSessionWithRejection(importSession))
+            complete(BadRequest)
         }
       case None =>
         complete(NotFound)

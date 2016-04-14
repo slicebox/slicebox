@@ -73,7 +73,7 @@ trait SliceboxRoutes extends DirectoryRoutes
               generalRoutes(apiUser) ~
               seriesTypeRoutes(apiUser) ~
               forwardingRoutes(apiUser) ~
-              importRoutes
+              importRoutes(apiUser)
           }
       } ~ transactionRoutes
     } ~

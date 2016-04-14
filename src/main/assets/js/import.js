@@ -103,7 +103,13 @@ angular.module('slicebox.import', ['ngRoute', 'ngFileUpload'])
         $scope.uiState.currentFileSet.index = 0;
         $scope.uiState.currentFileSet.total = files.length;
         $scope.uiState.currentFileSet.progress = 0;
-        importFirst(files);
+        var filesPrune = [];
+        for (var i = 0; i < files.length; i++) {
+            if (files[i].type !== 'directory') {
+                filesPrune.push(files[i]);
+            }
+        }
+        importFirst(filesPrune);
     };
 
 })

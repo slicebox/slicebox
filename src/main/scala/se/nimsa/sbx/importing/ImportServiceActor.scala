@@ -17,6 +17,13 @@ class ImportServiceActor(dbProps: DbProps) extends Actor {
   log.info("Import service started")
 
   override def receive = LoggingReceive {
+    case AddImportSession(importSession) =>
+      db.withSession { implicit session =>
+        val newImportSession = importSession.copy(filesImported = 0, filesRejected = 0,
+          created = System.currentTimeMillis(), lastUpdated = System.currentTimeMillis())
+        sender ! dao.addImportSession(newImportSession)
+      }
+
     case GetImportSessions =>
       db.withSession { implicit session =>
         sender ! ImportSessions(dao.getImportSessions)
@@ -28,16 +35,16 @@ class ImportServiceActor(dbProps: DbProps) extends Actor {
       }
 
     case DeleteImportSession(id) =>
-      db.withSession {implicit session =>
+      db.withSession { implicit session =>
         sender ! dao.removeImportSession(id)
       }
 
     case GetImportSessionImages(id) =>
-      db.withSession {implicit session =>
+      db.withSession { implicit session =>
         sender ! ImportSessionImages(dao.listImagesForImportSesstionId(id))
       }
 
-    case AddImageToSession(importSessionId, image) =>
+    case AddImageToSession(importSession, image, overwrite) =>
       db.withSession { implicit session =>
         sender ! dao.insertImportSessionImage(ImportSessionImage(id = 0, importSessionId = importSessionId, imageId = image.id))
       }

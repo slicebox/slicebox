@@ -54,7 +54,7 @@ class ImportDAO(val driver: JdbcProfile) {
     importSessionQuery.filter(_.id === importSessionId).firstOption
   }
 
-  def addImportSession(importSession: ImportSession)(implicit session: Session): Unit = {
+  def addImportSession(importSession: ImportSession)(implicit session: Session): ImportSession = {
     val generatedId = (importSessionQuery returning importSessionQuery.map(_.id)) += importSession
     importSession.copy(id = generatedId)
   }
