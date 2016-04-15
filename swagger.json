@@ -16,7 +16,11 @@
   "tags": [
     {
       "name": "General",
-      "description": "General routes applicable to multiple aspects of the Slicebox API and to the Slicebox system"
+      "description": "General routes applicable to multiple aspects of the slicebox API and to the slicebox system"
+    },
+    {
+      "name": "Import",
+      "description": "Methods for handling structured importing of DICOM files into slicebox"
     },
     {
       "name": "Meta Data",
@@ -36,7 +40,7 @@
     },
     {
       "name": "Transactions",
-      "description": "Methods for handling box-to-box transactions of images (primarily for internal Slicebox use)"
+      "description": "Methods for handling box-to-box transactions of images (primarily for internal slicebox use)"
     },
     {
       "name": "SCPs",
@@ -83,7 +87,7 @@
 
     "/sources": {
       "get": {
-        "description": "Returns a list of currently available data sources. Possible source types are user - data imported by an API call by a user, box - data received from a remote box, directory - data imported via a watched directory or scp - data received from a PACS.",
+        "description": "Returns a list of currently available data sources. Possible source types are user - data imported by an API call by a user, box - data received from a remote box, directory - data imported via a watched directory, import - data imported into slicebox using import sessions, or scp - data received from a PACS.",
         "tags": ["General"],
         "responses": {
           "200": {
@@ -124,6 +128,145 @@
         "responses": {
           "200": {
             "description": "shutdown message"
+          }
+        }
+      }
+    },
+
+    "/import/sessions": {
+      "get": {
+        "description": "Returns a list of available import sessions.",
+        "tags": ["Import"],
+        "responses": {
+          "200": {
+            "description": "available import sessions",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/importSession"
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "description": "create a new import sessions",
+        "tags": ["Import"],
+        "parameters": [
+          {
+            "name": "import session",
+            "in": "body",
+            "description": "The import session to create containing the user defined name of the session",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/importSession"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "the created import session",
+            "schema": {
+              "$ref": "#/definitions/importSession"
+            }
+          }
+        }        
+      }
+    },
+
+    "/import/sessions/{id}": {
+      "get": {
+        "description": "Returns the import sessions with the supplied ID",
+        "tags": ["Import"],
+        "responses": {
+          "200": {
+            "description": "the import session with the supplied ID",
+            "schema": {
+              "$ref": "#/definitions/importSession"
+            }
+          },
+          "404": {
+            "description": "import session not found (invalid ID)"
+          }
+        }
+      },
+      "delete": {
+        "description": "deletes the import session with the supplied ID",
+        "tags": ["Import"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of import session to delete",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "import session deleted"
+          }
+        }
+      }
+    },
+
+    "/import/sessions/{id}/images": {
+      "post": {
+        "description": "add a DICOM dataset to the import session with the supplied ID",
+        "tags": ["Import"],
+        "parameters": [
+          {
+            "name": "dataset",
+            "in": "formData",
+            "description": "The dataset file",
+            "required": true,
+            "type": "file"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "meta data for the imported dataset on the image level of the DICOM hierarchy. Status code 200 signifies that this image was already present in the slicebox database.",
+            "schema": {
+              "$ref": "#/definitions/image"
+            }
+          },
+          "201": {
+            "description": "meta data for the imported dataset on the image level of the DICOM hierarchy",
+            "schema": {
+              "$ref": "#/definitions/image"
+            }
+          },
+          "404": {
+            "description": "import session not found (invalid ID)"
+          }
+        }
+      },
+      "get": {        
+        "description": "get the imported images corresponding to the import session with the supplied ID",
+        "tags": ["Import"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of import session",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "images corresponding to the specified import session",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/image"
+              }
+            }
+          },
+          "404": {
+            "description": "import session not found (invalid ID)"
           }
         }
       }
@@ -484,6 +627,9 @@
                 "$ref": "#/definitions/image"
               }
             }
+          },
+          "404": {
+            "description": "study not found (invalid ID)"
           }
         }          
       }
@@ -1002,6 +1148,12 @@
           }
         ],
         "responses": {
+          "200": {
+            "description": "meta data for added dataset on the image level of the DICOM hierarchy. Status code 200 signifies that this image was already present in the slicebox database.",
+            "schema": {
+              "$ref": "#/definitions/image"
+            }
+          },
           "201": {
             "description": "meta data for added dataset on the image level of the DICOM hierarchy",
             "schema": {
@@ -1924,6 +2076,9 @@
                 "$ref": "#/definitions/image"
               }
             }
+          },
+          "404": {
+            "description": "incoming transaction not found (invalid ID)"
           }
         }
       }
@@ -1992,6 +2147,9 @@
                 "$ref": "#/definitions/image"
               }
             }
+          },
+          "404": {
+            "description": "outgoing transaction not found (invalid ID)"
           }
         }
       }
@@ -2741,6 +2899,40 @@
   },
 
   "definitions": {
+    "importSession": {
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "name": {
+          "type": "string"
+        },
+        "userId": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "user": {
+          "type": "string"
+        },
+        "filesImported": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "filesRejected": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "created": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "lastUpdated": {
+          "type": "integer",
+          "format": "int64"
+        }        
+      }
+    },
     "userInfo": {
       "properties": {
         "id": {
