@@ -91,6 +91,10 @@ trait SliceboxService extends HttpService with SliceboxRoutes with JsonFormats {
   def db = {
     val config = new HikariConfig()
     config.setJdbcUrl(dbUrl)
+    if (sliceboxConfig.hasPath("database.user") && sliceboxConfig.getString("database.user").nonEmpty)
+      config.setUsername(sliceboxConfig.getString("database.user"))
+    if (sliceboxConfig.hasPath("database.password") && sliceboxConfig.getString("database.password").nonEmpty)
+      config.setPassword(sliceboxConfig.getString("database.password"))
     Database.forDataSource(new HikariDataSource(config))
   }
 
@@ -102,7 +106,6 @@ trait SliceboxService extends HttpService with SliceboxRoutes with JsonFormats {
     driverString.get.toLowerCase match {
       case "h2" => H2Driver
       case "mysql" => MySQLDriver
-      case "postgresql" => PostgresDriver
       case s => throw new IllegalArgumentException(s"Database not supported: $s")
     }
   }

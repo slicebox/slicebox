@@ -403,9 +403,9 @@ class PropertiesDAO(val driver: JdbcProfile) {
 
   def patientsBasePart = s"""select distinct("Patients"."id"),
        "Patients"."patientName","Patients"."patientID","Patients"."patientBirthDate","Patients"."patientSex"
-       from "Series" 
-       inner join "Patients" on "Studies"."patientId" = "Patients"."id"
-       inner join "Studies" on "Series"."studyId" = "Studies"."id""""
+       from "Series"
+       inner join "Studies" on "Series"."studyId" = "Studies"."id"
+       inner join "Patients" on "Studies"."patientId" = "Patients"."id""""
 
   def andPart(target: Seq[_ <: Any]) = if (target.nonEmpty) " and" else ""
 
