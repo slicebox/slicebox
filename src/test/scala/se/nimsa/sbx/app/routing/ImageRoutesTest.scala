@@ -1,7 +1,8 @@
 package se.nimsa.sbx.app.routing
 
-import java.io.{ByteArrayInputStream, File}
-import java.nio.file.{Files, Paths}
+import java.io.{ByteArrayInputStream, File, IOException}
+import java.nio.file.{Files, Path, Paths}
+import java.util.zip.ZipFile
 import javax.imageio.ImageIO
 
 import org.dcm4che3.data.Tag
@@ -106,8 +107,8 @@ class ImageRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       status shouldBe OK
       val pngBytes = responseAs[Array[Byte]]
       val bufferedImage = ImageIO.read(new ByteArrayInputStream(pngBytes))
-      bufferedImage.getWidth shouldBe > (0)
-      bufferedImage.getHeight shouldBe > (0)
+      bufferedImage.getWidth shouldBe >(0)
+      bufferedImage.getHeight shouldBe >(0)
     }
   }
 
@@ -246,15 +247,30 @@ class ImageRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
   }
 
-  it should "return 200 OK and the file path to an existing zip file of exported files" in {
+  it should "return 200 OK and the file path to an existing and valid zip file of exported files" in {
     val image = PostAsUser("/api/images", HttpData(TestUtil.testImageByteArray)) ~> routes ~> check {
       responseAs[Image]
     }
     PostAsUser("/api/images/export", Seq(image.id)) ~> routes ~> check {
       status shouldBe OK
       val filePath = responseAs[FileName]
-      val path = Paths.get(filePath.value)
+      val path = Paths.get(System.getProperty("java.io.tmpdir"), filePath.value)
       Files.exists(path) shouldBe true
+      isValidZip(path) shouldBe true
+      Files.deleteIfExists(path)
+    }
+  }
+
+  def isValidZip(path: Path): Boolean = {
+    var zipfile: ZipFile = null
+    try {
+      zipfile = new ZipFile(path.toFile)
+      true
+    } catch {
+      case _: IOException => false
+    } finally {
+      if (zipfile != null)
+        zipfile.close()
     }
   }
 }
