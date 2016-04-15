@@ -63,6 +63,7 @@ class StorageServiceActor(storage: Path, implicit val timeout: Timeout) extends 
   val bufferSize = 524288
 
   import context.system
+
   val log = Logging(context.system, this)
 
   implicit val ec = ExecutionContexts.fromExecutor(Executors.newWorkStealingPool())
@@ -79,7 +80,7 @@ class StorageServiceActor(storage: Path, implicit val timeout: Timeout) extends 
   def receive = LoggingReceive {
 
     case FileReceived(path, source) =>
-      val dataset = loadDataset(path, true)
+      val dataset = loadDataset(path, withPixelData = true)
       if (dataset != null)
         if (checkSopClass(dataset))
           addMetadata(dataset, source).map { image =>
@@ -148,7 +149,7 @@ class StorageServiceActor(storage: Path, implicit val timeout: Timeout) extends 
 
       image.foreach(_.foreach { image =>
         log.info(s"Stored encapsulated JPEG with image id ${image.id}")
-        context.system.eventStream.publish(DatasetAdded(image, source, false))
+        context.system.eventStream.publish(DatasetAdded(image, source, overwrite = false))
       })
 
       image.pipeTo(sender)
@@ -224,9 +225,9 @@ class StorageServiceActor(storage: Path, implicit val timeout: Timeout) extends 
   }
 
   def storeEncapsulated(
-    dbPatient: Patient, dbStudy: Study,
-    series: Series, image: Image,
-    source: Source, dcmTempPath: Path): Future[Image] =
+                         dbPatient: Patient, dbStudy: Study,
+                         series: Series, image: Image,
+                         source: Source, dcmTempPath: Path): Future[Image] =
     addMetadata(createDataset(dbPatient, dbStudy, series, image), source).map { dbImage =>
       val storedPath = filePath(dbImage)
       Files.move(dcmTempPath, storedPath)
@@ -234,13 +235,14 @@ class StorageServiceActor(storage: Path, implicit val timeout: Timeout) extends 
     }
 
   def filePath(image: Image) = storage.resolve(fileName(image))
+
   def fileName(image: Image) = image.id.toString
 
   def imagePathForId(imageId: Long): Future[Option[Path]] =
     imageById(imageId).map {
       _.map(filePath(_))
         .filter(Files.exists(_))
-        .filter(Files.isReadable(_))
+        .filter(Files.isReadable)
     }
 
   def deleteFromStorage(imageIds: Seq[Long]): Future[Seq[Unit]] =
@@ -250,7 +252,7 @@ class StorageServiceActor(storage: Path, implicit val timeout: Timeout) extends 
 
   def deleteFromStorage(imageId: Long): Future[Unit] =
     imagePathForId(imageId).map { optionalImagePath =>
-      optionalImagePath.map { imagePath =>
+      optionalImagePath.foreach { imagePath =>
         Files.delete(imagePath)
         log.debug("Deleted file " + imagePath)
       }
@@ -266,14 +268,14 @@ class StorageServiceActor(storage: Path, implicit val timeout: Timeout) extends 
   def readImageAttributes(imageId: Long): Future[Option[List[ImageAttribute]]] =
     imagePathForId(imageId).map { optionalImagePath =>
       optionalImagePath.map { imagePath =>
-        DicomUtil.readImageAttributes(loadDataset(imagePath, false))
+        DicomUtil.readImageAttributes(loadDataset(imagePath, withPixelData = false))
       }
     }
 
   def readImageInformation(imageId: Long): Future[Option[ImageInformation]] =
     imagePathForId(imageId).map { optionalImagePath =>
       optionalImagePath.map { imagePath =>
-        val dataset = loadDataset(imagePath, false)
+        val dataset = loadDataset(imagePath, withPixelData = false)
         val instanceNumber = dataset.getInt(Tag.InstanceNumber, 1)
         val imageIndex = dataset.getInt(Tag.ImageIndex, 1)
         val frameIndex = if (instanceNumber > imageIndex) instanceNumber else imageIndex
@@ -293,7 +295,7 @@ class StorageServiceActor(storage: Path, implicit val timeout: Timeout) extends 
         try {
           val imageReader = ImageIO.getImageReadersByFormatName("DICOM").next
           imageReader.setInput(iis)
-          val param = imageReader.getDefaultReadParam().asInstanceOf[DicomImageReadParam]
+          val param = imageReader.getDefaultReadParam.asInstanceOf[DicomImageReadParam]
           if (windowMin < windowMax) {
             param.setWindowCenter((windowMax - windowMin) / 2)
             param.setWindowWidth(windowMax - windowMin)
@@ -321,16 +323,17 @@ class StorageServiceActor(storage: Path, implicit val timeout: Timeout) extends 
         if (pd != null && pd.isInstanceOf[Fragments]) {
           val fragments = pd.asInstanceOf[Fragments]
           if (fragments.size == 2) {
-            val f1 = fragments.get(1)
-            if (f1.isInstanceOf[BulkData]) {
-              val bd = f1.asInstanceOf[BulkData]
-              val bytes = bd.toBytes(null, bd.bigEndian)
-              val bi = scaleImage(ImageIO.read(new ByteArrayInputStream(bytes)), imageHeight)
-              val baos = new ByteArrayOutputStream
-              ImageIO.write(bi, "png", baos)
-              baos.close()
-              baos.toByteArray
-            } else throw new IllegalArgumentException("JPEG bytes not an instance of BulkData")
+            fragments.get(1) match {
+              case bd: BulkData =>
+                val bytes = bd.toBytes(null, bd.bigEndian)
+                val bi = scaleImage(ImageIO.read(new ByteArrayInputStream(bytes)), imageHeight)
+                val baos = new ByteArrayOutputStream
+                ImageIO.write(bi, "png", baos)
+                baos.close()
+                baos.toByteArray
+              case _ =>
+                throw new IllegalArgumentException("JPEG bytes not an instance of BulkData")
+            }
           } else throw new IllegalArgumentException(s"JPEG fragements are expected to contain 2 entries, contained ${fragments.size}")
         } else throw new IllegalArgumentException("JPEG bytes not contained in Fragments")
       }
@@ -342,8 +345,8 @@ class StorageServiceActor(storage: Path, implicit val timeout: Timeout) extends 
       val imageWidth = (image.getWidth * ratio).asInstanceOf[Int]
       val resized = new BufferedImage(imageWidth, imageHeight, image.getType)
       val g = resized.createGraphics()
-      g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-      g.drawImage(image, 0, 0, imageWidth, imageHeight, 0, 0, image.getWidth, image.getHeight, null);
+      g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR)
+      g.drawImage(image, 0, 0, imageWidth, imageHeight, 0, 0, image.getWidth, image.getHeight, null)
       g.dispose()
       resized
     } else
@@ -354,34 +357,43 @@ class StorageServiceActor(storage: Path, implicit val timeout: Timeout) extends 
 
     val tempFile = Files.createTempFile("slicebox-export-", ".zip")
     val fos = Files.newOutputStream(tempFile)
-    val zos = new ZipOutputStream(fos);
+    val zos = new ZipOutputStream(fos)
 
-    // Add the files to the zip archive strictly sequentially (no concurrency) to 
+    // Add the files to the zip archive strictly sequentially (no concurrency) to
     // reduce load on meta data service and to keep memory consumption bounded
-    val futureAddedFiles = FutureUtil.traverseSequentially(imageIds) { imageId =>
-      val pathImageAndFlatSeries =
-        imagePathForId(imageId).flatMap(_.map { path =>
-          imageById(imageId).flatMap(_.map { image =>
-            flatSeriesById(image.seriesId).map(_.map { flatSeries =>
-              (path, image, flatSeries)
-            })
+    val futureAddedFiles = FutureUtil.traverseSequentially(imageIds) {
+      imageId =>
+        val pathImageAndFlatSeries =
+          imagePathForId(imageId).flatMap(_.map {
+            path =>
+              imageById(imageId).flatMap(_.map {
+                image =>
+                  flatSeriesById(image.seriesId).map(_.map {
+                    flatSeries =>
+                      (path, image, flatSeries)
+                  })
+              }.unwrap)
           }.unwrap)
-        }.unwrap)
-      pathImageAndFlatSeries.map(_.map {
-        case (path, image, flatSeries) =>
-          addToZipFile(path, image, flatSeries, zos)
-      })
+        pathImageAndFlatSeries.map(_.foreach {
+          case (path, image, flatSeries) =>
+            addToZipFile(path, image, flatSeries, zos)
+        })
     }
 
     def cleanup = {
-      zos.close
-      fos.close
+      zos.close()
+      fos.close()
       scheduleDeleteTempFile(tempFile)
     }
 
-    futureAddedFiles.onFailure { case _ => cleanup }
+    futureAddedFiles.onFailure {
+      case _ => cleanup
+    }
 
-    futureAddedFiles.map { u => cleanup; tempFile }
+    futureAddedFiles.map {
+      u => cleanup
+        tempFile
+    }
   }
 
   def addToZipFile(path: Path, image: Image, flatSeries: FlatSeries, zos: ZipOutputStream): Unit = {
@@ -389,10 +401,28 @@ class StorageServiceActor(storage: Path, implicit val timeout: Timeout) extends 
     def sanitize(string: String) = string.replace('/', '-').replace('\\', '-')
 
     val is = Files.newInputStream(path)
-    val patientFolder = sanitize(s"${flatSeries.patient.id}_${flatSeries.patient.patientName.value}-${flatSeries.patient.patientID.value}")
-    val studyFolder = sanitize(s"${flatSeries.study.id}_${flatSeries.study.studyDate.value}")
-    val seriesFolder = sanitize(s"${flatSeries.series.id}_${flatSeries.series.seriesDate.value}_${flatSeries.series.modality.value}")
-    val imageName = s"${image.id}.dcm"
+    val patientFolder = sanitize(s"${
+      flatSeries.patient.id
+    }_${
+      flatSeries.patient.patientName.value
+    }-${
+      flatSeries.patient.patientID.value
+    }")
+    val studyFolder = sanitize(s"${
+      flatSeries.study.id
+    }_${
+      flatSeries.study.studyDate.value
+    }")
+    val seriesFolder = sanitize(s"${
+      flatSeries.series.id
+    }_${
+      flatSeries.series.seriesDate.value
+    }_${
+      flatSeries.series.modality.value
+    }")
+    val imageName = s"${
+      image.id
+    }.dcm"
     val entryName = s"$patientFolder/$studyFolder/$seriesFolder/$imageName"
     val zipEntry = new ZipEntry(entryName)
     zos.putNextEntry(zipEntry)
@@ -405,8 +435,8 @@ class StorageServiceActor(storage: Path, implicit val timeout: Timeout) extends 
       if (bytesLeft) zos.write(bytes, 0, length)
     }
 
-    zos.closeEntry
-    is.close
+    zos.closeEntry()
+    is.close()
   }
 
   def scheduleDeleteTempFile(tempFile: Path) =
@@ -435,7 +465,8 @@ class StorageServiceActor(storage: Path, implicit val timeout: Timeout) extends 
       .map(_.image)
 
   def deleteMetaData(image: Image): Future[Unit] =
-    metaDataService.ask(DeleteMetaData(image.id)).map(any => {})
+    metaDataService.ask(DeleteMetaData(image.id)).map(any => {
+    })
 
 }
 

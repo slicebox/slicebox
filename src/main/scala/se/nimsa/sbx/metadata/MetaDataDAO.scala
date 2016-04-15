@@ -127,7 +127,7 @@ class MetaDataDAO(val driver: JdbcProfile) {
   }
 
   def drop(implicit session: Session) =
-    if (MTable.getTables("Patients").list.size > 0)
+    if (MTable.getTables("Patients").list.nonEmpty)
       (patientsQuery.ddl ++
         studiesQuery.ddl ++
         seriesQuery.ddl ++
@@ -145,7 +145,7 @@ class MetaDataDAO(val driver: JdbcProfile) {
     if (tables.isEmpty)
       false
     else
-      !tables(0).getColumns.list.filter(_.name == columnName).isEmpty
+      tables.head.getColumns.list.exists(_.name == columnName)
   }
 
   def checkColumnExists(columnName: String, tableNames: String*)(implicit session: Session) =
@@ -545,7 +545,7 @@ object MetaDataDAO {
         s"'${queryProperty.propertyValue}'"
       else
         s"'%${queryProperty.propertyValue}%'"
-    s""""${queryProperty.propertyName}" ${queryProperty.operator.toString} $valuePart"""
+    s""""${queryProperty.propertyName}" ${queryProperty.operator.toString()} $valuePart"""
   }
 
 }

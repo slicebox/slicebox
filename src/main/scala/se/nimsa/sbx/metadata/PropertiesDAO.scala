@@ -21,7 +21,6 @@ import scala.slick.jdbc.{ GetResult, StaticQuery => Q }
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomPropertyValue._
 import se.nimsa.sbx.seriestype.SeriesTypeDAO
-import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
 import scala.slick.jdbc.meta.MTable
 import se.nimsa.sbx.app.GeneralProtocol._
 import MetaDataProtocol._
@@ -37,7 +36,7 @@ class PropertiesDAO(val driver: JdbcProfile) {
 
   private val toSeriesSource = (id: Long, sourceType: String, sourceName: String, sourceId: Long) => SeriesSource(id, Source(SourceType.withName(sourceType), sourceName, sourceId))
 
-  private val fromSeriesSource = (seriesSource: SeriesSource) => Option((seriesSource.id, seriesSource.source.sourceType.toString, seriesSource.source.sourceName, seriesSource.source.sourceId))
+  private val fromSeriesSource = (seriesSource: SeriesSource) => Option((seriesSource.id, seriesSource.source.sourceType.toString(), seriesSource.source.sourceName, seriesSource.source.sourceId))
 
   private class SeriesSources(tag: Tag) extends Table[SeriesSource](tag, "SeriesSources") {
     def id = column[Long]("id", O.PrimaryKey)
@@ -91,7 +90,7 @@ class PropertiesDAO(val driver: JdbcProfile) {
   }
 
   def drop(implicit session: Session) =
-    if (MTable.getTables("SeriesTags").list.size > 0)
+    if (MTable.getTables("SeriesTags").list.nonEmpty)
       (seriesSourceQuery.ddl ++ seriesTagQuery.ddl ++ seriesSeriesTagQuery.ddl).drop
 
   def clear(implicit session: Session) = {
@@ -157,9 +156,8 @@ class PropertiesDAO(val driver: JdbcProfile) {
 
   def addAndInsertSeriesTagForSeriesId(seriesTag: SeriesTag, seriesId: Long)(implicit session: Session): SeriesTag = {
     val dbSeriesTag = seriesTagForName(seriesTag.name).getOrElse(insertSeriesTag(seriesTag))
-    val dbSeriesSeriesTag =
-      seriesSeriesTagForSeriesTagIdAndSeriesId(dbSeriesTag.id, seriesId)
-        .getOrElse(insertSeriesSeriesTag(SeriesSeriesTag(seriesId, dbSeriesTag.id)))
+    seriesSeriesTagForSeriesTagIdAndSeriesId(dbSeriesTag.id, seriesId)
+      .getOrElse(insertSeriesSeriesTag(SeriesSeriesTag(seriesId, dbSeriesTag.id)))
     dbSeriesTag
   }
 
@@ -255,10 +253,10 @@ class PropertiesDAO(val driver: JdbcProfile) {
   }
 
   def parseQueryOrder(optionalOrder: Option[QueryOrder]) =
-    (optionalOrder.map(_.orderBy), optionalOrder.map(_.orderAscending).getOrElse(true))
+    (optionalOrder.map(_.orderBy), optionalOrder.forall(_.orderAscending))
 
   def wherePart(arrays: Seq[_ <: Any]*) =
-    if (arrays.exists(!_.isEmpty))
+    if (arrays.exists(_.nonEmpty))
       " where "
     else
       ""
@@ -401,7 +399,7 @@ class PropertiesDAO(val driver: JdbcProfile) {
 
   }
 
-  def isWithAdvancedFiltering(arrays: Seq[_ <: Any]*) = arrays.exists(!_.isEmpty)
+  def isWithAdvancedFiltering(arrays: Seq[_ <: Any]*) = arrays.exists(_.nonEmpty)
 
   def patientsBasePart = s"""select distinct("Patients"."id"),
        "Patients"."patientName","Patients"."patientID","Patients"."patientBirthDate","Patients"."patientSex"
@@ -409,19 +407,19 @@ class PropertiesDAO(val driver: JdbcProfile) {
        inner join "Patients" on "Studies"."patientId" = "Patients"."id"
        inner join "Studies" on "Series"."studyId" = "Studies"."id""""
 
-  def andPart(target: Seq[_ <: Any]) = if (!target.isEmpty) " and" else ""
+  def andPart(target: Seq[_ <: Any]) = if (target.nonEmpty) " and" else ""
 
-  def andPart(array: Seq[_ <: Any], target: Seq[_ <: Any]) = if (!array.isEmpty && !target.isEmpty) " and" else ""
+  def andPart(array: Seq[_ <: Any], target: Seq[_ <: Any]) = if (array.nonEmpty && target.nonEmpty) " and" else ""
 
-  def andPart(array1: Seq[_ <: Any], array2: Seq[_ <: Any], target: Seq[_ <: Any]) = if ((!array1.isEmpty || !array2.isEmpty) && !target.isEmpty) " and" else ""
+  def andPart(array1: Seq[_ <: Any], array2: Seq[_ <: Any], target: Seq[_ <: Any]) = if ((array1.nonEmpty || array2.nonEmpty) && target.nonEmpty) " and" else ""
 
-  def andPart(array1: Seq[_ <: Any], array2: Seq[_ <: Any], array3: Seq[_ <: Any], target: Seq[_ <: Any]) = if ((!array1.isEmpty || !array2.isEmpty || !array3.isEmpty) && !target.isEmpty) " and" else ""
+  def andPart(array1: Seq[_ <: Any], array2: Seq[_ <: Any], array3: Seq[_ <: Any], target: Seq[_ <: Any]) = if ((array1.nonEmpty || array2.nonEmpty || array3.nonEmpty) && target.nonEmpty) " and" else ""
 
-  def andPart(option: Option[Any], target: Seq[_ <: Any]) = if (option.isDefined && !target.isEmpty) " and" else ""
+  def andPart(option: Option[Any], target: Seq[_ <: Any]) = if (option.isDefined && target.nonEmpty) " and" else ""
 
-  def andPart(option: Option[Any], array: Seq[_ <: Any], target: Seq[_ <: Any]) = if ((option.isDefined || !array.isEmpty) && !target.isEmpty) " and" else ""
+  def andPart(option: Option[Any], array: Seq[_ <: Any], target: Seq[_ <: Any]) = if ((option.isDefined || array.nonEmpty) && target.nonEmpty) " and" else ""
 
-  def andPart(option: Option[Any], array1: Seq[_ <: Any], array2: Seq[_ <: Any], target: Seq[_ <: Any]) = if ((option.isDefined || !array1.isEmpty || !array2.isEmpty) && !target.isEmpty) " and" else ""
+  def andPart(option: Option[Any], array1: Seq[_ <: Any], array2: Seq[_ <: Any], target: Seq[_ <: Any]) = if ((option.isDefined || array1.nonEmpty || array2.nonEmpty) && target.nonEmpty) " and" else ""
 
   def sourcesPart(sourceRefs: Seq[SourceRef]) =
     if (sourceRefs.isEmpty)

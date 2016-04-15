@@ -19,7 +19,6 @@ package se.nimsa.sbx.metadata
 import se.nimsa.sbx.app.GeneralProtocol.Source
 import se.nimsa.sbx.app.GeneralProtocol.SourceRef
 import se.nimsa.sbx.dicom.DicomHierarchy._
-import se.nimsa.sbx.seriestype.SeriesTypeProtocol.SeriesType
 
 object MetaDataProtocol {
   
@@ -34,7 +33,7 @@ object MetaDataProtocol {
   case class SeriesSeriesTag(seriesId: Long, seriesTagId: Long)
 
   sealed trait QueryOperator {
-    override def toString(): String = this match {
+    override def toString: String = this match {
       case QueryOperator.EQUALS => "="
       case QueryOperator.LIKE   => "like"
     }

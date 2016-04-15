@@ -61,7 +61,7 @@ class StorageServiceActorTest(_system: ActorSystem) extends TestKit(_system) wit
       val source = Source(SourceType.UNKNOWN, "unknown", -1)
       storageActorRef ! AddDataset(dataset, source)
       expectMsgPF() {
-        case DatasetAdded(image, source, overwrite) => true
+        case DatasetAdded(image, src, overwrite) => true
       }
     }
 
@@ -69,14 +69,14 @@ class StorageServiceActorTest(_system: ActorSystem) extends TestKit(_system) wit
       val source = Source(SourceType.UNKNOWN, "unknown", -1)
       storageActorRef ! AddDataset(dataset, source)
       expectMsgPF() {
-        case DatasetAdded(image, source, overwrite) => true
+        case DatasetAdded(image, src, overwrite) => true
       }
     }
 
     "return a list of one object when asking for all patients even though a dataset has been added twice" in {
-      metaDataService ! GetPatients(0, 10000, None, true, None, Array.empty, Array.empty, Array.empty)
+      metaDataService ! GetPatients(0, 10000, orderBy = None, orderAscending = true, filter = None, Array.empty, Array.empty, Array.empty)
       expectMsgPF() {
-        case Patients(list) if (list.size == 1) => true
+        case Patients(list) if list.size == 1 => true
       }
     }
 

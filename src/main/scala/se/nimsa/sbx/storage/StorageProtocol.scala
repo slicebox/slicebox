@@ -23,8 +23,6 @@ import se.nimsa.sbx.app.GeneralProtocol._
 
 object StorageProtocol {
 
-  import se.nimsa.sbx.model.Entity
-
   // domain objects
 
   case class FileName(value: String)

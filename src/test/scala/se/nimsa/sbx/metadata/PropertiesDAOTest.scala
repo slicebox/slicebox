@@ -5,13 +5,9 @@ import scala.slick.jdbc.JdbcBackend.{ Database, Session }
 import org.scalatest.FlatSpec
 import org.scalatest.Matchers
 import org.scalatest.BeforeAndAfterEach
-import se.nimsa.sbx.dicom.DicomPropertyValue._
-import se.nimsa.sbx.dicom.DicomHierarchy._
 import org.h2.jdbc.JdbcSQLException
 import se.nimsa.sbx.util.TestUtil._
 import se.nimsa.sbx.seriestype.SeriesTypeDAO
-import se.nimsa.sbx.seriestype.SeriesTypeProtocol.SeriesType
-import se.nimsa.sbx.seriestype.SeriesTypeProtocol.SeriesSeriesType
 import se.nimsa.sbx.app.GeneralProtocol._
 import MetaDataProtocol._
 
@@ -68,19 +64,19 @@ class PropertiesDAOTest extends FlatSpec with Matchers with BeforeAndAfterEach {
     db.withSession { implicit session =>
       insertMetaDataAndProperties
 
-      propertiesDao.flatSeries(0, 20, None, true, None, Seq.empty, Seq.empty, Seq.empty).size should be(4)
-      propertiesDao.flatSeries(0, 20, None, true, None, Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq.empty).size should be(1)
-      propertiesDao.flatSeries(0, 20, None, true, None, Seq(SourceRef(SourceType.BOX, 2)), Seq.empty, Seq.empty).size should be(0)
+      propertiesDao.flatSeries(0, 20, None, orderAscending = true, None, Seq.empty, Seq.empty, Seq.empty).size should be(4)
+      propertiesDao.flatSeries(0, 20, None, orderAscending = true, None, Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq.empty).size should be(1)
+      propertiesDao.flatSeries(0, 20, None, orderAscending = true, None, Seq(SourceRef(SourceType.BOX, 2)), Seq.empty, Seq.empty).size should be(0)
     }
   }
 
   it should "support filtering patients by source" in {
     db.withSession { implicit session =>
       insertMetaDataAndProperties
-      propertiesDao.patients(0, 20, None, true, None, Seq.empty, Seq.empty, Seq.empty).size should be(1)
-      propertiesDao.patients(0, 20, None, true, None, Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq.empty).size should be(1)
-      propertiesDao.patients(0, 20, None, true, None, Seq(SourceRef(SourceType.BOX, 2)), Seq.empty, Seq.empty).size should be(0)
-      propertiesDao.patients(0, 20, None, true, None, Seq(SourceRef(SourceType.UNKNOWN, 1)), Seq.empty, Seq.empty).size should be(0)
+      propertiesDao.patients(0, 20, None, orderAscending = true, None, Seq.empty, Seq.empty, Seq.empty).size should be(1)
+      propertiesDao.patients(0, 20, None, orderAscending = true, None, Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq.empty).size should be(1)
+      propertiesDao.patients(0, 20, None, orderAscending = true, None, Seq(SourceRef(SourceType.BOX, 2)), Seq.empty, Seq.empty).size should be(0)
+      propertiesDao.patients(0, 20, None, orderAscending = true, None, Seq(SourceRef(SourceType.UNKNOWN, 1)), Seq.empty, Seq.empty).size should be(0)
     }
   }
 
@@ -109,20 +105,20 @@ class PropertiesDAOTest extends FlatSpec with Matchers with BeforeAndAfterEach {
   it should "support filtering flat series by series tag" in {
     db.withSession { implicit session =>
       insertMetaDataAndProperties
-      propertiesDao.flatSeries(0, 20, None, true, None, Seq.empty, Seq.empty, Seq(1, 2)).size should be(3)
-      propertiesDao.flatSeries(0, 20, None, true, None, Seq.empty, Seq.empty, Seq(1)).size should be(2)
-      propertiesDao.flatSeries(0, 20, None, true, None, Seq.empty, Seq.empty, Seq(1, 3)).size should be(2)
-      propertiesDao.flatSeries(0, 20, None, true, None, Seq.empty, Seq.empty, Seq(3)).size should be(0)
+      propertiesDao.flatSeries(0, 20, None, orderAscending = true, None, Seq.empty, Seq.empty, Seq(1, 2)).size should be(3)
+      propertiesDao.flatSeries(0, 20, None, orderAscending = true, None, Seq.empty, Seq.empty, Seq(1)).size should be(2)
+      propertiesDao.flatSeries(0, 20, None, orderAscending = true, None, Seq.empty, Seq.empty, Seq(1, 3)).size should be(2)
+      propertiesDao.flatSeries(0, 20, None, orderAscending = true, None, Seq.empty, Seq.empty, Seq(3)).size should be(0)
     }
   }
 
   it should "support filtering patients by series tag" in {
     db.withSession { implicit session =>
       insertMetaDataAndProperties
-      propertiesDao.patients(0, 20, None, true, None, Seq.empty, Seq.empty, Seq(1, 2)).size should be(1)
-      propertiesDao.patients(0, 20, None, true, None, Seq.empty, Seq.empty, Seq(1)).size should be(1)
-      propertiesDao.patients(0, 20, None, true, None, Seq.empty, Seq.empty, Seq(1, 3)).size should be(1)
-      propertiesDao.patients(0, 20, None, true, None, Seq.empty, Seq.empty, Seq(3)).size should be(0)
+      propertiesDao.patients(0, 20, None, orderAscending = true, None, Seq.empty, Seq.empty, Seq(1, 2)).size should be(1)
+      propertiesDao.patients(0, 20, None, orderAscending = true, None, Seq.empty, Seq.empty, Seq(1)).size should be(1)
+      propertiesDao.patients(0, 20, None, orderAscending = true, None, Seq.empty, Seq.empty, Seq(1, 3)).size should be(1)
+      propertiesDao.patients(0, 20, None, orderAscending = true, None, Seq.empty, Seq.empty, Seq(3)).size should be(0)
     }
   }
 
@@ -152,10 +148,10 @@ class PropertiesDAOTest extends FlatSpec with Matchers with BeforeAndAfterEach {
   it should "support filtering patients by series type" in {
     db.withSession { implicit session =>
       insertMetaDataAndProperties
-      propertiesDao.patients(0, 20, None, true, None, Seq.empty, Seq(1), Seq.empty).size should be(1)
-      propertiesDao.patients(0, 20, None, true, None, Seq.empty, Seq(1, 2), Seq.empty).size should be(1)
-      propertiesDao.patients(0, 20, None, true, None, Seq.empty, Seq(1, 2, 3), Seq.empty).size should be(1)
-      propertiesDao.patients(0, 20, None, true, None, Seq.empty, Seq(3), Seq.empty).size should be(0)
+      propertiesDao.patients(0, 20, None, orderAscending = true, None, Seq.empty, Seq(1), Seq.empty).size should be(1)
+      propertiesDao.patients(0, 20, None, orderAscending = true, None, Seq.empty, Seq(1, 2), Seq.empty).size should be(1)
+      propertiesDao.patients(0, 20, None, orderAscending = true, None, Seq.empty, Seq(1, 2, 3), Seq.empty).size should be(1)
+      propertiesDao.patients(0, 20, None, orderAscending = true, None, Seq.empty, Seq(3), Seq.empty).size should be(0)
     }
   }
 
@@ -186,53 +182,53 @@ class PropertiesDAOTest extends FlatSpec with Matchers with BeforeAndAfterEach {
   it should "support filtering flat series by series type" in {
     db.withSession { implicit session =>
       insertMetaDataAndProperties
-      propertiesDao.flatSeries(0, 20, None, true, None, Seq.empty, Seq(1), Seq.empty).size should be(2)
-      propertiesDao.flatSeries(0, 20, None, true, None, Seq.empty, Seq(1, 2), Seq.empty).size should be(3)
-      propertiesDao.flatSeries(0, 20, None, true, None, Seq.empty, Seq(1, 2, 3), Seq.empty).size should be(3)
-      propertiesDao.flatSeries(0, 20, None, true, None, Seq.empty, Seq(3), Seq.empty).size should be(0)
+      propertiesDao.flatSeries(0, 20, None, orderAscending = true, None, Seq.empty, Seq(1), Seq.empty).size should be(2)
+      propertiesDao.flatSeries(0, 20, None, orderAscending = true, None, Seq.empty, Seq(1, 2), Seq.empty).size should be(3)
+      propertiesDao.flatSeries(0, 20, None, orderAscending = true, None, Seq.empty, Seq(1, 2, 3), Seq.empty).size should be(3)
+      propertiesDao.flatSeries(0, 20, None, orderAscending = true, None, Seq.empty, Seq(3), Seq.empty).size should be(0)
     }
   }
 
   it should "create valid SQL queries (no SQL exceptions) with all combinations of input arguments when listing patients" in {
     db.withSession { implicit session =>
       insertMetaDataAndProperties
-      propertiesDao.patients(0, 20, None, true, None, Seq.empty, Seq.empty, Seq.empty)
+      propertiesDao.patients(0, 20, None, orderAscending = true, None, Seq.empty, Seq.empty, Seq.empty)
 
-      propertiesDao.patients(0, 20, Some("patientID"), true, None, Seq.empty, Seq.empty, Seq.empty)
+      propertiesDao.patients(0, 20, Some("patientID"), orderAscending = true, None, Seq.empty, Seq.empty, Seq.empty)
 
-      propertiesDao.patients(0, 20, None, true, Some("filter"), Seq.empty, Seq.empty, Seq.empty)
-      propertiesDao.patients(0, 20, Some("patientID"), true, Some("filter"), Seq.empty, Seq.empty, Seq.empty)
+      propertiesDao.patients(0, 20, None, orderAscending = true, Some("filter"), Seq.empty, Seq.empty, Seq.empty)
+      propertiesDao.patients(0, 20, Some("patientID"), orderAscending = true, Some("filter"), Seq.empty, Seq.empty, Seq.empty)
 
-      propertiesDao.patients(0, 20, None, true, None, Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq.empty)
-      propertiesDao.patients(0, 20, Some("patientID"), true, None, Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq.empty)
-      propertiesDao.patients(0, 20, None, true, Some("filter"), Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq.empty)
-      propertiesDao.patients(0, 20, Some("patientID"), true, Some("filter"), Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq.empty)
+      propertiesDao.patients(0, 20, None, orderAscending = true, None, Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq.empty)
+      propertiesDao.patients(0, 20, Some("patientID"), orderAscending = true, None, Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq.empty)
+      propertiesDao.patients(0, 20, None, orderAscending = true, Some("filter"), Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq.empty)
+      propertiesDao.patients(0, 20, Some("patientID"), orderAscending = true, Some("filter"), Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq.empty)
 
-      propertiesDao.patients(0, 20, None, true, None, Seq.empty, Seq(1), Seq.empty)
-      propertiesDao.patients(0, 20, Some("patientID"), true, None, Seq.empty, Seq(1), Seq.empty)
-      propertiesDao.patients(0, 20, None, true, Some("filter"), Seq.empty, Seq(1), Seq.empty)
-      propertiesDao.patients(0, 20, Some("patientID"), true, Some("filter"), Seq.empty, Seq(1), Seq.empty)
-      propertiesDao.patients(0, 20, None, true, None, Seq(SourceRef(SourceType.BOX, 1)), Seq(1), Seq.empty)
-      propertiesDao.patients(0, 20, Some("patientID"), true, None, Seq(SourceRef(SourceType.BOX, 1)), Seq(1), Seq.empty)
-      propertiesDao.patients(0, 20, None, true, Some("filter"), Seq(SourceRef(SourceType.BOX, 1)), Seq(1), Seq.empty)
-      propertiesDao.patients(0, 20, Some("patientID"), true, Some("filter"), Seq(SourceRef(SourceType.BOX, 1)), Seq(1), Seq.empty)
+      propertiesDao.patients(0, 20, None, orderAscending = true, None, Seq.empty, Seq(1), Seq.empty)
+      propertiesDao.patients(0, 20, Some("patientID"), orderAscending = true, None, Seq.empty, Seq(1), Seq.empty)
+      propertiesDao.patients(0, 20, None, orderAscending = true, Some("filter"), Seq.empty, Seq(1), Seq.empty)
+      propertiesDao.patients(0, 20, Some("patientID"), orderAscending = true, Some("filter"), Seq.empty, Seq(1), Seq.empty)
+      propertiesDao.patients(0, 20, None, orderAscending = true, None, Seq(SourceRef(SourceType.BOX, 1)), Seq(1), Seq.empty)
+      propertiesDao.patients(0, 20, Some("patientID"), orderAscending = true, None, Seq(SourceRef(SourceType.BOX, 1)), Seq(1), Seq.empty)
+      propertiesDao.patients(0, 20, None, orderAscending = true, Some("filter"), Seq(SourceRef(SourceType.BOX, 1)), Seq(1), Seq.empty)
+      propertiesDao.patients(0, 20, Some("patientID"), orderAscending = true, Some("filter"), Seq(SourceRef(SourceType.BOX, 1)), Seq(1), Seq.empty)
 
-      propertiesDao.patients(0, 20, None, true, None, Seq.empty, Seq.empty, Seq(1))
-      propertiesDao.patients(0, 20, Some("patientID"), true, None, Seq.empty, Seq.empty, Seq(1))
-      propertiesDao.patients(0, 20, None, true, Some("filter"), Seq.empty, Seq.empty, Seq(1))
-      propertiesDao.patients(0, 20, Some("patientID"), true, Some("filter"), Seq.empty, Seq.empty, Seq(1))
-      propertiesDao.patients(0, 20, None, true, None, Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq(1))
-      propertiesDao.patients(0, 20, Some("patientID"), true, None, Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq(1))
-      propertiesDao.patients(0, 20, None, true, Some("filter"), Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq(1))
-      propertiesDao.patients(0, 20, Some("patientID"), true, Some("filter"), Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq(1))
-      propertiesDao.patients(0, 20, None, true, None, Seq.empty, Seq(1), Seq(1))
-      propertiesDao.patients(0, 20, Some("patientID"), true, None, Seq.empty, Seq(1), Seq(1))
-      propertiesDao.patients(0, 20, None, true, Some("filter"), Seq.empty, Seq(1), Seq(1))
-      propertiesDao.patients(0, 20, Some("patientID"), true, Some("filter"), Seq.empty, Seq(1), Seq(1))
-      propertiesDao.patients(0, 20, None, true, None, Seq(SourceRef(SourceType.BOX, 1)), Seq(1), Seq(1))
-      propertiesDao.patients(0, 20, Some("patientID"), true, None, Seq(SourceRef(SourceType.BOX, 1)), Seq(1), Seq(1))
-      propertiesDao.patients(0, 20, None, true, Some("filter"), Seq(SourceRef(SourceType.BOX, 1)), Seq(1), Seq(1))
-      propertiesDao.patients(0, 20, Some("patientID"), true, Some("filter"), Seq(SourceRef(SourceType.BOX, 1)), Seq(1), Seq(1))
+      propertiesDao.patients(0, 20, None, orderAscending = true, None, Seq.empty, Seq.empty, Seq(1))
+      propertiesDao.patients(0, 20, Some("patientID"), orderAscending = true, None, Seq.empty, Seq.empty, Seq(1))
+      propertiesDao.patients(0, 20, None, orderAscending = true, Some("filter"), Seq.empty, Seq.empty, Seq(1))
+      propertiesDao.patients(0, 20, Some("patientID"), orderAscending = true, Some("filter"), Seq.empty, Seq.empty, Seq(1))
+      propertiesDao.patients(0, 20, None, orderAscending = true, None, Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq(1))
+      propertiesDao.patients(0, 20, Some("patientID"), orderAscending = true, None, Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq(1))
+      propertiesDao.patients(0, 20, None, orderAscending = true, Some("filter"), Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq(1))
+      propertiesDao.patients(0, 20, Some("patientID"), orderAscending = true, Some("filter"), Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq(1))
+      propertiesDao.patients(0, 20, None, orderAscending = true, None, Seq.empty, Seq(1), Seq(1))
+      propertiesDao.patients(0, 20, Some("patientID"), orderAscending = true, None, Seq.empty, Seq(1), Seq(1))
+      propertiesDao.patients(0, 20, None, orderAscending = true, Some("filter"), Seq.empty, Seq(1), Seq(1))
+      propertiesDao.patients(0, 20, Some("patientID"), orderAscending = true, Some("filter"), Seq.empty, Seq(1), Seq(1))
+      propertiesDao.patients(0, 20, None, orderAscending = true, None, Seq(SourceRef(SourceType.BOX, 1)), Seq(1), Seq(1))
+      propertiesDao.patients(0, 20, Some("patientID"), orderAscending = true, None, Seq(SourceRef(SourceType.BOX, 1)), Seq(1), Seq(1))
+      propertiesDao.patients(0, 20, None, orderAscending = true, Some("filter"), Seq(SourceRef(SourceType.BOX, 1)), Seq(1), Seq(1))
+      propertiesDao.patients(0, 20, Some("patientID"), orderAscending = true, Some("filter"), Seq(SourceRef(SourceType.BOX, 1)), Seq(1), Seq(1))
     }
   }
 
@@ -267,43 +263,43 @@ class PropertiesDAOTest extends FlatSpec with Matchers with BeforeAndAfterEach {
   it should "create valid SQL queries (no SQL exceptions) with all combinations of input arguments when listing flat series" in {
     db.withSession { implicit session =>
       insertMetaDataAndProperties
-      propertiesDao.flatSeries(0, 20, None, true, None, Seq.empty, Seq.empty, Seq.empty)
+      propertiesDao.flatSeries(0, 20, None, orderAscending = true, None, Seq.empty, Seq.empty, Seq.empty)
 
-      propertiesDao.flatSeries(0, 20, Some("patientID"), true, None, Seq.empty, Seq.empty, Seq.empty)
+      propertiesDao.flatSeries(0, 20, Some("patientID"), orderAscending = true, None, Seq.empty, Seq.empty, Seq.empty)
 
-      propertiesDao.flatSeries(0, 20, None, true, Some("filter"), Seq.empty, Seq.empty, Seq.empty)
-      propertiesDao.flatSeries(0, 20, Some("patientID"), true, Some("filter"), Seq.empty, Seq.empty, Seq.empty)
+      propertiesDao.flatSeries(0, 20, None, orderAscending = true, Some("filter"), Seq.empty, Seq.empty, Seq.empty)
+      propertiesDao.flatSeries(0, 20, Some("patientID"), orderAscending = true, Some("filter"), Seq.empty, Seq.empty, Seq.empty)
 
-      propertiesDao.flatSeries(0, 20, None, true, None, Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq.empty)
-      propertiesDao.flatSeries(0, 20, Some("patientID"), true, None, Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq.empty)
-      propertiesDao.flatSeries(0, 20, None, true, Some("filter"), Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq.empty)
-      propertiesDao.flatSeries(0, 20, Some("patientID"), true, Some("filter"), Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq.empty)
+      propertiesDao.flatSeries(0, 20, None, orderAscending = true, None, Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq.empty)
+      propertiesDao.flatSeries(0, 20, Some("patientID"), orderAscending = true, None, Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq.empty)
+      propertiesDao.flatSeries(0, 20, None, orderAscending = true, Some("filter"), Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq.empty)
+      propertiesDao.flatSeries(0, 20, Some("patientID"), orderAscending = true, Some("filter"), Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq.empty)
 
-      propertiesDao.flatSeries(0, 20, None, true, None, Seq.empty, Seq(1), Seq.empty)
-      propertiesDao.flatSeries(0, 20, Some("patientID"), true, None, Seq.empty, Seq(1), Seq.empty)
-      propertiesDao.flatSeries(0, 20, None, true, Some("filter"), Seq.empty, Seq(1), Seq.empty)
-      propertiesDao.flatSeries(0, 20, Some("patientID"), true, Some("filter"), Seq.empty, Seq(1), Seq.empty)
-      propertiesDao.flatSeries(0, 20, None, true, None, Seq(SourceRef(SourceType.BOX, 1)), Seq(1), Seq.empty)
-      propertiesDao.flatSeries(0, 20, Some("patientID"), true, None, Seq(SourceRef(SourceType.BOX, 1)), Seq(1), Seq.empty)
-      propertiesDao.flatSeries(0, 20, None, true, Some("filter"), Seq(SourceRef(SourceType.BOX, 1)), Seq(1), Seq.empty)
-      propertiesDao.flatSeries(0, 20, Some("patientID"), true, Some("filter"), Seq(SourceRef(SourceType.BOX, 1)), Seq(1), Seq.empty)
+      propertiesDao.flatSeries(0, 20, None, orderAscending = true, None, Seq.empty, Seq(1), Seq.empty)
+      propertiesDao.flatSeries(0, 20, Some("patientID"), orderAscending = true, None, Seq.empty, Seq(1), Seq.empty)
+      propertiesDao.flatSeries(0, 20, None, orderAscending = true, Some("filter"), Seq.empty, Seq(1), Seq.empty)
+      propertiesDao.flatSeries(0, 20, Some("patientID"), orderAscending = true, Some("filter"), Seq.empty, Seq(1), Seq.empty)
+      propertiesDao.flatSeries(0, 20, None, orderAscending = true, None, Seq(SourceRef(SourceType.BOX, 1)), Seq(1), Seq.empty)
+      propertiesDao.flatSeries(0, 20, Some("patientID"), orderAscending = true, None, Seq(SourceRef(SourceType.BOX, 1)), Seq(1), Seq.empty)
+      propertiesDao.flatSeries(0, 20, None, orderAscending = true, Some("filter"), Seq(SourceRef(SourceType.BOX, 1)), Seq(1), Seq.empty)
+      propertiesDao.flatSeries(0, 20, Some("patientID"), orderAscending = true, Some("filter"), Seq(SourceRef(SourceType.BOX, 1)), Seq(1), Seq.empty)
 
-      propertiesDao.flatSeries(0, 20, None, true, None, Seq.empty, Seq.empty, Seq(1))
-      propertiesDao.flatSeries(0, 20, Some("patientID"), true, None, Seq.empty, Seq.empty, Seq(1))
-      propertiesDao.flatSeries(0, 20, None, true, Some("filter"), Seq.empty, Seq.empty, Seq(1))
-      propertiesDao.flatSeries(0, 20, Some("patientID"), true, Some("filter"), Seq.empty, Seq.empty, Seq(1))
-      propertiesDao.flatSeries(0, 20, None, true, None, Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq(1))
-      propertiesDao.flatSeries(0, 20, Some("patientID"), true, None, Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq(1))
-      propertiesDao.flatSeries(0, 20, None, true, Some("filter"), Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq(1))
-      propertiesDao.flatSeries(0, 20, Some("patientID"), true, Some("filter"), Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq(1))
-      propertiesDao.flatSeries(0, 20, None, true, None, Seq.empty, Seq(1), Seq(1))
-      propertiesDao.flatSeries(0, 20, Some("patientID"), true, None, Seq.empty, Seq(1), Seq(1))
-      propertiesDao.flatSeries(0, 20, None, true, Some("filter"), Seq.empty, Seq(1), Seq(1))
-      propertiesDao.flatSeries(0, 20, Some("patientID"), true, Some("filter"), Seq.empty, Seq(1), Seq(1))
-      propertiesDao.flatSeries(0, 20, None, true, None, Seq(SourceRef(SourceType.BOX, 1)), Seq(1), Seq(1))
-      propertiesDao.flatSeries(0, 20, Some("patientID"), true, None, Seq(SourceRef(SourceType.BOX, 1)), Seq(1), Seq(1))
-      propertiesDao.flatSeries(0, 20, None, true, Some("filter"), Seq(SourceRef(SourceType.BOX, 1)), Seq(1), Seq(1))
-      propertiesDao.flatSeries(0, 20, Some("patientID"), true, Some("filter"), Seq(SourceRef(SourceType.BOX, 1)), Seq(1), Seq(1))
+      propertiesDao.flatSeries(0, 20, None, orderAscending = true, None, Seq.empty, Seq.empty, Seq(1))
+      propertiesDao.flatSeries(0, 20, Some("patientID"), orderAscending = true, None, Seq.empty, Seq.empty, Seq(1))
+      propertiesDao.flatSeries(0, 20, None, orderAscending = true, Some("filter"), Seq.empty, Seq.empty, Seq(1))
+      propertiesDao.flatSeries(0, 20, Some("patientID"), orderAscending = true, Some("filter"), Seq.empty, Seq.empty, Seq(1))
+      propertiesDao.flatSeries(0, 20, None, orderAscending = true, None, Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq(1))
+      propertiesDao.flatSeries(0, 20, Some("patientID"), orderAscending = true, None, Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq(1))
+      propertiesDao.flatSeries(0, 20, None, orderAscending = true, Some("filter"), Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq(1))
+      propertiesDao.flatSeries(0, 20, Some("patientID"), orderAscending = true, Some("filter"), Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq(1))
+      propertiesDao.flatSeries(0, 20, None, orderAscending = true, None, Seq.empty, Seq(1), Seq(1))
+      propertiesDao.flatSeries(0, 20, Some("patientID"), orderAscending = true, None, Seq.empty, Seq(1), Seq(1))
+      propertiesDao.flatSeries(0, 20, None, orderAscending = true, Some("filter"), Seq.empty, Seq(1), Seq(1))
+      propertiesDao.flatSeries(0, 20, Some("patientID"), orderAscending = true, Some("filter"), Seq.empty, Seq(1), Seq(1))
+      propertiesDao.flatSeries(0, 20, None, orderAscending = true, None, Seq(SourceRef(SourceType.BOX, 1)), Seq(1), Seq(1))
+      propertiesDao.flatSeries(0, 20, Some("patientID"), orderAscending = true, None, Seq(SourceRef(SourceType.BOX, 1)), Seq(1), Seq(1))
+      propertiesDao.flatSeries(0, 20, None, orderAscending = true, Some("filter"), Seq(SourceRef(SourceType.BOX, 1)), Seq(1), Seq(1))
+      propertiesDao.flatSeries(0, 20, Some("patientID"), orderAscending = true, Some("filter"), Seq(SourceRef(SourceType.BOX, 1)), Seq(1), Seq(1))
     }
   }
 
@@ -311,7 +307,7 @@ class PropertiesDAOTest extends FlatSpec with Matchers with BeforeAndAfterEach {
     db.withSession { implicit session =>
       insertMetaDataAndProperties
       val sr = Seq(SourceRef(SourceType.USER, 1))
-      val qo = Some(QueryOrder("patientName", true))
+      val qo = Some(QueryOrder("patientName", orderAscending = true))
       val qp = Seq(QueryProperty("modality", QueryOperator.EQUALS, "NM"))
       val qf1 = Some(QueryFilters(Seq.empty, Seq.empty, Seq.empty))
       val qf2 = Some(QueryFilters(Seq.empty, Seq.empty, Seq(1)))
@@ -364,7 +360,7 @@ class PropertiesDAOTest extends FlatSpec with Matchers with BeforeAndAfterEach {
     db.withSession { implicit session =>
       insertMetaDataAndProperties
       val sr = Seq(SourceRef(SourceType.USER, 1))
-      val qo = Some(QueryOrder("studyDate", true))
+      val qo = Some(QueryOrder("studyDate", orderAscending = true))
       val qp = Seq(QueryProperty("patientId", QueryOperator.EQUALS, "1"), QueryProperty("modality", QueryOperator.LIKE, "NM"))
       val qf1 = Some(QueryFilters(Seq.empty, Seq.empty, Seq.empty))
       val qf2 = Some(QueryFilters(Seq.empty, Seq.empty, Seq(1)))
@@ -417,7 +413,7 @@ class PropertiesDAOTest extends FlatSpec with Matchers with BeforeAndAfterEach {
     db.withSession { implicit session =>
       insertMetaDataAndProperties
       val sr = Seq(SourceRef(SourceType.USER, 1))
-      val qo = Some(QueryOrder("seriesDate", true))
+      val qo = Some(QueryOrder("seriesDate", orderAscending = true))
       val qp = Seq(QueryProperty("studyId", QueryOperator.EQUALS, "1"), QueryProperty("modality", QueryOperator.LIKE, "NM"))
       val qf1 = Some(QueryFilters(Seq.empty, Seq.empty, Seq.empty))
       val qf2 = Some(QueryFilters(Seq.empty, Seq.empty, Seq(1)))
@@ -470,7 +466,7 @@ class PropertiesDAOTest extends FlatSpec with Matchers with BeforeAndAfterEach {
     db.withSession { implicit session =>
       insertMetaDataAndProperties
       val sr = Seq(SourceRef(SourceType.USER, 1))
-      val qo = Some(QueryOrder("seriesDate", true))
+      val qo = Some(QueryOrder("seriesDate", orderAscending = true))
       val qp = Seq(QueryProperty("studyId", QueryOperator.EQUALS, "1"), QueryProperty("modality", QueryOperator.LIKE, "NM"))
       val qf1 = Some(QueryFilters(Seq.empty, Seq.empty, Seq.empty))
       val qf2 = Some(QueryFilters(Seq.empty, Seq.empty, Seq(1)))
@@ -523,7 +519,7 @@ class PropertiesDAOTest extends FlatSpec with Matchers with BeforeAndAfterEach {
     db.withSession { implicit session =>
       insertMetaDataAndProperties
       val sr = Seq(SourceRef(SourceType.USER, 1))
-      val qo = Some(QueryOrder("instanceNumber", true))
+      val qo = Some(QueryOrder("instanceNumber", orderAscending = true))
       val qp = Seq(QueryProperty("studyId", QueryOperator.EQUALS, "1"), QueryProperty("modality", QueryOperator.LIKE, "NM"))
       val qf1 = Some(QueryFilters(Seq.empty, Seq.empty, Seq.empty))
       val qf2 = Some(QueryFilters(Seq.empty, Seq.empty, Seq(1)))
@@ -644,16 +640,15 @@ class PropertiesDAOTest extends FlatSpec with Matchers with BeforeAndAfterEach {
 
   it should "remove a series tag when the last occurrence of it has been removed" in {
     db.withSession { implicit session =>
-      val (dbPatient1, (dbStudy1, dbStudy2), (dbSeries1, dbSeries2, dbSeries3, dbSeries4), (dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)) =
-        insertMetaDataAndProperties
+      val (_, (_, _), (dbSeries1, dbSeries2, dbSeries3, _), (_, _, _, _, _, _, _, _)) = insertMetaDataAndProperties
       val seriesTags = propertiesDao.listSeriesTags
       seriesTags.size should be(2)
       seriesTags.map(_.name) should be(List("Tag1", "Tag2"))
-      propertiesDao.removeAndCleanupSeriesTagForSeriesId(seriesTags(0).id, dbSeries1.id)
+      propertiesDao.removeAndCleanupSeriesTagForSeriesId(seriesTags.head.id, dbSeries1.id)
       propertiesDao.listSeriesTags.size should be(2)
       propertiesDao.removeAndCleanupSeriesTagForSeriesId(seriesTags(1).id, dbSeries1.id)
       propertiesDao.listSeriesTags.size should be(2)
-      propertiesDao.removeAndCleanupSeriesTagForSeriesId(seriesTags(0).id, dbSeries2.id)
+      propertiesDao.removeAndCleanupSeriesTagForSeriesId(seriesTags.head.id, dbSeries2.id)
       propertiesDao.listSeriesTags.size should be(1)
       propertiesDao.removeAndCleanupSeriesTagForSeriesId(seriesTags(1).id, dbSeries3.id)
       propertiesDao.listSeriesTags.size should be(0)
@@ -662,8 +657,7 @@ class PropertiesDAOTest extends FlatSpec with Matchers with BeforeAndAfterEach {
 
   it should "remove a series tag when deleting a series if the series tag attached to the series was the last of its kind" in {
     db.withSession { implicit session =>
-      val (dbPatient1, (dbStudy1, dbStudy2), (dbSeries1, dbSeries2, dbSeries3, dbSeries4), (dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)) =
-        insertMetaDataAndProperties
+      val (_, (_, _), (dbSeries1, dbSeries2, dbSeries3, dbSeries4), (_, _, _, _, _, _, _, _)) = insertMetaDataAndProperties
       propertiesDao.listSeriesTags.size should be(2)
       propertiesDao.deleteFully(dbSeries4)
       propertiesDao.listSeriesTags.size should be(2)
