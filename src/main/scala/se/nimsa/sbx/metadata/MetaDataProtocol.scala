@@ -16,6 +16,7 @@
 
 package se.nimsa.sbx.metadata
 
+import org.dcm4che3.data.Attributes
 import se.nimsa.sbx.app.GeneralProtocol.Source
 import se.nimsa.sbx.app.GeneralProtocol.SourceRef
 import se.nimsa.sbx.dicom.DicomHierarchy._
@@ -72,7 +73,7 @@ object MetaDataProtocol {
 
   // messages
 
-  case class AddMetaData(patient: Patient, study: Study, series: Series, image: Image, source: Source)
+  case class AddMetaData(dataset: Attributes, source: Source)
   
   case class DeleteMetaData(imageId: Long)  
     

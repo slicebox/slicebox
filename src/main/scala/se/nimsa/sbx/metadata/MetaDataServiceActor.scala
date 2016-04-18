@@ -16,16 +16,15 @@
 
 package se.nimsa.sbx.metadata
 
-import MetaDataProtocol._
-import akka.actor.Actor
-import akka.actor.Props
-import akka.event.Logging
-import akka.event.LoggingReceive
+import akka.actor.{Actor, Props}
+import akka.event.{Logging, LoggingReceive}
 import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.app.GeneralProtocol.Source
 import se.nimsa.sbx.dicom.DicomHierarchy._
+import se.nimsa.sbx.dicom.DicomUtil._
 import se.nimsa.sbx.lang.NotFoundException
 import se.nimsa.sbx.log.SbxLog
+import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.util.ExceptionCatching
 
 class MetaDataServiceActor(dbProps: DbProps) extends Actor with ExceptionCatching {
@@ -42,9 +41,14 @@ class MetaDataServiceActor(dbProps: DbProps) extends Actor with ExceptionCatchin
 
   def receive = LoggingReceive {
 
-    case AddMetaData(patient, study, series, image, source) =>
+    case AddMetaData(dataset, source) =>
       catchAndReport {
-        val metaDataAdded = MetaDataAdded.tupled(addMetaData(patient, study, series, image, source))
+        val metaDataAdded = MetaDataAdded.tupled(addMetaData(
+          datasetToPatient(dataset),
+          datasetToStudy(dataset),
+          datasetToSeries(dataset),
+          datasetToImage(dataset),
+          source))
         log.debug(s"Added metadata $metaDataAdded")
         sender ! metaDataAdded
       }
@@ -218,19 +222,19 @@ class MetaDataServiceActor(dbProps: DbProps) extends Actor with ExceptionCatchin
         val seriesSource = SeriesSource(-1, source)
 
         val dbPatient = dao.patientByNameAndID(patient).getOrElse {
-        	patientAdded = true
+          patientAdded = true
           dao.insert(patient)
         }
         val dbStudy = dao.studyByUidAndPatient(study, dbPatient).getOrElse {
-        	studyAdded = true
+          studyAdded = true
           dao.insert(study.copy(patientId = dbPatient.id))
         }
         val dbSeries = dao.seriesByUidAndStudy(series, dbStudy).getOrElse {
-        	seriesAdded = true
+          seriesAdded = true
           dao.insert(series.copy(studyId = dbStudy.id))
         }
         val dbImage = dao.imageByUidAndSeries(image, dbSeries).getOrElse {
-        	imageAdded = true
+          imageAdded = true
           dao.insert(image.copy(seriesId = dbSeries.id))
         }
         val dbSeriesSource = propertiesDao.seriesSourceById(dbSeries.id)

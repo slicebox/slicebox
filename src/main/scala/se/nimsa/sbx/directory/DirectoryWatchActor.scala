@@ -16,19 +16,22 @@
 
 package se.nimsa.sbx.directory
 
-import java.nio.file.Files
-import java.nio.file.Path
-import akka.actor.Actor
-import akka.actor.ActorRef
-import akka.actor.Props
-import akka.event.Logging
-import akka.event.LoggingReceive
-import se.nimsa.sbx.dicom.DicomUtil._
-import org.dcm4che3.data.Tag
-import java.nio.file.Paths
-import se.nimsa.sbx.storage.StorageProtocol.FileReceived
+import java.nio.file.{Files, Paths}
+
+import akka.actor.{Actor, Props}
+import akka.event.{Logging, LoggingReceive}
+import akka.pattern.ask
+import org.dcm4che3.data.Attributes
 import se.nimsa.sbx.app.GeneralProtocol._
-import DirectoryWatchProtocol._
+import se.nimsa.sbx.dicom.DicomHierarchy.Image
+import se.nimsa.sbx.directory.DirectoryWatchProtocol._
+import se.nimsa.sbx.dicom.DicomUtil._
+import se.nimsa.sbx.log.SbxLog
+import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, MetaDataAdded}
+import se.nimsa.sbx.storage.StorageProtocol.{AddDataset, CheckDataset, DatasetAdded}
+
+import scala.concurrent.Future
+import scala.util.control.NonFatal
 
 class DirectoryWatchActor(watchedDirectory: WatchedDirectory) extends Actor {
   val log = Logging(context.system, this)
@@ -36,6 +39,9 @@ class DirectoryWatchActor(watchedDirectory: WatchedDirectory) extends Actor {
   val watchServiceTask = new DirectoryWatch(self)
 
   val watchThread = new Thread(watchServiceTask, "WatchService")
+
+  val storageService = context.actorSelection("../StorageService")
+  val metaDataService = context.actorSelection("../MetaDataService")
 
   override def preStart() {
     watchThread.setDaemon(true)
@@ -48,10 +54,36 @@ class DirectoryWatchActor(watchedDirectory: WatchedDirectory) extends Actor {
   }
 
   def receive = LoggingReceive {
+
     case FileAddedToWatchedDirectory(path) =>
-      if (Files.isRegularFile(path))
-        context.system.eventStream.publish(FileReceived(path, Source(SourceType.DIRECTORY, watchedDirectory.name, watchedDirectory.id)))
+      if (Files.isRegularFile(path)) {
+        val dataset = loadDataset(path, withPixelData = true)
+        val source = Source(SourceType.DIRECTORY, watchedDirectory.name, watchedDirectory.id)
+        checkDataset(dataset).flatMap { status =>
+          addMetadata(dataset, source).flatMap { image =>
+            addDataset(dataset, image).map { overwrite =>
+            }
+          }
+        }.onFailure {
+          case NonFatal(e) => SbxLog.error("Directory", s"Could not add file: ${e.getMessage}")
+        }
+      }
+
   }
+
+  def addMetadata(dataset: Attributes, source: Source): Future[Image] =
+    metaDataService.ask(
+      AddMetaData(dataset, source)
+      .mapTo[MetaDataAdded]
+      .map(_.image)
+
+  def addDataset(dataset: Attributes, image: Image): Future[Boolean] =
+    storageService.ask(AddDataset(dataset, image))
+      .mapTo[DatasetAdded]
+      .map(_.overwrite)
+
+  def checkDataset(dataset: Attributes): Future[Boolean] =
+    storageService.ask(CheckDataset(dataset)).mapTo[Boolean]
 
 }
 

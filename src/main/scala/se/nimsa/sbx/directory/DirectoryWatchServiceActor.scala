@@ -16,20 +16,15 @@
 
 package se.nimsa.sbx.directory
 
-import java.nio.file.FileSystems
-import java.nio.file.Files
-import java.nio.file.Path
-import java.nio.file.Paths
-import scala.language.postfixOps
-import akka.actor.Actor
-import akka.actor.PoisonPill
-import akka.actor.Props
-import akka.event.Logging
-import akka.event.LoggingReceive
+import java.nio.file.{Files, Path, Paths}
+
+import akka.actor.{Actor, PoisonPill, Props}
+import akka.event.{Logging, LoggingReceive}
 import se.nimsa.sbx.app.DbProps
-import akka.actor.Status.Failure
+import se.nimsa.sbx.directory.DirectoryWatchProtocol._
 import se.nimsa.sbx.util.ExceptionCatching
-import DirectoryWatchProtocol._
+
+import scala.language.postfixOps
 
 class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor with ExceptionCatching {
   val log = Logging(context.system, this)
@@ -84,8 +79,7 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor 
             sender ! DirectoryUnwatched(watchedDirectoryId)
 
           case GetWatchedDirectories =>
-            val directories = getWatchedDirectories()
-            sender ! WatchedDirectories(directories)
+            sender ! WatchedDirectories(getWatchedDirectories)
 
           case GetWatchedDirectoryById(id) =>
             db.withSession { implicit session =>
@@ -131,7 +125,7 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor 
       dao.watchedDirectoryForPath(path)
     }
 
-  def getWatchedDirectories() =
+  def getWatchedDirectories =
     db.withSession { implicit session =>
       dao.allWatchedDirectories
     }
