@@ -49,18 +49,18 @@ object StorageProtocol {
 
   case class GetImageFrame(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int) extends ImageRequest
 
+  case class CheckDataset(dataset: Attributes) extends ImageRequest
 
-  case class CheckDataset(dataset: Attributes)
+  case class AddDataset(dataset: Attributes, image: Image) extends ImageRequest
+  
+  case class AddJpeg(jpegBytes: Array[Byte], patient: Patient, study: Study, source: Source) extends ImageRequest
+  
+  case class DeleteDataset(image: Image) extends ImageRequest
 
-  case class AddDataset(dataset: Attributes, image: Image)
-  
-  case class AddJpeg(jpegBytes: Array[Byte], patient: Patient, study: Study, source: Source)
-  
-  case class DeleteDataset(image: Image)
+  case class CreateTempZipFile(imagesAndSeries: Seq[(Image, FlatSeries)]) extends ImageRequest
+
 
   case class DatasetDeleted(image: Image)
-
-  case class CreateTempZipFile(imagesAndSeries: Seq[(Image, FlatSeries)])
 
   case class ImagePath(imagePath: Path)
 

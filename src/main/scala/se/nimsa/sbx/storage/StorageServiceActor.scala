@@ -32,66 +32,69 @@ import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.{DicomUtil, ImageAttribute, Jpg2Dcm}
 import se.nimsa.sbx.dicom.DicomUtil._
 import se.nimsa.sbx.storage.StorageProtocol._
+import se.nimsa.sbx.util.ExceptionCatching
 
 import scala.concurrent.duration.DurationInt
 import scala.util.control.NonFatal
 
-class StorageServiceActor(storage: Path) extends Actor {
+class StorageServiceActor(storage: Path) extends Actor with ExceptionCatching {
 
   val bufferSize = 524288
 
   val log = Logging(context.system, this)
 
+  implicit val ec = context.dispatcher
+
   log.info("Storage service started")
 
   def receive = LoggingReceive {
 
-    case CheckDataset(dataset) =>
-      sender ! checkDataset(dataset)
-
-    case AddDataset(dataset, image) =>
-      if (checkDataset(dataset)) {
-        val overwrite = storeDataset(dataset, image)
-        if (overwrite)
-          log.info(s"Updated existing file with image id ${image.id}")
-        else
-          log.info(s"Stored file with image id ${image.id}")
-        val datasetAdded = DatasetAdded(image, overwrite)
-        context.system.eventStream.publish(datasetAdded)
-        sender ! datasetAdded
-      }
-
-    case AddJpeg(jpegBytes, patient, study, source) =>
-      val dcmTempPath = Files.createTempFile("slicebox-sc-", "")
-      val attributes = Jpg2Dcm(jpegBytes, patient, study, dcmTempPath.toFile)
-      val series = datasetToSeries(attributes)
-      val image = datasetToImage(attributes)
-      storeEncapsulated(patient, study, series, image, source, dcmTempPath)
-
-      log.info(s"Stored encapsulated JPEG with image id ${image.id}")
-      context.system.eventStream.publish(DatasetAdded(image, overwrite = false))
-
-      sender ! image
-
-    case DeleteDataset(image) =>
-      val datasetDeleted = DatasetDeleted(image)
-      try {
-        deleteFromStorage(image)
-        context.system.eventStream.publish(datasetDeleted)
-      } catch {
-        case e: NoSuchFileException => log.info(s"DICOM file for image with id ${image.id} could not be found, no need to delete.")
-      }
-      sender ! datasetDeleted
-
-    case CreateTempZipFile(imagesAndSeries) =>
-      val zipFilePath = createTempZipFile(imagesAndSeries)
-      sender ! FileName(zipFilePath.getFileName.toString)
-
     case DeleteTempZipFile(path) =>
       Files.deleteIfExists(path)
 
-    case msg: ImageRequest =>
+    case msg: ImageRequest => catchAndReport {
       msg match {
+
+        case CheckDataset(dataset) =>
+          sender ! checkDataset(dataset)
+
+        case AddDataset(dataset, image) =>
+          if (checkDataset(dataset)) {
+            val overwrite = storeDataset(dataset, image)
+            if (overwrite)
+              log.info(s"Updated existing file with image id ${image.id}")
+            else
+              log.info(s"Stored file with image id ${image.id}")
+            val datasetAdded = DatasetAdded(image, overwrite)
+            context.system.eventStream.publish(datasetAdded)
+            sender ! datasetAdded
+          }
+
+        case AddJpeg(jpegBytes, patient, study, source) =>
+          val dcmTempPath = Files.createTempFile("slicebox-sc-", "")
+          val attributes = Jpg2Dcm(jpegBytes, patient, study, dcmTempPath.toFile)
+          val series = datasetToSeries(attributes)
+          val image = datasetToImage(attributes)
+          storeEncapsulated(patient, study, series, image, source, dcmTempPath)
+
+          log.info(s"Stored encapsulated JPEG with image id ${image.id}")
+          context.system.eventStream.publish(DatasetAdded(image, overwrite = false))
+
+          sender ! image
+
+        case DeleteDataset(image) =>
+          val datasetDeleted = DatasetDeleted(image)
+          try {
+            deleteFromStorage(image)
+            context.system.eventStream.publish(datasetDeleted)
+          } catch {
+            case e: NoSuchFileException => log.info(s"DICOM file for image with id ${image.id} could not be found, no need to delete.")
+          }
+          sender ! datasetDeleted
+
+        case CreateTempZipFile(imagesAndSeries) =>
+          val zipFilePath = createTempZipFile(imagesAndSeries)
+          sender ! FileName(zipFilePath.getFileName.toString)
 
         case GetImagePath(image) =>
           sender ! resolvePath(image).map(ImagePath(_))
@@ -116,7 +119,7 @@ class StorageServiceActor(storage: Path) extends Actor {
           sender ! imageBytes
 
       }
-
+    }
   }
 
   def checkDataset(dataset: Attributes): Boolean = {
@@ -298,7 +301,7 @@ class StorageServiceActor(storage: Path) extends Actor {
     }
 
     def scheduleDeleteTempFile(tempFile: Path) =
-      context.system.scheduler.scheduleOnce(12.hours, self, tempFile)
+      context.system.scheduler.scheduleOnce(12.hours, self, DeleteTempZipFile(tempFile))
 
     val tempFile = Files.createTempFile("slicebox-export-", ".zip")
     val fos = Files.newOutputStream(tempFile)

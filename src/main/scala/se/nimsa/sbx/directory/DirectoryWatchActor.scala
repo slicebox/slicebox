@@ -21,6 +21,7 @@ import java.nio.file.{Files, Paths}
 import akka.actor.{Actor, Props}
 import akka.event.{Logging, LoggingReceive}
 import akka.pattern.ask
+import akka.util.Timeout
 import org.dcm4che3.data.Attributes
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
@@ -33,7 +34,7 @@ import se.nimsa.sbx.storage.StorageProtocol.{AddDataset, CheckDataset, DatasetAd
 import scala.concurrent.Future
 import scala.util.control.NonFatal
 
-class DirectoryWatchActor(watchedDirectory: WatchedDirectory) extends Actor {
+class DirectoryWatchActor(watchedDirectory: WatchedDirectory, implicit val timeout: Timeout) extends Actor {
   val log = Logging(context.system, this)
 
   val watchServiceTask = new DirectoryWatch(self)
@@ -42,6 +43,9 @@ class DirectoryWatchActor(watchedDirectory: WatchedDirectory) extends Actor {
 
   val storageService = context.actorSelection("../StorageService")
   val metaDataService = context.actorSelection("../MetaDataService")
+
+  implicit val system = context.system
+  implicit val ec = context.dispatcher
 
   override def preStart() {
     watchThread.setDaemon(true)
@@ -73,7 +77,7 @@ class DirectoryWatchActor(watchedDirectory: WatchedDirectory) extends Actor {
 
   def addMetadata(dataset: Attributes, source: Source): Future[Image] =
     metaDataService.ask(
-      AddMetaData(dataset, source)
+      AddMetaData(dataset, source))
       .mapTo[MetaDataAdded]
       .map(_.image)
 
@@ -88,5 +92,5 @@ class DirectoryWatchActor(watchedDirectory: WatchedDirectory) extends Actor {
 }
 
 object DirectoryWatchActor {
-  def props(watchedDirectory: WatchedDirectory): Props = Props(new DirectoryWatchActor(watchedDirectory))
+  def props(watchedDirectory: WatchedDirectory, timeout: Timeout): Props = Props(new DirectoryWatchActor(watchedDirectory, timeout))
 }

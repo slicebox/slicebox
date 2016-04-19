@@ -16,31 +16,22 @@
 
 package se.nimsa.sbx.app.routing
 
-import java.io.File
-import scala.concurrent.Future
-import org.dcm4che3.data.Attributes
 import akka.pattern.ask
+import org.dcm4che3.data.Attributes
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.anonymization.AnonymizationUtil
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.app.SliceboxService
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
-import se.nimsa.sbx.dicom.DicomUtil
-import se.nimsa.sbx.dicom.ImageAttribute
+import se.nimsa.sbx.metadata.MetaDataProtocol.{GetImage, Images}
 import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.user.UserProtocol.ApiUser
 import se.nimsa.sbx.util.SbxExtensions._
-import spray.http.ContentType.apply
-import spray.http.FormFile
-import spray.http.HttpData
-import spray.http.HttpEntity
-import spray.http.HttpHeaders._
-import spray.http.MediaTypes._
 import spray.http.StatusCodes._
-import spray.routing.Route
-import spray.routing.directives._
 import spray.httpx.SprayJsonSupport._
-import se.nimsa.sbx.metadata.MetaDataProtocol.Images
+import spray.routing.Route
+
+import scala.concurrent.Future
 
 trait AnonymizationRoutes { this: SliceboxService =>
 
@@ -76,7 +67,6 @@ trait AnonymizationRoutes { this: SliceboxService =>
               'filter.as[String].?) { (startIndex, count, orderBy, orderAscending, filter) =>
                 onSuccess(anonymizationService.ask(GetAnonymizationKeys(startIndex, count, orderBy, orderAscending, filter))) {
                   case AnonymizationKeys(anonymizationKeys) =>
-                    import spray.httpx.SprayJsonSupport._
                     complete(anonymizationKeys)
                 }
               }
@@ -114,18 +104,22 @@ trait AnonymizationRoutes { this: SliceboxService =>
     }
 
   def anonymizeOne(apiUser: ApiUser, imageId: Long, tagValues: Seq[TagValue]): Future[Option[DatasetAdded]] =
-    storageService.ask(GetDataset(imageId, true)).mapTo[Option[Attributes]].map { optionalDataset =>
-      optionalDataset.map { dataset =>
-        AnonymizationUtil.setAnonymous(dataset, false) // pretend not anonymized to force anonymization
-        anonymizationService.ask(Anonymize(imageId, dataset, tagValues)).flatMap {
-          case anonDataset: Attributes =>
-            storageService.ask(DeleteDataset(imageId)).flatMap {
-              case DatasetDeleted(imageId) =>
-                val source = Source(SourceType.USER, apiUser.user, apiUser.id)
-                storageService.ask(AddDataset(anonDataset, source)).mapTo[DatasetAdded]
+    metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]].flatMap { imageMaybe =>
+      imageMaybe.map { image =>
+        storageService.ask(GetDataset(image, true)).mapTo[Option[Attributes]].map { optionalDataset =>
+          optionalDataset.map { dataset =>
+            AnonymizationUtil.setAnonymous(dataset, false) // pretend not anonymized to force anonymization
+            anonymizationService.ask(Anonymize(imageId, dataset, tagValues)).flatMap {
+              case anonDataset: Attributes =>
+                storageService.ask(DeleteDataset(image)).flatMap {
+                  case DatasetDeleted(imageId) =>
+                    val source = Source(SourceType.USER, apiUser.user, apiUser.id)
+                    storageService.ask(AddDataset(anonDataset, image)).mapTo[DatasetAdded]
+                }
             }
+          }
         }
-      }
+      }.unwrap
     }.unwrap
 
 }
