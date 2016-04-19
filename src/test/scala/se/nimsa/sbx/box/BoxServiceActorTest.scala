@@ -2,18 +2,10 @@ package se.nimsa.sbx.box
 
 import java.nio.file.Files
 
-import scala.concurrent.duration.DurationInt
-import scala.slick.driver.H2Driver
-import scala.slick.jdbc.JdbcBackend.Database
-
-import org.scalatest._
-
-import akka.actor.ActorSystem
-import akka.actor.Props
-import akka.actor.actorRef2Scala
-import akka.testkit.ImplicitSender
-import akka.testkit.TestKit
+import akka.actor.{ActorSystem, Props, actorRef2Scala}
+import akka.testkit.{ImplicitSender, TestKit}
 import akka.util.Timeout.durationToTimeout
+import org.scalatest._
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.box.BoxProtocol._
@@ -22,6 +14,10 @@ import se.nimsa.sbx.dicom.DicomPropertyValue._
 import se.nimsa.sbx.metadata.MetaDataDAO
 import se.nimsa.sbx.storage.StorageServiceActor
 import se.nimsa.sbx.util.TestUtil
+
+import scala.concurrent.duration.DurationInt
+import scala.slick.driver.H2Driver
+import scala.slick.jdbc.JdbcBackend.Database
 
 class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
     with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {
@@ -41,7 +37,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
     metaDataDao.create
   }
 
-  val storageService = system.actorOf(Props(new StorageServiceActor(storage, 5.minutes)), name = "StorageService")
+  val storageService = system.actorOf(Props(new StorageServiceActor(storage)), name = "StorageService")
   val boxService = system.actorOf(Props(new BoxServiceActor(dbProps, "http://testhost:1234", 5.minutes)), name = "BoxService")
 
   override def afterEach() =
@@ -60,9 +56,9 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
     "create incoming transaction for first file in transaction" in {
       db.withSession { implicit session =>
 
-        val box = boxDao.insertBox(Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, false))
+        val box = boxDao.insertBox(Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, online = false))
 
-        boxService ! UpdateIncoming(box, 123, 1, 2, 2, false)
+        boxService ! UpdateIncoming(box, 123, 1, 2, 2, overwrite = false)
 
         expectMsgType[IncomingUpdated]
 
@@ -84,12 +80,12 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
     "update incoming transaction for next file in transaction" in {
       db.withSession { implicit session =>
 
-        val box = boxDao.insertBox(Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, false))
+        val box = boxDao.insertBox(Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, online = false))
 
-        boxService ! UpdateIncoming(box, 123, 1, 3, 4, false)
+        boxService ! UpdateIncoming(box, 123, 1, 3, 4, overwrite = false)
         expectMsgType[IncomingUpdated]
 
-        boxService ! UpdateIncoming(box, 123, 2, 3, 5, false)
+        boxService ! UpdateIncoming(box, 123, 2, 3, 5, overwrite = false)
         expectMsgType[IncomingUpdated]
 
         val incomingTransactions = boxDao.listIncomingTransactions
@@ -110,7 +106,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
 
     "return no outgoing transaction when polling and outgoing is empty" in {
       db.withSession { implicit session =>
-        val box = boxDao.insertBox(Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, false))
+        val box = boxDao.insertBox(Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, online = false))
 
         db.withSession { implicit session =>
           boxDao.listOutgoingTransactions shouldBe empty
@@ -124,23 +120,22 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
 
     "return first outgoing transaction when receiving poll message" in {
       db.withSession { implicit session =>
-        val transactionId = 987
         val imageId = 123
-        val box = boxDao.insertBox(Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, false))
+        val box = boxDao.insertBox(Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, online = false))
 
         // insert images with sequence numbers out of order
         val transaction = boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, box.id, box.name, 0, 1, 123, 123, TransactionStatus.WAITING))
-        val image1 = boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, imageId, 2, false))
-        val image2 = boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, imageId, 1, false))
+        boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, imageId, 2, sent = false))
+        boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, imageId, 1, sent = false))
 
         boxService ! PollOutgoing(box)
 
         expectMsgPF() {
-          case Some(OutgoingTransactionImage(transaction, image)) =>
-            transaction.boxId should be(box.id)
-            transaction.boxName should be("some box")
-            transaction.sentImageCount should be(0)
-            transaction.totalImageCount should be(1)
+          case Some(OutgoingTransactionImage(dbTransaction, image)) =>
+            dbTransaction.boxId should be(box.id)
+            dbTransaction.boxName should be("some box")
+            dbTransaction.sentImageCount should be(0)
+            dbTransaction.totalImageCount should be(1)
             image.imageId should be(imageId)
             image.sequenceNumber should be(1)
             image.sent should be(false)
@@ -151,11 +146,11 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
 
     "create incoming transaction when receiving the first incoming file in a transaction" in {
 
-      val box = Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, false)
+      val box = Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, online = false)
 
       val sequenceNumber = 1
       val totalImageCount = 55
-      boxService ! UpdateIncoming(box, 32, sequenceNumber, totalImageCount, 33, false)
+      boxService ! UpdateIncoming(box, 32, sequenceNumber, totalImageCount, 33, overwrite = false)
 
       expectMsgPF() {
         case IncomingUpdated(transaction) =>
@@ -173,10 +168,10 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
 
     "mark incoming transaction as finished when receiving the UpdateIncoming message for the last file of the transaction" in {
 
-      val box = Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, false)
+      val box = Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, online = false)
 
       val totalImageCount = 2
-      boxService ! UpdateIncoming(box, 32, sequenceNumber = 1, totalImageCount, 33, false)
+      boxService ! UpdateIncoming(box, 32, sequenceNumber = 1, totalImageCount, 33, overwrite = false)
 
       expectMsgPF() {
         case IncomingUpdated(transaction) =>
@@ -185,7 +180,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
           transaction.status shouldBe TransactionStatus.PROCESSING
       }
       
-      boxService ! UpdateIncoming(box, 32, sequenceNumber = 2, totalImageCount, 33, false)
+      boxService ! UpdateIncoming(box, 32, sequenceNumber = 2, totalImageCount, 33, overwrite = false)
       
       expectMsgPF() {
         case IncomingUpdated(transaction) =>
@@ -202,14 +197,14 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
 
     "mark incoming transaction as failed when receiving the UpdateIncoming message for the last file of the transaction and the number of images in the transactions does not match the number of incoming images stored in the database" in {
 
-      val box = Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, false)
+      val box = Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, online = false)
 
       val totalImageCount = 3
       
-      boxService ! UpdateIncoming(box, 32, sequenceNumber = 1, totalImageCount, 33, false)
+      boxService ! UpdateIncoming(box, 32, sequenceNumber = 1, totalImageCount, 33, overwrite = false)
       expectMsgType[IncomingUpdated]
       
-      boxService ! UpdateIncoming(box, 32, sequenceNumber = 3, totalImageCount, 33, false)
+      boxService ! UpdateIncoming(box, 32, sequenceNumber = 3, totalImageCount, 33, overwrite = false)
 
       expectMsgPF() {
         case IncomingUpdated(transaction) =>
@@ -221,9 +216,9 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
 
     "remove all related box tag values when an outgoing transaction is removed" in {
       db.withSession { implicit session =>
-        val box = boxDao.insertBox(Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, false))
+        val box = boxDao.insertBox(Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, online = false))
 
-        val (p1, s1, r1, i1, i2, i3) = insertMetadata
+        val (_, _, _, i1, i2, i3) = insertMetadata
 
         val imageTagValuesSeq = Seq(
           ImageTagValues(i1.id, Seq(
@@ -253,11 +248,11 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
         outgoingImages should have length 3
 
         boxDao.listOutgoingTagValues.size should be(3 * 3)
-        boxDao.tagValuesByOutgoingTransactionImage(outgoingTransactions(0).id, outgoingImages(0).id) should have length 3
-        boxDao.tagValuesByOutgoingTransactionImage(outgoingTransactions(0).id, outgoingImages(1).id) should have length 3
-        boxDao.tagValuesByOutgoingTransactionImage(outgoingTransactions(0).id, outgoingImages(2).id) should have length 3
+        boxDao.tagValuesByOutgoingTransactionImage(outgoingTransactions.head.id, outgoingImages.head.id) should have length 3
+        boxDao.tagValuesByOutgoingTransactionImage(outgoingTransactions.head.id, outgoingImages(1).id) should have length 3
+        boxDao.tagValuesByOutgoingTransactionImage(outgoingTransactions.head.id, outgoingImages(2).id) should have length 3
 
-        boxService ! RemoveOutgoingTransaction(outgoingTransactions(0).id)
+        boxService ! RemoveOutgoingTransaction(outgoingTransactions.head.id)
 
         expectMsgType[OutgoingTransactionRemoved]
 
@@ -267,12 +262,12 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
 
     "remove incoming images when the related incoming transaction is removed" in {
       db.withSession { implicit session =>
-        val box = boxDao.insertBox(Box(-1, "some remote box", "abc", "https://someurl.com", BoxSendMethod.POLL, false))
+        val box = boxDao.insertBox(Box(-1, "some remote box", "abc", "https://someurl.com", BoxSendMethod.POLL, online = false))
 
-        boxService ! UpdateIncoming(box, 123, 1, 3, 4, false)
+        boxService ! UpdateIncoming(box, 123, 1, 3, 4, overwrite = false)
         expectMsgType[IncomingUpdated]
 
-        boxService ! UpdateIncoming(box, 123, 2, 3, 5, false)
+        boxService ! UpdateIncoming(box, 123, 2, 3, 5, overwrite = false)
         expectMsgType[IncomingUpdated]
 
         val incomingTransactions = boxDao.listIncomingTransactions

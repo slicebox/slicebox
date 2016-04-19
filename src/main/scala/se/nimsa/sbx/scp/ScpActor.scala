@@ -16,25 +16,31 @@
 
 package se.nimsa.sbx.scp
 
-import java.util.concurrent.Executor
-import java.util.concurrent.Executors
-import java.util.concurrent.ThreadFactory
-import akka.actor.Actor
-import akka.actor.ActorRef
-import akka.actor.PoisonPill
-import akka.actor.Props
-import akka.event.Logging
-import akka.event.LoggingReceive
-import java.util.Date
-import se.nimsa.sbx.log.SbxLog
-import se.nimsa.sbx.storage.StorageProtocol.DatasetReceived
-import se.nimsa.sbx.app.GeneralProtocol._
-import ScpProtocol._
+import java.util.concurrent.{Executor, Executors, ThreadFactory}
 
-class ScpActor(scpData: ScpData, executor: Executor) extends Actor {
+import akka.actor.{Actor, Props}
+import akka.event.{Logging, LoggingReceive}
+import akka.pattern.ask
+import akka.util.Timeout
+import org.dcm4che3.data.Attributes
+import se.nimsa.sbx.app.GeneralProtocol._
+import se.nimsa.sbx.dicom.DicomHierarchy.Image
+import se.nimsa.sbx.log.SbxLog
+import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, MetaDataAdded}
+import se.nimsa.sbx.scp.ScpProtocol._
+import se.nimsa.sbx.storage.StorageProtocol.{AddDataset, CheckDataset, DatasetAdded}
+
+import scala.concurrent.Future
+import scala.util.control.NonFatal
+
+class ScpActor(scpData: ScpData, executor: Executor, implicit val timeout: Timeout) extends Actor {
   
-  import context.system
-  
+  val storageService = context.actorSelection("../StorageService")
+  val metaDataService = context.actorSelection("../MetaDataService")
+
+  implicit val system = context.system
+  implicit val ec = context.dispatcher
+
   val log = Logging(context.system, this)
 
   val scheduledExecutor = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
@@ -60,11 +66,33 @@ class ScpActor(scpData: ScpData, executor: Executor) extends Actor {
   def receive = LoggingReceive {
     case DatasetReceivedByScp(dataset) =>
       log.debug("SCP", s"Dataset received using SCP ${scpData.name}")
-      context.system.eventStream.publish(DatasetReceived(dataset, Source(SourceType.SCP, scpData.name, scpData.id)))
+      val source = Source(SourceType.SCP, scpData.name, scpData.id)
+      checkDataset(dataset).flatMap { status =>
+        addMetadata(dataset, source).flatMap { image =>
+          addDataset(dataset, image).map { overwrite =>
+          }
+        }
+      }.onFailure {
+        case NonFatal(e) => SbxLog.error("Directory", s"Could not add file: ${e.getMessage}")
+      }
   }
+
+  def addMetadata(dataset: Attributes, source: Source): Future[Image] =
+    metaDataService.ask(
+      AddMetaData(dataset, source))
+      .mapTo[MetaDataAdded]
+      .map(_.image)
+
+  def addDataset(dataset: Attributes, image: Image): Future[Boolean] =
+    storageService.ask(AddDataset(dataset, image))
+      .mapTo[DatasetAdded]
+      .map(_.overwrite)
+
+  def checkDataset(dataset: Attributes): Future[Boolean] =
+    storageService.ask(CheckDataset(dataset)).mapTo[Boolean]
 
 }
 
 object ScpActor {
-  def props(scpData: ScpData, executor: Executor): Props = Props(new ScpActor(scpData, executor))
+  def props(scpData: ScpData, executor: Executor, timeout: Timeout): Props = Props(new ScpActor(scpData, executor, timeout))
 }

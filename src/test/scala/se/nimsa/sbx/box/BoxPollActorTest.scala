@@ -1,43 +1,29 @@
 package se.nimsa.sbx.box
 
-import akka.testkit.TestKit
-import org.scalatest.BeforeAndAfterEach
-import akka.testkit.ImplicitSender
-import org.scalatest.BeforeAndAfterAll
-import akka.actor.ActorSystem
-import org.scalatest.Matchers
-import org.scalatest.WordSpecLike
 import java.nio.file.Files
-import scala.slick.driver.H2Driver
-import se.nimsa.sbx.app.DbProps
-import scala.slick.jdbc.JdbcBackend.Database
+
+import akka.actor.{Actor, ActorSystem, Props, ReceiveTimeout}
+import akka.testkit.{ImplicitSender, TestKit}
+import akka.util.Timeout
+import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
+import se.nimsa.sbx.anonymization.AnonymizationServiceActor
+import se.nimsa.sbx.app.{DbProps, JsonFormats}
 import se.nimsa.sbx.box.BoxProtocol._
-import se.nimsa.sbx.anonymization.AnonymizationProtocol._
-import se.nimsa.sbx.storage.StorageProtocol.DatasetReceived
+import se.nimsa.sbx.box.MockupStorageActor.{ShowBadBehavior, ShowGoodBehavior}
+import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, MetaDataAdded}
+import se.nimsa.sbx.util.CompressionUtil._
 import se.nimsa.sbx.util.TestUtil
-import akka.actor.Actor
-import akka.actor.Props
-import spray.http.HttpResponse
-import spray.http.HttpRequest
+import se.nimsa.sbx.dicom.DicomHierarchy.Image
+import spray.http.StatusCodes._
+import spray.http._
+import spray.httpx.marshalling._
+import spray.httpx.SprayJsonSupport._
+
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.Future
-import spray.http.StatusCodes._
 import scala.concurrent.duration.DurationInt
-import se.nimsa.sbx.app.JsonFormats
-import spray.httpx.marshalling._
-import spray.httpx.SprayJsonSupport.sprayJsonMarshaller
-import spray.http.HttpEntity
-import spray.http.StatusCodes
-import spray.http.ContentTypes
-import java.nio.file.Paths
-import spray.http.HttpData
-import akka.actor.ReceiveTimeout
-import se.nimsa.sbx.anonymization.AnonymizationServiceActor
-import akka.util.Timeout
-import se.nimsa.sbx.storage.StorageProtocol.GetDataset
-import se.nimsa.sbx.box.MockupStorageActor.ShowGoodBehavior
-import se.nimsa.sbx.box.MockupStorageActor.ShowBadBehavior
-import se.nimsa.sbx.util.CompressionUtil._
+import scala.slick.driver.H2Driver
+import scala.slick.jdbc.JdbcBackend.Database
 
 class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
     with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach with JsonFormats {
@@ -58,7 +44,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
   val remoteBoxBaseUrl = "https://someurl.com"
   val remoteBox =
     db.withSession { implicit session =>
-      boxDao.insertBox(Box(-1, "some remote box", "abc", remoteBoxBaseUrl, BoxSendMethod.PUSH, false))
+      boxDao.insertBox(Box(-1, "some remote box", "abc", remoteBoxBaseUrl, BoxSendMethod.PUSH, online = false))
     }
 
   val notFoundResponse = HttpResponse(NotFound)
@@ -66,10 +52,16 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
   val mockHttpResponses: ArrayBuffer[HttpResponse] = ArrayBuffer()
   val capturedRequests: ArrayBuffer[HttpRequest] = ArrayBuffer()
 
+  val metaDataService = system.actorOf(Props(new Actor() {
+    def receive = {
+      case AddMetaData(dataset, source) =>
+        sender ! MetaDataAdded(null, null, null, Image(12, 22, null, null, null), null)
+    }
+  }), name = "MetaDataService")
   val storageService = system.actorOf(Props[MockupStorageActor], name = "StorageService")
   val anonymizationService = system.actorOf(AnonymizationServiceActor.props(dbProps, 5.minutes), name = "AnonymizationService")
   val boxService = system.actorOf(BoxServiceActor.props(dbProps, "http://testhost:1234", 1.minute), name = "BoxService")
-  val pollBoxActorRef = system.actorOf(Props(new BoxPollActor(remoteBox, Timeout(30.seconds), 1.hour, 1000.hours, "../BoxService", "../StorageService", "../AnonymizationService") {
+  val pollBoxActorRef = system.actorOf(Props(new BoxPollActor(remoteBox, Timeout(30.seconds), 1.hour, 1000.hours, "../BoxService", "../MetaDataService", "../StorageService", "../AnonymizationService") {
 
     override def sendRequestToRemoteBoxPipeline = {
       (req: HttpRequest) =>
@@ -119,7 +111,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       val outgoingTransactionId = 999
       val outgoingImageId = 33
       val transaction = OutgoingTransaction(outgoingTransactionId, 987, "some box", 1, 2, 112233, 112233, TransactionStatus.WAITING)
-      val image = OutgoingImage(outgoingImageId, outgoingTransactionId, 666, 1, false)
+      val image = OutgoingImage(outgoingImageId, outgoingTransactionId, 666, 1, sent = false)
       val transactionImage = OutgoingTransactionImage(transaction, image)
       
       marshal(transactionImage) match {
@@ -138,7 +130,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       val outgoingTransactionId = 999
       val outgoingImageId = 33
       val transaction = OutgoingTransaction(outgoingTransactionId, 987, "some box", 1, 2, 2, 2, TransactionStatus.WAITING)
-      val image = OutgoingImage(outgoingImageId, outgoingTransactionId, 666, 1, false)
+      val image = OutgoingImage(outgoingImageId, outgoingTransactionId, 666, 1, sent = false)
       val transactionImage = OutgoingTransactionImage(transaction, image)
 
       marshal(transactionImage) match {
@@ -211,8 +203,8 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
     "mark incoming transaction as finished when all files have been received" in {
       val outgoingTransactionId = 999
       val transaction = OutgoingTransaction(outgoingTransactionId, 987, "some box", 0, 2, 112233, 112233, TransactionStatus.WAITING)
-      val image1 = OutgoingImage(1, outgoingTransactionId, 1, 1, false)
-      val image2 = OutgoingImage(2, outgoingTransactionId, 2, 2, false)
+      val image1 = OutgoingImage(1, outgoingTransactionId, 1, 1, sent = false)
+      val image2 = OutgoingImage(2, outgoingTransactionId, 2, 2, sent = false)
       val transactionImage1 = OutgoingTransactionImage(transaction.copy(sentImageCount = 1), image1)
       val transactionImage2 = OutgoingTransactionImage(transaction.copy(sentImageCount = 2), image2)
   
@@ -239,15 +231,15 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       db.withSession { implicit session =>
         val incomingTransactions = boxDao.listIncomingTransactions
         incomingTransactions should have length 1
-        incomingTransactions(0).status shouldBe TransactionStatus.FINISHED
+        incomingTransactions.head.status shouldBe TransactionStatus.FINISHED
       }
     }
     
     "mark incoming transaction as failed if the number of received files does not match the number of images in the transaction (the highest sequence number)" in {
       val outgoingTransactionId = 999
       val transaction = OutgoingTransaction(outgoingTransactionId, 987, "some box", 0, 3, 112233, 112233, TransactionStatus.WAITING)
-      val image1 = OutgoingImage(1, outgoingTransactionId, 1, 1, false)
-      val image2 = OutgoingImage(3, outgoingTransactionId, 2, 3, false)
+      val image1 = OutgoingImage(1, outgoingTransactionId, 1, 1, sent = false)
+      val image2 = OutgoingImage(3, outgoingTransactionId, 2, 3, sent = false)
       val transactionImage1 = OutgoingTransactionImage(transaction.copy(sentImageCount = 1), image1)
       val transactionImage2 = OutgoingTransactionImage(transaction.copy(sentImageCount = 3), image2)
   
@@ -274,14 +266,14 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       db.withSession { implicit session =>
         val incomingTransactions = boxDao.listIncomingTransactions
         incomingTransactions should have length 1
-        incomingTransactions(0).status shouldBe TransactionStatus.FAILED
+        incomingTransactions.head.status shouldBe TransactionStatus.FAILED
       }
     }
     
     "keep trying to fetch remote file until fetching succeeds" in {
       val outgoingTransactionId = 999
       val transaction = OutgoingTransaction(outgoingTransactionId, 987, "some box", 1, 2, 2, 2, TransactionStatus.WAITING)
-      val image = OutgoingImage(456, outgoingTransactionId, 33, 1, false)
+      val image = OutgoingImage(456, outgoingTransactionId, 33, 1, sent = false)
       val transactionImage = OutgoingTransactionImage(transaction, image)
 
       marshal(transactionImage) match {
@@ -320,7 +312,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
     "should tell the box it is pulling images from that a transaction has failed due to receiving an invalid DICOM file" in {
       val outgoingTransactionId = 999
       val transaction = OutgoingTransaction(outgoingTransactionId, 987, "some box", 1, 2, 2, 2, TransactionStatus.WAITING)
-      val image = OutgoingImage(456, outgoingTransactionId, 33, 1, false)
+      val image = OutgoingImage(456, outgoingTransactionId, 33, 1, sent = false)
       val transactionImage = OutgoingTransactionImage(transaction, image)
 
       marshal(transactionImage) match {
@@ -347,7 +339,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
       val outgoingTransactionId = 999
       val transaction = OutgoingTransaction(outgoingTransactionId, 987, "some box", 1, 2, 2, 2, TransactionStatus.WAITING)
-      val image = OutgoingImage(456, outgoingTransactionId, 33, 1, false)
+      val image = OutgoingImage(456, outgoingTransactionId, 33, 1, sent = false)
       val transactionImage = OutgoingTransactionImage(transaction, image)
 
       marshal(transactionImage) match {

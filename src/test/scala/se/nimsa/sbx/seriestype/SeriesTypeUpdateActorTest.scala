@@ -2,34 +2,26 @@ package se.nimsa.sbx.seriestype
 
 import java.nio.file.Files
 
+import akka.actor.ActorSelection.toScala
+import akka.actor.ActorSystem
+import akka.testkit.{ImplicitSender, TestKit}
+import akka.util.Timeout.durationToTimeout
+import org.dcm4che3.data.{Keyword, Tag}
+import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
+import se.nimsa.sbx.app.DbProps
+import se.nimsa.sbx.app.GeneralProtocol.{Source, SourceType}
+import se.nimsa.sbx.dicom.DicomHierarchy.Series
+import se.nimsa.sbx.dicom.DicomUtil
+import se.nimsa.sbx.metadata.MetaDataProtocol.AddMetaData
+import se.nimsa.sbx.metadata.{MetaDataDAO, MetaDataServiceActor, PropertiesDAO}
+import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
+import se.nimsa.sbx.storage.StorageProtocol.{AddDataset, DatasetAdded}
+import se.nimsa.sbx.storage.StorageServiceActor
+import se.nimsa.sbx.util.TestUtil
+
 import scala.concurrent.duration.DurationInt
 import scala.slick.driver.H2Driver
 import scala.slick.jdbc.JdbcBackend.Database
-
-import org.dcm4che3.data.Keyword
-import org.dcm4che3.data.Tag
-import org.scalatest.BeforeAndAfterAll
-import org.scalatest.BeforeAndAfterEach
-import org.scalatest.Matchers
-import org.scalatest.WordSpecLike
-
-import akka.actor.ActorSelection.toScala
-import akka.actor.ActorSystem
-import akka.testkit.ImplicitSender
-import akka.testkit.TestKit
-import akka.util.Timeout.durationToTimeout
-import se.nimsa.sbx.app.DbProps
-import se.nimsa.sbx.app.GeneralProtocol.Source
-import se.nimsa.sbx.app.GeneralProtocol.SourceType
-import se.nimsa.sbx.dicom.DicomHierarchy.Series
-import se.nimsa.sbx.metadata.MetaDataDAO
-import se.nimsa.sbx.metadata.MetaDataServiceActor
-import se.nimsa.sbx.metadata.PropertiesDAO
-import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
-import se.nimsa.sbx.storage.StorageProtocol.AddDataset
-import se.nimsa.sbx.storage.StorageProtocol.DatasetAdded
-import se.nimsa.sbx.storage.StorageServiceActor
-import se.nimsa.sbx.util.TestUtil
 
 class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
     with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {
@@ -51,7 +43,7 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
     propertiesDao.create
   }
 
-  val storageService = system.actorOf(StorageServiceActor.props(storage, 5.minutes), name = "StorageService")
+  val storageService = system.actorOf(StorageServiceActor.props(storage), name = "StorageService")
   val metaDataService = system.actorOf(MetaDataServiceActor.props(dbProps), name = "MetaDataService")
   val seriesTypeServiceActor = system.actorOf(SeriesTypeServiceActor.props(dbProps, 1.minute), name = "SeriesTypeService")
   val seriesTypeUpdateService = system.actorSelection("user/SeriesTypeService/SeriesTypeUpdate")
@@ -86,7 +78,7 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
       val seriesSeriesTypes = seriesSeriesTypesForSeries(series)
 
       seriesSeriesTypes.size should be(1)
-      seriesSeriesTypes(0).seriesTypeId should be(seriesType.id)
+      seriesSeriesTypes.head.seriesTypeId should be(seriesType.id)
     }
 
     "not add series type that do not match series" in {
@@ -185,11 +177,10 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
       patientName = patientName,
       patientSex = patientSex)
 
-    val source = Source(SourceType.UNKNOWN, "unknown source", -1)
-    storageService ! AddDataset(dataset, source)
-    expectMsgPF() {
-      case DatasetAdded(image, source, overwrite) => true
-    }
+    val image = DicomUtil.datasetToImage(dataset)
+    metaDataService ! AddMetaData(dataset, Source(SourceType.BOX, "remote box", 1))
+    storageService ! AddDataset(dataset, image)
+    expectMsgType[DatasetAdded]
 
     val series = db.withSession { implicit session =>
       metaDataDao.series

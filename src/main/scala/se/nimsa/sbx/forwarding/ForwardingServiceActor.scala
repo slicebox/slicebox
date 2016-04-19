@@ -29,6 +29,7 @@ import akka.actor.Props
 import akka.event.Logging
 import akka.event.LoggingReceive
 import akka.pattern.ask
+import akka.pattern.pipe
 import akka.util.Timeout
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.app.DbProps
@@ -92,8 +93,9 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
   def receive = LoggingReceive {
 
     case DatasetAdded(image, overwrite) =>
-      val applicableRules = maybeAddImageToForwardingQueue(image, sender)
-      sender ! ImageRegisteredForForwarding(image, applicableRules)
+      maybeAddImageToForwardingQueue(image, sender).map { applicableRules =>
+        ImageRegisteredForForwarding(image, applicableRules)
+      }.pipeTo(sender)
 
     case ImageDeleted(imageId) =>
       removeImageFromTransactions(imageId)
@@ -152,21 +154,23 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
       forwardingDao.removeForwardingRule(forwardingRuleId)
     }
 
-  def maybeAddImageToForwardingQueue(image: Image, origin: ActorRef): List[ForwardingRule] =
-    if (hasForwardingRules) {
+  def maybeAddImageToForwardingQueue(image: Image, origin: ActorRef): Future[List[ForwardingRule]] =
+    getSourceForSeries(image.seriesId).map { sourceMaybe =>
+      sourceMaybe.filter(_ => hasForwardingRules).map { source =>
 
-      // look for rules with this source
-      val rules = getForwardingRulesForSourceTypeAndId(source.sourceType, source.sourceId)
+        // look for rules with this source
+        val rules = getForwardingRulesForSourceTypeAndId(source.sourceType, source.sourceId)
 
-      // check if source is box, if so, maybe transfer
-      if (source.sourceType == SourceType.BOX)
-        rules.foreach(rule => addImageToForwardingQueueForBoxSource(image, rule, origin))
-      else
-        rules.foreach(rule => self ! AddImageToForwardingQueue(image, rule, nonBoxBatchId, transferNow = false, origin))
+        // check if source is box, if so, maybe transfer
+        if (source.sourceType == SourceType.BOX)
+          rules.foreach(rule => addImageToForwardingQueueForBoxSource(image, rule, origin))
+        else
+          rules.foreach(rule => self ! AddImageToForwardingQueue(image, rule, nonBoxBatchId, transferNow = false, origin))
 
-      rules
-    } else
-      List.empty
+        rules
+
+      }.getOrElse(List.empty)
+    }
 
   def addImageToForwardingQueue(image: Image, rule: ForwardingRule, batchId: Long): (ForwardingTransaction, ForwardingTransactionImage) = {
     // look for transactions, create or update (timestamp)
@@ -378,7 +382,11 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
     futureDeletedImageIds
   }
 
-  def removeImageFromTransactions(imageId: Long) =
+  def getSourceForSeries(seriesId: Long): Future[Option[Source]] =
+    metaDataService.ask(GetSourceForSeries(seriesId)).mapTo[Option[SeriesSource]]
+      .map(_.map(_.source))
+
+  def removeImageFromTransactions(imageId: Long): Unit =
     db.withSession { implicit session =>
       forwardingDao.removeTransactionImagesForImageId(imageId)
     }

@@ -28,6 +28,7 @@ import akka.event.LoggingReceive
 import akka.pattern.ask
 import akka.util.Timeout
 import se.nimsa.sbx.dicom.DicomHierarchy.Series
+import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.DicomUtil
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.storage.StorageProtocol.GetDataset
@@ -65,12 +66,12 @@ class SeriesTypeUpdateActor(implicit val timeout: Timeout) extends Actor with Ex
       self ! PollSeriesTypesUpdateQueue
 
     case GetUpdateSeriesTypesRunningStatus =>
-      sender ! UpdateSeriesTypesRunningStatus(seriesToUpdate.size > 0 || seriesBeingUpdated.size > 0)
+      sender ! UpdateSeriesTypesRunningStatus(seriesToUpdate.nonEmpty || seriesBeingUpdated.nonEmpty)
 
     case MarkSeriesAsProcessed(seriesId) =>
       seriesBeingUpdated -= seriesId
 
-    case DatasetAdded(image, source, overwrite) =>
+    case DatasetAdded(image, overwrite) =>
       self ! UpdateSeriesTypesForSeries(Seq(image.seriesId))
 
     case PollSeriesTypesUpdateQueue => pollSeriesTypesUpdateQueue()
@@ -80,7 +81,7 @@ class SeriesTypeUpdateActor(implicit val timeout: Timeout) extends Actor with Ex
     seriesToUpdate.add(seriesId)
 
   def pollSeriesTypesUpdateQueue() =
-    if (!seriesToUpdate.isEmpty)
+    if (seriesToUpdate.nonEmpty)
       nextSeriesNotBeingUpdated().foreach { seriesId =>
         val marked = markSeriesAsBeingUpdated(seriesId)
         if (marked)
@@ -101,12 +102,12 @@ class SeriesTypeUpdateActor(implicit val timeout: Timeout) extends Actor with Ex
       false
 
   def updateSeriesTypesForSeries(series: Series) = {
-    val futureImageIdOpt = removeAllSeriesTypesForSeries(series)
-      .flatMap(u => getImageIdForSeries(series))
+    val futureImageMaybe = removeAllSeriesTypesForSeries(series)
+      .flatMap(u => getImageForSeries(series))
 
-    futureImageIdOpt.flatMap(_ match {
-      case Some(imageId) =>
-        val futureDatasetMaybe = storageService.ask(GetDataset(imageId, false)).mapTo[Option[Attributes]]
+    futureImageMaybe.flatMap {
+      case Some(image) =>
+        val futureDatasetMaybe = storageService.ask(GetDataset(image, withPixelData = false)).mapTo[Option[Attributes]]
 
         val updateSeriesTypes = futureDatasetMaybe.flatMap(_.map(dataset => handleLoadedDataset(dataset, series)).getOrElse(Future.successful(Seq.empty)))
 
@@ -119,11 +120,11 @@ class SeriesTypeUpdateActor(implicit val timeout: Timeout) extends Actor with Ex
       case None =>
         self ! PollSeriesTypesUpdateQueue
         Future.successful(Seq.empty)
-    })
+    }
   }
 
   def handleLoadedDataset(dataset: Attributes, series: Series): Future[Seq[Boolean]] = {
-    getSeriesTypes().flatMap(allSeriesTypes =>
+    getSeriesTypes.flatMap(allSeriesTypes =>
       updateSeriesTypesForDataset(dataset, series, allSeriesTypes))
   }
 
@@ -178,11 +179,11 @@ class SeriesTypeUpdateActor(implicit val timeout: Timeout) extends Actor with Ex
   def getSeries(seriesId: Long): Future[Option[Series]] =
     metaDataService.ask(GetSingleSeries(seriesId)).mapTo[Option[Series]]
 
-  def getImageIdForSeries(series: Series): Future[Option[Long]] =
+  def getImageForSeries(series: Series): Future[Option[Image]] =
     metaDataService.ask(GetImages(0, 1, series.id)).mapTo[Images]
-      .map(_.images.headOption.map(_.id))
+      .map(_.images.headOption)
 
-  def getSeriesTypes(): Future[Seq[SeriesType]] =
+  def getSeriesTypes: Future[Seq[SeriesType]] =
     seriesTypeService.ask(GetSeriesTypes).mapTo[SeriesTypes].map(_.seriesTypes)
 
   def getSeriesTypeRules(seriesType: SeriesType): Future[Seq[SeriesTypeRule]] =
