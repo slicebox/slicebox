@@ -36,7 +36,9 @@ import se.nimsa.sbx.dicom.DicomUtil.datasetToPatient
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.util.ExceptionCatching
 
-class AnonymizationServiceActor(dbProps: DbProps, implicit val timeout: Timeout) extends Actor with ExceptionCatching {
+class AnonymizationServiceActor(dbProps: DbProps,
+                                implicit val timeout: Timeout,
+                                metaDataServicePath: String = "../MetaDataService") extends Actor with ExceptionCatching {
 
   val log = Logging(context.system, this)
 
@@ -46,7 +48,7 @@ class AnonymizationServiceActor(dbProps: DbProps, implicit val timeout: Timeout)
   implicit val system = context.system
   implicit val ec = context.dispatcher
 
-  val metaDataService = context.actorSelection("../MetaDataService")
+  val metaDataService = context.actorSelection(metaDataServicePath)
 
   setupDb()
 
@@ -175,7 +177,7 @@ class AnonymizationServiceActor(dbProps: DbProps, implicit val timeout: Timeout)
   def queryAnonymizationKeys(query: AnonymizationKeyQuery): List[AnonymizationKey] =
     db.withSession { implicit session =>
       val order = query.order.map(_.orderBy)
-      val orderAscending = query.order.map(_.orderAscending).getOrElse(true)
+      val orderAscending = query.order.forall(_.orderAscending)
       dao.queryAnonymizationKeys(query.startIndex, query.count, order, orderAscending, query.queryProperties)
     }
 

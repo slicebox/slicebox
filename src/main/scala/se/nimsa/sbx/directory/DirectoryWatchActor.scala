@@ -34,15 +34,19 @@ import se.nimsa.sbx.storage.StorageProtocol.{AddDataset, CheckDataset, DatasetAd
 import scala.concurrent.Future
 import scala.util.control.NonFatal
 
-class DirectoryWatchActor(watchedDirectory: WatchedDirectory, implicit val timeout: Timeout) extends Actor {
+class DirectoryWatchActor(watchedDirectory: WatchedDirectory,
+                          implicit val timeout: Timeout,
+                          metaDataServicePath: String = "../../MetaDataService",
+                          storageServicePath: String = "../../StorageService") extends Actor {
+
   val log = Logging(context.system, this)
 
   val watchServiceTask = new DirectoryWatch(self)
 
   val watchThread = new Thread(watchServiceTask, "WatchService")
 
-  val storageService = context.actorSelection("../StorageService")
-  val metaDataService = context.actorSelection("../MetaDataService")
+  val storageService = context.actorSelection(storageServicePath)
+  val metaDataService = context.actorSelection(metaDataServicePath)
 
   implicit val system = context.system
   implicit val ec = context.dispatcher

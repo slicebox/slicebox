@@ -53,12 +53,18 @@ object StorageProtocol {
 
   case class AddDataset(dataset: Attributes, image: Image) extends ImageRequest
   
-  case class AddJpeg(jpegBytes: Array[Byte], patient: Patient, study: Study, source: Source) extends ImageRequest
-  
+  case class CreateJpeg(jpegBytes: Array[Byte], patient: Patient, study: Study) extends ImageRequest
+
+  case class AddJpeg(image: Image, jpegTempPath: Path) extends ImageRequest
+
   case class DeleteDataset(image: Image) extends ImageRequest
 
   case class CreateTempZipFile(imagesAndSeries: Seq[(Image, FlatSeries)]) extends ImageRequest
 
+
+  case class JpegCreated(dataset: Attributes, jpegTempPath: Path)
+
+  case object JpegAdded
 
   case class DatasetDeleted(image: Image)
 

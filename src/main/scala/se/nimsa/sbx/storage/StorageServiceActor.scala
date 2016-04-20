@@ -68,19 +68,21 @@ class StorageServiceActor(storage: Path) extends Actor with ExceptionCatching {
             val datasetAdded = DatasetAdded(image, overwrite)
             context.system.eventStream.publish(datasetAdded)
             sender ! datasetAdded
-          }
+          } else
+            throw new IllegalArgumentException("Dataset does not conform to slicebox storage restrictions")
 
-        case AddJpeg(jpegBytes, patient, study, source) =>
-          val dcmTempPath = Files.createTempFile("slicebox-sc-", "")
-          val attributes = Jpg2Dcm(jpegBytes, patient, study, dcmTempPath.toFile)
-          val series = datasetToSeries(attributes)
-          val image = datasetToImage(attributes)
-          storeEncapsulated(patient, study, series, image, source, dcmTempPath)
+        case CreateJpeg(jpegBytes, patient, study) =>
+          val jpegTempPath = Files.createTempFile("slicebox-sc-", "")
+          val dataset = Jpg2Dcm(jpegBytes, patient, study, jpegTempPath.toFile)
+          sender ! JpegCreated(dataset, jpegTempPath)
+
+        case AddJpeg(image, jpegTempPath) =>
+          storeEncapsulated(image, jpegTempPath)
 
           log.info(s"Stored encapsulated JPEG with image id ${image.id}")
           context.system.eventStream.publish(DatasetAdded(image, overwrite = false))
 
-          sender ! image
+          sender ! JpegAdded
 
         case DeleteDataset(image) =>
           val datasetDeleted = DatasetDeleted(image)
@@ -97,7 +99,8 @@ class StorageServiceActor(storage: Path) extends Actor with ExceptionCatching {
           sender ! FileName(zipFilePath.getFileName.toString)
 
         case GetImagePath(image) =>
-          sender ! resolvePath(image).map(ImagePath(_))
+          val imagePath = resolvePath(image).map(ImagePath(_))
+          sender ! imagePath
 
         case GetDataset(image, withPixelData) =>
           sender ! readDataset(image, withPixelData)
@@ -140,22 +143,17 @@ class StorageServiceActor(storage: Path) extends Actor with ExceptionCatching {
     overwrite
   }
 
-  def storeEncapsulated(dbPatient: Patient, dbStudy: Study,
-                        series: Series, image: Image,
-                        source: Source, dcmTempPath: Path): Image = {
-    val storedPath = filePath(image)
-    Files.move(dcmTempPath, storedPath)
-    image
-  }
+  def storeEncapsulated(image: Image, dcmTempPath: Path): Unit =
+    Files.move(dcmTempPath, filePath(image))
 
-  def filePath(image: Image) = storage.resolve(fileName(image))
+  def filePath(image: Image) =
+    storage.resolve(fileName(image))
 
   def fileName(image: Image) = image.id.toString
 
   def resolvePath(image: Image): Option[Path] =
-    Some(filePath(image))
-      .filter(Files.exists(_))
-      .filter(Files.isReadable)
+    Option(filePath(image))
+      .filter(p => Files.exists(p) && Files.isReadable(p))
 
   def deleteFromStorage(images: Seq[Image]): Unit = images foreach (deleteFromStorage(_))
 

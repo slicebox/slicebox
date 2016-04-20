@@ -1,27 +1,20 @@
 package se.nimsa.sbx.app.routing
 
-import java.io.File
-import scala.slick.driver.H2Driver
-import org.dcm4che3.data.Tag
-import org.dcm4che3.data.VR
-import org.scalatest.FlatSpec
-import org.scalatest.Matchers
+import org.dcm4che3.data.{Tag, VR}
+import org.scalatest.{FlatSpec, Matchers}
 import se.nimsa.sbx.anonymization.AnonymizationDAO
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
-import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomUtil
-import se.nimsa.sbx.dicom.ImageAttribute
-import se.nimsa.sbx.util.TestUtil
-import spray.http.BodyPart
-import spray.http.ContentTypes
-import spray.http.HttpData
-import spray.http.MultipartFormData
-import spray.http.StatusCodes._
-import spray.httpx.SprayJsonSupport._
-import spray.httpx.unmarshalling.BasicUnmarshallers.ByteArrayUnmarshaller
 import se.nimsa.sbx.metadata.MetaDataDAO
-import se.nimsa.sbx.dicom.DicomPropertyValue._
+import se.nimsa.sbx.metadata.MetaDataProtocol._
+import se.nimsa.sbx.util.TestUtil
+import spray.http.{BodyPart, HttpData, MultipartFormData}
+import spray.http.StatusCodes._
+import spray.httpx.unmarshalling.BasicUnmarshallers.ByteArrayUnmarshaller
+import spray.httpx.SprayJsonSupport._
+
+import scala.slick.driver.H2Driver
 
 class AnonymizationRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
@@ -46,12 +39,12 @@ class AnonymizationRoutesTest extends FlatSpec with Matchers with RoutesTestBase
         responseAs[Image]
       }
 
-    val patient = GetAsUser("/api/metadata/patients/1") ~> routes ~> check {
+    val flatSeries = GetAsUser(s"/api/metadata/flatseries/${image.seriesId}") ~> routes ~> check {
       status should be(OK)
-      responseAs[Patient]
+      responseAs[FlatSeries]
     }
     val anonImage =
-      PutAsUser("/api/images/1/anonymize", Seq.empty[TagValue]) ~> routes ~> check {
+      PutAsUser(s"/api/images/${flatSeries.patient.id}/anonymize", Seq.empty[TagValue]) ~> routes ~> check {
         status should be(OK)
         responseAs[Image]
       }
@@ -64,9 +57,9 @@ class AnonymizationRoutesTest extends FlatSpec with Matchers with RoutesTestBase
     GetAsUser("/api/metadata/patients/2") ~> routes ~> check {
       status should be(OK)
       val anonPatient = responseAs[Patient]
-      anonPatient.patientName should not be (patient.patientName)
-      anonPatient.patientID should not be (patient.patientID)
-      anonPatient.patientSex should be(patient.patientSex)
+      anonPatient.patientName should not be flatSeries.patient.patientName
+      anonPatient.patientID should not be flatSeries.patient.patientID
+      anonPatient.patientSex should be(flatSeries.patient.patientSex)
     }
     GetAsUser("/api/metadata/studies/1") ~> routes ~> check {
       status should be(NotFound)
@@ -105,17 +98,15 @@ class AnonymizationRoutesTest extends FlatSpec with Matchers with RoutesTestBase
         responseAs[Image]
       }
 
-    val flatSeries1 =
-      GetAsUser(s"/api/metadata/flatseries/${image1.seriesId}") ~> routes ~> check {
-        status should be(OK)
-        responseAs[FlatSeries]
-      }
+    GetAsUser(s"/api/metadata/flatseries/${image1.seriesId}") ~> routes ~> check {
+      status should be(OK)
+      responseAs[FlatSeries]
+    }
 
-    val flatSeries2 =
-      GetAsUser(s"/api/metadata/flatseries/${image2.seriesId}") ~> routes ~> check {
-        status should be(OK)
-        responseAs[FlatSeries]
-      }
+    GetAsUser(s"/api/metadata/flatseries/${image2.seriesId}") ~> routes ~> check {
+      status should be(OK)
+      responseAs[FlatSeries]
+    }
 
     val anonImages =
       PostAsUser("/api/anonymization/anonymize", Seq(ImageTagValues(image1.id, Seq.empty), ImageTagValues(image2.id, Seq.empty))) ~> routes ~> check {
@@ -126,7 +117,7 @@ class AnonymizationRoutesTest extends FlatSpec with Matchers with RoutesTestBase
     anonImages should have length 2
 
     val anonFlatSeries1 =
-      GetAsUser(s"/api/metadata/flatseries/${anonImages(0).seriesId}") ~> routes ~> check {
+      GetAsUser(s"/api/metadata/flatseries/${anonImages.head.seriesId}") ~> routes ~> check {
         status should be(OK)
         responseAs[FlatSeries]
       }
@@ -184,13 +175,13 @@ class AnonymizationRoutesTest extends FlatSpec with Matchers with RoutesTestBase
       val dataset = TestUtil.createDataset(patientName = "B")
       val key1 = TestUtil.createAnonymizationKey(dataset, anonPatientName = "anon B")
       val key2 = key1.copy(patientName = "A", anonPatientName = "anon A")
-      val insertedKey1 = dao.insertAnonymizationKey(key1)
+      dao.insertAnonymizationKey(key1)
       val insertedKey2 = dao.insertAnonymizationKey(key2)
       GetAsUser("/api/anonymization/keys?startindex=0&count=1&orderby=patientName&orderascending=true") ~> routes ~> check {
         status should be(OK)
         val keys = responseAs[List[AnonymizationKey]]
         keys.length should be(1)
-        keys(0) should be(insertedKey2)
+        keys.head should be(insertedKey2)
       }
     }
   }
@@ -203,13 +194,13 @@ class AnonymizationRoutesTest extends FlatSpec with Matchers with RoutesTestBase
 
   it should "return 200 OK and a list of images corresponding to the anonymization key with the supplied ID" in {
     db.withSession { implicit session =>
-      val (dbPatient1, (dbStudy1, dbStudy2), (dbSeries1, dbSeries2, dbSeries3, dbSeries4), (dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)) = TestUtil.insertMetaData(metaDataDao)
+      val (dbPatient1, (_, _), (_, _, _, _), (dbImage1, dbImage2, _, _, _, _, _, _)) = TestUtil.insertMetaData(metaDataDao)
       val key1 = AnonymizationKey(-1, 1234, dbPatient1.patientName.value, "anonPN", dbPatient1.patientID.value, "anonPID", "", "", "", "", "", "", "", "", "", "", "", "")
       val insertedKey1 = dao.insertAnonymizationKey(key1)
       val akImage1 = AnonymizationKeyImage(-1, insertedKey1.id, dbImage1.id)
       val akImage2 = AnonymizationKeyImage(-1, insertedKey1.id, dbImage2.id)
-      val insertedAkImage1 = dao.insertAnonymizationKeyImage(akImage1)
-      val insertedAkImage2 = dao.insertAnonymizationKeyImage(akImage2)
+      dao.insertAnonymizationKeyImage(akImage1)
+      dao.insertAnonymizationKeyImage(akImage2)
       val akImages =
         GetAsUser(s"/api/anonymization/keys/${insertedKey1.id}/images") ~> routes ~> check {
           status shouldBe OK
@@ -222,7 +213,7 @@ class AnonymizationRoutesTest extends FlatSpec with Matchers with RoutesTestBase
 
   it should "return 200 OK and a list of anonymization keys when querying" in {
     db.withSession { implicit session =>
-      val (dbPatient1, (dbStudy1, dbStudy2), (dbSeries1, dbSeries2, dbSeries3, dbSeries4), (dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)) = TestUtil.insertMetaData(metaDataDao)
+      val (dbPatient1, (_, _), (_, _, _, _), (_, _, _, _, _, _, _, _)) = TestUtil.insertMetaData(metaDataDao)
       val key1 = AnonymizationKey(-1, 1234, dbPatient1.patientName.value, "anonPN", dbPatient1.patientID.value, "anonPID", "", "", "", "", "", "", "", "", "", "", "", "")
       val insertedKey1 = dao.insertAnonymizationKey(key1)
 
@@ -234,7 +225,7 @@ class AnonymizationRoutesTest extends FlatSpec with Matchers with RoutesTestBase
         }
 
       keys should have length 1
-      keys(0) shouldBe insertedKey1
+      keys.head shouldBe insertedKey1
     }
   }
 
@@ -247,11 +238,11 @@ class AnonymizationRoutesTest extends FlatSpec with Matchers with RoutesTestBase
         responseAs[Image]
       }
 
-    val (key, keyImage) =
+    val key =
       db.withSession { implicit session =>
         val key = dao.insertAnonymizationKey(AnonymizationKey(-1, 1234, "pn", "anonPN", "pid", "anonPID", "", "", "", "", "", "", "", "", "", "", "", ""))
-        val keyImage = dao.insertAnonymizationKeyImage(AnonymizationKeyImage(-1, key.id, image.id))
-        (key, keyImage)
+        dao.insertAnonymizationKeyImage(AnonymizationKeyImage(-1, key.id, image.id))
+        key
       }
 
     GetAsUser(s"/api/anonymization/keys/${key.id}/images") ~> routes ~> check {

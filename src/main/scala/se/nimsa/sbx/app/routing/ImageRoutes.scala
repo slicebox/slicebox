@@ -49,35 +49,9 @@ trait ImageRoutes {
       pathEndOrSingleSlash {
         post {
           formField('file.as[FormFile]) { file =>
-            val dataset = DicomUtil.loadDataset(file.entity.data.toByteArray, withPixelData = true)
-            val source = Source(SourceType.USER, apiUser.user, apiUser.id)
-            onSuccess(storageService.ask(CheckDataset(dataset)).mapTo[Boolean]) { status =>
-              onSuccess(metaDataService.ask(AddMetaData(dataset, source)).mapTo[MetaDataAdded]) { metaData =>
-                onSuccess(storageService.ask(AddDataset(dataset, metaData.image))) {
-                  case DatasetAdded(image, overwrite) =>
-                    import spray.httpx.SprayJsonSupport._
-                    if (overwrite)
-                      complete((OK, image))
-                    else
-                      complete((Created, image))
-                }
-              }
-            }
+            addDatasetRoute(file.entity.data.toByteArray, apiUser)
           } ~ entity(as[Array[Byte]]) { bytes =>
-            val dataset = DicomUtil.loadDataset(bytes, withPixelData = true)
-            val source = Source(SourceType.USER, apiUser.user, apiUser.id)
-            onSuccess(storageService.ask(CheckDataset(dataset)).mapTo[Boolean]) { status =>
-              onSuccess(metaDataService.ask(AddMetaData(dataset, source)).mapTo[MetaDataAdded]) { metaData =>
-                onSuccess(storageService.ask(AddDataset(dataset, metaData.image))) {
-                  case DatasetAdded(image, overwrite) =>
-                    import spray.httpx.SprayJsonSupport._
-                    if (overwrite)
-                      complete((OK, image))
-                    else
-                      complete((Created, image))
-                }
-              }
-            }
+            addDatasetRoute(bytes, apiUser)
           }
         }
       } ~ pathPrefix(LongNumber) { imageId =>
@@ -86,19 +60,21 @@ trait ImageRoutes {
             pathEndOrSingleSlash {
               get {
                 onSuccess(storageService.ask(GetImagePath(image)).mapTo[Option[ImagePath]]) {
-                  _.map(imagePath => {
+                  case Some(imagePath) =>
                     detach() {
                       autoChunk(chunkSize) {
                         complete(HttpEntity(`application/octet-stream`, HttpData(imagePath.imagePath.toFile)))
                       }
                     }
-                  }).getOrElse {
+                  case None =>
+                    println("oh no")
                     complete((NotFound, s"No file found for image id $imageId"))
-                  }
                 }
               } ~ delete {
-                onSuccess(storageService.ask(DeleteDataset(image))) {
-                  case DatasetDeleted(image) =>
+                onSuccess(storageService.ask(DeleteDataset(image)).flatMap { _ =>
+                  metaDataService.ask(DeleteMetaData(image.id))
+                }) {
+                  case _ =>
                     complete(NoContent)
                 }
               }
@@ -138,12 +114,14 @@ trait ImageRoutes {
           import spray.httpx.SprayJsonSupport._
           entity(as[Seq[Long]]) { imageIds =>
             val futureDeleted = Future.sequence {
-              imageIds.map { imageId =>
-                metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]].map { imageMaybe =>
-                  imageMaybe.map { image =>
-                    storageService.ask(DeleteDataset(image))
-                  }
-                }.unwrap
+                  imageIds.map { imageId =>
+                    metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]].map { imageMaybe =>
+                      imageMaybe.map { image =>
+                        storageService.ask(DeleteDataset(image)).flatMap { _ =>
+                          metaDataService.ask(DeleteMetaData(image.id))
+                        }
+                      }
+                    }.unwrap
               }
             }
             onSuccess(futureDeleted) { m =>
@@ -193,24 +171,23 @@ trait ImageRoutes {
           post {
             entity(as[Array[Byte]]) { jpegBytes =>
               val source = Source(SourceType.USER, apiUser.user, apiUser.id)
-              val studyPatientFuture = metaDataService.ask(GetStudy(studyId)).mapTo[Option[Study]].flatMap { studyMaybe =>
+              val addedJpegFuture = metaDataService.ask(GetStudy(studyId)).mapTo[Option[Study]].flatMap { studyMaybe =>
                 studyMaybe.map { study =>
                   metaDataService.ask(GetPatient(study.patientId)).mapTo[Option[Patient]].map { patientMaybe =>
                     patientMaybe.map { patient =>
-                      (study, patient)
+                      storageService.ask(CreateJpeg(jpegBytes, patient, study)).mapTo[JpegCreated].flatMap { jpeg =>
+                        metaDataService.ask(AddMetaData(jpeg.dataset, source)).mapTo[MetaDataAdded].flatMap { metaData =>
+                          storageService.ask(AddJpeg(metaData.image, jpeg.jpegTempPath)).map { _ => metaData.image }
+                        }
+                      }
                     }
                   }
                 }.unwrap
-              }
-              onSuccess(studyPatientFuture) {
-                case Some((study, patient)) =>
-                  onSuccess(storageService.ask(AddJpeg(jpegBytes, patient, study, source)).mapTo[Option[Image]]) {
-                    case Some(image) =>
-                      import spray.httpx.SprayJsonSupport._
-                      complete((Created, image))
-                    case _ =>
-                      complete(NotFound)
-                  }
+              }.unwrap
+              onSuccess(addedJpegFuture) {
+                case Some(image) =>
+                  import spray.httpx.SprayJsonSupport._
+                  complete((Created, image))
                 case _ =>
                   complete(NotFound)
               }
@@ -219,5 +196,24 @@ trait ImageRoutes {
         }
       }
     }
+
+  private def addDatasetRoute(bytes: Array[Byte], apiUser: ApiUser) = {
+    val dataset = DicomUtil.loadDataset(bytes, withPixelData = true)
+    val source = Source(SourceType.USER, apiUser.user, apiUser.id)
+    val futureImageAndOverwrite =
+      storageService.ask(CheckDataset(dataset)).mapTo[Boolean].flatMap { status =>
+        metaDataService.ask(AddMetaData(dataset, source)).mapTo[MetaDataAdded].flatMap { metaData =>
+          storageService.ask(AddDataset(dataset, metaData.image)).mapTo[DatasetAdded].map { datasetAdded => (metaData.image, datasetAdded.overwrite) }
+        }
+      }
+    onSuccess(futureImageAndOverwrite) {
+      case (image, overwrite) =>
+        import spray.httpx.SprayJsonSupport._
+        if (overwrite)
+          complete((OK, image))
+        else
+          complete((Created, image))
+    }
+  }
 
 }

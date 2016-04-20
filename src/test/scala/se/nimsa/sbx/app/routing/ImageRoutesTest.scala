@@ -29,6 +29,7 @@ class ImageRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     db.withSession { implicit session =>
       metaDataDao.clear
     }
+    TestUtil.deleteFolderContents(storage)
   }
 
   "Image routes" should "return 201 Created when adding an image using multipart form data" in {
@@ -63,6 +64,7 @@ class ImageRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       responseAs[Image]
     }
     GetAsUser(s"/api/images/${image.id}") ~> routes ~> check {
+      status shouldBe OK
       contentType should be(ContentTypes.`application/octet-stream`)
       val dataset = DicomUtil.loadDataset(responseAs[Array[Byte]], withPixelData = true)
       dataset should not be null
