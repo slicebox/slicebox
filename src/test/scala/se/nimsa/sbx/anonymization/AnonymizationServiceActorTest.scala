@@ -14,16 +14,12 @@ import org.scalatest.WordSpecLike
 import AnonymizationProtocol.Anonymize
 import AnonymizationProtocol.ReverseAnonymization
 import AnonymizationUtil.anonymizeDataset
-import akka.actor.Actor
 import akka.actor.ActorSystem
 import akka.actor.Props
 import akka.testkit.ImplicitSender
 import akka.testkit.TestKit
 import se.nimsa.sbx.app.DbProps
-import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.DicomUtil.datasetToImage
-import se.nimsa.sbx.metadata.MetaDataProtocol.GetImage
-import se.nimsa.sbx.metadata.MetaDataProtocol.ImageAdded
 import se.nimsa.sbx.util.TestUtil.createAnonymizationKey
 import se.nimsa.sbx.util.TestUtil.createDataset
 
@@ -43,18 +39,6 @@ class AnonymizationServiceActorTest(_system: ActorSystem) extends TestKit(_syste
 
   val anonymizationService = system.actorOf(Props(new AnonymizationServiceActor(dbProps)), name = "AnonymizationService")
 
-  case class AddImage(image: Image)
-  val metaDataService = system.actorOf(Props(new Actor {
-    var addedImages = Seq.empty[Image]
-    def receive = {
-      case AddImage(image) =>
-        addedImages = addedImages :+ image
-        sender ! ImageAdded(image, null)
-      case GetImage(imageId) =>
-        sender ! addedImages.find(_.id == imageId)
-    }
-  }), name = "MetaDataService")
-  
   override def afterEach() =
     db.withSession { implicit session =>
       anonymizationDao.clear
@@ -120,12 +104,6 @@ class AnonymizationServiceActorTest(_system: ActorSystem) extends TestKit(_syste
         val image1 = datasetToImage(dataset1).copy(id = 1)
         val image2 = datasetToImage(dataset2).copy(id = 2)
         val image3 = datasetToImage(dataset3).copy(id = 3)
-        metaDataService ! AddImage(image1)
-        expectMsgType[ImageAdded]
-        metaDataService ! AddImage(image2)
-        expectMsgType[ImageAdded]
-        metaDataService ! AddImage(image3)
-        expectMsgType[ImageAdded]
         anonymizationService ! Anonymize(image1.id, dataset1, Seq.empty)
         expectMsgType[Attributes]
         anonymizationService ! Anonymize(image2.id, dataset2, Seq.empty)

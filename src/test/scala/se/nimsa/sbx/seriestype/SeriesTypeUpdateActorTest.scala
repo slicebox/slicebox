@@ -75,7 +75,7 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
 
       val series = addTestDataset()
 
-      seriesTypeUpdateService ! UpdateSeriesTypesForSeries(Seq(series.id))
+      seriesTypeUpdateService ! UpdateSeriesTypesForSeries(series.id)
       expectNoMsg
 
       waitForSeriesTypesUpdateCompletion()
@@ -93,7 +93,7 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
 
       val series = addTestDataset()
 
-      seriesTypeUpdateService ! UpdateSeriesTypesForSeries(Seq(series.id))
+      seriesTypeUpdateService ! UpdateSeriesTypesForSeries(series.id)
       expectNoMsg
 
       waitForSeriesTypesUpdateCompletion()
@@ -113,7 +113,7 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
         seriesTypeDao.insertSeriesSeriesType(SeriesSeriesType(series.id, seriesType.id))
       }
 
-      seriesTypeUpdateService ! UpdateSeriesTypesForSeries(Seq(series.id))
+      seriesTypeUpdateService ! UpdateSeriesTypesForSeries(series.id)
       expectNoMsg
 
       waitForSeriesTypesUpdateCompletion()
@@ -128,9 +128,10 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
       val seriesType = addSeriesType()
       addMatchingRuleToSeriesType(seriesType)
 
-      seriesTypeUpdateService ! UpdateSeriesTypesForSeries(Seq(series1.id, series2.id))
+      seriesTypeUpdateService ! UpdateSeriesTypesForSeries(series1.id)
       expectNoMsg
-
+      seriesTypeUpdateService ! UpdateSeriesTypesForSeries(series2.id)
+      expectNoMsg
       waitForSeriesTypesUpdateCompletion()
 
       seriesSeriesTypesForSeries(series1).size should be(1)
@@ -145,7 +146,7 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
 
       val series = addTestDataset(patientName = "xyz", patientSex = "M")
 
-      seriesTypeUpdateService ! UpdateSeriesTypesForSeries(Seq(series.id))
+      seriesTypeUpdateService ! UpdateSeriesTypesForSeries(series.id)
       expectNoMsg
 
       waitForSeriesTypesUpdateCompletion()
@@ -161,7 +162,7 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
 
       val series = addTestDataset(patientName = "xyz", patientSex = "F")
 
-      seriesTypeUpdateService ! UpdateSeriesTypesForSeries(Seq(series.id))
+      seriesTypeUpdateService ! UpdateSeriesTypesForSeries(series.id)
       expectNoMsg
 
       waitForSeriesTypesUpdateCompletion()
