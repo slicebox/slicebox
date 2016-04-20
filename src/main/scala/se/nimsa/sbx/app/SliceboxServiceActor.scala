@@ -164,7 +164,7 @@ trait SliceboxService extends HttpService with SliceboxRoutes with JsonFormats {
   val logService = actorRefFactory.actorOf(LogServiceActor.props(dbProps), name = "LogService")
   val metaDataService = actorRefFactory.actorOf(MetaDataServiceActor.props(dbProps).withDispatcher("akka.prio-dispatcher"), name = "MetaDataService")
   val storageService = actorRefFactory.actorOf(StorageServiceActor.props(storage), name = "StorageService")
-  val anonymizationService = actorRefFactory.actorOf(AnonymizationServiceActor.props(dbProps, timeout), name = "AnonymizationService")
+  val anonymizationService = actorRefFactory.actorOf(AnonymizationServiceActor.props(dbProps), name = "AnonymizationService")
   val boxService = actorRefFactory.actorOf(BoxServiceActor.props(dbProps, apiBaseURL, timeout), name = "BoxService")
   val scpService = actorRefFactory.actorOf(ScpServiceActor.props(dbProps, timeout), name = "ScpService")
   val scuService = actorRefFactory.actorOf(ScuServiceActor.props(dbProps, timeout), name = "ScuService")

@@ -86,18 +86,19 @@ trait AnonymizationRoutes {
             }
           } ~ path("images") {
             get {
-              onSuccess(anonymizationService.ask(GetImagesForAnonymizationKey(anonymizationKeyId))) {
-                case Images(images) =>
-                  complete(images)
-              }
+              complete(anonymizationService.ask(GetImageIdsForAnonymizationKey(anonymizationKeyId)).mapTo[List[Long]].flatMap { imageIds =>
+                Future.sequence {
+                  imageIds.map { imageId =>
+                    metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]]
+                  }
+                }
+              }.map(_.flatten))
             }
           }
         } ~ path("query") {
           post {
             entity(as[AnonymizationKeyQuery]) { query =>
-              complete {
-                anonymizationService.ask(QueryAnonymizationKeys(query)).mapTo[List[AnonymizationKey]]
-              }
+              complete(anonymizationService.ask(QueryAnonymizationKeys(query)).mapTo[List[AnonymizationKey]])
             }
           }
         }

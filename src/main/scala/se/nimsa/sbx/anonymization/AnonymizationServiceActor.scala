@@ -16,8 +16,6 @@
 
 package se.nimsa.sbx.anonymization
 
-import scala.concurrent.Future
-
 import org.dcm4che3.data.Attributes
 
 import AnonymizationProtocol._
@@ -26,29 +24,18 @@ import akka.actor.Actor
 import akka.actor.Props
 import akka.event.Logging
 import akka.event.LoggingReceive
-import akka.pattern.ask
-import akka.pattern.pipe
-import akka.util.Timeout
 import se.nimsa.sbx.app.DbProps
-import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.DicomUtil.cloneDataset
 import se.nimsa.sbx.dicom.DicomUtil.datasetToPatient
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.util.ExceptionCatching
 
-class AnonymizationServiceActor(dbProps: DbProps,
-                                implicit val timeout: Timeout,
-                                metaDataServicePath: String = "../MetaDataService") extends Actor with ExceptionCatching {
+class AnonymizationServiceActor(dbProps: DbProps) extends Actor with ExceptionCatching {
 
   val log = Logging(context.system, this)
 
   val db = dbProps.db
   val dao = new AnonymizationDAO(dbProps.driver)
-
-  implicit val system = context.system
-  implicit val ec = context.dispatcher
-
-  val metaDataService = context.actorSelection(metaDataServicePath)
 
   setupDb()
 
@@ -78,9 +65,10 @@ class AnonymizationServiceActor(dbProps: DbProps,
           case GetAnonymizationKey(anonymizationKeyId) =>
             sender ! getAnonymizationKeyForId(anonymizationKeyId)
 
-          case GetImagesForAnonymizationKey(anonymizationKeyId) =>
+          case GetImageIdsForAnonymizationKey(anonymizationKeyId) =>
             val imageIds = getAnonymizationKeyImagesByAnonymizationKeyId(anonymizationKeyId).map(_.imageId)
-            getImagesFromStorage(imageIds).pipeTo(sender)
+            sender ! imageIds
+
 
           case ReverseAnonymization(dataset) =>
             val clonedDataset = cloneDataset(dataset)
@@ -163,12 +151,6 @@ class AnonymizationServiceActor(dbProps: DbProps,
       dao.anonymizationKeyImagesForAnonymizationKeyId(anonymizationKeyId)
     }
 
-  def getImagesFromStorage(imageIds: List[Long]): Future[Images] =
-    Future.sequence(
-      imageIds.map(imageId =>
-        metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]]))
-      .map(imageMaybes => Images(imageMaybes.flatten))
-
   def getAnonymizationKeyForId(id: Long): Option[AnonymizationKey] =
     db.withSession { implicit session =>
       dao.anonymizationKeyForId(id)
@@ -184,5 +166,5 @@ class AnonymizationServiceActor(dbProps: DbProps,
 }
 
 object AnonymizationServiceActor {
-  def props(dbProps: DbProps, timeout: Timeout): Props = Props(new AnonymizationServiceActor(dbProps, timeout))
+  def props(dbProps: DbProps): Props = Props(new AnonymizationServiceActor(dbProps))
 }

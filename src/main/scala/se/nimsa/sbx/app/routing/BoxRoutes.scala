@@ -20,7 +20,8 @@ import akka.pattern.ask
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.ImageTagValues
 import se.nimsa.sbx.app.SliceboxService
 import se.nimsa.sbx.box.BoxProtocol._
-import se.nimsa.sbx.metadata.MetaDataProtocol.Images
+import se.nimsa.sbx.dicom.DicomHierarchy.Image
+import se.nimsa.sbx.metadata.MetaDataProtocol.{GetImage, Images}
 import se.nimsa.sbx.user.UserProtocol.ApiUser
 import se.nimsa.sbx.user.UserProtocol.UserRole
 import spray.http.StatusCodes.Created
@@ -28,6 +29,8 @@ import spray.http.StatusCodes.NoContent
 import spray.http.StatusCodes.NotFound
 import spray.httpx.SprayJsonSupport._
 import spray.routing.Route
+
+import scala.concurrent.Future
 
 trait BoxRoutes { this: SliceboxService =>
 
@@ -107,10 +110,13 @@ trait BoxRoutes { this: SliceboxService =>
           }
         } ~ path("images") {
           get {
-            onSuccess(boxService.ask(GetImagesForIncomingTransaction(incomingTransactionId))) {
-              case Images(images) =>
-                complete(images)
-            }
+            complete(boxService.ask(GetImageIdsForIncomingTransaction(incomingTransactionId)).mapTo[List[Long]].flatMap { imageIds =>
+              Future.sequence {
+                imageIds.map { imageId =>
+                  metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]]
+                }
+              }
+            }.map(_.flatten))
           }
         }
       }
@@ -135,10 +141,13 @@ trait BoxRoutes { this: SliceboxService =>
           }
         } ~ path("images") {
           get {
-            onSuccess(boxService.ask(GetImagesForOutgoingTransaction(outgoingTransactionId))) {
-              case Images(images) =>
-                complete(images)
-            }
+            complete(boxService.ask(GetImageIdsForOutgoingTransaction(outgoingTransactionId)).mapTo[List[Long]].flatMap { imageIds =>
+              Future.sequence {
+                imageIds.map { imageId =>
+                  metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]]
+                }
+              }
+            }.map(_.flatten))
           }
         }
       }

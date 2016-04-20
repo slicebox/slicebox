@@ -16,13 +16,10 @@
 
 package se.nimsa.sbx.box
 
-import java.util.Date
 import java.util.UUID
 
 import scala.collection.mutable
-import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
-import scala.math.abs
 
 import akka.actor.Actor
 import akka.actor.PoisonPill
@@ -30,14 +27,11 @@ import akka.actor.Props
 import akka.actor.Stash
 import akka.event.Logging
 import akka.event.LoggingReceive
-import akka.pattern.ask
-import akka.pattern.pipe
 import akka.util.Timeout
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.box.BoxProtocol._
-import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.util.ExceptionCatching
@@ -50,17 +44,15 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
   val boxDao = new BoxDAO(dbProps.driver)
   import dbProps.driver.simple.Session
 
-  implicit val system = context.system
-  implicit val ec = context.dispatcher
-
   val pollBoxOnlineStatusTimeoutMillis: Long = 15000
   val pollBoxesLastPollTimestamp = mutable.Map.empty[Long, Long] // box id to timestamp
 
-  val metaDataService = context.actorSelection("../MetaDataService")
+  implicit val system = context.system
+  implicit val ec = context.dispatcher
 
   setupBoxes()
 
-  val pollBoxesOnlineStatusSchedule = system.scheduler.schedule(100.milliseconds, 7.seconds) {
+  val pollBoxesOnlineStatusSchedule = context.system.scheduler.schedule(100.milliseconds, 7.seconds) {
     self ! UpdateStatusForBoxesAndTransactions
   }
 
@@ -91,16 +83,16 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
         msg match {
 
           case CreateConnection(remoteBoxConnectionData) =>
-            val token = UUID.randomUUID().toString()
+            val token = UUID.randomUUID().toString
             val baseUrl = s"$apiBaseURL/transactions/$token"
             val name = remoteBoxConnectionData.name
-            val box = addBoxToDb(Box(-1, name, token, baseUrl, BoxSendMethod.POLL, false))
+            val box = addBoxToDb(Box(-1, name, token, baseUrl, BoxSendMethod.POLL, online = false))
             sender ! RemoteBoxAdded(box)
 
           case Connect(remoteBox) =>
             val box = pushBoxByBaseUrl(remoteBox.baseUrl) getOrElse {
               val token = baseUrlToToken(remoteBox.baseUrl)
-              addBoxToDb(Box(-1, remoteBox.name, token, remoteBox.baseUrl, BoxSendMethod.PUSH, false))
+              addBoxToDb(Box(-1, remoteBox.name, token, remoteBox.baseUrl, BoxSendMethod.PUSH, online = false))
             }
             maybeStartPushActor(box)
             maybeStartPollActor(box)
@@ -117,7 +109,7 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
             sender ! BoxRemoved(boxId)
 
           case GetBoxes =>
-            val boxes = getBoxesFromDb()
+            val boxes = getBoxesFromDb
             sender ! Boxes(boxes)
 
           case GetBoxById(boxId) =>
@@ -149,10 +141,10 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
                     val nIncomingImages = boxDao.countIncomingImagesForIncomingTransactionId(incomingTransaction.id)
                     val status =
                       if (nIncomingImages == totalImageCount) {
-                        SbxLog.info("Box", s"Received ${totalImageCount} files from box ${box.name}")
+                        SbxLog.info("Box", s"Received $totalImageCount files from box ${box.name}")
                         TransactionStatus.FINISHED
                       } else {
-                        SbxLog.error("Box", s"Finished receiving ${totalImageCount} files from box ${box.name}, but only $nIncomingImages files can be found at this time.")
+                        SbxLog.error("Box", s"Finished receiving $totalImageCount files from box ${box.name}, but only $nIncomingImages files can be found at this time.")
                         TransactionStatus.FAILED
                       }
                     boxDao.setIncomingTransactionStatus(incomingTransaction.id, status)
@@ -209,13 +201,13 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
           case GetOutgoingTransactions =>
             sender ! OutgoingTransactions(getOutgoingTransactions)
 
-          case GetImagesForIncomingTransaction(incomingTransactionId) =>
+          case GetImageIdsForIncomingTransaction(incomingTransactionId) =>
             val imageIds = getIncomingImagesByIncomingTransactionId(incomingTransactionId).map(_.imageId)
-            getImageMetaData(imageIds).pipeTo(sender)
+            sender ! imageIds
 
-          case GetImagesForOutgoingTransaction(outgoingTransactionId) =>
+          case GetImageIdsForOutgoingTransaction(outgoingTransactionId) =>
             val imageIds = getOutgoingImagesByOutgoingTransactionId(outgoingTransactionId).map(_.imageId)
-            getImageMetaData(imageIds).pipeTo(sender)
+            sender ! imageIds
 
           case RemoveOutgoingTransaction(outgoingTransactionId) =>
             removeOutgoingTransactionFromDb(outgoingTransactionId)
@@ -307,7 +299,7 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
       boxDao.removeBox(boxId)
     }
 
-  def getBoxesFromDb(): Seq[Box] =
+  def getBoxesFromDb: Seq[Box] =
     db.withSession { implicit session =>
       boxDao.listBoxes
     }
@@ -368,7 +360,7 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
       imageTagValuesSeq.zipWithIndex.foreach {
         case (imageTagValues, index) =>
           val sequenceNumber = index + 1
-          val outgoingImage = boxDao.insertOutgoingImage(OutgoingImage(-1, outgoingTransaction.id, imageTagValues.imageId, sequenceNumber, false))
+          val outgoingImage = boxDao.insertOutgoingImage(OutgoingImage(-1, outgoingTransaction.id, imageTagValues.imageId, sequenceNumber, sent = false))
           imageTagValues.tagValues.foreach { tagValue =>
             boxDao.insertOutgoingTagValue(OutgoingTagValue(-1, outgoingImage.id, tagValue))
           }
@@ -424,12 +416,6 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
     db.withSession { implicit session =>
       boxDao.tagValuesByOutgoingTransactionImage(transactionImage.transaction.id, transactionImage.image.id)
     }
-
-  def getImageMetaData(imageIds: List[Long]): Future[Images] =
-    Future.sequence(
-      imageIds.map(imageId =>
-        metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]]))
-      .map(imageMaybes => Images(imageMaybes.flatten))
 
   def incomingTransactionForImageId(imageId: Long): Option[IncomingTransaction] =
     db.withSession { implicit session =>

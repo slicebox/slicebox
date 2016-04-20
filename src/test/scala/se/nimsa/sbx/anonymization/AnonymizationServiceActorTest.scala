@@ -1,6 +1,5 @@
 package se.nimsa.sbx.anonymization
 
-import scala.concurrent.duration.DurationInt
 import scala.slick.driver.H2Driver
 import scala.slick.jdbc.JdbcBackend.Database
 
@@ -20,7 +19,6 @@ import akka.actor.ActorSystem
 import akka.actor.Props
 import akka.testkit.ImplicitSender
 import akka.testkit.TestKit
-import akka.util.Timeout.durationToTimeout
 import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.DicomUtil.datasetToImage
@@ -43,7 +41,7 @@ class AnonymizationServiceActorTest(_system: ActorSystem) extends TestKit(_syste
     anonymizationDao.create
   }
 
-  val anonymizationService = system.actorOf(Props(new AnonymizationServiceActor(dbProps, 5.minutes)), name = "AnonymizationService")
+  val anonymizationService = system.actorOf(Props(new AnonymizationServiceActor(dbProps)), name = "AnonymizationService")
 
   case class AddImage(image: Image)
   val metaDataService = system.actorOf(Props(new Actor {
