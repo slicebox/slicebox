@@ -6,25 +6,27 @@ import akka.actor.ActorSelection.toScala
 import akka.actor.ActorSystem
 import akka.testkit.{ImplicitSender, TestKit}
 import akka.util.Timeout.durationToTimeout
+import akka.pattern.ask
+import akka.util.Timeout
 import org.dcm4che3.data.{Keyword, Tag}
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
 import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.app.GeneralProtocol.{Source, SourceType}
 import se.nimsa.sbx.dicom.DicomHierarchy.Series
-import se.nimsa.sbx.dicom.DicomUtil
-import se.nimsa.sbx.metadata.MetaDataProtocol.AddMetaData
+import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, MetaDataAdded}
 import se.nimsa.sbx.metadata.{MetaDataDAO, MetaDataServiceActor, PropertiesDAO}
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
-import se.nimsa.sbx.storage.StorageProtocol.{AddDataset, DatasetAdded}
+import se.nimsa.sbx.storage.StorageProtocol.AddDataset
 import se.nimsa.sbx.storage.StorageServiceActor
 import se.nimsa.sbx.util.TestUtil
 
+import scala.concurrent.Await
 import scala.concurrent.duration.DurationInt
 import scala.slick.driver.H2Driver
 import scala.slick.jdbc.JdbcBackend.Database
 
 class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
-    with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {
+  with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {
 
   def this() = this(ActorSystem("SeriesTypesUpdateActorSystem"))
 
@@ -36,6 +38,9 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
   val seriesTypeDao = new SeriesTypeDAO(H2Driver)
   val metaDataDao = new MetaDataDAO(H2Driver)
   val propertiesDao = new PropertiesDAO(H2Driver)
+
+  implicit val timeout = Timeout(30.seconds)
+  implicit val ec = system.dispatcher
 
   db.withSession { implicit session =>
     seriesTypeDao.create
@@ -72,7 +77,7 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
 
       seriesTypeUpdateService ! UpdateSeriesTypesForSeries(Seq(series.id))
       expectNoMsg
-      
+
       waitForSeriesTypesUpdateCompletion()
 
       val seriesSeriesTypes = seriesSeriesTypesForSeries(series)
@@ -166,10 +171,10 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
   }
 
   def addTestDataset(
-    sopInstanceUID: String = "sop id 1",
-    seriesInstanceUID: String = "series 1",
-    patientName: String = "abc",
-    patientSex: String = "F"): Series = {
+                      sopInstanceUID: String = "sop id 1",
+                      seriesInstanceUID: String = "series 1",
+                      patientName: String = "abc",
+                      patientSex: String = "F"): Series = {
 
     val dataset = TestUtil.createDataset(
       sopInstanceUID = sopInstanceUID,
@@ -177,16 +182,17 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
       patientName = patientName,
       patientSex = patientSex)
 
-    val image = DicomUtil.datasetToImage(dataset)
-    metaDataService ! AddMetaData(dataset, Source(SourceType.BOX, "remote box", 1))
-    storageService ! AddDataset(dataset, image)
-    expectMsgType[DatasetAdded]
-
-    val series = db.withSession { implicit session =>
-      metaDataDao.series
-    }
-
-    series.last
+    Await.result(
+      metaDataService.ask(AddMetaData(dataset, Source(SourceType.BOX, "remote box", 1)))
+        .mapTo[MetaDataAdded]
+        .flatMap { metaData =>
+          storageService.ask(AddDataset(dataset, metaData.image))
+        }.map { _ =>
+        val series = db.withSession { implicit session =>
+          metaDataDao.series
+        }
+        series.last
+      }, 30.seconds)
   }
 
   def addSeriesType(): SeriesType =
@@ -212,9 +218,9 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
     }
 
   def addSeriesTypeRuleAttribute(
-    seriesTypeRule: SeriesTypeRule,
-    tag: Int,
-    values: String): SeriesTypeRuleAttribute =
+                                  seriesTypeRule: SeriesTypeRule,
+                                  tag: Int,
+                                  values: String): SeriesTypeRuleAttribute =
     db.withSession { implicit session =>
       seriesTypeDao.insertSeriesTypeRuleAttribute(
         SeriesTypeRuleAttribute(-1,
@@ -234,7 +240,7 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
       seriesTypeUpdateService ! GetUpdateSeriesTypesRunningStatus
 
       expectMsgPF() { case UpdateSeriesTypesRunningStatus(running) => statusUpdateRunning = running }
-      
+
       Thread.sleep(500)
       attempt += 1
     }

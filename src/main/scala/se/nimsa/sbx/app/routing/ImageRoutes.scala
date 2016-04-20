@@ -211,7 +211,7 @@ trait ImageRoutes {
                     case _ =>
                       complete(NotFound)
                   }
-                case None =>
+                case _ =>
                   complete(NotFound)
               }
             }
