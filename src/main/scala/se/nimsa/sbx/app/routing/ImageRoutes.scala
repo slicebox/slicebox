@@ -67,7 +67,6 @@ trait ImageRoutes {
                       }
                     }
                   case None =>
-                    println("oh no")
                     complete((NotFound, s"No file found for image id $imageId"))
                 }
               } ~ delete {

@@ -16,7 +16,6 @@ import se.nimsa.sbx.storage.StorageProtocol.DeleteDataset
 import se.nimsa.sbx.util.SbxExtensions._
 
 import scala.concurrent.Future
-import scala.concurrent.duration.FiniteDuration
 
 class ForwardingActor(rule: ForwardingRule, transaction: ForwardingTransaction, images: Seq[ForwardingTransactionImage], implicit val timeout: Timeout) extends Actor {
 
@@ -28,39 +27,19 @@ class ForwardingActor(rule: ForwardingRule, transaction: ForwardingTransaction, 
   val boxService = context.actorSelection("../../BoxService")
   val scuService = context.actorSelection("../../ScuService")
 
-  val nonBoxBatchId = 1L
+  doForward()
 
-  system.scheduler.schedule(pollInterval + pollInterval / 2, pollInterval) {
-    self ! FinalizeSentTransactions
-  }
-
-  /**
-    * Happy flow for BOX sources:
-    * ImageAdded (ImageRegisteredForForwarding to sender)
-    * AddImageToForwardingQueue (one per applicable rule) (ImageAddedToForwardingQueue to sender of ImageAdded)
-    * (transfer is made if batch is complete)
-    * ImagesSent (TransactionMarkedAsDelivered to sender (box, scu))
-    * FinalizeSentTransactions (TransactionsFinalized to sender (self))
-    *
-    * Happy flow for non-BOX sources:
-    * ImageAdded (ImageRegisteredForForwarding to sender)
-    * AddImageToForwardingQueue (one per applicable rule) (ImageAddedToForwardingQueue to sender of ImageAdded)
-    * PollForwardingQueue (until transaction update period expires) (TransactionsEnroute to sender (self))
-    * (transfer is made)
-    * ImagesSent (TransactionMarkedAsDelivered to sender (box, scu))
-    * FinalizeSentTransactions (TransactionsFinalized to sender (self))
-    */
   def receive = LoggingReceive {
-    case FinalizeForwarding =>
-
-      if (imageIdsToDelete.nonEmpty)
-        SbxLog.info("Forwarding", s"Deleted ${imageIdsToDelete.length} images after forwarding.")
-
-      val (transactionsToRemove, idsOfDeletedImages) = finalizeSentTransactions()
-      sender ! TransactionsFinalized(transactionsToRemove, idsOfDeletedImages)
+    case FinalizeForwarding(deleteImages) =>
+      if (deleteImages)
+        doDelete().andThen {
+          case _ => context.stop(self)
+        }
+      else
+        context.stop(self)
   }
 
-  def makeTransfer(): Unit = {
+  def doForward(): Unit = {
 
     SbxLog.info("Forwarding", s"Forwarding ${images.length} images from ${rule.source.sourceType.toString()} ${rule.source.sourceName} to ${rule.destination.destinationType.toString()} ${rule.destination.destinationName}.")
 
@@ -81,48 +60,17 @@ class ForwardingActor(rule: ForwardingRule, transaction: ForwardingTransaction, 
           .onFailure {
             case e: Throwable =>
               SbxLog.warn("Forwarding", "Could not forward images to SCP. Trying again later. Message: " + e.getMessage)
-              self ! UpdateTransaction(transaction, enroute = false, delivered = false)
+              context.parent ! UpdateTransaction(transaction.copy(enroute = false, delivered = false))
           }
       case _ =>
         SbxLog.error("Forwarding", "Unknown destination type")
     }
   }
 
-  def finalizeSentTransactions(): (List[ForwardingProtocol.ForwardingTransaction], List[Long]) = {
-    /*
-     * This is tricky since we allow many rules with the same source, but different choices for keep images.
-     * - It is safe to remove delivered transactions with keepImages=true
-     * - If keepImages=false, wait until all transactions with the same source have been delivered,
-     *   then delete.
-     * - If there are multiple rules with the same source and differing choices for keepImages,
-     *   keepImages=false wins, i.e. images will be deleted eventually.
-     */
-    val transactionsAndRules = transactionsToRulesAndTransactions(getDeliveredTransactions)
-    val toRemoveButNotDeleteImages = transactionsAndRules.filter(_._1.keepImages).map(_._2)
-    val toRemoveAndDeleteImages = transactionsAndRules.filter {
-      case (rule, transaction) =>
-        !rule.keepImages && getUndeliveredTransactionsForSource(rule.source).isEmpty
-    }.map(_._2)
-    val transactionsToRemove = toRemoveButNotDeleteImages ++ toRemoveAndDeleteImages
-    val imageIdsToDelete = toRemoveAndDeleteImages.flatMap(transaction =>
-      getTransactionImagesForTransactionId(transaction.id).map(_.imageId))
-      .distinct
-    transactionsToRemove.foreach(transaction => removeTransactionForId(transaction.id))
-    deleteImages(imageIdsToDelete)
+  def doDelete(): Future[Seq[Long]] = {
 
-    if (transactionsToRemove.nonEmpty) {
-      SbxLog.info("Forwarding", s"Finalized ${transactionsToRemove.length} transactions.")
-      if (imageIdsToDelete.nonEmpty)
-        SbxLog.info("Forwarding", s"Deleted ${imageIdsToDelete.length} images after forwarding.")
-    }
-
-    (transactionsToRemove, imageIdsToDelete)
-  }
-
-
-  def deleteImages(imageIds: List[Long]): Future[Seq[Long]] = {
     val futureDeletedImageIds = Future.sequence {
-      imageIds.map { imageId =>
+      images.map(_.imageId).map { imageId =>
         metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]].map { imageMaybe =>
           imageMaybe.map { image =>
             metaDataService.ask(DeleteMetaData(imageId)).flatMap { _ =>

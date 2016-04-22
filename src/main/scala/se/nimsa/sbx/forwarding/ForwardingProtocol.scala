@@ -51,7 +51,9 @@ object ForwardingProtocol {
   
   case object FinalizeSentTransactions
 
-  case object FinalizeForwarding
+  case class FinalizeForwarding(deleteImages: Boolean)
+
+  case class UpdateTransaction(transaction: ForwardingTransaction)
 
 
   case class ImageRegisteredForForwarding(image: Image, applicableRules: List[ForwardingRule])
@@ -60,5 +62,5 @@ object ForwardingProtocol {
   
   case class TransactionMarkedAsDelivered(transactionMaybe: Option[ForwardingTransaction])
   
-  case class TransactionsFinalized(transactionsToRemove: List[ForwardingTransaction], idsOfDeletedImages: List[Long])
+  case class TransactionsFinalized(removedTransactions: List[ForwardingTransaction])
 }
