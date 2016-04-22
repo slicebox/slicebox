@@ -16,18 +16,14 @@
 
 package se.nimsa.sbx.anonymization
 
+import akka.actor.{Actor, Props}
+import akka.event.{Logging, LoggingReceive}
 import org.dcm4che3.data.Attributes
-
-import AnonymizationProtocol._
-import AnonymizationUtil._
-import akka.actor.Actor
-import akka.actor.Props
-import akka.event.Logging
-import akka.event.LoggingReceive
+import se.nimsa.sbx.anonymization.AnonymizationProtocol._
+import se.nimsa.sbx.anonymization.AnonymizationUtil._
 import se.nimsa.sbx.app.DbProps
-import se.nimsa.sbx.dicom.DicomUtil.cloneDataset
-import se.nimsa.sbx.dicom.DicomUtil.datasetToPatient
-import se.nimsa.sbx.metadata.MetaDataProtocol._
+import se.nimsa.sbx.app.GeneralProtocol.ImageDeleted
+import se.nimsa.sbx.dicom.DicomUtil.{cloneDataset, datasetToPatient}
 import se.nimsa.sbx.util.ExceptionCatching
 
 class AnonymizationServiceActor(dbProps: DbProps) extends Actor with ExceptionCatching {

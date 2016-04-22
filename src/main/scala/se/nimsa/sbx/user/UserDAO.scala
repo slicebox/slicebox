@@ -43,10 +43,10 @@ class UserDAO(val driver: JdbcProfile) {
     def token = column[String]("token")
     def ip = column[String]("ip")
     def userAgent = column[String]("useragent")
-    def lastUpdated = column[Long]("lastupdated")
+    def updated = column[Long]("updated")
     def fkUser = foreignKey("fk_user", userId, userQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
     def idxUniqueSession = index("idx_unique_session", (token, ip, userAgent), unique = true)
-    def * = (id, userId, token, ip, userAgent, lastUpdated) <> (ApiSession.tupled, ApiSession.unapply)
+    def * = (id, userId, token, ip, userAgent, updated) <> (ApiSession.tupled, ApiSession.unapply)
   }
 
   val sessionQuery = TableQuery[SessionTable]

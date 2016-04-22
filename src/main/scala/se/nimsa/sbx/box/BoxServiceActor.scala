@@ -128,7 +128,7 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
                   receivedImageCount = sequenceNumber,
                   addedImageCount = addedImageCount,
                   totalImageCount = totalImageCount,
-                  lastUpdated = System.currentTimeMillis,
+                  updated = System.currentTimeMillis,
                   status = TransactionStatus.PROCESSING)
                 boxDao.updateIncomingTransaction(incomingTransaction)
                 boxDao.incomingImageByIncomingTransactionIdAndSequenceNumber(incomingTransaction.id, sequenceNumber) match {
@@ -338,12 +338,12 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
     val now = System.currentTimeMillis
 
     getIncomingTransactionsInProcess.foreach { transaction =>
-      if (now - transaction.lastUpdated < pollBoxOnlineStatusTimeoutMillis)
+      if (now - transaction.updated < pollBoxOnlineStatusTimeoutMillis)
         boxDao.setIncomingTransactionStatus(transaction.id, TransactionStatus.WAITING)
     }
 
     getOutgoingTransactionsInProcess.foreach { transaction =>
-      if (now - transaction.lastUpdated < pollBoxOnlineStatusTimeoutMillis)
+      if (now - transaction.updated < pollBoxOnlineStatusTimeoutMillis)
         boxDao.setOutgoingTransactionStatus(transaction.id, TransactionStatus.WAITING)
     }
   }
@@ -453,7 +453,7 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
       val updatedTransactionImage = transactionImage.image.copy(sent = true)
       val updatedTransaction = transactionImage.transaction.copy(
         sentImageCount = transactionImage.image.sequenceNumber,
-        lastUpdated = System.currentTimeMillis,
+        updated = System.currentTimeMillis,
         status = TransactionStatus.PROCESSING)
       boxDao.updateOutgoingTransaction(updatedTransaction)
       boxDao.updateOutgoingImage(updatedTransactionImage)

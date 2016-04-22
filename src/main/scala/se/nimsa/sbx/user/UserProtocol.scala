@@ -64,7 +64,7 @@ object UserProtocol {
     }
   } 
 
-  case class ApiSession(id: Long, userId: Long, token: String, ip: String, userAgent: String, lastUpdated: Long) extends Entity
+  case class ApiSession(id: Long, userId: Long, token: String, ip: String, userAgent: String, updated: Long) extends Entity
 
   case class AuthKey(token: Option[String], ip: Option[String], userAgent: Option[String]) {
     def isValid = List(token, ip, userAgent).flatten.length == 3

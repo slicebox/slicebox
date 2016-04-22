@@ -130,25 +130,9 @@ object MetaDataProtocol {
 
   // ***to API***
 
-  case class MetaDataAdded(patient: Patient, study: Study, series: Series, image: Image, seriesSource: SeriesSource)
-  
-  case class PatientAdded(patient: Patient, source: Source)
-  
-  case class StudyAdded(study: Study, source: Source)
-  
-  case class SeriesAdded(series: Series, source: Source)
-  
-  case class ImageAdded(image: Image, source: Source)
-  
+  case class MetaDataAdded(patient: Patient, study: Study, series: Series, image: Image, patientAdded: Boolean, studyAdded: Boolean, seriesAdded: Boolean, imageAdded: Boolean, source: Source)
+
   case class MetaDataDeleted(deletedPatient: Option[Patient], deletedStudy: Option[Study], deletedSeries: Option[Series], deletedImage: Option[Image])
-  
-  case class PatientDeleted(patientId: Long)
-  
-  case class StudyDeleted(studyId: Long)
-  
-  case class SeriesDeleted(seriesId: Long)
-  
-  case class ImageDeleted(imageId: Long)
   
   case class Patients(patients: Seq[Patient])
 

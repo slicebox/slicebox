@@ -47,11 +47,11 @@ class ForwardingDAO(val driver: JdbcProfile) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def forwardingRuleId = column[Long]("forwardingruleid")
     def created = column[Long]("created")
-    def lastUpdated = column[Long]("lastupdated")
+    def updated = column[Long]("updated")
     def enroute = column[Boolean]("enroute")
     def delivered = column[Boolean]("delivered")
     def fkForwardingRule = foreignKey("fk_forwarding_rule", forwardingRuleId, ruleQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
-    def * = (id, forwardingRuleId, created, lastUpdated, enroute, delivered) <> (ForwardingTransaction.tupled, ForwardingTransaction.unapply)
+    def * = (id, forwardingRuleId, created, updated, enroute, delivered) <> (ForwardingTransaction.tupled, ForwardingTransaction.unapply)
   }
 
   val transactionQuery = TableQuery[ForwardingTransactionTable]
@@ -109,7 +109,7 @@ class ForwardingDAO(val driver: JdbcProfile) {
   def createOrUpdateForwardingTransaction(forwardingRule: ForwardingRule)(implicit session: Session): ForwardingTransaction =
     getFreshTransactionForRule(forwardingRule) match {
       case Some(transaction) =>
-        val updatedTransaction = transaction.copy(lastUpdated = System.currentTimeMillis())
+        val updatedTransaction = transaction.copy(updated = System.currentTimeMillis())
         updateForwardingTransaction(updatedTransaction)
         updatedTransaction
       case None =>
@@ -138,7 +138,7 @@ class ForwardingDAO(val driver: JdbcProfile) {
 
   def listFreshExpiredTransactions(timeLimit: Long)(implicit session: Session) =
     transactionQuery
-      .filter(_.lastUpdated < timeLimit)
+      .filter(_.updated < timeLimit)
       .filter(_.enroute === false)
       .filter(_.delivered === false)
       .list

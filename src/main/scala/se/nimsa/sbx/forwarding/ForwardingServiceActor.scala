@@ -69,7 +69,7 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
 
     // EVENTS
 
-    case ImageAdded(image, source) =>
+    case ImageAdded(image, source, overwrite) =>
       val applicableRules = maybeAddImageToForwardingQueue(image, source, sender)
       sender ! ImageRegisteredForForwarding(image, applicableRules)
 

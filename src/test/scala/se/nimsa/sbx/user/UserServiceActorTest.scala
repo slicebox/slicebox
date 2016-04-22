@@ -76,7 +76,7 @@ class UserServiceActorTest(_system: ActorSystem) extends TestKit(_system) with I
 
         val optionalSession = dao.userSessionByTokenIpAndUserAgent("token", "ip", "user agent")
         optionalSession.isDefined shouldBe true
-        optionalSession.get._2.lastUpdated shouldBe >(sessionTime)
+        optionalSession.get._2.updated shouldBe >(sessionTime)
       }
     }
 
@@ -91,7 +91,7 @@ class UserServiceActorTest(_system: ActorSystem) extends TestKit(_system) with I
 
         val optionalSession = dao.userSessionByTokenIpAndUserAgent("token", "ip", "user agent")
         optionalSession.isDefined shouldBe true
-        optionalSession.get._2.lastUpdated shouldBe (sessionTime)
+        optionalSession.get._2.updated shouldBe (sessionTime)
       }
     }
 
@@ -109,7 +109,7 @@ class UserServiceActorTest(_system: ActorSystem) extends TestKit(_system) with I
 
         val session2 = userActor.createOrUpdateSession(user, "ip", "userAgent")
         dao.listSessions should have length 1
-        session2.lastUpdated shouldBe >(session1.lastUpdated)
+        session2.updated shouldBe >(session1.updated)
       }
     }
 

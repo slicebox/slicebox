@@ -55,7 +55,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
   val metaDataService = system.actorOf(Props(new Actor() {
     def receive = {
       case AddMetaData(dataset, source) =>
-        sender ! MetaDataAdded(null, null, null, Image(12, 22, null, null, null), null)
+        sender ! MetaDataAdded(null, null, null, Image(12, 22, null, null, null), false, false, false, true, null)
     }
   }), name = "MetaDataService")
   val storageService = system.actorOf(Props[MockupStorageActor], name = "StorageService")

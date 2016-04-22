@@ -72,7 +72,11 @@ object GeneralProtocol {
   case class SourceRef(sourceType: SourceType, sourceId: Long)
   
   case class Destination(destinationType: DestinationType, destinationName: String, destinationId: Long)
-  
+
+  case class ImageAdded(image: Image, source: Source, overwrite: Boolean)
+
+  case class ImageDeleted(imageId: Long)
+
   case class ImagesSent(destination: Destination, imageIds: Seq[Long])
 
 }

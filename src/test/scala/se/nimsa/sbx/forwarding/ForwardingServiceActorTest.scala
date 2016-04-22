@@ -454,6 +454,6 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
   def expireTransaction(index: Int) =
     db.withSession { implicit session =>
       val transaction = forwardingDao.listForwardingTransactions(session)(index)
-      forwardingDao.updateForwardingTransaction(transaction.copy(lastUpdated = 0))
+      forwardingDao.updateForwardingTransaction(transaction.copy(updated = 0))
     }
 }
