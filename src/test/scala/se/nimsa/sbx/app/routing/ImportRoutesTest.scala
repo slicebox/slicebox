@@ -90,7 +90,7 @@ class ImportRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
   }
 
-  it should "return 201 Created when adding an image to an import session" in {
+  it should "return 201 Created and update counters when adding an image to an import session" in {
     val addedSession = PostAsUser("/api/import/sessions", importSession) ~> routes ~> check {
       responseAs[ImportSession]
     }
@@ -101,24 +101,30 @@ class ImportRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       val image = responseAs[Image]
       image.id should not be -1
     }
-  }
-
-  it should "update imported files when addind a file" in {
-    val addedSession = PostAsUser("/api/import/sessions", importSession) ~> routes ~> check {
-      responseAs[ImportSession]
-    }
-    val file = TestUtil.testImageFile
-    val mfd = MultipartFormData(Seq(BodyPart(file, "file")))
-    PostAsUser(s"/api/import/sessions/${addedSession.id}/images", mfd) ~> routes ~> check {
-      responseAs[Image]
-    }
 
     val updatedSession = GetAsUser(s"/api/import/sessions/${addedSession.id}") ~> routes ~> check {
       responseAs[ImportSession]
     }
     updatedSession.filesImported should be(1)
     updatedSession.filesAdded should be(1)
-    updatedSession.filesRejected should be(1)
+    updatedSession.filesRejected should be(0)
+  }
 
+  it should "return 400 Bad Request and update counters when adding a jpg image to an import session" in {
+    val addedSession = PostAsUser("/api/import/sessions", importSession) ~> routes ~> check {
+      responseAs[ImportSession]
+    }
+    val file = TestUtil.jpegFile
+    val mfd = MultipartFormData(Seq(BodyPart(file, "file")))
+    PostAsUser(s"/api/import/sessions/${addedSession.id}/images", mfd) ~> routes ~> check {
+      status should be(BadRequest)
+    }
+
+    val updatedSession = GetAsUser(s"/api/import/sessions/${addedSession.id}") ~> routes ~> check {
+      responseAs[ImportSession]
+    }
+    updatedSession.filesImported should be(0)
+    updatedSession.filesAdded should be(0)
+    updatedSession.filesRejected should be(1)
   }
 }

@@ -119,14 +119,14 @@ trait ImportRoutes {
           case Success(DatasetAdded(image, source, overwrite)) =>
             onSuccess(importService.ask(AddImageToSession(importSession, image, overwrite))) {
 
-              case Some(ImageAddedToSession(importSessionImage)) =>
+              case ImageAddedToSession(importSessionImage) =>
                 if (overwrite)
                   complete((OK, image))
                 else
                   complete((Created, image))
 
-              case None =>
-                complete(NotFound)
+              case _ =>
+                complete(InternalServerError)
             }
 
           case Success(_) =>
