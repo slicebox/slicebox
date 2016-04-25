@@ -27,7 +27,7 @@ import akka.actor.{Actor, Props}
 import akka.event.{Logging, LoggingReceive}
 import org.dcm4che3.data.{Attributes, BulkData, Fragments, Tag}
 import org.dcm4che3.imageio.plugins.dcm.DicomImageReadParam
-import se.nimsa.sbx.app.GeneralProtocol.Source
+import se.nimsa.sbx.app.GeneralProtocol.{ImageAdded, Source}
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.{DicomUtil, ImageAttribute, Jpg2Dcm}
 import se.nimsa.sbx.dicom.DicomUtil._
@@ -58,7 +58,7 @@ class StorageServiceActor(storage: Path) extends Actor with ExceptionCatching {
         case CheckDataset(dataset) =>
           sender ! checkDataset(dataset)
 
-        case AddDataset(dataset, image) =>
+        case AddDataset(dataset, source, image) =>
           if (checkDataset(dataset)) {
             val overwrite = storeDataset(dataset, image)
             if (overwrite)
@@ -66,7 +66,8 @@ class StorageServiceActor(storage: Path) extends Actor with ExceptionCatching {
             else
               log.info(s"Stored file with image id ${image.id}")
             val datasetAdded = DatasetAdded(image, overwrite)
-            context.system.eventStream.publish(datasetAdded)
+            val imageAdded = ImageAdded(image, source, overwrite)
+            context.system.eventStream.publish(imageAdded)
             sender ! datasetAdded
           } else
             throw new IllegalArgumentException("Dataset does not conform to slicebox storage restrictions")
@@ -76,11 +77,11 @@ class StorageServiceActor(storage: Path) extends Actor with ExceptionCatching {
           val dataset = Jpg2Dcm(jpegBytes, patient, study, jpegTempPath.toFile)
           sender ! JpegCreated(dataset, jpegTempPath)
 
-        case AddJpeg(image, jpegTempPath) =>
+        case AddJpeg(image, source, jpegTempPath) =>
           storeEncapsulated(image, jpegTempPath)
 
           log.info(s"Stored encapsulated JPEG with image id ${image.id}")
-          context.system.eventStream.publish(DatasetAdded(image, overwrite = false))
+          context.system.eventStream.publish(ImageAdded(image, source, overwrite = false))
 
           sender ! JpegAdded
 

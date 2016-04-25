@@ -116,7 +116,7 @@ trait AnonymizationRoutes {
                 storageService.ask(DeleteDataset(image)).flatMap { _ =>
                   val source = Source(SourceType.USER, apiUser.user, apiUser.id)
                   metaDataService.ask(AddMetaData(anonDataset, source)).mapTo[MetaDataAdded].flatMap { metaData =>
-                    storageService.ask(AddDataset(anonDataset, metaData.image)).mapTo[DatasetAdded]
+                    storageService.ask(AddDataset(anonDataset, source, metaData.image)).mapTo[DatasetAdded]
                   }
                 }
               }

@@ -69,7 +69,7 @@ class DirectoryWatchActor(watchedDirectory: WatchedDirectory,
         val source = Source(SourceType.DIRECTORY, watchedDirectory.name, watchedDirectory.id)
         checkDataset(dataset).flatMap { status =>
           addMetadata(dataset, source).flatMap { image =>
-            addDataset(dataset, image).map { overwrite =>
+            addDataset(dataset, source, image).map { overwrite =>
             }
           }
         }.onFailure {
@@ -85,8 +85,8 @@ class DirectoryWatchActor(watchedDirectory: WatchedDirectory,
       .mapTo[MetaDataAdded]
       .map(_.image)
 
-  def addDataset(dataset: Attributes, image: Image): Future[Boolean] =
-    storageService.ask(AddDataset(dataset, image))
+  def addDataset(dataset: Attributes, source: Source, image: Image): Future[Boolean] =
+    storageService.ask(AddDataset(dataset, source, image))
       .mapTo[DatasetAdded]
       .map(_.overwrite)
 

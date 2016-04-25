@@ -176,7 +176,7 @@ trait ImageRoutes {
                     patientMaybe.map { patient =>
                       storageService.ask(CreateJpeg(jpegBytes, patient, study)).mapTo[JpegCreated].flatMap { jpeg =>
                         metaDataService.ask(AddMetaData(jpeg.dataset, source)).mapTo[MetaDataAdded].flatMap { metaData =>
-                          storageService.ask(AddJpeg(metaData.image, jpeg.jpegTempPath)).map { _ => metaData.image }
+                          storageService.ask(AddJpeg(metaData.image, source, jpeg.jpegTempPath)).map { _ => metaData.image }
                         }
                       }
                     }
@@ -202,7 +202,7 @@ trait ImageRoutes {
     val futureImageAndOverwrite =
       storageService.ask(CheckDataset(dataset)).mapTo[Boolean].flatMap { status =>
         metaDataService.ask(AddMetaData(dataset, source)).mapTo[MetaDataAdded].flatMap { metaData =>
-          storageService.ask(AddDataset(dataset, metaData.image)).mapTo[DatasetAdded].map { datasetAdded => (metaData.image, datasetAdded.overwrite) }
+          storageService.ask(AddDataset(dataset, source, metaData.image)).mapTo[DatasetAdded].map { datasetAdded => (metaData.image, datasetAdded.overwrite) }
         }
       }
     onSuccess(futureImageAndOverwrite) {

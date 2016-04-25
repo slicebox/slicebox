@@ -7,6 +7,7 @@ import akka.actor.Status.Failure
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit}
 import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpecLike}
 import se.nimsa.sbx.app.DbProps
+import se.nimsa.sbx.app.GeneralProtocol.{Source, SourceType}
 import se.nimsa.sbx.dicom.DicomUtil
 import se.nimsa.sbx.storage.StorageProtocol.{AddDataset, DatasetAdded}
 import se.nimsa.sbx.util.TestUtil
@@ -30,6 +31,8 @@ class StorageServiceActorTest(_system: ActorSystem) extends TestKit(_system) wit
   val storageActorRef = TestActorRef(new StorageServiceActor(storage))
   val storageActor = storageActorRef.underlyingActor
 
+  val source = Source(SourceType.BOX, "remote box", 1)
+
   override def afterAll {
     TestKit.shutdownActorSystem(system)
     TestUtil.deleteFolder(storage)
@@ -38,12 +41,12 @@ class StorageServiceActorTest(_system: ActorSystem) extends TestKit(_system) wit
   "The storage service" must {
 
     "return 'overwrite = true' when adding the same dataset for the second time, indicating that the previous dataset was overwritten" in {
-      storageActorRef ! AddDataset(dataset, image)
+      storageActorRef ! AddDataset(dataset, source, image)
       expectMsgPF() {
         case DatasetAdded(_, overwrite) =>
           overwrite shouldBe false
       }
-      storageActorRef ! AddDataset(dataset, image)
+      storageActorRef ! AddDataset(dataset, source, image)
       expectMsgPF() {
         case DatasetAdded(_, overwrite) =>
           overwrite shouldBe true
@@ -51,17 +54,17 @@ class StorageServiceActorTest(_system: ActorSystem) extends TestKit(_system) wit
     }
 
     "return a notification that the dataset has been added when adding a dataset" in {
-      storageActorRef ! AddDataset(dataset, image)
+      storageActorRef ! AddDataset(dataset, source, image)
       expectMsgType[DatasetAdded]
     }
 
     "return a notification that the dataset has been added when adding an already added dataset" in {
-      storageActorRef ! AddDataset(dataset, image)
+      storageActorRef ! AddDataset(dataset, source, image)
       expectMsgType[DatasetAdded]
     }
 
     "return a failure message when adding a dataset with a non-supported SOP class" in {
-      storageActorRef ! AddDataset(DicomUtil.loadDataset(TestUtil.testSecondaryCaptureFile.toPath, withPixelData = true), image)
+      storageActorRef ! AddDataset(DicomUtil.loadDataset(TestUtil.testSecondaryCaptureFile.toPath, withPixelData = true), source, image)
       expectMsgType[Failure]
     }
   }

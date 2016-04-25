@@ -10,8 +10,9 @@ import akka.testkit.ImplicitSender
 import akka.testkit.TestKit
 import akka.util.Timeout.durationToTimeout
 import se.nimsa.sbx.app.DbProps
+import se.nimsa.sbx.dicom.DicomHierarchy.Series
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
-import se.nimsa.sbx.metadata.MetaDataProtocol.SeriesDeleted
+import se.nimsa.sbx.metadata.MetaDataProtocol.MetaDataDeleted
 
 class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
     with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {
@@ -299,7 +300,7 @@ class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
         seriesTypeDao.insertSeriesSeriesType(SeriesSeriesType(seriesId, addedSeriesType.id))
       }
       
-      seriesTypeService ! SeriesDeleted(seriesId)
+      seriesTypeService ! MetaDataDeleted(None, None, Some(Series(seriesId, -1, null, null, null, null, null, null, null, null, null)), None)
       expectMsgType[SeriesTypesRemovedFromSeries]
       
       db.withSession { implicit session =>

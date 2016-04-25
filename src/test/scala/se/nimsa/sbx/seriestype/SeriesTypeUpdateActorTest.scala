@@ -183,11 +183,13 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
       patientName = patientName,
       patientSex = patientSex)
 
+    val source = Source(SourceType.BOX, "remote box", 1)
+
     Await.result(
-      metaDataService.ask(AddMetaData(dataset, Source(SourceType.BOX, "remote box", 1)))
+      metaDataService.ask(AddMetaData(dataset, source))
         .mapTo[MetaDataAdded]
         .flatMap { metaData =>
-          storageService.ask(AddDataset(dataset, metaData.image))
+          storageService.ask(AddDataset(dataset, source, metaData.image))
         }.map { _ =>
         val series = db.withSession { implicit session =>
           metaDataDao.series

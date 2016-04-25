@@ -51,11 +51,11 @@ object StorageProtocol {
 
   case class CheckDataset(dataset: Attributes) extends ImageRequest
 
-  case class AddDataset(dataset: Attributes, image: Image) extends ImageRequest
+  case class AddDataset(dataset: Attributes, source: Source, image: Image) extends ImageRequest
   
   case class CreateJpeg(jpegBytes: Array[Byte], patient: Patient, study: Study) extends ImageRequest
 
-  case class AddJpeg(image: Image, jpegTempPath: Path) extends ImageRequest
+  case class AddJpeg(image: Image, source: Source, jpegTempPath: Path) extends ImageRequest
 
   case class DeleteDataset(image: Image) extends ImageRequest
 

@@ -30,7 +30,7 @@ class MockupStorageActor extends Actor {
     case CheckDataset(dataset) =>
       sender ! true
 
-    case AddDataset(dataset, source) =>
+    case AddDataset(dataset, source, image) =>
       if (badBehavior)
         sender ! Failure(exception)
       else
