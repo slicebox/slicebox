@@ -48,7 +48,7 @@ import scala.util.{Try, Success, Failure}
 trait ImportRoutes { this: SliceboxService =>
 
   def importRoutes(apiUser: ApiUser): Route =
-    pathPrefix("importing" / "sessions" / LongNumber / "images") { id =>
+    pathPrefix("import" / "sessions" / LongNumber / "images") { id =>
       post {
         formField('file.as[FormFile]) { file =>
           file.
@@ -57,7 +57,7 @@ trait ImportRoutes { this: SliceboxService =>
           addImageToImportSessionRoute(bytes, id)
         }
       }
-    } ~ pathPrefix("importing") {
+    } ~ pathPrefix("import") {
       import spray.httpx.SprayJsonSupport._
       
       pathPrefix("sessions") {

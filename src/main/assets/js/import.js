@@ -46,7 +46,7 @@ angular.module('slicebox.import', ['ngRoute', 'ngFileUpload'])
     });
   
     $scope.loadImportSessions = function(startIndex, count) {
-        var sessionsPromise = $http.get('/api/importing/sessions');
+        var sessionsPromise = $http.get('/api/import/sessions');
         return sessionsPromise;
     };
 
@@ -58,9 +58,9 @@ angular.module('slicebox.import', ['ngRoute', 'ngFileUpload'])
             'Import session', 
             $scope.callbacks.importSessionsTable)
         .then(function (importSession) {
-            $http.post('/api/importing/sessions', importSession).then(function(data) {
+            $http.post('/api/import/sessions', importSession).then(function(data) {
                 $scope.callbacks.importSessionsTable.selectObject(data.importSession);
-            })
+            });
         });
     };
 
@@ -74,7 +74,7 @@ angular.module('slicebox.import', ['ngRoute', 'ngFileUpload'])
             $scope.uiState.selectedSession.lastUpdated = new Date().getTime(); // TODO move to server
             $scope.uiState.currentFileSet.progress = Math.round(100 * $scope.uiState.currentFileSet.index / $scope.uiState.currentFileSet.total);
             Upload.upload({
-                url: '/api/importing/sessions/' + $scope.uiState.selectedSession.id + '/images',
+                url: '/api/import/sessions/' + $scope.uiState.selectedSession.id + '/images',
                 file: files[0]
             }).success(function (data, status, headers, config) {
                 //importedFiles.push({ name: config.file.name });
