@@ -28,6 +28,7 @@ class ImportRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   override def dbUrl() = "jdbc:h2:mem:importroutestest;DB_CLOSE_DELAY=-1"
 
   val importDao = new ImportDAO(H2Driver)
+  val importSession = ImportSession(id = 12, name = "importSessionName", userId = 123, user = "userName", filesImported = 0, filesAdded = 0, filesRejected = 0, created = System.currentTimeMillis(), lastUpdated = System.currentTimeMillis())
 
   override def afterEach() {
     db.withSession { implicit session =>
@@ -36,26 +37,28 @@ class ImportRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   }
 
   it should "return 200 OK and a list of import sessions when listing sessions" in {
-    var importSession = ImportSession(id = 12, name = "importSessionName", userId = 123, user = "userName", filesImported = 0, filesAdded = 0, filesRejected = 0, created = System.currentTimeMillis(), lastUpdated = System.currentTimeMillis())
     PostAsUser("/api/import/sessions", importSession) ~> routes ~> check {
       responseAs[ImportSession]
     }
     GetAsUser("/api/import/sessions") ~> routes ~> check {
       status should be(OK)
-      responseAs[Seq[ImportSession]] should not be empty
+      val importSessionSeq = responseAs[Seq[ImportSession]]
+      importSessionSeq should have length 1
+      importSessionSeq.head.name should be(importSession.name)
     }
   }
 
   it should "return 201 Created when adding a new import session" in {
-    PostAsUser("/api/import/sessions") ~> routes ~> check {
+    PostAsUser("/api/import/sessions", importSession) ~> routes ~> check {
       status should be(Created)
       val createdSession = responseAs[ImportSession]
       createdSession.id should not be -1
+      createdSession.name should be(importSession.name)
     }
   }
 
   it should "return 204 NoContent when deleting an import session" in {
-    val addedSession = PostAsUser("/api/import/sessions") ~> routes ~> check {
+    val addedSession = PostAsUser("/api/import/sessions", importSession) ~> routes ~> check {
       responseAs[ImportSession]
     }
     DeleteAsUser(s"/api/import/sessions/${addedSession.id}") ~> routes ~> check {
@@ -73,7 +76,7 @@ class ImportRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   }
 
   it should "return 200 OK and the requested import session when fetching a specific import session" in {
-    val addedSession = PostAsUser("/api/import/sessions") ~> routes ~> check {
+    val addedSession = PostAsUser("/api/import/sessions", importSession) ~> routes ~> check {
       responseAs[ImportSession]
     }
     GetAsUser(s"/api/import/sessions/${addedSession.id}") ~> routes ~> check {
@@ -88,7 +91,7 @@ class ImportRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   }
 
   it should "return 201 Created when adding an image to an import session" in {
-    val addedSession = PostAsUser("/api/import/sessions") ~> routes ~> check {
+    val addedSession = PostAsUser("/api/import/sessions", importSession) ~> routes ~> check {
       responseAs[ImportSession]
     }
     val file = TestUtil.testImageFile
@@ -101,7 +104,7 @@ class ImportRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   }
 
   it should "update imported files when addind a file" in {
-    val addedSession = PostAsUser("/api/import/sessions") ~> routes ~> check {
+    val addedSession = PostAsUser("/api/import/sessions", importSession) ~> routes ~> check {
       responseAs[ImportSession]
     }
     val file = TestUtil.testImageFile

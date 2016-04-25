@@ -28,7 +28,7 @@ object ImportProtocol {
 
   case class ImageAddedToSession(importSessionImage: ImportSessionImage)
 
-  case class GetImportSessions()
+  case object GetImportSessions
 
   case class ImportSessions(importSessions:Seq[ImportSession])
 

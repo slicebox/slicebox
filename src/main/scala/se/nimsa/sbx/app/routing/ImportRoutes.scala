@@ -45,10 +45,11 @@ import se.nimsa.sbx.importing.ImportProtocol._
 import akka.util.ByteString
 import scala.util.{Try, Success, Failure}
 
-trait ImportRoutes { this: SliceboxService =>
+trait ImportRoutes {
+  this: SliceboxService =>
 
   def importRoutes(apiUser: ApiUser): Route =
-    pathPrefix("import" / "sessions" / LongNumber / "images") { id =>
+    path("import" / "sessions" / LongNumber / "images") { id =>
       post {
         formField('file.as[FormFile]) { file =>
           addImageToImportSessionRoute(file.entity.data.toByteArray, id)
@@ -58,11 +59,11 @@ trait ImportRoutes { this: SliceboxService =>
       }
     } ~ pathPrefix("import") {
       import spray.httpx.SprayJsonSupport._
-      
+
       pathPrefix("sessions") {
         pathEndOrSingleSlash {
           get {
-            onSuccess(importService.ask(GetImportSessions())){
+            onSuccess(importService.ask(GetImportSessions)) {
               case ImportSessions(importSessions) => {
                 complete(importSessions)
               }

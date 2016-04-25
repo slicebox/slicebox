@@ -51,7 +51,7 @@ class ImportServiceActor(dbProps: DbProps) extends Actor {
         } else {
           dao.updateImportSession(importSession = importSession, imported = 1, added = 1)
         }
-        sender ! dao.insertImportSessionImage(ImportSessionImage(id = 0, importSessionId = importSession.id, imageId = image.id))
+        sender ! ImageAddedToSession(dao.insertImportSessionImage(ImportSessionImage(id = 0, importSessionId = importSession.id, imageId = image.id)))
       }
 
     case UpdateSessionWithRejection(importSession) =>
