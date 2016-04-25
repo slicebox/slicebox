@@ -6,30 +6,46 @@ import scala.slick.jdbc.meta.MTable
 import ImportProtocol._
 
 class ImportDAO(val driver: JdbcProfile) {
+
   import driver.simple._
+
   val importSessionTableName = "ImportSessions"
   val importSessionImageTableName = "ImportSessionImages"
 
   class ImportSessionTable(tag: Tag) extends Table[ImportSession](tag, importSessionTableName) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
+
     def name = column[String]("name")
+
     def userId = column[Long]("userid")
+
     def user = column[String]("user")
+
     def filesImported = column[Int]("filesimported")
+
+    def filesAdded = column[Int]("filesadded")
+
     def filesRejected = column[Int]("filesrejected")
+
     def created = column[Long]("created")
+
     def lastUpdated = column[Long]("lastupdated")
-    def * = (id, name, userId, user, filesImported, filesRejected, created, lastUpdated) <> (ImportSession.tupled, ImportSession.unapply)
+
+    def * = (id, name, userId, user, filesImported, filesAdded, filesRejected, created, lastUpdated) <>(ImportSession.tupled, ImportSession.unapply)
   }
 
   val importSessionQuery = TableQuery[ImportSessionTable]
 
   class ImportSessionImageTable(tag: Tag) extends Table[ImportSessionImage](tag, importSessionImageTableName) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
+
     def importSessionId = column[Long]("importsessionid")
+
     def imageId = column[Long]("imageid")
+
     def fkImportSession = foreignKey("fk_import_session_id", importSessionId, importSessionQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
-    def * = (id, importSessionId, imageId) <> (ImportSessionImage.tupled, ImportSessionImage.unapply)
+
+    def * = (id, importSessionId, imageId) <>(ImportSessionImage.tupled, ImportSessionImage.unapply)
   }
 
   val importSessionImageQuery = TableQuery[ImportSessionImageTable]
@@ -68,5 +84,11 @@ class ImportDAO(val driver: JdbcProfile) {
   def insertImportSessionImage(importSessionImage: ImportSessionImage)(implicit session: Session): ImportSessionImage = {
     val generatedId = (importSessionImageQuery returning importSessionImageQuery.map(_.id)) += importSessionImage
     importSessionImage.copy(id = generatedId)
+  }
+
+  def updateImportSession(importSession: ImportSession, imported: Int = 0, added: Int = 0, rejected: Int = 0)(implicit session: Session): ImportSession = {
+    var updatedImportSession = importSession.copy(filesImported = importSession.filesImported + imported, filesAdded = importSession.filesAdded + added, filesRejected = importSession.filesRejected + rejected, lastUpdated = System.currentTimeMillis())
+    importSessionQuery.filter(_.id === importSession.id).update(updatedImportSession)
+    updatedImportSession
   }
 }

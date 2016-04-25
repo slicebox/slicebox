@@ -11,7 +11,7 @@ import se.nimsa.sbx.metadata.MetaDataProtocol.GetAllSeries
 class ImportServiceActor(dbProps: DbProps) extends Actor {
   val log = Logging(context.system, this)
 
-  val db = dbProps.db;
+  val db = dbProps.db
   val dao = new ImportDAO(dbProps.driver)
 
   log.info("Import service started")
@@ -19,7 +19,7 @@ class ImportServiceActor(dbProps: DbProps) extends Actor {
   override def receive = LoggingReceive {
     case AddImportSession(importSession) =>
       db.withSession { implicit session =>
-        val newImportSession = importSession.copy(filesImported = 0, filesRejected = 0,
+        val newImportSession = importSession.copy(filesImported = 0, filesAdded = 0, filesRejected = 0,
           created = System.currentTimeMillis(), lastUpdated = System.currentTimeMillis())
         sender ! dao.addImportSession(newImportSession)
       }

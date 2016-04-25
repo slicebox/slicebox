@@ -11,6 +11,7 @@ object ImportProtocol {
     userId: Long,
     user: String,
     filesImported: Int,
+    filesAdded: Int,
     filesRejected: Int, 
     created: Long,
     lastUpdated: Long) extends Entity
