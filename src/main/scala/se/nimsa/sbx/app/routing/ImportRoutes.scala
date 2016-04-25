@@ -51,7 +51,6 @@ trait ImportRoutes { this: SliceboxService =>
     pathPrefix("import" / "sessions" / LongNumber / "images") { id =>
       post {
         formField('file.as[FormFile]) { file =>
-          file.
           addImageToImportSessionRoute(file.entity.data.toByteArray, id)
         } ~ entity(as[Array[Byte]]) { bytes =>
           addImageToImportSessionRoute(bytes, id)
@@ -129,9 +128,13 @@ trait ImportRoutes { this: SliceboxService =>
                 complete(NotFound)
             }
 
+          case Success(_) =>
+            complete(InternalServerError)
+
           case Failure(e) =>
             importService.ask(UpdateSessionWithRejection(importSession))
             complete(BadRequest)
+
         }
       case None =>
         complete(NotFound)

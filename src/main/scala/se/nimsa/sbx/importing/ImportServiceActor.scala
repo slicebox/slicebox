@@ -46,11 +46,21 @@ class ImportServiceActor(dbProps: DbProps) extends Actor {
 
     case AddImageToSession(importSession, image, overwrite) =>
       db.withSession { implicit session =>
-        sender ! dao.insertImportSessionImage(ImportSessionImage(id = 0, importSessionId = importSessionId, imageId = image.id))
+        if (overwrite) {
+          dao.updateImportSession(importSession = importSession, imported = 1)
+        } else {
+          dao.updateImportSession(importSession = importSession, imported = 1, added = 1)
+        }
+        sender ! dao.insertImportSessionImage(ImportSessionImage(id = 0, importSessionId = importSession.id, imageId = image.id))
       }
 
-    case msg =>
+    case UpdateSessionWithRejection(importSession) =>
+      db.withSession { implicit session =>
+        sender ! dao.updateImportSession(importSession = importSession, rejected = 1)
+      }
+
   }
+
 }
 
 object ImportServiceActor {
