@@ -25,11 +25,12 @@ class ImageRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
   val metaDataDao = new MetaDataDAO(H2Driver)
 
+
   override def afterEach() {
     db.withSession { implicit session =>
       metaDataDao.clear
     }
-    TestUtil.deleteFolderContents(storage)
+    TestUtil.deleteFolderContents(unitTestPath)
   }
 
   "Image routes" should "return 201 Created when adding an image using multipart form data" in {

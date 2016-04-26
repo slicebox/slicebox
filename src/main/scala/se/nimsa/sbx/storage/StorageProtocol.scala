@@ -16,6 +16,7 @@
 
 package se.nimsa.sbx.storage
 
+import java.io.InputStream
 import java.nio.file.Path
 
 import org.dcm4che3.data.Attributes
@@ -38,6 +39,7 @@ object StorageProtocol {
   sealed trait ImageRequest
 
   case class GetImagePath(image: Image) extends ImageRequest
+  case class GetImageData(image: Image) extends ImageRequest
 
   case class GetDataset(image: Image, withPixelData: Boolean) extends ImageRequest
 
@@ -69,7 +71,7 @@ object StorageProtocol {
   case class DatasetDeleted(image: Image)
 
   case class ImagePath(imagePath: Path)
+  case class ImageData(data: Array[Byte])
 
   case class DeleteTempZipFile(path: Path)
-  
 }

@@ -25,6 +25,7 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.zaxxer.hikari.{HikariConfig, HikariDataSource}
 import se.nimsa.sbx.anonymization.AnonymizationServiceActor
 import se.nimsa.sbx.app.routing.SliceboxRoutes
+
 import se.nimsa.sbx.box.{BoxDAO, BoxServiceActor}
 import se.nimsa.sbx.directory.{DirectoryWatchDAO, DirectoryWatchServiceActor}
 import se.nimsa.sbx.forwarding.{ForwardingDAO, ForwardingServiceActor}
@@ -38,27 +39,16 @@ import se.nimsa.sbx.storage.StorageServiceActor
 import se.nimsa.sbx.user.{Authenticator, UserDAO, UserServiceActor}
 import spray.routing.HttpService
 
-import scala.slick.driver.{H2Driver, MySQLDriver, PostgresDriver}
+import scala.slick.driver.{H2Driver, MySQLDriver}
 import scala.slick.jdbc.JdbcBackend.Database
 
 class SliceboxServiceActor extends Actor with SliceboxService {
 
   override def actorRefFactory = context
 
-  def dbUrl() = sliceboxConfig.getString("database.path")
+  def appConfig: Config = ConfigFactory.load()
 
-  override def createStorageDirectory() = {
-    val storagePath = Paths.get(sliceboxConfig.getString("dicom-files.path"))
-    if (!Files.exists(storagePath))
-      try {
-        Files.createDirectories(storagePath)
-      } catch {
-        case e: Exception => throw new RuntimeException("Dicom-files directory could not be created: " + e.getMessage)
-      }
-    if (!Files.isDirectory(storagePath))
-      throw new IllegalArgumentException("Dicom-files directory is not a directory.")
-    storagePath
-  }
+  def dbUrl() = sliceboxConfig.getString("database.path")
 
   override def receive = runRoute(routes)
 
@@ -66,10 +56,8 @@ class SliceboxServiceActor extends Actor with SliceboxService {
 
 trait SliceboxService extends HttpService with SliceboxRoutes with JsonFormats {
 
-  val appConfig: Config = ConfigFactory.load()
-  val sliceboxConfig: Config = appConfig.getConfig("slicebox")
-
-  def createStorageDirectory(): Path
+  def appConfig: Config
+  val sliceboxConfig = appConfig.getConfig("slicebox")
 
   def dbUrl(): String
 
@@ -110,7 +98,7 @@ trait SliceboxService extends HttpService with SliceboxRoutes with JsonFormats {
     new ImportDAO(dbProps.driver).create
   }
 
-  val storage = createStorageDirectory()
+
 
   val host = sliceboxConfig.getString("host")
   val publicHost = sliceboxConfig.getString("public.host")
@@ -148,6 +136,17 @@ trait SliceboxService extends HttpService with SliceboxRoutes with JsonFormats {
 
   implicit def executionContext = actorRefFactory.dispatcher
 
+  val (dicomDir, storage) = {
+    if (sliceboxConfig.getString("dicom-storage.config.name") == "s3") {
+      val s3Storage = new S3Storage(sliceboxConfig.getString("dicom-storage.config.bucket"),sliceboxConfig.getString("dicom-storage.config.prefix") )
+      (None, s3Storage)
+    } else {
+      val fileStorage = new FileStorage(sliceboxConfig.getString("dicom-storage.file-system.path"))
+      val path = fileStorage.createStorageDirectory(sliceboxConfig.getString("dicom-storage.file-system.path"))
+      (Some(path), fileStorage)
+    }
+  }
+
   val userService = actorRefFactory.actorOf(UserServiceActor.props(dbProps, superUser, superPassword, sessionTimeout), name = "UserService")
   val logService = actorRefFactory.actorOf(LogServiceActor.props(dbProps), name = "LogService")
   val metaDataService = actorRefFactory.actorOf(MetaDataServiceActor.props(dbProps).withDispatcher("akka.prio-dispatcher"), name = "MetaDataService")
@@ -156,7 +155,7 @@ trait SliceboxService extends HttpService with SliceboxRoutes with JsonFormats {
   val boxService = actorRefFactory.actorOf(BoxServiceActor.props(dbProps, apiBaseURL, timeout), name = "BoxService")
   val scpService = actorRefFactory.actorOf(ScpServiceActor.props(dbProps, timeout), name = "ScpService")
   val scuService = actorRefFactory.actorOf(ScuServiceActor.props(dbProps, timeout), name = "ScuService")
-  val directoryService = actorRefFactory.actorOf(DirectoryWatchServiceActor.props(dbProps, storage, timeout), name = "DirectoryService")
+  val directoryService = actorRefFactory.actorOf(DirectoryWatchServiceActor.props(dbProps, dicomDir, timeout), name = "DirectoryService")
   val seriesTypeService = actorRefFactory.actorOf(SeriesTypeServiceActor.props(dbProps, timeout), name = "SeriesTypeService")
   val forwardingService = actorRefFactory.actorOf(ForwardingServiceActor.props(dbProps, timeout), name = "ForwardingService")
   val importService = actorRefFactory.actorOf(ImportServiceActor.props(dbProps), name = "ImportService")

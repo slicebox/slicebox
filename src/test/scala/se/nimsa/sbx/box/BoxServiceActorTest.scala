@@ -3,7 +3,7 @@ package se.nimsa.sbx.box
 import java.nio.file.Files
 
 import akka.actor.{ActorSystem, Props, actorRef2Scala}
-import akka.testkit.{ImplicitSender, TestKit}
+import akka.testkit.{TestActorRef, ImplicitSender, TestKit}
 import akka.util.Timeout.durationToTimeout
 import org.scalatest._
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
@@ -12,7 +12,7 @@ import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomPropertyValue._
 import se.nimsa.sbx.metadata.MetaDataDAO
-import se.nimsa.sbx.storage.StorageServiceActor
+import se.nimsa.sbx.storage.{FileStorage, StorageServiceActor}
 import se.nimsa.sbx.util.TestUtil
 
 import scala.concurrent.duration.DurationInt
@@ -27,7 +27,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
   val db = Database.forURL("jdbc:h2:mem:boxserviceactortest;DB_CLOSE_DELAY=-1", driver = "org.h2.Driver")
   val dbProps = DbProps(db, H2Driver)
 
-  val storage = Files.createTempDirectory("slicebox-test-storage-")
+  val fileStorage = Files.createTempDirectory("slicebox-test-storage-")
 
   val boxDao = new BoxDAO(H2Driver)
   val metaDataDao = new MetaDataDAO(H2Driver)
@@ -37,7 +37,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
     metaDataDao.create
   }
 
-  val storageService = system.actorOf(Props(new StorageServiceActor(storage)), name = "StorageService")
+  val storageService = system.actorOf(Props(new StorageServiceActor(new FileStorage(fileStorage.toString))), name = "StorageService")
   val boxService = system.actorOf(Props(new BoxServiceActor(dbProps, "http://testhost:1234", 5.minutes)), name = "BoxService")
 
   override def afterEach() =
@@ -48,7 +48,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
 
   override def afterAll {
     TestKit.shutdownActorSystem(system)
-    TestUtil.deleteFolder(storage)
+    TestUtil.deleteFolder(fileStorage)
   }
 
   "A BoxServiceActor" should {

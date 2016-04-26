@@ -59,13 +59,9 @@ trait ImageRoutes {
           case Some(image) =>
             pathEndOrSingleSlash {
               get {
-                onSuccess(storageService.ask(GetImagePath(image)).mapTo[Option[ImagePath]]) {
-                  case Some(imagePath) =>
-                    detach() {
-                      autoChunk(chunkSize) {
-                        complete(HttpEntity(`application/octet-stream`, HttpData(imagePath.imagePath.toFile)))
-                      }
-                    }
+                onSuccess(storageService.ask(GetImageData(image)).mapTo[Option[ImageData]]) {
+                  case Some(imageData) =>
+                    complete(HttpEntity(`application/octet-stream`, HttpData(imageData.data)))
                   case None =>
                     complete((NotFound, s"No file found for image id $imageId"))
                 }

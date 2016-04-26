@@ -24,3 +24,4 @@ project/activator*
 /.cache-main
 /.cache-tests
 /.idea
+.DS_Store

@@ -26,16 +26,16 @@ class StorageServiceActorTest(_system: ActorSystem) extends TestKit(_system) wit
   val dataset = TestUtil.testImageDataset()
   val image = DicomUtil.datasetToImage(dataset)
 
-  val storage = Files.createTempDirectory("slicebox-test-storage-")
+  val fileStorage = Files.createTempDirectory("slicebox-test-storage-")
 
-  val storageActorRef = TestActorRef(new StorageServiceActor(storage))
+  val storageActorRef = TestActorRef(new StorageServiceActor(new FileStorage(fileStorage.toString)))
   val storageActor = storageActorRef.underlyingActor
 
   val source = Source(SourceType.BOX, "remote box", 1)
 
   override def afterAll {
     TestKit.shutdownActorSystem(system)
-    TestUtil.deleteFolder(storage)
+    TestUtil.deleteFolder(fileStorage)
   }
 
   "The storage service" must {
