@@ -94,6 +94,7 @@ class ImportRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     val addedSession = PostAsUser("/api/import/sessions", importSession) ~> routes ~> check {
       responseAs[ImportSession]
     }
+
     val file = TestUtil.testImageFile
     val mfd = MultipartFormData(Seq(BodyPart(file, "file")))
     PostAsUser(s"/api/import/sessions/${addedSession.id}/images", mfd) ~> routes ~> check {
@@ -116,11 +117,15 @@ class ImportRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
     val file = TestUtil.jpegFile
     val mfd = MultipartFormData(Seq(BodyPart(file, "file")))
-    PostAsUser(s"/api/import/sessions/${addedSession.id}/images", mfd) ~> routes ~> check {
+    PostAsUser(s"/api/import/sessions/${
+      addedSession.id
+    }/images", mfd) ~> routes ~> check {
       status should be(BadRequest)
     }
 
-    val updatedSession = GetAsUser(s"/api/import/sessions/${addedSession.id}") ~> routes ~> check {
+    val updatedSession = GetAsUser(s"/api/import/sessions/${
+      addedSession.id
+    }") ~> routes ~> check {
       responseAs[ImportSession]
     }
     updatedSession.filesImported should be(0)
