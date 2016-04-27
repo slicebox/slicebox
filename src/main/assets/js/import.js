@@ -8,20 +8,20 @@ angular.module('slicebox.import', ['ngRoute', 'ngFileUpload'])
   $routeProvider.when('/import', {
     templateUrl: '/assets/partials/import.html',
     controller: 'ImportCtrl'
-  });  
+  });
 })
 
-.controller('ImportCtrl', function($scope, Upload, $q, $interval, sbxToast, openAddEntityModal, openDeleteEntitiesModalFunction, openTagSeriesModalFunction) {
-    
+.controller('ImportCtrl', function($scope, $http, Upload, $q, $interval, sbxToast, openAddEntityModal, openDeleteEntitiesModalFunction, openTagSeriesModalFunction) {
+
     $scope.sessionActions =
         [
             {
                 name: 'Delete',
-                action: openDeleteEntitiesModalFunction('/api/imports/', 'import sessions')
+                action: openDeleteEntitiesModalFunction('/api/import/sessions/', 'import sessions')
             },
             {
                 name: 'Tag Series',
-                action: openTagSeriesModalFunction('/api/imports/')
+                action: openTagSeriesModalFunction('/api/import/sessions/')
             }
         ];
 
@@ -44,7 +44,7 @@ angular.module('slicebox.import', ['ngRoute', 'ngFileUpload'])
     $scope.$on('$destroy', function() {
         $interval.cancel(timer);
     });
-  
+
     $scope.loadImportSessions = function(startIndex, count) {
         var sessionsPromise = $http.get('/api/import/sessions');
         return sessionsPromise;
@@ -52,15 +52,13 @@ angular.module('slicebox.import', ['ngRoute', 'ngFileUpload'])
 
     $scope.addImportSessionButtonClicked = function() {
         openAddEntityModal(
-            'addImportSessionModalContent.html', 
-            'AddImportSessionModalCtrl', 
-            '/api/imports', 
-            'Import session', 
+            'addImportSessionModalContent.html',
+            'AddImportSessionModalCtrl',
+            '/api/import/sessions/',
+            'Import session',
             $scope.callbacks.importSessionsTable)
         .then(function (importSession) {
-            $http.post('/api/import/sessions', importSession).then(function(data) {
-                $scope.callbacks.importSessionsTable.selectObject(data.importSession);
-            });
+            $scope.callbacks.importSessionsTable.selectObject(importSession);
         });
     };
 
@@ -71,7 +69,6 @@ angular.module('slicebox.import', ['ngRoute', 'ngFileUpload'])
     function importFirst(files) {
         if (files && files.length) {
             $scope.uiState.currentFileSet.index++;
-            $scope.uiState.selectedSession.lastUpdated = new Date().getTime(); // TODO move to server
             $scope.uiState.currentFileSet.progress = Math.round(100 * $scope.uiState.currentFileSet.index / $scope.uiState.currentFileSet.total);
             Upload.upload({
                 url: '/api/import/sessions/' + $scope.uiState.selectedSession.id + '/images',
@@ -79,17 +76,12 @@ angular.module('slicebox.import', ['ngRoute', 'ngFileUpload'])
             }).success(function (data, status, headers, config) {
                 //importedFiles.push({ name: config.file.name });
                 files.shift();
-                $scope.uiState.selectedSession.filesImported++; // TODO move to server
-                if (status == 201) {
-                    $scope.uiState.selectedSession.filesAdded++; // TODO move to server
-                }
                 importFirst(files);
             }).error(function (message, status, headers, config) {
                 if (status >= 300 && status !== 400) {
                     sbxToast.showErrorMessage('Error importing file: ' + message);
                 }
                 files.shift();
-                $scope.uiState.selectedSession.filesRejected++; // TODO move to server
                 importFirst(files);
             });
         } else {
@@ -118,12 +110,12 @@ angular.module('slicebox.import', ['ngRoute', 'ngFileUpload'])
 
     // Scope functions
     $scope.addButtonClicked = function() {
-        return $mdDialog.hide({ 
-            id: new Date().getTime(), // change to -1 later... 
+        return $mdDialog.hide({
+            id: new Date().getTime(), // change to -1 later...
             name: $scope.name,
             userId: -1,
             user: "user",
-            filesImported: 0, 
+            filesImported: 0,
             filesAdded: 0,
             filesRejected: 0,
             created: new Date().getTime(),
