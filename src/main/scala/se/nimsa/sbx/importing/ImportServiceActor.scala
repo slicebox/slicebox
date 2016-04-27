@@ -6,7 +6,6 @@ import akka.event.Logging
 import akka.actor.Props
 import akka.event.LoggingReceive
 import se.nimsa.sbx.importing.ImportProtocol._
-import se.nimsa.sbx.metadata.MetaDataProtocol.GetAllSeries
 
 class ImportServiceActor(dbProps: DbProps) extends Actor {
   val log = Logging(context.system, this)
@@ -19,8 +18,7 @@ class ImportServiceActor(dbProps: DbProps) extends Actor {
   override def receive = LoggingReceive {
     case AddImportSession(importSession) =>
       db.withSession { implicit session =>
-        val newImportSession = importSession.copy(filesImported = 0, filesAdded = 0, filesRejected = 0,
-          created = System.currentTimeMillis(), lastUpdated = System.currentTimeMillis())
+        val newImportSession = importSession.copy(filesImported = 0, filesAdded = 0, filesRejected = 0, created = now, lastUpdated = now)
         sender ! dao.addImportSession(newImportSession)
       }
 
@@ -47,19 +45,24 @@ class ImportServiceActor(dbProps: DbProps) extends Actor {
     case AddImageToSession(importSession, image, overwrite) =>
       db.withSession { implicit session =>
         if (overwrite) {
-          dao.updateImportSession(importSession = importSession, imported = 1)
+          val updatedImportSession = importSession.copy(filesImported = importSession.filesImported + 1, lastUpdated = now)
+          dao.updateImportSession(updatedImportSession)
         } else {
-          dao.updateImportSession(importSession = importSession, imported = 1, added = 1)
+          val updatedImportSession = importSession.copy(filesImported = importSession.filesImported + 1, filesAdded = importSession.filesAdded + 1, lastUpdated = now)
+          dao.updateImportSession(updatedImportSession)
         }
-        sender ! ImageAddedToSession(dao.insertImportSessionImage(ImportSessionImage(id = 0, importSessionId = importSession.id, imageId = image.id)))
+        sender ! ImageAddedToSession(dao.insertImportSessionImage(ImportSessionImage(-1, importSession.id, image.id)))
       }
 
     case UpdateSessionWithRejection(importSession) =>
       db.withSession { implicit session =>
-        sender ! dao.updateImportSession(importSession = importSession, rejected = 1)
+        val updatedImportSession = importSession.copy(filesRejected = importSession.filesRejected + 1, lastUpdated = now)
+        sender ! dao.updateImportSession(updatedImportSession)
       }
 
   }
+
+  def now = System.currentTimeMillis
 
 }
 

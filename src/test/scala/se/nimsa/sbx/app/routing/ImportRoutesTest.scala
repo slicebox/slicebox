@@ -26,11 +26,14 @@ class ImportRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   override def dbUrl() = "jdbc:h2:mem:importroutestest;DB_CLOSE_DELAY=-1"
 
   val importDao = new ImportDAO(H2Driver)
+  val metaDataDao = new MetaDataDAO(H2Driver)
+
   val importSession = ImportSession(id = 12, name = "importSessionName", userId = 123, user = "userName", filesImported = 0, filesAdded = 0, filesRejected = 0, created = System.currentTimeMillis(), lastUpdated = System.currentTimeMillis())
 
   override def afterEach() {
     db.withSession { implicit session =>
       importDao.clear
+      metaDataDao.clear
     }
   }
 
@@ -107,8 +110,19 @@ class ImportRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     updatedSession.filesImported should be(1)
     updatedSession.filesAdded should be(1)
     updatedSession.filesRejected should be(0)
+  }
 
-    // Testing overwrite
+  it should "return 200 OK and update counters when adding an already added image to an import session" in {
+    val addedSession = PostAsUser("/api/import/sessions", importSession) ~> routes ~> check {
+      responseAs[ImportSession]
+    }
+
+    val file = TestUtil.testImageFile
+    val mfd = MultipartFormData(Seq(BodyPart(file, "file")))
+    PostAsUser(s"/api/import/sessions/${addedSession.id}/images", mfd) ~> routes ~> check {
+      status should be(Created)
+    }
+
     val mfd2 = MultipartFormData(Seq(BodyPart(file, "file")))
     PostAsUser(s"/api/import/sessions/${addedSession.id}/images", mfd2) ~> routes ~> check {
       status should be(OK)
@@ -122,8 +136,6 @@ class ImportRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     updatedSession2.filesImported should be(2)
     updatedSession2.filesAdded should be(1)
     updatedSession2.filesRejected should be(0)
-
-
   }
 
   it should "return 400 Bad Request and update counters when adding a jpg image to an import session" in {
@@ -132,15 +144,11 @@ class ImportRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
     val file = TestUtil.jpegFile
     val mfd = MultipartFormData(Seq(BodyPart(file, "file")))
-    PostAsUser(s"/api/import/sessions/${
-      addedSession.id
-    }/images", mfd) ~> routes ~> check {
+    PostAsUser(s"/api/import/sessions/${addedSession.id}/images", mfd) ~> routes ~> check {
       status should be(BadRequest)
     }
 
-    val updatedSession = GetAsUser(s"/api/import/sessions/${
-      addedSession.id
-    }") ~> routes ~> check {
+    val updatedSession = GetAsUser(s"/api/import/sessions/${addedSession.id}") ~> routes ~> check {
       responseAs[ImportSession]
     }
     updatedSession.filesImported should be(0)
