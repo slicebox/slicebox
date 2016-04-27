@@ -111,15 +111,15 @@ angular.module('slicebox.import', ['ngRoute', 'ngFileUpload'])
     // Scope functions
     $scope.addButtonClicked = function() {
         return $mdDialog.hide({
-            id: new Date().getTime(), // change to -1 later...
+            id: -1,
             name: $scope.name,
             userId: -1,
-            user: "user",
+            user: "",
             filesImported: 0,
             filesAdded: 0,
             filesRejected: 0,
-            created: new Date().getTime(),
-            lastUpdated: new Date().getTime()
+            created: 0,
+            lastUpdated: 0
         });
     };
 

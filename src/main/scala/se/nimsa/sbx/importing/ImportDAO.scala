@@ -68,6 +68,12 @@ class ImportDAO(val driver: JdbcProfile) {
   def listImagesForImportSesstionId(importSessionId: Long)(implicit session: Session): List[ImportSessionImage] =
     importSessionImageQuery.filter(_.importSessionId === importSessionId).list
 
+  def importSessionImageForImportSessionIdAndImageId(importSessionId: Long, imageId: Long)(implicit session: Session): Option[ImportSessionImage] =
+    importSessionImageQuery
+      .filter(_.importSessionId === importSessionId)
+      .filter(_.imageId === imageId)
+      .firstOption
+
   def insertImportSessionImage(importSessionImage: ImportSessionImage)(implicit session: Session): ImportSessionImage = {
     val generatedId = (importSessionImageQuery returning importSessionImageQuery.map(_.id)) += importSessionImage
     importSessionImage.copy(id = generatedId)

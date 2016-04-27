@@ -39,7 +39,7 @@ import spray.http.MediaTypes._
 import spray.http.StatusCodes._
 import spray.routing.Route
 import spray.routing.directives._
-import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, Images, MetaDataAdded}
+import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, GetImage, Images, MetaDataAdded}
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.DicomPropertyValue._
 import se.nimsa.sbx.importing.ImportProtocol._
@@ -93,7 +93,13 @@ trait ImportRoutes {
             get {
               onSuccess(importService.ask(GetImportSessionImages(id))) {
                 case ImportSessionImages(importSessionImages) =>
-                  complete(importSessionImages.map(_.imageId))
+                  complete {
+                    Future.sequence {
+                      importSessionImages.map { importSessionImage =>
+                        metaDataService.ask(GetImage(importSessionImage.imageId)).mapTo[Option[Image]]
+                      }
+                    }.map(_.flatten)
+                  }
               }
             }
           }
