@@ -1,6 +1,7 @@
 package se.nimsa.sbx.app.routing
 
 import java.io.File
+
 import scala.slick.driver.H2Driver
 import org.dcm4che3.data.Tag
 import org.dcm4che3.data.VR
@@ -12,10 +13,7 @@ import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomUtil
 import se.nimsa.sbx.dicom.ImageAttribute
 import se.nimsa.sbx.util.TestUtil
-import spray.http.BodyPart
-import spray.http.ContentTypes
-import spray.http.HttpData
-import spray.http.MultipartFormData
+import spray.http._
 import spray.http.StatusCodes._
 import spray.httpx.SprayJsonSupport._
 import spray.httpx.unmarshalling.BasicUnmarshallers.ByteArrayUnmarshaller
@@ -109,6 +107,23 @@ class ImportRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     updatedSession.filesImported should be(1)
     updatedSession.filesAdded should be(1)
     updatedSession.filesRejected should be(0)
+
+    // Testing overwrite
+    val mfd2 = MultipartFormData(Seq(BodyPart(file, "file")))
+    PostAsUser(s"/api/import/sessions/${addedSession.id}/images", mfd2) ~> routes ~> check {
+      status should be(OK)
+      val image = responseAs[Image]
+      image.id should not be -1
+    }
+
+    val updatedSession2 = GetAsUser(s"/api/import/sessions/${addedSession.id}") ~> routes ~> check {
+      responseAs[ImportSession]
+    }
+    updatedSession2.filesImported should be(2)
+    updatedSession2.filesAdded should be(1)
+    updatedSession2.filesRejected should be(0)
+
+
   }
 
   it should "return 400 Bad Request and update counters when adding a jpg image to an import session" in {
