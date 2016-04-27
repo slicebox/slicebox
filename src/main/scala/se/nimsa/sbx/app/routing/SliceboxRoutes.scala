@@ -37,7 +37,8 @@ trait SliceboxRoutes extends DirectoryRoutes
     with LogRoutes
     with UiRoutes
     with GeneralRoutes
-    with SeriesTypeRoutes { this: SliceboxService =>
+    with SeriesTypeRoutes
+    with ImportRoutes { this: SliceboxService =>
 
   implicit val knownExceptionHandler =
     ExceptionHandler {
@@ -71,7 +72,8 @@ trait SliceboxRoutes extends DirectoryRoutes
               logRoutes ~
               generalRoutes(apiUser) ~
               seriesTypeRoutes(apiUser) ~
-              forwardingRoutes(apiUser)
+              forwardingRoutes(apiUser) ~
+              importRoutes(apiUser)
           }
       } ~ transactionRoutes
     } ~

@@ -16,51 +16,38 @@
 
 package se.nimsa.sbx.app
 
-import java.nio.file.Files
-import java.nio.file.Path
-import java.nio.file.Paths
+import java.nio.file.{Files, Path, Paths}
 import java.util.concurrent.TimeUnit.MILLISECONDS
-import scala.slick.driver.H2Driver
-import scala.slick.driver.MySQLDriver
-import scala.slick.jdbc.JdbcBackend.Database
-import com.typesafe.config.Config
-import com.typesafe.config.ConfigFactory
-import com.zaxxer.hikari.HikariDataSource
-import com.zaxxer.hikari.HikariConfig
+
 import akka.actor.Actor
 import akka.util.Timeout
+import com.typesafe.config.{Config, ConfigFactory}
+import com.zaxxer.hikari.{HikariConfig, HikariDataSource}
 import se.nimsa.sbx.anonymization.AnonymizationServiceActor
 import se.nimsa.sbx.app.routing.SliceboxRoutes
-import se.nimsa.sbx.box.BoxDAO
-import se.nimsa.sbx.box.BoxServiceActor
-import se.nimsa.sbx.directory.DirectoryWatchDAO
-import se.nimsa.sbx.directory.DirectoryWatchServiceActor
-import se.nimsa.sbx.forwarding.ForwardingDAO
-import se.nimsa.sbx.forwarding.ForwardingServiceActor
-import se.nimsa.sbx.log.LogDAO
-import se.nimsa.sbx.log.LogServiceActor
-import se.nimsa.sbx.scp.ScpDAO
-import se.nimsa.sbx.scp.ScpServiceActor
-import se.nimsa.sbx.scu.ScuDAO
-import se.nimsa.sbx.scu.ScuServiceActor
-import se.nimsa.sbx.seriestype.SeriesTypeDAO
-import se.nimsa.sbx.seriestype.SeriesTypeServiceActor
-import se.nimsa.sbx.metadata.MetaDataDAO
-import se.nimsa.sbx.metadata.PropertiesDAO
-import se.nimsa.sbx.metadata.MetaDataServiceActor
+import se.nimsa.sbx.box.{BoxDAO, BoxServiceActor}
+import se.nimsa.sbx.directory.{DirectoryWatchDAO, DirectoryWatchServiceActor}
+import se.nimsa.sbx.forwarding.{ForwardingDAO, ForwardingServiceActor}
+import se.nimsa.sbx.importing.{ImportDAO, ImportServiceActor}
+import se.nimsa.sbx.log.{LogDAO, LogServiceActor}
+import se.nimsa.sbx.metadata.{MetaDataDAO, MetaDataServiceActor, PropertiesDAO}
+import se.nimsa.sbx.scp.{ScpDAO, ScpServiceActor}
+import se.nimsa.sbx.scu.{ScuDAO, ScuServiceActor}
+import se.nimsa.sbx.seriestype.{SeriesTypeDAO, SeriesTypeServiceActor}
 import se.nimsa.sbx.storage.StorageServiceActor
-import se.nimsa.sbx.user.Authenticator
-import se.nimsa.sbx.user.UserDAO
-import se.nimsa.sbx.user.UserServiceActor
+import se.nimsa.sbx.user.{Authenticator, UserDAO, UserServiceActor}
 import spray.routing.HttpService
+
+import scala.slick.driver.{H2Driver, MySQLDriver, PostgresDriver}
+import scala.slick.jdbc.JdbcBackend.Database
 
 class SliceboxServiceActor extends Actor with SliceboxService {
 
-  def actorRefFactory = context
+  override def actorRefFactory = context
 
   def dbUrl() = sliceboxConfig.getString("database.path")
 
-  def createStorageDirectory() = {
+  override def createStorageDirectory() = {
     val storagePath = Paths.get(sliceboxConfig.getString("dicom-files.path"))
     if (!Files.exists(storagePath))
       try {
@@ -73,7 +60,7 @@ class SliceboxServiceActor extends Actor with SliceboxService {
     storagePath
   }
 
-  def receive = runRoute(routes)
+  override def receive = runRoute(routes)
 
 }
 
@@ -120,6 +107,7 @@ trait SliceboxService extends HttpService with SliceboxRoutes with JsonFormats {
     new ScpDAO(dbProps.driver).create
     new ScuDAO(dbProps.driver).create
     new BoxDAO(dbProps.driver).create
+    new ImportDAO(dbProps.driver).create
   }
 
   val storage = createStorageDirectory()
@@ -171,6 +159,7 @@ trait SliceboxService extends HttpService with SliceboxRoutes with JsonFormats {
   val directoryService = actorRefFactory.actorOf(DirectoryWatchServiceActor.props(dbProps, storage, timeout), name = "DirectoryService")
   val seriesTypeService = actorRefFactory.actorOf(SeriesTypeServiceActor.props(dbProps, timeout), name = "SeriesTypeService")
   val forwardingService = actorRefFactory.actorOf(ForwardingServiceActor.props(dbProps, timeout), name = "ForwardingService")
+  val importService = actorRefFactory.actorOf(ImportServiceActor.props(dbProps), name = "ImportService")
 
   val authenticator = new Authenticator(userService)
 

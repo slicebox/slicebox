@@ -79,7 +79,7 @@ angular.module('slicebox.adminSeriesTypes', ['ngRoute'])
 		var rulesHaveChanged = false;
 		var attributesHaveChnaged = false;
 
-		if (angular.equals($scope.uiState.selectedSeriesType, $scope.originalServiceType) === false) {
+		if (angular.equals($scope.uiState.selectedSeriesType, $scope.originalSeriesType) === false) {
 			return true;
 		}
 
@@ -135,7 +135,7 @@ angular.module('slicebox.adminSeriesTypes', ['ngRoute'])
 		var savePromise;
 		var isCreate;
 
-		if ($scope.serviceTypeForm.$invalid) {
+		if ($scope.seriesTypeForm.$invalid) {
 			return;
 		}
 
@@ -179,9 +179,9 @@ angular.module('slicebox.adminSeriesTypes', ['ngRoute'])
 	}
 
 	function resetState() {
-		$scope.serviceTypeForm.$setPristine();
+		$scope.seriesTypeForm.$setPristine();
 
-		$scope.originalServiceType = angular.copy($scope.uiState.selectedSeriesType);
+		$scope.originalSeriesType = angular.copy($scope.uiState.selectedSeriesType);
 
 		$scope.state.rules = [];
 		$scope.callbacks.ruleAttributesTables = [];

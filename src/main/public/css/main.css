@@ -52,6 +52,12 @@
     border-color: #90A4AE;
 }
 
+.import-drop-box-container[disabled] {
+	background-color: #ECEFF1;	
+    border-color: #CFD8DC;
+	border-style: dashed;
+}
+
 .import-drop-box-dragover {
 	background-color: #90A4AE;
     border-color: #CFD8DC;

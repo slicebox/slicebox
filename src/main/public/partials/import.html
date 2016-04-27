@@ -1,82 +1,85 @@
-<div layout="column" layout-margin>
+<div layout="column" layout-margin class="import">
 
-    <div flex ng-controller="ImportCtrl">
+    <div layout="row" layout-margin>
 
-        <div layout="row" layout-margin>
+        <div flex>
+            <md-card>
+                <md-card-content>
+                    <h4 class="md-flex">Import Sessions</h4>
+                    <md-content>
+                        <sbx-grid
+                            load-page="loadImportSessions(startIndex, count)"
+                            page-size="1000000"
+                            sorting="false"
+                            object-actions="sessionActions"
+                            object-selected="importSessionSelected(object)"
+                            callbacks="callbacks.importSessionsTable"
+                            empty-message="No recorded import sessions">
 
-            <div flex>
+                            <sbx-grid-column property="name" title="Name">
+                            </sbx-grid-column>
 
-                <div ngf-drop ngf-change="import($files)" 
-                     class="import-drop-box-container" 
-                     ngf-drag-over-class="import-drop-box-dragover" 
-                     ngf-multiple="true" 
-                     ngf-allow-dir="true"> 
-                    <div layout="row" layout-align="center center" style="height: 300px"> 
-                        <h3>Drop DICOM files or folders here</h3>
-                    </div>
-                </div>
-                
-                <div ngf-no-file-drop>Drag/Drop is not supported for this browser</div>
+                            <sbx-grid-column property="user" title="User">
+                            </sbx-grid-column>
 
-                <div layout="row">
-                    <div flex="33">
+                            <sbx-grid-column property="filesImported" title="Imported">
+                            </sbx-grid-column>
 
-                        <md-card>
-                            <md-card-content>
+                            <sbx-grid-column property="filesAdded" title="Added">
+                            </sbx-grid-column>
 
-                                <h4>Imported files</h4>
-                        
-                                <md-content class="md-padding" style="height: 300px">
+                            <sbx-grid-column property="filesRejected" title="Rejected">
+                            </sbx-grid-column>
 
-                                    <sbx-grid
-                                        load-page="getImportedFiles()"
-                                        page-size="10000000"
-                                        callbacks="callbacks.importedFilesTable"
-                                        sorting="false"
-                                        empty-message="No imported files">
+                            <sbx-grid-column property="created" title="Created" filter="date: yyyy-MM-dd HH:mm">
+                            </sbx-grid-column>
 
-                                        <sbx-grid-column property="name" title="File Name"></sbx-grid-column>
-                                    
-                                    </sbx-grid>
+                            <sbx-grid-column property="lastUpdated" title="Updated" filter="date: yyyy-MM-dd HH:mm">
+                            </sbx-grid-column>
+                        </sbx-grid>
 
-                                </md-content>
-
-                            </md-card-content>
-                        </md-card>
-
-                    </div>
-                    <div flex="66">
-
-                        <md-card>
-                            <md-card-content>
-
-                                <h4>Rejected files</h4>                                
-
-                                <md-content class="md-padding" style="height: 300px">
-
-                                    <sbx-grid
-                                        load-page="getRejectedFiles()"
-                                        page-size="10000000"
-                                        callbacks="callbacks.rejectedFilesTable"
-                                        sorting="false"
-                                        empty-message="No rejected files">
-
-                                        <sbx-grid-column property="name" title="File Name"></sbx-grid-column>
-                                        <sbx-grid-column property="status" title="Status Code"></sbx-grid-column>
-                                        <sbx-grid-column property="message" title="Message"></sbx-grid-column>
-                                    
-                                    </sbx-grid>
-
-                                </md-content>
-
-                            </md-card-content>
-                        </md-card>
-
-                    </div>
-                </div>
-
-            </div>
+                        <div layout="row" class="button-row">
+                            <md-button class="md-primary md-raised" ng-click="addImportSessionButtonClicked()">
+                                Add Import Session
+                            </md-button>
+                            <div flex></div>
+                        </div>
+                    </md-content>
+                </md-card-content>
+            </md-card>
         </div>
+
+        <div flex>
+
+            <md-card ng-if="uiState.selectedSession">
+                <md-card-content>
+                    <h4 class="md-flex">Add files to <i>{{uiState.selectedSession.name}}</i></h4>
+                    <md-content>
+
+                        <div ngf-drop 
+                             ngf-change="import($files)" 
+                             ngf-drag-over-class="import-drop-box-dragover" 
+                             ngf-multiple="true" 
+                             ngf-allow-dir="true"
+                             ng-disabled="uiState.currentFileSet.processing"
+                             class="import-drop-box-container">
+                            <div layout="row" layout-align="center center" style="height: 300px"> 
+                                <h3 ng-if="!uiState.currentFileSet.processing">Drop DICOM files or folders here</h3>
+                                <div class="column" ng-hide="!uiState.currentFileSet.processing">
+                                    <h4>Importing {{uiState.currentFileSet.total}} files...</h4>
+                                    <md-progress-linear md-mode="determinate" ng-value="uiState.currentFileSet.progress"></md-progress-linear>
+                                </div>
+                            </div>
+                        </div>
+            
+                        <div ngf-no-file-drop>Drag/Drop is not supported for this browser</div>
+
+
+                   </md-content>
+                </md-card-content>
+            </md-card>
+
+         </div>
 
     </div>
 

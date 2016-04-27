@@ -27,6 +27,7 @@ object GeneralProtocol {
       case SourceType.DIRECTORY => "directory"
       case SourceType.BOX => "box"
       case SourceType.USER => "user"
+      case SourceType.IMPORT => "import"
       case _ => "unknown"
     }
   }
@@ -37,12 +38,14 @@ object GeneralProtocol {
     case object BOX extends SourceType
     case object USER extends SourceType
     case object UNKNOWN extends SourceType
+    case object IMPORT extends SourceType
 
     def withName(string: String) = string match {
       case "scp" => SCP
       case "directory" => DIRECTORY
       case "box" => BOX
       case "user" => USER
+      case "import" => IMPORT
       case _ => UNKNOWN
     }    
   }

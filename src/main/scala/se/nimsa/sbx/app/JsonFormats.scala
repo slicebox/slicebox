@@ -33,6 +33,7 @@ import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.user.UserProtocol._
 import spray.json._
 import spray.routing.authentication.UserPass
+import se.nimsa.sbx.importing.ImportProtocol._
 
 trait JsonFormats extends DefaultJsonProtocol {
 
@@ -195,4 +196,7 @@ trait JsonFormats extends DefaultJsonProtocol {
   implicit val seriesTypeRuleAttributeFormat = jsonFormat7(SeriesTypeRuleAttribute)
   
   implicit val forwardingRuleFormat = jsonFormat4(ForwardingRule)
+  
+  implicit val importSessionFormat = jsonFormat9(ImportSession)
+  
 }

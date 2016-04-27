@@ -8,46 +8,122 @@ angular.module('slicebox.import', ['ngRoute', 'ngFileUpload'])
   $routeProvider.when('/import', {
     templateUrl: '/assets/partials/import.html',
     controller: 'ImportCtrl'
-  });  
+  });
 })
 
-.controller('ImportCtrl', function($scope, Upload, $q) {
-    
-    var importedFiles = [];
-    var rejectedFiles = [];
+.controller('ImportCtrl', function($scope, $http, Upload, $q, $interval, sbxToast, openAddEntityModal, openDeleteEntitiesModalFunction, openTagSeriesModalFunction) {
+
+    $scope.sessionActions =
+        [
+            {
+                name: 'Delete',
+                action: openDeleteEntitiesModalFunction('/api/import/sessions/', 'import sessions')
+            },
+            {
+                name: 'Tag Series',
+                action: openTagSeriesModalFunction('/api/import/sessions/')
+            }
+        ];
+
+    $scope.uiState.selectedSession = null;
+    $scope.uiState.currentFileSet = {
+        processing: false,
+        index: 0,
+        total: 0,
+        progress: 0
+    };
 
     $scope.callbacks = {};
 
+    var timer = $interval(function() {
+        if ($scope.uiState.currentFileSet.processing) {
+            $scope.callbacks.importSessionsTable.reloadPage();
+        }
+    }, 3000);
+
+    $scope.$on('$destroy', function() {
+        $interval.cancel(timer);
+    });
+
+    $scope.loadImportSessions = function(startIndex, count) {
+        var sessionsPromise = $http.get('/api/import/sessions');
+        return sessionsPromise;
+    };
+
+    $scope.addImportSessionButtonClicked = function() {
+        openAddEntityModal(
+            'addImportSessionModalContent.html',
+            'AddImportSessionModalCtrl',
+            '/api/import/sessions/',
+            'Import session',
+            $scope.callbacks.importSessionsTable)
+        .then(function (importSession) {
+            $scope.callbacks.importSessionsTable.selectObject(importSession);
+        });
+    };
+
+    $scope.importSessionSelected = function(importSession) {
+        $scope.uiState.selectedSession = importSession;
+    };
+
     function importFirst(files) {
         if (files && files.length) {
+            $scope.uiState.currentFileSet.index++;
+            $scope.uiState.currentFileSet.progress = Math.round(100 * $scope.uiState.currentFileSet.index / $scope.uiState.currentFileSet.total);
             Upload.upload({
-                url: '/api/images',
+                url: '/api/import/sessions/' + $scope.uiState.selectedSession.id + '/images',
                 file: files[0]
             }).success(function (data, status, headers, config) {
-                importedFiles.push({ name: config.file.name });
-                $scope.callbacks.importedFilesTable.reset();
+                //importedFiles.push({ name: config.file.name });
                 files.shift();
                 importFirst(files);
             }).error(function (message, status, headers, config) {
-                var errorMessage = status === 400 ? "Not a valid DICOM file" : message;
-                rejectedFiles.push({ name: config.file.name, status: status, message: errorMessage });
-                $scope.callbacks.rejectedFilesTable.reset();
+                if (status >= 300 && status !== 400) {
+                    sbxToast.showErrorMessage('Error importing file: ' + message);
+                }
                 files.shift();
                 importFirst(files);
             });
+        } else {
+            $scope.uiState.currentFileSet.processing = false;
+            $scope.callbacks.importSessionsTable.reloadPage();
         }
     }
 
     $scope.import = function(files) {
-        importFirst(files);
+        var filesPrune = [];
+        for (var i = 0; i < files.length; i++) {
+            if (files[i].type !== 'directory') {
+                filesPrune.push(files[i]);
+            }
+        }
+        $scope.uiState.currentFileSet.processing = true;
+        $scope.uiState.currentFileSet.index = 0;
+        $scope.uiState.currentFileSet.total = filesPrune.length;
+        $scope.uiState.currentFileSet.progress = 0;
+        importFirst(filesPrune);
     };
 
-    $scope.getImportedFiles = function() {
-        return $q.when(importedFiles);
+})
+
+.controller('AddImportSessionModalCtrl', function($scope, $mdDialog) {
+
+    // Scope functions
+    $scope.addButtonClicked = function() {
+        return $mdDialog.hide({
+            id: new Date().getTime(), // change to -1 later...
+            name: $scope.name,
+            userId: -1,
+            user: "user",
+            filesImported: 0,
+            filesAdded: 0,
+            filesRejected: 0,
+            created: new Date().getTime(),
+            lastUpdated: new Date().getTime()
+        });
     };
 
-    $scope.getRejectedFiles = function() {
-        return $q.when(rejectedFiles);
+    $scope.cancelButtonClicked = function() {
+        $mdDialog.cancel();
     };
-
 });
