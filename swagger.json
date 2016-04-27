@@ -1650,7 +1650,7 @@
             "schema": {
               "type": "array",
               "items": {
-                "$ref": "#/definitions/anonymizationKeyImage"
+                "$ref": "#/definitions/image"
               }
             }
           },          
@@ -3144,22 +3144,6 @@
         },
         "anonFrameOfReferenceUID": {
           "type": "string"
-        }
-      }
-    },
-    "anonymizationKeyImage": {
-      "properties": {
-        "id": {
-          "type": "integer",
-          "format": "int64"          
-        },
-        "anonymizationKeyId": {
-          "type": "integer",
-          "format": "int64"          
-        },
-        "imageId": {
-          "type": "integer",
-          "format": "int64"          
         }
       }
     },
