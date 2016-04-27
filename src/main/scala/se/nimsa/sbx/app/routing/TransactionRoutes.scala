@@ -23,19 +23,20 @@ import spray.http.HttpEntity
 import spray.http.StatusCodes._
 import spray.routing._
 import se.nimsa.sbx.app.SliceboxService
-import se.nimsa.sbx.user.UserProtocol.UserRole
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.dicom.DicomUtil._
-import se.nimsa.sbx.anonymization.AnonymizationUtil._
+import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import org.dcm4che3.data.Attributes
 import spray.httpx.SprayJsonSupport._
 import spray.httpx.unmarshalling.BasicUnmarshallers.ByteArrayUnmarshaller
 import se.nimsa.sbx.app.GeneralProtocol._
+import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, GetImage, MetaDataAdded}
 import se.nimsa.sbx.util.CompressionUtil._
 
-trait TransactionRoutes { this: SliceboxService =>
+trait TransactionRoutes {
+  this: SliceboxService =>
 
   def transactionRoutes: Route =
     pathPrefix("transactions" / Segment) { token =>
@@ -49,17 +50,21 @@ trait TransactionRoutes { this: SliceboxService =>
               post {
                 entity(as[Array[Byte]]) { compressedBytes =>
                   val bytes = decompress(compressedBytes)
-                  val dataset = loadDataset(bytes, true)
+                  val dataset = loadDataset(bytes, withPixelData = true)
                   if (dataset == null)
                     complete((BadRequest, "Dataset could not be read"))
                   else
                     onSuccess(anonymizationService.ask(ReverseAnonymization(dataset)).mapTo[Attributes]) { reversedDataset =>
                       val source = Source(SourceType.BOX, box.name, box.id)
-                      onSuccess(storageService.ask(AddDataset(reversedDataset, source))) {
-                        case DatasetAdded(image, source, overwrite) =>
-                          onSuccess(boxService.ask(UpdateIncoming(box, outgoingTransactionId, sequenceNumber, totalImageCount, image.id, overwrite))) {
-                            case IncomingUpdated(_) => complete(NoContent)
+                      onSuccess(storageService.ask(CheckDataset(reversedDataset)).mapTo[Boolean]) { status =>
+                        onSuccess(metaDataService.ask(AddMetaData(reversedDataset, source)).mapTo[MetaDataAdded]) { metaData =>
+                          onSuccess(storageService.ask(AddDataset(reversedDataset, source, metaData.image))) {
+                            case DatasetAdded(image, overwrite) =>
+                              onSuccess(boxService.ask(UpdateIncoming(box, outgoingTransactionId, sequenceNumber, totalImageCount, image.id, overwrite))) {
+                                case IncomingUpdated(_) => complete(NoContent)
+                              }
                           }
+                        }
                       }
                     }
                 }
@@ -90,13 +95,13 @@ trait TransactionRoutes { this: SliceboxService =>
               get {
                 parameters('transactionid.as[Long], 'imageid.as[Long]) { (outgoingTransactionId, outgoingImageId) =>
                   onSuccess(boxService.ask(GetOutgoingTransactionImage(box, outgoingTransactionId, outgoingImageId)).mapTo[Option[OutgoingTransactionImage]]) {
-                    _ match {
-                      case Some(transactionImage) =>
-                        val imageId = transactionImage.image.imageId
-                        onSuccess(boxService.ask(GetOutgoingTagValues(transactionImage)).mapTo[Seq[OutgoingTagValue]]) {
-                          case transactionTagValues =>
-                            onSuccess(storageService.ask(GetDataset(imageId, true)).mapTo[Option[Attributes]]) {
-                              _ match {
+                    case Some(transactionImage) =>
+                      val imageId = transactionImage.image.imageId
+                      onSuccess(boxService.ask(GetOutgoingTagValues(transactionImage)).mapTo[Seq[OutgoingTagValue]]) {
+                        case transactionTagValues =>
+                          onSuccess(metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]]) {
+                            case Some(image) =>
+                              onSuccess(storageService.ask(GetDataset(image, withPixelData = true)).mapTo[Option[Attributes]]) {
                                 case Some(dataset) =>
 
                                   onSuccess(anonymizationService.ask(Anonymize(imageId, dataset, transactionTagValues.map(_.tagValue)))) {
@@ -105,14 +110,14 @@ trait TransactionRoutes { this: SliceboxService =>
                                       complete(HttpEntity(ContentTypes.`application/octet-stream`, HttpData(compressedBytes)))
                                   }
                                 case None =>
-
-                                  complete((NotFound, s"File not found for image id ${imageId}"))
+                                  complete((NotFound, s"File not found for image id $imageId"))
                               }
-                            }
-                        }
-                      case None =>
-                        complete((NotFound, s"No outgoing image found for transaction id $outgoingTransactionId and outgoing image id ${outgoingImageId}"))
-                    }
+                            case None =>
+                              complete((NotFound, s"Image not found for image id $imageId"))
+                          }
+                      }
+                    case None =>
+                      complete((NotFound, s"No outgoing image found for transaction id $outgoingTransactionId and outgoing image id $outgoingImageId"))
                   }
                 }
               }

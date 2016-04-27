@@ -127,7 +127,7 @@ class MetaDataDAO(val driver: JdbcProfile) {
   }
 
   def drop(implicit session: Session) =
-    if (MTable.getTables("Patients").list.size > 0)
+    if (MTable.getTables("Patients").list.nonEmpty)
       (patientsQuery.ddl ++
         studiesQuery.ddl ++
         seriesQuery.ddl ++
@@ -145,7 +145,7 @@ class MetaDataDAO(val driver: JdbcProfile) {
     if (tables.isEmpty)
       false
     else
-      !tables(0).getColumns.list.filter(_.name == columnName).isEmpty
+      tables.head.getColumns.list.exists(_.name == columnName)
   }
 
   def checkColumnExists(columnName: String, tableNames: String*)(implicit session: Session) =
@@ -224,10 +224,10 @@ class MetaDataDAO(val driver: JdbcProfile) {
   def patientsFilterPart(filter: Option[String]) =
     filter.map(filterValue => {
       val filterValueLike = s"'%$filterValue%'".toLowerCase
-      s""" (lcase("patientName") like $filterValueLike or 
-           lcase("patientID") like $filterValueLike or 
-           lcase("patientBirthDate") like $filterValueLike or 
-           lcase("patientSex") like $filterValueLike)"""
+      s""" (lcase("Patients"."patientName") like $filterValueLike or
+           lcase("Patients"."patientID") like $filterValueLike or
+           lcase("Patients"."patientBirthDate") like $filterValueLike or
+           lcase("Patients"."patientSex") like $filterValueLike)"""
     })
       .getOrElse("")
 
@@ -390,22 +390,22 @@ class MetaDataDAO(val driver: JdbcProfile) {
     filter.map(filterValue => {
       val filterValueLike = s"'%$filterValue%'".toLowerCase
       s""" (lcase("Series"."id") like $filterValueLike or
-           lcase("patientName") like $filterValueLike or 
-           lcase("patientID") like $filterValueLike or 
-           lcase("patientBirthDate") like $filterValueLike or 
-           lcase("patientSex") like $filterValueLike or
-             lcase("studyDescription") like $filterValueLike or
-             lcase("studyDate") like $filterValueLike or
-             lcase("studyID") like $filterValueLike or
-             lcase("accessionNumber") like $filterValueLike or
-             lcase("patientAge") like $filterValueLike or
-                 lcase("seriesDescription") like $filterValueLike or
-                 lcase("seriesDate") like $filterValueLike or
-                 lcase("modality") like $filterValueLike or
-                 lcase("protocolName") like $filterValueLike or
-                 lcase("bodyPartExamined") like $filterValueLike or
-                 lcase("manufacturer") like $filterValueLike or
-                 lcase("stationName") like $filterValueLike)"""
+           lcase("Patients"."patientName") like $filterValueLike or
+           lcase("Patients"."patientID") like $filterValueLike or
+           lcase("Patients"."patientBirthDate") like $filterValueLike or
+           lcase("Patients"."patientSex") like $filterValueLike or
+             lcase("Studies"."studyDescription") like $filterValueLike or
+             lcase("Studies"."studyDate") like $filterValueLike or
+             lcase("Studies"."studyID") like $filterValueLike or
+             lcase("Studies"."accessionNumber") like $filterValueLike or
+             lcase("Studies"."patientAge") like $filterValueLike or
+                 lcase("Series"."seriesDescription") like $filterValueLike or
+                 lcase("Series"."seriesDate") like $filterValueLike or
+                 lcase("Series"."modality") like $filterValueLike or
+                 lcase("Series"."protocolName") like $filterValueLike or
+                 lcase("Series"."bodyPartExamined") like $filterValueLike or
+                 lcase("Series"."manufacturer") like $filterValueLike or
+                 lcase("Series"."stationName") like $filterValueLike)"""
     })
       .getOrElse("")
 
@@ -545,7 +545,7 @@ object MetaDataDAO {
         s"'${queryProperty.propertyValue}'"
       else
         s"'%${queryProperty.propertyValue}%'"
-    s""""${queryProperty.propertyName}" ${queryProperty.operator.toString} $valuePart"""
+    s""""${queryProperty.propertyName}" ${queryProperty.operator.toString()} $valuePart"""
   }
 
 }

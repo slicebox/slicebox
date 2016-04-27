@@ -16,16 +16,15 @@
 
 package se.nimsa.sbx.metadata
 
-import MetaDataProtocol._
-import akka.actor.Actor
-import akka.actor.Props
-import akka.event.Logging
-import akka.event.LoggingReceive
+import akka.actor.{Actor, Props}
+import akka.event.{Logging, LoggingReceive}
 import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.app.GeneralProtocol.Source
 import se.nimsa.sbx.dicom.DicomHierarchy._
+import se.nimsa.sbx.dicom.DicomUtil._
 import se.nimsa.sbx.lang.NotFoundException
 import se.nimsa.sbx.log.SbxLog
+import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.util.ExceptionCatching
 
 class MetaDataServiceActor(dbProps: DbProps) extends Actor with ExceptionCatching {
@@ -42,11 +41,17 @@ class MetaDataServiceActor(dbProps: DbProps) extends Actor with ExceptionCatchin
 
   def receive = LoggingReceive {
 
-    case AddMetaData(patient, study, series, image, source) =>
+    case AddMetaData(dataset, source) =>
       catchAndReport {
-        val metaDataAdded = MetaDataAdded.tupled(addMetaData(patient, study, series, image, source))
-        log.debug(s"Added metadata $metaDataAdded")
-        sender ! metaDataAdded
+        val metaData = addMetaData(
+          datasetToPatient(dataset),
+          datasetToStudy(dataset),
+          datasetToSeries(dataset),
+          datasetToImage(dataset),
+          source)
+        log.debug(s"Added metadata $metaData")
+        context.system.eventStream.publish(metaData)
+        sender ! metaData
       }
 
     case DeleteMetaData(imageId) =>
@@ -56,12 +61,10 @@ class MetaDataServiceActor(dbProps: DbProps) extends Actor with ExceptionCatchin
             dao.imageById(imageId).map(propertiesDao.deleteFully).getOrElse((None, None, None, None))
           }
 
-        deletedPatient.foreach(patient => system.eventStream.publish(PatientDeleted(patient.id)))
-        deletedStudy.foreach(study => system.eventStream.publish(StudyDeleted(study.id)))
-        deletedSeries.foreach(series => system.eventStream.publish(SeriesDeleted(series.id)))
-        deletedImage.foreach(image => system.eventStream.publish(ImageDeleted(image.id)))
+        val metaDataDeleted = MetaDataDeleted(deletedPatient, deletedStudy, deletedSeries, deletedImage)
+        system.eventStream.publish(metaDataDeleted)
 
-        sender ! MetaDataDeleted(deletedPatient, deletedStudy, deletedSeries, deletedImage)
+        sender ! metaDataDeleted
       }
 
     case msg: PropertiesRequest => catchAndReport {
@@ -206,7 +209,7 @@ class MetaDataServiceActor(dbProps: DbProps) extends Actor with ExceptionCatchin
       propertiesDao.seriesTagsForSeries(seriesId)
     }
 
-  def addMetaData(patient: Patient, study: Study, series: Series, image: Image, source: Source): (Patient, Study, Series, Image, SeriesSource) = {
+  def addMetaData(patient: Patient, study: Study, series: Series, image: Image, source: Source): MetaDataAdded = {
     var patientAdded = false
     var studyAdded = false
     var seriesAdded = false
@@ -218,19 +221,19 @@ class MetaDataServiceActor(dbProps: DbProps) extends Actor with ExceptionCatchin
         val seriesSource = SeriesSource(-1, source)
 
         val dbPatient = dao.patientByNameAndID(patient).getOrElse {
-        	patientAdded = true
+          patientAdded = true
           dao.insert(patient)
         }
         val dbStudy = dao.studyByUidAndPatient(study, dbPatient).getOrElse {
-        	studyAdded = true
+          studyAdded = true
           dao.insert(study.copy(patientId = dbPatient.id))
         }
         val dbSeries = dao.seriesByUidAndStudy(series, dbStudy).getOrElse {
-        	seriesAdded = true
+          seriesAdded = true
           dao.insert(series.copy(studyId = dbStudy.id))
         }
         val dbImage = dao.imageByUidAndSeries(image, dbSeries).getOrElse {
-        	imageAdded = true
+          imageAdded = true
           dao.insert(image.copy(seriesId = dbSeries.id))
         }
         val dbSeriesSource = propertiesDao.seriesSourceById(dbSeries.id)
@@ -242,12 +245,7 @@ class MetaDataServiceActor(dbProps: DbProps) extends Actor with ExceptionCatchin
         (dbPatient, dbStudy, dbSeries, dbImage, dbSeriesSource)
       }
 
-    if (patientAdded) context.system.eventStream.publish(PatientAdded(dbPatient, source))
-    if (studyAdded) context.system.eventStream.publish(StudyAdded(dbStudy, source))
-    if (seriesAdded) context.system.eventStream.publish(SeriesAdded(dbSeries, source))
-    if (imageAdded) context.system.eventStream.publish(ImageAdded(dbImage, source))
-
-    (dbPatient, dbStudy, dbSeries, dbImage, dbSeriesSource)
+    MetaDataAdded(dbPatient, dbStudy, dbSeries, dbImage, patientAdded, studyAdded, seriesAdded, imageAdded, dbSeriesSource.source)
   }
 }
 

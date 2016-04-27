@@ -16,51 +16,43 @@
 
 package se.nimsa.sbx.box
 
-import scala.concurrent.Future
-import scala.concurrent.duration.DurationInt
-import scala.concurrent.duration.FiniteDuration
-import akka.actor.Actor
-import akka.actor.Props
-import akka.event.Logging
-import akka.event.LoggingReceive
+import akka.actor.{Actor, Props, ReceiveTimeout}
+import akka.event.{Logging, LoggingReceive}
 import akka.pattern.ask
+import akka.util.Timeout
+import org.dcm4che3.data.Attributes
+import se.nimsa.sbx.anonymization.AnonymizationProtocol._
+import se.nimsa.sbx.app.GeneralProtocol._
+import se.nimsa.sbx.app.JsonFormats
+import se.nimsa.sbx.box.BoxProtocol._
+import se.nimsa.sbx.dicom.DicomUtil._
+import se.nimsa.sbx.log.SbxLog
+import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, MetaDataAdded}
+import se.nimsa.sbx.storage.StorageProtocol._
+import se.nimsa.sbx.util.CompressionUtil._
 import spray.client.pipelining._
 import spray.http.HttpResponse
 import spray.http.StatusCodes._
 import spray.httpx.SprayJsonSupport._
 import spray.httpx.marshalling.marshal
 import spray.httpx.unmarshalling.FromResponseUnmarshaller
-import se.nimsa.sbx.app.DbProps
-import se.nimsa.sbx.app.JsonFormats
-import se.nimsa.sbx.storage.StorageProtocol.DatasetReceived
-import se.nimsa.sbx.app.GeneralProtocol._
-import se.nimsa.sbx.log.SbxLog
-import se.nimsa.sbx.dicom.DicomUtil._
-import se.nimsa.sbx.dicom.DicomHierarchy.Image
-import BoxProtocol._
-import akka.actor.ReceiveTimeout
-import java.util.Date
-import org.dcm4che3.data.Attributes
-import org.dcm4che3.data.VR
-import se.nimsa.sbx.dicom.DicomProperty.PatientName
-import org.dcm4che3.data.Tag
-import akka.util.Timeout
-import se.nimsa.sbx.anonymization.AnonymizationProtocol._
-import se.nimsa.sbx.storage.StorageProtocol._
-import scala.util.Success
-import scala.util.Failure
-import se.nimsa.sbx.util.CompressionUtil._
+
+import scala.concurrent.Future
+import scala.concurrent.duration.{DurationInt, FiniteDuration}
+import scala.util.{Failure, Success}
 
 class BoxPollActor(box: Box,
                    implicit val timeout: Timeout,
                    pollInterval: FiniteDuration = 5.seconds,
                    receiveTimeout: FiniteDuration = 1.minute,
                    boxServicePath: String = "../../BoxService",
+                   metaDataServicePath: String = "../../MetaDataService",
                    storageServicePath: String = "../../StorageService",
                    anonymizationServicePath: String = "../../AnonymizationService") extends Actor with JsonFormats {
 
   val log = Logging(context.system, this)
 
+  val metaDataService = context.actorSelection(metaDataServicePath)
   val storageService = context.actorSelection(storageServicePath)
   val anonymizationService = context.actorSelection(anonymizationServicePath)
   val boxService = context.actorSelection(boxServicePath)
@@ -117,7 +109,7 @@ class BoxPollActor(box: Box,
     poller.cancel()
 
   def receive = LoggingReceive {
-    case PollRemoteBox => pollRemoteBox
+    case PollRemoteBox => pollRemoteBox()
   }
 
   def waitForPollRemoteOutgoingState: PartialFunction[Any, Unit] = LoggingReceive {
@@ -126,7 +118,7 @@ class BoxPollActor(box: Box,
       context.unbecome
 
     case RemoteOutgoingTransactionImageFound(transactionImage) =>
-      log.debug(s"Received outgoing transaction ${transactionImage}")
+      log.debug(s"Received outgoing transaction $transactionImage")
 
       context.become(waitForFileFetchedState)
       fetchFileForRemoteOutgoingTransaction(transactionImage)
@@ -172,7 +164,7 @@ class BoxPollActor(box: Box,
       .map(transactionImageMaybe => {
         log.debug(s"Remote box answered poll request with outgoing transaction $transactionImageMaybe")
 
-        boxService ! UpdateBoxOnlineStatus(box.id, true)
+        boxService ! UpdateBoxOnlineStatus(box.id, online = true)
 
         transactionImageMaybe match {
           case Some(transactionImage) =>
@@ -183,7 +175,7 @@ class BoxPollActor(box: Box,
       })
       .recover {
         case exception: Exception =>
-          boxService ! UpdateBoxOnlineStatus(box.id, false)
+          boxService ! UpdateBoxOnlineStatus(box.id, online = false)
           self ! PollRemoteBoxFailed(exception)
       }
   }
@@ -195,7 +187,7 @@ class BoxPollActor(box: Box,
         case Success(response) =>
           if (response.status.intValue < 300) {
             val bytes = decompress(response.entity.data.toByteArray)
-            val dataset = loadDataset(bytes, true)
+            val dataset = loadDataset(bytes, withPixelData = true)
 
             if (dataset == null)
               self ! FetchFileFailedPermanently(transactionImage, new IllegalArgumentException("Dataset could not be read"))
@@ -206,13 +198,13 @@ class BoxPollActor(box: Box,
 
                   case Success(reversedDataset) =>
                     val source = Source(SourceType.BOX, box.name, box.id)
-                    storageService.ask(AddDataset(reversedDataset, source))
-                      .onComplete {
-
-                        case Success(DatasetAdded(image, source, overwrite)) =>
+                    storageService.ask(CheckDataset(dataset)).mapTo[Boolean].flatMap { status =>
+                      metaDataService.ask(AddMetaData(dataset, source)).mapTo[MetaDataAdded].flatMap { metaData =>
+                        storageService.ask(AddDataset(reversedDataset, source, metaData.image)).mapTo[DatasetAdded]
+                      }
+                    }.onComplete {
+                        case Success(DatasetAdded(image, overwrite)) =>
                           self ! RemoteOutgoingFileFetched(transactionImage, image.id, overwrite)
-                        case Success(_) =>
-                          self ! FetchFileFailedPermanently(transactionImage, new Exception("Unexpected response when adding dataset"))
                         case Failure(exception) =>
                           self ! FetchFileFailedPermanently(transactionImage, exception)
                       }

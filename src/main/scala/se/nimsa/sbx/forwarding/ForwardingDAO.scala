@@ -19,8 +19,6 @@ package se.nimsa.sbx.forwarding
 import ForwardingProtocol._
 import scala.slick.driver.JdbcProfile
 import scala.slick.jdbc.meta.MTable
-import se.nimsa.sbx.storage.StorageProtocol._
-import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.app.GeneralProtocol._
 
 class ForwardingDAO(val driver: JdbcProfile) {
@@ -28,7 +26,7 @@ class ForwardingDAO(val driver: JdbcProfile) {
 
   private val toForwardingRule = (id: Long, sourceType: String, sourceName: String, sourceId: Long, destinationType: String, destinationName: String, destinationId: Long, keepImages: Boolean) => ForwardingRule(id, Source(SourceType.withName(sourceType), sourceName, sourceId), Destination(DestinationType.withName(destinationType), destinationName, destinationId), keepImages)
 
-  private val fromForwardingRule = (rule: ForwardingRule) => Option((rule.id, rule.source.sourceType.toString, rule.source.sourceName, rule.source.sourceId, rule.destination.destinationType.toString, rule.destination.destinationName, rule.destination.destinationId, rule.keepImages))
+  private val fromForwardingRule = (rule: ForwardingRule) => Option((rule.id, rule.source.sourceType.toString(), rule.source.sourceName, rule.source.sourceId, rule.destination.destinationType.toString(), rule.destination.destinationName, rule.destination.destinationId, rule.keepImages))
 
   class ForwardingRuleTable(tag: Tag) extends Table[ForwardingRule](tag, "ForwardingRules") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
@@ -48,13 +46,12 @@ class ForwardingDAO(val driver: JdbcProfile) {
   class ForwardingTransactionTable(tag: Tag) extends Table[ForwardingTransaction](tag, "ForwardingTransactions") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def forwardingRuleId = column[Long]("forwardingruleid")
-    def batchId = column[Long]("batchid")
     def created = column[Long]("created")
-    def lastUpdated = column[Long]("lastupdated")
+    def updated = column[Long]("updated")
     def enroute = column[Boolean]("enroute")
     def delivered = column[Boolean]("delivered")
     def fkForwardingRule = foreignKey("fk_forwarding_rule", forwardingRuleId, ruleQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
-    def * = (id, forwardingRuleId, batchId, created, lastUpdated, enroute, delivered) <> (ForwardingTransaction.tupled, ForwardingTransaction.unapply)
+    def * = (id, forwardingRuleId, created, updated, enroute, delivered) <> (ForwardingTransaction.tupled, ForwardingTransaction.unapply)
   }
 
   val transactionQuery = TableQuery[ForwardingTransactionTable]
@@ -109,20 +106,19 @@ class ForwardingDAO(val driver: JdbcProfile) {
       .filter(_.sourceId === sourceId)
       .list
 
-  def createOrUpdateForwardingTransaction(forwardingRule: ForwardingRule, batchId: Long)(implicit session: Session): ForwardingTransaction =
-    getFreshTransactionForRuleAndBatchId(forwardingRule, batchId) match {
+  def createOrUpdateForwardingTransaction(forwardingRule: ForwardingRule)(implicit session: Session): ForwardingTransaction =
+    getFreshTransactionForRule(forwardingRule) match {
       case Some(transaction) =>
-        val updatedTransaction = transaction.copy(lastUpdated = System.currentTimeMillis())
+        val updatedTransaction = transaction.copy(updated = System.currentTimeMillis())
         updateForwardingTransaction(updatedTransaction)
         updatedTransaction
       case None =>
-        insertForwardingTransaction(ForwardingTransaction(-1, forwardingRule.id, batchId, System.currentTimeMillis, System.currentTimeMillis, false, false))
+        insertForwardingTransaction(ForwardingTransaction(-1, forwardingRule.id, System.currentTimeMillis, System.currentTimeMillis, enroute = false, delivered = false))
     }
 
-  def getFreshTransactionForRuleAndBatchId(forwardingRule: ForwardingRule, batchId: Long)(implicit session: Session): Option[ForwardingTransaction] =
+  def getFreshTransactionForRule(forwardingRule: ForwardingRule)(implicit session: Session): Option[ForwardingTransaction] =
     transactionQuery
       .filter(_.forwardingRuleId === forwardingRule.id)
-      .filter(_.batchId === batchId)
       .filter(_.enroute === false)
       .filter(_.delivered === false)
       .firstOption
@@ -142,7 +138,7 @@ class ForwardingDAO(val driver: JdbcProfile) {
 
   def listFreshExpiredTransactions(timeLimit: Long)(implicit session: Session) =
     transactionQuery
-      .filter(_.lastUpdated < timeLimit)
+      .filter(_.updated < timeLimit)
       .filter(_.enroute === false)
       .filter(_.delivered === false)
       .list

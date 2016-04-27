@@ -16,22 +16,18 @@
 
 package se.nimsa.sbx.directory
 
-import java.nio.file.FileSystems
-import java.nio.file.Files
-import java.nio.file.Path
-import java.nio.file.Paths
-import scala.language.postfixOps
-import akka.actor.Actor
-import akka.actor.PoisonPill
-import akka.actor.Props
-import akka.event.Logging
-import akka.event.LoggingReceive
-import se.nimsa.sbx.app.DbProps
-import akka.actor.Status.Failure
-import se.nimsa.sbx.util.ExceptionCatching
-import DirectoryWatchProtocol._
+import java.nio.file.{Files, Path, Paths}
 
-class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor with ExceptionCatching {
+import akka.actor.{Actor, PoisonPill, Props}
+import akka.event.{Logging, LoggingReceive}
+import akka.util.Timeout
+import se.nimsa.sbx.app.DbProps
+import se.nimsa.sbx.directory.DirectoryWatchProtocol._
+import se.nimsa.sbx.util.ExceptionCatching
+
+import scala.language.postfixOps
+
+class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path, timeout: Timeout) extends Actor with ExceptionCatching {
   val log = Logging(context.system, this)
 
   val db = dbProps.db
@@ -73,7 +69,7 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor 
                 val watchedDirectory = addDirectory(directory)
 
                 context.child(watchedDirectory.id.toString).getOrElse(
-                  context.actorOf(DirectoryWatchActor.props(watchedDirectory), watchedDirectory.id.toString))
+                  context.actorOf(DirectoryWatchActor.props(watchedDirectory, timeout), watchedDirectory.id.toString))
 
                 sender ! watchedDirectory
             }
@@ -84,8 +80,7 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor 
             sender ! DirectoryUnwatched(watchedDirectoryId)
 
           case GetWatchedDirectories =>
-            val directories = getWatchedDirectories()
-            sender ! WatchedDirectories(directories)
+            sender ! WatchedDirectories(getWatchedDirectories)
 
           case GetWatchedDirectoryById(id) =>
             db.withSession { implicit session =>
@@ -105,7 +100,7 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor 
     watchedDirectories foreach (watchedDirectory => {
       val path = Paths.get(watchedDirectory.path)
       if (Files.isDirectory(path))
-        context.actorOf(DirectoryWatchActor.props(watchedDirectory), watchedDirectory.id.toString)
+        context.actorOf(DirectoryWatchActor.props(watchedDirectory, timeout), watchedDirectory.id.toString)
       else
         deleteDirectory(watchedDirectory.id)
     })
@@ -131,7 +126,7 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor 
       dao.watchedDirectoryForPath(path)
     }
 
-  def getWatchedDirectories() =
+  def getWatchedDirectories =
     db.withSession { implicit session =>
       dao.allWatchedDirectories
     }
@@ -139,5 +134,5 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path) extends Actor 
 }
 
 object DirectoryWatchServiceActor {
-  def props(dbProps: DbProps, storage: Path): Props = Props(new DirectoryWatchServiceActor(dbProps, storage))
+  def props(dbProps: DbProps, storage: Path, timeout: Timeout): Props = Props(new DirectoryWatchServiceActor(dbProps, storage, timeout))
 }

@@ -16,19 +16,18 @@
 
 package se.nimsa.sbx.scp
 
-import java.nio.file.Path
 import java.util.concurrent.Executors
-import scala.language.postfixOps
-import akka.actor.Actor
-import akka.actor.PoisonPill
-import akka.actor.Props
-import akka.event.Logging
-import akka.event.LoggingReceive
-import se.nimsa.sbx.app.DbProps
-import se.nimsa.sbx.util.ExceptionCatching
-import ScpProtocol._
 
-class ScpServiceActor(dbProps: DbProps) extends Actor with ExceptionCatching {
+import akka.actor.{Actor, PoisonPill, Props}
+import akka.event.{Logging, LoggingReceive}
+import akka.util.Timeout
+import se.nimsa.sbx.app.DbProps
+import se.nimsa.sbx.scp.ScpProtocol._
+import se.nimsa.sbx.util.ExceptionCatching
+
+import scala.language.postfixOps
+
+class ScpServiceActor(dbProps: DbProps, timeout: Timeout) extends Actor with ExceptionCatching {
   val log = Logging(context.system, this)
 
   val db = dbProps.db
@@ -77,7 +76,7 @@ class ScpServiceActor(dbProps: DbProps) extends Actor with ExceptionCatching {
                 val scpData = addScp(scp)
 
                 context.child(scpData.id.toString).getOrElse(
-                  context.actorOf(ScpActor.props(scpData, executor), scpData.id.toString))
+                  context.actorOf(ScpActor.props(scpData, executor, timeout), scpData.id.toString))
 
                 sender ! scpData
 
@@ -89,8 +88,7 @@ class ScpServiceActor(dbProps: DbProps) extends Actor with ExceptionCatching {
             sender ! ScpRemoved(scpDataId)
 
           case GetScps =>
-            val scps = getScps()
-            sender ! Scps(scps)
+            sender ! Scps(getScps)
 
           case GetScpById(id) =>
             db.withSession { implicit session =>
@@ -126,7 +124,7 @@ class ScpServiceActor(dbProps: DbProps) extends Actor with ExceptionCatching {
       dao.deleteScpDataWithId(id)
     }
 
-  def getScps() =
+  def getScps =
     db.withSession { implicit session =>
       dao.allScpDatas
     }
@@ -136,11 +134,11 @@ class ScpServiceActor(dbProps: DbProps) extends Actor with ExceptionCatching {
       db.withSession { implicit session =>
         dao.allScpDatas
       }
-    scps foreach (scpData => context.actorOf(ScpActor.props(scpData, executor), scpData.id.toString))
+    scps foreach (scpData => context.actorOf(ScpActor.props(scpData, executor, timeout), scpData.id.toString))
   }
 
 }
 
 object ScpServiceActor {
-  def props(dbProps: DbProps): Props = Props(new ScpServiceActor(dbProps))
+  def props(dbProps: DbProps, timeout: Timeout): Props = Props(new ScpServiceActor(dbProps, timeout))
 }

@@ -2,37 +2,31 @@ package se.nimsa.sbx.seriestype
 
 import java.nio.file.Files
 
+import akka.actor.ActorSelection.toScala
+import akka.actor.ActorSystem
+import akka.testkit.{ImplicitSender, TestKit}
+import akka.util.Timeout.durationToTimeout
+import akka.pattern.ask
+import akka.util.Timeout
+import org.dcm4che3.data.{Keyword, Tag}
+import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
+import se.nimsa.sbx.app.DbProps
+import se.nimsa.sbx.app.GeneralProtocol.{Source, SourceType}
+import se.nimsa.sbx.dicom.DicomHierarchy.Series
+import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, MetaDataAdded}
+import se.nimsa.sbx.metadata.{MetaDataDAO, MetaDataServiceActor, PropertiesDAO}
+import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
+import se.nimsa.sbx.storage.StorageProtocol.AddDataset
+import se.nimsa.sbx.storage.StorageServiceActor
+import se.nimsa.sbx.util.TestUtil
+
+import scala.concurrent.Await
 import scala.concurrent.duration.DurationInt
 import scala.slick.driver.H2Driver
 import scala.slick.jdbc.JdbcBackend.Database
 
-import org.dcm4che3.data.Keyword
-import org.dcm4che3.data.Tag
-import org.scalatest.BeforeAndAfterAll
-import org.scalatest.BeforeAndAfterEach
-import org.scalatest.Matchers
-import org.scalatest.WordSpecLike
-
-import akka.actor.ActorSelection.toScala
-import akka.actor.ActorSystem
-import akka.testkit.ImplicitSender
-import akka.testkit.TestKit
-import akka.util.Timeout.durationToTimeout
-import se.nimsa.sbx.app.DbProps
-import se.nimsa.sbx.app.GeneralProtocol.Source
-import se.nimsa.sbx.app.GeneralProtocol.SourceType
-import se.nimsa.sbx.dicom.DicomHierarchy.Series
-import se.nimsa.sbx.metadata.MetaDataDAO
-import se.nimsa.sbx.metadata.MetaDataServiceActor
-import se.nimsa.sbx.metadata.PropertiesDAO
-import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
-import se.nimsa.sbx.storage.StorageProtocol.AddDataset
-import se.nimsa.sbx.storage.StorageProtocol.DatasetAdded
-import se.nimsa.sbx.storage.StorageServiceActor
-import se.nimsa.sbx.util.TestUtil
-
 class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
-    with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {
+  with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {
 
   def this() = this(ActorSystem("SeriesTypesUpdateActorSystem"))
 
@@ -45,15 +39,18 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
   val metaDataDao = new MetaDataDAO(H2Driver)
   val propertiesDao = new PropertiesDAO(H2Driver)
 
+  implicit val timeout = Timeout(30.seconds)
+  implicit val ec = system.dispatcher
+
   db.withSession { implicit session =>
     seriesTypeDao.create
     metaDataDao.create
     propertiesDao.create
   }
 
-  val storageService = system.actorOf(StorageServiceActor.props(storage, 5.minutes), name = "StorageService")
+  val storageService = system.actorOf(StorageServiceActor.props(storage), name = "StorageService")
   val metaDataService = system.actorOf(MetaDataServiceActor.props(dbProps), name = "MetaDataService")
-  val seriesTypeServiceActor = system.actorOf(SeriesTypeServiceActor.props(dbProps, 1.minute), name = "SeriesTypeService")
+  val seriesTypeService = system.actorOf(SeriesTypeServiceActor.props(dbProps, timeout), name = "SeriesTypeService")
   val seriesTypeUpdateService = system.actorSelection("user/SeriesTypeService/SeriesTypeUpdate")
 
   override def afterAll {
@@ -78,15 +75,15 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
 
       val series = addTestDataset()
 
-      seriesTypeUpdateService ! UpdateSeriesTypesForSeries(Seq(series.id))
+      seriesTypeUpdateService ! UpdateSeriesTypesForSeries(series.id)
       expectNoMsg
-      
+
       waitForSeriesTypesUpdateCompletion()
 
       val seriesSeriesTypes = seriesSeriesTypesForSeries(series)
 
       seriesSeriesTypes.size should be(1)
-      seriesSeriesTypes(0).seriesTypeId should be(seriesType.id)
+      seriesSeriesTypes.head.seriesTypeId should be(seriesType.id)
     }
 
     "not add series type that do not match series" in {
@@ -96,7 +93,7 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
 
       val series = addTestDataset()
 
-      seriesTypeUpdateService ! UpdateSeriesTypesForSeries(Seq(series.id))
+      seriesTypeUpdateService ! UpdateSeriesTypesForSeries(series.id)
       expectNoMsg
 
       waitForSeriesTypesUpdateCompletion()
@@ -116,7 +113,7 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
         seriesTypeDao.insertSeriesSeriesType(SeriesSeriesType(series.id, seriesType.id))
       }
 
-      seriesTypeUpdateService ! UpdateSeriesTypesForSeries(Seq(series.id))
+      seriesTypeUpdateService ! UpdateSeriesTypesForSeries(series.id)
       expectNoMsg
 
       waitForSeriesTypesUpdateCompletion()
@@ -131,9 +128,10 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
       val seriesType = addSeriesType()
       addMatchingRuleToSeriesType(seriesType)
 
-      seriesTypeUpdateService ! UpdateSeriesTypesForSeries(Seq(series1.id, series2.id))
+      seriesTypeUpdateService ! UpdateSeriesTypesForSeries(series1.id)
       expectNoMsg
-
+      seriesTypeUpdateService ! UpdateSeriesTypesForSeries(series2.id)
+      expectNoMsg
       waitForSeriesTypesUpdateCompletion()
 
       seriesSeriesTypesForSeries(series1).size should be(1)
@@ -148,7 +146,7 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
 
       val series = addTestDataset(patientName = "xyz", patientSex = "M")
 
-      seriesTypeUpdateService ! UpdateSeriesTypesForSeries(Seq(series.id))
+      seriesTypeUpdateService ! UpdateSeriesTypesForSeries(series.id)
       expectNoMsg
 
       waitForSeriesTypesUpdateCompletion()
@@ -164,7 +162,7 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
 
       val series = addTestDataset(patientName = "xyz", patientSex = "F")
 
-      seriesTypeUpdateService ! UpdateSeriesTypesForSeries(Seq(series.id))
+      seriesTypeUpdateService ! UpdateSeriesTypesForSeries(series.id)
       expectNoMsg
 
       waitForSeriesTypesUpdateCompletion()
@@ -174,10 +172,10 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
   }
 
   def addTestDataset(
-    sopInstanceUID: String = "sop id 1",
-    seriesInstanceUID: String = "series 1",
-    patientName: String = "abc",
-    patientSex: String = "F"): Series = {
+                      sopInstanceUID: String = "sop id 1",
+                      seriesInstanceUID: String = "series 1",
+                      patientName: String = "abc",
+                      patientSex: String = "F"): Series = {
 
     val dataset = TestUtil.createDataset(
       sopInstanceUID = sopInstanceUID,
@@ -185,17 +183,19 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
       patientName = patientName,
       patientSex = patientSex)
 
-    val source = Source(SourceType.UNKNOWN, "unknown source", -1)
-    storageService ! AddDataset(dataset, source)
-    expectMsgPF() {
-      case DatasetAdded(image, source, overwrite) => true
-    }
+    val source = Source(SourceType.BOX, "remote box", 1)
 
-    val series = db.withSession { implicit session =>
-      metaDataDao.series
-    }
-
-    series.last
+    Await.result(
+      metaDataService.ask(AddMetaData(dataset, source))
+        .mapTo[MetaDataAdded]
+        .flatMap { metaData =>
+          storageService.ask(AddDataset(dataset, source, metaData.image))
+        }.map { _ =>
+        val series = db.withSession { implicit session =>
+          metaDataDao.series
+        }
+        series.last
+      }, 30.seconds)
   }
 
   def addSeriesType(): SeriesType =
@@ -221,9 +221,9 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
     }
 
   def addSeriesTypeRuleAttribute(
-    seriesTypeRule: SeriesTypeRule,
-    tag: Int,
-    values: String): SeriesTypeRuleAttribute =
+                                  seriesTypeRule: SeriesTypeRule,
+                                  tag: Int,
+                                  values: String): SeriesTypeRuleAttribute =
     db.withSession { implicit session =>
       seriesTypeDao.insertSeriesTypeRuleAttribute(
         SeriesTypeRuleAttribute(-1,
@@ -243,7 +243,7 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
       seriesTypeUpdateService ! GetUpdateSeriesTypesRunningStatus
 
       expectMsgPF() { case UpdateSeriesTypesRunningStatus(running) => statusUpdateRunning = running }
-      
+
       Thread.sleep(500)
       attempt += 1
     }

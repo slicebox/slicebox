@@ -54,9 +54,9 @@ class BoxDAO(val driver: JdbcProfile) {
     def sentImageCount = column[Long]("sentimagecount")
     def totalImageCount = column[Long]("totalimagecount")
     def created = column[Long]("created")
-    def lastUpdated = column[Long]("lastupdated")
+    def updated = column[Long]("updated")
     def status = column[TransactionStatus]("status")
-    def * = (id, boxId, boxName, sentImageCount, totalImageCount, created, lastUpdated, status) <> (OutgoingTransaction.tupled, OutgoingTransaction.unapply)
+    def * = (id, boxId, boxName, sentImageCount, totalImageCount, created, updated, status) <> (OutgoingTransaction.tupled, OutgoingTransaction.unapply)
   }
 
   val outgoingTransactionQuery = TableQuery[OutgoingTransactionTable]
@@ -97,9 +97,9 @@ class BoxDAO(val driver: JdbcProfile) {
     def addedImageCount = column[Long]("addedimagecount")
     def totalImageCount = column[Long]("totalimagecount")
     def created = column[Long]("created")
-    def lastUpdated = column[Long]("lastupdated")
+    def updated = column[Long]("updated")
     def status = column[TransactionStatus]("status")
-    def * = (id, boxId, boxName, outgoingTransactionId, receivedImageCount, addedImageCount, totalImageCount, created, lastUpdated, status) <> (IncomingTransaction.tupled, IncomingTransaction.unapply)
+    def * = (id, boxId, boxName, outgoingTransactionId, receivedImageCount, addedImageCount, totalImageCount, created, updated, status) <> (IncomingTransaction.tupled, IncomingTransaction.unapply)
   }
 
   val incomingTransactionQuery = TableQuery[IncomingTransactionTable]
@@ -299,7 +299,7 @@ class BoxDAO(val driver: JdbcProfile) {
 
   def listOutgoingTransactions(implicit session: Session): List[OutgoingTransaction] =
     outgoingTransactionQuery
-      .sortBy(_.lastUpdated.desc)
+      .sortBy(_.updated.desc)
       .list
 
   def listOutgoingImages(implicit session: Session): List[OutgoingImage] =
@@ -307,7 +307,7 @@ class BoxDAO(val driver: JdbcProfile) {
 
   def listIncomingTransactions(implicit session: Session): List[IncomingTransaction] =
     incomingTransactionQuery
-      .sortBy(_.lastUpdated.desc)
+      .sortBy(_.updated.desc)
       .list
 
   def listIncomingImages(implicit session: Session): List[IncomingImage] =

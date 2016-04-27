@@ -16,24 +16,23 @@
 
 package se.nimsa.sbx.app
 
-import spray.json._
-import se.nimsa.sbx.dicom.DicomProperty
-import se.nimsa.sbx.dicom.DicomPropertyValue._
+import se.nimsa.sbx.anonymization.AnonymizationProtocol._
+import se.nimsa.sbx.app.GeneralProtocol._
+import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy._
-import se.nimsa.sbx.metadata.MetaDataProtocol._
-import se.nimsa.sbx.storage.StorageProtocol._
+import se.nimsa.sbx.dicom.DicomPropertyValue._
+import se.nimsa.sbx.dicom.ImageAttribute
 import se.nimsa.sbx.directory.DirectoryWatchProtocol._
+import se.nimsa.sbx.forwarding.ForwardingProtocol._
+import se.nimsa.sbx.log.LogProtocol._
+import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.scp.ScpProtocol._
 import se.nimsa.sbx.scu.ScuProtocol._
-import se.nimsa.sbx.box.BoxProtocol._
-import se.nimsa.sbx.anonymization.AnonymizationProtocol._
-import se.nimsa.sbx.log.LogProtocol._
-import se.nimsa.sbx.user.UserProtocol._
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
-import se.nimsa.sbx.forwarding.ForwardingProtocol._
-import GeneralProtocol._
+import se.nimsa.sbx.storage.StorageProtocol._
+import se.nimsa.sbx.user.UserProtocol._
+import spray.json._
 import spray.routing.authentication.UserPass
-import se.nimsa.sbx.dicom.ImageAttribute
 import se.nimsa.sbx.importing.ImportProtocol._
 
 trait JsonFormats extends DefaultJsonProtocol {
@@ -48,7 +47,7 @@ trait JsonFormats extends DefaultJsonProtocol {
   implicit val remoteBoxConnectionDataFormat = jsonFormat1(RemoteBoxConnectionData)
 
   implicit object SourceTypeFormat extends JsonFormat[SourceType] {
-    def write(obj: SourceType) = JsString(obj.toString)
+    def write(obj: SourceType) = JsString(obj.toString())
 
     def read(json: JsValue): SourceType = json match {
       case JsString(string) => SourceType.withName(string)
@@ -57,7 +56,7 @@ trait JsonFormats extends DefaultJsonProtocol {
   }
 
   implicit object DestinationTypeFormat extends JsonFormat[DestinationType] {
-    def write(obj: DestinationType) = JsString(obj.toString)
+    def write(obj: DestinationType) = JsString(obj.toString())
 
     def read(json: JsValue): DestinationType = json match {
       case JsString(string) => DestinationType.withName(string)
@@ -66,7 +65,7 @@ trait JsonFormats extends DefaultJsonProtocol {
   }
 
   implicit object BoxSendMethodFormat extends JsonFormat[BoxSendMethod] {
-    def write(obj: BoxSendMethod) = JsString(obj.toString)
+    def write(obj: BoxSendMethod) = JsString(obj.toString())
 
     def read(json: JsValue): BoxSendMethod = json match {
       case JsString(string) => BoxSendMethod.withName(string)
@@ -75,7 +74,7 @@ trait JsonFormats extends DefaultJsonProtocol {
   }
 
   implicit object TransactionStatusFormat extends JsonFormat[TransactionStatus] {
-    def write(obj: TransactionStatus) = JsString(obj.toString)
+    def write(obj: TransactionStatus) = JsString(obj.toString())
 
     def read(json: JsValue): TransactionStatus = json match {
       case JsString(string) => TransactionStatus.withName(string)
@@ -99,7 +98,7 @@ trait JsonFormats extends DefaultJsonProtocol {
   implicit val entityTagValueFormat = jsonFormat2(ImageTagValues)
 
   implicit object RoleFormat extends JsonFormat[UserRole] {
-    def write(obj: UserRole) = JsString(obj.toString)
+    def write(obj: UserRole) = JsString(obj.toString())
 
     def read(json: JsValue): UserRole = json match {
       case JsString(string) => UserRole.withName(string)
@@ -162,7 +161,7 @@ trait JsonFormats extends DefaultJsonProtocol {
   implicit val numberOfImageFramesFormat = jsonFormat4(ImageInformation)
   
   implicit object LogEntryTypeFormat extends JsonFormat[LogEntryType] {
-    def write(obj: LogEntryType) = JsString(obj.toString)
+    def write(obj: LogEntryType) = JsString(obj.toString())
 
     def read(json: JsValue): LogEntryType = json match {
       case JsString(string) => LogEntryType.withName(string)

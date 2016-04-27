@@ -19,9 +19,7 @@ package se.nimsa.sbx.box
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.duration.FiniteDuration
-
 import org.dcm4che3.data.Attributes
-
 import BoxProtocol._
 import akka.actor.Actor
 import akka.actor.Props
@@ -31,10 +29,11 @@ import akka.event.LoggingReceive
 import akka.pattern.ask
 import akka.util.Timeout
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.Anonymize
-import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.dicom.DicomUtil.toByteArray
+import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.log.SbxLog
+import se.nimsa.sbx.metadata.MetaDataProtocol.GetImage
 import se.nimsa.sbx.storage.StorageProtocol.GetDataset
 import se.nimsa.sbx.util.CompressionUtil.compress
 import spray.client.pipelining.Post
@@ -47,11 +46,13 @@ class BoxPushActor(box: Box,
                    pollInterval: FiniteDuration = 5.seconds,
                    receiveTimeout: FiniteDuration = 1.minute,
                    boxServicePath: String = "../../BoxService",
+                   metaDataServicePath: String = "../../MetaDataService",
                    storageServicePath: String = "../../StorageService",
                    anonymizationServicePath: String = "../../AnonymizationService") extends Actor {
 
   val log = Logging(context.system, this)
 
+  val metaDataService = context.actorSelection(metaDataServicePath)
   val storageService = context.actorSelection(storageServicePath)
   val anonymizationService = context.actorSelection(anonymizationServicePath)
   val boxService = context.actorSelection(boxServicePath)
@@ -70,7 +71,7 @@ class BoxPushActor(box: Box,
 
   def receive = LoggingReceive {
     case PollOutgoing =>
-      processNextOutgoingTransaction
+      processNextOutgoingTransaction()
   }
 
   def processNextOutgoingTransaction(): Unit =
@@ -104,19 +105,21 @@ class BoxPushActor(box: Box,
 
   def sendFilePipeline = sendReceive
 
-  def pushImagePipeline(transactionImage: OutgoingTransactionImage, tagValues: Seq[OutgoingTagValue]): Future[HttpResponse] = {
-    val futureDatasetMaybe = storageService.ask(GetDataset(transactionImage.image.imageId, true)).mapTo[Option[Attributes]]
-    futureDatasetMaybe.flatMap(_ match {
-      case Some(dataset) =>
-        val futureAnonymizedDataset = anonymizationService.ask(Anonymize(transactionImage.image.imageId, dataset, tagValues.map(_.tagValue))).mapTo[Attributes]
-        futureAnonymizedDataset flatMap { anonymizedDataset =>
-          val compressedBytes = compress(toByteArray(anonymizedDataset))
-          sendFilePipeline(Post(s"${box.baseUrl}/image?transactionid=${transactionImage.transaction.id}&sequencenumber=${transactionImage.image.sequenceNumber}&totalimagecount=${transactionImage.transaction.totalImageCount}", HttpData(compressedBytes)))
+  def pushImagePipeline(transactionImage: OutgoingTransactionImage, tagValues: Seq[OutgoingTagValue]): Future[HttpResponse] =
+    metaDataService.ask(GetImage(transactionImage.image.imageId)).mapTo[Option[Image]].flatMap {
+      case Some(image) =>
+        storageService.ask(GetDataset(image, withPixelData = true)).mapTo[Option[Attributes]].flatMap {
+          case Some(dataset) =>
+            anonymizationService.ask(Anonymize(transactionImage.image.imageId, dataset, tagValues.map(_.tagValue))).mapTo[Attributes].flatMap { anonymizedDataset =>
+              val compressedBytes = compress(toByteArray(anonymizedDataset))
+              sendFilePipeline(Post(s"${box.baseUrl}/image?transactionid=${transactionImage.transaction.id}&sequencenumber=${transactionImage.image.sequenceNumber}&totalimagecount=${transactionImage.transaction.totalImageCount}", HttpData(compressedBytes)))
+            }
+          case None =>
+            Future.failed(new IllegalArgumentException("No dataset found for image id " + image.id))
         }
       case None =>
-        Future.failed(new IllegalArgumentException("No dataset found for image id " + transactionImage.image.imageId))
-    })
-  }
+        Future.failed(new IllegalArgumentException("No image found for image id " + transactionImage.image.imageId))
+    }
 
   def sendFile(transactionImage: OutgoingTransactionImage, tagValues: Seq[OutgoingTagValue]) = {
     log.debug(s"Pushing transaction image $transactionImage with tag values $tagValues")

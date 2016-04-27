@@ -71,7 +71,7 @@ object BoxProtocol {
 
   case class Box(id: Long, name: String, token: String, baseUrl: String, sendMethod: BoxSendMethod, online: Boolean) extends Entity
 
-  case class OutgoingTransaction(id: Long, boxId: Long, boxName: String, sentImageCount: Long, totalImageCount: Long, created: Long, lastUpdated: Long, status: TransactionStatus) extends Entity
+  case class OutgoingTransaction(id: Long, boxId: Long, boxName: String, sentImageCount: Long, totalImageCount: Long, created: Long, updated: Long, status: TransactionStatus) extends Entity
 
   case class OutgoingImage(id: Long, outgoingTransactionId: Long, imageId: Long, sequenceNumber: Long, sent: Boolean) extends Entity
   
@@ -79,7 +79,7 @@ object BoxProtocol {
   
   case class OutgoingTransactionImage(transaction: OutgoingTransaction, image: OutgoingImage)
   
-  case class IncomingTransaction(id: Long, boxId: Long, boxName: String, outgoingTransactionId: Long, receivedImageCount: Long, addedImageCount: Long, totalImageCount: Long, created: Long, lastUpdated: Long, status: TransactionStatus) extends Entity
+  case class IncomingTransaction(id: Long, boxId: Long, boxName: String, outgoingTransactionId: Long, receivedImageCount: Long, addedImageCount: Long, totalImageCount: Long, created: Long, updated: Long, status: TransactionStatus) extends Entity
 
   case class IncomingImage(id: Long, incomingTransactionId: Long, imageId: Long, sequenceNumber: Long, overwrite: Boolean) extends Entity
   
@@ -136,9 +136,9 @@ object BoxProtocol {
   
   case class RemoveOutgoingTransaction(outgoingTransactionId: Long) extends BoxRequest
 
-  case class GetImagesForIncomingTransaction(incomingTransactionId: Long) extends BoxRequest
+  case class GetImageIdsForIncomingTransaction(incomingTransactionId: Long) extends BoxRequest
   
-  case class GetImagesForOutgoingTransaction(outgoingTransactionId: Long) extends BoxRequest
+  case class GetImageIdsForOutgoingTransaction(outgoingTransactionId: Long) extends BoxRequest
   
   case class GetIncomingTransactionForImageId(imageId: Long) extends BoxRequest
   

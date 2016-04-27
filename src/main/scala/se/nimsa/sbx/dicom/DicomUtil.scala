@@ -37,14 +37,9 @@ import org.dcm4che3.imageio.plugins.dcm.DicomImageReadParam
 import java.io.ByteArrayOutputStream
 import org.dcm4che3.data.Attributes.Visitor
 import org.dcm4che3.data.VR
-import se.nimsa.sbx.box.BoxProtocol.OutgoingTagValue
-import se.nimsa.sbx.anonymization.AnonymizationProtocol.AnonymizationKey
-import java.util.Date
 import scala.collection.mutable.ListBuffer
 import org.dcm4che3.util.TagUtils
 import org.dcm4che3.data.Keyword
-import org.dcm4che3.data.Fragments
-import org.dcm4che3.data.BulkData
 import org.dcm4che3.io.BulkDataDescriptor
 
 object DicomUtil {
@@ -85,7 +80,7 @@ object DicomUtil {
           dis.readDataset(-1, -1)
         } else {
           dis.setIncludeBulkData(IncludeBulkData.NO)
-          dis.readDataset(-1, Tag.PixelData);
+          dis.readDataset(-1, Tag.PixelData)
         }
 
       dataset
@@ -112,13 +107,13 @@ object DicomUtil {
       SafeClose.close(dis)
     }
   }
-  def toByteArray(path: Path): Array[Byte] = toByteArray(loadDataset(path, true))
+  def toByteArray(path: Path): Array[Byte] = toByteArray(loadDataset(path, withPixelData = true))
 
   def toByteArray(dataset: Attributes): Array[Byte] = {
     val bos = new ByteArrayOutputStream
     saveDataset(dataset, bos)
     bos.close()
-    bos.toByteArray()
+    bos.toByteArray
   }
 
   def createDataset(patient: Patient, study: Study, series: Series, image: Image): Attributes = {
@@ -204,13 +199,13 @@ object DicomUtil {
 
   def fileToBufferedImages(path: Path): Seq[BufferedImage] = {
     val iter = ImageIO.getImageReadersByFormatName("DICOM")
-    val reader = iter.next();
-    val iis = ImageIO.createImageInputStream(path.toFile);
-    reader.setInput(iis, false);
-    val param = reader.getDefaultReadParam().asInstanceOf[DicomImageReadParam];
-    val bufferedImage = reader.read(0, param);
-    iis.close();
-    Seq(bufferedImage);
+    val reader = iter.next()
+    val iis = ImageIO.createImageInputStream(path.toFile)
+    reader.setInput(iis, false)
+    val param = reader.getDefaultReadParam.asInstanceOf[DicomImageReadParam]
+    val bufferedImage = reader.read(0, param)
+    iis.close()
+    Seq(bufferedImage)
   }
 
   def readImageAttributes(dataset: Attributes): List[ImageAttribute] =

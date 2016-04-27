@@ -6,9 +6,7 @@ import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.DicomPropertyValue.ImageType
 import se.nimsa.sbx.dicom.DicomPropertyValue.InstanceNumber
 import se.nimsa.sbx.dicom.DicomPropertyValue.SOPInstanceUID
-import se.nimsa.sbx.storage.StorageProtocol.AddDataset
-import se.nimsa.sbx.storage.StorageProtocol.DatasetAdded
-import se.nimsa.sbx.storage.StorageProtocol.GetDataset
+import se.nimsa.sbx.storage.StorageProtocol.{AddDataset, CheckDataset, DatasetAdded, GetDataset}
 import se.nimsa.sbx.util.TestUtil
 
 class MockupStorageActor extends Actor {
@@ -29,24 +27,24 @@ class MockupStorageActor extends Actor {
       badBehavior = false
       nStoredDatasets = n
 
-    case AddDataset(dataset, source) =>
-      if (badBehavior) {
-        sender ! Failure(exception)
-      } else {
-        sender ! DatasetAdded(Image((math.random * 1000).toLong, (math.random * 1000).toLong, SOPInstanceUID("sop uid"), ImageType("image type"), InstanceNumber("instance number")), source, false)
-      }
+    case CheckDataset(dataset) =>
+      sender ! true
 
-    case GetDataset(imageId, withPixelData) =>
-      if (badBehavior) {
+    case AddDataset(dataset, source, image) =>
+      if (badBehavior)
         sender ! Failure(exception)
-      } else {
-        val datasetMaybe = imageId match {
+      else
+        sender ! DatasetAdded(Image((math.random * 1000).toLong, (math.random * 1000).toLong, SOPInstanceUID("sop uid"), ImageType("image type"), InstanceNumber("instance number")), overwrite = false)
+
+    case GetDataset(image, withPixelData) =>
+      if (badBehavior)
+        sender ! Failure(exception)
+      else
+        sender ! (image.id match {
           case id if id <= nStoredDatasets => Some(TestUtil.createDataset())
           case _ =>
             None
-        }
-        sender ! datasetMaybe
-      }
+        })
   }
 }
 

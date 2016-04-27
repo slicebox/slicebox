@@ -57,12 +57,12 @@ class MetaDataDAOTest extends FlatSpec with Matchers {
       dao.images.size should be(1)
       dao.series.size should be(1)
       dao.studies.size should be(1)
-      dao.patients(0, 20, None, false, None).size should be(1)
+      dao.patients(0, 20, None, orderAscending = false, None).size should be(1)
 
-      dbPat.id should be >= (0L)
-      dbStudy.id should be >= (0L)
-      dbSeries.id should be >= (0L)
-      dbImage.id should be >= (0L)
+      dbPat.id should be >= 0L
+      dbStudy.id should be >= 0L
+      dbSeries.id should be >= 0L
+      dbImage.id should be >= 0L
     }
   }
 
@@ -73,7 +73,7 @@ class MetaDataDAOTest extends FlatSpec with Matchers {
         dao.images.size should be(0)
         dao.series.size should be(0)
         dao.studies.size should be(0)
-        dao.patients(0, 20, None, false, None).size should be(0)
+        dao.patients(0, 20, None, orderAscending = false, None).size should be(0)
       })
     }
   }
@@ -95,16 +95,16 @@ class MetaDataDAOTest extends FlatSpec with Matchers {
       val dbSeries2 = dao.insert(series2.copy(studyId = dbStudy2.id))
       val dbSeries3 = dao.insert(series3.copy(studyId = dbStudy1.id))
       val dbSeries4 = dao.insert(series4.copy(studyId = dbStudy2.id))
-      val dbImage1 = dao.insert(image1.copy(seriesId = dbSeries1.id))
-      val dbImage2 = dao.insert(image2.copy(seriesId = dbSeries2.id))
-      val dbImage3 = dao.insert(image3.copy(seriesId = dbSeries3.id))
-      val dbImage4 = dao.insert(image4.copy(seriesId = dbSeries4.id))
-      val dbImage5 = dao.insert(image5.copy(seriesId = dbSeries1.id))
-      val dbImage6 = dao.insert(image6.copy(seriesId = dbSeries2.id))
-      val dbImage7 = dao.insert(image7.copy(seriesId = dbSeries3.id))
-      val dbImage8 = dao.insert(image8.copy(seriesId = dbSeries4.id))
+      dao.insert(image1.copy(seriesId = dbSeries1.id))
+      dao.insert(image2.copy(seriesId = dbSeries2.id))
+      dao.insert(image3.copy(seriesId = dbSeries3.id))
+      dao.insert(image4.copy(seriesId = dbSeries4.id))
+      dao.insert(image5.copy(seriesId = dbSeries1.id))
+      dao.insert(image6.copy(seriesId = dbSeries2.id))
+      dao.insert(image7.copy(seriesId = dbSeries3.id))
+      dao.insert(image8.copy(seriesId = dbSeries4.id))
 
-      dao.patients(0, 20, None, false, None).size should be(1)
+      dao.patients(0, 20, None, orderAscending = false, None).size should be(1)
       dao.studiesForPatient(0, 20, dbPat.id).size should be(2)
       dao.seriesForStudy(0, 20, dbStudy1.id).size should be(2)
       dao.seriesForStudy(0, 20, dbStudy2.id).size should be(2)
@@ -118,13 +118,13 @@ class MetaDataDAOTest extends FlatSpec with Matchers {
   it should "return the correct number of patients for patients queries" in {
     db.withSession { implicit session =>
       // Queries on Patient properties
-      dao.queryPatients(0, 10, None, true, Seq(QueryProperty("patientName", QueryOperator.EQUALS, "p1"))).size should be(1)
-      dao.queryPatients(0, 10, None, true, Seq(QueryProperty("patientName", QueryOperator.EQUALS, "p1"), QueryProperty("patientSex", QueryOperator.EQUALS, "M"))).size should be(1)
-      dao.queryPatients(0, 10, None, true, Seq(QueryProperty("patientName", QueryOperator.EQUALS, "p1"), QueryProperty("patientSex", QueryOperator.EQUALS, "F"))).size should be(0)
+      dao.queryPatients(0, 10, None, orderAscending = true, Seq(QueryProperty("patientName", QueryOperator.EQUALS, "p1"))).size should be(1)
+      dao.queryPatients(0, 10, None, orderAscending = true, Seq(QueryProperty("patientName", QueryOperator.EQUALS, "p1"), QueryProperty("patientSex", QueryOperator.EQUALS, "M"))).size should be(1)
+      dao.queryPatients(0, 10, None, orderAscending = true, Seq(QueryProperty("patientName", QueryOperator.EQUALS, "p1"), QueryProperty("patientSex", QueryOperator.EQUALS, "F"))).size should be(0)
       
       // Check that query returns Patient with all data
-      dao.queryPatients(0, 1, None, true, Seq(QueryProperty("patientName", QueryOperator.EQUALS, "p1"))).foreach(dbPatient => {
-        dbPatient.id should be >= (0L)
+      dao.queryPatients(0, 1, None, orderAscending = true, Seq(QueryProperty("patientName", QueryOperator.EQUALS, "p1"))).foreach(dbPatient => {
+        dbPatient.id should be >= 0L
         dbPatient.patientName.value should be("p1")
         dbPatient.patientID.value should be("s1")
         dbPatient.patientBirthDate.value should be("2000-01-01")
@@ -132,36 +132,36 @@ class MetaDataDAOTest extends FlatSpec with Matchers {
       })
       
       // Queries on Study properties
-      dao.queryPatients(0, 10, None, true, Seq(QueryProperty("studyInstanceUID", QueryOperator.EQUALS, "stuid1"))).size should be(1)
-      dao.queryPatients(0, 10, None, true, Seq(QueryProperty("studyInstanceUID", QueryOperator.EQUALS, "stuid1"), QueryProperty("studyDate", QueryOperator.EQUALS, "19990101"))).size should be(1)
-      dao.queryPatients(0, 10, None, true, Seq(QueryProperty("studyInstanceUID", QueryOperator.EQUALS, "stuid1"), QueryProperty("studyDate", QueryOperator.EQUALS, "20100101"))).size should be(0)
+      dao.queryPatients(0, 10, None, orderAscending = true, Seq(QueryProperty("studyInstanceUID", QueryOperator.EQUALS, "stuid1"))).size should be(1)
+      dao.queryPatients(0, 10, None, orderAscending = true, Seq(QueryProperty("studyInstanceUID", QueryOperator.EQUALS, "stuid1"), QueryProperty("studyDate", QueryOperator.EQUALS, "19990101"))).size should be(1)
+      dao.queryPatients(0, 10, None, orderAscending = true, Seq(QueryProperty("studyInstanceUID", QueryOperator.EQUALS, "stuid1"), QueryProperty("studyDate", QueryOperator.EQUALS, "20100101"))).size should be(0)
       
       // Queries on Series properties
-      dao.queryPatients(0, 10, None, true, Seq(QueryProperty("seriesInstanceUID", QueryOperator.EQUALS, "seuid1"))).size should be(1)
+      dao.queryPatients(0, 10, None, orderAscending = true, Seq(QueryProperty("seriesInstanceUID", QueryOperator.EQUALS, "seuid1"))).size should be(1)
       
       // Queries on Equipments properties
-      dao.queryPatients(0, 10, None, true, Seq(QueryProperty("manufacturer", QueryOperator.EQUALS, "manu1"))).size should be(1)
+      dao.queryPatients(0, 10, None, orderAscending = true, Seq(QueryProperty("manufacturer", QueryOperator.EQUALS, "manu1"))).size should be(1)
       
       // Queries on FrameOfReferences properties
-      dao.queryPatients(0, 10, None, true, Seq(QueryProperty("frameOfReferenceUID", QueryOperator.EQUALS, "frid1"))).size should be(1)
+      dao.queryPatients(0, 10, None, orderAscending = true, Seq(QueryProperty("frameOfReferenceUID", QueryOperator.EQUALS, "frid1"))).size should be(1)
       
       // Test like query
-      dao.queryPatients(0, 10, None, true, Seq(QueryProperty("studyDescription", QueryOperator.LIKE, "desc"))).size should be(1)
+      dao.queryPatients(0, 10, None, orderAscending = true, Seq(QueryProperty("studyDescription", QueryOperator.LIKE, "desc"))).size should be(1)
       
       // Test paging
-      dao.queryPatients(1, 1, None, true, Seq(QueryProperty("manufacturer", QueryOperator.EQUALS, "manu1"))).size should be(0)
+      dao.queryPatients(1, 1, None, orderAscending = true, Seq(QueryProperty("manufacturer", QueryOperator.EQUALS, "manu1"))).size should be(0)
     }
   }
   
   it should "return the correct number of studies for studies queries" in {
     db.withSession { implicit session =>
       // Queries on Study properties
-      dao.queryStudies(0, 10, None, true, Seq(QueryProperty("studyInstanceUID", QueryOperator.EQUALS, "stuid1"))).size should be(1)
+      dao.queryStudies(0, 10, None, orderAscending = true, Seq(QueryProperty("studyInstanceUID", QueryOperator.EQUALS, "stuid1"))).size should be(1)
       
       // Check that query returns Studies with all data
-      dao.queryStudies(0, 1, None, true, Seq(QueryProperty("studyInstanceUID", QueryOperator.EQUALS, "stuid1"))).foreach(dbStudy => {
-          dbStudy.id should be >= (0L)
-          dbStudy.patientId should be >= (0L)
+      dao.queryStudies(0, 1, None, orderAscending = true, Seq(QueryProperty("studyInstanceUID", QueryOperator.EQUALS, "stuid1"))).foreach(dbStudy => {
+          dbStudy.id should be >= 0L
+          dbStudy.patientId should be >= 0L
           dbStudy.studyInstanceUID.value should be("stuid1")
           dbStudy.studyDescription.value should be("stdesc1")
           dbStudy.studyDate.value should be("19990101")
@@ -171,28 +171,28 @@ class MetaDataDAOTest extends FlatSpec with Matchers {
         })
         
       // Queries on Patient properties
-      dao.queryStudies(0, 10, None, true, Seq(QueryProperty("patientName", QueryOperator.EQUALS, "p1"))).size should be(2)
+      dao.queryStudies(0, 10, None, orderAscending = true, Seq(QueryProperty("patientName", QueryOperator.EQUALS, "p1"))).size should be(2)
       
       // Queries on Series properties
-      dao.queryStudies(0, 10, None, true, Seq(QueryProperty("seriesInstanceUID", QueryOperator.EQUALS, "seuid1"))).size should be(1)
+      dao.queryStudies(0, 10, None, orderAscending = true, Seq(QueryProperty("seriesInstanceUID", QueryOperator.EQUALS, "seuid1"))).size should be(1)
       
       // Queries on Equipments properties
-      dao.queryStudies(0, 10, None, true, Seq(QueryProperty("manufacturer", QueryOperator.EQUALS, "manu2"))).size should be(1)
+      dao.queryStudies(0, 10, None, orderAscending = true, Seq(QueryProperty("manufacturer", QueryOperator.EQUALS, "manu2"))).size should be(1)
       
       // Queries on FrameOfReferences properties
-      dao.queryStudies(0, 10, None, true, Seq(QueryProperty("frameOfReferenceUID", QueryOperator.EQUALS, "frid1"))).size should be(1)
+      dao.queryStudies(0, 10, None, orderAscending = true, Seq(QueryProperty("frameOfReferenceUID", QueryOperator.EQUALS, "frid1"))).size should be(1)
     }
   }
   
   it should "return the correct number of series for series queries" in {
     db.withSession { implicit session =>
       // Queries on Series properties
-      dao.querySeries(0, 10, None, true, Seq(QueryProperty("seriesInstanceUID", QueryOperator.EQUALS, "seuid1"))).size should be(1)
+      dao.querySeries(0, 10, None, orderAscending = true, Seq(QueryProperty("seriesInstanceUID", QueryOperator.EQUALS, "seuid1"))).size should be(1)
       
       // Check that query returns Studies with all data
-      dao.querySeries(0, 1, None, true, Seq(QueryProperty("seriesInstanceUID", QueryOperator.EQUALS, "seuid1"))).foreach(dbSeries => {
-          dbSeries.id should be >= (0L)
-          dbSeries.studyId should be >= (0L)
+      dao.querySeries(0, 1, None, orderAscending = true, Seq(QueryProperty("seriesInstanceUID", QueryOperator.EQUALS, "seuid1"))).foreach(dbSeries => {
+          dbSeries.id should be >= 0L
+          dbSeries.studyId should be >= 0L
           dbSeries.seriesDescription.value should be("sedesc1")
           dbSeries.seriesDate.value should be("19990101")
           dbSeries.modality.value should be("NM")
@@ -201,59 +201,59 @@ class MetaDataDAOTest extends FlatSpec with Matchers {
         })
         
       // Queries on Patient properties
-      dao.querySeries(0, 10, None, true, Seq(QueryProperty("patientName", QueryOperator.EQUALS, "p1"))).size should be(4)
+      dao.querySeries(0, 10, None, orderAscending = true, Seq(QueryProperty("patientName", QueryOperator.EQUALS, "p1"))).size should be(4)
       
       // Queries on Studies properties
-      dao.querySeries(0, 10, None, true, Seq(QueryProperty("studyInstanceUID", QueryOperator.EQUALS, "stuid1"))).size should be(2)
+      dao.querySeries(0, 10, None, orderAscending = true, Seq(QueryProperty("studyInstanceUID", QueryOperator.EQUALS, "stuid1"))).size should be(2)
       
       // Queries on Equipments properties
-      dao.querySeries(0, 10, None, true, Seq(QueryProperty("manufacturer", QueryOperator.EQUALS, "manu2"))).size should be(1)
+      dao.querySeries(0, 10, None, orderAscending = true, Seq(QueryProperty("manufacturer", QueryOperator.EQUALS, "manu2"))).size should be(1)
       
       // Queries on FrameOfReferences properties
-      dao.querySeries(0, 10, None, true, Seq(QueryProperty("frameOfReferenceUID", QueryOperator.EQUALS, "frid1"))).size should be(2)
+      dao.querySeries(0, 10, None, orderAscending = true, Seq(QueryProperty("frameOfReferenceUID", QueryOperator.EQUALS, "frid1"))).size should be(2)
     }
   }
 
   it should "return the correct number of images for image queries" in {
     db.withSession { implicit session =>
       // Queries on Image properties
-      dao.queryImages(0, 10, None, true, Seq(QueryProperty("sopInstanceUID", QueryOperator.EQUALS, "souid1"))).size should be(1)
+      dao.queryImages(0, 10, None, orderAscending = true, Seq(QueryProperty("sopInstanceUID", QueryOperator.EQUALS, "souid1"))).size should be(1)
       
       // Check that query returns Studies with all data
-      dao.queryImages(0, 1, None, true, Seq(QueryProperty("sopInstanceUID", QueryOperator.EQUALS, "souid1"))).foreach(dbImage => {
-          dbImage.id should be >= (0L)
-          dbImage.seriesId should be >= (0L)
+      dao.queryImages(0, 1, None, orderAscending = true, Seq(QueryProperty("sopInstanceUID", QueryOperator.EQUALS, "souid1"))).foreach(dbImage => {
+          dbImage.id should be >= 0L
+          dbImage.seriesId should be >= 0L
           dbImage.sopInstanceUID.value should be("souid1")
           dbImage.imageType.value should be("PRIMARY/RECON/TOMO")
           dbImage.instanceNumber.value should be("1")
         })
         
       // Queries on Patient properties
-      dao.queryImages(0, 10, None, true, Seq(QueryProperty("patientName", QueryOperator.EQUALS, "p1"))).size should be(8)
+      dao.queryImages(0, 10, None, orderAscending = true, Seq(QueryProperty("patientName", QueryOperator.EQUALS, "p1"))).size should be(8)
       
       // Queries on Studies properties
-      dao.queryImages(0, 10, None, true, Seq(QueryProperty("studyInstanceUID", QueryOperator.EQUALS, "stuid1"))).size should be(4)
+      dao.queryImages(0, 10, None, orderAscending = true, Seq(QueryProperty("studyInstanceUID", QueryOperator.EQUALS, "stuid1"))).size should be(4)
       
       // Queries on Equipments properties
-      dao.queryImages(0, 10, None, true, Seq(QueryProperty("manufacturer", QueryOperator.EQUALS, "manu2"))).size should be(2)
+      dao.queryImages(0, 10, None, orderAscending = true, Seq(QueryProperty("manufacturer", QueryOperator.EQUALS, "manu2"))).size should be(2)
       
       // Queries on FrameOfReferences properties
-      dao.queryImages(0, 10, None, true, Seq(QueryProperty("frameOfReferenceUID", QueryOperator.EQUALS, "frid1"))).size should be(4)
+      dao.queryImages(0, 10, None, orderAscending = true, Seq(QueryProperty("frameOfReferenceUID", QueryOperator.EQUALS, "frid1"))).size should be(4)
       
       // Queries on Series properties
-      dao.queryImages(0, 10, None, true, Seq(QueryProperty("seriesInstanceUID", QueryOperator.EQUALS, "seuid1"))).size should be(2)
+      dao.queryImages(0, 10, None, orderAscending = true, Seq(QueryProperty("seriesInstanceUID", QueryOperator.EQUALS, "seuid1"))).size should be(2)
     }
   }
 
   it should "return the correct number of flat series for flat series queries" in {
     db.withSession { implicit session =>
       // Queries on Series properties
-      dao.queryFlatSeries(0, 10, None, true, Seq(QueryProperty("seriesInstanceUID", QueryOperator.EQUALS, "seuid1"))).size should be(1)
+      dao.queryFlatSeries(0, 10, None, orderAscending = true, Seq(QueryProperty("seriesInstanceUID", QueryOperator.EQUALS, "seuid1"))).size should be(1)
       
       // Check that query returns Studies with all data
-      dao.queryFlatSeries(0, 1, None, true, Seq(QueryProperty("seriesInstanceUID", QueryOperator.EQUALS, "seuid1"))).foreach(dbFlatSeries => {
-          dbFlatSeries.id should be >= (0L)
-          dbFlatSeries.series.studyId should be >= (0L)
+      dao.queryFlatSeries(0, 1, None, orderAscending = true, Seq(QueryProperty("seriesInstanceUID", QueryOperator.EQUALS, "seuid1"))).foreach(dbFlatSeries => {
+          dbFlatSeries.id should be >= 0L
+          dbFlatSeries.series.studyId should be >= 0L
           dbFlatSeries.series.seriesDescription.value should be("sedesc1")
           dbFlatSeries.series.seriesDate.value should be("19990101")
           dbFlatSeries.series.modality.value should be("NM")
@@ -262,26 +262,26 @@ class MetaDataDAOTest extends FlatSpec with Matchers {
         })
         
       // Queries on Patient properties
-      dao.queryFlatSeries(0, 10, None, true, Seq(QueryProperty("patientName", QueryOperator.EQUALS, "p1"))).size should be(4)
+      dao.queryFlatSeries(0, 10, None, orderAscending = true, Seq(QueryProperty("patientName", QueryOperator.EQUALS, "p1"))).size should be(4)
       
       // Queries on Studies properties
-      dao.queryFlatSeries(0, 10, None, true, Seq(QueryProperty("studyInstanceUID", QueryOperator.EQUALS, "stuid1"))).size should be(2)
+      dao.queryFlatSeries(0, 10, None, orderAscending = true, Seq(QueryProperty("studyInstanceUID", QueryOperator.EQUALS, "stuid1"))).size should be(2)
       
       // Queries on Equipments properties
-      dao.queryFlatSeries(0, 10, None, true, Seq(QueryProperty("manufacturer", QueryOperator.EQUALS, "manu2"))).size should be(1)
+      dao.queryFlatSeries(0, 10, None, orderAscending = true, Seq(QueryProperty("manufacturer", QueryOperator.EQUALS, "manu2"))).size should be(1)
       
       // Queries on FrameOfReferences properties
-      dao.queryFlatSeries(0, 10, None, true, Seq(QueryProperty("frameOfReferenceUID", QueryOperator.EQUALS, "frid1"))).size should be(2)
+      dao.queryFlatSeries(0, 10, None, orderAscending = true, Seq(QueryProperty("frameOfReferenceUID", QueryOperator.EQUALS, "frid1"))).size should be(2)
     }
   }
 
   it should "support listing flat series complete with series, study and patient information" in {
     db.withSession { implicit session =>
-      val flatSeries = dao.flatSeries(0, 20, None, true, None)
+      val flatSeries = dao.flatSeries(0, 20, None, orderAscending = true, filter = None)
       flatSeries.length should be(4)
-      flatSeries(0).series should not be (null)
-      flatSeries(0).study should not be (null)
-      flatSeries(0).patient should not be (null)
+      flatSeries.head.series should not be null
+      flatSeries.head.study should not be null
+      flatSeries.head.patient should not be null
     }
   }
 
@@ -289,7 +289,7 @@ class MetaDataDAOTest extends FlatSpec with Matchers {
     db.withSession { implicit session =>
       dao.series.foreach(s => {
         val flatSeries = dao.flatSeriesById(s.id)
-        flatSeries should not be (None)
+        flatSeries should not be None
         flatSeries.get.id should be(s.id)
       })
     }

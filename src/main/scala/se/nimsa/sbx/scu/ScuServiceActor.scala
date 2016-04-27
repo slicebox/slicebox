@@ -16,29 +16,25 @@
 
 package se.nimsa.sbx.scu
 
-import java.nio.file.Path
-import scala.language.postfixOps
-import scala.concurrent.Future
-import akka.actor.Actor
-import akka.actor.PoisonPill
-import akka.actor.Props
-import akka.pattern.ask
-import akka.event.Logging
-import akka.event.LoggingReceive
-import akka.pattern.pipe
-import se.nimsa.sbx.app.DbProps
-import se.nimsa.sbx.util.ExceptionCatching
-import se.nimsa.sbx.log.SbxLog
-import ScuProtocol._
-import java.net.UnknownHostException
-import java.net.ConnectException
-import se.nimsa.sbx.lang.NotFoundException
-import se.nimsa.sbx.lang.BadGatewayException
-import java.net.NoRouteToHostException
-import se.nimsa.sbx.app.GeneralProtocol._
-import se.nimsa.sbx.storage.StorageProtocol.GetImagePath
-import se.nimsa.sbx.storage.StorageProtocol.ImagePath
+import java.net.{ConnectException, NoRouteToHostException, UnknownHostException}
+
+import akka.actor.{Actor, Props}
+import akka.event.{Logging, LoggingReceive}
+import akka.pattern.{ask, pipe}
 import akka.util.Timeout
+import se.nimsa.sbx.app.DbProps
+import se.nimsa.sbx.app.GeneralProtocol._
+import se.nimsa.sbx.dicom.DicomHierarchy.Image
+import se.nimsa.sbx.lang.{BadGatewayException, NotFoundException}
+import se.nimsa.sbx.log.SbxLog
+import se.nimsa.sbx.metadata.MetaDataProtocol.GetImage
+import se.nimsa.sbx.scu.ScuProtocol._
+import se.nimsa.sbx.storage.StorageProtocol.{GetImagePath, ImagePath}
+import se.nimsa.sbx.util.ExceptionCatching
+import se.nimsa.sbx.util.SbxExtensions._
+
+import scala.concurrent.Future
+import scala.language.postfixOps
 
 class ScuServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extends Actor with ExceptionCatching {
   val log = Logging(context.system, this)
@@ -47,8 +43,10 @@ class ScuServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extends Actor
   val dao = new ScuDAO(dbProps.driver)
 
   import context.system
+
   implicit val ec = context.dispatcher
 
+  val metaDataService = context.actorSelection("../MetaDataService")
   val storageService = context.actorSelection("../StorageService")
 
   log.info("SCU service started")
@@ -94,8 +92,7 @@ class ScuServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extends Actor
             sender ! ScuRemoved(scuDataId)
 
           case GetScus =>
-            val scus = getScus()
-            sender ! Scus(scus)
+            sender ! Scus(getScus)
 
           case SendImagesToScp(imageIds, scuId) =>
             scuForId(scuId).map(scu => {
@@ -151,15 +148,21 @@ class ScuServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extends Actor
       dao.deleteScuDataWithId(id)
     }
 
-  def getScus() =
+  def getScus =
     db.withSession { implicit session =>
       dao.allScuDatas
     }
 
-  def imagePathsForImageIds(imageIds: Seq[Long]) =
-    Future.sequence(imageIds.map(imageId =>
-      storageService.ask(GetImagePath(imageId)).mapTo[Option[ImagePath]]))
-      .map(_.flatten)
+  def imagePathsForImageIds(imageIds: Seq[Long]): Future[Seq[ImagePath]] =
+    Future.sequence {
+      imageIds.map { imageId =>
+        metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]].flatMap { imageMaybe =>
+          imageMaybe.map { image =>
+            storageService.ask(GetImagePath(image)).mapTo[Option[ImagePath]]
+          }.unwrap
+        }
+      }
+    }.map(_.flatten)
 }
 
 object ScuServiceActor {

@@ -5,6 +5,9 @@ import java.io.IOException
 import java.nio.file._
 import java.nio.file.attribute.BasicFileAttributes
 import java.util.Date
+import java.util.stream.Collectors
+
+import scala.collection.JavaConverters._
 import scala.slick.jdbc.JdbcBackend.Session
 import org.dcm4che3.data.Attributes
 import org.dcm4che3.data.Tag
@@ -73,10 +76,10 @@ object TestUtil {
     val dbSeriesSource3 = propertiesDao.insertSeriesSource(seriesSource3.copy(id = dbSeries3.id))
     val dbSeriesSource4 = propertiesDao.insertSeriesSource(seriesSource4.copy(id = dbSeries4.id))
 
-    val dbSeriesTag1 = propertiesDao.addAndInsertSeriesTagForSeriesId(SeriesTag(-1, "Tag1"), dbSeries1.id)
-    val dbSeriesTag2 = propertiesDao.addAndInsertSeriesTagForSeriesId(SeriesTag(-1, "Tag2"), dbSeries1.id)
-    val dbSeriesTag3 = propertiesDao.addAndInsertSeriesTagForSeriesId(SeriesTag(-1, "Tag1"), dbSeries2.id)
-    val dbSeriesTag4 = propertiesDao.addAndInsertSeriesTagForSeriesId(SeriesTag(-1, "Tag2"), dbSeries3.id)
+    propertiesDao.addAndInsertSeriesTagForSeriesId(SeriesTag(-1, "Tag1"), dbSeries1.id)
+    propertiesDao.addAndInsertSeriesTagForSeriesId(SeriesTag(-1, "Tag2"), dbSeries1.id)
+    propertiesDao.addAndInsertSeriesTagForSeriesId(SeriesTag(-1, "Tag1"), dbSeries2.id)
+    propertiesDao.addAndInsertSeriesTagForSeriesId(SeriesTag(-1, "Tag2"), dbSeries3.id)
     
     val dbSeriesType1 = seriesTypeDao.insertSeriesType(seriesType1)
     val dbSeriesType2 = seriesTypeDao.insertSeriesType(seriesType2)
@@ -94,15 +97,15 @@ object TestUtil {
     ((dbSeriesSource1, dbSeriesSource2, dbSeriesSource3, dbSeriesSource4), (dbSeriesSeriesType1, dbSeriesSeriesType2, dbSeriesSeriesType3, dbSeriesSeriesType4))
   }
   
-  def testImageFile = new File(getClass().getResource("test.dcm").toURI())
-  def testSecondaryCaptureFile = new File(getClass().getResource("sc.dcm").toURI())
+  def testImageFile = new File(getClass.getResource("test.dcm").toURI)
+  def testSecondaryCaptureFile = new File(getClass.getResource("sc.dcm").toURI)
   def testImageDataset(withPixelData: Boolean = true) = DicomUtil.loadDataset(testImageFile.toPath, withPixelData)
   def testImageByteArray = DicomUtil.toByteArray(testImageFile.toPath)
 
-  def jpegFile = new File(getClass().getResource("cat.jpg").toURI())
+  def jpegFile = new File(getClass.getResource("cat.jpg").toURI)
   def jpegByteArray = Files.readAllBytes(jpegFile.toPath)
   
-  def invalidImageFile = new File(getClass().getResource("invalid.dcm").toURI())
+  def invalidImageFile = new File(getClass.getResource("invalid.dcm").toURI)
   
   def createDataset(
     patientName: String = "pat name",
@@ -159,6 +162,15 @@ object TestUtil {
       dataset.getString(Tag.SeriesDescription),
       dataset.getString(Tag.ProtocolName),
       dataset.getString(Tag.FrameOfReferenceUID), anonFrameOfReferenceUID)
+
+  def deleteFolderContents(path: Path) =
+    Files.list(path).collect(Collectors.toList()).asScala.foreach { path =>
+      if (Files.isDirectory(path)) {
+        deleteFolder(path);
+      } else {
+        Files.deleteIfExists(path)
+      }
+    }
 
   def deleteFolder(path: Path) =
     Files.walkFileTree(path, new SimpleFileVisitor[Path]() {

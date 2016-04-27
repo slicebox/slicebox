@@ -16,20 +16,14 @@
 
 package se.nimsa.sbx.seriestype
 
-import SeriesTypeProtocol._
-import akka.actor.Actor
-import akka.actor.Props
-import akka.actor.actorRef2Scala
-import akka.event.Logging
-import akka.event.LoggingReceive
+import akka.actor.{Actor, Props}
+import akka.event.{Logging, LoggingReceive}
 import akka.util.Timeout
-import akka.pattern.ask
 import se.nimsa.sbx.app.DbProps
-import se.nimsa.sbx.util.ExceptionCatching
 import se.nimsa.sbx.dicom.DicomUtil
-import se.nimsa.sbx.dicom.DicomHierarchy.Series
 import se.nimsa.sbx.metadata.MetaDataProtocol._
-import scala.concurrent.Future
+import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
+import se.nimsa.sbx.util.ExceptionCatching
 
 class SeriesTypeServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extends Actor with ExceptionCatching {
 
@@ -41,11 +35,10 @@ class SeriesTypeServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extend
   val db = dbProps.db
   val seriesTypeDao = new SeriesTypeDAO(dbProps.driver)
 
-  val metaDataService = context.actorSelection("../MetaDataService")
   val seriesTypeUpdateService = context.actorOf(SeriesTypeUpdateActor.props(timeout), name = "SeriesTypeUpdate")
 
   override def preStart {
-    system.eventStream.subscribe(context.self, classOf[SeriesDeleted])
+    system.eventStream.subscribe(context.self, classOf[MetaDataDeleted])
   }
 
   log.info("Series type service started")
@@ -54,10 +47,12 @@ class SeriesTypeServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extend
 
   def receive = LoggingReceive {
 
-    case SeriesDeleted(seriesId) =>
-      removeSeriesTypesFromSeries(seriesId)
-      sender ! SeriesTypesRemovedFromSeries(seriesId)
-      
+    case MetaDataDeleted(patientMaybe, studyMaybe, seriesMaybe, imageMaybe) =>
+      seriesMaybe.foreach { series =>
+        removeSeriesTypesFromSeries(series.id)
+        sender ! SeriesTypesRemovedFromSeries(series.id)
+      }
+
     case msg: SeriesTypeRequest =>
 
       catchAndReport {
@@ -65,7 +60,7 @@ class SeriesTypeServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extend
         msg match {
 
           case GetSeriesTypes =>
-            val seriesTypes = getSeriesTypesFromDb()
+            val seriesTypes = getSeriesTypesFromDb
             sender ! SeriesTypes(seriesTypes)
 
           case AddSeriesType(seriesType) =>
@@ -73,7 +68,7 @@ class SeriesTypeServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extend
             sender ! SeriesTypeAdded(dbSeriesType)
 
           case UpdateSeriesType(seriesType) =>
-            val dbSeriesType = updateSeriesTypeInDb(seriesType)
+            updateSeriesTypeInDb(seriesType)
             sender ! SeriesTypeUpdated
 
           case RemoveSeriesType(seriesTypeId) =>
@@ -126,7 +121,7 @@ class SeriesTypeServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extend
       }
   }
 
-  def getSeriesTypesFromDb(): Seq[SeriesType] =
+  def getSeriesTypesFromDb: Seq[SeriesType] =
     db.withSession { implicit session =>
       seriesTypeDao.listSeriesTypes
     }
@@ -198,11 +193,7 @@ class SeriesTypeServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extend
     }
 
   def updateSeriesTypesForAllSeries() =
-    getAllSeries().map(allSeries =>
-      seriesTypeUpdateService ! UpdateSeriesTypesForSeries(allSeries.map(_.id)))
-
-  def getAllSeries(): Future[Seq[Series]] =
-    metaDataService.ask(GetAllSeries).mapTo[SeriesCollection].map(_.series)
+    seriesTypeUpdateService ! UpdateSeriesTypesForAllSeries
 
 }
 

@@ -98,11 +98,20 @@ object SeriesTypeProtocol {
   
   sealed trait SeriesTypesUpdateRequest
   
-  case class UpdateSeriesTypesForSeries(seriesIds: Seq[Long]) extends SeriesTypesUpdateRequest
+  case object UpdateSeriesTypesForAllSeries extends SeriesTypesUpdateRequest
     
   case object GetUpdateSeriesTypesRunningStatus extends SeriesTypesUpdateRequest with SeriesTypeRequest
   
   case class UpdateSeriesTypesRunningStatus(running: Boolean)
-  
+
+
+  case class MarkSeriesAsProcessed(seriesId: Long)
+
+  case object PollSeriesTypesUpdateQueue
+
+  case class AddToUpdateQueue(seriesIds: Seq[Long])
+
+  case class UpdateSeriesTypesForSeries(seriesId: Long)
+
 
 }

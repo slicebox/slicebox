@@ -116,7 +116,7 @@ class UserServiceActor(dbProps: DbProps, superUser: String, superPassword: Strin
     db.withSession { implicit session =>
       dao.userSessionByUserIdIpAndUserAgent(user.id, ip, userAgent)
         .map(apiSession => {
-          val updatedSession = apiSession.copy(lastUpdated = currentTime)
+          val updatedSession = apiSession.copy(updated = currentTime)
           dao.updateSession(updatedSession)
           updatedSession
         })
@@ -140,12 +140,12 @@ class UserServiceActor(dbProps: DbProps, superUser: String, superPassword: Strin
               dao.userSessionByTokenIpAndUserAgent(token, ip, userAgent))))
           .filter {
             case (user, apiSession) =>
-              apiSession.lastUpdated > (currentTime - sessionTimeout)
+              apiSession.updated > (currentTime - sessionTimeout)
           }
 
       validUserAndSession.foreach {
         case (user, apiSession) =>
-          dao.updateSession(apiSession.copy(lastUpdated = currentTime))
+          dao.updateSession(apiSession.copy(updated = currentTime))
       }
 
       validUserAndSession.map(_._1)
@@ -169,7 +169,7 @@ class UserServiceActor(dbProps: DbProps, superUser: String, superPassword: Strin
   def removeExpiredSessions(): Unit =
     db.withSession { implicit session =>
       dao.listSessions
-        .filter(_.lastUpdated < currentTime - sessionTimeout)
+        .filter(_.updated < currentTime - sessionTimeout)
         .foreach(expiredSession => dao.deleteSessionById(expiredSession.id))
     }
 

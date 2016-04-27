@@ -45,9 +45,9 @@ class SliceboxServiceActor extends Actor with SliceboxService {
 
   override def actorRefFactory = context
 
-  def dbUrl = sliceboxConfig.getString("database.path")
+  def dbUrl() = sliceboxConfig.getString("database.path")
 
-  override def createStorageDirectory = {
+  override def createStorageDirectory() = {
     val storagePath = Paths.get(sliceboxConfig.getString("dicom-files.path"))
     if (!Files.exists(storagePath))
       try {
@@ -75,19 +75,22 @@ trait SliceboxService extends HttpService with SliceboxRoutes with JsonFormats {
 
   def db = {
     val config = new HikariConfig()
-    config.setJdbcUrl(dbUrl)
+    config.setJdbcUrl(dbUrl())
+    if (sliceboxConfig.hasPath("database.user") && sliceboxConfig.getString("database.user").nonEmpty)
+      config.setUsername(sliceboxConfig.getString("database.user"))
+    if (sliceboxConfig.hasPath("database.password") && sliceboxConfig.getString("database.password").nonEmpty)
+      config.setPassword(sliceboxConfig.getString("database.password"))
     Database.forDataSource(new HikariDataSource(config))
   }
 
   val driver = {
     val pattern = "jdbc:(.*?):".r
-    val driverString = pattern.findFirstMatchIn(dbUrl).map(_ group 1)
+    val driverString = pattern.findFirstMatchIn(dbUrl()).map(_ group 1)
     if (driverString.isEmpty)
-      throw new IllegalArgumentException(s"Malformed database URL: $dbUrl")
+      throw new IllegalArgumentException(s"Malformed database URL: ${dbUrl()}")
     driverString.get.toLowerCase match {
       case "h2" => H2Driver
       case "mysql" => MySQLDriver
-      case "postgresql" => PostgresDriver
       case s => throw new IllegalArgumentException(s"Database not supported: $s")
     }
   }
@@ -148,12 +151,12 @@ trait SliceboxService extends HttpService with SliceboxRoutes with JsonFormats {
   val userService = actorRefFactory.actorOf(UserServiceActor.props(dbProps, superUser, superPassword, sessionTimeout), name = "UserService")
   val logService = actorRefFactory.actorOf(LogServiceActor.props(dbProps), name = "LogService")
   val metaDataService = actorRefFactory.actorOf(MetaDataServiceActor.props(dbProps).withDispatcher("akka.prio-dispatcher"), name = "MetaDataService")
-  val storageService = actorRefFactory.actorOf(StorageServiceActor.props(storage, timeout), name = "StorageService")
-  val anonymizationService = actorRefFactory.actorOf(AnonymizationServiceActor.props(dbProps, timeout), name = "AnonymizationService")
+  val storageService = actorRefFactory.actorOf(StorageServiceActor.props(storage), name = "StorageService")
+  val anonymizationService = actorRefFactory.actorOf(AnonymizationServiceActor.props(dbProps), name = "AnonymizationService")
   val boxService = actorRefFactory.actorOf(BoxServiceActor.props(dbProps, apiBaseURL, timeout), name = "BoxService")
-  val scpService = actorRefFactory.actorOf(ScpServiceActor.props(dbProps), name = "ScpService")
+  val scpService = actorRefFactory.actorOf(ScpServiceActor.props(dbProps, timeout), name = "ScpService")
   val scuService = actorRefFactory.actorOf(ScuServiceActor.props(dbProps, timeout), name = "ScuService")
-  val directoryService = actorRefFactory.actorOf(DirectoryWatchServiceActor.props(dbProps, storage), name = "DirectoryService")
+  val directoryService = actorRefFactory.actorOf(DirectoryWatchServiceActor.props(dbProps, storage, timeout), name = "DirectoryService")
   val seriesTypeService = actorRefFactory.actorOf(SeriesTypeServiceActor.props(dbProps, timeout), name = "SeriesTypeService")
   val forwardingService = actorRefFactory.actorOf(ForwardingServiceActor.props(dbProps, timeout), name = "ForwardingService")
   val importService = actorRefFactory.actorOf(ImportServiceActor.props(dbProps), name = "ImportService")

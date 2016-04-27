@@ -68,7 +68,7 @@ object AnonymizationProtocol {
 
   case class GetAnonymizationKey(anonymizationKeyId: Long) extends AnonymizationRequest
   
-  case class GetImagesForAnonymizationKey(anonymizationKeyId: Long) extends AnonymizationRequest
+  case class GetImageIdsForAnonymizationKey(anonymizationKeyId: Long) extends AnonymizationRequest
   
   case class QueryAnonymizationKeys(query: AnonymizationKeyQuery) extends AnonymizationRequest
   

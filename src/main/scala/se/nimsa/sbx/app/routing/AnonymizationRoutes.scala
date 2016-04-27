@@ -16,33 +16,25 @@
 
 package se.nimsa.sbx.app.routing
 
-import java.io.File
-import scala.concurrent.Future
-import org.dcm4che3.data.Attributes
 import akka.pattern.ask
+import org.dcm4che3.data.Attributes
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.anonymization.AnonymizationUtil
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.app.SliceboxService
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
-import se.nimsa.sbx.dicom.DicomUtil
-import se.nimsa.sbx.dicom.ImageAttribute
+import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.user.UserProtocol.ApiUser
 import se.nimsa.sbx.util.SbxExtensions._
-import spray.http.ContentType.apply
-import spray.http.FormFile
-import spray.http.HttpData
-import spray.http.HttpEntity
-import spray.http.HttpHeaders._
-import spray.http.MediaTypes._
 import spray.http.StatusCodes._
-import spray.routing.Route
-import spray.routing.directives._
 import spray.httpx.SprayJsonSupport._
-import se.nimsa.sbx.metadata.MetaDataProtocol.Images
+import spray.routing.Route
 
-trait AnonymizationRoutes { this: SliceboxService =>
+import scala.concurrent.Future
+
+trait AnonymizationRoutes {
+  this: SliceboxService =>
 
   def anonymizationRoutes(apiUser: ApiUser): Route =
     path("images" / LongNumber / "anonymize") { imageId =>
@@ -61,7 +53,7 @@ trait AnonymizationRoutes { this: SliceboxService =>
               Future.sequence {
                 imageTagValuesSeq.map(imageTagValues =>
                   anonymizeOne(apiUser, imageTagValues.imageId, imageTagValues.tagValues))
-              }.map(_.map(_.map(_.image)).flatten)
+              }.map(_.flatMap(_.map(_.image)))
             }
           }
         }
@@ -74,12 +66,11 @@ trait AnonymizationRoutes { this: SliceboxService =>
               'orderby.as[String].?,
               'orderascending.as[Boolean] ? true,
               'filter.as[String].?) { (startIndex, count, orderBy, orderAscending, filter) =>
-                onSuccess(anonymizationService.ask(GetAnonymizationKeys(startIndex, count, orderBy, orderAscending, filter))) {
-                  case AnonymizationKeys(anonymizationKeys) =>
-                    import spray.httpx.SprayJsonSupport._
-                    complete(anonymizationKeys)
-                }
+              onSuccess(anonymizationService.ask(GetAnonymizationKeys(startIndex, count, orderBy, orderAscending, filter))) {
+                case AnonymizationKeys(anonymizationKeys) =>
+                  complete(anonymizationKeys)
               }
+            }
           }
         } ~ pathPrefix(LongNumber) { anonymizationKeyId =>
           pathEndOrSingleSlash {
@@ -89,24 +80,25 @@ trait AnonymizationRoutes { this: SliceboxService =>
               }
             } ~ delete {
               onSuccess(anonymizationService.ask(RemoveAnonymizationKey(anonymizationKeyId))) {
-                case AnonymizationKeyRemoved(anonymizationKeyId) =>
+                case AnonymizationKeyRemoved(_) =>
                   complete(NoContent)
               }
             }
           } ~ path("images") {
             get {
-              onSuccess(anonymizationService.ask(GetImagesForAnonymizationKey(anonymizationKeyId))) {
-                case Images(images) =>
-                  complete(images)
-              }
+              complete(anonymizationService.ask(GetImageIdsForAnonymizationKey(anonymizationKeyId)).mapTo[List[Long]].flatMap { imageIds =>
+                Future.sequence {
+                  imageIds.map { imageId =>
+                    metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]]
+                  }
+                }
+              }.map(_.flatten))
             }
           }
         } ~ path("query") {
           post {
             entity(as[AnonymizationKeyQuery]) { query =>
-              complete {
-                anonymizationService.ask(QueryAnonymizationKeys(query)).mapTo[List[AnonymizationKey]]
-              }
+              complete(anonymizationService.ask(QueryAnonymizationKeys(query)).mapTo[List[AnonymizationKey]])
             }
           }
         }
@@ -114,18 +106,24 @@ trait AnonymizationRoutes { this: SliceboxService =>
     }
 
   def anonymizeOne(apiUser: ApiUser, imageId: Long, tagValues: Seq[TagValue]): Future[Option[DatasetAdded]] =
-    storageService.ask(GetDataset(imageId, true)).mapTo[Option[Attributes]].map { optionalDataset =>
-      optionalDataset.map { dataset =>
-        AnonymizationUtil.setAnonymous(dataset, false) // pretend not anonymized to force anonymization
-        anonymizationService.ask(Anonymize(imageId, dataset, tagValues)).flatMap {
-          case anonDataset: Attributes =>
-            storageService.ask(DeleteDataset(imageId)).flatMap {
-              case DatasetDeleted(imageId) =>
-                val source = Source(SourceType.USER, apiUser.user, apiUser.id)
-                storageService.ask(AddDataset(anonDataset, source)).mapTo[DatasetAdded]
+    metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]].flatMap { imageMaybe =>
+      imageMaybe.map { image =>
+        storageService.ask(GetDataset(image, withPixelData = true)).mapTo[Option[Attributes]].map { optionalDataset =>
+          optionalDataset.map { dataset =>
+            AnonymizationUtil.setAnonymous(dataset, anonymous = false) // pretend not anonymized to force anonymization
+            anonymizationService.ask(Anonymize(imageId, dataset, tagValues)).mapTo[Attributes].flatMap { anonDataset =>
+              metaDataService.ask(DeleteMetaData(image.id)).flatMap { _ =>
+                storageService.ask(DeleteDataset(image)).flatMap { _ =>
+                  val source = Source(SourceType.USER, apiUser.user, apiUser.id)
+                  metaDataService.ask(AddMetaData(anonDataset, source)).mapTo[MetaDataAdded].flatMap { metaData =>
+                    storageService.ask(AddDataset(anonDataset, source, metaData.image)).mapTo[DatasetAdded]
+                  }
+                }
+              }
             }
+          }
         }
-      }
+      }.unwrap
     }.unwrap
 
 }

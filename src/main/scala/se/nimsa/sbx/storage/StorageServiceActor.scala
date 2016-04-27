@@ -18,322 +18,226 @@ package se.nimsa.sbx.storage
 
 import java.awt.RenderingHints
 import java.awt.image.BufferedImage
-import java.io.ByteArrayInputStream
-import java.io.ByteArrayOutputStream
-import java.nio.file.Files
-import java.nio.file.NoSuchFileException
-import java.nio.file.Path
-import java.util.concurrent.Executors
-import java.util.zip.ZipEntry
-import java.util.zip.ZipOutputStream
+import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
+import java.nio.file.{Files, NoSuchFileException, Path}
+import java.util.zip.{ZipEntry, ZipOutputStream}
+import javax.imageio.ImageIO
 
-import scala.concurrent.Future
+import akka.actor.{Actor, Props}
+import akka.event.{Logging, LoggingReceive}
+import org.dcm4che3.data.{Attributes, BulkData, Fragments, Tag}
+import org.dcm4che3.imageio.plugins.dcm.DicomImageReadParam
+import se.nimsa.sbx.app.GeneralProtocol.{ImageAdded, Source}
+import se.nimsa.sbx.dicom.DicomHierarchy._
+import se.nimsa.sbx.dicom.{DicomUtil, ImageAttribute, Jpg2Dcm}
+import se.nimsa.sbx.dicom.DicomUtil._
+import se.nimsa.sbx.storage.StorageProtocol._
+import se.nimsa.sbx.util.ExceptionCatching
+
 import scala.concurrent.duration.DurationInt
 import scala.util.control.NonFatal
 
-import org.dcm4che3.data.Attributes
-import org.dcm4che3.data.BulkData
-import org.dcm4che3.data.Fragments
-import org.dcm4che3.data.Tag
-import org.dcm4che3.imageio.plugins.dcm.DicomImageReadParam
-
-import akka.actor.Actor
-import akka.actor.Props
-import akka.dispatch.ExecutionContexts
-import akka.event.Logging
-import akka.event.LoggingReceive
-import akka.pattern.ask
-import akka.pattern.pipe
-import akka.util.Timeout
-import javax.imageio.ImageIO
-import se.nimsa.sbx.app.GeneralProtocol.Source
-import se.nimsa.sbx.dicom.DicomHierarchy._
-import se.nimsa.sbx.dicom.DicomUtil
-import se.nimsa.sbx.dicom.DicomUtil._
-import se.nimsa.sbx.dicom.ImageAttribute
-import se.nimsa.sbx.dicom.Jpg2Dcm
-import se.nimsa.sbx.log.SbxLog
-import se.nimsa.sbx.metadata.MetaDataProtocol._
-import se.nimsa.sbx.storage.StorageProtocol._
-import se.nimsa.sbx.util.FutureUtil
-import se.nimsa.sbx.util.SbxExtensions._
-
-class StorageServiceActor(storage: Path, implicit val timeout: Timeout) extends Actor {
+class StorageServiceActor(storage: Path) extends Actor with ExceptionCatching {
 
   val bufferSize = 524288
 
-  import context.system
   val log = Logging(context.system, this)
 
-  implicit val ec = ExecutionContexts.fromExecutor(Executors.newWorkStealingPool())
-
-  val metaDataService = context.actorSelection("../MetaDataService")
-
-  override def preStart {
-    context.system.eventStream.subscribe(context.self, classOf[DatasetReceived])
-    context.system.eventStream.subscribe(context.self, classOf[FileReceived])
-  }
+  implicit val ec = context.dispatcher
 
   log.info("Storage service started")
 
   def receive = LoggingReceive {
 
-    case FileReceived(path, source) =>
-      val dataset = loadDataset(path, true)
-      if (dataset != null)
-        if (checkSopClass(dataset))
-          addMetadata(dataset, source).map { image =>
-            val overwrite = storeDataset(dataset, image, source)
-            if (overwrite)
-              log.info(s"Updated existing file with image id ${image.id}")
-            else
-              log.info(s"Stored file with image id ${image.id}")
-            context.system.eventStream.publish(DatasetAdded(image, source, overwrite))
-          }
-        else
-          SbxLog.info("Storage", s"Received dataset with unsupported SOP Class UID ${dataset.getString(Tag.SOPClassUID)}, skipping")
-      else
-        log.debug("Storage", s"Dataset could not be read, skipping")
-
-    case DatasetReceived(dataset, source) =>
-      if (dataset != null)
-        if (checkSopClass(dataset))
-          addMetadata(dataset, source).map { image =>
-            val overwrite = storeDataset(dataset, image, source)
-            if (overwrite)
-              log.info(s"Updated existing file with image id ${image.id}")
-            else
-              log.info(s"Stored file with image id ${image.id}")
-            context.system.eventStream.publish(DatasetAdded(image, source, overwrite))
-          }
-        else
-          SbxLog.info("Storage", s"Received dataset with unsupported SOP Class UID ${dataset.getString(Tag.SOPClassUID)}, skipping")
-      else
-        log.debug("Storage", s"Dataset could not be read, skipping")
-
-    case AddDataset(dataset, source) =>
-      val datasetAdded: Future[DatasetAdded] =
-        if (dataset == null)
-          Future.failed(new IllegalArgumentException("Invalid dataset"))
-        else if (!checkSopClass(dataset))
-          Future.failed(new IllegalArgumentException(s"Unsupported SOP Class UID ${dataset.getString(Tag.SOPClassUID)}"))
-        else
-          addMetadata(dataset, source).map { image =>
-            val overwrite = storeDataset(dataset, image, source)
-            if (overwrite)
-              log.info(s"Updated existing file with image id ${image.id}")
-            else
-              log.info(s"Stored file with image id ${image.id}")
-            val datasetAdded = DatasetAdded(image, source, overwrite)
-            context.system.eventStream.publish(datasetAdded)
-            datasetAdded
-          }
-      datasetAdded.pipeTo(sender)
-
-    case AddJpeg(jpegBytes, studyId, source) =>
-      val image: Future[Option[Image]] =
-        studyById(studyId).flatMap { optionalStudy =>
-          optionalStudy.map { study =>
-            patientById(study.patientId).map { optionalPatient =>
-              optionalPatient.map { patient =>
-                val dcmTempPath = Files.createTempFile("slicebox-sc-", "")
-                val attributes = Jpg2Dcm(jpegBytes, patient, study, dcmTempPath.toFile)
-                val series = datasetToSeries(attributes)
-                val image = datasetToImage(attributes)
-                storeEncapsulated(patient, study, series, image, source, dcmTempPath)
-              }
-            }
-          }.unwrap
-        }.unwrap
-
-      image.foreach(_.foreach { image =>
-        log.info(s"Stored encapsulated JPEG with image id ${image.id}")
-        context.system.eventStream.publish(DatasetAdded(image, source, false))
-      })
-
-      image.pipeTo(sender)
-
-    case DeleteDataset(imageId) =>
-      val datasetDeleted: Future[DatasetDeleted] =
-        imageById(imageId).flatMap { optionalImage =>
-          optionalImage.map { image =>
-            try deleteFromStorage(image.id) catch {
-              case e: NoSuchFileException => log.info(s"DICOM file for image with id $imageId could not be found, no need to delete.")
-            }
-            deleteMetaData(image)
-          }
-            .getOrElse(Future.successful {})
-            .map(i => DatasetDeleted(imageId))
-        }
-      datasetDeleted.foreach {
-        log.info(s"Deleted dataset with image id $imageId")
-        context.system.eventStream.publish(_)
-      }
-      datasetDeleted.pipeTo(sender)
-
-    case CreateTempZipFile(imageIds) =>
-      createTempZipFile(imageIds)
-        .map(path => FileName(path.getFileName.toString))
-        .pipeTo(sender)
-
     case DeleteTempZipFile(path) =>
       Files.deleteIfExists(path)
 
-    case msg: ImageRequest =>
+    case msg: ImageRequest => catchAndReport {
       msg match {
 
-        case GetImagePath(imageId) =>
-          imagePathForId(imageId)
-            .map(_.map(ImagePath(_)))
-            .pipeTo(sender)
+        case CheckDataset(dataset) =>
+          sender ! checkDataset(dataset)
 
-        case GetDataset(imageId, withPixelData) =>
-          readDataset(imageId, withPixelData)
-            .pipeTo(sender)
+        case AddDataset(dataset, source, image) =>
+          if (checkDataset(dataset)) {
+            val overwrite = storeDataset(dataset, image)
+            if (overwrite)
+              log.info(s"Updated existing file with image id ${image.id}")
+            else
+              log.info(s"Stored file with image id ${image.id}")
+            val datasetAdded = DatasetAdded(image, overwrite)
+            val imageAdded = ImageAdded(image, source, overwrite)
+            context.system.eventStream.publish(imageAdded)
+            sender ! datasetAdded
+          } else
+            throw new IllegalArgumentException("Dataset does not conform to slicebox storage restrictions")
 
-        case GetImageAttributes(imageId) =>
-          readImageAttributes(imageId)
-            .pipeTo(sender)
+        case CreateJpeg(jpegBytes, patient, study) =>
+          val jpegTempPath = Files.createTempFile("slicebox-sc-", "")
+          val dataset = Jpg2Dcm(jpegBytes, patient, study, jpegTempPath.toFile)
+          sender ! JpegCreated(dataset, jpegTempPath)
 
-        case GetImageInformation(imageId) =>
-          readImageInformation(imageId)
-            .pipeTo(sender)
+        case AddJpeg(image, source, jpegTempPath) =>
+          storeEncapsulated(image, jpegTempPath)
 
-        case GetImageFrame(imageId, frameNumber, windowMin, windowMax, imageHeight) =>
-          val imageBytes: Future[Option[Array[Byte]]] =
-            readImageFrame(imageId, frameNumber, windowMin, windowMax, imageHeight)
-              .recoverWith {
-                case NonFatal(e) =>
-                  readSecondaryCaptureJpeg(imageId, imageHeight)
-              }
-          imageBytes.pipeTo(sender)
+          log.info(s"Stored encapsulated JPEG with image id ${image.id}")
+          context.system.eventStream.publish(ImageAdded(image, source, overwrite = false))
+
+          sender ! JpegAdded
+
+        case DeleteDataset(image) =>
+          val datasetDeleted = DatasetDeleted(image)
+          try {
+            deleteFromStorage(image)
+            context.system.eventStream.publish(datasetDeleted)
+          } catch {
+            case e: NoSuchFileException => log.info(s"DICOM file for image with id ${image.id} could not be found, no need to delete.")
+          }
+          sender ! datasetDeleted
+
+        case CreateTempZipFile(imagesAndSeries) =>
+          val zipFilePath = createTempZipFile(imagesAndSeries)
+          sender ! FileName(zipFilePath.getFileName.toString)
+
+        case GetImagePath(image) =>
+          val imagePath = resolvePath(image).map(ImagePath(_))
+          sender ! imagePath
+
+        case GetDataset(image, withPixelData) =>
+          sender ! readDataset(image, withPixelData)
+
+        case GetImageAttributes(image) =>
+          sender ! readImageAttributes(image)
+
+        case GetImageInformation(image) =>
+          sender ! readImageInformation(image)
+
+        case GetImageFrame(image, frameNumber, windowMin, windowMax, imageHeight) =>
+          val imageBytes: Option[Array[Byte]] =
+            try
+              readImageFrame(image, frameNumber, windowMin, windowMax, imageHeight)
+            catch {
+              case NonFatal(e) =>
+                readSecondaryCaptureJpeg(image, imageHeight)
+            }
+          sender ! imageBytes
 
       }
-
+    }
   }
 
-  def storeDataset(dataset: Attributes, image: Image, source: Source): Boolean = {
+  def checkDataset(dataset: Attributes): Boolean = {
+    if (dataset == null)
+      throw new IllegalArgumentException("Invalid dataset")
+    else if (!DicomUtil.checkSopClass(dataset))
+      throw new IllegalArgumentException(s"Unsupported SOP Class UID ${dataset.getString(Tag.SOPClassUID)}")
+    true
+  }
+
+  def storeDataset(dataset: Attributes, image: Image): Boolean = {
     val storedPath = filePath(image)
     val overwrite = Files.exists(storedPath)
     try saveDataset(dataset, storedPath) catch {
       case NonFatal(e) =>
-        deleteMetaData(image) // try to clean up, not interested in whether it worked or not        
         throw new IllegalArgumentException("Dataset file could not be stored", e)
     }
     overwrite
   }
 
-  def storeEncapsulated(
-    dbPatient: Patient, dbStudy: Study,
-    series: Series, image: Image,
-    source: Source, dcmTempPath: Path): Future[Image] =
-    addMetadata(createDataset(dbPatient, dbStudy, series, image), source).map { dbImage =>
-      val storedPath = filePath(dbImage)
-      Files.move(dcmTempPath, storedPath)
-      dbImage
-    }
+  def storeEncapsulated(image: Image, dcmTempPath: Path): Unit =
+    Files.move(dcmTempPath, filePath(image))
 
-  def filePath(image: Image) = storage.resolve(fileName(image))
+  def filePath(image: Image) =
+    storage.resolve(fileName(image))
+
   def fileName(image: Image) = image.id.toString
 
-  def imagePathForId(imageId: Long): Future[Option[Path]] =
-    imageById(imageId).map {
-      _.map(filePath(_))
-        .filter(Files.exists(_))
-        .filter(Files.isReadable(_))
-    }
+  def resolvePath(image: Image): Option[Path] =
+    Option(filePath(image))
+      .filter(p => Files.exists(p) && Files.isReadable(p))
 
-  def deleteFromStorage(imageIds: Seq[Long]): Future[Seq[Unit]] =
-    Future.sequence {
-      imageIds map (deleteFromStorage(_))
-    }
+  def deleteFromStorage(images: Seq[Image]): Unit = images foreach (deleteFromStorage(_))
 
-  def deleteFromStorage(imageId: Long): Future[Unit] =
-    imagePathForId(imageId).map { optionalImagePath =>
-      optionalImagePath.map { imagePath =>
+  def deleteFromStorage(image: Image): Unit =
+    resolvePath(image) match {
+      case Some(imagePath) =>
         Files.delete(imagePath)
-        log.debug("Deleted file " + imagePath)
-      }
+        log.info(s"Deleted dataset with image id ${image.id}")
+      case None =>
+        log.warning(s"No DICOM file found for image with id ${image.id} when deleting dataset")
     }
 
-  def readDataset(imageId: Long, withPixelData: Boolean): Future[Option[Attributes]] =
-    imagePathForId(imageId).map { optionalImagePath =>
-      optionalImagePath.map { imagePath =>
-        loadDataset(imagePath, withPixelData)
-      }
+  def readDataset(image: Image, withPixelData: Boolean): Option[Attributes] =
+    resolvePath(image).map { imagePath =>
+      loadDataset(imagePath, withPixelData)
     }
 
-  def readImageAttributes(imageId: Long): Future[Option[List[ImageAttribute]]] =
-    imagePathForId(imageId).map { optionalImagePath =>
-      optionalImagePath.map { imagePath =>
-        DicomUtil.readImageAttributes(loadDataset(imagePath, false))
-      }
+  def readImageAttributes(image: Image): Option[List[ImageAttribute]] =
+    resolvePath(image).map { imagePath =>
+      DicomUtil.readImageAttributes(loadDataset(imagePath, withPixelData = false))
     }
 
-  def readImageInformation(imageId: Long): Future[Option[ImageInformation]] =
-    imagePathForId(imageId).map { optionalImagePath =>
-      optionalImagePath.map { imagePath =>
-        val dataset = loadDataset(imagePath, false)
-        val instanceNumber = dataset.getInt(Tag.InstanceNumber, 1)
-        val imageIndex = dataset.getInt(Tag.ImageIndex, 1)
-        val frameIndex = if (instanceNumber > imageIndex) instanceNumber else imageIndex
-        ImageInformation(
-          dataset.getInt(Tag.NumberOfFrames, 1),
-          frameIndex,
-          dataset.getInt(Tag.SmallestImagePixelValue, 0),
-          dataset.getInt(Tag.LargestImagePixelValue, 0))
-      }
+  def readImageInformation(image: Image): Option[ImageInformation] =
+    resolvePath(image).map { imagePath =>
+      val dataset = loadDataset(imagePath, withPixelData = false)
+      val instanceNumber = dataset.getInt(Tag.InstanceNumber, 1)
+      val imageIndex = dataset.getInt(Tag.ImageIndex, 1)
+      val frameIndex = if (instanceNumber > imageIndex) instanceNumber else imageIndex
+      ImageInformation(
+        dataset.getInt(Tag.NumberOfFrames, 1),
+        frameIndex,
+        dataset.getInt(Tag.SmallestImagePixelValue, 0),
+        dataset.getInt(Tag.LargestImagePixelValue, 0))
     }
 
-  def readImageFrame(imageId: Long, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int): Future[Option[Array[Byte]]] =
-    imagePathForId(imageId).map { optionalImagePath =>
-      optionalImagePath.map { imagePath =>
-        val file = imagePath.toFile
-        val iis = ImageIO.createImageInputStream(file)
-        try {
-          val imageReader = ImageIO.getImageReadersByFormatName("DICOM").next
-          imageReader.setInput(iis)
-          val param = imageReader.getDefaultReadParam().asInstanceOf[DicomImageReadParam]
-          if (windowMin < windowMax) {
-            param.setWindowCenter((windowMax - windowMin) / 2)
-            param.setWindowWidth(windowMax - windowMin)
-          }
-          val bi = try
-            scaleImage(imageReader.read(frameNumber - 1, param), imageHeight)
-          catch {
-            case e: Exception => throw new IllegalArgumentException(e)
-          }
-          val baos = new ByteArrayOutputStream
-          ImageIO.write(bi, "png", baos)
-          baos.close()
-          baos.toByteArray
-        } finally {
-          iis.close()
+  def readImageFrame(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int): Option[Array[Byte]] =
+    resolvePath(image).map { imagePath =>
+      val file = imagePath.toFile
+      val iis = ImageIO.createImageInputStream(file)
+      try {
+        val imageReader = ImageIO.getImageReadersByFormatName("DICOM").next
+        imageReader.setInput(iis)
+        val param = imageReader.getDefaultReadParam.asInstanceOf[DicomImageReadParam]
+        if (windowMin < windowMax) {
+          param.setWindowCenter((windowMax - windowMin) / 2)
+          param.setWindowWidth(windowMax - windowMin)
         }
+        val bi = try
+          scaleImage(imageReader.read(frameNumber - 1, param), imageHeight)
+        catch {
+          case e: Exception => throw new IllegalArgumentException(e)
+        }
+        val baos = new ByteArrayOutputStream
+        ImageIO.write(bi, "png", baos)
+        baos.close()
+        baos.toByteArray
+      } finally {
+        iis.close()
       }
     }
 
-  def readSecondaryCaptureJpeg(imageId: Long, imageHeight: Int) =
-    imagePathForId(imageId).map { optionalImagePath =>
-      optionalImagePath.map { imagePath =>
-        val ds = loadJpegDataset(imagePath)
-        val pd = ds.getValue(Tag.PixelData)
-        if (pd != null && pd.isInstanceOf[Fragments]) {
-          val fragments = pd.asInstanceOf[Fragments]
-          if (fragments.size == 2) {
-            val f1 = fragments.get(1)
-            if (f1.isInstanceOf[BulkData]) {
-              val bd = f1.asInstanceOf[BulkData]
+  def readSecondaryCaptureJpeg(image: Image, imageHeight: Int) =
+    resolvePath(image).map { imagePath =>
+      val ds = loadJpegDataset(imagePath)
+      val pd = ds.getValue(Tag.PixelData)
+      if (pd != null && pd.isInstanceOf[Fragments]) {
+        val fragments = pd.asInstanceOf[Fragments]
+        if (fragments.size == 2) {
+          fragments.get(1) match {
+            case bd: BulkData =>
               val bytes = bd.toBytes(null, bd.bigEndian)
               val bi = scaleImage(ImageIO.read(new ByteArrayInputStream(bytes)), imageHeight)
               val baos = new ByteArrayOutputStream
               ImageIO.write(bi, "png", baos)
               baos.close()
               baos.toByteArray
-            } else throw new IllegalArgumentException("JPEG bytes not an instance of BulkData")
-          } else throw new IllegalArgumentException(s"JPEG fragements are expected to contain 2 entries, contained ${fragments.size}")
-        } else throw new IllegalArgumentException("JPEG bytes not contained in Fragments")
-      }
+            case _ =>
+              throw new IllegalArgumentException("JPEG bytes not an instance of BulkData")
+          }
+        } else throw new IllegalArgumentException(s"JPEG fragements are expected to contain 2 entries, contained ${
+          fragments.size
+        }")
+      } else throw new IllegalArgumentException("JPEG bytes not contained in Fragments")
     }
 
   def scaleImage(image: BufferedImage, imageHeight: Int): BufferedImage = {
@@ -342,103 +246,85 @@ class StorageServiceActor(storage: Path, implicit val timeout: Timeout) extends 
       val imageWidth = (image.getWidth * ratio).asInstanceOf[Int]
       val resized = new BufferedImage(imageWidth, imageHeight, image.getType)
       val g = resized.createGraphics()
-      g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-      g.drawImage(image, 0, 0, imageWidth, imageHeight, 0, 0, image.getWidth, image.getHeight, null);
+      g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR)
+      g.drawImage(image, 0, 0, imageWidth, imageHeight, 0, 0, image.getWidth, image.getHeight, null)
       g.dispose()
       resized
     } else
       image
   }
 
-  def createTempZipFile(imageIds: Seq[Long]): Future[Path] = {
+  def createTempZipFile(imagesAndSeries: Seq[(Image, FlatSeries)]): Path = {
+
+    def addToZipFile(path: Path, image: Image, flatSeries: FlatSeries, zos: ZipOutputStream): Unit = {
+
+      def sanitize(string: String) = string.replace('/', '-').replace('\\', '-')
+
+      val is = Files.newInputStream(path)
+      val patientFolder = sanitize(s"${
+        flatSeries.patient.id
+      }_${
+        flatSeries.patient.patientName.value
+      }-${
+        flatSeries.patient.patientID.value
+      }")
+      val studyFolder = sanitize(s"${
+        flatSeries.study.id
+      }_${
+        flatSeries.study.studyDate.value
+      }")
+      val seriesFolder = sanitize(s"${
+        flatSeries.series.id
+      }_${
+        flatSeries.series.seriesDate.value
+      }_${
+        flatSeries.series.modality.value
+      }")
+      val imageName = s"${
+        image.id
+      }.dcm"
+      val entryName = s"$patientFolder/$studyFolder/$seriesFolder/$imageName"
+      val zipEntry = new ZipEntry(entryName)
+      zos.putNextEntry(zipEntry)
+
+      val bytes = new Array[Byte](bufferSize)
+      var bytesLeft = true
+      while (bytesLeft) {
+        val length = is.read(bytes)
+        bytesLeft = length > 0
+        if (bytesLeft) zos.write(bytes, 0, length)
+      }
+
+      zos.closeEntry()
+      is.close()
+    }
+
+    def scheduleDeleteTempFile(tempFile: Path) =
+      context.system.scheduler.scheduleOnce(12.hours, self, DeleteTempZipFile(tempFile))
 
     val tempFile = Files.createTempFile("slicebox-export-", ".zip")
     val fos = Files.newOutputStream(tempFile)
-    val zos = new ZipOutputStream(fos);
+    val zos = new ZipOutputStream(fos)
 
-    // Add the files to the zip archive strictly sequentially (no concurrency) to 
+    // Add the files to the zip archive strictly sequentially (no concurrency) to
     // reduce load on meta data service and to keep memory consumption bounded
-    val futureAddedFiles = FutureUtil.traverseSequentially(imageIds) { imageId =>
-      val pathImageAndFlatSeries =
-        imagePathForId(imageId).flatMap(_.map { path =>
-          imageById(imageId).flatMap(_.map { image =>
-            flatSeriesById(image.seriesId).map(_.map { flatSeries =>
-              (path, image, flatSeries)
-            })
-          }.unwrap)
-        }.unwrap)
-      pathImageAndFlatSeries.map(_.map {
-        case (path, image, flatSeries) =>
+    imagesAndSeries.foreach {
+      case (image, flatSeries) =>
+        resolvePath(image).foreach { path =>
           addToZipFile(path, image, flatSeries, zos)
-      })
+        }
     }
 
-    def cleanup = {
-      zos.close
-      fos.close
-      scheduleDeleteTempFile(tempFile)
-    }
+    zos.close()
+    fos.close()
 
-    futureAddedFiles.onFailure { case _ => cleanup }
+    scheduleDeleteTempFile(tempFile)
 
-    futureAddedFiles.map { u => cleanup; tempFile }
+    tempFile
   }
-
-  def addToZipFile(path: Path, image: Image, flatSeries: FlatSeries, zos: ZipOutputStream): Unit = {
-
-    def sanitize(string: String) = string.replace('/', '-').replace('\\', '-')
-
-    val is = Files.newInputStream(path)
-    val patientFolder = sanitize(s"${flatSeries.patient.id}_${flatSeries.patient.patientName.value}-${flatSeries.patient.patientID.value}")
-    val studyFolder = sanitize(s"${flatSeries.study.id}_${flatSeries.study.studyDate.value}")
-    val seriesFolder = sanitize(s"${flatSeries.series.id}_${flatSeries.series.seriesDate.value}_${flatSeries.series.modality.value}")
-    val imageName = s"${image.id}.dcm"
-    val entryName = s"$patientFolder/$studyFolder/$seriesFolder/$imageName"
-    val zipEntry = new ZipEntry(entryName)
-    zos.putNextEntry(zipEntry)
-
-    val bytes = new Array[Byte](bufferSize)
-    var bytesLeft = true
-    while (bytesLeft) {
-      val length = is.read(bytes)
-      bytesLeft = length > 0
-      if (bytesLeft) zos.write(bytes, 0, length)
-    }
-
-    zos.closeEntry
-    is.close
-  }
-
-  def scheduleDeleteTempFile(tempFile: Path) =
-    context.system.scheduler.scheduleOnce(12.hours, self, tempFile)
-
-  def patientById(patientId: Long): Future[Option[Patient]] =
-    metaDataService.ask(GetPatient(patientId)).mapTo[Option[Patient]]
-
-  def studyById(studyId: Long): Future[Option[Study]] =
-    metaDataService.ask(GetStudy(studyId)).mapTo[Option[Study]]
-
-  def imageById(imageId: Long): Future[Option[Image]] =
-    metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]]
-
-  def flatSeriesById(seriesId: Long): Future[Option[FlatSeries]] =
-    metaDataService.ask(GetSingleFlatSeries(seriesId)).mapTo[Option[FlatSeries]]
-
-  def addMetadata(dataset: Attributes, source: Source): Future[Image] =
-    metaDataService.ask(
-      AddMetaData(
-        datasetToPatient(dataset),
-        datasetToStudy(dataset),
-        datasetToSeries(dataset),
-        datasetToImage(dataset), source))
-      .mapTo[MetaDataAdded]
-      .map(_.image)
-
-  def deleteMetaData(image: Image): Future[Unit] =
-    metaDataService.ask(DeleteMetaData(image.id)).map(any => {})
 
 }
 
 object StorageServiceActor {
-  def props(storage: Path, timeout: Timeout): Props = Props(new StorageServiceActor(storage, timeout))
+  def props(storage: Path): Props = Props(new StorageServiceActor(storage))
 }

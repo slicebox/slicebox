@@ -17,13 +17,12 @@
 package se.nimsa.sbx.storage
 
 import java.nio.file.Path
+
 import org.dcm4che3.data.Attributes
-import se.nimsa.sbx.dicom.DicomHierarchy.Image
+import se.nimsa.sbx.dicom.DicomHierarchy.{FlatSeries, Image, Patient, Study}
 import se.nimsa.sbx.app.GeneralProtocol._
 
 object StorageProtocol {
-
-  import se.nimsa.sbx.model.Entity
 
   // domain objects
 
@@ -35,42 +34,42 @@ object StorageProtocol {
     minimumPixelValue: Int,
     maximumPixelValue: Int)
 
-  // messages
 
   sealed trait ImageRequest
 
-  case class GetImagePath(imageId: Long) extends ImageRequest
+  case class GetImagePath(image: Image) extends ImageRequest
 
-  case class GetDataset(imageId: Long, withPixelData: Boolean) extends ImageRequest
+  case class GetDataset(image: Image, withPixelData: Boolean) extends ImageRequest
 
-  case class GetImageAttributes(imageId: Long) extends ImageRequest
+  case class DatasetAdded(image: Image, overwrite: Boolean)
 
-  case class GetImageInformation(imageId: Long) extends ImageRequest
+  case class GetImageAttributes(image: Image) extends ImageRequest
 
-  case class GetImageFrame(imageId: Long, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int) extends ImageRequest
+  case class GetImageInformation(image: Image) extends ImageRequest
 
-  case class AddDataset(dataset: Attributes, source: Source)
+  case class GetImageFrame(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int) extends ImageRequest
+
+  case class CheckDataset(dataset: Attributes) extends ImageRequest
+
+  case class AddDataset(dataset: Attributes, source: Source, image: Image) extends ImageRequest
   
-  case class AddJpeg(jpegBytes: Array[Byte], studyId: Long, source: Source)
-  
-  case class DeleteDataset(imageId: Long)
+  case class CreateJpeg(jpegBytes: Array[Byte], patient: Patient, study: Study) extends ImageRequest
 
-  case class CreateTempZipFile(imageIds: Seq[Long])
-  
-  case class DeleteTempZipFile(path: Path)
-  
-  // ***to API***
+  case class AddJpeg(image: Image, source: Source, jpegTempPath: Path) extends ImageRequest
 
-  case class DatasetAdded(image: Image, source: Source, overwrite: Boolean)
-  
-  case class DatasetDeleted(imageId: Long)
+  case class DeleteDataset(image: Image) extends ImageRequest
+
+  case class CreateTempZipFile(imagesAndSeries: Seq[(Image, FlatSeries)]) extends ImageRequest
+
+
+  case class JpegCreated(dataset: Attributes, jpegTempPath: Path)
+
+  case object JpegAdded
+
+  case class DatasetDeleted(image: Image)
 
   case class ImagePath(imagePath: Path)
 
-  // ***to storage***
-
-  case class DatasetReceived(dataset: Attributes, source: Source)
-
-  case class FileReceived(path: Path, source: Source)
-
+  case class DeleteTempZipFile(path: Path)
+  
 }

@@ -16,10 +16,10 @@
 
 package se.nimsa.sbx.metadata
 
+import org.dcm4che3.data.Attributes
 import se.nimsa.sbx.app.GeneralProtocol.Source
 import se.nimsa.sbx.app.GeneralProtocol.SourceRef
 import se.nimsa.sbx.dicom.DicomHierarchy._
-import se.nimsa.sbx.seriestype.SeriesTypeProtocol.SeriesType
 
 object MetaDataProtocol {
   
@@ -34,7 +34,7 @@ object MetaDataProtocol {
   case class SeriesSeriesTag(seriesId: Long, seriesTagId: Long)
 
   sealed trait QueryOperator {
-    override def toString(): String = this match {
+    override def toString: String = this match {
       case QueryOperator.EQUALS => "="
       case QueryOperator.LIKE   => "like"
     }
@@ -73,7 +73,7 @@ object MetaDataProtocol {
 
   // messages
 
-  case class AddMetaData(patient: Patient, study: Study, series: Series, image: Image, source: Source)
+  case class AddMetaData(dataset: Attributes, source: Source)
   
   case class DeleteMetaData(imageId: Long)  
     
@@ -130,25 +130,9 @@ object MetaDataProtocol {
 
   // ***to API***
 
-  case class MetaDataAdded(patient: Patient, study: Study, series: Series, image: Image, seriesSource: SeriesSource)
-  
-  case class PatientAdded(patient: Patient, source: Source)
-  
-  case class StudyAdded(study: Study, source: Source)
-  
-  case class SeriesAdded(series: Series, source: Source)
-  
-  case class ImageAdded(image: Image, source: Source)
-  
+  case class MetaDataAdded(patient: Patient, study: Study, series: Series, image: Image, patientAdded: Boolean, studyAdded: Boolean, seriesAdded: Boolean, imageAdded: Boolean, source: Source)
+
   case class MetaDataDeleted(deletedPatient: Option[Patient], deletedStudy: Option[Study], deletedSeries: Option[Series], deletedImage: Option[Image])
-  
-  case class PatientDeleted(patientId: Long)
-  
-  case class StudyDeleted(studyId: Long)
-  
-  case class SeriesDeleted(seriesId: Long)
-  
-  case class ImageDeleted(imageId: Long)
   
   case class Patients(patients: Seq[Patient])
 

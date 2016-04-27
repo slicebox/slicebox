@@ -26,7 +26,7 @@ object ForwardingProtocol {
 
   case class ForwardingRule(id: Long, source: Source, destination: Destination, keepImages: Boolean) extends Entity
   
-  case class ForwardingTransaction(id: Long, forwardingRuleId: Long, batchId: Long, created: Long, lastUpdated: Long, enroute: Boolean, delivered: Boolean)
+  case class ForwardingTransaction(id: Long, forwardingRuleId: Long, created: Long, updated: Long, enroute: Boolean, delivered: Boolean)
   
   case class ForwardingTransactionImage(id: Long, forwardingTransactionId: Long, imageId: Long)
   
@@ -51,18 +51,16 @@ object ForwardingProtocol {
   
   case object FinalizeSentTransactions
 
-  case class UpdateTransaction(forwardingTransaction: ForwardingTransaction, enroute: Boolean, delivered: Boolean)
+  case class FinalizeForwarding(deleteImages: Boolean)
 
-  case class AddImageToForwardingQueue(image: Image, rule: ForwardingRule, batchId: Long, transferNow: Boolean, origin: ActorRef)
-  
+  case class UpdateTransaction(transaction: ForwardingTransaction)
+
 
   case class ImageRegisteredForForwarding(image: Image, applicableRules: List[ForwardingRule])
-  
-  case class ImageAddedToForwardingQueue(transactionImage: ForwardingTransactionImage)
   
   case class TransactionsEnroute(transactions: List[ForwardingTransaction])
   
   case class TransactionMarkedAsDelivered(transactionMaybe: Option[ForwardingTransaction])
   
-  case class TransactionsFinalized(transactionsToRemove: List[ForwardingTransaction], idsOfDeletedImages: List[Long])
+  case class TransactionsFinalized(removedTransactions: List[ForwardingTransaction])
 }

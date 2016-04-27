@@ -10,9 +10,9 @@ import akka.testkit.ImplicitSender
 import akka.testkit.TestKit
 import akka.util.Timeout.durationToTimeout
 import se.nimsa.sbx.app.DbProps
-import se.nimsa.sbx.metadata.MetaDataDAO
+import se.nimsa.sbx.dicom.DicomHierarchy.Series
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
-import se.nimsa.sbx.metadata.MetaDataProtocol.SeriesDeleted
+import se.nimsa.sbx.metadata.MetaDataProtocol.MetaDataDeleted
 
 class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
     with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {
@@ -23,11 +23,8 @@ class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
   val dbProps = DbProps(db, H2Driver)
 
   val seriesTypeDao = new SeriesTypeDAO(dbProps.driver)
-  val metaDataDao = new MetaDataDAO(dbProps.driver)
 
   db.withSession { implicit session =>
-    metaDataDao.create
-    seriesTypeDao.create
     seriesTypeDao.create
   }
 
@@ -55,7 +52,7 @@ class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
       expectMsgPF() {
         case SeriesTypes(seriesTypes) =>
           seriesTypes.size should be(1)
-          seriesTypes(0).name should be("st1")
+          seriesTypes.head.name should be("st1")
       }
     }
 
@@ -66,7 +63,7 @@ class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
 
       expectMsgPF() {
         case SeriesTypeAdded(returnedSeriesType) =>
-          returnedSeriesType.id should be > (0L)
+          returnedSeriesType.id should be > 0L
           returnedSeriesType.name should be(seriesType.name)
       }
 
@@ -75,7 +72,7 @@ class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
       expectMsgPF() {
         case SeriesTypes(seriesTypes) =>
           seriesTypes.size should be(1)
-          seriesTypes(0).name should be(seriesType.name)
+          seriesTypes.head.name should be(seriesType.name)
       }
     }
 
@@ -106,11 +103,11 @@ class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
       seriesTypeService ! AddSeriesType(seriesType)
 
       val addedSeriesType = expectMsgPF() {
-        case SeriesTypeAdded(seriesType) =>
-          seriesType
+        case SeriesTypeAdded(newSeriesType) =>
+          newSeriesType
       }
 
-      val updatedSeriesType = SeriesType(addedSeriesType.id, "s2");
+      val updatedSeriesType = SeriesType(addedSeriesType.id, "s2")
       seriesTypeService ! UpdateSeriesType(updatedSeriesType)
       expectMsg(SeriesTypeUpdated)
 
@@ -119,7 +116,7 @@ class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
       expectMsgPF() {
         case SeriesTypes(seriesTypes) =>
           seriesTypes.size should be(1)
-          seriesTypes(0).name should be(updatedSeriesType.name)
+          seriesTypes.head.name should be(updatedSeriesType.name)
       }
     }
 
@@ -153,7 +150,7 @@ class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
 
       expectMsgPF() {
         case SeriesTypeRuleAdded(returnedSeriesTypeRule) =>
-          returnedSeriesTypeRule.id should be > (0L)
+          returnedSeriesTypeRule.id should be > 0L
           returnedSeriesTypeRule.seriesTypeId should be(addedSeriesType.id)
       }
 
@@ -162,7 +159,7 @@ class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
       expectMsgPF() {
         case SeriesTypeRules(seriesTypeRules) =>
           seriesTypeRules.size should be(1)
-          seriesTypeRules(0).seriesTypeId should be(addedSeriesType.id)
+          seriesTypeRules.head.seriesTypeId should be(addedSeriesType.id)
       }
     }
 
@@ -194,7 +191,7 @@ class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
         seriesTypeDao.insertSeriesType(SeriesType(-1, "st1"))
       }
 
-      val addedSeriesTypeRule = db.withSession { implicit session =>
+      db.withSession { implicit session =>
         seriesTypeDao.insertSeriesTypeRule(SeriesTypeRule(-1, addedSeriesType.id))
       }
 
@@ -227,7 +224,7 @@ class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
 
       expectMsgPF() {
         case SeriesTypeRuleAttributeAdded(returnedSeriesTypeRuleAttribute) =>
-          returnedSeriesTypeRuleAttribute.id should be > (0L)
+          returnedSeriesTypeRuleAttribute.id should be > 0L
           returnedSeriesTypeRuleAttribute.seriesTypeRuleId should be(addedSeriesTypeRule.id)
       }
 
@@ -236,7 +233,7 @@ class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
       expectMsgPF() {
         case SeriesTypeRuleAttributes(seriesTypeRuleAttributes) =>
           seriesTypeRuleAttributes.size should be(1)
-          seriesTypeRuleAttributes(0).seriesTypeRuleId should be(addedSeriesTypeRule.id)
+          seriesTypeRuleAttributes.head.seriesTypeRuleId should be(addedSeriesTypeRule.id)
       }
     }
 
@@ -276,7 +273,7 @@ class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
         seriesTypeDao.insertSeriesTypeRule(SeriesTypeRule(-1, addedSeriesType.id))
       }
 
-      val addedSeriesTypeRuleAttribute = db.withSession { implicit session =>
+      db.withSession { implicit session =>
         seriesTypeDao.insertSeriesTypeRuleAttribute(SeriesTypeRuleAttribute(-1, addedSeriesTypeRule.id, 1, "Name", None, None, "test"))
       }
 
@@ -299,11 +296,11 @@ class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
       }
 
       val seriesId = 45
-      val addedSeriesSeriesType = db.withSession { implicit session =>
+      db.withSession { implicit session =>
         seriesTypeDao.insertSeriesSeriesType(SeriesSeriesType(seriesId, addedSeriesType.id))
       }
       
-      seriesTypeService ! SeriesDeleted(seriesId)
+      seriesTypeService ! MetaDataDeleted(None, None, Some(Series(seriesId, -1, null, null, null, null, null, null, null, null, null)), None)
       expectMsgType[SeriesTypesRemovedFromSeries]
       
       db.withSession { implicit session =>
