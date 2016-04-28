@@ -25,7 +25,7 @@ angular.module('slicebox.adminWatchDirectories', ['ngRoute'])
 
     // Scope functions
     $scope.loadWatchDirectoriesPage = function(startIndex, count, orderByProperty, orderByDirection) {
-        return $http.get('/api/directorywatches');
+        return $http.get('/api/directorywatches?startindex=' + startIndex + '&count=' + count);
     };
 
     $scope.addDirectoryButtonClicked = function() {

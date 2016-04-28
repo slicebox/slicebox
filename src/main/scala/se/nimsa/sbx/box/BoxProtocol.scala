@@ -96,7 +96,7 @@ object BoxProtocol {
 
   case class RemoveBox(boxId: Long) extends BoxRequest
 
-  case object GetBoxes extends BoxRequest
+  case class GetBoxes(startIndex: Long, count: Long) extends BoxRequest
 
   case class GetBoxById(boxId: Long) extends BoxRequest
   
@@ -118,9 +118,9 @@ object BoxProtocol {
 
   case class MarkOutgoingTransactionAsFailed(box: Box, failedTransactionImage: FailedOutgoingTransactionImage) extends BoxRequest
   
-  case object GetIncomingTransactions extends BoxRequest
+  case class GetIncomingTransactions(startIndex: Long, count: Long) extends BoxRequest
 
-  case object GetOutgoingTransactions extends BoxRequest
+  case class GetOutgoingTransactions(startIndex: Long, count: Long) extends BoxRequest
   
   case class GetNextOutgoingTransactionImage(boxId: Long) extends BoxRequest
 

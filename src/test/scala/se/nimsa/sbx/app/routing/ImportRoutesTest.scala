@@ -1,25 +1,16 @@
 package se.nimsa.sbx.app.routing
 
-import java.io.File
+import org.scalatest.{FlatSpec, Matchers}
+import se.nimsa.sbx.dicom.DicomHierarchy._
+import se.nimsa.sbx.importing.ImportDAO
+import se.nimsa.sbx.importing.ImportProtocol._
+import se.nimsa.sbx.metadata.MetaDataDAO
+import se.nimsa.sbx.util.TestUtil
+import spray.http.StatusCodes._
+import spray.http._
+import spray.httpx.SprayJsonSupport._
 
 import scala.slick.driver.H2Driver
-import org.dcm4che3.data.Tag
-import org.dcm4che3.data.VR
-import org.scalatest.FlatSpec
-import org.scalatest.Matchers
-import se.nimsa.sbx.anonymization.AnonymizationDAO
-import se.nimsa.sbx.anonymization.AnonymizationProtocol._
-import se.nimsa.sbx.dicom.DicomHierarchy._
-import se.nimsa.sbx.dicom.DicomUtil
-import se.nimsa.sbx.dicom.ImageAttribute
-import se.nimsa.sbx.util.TestUtil
-import spray.http._
-import spray.http.StatusCodes._
-import spray.httpx.SprayJsonSupport._
-import spray.httpx.unmarshalling.BasicUnmarshallers.ByteArrayUnmarshaller
-import se.nimsa.sbx.metadata.MetaDataDAO
-import se.nimsa.sbx.importing.ImportProtocol._
-import se.nimsa.sbx.importing.ImportDAO
 
 class ImportRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
@@ -66,7 +57,7 @@ class ImportRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       status should be(NoContent)
     }
     db.withSession { implicit session =>
-      importDao.getImportSessions shouldBe empty
+      importDao.getImportSessions(0, 10) shouldBe empty
     }
   }
 

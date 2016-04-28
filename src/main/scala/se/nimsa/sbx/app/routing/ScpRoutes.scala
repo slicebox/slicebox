@@ -33,9 +33,11 @@ def scpRoutes(apiUser: ApiUser): Route =
     pathPrefix("scps") {
       pathEndOrSingleSlash {
         get {
-          onSuccess(scpService.ask(GetScps)) {
-            case Scps(scps) =>
-              complete(scps)
+          parameters('startindex.as[Long] ? 0, 'count.as[Long] ? 20) { (startIndex, count) =>
+            onSuccess(scpService.ask(GetScps(startIndex, count))) {
+              case Scps(scps) =>
+                complete(scps)
+            }
           }
         } ~ post {
           authorize(apiUser.hasPermission(UserRole.ADMINISTRATOR)) {

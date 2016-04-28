@@ -34,9 +34,11 @@ trait SeriesTypeRoutes { this: SliceboxService =>
     pathPrefix("seriestypes") {
       pathEndOrSingleSlash {
         get {
-          onSuccess(seriesTypeService.ask(GetSeriesTypes)) {
-            case SeriesTypes(seriesTypes) =>
-              complete(seriesTypes)
+          parameters('startindex.as[Long] ? 0, 'count.as[Long] ? 20) { (startIndex, count) =>
+            onSuccess(seriesTypeService.ask(GetSeriesTypes(startIndex, count))) {
+              case SeriesTypes(seriesTypes) =>
+                complete(seriesTypes)
+            }
           }
         } ~ post {
           authorize(apiUser.hasPermission(UserRole.ADMINISTRATOR)) {

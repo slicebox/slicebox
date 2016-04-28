@@ -25,7 +25,7 @@ angular.module('slicebox.adminForwarding', ['ngRoute'])
   
     // Scope functions
     $scope.loadRulesPage = function(startIndex, count, orderByProperty, orderByDirection) {
-        return $http.get('/api/forwarding/rules');
+        return $http.get('/api/forwarding/rules?startindex=' + startIndex + '&count=' + count);
     };
 
     $scope.addRuleButtonClicked = function() {

@@ -62,7 +62,7 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path, timeout: Timeo
                 if (Files.isSameFile(path, storage))
                   throw new IllegalArgumentException("The storage directory may not be watched.")
 
-                getWatchedDirectories.map(dir => Paths.get(dir.path)).foreach(other =>
+                getWatchedDirectories(0, 1000000).map(dir => Paths.get(dir.path)).foreach(other =>
                   if (path.startsWith(other) || other.startsWith(path))
                     throw new IllegalArgumentException("Directory intersects existing directory " + other))
 
@@ -79,8 +79,8 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path, timeout: Timeo
             context.child(watchedDirectoryId.toString).foreach(_ ! PoisonPill)
             sender ! DirectoryUnwatched(watchedDirectoryId)
 
-          case GetWatchedDirectories =>
-            sender ! WatchedDirectories(getWatchedDirectories)
+          case GetWatchedDirectories(startIndex, count) =>
+            sender ! WatchedDirectories(getWatchedDirectories(startIndex, count))
 
           case GetWatchedDirectoryById(id) =>
             db.withSession { implicit session =>
@@ -94,9 +94,9 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path, timeout: Timeo
   def setupWatches() = {
     val watchedDirectories =
       db.withSession { implicit session =>
-        dao.allWatchedDirectories
+        dao.listWatchedDirectories(0, 1000000)
       }
-    
+
     watchedDirectories foreach (watchedDirectory => {
       val path = Paths.get(watchedDirectory.path)
       if (Files.isDirectory(path))
@@ -126,9 +126,9 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path, timeout: Timeo
       dao.watchedDirectoryForPath(path)
     }
 
-  def getWatchedDirectories =
+  def getWatchedDirectories(startIndex: Long, count: Long) =
     db.withSession { implicit session =>
-      dao.allWatchedDirectories
+      dao.listWatchedDirectories(startIndex, count)
     }
 
 }

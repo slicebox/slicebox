@@ -69,10 +69,10 @@ trait GeneralRoutes { this: SliceboxService =>
       get {
         def futureSources =
           for {
-            users <- userService.ask(GetUsers).mapTo[Users]
-            boxes <- boxService.ask(GetBoxes).mapTo[Boxes]
-            scps <- scpService.ask(GetScps).mapTo[Scps]
-            dirs <- directoryService.ask(GetWatchedDirectories).mapTo[WatchedDirectories]
+            users <- userService.ask(GetUsers(0, 1000000)).mapTo[Users]
+            boxes <- boxService.ask(GetBoxes(0, 1000000)).mapTo[Boxes]
+            scps <- scpService.ask(GetScps(0, 1000000)).mapTo[Scps]
+            dirs <- directoryService.ask(GetWatchedDirectories(0, 1000000)).mapTo[WatchedDirectories]
           } yield {
             users.users.map(user => Source(SourceType.USER, user.user, user.id)) ++
               boxes.boxes.map(box => Source(SourceType.BOX, box.name, box.id)) ++
@@ -87,8 +87,8 @@ trait GeneralRoutes { this: SliceboxService =>
       get {
         def futureDestinations =
           for {
-            boxes <- boxService.ask(GetBoxes).mapTo[Boxes]
-            scus <- scuService.ask(GetScus).mapTo[Scus]
+            boxes <- boxService.ask(GetBoxes(0, 1000000)).mapTo[Boxes]
+            scus <- scuService.ask(GetScus(0, 1000000)).mapTo[Scus]
           } yield {
             boxes.boxes.map(box => Destination(DestinationType.BOX, box.name, box.id)) ++
               scus.scus.map(scu => Destination(DestinationType.SCU, scu.name, scu.id))

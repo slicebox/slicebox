@@ -21,22 +21,27 @@ import scala.slick.jdbc.meta.MTable
 import ScpProtocol.ScpData
 
 class ScpDAO(val driver: JdbcProfile) {
+
   import driver.simple._
 
   class ScpDataTable(tag: Tag) extends Table[ScpData](tag, "ScpData") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
+
     def name = column[String]("name")
+
     def aeTitle = column[String]("aeTitle")
+
     def port = column[Int]("port")
-    def * = (id, name, aeTitle, port) <> (ScpData.tupled, ScpData.unapply)
+
+    def * = (id, name, aeTitle, port) <>(ScpData.tupled, ScpData.unapply)
   }
 
   val scpDataQuery = TableQuery[ScpDataTable]
-  
+
   def create(implicit session: Session) =
     if (MTable.getTables("ScpData").list.isEmpty) scpDataQuery.ddl.create
-  
-  
+
+
   def insert(scpData: ScpData)(implicit session: Session): ScpData = {
     val generatedId = (scpDataQuery returning scpDataQuery.map(_.id)) += scpData
     scpData.copy(id = generatedId)
@@ -47,15 +52,19 @@ class ScpDAO(val driver: JdbcProfile) {
       .filter(_.id === scpDataId)
       .delete
   }
-  
+
   def scpDataForId(id: Long)(implicit session: Session): Option[ScpData] =
     scpDataQuery.filter(_.id === id).firstOption
-  
+
   def scpDataForName(name: String)(implicit session: Session): Option[ScpData] =
     scpDataQuery.filter(_.name === name).firstOption
-  
+
   def scpDataForPort(port: Int)(implicit session: Session): Option[ScpData] =
     scpDataQuery.filter(_.port === port).firstOption
-  
-  def allScpDatas(implicit session: Session): List[ScpData] = scpDataQuery.list
+
+  def listScpDatas(startIndex: Long, count: Long)(implicit session: Session): List[ScpData] =
+    scpDataQuery
+      .drop(startIndex)
+      .take(count)
+      .list
 }

@@ -188,7 +188,7 @@ class SeriesTypeUpdateActor(implicit val timeout: Timeout) extends Actor with Ex
       .map(_.images.headOption)
 
   def getSeriesTypes: Future[Seq[SeriesType]] =
-    seriesTypeService.ask(GetSeriesTypes).mapTo[SeriesTypes].map(_.seriesTypes)
+    seriesTypeService.ask(GetSeriesTypes(0, 10000000)).mapTo[SeriesTypes].map(_.seriesTypes)
 
   def getSeriesTypeRules(seriesType: SeriesType): Future[Seq[SeriesTypeRule]] =
     seriesTypeService.ask(GetSeriesTypeRules(seriesType.id)).mapTo[SeriesTypeRules].map(_.seriesTypeRules)

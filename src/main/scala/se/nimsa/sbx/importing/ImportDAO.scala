@@ -14,14 +14,23 @@ class ImportDAO(val driver: JdbcProfile) {
 
   class ImportSessionTable(tag: Tag) extends Table[ImportSession](tag, importSessionTableName) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
+
     def name = column[String]("name")
+
     def userId = column[Long]("userid")
+
     def user = column[String]("user")
+
     def filesImported = column[Int]("filesimported")
+
     def filesAdded = column[Int]("filesadded")
+
     def filesRejected = column[Int]("filesrejected")
+
     def created = column[Long]("created")
+
     def lastUpdated = column[Long]("lastupdated")
+
     def * = (id, name, userId, user, filesImported, filesAdded, filesRejected, created, lastUpdated) <>(ImportSession.tupled, ImportSession.unapply)
   }
 
@@ -29,9 +38,13 @@ class ImportDAO(val driver: JdbcProfile) {
 
   class ImportSessionImageTable(tag: Tag) extends Table[ImportSessionImage](tag, importSessionImageTableName) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
+
     def importSessionId = column[Long]("importsessionid")
+
     def imageId = column[Long]("imageid")
+
     def fkImportSession = foreignKey("fk_import_session_id", importSessionId, importSessionQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
+
     def * = (id, importSessionId, imageId) <>(ImportSessionImage.tupled, ImportSessionImage.unapply)
   }
 
@@ -49,8 +62,11 @@ class ImportDAO(val driver: JdbcProfile) {
     importSessionQuery.delete //Cascade deletes ImportSessionImages
   }
 
-  def getImportSessions(implicit session: Session): List[ImportSession] = {
-    importSessionQuery.list
+  def getImportSessions(startIndex: Long, count: Long)(implicit session: Session): List[ImportSession] = {
+    importSessionQuery
+      .drop(startIndex)
+      .take(count)
+      .list
   }
 
   def getImportSession(importSessionId: Long)(implicit session: Session): Option[ImportSession] = {

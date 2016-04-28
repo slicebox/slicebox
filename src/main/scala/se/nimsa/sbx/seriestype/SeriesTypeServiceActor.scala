@@ -59,8 +59,8 @@ class SeriesTypeServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extend
 
         msg match {
 
-          case GetSeriesTypes =>
-            val seriesTypes = getSeriesTypesFromDb
+          case GetSeriesTypes(startIndex, count) =>
+            val seriesTypes = getSeriesTypesFromDb(startIndex, count)
             sender ! SeriesTypes(seriesTypes)
 
           case AddSeriesType(seriesType) =>
@@ -121,9 +121,9 @@ class SeriesTypeServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extend
       }
   }
 
-  def getSeriesTypesFromDb: Seq[SeriesType] =
+  def getSeriesTypesFromDb(startIndex: Long, count: Long): Seq[SeriesType] =
     db.withSession { implicit session =>
-      seriesTypeDao.listSeriesTypes
+      seriesTypeDao.listSeriesTypes(startIndex, count)
     }
 
   def addSeriesTypeToDb(seriesType: SeriesType): SeriesType =

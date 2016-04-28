@@ -30,9 +30,11 @@ trait DirectoryRoutes { this: SliceboxService =>
     pathPrefix("directorywatches") {
       pathEndOrSingleSlash {
         get {
-          onSuccess(directoryService.ask(GetWatchedDirectories)) {
-            case WatchedDirectories(directories) =>
-              complete(directories)
+          parameters('startindex.as[Long] ? 0, 'count.as[Long] ? 20) { (startIndex, count) =>
+            onSuccess(directoryService.ask(GetWatchedDirectories(startIndex, count))) {
+              case WatchedDirectories(directories) =>
+                complete(directories)
+            }
           }
         } ~ post {
           authorize(apiUser.hasPermission(UserRole.ADMINISTRATOR)) {

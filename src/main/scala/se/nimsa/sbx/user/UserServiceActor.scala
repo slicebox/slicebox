@@ -22,7 +22,6 @@ import akka.actor.Props
 import akka.event.Logging
 import akka.event.LoggingReceive
 import se.nimsa.sbx.util.ExceptionCatching
-import scala.collection.mutable.Map
 import scala.concurrent.duration.DurationInt
 import java.util.UUID
 import akka.actor.actorRef2Scala
@@ -83,8 +82,8 @@ class UserServiceActor(dbProps: DbProps, superUser: String, superPassword: Strin
             val optionalUser = getAndRefreshUser(authKey)
             sender ! optionalUser
 
-          case GetUsers =>
-            val users = listUsers
+          case GetUsers(startIndex, count) =>
+            val users = listUsers(startIndex, count)
             sender ! Users(users)
 
           case DeleteUser(userId) =>
@@ -100,8 +99,8 @@ class UserServiceActor(dbProps: DbProps, superUser: String, superPassword: Strin
 
   def addSuperUser(): Unit =
     db.withSession { implicit session =>
-      val superUsers = dao.listUsers.filter(_.role == UserRole.SUPERUSER)
-      if (superUsers.isEmpty || superUsers(0).user != superUser || !superUsers(0).passwordMatches(superPassword)) {
+      val superUsers = dao.listUsers(0, 1000000).filter(_.role == UserRole.SUPERUSER)
+      if (superUsers.isEmpty || superUsers.head.user != superUser || !superUsers.head.passwordMatches(superPassword)) {
         superUsers.foreach(superUser => dao.deleteUserByUserId(superUser.id))
         dao.insert(ApiUser(-1, superUser, UserRole.SUPERUSER).withPassword(superPassword))
       }
@@ -173,9 +172,9 @@ class UserServiceActor(dbProps: DbProps, superUser: String, superPassword: Strin
         .foreach(expiredSession => dao.deleteSessionById(expiredSession.id))
     }
 
-  def listUsers: List[ApiUser] =
+  def listUsers(startIndex: Long, count: Long): List[ApiUser] =
     db.withSession { implicit session =>
-      dao.listUsers
+      dao.listUsers(startIndex, count)
     }
 }
 

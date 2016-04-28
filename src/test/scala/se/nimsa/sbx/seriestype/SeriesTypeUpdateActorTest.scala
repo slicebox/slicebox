@@ -4,9 +4,8 @@ import java.nio.file.Files
 
 import akka.actor.ActorSelection.toScala
 import akka.actor.ActorSystem
-import akka.testkit.{ImplicitSender, TestKit}
-import akka.util.Timeout.durationToTimeout
 import akka.pattern.ask
+import akka.testkit.{ImplicitSender, TestKit}
 import akka.util.Timeout
 import org.dcm4che3.data.{Keyword, Tag}
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}

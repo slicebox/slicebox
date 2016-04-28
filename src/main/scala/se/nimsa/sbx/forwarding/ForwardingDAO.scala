@@ -22,6 +22,7 @@ import scala.slick.jdbc.meta.MTable
 import se.nimsa.sbx.app.GeneralProtocol._
 
 class ForwardingDAO(val driver: JdbcProfile) {
+
   import driver.simple._
 
   private val toForwardingRule = (id: Long, sourceType: String, sourceName: String, sourceId: Long, destinationType: String, destinationName: String, destinationId: Long, keepImages: Boolean) => ForwardingRule(id, Source(SourceType.withName(sourceType), sourceName, sourceId), Destination(DestinationType.withName(destinationType), destinationName, destinationId), keepImages)
@@ -30,38 +31,58 @@ class ForwardingDAO(val driver: JdbcProfile) {
 
   class ForwardingRuleTable(tag: Tag) extends Table[ForwardingRule](tag, "ForwardingRules") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
+
     def sourceType = column[String]("sourcetype")
+
     def sourceName = column[String]("sourcename")
+
     def sourceId = column[Long]("sourceid")
+
     def destinationType = column[String]("destinationtype")
+
     def destinationName = column[String]("destinationname")
+
     def destinationId = column[Long]("destinationid")
+
     def keepImages = column[Boolean]("keepimages")
+
     def idxUnique = index("idx_unique_forwarding_rule", (sourceType, sourceId, destinationType, destinationId), unique = true)
-    def * = (id, sourceType, sourceName, sourceId, destinationType, destinationName, destinationId, keepImages) <> (toForwardingRule.tupled, fromForwardingRule)
+
+    def * = (id, sourceType, sourceName, sourceId, destinationType, destinationName, destinationId, keepImages) <>(toForwardingRule.tupled, fromForwardingRule)
   }
 
   val ruleQuery = TableQuery[ForwardingRuleTable]
 
   class ForwardingTransactionTable(tag: Tag) extends Table[ForwardingTransaction](tag, "ForwardingTransactions") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
+
     def forwardingRuleId = column[Long]("forwardingruleid")
+
     def created = column[Long]("created")
+
     def updated = column[Long]("updated")
+
     def enroute = column[Boolean]("enroute")
+
     def delivered = column[Boolean]("delivered")
+
     def fkForwardingRule = foreignKey("fk_forwarding_rule", forwardingRuleId, ruleQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
-    def * = (id, forwardingRuleId, created, updated, enroute, delivered) <> (ForwardingTransaction.tupled, ForwardingTransaction.unapply)
+
+    def * = (id, forwardingRuleId, created, updated, enroute, delivered) <>(ForwardingTransaction.tupled, ForwardingTransaction.unapply)
   }
 
   val transactionQuery = TableQuery[ForwardingTransactionTable]
 
   class ForwardingTransactionImageTable(tag: Tag) extends Table[ForwardingTransactionImage](tag, "ForwardingTransactionImages") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
+
     def forwardingTransactionId = column[Long]("forwardingtransactionid")
+
     def imageId = column[Long]("imageid")
+
     def fkForwardingTransaction = foreignKey("fk_forwarding_transaction", forwardingTransactionId, transactionQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
-    def * = (id, forwardingTransactionId, imageId) <> (ForwardingTransactionImage.tupled, ForwardingTransactionImage.unapply)
+
+    def * = (id, forwardingTransactionId, imageId) <>(ForwardingTransactionImage.tupled, ForwardingTransactionImage.unapply)
   }
 
   val transactionImageQuery = TableQuery[ForwardingTransactionImageTable]
@@ -88,8 +109,11 @@ class ForwardingDAO(val driver: JdbcProfile) {
     forwardingRule.copy(id = generatedId)
   }
 
-  def listForwardingRules(implicit session: Session): List[ForwardingRule] =
-    ruleQuery.list
+  def listForwardingRules(startIndex: Long, count: Long)(implicit session: Session): List[ForwardingRule] =
+    ruleQuery
+      .drop(startIndex)
+      .take(count)
+      .list
 
   def listForwardingTransactions(implicit session: Session): List[ForwardingTransaction] =
     transactionQuery.list
@@ -151,10 +175,10 @@ class ForwardingDAO(val driver: JdbcProfile) {
 
   def getTransactionImageForTransactionIdAndImageId(transactionId: Long, imageId: Long)(implicit session: Session) =
     transactionImageQuery
-    .filter(_.forwardingTransactionId === transactionId)
-    .filter(_.imageId === imageId)
-    .firstOption
-    
+      .filter(_.forwardingTransactionId === transactionId)
+      .filter(_.imageId === imageId)
+      .firstOption
+
   def removeTransactionForId(transactionId: Long)(implicit session: Session) =
     transactionQuery.filter(_.id === transactionId).delete
 
@@ -189,5 +213,5 @@ class ForwardingDAO(val driver: JdbcProfile) {
 
   def removeTransactionImagesForImageId(imageId: Long)(implicit session: Session) =
     transactionImageQuery.filter(_.imageId === imageId).delete
-    
+
 }

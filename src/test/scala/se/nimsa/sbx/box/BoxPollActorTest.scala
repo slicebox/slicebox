@@ -55,7 +55,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
   val metaDataService = system.actorOf(Props(new Actor() {
     def receive = {
       case AddMetaData(dataset, source) =>
-        sender ! MetaDataAdded(null, null, null, Image(12, 22, null, null, null), false, false, false, true, null)
+        sender ! MetaDataAdded(null, null, null, Image(12, 22, null, null, null), patientAdded = false, studyAdded = false, seriesAdded = false, imageAdded = true, null)
     }
   }), name = "MetaDataService")
   val storageService = system.actorOf(Props[MockupStorageActor], name = "StorageService")
@@ -149,7 +149,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
       // Check that incoming transaction has been created
       db.withSession { implicit session =>
-        val incomingTransactions = boxDao.listIncomingTransactions
+        val incomingTransactions = boxDao.listIncomingTransactions(0, 10)
         incomingTransactions should have length 1
 
         incomingTransactions.foreach(incomingTransaction => {
@@ -187,7 +187,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
       // Check that no incoming transaction was created since the poll request timed out
       db.withSession { implicit session =>
-        val incomingTransactions = boxDao.listIncomingTransactions
+        val incomingTransactions = boxDao.listIncomingTransactions(0, 1)
         incomingTransactions shouldBe empty
       }
 
@@ -229,7 +229,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       expectNoMsg
 
       db.withSession { implicit session =>
-        val incomingTransactions = boxDao.listIncomingTransactions
+        val incomingTransactions = boxDao.listIncomingTransactions(0, 10)
         incomingTransactions should have length 1
         incomingTransactions.head.status shouldBe TransactionStatus.FINISHED
       }
@@ -264,7 +264,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       expectNoMsg
 
       db.withSession { implicit session =>
-        val incomingTransactions = boxDao.listIncomingTransactions
+        val incomingTransactions = boxDao.listIncomingTransactions(0, 10)
         incomingTransactions should have length 1
         incomingTransactions.head.status shouldBe TransactionStatus.FAILED
       }

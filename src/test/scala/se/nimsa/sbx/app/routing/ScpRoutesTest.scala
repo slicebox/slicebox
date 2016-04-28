@@ -1,12 +1,11 @@
 package se.nimsa.sbx.app.routing
 
-import java.nio.file.Files
-import org.scalatest.FlatSpec
-import org.scalatest.Matchers
-import se.nimsa.sbx.scp.ScpProtocol._
-import spray.httpx.SprayJsonSupport._
-import spray.http.StatusCodes._
+import org.scalatest.{FlatSpec, Matchers}
 import se.nimsa.sbx.scp.ScpDAO
+import se.nimsa.sbx.scp.ScpProtocol._
+import spray.http.StatusCodes._
+import spray.httpx.SprayJsonSupport._
+
 import scala.slick.driver.H2Driver
 
 class ScpRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
@@ -31,7 +30,7 @@ class ScpRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   }
   it should "be possible to remove the SCP again" in {
     val scp = db.withSession { implicit session =>
-      scpDao.allScpDatas.head
+      scpDao.listScpDatas(0, 1).head
     }
     DeleteAsAdmin(s"/api/scps/${scp.id}") ~> routes ~> check {
       status should be(NoContent)

@@ -33,7 +33,7 @@ object ForwardingProtocol {
   
   sealed trait ForwardingRequest
 
-  case object GetForwardingRules extends ForwardingRequest
+  case class GetForwardingRules(startIndex: Long, count: Long) extends ForwardingRequest
 
   case class AddForwardingRule(forwardingRule: ForwardingRule) extends ForwardingRequest
   

@@ -46,7 +46,7 @@ object SeriesTypeProtocol {
   
   sealed trait SeriesTypeRequest
   
-  case object GetSeriesTypes extends SeriesTypeRequest
+  case class GetSeriesTypes(startIndex: Long, count: Long) extends SeriesTypeRequest
   
   case class AddSeriesType(seriesType: SeriesType) extends SeriesTypeRequest
   

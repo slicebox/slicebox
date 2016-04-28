@@ -46,7 +46,7 @@ angular.module('slicebox.import', ['ngRoute', 'ngFileUpload'])
     });
 
     $scope.loadImportSessions = function(startIndex, count) {
-        var sessionsPromise = $http.get('/api/import/sessions');
+        var sessionsPromise = $http.get('/api/import/sessions?startindex=' + startIndex + '&count=' + count);
         return sessionsPromise;
     };
 

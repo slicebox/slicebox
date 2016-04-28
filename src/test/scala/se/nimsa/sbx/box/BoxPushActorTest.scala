@@ -140,13 +140,13 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
         boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage1.id, 1, sent = false))
         boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage2.id, 2, sent = false))
 
-        boxDao.listOutgoingTransactions.head.status shouldBe TransactionStatus.WAITING
+        boxDao.listOutgoingTransactions(0, 1).head.status shouldBe TransactionStatus.WAITING
 
         boxPushActorRef ! PollOutgoing
 
         expectNoMsg() // both images will be sent
 
-        boxDao.listOutgoingTransactions.head.status shouldBe TransactionStatus.FINISHED
+        boxDao.listOutgoingTransactions(0, 1).head.status shouldBe TransactionStatus.FINISHED
       }
     }
 
@@ -162,7 +162,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
         expectNoMsg()
 
-        val outgoingTransactions = boxDao.listOutgoingTransactions
+        val outgoingTransactions = boxDao.listOutgoingTransactions(0, 10)
         outgoingTransactions.size should be(1)
         outgoingTransactions.foreach(_.status shouldBe TransactionStatus.FAILED)
       }
@@ -180,7 +180,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
         boxPushActorRef ! PollOutgoing
         expectNoMsg()
 
-        val outgoingTransactions = boxDao.listOutgoingTransactions
+        val outgoingTransactions = boxDao.listOutgoingTransactions(0, 10)
         outgoingTransactions.size should be(2)
         outgoingTransactions.foreach { transaction =>
           if (transaction.id == transaction1.id)
@@ -210,7 +210,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
         capturedFileSendRequests.size should be(1)
 
-        val outgoingTransactions = boxDao.listOutgoingTransactions
+        val outgoingTransactions = boxDao.listOutgoingTransactions(0, 10)
         outgoingTransactions.size should be(2)
         outgoingTransactions.foreach(transaction =>
           if (transaction.id == transaction1.id) {

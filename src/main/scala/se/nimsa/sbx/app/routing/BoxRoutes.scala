@@ -32,15 +32,18 @@ import spray.routing.Route
 
 import scala.concurrent.Future
 
-trait BoxRoutes { this: SliceboxService =>
+trait BoxRoutes {
+  this: SliceboxService =>
 
   def boxRoutes(apiUser: ApiUser): Route =
     pathPrefix("boxes") {
       pathEndOrSingleSlash {
         get {
-          onSuccess(boxService.ask(GetBoxes)) {
-            case Boxes(boxes) =>
-              complete(boxes)
+          parameters('startindex.as[Long] ? 0, 'count.as[Long] ? 20) { (startIndex, count) =>
+            onSuccess(boxService.ask(GetBoxes(startIndex, count))) {
+              case Boxes(boxes) =>
+                complete(boxes)
+            }
           }
         }
       } ~ authorize(apiUser.hasPermission(UserRole.ADMINISTRATOR)) {
@@ -95,9 +98,11 @@ trait BoxRoutes { this: SliceboxService =>
     pathPrefix("incoming") {
       pathEndOrSingleSlash {
         get {
-          onSuccess(boxService.ask(GetIncomingTransactions)) {
-            case IncomingTransactions(transactions) =>
-              complete(transactions)
+          parameters('startindex.as[Long] ? 0, 'count.as[Long] ? 20) { (startIndex, count) =>
+            onSuccess(boxService.ask(GetIncomingTransactions(startIndex, count))) {
+              case IncomingTransactions(transactions) =>
+                complete(transactions)
+            }
           }
         }
       } ~ pathPrefix(LongNumber) { incomingTransactionId =>
@@ -126,9 +131,11 @@ trait BoxRoutes { this: SliceboxService =>
     pathPrefix("outgoing") {
       pathEndOrSingleSlash {
         get {
-          onSuccess(boxService.ask(GetOutgoingTransactions)) {
-            case OutgoingTransactions(transactions) =>
-              complete(transactions)
+          parameters('startindex.as[Long] ? 0, 'count.as[Long] ? 20) { (startIndex, count) =>
+            onSuccess(boxService.ask(GetOutgoingTransactions(startIndex, count))) {
+              case OutgoingTransactions(transactions) =>
+                complete(transactions)
+            }
           }
         }
       } ~ pathPrefix(LongNumber) { outgoingTransactionId =>

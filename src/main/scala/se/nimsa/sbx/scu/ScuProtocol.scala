@@ -29,7 +29,7 @@ object ScuProtocol {
 
   case class RemoveScu(id: Long) extends ScuRequest 
 
-  case object GetScus extends ScuRequest 
+  case class GetScus(startIndex: Long, count: Long) extends ScuRequest
 
   case class SendImagesToScp(imageIds: Seq[Long], scuId: Long) extends ScuRequest
   

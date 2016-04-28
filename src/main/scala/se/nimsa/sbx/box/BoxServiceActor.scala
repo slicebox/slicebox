@@ -33,7 +33,6 @@ import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.log.SbxLog
-import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.util.ExceptionCatching
 
 class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout: Timeout) extends Actor with Stash with ExceptionCatching {
@@ -108,8 +107,8 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
             removeBoxFromDb(boxId)
             sender ! BoxRemoved(boxId)
 
-          case GetBoxes =>
-            val boxes = getBoxesFromDb
+          case GetBoxes(startIndex, count) =>
+            val boxes = getBoxesFromDb(startIndex, count)
             sender ! Boxes(boxes)
 
           case GetBoxById(boxId) =>
@@ -195,11 +194,11 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
               sender ! OutgoingTransactionMarkedAsFailed
             }
 
-          case GetIncomingTransactions =>
-            sender ! IncomingTransactions(getIncomingTransactions)
+          case GetIncomingTransactions(startIndex, count) =>
+            sender ! IncomingTransactions(getIncomingTransactions(startIndex, count))
 
-          case GetOutgoingTransactions =>
-            sender ! OutgoingTransactions(getOutgoingTransactions)
+          case GetOutgoingTransactions(startIndex, count) =>
+            sender ! OutgoingTransactions(getOutgoingTransactions(startIndex, count))
 
           case GetImageIdsForIncomingTransaction(incomingTransactionId) =>
             val imageIds = getIncomingImagesByIncomingTransactionId(incomingTransactionId).map(_.imageId)
@@ -252,7 +251,7 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
     }
 
   def setupBoxes(): Unit =
-    getBoxesFromDb foreach (box =>
+    getBoxesFromDb(0, 10000000) foreach (box =>
       box.sendMethod match {
         case BoxSendMethod.PUSH =>
           maybeStartPushActor(box)
@@ -299,9 +298,9 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
       boxDao.removeBox(boxId)
     }
 
-  def getBoxesFromDb: Seq[Box] =
+  def getBoxesFromDb(startIndex: Long, count: Long): Seq[Box] =
     db.withSession { implicit session =>
-      boxDao.listBoxes
+      boxDao.listBoxes(startIndex, count)
     }
 
   def pollBoxByToken(token: String): Option[Box] =
@@ -382,14 +381,14 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
       boxDao.removeOutgoingTransaction(outgoingTransactionId)
     }
 
-  def getIncomingTransactions =
+  def getIncomingTransactions(startIndex: Long, count: Long) =
     db.withSession { implicit session =>
-      boxDao.listIncomingTransactions
+      boxDao.listIncomingTransactions(startIndex, count)
     }
 
-  def getOutgoingTransactions =
+  def getOutgoingTransactions(startIndex: Long, count: Long) =
     db.withSession { implicit session =>
-      boxDao.listOutgoingTransactions
+      boxDao.listOutgoingTransactions(startIndex, count)
     }
 
   def getIncomingTransactionsInProcess =

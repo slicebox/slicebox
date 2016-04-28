@@ -75,7 +75,7 @@ object UserProtocol {
   case class Login(userPass: UserPass, authKey: AuthKey) extends UserRequest
   case class Logout(user: ApiUser, authKey: AuthKey) extends UserRequest
   case class AddUser(user: ApiUser) extends UserRequest
-  case object GetUsers extends UserRequest
+  case class GetUsers(startIndex: Long, count: Long) extends UserRequest
   case class GetUserByName(user: String) extends UserRequest
   case class GetAndRefreshUserByAuthKey(authKey: AuthKey) extends UserRequest
   case class DeleteUser(userId: Long) extends UserRequest

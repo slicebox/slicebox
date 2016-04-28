@@ -65,10 +65,12 @@ trait ImportRoutes {
       pathPrefix("sessions") {
         pathEndOrSingleSlash {
           get {
-            onSuccess(importService.ask(GetImportSessions)) {
+            parameters('startindex.as[Long] ? 0, 'count.as[Long] ? 20) { (startIndex, count) =>
+            onSuccess(importService.ask(GetImportSessions(startIndex, count))) {
               case ImportSessions(importSessions) => {
                 complete(importSessions)
               }
+            }
             }
           } ~ post {
             entity(as[ImportSession]) { importSession =>

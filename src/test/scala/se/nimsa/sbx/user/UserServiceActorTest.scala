@@ -1,22 +1,17 @@
 package se.nimsa.sbx.user
 
 import java.nio.file.Files
-import scala.slick.driver.H2Driver
-import scala.slick.jdbc.JdbcBackend.Database
-import org.scalatest.BeforeAndAfterAll
-import org.scalatest.BeforeAndAfterEach
-import org.scalatest.Matchers
-import org.scalatest.WordSpecLike
+
 import akka.actor.ActorSystem
-import akka.actor.Props
-import akka.actor.Status.Failure
-import akka.testkit.ImplicitSender
-import akka.testkit.TestKit
-import akka.testkit.TestActorRef
+import akka.testkit.{ImplicitSender, TestActorRef, TestKit}
+import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
 import se.nimsa.sbx.app.DbProps
+import se.nimsa.sbx.user.UserProtocol._
 import se.nimsa.sbx.util.TestUtil
 import spray.routing.authentication.UserPass
-import UserProtocol._
+
+import scala.slick.driver.H2Driver
+import scala.slick.jdbc.JdbcBackend.Database
 
 class UserServiceActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
     with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {
@@ -56,7 +51,7 @@ class UserServiceActorTest(_system: ActorSystem) extends TestKit(_system) with I
         dao.insertSession(ApiSession(-1, user.id, "token1", "ip1", "user agent1", System.currentTimeMillis))
         dao.insertSession(ApiSession(-1, user.id, "token2", "ip2", "user agent2", 0))
 
-        dao.listUsers should have length 2
+        dao.listUsers(0, 10) should have length 2
         dao.listSessions should have length 2
 
         userActor.removeExpiredSessions()
@@ -91,7 +86,7 @@ class UserServiceActorTest(_system: ActorSystem) extends TestKit(_system) with I
 
         val optionalSession = dao.userSessionByTokenIpAndUserAgent("token", "ip", "user agent")
         optionalSession.isDefined shouldBe true
-        optionalSession.get._2.updated shouldBe (sessionTime)
+        optionalSession.get._2.updated shouldBe sessionTime
       }
     }
 
@@ -131,12 +126,12 @@ class UserServiceActorTest(_system: ActorSystem) extends TestKit(_system) with I
 
         userService ! Login(UserPass("user", "pass"), AuthKey(None, Some("ip"), Some("userAgent")))
         expectMsgType[LoggedIn]
-        dao.listUsers should have length 1
+        dao.listUsers (0, 10) should have length 1
         dao.listSessions should have length 1
 
         userService ! Login(UserPass("user", "pass"), AuthKey(None, Some("ip"), Some("userAgent")))
         expectMsgType[LoggedIn]
-        dao.listUsers should have length 1
+        dao.listUsers(0, 10) should have length 1
         dao.listSessions should have length 1
       }
     }
