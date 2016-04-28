@@ -137,6 +137,26 @@
       "get": {
         "description": "Returns a list of available import sessions.",
         "tags": ["Import"],
+        "parameters": [
+          {
+            "name": "startindex",
+            "in": "query",
+            "description": "start index of returned slice of import sessions",
+            "required": false,
+            "default": "0",
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "count",
+            "in": "query",
+            "description": "size of returned slice of import sessions",
+            "required": false,
+            "default": "20",
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
         "responses": {
           "200": {
             "description": "available import sessions",
@@ -1751,6 +1771,26 @@
       "get": {
         "description": "Returns all users of slicebox",
         "tags": ["Users"],
+        "parameters": [
+          {
+            "name": "startindex",
+            "in": "query",
+            "description": "start index of returned slice of users",
+            "required": false,
+            "default": "0",
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "count",
+            "in": "query",
+            "description": "size of returned slice of users",
+            "required": false,
+            "default": "20",
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
         "responses": {
           "200": {
             "description": "user response",
@@ -1888,6 +1928,26 @@
       "get": {
         "description": "get a list of box connections",
         "tags": ["Boxes"],
+        "parameters": [
+          {
+            "name": "startindex",
+            "in": "query",
+            "description": "start index of returned slice of boxes",
+            "required": false,
+            "default": "0",
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "count",
+            "in": "query",
+            "description": "size of returned slice of boxes",
+            "required": false,
+            "default": "20",
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
         "responses": {
           "200": {
             "description": "box connections",
@@ -2017,6 +2077,26 @@
       "get": {        
         "description": "get incoming transactions (finished, currently receiving, waiting or failed)",
         "tags": ["Boxes"],
+        "parameters": [
+          {
+            "name": "startindex",
+            "in": "query",
+            "description": "start index of returned slice of transactions",
+            "required": false,
+            "default": "0",
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "count",
+            "in": "query",
+            "description": "size of returned slice of transactions",
+            "required": false,
+            "default": "20",
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
         "responses": {
           "200": {
             "description": "incoming transactions, sorted from most to least recently updated",
@@ -2088,6 +2168,26 @@
       "get": {        
         "description": "get outgoing transactions (finished, currently sending, waiting or failed)",
         "tags": ["Boxes"],
+        "parameters": [
+          {
+            "name": "startindex",
+            "in": "query",
+            "description": "start index of returned slice of transactions",
+            "required": false,
+            "default": "0",
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "count",
+            "in": "query",
+            "description": "size of returned slice of transactions",
+            "required": false,
+            "default": "20",
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
         "responses": {
           "200": {
             "description": "outgoing transactions, finished, sending, waiting or failed",
@@ -2360,6 +2460,26 @@
       "get": {
         "description": "get a list of watch directories. Each watch directory and its sub-directories are watched for incoming DICOM files, which are read and imported into slicebox.",
         "tags": ["Directories"],
+        "parameters": [
+          {
+            "name": "startindex",
+            "in": "query",
+            "description": "start index of returned slice of watched directories",
+            "required": false,
+            "default": "0",
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "count",
+            "in": "query",
+            "description": "size of returned slice of watched directories",
+            "required": false,
+            "default": "20",
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
         "responses": {
           "200": {
             "description": "the list of watched directories",
@@ -2422,6 +2542,26 @@
       "get": {
         "description": "get a list of DICOM SCPs. Each SCP is a server for receiving DICOM images from e.g. a PACS system.",
         "tags": ["SCPs"],
+        "parameters": [
+          {
+            "name": "startindex",
+            "in": "query",
+            "description": "start index of returned slice of SCPs",
+            "required": false,
+            "default": "0",
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "count",
+            "in": "query",
+            "description": "size of returned slice of SCPs",
+            "required": false,
+            "default": "20",
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
         "responses": {
           "200": {
             "description": "the list of SCPs",
@@ -2487,6 +2627,26 @@
       "get": {
         "description": "get a list of DICOM SCUs. Each SCU is a client for sending DICOM images to an SCP, e.g. a PACS system.",
         "tags": ["SCUs"],
+        "parameters": [
+          {
+            "name": "startindex",
+            "in": "query",
+            "description": "start index of returned slice of SCUs",
+            "required": false,
+            "default": "0",
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "count",
+            "in": "query",
+            "description": "size of returned slice of SCUs",
+            "required": false,
+            "default": "20",
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
         "responses": {
           "200": {
             "description": "the list of SCUs",
@@ -2593,6 +2753,26 @@
       "get": {
         "description": "get a list of all added series types. By filtering search results for certain series types, it is easier for applications to ensure that they read images of applicable types.",
         "tags": ["Series Types"],
+        "parameters": [
+          {
+            "name": "startindex",
+            "in": "query",
+            "description": "start index of returned slice of series types",
+            "required": false,
+            "default": "0",
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "count",
+            "in": "query",
+            "description": "size of returned slice of series types",
+            "required": false,
+            "default": "20",
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
         "responses": {
           "200": {
             "description": "the list of series types",
@@ -2838,6 +3018,26 @@
       "get": {
         "description": "get a list of all forwarding rules. A forwarding rule specifies the automatic forwarding of images from a source (SCP, BOX, etc.) to a destimation (BOX, SCU, etc.)",
         "tags": ["Forwarding"],
+        "parameters": [
+          {
+            "name": "startindex",
+            "in": "query",
+            "description": "start index of returned slice of rules",
+            "required": false,
+            "default": "0",
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "count",
+            "in": "query",
+            "description": "size of returned slice of rules",
+            "required": false,
+            "default": "20",
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
         "responses": {
           "200": {
             "description": "the list of forwarding rules",
