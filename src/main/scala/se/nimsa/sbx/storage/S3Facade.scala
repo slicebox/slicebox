@@ -22,7 +22,7 @@ class S3Facade(val bucket: String) {
   val s3 = new AmazonS3Client(new DefaultAWSCredentialsProviderChain(), new ClientConfiguration().withProtocol(Protocol.HTTP))
 
 
-  def delete(key: String) {
+  def delete(key: String): Unit = {
     s3.deleteObject(bucket, key)
   }
 

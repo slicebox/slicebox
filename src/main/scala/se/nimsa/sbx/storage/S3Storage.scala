@@ -42,7 +42,6 @@ class S3Storage(val bucket: String, val s3Prefix: String) extends StorageService
         throw new IllegalArgumentException("Dataset file could not be stored", e)
     }
     val buffer = os.toByteArray()
-    val is = new ByteArrayInputStream(buffer)
     s3Client.upload(s3Key, buffer)
   }
 
