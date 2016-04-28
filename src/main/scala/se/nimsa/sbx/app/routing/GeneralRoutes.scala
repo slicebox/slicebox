@@ -19,7 +19,6 @@ package se.nimsa.sbx.app.routing
 import scala.concurrent.Await
 import scala.concurrent.TimeoutException
 import scala.concurrent.duration.DurationInt
-
 import akka.actor.ActorContext
 import akka.actor.PoisonPill
 import akka.pattern.ask
@@ -30,6 +29,7 @@ import se.nimsa.sbx.box.BoxProtocol.Boxes
 import se.nimsa.sbx.box.BoxProtocol.GetBoxes
 import se.nimsa.sbx.directory.DirectoryWatchProtocol.GetWatchedDirectories
 import se.nimsa.sbx.directory.DirectoryWatchProtocol.WatchedDirectories
+import se.nimsa.sbx.importing.ImportProtocol.{GetImportSessions, ImportSessions}
 import se.nimsa.sbx.scp.ScpProtocol._
 import se.nimsa.sbx.scu.ScuProtocol._
 import se.nimsa.sbx.user.UserProtocol._
@@ -46,6 +46,7 @@ trait GeneralRoutes { this: SliceboxService =>
             complete {
               val stop =
                 gracefulStop(forwardingService, 5.seconds, PoisonPill) andThen
+                  { case _ => gracefulStop(importService, 5.seconds, PoisonPill) } andThen
                   { case _ => gracefulStop(directoryService, 5.seconds, PoisonPill) } andThen
                   { case _ => gracefulStop(scpService, 5.seconds, PoisonPill) } andThen
                   { case _ => gracefulStop(scuService, 5.seconds, PoisonPill) } andThen
@@ -73,11 +74,13 @@ trait GeneralRoutes { this: SliceboxService =>
             boxes <- boxService.ask(GetBoxes).mapTo[Boxes]
             scps <- scpService.ask(GetScps).mapTo[Scps]
             dirs <- directoryService.ask(GetWatchedDirectories).mapTo[WatchedDirectories]
+            imports <- importService.ask(GetImportSessions).mapTo[ImportSessions]
           } yield {
             users.users.map(user => Source(SourceType.USER, user.user, user.id)) ++
               boxes.boxes.map(box => Source(SourceType.BOX, box.name, box.id)) ++
               scps.scps.map(scp => Source(SourceType.SCP, scp.name, scp.id)) ++
-              dirs.directories.map(dir => Source(SourceType.DIRECTORY, dir.name, dir.id))
+              dirs.directories.map(dir => Source(SourceType.DIRECTORY, dir.name, dir.id)) ++
+              imports.importSessions.map(importSession => Source(SourceType.IMPORT, importSession.name, importSession.id))
           }
         onSuccess(futureSources) {
           complete(_)

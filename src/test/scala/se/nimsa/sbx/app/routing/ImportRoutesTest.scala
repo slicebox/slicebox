@@ -138,6 +138,26 @@ class ImportRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     updatedSession2.filesRejected should be(0)
   }
 
+  it should "return 200 OK and the list of images associated with an import session" in {
+    val addedSession = PostAsUser("/api/import/sessions", importSession) ~> routes ~> check {
+      responseAs[ImportSession]
+    }
+
+    val file = TestUtil.testImageFile
+    val mfd = MultipartFormData(Seq(BodyPart(file, "file")))
+    val addedImage =
+      PostAsUser(s"/api/import/sessions/${addedSession.id}/images", mfd) ~> routes ~> check {
+        responseAs[Image]
+      }
+
+    val updatedSession = GetAsUser(s"/api/import/sessions/${addedSession.id}/images") ~> routes ~> check {
+      status shouldBe OK
+      val images = responseAs[Seq[Image]]
+      images should have length 1
+      images.head shouldBe addedImage
+    }
+  }
+
   it should "return 400 Bad Request and update counters when adding a jpg image to an import session" in {
     val addedSession = PostAsUser("/api/import/sessions", importSession) ~> routes ~> check {
       responseAs[ImportSession]
