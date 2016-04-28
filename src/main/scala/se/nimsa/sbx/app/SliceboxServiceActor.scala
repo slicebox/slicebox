@@ -35,7 +35,7 @@ import se.nimsa.sbx.metadata.{MetaDataDAO, MetaDataServiceActor, PropertiesDAO}
 import se.nimsa.sbx.scp.{ScpDAO, ScpServiceActor}
 import se.nimsa.sbx.scu.{ScuDAO, ScuServiceActor}
 import se.nimsa.sbx.seriestype.{SeriesTypeDAO, SeriesTypeServiceActor}
-import se.nimsa.sbx.storage.StorageServiceActor
+import se.nimsa.sbx.storage.{FileStorage, S3Storage, StorageServiceActor}
 import se.nimsa.sbx.user.{Authenticator, UserDAO, UserServiceActor}
 import spray.routing.HttpService
 
