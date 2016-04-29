@@ -18,7 +18,10 @@ package se.nimsa.sbx.app.routing
 
 import java.io.File
 
+import akka.actor.{Actor, ActorLogging, ActorRef, Props}
+
 import scala.concurrent.Future
+import scala.concurrent.duration.DurationInt
 import akka.pattern.ask
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.app.SliceboxService
@@ -28,14 +31,13 @@ import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.user.UserProtocol.ApiUser
 import spray.http.ContentType.apply
-import spray.http.FormFile
-import spray.http.HttpData
-import spray.http.HttpEntity
+import spray.http._
 import spray.http.HttpHeaders._
 import spray.http.MediaTypes._
 import spray.http.StatusCodes._
 import spray.routing.Route
 import se.nimsa.sbx.util.SbxExtensions._
+import spray.can.Http
 
 trait ImageRoutes {
   this: SliceboxService =>
@@ -130,33 +132,32 @@ trait ImageRoutes {
             if (imageIds.isEmpty)
               complete(NoContent)
             else {
-              val imagesAndSeriesFuture = Future.sequence {
-                imageIds.map { imageId =>
-                  metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]].flatMap { imageMaybe =>
-                    imageMaybe.map { image =>
-                      metaDataService.ask(GetSingleFlatSeries(image.seriesId)).mapTo[Option[FlatSeries]].map { flatSeriesMaybe =>
-                        flatSeriesMaybe.map { flatSeries =>
-                          (image, flatSeries)
-                        }
-                      }
-                    }.unwrap
-                  }
-                }
-              }.map(_.flatten)
+              //              val imagesAndSeriesFuture = Future.sequence {
+              //                imageIds.map { imageId =>
+              //                  metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]].flatMap { imageMaybe =>
+              //                    imageMaybe.map { image =>
+              //                      metaDataService.ask(GetSingleFlatSeries(image.seriesId)).mapTo[Option[FlatSeries]].map { flatSeriesMaybe =>
+              //                        flatSeriesMaybe.map { flatSeries =>
+              //                          (image, flatSeries)
+              //                        }
+              //                      }
+              //                    }.unwrap
+              //                  }
+              //                }
+              //              }.map(_.flatten)
 
-              onSuccess(imagesAndSeriesFuture) { imagesAndSeries =>
-                complete(storageService.ask(CreateTempZipFile(imagesAndSeries)).mapTo[FileName])
-              }
+              complete(storageService.ask(CreateExportSet(imageIds)).mapTo[ExportSetId])
             }
           }
-        } ~ get {
-          parameter('filename) { fileName =>
-            detach() {
-              autoChunk(chunkSize) {
-                respondWithHeader(`Content-Disposition`("attachment; filename=\"slicebox-export.zip\"")) {
-                  complete(HttpEntity(`application/zip`, HttpData(new File(System.getProperty("java.io.tmpdir"), fileName))))
-                }
-              }
+        }
+      } ~ path(LongNumber) { exportSetId =>
+        get { ctx =>
+          respondWithHeader(`Content-Disposition`("attachment; filename=\"slicebox-export.zip\"")) {
+            storageService.ask(GetExportSetImageIds(exportSetId)).mapTo[Option[Seq[Long]]].map {
+              case Some(imageIds) =>
+                actorRefFactory.actorOf(Props(new Streamer(ctx.responder, imageIds)))
+              case None =>
+                complete(NotFound)
             }
           }
         }
@@ -207,6 +208,35 @@ trait ImageRoutes {
         else
           complete((Created, image))
     }
+  }
+
+  class Streamer(client: ActorRef, imageIds: Seq[Long]) extends Actor with ActorLogging {
+    log.info("Starting streaming response ...")
+
+    // we use the successful sending of a chunk as trigger for scheduling the next chunk
+    client ! ChunkedResponseStart(HttpResponse(entity = " " * 2048)).withAck(Ok(imageIds.tail))
+
+    def receive = {
+      case Ok(remaining) if remaining.isEmpty =>
+        log.info("Finalizing response stream ...")
+        client ! MessageChunk("\nStopped...")
+        client ! ChunkedMessageEnd
+        context.stop(self)
+
+      case Ok(remaining) =>
+        log.info("Sending response chunk ...")
+        context.system.scheduler.scheduleOnce(100.millis) {
+          client ! MessageChunk(remaining.head + ", ").withAck(Ok(remaining.tail))
+        }
+
+      case x: Http.ConnectionClosed =>
+        log.info("Canceling response stream due to {} ...", x)
+        context.stop(self)
+    }
+
+    // simple case class whose instances we use as send confirmation message for streaming chunks
+    case class Ok(imageIds: Seq[Long])
+
   }
 
 }
