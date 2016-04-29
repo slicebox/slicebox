@@ -16,28 +16,20 @@
 
 package se.nimsa.sbx.dicom
 
-import java.io.File
-import java.io.DataInputStream
-import java.io.BufferedInputStream
-import java.io.FileInputStream
-import org.dcm4che3.data.Attributes
-import org.dcm4che3.data.Tag
-import org.dcm4che3.data.VR
+import java.io.{ByteArrayInputStream, ByteArrayOutputStream, DataInputStream}
 import java.util.Date
-import org.dcm4che3.util.UIDUtils
+
+import org.dcm4che3.data.{Attributes, Tag, UID, VR}
 import org.dcm4che3.io.DicomOutputStream
-import java.io.IOException
-import org.dcm4che3.data.UID
-import java.io.ByteArrayInputStream
-import se.nimsa.sbx.dicom.DicomHierarchy.Study
-import se.nimsa.sbx.dicom.DicomHierarchy.Patient
+import org.dcm4che3.util.UIDUtils
+import se.nimsa.sbx.dicom.DicomHierarchy.{Patient, Study}
 
 /**
  * Scala port and minor adaptation of the Jpg2Dcm tool which is part of the Dcm4Che toolkit.
  * See https://github.com/dcm4che/dcm4che/, specifically
  * https://github.com/dcm4che/dcm4che/blob/master/dcm4che-tool/dcm4che-tool-jpg2dcm/src/main/java/org/dcm4che3/tool/jpg2dcm/Jpg2Dcm.java
  */
-object Jpg2Dcm {
+object Jpeg2Dcm {
 
   private val FF = 0xff
 
@@ -51,13 +43,11 @@ object Jpg2Dcm {
 
   private val SOS = 0xda
 
-  private val APP = 0xe0
-
   private val charset = "ISO_IR 100"
 
   private val transferSyntax = UID.JPEGBaseline1
 
-  def apply(bytes: Array[Byte], patient: Patient, study: Study, dcmFile: File): Attributes = {
+  def apply(bytes: Array[Byte], patient: Patient, study: Study): Attributes = {
 
     val jpgInput = new DataInputStream(new ByteArrayInputStream(bytes))
 
@@ -78,11 +68,11 @@ object Jpg2Dcm {
       attrs.setString(Tag.SpecificCharacterSet, VR.CS, charset)
 
       val buffer = new Array[Byte](8192)
-      val jpgLen = bytes.length.toInt
+      val jpgLen = bytes.length
       val jpgHeaderLen = readHeader(attrs, jpgInput, buffer)
       ensureUS(attrs, Tag.BitsAllocated, 8)
       ensureUS(attrs, Tag.BitsStored, attrs.getInt(Tag.BitsAllocated, if ((buffer(jpgHeaderLen) & 0xff) > 8) 16 else 8))
-      ensureUS(attrs, Tag.HighBit, attrs.getInt(Tag.BitsStored, (buffer(jpgHeaderLen) & 0xff)) - 1)
+      ensureUS(attrs, Tag.HighBit, attrs.getInt(Tag.BitsStored, buffer(jpgHeaderLen) & 0xff) - 1)
       ensureUS(attrs, Tag.PixelRepresentation, 0)
       ensureUID(attrs, Tag.StudyInstanceUID)
       ensureUID(attrs, Tag.SeriesInstanceUID)
@@ -92,7 +82,8 @@ object Jpg2Dcm {
       attrs.setDate(Tag.InstanceCreationTime, VR.TM, now)
       attrs.setDate(Tag.SeriesDate, VR.DA, now)
       val fmi = attrs.createFileMetaInformation(transferSyntax)
-      val dos = new DicomOutputStream(dcmFile)
+      val baos = new ByteArrayOutputStream()
+      val dos = new DicomOutputStream(baos, UID.ExplicitVRLittleEndian)
       try {
         dos.writeDataset(fmi, attrs)
         dos.writeHeader(Tag.PixelData, VR.OB, -1)
@@ -107,7 +98,7 @@ object Jpg2Dcm {
         if ((jpgLen & 1) != 0)
           dos.write(0)
         dos.writeHeader(Tag.SequenceDelimitationItem, null, 0)
-        attrs
+        DicomUtil.loadDataset(baos.toByteArray, withPixelData = true, useBulkDataURI = false)
       } finally {
         dos.close()
       }
@@ -115,12 +106,6 @@ object Jpg2Dcm {
       jpgInput.close()
     }
   }
-
-  private def missingRowsColumnsSamplesPMI(attrs: Attributes) =
-    !(attrs.containsValue(Tag.Rows)
-      && attrs.containsValue(Tag.Columns)
-      && attrs.containsValue(Tag.SamplesPerPixel) && attrs
-      .containsValue(Tag.PhotometricInterpretation))
 
   private def readHeader(attrs: Attributes, jpgInput: DataInputStream, initialBuffer: Array[Byte]): Int = {
     if (jpgInput.read() != FF || jpgInput.read() != SOI

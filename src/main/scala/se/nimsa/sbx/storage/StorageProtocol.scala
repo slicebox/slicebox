@@ -42,8 +42,6 @@ object StorageProtocol {
 
   case class GetDataset(image: Image, withPixelData: Boolean, useBulkDataURI: Boolean = false) extends ImageRequest
 
-  case class DatasetAdded(image: Image, overwrite: Boolean)
-
   case class GetImageAttributes(image: Image) extends ImageRequest
 
   case class GetImageInformation(image: Image) extends ImageRequest
@@ -54,18 +52,16 @@ object StorageProtocol {
 
   case class AddDataset(dataset: Attributes, source: Source, image: Image) extends ImageRequest
   
-  case class CreateJpeg(jpegBytes: Array[Byte], patient: Patient, study: Study) extends ImageRequest
-
-  case class AddJpeg(image: Image, source: Source, jpegTempPath: Path) extends ImageRequest
+  case class AddJpeg(dataset: Attributes, source: Source, image: Image) extends ImageRequest
 
   case class DeleteDataset(image: Image) extends ImageRequest
 
   case class CreateTempZipFile(imagesAndSeries: Seq[(Image, FlatSeries)]) extends ImageRequest
 
 
-  case class JpegCreated(dataset: Attributes, jpegTempPath: Path)
+  case class DatasetAdded(image: Image, overwrite: Boolean)
 
-  case object JpegAdded
+  case class JpegAdded(image: Image)
 
   case class DatasetDeleted(image: Image)
 

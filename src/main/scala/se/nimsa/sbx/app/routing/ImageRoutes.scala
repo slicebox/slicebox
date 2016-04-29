@@ -23,8 +23,7 @@ import akka.pattern.ask
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.app.SliceboxService
 import se.nimsa.sbx.dicom.DicomHierarchy.{FlatSeries, Image, Patient, Study}
-import se.nimsa.sbx.dicom.DicomUtil
-import se.nimsa.sbx.dicom.ImageAttribute
+import se.nimsa.sbx.dicom.{DicomUtil, ImageAttribute, Jpeg2Dcm}
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.user.UserProtocol.ApiUser
@@ -109,14 +108,14 @@ trait ImageRoutes {
           import spray.httpx.SprayJsonSupport._
           entity(as[Seq[Long]]) { imageIds =>
             val futureDeleted = Future.sequence {
-                  imageIds.map { imageId =>
-                    metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]].map { imageMaybe =>
-                      imageMaybe.map { image =>
-                        storageService.ask(DeleteDataset(image)).flatMap { _ =>
-                          metaDataService.ask(DeleteMetaData(image.id))
-                        }
-                      }
-                    }.unwrap
+              imageIds.map { imageId =>
+                metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]].map { imageMaybe =>
+                  imageMaybe.map { image =>
+                    storageService.ask(DeleteDataset(image)).flatMap { _ =>
+                      metaDataService.ask(DeleteMetaData(image.id))
+                    }
+                  }
+                }.unwrap
               }
             }
             onSuccess(futureDeleted) { m =>
@@ -170,10 +169,9 @@ trait ImageRoutes {
                 studyMaybe.map { study =>
                   metaDataService.ask(GetPatient(study.patientId)).mapTo[Option[Patient]].map { patientMaybe =>
                     patientMaybe.map { patient =>
-                      storageService.ask(CreateJpeg(jpegBytes, patient, study)).mapTo[JpegCreated].flatMap { jpeg =>
-                        metaDataService.ask(AddMetaData(jpeg.dataset, source)).mapTo[MetaDataAdded].flatMap { metaData =>
-                          storageService.ask(AddJpeg(metaData.image, source, jpeg.jpegTempPath)).map { _ => metaData.image }
-                        }
+                      val encapsulatedJpeg = Jpeg2Dcm(jpegBytes, patient, study)
+                      metaDataService.ask(AddMetaData(encapsulatedJpeg, source)).mapTo[MetaDataAdded].flatMap { metaData =>
+                        storageService.ask(AddJpeg(encapsulatedJpeg, source, metaData.image)).map { _ => metaData.image }
                       }
                     }
                   }

@@ -24,7 +24,7 @@ import akka.event.{Logging, LoggingReceive}
 import org.dcm4che3.data.{Attributes, Tag}
 import se.nimsa.sbx.app.GeneralProtocol.ImageAdded
 import se.nimsa.sbx.dicom.DicomHierarchy._
-import se.nimsa.sbx.dicom.{DicomUtil, Jpg2Dcm}
+import se.nimsa.sbx.dicom.{DicomUtil, Jpeg2Dcm}
 import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.util.ExceptionCatching
 
@@ -64,18 +64,13 @@ class StorageServiceActor(storage: StorageService) extends Actor with ExceptionC
           } else
             throw new IllegalArgumentException("Dataset does not conform to slicebox storage restrictions")
 
-        case CreateJpeg(jpegBytes, patient, study) =>
-          val jpegTempPath = Files.createTempFile("slicebox-sc-", "")
-          val dataset = Jpg2Dcm(jpegBytes, patient, study, jpegTempPath.toFile)
-          sender ! JpegCreated(dataset, jpegTempPath)
-
-        case AddJpeg(image, source, jpegTempPath) =>
-          storage.storeEncapsulated(image, jpegTempPath)
-
+        case AddJpeg(dataset, source, image) =>
+          storage.storeDataset(dataset, image)
           log.info(s"Stored encapsulated JPEG with image id ${image.id}")
-          context.system.eventStream.publish(ImageAdded(image, source, overwrite = false))
-
-          sender ! JpegAdded
+          val jpegAdded = JpegAdded(image)
+          val imageAdded = ImageAdded(image, source, overwrite = false)
+          context.system.eventStream.publish(imageAdded)
+          sender ! jpegAdded
 
         case DeleteDataset(image) =>
           val datasetDeleted = DatasetDeleted(image)
