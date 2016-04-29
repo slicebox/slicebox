@@ -35,7 +35,7 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
   
     // Scope functions
     $scope.loadBoxesPage = function(startIndex, count, orderByProperty, orderByDirection) {
-        return $http.get('/api/boxes');
+        return $http.get('/api/boxes?startindex=' + startIndex + '&count=' + count);
     };
 
     $scope.addBoxButtonClicked = function() {

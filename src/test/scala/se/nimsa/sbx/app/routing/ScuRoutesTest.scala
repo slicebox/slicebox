@@ -1,19 +1,17 @@
 package se.nimsa.sbx.app.routing
 
-import java.nio.file.Files
-import org.scalatest.FlatSpec
-import org.scalatest.Matchers
-import se.nimsa.sbx.scu.ScuProtocol._
-import spray.httpx.SprayJsonSupport._
-import spray.http.StatusCodes._
-import se.nimsa.sbx.util.TestUtil
-import spray.http.MultipartFormData
-import spray.http.BodyPart
+import org.scalatest.{FlatSpec, Matchers}
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
-import se.nimsa.sbx.scp.ScpProtocol.ScpData
-import se.nimsa.sbx.scp.ScpDAO
-import se.nimsa.sbx.scu.ScuDAO
 import se.nimsa.sbx.metadata.MetaDataDAO
+import se.nimsa.sbx.scp.ScpDAO
+import se.nimsa.sbx.scp.ScpProtocol.ScpData
+import se.nimsa.sbx.scu.ScuDAO
+import se.nimsa.sbx.scu.ScuProtocol._
+import se.nimsa.sbx.util.TestUtil
+import spray.http.{BodyPart, MultipartFormData}
+import spray.http.StatusCodes._
+import spray.httpx.SprayJsonSupport._
+
 import scala.slick.driver.H2Driver
 
 class ScuRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
@@ -72,7 +70,7 @@ class ScuRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
   it should "return 204 NoContent when asking to send an image using an SCU" in {
     val scu = db.withSession { implicit session =>
-      scuDao.allScuDatas.head
+      scuDao.listScuDatas(0, 1).head
     }
     val image = db.withSession { implicit session =>
       metaDataDao.images.head
@@ -84,10 +82,10 @@ class ScuRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
   it should "be possible to remove the SCU again" in {
     val scu = db.withSession { implicit session =>
-      scuDao.allScuDatas.head
+      scuDao.listScuDatas(0, 1).head
     }
     val scp = db.withSession { implicit session =>
-      scpDao.allScpDatas.head
+      scpDao.listScpDatas(0, 1).head
     }
     DeleteAsAdmin(s"/api/scus/${scu.id}") ~> routes ~> check {
       status should be(NoContent)

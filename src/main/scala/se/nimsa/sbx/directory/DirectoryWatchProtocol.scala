@@ -30,7 +30,7 @@ object DirectoryWatchProtocol {
   
   case class UnWatchDirectory(id: Long) extends DirectoryRequest
 
-  case object GetWatchedDirectories extends DirectoryRequest
+  case class GetWatchedDirectories(startIndex: Long, count: Long) extends DirectoryRequest
     
   case class GetWatchedDirectoryById(watchedDirectoryId: Long) extends DirectoryRequest
   

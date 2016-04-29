@@ -85,9 +85,11 @@ trait UserRoutes { this: SliceboxService =>
     pathPrefix("users") {
       pathEndOrSingleSlash {
         get {
-          onSuccess(userService.ask(GetUsers)) {
-            case Users(users) =>
-              complete(users)
+          parameters('startindex.as[Long] ? 0, 'count.as[Long] ? 20) { (startIndex, count) =>
+            onSuccess(userService.ask(GetUsers(startIndex, count))) {
+              case Users(users) =>
+                complete(users)
+            }
           }
         } ~ post {
           authorize(apiUser.hasPermission(UserRole.ADMINISTRATOR)) {

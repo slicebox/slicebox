@@ -30,7 +30,7 @@ angular.module('slicebox.adminPacs', ['ngRoute'])
   
     // Scope functions
     $scope.loadScpsPage = function(startIndex, count, orderByProperty, orderByDirection) {
-        return $http.get('/api/scps');
+        return $http.get('/api/scps?startindex=' + startIndex + '&count=' + count);
     };
 
     $scope.addScpButtonClicked = function() {
@@ -67,7 +67,7 @@ angular.module('slicebox.adminPacs', ['ngRoute'])
   
     // Scope functions
     $scope.loadScusPage = function(startIndex, count, orderByProperty, orderByDirection) {
-        return $http.get('/api/scus');
+        return $http.get('/api/scus?startindex=' + startIndex + '&count=' + count);
     };
 
     $scope.addScuButtonClicked = function() {

@@ -87,8 +87,8 @@ class ScpServiceActor(dbProps: DbProps, timeout: Timeout) extends Actor with Exc
             context.child(scpDataId.toString).foreach(_ ! PoisonPill)
             sender ! ScpRemoved(scpDataId)
 
-          case GetScps =>
-            sender ! Scps(getScps)
+          case GetScps(startIndex, count) =>
+            sender ! Scps(getScps(startIndex, count))
 
           case GetScpById(id) =>
             db.withSession { implicit session =>
@@ -124,15 +124,15 @@ class ScpServiceActor(dbProps: DbProps, timeout: Timeout) extends Actor with Exc
       dao.deleteScpDataWithId(id)
     }
 
-  def getScps =
+  def getScps(startIndex: Long, count: Long) =
     db.withSession { implicit session =>
-      dao.allScpDatas
+      dao.listScpDatas(startIndex, count)
     }
 
   def setupScps() = {
     val scps =
       db.withSession { implicit session =>
-        dao.allScpDatas
+        dao.listScpDatas(0, 10000000)
       }
     scps foreach (scpData => context.actorOf(ScpActor.props(scpData, executor, timeout), scpData.id.toString))
   }

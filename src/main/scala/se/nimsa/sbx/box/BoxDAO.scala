@@ -22,10 +22,11 @@ import scala.slick.jdbc.meta.MTable
 import BoxProtocol._
 import BoxProtocol.BoxSendMethod._
 import BoxProtocol.TransactionStatus._
-import scala.slick.jdbc.{ GetResult, StaticQuery => Q }
+import scala.slick.jdbc.{GetResult, StaticQuery => Q}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.TagValue
 
 class BoxDAO(val driver: JdbcProfile) {
+
   import driver.simple._
 
   implicit val statusColumnType =
@@ -36,40 +37,62 @@ class BoxDAO(val driver: JdbcProfile) {
 
   class BoxTable(tag: Tag) extends Table[Box](tag, "Boxes") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
+
     def name = column[String]("name")
+
     def token = column[String]("token")
+
     def baseUrl = column[String]("baseurl")
+
     def sendMethod = column[BoxSendMethod]("sendmethod")
+
     def online = column[Boolean]("online")
+
     def idxUniqueName = index("idx_unique_box_name", name, unique = true)
-    def * = (id, name, token, baseUrl, sendMethod, online) <> (Box.tupled, Box.unapply)
+
+    def * = (id, name, token, baseUrl, sendMethod, online) <>(Box.tupled, Box.unapply)
   }
 
   val boxQuery = TableQuery[BoxTable]
 
   class OutgoingTransactionTable(tag: Tag) extends Table[OutgoingTransaction](tag, "OutgoingTransactions") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
+
     def boxId = column[Long]("boxid")
+
     def boxName = column[String]("boxname")
+
     def sentImageCount = column[Long]("sentimagecount")
+
     def totalImageCount = column[Long]("totalimagecount")
+
     def created = column[Long]("created")
+
     def updated = column[Long]("updated")
+
     def status = column[TransactionStatus]("status")
-    def * = (id, boxId, boxName, sentImageCount, totalImageCount, created, updated, status) <> (OutgoingTransaction.tupled, OutgoingTransaction.unapply)
+
+    def * = (id, boxId, boxName, sentImageCount, totalImageCount, created, updated, status) <>(OutgoingTransaction.tupled, OutgoingTransaction.unapply)
   }
 
   val outgoingTransactionQuery = TableQuery[OutgoingTransactionTable]
 
   class OutgoingImageTable(tag: Tag) extends Table[OutgoingImage](tag, "OutgoingImages") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
+
     def outgoingTransactionId = column[Long]("outgoingtransactionid")
+
     def imageId = column[Long]("imageid")
+
     def sequenceNumber = column[Long]("sequencenumber")
+
     def sent = column[Boolean]("sent")
+
     def fkOutgoingTransaction = foreignKey("fk_outgoing_transaction_id", outgoingTransactionId, outgoingTransactionQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
+
     def idxUniqueTransactionAndNumber = index("idx_unique_outgoing_image", (outgoingTransactionId, sequenceNumber), unique = true)
-    def * = (id, outgoingTransactionId, imageId, sequenceNumber, sent) <> (OutgoingImage.tupled, OutgoingImage.unapply)
+
+    def * = (id, outgoingTransactionId, imageId, sequenceNumber, sent) <>(OutgoingImage.tupled, OutgoingImage.unapply)
   }
 
   val outgoingImageQuery = TableQuery[OutgoingImageTable]
@@ -79,40 +102,62 @@ class BoxDAO(val driver: JdbcProfile) {
 
   class OutgoingTagValueTable(tag: Tag) extends Table[OutgoingTagValue](tag, "OutgoingTagValues") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
+
     def outgoingImageId = column[Long]("outgoingimageid")
+
     def dicomTag = column[Int]("tag")
+
     def value = column[String]("value")
+
     def fkOutgoingImage = foreignKey("fk_outgoing_image_id", outgoingImageId, outgoingImageQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
-    def * = (id, outgoingImageId, dicomTag, value) <> (toOutgoingTagValue.tupled, fromOutgoingTagValue)
+
+    def * = (id, outgoingImageId, dicomTag, value) <>(toOutgoingTagValue.tupled, fromOutgoingTagValue)
   }
 
   val outgoingTagValueQuery = TableQuery[OutgoingTagValueTable]
 
   class IncomingTransactionTable(tag: Tag) extends Table[IncomingTransaction](tag, "IncomingTransactions") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
+
     def boxId = column[Long]("boxid")
+
     def boxName = column[String]("boxname")
+
     def outgoingTransactionId = column[Long]("outgoingtransactionid")
+
     def receivedImageCount = column[Long]("receivedimagecount")
+
     def addedImageCount = column[Long]("addedimagecount")
+
     def totalImageCount = column[Long]("totalimagecount")
+
     def created = column[Long]("created")
+
     def updated = column[Long]("updated")
+
     def status = column[TransactionStatus]("status")
-    def * = (id, boxId, boxName, outgoingTransactionId, receivedImageCount, addedImageCount, totalImageCount, created, updated, status) <> (IncomingTransaction.tupled, IncomingTransaction.unapply)
+
+    def * = (id, boxId, boxName, outgoingTransactionId, receivedImageCount, addedImageCount, totalImageCount, created, updated, status) <>(IncomingTransaction.tupled, IncomingTransaction.unapply)
   }
 
   val incomingTransactionQuery = TableQuery[IncomingTransactionTable]
 
   class IncomingImageTable(tag: Tag) extends Table[IncomingImage](tag, "IncomingImages") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
+
     def incomingTransactionId = column[Long]("incomingtransactionid")
+
     def imageId = column[Long]("imageid")
+
     def sequenceNumber = column[Long]("sequencenumber")
+
     def overwrite = column[Boolean]("overwrite")
+
     def fkIncomingTransaction = foreignKey("fk_incoming_transaction_id", incomingTransactionId, incomingTransactionQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
+
     def idxUniqueTransactionAndNumber = index("idx_unique_incoming_image", (incomingTransactionId, sequenceNumber), unique = true)
-    def * = (id, incomingTransactionId, imageId, sequenceNumber, overwrite) <> (IncomingImage.tupled, IncomingImage.unapply)
+
+    def * = (id, incomingTransactionId, imageId, sequenceNumber, overwrite) <>(IncomingImage.tupled, IncomingImage.unapply)
   }
 
   val incomingImageQuery = TableQuery[IncomingImageTable]
@@ -294,24 +339,29 @@ class BoxDAO(val driver: JdbcProfile) {
   def removeOutgoingTransactions(outgoingTransactionIds: Seq[Long])(implicit session: Session): Unit =
     outgoingTransactionQuery.filter(_.id inSet outgoingTransactionIds).delete
 
-  def listBoxes(implicit session: Session): List[Box] =
-    boxQuery.list
+  def listBoxes(startIndex: Long, count: Long)(implicit session: Session): List[Box] =
+    boxQuery.drop(startIndex).take(count).list
 
-  def listOutgoingTransactions(implicit session: Session): List[OutgoingTransaction] =
+  def listOutgoingTransactions(startIndex: Long, count: Long)(implicit session: Session): List[OutgoingTransaction] =
     outgoingTransactionQuery
+      .drop(startIndex)
+      .take(count)
       .sortBy(_.updated.desc)
       .list
 
   def listOutgoingImages(implicit session: Session): List[OutgoingImage] =
     outgoingImageQuery.list
 
-  def listIncomingTransactions(implicit session: Session): List[IncomingTransaction] =
+  def listIncomingTransactions(startIndex: Long, count: Long)(implicit session: Session): List[IncomingTransaction] =
     incomingTransactionQuery
+      .drop(startIndex)
+      .take(count)
       .sortBy(_.updated.desc)
       .list
 
   def listIncomingImages(implicit session: Session): List[IncomingImage] =
-    incomingImageQuery.list
+    incomingImageQuery
+      .list
 
   def listOutgoingTransactionsInProcess(implicit session: Session): List[OutgoingTransaction] =
     outgoingTransactionQuery

@@ -30,7 +30,7 @@ object ScpProtocol {
 
   case class RemoveScp(id: Long) extends ScpRequest 
 
-  case object GetScps extends ScpRequest 
+  case class GetScps(startIndex: Long, count: Long) extends ScpRequest
 
   case class GetScpById(scpId: Long) extends ScpRequest
   

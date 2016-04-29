@@ -91,8 +91,8 @@ class ScuServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extends Actor
             scuForId(scuDataId).foreach(scuData => deleteScuWithId(scuDataId))
             sender ! ScuRemoved(scuDataId)
 
-          case GetScus =>
-            sender ! Scus(getScus)
+          case GetScus(startIndex, count) =>
+            sender ! Scus(getScus(startIndex, count))
 
           case SendImagesToScp(imageIds, scuId) =>
             scuForId(scuId).map(scu => {
@@ -148,9 +148,9 @@ class ScuServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extends Actor
       dao.deleteScuDataWithId(id)
     }
 
-  def getScus =
+  def getScus(startIndex: Long, count: Long) =
     db.withSession { implicit session =>
-      dao.allScuDatas
+      dao.listScuDatas(startIndex, count)
     }
 
   def imagePathsForImageIds(imageIds: Seq[Long]): Future[Seq[ImagePath]] =

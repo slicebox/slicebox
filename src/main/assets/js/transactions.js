@@ -42,7 +42,7 @@ angular.module('slicebox.transactions', ['ngRoute'])
     });
   
     $scope.loadIncomingPage = function(startIndex, count, orderByProperty, orderByDirection) {
-        return $http.get('/api/boxes/incoming');
+        return $http.get('/api/boxes/incoming?startindex=' + startIndex + '&count=' + count);
     };
 
 })
@@ -75,7 +75,7 @@ angular.module('slicebox.transactions', ['ngRoute'])
   
     // Scope functions
     $scope.loadOutgoingPage = function(startIndex, count, orderByProperty, orderByDirection) {
-        return $http.get('/api/boxes/outgoing');
+        return $http.get('/api/boxes/outgoing?startindex=' + startIndex + '&count=' + count);
     };
 
 })

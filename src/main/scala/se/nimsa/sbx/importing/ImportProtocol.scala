@@ -29,7 +29,7 @@ object ImportProtocol {
 
   case class UpdateSessionWithRejection(importSession: ImportSession) extends ImportSessionRequest
 
-  case object GetImportSessions extends ImportSessionRequest
+  case class GetImportSessions(startIndex: Long, count: Long) extends ImportSessionRequest
 
   case class DeleteImportSession(id: Long) extends ImportSessionRequest
 

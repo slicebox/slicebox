@@ -99,8 +99,8 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
     case msg: ForwardingRequest =>
 
       msg match {
-        case GetForwardingRules =>
-          val forwardingRules = getForwardingRulesFromDb
+        case GetForwardingRules(startIndex, count) =>
+          val forwardingRules = getForwardingRulesFromDb(startIndex, count)
           sender ! ForwardingRules(forwardingRules)
 
         case AddForwardingRule(forwardingRule) =>
@@ -213,9 +213,9 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
 
   // Database function
 
-  def getForwardingRulesFromDb =
+  def getForwardingRulesFromDb(startIndex: Long, count: Long) =
     db.withSession { implicit session =>
-      forwardingDao.listForwardingRules
+      forwardingDao.listForwardingRules(startIndex, count)
     }
 
   def addForwardingRuleToDb(forwardingRule: ForwardingRule): ForwardingRule =

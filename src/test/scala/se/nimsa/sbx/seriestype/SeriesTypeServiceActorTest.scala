@@ -1,18 +1,18 @@
 package se.nimsa.sbx.seriestype
 
+import akka.actor.ActorSystem
+import akka.actor.Status.Failure
+import akka.testkit.{ImplicitSender, TestKit}
+import akka.util.Timeout.durationToTimeout
+import org.scalatest._
+import se.nimsa.sbx.app.DbProps
+import se.nimsa.sbx.dicom.DicomHierarchy.Series
+import se.nimsa.sbx.metadata.MetaDataProtocol.MetaDataDeleted
+import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
+
 import scala.concurrent.duration.DurationInt
 import scala.slick.driver.H2Driver
 import scala.slick.jdbc.JdbcBackend.Database
-import org.scalatest._
-import akka.actor.ActorSystem
-import akka.actor.Status.Failure
-import akka.testkit.ImplicitSender
-import akka.testkit.TestKit
-import akka.util.Timeout.durationToTimeout
-import se.nimsa.sbx.app.DbProps
-import se.nimsa.sbx.dicom.DicomHierarchy.Series
-import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
-import se.nimsa.sbx.metadata.MetaDataProtocol.MetaDataDeleted
 
 class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
     with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {
@@ -47,7 +47,7 @@ class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
         seriesTypeDao.insertSeriesType(SeriesType(-1, "st1"))
       }
 
-      seriesTypeService ! GetSeriesTypes
+      seriesTypeService ! GetSeriesTypes(0, 10)
 
       expectMsgPF() {
         case SeriesTypes(seriesTypes) =>
@@ -67,7 +67,7 @@ class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
           returnedSeriesType.name should be(seriesType.name)
       }
 
-      seriesTypeService ! GetSeriesTypes
+      seriesTypeService ! GetSeriesTypes(0, 10)
 
       expectMsgPF() {
         case SeriesTypes(seriesTypes) =>
@@ -89,7 +89,7 @@ class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
         case Failure(e) if e.isInstanceOf[IllegalArgumentException] => true
       }
 
-      seriesTypeService ! GetSeriesTypes
+      seriesTypeService ! GetSeriesTypes(0, 10)
 
       expectMsgPF() {
         case SeriesTypes(seriesTypes) =>
@@ -111,7 +111,7 @@ class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
       seriesTypeService ! UpdateSeriesType(updatedSeriesType)
       expectMsg(SeriesTypeUpdated)
 
-      seriesTypeService ! GetSeriesTypes
+      seriesTypeService ! GetSeriesTypes(0, 10)
 
       expectMsgPF() {
         case SeriesTypes(seriesTypes) =>
@@ -131,7 +131,7 @@ class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
           seriesTypeId should be(addedSeriesType.id)
       }
 
-      seriesTypeService ! GetSeriesTypes
+      seriesTypeService ! GetSeriesTypes(0, 10)
 
       expectMsgPF() {
         case SeriesTypes(seriesTypes) =>
