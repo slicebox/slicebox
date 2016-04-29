@@ -1,6 +1,6 @@
 package se.nimsa.sbx.storage
 
-import java.io.{InputStream, ByteArrayInputStream, ByteArrayOutputStream}
+import java.io.{InputStream, ByteArrayOutputStream}
 import java.nio.file.{Files, Path}
 import javax.imageio.ImageIO
 
@@ -41,7 +41,7 @@ class S3Storage(val bucket: String, val s3Prefix: String) extends StorageService
       case NonFatal(e) =>
         throw new IllegalArgumentException("Dataset file could not be stored", e)
     }
-    val buffer = os.toByteArray()
+    val buffer = os.toByteArray
     s3Client.upload(s3Key, buffer)
   }
 
@@ -52,14 +52,14 @@ class S3Storage(val bucket: String, val s3Prefix: String) extends StorageService
 
   def deleteFromStorage(image: Image): Unit = s3Client.delete(s3Id(image))
 
-  def readDataset(image: Image, withPixelData: Boolean): Option[Attributes] = {
+  def readDataset(image: Image, withPixelData: Boolean, useBulkDataURI: Boolean): Option[Attributes] = {
     val s3InputStream = s3Client.get(s3Id(image))
-    Some(loadDataset(s3InputStream, withPixelData))
+    Some(loadDataset(s3InputStream, withPixelData, useBulkDataURI))
   }
 
   def readImageAttributes(image: Image): Option[List[ImageAttribute]] = {
     val s3InputStream = s3Client.get(s3Id(image))
-    Some(DicomUtil.readImageAttributes(loadDataset(s3InputStream, withPixelData = false)))
+    Some(DicomUtil.readImageAttributes(loadDataset(s3InputStream, withPixelData = false, useBulkDataURI = false)))
   }
 
   def readImageInformation(image: Image): Option[ImageInformation] = {

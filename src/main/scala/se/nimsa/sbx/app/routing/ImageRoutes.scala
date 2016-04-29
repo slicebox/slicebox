@@ -193,7 +193,7 @@ trait ImageRoutes {
     }
 
   private def addDatasetRoute(bytes: Array[Byte], apiUser: ApiUser) = {
-    val dataset = DicomUtil.loadDataset(bytes, withPixelData = true)
+    val dataset = DicomUtil.loadDataset(bytes, withPixelData = true, useBulkDataURI = false)
     val source = Source(SourceType.USER, apiUser.user, apiUser.id)
     val futureImageAndOverwrite =
       storageService.ask(CheckDataset(dataset)).mapTo[Boolean].flatMap { status =>

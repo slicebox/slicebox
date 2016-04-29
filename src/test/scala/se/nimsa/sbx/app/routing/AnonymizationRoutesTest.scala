@@ -18,7 +18,7 @@ import scala.slick.driver.H2Driver
 
 class AnonymizationRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
-  def dbUrl() = "jdbc:h2:mem:anonymizationroutestest;DB_CLOSE_DELAY=-1"
+  def dbUrl = "jdbc:h2:mem:anonymizationroutestest;DB_CLOSE_DELAY=-1"
 
   val dao = new AnonymizationDAO(H2Driver)
   val metaDataDao = new MetaDataDAO(H2Driver)

@@ -38,10 +38,9 @@ object StorageProtocol {
 
   sealed trait ImageRequest
 
-  case class GetImagePath(image: Image) extends ImageRequest
   case class GetImageData(image: Image) extends ImageRequest
 
-  case class GetDataset(image: Image, withPixelData: Boolean) extends ImageRequest
+  case class GetDataset(image: Image, withPixelData: Boolean, useBulkDataURI: Boolean = false) extends ImageRequest
 
   case class DatasetAdded(image: Image, overwrite: Boolean)
 

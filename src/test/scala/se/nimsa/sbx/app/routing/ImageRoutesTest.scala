@@ -10,6 +10,7 @@ import org.scalatest.{FlatSpec, Matchers}
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.{DicomUtil, ImageAttribute}
 import se.nimsa.sbx.metadata.MetaDataDAO
+import se.nimsa.sbx.storage.RuntimeStorage
 import se.nimsa.sbx.storage.StorageProtocol.{FileName, ImageInformation}
 import se.nimsa.sbx.util.TestUtil
 import spray.http.{BodyPart, ContentTypes, HttpData, MultipartFormData}
@@ -21,7 +22,7 @@ import scala.slick.driver.H2Driver
 
 class ImageRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
-  def dbUrl() = "jdbc:h2:mem:imageroutestest;DB_CLOSE_DELAY=-1"
+  def dbUrl = "jdbc:h2:mem:imageroutestest;DB_CLOSE_DELAY=-1"
 
   val metaDataDao = new MetaDataDAO(H2Driver)
 
@@ -30,7 +31,7 @@ class ImageRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     db.withSession { implicit session =>
       metaDataDao.clear
     }
-    TestUtil.deleteFolderContents(unitTestPath)
+    storage.asInstanceOf[RuntimeStorage].clear()
   }
 
   "Image routes" should "return 201 Created when adding an image using multipart form data" in {
@@ -67,7 +68,7 @@ class ImageRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     GetAsUser(s"/api/images/${image.id}") ~> routes ~> check {
       status shouldBe OK
       contentType should be(ContentTypes.`application/octet-stream`)
-      val dataset = DicomUtil.loadDataset(responseAs[Array[Byte]], withPixelData = true)
+      val dataset = DicomUtil.loadDataset(responseAs[Array[Byte]], withPixelData = true, useBulkDataURI = false)
       dataset should not be null
     }
   }
@@ -240,7 +241,7 @@ class ImageRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     val image = PostAsUser("/api/images", HttpData(TestUtil.testImageByteArray)) ~> routes ~> check {
       responseAs[Image]
     }
-    val dataset = DicomUtil.loadDataset(TestUtil.testImageByteArray, withPixelData = false)
+    val dataset = DicomUtil.loadDataset(TestUtil.testImageByteArray, withPixelData = false, useBulkDataURI = false)
     GetAsUser(s"/api/images/${image.id}/imageinformation") ~> routes ~> check {
       status shouldBe OK
       val info = responseAs[ImageInformation]

@@ -12,7 +12,7 @@ import se.nimsa.sbx.log.LogDAO
 
 class LogRoutesTest extends FlatSpec with Matchers with RoutesTestBase with BeforeAndAfterAll {
 
-  def dbUrl() = "jdbc:h2:mem:logroutestest;DB_CLOSE_DELAY=-1"
+  def dbUrl = "jdbc:h2:mem:logroutestest;DB_CLOSE_DELAY=-1"
   
   val logDao = new LogDAO(H2Driver)
 

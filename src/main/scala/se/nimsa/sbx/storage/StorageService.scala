@@ -3,7 +3,7 @@ package se.nimsa.sbx.storage
 import java.awt.RenderingHints
 import java.awt.image.BufferedImage
 import java.io.{IOException, InputStream, ByteArrayInputStream, ByteArrayOutputStream}
-import java.nio.file.{Path, Files}
+import java.nio.file.Path
 import java.util.zip.{ZipEntry, ZipOutputStream}
 import javax.imageio.ImageIO
 import javax.imageio.stream.ImageInputStream
@@ -13,10 +13,8 @@ import org.dcm4che3.data.{BulkData, Fragments, Tag, Attributes}
 import org.dcm4che3.imageio.plugins.dcm.DicomImageReadParam
 import se.nimsa.sbx.dicom.DicomHierarchy.{FlatSeries, Image}
 import se.nimsa.sbx.dicom.DicomUtil._
-import se.nimsa.sbx.dicom.{DicomUtil, ImageAttribute}
-import se.nimsa.sbx.storage.StorageProtocol.{ImageData, DeleteTempZipFile, ImageInformation}
-
-import scala.util.control.NonFatal
+import se.nimsa.sbx.dicom.ImageAttribute
+import se.nimsa.sbx.storage.StorageProtocol.ImageInformation
 
 /**
   * Created by michaelkober on 2016-04-25.
@@ -35,14 +33,14 @@ trait StorageService {
 
   def deleteFromStorage(image: Image): Unit
 
-  def readDataset(image: Image, withPixelData: Boolean): Option[Attributes]
+  def readDataset(image: Image, withPixelData: Boolean, useBulkDataURI: Boolean): Option[Attributes]
 
   def readImageAttributes(image: Image): Option[List[ImageAttribute]]
 
   def readImageInformation(image: Image): Option[ImageInformation]
 
   def readImageInformation(inputStream: InputStream): ImageInformation = {
-      val dataset = loadDataset(inputStream, withPixelData = false)
+      val dataset = loadDataset(inputStream, withPixelData = false, useBulkDataURI = false)
       val instanceNumber = dataset.getInt(Tag.InstanceNumber, 1)
       val imageIndex = dataset.getInt(Tag.ImageIndex, 1)
       val frameIndex = if (instanceNumber > imageIndex) instanceNumber else imageIndex

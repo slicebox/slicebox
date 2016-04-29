@@ -167,7 +167,7 @@ class TransactionRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
       contentType should be(ContentTypes.`application/octet-stream`)
 
-      val dataset = DicomUtil.loadDataset(decompress(responseAs[Array[Byte]]), true)
+      val dataset = DicomUtil.loadDataset(decompress(responseAs[Array[Byte]]), withPixelData = true, useBulkDataURI = false)
       dataset should not be (null)
     }
   }
@@ -299,7 +299,7 @@ class TransactionRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       status should be(OK)
       responseAs[Array[Byte]]
     }
-    val dataset = DicomUtil.loadDataset(decompress(compressedArray), false)
+    val dataset = DicomUtil.loadDataset(decompress(compressedArray), withPixelData = false, useBulkDataURI = false)
     dataset.getString(PatientName.dicomTag) should be("TEST NAME") // mapped
     dataset.getString(PatientID.dicomTag) should be("TEST ID") // mapped
     dataset.getString(PatientBirthDate.dicomTag) should be("19601010") // mapped

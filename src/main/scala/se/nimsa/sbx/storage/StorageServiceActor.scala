@@ -16,22 +16,15 @@
 
 package se.nimsa.sbx.storage
 
-import java.awt.RenderingHints
-import java.awt.image.BufferedImage
-import java.io.{IOException, InputStream, ByteArrayInputStream, ByteArrayOutputStream}
 import java.nio.file.{Files, NoSuchFileException, Path}
-import java.util.zip.{ZipEntry, ZipOutputStream}
-import javax.imageio.ImageIO
+import java.util.zip.ZipOutputStream
 
 import akka.actor.{Actor, Props}
 import akka.event.{Logging, LoggingReceive}
-import com.amazonaws.util.IOUtils
-import org.dcm4che3.data.{Attributes, BulkData, Fragments, Tag}
-import org.dcm4che3.imageio.plugins.dcm.DicomImageReadParam
-import se.nimsa.sbx.app.GeneralProtocol.{ImageAdded, Source}
+import org.dcm4che3.data.{Attributes, Tag}
+import se.nimsa.sbx.app.GeneralProtocol.ImageAdded
 import se.nimsa.sbx.dicom.DicomHierarchy._
-import se.nimsa.sbx.dicom.{DicomUtil, ImageAttribute, Jpg2Dcm}
-import se.nimsa.sbx.dicom.DicomUtil._
+import se.nimsa.sbx.dicom.{DicomUtil, Jpg2Dcm}
 import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.util.ExceptionCatching
 
@@ -98,16 +91,12 @@ class StorageServiceActor(storage: StorageService) extends Actor with ExceptionC
           val zipFilePath = createTempZipFile(imagesAndSeries)
           sender ! FileName(zipFilePath.getFileName.toString)
 
-        case GetImagePath(image) =>
-          // FIXME
-          sender ! None
-
         case GetImageData(image) =>
           val data = storage.imageAsByteArray(image).map(ImageData(_))
           sender ! data
 
-        case GetDataset(image, withPixelData) =>
-          sender ! storage.readDataset(image, withPixelData)
+        case GetDataset(image, withPixelData, useBulkDataURI) =>
+          sender ! storage.readDataset(image, withPixelData, useBulkDataURI)
 
         case GetImageAttributes(image) =>
           sender ! storage.readImageAttributes(image)

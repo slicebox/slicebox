@@ -4,8 +4,6 @@ import java.io.{InputStream, BufferedInputStream}
 import java.nio.file.{Path, Paths, Files}
 import javax.imageio.ImageIO
 
-import akka.event.LoggingAdapter
-import com.amazonaws.util.IOUtils
 import org.dcm4che3.data.Attributes
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.DicomUtil._
@@ -19,7 +17,9 @@ import scala.util.control.NonFatal
   *
   * @param path relative path to directory for DICOM files
   */
-class FileStorage(val path: String) extends StorageService {
+class FileStorage(val path: Path) extends StorageService {
+
+  createStorageDirectoryIfNecessary()
 
   def storeDataset(dataset: Attributes, image: Image): Boolean = {
     val storedPath = filePath(image)
@@ -32,7 +32,7 @@ class FileStorage(val path: String) extends StorageService {
   }
 
   def filePath(image: Image) =
-    Paths.get(path).resolve(imageName(image))
+    path.resolve(imageName(image))
 
   def storeEncapsulated(image: Image, dcmTempPath: Path): Unit =
     Files.move(dcmTempPath, filePath(image))
@@ -50,14 +50,14 @@ class FileStorage(val path: String) extends StorageService {
         //log.warning(s"No DICOM file found for image with id ${image.id} when deleting dataset")
     }
 
-  def readDataset(image: Image, withPixelData: Boolean): Option[Attributes] =
+  def readDataset(image: Image, withPixelData: Boolean, useBulkDataURI: Boolean): Option[Attributes] =
     resolvePath(image).map { imagePath =>
-      loadDataset(imagePath, withPixelData)
+      loadDataset(imagePath, withPixelData, useBulkDataURI)
     }
 
   def readImageAttributes(image: Image): Option[List[ImageAttribute]] =
     resolvePath(image).map { imagePath =>
-      DicomUtil.readImageAttributes(loadDataset(imagePath, withPixelData = false))
+      DicomUtil.readImageAttributes(loadDataset(imagePath, withPixelData = false, useBulkDataURI = false))
     }
 
   def readImageInformation(image: Image): Option[ImageInformation] =
@@ -82,16 +82,14 @@ class FileStorage(val path: String) extends StorageService {
       new BufferedInputStream(Files.newInputStream(imagePath))
     }
 
-  def createStorageDirectory(directory: String) = {
-    val storagePath = Paths.get(directory)
-    if (!Files.exists(storagePath))
+  private def createStorageDirectoryIfNecessary(): Unit = {
+    if (!Files.exists(path))
       try {
-        Files.createDirectories(storagePath)
+        Files.createDirectories(path)
       } catch {
         case e: Exception => throw new RuntimeException("Dicom-files directory could not be created: " + e.getMessage)
       }
-    if (!Files.isDirectory(storagePath))
+    if (!Files.isDirectory(path))
       throw new IllegalArgumentException("Dicom-files directory is not a directory.")
-    storagePath
   }
 }

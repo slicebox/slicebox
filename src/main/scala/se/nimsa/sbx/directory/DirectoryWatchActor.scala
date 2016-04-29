@@ -65,7 +65,7 @@ class DirectoryWatchActor(watchedDirectory: WatchedDirectory,
 
     case FileAddedToWatchedDirectory(path) =>
       if (Files.isRegularFile(path)) {
-        val dataset = loadDataset(path, withPixelData = true)
+        val dataset = loadDataset(path, withPixelData = true, useBulkDataURI = false)
         val source = Source(SourceType.DIRECTORY, watchedDirectory.name, watchedDirectory.id)
         checkDataset(dataset).flatMap { status =>
           addMetadata(dataset, source).flatMap { image =>

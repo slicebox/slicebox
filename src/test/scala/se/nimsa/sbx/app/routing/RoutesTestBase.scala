@@ -1,22 +1,17 @@
 package se.nimsa.sbx.app.routing
 
-import java.nio.file.{Paths, Path, Files}
 
-import com.typesafe.config.{ConfigFactory, Config}
 import com.typesafe.scalalogging.Logger
 import org.slf4j.LoggerFactory
-import se.nimsa.sbx.storage.{FileStorage, StorageServiceActor}
 
 import scala.concurrent.duration.DurationInt
-
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.Suite
-
 import se.nimsa.sbx.app.SliceboxService
+import se.nimsa.sbx.storage.RuntimeStorage
 import se.nimsa.sbx.user.UserProtocol.ClearTextUser
 import se.nimsa.sbx.user.UserProtocol.UserRole
-import se.nimsa.sbx.util.TestUtil
 import spray.http.BasicHttpCredentials
 import spray.http.HttpRequest
 import spray.http.StatusCodes.OK
@@ -42,20 +37,13 @@ trait RoutesTestBase extends ScalatestRouteTest with SliceboxService with Before
    */
   override def executionContext = executor
 
-
-  def appConfig: Config = ConfigFactory.load("test.conf")
-
-  val unitTestPath = Paths.get(sliceboxConfig.getString("dicom-storage.file-system.path"))
+  def createStorageService() = new RuntimeStorage
 
   def addUser(name: String, password: String, role: UserRole) = {
     val user = ClearTextUser(name, role, password)
     PostAsAdmin("/api/users", user) ~> sealRoute(routes) ~> check {
-      status === (OK)
+      status === OK
     }
-  }
-
-  override def afterAll {
-    TestUtil.deleteFolder(unitTestPath)
   }
 
   override def beforeAll {

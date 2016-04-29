@@ -11,7 +11,7 @@ import scala.slick.driver.H2Driver
 
 class ForwardingRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
-  def dbUrl() = "jdbc:h2:mem:forwardingroutestest;DB_CLOSE_DELAY=-1"
+  def dbUrl = "jdbc:h2:mem:forwardingroutestest;DB_CLOSE_DELAY=-1"
 
   val dao = new ForwardingDAO(H2Driver)
 

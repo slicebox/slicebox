@@ -14,7 +14,7 @@ import scala.slick.driver.H2Driver
 
 class ImportRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
-  override def dbUrl() = "jdbc:h2:mem:importroutestest;DB_CLOSE_DELAY=-1"
+  override def dbUrl = "jdbc:h2:mem:importroutestest;DB_CLOSE_DELAY=-1"
 
   val importDao = new ImportDAO(H2Driver)
   val metaDataDao = new MetaDataDAO(H2Driver)

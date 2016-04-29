@@ -46,12 +46,6 @@ class ScuRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
   }
 
-  it should "return 404 NotFound when asking to send an image that does not exist" in {
-    PostAsUser("/api/scus/1/send", Array(666)) ~> routes ~> check {
-      status should be(NotFound)
-    }
-  }
-
   it should "return 502 BadGateway when sending an image to an SCP that is unavailable" in {
     val file = TestUtil.testImageFile
     val mfd = MultipartFormData(Seq(BodyPart(file, "file")))

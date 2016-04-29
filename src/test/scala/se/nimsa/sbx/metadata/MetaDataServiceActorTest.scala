@@ -1,7 +1,5 @@
 package se.nimsa.sbx.metadata
 
-import java.nio.file.Files
-
 import akka.actor.{Actor, ActorSystem, Props}
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit}
 import org.dcm4che3.data.{Attributes, Tag, VR}
@@ -37,14 +35,11 @@ class MetaDataServiceActorTest(_system: ActorSystem) extends TestKit(_system) wi
 
   val dataset = TestUtil.testImageDataset()
 
-  val storage = Files.createTempDirectory("slicebox-test-storage-")
-
   val metaDataActorRef = TestActorRef(new MetaDataServiceActor(dbProps))
   val metaDataActor = metaDataActorRef.underlyingActor
 
   override def afterAll {
     TestKit.shutdownActorSystem(system)
-    TestUtil.deleteFolder(storage)
   }
 
   val patientEvents = new ListBuffer[Patient]()

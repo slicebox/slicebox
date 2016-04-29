@@ -10,7 +10,7 @@ import se.nimsa.sbx.lang.BadGatewayException
 
 class AppRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
-  def dbUrl() = "jdbc:h2:mem:approutestest;DB_CLOSE_DELAY=-1"
+  def dbUrl = "jdbc:h2:mem:approutestest;DB_CLOSE_DELAY=-1"
 
   def illegalArgumentRoute =
     path("illegalargumentexception") {

@@ -22,7 +22,7 @@ import spray.http.BodyPart
 
 class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
-  def dbUrl() = "jdbc:h2:mem:metadataroutestest;DB_CLOSE_DELAY=-1"
+  def dbUrl = "jdbc:h2:mem:metadataroutestest;DB_CLOSE_DELAY=-1"
 
   val dao = new MetaDataDAO(H2Driver)
   val seriesTypeDao = new SeriesTypeDAO(H2Driver)

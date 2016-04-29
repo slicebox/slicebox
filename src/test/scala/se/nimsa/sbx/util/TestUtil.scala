@@ -99,7 +99,7 @@ object TestUtil {
   
   def testImageFile = new File(getClass.getResource("test.dcm").toURI)
   def testSecondaryCaptureFile = new File(getClass.getResource("sc.dcm").toURI)
-  def testImageDataset(withPixelData: Boolean = true) = DicomUtil.loadDataset(testImageFile.toPath, withPixelData)
+  def testImageDataset(withPixelData: Boolean = true) = DicomUtil.loadDataset(testImageFile.toPath, withPixelData, useBulkDataURI = false)
   def testImageByteArray = DicomUtil.toByteArray(testImageFile.toPath)
 
   def jpegFile = new File(getClass.getResource("cat.jpg").toURI)
@@ -166,7 +166,7 @@ object TestUtil {
   def deleteFolderContents(path: Path) =
     Files.list(path).collect(Collectors.toList()).asScala.foreach { path =>
       if (Files.isDirectory(path)) {
-        deleteFolder(path);
+        deleteFolder(path)
       } else {
         Files.deleteIfExists(path)
       }
