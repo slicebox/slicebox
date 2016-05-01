@@ -16,20 +16,17 @@
 
 package se.nimsa.sbx.storage
 
-import java.nio.file.{Files, NoSuchFileException, Path}
-import java.util.zip.ZipOutputStream
+import java.nio.file.NoSuchFileException
 
 import akka.actor.{Actor, Props}
 import akka.event.{Logging, LoggingReceive}
 import org.dcm4che3.data.{Attributes, Tag}
 import se.nimsa.sbx.app.GeneralProtocol.ImageAdded
-import se.nimsa.sbx.dicom.DicomHierarchy._
-import se.nimsa.sbx.dicom.{DicomUtil, Jpeg2Dcm}
+import se.nimsa.sbx.dicom.DicomUtil
 import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.util.ExceptionCatching
 
 import scala.concurrent.duration.DurationInt
-import scala.util.Random
 import scala.util.control.NonFatal
 
 class StorageServiceActor(storage: StorageService) extends Actor with ExceptionCatching {
@@ -41,6 +38,7 @@ class StorageServiceActor(storage: StorageService) extends Actor with ExceptionC
   implicit val ec = context.dispatcher
 
   val exportSets = mutable.Map.empty[Long, Seq[Long]]
+  case class RemoveExportSet(id: Long)
 
   log.info("Storage service started")
 
@@ -87,7 +85,7 @@ class StorageServiceActor(storage: StorageService) extends Actor with ExceptionC
         case CreateExportSet(imageIds) =>
           val exportSetId = if (exportSets.isEmpty) 1 else exportSets.keys.max + 1
           exportSets(exportSetId) = imageIds
-          //      context.system.scheduler.scheduleOnce(12.hours, self, RemoveExportSet(exportSet))
+          context.system.scheduler.scheduleOnce(12.hours, self, RemoveExportSet(exportSetId))
           sender ! ExportSetId(exportSetId)
 
         case GetExportSetImageIds(exportSetId) =>
@@ -118,6 +116,10 @@ class StorageServiceActor(storage: StorageService) extends Actor with ExceptionC
 
       }
     }
+
+    case RemoveExportSet(id) =>
+      exportSets.remove(id)
+
   }
 
   def checkDataset(dataset: Attributes): Boolean = {

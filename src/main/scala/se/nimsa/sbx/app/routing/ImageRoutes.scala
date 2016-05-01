@@ -16,12 +16,10 @@
 
 package se.nimsa.sbx.app.routing
 
-import java.io.File
+import java.io.ByteArrayOutputStream
+import java.util.zip.{ZipEntry, ZipOutputStream}
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
-
-import scala.concurrent.Future
-import scala.concurrent.duration.DurationInt
 import akka.pattern.ask
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.app.SliceboxService
@@ -30,14 +28,16 @@ import se.nimsa.sbx.dicom.{DicomUtil, ImageAttribute, Jpeg2Dcm}
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.user.UserProtocol.ApiUser
+import se.nimsa.sbx.util.SbxExtensions._
+import spray.can.Http
 import spray.http.ContentType.apply
-import spray.http._
 import spray.http.HttpHeaders._
 import spray.http.MediaTypes._
 import spray.http.StatusCodes._
+import spray.http._
 import spray.routing.Route
-import se.nimsa.sbx.util.SbxExtensions._
-import spray.can.Http
+
+import scala.concurrent.Future
 
 trait ImageRoutes {
   this: SliceboxService =>
@@ -55,109 +55,95 @@ trait ImageRoutes {
             addDatasetRoute(bytes, apiUser)
           }
         }
-      } ~ pathPrefix(LongNumber) { imageId =>
-        onSuccess(metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]]) {
-          case Some(image) =>
-            pathEndOrSingleSlash {
-              get {
-                onSuccess(storageService.ask(GetImageData(image)).mapTo[Option[ImageData]]) {
-                  case Some(imageData) =>
-                    complete(HttpEntity(`application/octet-stream`, HttpData(imageData.data)))
-                  case None =>
-                    complete((NotFound, s"No file found for image id $imageId"))
-                }
-              } ~ delete {
-                onSuccess(storageService.ask(DeleteDataset(image)).flatMap { _ =>
-                  metaDataService.ask(DeleteMetaData(image.id))
-                }) {
-                  case _ =>
-                    complete(NoContent)
-                }
-              }
-            } ~ path("attributes") {
-              get {
-                onSuccess(storageService.ask(GetImageAttributes(image)).mapTo[Option[List[ImageAttribute]]]) {
-                  import spray.httpx.SprayJsonSupport._
-                  complete(_)
-                }
-              }
-            } ~ path("imageinformation") {
-              get {
-                onSuccess(storageService.ask(GetImageInformation(image)).mapTo[Option[ImageInformation]]) {
-                  import spray.httpx.SprayJsonSupport._
-                  complete(_)
-                }
-              }
-            } ~ path("png") {
-              parameters(
-                'framenumber.as[Int] ? 1,
-                'windowmin.as[Int] ? 0,
-                'windowmax.as[Int] ? 0,
-                'imageheight.as[Int] ? 0) { (frameNumber, min, max, height) =>
+      } ~ noop {
+        import spray.httpx.SprayJsonSupport._
+        pathPrefix(LongNumber) { imageId =>
+          onSuccess(metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]]) {
+            case Some(image) =>
+              pathEndOrSingleSlash {
                 get {
-                  onSuccess(storageService.ask(GetImageFrame(image, frameNumber, min, max, height)).mapTo[Option[Array[Byte]]]) {
-                    case Some(bytes) => complete(HttpEntity(`image/png`, HttpData(bytes)))
-                    case None => complete(NotFound)
+                  onSuccess(storageService.ask(GetImageData(image)).mapTo[Option[ImageData]]) {
+                    case Some(imageData) =>
+                      complete(HttpEntity(`application/octet-stream`, HttpData(imageData.data)))
+                    case None =>
+                      complete((NotFound, s"No file found for image id $imageId"))
+                  }
+                } ~ delete {
+                  onSuccess(storageService.ask(DeleteDataset(image)).flatMap { _ =>
+                    metaDataService.ask(DeleteMetaData(image.id))
+                  }) {
+                    case _ =>
+                      complete(NoContent)
                   }
                 }
-              }
-            }
-          case None =>
-            complete(NotFound)
-        }
-      } ~ path("delete") {
-        post {
-          import spray.httpx.SprayJsonSupport._
-          entity(as[Seq[Long]]) { imageIds =>
-            val futureDeleted = Future.sequence {
-              imageIds.map { imageId =>
-                metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]].map { imageMaybe =>
-                  imageMaybe.map { image =>
-                    storageService.ask(DeleteDataset(image)).flatMap { _ =>
-                      metaDataService.ask(DeleteMetaData(image.id))
+              } ~ path("attributes") {
+                get {
+                  onSuccess(storageService.ask(GetImageAttributes(image)).mapTo[Option[List[ImageAttribute]]]) {
+                    complete(_)
+                  }
+                }
+              } ~ path("imageinformation") {
+                get {
+                  onSuccess(storageService.ask(GetImageInformation(image)).mapTo[Option[ImageInformation]]) {
+                    complete(_)
+                  }
+                }
+              } ~ path("png") {
+                parameters(
+                  'framenumber.as[Int] ? 1,
+                  'windowmin.as[Int] ? 0,
+                  'windowmax.as[Int] ? 0,
+                  'imageheight.as[Int] ? 0) { (frameNumber, min, max, height) =>
+                  get {
+                    onSuccess(storageService.ask(GetImageFrame(image, frameNumber, min, max, height)).mapTo[Option[Array[Byte]]]) {
+                      case Some(bytes) => complete(HttpEntity(`image/png`, HttpData(bytes)))
+                      case None => complete(NotFound)
                     }
                   }
-                }.unwrap
+                }
+              }
+            case None =>
+              complete(NotFound)
+          }
+        } ~ path("delete") {
+          post {
+            entity(as[Seq[Long]]) { imageIds =>
+              val futureDeleted = Future.sequence {
+                imageIds.map { imageId =>
+                  metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]].map { imageMaybe =>
+                    imageMaybe.map { image =>
+                      storageService.ask(DeleteDataset(image)).flatMap { _ =>
+                        metaDataService.ask(DeleteMetaData(image.id))
+                      }
+                    }
+                  }.unwrap
+                }
+              }
+              onSuccess(futureDeleted) { m =>
+                complete(NoContent)
               }
             }
-            onSuccess(futureDeleted) { m =>
-              complete(NoContent)
-            }
           }
-        }
-      } ~ path("export") {
-        post {
-          import spray.httpx.SprayJsonSupport._
-          entity(as[Seq[Long]]) { imageIds =>
-            if (imageIds.isEmpty)
-              complete(NoContent)
-            else {
-              //              val imagesAndSeriesFuture = Future.sequence {
-              //                imageIds.map { imageId =>
-              //                  metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]].flatMap { imageMaybe =>
-              //                    imageMaybe.map { image =>
-              //                      metaDataService.ask(GetSingleFlatSeries(image.seriesId)).mapTo[Option[FlatSeries]].map { flatSeriesMaybe =>
-              //                        flatSeriesMaybe.map { flatSeries =>
-              //                          (image, flatSeries)
-              //                        }
-              //                      }
-              //                    }.unwrap
-              //                  }
-              //                }
-              //              }.map(_.flatten)
-
-              complete(storageService.ask(CreateExportSet(imageIds)).mapTo[ExportSetId])
+        } ~ path("export") {
+          post {
+            entity(as[Seq[Long]]) { imageIds =>
+              if (imageIds.isEmpty)
+                complete(NoContent)
+              else
+                complete(storageService.ask(CreateExportSet(imageIds)).mapTo[ExportSetId])
             }
-          }
-        }
-      } ~ path(LongNumber) { exportSetId =>
-        get { ctx =>
-          respondWithHeader(`Content-Disposition`("attachment; filename=\"slicebox-export.zip\"")) {
-            storageService.ask(GetExportSetImageIds(exportSetId)).mapTo[Option[Seq[Long]]].map {
-              case Some(imageIds) =>
-                actorRefFactory.actorOf(Props(new Streamer(ctx.responder, imageIds)))
-              case None =>
-                complete(NotFound)
+          } ~ get {
+            parameter('id.as[Long]) { exportSetId =>
+              respondWithHeader(`Content-Disposition`("attachment; filename=\"slicebox-export.zip\"")) {
+                onSuccess(storageService.ask(GetExportSetImageIds(exportSetId)).mapTo[Option[Seq[Long]]]) {
+                  case Some(imageIds) =>
+                    ctx => {
+                      val streamer = actorRefFactory.actorOf(Props(new ChunkedZipStreamer(ctx.responder, imageIds)))
+                    }
+                  case None =>
+                    complete(NotFound)
+                }
+              }
             }
           }
         }
@@ -165,6 +151,8 @@ trait ImageRoutes {
         parameters('studyid.as[Long]) { studyId =>
           post {
             entity(as[Array[Byte]]) { jpegBytes =>
+              import spray.httpx.SprayJsonSupport._
+
               val source = Source(SourceType.USER, apiUser.user, apiUser.id)
               val addedJpegFuture = metaDataService.ask(GetStudy(studyId)).mapTo[Option[Study]].flatMap { studyMaybe =>
                 studyMaybe.map { study =>
@@ -180,7 +168,6 @@ trait ImageRoutes {
               }.unwrap
               onSuccess(addedJpegFuture) {
                 case Some(image) =>
-                  import spray.httpx.SprayJsonSupport._
                   complete((Created, image))
                 case _ =>
                   complete(NotFound)
@@ -192,17 +179,22 @@ trait ImageRoutes {
     }
 
   private def addDatasetRoute(bytes: Array[Byte], apiUser: ApiUser) = {
+    import spray.httpx.SprayJsonSupport._
+
     val dataset = DicomUtil.loadDataset(bytes, withPixelData = true, useBulkDataURI = false)
     val source = Source(SourceType.USER, apiUser.user, apiUser.id)
     val futureImageAndOverwrite =
-      storageService.ask(CheckDataset(dataset)).mapTo[Boolean].flatMap { status =>
-        metaDataService.ask(AddMetaData(dataset, source)).mapTo[MetaDataAdded].flatMap { metaData =>
-          storageService.ask(AddDataset(dataset, source, metaData.image)).mapTo[DatasetAdded].map { datasetAdded => (metaData.image, datasetAdded.overwrite) }
-        }
+      storageService.ask(CheckDataset(dataset)).mapTo[Boolean].flatMap {
+        status =>
+          metaDataService.ask(AddMetaData(dataset, source)).mapTo[MetaDataAdded].flatMap {
+            metaData =>
+              storageService.ask(AddDataset(dataset, source, metaData.image)).mapTo[DatasetAdded].map {
+                datasetAdded => (metaData.image, datasetAdded.overwrite)
+              }
+          }
       }
     onSuccess(futureImageAndOverwrite) {
       case (image, overwrite) =>
-        import spray.httpx.SprayJsonSupport._
         if (overwrite)
           complete((OK, image))
         else
@@ -210,32 +202,71 @@ trait ImageRoutes {
     }
   }
 
-  class Streamer(client: ActorRef, imageIds: Seq[Long]) extends Actor with ActorLogging {
-    log.info("Starting streaming response ...")
+  class ChunkedZipStreamer(recipient: ActorRef, imageIds: Seq[Long]) extends Actor with ActorLogging {
 
-    // we use the successful sending of a chunk as trigger for scheduling the next chunk
-    client ! ChunkedResponseStart(HttpResponse(entity = " " * 2048)).withAck(Ok(imageIds.tail))
+    case class Ok(imageIds: Seq[Long])
+
+    val byteStream = new ByteArrayOutputStream()
+    val zipStream = new ZipOutputStream(byteStream)
+    log.debug("Starting export zip stream")
+
+    recipient ! ChunkedResponseStart(HttpResponse()).withAck(Ok(imageIds))
 
     def receive = {
-      case Ok(remaining) if remaining.isEmpty =>
-        log.info("Finalizing response stream ...")
-        client ! MessageChunk("\nStopped...")
-        client ! ChunkedMessageEnd
+      case Ok(Nil) =>
+        log.debug("Finalizing images export zip stream")
+        zipStream.close()
+        val zippedBytes = byteStream.toByteArray
+        recipient ! MessageChunk(zippedBytes)
+        recipient ! ChunkedMessageEnd
         context.stop(self)
 
-      case Ok(remaining) =>
-        log.info("Sending response chunk ...")
-        context.system.scheduler.scheduleOnce(100.millis) {
-          client ! MessageChunk(remaining.head + ", ").withAck(Ok(remaining.tail))
+      case Ok(remainingImageIds) =>
+        val imageId = remainingImageIds.head
+        log.debug(s"Sending images export zip stream chunk for image id $imageId")
+        getImageData(imageId).foreach {
+          case Some((image, flatSeries, imageData)) =>
+            val zipEntry = createZipEntry(image, flatSeries)
+            zipStream.putNextEntry(zipEntry)
+            zipStream.write(imageData.data)
+            val zippedBytes = byteStream.toByteArray
+            byteStream.reset()
+            recipient ! MessageChunk(zippedBytes).withAck(Ok(remainingImageIds.tail))
+          case _ =>
+            self ! Ok(remainingImageIds.tail)
         }
 
       case x: Http.ConnectionClosed =>
-        log.info("Canceling response stream due to {} ...", x)
+        log.debug("Canceling images export zip stream due to {}", x)
         context.stop(self)
     }
 
-    // simple case class whose instances we use as send confirmation message for streaming chunks
-    case class Ok(imageIds: Seq[Long])
+    def getImageData(imageId: Long): Future[Option[(Image, FlatSeries, ImageData)]] =
+      metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]].flatMap { imageMaybe =>
+        imageMaybe.map { image =>
+          metaDataService.ask(GetSingleFlatSeries(image.seriesId)).mapTo[Option[FlatSeries]].flatMap { flatSeriesMaybe =>
+            flatSeriesMaybe.map { flatSeries =>
+              storageService.ask(GetImageData(image)).mapTo[Option[ImageData]].map { imageDataMaybe =>
+                imageDataMaybe.map { imageData =>
+                  (image, flatSeries, imageData)
+                }
+              }
+            }.unwrap
+          }
+        }.unwrap
+      }
+
+    def createZipEntry(image: Image, flatSeries: FlatSeries): ZipEntry = {
+
+      def sanitize(string: String) = string.replace('/', '-').replace('\\', '-')
+
+      val patientFolder = sanitize(s"${flatSeries.patient.id}_${flatSeries.patient.patientName.value}-${flatSeries.patient.patientID.value}")
+      val studyFolder = sanitize(s"${flatSeries.study.id}_${flatSeries.study.studyDate.value}")
+      val seriesFolder = sanitize(s"${flatSeries.series.id}_${flatSeries.series.seriesDate.value}_${flatSeries.series.modality.value}")
+      val imageName = s"${image.id}.dcm"
+      val entryName = s"$patientFolder/$studyFolder/$seriesFolder/$imageName"
+      new ZipEntry(entryName)
+    }
 
   }
 

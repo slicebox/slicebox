@@ -19,7 +19,6 @@ package se.nimsa.sbx.app.routing
 import spray.routing._
 import spray.http.StatusCodes._
 import se.nimsa.sbx.app.SliceboxService
-import se.nimsa.sbx.user.UserProtocol._
 import spray.routing.ExceptionHandler
 import se.nimsa.sbx.lang.NotFoundException
 import se.nimsa.sbx.lang.BadGatewayException
@@ -43,11 +42,11 @@ trait SliceboxRoutes extends DirectoryRoutes
   implicit val knownExceptionHandler =
     ExceptionHandler {
       case e: IllegalArgumentException =>
-        complete((BadRequest, e.getMessage()))
+        complete((BadRequest, e.getMessage))
       case e: NotFoundException =>
-        complete((NotFound, e.getMessage()))
+        complete((NotFound, e.getMessage))
       case e: BadGatewayException =>
-        complete((BadGateway, e.getMessage()))
+        complete((BadGateway, e.getMessage))
     }
 
   implicit val authRejectionHandler = RejectionHandler {
