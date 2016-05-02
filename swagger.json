@@ -1459,7 +1459,7 @@
 
     "/images/export": {
       "post": {
-        "description": "create a zip archive containing the selected images. The archive is available for downloading for 12 hours before it is automatically deleted.",
+        "description": "create an export set, a group of image IDs of images to export. The export set will contain the selected images. The export set is available for download 12 hours before it is automatically deleted.",
         "tags": ["Images"],
         "parameters": [
           {
@@ -1481,26 +1481,27 @@
             "description": "if the supplied list of image ids is empty or no if images could be found"
           },
           "200": {
-            "description": "file name of created zip archive. To be used with the below GET method for downloading.",
+            "description": "ID of created export set. To be used with the associated GET method for downloading.",
             "schema": {
-              "$ref": "#/definitions/fileName"
+              "$ref": "#/definitions/exportSetId"
             }
           }
         }
       },
       "get": {
-        "description": "download the export zip archive with the supplied file name",
+        "description": "download the export set with the supplied export set ID as a zip archive",
         "produces": [
           "application/zip"
         ],
         "tags": ["Images"],
         "parameters": [
           {
-            "name": "filename",
+            "name": "id",
             "in": "query",
-            "description": "file name of zip archive to download",
+            "description": "ID of export set to download",
             "required": true,
-            "type": "string"
+            "type": "integer",
+            "format": "int64"
           }
         ],
         "responses": {
@@ -3230,10 +3231,11 @@
         }
       }      
     },
-    "fileName": {
+    "exportSetId": {
       "properties": {
         "value": {
-          "type": "string"
+          "id": "integer",
+          "format": "int64"          
         }
       }
     },
