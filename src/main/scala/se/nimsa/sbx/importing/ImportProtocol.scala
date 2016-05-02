@@ -35,6 +35,7 @@ object ImportProtocol {
 
   case class GetImportSessionImages(id: Long) extends ImportSessionRequest
 
+
   case class ImageAddedToSession(importSessionImage: ImportSessionImage)
 
   case class ImportSessions(importSessions:Seq[ImportSession])
