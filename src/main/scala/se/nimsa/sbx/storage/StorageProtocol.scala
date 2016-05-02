@@ -16,18 +16,15 @@
 
 package se.nimsa.sbx.storage
 
-import java.io.InputStream
 import java.nio.file.Path
 
 import org.dcm4che3.data.Attributes
-import se.nimsa.sbx.dicom.DicomHierarchy.{FlatSeries, Image, Patient, Study}
+import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.app.GeneralProtocol._
 
 object StorageProtocol {
 
   // domain objects
-
-  case class FileName(value: String)
 
   case class ImageInformation(
     numberOfFrames: Int,
@@ -56,7 +53,9 @@ object StorageProtocol {
 
   case class DeleteDataset(image: Image) extends ImageRequest
 
-  case class CreateTempZipFile(imagesAndSeries: Seq[(Image, FlatSeries)]) extends ImageRequest
+  case class CreateExportSet(imageIds: Seq[Long]) extends ImageRequest
+
+  case class GetExportSetImageIds(exportSetId: Long) extends ImageRequest
 
 
   case class DatasetAdded(image: Image, overwrite: Boolean)
@@ -65,8 +64,8 @@ object StorageProtocol {
 
   case class DatasetDeleted(image: Image)
 
-  case class ImagePath(imagePath: Path)
   case class ImageData(data: Array[Byte])
 
-  case class DeleteTempZipFile(path: Path)
+  case class ExportSetId(id: Long)
+
 }

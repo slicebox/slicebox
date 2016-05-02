@@ -16,7 +16,7 @@ import scala.slick.driver.H2Driver
 
 class UserRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
-  def dbUrl() = "jdbc:h2:mem:userroutestest;DB_CLOSE_DELAY=-1"
+  def dbUrl = "jdbc:h2:mem:userroutestest;DB_CLOSE_DELAY=-1"
 
   val user = ClearTextUser("name", ADMINISTRATOR, "password")
 

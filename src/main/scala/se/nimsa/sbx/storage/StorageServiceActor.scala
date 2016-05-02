@@ -16,15 +16,13 @@
 
 package se.nimsa.sbx.storage
 
-import java.nio.file.{Files, NoSuchFileException, Path}
-import java.util.zip.ZipOutputStream
+import java.nio.file.NoSuchFileException
 
 import akka.actor.{Actor, Props}
 import akka.event.{Logging, LoggingReceive}
 import org.dcm4che3.data.{Attributes, Tag}
 import se.nimsa.sbx.app.GeneralProtocol.ImageAdded
-import se.nimsa.sbx.dicom.DicomHierarchy._
-import se.nimsa.sbx.dicom.{DicomUtil, Jpeg2Dcm}
+import se.nimsa.sbx.dicom.DicomUtil
 import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.util.ExceptionCatching
 
@@ -33,16 +31,18 @@ import scala.util.control.NonFatal
 
 class StorageServiceActor(storage: StorageService) extends Actor with ExceptionCatching {
 
+  import scala.collection.mutable
+
   val log = Logging(context.system, this)
 
   implicit val ec = context.dispatcher
 
+  val exportSets = mutable.Map.empty[Long, Seq[Long]]
+  case class RemoveExportSet(id: Long)
+
   log.info("Storage service started")
 
   def receive = LoggingReceive {
-
-    case DeleteTempZipFile(path) =>
-      Files.deleteIfExists(path)
 
     case msg: ImageRequest => catchAndReport {
       msg match {
@@ -82,9 +82,14 @@ class StorageServiceActor(storage: StorageService) extends Actor with ExceptionC
           }
           sender ! datasetDeleted
 
-        case CreateTempZipFile(imagesAndSeries) =>
-          val zipFilePath = createTempZipFile(imagesAndSeries)
-          sender ! FileName(zipFilePath.getFileName.toString)
+        case CreateExportSet(imageIds) =>
+          val exportSetId = if (exportSets.isEmpty) 1 else exportSets.keys.max + 1
+          exportSets(exportSetId) = imageIds
+          context.system.scheduler.scheduleOnce(12.hours, self, RemoveExportSet(exportSetId))
+          sender ! ExportSetId(exportSetId)
+
+        case GetExportSetImageIds(exportSetId) =>
+          sender ! exportSets.get(exportSetId)
 
         case GetImageData(image) =>
           val data = storage.imageAsByteArray(image).map(ImageData(_))
@@ -111,6 +116,10 @@ class StorageServiceActor(storage: StorageService) extends Actor with ExceptionC
 
       }
     }
+
+    case RemoveExportSet(id) =>
+      exportSets.remove(id)
+
   }
 
   def checkDataset(dataset: Attributes): Boolean = {
@@ -119,32 +128,6 @@ class StorageServiceActor(storage: StorageService) extends Actor with ExceptionC
     else if (!DicomUtil.checkSopClass(dataset))
       throw new IllegalArgumentException(s"Unsupported SOP Class UID ${dataset.getString(Tag.SOPClassUID)}")
     true
-  }
-
-  def createTempZipFile(imagesAndSeries: Seq[(Image, FlatSeries)]): Path = {
-
-    def scheduleDeleteTempFile(tempFile: Path) =
-      context.system.scheduler.scheduleOnce(12.hours, self, DeleteTempZipFile(tempFile))
-
-    val tempFile = Files.createTempFile("slicebox-export-", ".zip")
-    val fos = Files.newOutputStream(tempFile)
-    val zos = new ZipOutputStream(fos)
-
-    // Add the files to the zip archive strictly sequentially (no concurrency) to
-    // reduce load on meta data service and to keep memory consumption bounded
-    imagesAndSeries.foreach {
-      case (image, flatSeries) =>
-        storage.imageAsInputStream(image).foreach { is =>
-          storage.addToZipFile(is, image, flatSeries, zos)
-        }
-    }
-
-    zos.close()
-    fos.close()
-
-    scheduleDeleteTempFile(tempFile)
-
-    tempFile
   }
 
 }

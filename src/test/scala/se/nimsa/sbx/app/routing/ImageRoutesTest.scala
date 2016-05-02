@@ -1,8 +1,7 @@
 package se.nimsa.sbx.app.routing
 
-import java.io.{ByteArrayInputStream, File, IOException}
-import java.nio.file.{Files, Path, Paths}
-import java.util.zip.ZipFile
+import java.io.{ByteArrayInputStream, File}
+import java.util.zip.ZipInputStream
 import javax.imageio.ImageIO
 
 import org.dcm4che3.data.Tag
@@ -11,7 +10,7 @@ import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.{DicomUtil, ImageAttribute}
 import se.nimsa.sbx.metadata.MetaDataDAO
 import se.nimsa.sbx.storage.RuntimeStorage
-import se.nimsa.sbx.storage.StorageProtocol.{FileName, ImageInformation}
+import se.nimsa.sbx.storage.StorageProtocol.{ExportSetId, ImageInformation}
 import se.nimsa.sbx.util.TestUtil
 import spray.http.{BodyPart, ContentTypes, HttpData, MultipartFormData}
 import spray.http.StatusCodes._
@@ -251,30 +250,40 @@ class ImageRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
   }
 
-  it should "return 200 OK and the file path to an existing and valid zip file of exported files" in {
+  it should "return 200 OK and an ID which is related to a set of images to export" in {
     val image = PostAsUser("/api/images", HttpData(TestUtil.testImageByteArray)) ~> routes ~> check {
       responseAs[Image]
     }
     PostAsUser("/api/images/export", Seq(image.id)) ~> routes ~> check {
       status shouldBe OK
-      val filePath = responseAs[FileName]
-      val path = Paths.get(System.getProperty("java.io.tmpdir"), filePath.value)
-      Files.exists(path) shouldBe true
-      isValidZip(path) shouldBe true
-      Files.deleteIfExists(path)
+      val exportSetId = responseAs[ExportSetId]
+      exportSetId.id.toInt should be > 0
     }
   }
 
-  def isValidZip(path: Path): Boolean = {
-    var zipfile: ZipFile = null
-    try {
-      zipfile = new ZipFile(path.toFile)
-      true
-    } catch {
-      case _: IOException => false
-    } finally {
-      if (zipfile != null)
-        zipfile.close()
+  it should "return 200 OK and a valid zip file sent with chunked encoding when exporting" in {
+    val image = PostAsUser("/api/images", HttpData(TestUtil.testImageByteArray)) ~> routes ~> check {
+      responseAs[Image]
     }
+    val exportSetId =
+      PostAsUser("/api/images/export", Seq(image.id)) ~> routes ~> check {
+        responseAs[ExportSetId].id
+      }
+    val byteChunks =
+      GetAsUser(s"/api/images/export?id=$exportSetId") ~> routes ~> check {
+        status shouldBe OK
+        chunks
+      }
+    byteChunks should not be empty
+    val zipBytes = byteChunks.flatMap(_.data.toByteArray).toArray
+    zipBytes should not be empty
+    isValidZip(zipBytes) shouldBe true
+  }
+
+  def isValidZip(zipBytes: Array[Byte]): Boolean = {
+    val stream = new ZipInputStream(new ByteArrayInputStream(zipBytes))
+    stream.getNextEntry should not be null
+    stream.close()
+    true
   }
 }
