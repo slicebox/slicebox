@@ -133,46 +133,4 @@ trait StorageService {
       image
   }
 
-  def addToZipFile(inputStream: InputStream, image: Image, flatSeries: FlatSeries, zos: ZipOutputStream): Unit = {
-
-    def sanitize(string: String) = string.replace('/', '-').replace('\\', '-')
-
-    val patientFolder = sanitize(s"${
-      flatSeries.patient.id
-    }_${
-      flatSeries.patient.patientName.value
-    }-${
-      flatSeries.patient.patientID.value
-    }")
-    val studyFolder = sanitize(s"${
-      flatSeries.study.id
-    }_${
-      flatSeries.study.studyDate.value
-    }")
-    val seriesFolder = sanitize(s"${
-      flatSeries.series.id
-    }_${
-      flatSeries.series.seriesDate.value
-    }_${
-      flatSeries.series.modality.value
-    }")
-    val imageName = s"${
-      image.id
-    }.dcm"
-    val entryName = s"$patientFolder/$studyFolder/$seriesFolder/$imageName"
-    val zipEntry = new ZipEntry(entryName)
-    zos.putNextEntry(zipEntry)
-
-    val bytes = new Array[Byte](bufferSize)
-    var bytesLeft = true
-    while (bytesLeft) {
-      val length = inputStream.read(bytes)
-      bytesLeft = length > 0
-      if (bytesLeft) zos.write(bytes, 0, length)
-    }
-
-    zos.closeEntry()
-    inputStream.close()
-  }
-
 }

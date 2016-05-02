@@ -14,27 +14,27 @@ class RuntimeStorage extends StorageService {
 
   import scala.collection.mutable
 
-  val storage = mutable.Map.empty[Long, Array[Byte]]
+  val storage = mutable.Map.empty[String, Array[Byte]]
 
   def storeDataset(dataset: Attributes, image: Image): Boolean = {
-    val overwrite = storage.contains(image.id)
-    storage.put(image.id, toByteArray(dataset))
+    val overwrite = storage.contains(imageName(image))
+    storage.put(imageName(image), toByteArray(dataset))
     overwrite
   }
 
   def storeEncapsulated(image: Image, dcmTempPath: Path): Unit = {
-    storage.put(image.id, Files.readAllBytes(dcmTempPath))
+    storage.put(imageName(image), Files.readAllBytes(dcmTempPath))
     Files.delete(dcmTempPath)
   }
 
   def deleteFromStorage(image: Image): Unit =
-    storage.remove(image.id)
+    storage.remove(imageName(image))
 
   def readDataset(image: Image, withPixelData: Boolean, useBulkDataURI: Boolean): Option[Attributes] =
-    storage.get(image.id).map(bytes => loadDataset(bytes, withPixelData, useBulkDataURI))
+    storage.get(imageName(image)).map(bytes => loadDataset(bytes, withPixelData, useBulkDataURI))
 
   def readImageAttributes(image: Image): Option[List[ImageAttribute]] =
-    storage.get(image.id).map(bytes => DicomUtil.readImageAttributes(loadDataset(bytes, withPixelData = false, useBulkDataURI = false)))
+    storage.get(imageName(image)).map(bytes => DicomUtil.readImageAttributes(loadDataset(bytes, withPixelData = false, useBulkDataURI = false)))
 
   def readImageInformation(image: Image): Option[ImageInformation] =
     imageAsInputStream(image).map(is => super.readImageInformation(is))
@@ -46,7 +46,7 @@ class RuntimeStorage extends StorageService {
     imageAsInputStream(image).map(is => super.readSecondaryCaptureJpeg(is, imageHeight))
 
   def imageAsInputStream(image: Image): Option[InputStream] =
-    storage.get(image.id).map(bytes => new ByteArrayInputStream(bytes))
+    storage.get(imageName(image)).map(bytes => new ByteArrayInputStream(bytes))
 
   def clear() =
     storage.clear()
