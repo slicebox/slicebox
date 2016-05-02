@@ -62,7 +62,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
 
         expectMsgType[IncomingUpdated]
 
-        val incomingTransactions = boxDao.listIncomingTransactions
+        val incomingTransactions = boxDao.listIncomingTransactions(0, 10)
 
         incomingTransactions should have length 1
         incomingTransactions.foreach { incomingTransaction =>
@@ -88,7 +88,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
         boxService ! UpdateIncoming(box, 123, 2, 3, 5, overwrite = false)
         expectMsgType[IncomingUpdated]
 
-        val incomingTransactions = boxDao.listIncomingTransactions
+        val incomingTransactions = boxDao.listIncomingTransactions(0, 10)
 
         incomingTransactions.size should be(1)
         incomingTransactions.foreach { incomingTransaction =>
@@ -109,7 +109,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
         val box = boxDao.insertBox(Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, online = false))
 
         db.withSession { implicit session =>
-          boxDao.listOutgoingTransactions shouldBe empty
+          boxDao.listOutgoingTransactions(0, 1) shouldBe empty
         }
 
         boxService ! PollOutgoing(box)
@@ -160,7 +160,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
       }
       
       db.withSession { implicit session =>
-        boxDao.listIncomingTransactions should have length 1
+        boxDao.listIncomingTransactions(0, 10) should have length 1
         boxDao.listIncomingImages should have length 1
       }
       
@@ -190,7 +190,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
       }
       
       db.withSession { implicit session =>
-        boxDao.listIncomingTransactions should have length 1
+        boxDao.listIncomingTransactions(0, 10) should have length 1
         boxDao.listIncomingImages should have length 2
       }
     }
@@ -242,7 +242,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
             imageIds should be(Seq(i1.id, i2.id, i3.id))
         }
 
-        val outgoingTransactions = boxDao.listOutgoingTransactions
+        val outgoingTransactions = boxDao.listOutgoingTransactions(0, 10)
         outgoingTransactions should have length 1
         val outgoingImages = boxDao.listOutgoingImages
         outgoingImages should have length 3
@@ -270,7 +270,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
         boxService ! UpdateIncoming(box, 123, 2, 3, 5, overwrite = false)
         expectMsgType[IncomingUpdated]
 
-        val incomingTransactions = boxDao.listIncomingTransactions
+        val incomingTransactions = boxDao.listIncomingTransactions(0, 10)
         incomingTransactions.size should be(1)
 
         val incomingTransaction = incomingTransactions.head

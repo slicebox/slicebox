@@ -33,9 +33,11 @@ trait ScuRoutes { this: SliceboxService =>
     pathPrefix("scus") {
       pathEndOrSingleSlash {
         get {
-          onSuccess(scuService.ask(GetScus)) {
-            case Scus(scus) =>
-              complete(scus)
+          parameters('startindex.as[Long] ? 0, 'count.as[Long] ? 20) { (startIndex, count) =>
+            onSuccess(scuService.ask(GetScus(startIndex, count))) {
+              case Scus(scus) =>
+                complete(scus)
+            }
           }
         } ~ post {
           authorize(apiUser.hasPermission(UserRole.ADMINISTRATOR)) {

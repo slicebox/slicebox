@@ -21,32 +21,46 @@ import scala.slick.jdbc.meta.MTable
 import UserProtocol._
 
 class UserDAO(val driver: JdbcProfile) {
+
   import driver.simple._
 
   val toUser = (id: Long, user: String, role: String, password: String) => ApiUser(id, user, UserRole.withName(role), Some(password))
-  val fromUser = (user: ApiUser) => Option((user.id, user.user, user.role.toString, user.hashedPassword.get))
+  val fromUser = (user: ApiUser) => Option((user.id, user.user, user.role.toString(), user.hashedPassword.get))
 
   class UserTable(tag: Tag) extends Table[ApiUser](tag, "User") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
+
     def user = column[String]("user")
+
     def role = column[String]("role")
+
     def password = column[String]("password")
+
     def idxUniqueUser = index("idx_unique_user", user, unique = true)
-    def * = (id, user, role, password) <> (toUser.tupled, fromUser)
+
+    def * = (id, user, role, password) <>(toUser.tupled, fromUser)
   }
 
   val userQuery = TableQuery[UserTable]
 
   class SessionTable(tag: Tag) extends Table[ApiSession](tag, "ApiSession") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
+
     def userId = column[Long]("userid")
+
     def token = column[String]("token")
+
     def ip = column[String]("ip")
+
     def userAgent = column[String]("useragent")
+
     def updated = column[Long]("updated")
+
     def fkUser = foreignKey("fk_user", userId, userQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
+
     def idxUniqueSession = index("idx_unique_session", (token, ip, userAgent), unique = true)
-    def * = (id, userId, token, ip, userAgent, updated) <> (ApiSession.tupled, ApiSession.unapply)
+
+    def * = (id, userId, token, ip, userAgent, updated) <>(ApiSession.tupled, ApiSession.unapply)
   }
 
   val sessionQuery = TableQuery[SessionTable]
@@ -55,6 +69,7 @@ class UserDAO(val driver: JdbcProfile) {
     if (MTable.getTables("User").list.isEmpty) userQuery.ddl.create
     if (MTable.getTables("ApiSession").list.isEmpty) sessionQuery.ddl.create
   }
+
   def drop(implicit session: Session): Unit =
     (userQuery.ddl ++ sessionQuery.ddl).drop
 
@@ -95,8 +110,11 @@ class UserDAO(val driver: JdbcProfile) {
   def deleteUserByUserId(userId: Long)(implicit session: Session): Unit =
     userQuery.filter(_.id === userId).delete
 
-  def listUsers(implicit session: Session): List[ApiUser] =
-    userQuery.list
+  def listUsers(startIndex: Long, count: Long)(implicit session: Session): List[ApiUser] =
+    userQuery
+      .drop(startIndex)
+      .take(count)
+      .list
 
   def listSessions(implicit session: Session): List[ApiSession] =
     sessionQuery.list

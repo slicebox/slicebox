@@ -25,7 +25,7 @@ angular.module('slicebox.adminUsers', ['ngRoute'])
 
     // Scope functions
     $scope.loadUsersPage = function(startIndex, count, orderByProperty, orderByDirection) {
-        return $http.get('/api/users');
+        return $http.get('/api/users?startindex=' + startIndex + '&count=' + count);
     };
 
     $scope.addUserButtonClicked = function() {

@@ -40,7 +40,7 @@ angular.module('slicebox.adminSeriesTypes', ['ngRoute'])
 
 	// Scope functions
 	$scope.loadSeriesTypesPage = function(startIndex, count, orderByProperty, orderByDirection) {
-		return $http.get('/api/seriestypes');
+		return $http.get('/api/seriestypes?startindex=' + startIndex + '&count=' + count);
 	};
 
 	$scope.seriesTypeSelected = function(seriesType) {

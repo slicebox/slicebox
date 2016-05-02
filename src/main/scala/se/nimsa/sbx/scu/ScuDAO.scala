@@ -21,23 +21,29 @@ import scala.slick.jdbc.meta.MTable
 import ScuProtocol.ScuData
 
 class ScuDAO(val driver: JdbcProfile) {
+
   import driver.simple._
 
   class ScuDataTable(tag: Tag) extends Table[ScuData](tag, "ScuData") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
+
     def name = column[String]("name")
+
     def aeTitle = column[String]("aeTitle")
+
     def host = column[String]("host")
+
     def port = column[Int]("port")
-    def * = (id, name, aeTitle, host, port) <> (ScuData.tupled, ScuData.unapply)
+
+    def * = (id, name, aeTitle, host, port) <>(ScuData.tupled, ScuData.unapply)
   }
 
   val scuDataQuery = TableQuery[ScuDataTable]
-  
+
   def create(implicit session: Session) =
     if (MTable.getTables("ScuData").list.isEmpty) scuDataQuery.ddl.create
-  
-  
+
+
   def insert(scuData: ScuData)(implicit session: Session): ScuData = {
     val generatedId = (scuDataQuery returning scuDataQuery.map(_.id)) += scuData
     scuData.copy(id = generatedId)
@@ -48,15 +54,19 @@ class ScuDAO(val driver: JdbcProfile) {
       .filter(_.id === scuDataId)
       .delete
   }
-  
+
   def scuDataForId(id: Long)(implicit session: Session): Option[ScuData] =
     scuDataQuery.filter(_.id === id).firstOption
-  
+
   def scuDataForName(name: String)(implicit session: Session): Option[ScuData] =
     scuDataQuery.filter(_.name === name).firstOption
-  
+
   def scuDataForHostAndPort(host: String, port: Int)(implicit session: Session): Option[ScuData] =
     scuDataQuery.filter(_.host === host).filter(_.port === port).firstOption
-  
-  def allScuDatas(implicit session: Session): List[ScuData] = scuDataQuery.list
+
+  def listScuDatas(startIndex: Long, count: Long)(implicit session: Session): List[ScuData] =
+    scuDataQuery
+      .drop(startIndex)
+      .take(count)
+      .list
 }

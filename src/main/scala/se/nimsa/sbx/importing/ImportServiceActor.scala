@@ -28,9 +28,9 @@ class ImportServiceActor(dbProps: DbProps) extends Actor with ExceptionCatching 
             sender ! dao.addImportSession(newImportSession)
           }
 
-        case GetImportSessions =>
+        case GetImportSessions(startIndex, count) =>
           db.withSession { implicit session =>
-            sender ! ImportSessions(dao.getImportSessions)
+            sender ! ImportSessions(dao.getImportSessions(startIndex, count))
           }
 
         case GetImportSession(id) =>

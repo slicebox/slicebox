@@ -110,7 +110,7 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
 
     "support adding and listing forwarding rules" in {
 
-      forwardingService ! GetForwardingRules
+      forwardingService ! GetForwardingRules(0, 1)
       expectMsg(ForwardingRules(List.empty))
 
       val rule1 = scpToBoxRule
@@ -122,7 +122,7 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
       val dbRule1 = expectMsgType[ForwardingRuleAdded].forwardingRule
       val dbRule2 = expectMsgType[ForwardingRuleAdded].forwardingRule
 
-      forwardingService ! GetForwardingRules
+      forwardingService ! GetForwardingRules(0, 10)
       expectMsg(ForwardingRules(List(dbRule1, dbRule2)))
     }
 
@@ -132,13 +132,13 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
       forwardingService ! AddForwardingRule(rule1)
       val dbRule1 = expectMsgType[ForwardingRuleAdded].forwardingRule
 
-      forwardingService ! GetForwardingRules
+      forwardingService ! GetForwardingRules(0, 10)
       expectMsg(ForwardingRules(List(dbRule1)))
 
       forwardingService ! RemoveForwardingRule(dbRule1.id)
       expectMsg(ForwardingRuleRemoved(dbRule1.id))
 
-      forwardingService ! GetForwardingRules
+      forwardingService ! GetForwardingRules(0, 1)
       expectMsg(ForwardingRules(List.empty))
     }
   }
@@ -152,7 +152,7 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     }
     expectNoMsg
     db.withSession { implicit session =>
-      forwardingDao.listForwardingRules should be(empty)
+      forwardingDao.listForwardingRules(0, 1) should be(empty)
       forwardingDao.listForwardingTransactions should be(empty)
       forwardingDao.listForwardingTransactionImages should be(empty)
     }
