@@ -10,7 +10,7 @@ import scala.slick.driver.H2Driver
 
 class ScpRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
-  def dbUrl() = "jdbc:h2:mem:scproutestest;DB_CLOSE_DELAY=-1"
+  def dbUrl = "jdbc:h2:mem:scproutestest;DB_CLOSE_DELAY=-1"
   
   val scpDao = new ScpDAO(H2Driver)
   

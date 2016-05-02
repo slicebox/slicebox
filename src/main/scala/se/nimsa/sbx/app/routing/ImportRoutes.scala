@@ -16,36 +16,22 @@
 
 package se.nimsa.sbx.app.routing
 
-import java.io.File
 
 import scala.concurrent.Future
-import org.dcm4che3.data.Attributes
 import akka.pattern.ask
-import se.nimsa.sbx.anonymization.AnonymizationProtocol._
-import se.nimsa.sbx.anonymization.AnonymizationUtil
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.app.SliceboxService
-import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.DicomUtil
-import se.nimsa.sbx.dicom.ImageAttribute
 import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.user.UserProtocol.ApiUser
-import spray.http.ContentType.apply
 import spray.http.FormFile
-import spray.http.HttpData
-import spray.http.HttpEntity
-import spray.http.HttpHeaders._
-import spray.http.MediaTypes._
 import spray.http.StatusCodes._
 import spray.routing.Route
-import spray.routing.directives._
-import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, Images, MetaDataAdded}
+import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, GetImage, MetaDataAdded}
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
-import se.nimsa.sbx.dicom.DicomPropertyValue._
 import se.nimsa.sbx.importing.ImportProtocol._
-import akka.util.ByteString
 
-import scala.util.{Failure, Success, Try}
+import scala.util.{Failure, Success}
 
 trait ImportRoutes {
   this: SliceboxService =>
@@ -95,7 +81,13 @@ trait ImportRoutes {
             get {
               onSuccess(importService.ask(GetImportSessionImages(id))) {
                 case ImportSessionImages(importSessionImages) =>
-                  complete(importSessionImages.map(_.imageId))
+                  complete {
+                    Future.sequence {
+                      importSessionImages.map { importSessionImage =>
+                        metaDataService.ask(GetImage(importSessionImage.imageId)).mapTo[Option[Image]]
+                      }
+                    }.map(_.flatten)
+                  }
               }
             }
           }
@@ -107,7 +99,7 @@ trait ImportRoutes {
   def addImageToImportSessionRoute(bytes: Array[Byte], importSessionId: Long): Route = {
     import spray.httpx.SprayJsonSupport._
 
-    val dataset = DicomUtil.loadDataset(bytes, true)
+    val dataset = DicomUtil.loadDataset(bytes, withPixelData = true, useBulkDataURI = false)
     onSuccess(importService.ask(GetImportSession(importSessionId)).mapTo[Option[ImportSession]]) {
       case Some(importSession) =>
 

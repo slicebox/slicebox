@@ -64,19 +64,23 @@ object DicomUtil {
     }
   }
 
-  def loadDataset(path: Path, withPixelData: Boolean): Attributes =
-    loadDataset(new BufferedInputStream(Files.newInputStream(path)), withPixelData)
+  def loadDataset(path: Path, withPixelData: Boolean, useBulkDataURI: Boolean): Attributes =
+    loadDataset(new BufferedInputStream(Files.newInputStream(path)), withPixelData, useBulkDataURI)
 
-  def loadDataset(byteArray: Array[Byte], withPixelData: Boolean): Attributes =
-    loadDataset(new BufferedInputStream(new ByteArrayInputStream(byteArray)), withPixelData)
+  def loadDataset(byteArray: Array[Byte], withPixelData: Boolean, useBulkDataURI: Boolean): Attributes =
+    loadDataset(new BufferedInputStream(new ByteArrayInputStream(byteArray)), withPixelData, useBulkDataURI)
 
-  def loadDataset(inputStream: InputStream, withPixelData: Boolean): Attributes = {
+  def loadDataset(inputStream: InputStream, withPixelData: Boolean, useBulkDataURI: Boolean): Attributes = {
     var dis: DicomInputStream = null
     try {
       dis = new DicomInputStream(inputStream)
 
       val dataset =
         if (withPixelData) {
+          if (useBulkDataURI)
+            dis.setIncludeBulkData(IncludeBulkData.URI)
+          else
+            dis.setIncludeBulkData(IncludeBulkData.YES)
           dis.readDataset(-1, -1)
         } else {
           dis.setIncludeBulkData(IncludeBulkData.NO)
@@ -107,7 +111,7 @@ object DicomUtil {
       SafeClose.close(dis)
     }
   }
-  def toByteArray(path: Path): Array[Byte] = toByteArray(loadDataset(path, withPixelData = true))
+  def toByteArray(path: Path): Array[Byte] = toByteArray(loadDataset(path, withPixelData = true, useBulkDataURI = false))
 
   def toByteArray(dataset: Attributes): Array[Byte] = {
     val bos = new ByteArrayOutputStream

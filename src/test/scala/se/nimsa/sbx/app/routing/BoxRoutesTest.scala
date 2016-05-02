@@ -17,7 +17,7 @@ import scala.slick.driver.H2Driver
 
 class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
-  def dbUrl() = "jdbc:h2:mem:boxroutestest;DB_CLOSE_DELAY=-1"
+  def dbUrl = "jdbc:h2:mem:boxroutestest;DB_CLOSE_DELAY=-1"
 
   val boxDao = new BoxDAO(H2Driver)
   val metaDataDao = new MetaDataDAO(H2Driver)

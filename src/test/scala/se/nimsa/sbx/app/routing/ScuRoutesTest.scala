@@ -16,7 +16,7 @@ import scala.slick.driver.H2Driver
 
 class ScuRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
-  def dbUrl() = "jdbc:h2:mem:scuroutestest;DB_CLOSE_DELAY=-1"
+  def dbUrl = "jdbc:h2:mem:scuroutestest;DB_CLOSE_DELAY=-1"
 
   val scpDao = new ScpDAO(H2Driver)
   val scuDao = new ScuDAO(H2Driver)
@@ -42,12 +42,6 @@ class ScuRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
   it should "return 404 NotFound when asking to send an image using an SCP that does not exist" in {
     PostAsUser("/api/scus/666/send", Array(1)) ~> routes ~> check {
-      status should be(NotFound)
-    }
-  }
-
-  it should "return 404 NotFound when asking to send an image that does not exist" in {
-    PostAsUser("/api/scus/1/send", Array(666)) ~> routes ~> check {
       status should be(NotFound)
     }
   }

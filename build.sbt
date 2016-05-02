@@ -48,7 +48,7 @@ import de.heikoseeberger.sbtheader.license.Apache2_0
 	rpmVendor := maintainer.value
 
 	rpmLicense := Some("Apache v2")
-	
+
 	// for automatic license stub generation
 
 	val licenceYear = "2016"
@@ -90,7 +90,8 @@ import de.heikoseeberger.sbtheader.license.Apache2_0
 			"com.typesafe.akka"						%% "akka-testkit"					% akkaVersion			% "test",
 			"org.webjars"									%  "angularjs"						% "1.4.7",
 			"org.webjars"									%  "angular-material"			% "1.0.1",
-			"org.webjars"									%  "angular-file-upload"	% "5.0.0"
+			"org.webjars"									%  "angular-file-upload"	% "5.0.0",
+			"com.amazonaws"               % "aws-java-sdk"          % "1.10.72"
 		)
 	}
 

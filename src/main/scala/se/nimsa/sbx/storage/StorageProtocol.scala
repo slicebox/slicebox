@@ -19,14 +19,12 @@ package se.nimsa.sbx.storage
 import java.nio.file.Path
 
 import org.dcm4che3.data.Attributes
-import se.nimsa.sbx.dicom.DicomHierarchy.{FlatSeries, Image, Patient, Study}
+import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.app.GeneralProtocol._
 
 object StorageProtocol {
 
   // domain objects
-
-  case class FileName(value: String)
 
   case class ImageInformation(
     numberOfFrames: Int,
@@ -37,11 +35,9 @@ object StorageProtocol {
 
   sealed trait ImageRequest
 
-  case class GetImagePath(image: Image) extends ImageRequest
+  case class GetImageData(image: Image) extends ImageRequest
 
-  case class GetDataset(image: Image, withPixelData: Boolean) extends ImageRequest
-
-  case class DatasetAdded(image: Image, overwrite: Boolean)
+  case class GetDataset(image: Image, withPixelData: Boolean, useBulkDataURI: Boolean = false) extends ImageRequest
 
   case class GetImageAttributes(image: Image) extends ImageRequest
 
@@ -53,23 +49,23 @@ object StorageProtocol {
 
   case class AddDataset(dataset: Attributes, source: Source, image: Image) extends ImageRequest
   
-  case class CreateJpeg(jpegBytes: Array[Byte], patient: Patient, study: Study) extends ImageRequest
-
-  case class AddJpeg(image: Image, source: Source, jpegTempPath: Path) extends ImageRequest
+  case class AddJpeg(dataset: Attributes, source: Source, image: Image) extends ImageRequest
 
   case class DeleteDataset(image: Image) extends ImageRequest
 
-  case class CreateTempZipFile(imagesAndSeries: Seq[(Image, FlatSeries)]) extends ImageRequest
+  case class CreateExportSet(imageIds: Seq[Long]) extends ImageRequest
+
+  case class GetExportSetImageIds(exportSetId: Long) extends ImageRequest
 
 
-  case class JpegCreated(dataset: Attributes, jpegTempPath: Path)
+  case class DatasetAdded(image: Image, overwrite: Boolean)
 
-  case object JpegAdded
+  case class JpegAdded(image: Image)
 
   case class DatasetDeleted(image: Image)
 
-  case class ImagePath(imagePath: Path)
+  case class ImageData(data: Array[Byte])
 
-  case class DeleteTempZipFile(path: Path)
-  
+  case class ExportSetId(id: Long)
+
 }

@@ -25,7 +25,7 @@ import se.nimsa.sbx.app.GeneralProtocol._
 
 class GeneralRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
-  def dbUrl() = "jdbc:h2:mem:generalroutestest;DB_CLOSE_DELAY=-1"
+  def dbUrl = "jdbc:h2:mem:generalroutestest;DB_CLOSE_DELAY=-1"
 
   "General routes" should "return a list of sources of the correct length" in {
     PostAsAdmin("/api/users", ClearTextUser("name", ADMINISTRATOR, "password")) ~> routes ~> check {

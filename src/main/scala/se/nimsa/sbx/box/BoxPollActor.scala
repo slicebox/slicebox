@@ -187,7 +187,7 @@ class BoxPollActor(box: Box,
         case Success(response) =>
           if (response.status.intValue < 300) {
             val bytes = decompress(response.entity.data.toByteArray)
-            val dataset = loadDataset(bytes, withPixelData = true)
+            val dataset = loadDataset(bytes, withPixelData = true, useBulkDataURI = false)
 
             if (dataset == null)
               self ! FetchFileFailedPermanently(transactionImage, new IllegalArgumentException("Dataset could not be read"))

@@ -1,13 +1,11 @@
 package se.nimsa.sbx.user
 
-import java.nio.file.Files
 
 import akka.actor.ActorSystem
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit}
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
 import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.user.UserProtocol._
-import se.nimsa.sbx.util.TestUtil
 import spray.routing.authentication.UserPass
 
 import scala.slick.driver.H2Driver
@@ -20,8 +18,6 @@ class UserServiceActorTest(_system: ActorSystem) extends TestKit(_system) with I
 
   val db = Database.forURL("jdbc:h2:mem:userserviceactortest;DB_CLOSE_DELAY=-1", driver = "org.h2.Driver")
   val dbProps = DbProps(db, H2Driver)
-
-  val storage = Files.createTempDirectory("slicebox-test-storage-")
 
   val dao = new UserDAO(H2Driver)
 
@@ -39,7 +35,6 @@ class UserServiceActorTest(_system: ActorSystem) extends TestKit(_system) with I
 
   override def afterAll {
     TestKit.shutdownActorSystem(system)
-    TestUtil.deleteFolder(storage)
   }
 
   "A UserServiceActor" should {

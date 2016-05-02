@@ -918,8 +918,8 @@ angular.module('slicebox.home', ['ngRoute'])
             var imageIds = images.map(function (image) {
                 return image.id;
             });
-            return $http.post('/api/images/export', imageIds).success(function (fileName) {
-                location.href = '/api/images/export?filename=' + fileName.value;
+            return $http.post('/api/images/export', imageIds).success(function (exportSetId) {
+                location.href = '/api/images/export?id=' + exportSetId.id;
             });
         });
     }

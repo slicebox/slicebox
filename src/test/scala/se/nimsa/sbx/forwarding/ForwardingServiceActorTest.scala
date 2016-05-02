@@ -1,7 +1,5 @@
 package se.nimsa.sbx.forwarding
 
-import java.nio.file.Files
-
 import akka.actor.{Actor, ActorSystem, Props}
 import akka.testkit.{ImplicitSender, TestKit}
 import akka.util.Timeout
@@ -14,7 +12,6 @@ import se.nimsa.sbx.dicom.DicomPropertyValue._
 import se.nimsa.sbx.forwarding.ForwardingProtocol._
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.storage.StorageProtocol._
-import se.nimsa.sbx.util.TestUtil
 
 import scala.concurrent.duration.DurationInt
 import scala.slick.driver.H2Driver
@@ -27,8 +24,6 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
 
   val db = Database.forURL("jdbc:h2:mem:forwardingserviceactortest;DB_CLOSE_DELAY=-1", driver = "org.h2.Driver")
   val dbProps = DbProps(db, H2Driver)
-
-  val storage = Files.createTempDirectory("slicebox-test-storage-")
 
   val forwardingDao = new ForwardingDAO(H2Driver)
 
@@ -103,7 +98,6 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
 
   override def afterAll {
     TestKit.shutdownActorSystem(system)
-    TestUtil.deleteFolder(storage)
   }
 
   "A ForwardingServiceActor" should {

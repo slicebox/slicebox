@@ -22,6 +22,7 @@ import akka.actor.{Actor, Props}
 import akka.event.{Logging, LoggingReceive}
 import akka.pattern.{ask, pipe}
 import akka.util.Timeout
+import org.dcm4che3.data.Attributes
 import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
@@ -29,7 +30,7 @@ import se.nimsa.sbx.lang.{BadGatewayException, NotFoundException}
 import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.metadata.MetaDataProtocol.GetImage
 import se.nimsa.sbx.scu.ScuProtocol._
-import se.nimsa.sbx.storage.StorageProtocol.{GetImagePath, ImagePath}
+import se.nimsa.sbx.storage.StorageProtocol.GetDataset
 import se.nimsa.sbx.util.ExceptionCatching
 import se.nimsa.sbx.util.SbxExtensions._
 
@@ -48,6 +49,16 @@ class ScuServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extends Actor
 
   val metaDataService = context.actorSelection("../MetaDataService")
   val storageService = context.actorSelection("../StorageService")
+
+  val datasetProvider = new DatasetProvider {
+    override def getDataset(imageId: Long, withPixelData: Boolean): Future[Option[Attributes]] = {
+      metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]].flatMap { imageMaybe =>
+        imageMaybe.map { image =>
+          storageService.ask(GetDataset(image, withPixelData, useBulkDataURI = withPixelData)).mapTo[Option[Attributes]]
+        }.unwrap
+      }
+    }
+  }
 
   log.info("SCU service started")
 
@@ -96,14 +107,13 @@ class ScuServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extends Actor
 
           case SendImagesToScp(imageIds, scuId) =>
             scuForId(scuId).map(scu => {
-              imagePathsForImageIds(imageIds).map(imagePaths => {
-                if (imagePaths.isEmpty)
-                  throw new NotFoundException(s"No images found given ${imageIds.length} image ids")
-                SbxLog.info("SCU", s"Sending ${imagePaths.length} images using SCU ${scu.name}")
-                Scu.sendFiles(scu, imagePaths.map(_.imagePath))
-              })
+              SbxLog.info("SCU", s"Sending ${imageIds.length} images using SCU ${scu.name}")
+              Scu.sendFiles(scu, datasetProvider, imageIds)
                 .map(r => {
                   SbxLog.info("SCU", s"Finished sending ${imageIds.length} images using SCU ${scu.name}")
+                  val nNotFound = imageIds.length - r.length
+                  if (nNotFound > 0)
+                    SbxLog.warn("SCU", s"$nNotFound of ${imageIds.length} images could not be found and were not sent")
                   context.system.eventStream.publish(ImagesSent(Destination(DestinationType.SCU, scu.name, scu.id), imageIds))
                   ImagesSentToScp(scuId, imageIds)
                 })
@@ -117,7 +127,6 @@ class ScuServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extends Actor
                 }
                 .pipeTo(sender)
             }).orElse(throw new NotFoundException(s"SCU with id $scuId not found"))
-          // TODO handle errors when sending (do not return 500)
         }
       }
 
@@ -153,16 +162,6 @@ class ScuServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extends Actor
       dao.listScuDatas(startIndex, count)
     }
 
-  def imagePathsForImageIds(imageIds: Seq[Long]): Future[Seq[ImagePath]] =
-    Future.sequence {
-      imageIds.map { imageId =>
-        metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]].flatMap { imageMaybe =>
-          imageMaybe.map { image =>
-            storageService.ask(GetImagePath(image)).mapTo[Option[ImagePath]]
-          }.unwrap
-        }
-      }
-    }.map(_.flatten)
 }
 
 object ScuServiceActor {

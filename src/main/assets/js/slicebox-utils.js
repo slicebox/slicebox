@@ -137,23 +137,22 @@ angular.module('slicebox.utils', ['ngSanitize'])
             controller: controllerName
         });
 
-        dialogPromise.then(function (entity) {
+        return dialogPromise.then(function (entity) {
 
-            var addPromise = $http.post(url, entity);
-            addPromise.error(function(data) {
-                sbxToast.showErrorMessage(data);
-            });
-
-            addPromise.success(function() {
-                sbxToast.showInfoMessage(entityName + " added");                
+            var addPromise = $http.post(url, entity).then(function(response) {
+                sbxToast.showInfoMessage(entityName + " added");
+                return response.data;
+            }, function(error) {
+                sbxToast.showErrorMessage(error.data);
+                return error.data;
             });
 
             addPromise.finally(function() {
                 table.reloadPage();
             });
-        });
 
-        return dialogPromise;
+            return addPromise;
+        });
     };
 })
 

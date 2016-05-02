@@ -66,7 +66,6 @@ class MetaDataDAO(val driver: JdbcProfile) {
     def * = (id, patientId, studyInstanceUID, studyDescription, studyDate, studyID, accessionNumber, patientAge) <> (toStudy.tupled, fromStudy)
 
     def patientFKey = foreignKey("patientFKey", patientId, patientsQuery)(_.id, onUpdate = ForeignKeyAction.Cascade, onDelete = ForeignKeyAction.Cascade)
-    def patientIdJoin = patientsQuery.filter(_.id === patientId)
   }
 
   val studiesQuery = TableQuery[Studies]
@@ -93,7 +92,6 @@ class MetaDataDAO(val driver: JdbcProfile) {
     def * = (id, studyId, seriesInstanceUID, seriesDescription, seriesDate, modality, protocolName, bodyPartExamined, manufacturer, stationName, frameOfReferenceUID) <> (toSeries.tupled, fromSeries)
 
     def studyFKey = foreignKey("studyFKey", studyId, studiesQuery)(_.id, onUpdate = ForeignKeyAction.Cascade, onDelete = ForeignKeyAction.Cascade)
-    def studyIdJoin = studiesQuery.filter(_.id === studyId)
   }
 
   val seriesQuery = TableQuery[SeriesTable]
@@ -114,7 +112,6 @@ class MetaDataDAO(val driver: JdbcProfile) {
     def * = (id, seriesId, sopInstanceUID, imageType, instanceNumber) <> (toImage.tupled, fromImage)
 
     def seriesFKey = foreignKey("seriesFKey", seriesId, seriesQuery)(_.id, onUpdate = ForeignKeyAction.Cascade, onDelete = ForeignKeyAction.Cascade)
-    def seriesIdJoin = seriesQuery.filter(_.id === seriesId)
   }
 
   val imagesQuery = TableQuery[Images]
@@ -488,16 +485,6 @@ class MetaDataDAO(val driver: JdbcProfile) {
     imagesQuery
       .filter(_.id === imageId)
       .delete
-  }
-
-  def deleteFully(image: Image)(implicit session: Session): (Option[Patient], Option[Study], Option[Series], Option[Image]) = {
-    val imagesDeleted = deleteImage(image.id)
-    val pssMaybe = seriesById(image.seriesId)
-      .filter(series => imagesForSeries(0, 2, series.id).isEmpty)
-      .map(series => deleteFully(series))
-      .getOrElse((None, None, None))
-    val imageMaybe = if (imagesDeleted == 0) None else Some(image)
-    (pssMaybe._1, pssMaybe._2, pssMaybe._3, imageMaybe)
   }
 
   def deleteFully(series: Series)(implicit session: Session): (Option[Patient], Option[Study], Option[Series]) = {

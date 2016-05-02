@@ -50,7 +50,7 @@ trait TransactionRoutes {
               post {
                 entity(as[Array[Byte]]) { compressedBytes =>
                   val bytes = decompress(compressedBytes)
-                  val dataset = loadDataset(bytes, withPixelData = true)
+                  val dataset = loadDataset(bytes, withPixelData = true, useBulkDataURI = false)
                   if (dataset == null)
                     complete((BadRequest, "Dataset could not be read"))
                   else

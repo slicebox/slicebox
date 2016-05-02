@@ -1,18 +1,12 @@
 package se.nimsa.sbx.dicom
 
-import org.scalatest.FlatSpec
-import org.scalatest.Matchers
-import DicomUtil._
-import org.dcm4che3.data.Attributes
-import org.dcm4che3.data.Tag
-import org.dcm4che3.data.VR
 import java.nio.file.Files
-import java.nio.file.Paths
-import org.scalatest.BeforeAndAfterAll
-import se.nimsa.sbx.util.TestUtil
-import se.nimsa.sbx.dicom.DicomHierarchy._
-import se.nimsa.sbx.dicom.DicomPropertyValue._
+
+import org.dcm4che3.data.{Attributes, Tag, VR}
+import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 import se.nimsa.sbx.anonymization.AnonymizationUtil._
+import se.nimsa.sbx.dicom.DicomUtil._
+import se.nimsa.sbx.util.TestUtil
 
 class DicomUtilTest extends FlatSpec with Matchers with BeforeAndAfterAll {
 
@@ -47,7 +41,7 @@ class DicomUtilTest extends FlatSpec with Matchers with BeforeAndAfterAll {
   "Loading a dataset" should "return the same dataset, disregarding pixelData, when loading with and without pixelData" in {
     val dataset1 = TestUtil.testImageDataset(false)
     val dataset2 = TestUtil.testImageDataset(true)
-    dataset1 should not equal (dataset2)
+    dataset1 should not equal dataset2
     dataset1.remove(Tag.PixelData)
     dataset2.remove(Tag.PixelData)
     dataset1 should equal (dataset2)
@@ -57,7 +51,7 @@ class DicomUtilTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     val dataset1 = TestUtil.testImageDataset(false)
     val savePath = tempDir.resolve("dataset1.dcm")
     saveDataset(dataset1, savePath)
-    val dataset2 = loadDataset(savePath, false)
+    val dataset2 = loadDataset(savePath, withPixelData = false, useBulkDataURI = false)
     dataset1 should equal (dataset2)
   }
 
@@ -66,7 +60,7 @@ class DicomUtilTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     val anonymized1 = anonymizeDataset(dataset)
     val savePath = tempDir.resolve("anonymized.dcm")
     saveDataset(anonymized1, savePath)
-    val anonymized2 = loadDataset(savePath, true)
+    val anonymized2 = loadDataset(savePath, withPixelData = true, useBulkDataURI = false)
     anonymized2 should equal (anonymized1)
     
   }

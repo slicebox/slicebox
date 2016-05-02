@@ -1,7 +1,5 @@
 package se.nimsa.sbx.box
 
-import java.nio.file.Files
-
 import akka.actor.{ActorSystem, Props, actorRef2Scala}
 import akka.testkit.{ImplicitSender, TestKit}
 import akka.util.Timeout.durationToTimeout
@@ -12,8 +10,7 @@ import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomPropertyValue._
 import se.nimsa.sbx.metadata.MetaDataDAO
-import se.nimsa.sbx.storage.StorageServiceActor
-import se.nimsa.sbx.util.TestUtil
+import se.nimsa.sbx.storage.{RuntimeStorage, StorageServiceActor}
 
 import scala.concurrent.duration.DurationInt
 import scala.slick.driver.H2Driver
@@ -27,7 +24,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
   val db = Database.forURL("jdbc:h2:mem:boxserviceactortest;DB_CLOSE_DELAY=-1", driver = "org.h2.Driver")
   val dbProps = DbProps(db, H2Driver)
 
-  val storage = Files.createTempDirectory("slicebox-test-storage-")
+  val storage = new RuntimeStorage
 
   val boxDao = new BoxDAO(H2Driver)
   val metaDataDao = new MetaDataDAO(H2Driver)
@@ -44,11 +41,11 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
     db.withSession { implicit session =>
       metaDataDao.clear
       boxDao.clear
+      storage.clear()
     }
 
   override def afterAll {
     TestKit.shutdownActorSystem(system)
-    TestUtil.deleteFolder(storage)
   }
 
   "A BoxServiceActor" should {

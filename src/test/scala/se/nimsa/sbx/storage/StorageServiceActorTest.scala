@@ -1,7 +1,5 @@
 package se.nimsa.sbx.storage
 
-import java.nio.file.Files
-
 import akka.actor.ActorSystem
 import akka.actor.Status.Failure
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit}
@@ -26,7 +24,7 @@ class StorageServiceActorTest(_system: ActorSystem) extends TestKit(_system) wit
   val dataset = TestUtil.testImageDataset()
   val image = DicomUtil.datasetToImage(dataset)
 
-  val storage = Files.createTempDirectory("slicebox-test-storage-")
+  val storage = new RuntimeStorage
 
   val storageActorRef = TestActorRef(new StorageServiceActor(storage))
   val storageActor = storageActorRef.underlyingActor
@@ -35,7 +33,6 @@ class StorageServiceActorTest(_system: ActorSystem) extends TestKit(_system) wit
 
   override def afterAll {
     TestKit.shutdownActorSystem(system)
-    TestUtil.deleteFolder(storage)
   }
 
   "The storage service" must {
@@ -64,7 +61,7 @@ class StorageServiceActorTest(_system: ActorSystem) extends TestKit(_system) wit
     }
 
     "return a failure message when adding a dataset with a non-supported SOP class" in {
-      storageActorRef ! AddDataset(DicomUtil.loadDataset(TestUtil.testSecondaryCaptureFile.toPath, withPixelData = true), source, image)
+      storageActorRef ! AddDataset(DicomUtil.loadDataset(TestUtil.testSecondaryCaptureFile.toPath, withPixelData = true, useBulkDataURI = false), source, image)
       expectMsgType[Failure]
     }
   }

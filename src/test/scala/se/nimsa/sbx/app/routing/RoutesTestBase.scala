@@ -1,17 +1,17 @@
 package se.nimsa.sbx.app.routing
 
-import java.nio.file.Files
+
+import com.typesafe.scalalogging.Logger
+import org.slf4j.LoggerFactory
 
 import scala.concurrent.duration.DurationInt
-
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.Suite
-
 import se.nimsa.sbx.app.SliceboxService
+import se.nimsa.sbx.storage.RuntimeStorage
 import se.nimsa.sbx.user.UserProtocol.ClearTextUser
 import se.nimsa.sbx.user.UserProtocol.UserRole
-import se.nimsa.sbx.util.TestUtil
 import spray.http.BasicHttpCredentials
 import spray.http.HttpRequest
 import spray.http.StatusCodes.OK
@@ -23,6 +23,7 @@ import spray.http.HttpHeaders.`User-Agent`
 
 trait RoutesTestBase extends ScalatestRouteTest with SliceboxService with BeforeAndAfterAll with BeforeAndAfterEach { this: Suite =>
 
+  val logger = Logger(LoggerFactory.getLogger("se.nimsa.sbx"))
   implicit val routeTestTimeout = RouteTestTimeout(10.seconds)
 
   val adminCredentials = BasicHttpCredentials(superUser, superPassword)
@@ -36,17 +37,13 @@ trait RoutesTestBase extends ScalatestRouteTest with SliceboxService with Before
    */
   override def executionContext = executor
 
-  def createStorageDirectory = Files.createTempDirectory("slicebox-test-storage-")
+  def createStorageService() = new RuntimeStorage
 
   def addUser(name: String, password: String, role: UserRole) = {
     val user = ClearTextUser(name, role, password)
     PostAsAdmin("/api/users", user) ~> sealRoute(routes) ~> check {
-      status === (OK)
+      status === OK
     }
-  }
-
-  override def afterAll {
-    TestUtil.deleteFolder(storage)
   }
 
   override def beforeAll {

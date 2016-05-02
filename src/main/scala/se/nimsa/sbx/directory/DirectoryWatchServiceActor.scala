@@ -16,7 +16,7 @@
 
 package se.nimsa.sbx.directory
 
-import java.nio.file.{Files, Path, Paths}
+import java.nio.file.{Files, Paths}
 
 import akka.actor.{Actor, PoisonPill, Props}
 import akka.event.{Logging, LoggingReceive}
@@ -27,7 +27,7 @@ import se.nimsa.sbx.util.ExceptionCatching
 
 import scala.language.postfixOps
 
-class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path, timeout: Timeout) extends Actor with ExceptionCatching {
+class DirectoryWatchServiceActor(dbProps: DbProps, timeout: Timeout) extends Actor with ExceptionCatching {
   val log = Logging(context.system, this)
 
   val db = dbProps.db
@@ -58,9 +58,6 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path, timeout: Timeo
 
                 if (!Files.isDirectory(path))
                   throw new IllegalArgumentException("Could not create directory watch: Not a directory: " + directory.path)
-
-                if (Files.isSameFile(path, storage))
-                  throw new IllegalArgumentException("The storage directory may not be watched.")
 
                 getWatchedDirectories(0, 1000000).map(dir => Paths.get(dir.path)).foreach(other =>
                   if (path.startsWith(other) || other.startsWith(path))
@@ -134,5 +131,5 @@ class DirectoryWatchServiceActor(dbProps: DbProps, storage: Path, timeout: Timeo
 }
 
 object DirectoryWatchServiceActor {
-  def props(dbProps: DbProps, storage: Path, timeout: Timeout): Props = Props(new DirectoryWatchServiceActor(dbProps, storage, timeout))
+  def props(dbProps: DbProps, timeout: Timeout): Props = Props(new DirectoryWatchServiceActor(dbProps, timeout))
 }

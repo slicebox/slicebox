@@ -16,7 +16,7 @@ import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, MetaDataAdded}
 import se.nimsa.sbx.metadata.{MetaDataDAO, MetaDataServiceActor, PropertiesDAO}
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
 import se.nimsa.sbx.storage.StorageProtocol.AddDataset
-import se.nimsa.sbx.storage.StorageServiceActor
+import se.nimsa.sbx.storage.{FileStorage, RuntimeStorage, StorageServiceActor}
 import se.nimsa.sbx.util.TestUtil
 
 import scala.concurrent.Await
@@ -32,7 +32,7 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
   val db = Database.forURL("jdbc:h2:mem:seriestypeserviceactortest;DB_CLOSE_DELAY=-1", driver = "org.h2.Driver")
   val dbProps = DbProps(db, H2Driver)
 
-  val storage = Files.createTempDirectory("slicebox-test-storage-")
+  val storage = new RuntimeStorage
 
   val seriesTypeDao = new SeriesTypeDAO(H2Driver)
   val metaDataDao = new MetaDataDAO(H2Driver)
@@ -54,7 +54,6 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
 
   override def afterAll {
     TestKit.shutdownActorSystem(system)
-    TestUtil.deleteFolder(storage)
   }
 
   override def afterEach() {
@@ -62,6 +61,7 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
       seriesTypeDao.clear
       metaDataDao.clear
       propertiesDao.clear
+      storage.clear()
     }
   }
 

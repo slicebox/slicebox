@@ -15,26 +15,30 @@ object ImportProtocol {
     filesRejected: Int, 
     created: Long,
     lastUpdated: Long) extends Entity
-    
+
   case class ImportSessionImage(id: Long, importSessionId: Long, imageId: Long) extends Entity
 
-  case class GetImportSession(id: Long)
 
-  case class AddImportSession(importSession: ImportSession)
+  sealed trait ImportSessionRequest
 
-  case class AddImageToSession(importSession: ImportSession, image: Image, overwrite: Boolean)
+  case class GetImportSession(id: Long) extends ImportSessionRequest
 
-  case class UpdateSessionWithRejection(importSession: ImportSession)
+  case class AddImportSession(importSession: ImportSession) extends ImportSessionRequest
+
+  case class AddImageToSession(importSession: ImportSession, image: Image, overwrite: Boolean) extends ImportSessionRequest
+
+  case class UpdateSessionWithRejection(importSession: ImportSession) extends ImportSessionRequest
+
+  case class GetImportSessions(startIndex: Long, count: Long) extends ImportSessionRequest
+
+  case class DeleteImportSession(id: Long) extends ImportSessionRequest
+
+  case class GetImportSessionImages(id: Long) extends ImportSessionRequest
+
 
   case class ImageAddedToSession(importSessionImage: ImportSessionImage)
 
-  case class GetImportSessions(startIndex: Long, count: Long)
-
   case class ImportSessions(importSessions:Seq[ImportSession])
-
-  case class DeleteImportSession(id: Long)
-
-  case class GetImportSessionImages(id: Long)
 
   case class ImportSessionImages(importSessionImages: Seq[ImportSessionImage])
 }

@@ -1,7 +1,5 @@
 package se.nimsa.sbx.box
 
-import java.nio.file.Files
-
 import akka.actor.{Actor, ActorSystem, Props, ReceiveTimeout}
 import akka.testkit.{ImplicitSender, TestKit}
 import akka.util.Timeout
@@ -32,8 +30,6 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
   val db = Database.forURL("jdbc:h2:mem:boxpollactortest;DB_CLOSE_DELAY=-1", driver = "org.h2.Driver")
   val dbProps = DbProps(db, H2Driver)
-
-  val storage = Files.createTempDirectory("slicebox-test-storage-")
 
   val boxDao = new BoxDAO(H2Driver)
 
@@ -91,7 +87,6 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
   override def afterAll {
     TestKit.shutdownActorSystem(system)
-    TestUtil.deleteFolder(storage)
   }
 
   "A BoxPollActor" should {

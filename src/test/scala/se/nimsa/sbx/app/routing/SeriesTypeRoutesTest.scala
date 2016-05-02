@@ -14,7 +14,7 @@ import se.nimsa.sbx.dicom.DicomHierarchy.Image
 
 class SeriesTypeRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
-  def dbUrl() = "jdbc:h2:mem:seriestyperoutestest;DB_CLOSE_DELAY=-1"
+  def dbUrl = "jdbc:h2:mem:seriestyperoutestest;DB_CLOSE_DELAY=-1"
 
   val seriesTypeDao = new SeriesTypeDAO(H2Driver)
 
