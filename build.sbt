@@ -6,7 +6,7 @@ import de.heikoseeberger.sbtheader.license.Apache2_0
 
 	organization := "se.nimsa"
 
-	scalaVersion := "2.11.6"
+	scalaVersion := "2.11.8"
 
 	scalacOptions := Seq("-encoding", "UTF-8", "-Xlint","-deprecation", "-unchecked", "-feature", "-target:jvm-1.8")
 
@@ -83,26 +83,26 @@ import de.heikoseeberger.sbtheader.license.Apache2_0
 		val akkaVersion				= "2.3.9"
 		val sprayVersion			= "1.3.3"
 		Seq(
-			"com.typesafe.scala-logging"	%% "scala-logging"				% "3.1.0",
+			"com.typesafe.scala-logging"	%% "scala-logging"				% "3.4.0",
 			"com.typesafe.akka"						%% "akka-actor"						% akkaVersion,
 			"io.spray"										%% "spray-can"						% sprayVersion,
 			"io.spray"										%% "spray-routing"				% sprayVersion,
 			"io.spray"										%% "spray-client"					% sprayVersion,
-			"io.spray"										%% "spray-json"						% "1.3.1",
+			"io.spray"										%% "spray-json"						% "1.3.2",
 			"com.typesafe.akka"						%% "akka-slf4j"						% akkaVersion,
-			"ch.qos.logback"							%  "logback-classic" 			% "1.1.2",
+			"ch.qos.logback"							%  "logback-classic" 			% "1.1.7",
 			"com.typesafe.slick"					%% "slick"								% "2.1.0",
-			"com.h2database"							%  "h2"										% "1.4.190",
-			"mysql"												%  "mysql-connector-java"	%  "5.1.38",
-			"com.zaxxer"									%  "HikariCP"							% "2.4.5",
-			"com.github.t3hnar"						%% "scala-bcrypt"					% "2.4",
-			"org.scalatest"								%% "scalatest"						% "2.2.4"					% "test",
+			"com.h2database"							%  "h2"										% "1.4.191",
+			"mysql"												%  "mysql-connector-java"	%  "6.0.2",
+			"com.zaxxer"									%  "HikariCP"							% "2.4.6",
+			"com.github.t3hnar"						%% "scala-bcrypt"					% "2.6",
+			"org.scalatest"								%% "scalatest"						% "2.2.5"					% "test",
 			"io.spray"										%% "spray-testkit"				% sprayVersion		% "test",
 			"com.typesafe.akka"						%% "akka-testkit"					% akkaVersion			% "test",
-			"org.webjars"									%  "angularjs"						% "1.4.7",
-			"org.webjars"									%  "angular-material"			% "1.0.1",
-			"org.webjars"									%  "angular-file-upload"	% "5.0.0",
-			"com.amazonaws"               % "aws-java-sdk"          % "1.10.72"
+			"org.webjars"									%  "angularjs"						% "1.5.5",
+			"org.webjars"									%  "angular-material"			% "1.0.7",
+			"org.webjars"									%  "angular-file-upload"	% "11.0.0",
+			"com.amazonaws"               % "aws-java-sdk"          % "1.10.74"
 		)
 	}
 
