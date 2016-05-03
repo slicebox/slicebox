@@ -55,7 +55,7 @@ class ImportServiceActor(dbProps: DbProps) extends Actor with ExceptionCatching 
                 val updatedImportSession = importSession.copy(filesImported = importSession.filesImported + 1, lastUpdated = now)
                 dao.updateImportSession(updatedImportSession)
                 dao.importSessionImageForImportSessionIdAndImageId(importSession.id, image.id)
-                  .getOrElse(throw new NotFoundException(s"No import session image found for import session id ${importSession.id} and image id ${image.id}"))
+                  .getOrElse(dao.insertImportSessionImage(ImportSessionImage(-1, updatedImportSession.id, image.id)))
               } else {
                 val updatedImportSession = importSession.copy(filesImported = importSession.filesImported + 1, filesAdded = importSession.filesAdded + 1, lastUpdated = now)
                 dao.updateImportSession(updatedImportSession)

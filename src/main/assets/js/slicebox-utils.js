@@ -30,14 +30,10 @@ angular.module('slicebox.utils', ['ngSanitize'])
         },
 
         showInfoMessage: function(infoMessage) {
-            var toast = {
-                template: '<md-toast>' + infoMessage + '</md-toast>',
-                position: 'top right'
-            };
-            var parent = angular.element(document.getElementById("content"));
-            if (parent) {
-                toast.parent = parent;
-            }
+            var toast = $mdToast.simple()
+                .content(infoMessage)
+                .parent(angular.element(document.getElementById("content")))
+                .position("top right");
             $mdToast.show(toast);
         }
     };

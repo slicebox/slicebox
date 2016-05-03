@@ -56,9 +56,8 @@
                     <h4 class="md-flex">Add files to <i>{{uiState.selectedSession.name}}</i></h4>
                     <md-content>
 
-                        <div ngf-drop 
-                             ngf-change="import($files)" 
-                             ngf-drag-over-class="import-drop-box-dragover" 
+                        <div ngf-drop="import($files)" 
+                             ngf-drag-over-class="'import-drop-box-dragover'" 
                              ngf-multiple="true" 
                              ngf-allow-dir="true"
                              ng-disabled="uiState.currentFileSet.processing"
