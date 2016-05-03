@@ -56,9 +56,9 @@ trait TransactionRoutes {
                   else
                     onSuccess(anonymizationService.ask(ReverseAnonymization(dataset)).mapTo[Attributes]) { reversedDataset =>
                       val source = Source(SourceType.BOX, box.name, box.id)
-                      onSuccess(storageService.ask(CheckDataset(reversedDataset)).mapTo[Boolean]) { status =>
+                      onSuccess(storageService.ask(CheckDataset(reversedDataset, allowSC = true)).mapTo[Boolean]) { status =>
                         onSuccess(metaDataService.ask(AddMetaData(reversedDataset, source)).mapTo[MetaDataAdded]) { metaData =>
-                          onSuccess(storageService.ask(AddDataset(reversedDataset, source, metaData.image))) {
+                          onSuccess(storageService.ask(AddDataset(reversedDataset, source, metaData.image, allowSC = true))) {
                             case DatasetAdded(image, overwrite) =>
                               onSuccess(boxService.ask(UpdateIncoming(box, outgoingTransactionId, sequenceNumber, totalImageCount, image.id, overwrite))) {
                                 case IncomingUpdated(_) => complete(NoContent)

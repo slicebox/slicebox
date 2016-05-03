@@ -108,22 +108,26 @@ trait AnonymizationRoutes {
   def anonymizeOne(apiUser: ApiUser, imageId: Long, tagValues: Seq[TagValue]): Future[Option[DatasetAdded]] =
     metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]].flatMap { imageMaybe =>
       imageMaybe.map { image =>
-        storageService.ask(GetDataset(image, withPixelData = true)).mapTo[Option[Attributes]].map { optionalDataset =>
-          optionalDataset.map { dataset =>
-            AnonymizationUtil.setAnonymous(dataset, anonymous = false) // pretend not anonymized to force anonymization
-            anonymizationService.ask(Anonymize(imageId, dataset, tagValues)).mapTo[Attributes].flatMap { anonDataset =>
-              metaDataService.ask(DeleteMetaData(image.id)).flatMap { _ =>
-                storageService.ask(DeleteDataset(image)).flatMap { _ =>
-                  val source = Source(SourceType.USER, apiUser.user, apiUser.id)
-                  metaDataService.ask(AddMetaData(anonDataset, source)).mapTo[MetaDataAdded].flatMap { metaData =>
-                    storageService.ask(AddDataset(anonDataset, source, metaData.image)).mapTo[DatasetAdded]
+        metaDataService.ask(GetSourceForSeries(image.seriesId)).mapTo[Option[SeriesSource]].flatMap { seriesSourceMaybe =>
+          seriesSourceMaybe.map { seriesSource =>
+            val source = seriesSource.source
+            storageService.ask(GetDataset(image, withPixelData = true)).mapTo[Option[Attributes]].map { optionalDataset =>
+              optionalDataset.map { dataset =>
+                AnonymizationUtil.setAnonymous(dataset, anonymous = false) // pretend not anonymized to force anonymization
+                anonymizationService.ask(Anonymize(imageId, dataset, tagValues)).mapTo[Attributes].flatMap { anonDataset =>
+                  metaDataService.ask(DeleteMetaData(image.id)).flatMap { _ =>
+                    storageService.ask(DeleteDataset(image)).flatMap { _ =>
+                      metaDataService.ask(AddMetaData(anonDataset, source)).mapTo[MetaDataAdded].flatMap { metaData =>
+                        storageService.ask(AddDataset(anonDataset, source, metaData.image, allowSC = true)).mapTo[DatasetAdded]
+                      }
+                    }
                   }
                 }
               }
-            }
-          }
+            }.unwrap
+          }.unwrap
         }
       }.unwrap
-    }.unwrap
+    }
 
 }

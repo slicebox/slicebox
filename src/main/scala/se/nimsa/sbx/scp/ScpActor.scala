@@ -84,12 +84,12 @@ class ScpActor(scpData: ScpData, executor: Executor, implicit val timeout: Timeo
       .map(_.image)
 
   def addDataset(dataset: Attributes, source: Source, image: Image): Future[Boolean] =
-    storageService.ask(AddDataset(dataset, source, image))
+    storageService.ask(AddDataset(dataset, source, image, allowSC = false))
       .mapTo[DatasetAdded]
       .map(_.overwrite)
 
   def checkDataset(dataset: Attributes): Future[Boolean] =
-    storageService.ask(CheckDataset(dataset)).mapTo[Boolean]
+    storageService.ask(CheckDataset(dataset, allowSC = false)).mapTo[Boolean]
 
 }
 

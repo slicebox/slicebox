@@ -198,9 +198,9 @@ class BoxPollActor(box: Box,
 
                   case Success(reversedDataset) =>
                     val source = Source(SourceType.BOX, box.name, box.id)
-                    storageService.ask(CheckDataset(dataset)).mapTo[Boolean].flatMap { status =>
+                    storageService.ask(CheckDataset(dataset, allowSC = true)).mapTo[Boolean].flatMap { status =>
                       metaDataService.ask(AddMetaData(dataset, source)).mapTo[MetaDataAdded].flatMap { metaData =>
-                        storageService.ask(AddDataset(reversedDataset, source, metaData.image)).mapTo[DatasetAdded]
+                        storageService.ask(AddDataset(reversedDataset, source, metaData.image, allowSC = true)).mapTo[DatasetAdded]
                       }
                     }.onComplete {
                         case Success(DatasetAdded(image, overwrite)) =>

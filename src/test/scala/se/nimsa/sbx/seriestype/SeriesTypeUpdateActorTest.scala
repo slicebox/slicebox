@@ -1,7 +1,5 @@
 package se.nimsa.sbx.seriestype
 
-import java.nio.file.Files
-
 import akka.actor.ActorSelection.toScala
 import akka.actor.ActorSystem
 import akka.pattern.ask
@@ -16,7 +14,7 @@ import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, MetaDataAdded}
 import se.nimsa.sbx.metadata.{MetaDataDAO, MetaDataServiceActor, PropertiesDAO}
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
 import se.nimsa.sbx.storage.StorageProtocol.AddDataset
-import se.nimsa.sbx.storage.{FileStorage, RuntimeStorage, StorageServiceActor}
+import se.nimsa.sbx.storage.{RuntimeStorage, StorageServiceActor}
 import se.nimsa.sbx.util.TestUtil
 
 import scala.concurrent.Await
@@ -188,7 +186,7 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
       metaDataService.ask(AddMetaData(dataset, source))
         .mapTo[MetaDataAdded]
         .flatMap { metaData =>
-          storageService.ask(AddDataset(dataset, source, metaData.image))
+          storageService.ask(AddDataset(dataset, source, metaData.image, allowSC = false))
         }.map { _ =>
         val series = db.withSession { implicit session =>
           metaDataDao.series

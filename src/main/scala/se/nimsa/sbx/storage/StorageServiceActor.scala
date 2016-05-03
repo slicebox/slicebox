@@ -47,11 +47,11 @@ class StorageServiceActor(storage: StorageService) extends Actor with ExceptionC
     case msg: ImageRequest => catchAndReport {
       msg match {
 
-        case CheckDataset(dataset) =>
-          sender ! checkDataset(dataset)
+        case CheckDataset(dataset, allowSC) =>
+          sender ! checkDataset(dataset, allowSC)
 
-        case AddDataset(dataset, source, image) =>
-          if (checkDataset(dataset)) {
+        case AddDataset(dataset, source, image, allowSC) =>
+          if (checkDataset(dataset, allowSC)) {
             val overwrite = storage.storeDataset(dataset, image)
             if (overwrite)
               log.info(s"Updated existing file with image id ${image.id}")
@@ -122,10 +122,10 @@ class StorageServiceActor(storage: StorageService) extends Actor with ExceptionC
 
   }
 
-  def checkDataset(dataset: Attributes): Boolean = {
+  def checkDataset(dataset: Attributes, allowSC: Boolean): Boolean = {
     if (dataset == null)
       throw new IllegalArgumentException("Invalid dataset")
-    else if (!DicomUtil.checkSopClass(dataset))
+    else if (!DicomUtil.checkSopClass(dataset, allowSC))
       throw new IllegalArgumentException(s"Unsupported SOP Class UID ${dataset.getString(Tag.SOPClassUID)}")
     true
   }

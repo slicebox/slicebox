@@ -45,9 +45,9 @@ object StorageProtocol {
 
   case class GetImageFrame(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int) extends ImageRequest
 
-  case class CheckDataset(dataset: Attributes) extends ImageRequest
+  case class CheckDataset(dataset: Attributes, allowSC: Boolean) extends ImageRequest
 
-  case class AddDataset(dataset: Attributes, source: Source, image: Image) extends ImageRequest
+  case class AddDataset(dataset: Attributes, source: Source, image: Image, allowSC: Boolean) extends ImageRequest
   
   case class AddJpeg(dataset: Attributes, source: Source, image: Image) extends ImageRequest
 

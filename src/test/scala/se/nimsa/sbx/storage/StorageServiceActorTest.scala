@@ -38,12 +38,12 @@ class StorageServiceActorTest(_system: ActorSystem) extends TestKit(_system) wit
   "The storage service" must {
 
     "return 'overwrite = true' when adding the same dataset for the second time, indicating that the previous dataset was overwritten" in {
-      storageActorRef ! AddDataset(dataset, source, image)
+      storageActorRef ! AddDataset(dataset, source, image, allowSC = false)
       expectMsgPF() {
         case DatasetAdded(_, overwrite) =>
           overwrite shouldBe false
       }
-      storageActorRef ! AddDataset(dataset, source, image)
+      storageActorRef ! AddDataset(dataset, source, image, allowSC = false)
       expectMsgPF() {
         case DatasetAdded(_, overwrite) =>
           overwrite shouldBe true
@@ -51,18 +51,23 @@ class StorageServiceActorTest(_system: ActorSystem) extends TestKit(_system) wit
     }
 
     "return a notification that the dataset has been added when adding a dataset" in {
-      storageActorRef ! AddDataset(dataset, source, image)
+      storageActorRef ! AddDataset(dataset, source, image, allowSC = true)
       expectMsgType[DatasetAdded]
     }
 
     "return a notification that the dataset has been added when adding an already added dataset" in {
-      storageActorRef ! AddDataset(dataset, source, image)
+      storageActorRef ! AddDataset(dataset, source, image, allowSC = true)
       expectMsgType[DatasetAdded]
     }
 
     "return a failure message when adding a dataset with a non-supported SOP class" in {
-      storageActorRef ! AddDataset(DicomUtil.loadDataset(TestUtil.testSecondaryCaptureFile.toPath, withPixelData = true, useBulkDataURI = false), source, image)
+      storageActorRef ! AddDataset(DicomUtil.loadDataset(TestUtil.testSecondaryCaptureFile.toPath, withPixelData = true, useBulkDataURI = false), source, image, allowSC = false)
       expectMsgType[Failure]
+    }
+
+    "return a notification that the dataset has been added when adding a secondary dataset when this is allowed" in {
+      storageActorRef ! AddDataset(DicomUtil.loadDataset(TestUtil.testSecondaryCaptureFile.toPath, withPixelData = true, useBulkDataURI = false), source, image, allowSC = true)
+      expectMsgType[DatasetAdded]
     }
   }
 

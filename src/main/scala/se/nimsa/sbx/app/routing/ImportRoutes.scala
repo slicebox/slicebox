@@ -105,11 +105,11 @@ trait ImportRoutes {
 
         val source = Source(SourceType.IMPORT, importSession.name, importSessionId)
 
-        onComplete(storageService.ask(CheckDataset(dataset)).mapTo[Boolean]) {
+        onComplete(storageService.ask(CheckDataset(dataset, allowSC = false)).mapTo[Boolean]) {
 
           case Success(status) =>
             onSuccess(metaDataService.ask(AddMetaData(dataset, source)).mapTo[MetaDataAdded]) { metaData =>
-              onSuccess(storageService.ask(AddDataset(dataset, source, metaData.image)).mapTo[DatasetAdded]) {
+              onSuccess(storageService.ask(AddDataset(dataset, source, metaData.image, allowSC = false)).mapTo[DatasetAdded]) {
                 case DatasetAdded(image, overwrite) =>
                   onSuccess(importService.ask(AddImageToSession(importSession, image, overwrite)).mapTo[ImageAddedToSession]) { importSessionImage =>
                     if (overwrite)
