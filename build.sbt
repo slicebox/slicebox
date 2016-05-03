@@ -49,6 +49,17 @@ import de.heikoseeberger.sbtheader.license.Apache2_0
 
 	rpmLicense := Some("Apache v2")
 
+	// rpm specific
+	packageArchitecture in Rpm := "noarch"
+
+	rpmGroup := Some("Applications/Research")
+
+	rpmBrpJavaRepackJars := true
+
+	version in Rpm := version.value.replace("-SNAPSHOT", ".0.1")
+
+	rpmRelease := "1"
+
 	// for automatic license stub generation
 
 	val licenceYear = "2016"
