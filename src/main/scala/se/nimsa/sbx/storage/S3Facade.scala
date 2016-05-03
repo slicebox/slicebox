@@ -19,7 +19,7 @@ class S3Facade(val bucket: String) {
   // Environment Variables - AWS_ACCESS_KEY_ID and AWS_SECRET_KEY
   // Java System Properties - aws.accessKeyId and aws.secretKey
   // Instance profile credentials delivered through the Amazon EC2 metadata service
-  val s3 = new AmazonS3Client(new DefaultAWSCredentialsProviderChain(), new ClientConfiguration().withProtocol(Protocol.HTTP))
+  val s3 = new AmazonS3Client(new DefaultAWSCredentialsProviderChain(), new ClientConfiguration().withProtocol(Protocol.HTTPS))
 
 
   def delete(key: String): Unit = {
