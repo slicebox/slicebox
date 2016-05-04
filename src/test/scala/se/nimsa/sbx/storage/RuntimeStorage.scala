@@ -39,8 +39,8 @@ class RuntimeStorage extends StorageService {
   def readImageInformation(image: Image): Option[ImageInformation] =
     imageAsInputStream(image).map(is => super.readImageInformation(is))
 
-  def readImageFrame(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int): Option[Array[Byte]] =
-    imageAsInputStream(image).map(is => super.readImageFrame( ImageIO.createImageInputStream(is), frameNumber, windowMin, windowMax, imageHeight))
+  def readPngImageData(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int): Option[Array[Byte]] =
+    imageAsInputStream(image).map(is => super.readPngImageData( ImageIO.createImageInputStream(is), frameNumber, windowMin, windowMax, imageHeight))
 
   def readSecondaryCaptureJpeg(image: Image, imageHeight: Int): Option[Array[Byte]] =
     imageAsInputStream(image).map(is => super.readSecondaryCaptureJpeg(is, imageHeight))

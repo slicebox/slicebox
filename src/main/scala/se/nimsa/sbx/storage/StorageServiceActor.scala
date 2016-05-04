@@ -102,15 +102,21 @@ class StorageServiceActor(storage: StorageService) extends Actor with ExceptionC
         case GetImageInformation(image) =>
           sender ! storage.readImageInformation(image)
 
-        case GetImageFrame(image, frameNumber, windowMin, windowMax, imageHeight) =>
-          val imageBytes: Option[Array[Byte]] =
+        case GetPngImageData(image, frameNumber, windowMin, windowMax, imageHeight) =>
+          val pngResponse =
             try
-              storage.readImageFrame(image, frameNumber, windowMin, windowMax, imageHeight)
+              storage.readPngImageData(image, frameNumber, windowMin, windowMax, imageHeight).map(PngImageData(_))
             catch {
-              case NonFatal(e) =>
-                storage.readSecondaryCaptureJpeg(image, imageHeight)
+              case NonFatal(e1) =>
+                try
+                  storage.readSecondaryCaptureJpeg(image, imageHeight).map(PngImageData(_))
+                catch {
+                  case NonFatal(e2) =>
+                    log.debug(s"Could not create PNG image data for image with ID ${image.id}, returning empty response")
+                    Some(PngImageDataNotAvailable)
+                }
             }
-          sender ! imageBytes
+          sender ! pngResponse
 
       }
     }

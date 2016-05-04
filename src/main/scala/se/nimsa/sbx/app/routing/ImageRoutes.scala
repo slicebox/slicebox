@@ -95,8 +95,9 @@ trait ImageRoutes {
                   'windowmax.as[Int] ? 0,
                   'imageheight.as[Int] ? 0) { (frameNumber, min, max, height) =>
                   get {
-                    onSuccess(storageService.ask(GetImageFrame(image, frameNumber, min, max, height)).mapTo[Option[Array[Byte]]]) {
-                      case Some(bytes) => complete(HttpEntity(`image/png`, HttpData(bytes)))
+                    onSuccess(storageService.ask(GetPngImageData(image, frameNumber, min, max, height))) {
+                      case Some(PngImageData(bytes)) => complete(HttpEntity(`image/png`, HttpData(bytes)))
+                      case Some(PngImageDataNotAvailable) => complete(NoContent)
                       case None => complete(NotFound)
                     }
                   }

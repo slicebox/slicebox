@@ -43,7 +43,7 @@ object StorageProtocol {
 
   case class GetImageInformation(image: Image) extends ImageRequest
 
-  case class GetImageFrame(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int) extends ImageRequest
+  case class GetPngImageData(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int) extends ImageRequest
 
   case class CheckDataset(dataset: Attributes, restrictSopClass: Boolean) extends ImageRequest
 
@@ -58,13 +58,17 @@ object StorageProtocol {
   case class GetExportSetImageIds(exportSetId: Long) extends ImageRequest
 
 
+  case class ImageData(data: Array[Byte])
+
+  case class PngImageData(data: Array[Byte])
+
+  case object PngImageDataNotAvailable
+
   case class DatasetAdded(image: Image, overwrite: Boolean)
 
   case class JpegAdded(image: Image)
 
   case class DatasetDeleted(image: Image)
-
-  case class ImageData(data: Array[Byte])
 
   case class ExportSetId(id: Long)
 

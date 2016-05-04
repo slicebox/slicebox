@@ -4,7 +4,6 @@ import java.awt.RenderingHints
 import java.awt.image.BufferedImage
 import java.io.{IOException, InputStream, ByteArrayInputStream, ByteArrayOutputStream}
 import java.nio.file.Path
-import java.util.zip.{ZipEntry, ZipOutputStream}
 import javax.imageio.ImageIO
 import javax.imageio.stream.ImageInputStream
 
@@ -51,9 +50,9 @@ trait StorageService {
         dataset.getInt(Tag.LargestImagePixelValue, 0))
     }
 
-  def readImageFrame(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int): Option[Array[Byte]]
+  def readPngImageData(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int): Option[Array[Byte]]
 
-  def readImageFrame(iis: ImageInputStream, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int): Array[Byte] = {
+  def readPngImageData(iis: ImageInputStream, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int): Array[Byte] = {
       try {
         val imageReader = ImageIO.getImageReadersByFormatName("DICOM").next
         imageReader.setInput(iis)

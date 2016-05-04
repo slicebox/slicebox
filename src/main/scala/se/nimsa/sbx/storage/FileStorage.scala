@@ -65,11 +65,11 @@ class FileStorage(val path: Path) extends StorageService {
       super.readImageInformation(new BufferedInputStream(Files.newInputStream(imagePath)))
     }
 
-  def readImageFrame(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int): Option[Array[Byte]] =
+  def readPngImageData(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int): Option[Array[Byte]] =
     resolvePath(image).map { imagePath =>
       val file = imagePath.toFile
       val iis = ImageIO.createImageInputStream(file)
-      super.readImageFrame(iis, frameNumber, windowMin, windowMax, imageHeight)
+      super.readPngImageData(iis, frameNumber, windowMin, windowMax, imageHeight)
     }
 
   def readSecondaryCaptureJpeg(image: Image, imageHeight: Int): Option[Array[Byte]] =

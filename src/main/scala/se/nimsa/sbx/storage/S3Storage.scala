@@ -67,10 +67,10 @@ class S3Storage(val bucket: String, val s3Prefix: String) extends StorageService
     Some(super.readImageInformation(s3InputStream))
   }
 
-  def readImageFrame(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int): Option[Array[Byte]] = {
+  def readPngImageData(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int): Option[Array[Byte]] = {
     val s3InputStream = s3Client.get(s3Id(image))
     val iis = ImageIO.createImageInputStream(s3InputStream)
-    Some(super.readImageFrame(iis, frameNumber, windowMin, windowMax, imageHeight))
+    Some(super.readPngImageData(iis, frameNumber, windowMin, windowMax, imageHeight))
   }
 
   def readSecondaryCaptureJpeg(image: Image, imageHeight: Int): Option[Array[Byte]] = {
