@@ -112,7 +112,7 @@ import de.heikoseeberger.sbtheader.license.Apache2_0
 
 	// eclipse IDE settings
 
-	EclipseKeys.createSrc := EclipseCreateSrc.Default + EclipseCreateSrc.Resource
+	EclipseKeys.createSrc := EclipseCreateSrc.Default
 
 	EclipseKeys.withSource := true
 

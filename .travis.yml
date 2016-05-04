@@ -6,7 +6,6 @@ jdk:
 notifications:
   email:
     - karl.sjostrand@gmail.com
-    - mattias.hagstrand@caleigo.com
 
-script: "sbt ++2.11.6 clean coverage test"
+script: "sbt ++2.11.8 clean coverage test"
 after_success: "sbt coveralls"
