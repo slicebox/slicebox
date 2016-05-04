@@ -169,13 +169,11 @@ object DicomUtil {
     else
       values.tail.foldLeft(values.head)((result, part) => result + "/" + part)
 
-  def checkSopClass(dataset: Attributes, allowSC: Boolean) = {
-    val sopClasses = if (allowSC) SopClasses.sopClassesIncludingSC else SopClasses.sopClasses
-    sopClasses
+  def checkSopClass(dataset: Attributes) =
+    SopClasses.sopClasses
       .filter(sopClass => sopClass.included)
       .map(_.sopClassUID)
       .contains(dataset.getString(Tag.SOPClassUID))
-  }
 
   def fileToBufferedImages(path: Path): Seq[BufferedImage] = {
     val iter = ImageIO.getImageReadersByFormatName("DICOM")

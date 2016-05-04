@@ -39,7 +39,7 @@ class ImageRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     PostAsUser("/api/images", mfd) ~> routes ~> check {
       status should be(Created)
       val image = responseAs[Image]
-      image.id should be(1)
+      image.id.toInt should be > 0
     }
   }
 
@@ -47,7 +47,7 @@ class ImageRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     PostAsUser("/api/images", HttpData(TestUtil.testImageByteArray)) ~> routes ~> check {
       status should be(Created)
       val image = responseAs[Image]
-      image.id should be(2)
+      image.id.toInt should be > 0
     }
   }
 
@@ -60,7 +60,7 @@ class ImageRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
   }
 
-  it should "allow fetching the image again" in {
+  it should "200 OK and the specified dataset when fetching an added image" in {
     val image = PostAsUser("/api/images", HttpData(TestUtil.testImageByteArray)) ~> routes ~> check {
       responseAs[Image]
     }
@@ -75,6 +75,14 @@ class ImageRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   it should "return 404 NotFound when requesting an image that does not exist" in {
     GetAsUser("/api/images/2") ~> routes ~> check {
       status should be(NotFound)
+    }
+  }
+
+  it should "return 201 Created when adding a secondary capture image" in {
+    val file = TestUtil.testSecondaryCaptureFile
+    val mfd = MultipartFormData(Seq(BodyPart(file, "file")))
+    PostAsUser("/api/images", mfd) ~> routes ~> check {
+      status should be(Created)
     }
   }
 
@@ -115,7 +123,7 @@ class ImageRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
   }
 
-  it should "return a 200 OK and the bytes of a PNG image of the requested height when asking for a PNG rendering of an image frame with a specific height" in {
+  it should "return 200 OK and the bytes of a PNG image of the requested height when asking for a PNG rendering of an image frame with a specific height" in {
     val image = PostAsUser("/api/images", HttpData(TestUtil.testImageByteArray)) ~> routes ~> check {
       responseAs[Image]
     }

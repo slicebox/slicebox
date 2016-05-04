@@ -138,11 +138,4 @@ object SopClasses {
     SopClass("Implant Assembly Template Storage", "1.2.840.10008.5.1.4.44.1", "Implant Assembly Template IOD", included = false),
     SopClass("Implant Template Group Storage", "1.2.840.10008.5.1.4.45.1", "Implant Template Group IOD", included = false))
 
-  lazy val sopClassesIncludingSC = sopClasses.map { sopClass =>
-    if (sopClass.sopClassUID == "1.2.840.10008.5.1.4.1.1.7" || sopClass.sopClassUID.startsWith("1.2.840.10008.5.1.4.1.1.7."))
-      sopClass.copy(included = true)
-    else
-      sopClass
-  }
-
 }

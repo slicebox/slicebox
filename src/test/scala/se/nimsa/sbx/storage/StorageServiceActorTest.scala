@@ -7,7 +7,7 @@ import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpecLike}
 import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.app.GeneralProtocol.{Source, SourceType}
 import se.nimsa.sbx.dicom.DicomUtil
-import se.nimsa.sbx.storage.StorageProtocol.{AddDataset, DatasetAdded}
+import se.nimsa.sbx.storage.StorageProtocol.{AddDataset, CheckDataset, DatasetAdded}
 import se.nimsa.sbx.util.TestUtil
 
 import scala.slick.driver.H2Driver
@@ -38,12 +38,12 @@ class StorageServiceActorTest(_system: ActorSystem) extends TestKit(_system) wit
   "The storage service" must {
 
     "return 'overwrite = true' when adding the same dataset for the second time, indicating that the previous dataset was overwritten" in {
-      storageActorRef ! AddDataset(dataset, source, image, allowSC = false)
+      storageActorRef ! AddDataset(dataset, source, image)
       expectMsgPF() {
         case DatasetAdded(_, overwrite) =>
           overwrite shouldBe false
       }
-      storageActorRef ! AddDataset(dataset, source, image, allowSC = false)
+      storageActorRef ! AddDataset(dataset, source, image)
       expectMsgPF() {
         case DatasetAdded(_, overwrite) =>
           overwrite shouldBe true
@@ -51,23 +51,23 @@ class StorageServiceActorTest(_system: ActorSystem) extends TestKit(_system) wit
     }
 
     "return a notification that the dataset has been added when adding a dataset" in {
-      storageActorRef ! AddDataset(dataset, source, image, allowSC = true)
+      storageActorRef ! AddDataset(dataset, source, image)
       expectMsgType[DatasetAdded]
     }
 
     "return a notification that the dataset has been added when adding an already added dataset" in {
-      storageActorRef ! AddDataset(dataset, source, image, allowSC = true)
+      storageActorRef ! AddDataset(dataset, source, image)
       expectMsgType[DatasetAdded]
     }
 
-    "return a failure message when adding a dataset with a non-supported SOP class" in {
-      storageActorRef ! AddDataset(DicomUtil.loadDataset(TestUtil.testSecondaryCaptureFile.toPath, withPixelData = true, useBulkDataURI = false), source, image, allowSC = false)
+    "return a failure message when checking a dataset with a non-supported SOP class" in {
+      storageActorRef ! CheckDataset(DicomUtil.loadDataset(TestUtil.testSecondaryCaptureFile.toPath, withPixelData = true, useBulkDataURI = false), restrictSopClass = true)
       expectMsgType[Failure]
     }
 
-    "return a notification that the dataset has been added when adding a secondary dataset when this is allowed" in {
-      storageActorRef ! AddDataset(DicomUtil.loadDataset(TestUtil.testSecondaryCaptureFile.toPath, withPixelData = true, useBulkDataURI = false), source, image, allowSC = true)
-      expectMsgType[DatasetAdded]
+    "return a success message when checking a dataset with any SOP class when SOP class restrictions are off" in {
+      storageActorRef ! CheckDataset(DicomUtil.loadDataset(TestUtil.testSecondaryCaptureFile.toPath, withPixelData = true, useBulkDataURI = false), restrictSopClass = false)
+      expectMsg(true)
     }
   }
 

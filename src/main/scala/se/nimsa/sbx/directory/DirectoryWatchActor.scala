@@ -86,12 +86,12 @@ class DirectoryWatchActor(watchedDirectory: WatchedDirectory,
       .map(_.image)
 
   def addDataset(dataset: Attributes, source: Source, image: Image): Future[Boolean] =
-    storageService.ask(AddDataset(dataset, source, image, allowSC = false))
+    storageService.ask(AddDataset(dataset, source, image))
       .mapTo[DatasetAdded]
       .map(_.overwrite)
 
   def checkDataset(dataset: Attributes): Future[Boolean] =
-    storageService.ask(CheckDataset(dataset, allowSC = false)).mapTo[Boolean]
+    storageService.ask(CheckDataset(dataset, restrictSopClass = true)).mapTo[Boolean]
 
 }
 
