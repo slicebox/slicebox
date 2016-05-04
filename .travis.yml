@@ -7,5 +7,5 @@ notifications:
   email:
     - karl.sjostrand@gmail.com
 
-script: "sbt ++2.11.8 clean coverage test"
-after_success: "sbt coveralls"
+script: "sbt clean coverage test"
+after_success: "sbt coverageReport coveralls"
