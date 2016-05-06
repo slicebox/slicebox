@@ -44,10 +44,9 @@ class S3Facade(val bucket: String) {
       val putObjectRequest: PutObjectRequest = new PutObjectRequest(bucket, key, new ByteArrayInputStream(content), metadata)
       s3.putObject(putObjectRequest)
     } catch {
-      case e: Exception => {
+      case e: Exception =>
         //log.error("Failed to upload to S3", e)
         throw e
-      }
     }
     key
   }

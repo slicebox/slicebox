@@ -48,19 +48,19 @@ class Scp(val name: String, val aeTitle: String, val port: Int, notifyActor: Act
 
       val cuid = rq.getString(Tag.AffectedSOPClassUID)
       val iuid = rq.getString(Tag.AffectedSOPInstanceUID)
-      val tsuid = pc.getTransferSyntax()
+      val tsuid = pc.getTransferSyntax
       val dataset = data.readDataset(tsuid)
       notifyActor ! DatasetReceivedByScp(dataset)
     }
 
   }
 
-  device.setDimseRQHandler(createServiceRegistry());
-  device.addConnection(conn);
-  device.addApplicationEntity(ae);
+  device.setDimseRQHandler(createServiceRegistry())
+  device.addConnection(conn)
+  device.addApplicationEntity(ae)
 
-  ae.setAssociationAcceptor(true);
-  ae.addConnection(conn);
+  ae.setAssociationAcceptor(true)
+  ae.addConnection(conn)
   
   SopClasses.sopClasses.filter(_.included).foreach(sopClass =>
     ae.addTransferCapability(new TransferCapability(sopClass.sopClassUID, "*", TransferCapability.Role.SCP, "*")))

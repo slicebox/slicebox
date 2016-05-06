@@ -69,7 +69,7 @@ trait BoxRoutes {
           pathEndOrSingleSlash {
             delete {
               onSuccess(boxService.ask(RemoveBox(boxId))) {
-                case BoxRemoved(boxId) =>
+                case BoxRemoved(_) =>
                   complete(NoContent)
               }
             }
@@ -79,15 +79,13 @@ trait BoxRoutes {
         post {
           entity(as[Seq[ImageTagValues]]) { imageTagValuesSeq =>
             onSuccess(boxService.ask(GetBoxById(boxId)).mapTo[Option[Box]]) {
-              _ match {
-                case Some(box) =>
-                  onSuccess(boxService.ask(SendToRemoteBox(box, imageTagValuesSeq))) {
-                    case ImagesAddedToOutgoing(_, _) =>
-                      complete(NoContent)
-                  }
-                case None =>
-                  complete((NotFound, s"No box found for id $boxId"))
-              }
+              case Some(box) =>
+                onSuccess(boxService.ask(SendToRemoteBox(box, imageTagValuesSeq))) {
+                  case ImagesAddedToOutgoing(_, _) =>
+                    complete(NoContent)
+                }
+              case None =>
+                complete((NotFound, s"No box found for id $boxId"))
             }
           }
         }
@@ -109,7 +107,7 @@ trait BoxRoutes {
         pathEndOrSingleSlash {
           delete {
             onSuccess(boxService.ask(RemoveIncomingTransaction(incomingTransactionId))) {
-              case IncomingTransactionRemoved(incomingTransactionId) =>
+              case IncomingTransactionRemoved(_) =>
                 complete(NoContent)
             }
           }

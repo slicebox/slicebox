@@ -44,8 +44,8 @@ trait ForwardingRoutes { this: SliceboxService =>
             authorize(apiUser.hasPermission(UserRole.ADMINISTRATOR)) {
               entity(as[ForwardingRule]) { forwardingRule =>
                 onSuccess(forwardingService.ask(AddForwardingRule(forwardingRule))) {
-                  case ForwardingRuleAdded(forwardingRule) =>
-                    complete((Created, forwardingRule))
+                  case ForwardingRuleAdded(addedForwardingRule) =>
+                    complete((Created, addedForwardingRule))
                 }
               }
             }
@@ -55,7 +55,7 @@ trait ForwardingRoutes { this: SliceboxService =>
             delete {
               authorize(apiUser.hasPermission(UserRole.ADMINISTRATOR)) {
                 onSuccess(forwardingService.ask(RemoveForwardingRule(forwardingRuleId))) {
-                  case ForwardingRuleRemoved(forwardingRuleId) =>
+                  case ForwardingRuleRemoved(_) =>
                     complete(NoContent)
                 }
               }

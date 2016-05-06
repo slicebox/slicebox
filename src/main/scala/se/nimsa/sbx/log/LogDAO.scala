@@ -42,7 +42,7 @@ class LogDAO(val driver: JdbcProfile) {
     if (MTable.getTables("Log").list.isEmpty) logQuery.ddl.create
 
   def drop(implicit session: Session): Unit =
-    (logQuery.ddl).drop
+    logQuery.ddl.drop
     
   def clear(implicit session: Session): Unit =
     logQuery.delete

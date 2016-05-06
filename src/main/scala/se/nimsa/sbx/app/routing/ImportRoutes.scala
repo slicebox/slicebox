@@ -52,18 +52,16 @@ trait ImportRoutes {
         pathEndOrSingleSlash {
           get {
             parameters('startindex.as[Long] ? 0, 'count.as[Long] ? 20) { (startIndex, count) =>
-            onSuccess(importService.ask(GetImportSessions(startIndex, count))) {
-              case ImportSessions(importSessions) => {
-                complete(importSessions)
+              onSuccess(importService.ask(GetImportSessions(startIndex, count))) {
+                case ImportSessions(importSessions) =>
+                  complete(importSessions)
               }
-            }
             }
           } ~ post {
             entity(as[ImportSession]) { importSession =>
               onSuccess(importService.ask(AddImportSession(importSession.copy(user = apiUser.user, userId = apiUser.id)))) {
-                case importSession: ImportSession => {
+                case importSession: ImportSession =>
                   complete((Created, importSession))
-                }
               }
             }
           }

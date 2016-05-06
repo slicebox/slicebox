@@ -53,7 +53,7 @@ def scpRoutes(apiUser: ApiUser): Route =
         delete {
           authorize(apiUser.hasPermission(UserRole.ADMINISTRATOR)) {
             onSuccess(scpService.ask(RemoveScp(scpDataId))) {
-              case ScpRemoved(scpDataId) =>
+              case ScpRemoved(_) =>
                 complete(NoContent)
             }
           }

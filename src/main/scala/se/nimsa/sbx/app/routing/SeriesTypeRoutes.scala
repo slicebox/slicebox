@@ -44,8 +44,8 @@ trait SeriesTypeRoutes { this: SliceboxService =>
           authorize(apiUser.hasPermission(UserRole.ADMINISTRATOR)) {
             entity(as[SeriesType]) { seriesType =>
               onSuccess(seriesTypeService.ask(AddSeriesType(seriesType))) {
-                case SeriesTypeAdded(seriesType) =>
-                  complete((Created, seriesType))
+                case SeriesTypeAdded(addedSeriesType) =>
+                  complete((Created, addedSeriesType))
               }
             }
           }
@@ -65,7 +65,7 @@ trait SeriesTypeRoutes { this: SliceboxService =>
           } ~ delete {
             authorize(apiUser.hasPermission(UserRole.ADMINISTRATOR)) {
               onSuccess(seriesTypeService.ask(RemoveSeriesType(seriesTypeId))) {
-                case SeriesTypeRemoved(seriesTypeId) =>
+                case SeriesTypeRemoved(_) =>
                   complete(NoContent)
               }
             }
@@ -92,8 +92,8 @@ trait SeriesTypeRoutes { this: SliceboxService =>
             authorize(apiUser.hasPermission(UserRole.ADMINISTRATOR)) {
               entity(as[SeriesTypeRule]) { seriesTypeRule =>
                 onSuccess(seriesTypeService.ask(AddSeriesTypeRule(seriesTypeRule))) {
-                  case SeriesTypeRuleAdded(seriesTypeRule) =>
-                    complete((Created, seriesTypeRule))
+                  case SeriesTypeRuleAdded(addedSeriesTypeRule) =>
+                    complete((Created, addedSeriesTypeRule))
                 }
               }
             }
@@ -103,7 +103,7 @@ trait SeriesTypeRoutes { this: SliceboxService =>
             delete {
               authorize(apiUser.hasPermission(UserRole.ADMINISTRATOR)) {
                 onSuccess(seriesTypeService.ask(RemoveSeriesTypeRule(seriesTypeRuleId))) {
-                  case SeriesTypeRuleRemoved(seriesTypeRuleId) =>
+                  case SeriesTypeRuleRemoved(_) =>
                     complete(NoContent)
                 }
               }
@@ -119,8 +119,8 @@ trait SeriesTypeRoutes { this: SliceboxService =>
                 authorize(apiUser.hasPermission(UserRole.ADMINISTRATOR)) {
                   entity(as[SeriesTypeRuleAttribute]) { seriesTypeRuleAttribute =>
                     onSuccess(seriesTypeService.ask(AddSeriesTypeRuleAttribute(seriesTypeRuleAttribute))) {
-                      case SeriesTypeRuleAttributeAdded(seriesTypeRuleAttribute) =>
-                        complete((Created, seriesTypeRuleAttribute))
+                      case SeriesTypeRuleAttributeAdded(addedSeriesTypeRuleAttribute) =>
+                        complete((Created, addedSeriesTypeRuleAttribute))
                     }
                   }
                 }
@@ -130,7 +130,7 @@ trait SeriesTypeRoutes { this: SliceboxService =>
                 delete {
                   authorize(apiUser.hasPermission(UserRole.ADMINISTRATOR)) {
                     onSuccess(seriesTypeService.ask(RemoveSeriesTypeRuleAttribute(seriesTypeRuleAttributeId))) {
-                      case SeriesTypeRuleAttributeRemoved(seriesTypeRuleAttributeId) =>
+                      case SeriesTypeRuleAttributeRemoved(_) =>
                         complete(NoContent)
                     }
                   }

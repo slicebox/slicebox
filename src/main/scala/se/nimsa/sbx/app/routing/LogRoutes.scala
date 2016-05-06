@@ -46,7 +46,7 @@ trait LogRoutes { this: SliceboxService =>
       } ~ path(LongNumber) { logId =>
         delete {
             onSuccess(logService.ask(RemoveLogEntry(logId))) {
-              case LogEntryRemoved(logId) =>
+              case LogEntryRemoved(_) =>
                 complete(NoContent)
             }          
         }

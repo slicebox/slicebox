@@ -26,7 +26,7 @@ import se.nimsa.sbx.app.GeneralProtocol.Destination
 object BoxProtocol {
 
   sealed trait BoxSendMethod {
-    override def toString(): String = this match {
+    override def toString: String = this match {
       case BoxSendMethod.PUSH => "PUSH"
       case BoxSendMethod.POLL => "POLL"
     }
@@ -43,7 +43,7 @@ object BoxProtocol {
   }
 
   sealed trait TransactionStatus {
-    override def toString(): String = this match {
+    override def toString: String = this match {
       case TransactionStatus.PROCESSING => "PROCESSING"
       case TransactionStatus.WAITING => "WAITING"
       case TransactionStatus.FAILED => "FAILED"

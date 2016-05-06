@@ -54,7 +54,7 @@ trait ScuRoutes { this: SliceboxService =>
           delete {
             authorize(apiUser.hasPermission(UserRole.ADMINISTRATOR)) {
               onSuccess(scuService.ask(RemoveScu(scuDataId))) {
-                case ScuRemoved(scuDataId) =>
+                case ScuRemoved(_) =>
                   complete(NoContent)
               }
             }
@@ -63,7 +63,8 @@ trait ScuRoutes { this: SliceboxService =>
           post {
             entity(as[Seq[Long]]) { imageIds =>
               onSuccess(scuService.ask(SendImagesToScp(imageIds, scuDataId))) {
-                case ImagesSentToScp(scuDataId, imageIds) => complete(NoContent)
+                case ImagesSentToScp(_, _) =>
+                  complete(NoContent)
               }
             }
           }

@@ -207,15 +207,15 @@ trait MetadataRoutes { this: SliceboxService =>
               } ~ post {
                 entity(as[SeriesTag]) { seriesTag =>
                   onSuccess(metaDataService.ask(AddSeriesTagToSeries(seriesTag, seriesId))) {
-                    case SeriesTagAddedToSeries(seriesTag) =>
-                      complete((Created, seriesTag))
+                    case SeriesTagAddedToSeries(addedSeriesTag) =>
+                      complete((Created, addedSeriesTag))
                   }
                 }
               }
             } ~ path(LongNumber) { seriesTagId =>
               delete {
                 onSuccess(metaDataService.ask(RemoveSeriesTagFromSeries(seriesTagId, seriesId))) {
-                  case SeriesTagRemovedFromSeries(seriesId) =>
+                  case SeriesTagRemovedFromSeries(_) =>
                     complete(NoContent)
                 }
               }

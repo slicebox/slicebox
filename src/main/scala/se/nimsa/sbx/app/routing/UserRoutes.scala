@@ -96,8 +96,8 @@ trait UserRoutes { this: SliceboxService =>
             entity(as[ClearTextUser]) { user =>
               val apiUser = ApiUser(-1, user.user, user.role).withPassword(user.password)
               onSuccess(userService.ask(AddUser(apiUser))) {
-                case UserAdded(user) =>
-                  complete((Created, user))
+                case UserAdded(addedUser) =>
+                  complete((Created, addedUser))
               }
             }
           }
@@ -106,7 +106,7 @@ trait UserRoutes { this: SliceboxService =>
         delete {
           authorize(apiUser.hasPermission(UserRole.ADMINISTRATOR)) {
             onSuccess(userService.ask(DeleteUser(userId))) {
-              case UserDeleted(userId) =>
+              case UserDeleted(_) =>
                 complete(NoContent)
             }
           }

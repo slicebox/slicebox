@@ -82,7 +82,7 @@ class AnonymizationDAO(val driver: JdbcProfile) {
     if (tables.isEmpty)
       false
     else
-      !tables(0).getColumns.list.filter(_.name == columnName).isEmpty
+      tables.head.getColumns.list.exists(_.name == columnName)
   }
 
   def checkColumnExists(columnName: String, tableNames: String*)(implicit session: Session) =

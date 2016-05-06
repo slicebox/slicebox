@@ -22,7 +22,7 @@ import java.util.Date
 object LogProtocol {
 
   sealed trait LogEntryType {
-    override def toString(): String = this match {
+    override def toString: String = this match {
       case LogEntryType.DEFAULT => "DEFAULT"
       case LogEntryType.INFO => "INFO"
       case LogEntryType.WARN => "WARN"

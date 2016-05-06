@@ -54,7 +54,7 @@ object AnonymizationUtil {
 
       // this section from standard PS3.15 Table E.1-1
 
-      setAnonymous(modified, true)
+      setAnonymous(modified, anonymous = true)
 
       setStringTagIfPresent(modified, Tag.AccessionNumber, VR.SH, createAccessionNumber(modified.getString(Tag.AccessionNumber)))
       removeTag(modified, Tag.AcquisitionComments)
@@ -377,8 +377,8 @@ object AnonymizationUtil {
           })
         })
       })
-      if (!keys.isEmpty)
-        setAnonymous(dataset, false)
+      if (keys.nonEmpty)
+        setAnonymous(dataset, anonymous = false)
     }
     dataset
   }

@@ -263,7 +263,7 @@
                                 <md-progress-circular ng-if="uiState.loadPngImagesInProgress" md-mode="indeterminate"></md-progress-circular>
 
                                 <div class="clearfix">
-                                    <img ng-repeat="imageUrl in uiState.seriesDetails.pngImageUrls | orderBy:'frameIndex'" class="frame-image" ng-src="{{imageUrl.url}}" alt=""></img>
+                                    <img ng-repeat="imageUrl in uiState.seriesDetails.pngImageUrls | orderBy:'frameIndex'" class="frame-image" ng-src="{{imageUrl.url}}" alt="" />
                                 </div>
                             </md-content>
                         </md-card-content>

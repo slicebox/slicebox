@@ -26,7 +26,7 @@ import spray.routing.authentication.UserPass
 object UserProtocol {
 
   sealed trait UserRole {
-    override def toString(): String = this match {
+    override def toString: String = this match {
       case UserRole.SUPERUSER     => "SUPERUSER"
       case UserRole.ADMINISTRATOR => "ADMINISTRATOR"
       case UserRole.USER          => "USER"

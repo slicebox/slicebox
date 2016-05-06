@@ -18,7 +18,7 @@ package se.nimsa.sbx.dicom
 
 import org.dcm4che3.data.Tag
 
-case class DicomProperty(val name: String, val dicomTag: Int)
+case class DicomProperty(name: String, dicomTag: Int)
 
 object DicomProperty {
   object PatientName extends DicomProperty("patientName", Tag.PatientName) 

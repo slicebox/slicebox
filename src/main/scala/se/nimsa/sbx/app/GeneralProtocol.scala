@@ -22,7 +22,7 @@ import org.dcm4che3.data.Attributes
 object GeneralProtocol {
   
   sealed trait SourceType {
-    override def toString(): String = this match {
+    override def toString: String = this match {
       case SourceType.SCP => "scp"
       case SourceType.DIRECTORY => "directory"
       case SourceType.BOX => "box"
@@ -51,7 +51,7 @@ object GeneralProtocol {
   }
       
   sealed trait DestinationType {
-    override def toString(): String = this match {
+    override def toString: String = this match {
       case DestinationType.SCU => "scu"
       case DestinationType.BOX => "box"
       case _ => "unknown"

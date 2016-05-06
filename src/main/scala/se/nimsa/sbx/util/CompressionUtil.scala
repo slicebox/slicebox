@@ -28,16 +28,16 @@ object CompressionUtil {
    
    val outputStream = new ByteArrayOutputStream(data.length)
        
-   deflater.finish
+   deflater.finish()
    val buffer = new Array[Byte](1024)   
    while (!deflater.finished) {  
     val count = deflater.deflate(buffer)
     outputStream.write(buffer, 0, count)   
    }  
-   outputStream.close
+   outputStream.close()
    val output = outputStream.toByteArray
    
-   deflater.end
+   deflater.end()
 
    output
   }  
@@ -52,10 +52,10 @@ object CompressionUtil {
     val count = inflater.inflate(buffer)
     outputStream.write(buffer, 0, count)
    }  
-   outputStream.close
+   outputStream.close()
    val output = outputStream.toByteArray
    
-   inflater.end
+   inflater.end()
    
    output
   }   

@@ -30,10 +30,10 @@ class BoxDAO(val driver: JdbcProfile) {
   import driver.simple._
 
   implicit val statusColumnType =
-    MappedColumnType.base[TransactionStatus, String](ts => ts.toString, TransactionStatus.withName)
+    MappedColumnType.base[TransactionStatus, String](ts => ts.toString(), TransactionStatus.withName)
 
   implicit val sendMethodColumnType =
-    MappedColumnType.base[BoxSendMethod, String](bsm => bsm.toString, BoxSendMethod.withName)
+    MappedColumnType.base[BoxSendMethod, String](bsm => bsm.toString(), BoxSendMethod.withName)
 
   class BoxTable(tag: Tag) extends Table[Box](tag, "Boxes") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
@@ -167,7 +167,7 @@ class BoxDAO(val driver: JdbcProfile) {
     if (tables.isEmpty)
       false
     else
-      !tables(0).getColumns.list.filter(_.name == columnName).isEmpty
+      tables.head.getColumns.list.exists(_.name == columnName)
   }
 
   def create(implicit session: Session): Unit = {
