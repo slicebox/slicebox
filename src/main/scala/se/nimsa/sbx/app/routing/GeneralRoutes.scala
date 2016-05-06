@@ -17,7 +17,6 @@
 package se.nimsa.sbx.app.routing
 
 import scala.concurrent.Await
-import scala.concurrent.TimeoutException
 import scala.concurrent.duration.DurationInt
 
 import akka.actor.ActorContext
@@ -36,6 +35,7 @@ import se.nimsa.sbx.scu.ScuProtocol._
 import se.nimsa.sbx.user.UserProtocol._
 import spray.httpx.SprayJsonSupport._
 import spray.routing.Route
+import spray.http.StatusCodes.OK
 
 trait GeneralRoutes { this: SliceboxService =>
 
@@ -66,6 +66,8 @@ trait GeneralRoutes { this: SliceboxService =>
             }
           }
         }
+      } ~ path("health") {
+        complete(OK)
       }
     } ~ path("sources") {
       get {

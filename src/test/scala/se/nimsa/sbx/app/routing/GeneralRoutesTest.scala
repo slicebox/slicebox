@@ -52,4 +52,10 @@ class GeneralRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       responseAs[List[Destination]].length should be(2) // remote box, scu
     }    
   }
+
+  it should "return 200 OK when health status is checked and the service in running" in {
+    GetAsUser("/api/system/health") ~> routes ~> check {
+      status shouldBe OK
+    }
+  }
 }
