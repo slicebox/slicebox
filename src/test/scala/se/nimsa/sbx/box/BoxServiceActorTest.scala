@@ -6,6 +6,7 @@ import akka.util.Timeout.durationToTimeout
 import org.scalatest._
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.app.DbProps
+import se.nimsa.sbx.app.GeneralProtocol.ImageDeleted
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomPropertyValue._
@@ -281,6 +282,43 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
         boxDao.listIncomingImages.size should be(0)
       }
     }
+
+    "remove incoming transaction image when deleted from storage" in {
+      db.withSession { implicit session =>
+        val box = boxDao.insertBox(Box(-1, "some remote box", "abc", "https://someurl.com", BoxSendMethod.POLL, online = false))
+
+        // insert incoming images (2)
+        boxService ! UpdateIncoming(box, 123, 1, 3, 4, overwrite = false)
+        expectMsgType[IncomingUpdated]
+
+        boxService ! UpdateIncoming(box, 123, 2, 3, 5, overwrite = false)
+        expectMsgType[IncomingUpdated]
+
+        boxDao.listIncomingImages.size should be(2)
+        boxService ! ImageDeleted(4)
+        expectNoMsg
+        boxDao.listIncomingImages.size should be(1)
+      }
+    }
+
+    "remove outgoing transaction image when deleted from storage" in {
+      db.withSession { implicit session =>
+        val box = boxDao.insertBox(Box(-1, "some remote box", "abc", "https://someurl.com", BoxSendMethod.POLL, online = false))
+
+        // insert outgoing images (3)
+        val (_, _, _, i1, i2, i3) = insertMetadata
+        val imageTagValuesSeq = Seq(ImageTagValues(i1.id, Seq()), ImageTagValues(i2.id, Seq()), ImageTagValues(i3.id, Seq()))
+
+        boxService ! SendToRemoteBox(box, imageTagValuesSeq)
+        expectMsgType[ImagesAddedToOutgoing]
+
+        boxDao.listOutgoingImages.size should be(3)
+        boxService ! ImageDeleted(i2.id)
+        expectNoMsg
+        boxDao.listOutgoingImages.size should be(2)
+      }
+    }
+
   }
 
   def insertMetadata(implicit session: H2Driver.simple.Session) = {

@@ -219,9 +219,6 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
           case GetOutgoingTagValues(transactionImage) =>
             sender ! tagValuesForOutgoingTransactionImage(transactionImage)
 
-          case GetIncomingTransactionForImageId(imageId) =>
-            sender ! incomingTransactionForImageId(imageId)
-
           case UpdateOutgoingTransaction(transactionImage) =>
             sender ! updateOutgoingTransaction(transactionImage)
 
@@ -414,11 +411,6 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
   def tagValuesForOutgoingTransactionImage(transactionImage: OutgoingTransactionImage): Seq[OutgoingTagValue] =
     db.withSession { implicit session =>
       boxDao.tagValuesByOutgoingTransactionImage(transactionImage.transaction.id, transactionImage.image.id)
-    }
-
-  def incomingTransactionForImageId(imageId: Long): Option[IncomingTransaction] =
-    db.withSession { implicit session =>
-      boxDao.incomingTransactionByImageId(imageId)
     }
 
   def outgoingImageIdsForTransactionId(transactionId: Long): Seq[Long] =

@@ -67,22 +67,11 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     }
   }), name = "StorageService")
 
-  case object ResetReceivedImageCount
-
   val boxService = system.actorOf(Props(new Actor {
-    var receivedImageCount = 0
 
     def receive = {
       case SendToRemoteBox(box, tagValues) =>
         sender ! ImagesAddedToOutgoing(box.id, tagValues.map(_.imageId))
-      case GetIncomingTransactionForImageId(imageId) =>
-        if (imageId <= 2) {
-          receivedImageCount += 1
-          sender ! Some(IncomingTransaction(1, 11, "Source box", 1234, receivedImageCount, 2, 2, System.currentTimeMillis, System.currentTimeMillis, TransactionStatus.WAITING))
-        } else
-          sender ! Some(IncomingTransaction(2, 11, "Source box", 1234, 1, 1, 2, System.currentTimeMillis, System.currentTimeMillis, TransactionStatus.WAITING))
-      case ResetReceivedImageCount =>
-        receivedImageCount = 0
     }
   }), name = "BoxService")
 
@@ -93,7 +82,6 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
       forwardingDao.clear
       metaDataService ! SetSource(null)
       storageService ! ResetDeletedImages
-      boxService ! ResetReceivedImageCount
     }
 
   override def afterAll {

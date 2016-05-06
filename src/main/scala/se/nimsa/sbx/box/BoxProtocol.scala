@@ -140,9 +140,7 @@ object BoxProtocol {
   
   case class GetImageIdsForOutgoingTransaction(outgoingTransactionId: Long) extends BoxRequest
   
-  case class GetIncomingTransactionForImageId(imageId: Long) extends BoxRequest
-  
-  
+
   case class IncomingTransactionRemoved(incomingTransactionId: Long)
 
   case class OutgoingTransactionRemoved(outgoingTransactionId: Long)

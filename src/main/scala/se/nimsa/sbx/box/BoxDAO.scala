@@ -385,14 +385,6 @@ class BoxDAO(val driver: JdbcProfile) {
   def listIncomingImagesForIncomingTransactionId(incomingTransactionId: Long)(implicit session: Session): List[IncomingImage] =
     incomingImageQuery.filter(_.incomingTransactionId === incomingTransactionId).list
 
-  def incomingTransactionByImageId(imageId: Long)(implicit session: Session): Option[IncomingTransaction] = {
-    val join = for {
-      transaction <- incomingTransactionQuery
-      image <- incomingImageQuery if transaction.id === image.incomingTransactionId
-    } yield (transaction, image)
-    join.filter(_._2.imageId === imageId).map(_._1).firstOption
-  }
-
   def outgoingImagesByOutgoingTransactionId(outgoingTransactionId: Long)(implicit session: Session): List[OutgoingImage] = {
     val join = for {
       transaction <- outgoingTransactionQuery

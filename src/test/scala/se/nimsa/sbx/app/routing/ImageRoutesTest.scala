@@ -123,6 +123,21 @@ class ImageRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
   }
 
+  it should "return a 200 OK and an image of different intensity when asking for PNG rending of an image frame with a specific intensity window" in {
+    val image = PostAsUser("/api/images", HttpData(TestUtil.testImageByteArray)) ~> routes ~> check {
+      responseAs[Image]
+    }
+    val png1 =
+      GetAsUser(s"/api/images/${image.id}/png") ~> routes ~> check {
+        responseAs[Array[Byte]]
+      }
+    val png2 =
+      GetAsUser(s"/api/images/${image.id}/png?windowmin=10&windowmax=100") ~> routes ~> check {
+        responseAs[Array[Byte]]
+      }
+    png1 should not equal png2
+  }
+
   it should "return 200 OK and the bytes of a PNG image of the requested height when asking for a PNG rendering of an image frame with a specific height" in {
     val image = PostAsUser("/api/images", HttpData(TestUtil.testImageByteArray)) ~> routes ~> check {
       responseAs[Image]
