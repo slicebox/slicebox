@@ -128,7 +128,7 @@ class StorageServiceActor(storage: StorageService) extends Actor with ExceptionC
 
   def checkDataset(dataset: Attributes, restrictSopClass: Boolean): Boolean = {
     if (dataset == null)
-      throw new IllegalArgumentException("Invalid dataset")
+      throw new IllegalArgumentException("Not a DICOM file")
     else if (restrictSopClass & !DicomUtil.checkSopClass(dataset))
       throw new IllegalArgumentException(s"Unsupported SOP Class UID ${dataset.getString(Tag.SOPClassUID)}")
     true
