@@ -133,6 +133,18 @@
       }
     },
 
+    "/system/health": {
+      "get": {
+        "description": "No-op route for checking whether the service is alive or not",
+        "tags": ["General"],
+        "responses": {
+          "200": {
+            "description": "The service is up and running"
+          }
+        }
+      }
+    },
+
     "/import/sessions": {
       "get": {
         "description": "Returns a list of available import sessions.",
