@@ -67,6 +67,15 @@ class ImportRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
   }
 
+  it should "return 400 BadRequest when adding an import session with a name that already exists" in {
+    val addedSession = PostAsUser("/api/import/sessions", importSession) ~> routes ~> check {
+      responseAs[ImportSession]
+    }
+    PostAsUser("/api/import/sessions", importSession) ~> routes ~> check {
+      status shouldBe BadRequest
+    }
+  }
+
   it should "return 200 OK and the requested import session when fetching a specific import session" in {
     val addedSession = PostAsUser("/api/import/sessions", importSession) ~> routes ~> check {
       responseAs[ImportSession]
