@@ -24,6 +24,8 @@ import de.heikoseeberger.sbtheader.license.Apache2_0
 
 	// native packaging - universal
 
+	scriptClasspath := Seq("*")
+
 	mappings in Universal += {
     	val conf = (resourceDirectory in Compile).value / "slicebox.conf"
     	conf -> "conf/slicebox.conf"
