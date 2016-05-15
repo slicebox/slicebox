@@ -21,6 +21,8 @@ import java.util.zip.{ZipEntry, ZipOutputStream}
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.pattern.ask
+import org.dcm4che3.data.Attributes
+import se.nimsa.sbx.anonymization.AnonymizationProtocol.ReverseAnonymization
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.app.SliceboxService
 import se.nimsa.sbx.dicom.DicomHierarchy.{FlatSeries, Image, Patient, Study}
@@ -185,14 +187,14 @@ trait ImageRoutes {
     val dataset = DicomUtil.loadDataset(bytes, withPixelData = true, useBulkDataURI = false)
     val source = Source(SourceType.USER, apiUser.user, apiUser.id)
     val futureImageAndOverwrite =
-      storageService.ask(CheckDataset(dataset, restrictSopClass = false)).mapTo[Boolean].flatMap {
-        status =>
-          metaDataService.ask(AddMetaData(dataset, source)).mapTo[MetaDataAdded].flatMap {
-            metaData =>
-              storageService.ask(AddDataset(dataset, source, metaData.image)).mapTo[DatasetAdded].map {
-                datasetAdded => (metaData.image, datasetAdded.overwrite)
-              }
+      storageService.ask(CheckDataset(dataset, restrictSopClass = false)).mapTo[Boolean].flatMap { status =>
+        anonymizationService.ask(ReverseAnonymization(dataset)).mapTo[Attributes].flatMap { reversedDataset =>
+          metaDataService.ask(AddMetaData(reversedDataset, source)).mapTo[MetaDataAdded].flatMap { metaData =>
+            storageService.ask(AddDataset(reversedDataset, source, metaData.image)).mapTo[DatasetAdded].map { datasetAdded =>
+              (metaData.image, datasetAdded.overwrite)
+            }
           }
+        }
       }
     onSuccess(futureImageAndOverwrite) {
       case (image, overwrite) =>

@@ -23,6 +23,7 @@ import akka.event.{Logging, LoggingReceive}
 import akka.pattern.ask
 import akka.util.Timeout
 import org.dcm4che3.data.Attributes
+import se.nimsa.sbx.anonymization.AnonymizationProtocol.ReverseAnonymization
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.directory.DirectoryWatchProtocol._
@@ -37,7 +38,8 @@ import scala.util.control.NonFatal
 class DirectoryWatchActor(watchedDirectory: WatchedDirectory,
                           implicit val timeout: Timeout,
                           metaDataServicePath: String = "../../MetaDataService",
-                          storageServicePath: String = "../../StorageService") extends Actor {
+                          storageServicePath: String = "../../StorageService",
+                          anonymizationServicePath: String = "../../AnonymizationService") extends Actor {
 
   val log = Logging(context.system, this)
 
@@ -47,6 +49,7 @@ class DirectoryWatchActor(watchedDirectory: WatchedDirectory,
 
   val storageService = context.actorSelection(storageServicePath)
   val metaDataService = context.actorSelection(metaDataServicePath)
+  val anonymizationService = context.actorSelection(anonymizationServicePath)
 
   implicit val system = context.system
   implicit val ec = context.dispatcher
@@ -68,8 +71,10 @@ class DirectoryWatchActor(watchedDirectory: WatchedDirectory,
         val dataset = loadDataset(path, withPixelData = true, useBulkDataURI = false)
         val source = Source(SourceType.DIRECTORY, watchedDirectory.name, watchedDirectory.id)
         checkDataset(dataset).flatMap { status =>
-          addMetadata(dataset, source).flatMap { image =>
-            addDataset(dataset, source, image).map { overwrite =>
+          reverseAnonymization(dataset).flatMap { reversedDataset =>
+            addMetadata(reversedDataset, source).flatMap { image =>
+              addDataset(reversedDataset, source, image).map { overwrite =>
+              }
             }
           }
         }.onFailure {
@@ -92,6 +97,9 @@ class DirectoryWatchActor(watchedDirectory: WatchedDirectory,
 
   def checkDataset(dataset: Attributes): Future[Boolean] =
     storageService.ask(CheckDataset(dataset, restrictSopClass = true)).mapTo[Boolean]
+
+  def reverseAnonymization(dataset: Attributes): Future[Attributes] =
+    anonymizationService.ask(ReverseAnonymization(dataset)).mapTo[Attributes]
 
 }
 

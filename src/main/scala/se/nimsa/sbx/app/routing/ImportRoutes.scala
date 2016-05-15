@@ -19,6 +19,8 @@ package se.nimsa.sbx.app.routing
 
 import scala.concurrent.Future
 import akka.pattern.ask
+import org.dcm4che3.data.Attributes
+import se.nimsa.sbx.anonymization.AnonymizationProtocol.ReverseAnonymization
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.app.SliceboxService
 import se.nimsa.sbx.dicom.DicomUtil
@@ -106,15 +108,16 @@ trait ImportRoutes {
         onComplete(storageService.ask(CheckDataset(dataset, restrictSopClass = true)).mapTo[Boolean]) {
 
           case Success(status) =>
-            onSuccess(metaDataService.ask(AddMetaData(dataset, source)).mapTo[MetaDataAdded]) { metaData =>
-              onSuccess(storageService.ask(AddDataset(dataset, source, metaData.image)).mapTo[DatasetAdded]) {
-                case DatasetAdded(image, overwrite) =>
-                  onSuccess(importService.ask(AddImageToSession(importSession, image, overwrite)).mapTo[ImageAddedToSession]) { importSessionImage =>
-                    if (overwrite)
-                      complete((OK, image))
+            onSuccess(anonymizationService.ask(ReverseAnonymization(dataset)).mapTo[Attributes]) { reversedDataset =>
+              onSuccess(metaDataService.ask(AddMetaData(reversedDataset, source)).mapTo[MetaDataAdded]) { metaData =>
+                onSuccess(storageService.ask(AddDataset(reversedDataset, source, metaData.image)).mapTo[DatasetAdded]) { datasetAdded =>
+                  onSuccess(importService.ask(AddImageToSession(importSession, datasetAdded.image, datasetAdded.overwrite)).mapTo[ImageAddedToSession]) { importSessionImage =>
+                    if (datasetAdded.overwrite)
+                      complete((OK, datasetAdded.image))
                     else
-                      complete((Created, image))
+                      complete((Created, datasetAdded.image))
                   }
+                }
               }
             }
 

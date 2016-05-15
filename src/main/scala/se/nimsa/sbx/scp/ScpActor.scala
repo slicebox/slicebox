@@ -23,6 +23,7 @@ import akka.event.{Logging, LoggingReceive}
 import akka.pattern.ask
 import akka.util.Timeout
 import org.dcm4che3.data.Attributes
+import se.nimsa.sbx.anonymization.AnonymizationProtocol.ReverseAnonymization
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.log.SbxLog
@@ -33,10 +34,14 @@ import se.nimsa.sbx.storage.StorageProtocol.{AddDataset, CheckDataset, DatasetAd
 import scala.concurrent.Future
 import scala.util.control.NonFatal
 
-class ScpActor(scpData: ScpData, executor: Executor, implicit val timeout: Timeout) extends Actor {
-  
-  val storageService = context.actorSelection("../StorageService")
-  val metaDataService = context.actorSelection("../MetaDataService")
+class ScpActor(scpData: ScpData, executor: Executor, implicit val timeout: Timeout,
+               metaDataServicePath: String = "../../MetaDataService",
+               storageServicePath: String = "../../StorageService",
+               anonymizationServicePath: String = "../../AnonymizationService") extends Actor {
+
+  val metaDataService = context.actorSelection(metaDataServicePath)
+  val storageService = context.actorSelection(storageServicePath)
+  val anonymizationService = context.actorSelection(anonymizationServicePath)
 
   implicit val system = context.system
   implicit val ec = context.dispatcher
@@ -68,8 +73,10 @@ class ScpActor(scpData: ScpData, executor: Executor, implicit val timeout: Timeo
       log.debug("SCP", s"Dataset received using SCP ${scpData.name}")
       val source = Source(SourceType.SCP, scpData.name, scpData.id)
       checkDataset(dataset).flatMap { status =>
-        addMetadata(dataset, source).flatMap { image =>
-          addDataset(dataset, source, image).map { overwrite =>
+        reverseAnonymization(dataset).flatMap { reversedDataset =>
+          addMetadata(reversedDataset, source).flatMap { image =>
+            addDataset(reversedDataset, source, image).map { overwrite =>
+            }
           }
         }
       }.onFailure {
@@ -90,6 +97,9 @@ class ScpActor(scpData: ScpData, executor: Executor, implicit val timeout: Timeo
 
   def checkDataset(dataset: Attributes): Future[Boolean] =
     storageService.ask(CheckDataset(dataset, restrictSopClass = true)).mapTo[Boolean]
+
+  def reverseAnonymization(dataset: Attributes): Future[Attributes] =
+    anonymizationService.ask(ReverseAnonymization(dataset)).mapTo[Attributes]
 
 }
 
