@@ -23,10 +23,13 @@ import se.nimsa.sbx.anonymization.AnonymizationUtil
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.app.SliceboxService
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
+import se.nimsa.sbx.dicom.DicomUtil
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.user.UserProtocol.ApiUser
 import se.nimsa.sbx.util.SbxExtensions._
+import spray.http.{HttpData, HttpEntity}
+import spray.http.MediaTypes._
 import spray.http.StatusCodes._
 import spray.httpx.SprayJsonSupport._
 import spray.routing.Route
@@ -42,6 +45,24 @@ trait AnonymizationRoutes {
         entity(as[Seq[TagValue]]) { tagValues =>
           complete {
             anonymizeOne(apiUser, imageId, tagValues).map(_.map(_.image))
+          }
+        }
+      }
+    } ~ path("images" / LongNumber / "anonymized") { imageId =>
+      post {
+        entity(as[Seq[TagValue]]) { tagValues =>
+          onSuccess(metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]]) {
+            case Some(image) =>
+              onSuccess(storageService.ask(GetDataset(image, withPixelData = true, useBulkDataURI = false)).mapTo[Option[Attributes]]) {
+                case Some(dataset) =>
+                  onSuccess(anonymizationService.ask(Anonymize(imageId, dataset, tagValues)).mapTo[Attributes]) { anonDataset =>
+                    complete(HttpEntity(`application/octet-stream`, HttpData(DicomUtil.toByteArray(anonDataset))))
+                  }
+                case None =>
+                  complete((NotFound, s"No image data found for image id $imageId"))
+              }
+            case None =>
+              complete((NotFound, s"No image meta data found for image id $imageId"))
           }
         }
       }

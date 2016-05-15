@@ -5,9 +5,11 @@ import org.scalatest.{FlatSpec, Matchers}
 import se.nimsa.sbx.anonymization.AnonymizationDAO
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy._
+import se.nimsa.sbx.dicom.DicomProperty.PatientName
 import se.nimsa.sbx.dicom.DicomUtil
 import se.nimsa.sbx.metadata.MetaDataDAO
 import se.nimsa.sbx.metadata.MetaDataProtocol._
+import se.nimsa.sbx.storage.RuntimeStorage
 import se.nimsa.sbx.util.TestUtil
 import spray.http.{BodyPart, HttpData, MultipartFormData}
 import spray.http.StatusCodes._
@@ -28,6 +30,7 @@ class AnonymizationRoutesTest extends FlatSpec with Matchers with RoutesTestBase
       dao.clear
       metaDataDao.clear
     }
+    storage.asInstanceOf[RuntimeStorage].clear()
   }
 
   "Anonymization routes" should "return 200 OK and anonymize the data by removing the old data and inserting new anonymized data upon manual anonymization" in {
@@ -44,7 +47,7 @@ class AnonymizationRoutesTest extends FlatSpec with Matchers with RoutesTestBase
       responseAs[FlatSeries]
     }
     val anonImage =
-      PutAsUser(s"/api/images/${flatSeries.patient.id}/anonymize", Seq.empty[TagValue]) ~> routes ~> check {
+      PutAsUser(s"/api/images/${image.id}/anonymize", Seq.empty[TagValue]) ~> routes ~> check {
         status should be(OK)
         responseAs[Image]
       }
@@ -79,6 +82,32 @@ class AnonymizationRoutesTest extends FlatSpec with Matchers with RoutesTestBase
     GetAsUser("/api/metadata/images/2") ~> routes ~> check {
       status should be(OK)
     }
+  }
+
+  it should "return 200 OK and an anonymized version of the image with the supplied ID" in {
+    val file = TestUtil.testImageFile
+    val mfd = MultipartFormData(Seq(BodyPart(file, "file")))
+    val image =
+      PostAsUser("/api/images", mfd) ~> routes ~> check {
+        status shouldBe Created
+        responseAs[Image]
+      }
+
+    val flatSeries = GetAsUser(s"/api/metadata/flatseries/${image.seriesId}") ~> routes ~> check {
+      status should be(OK)
+      responseAs[FlatSeries]
+    }
+
+    val anonPatientName = "Anon Pat 1"
+    val tagValues = Seq(TagValue(PatientName.dicomTag, anonPatientName))
+    val anonDataset =
+      PostAsUser(s"/api/images/${image.id}/anonymized", tagValues) ~> routes ~> check {
+        status should be(OK)
+        DicomUtil.loadDataset(responseAs[Array[Byte]], withPixelData = true, useBulkDataURI = false)
+      }
+
+    anonDataset.getString(Tag.PatientName) shouldBe anonPatientName
+    anonDataset.getString(Tag.PatientID) should not be flatSeries.patient.patientName.value
   }
 
   it should "return 200 OK and the image IDs of the new anonymized images when bulk anonymizing a sequence of images" in {

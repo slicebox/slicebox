@@ -66,7 +66,7 @@ trait ImageRoutes {
                     case Some(imageData) =>
                       complete(HttpEntity(`application/octet-stream`, HttpData(imageData.data)))
                     case None =>
-                      complete((NotFound, s"No file found for image id $imageId"))
+                      complete((NotFound, s"No image data found for image id $imageId"))
                   }
                 } ~ delete {
                   onSuccess(storageService.ask(DeleteDataset(image)).flatMap { _ =>
@@ -104,7 +104,7 @@ trait ImageRoutes {
                 }
               }
             case None =>
-              complete(NotFound)
+              complete((NotFound, s"No image meta data found for image id $imageId"))
           }
         } ~ path("delete") {
           post {
