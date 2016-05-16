@@ -56,13 +56,12 @@ import de.heikoseeberger.sbtheader.license.Apache2_0
 
 	rpmGroup := Some("Applications/Research")
 
-	rpmBrpJavaRepackJars := true
+	version in Rpm := version.value.replace("-SNAPSHOT", "")
 
-	version in Rpm := version.value.replace("-SNAPSHOT", ".0.1")
+	rpmRelease := {if (version.value.matches(".*-SNAPSHOT")) System.currentTimeMillis().toString else "1"}
 
-	rpmRelease := "1"
 
-	// for automatic license stub generation
+// for automatic license stub generation
 
 	val licenceYear = "2016"
 	val licencedTo = "Lars Edenbrandt"
