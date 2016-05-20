@@ -24,8 +24,13 @@ class ImportServiceActor(dbProps: DbProps) extends Actor with ExceptionCatching 
 
         case AddImportSession(importSession) =>
           db.withSession { implicit session =>
-            val newImportSession = importSession.copy(filesImported = 0, filesAdded = 0, filesRejected = 0, created = now, lastUpdated = now)
-            sender ! dao.addImportSession(newImportSession)
+            dao.importSessionForName(importSession.name) match {
+              case Some(importSession) =>
+                throw new IllegalArgumentException(s"An import session with name ${importSession.name} already exists")
+              case None =>
+                val newImportSession = importSession.copy(filesImported = 0, filesAdded = 0, filesRejected = 0, created = now, lastUpdated = now)
+                sender ! dao.addImportSession(newImportSession)
+            }
           }
 
         case GetImportSessions(startIndex, count) =>
