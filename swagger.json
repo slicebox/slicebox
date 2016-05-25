@@ -3166,6 +3166,10 @@
           "type": "integer",
           "format": "int32"
         },
+        "filesAdded": {
+          "type": "integer",
+          "format": "int32"
+        },
         "filesRejected": {
           "type": "integer",
           "format": "int32"
@@ -3174,7 +3178,7 @@
           "type": "integer",
           "format": "int64"
         },
-        "updated": {
+        "lastUpdated": {
           "type": "integer",
           "format": "int64"
         }        
