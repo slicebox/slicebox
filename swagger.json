@@ -3174,7 +3174,7 @@
           "type": "integer",
           "format": "int64"
         },
-        "lastUpdated": {
+        "updated": {
           "type": "integer",
           "format": "int64"
         }        
@@ -3492,7 +3492,7 @@
           "type": "integer",
           "format": "int64"
         },
-        "lastUpdated": {
+        "updated": {
           "type": "integer",
           "format": "int64"          
         },
@@ -3569,7 +3569,7 @@
           "type": "integer",
           "format": "int64"
         },
-        "lastUpdated": {
+        "updated": {
           "type": "integer",
           "format": "int64"
         },
