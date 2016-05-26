@@ -111,7 +111,7 @@ trait ImportRoutes {
             onSuccess(anonymizationService.ask(ReverseAnonymization(dataset)).mapTo[Attributes]) { reversedDataset =>
               onSuccess(metaDataService.ask(AddMetaData(reversedDataset, source)).mapTo[MetaDataAdded]) { metaData =>
                 onSuccess(storageService.ask(AddDataset(reversedDataset, source, metaData.image)).mapTo[DatasetAdded]) { datasetAdded =>
-                  onSuccess(importService.ask(AddImageToSession(importSession, datasetAdded.image, datasetAdded.overwrite)).mapTo[ImageAddedToSession]) { importSessionImage =>
+                  onSuccess(importService.ask(AddImageToSession(importSession.id, datasetAdded.image, datasetAdded.overwrite)).mapTo[ImageAddedToSession]) { importSessionImage =>
                     if (datasetAdded.overwrite)
                       complete((OK, datasetAdded.image))
                     else

@@ -72,7 +72,7 @@ class ImportDAO(val driver: JdbcProfile) {
   def importSessionForName(importSessionName: String)(implicit session: Session): Option[ImportSession] =
     importSessionQuery.filter(_.name === importSessionName).firstOption
 
-  def listImagesForImportSesstionId(importSessionId: Long)(implicit session: Session): List[ImportSessionImage] =
+  def listImagesForImportSessionId(importSessionId: Long)(implicit session: Session): List[ImportSessionImage] =
     importSessionImageQuery.filter(_.importSessionId === importSessionId).list
 
   def importSessionImageForImportSessionIdAndImageId(importSessionId: Long, imageId: Long)(implicit session: Session): Option[ImportSessionImage] =

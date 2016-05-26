@@ -50,23 +50,25 @@ class ImportServiceActor(dbProps: DbProps) extends Actor with ExceptionCatching 
 
         case GetImportSessionImages(id) =>
           db.withSession { implicit session =>
-            sender ! ImportSessionImages(dao.listImagesForImportSesstionId(id))
+            sender ! ImportSessionImages(dao.listImagesForImportSessionId(id))
           }
 
-        case AddImageToSession(importSession, image, overwrite) =>
+        case AddImageToSession(importSessionId, image, overwrite) =>
           db.withSession { implicit session =>
-            val importSessionImage =
-              if (overwrite) {
-                val updatedImportSession = importSession.copy(filesImported = importSession.filesImported + 1, lastUpdated = now)
-                dao.updateImportSession(updatedImportSession)
-                dao.importSessionImageForImportSessionIdAndImageId(importSession.id, image.id)
-                  .getOrElse(dao.insertImportSessionImage(ImportSessionImage(-1, updatedImportSession.id, image.id)))
-              } else {
-                val updatedImportSession = importSession.copy(filesImported = importSession.filesImported + 1, filesAdded = importSession.filesAdded + 1, lastUpdated = now)
-                dao.updateImportSession(updatedImportSession)
-                dao.insertImportSessionImage(ImportSessionImage(-1, updatedImportSession.id, image.id))
-              }
-            sender ! ImageAddedToSession(importSessionImage)
+            dao.getImportSession(importSessionId).map { importSession =>
+              val importSessionImage =
+                if (overwrite) {
+                  val updatedImportSession = importSession.copy(filesImported = importSession.filesImported + 1, lastUpdated = now)
+                  dao.updateImportSession(updatedImportSession)
+                  dao.importSessionImageForImportSessionIdAndImageId(importSession.id, image.id)
+                    .getOrElse(dao.insertImportSessionImage(ImportSessionImage(-1, updatedImportSession.id, image.id)))
+                } else {
+                  val updatedImportSession = importSession.copy(filesImported = importSession.filesImported + 1, filesAdded = importSession.filesAdded + 1, lastUpdated = now)
+                  dao.updateImportSession(updatedImportSession)
+                  dao.insertImportSessionImage(ImportSessionImage(-1, updatedImportSession.id, image.id))
+                }
+              sender ! ImageAddedToSession(importSessionImage)
+            }.orElse(throw new NotFoundException(s"Import session not found for id $importSessionId"))
           }
 
         case UpdateSessionWithRejection(importSession) =>

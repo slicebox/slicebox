@@ -25,7 +25,7 @@ object ImportProtocol {
 
   case class AddImportSession(importSession: ImportSession) extends ImportSessionRequest
 
-  case class AddImageToSession(importSession: ImportSession, image: Image, overwrite: Boolean) extends ImportSessionRequest
+  case class AddImageToSession(importSessionId: Long, image: Image, overwrite: Boolean) extends ImportSessionRequest
 
   case class UpdateSessionWithRejection(importSession: ImportSession) extends ImportSessionRequest
 
