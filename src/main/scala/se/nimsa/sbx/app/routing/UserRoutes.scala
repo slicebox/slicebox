@@ -63,7 +63,7 @@ trait UserRoutes { this: SliceboxService =>
                 complete(NoContent)
               }
             case LoginFailed =>
-              complete(Unauthorized)
+              complete((Unauthorized, "Invalid username or password"))
           }
         }
       }

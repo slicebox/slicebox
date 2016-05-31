@@ -18,7 +18,7 @@ package se.nimsa.sbx.directory
 
 import java.nio.file.{Files, Paths}
 
-import akka.actor.{Actor, Props}
+import akka.actor.{Actor, Props, Stash}
 import akka.event.{Logging, LoggingReceive}
 import akka.pattern.ask
 import akka.util.Timeout
@@ -33,13 +33,14 @@ import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, MetaDataAdded}
 import se.nimsa.sbx.storage.StorageProtocol.{AddDataset, CheckDataset, DatasetAdded}
 
 import scala.concurrent.Future
+import scala.util.{Success, Failure}
 import scala.util.control.NonFatal
 
 class DirectoryWatchActor(watchedDirectory: WatchedDirectory,
                           implicit val timeout: Timeout,
                           metaDataServicePath: String = "../../MetaDataService",
                           storageServicePath: String = "../../StorageService",
-                          anonymizationServicePath: String = "../../AnonymizationService") extends Actor {
+                          anonymizationServicePath: String = "../../AnonymizationService") extends Actor with Stash {
 
   val log = Logging(context.system, this)
 
@@ -53,6 +54,8 @@ class DirectoryWatchActor(watchedDirectory: WatchedDirectory,
 
   implicit val system = context.system
   implicit val ec = context.dispatcher
+
+  case object DatasetProcessed
 
   override def preStart() {
     watchThread.setDaemon(true)
@@ -70,6 +73,7 @@ class DirectoryWatchActor(watchedDirectory: WatchedDirectory,
       if (Files.isRegularFile(path)) {
         val dataset = loadDataset(path, withPixelData = true, useBulkDataURI = false)
         val source = Source(SourceType.DIRECTORY, watchedDirectory.name, watchedDirectory.id)
+        context.become(waitForDatasetProcessed)
         checkDataset(dataset).flatMap { status =>
           reverseAnonymization(dataset).flatMap { reversedDataset =>
             addMetadata(reversedDataset, source).flatMap { image =>
@@ -77,11 +81,23 @@ class DirectoryWatchActor(watchedDirectory: WatchedDirectory,
               }
             }
           }
-        }.onFailure {
-          case NonFatal(e) => SbxLog.error("Directory", s"Could not add file: ${e.getMessage}")
+        }.onComplete {
+          case Success(_) =>
+            self ! DatasetProcessed
+          case Failure(NonFatal(e)) =>
+            SbxLog.error("Directory", s"Could not add file: ${e.getMessage}")
+            self ! DatasetProcessed
         }
       }
 
+  }
+
+  def waitForDatasetProcessed = LoggingReceive {
+    case msg: FileAddedToWatchedDirectory =>
+      stash()
+    case DatasetProcessed =>
+      context.unbecome()
+      unstashAll()
   }
 
   def addMetadata(dataset: Attributes, source: Source): Future[Image] =

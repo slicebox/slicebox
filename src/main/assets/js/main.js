@@ -63,7 +63,7 @@ angular.module('slicebox', [
     $httpProvider.interceptors.push(function($q, $location) {
         return {
             'responseError': function(rejection) {
-                if (rejection.status === 401) {
+                if (rejection.status === 401 && $location.path() !== '/login') {
                     $location.path('/login');
                 } else {
                     return $q.reject(rejection);

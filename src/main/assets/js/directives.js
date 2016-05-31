@@ -334,13 +334,15 @@ angular.module('slicebox.directives', [])
                 $q.when(loadPageResponse).then(function(response) {
                     if (angular.isArray(response)) {
                         handleLoadedPageData(response, selectedObjectsBeforeLoadPage);
-                    } else {
-                            // Assume response is a http response and extract data
-                            handleLoadedPageData(response.data, selectedObjectsBeforeLoadPage);
-                        }
-                        
                         deferred.resolve();
-                    });
+                    } else if (response) {
+                        // Assume response is a http response and extract data
+                        handleLoadedPageData(response.data, selectedObjectsBeforeLoadPage);
+                        deferred.resolve();
+                    } else {
+                        deferred.reject("Page data load error: empty response.");
+                    }
+                });
 
                 return deferred.promise;
             }

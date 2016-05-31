@@ -25,7 +25,7 @@ angular.module('slicebox.login', ['ngRoute'])
         }
 
         $scope.uiState.loginInProgress = true;
-        userService.login($scope.username, $scope.password).success(function () {
+        userService.login($scope.username, $scope.password).then(function(response, status, headers, config) {
             $scope.uiState.loginInProgress = false;
             userService.updateCurrentUser().then(function () {
                 var url = '/';
@@ -39,8 +39,8 @@ angular.module('slicebox.login', ['ngRoute'])
                 } catch (error) {}
                 $location.path(url);
             });
-        }).error(function(response) {
-            sbxToast.showErrorMessage(response.message);
+        }, function(reason) {
+            sbxToast.showInfoMessage(reason.data);
             $scope.uiState.loginInProgress = false;            
         });
     };
