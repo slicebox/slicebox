@@ -18,7 +18,7 @@ package se.nimsa.sbx.scp
 
 import java.util.concurrent.{Executor, Executors, ThreadFactory}
 
-import akka.actor.{Actor, Props}
+import akka.actor.{Actor, Props, Stash}
 import akka.event.{Logging, LoggingReceive}
 import akka.pattern.ask
 import akka.util.Timeout
@@ -32,12 +32,13 @@ import se.nimsa.sbx.scp.ScpProtocol._
 import se.nimsa.sbx.storage.StorageProtocol.{AddDataset, CheckDataset, DatasetAdded}
 
 import scala.concurrent.Future
+import scala.util.{Failure, Success}
 import scala.util.control.NonFatal
 
 class ScpActor(scpData: ScpData, executor: Executor, implicit val timeout: Timeout,
                metaDataServicePath: String = "../../MetaDataService",
                storageServicePath: String = "../../StorageService",
-               anonymizationServicePath: String = "../../AnonymizationService") extends Actor {
+               anonymizationServicePath: String = "../../AnonymizationService") extends Actor with Stash {
 
   val metaDataService = context.actorSelection(metaDataServicePath)
   val storageService = context.actorSelection(storageServicePath)
@@ -68,10 +69,13 @@ class ScpActor(scpData: ScpData, executor: Executor, implicit val timeout: Timeo
     SbxLog.info("SCP", s"Stopped SCP ${scpData.name}")
   }
 
+  case object DatasetProcessed
+
   def receive = LoggingReceive {
     case DatasetReceivedByScp(dataset) =>
       log.debug("SCP", s"Dataset received using SCP ${scpData.name}")
       val source = Source(SourceType.SCP, scpData.name, scpData.id)
+      context.become(waitForDatasetProcessed)
       checkDataset(dataset).flatMap { status =>
         reverseAnonymization(dataset).flatMap { reversedDataset =>
           addMetadata(reversedDataset, source).flatMap { image =>
@@ -79,9 +83,21 @@ class ScpActor(scpData: ScpData, executor: Executor, implicit val timeout: Timeo
             }
           }
         }
-      }.onFailure {
-        case NonFatal(e) => SbxLog.error("Directory", s"Could not add file: ${e.getMessage}")
+      }.onComplete {
+        case Success(_) =>
+          self ! DatasetProcessed
+        case Failure(NonFatal(e)) =>
+          SbxLog.error("Directory", s"Could not add file: ${e.getMessage}")
+          self ! DatasetProcessed
       }
+  }
+
+  def waitForDatasetProcessed = LoggingReceive {
+    case msg: DatasetReceivedByScp =>
+      stash()
+    case DatasetProcessed =>
+      context.unbecome()
+      unstashAll()
   }
 
   def addMetadata(dataset: Attributes, source: Source): Future[Image] =
