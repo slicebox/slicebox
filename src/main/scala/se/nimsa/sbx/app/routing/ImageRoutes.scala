@@ -208,6 +208,7 @@ trait ImageRoutes {
   class ChunkedZipStreamer(recipient: ActorRef, imageIds: Seq[Long]) extends Actor with ActorLogging {
 
     case class Ok(imageIds: Seq[Long])
+    case object Finalize
 
     val byteStream = new ByteArrayOutputStream()
     val zipStream = new ZipOutputStream(byteStream)
@@ -216,13 +217,16 @@ trait ImageRoutes {
     recipient ! ChunkedResponseStart(HttpResponse()).withAck(Ok(imageIds))
 
     def receive = {
-      case Ok(Nil) =>
+      case Finalize =>
         log.debug("Finalizing images export zip stream")
-        zipStream.close()
-        val zippedBytes = byteStream.toByteArray
-        recipient ! MessageChunk(zippedBytes)
         recipient ! ChunkedMessageEnd
         context.stop(self)
+
+      case Ok(Nil) =>
+        log.debug("Sending final chunk")
+        zipStream.close()
+        val zippedBytes = byteStream.toByteArray
+        recipient ! MessageChunk(zippedBytes).withAck(Finalize)
 
       case Ok(remainingImageIds) =>
         val imageId = remainingImageIds.head
