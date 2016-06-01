@@ -54,9 +54,9 @@ trait TransactionRoutes {
                   if (dataset == null)
                     complete((BadRequest, "Dataset could not be read"))
                   else
-                    onSuccess(anonymizationService.ask(ReverseAnonymization(dataset)).mapTo[Attributes]) { reversedDataset =>
-                      val source = Source(SourceType.BOX, box.name, box.id)
-                      onSuccess(storageService.ask(CheckDataset(reversedDataset, restrictSopClass = false)).mapTo[Boolean]) { status =>
+                    onSuccess(storageService.ask(CheckDataset(dataset, restrictSopClass = false)).mapTo[Boolean]) { status =>
+                      onSuccess(anonymizationService.ask(ReverseAnonymization(dataset)).mapTo[Attributes]) { reversedDataset =>
+                        val source = Source(SourceType.BOX, box.name, box.id)
                         onSuccess(metaDataService.ask(AddMetaData(reversedDataset, source)).mapTo[MetaDataAdded]) { metaData =>
                           onSuccess(storageService.ask(AddDataset(reversedDataset, source, metaData.image))) {
                             case DatasetAdded(image, overwrite) =>

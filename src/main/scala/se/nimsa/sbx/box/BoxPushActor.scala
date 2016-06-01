@@ -23,7 +23,6 @@ import org.dcm4che3.data.Attributes
 import BoxProtocol._
 import akka.actor.Actor
 import akka.actor.Props
-import akka.actor.ReceiveTimeout
 import akka.event.Logging
 import akka.event.LoggingReceive
 import akka.pattern.ask
@@ -41,10 +40,11 @@ import spray.client.pipelining.sendReceive
 import spray.http.HttpData
 import spray.http.HttpResponse
 
+import scala.util.{Failure, Success}
+
 class BoxPushActor(box: Box,
                    implicit val timeout: Timeout,
                    pollInterval: FiniteDuration = 5.seconds,
-                   receiveTimeout: FiniteDuration = 1.minute,
                    boxServicePath: String = "../../BoxService",
                    metaDataServicePath: String = "../../MetaDataService",
                    storageServicePath: String = "../../StorageService",
@@ -67,43 +67,65 @@ class BoxPushActor(box: Box,
   override def postStop() =
     poller.cancel()
 
-  context.setReceiveTimeout(receiveTimeout)
+  class EmptyTransactionException() extends RuntimeException()
+  class RemoteBoxUnavailableException() extends RuntimeException()
+  class FileTransferException(msg: String) extends RuntimeException(msg)
+
+  def sendFilePipeline = sendReceive
 
   def receive = LoggingReceive {
     case PollOutgoing =>
-      processNextOutgoingTransaction()
-  }
-
-  def processNextOutgoingTransaction(): Unit =
-    boxService.ask(GetNextOutgoingTransactionImage(box.id)).mapTo[Option[OutgoingTransactionImage]]
-      .map {
-        case Some(transactionImage) =>
-          context.become(waitForFileSentState)
-          sendFileForOutgoingTransactionImage(transactionImage)
-
-        case None =>
-          context.unbecome
+      context.become(inTransferState)
+      processNextOutgoingTransaction().onComplete {
+        case Success(_) =>
+          self ! TransferFinished
+          self ! PollOutgoing
+        case Failure(e) => e match {
+          case e: EmptyTransactionException =>
+            self ! TransferFinished
+          case e: RemoteBoxUnavailableException =>
+            self ! TransferFinished
+          case e: Exception =>
+            SbxLog.error("Box", s"Cannot send file to box ${box.name}: ${e.getMessage}")
+            self ! TransferFinished
+        }
       }
-
-  def waitForFileSentState: Receive = LoggingReceive {
-
-    case FileSent(transactionImage) =>
-      handleFileSentForOutgoingTransaction(transactionImage)
-
-    case FileSendFailed(transactionImage, statusCode, exception) =>
-      handleFileSendFailedForOutgoingTransaction(transactionImage, statusCode, exception)
-
-    case ReceiveTimeout =>
-      log.error("Processing next outgoing transaction timed out")
-      context.unbecome
   }
 
-  def sendFileForOutgoingTransactionImage(transactionImage: OutgoingTransactionImage) =
+  def inTransferState: Receive = {
+    case TransferFinished => context.unbecome()
+  }
+
+  def processNextOutgoingTransaction(): Future[Unit] = {
+    boxService.ask(GetNextOutgoingTransactionImage(box.id)).mapTo[Option[OutgoingTransactionImage]].flatMap {
+      case Some(transactionImage) => sendFileForOutgoingTransactionImage(transactionImage)
+      case None => Future.failed(new EmptyTransactionException())
+    }
+  }
+
+  def sendFileForOutgoingTransactionImage(transactionImage: OutgoingTransactionImage): Future[Unit] =
     boxService.ask(GetOutgoingTagValues(transactionImage)).mapTo[Seq[OutgoingTagValue]]
       .flatMap(transactionTagValues =>
         sendFile(transactionImage, transactionTagValues))
 
-  def sendFilePipeline = sendReceive
+  def sendFile(transactionImage: OutgoingTransactionImage, tagValues: Seq[OutgoingTagValue]): Future[Unit] = {
+    log.debug(s"Pushing transaction image $transactionImage with tag values $tagValues")
+
+    pushImagePipeline(transactionImage, tagValues).flatMap(response => {
+      val statusCode = response.status.intValue
+      if (statusCode >= 200 && statusCode < 300)
+        handleFileSentForOutgoingTransaction(transactionImage)
+      else {
+        val errorMessage = response.entity.asString
+        handleFileSendFailedForOutgoingTransaction(transactionImage, statusCode, new Exception(s"File send failed with status code $statusCode: $errorMessage"))
+      }
+    }).recoverWith {
+      case exception: IllegalArgumentException =>
+        handleFileSendFailedForOutgoingTransaction(transactionImage, 400, exception)
+      case exception: Exception =>
+        handleFileSendFailedForOutgoingTransaction(transactionImage, 500, exception)
+    }
+  }
 
   def pushImagePipeline(transactionImage: OutgoingTransactionImage, tagValues: Seq[OutgoingTagValue]): Future[HttpResponse] =
     metaDataService.ask(GetImage(transactionImage.image.imageId)).mapTo[Option[Image]].flatMap {
@@ -121,63 +143,42 @@ class BoxPushActor(box: Box,
         Future.failed(new IllegalArgumentException("No image found for image id " + transactionImage.image.imageId))
     }
 
-  def sendFile(transactionImage: OutgoingTransactionImage, tagValues: Seq[OutgoingTagValue]) = {
-    log.debug(s"Pushing transaction image $transactionImage with tag values $tagValues")
-
-    pushImagePipeline(transactionImage, tagValues)
-      .map(response => {
-        val statusCode = response.status.intValue
-        if (statusCode >= 200 && statusCode < 300)
-          self ! FileSent(transactionImage)
-        else {
-          val errorMessage = response.entity.asString
-          self ! FileSendFailed(transactionImage, statusCode, new Exception(s"File send failed with status code $statusCode: $errorMessage"))
-        }
-      })
-      .recover {
-        case exception: IllegalArgumentException =>
-          self ! FileSendFailed(transactionImage, 400, exception)
-        case exception: Exception =>
-          self ! FileSendFailed(transactionImage, 500, exception)
-      }
-  }
-
-  def handleFileSentForOutgoingTransaction(transactionImage: OutgoingTransactionImage) = {
+  def handleFileSentForOutgoingTransaction(transactionImage: OutgoingTransactionImage): Future[Unit] = {
     log.debug(s"File sent for outgoing transaction $transactionImage")
 
     boxService.ask(UpdateOutgoingTransaction(transactionImage))
       .mapTo[OutgoingTransaction]
-      .foreach { updatedTransaction =>
+      .flatMap { updatedTransaction =>
         boxService.ask(GetOutgoingImageIdsForTransaction(updatedTransaction))
           .mapTo[Seq[Long]]
-          .foreach { imageIds =>
+          .map { imageIds =>
             if (updatedTransaction.sentImageCount == updatedTransaction.totalImageCount) {
               SbxLog.info("Box", s"Finished sending ${updatedTransaction.totalImageCount} images to box ${box.name}")
               context.system.eventStream.publish(ImagesSent(Destination(DestinationType.BOX, box.name, box.id), imageIds))
             }
-
-            context.unbecome
-            self ! PollOutgoing
           }
       }
 
   }
 
-  def handleFileSendFailedForOutgoingTransaction(transactionImage: OutgoingTransactionImage, statusCode: Int, exception: Exception) = {
+  def handleFileSendFailedForOutgoingTransaction(transactionImage: OutgoingTransactionImage, statusCode: Int, exception: Exception): Future[Unit] = {
     log.debug(s"Failed to send file to box ${box.name}: ${exception.getMessage}")
     statusCode match {
       case code if code >= 500 =>
         // server-side error, remote box is most likely down
-        boxService ! SetOutgoingTransactionStatus(transactionImage.transaction, TransactionStatus.WAITING)
+        boxService.ask(SetOutgoingTransactionStatus(transactionImage.transaction, TransactionStatus.WAITING)).map {
+          throw new RemoteBoxUnavailableException()
+        }
 
       case _ =>
-        boxService ! SetOutgoingTransactionStatus(transactionImage.transaction, TransactionStatus.FAILED)
-        SbxLog.error("Box", s"Cannot send file to box ${box.name}: ${exception.getMessage}")
+        boxService.ask(SetOutgoingTransactionStatus(transactionImage.transaction, TransactionStatus.FAILED)).map {
+          throw new FileTransferException(s"Cannot send file to box ${box.name}: ${exception.getMessage}")
+        }
     }
-    context.unbecome
   }
 
 }
+
 
 object BoxPushActor {
   def props(box: Box, timeout: Timeout): Props = Props(new BoxPushActor(box, timeout))

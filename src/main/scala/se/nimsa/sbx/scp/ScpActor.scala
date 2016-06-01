@@ -18,9 +18,9 @@ package se.nimsa.sbx.scp
 
 import java.util.concurrent.{Executor, Executors, ThreadFactory}
 
-import akka.actor.{Actor, Props, Stash}
+import akka.actor.{Actor, Props}
 import akka.event.{Logging, LoggingReceive}
-import akka.pattern.ask
+import akka.pattern.{ask, pipe}
 import akka.util.Timeout
 import org.dcm4che3.data.Attributes
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.ReverseAnonymization
@@ -38,7 +38,7 @@ import scala.util.control.NonFatal
 class ScpActor(scpData: ScpData, executor: Executor, implicit val timeout: Timeout,
                metaDataServicePath: String = "../../MetaDataService",
                storageServicePath: String = "../../StorageService",
-               anonymizationServicePath: String = "../../AnonymizationService") extends Actor with Stash {
+               anonymizationServicePath: String = "../../AnonymizationService") extends Actor {
 
   val metaDataService = context.actorSelection(metaDataServicePath)
   val storageService = context.actorSelection(storageServicePath)
@@ -57,47 +57,35 @@ class ScpActor(scpData: ScpData, executor: Executor, implicit val timeout: Timeo
     }
   })
 
-  val scp = new Scp(scpData.name, scpData.aeTitle, scpData.port, self)
-  scp.device.setScheduledExecutor(scheduledExecutor)
-  scp.device.setExecutor(executor)
-  scp.device.bindConnections()
+  val scp = new Scp(scpData.name, scpData.aeTitle, scpData.port, executor, scheduledExecutor, self, timeout)
   SbxLog.info("SCP", s"Started SCP ${scpData.name} with AE title ${scpData.aeTitle} on port ${scpData.port}")
 
   override def postStop() {
-    scp.device.unbindConnections()
+    scp.shutdown()
     scheduledExecutor.shutdown()
     SbxLog.info("SCP", s"Stopped SCP ${scpData.name}")
   }
-
-  case object DatasetProcessed
 
   def receive = LoggingReceive {
     case DatasetReceivedByScp(dataset) =>
       log.debug("SCP", s"Dataset received using SCP ${scpData.name}")
       val source = Source(SourceType.SCP, scpData.name, scpData.id)
-      context.become(waitForDatasetProcessed)
-      checkDataset(dataset).flatMap { status =>
-        reverseAnonymization(dataset).flatMap { reversedDataset =>
-          addMetadata(reversedDataset, source).flatMap { image =>
-            addDataset(reversedDataset, source, image).map { overwrite =>
+      val addDatasetFuture =
+        checkDataset(dataset).flatMap { status =>
+          reverseAnonymization(dataset).flatMap { reversedDataset =>
+            addMetadata(reversedDataset, source).flatMap { image =>
+              addDataset(reversedDataset, source, image).map { overwrite =>
+              }
             }
           }
         }
-      }.onComplete {
-        case Success(_) =>
-          self ! DatasetProcessed
-        case Failure(NonFatal(e)) =>
-          SbxLog.error("Directory", s"Could not add file: ${e.getMessage}")
-          self ! DatasetProcessed
-      }
-  }
 
-  def waitForDatasetProcessed = LoggingReceive {
-    case msg: DatasetReceivedByScp =>
-      stash()
-    case DatasetProcessed =>
-      context.unbecome()
-      unstashAll()
+      addDatasetFuture.onFailure {
+        case NonFatal(e) =>
+          SbxLog.error("Directory", s"Could not add file: ${e.getMessage}")
+      }
+
+      addDatasetFuture.pipeTo(sender)
   }
 
   def addMetadata(dataset: Attributes, source: Source): Future[Image] =

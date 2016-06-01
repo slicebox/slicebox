@@ -224,9 +224,11 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
 
           case SetOutgoingTransactionStatus(transaction, status) =>
             setOutgoingTransactionStatus(transaction, status)
+            sender ! OutgoingTransactionStatusUpdated
 
           case SetIncomingTransactionStatus(boxId, transactionImage, status) =>
             setIncomingTransactionStatus(boxId, transactionImage, status)
+            sender ! IncomingTransactionStatusUpdated
 
           case UpdateBoxOnlineStatus(boxId, online) =>
             updateBoxOnlineStatus(boxId, online)

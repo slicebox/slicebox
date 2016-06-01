@@ -62,7 +62,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
   val storageService = system.actorOf(Props[MockupStorageActor], name = "StorageService")
   val anonymizationService = system.actorOf(AnonymizationServiceActor.props(dbProps), name = "AnonymizationService")
   val boxService = system.actorOf(BoxServiceActor.props(dbProps, "http://testhost:1234", 1.minute), name = "BoxService")
-  val boxPushActorRef = system.actorOf(Props(new BoxPushActor(testBox, Timeout(30.seconds), 1000.hours, 1000.hours, "../BoxService", "../MetaDataService", "../StorageService", "../AnonymizationService") {
+  val boxPushActorRef = system.actorOf(Props(new BoxPushActor(testBox, 1000.hours, 1000.hours, "../BoxService", "../MetaDataService", "../StorageService", "../AnonymizationService") {
 
       override def sendFilePipeline = {
         (req: HttpRequest) =>
@@ -94,7 +94,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
   "A BoxPushActor" should {
 
-    "should post file to correct URL" in {
+    "post file to correct URL" in {
 
       val (transaction, image) =
         db.withSession { implicit session =>
@@ -111,7 +111,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       capturedFileSendRequests(0).uri.toString() should be(s"${testBox.baseUrl}/image?transactionid=${transaction.id}&sequencenumber=${image.sequenceNumber}&totalimagecount=${transaction.totalImageCount}")
     }
 
-    "should post file in correct order" in {
+    "post file in correct order" in {
       db.withSession { implicit session =>
 
         // Insert outgoing images out of order
@@ -128,7 +128,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       }
     }
 
-    "should mark outgoing transaction as finished when all files have been sent" in {
+    "mark outgoing transaction as finished when all files have been sent" in {
       db.withSession { implicit session =>
 
         val transaction = boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, testBox.id, testBox.name, 0, 2, 1000, 1000, TransactionStatus.WAITING))

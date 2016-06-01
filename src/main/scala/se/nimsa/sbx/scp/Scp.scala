@@ -16,6 +16,8 @@
 
 package se.nimsa.sbx.scp
 
+import java.util.concurrent.{Executor, ScheduledExecutorService}
+
 import org.dcm4che3.data.Attributes
 import org.dcm4che3.data.Tag
 import org.dcm4che3.data.VR
@@ -31,39 +33,54 @@ import org.dcm4che3.net.service.BasicCStoreSCP
 import org.dcm4che3.net.service.DicomServiceRegistry
 import com.typesafe.scalalogging.LazyLogging
 import akka.actor.ActorRef
-import akka.actor.actorRef2Scala
+import akka.pattern.ask
 import se.nimsa.sbx.dicom.SopClasses
 import ScpProtocol.DatasetReceivedByScp
+import akka.util.Timeout
 
-class Scp(val name: String, val aeTitle: String, val port: Int, notifyActor: ActorRef) extends LazyLogging {
+import scala.concurrent.Await
 
-  val device = new Device("storescp")
-  private val ae = new ApplicationEntity(aeTitle)
-  private val conn = new Connection(name, null, port)
+class Scp(val name: String,
+          val aeTitle: String,
+          val port: Int,
+          executor: Executor,
+          scheduledExecutor: ScheduledExecutorService,
+          notifyActor: ActorRef,
+          implicit val timeout: Timeout) extends LazyLogging {
 
   private val cstoreSCP = new BasicCStoreSCP("*") {
 
     override protected def store(as: Association, pc: PresentationContext, rq: Attributes, data: PDVInputStream, rsp: Attributes): Unit = {
       rsp.setInt(Tag.Status, VR.US, 0)
 
-      val cuid = rq.getString(Tag.AffectedSOPClassUID)
-      val iuid = rq.getString(Tag.AffectedSOPInstanceUID)
       val tsuid = pc.getTransferSyntax
       val dataset = data.readDataset(tsuid)
-      notifyActor ! DatasetReceivedByScp(dataset)
+
+      /*
+       * This is the interface between a synchronous callback and a async actor system. To avoid sending too many large
+       * messages to the notification actor, risking heap overflow, we block and wait here, ensuring one-at-a-time
+       * processing of datasets.
+       */
+      Await.ready(notifyActor.ask(DatasetReceivedByScp(dataset)), timeout.duration)
     }
 
   }
 
+  private val conn = new Connection(name, null, port)
+
+  private val ae = new ApplicationEntity(aeTitle)
+  ae.setAssociationAcceptor(true)
+  ae.addConnection(conn)
+  SopClasses.sopClasses.filter(_.included).foreach(sopClass =>
+    ae.addTransferCapability(new TransferCapability(sopClass.sopClassUID, "*", TransferCapability.Role.SCP, "*")))
+
+  private val device = new Device("storescp")
+  device.setExecutor(executor)
+  device.setScheduledExecutor(scheduledExecutor)
   device.setDimseRQHandler(createServiceRegistry())
   device.addConnection(conn)
   device.addApplicationEntity(ae)
-
-  ae.setAssociationAcceptor(true)
-  ae.addConnection(conn)
-  
-  SopClasses.sopClasses.filter(_.included).foreach(sopClass =>
-    ae.addTransferCapability(new TransferCapability(sopClass.sopClassUID, "*", TransferCapability.Role.SCP, "*")))
+  device.bindConnections()
 
   private def createServiceRegistry(): DicomServiceRegistry = {
     val serviceRegistry = new DicomServiceRegistry()
@@ -72,4 +89,7 @@ class Scp(val name: String, val aeTitle: String, val port: Int, notifyActor: Act
     serviceRegistry
   }
 
+  def shutdown(): Unit = {
+    device.unbindConnections()
+  }
 }

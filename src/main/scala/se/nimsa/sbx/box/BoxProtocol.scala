@@ -17,11 +17,8 @@
 package se.nimsa.sbx.box
 
 import se.nimsa.sbx.model.Entity
-import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.TagValue
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.ImageTagValues
-import org.dcm4che3.data.Attributes
-import se.nimsa.sbx.app.GeneralProtocol.Destination
 
 object BoxProtocol {
 
@@ -128,7 +125,11 @@ object BoxProtocol {
   
   case class SetOutgoingTransactionStatus(transaction: OutgoingTransaction, status: TransactionStatus) extends BoxRequest
 
+  case object OutgoingTransactionStatusUpdated
+
   case class SetIncomingTransactionStatus(boxId: Long, transactionImage: OutgoingTransactionImage, status: TransactionStatus) extends BoxRequest
+
+  case object IncomingTransactionStatusUpdated
 
   case class UpdateBoxOnlineStatus(boxId: Long, online: Boolean) extends BoxRequest
   
@@ -167,9 +168,7 @@ object BoxProtocol {
 
   case object PollOutgoing
 
-  case class FileSent(transactionImage: OutgoingTransactionImage)
-
-  case class FileSendFailed(transactionImage: OutgoingTransactionImage, statusCode: Int, e: Exception)
+  case object TransferFinished
 
   // box poll actor internal messages
 
