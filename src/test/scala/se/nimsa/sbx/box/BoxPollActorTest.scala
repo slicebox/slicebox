@@ -1,8 +1,7 @@
 package se.nimsa.sbx.box
 
-import akka.actor.{Actor, ActorSystem, Props, ReceiveTimeout}
+import akka.actor.{Actor, ActorSystem, Props}
 import akka.testkit.{ImplicitSender, TestKit}
-import akka.util.Timeout
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
 import se.nimsa.sbx.anonymization.AnonymizationServiceActor
 import se.nimsa.sbx.app.{DbProps, JsonFormats}
@@ -57,7 +56,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
   val storageService = system.actorOf(Props[MockupStorageActor], name = "StorageService")
   val anonymizationService = system.actorOf(AnonymizationServiceActor.props(dbProps), name = "AnonymizationService")
   val boxService = system.actorOf(BoxServiceActor.props(dbProps, "http://testhost:1234", 1.minute), name = "BoxService")
-  val pollBoxActorRef = system.actorOf(Props(new BoxPollActor(remoteBox, Timeout(30.seconds), 1.hour, 1000.hours, "../BoxService", "../MetaDataService", "../StorageService", "../AnonymizationService") {
+  val pollBoxActorRef = system.actorOf(Props(new BoxPollActor(remoteBox, 1.hour, 1000.hours, "../BoxService", "../MetaDataService", "../StorageService", "../AnonymizationService") {
 
     override def sendRequestToRemoteBoxPipeline = {
       (req: HttpRequest) =>
@@ -94,7 +93,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
     "call correct poll URL" in {
       mockHttpResponses += notFoundResponse
 
-      pollBoxActorRef ! PollRemoteBox
+      pollBoxActorRef ! PollIncoming
 
       expectNoMsg
 
@@ -114,7 +113,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
         case Left(e)       => fail(e)
       }
 
-      pollBoxActorRef ! PollRemoteBox
+      pollBoxActorRef ! PollIncoming
 
       expectNoMsg
 
@@ -138,7 +137,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       mockHttpResponses += HttpResponse(StatusCodes.OK, HttpEntity(ContentTypes.`application/octet-stream`, HttpData(bytes)))
       mockHttpResponses += HttpResponse(StatusCodes.OK)
 
-      pollBoxActorRef ! PollRemoteBox
+      pollBoxActorRef ! PollIncoming
 
       expectNoMsg
 
@@ -163,33 +162,13 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
     "go back to polling state when poll request returns 404" in {
       mockHttpResponses += notFoundResponse
-      pollBoxActorRef ! PollRemoteBox
+      pollBoxActorRef ! PollIncoming
       expectNoMsg
 
       mockHttpResponses += notFoundResponse
-      pollBoxActorRef ! PollRemoteBox
+      pollBoxActorRef ! PollIncoming
       expectNoMsg
 
-      capturedRequests.size should be(2)
-      capturedRequests(0).uri.toString() should be(s"$remoteBoxBaseUrl/outgoing/poll")
-      capturedRequests(1).uri.toString() should be(s"$remoteBoxBaseUrl/outgoing/poll")
-    }
-
-    "go back to polling state if a step in the polling sequence exceeds the PollBoxActor's timeout limit" in {
-
-      pollBoxActorRef ! PollRemoteBox
-      pollBoxActorRef ! ReceiveTimeout // waiting for remote server timeout triggers this message 
-
-      // Check that no incoming transaction was created since the poll request timed out
-      db.withSession { implicit session =>
-        val incomingTransactions = boxDao.listIncomingTransactions(0, 1)
-        incomingTransactions shouldBe empty
-      }
-
-      pollBoxActorRef ! PollRemoteBox
-      expectNoMsg
-
-      // make sure we are back in the polling state. If we are, there should be two polling requests
       capturedRequests.size should be(2)
       capturedRequests(0).uri.toString() should be(s"$remoteBoxBaseUrl/outgoing/poll")
       capturedRequests(1).uri.toString() should be(s"$remoteBoxBaseUrl/outgoing/poll")
@@ -219,7 +198,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       mockHttpResponses += HttpResponse(StatusCodes.OK, HttpEntity(ContentTypes.`application/octet-stream`, HttpData(bytes)))
       mockHttpResponses += HttpResponse(StatusCodes.NoContent) // done reply
 
-      pollBoxActorRef ! PollRemoteBox
+      pollBoxActorRef ! PollIncoming
 
       expectNoMsg
 
@@ -254,7 +233,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       mockHttpResponses += HttpResponse(StatusCodes.OK, HttpEntity(ContentTypes.`application/octet-stream`, HttpData(bytes)))
       mockHttpResponses += HttpResponse(StatusCodes.NoContent) // done reply
 
-      pollBoxActorRef ! PollRemoteBox
+      pollBoxActorRef ! PollIncoming
 
       expectNoMsg
 
@@ -287,15 +266,15 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       mockHttpResponses += HttpResponse(StatusCodes.NoContent)
 
       // poll box, outgoing transaction will be found and an attempt to fetch the file will fail
-      pollBoxActorRef ! PollRemoteBox
+      pollBoxActorRef ! PollIncoming
       expectNoMsg
 
       // poll box again, fetching the file will fail again
-      pollBoxActorRef ! PollRemoteBox
+      pollBoxActorRef ! PollIncoming
       expectNoMsg
 
       // poll box again, fetching the file will succeed, done message will be sent
-      pollBoxActorRef ! PollRemoteBox
+      pollBoxActorRef ! PollIncoming
       expectNoMsg
 
       // Check that requests are sent as expected
@@ -321,7 +300,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       mockHttpResponses += HttpResponse(StatusCodes.NoContent)
 
       // poll box, reading the file will fail, failed message will be sent
-      pollBoxActorRef ! PollRemoteBox
+      pollBoxActorRef ! PollIncoming
       expectNoMsg
 
       // Check that requests are sent as expected
@@ -348,7 +327,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       mockHttpResponses += HttpResponse(StatusCodes.NoContent)
 
       // poll box, storing the file will fail, failed message will be sent
-      pollBoxActorRef ! PollRemoteBox
+      pollBoxActorRef ! PollIncoming
       expectNoMsg
 
       // Check that requests are sent as expected

@@ -35,10 +35,9 @@ import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.metadata.MetaDataProtocol.GetImage
 import se.nimsa.sbx.storage.StorageProtocol.GetDataset
 import se.nimsa.sbx.util.CompressionUtil.compress
-import spray.client.pipelining.Post
+import spray.client.pipelining.{Get, Post}
 import spray.client.pipelining.sendReceive
-import spray.http.HttpData
-import spray.http.HttpResponse
+import spray.http.{HttpData, HttpResponse}
 
 import scala.util.{Failure, Success}
 
@@ -67,9 +66,8 @@ class BoxPushActor(box: Box,
   override def postStop() =
     poller.cancel()
 
-  class EmptyTransactionException() extends RuntimeException()
-  class RemoteBoxUnavailableException() extends RuntimeException()
-  class FileTransferException(msg: String) extends RuntimeException(msg)
+  object EmptyTransactionException extends RuntimeException()
+  object RemoteBoxUnavailableException extends RuntimeException()
 
   def sendFilePipeline = sendReceive
 
@@ -81,12 +79,10 @@ class BoxPushActor(box: Box,
           self ! TransferFinished
           self ! PollOutgoing
         case Failure(e) => e match {
-          case e: EmptyTransactionException =>
-            self ! TransferFinished
-          case e: RemoteBoxUnavailableException =>
+          case e@(EmptyTransactionException | RemoteBoxUnavailableException) =>
             self ! TransferFinished
           case e: Exception =>
-            SbxLog.error("Box", s"Cannot send file to box ${box.name}: ${e.getMessage}")
+            SbxLog.error("Box", s"Failed to send file to box ${box.name}: ${e.getMessage}")
             self ! TransferFinished
         }
       }
@@ -99,7 +95,7 @@ class BoxPushActor(box: Box,
   def processNextOutgoingTransaction(): Future[Unit] = {
     boxService.ask(GetNextOutgoingTransactionImage(box.id)).mapTo[Option[OutgoingTransactionImage]].flatMap {
       case Some(transactionImage) => sendFileForOutgoingTransactionImage(transactionImage)
-      case None => Future.failed(new EmptyTransactionException())
+      case None => Future.failed(EmptyTransactionException)
     }
   }
 
@@ -146,18 +142,12 @@ class BoxPushActor(box: Box,
   def handleFileSentForOutgoingTransaction(transactionImage: OutgoingTransactionImage): Future[Unit] = {
     log.debug(s"File sent for outgoing transaction $transactionImage")
 
-    boxService.ask(UpdateOutgoingTransaction(transactionImage))
-      .mapTo[OutgoingTransaction]
-      .flatMap { updatedTransaction =>
-        boxService.ask(GetOutgoingImageIdsForTransaction(updatedTransaction))
-          .mapTo[Seq[Long]]
-          .map { imageIds =>
-            if (updatedTransaction.sentImageCount == updatedTransaction.totalImageCount) {
-              SbxLog.info("Box", s"Finished sending ${updatedTransaction.totalImageCount} images to box ${box.name}")
-              context.system.eventStream.publish(ImagesSent(Destination(DestinationType.BOX, box.name, box.id), imageIds))
-            }
-          }
-      }
+    boxService.ask(UpdateOutgoingTransaction(transactionImage)).mapTo[OutgoingTransaction].flatMap { updatedTransaction =>
+      if (updatedTransaction.sentImageCount == updatedTransaction.totalImageCount)
+        handleTransactionFinished(updatedTransaction)
+      else
+        Future.successful({})
+    }
 
   }
 
@@ -167,18 +157,37 @@ class BoxPushActor(box: Box,
       case code if code >= 500 =>
         // server-side error, remote box is most likely down
         boxService.ask(SetOutgoingTransactionStatus(transactionImage.transaction, TransactionStatus.WAITING)).map {
-          throw new RemoteBoxUnavailableException()
+          throw RemoteBoxUnavailableException
         }
 
       case _ =>
         boxService.ask(SetOutgoingTransactionStatus(transactionImage.transaction, TransactionStatus.FAILED)).map {
-          throw new FileTransferException(s"Cannot send file to box ${box.name}: ${exception.getMessage}")
+          throw exception
         }
     }
   }
 
-}
+  def handleTransactionFinished(outgoingTransaction: OutgoingTransaction): Future[Unit] =
+    boxService.ask(GetOutgoingImageIdsForTransaction(outgoingTransaction)).mapTo[Seq[Long]].flatMap { imageIds =>
+      sendFilePipeline(Get(s"${box.baseUrl}/status?transactionid=${outgoingTransaction.id}")).flatMap { response =>
+        val status = TransactionStatus.withName(response.entity.asString)
+        status match {
+          case TransactionStatus.FINISHED =>
+            SbxLog.info("Box", s"Finished sending ${outgoingTransaction.totalImageCount} images to box ${box.name}")
+            context.system.eventStream.publish(ImagesSent(Destination(DestinationType.BOX, box.name, box.id), imageIds))
+            Future.successful({})
+          case _ =>
+            boxService.ask(SetOutgoingTransactionStatus(outgoingTransaction, TransactionStatus.FAILED)).map {
+              throw new Exception("Remote box reported transaction failed")
+            }
+        }
+      }.recover {
+        case _ =>
+          SbxLog.warn("Box", "Unable to get remote status of finished transaction, assuming all is well.")
+      }
+    }
 
+}
 
 object BoxPushActor {
   def props(box: Box, timeout: Timeout): Props = Props(new BoxPushActor(box, timeout))

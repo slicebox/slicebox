@@ -70,6 +70,15 @@ trait TransactionRoutes {
                 }
               }
             }
+          } ~ path("status") {
+            parameters('transactionid.as[Long]) { outgoingTransactionId =>
+              get {
+                onSuccess(boxService.ask(GetIncomingTransactionStatus(box, outgoingTransactionId)).mapTo[Option[TransactionStatus]]) {
+                  case Some(status) => complete(status.toString)
+                  case None => complete(NotFound)
+                }
+              }
+            }
           } ~ pathPrefix("outgoing") {
             path("poll") {
               get {

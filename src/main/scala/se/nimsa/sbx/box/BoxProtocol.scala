@@ -26,16 +26,19 @@ object BoxProtocol {
     override def toString: String = this match {
       case BoxSendMethod.PUSH => "PUSH"
       case BoxSendMethod.POLL => "POLL"
+      case BoxSendMethod.UNKNOWN => "UNKNOWN"
     }
   }
 
   object BoxSendMethod {
     case object PUSH extends BoxSendMethod
     case object POLL extends BoxSendMethod
+    case object UNKNOWN extends BoxSendMethod
 
-    def withName(string: String) = string match {
+    def withName(string: String): BoxSendMethod = string match {
       case "PUSH" => PUSH
       case "POLL" => POLL
+      case _ => UNKNOWN
     }
   }
 
@@ -45,6 +48,7 @@ object BoxProtocol {
       case TransactionStatus.WAITING => "WAITING"
       case TransactionStatus.FAILED => "FAILED"
       case TransactionStatus.FINISHED => "FINISHED"
+      case TransactionStatus.UNKNOWN => "UNKNOWN"
     }
   }
 
@@ -53,12 +57,14 @@ object BoxProtocol {
     case object WAITING extends TransactionStatus
     case object FAILED extends TransactionStatus
     case object FINISHED extends TransactionStatus
+    case object UNKNOWN extends TransactionStatus
 
-    def withName(string: String) = string match {
+    def withName(string: String): TransactionStatus = string match {
       case "PROCESSING" => PROCESSING
       case "WAITING" => WAITING
       case "FAILED" => FAILED
       case "FINISHED" => FINISHED
+      case _ => UNKNOWN
     }
   }
 
@@ -132,7 +138,9 @@ object BoxProtocol {
   case object IncomingTransactionStatusUpdated
 
   case class UpdateBoxOnlineStatus(boxId: Long, online: Boolean) extends BoxRequest
-  
+
+  case class GetIncomingTransactionStatus(box: Box, transactionId: Long) extends BoxRequest
+
   case class RemoveIncomingTransaction(incomingTransactionId: Long) extends BoxRequest
   
   case class RemoveOutgoingTransaction(outgoingTransactionId: Long) extends BoxRequest
@@ -164,6 +172,10 @@ object BoxProtocol {
 
   case class OutgoingTransactions(transactions: Seq[OutgoingTransaction])
 
+  // box service actor internal messages
+
+  case object UpdateStatusForBoxesAndTransactions
+
   // box push actor internal messages
 
   case object PollOutgoing
@@ -172,20 +184,6 @@ object BoxProtocol {
 
   // box poll actor internal messages
 
-  case object PollRemoteBox
-
-  case object RemoteOutgoingEmpty
-
-  case class RemoteOutgoingTransactionImageFound(transactionImage: OutgoingTransactionImage)
-
-  case class PollRemoteBoxFailed(e: Throwable)
-
-  case class RemoteOutgoingFileFetched(transactionImage: OutgoingTransactionImage, imageId: Long, overwrite: Boolean)
-
-  case class FetchFileFailedTemporarily(transactionImage: OutgoingTransactionImage, e: Throwable)
-
-  case class FetchFileFailedPermanently(transactionImage: OutgoingTransactionImage, e: Throwable)
-  
-  case object UpdateStatusForBoxesAndTransactions
+  case object PollIncoming
 
 }

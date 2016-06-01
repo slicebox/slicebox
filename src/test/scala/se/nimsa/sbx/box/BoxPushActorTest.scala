@@ -9,7 +9,6 @@ import org.scalatest._
 import akka.actor.{Actor, ActorSystem, Props}
 import akka.testkit.ImplicitSender
 import akka.testkit.TestKit
-import akka.util.Timeout
 import se.nimsa.sbx.anonymization.AnonymizationServiceActor
 import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.box.BoxProtocol._
@@ -17,12 +16,11 @@ import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.metadata.MetaDataDAO
 import se.nimsa.sbx.metadata.MetaDataProtocol.GetImage
 import se.nimsa.sbx.util.TestUtil
-import spray.http.HttpRequest
-import spray.http.HttpResponse
+import spray.http.{HttpEntity, HttpMethods, HttpRequest, HttpResponse}
 import spray.http.StatusCodes.InternalServerError
 
 class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
-    with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {
+  with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {
 
   def this() = this(ActorSystem("BoxPushActorTestSystem"))
 
@@ -62,11 +60,15 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
   val storageService = system.actorOf(Props[MockupStorageActor], name = "StorageService")
   val anonymizationService = system.actorOf(AnonymizationServiceActor.props(dbProps), name = "AnonymizationService")
   val boxService = system.actorOf(BoxServiceActor.props(dbProps, "http://testhost:1234", 1.minute), name = "BoxService")
+
+  var reportTransactionAsFailed = false
+
   val boxPushActorRef = system.actorOf(Props(new BoxPushActor(testBox, 1000.hours, 1000.hours, "../BoxService", "../MetaDataService", "../StorageService", "../AnonymizationService") {
 
-      override def sendFilePipeline = {
-        (req: HttpRequest) =>
-          {
+    override def sendFilePipeline = {
+      (req: HttpRequest) =>
+        req.method match {
+          case HttpMethods.POST =>
             capturedFileSendRequests += req
             Future {
               if (failedResponseSendIndices.contains(capturedFileSendRequests.size))
@@ -74,11 +76,18 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
               else
                 okResponse
             }
-          }
-      }
+          case HttpMethods.GET =>
+            Future {
+              if (reportTransactionAsFailed)
+                HttpResponse(entity = HttpEntity(TransactionStatus.FAILED.toString))
+              else
+                HttpResponse(entity = HttpEntity(TransactionStatus.FINISHED.toString))
+            }
+        }
+    }
 
-    }), name = "PushBox")
-  
+  }), name = "PushBox")
+
   override def afterAll {
     TestKit.shutdownActorSystem(system)
   }
@@ -86,6 +95,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
   override def beforeEach() {
     capturedFileSendRequests.clear()
     failedResponseSendIndices.clear()
+    reportTransactionAsFailed = false
 
     db.withSession { implicit session =>
       boxDao.clear
@@ -238,6 +248,24 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
         expectNoMsg()
 
         boxDao.listOutgoingImagesForOutgoingTransactionId(transaction.id).count(_.sent == false) should be(0)
+      }
+    }
+
+    "mark transaction as failed if remote box reports it as failed after transaction has finished" in {
+      reportTransactionAsFailed = true
+      db.withSession { implicit session =>
+
+        val transaction = boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, testBox.id, testBox.name, 0, 2, 1000, 1000, TransactionStatus.WAITING))
+        boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage1.id, 1, sent = false))
+        boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage2.id, 2, sent = false))
+
+        boxDao.listOutgoingTransactions(0, 1).head.status shouldBe TransactionStatus.WAITING
+
+        boxPushActorRef ! PollOutgoing
+
+        expectNoMsg() // both images will be sent
+
+        boxDao.listOutgoingTransactions(0, 1).head.status shouldBe TransactionStatus.FAILED
       }
     }
   }

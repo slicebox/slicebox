@@ -194,6 +194,9 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
               sender ! OutgoingTransactionMarkedAsFailed
             }
 
+          case GetIncomingTransactionStatus(box, transactionId) =>
+            sender ! getIncomingTransactionStatus(box, transactionId)
+
           case GetIncomingTransactions(startIndex, count) =>
             sender ! IncomingTransactions(getIncomingTransactions(startIndex, count))
 
@@ -257,6 +260,7 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
           maybeStartPollActor(box)
         case BoxSendMethod.POLL =>
           pollBoxesLastPollTimestamp(box.id) = 0
+        case _ =>
       })
 
   def maybeStartPushActor(box: Box): Unit = {
@@ -383,6 +387,11 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
   def getIncomingTransactions(startIndex: Long, count: Long) =
     db.withSession { implicit session =>
       boxDao.listIncomingTransactions(startIndex, count)
+    }
+
+  def getIncomingTransactionStatus(box: Box, transactionId: Long): Option[TransactionStatus] =
+    db.withSession { implicit session =>
+      boxDao.incomingTransactionByOutgoingTransactionId(box.id, transactionId).map(_.status)
     }
 
   def getOutgoingTransactions(startIndex: Long, count: Long) =

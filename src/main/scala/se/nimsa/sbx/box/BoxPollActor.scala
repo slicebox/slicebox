@@ -16,7 +16,7 @@
 
 package se.nimsa.sbx.box
 
-import akka.actor.{Actor, Props, ReceiveTimeout}
+import akka.actor.{Actor, Props}
 import akka.event.{Logging, LoggingReceive}
 import akka.pattern.ask
 import akka.util.Timeout
@@ -44,7 +44,6 @@ import scala.util.{Failure, Success}
 class BoxPollActor(box: Box,
                    implicit val timeout: Timeout,
                    pollInterval: FiniteDuration = 5.seconds,
-                   receiveTimeout: FiniteDuration = 1.minute,
                    boxServicePath: String = "../../BoxService",
                    metaDataServicePath: String = "../../MetaDataService",
                    storageServicePath: String = "../../StorageService",
@@ -67,12 +66,106 @@ class BoxPollActor(box: Box,
     }
 
   def sendRequestToRemoteBoxPipeline = sendReceive
+
+  val poller = system.scheduler.schedule(pollInterval, pollInterval) {
+    self ! PollIncoming
+  }
+
+  override def postStop() =
+    poller.cancel()
+
+  object EmptyTransactionException extends RuntimeException()
+  object RemoteBoxUnavailableException extends RuntimeException()
+
+  def receive = LoggingReceive {
+    case PollIncoming =>
+      context.become(inTransferState)
+      processNextIncomingTransaction().onComplete {
+        case Success(_) =>
+          self ! TransferFinished
+          self ! PollIncoming
+        case Failure(e) => e match {
+          case e@(EmptyTransactionException | RemoteBoxUnavailableException) =>
+            self ! TransferFinished
+          case e: Exception =>
+            SbxLog.error("Box", s"Failed to receive file from box ${box.name}: ${e.getMessage}")
+            self ! TransferFinished
+        }
+      }
+  }
+
+  def inTransferState: Receive = {
+    case TransferFinished => context.unbecome()
+  }
+
+  def processNextIncomingTransaction(): Future[Unit] = {
+    sendPollRequestToRemoteBox.flatMap { transactionImageMaybe =>
+      log.debug(s"Remote box answered poll request with outgoing transaction $transactionImageMaybe")
+
+      boxService ! UpdateBoxOnlineStatus(box.id, online = true)
+
+      transactionImageMaybe match {
+        case Some(transactionImage) =>
+          log.debug(s"Received outgoing transaction $transactionImage")
+          fetchFileForRemoteOutgoingTransaction(transactionImage)
+        case None =>
+          log.debug("Remote outgoing is empty")
+          Future.failed(EmptyTransactionException)
+      }
+    }.recover {
+      case exception: Exception =>
+        boxService ! UpdateBoxOnlineStatus(box.id, online = false)
+        log.debug("Failed to poll remote box: " + exception.getMessage)
+        throw RemoteBoxUnavailableException
+    }
+  }
+
   def pollRemoteBoxOutgoingPipeline = sendRequestToRemoteBoxPipeline ~> convertOption[OutgoingTransactionImage]
 
   def sendPollRequestToRemoteBox: Future[Option[OutgoingTransactionImage]] = {
     log.debug(s"Polling remote box ${box.name}")
     pollRemoteBoxOutgoingPipeline(Get(s"${box.baseUrl}/outgoing/poll"))
   }
+
+  def fetchFileForRemoteOutgoingTransaction(transactionImage: OutgoingTransactionImage): Future[Unit] =
+    getRemoteOutgoingFile(transactionImage).flatMap { response =>
+      val statusCode = response.status.intValue
+      if (statusCode >= 200 && statusCode < 300) {
+        val bytes = decompress(response.entity.data.toByteArray)
+        val dataset = loadDataset(bytes, withPixelData = true, useBulkDataURI = false)
+
+        if (dataset == null)
+          signalFetchFileFailedPermanently(transactionImage, new IllegalArgumentException("Dataset could not be read"))
+
+        else
+          anonymizationService.ask(ReverseAnonymization(dataset)).mapTo[Attributes].flatMap { reversedDataset =>
+            val source = Source(SourceType.BOX, box.name, box.id)
+            storageService.ask(CheckDataset(dataset, restrictSopClass = false)).mapTo[Boolean].flatMap { status =>
+              metaDataService.ask(AddMetaData(dataset, source)).mapTo[MetaDataAdded].flatMap { metaData =>
+                storageService.ask(AddDataset(reversedDataset, source, metaData.image)).mapTo[DatasetAdded].flatMap { datasetAdded =>
+                  boxService.ask(UpdateIncoming(box, transactionImage.transaction.id, transactionImage.image.sequenceNumber, transactionImage.transaction.totalImageCount, datasetAdded.image.id, datasetAdded.overwrite)).flatMap { _ =>
+                    sendRemoteOutgoingFileCompleted(transactionImage).map { response =>
+                    }
+                  }
+                }
+              }
+            }
+          }.recoverWith {
+            case e: Exception =>
+              signalFetchFileFailedPermanently(transactionImage, e)
+          }
+
+      } else
+        statusCode match {
+          case s if s < 500 =>
+            signalFetchFileFailedPermanently(transactionImage, new RuntimeException(s"Server responded with status code $statusCode and message ${response.message.entity.asString}"))
+          case _ =>
+            signalFetchFileFailedTemporarily(transactionImage, new RuntimeException(s"Server responded with status code $statusCode and message ${response.message.entity.asString}"))
+        }
+    }.recoverWith {
+      case e: Exception =>
+        signalFetchFileFailedTemporarily(transactionImage, e)
+    }
 
   def getRemoteOutgoingFile(transactionImage: OutgoingTransactionImage): Future[HttpResponse] = {
     log.debug(s"Fetching remote outgoing image $transactionImage")
@@ -90,6 +183,19 @@ class BoxPollActor(box: Box,
         Future.failed(e)
     }
 
+  def signalFetchFileFailedTemporarily(transactionImage: OutgoingTransactionImage, exception: Exception): Future[Unit] =
+    boxService.ask(SetIncomingTransactionStatus(box.id, transactionImage, TransactionStatus.WAITING)).map { _ =>
+      log.info("Box", s"Failed to fetch file from box ${box.name}: " + exception.getMessage + ", trying again later.")
+      throw RemoteBoxUnavailableException
+    }
+
+  def signalFetchFileFailedPermanently(transactionImage: OutgoingTransactionImage, exception: Exception): Future[Unit] =
+    sendRemoteOutgoingFileFailed(FailedOutgoingTransactionImage(transactionImage, exception.getMessage)).flatMap { _ =>
+      boxService.ask(SetIncomingTransactionStatus(box.id, transactionImage, TransactionStatus.FAILED)).map { _ =>
+        throw exception;
+      }
+    }
+
   def sendRemoteOutgoingFileFailed(failedTransactionImage: FailedOutgoingTransactionImage): Future[HttpResponse] =
     marshal(failedTransactionImage) match {
       case Right(entity) =>
@@ -98,131 +204,6 @@ class BoxPollActor(box: Box,
         SbxLog.error("Box", s"Failed to send failed message to box ${box.name}, data=$failedTransactionImage")
         Future.failed(e)
     }
-
-  val poller = system.scheduler.schedule(pollInterval, pollInterval) {
-    self ! PollRemoteBox
-  }
-
-  context.setReceiveTimeout(receiveTimeout)
-
-  override def postStop() =
-    poller.cancel()
-
-  def receive = LoggingReceive {
-    case PollRemoteBox => pollRemoteBox()
-  }
-
-  def waitForPollRemoteOutgoingState: PartialFunction[Any, Unit] = LoggingReceive {
-    case RemoteOutgoingEmpty =>
-      log.debug("Remote outgoing is empty")
-      context.unbecome
-
-    case RemoteOutgoingTransactionImageFound(transactionImage) =>
-      log.debug(s"Received outgoing transaction $transactionImage")
-
-      context.become(waitForFileFetchedState)
-      fetchFileForRemoteOutgoingTransaction(transactionImage)
-
-    case PollRemoteBoxFailed(exception) =>
-      log.debug("Failed to poll remote box: " + exception.getMessage)
-      context.unbecome
-
-    case ReceiveTimeout =>
-      log.error("Polling sequence timed out while waiting for remote box state")
-      context.unbecome
-  }
-
-  def waitForFileFetchedState: PartialFunction[Any, Unit] = LoggingReceive {
-    case RemoteOutgoingFileFetched(transactionImage, imageId, overwrite) =>
-      boxService.ask(UpdateIncoming(box, transactionImage.transaction.id, transactionImage.image.sequenceNumber, transactionImage.transaction.totalImageCount, imageId, overwrite))
-        .foreach { _ =>
-          sendRemoteOutgoingFileCompleted(transactionImage).foreach { response =>
-            pollRemoteBox()
-          }
-        }
-
-    case FetchFileFailedTemporarily(transactionImage, exception) =>
-      log.info("Box", s"Failed to fetch file from box ${box.name}: " + exception.getMessage + ", trying again later.")
-      boxService ! SetIncomingTransactionStatus(box.id, transactionImage, TransactionStatus.WAITING)
-      context.unbecome
-
-    case FetchFileFailedPermanently(transactionImage, exception) =>
-      sendRemoteOutgoingFileFailed(FailedOutgoingTransactionImage(transactionImage, exception.getMessage))
-      SbxLog.error("Box", s"Failed to fetch file from box ${box.name}: " + exception.getMessage)
-      boxService ! SetIncomingTransactionStatus(box.id, transactionImage, TransactionStatus.FAILED)
-      context.unbecome
-
-    case ReceiveTimeout =>
-      log.error("Polling sequence timed out while fetching data")
-      context.unbecome
-  }
-
-  def pollRemoteBox(): Unit = {
-    context.become(waitForPollRemoteOutgoingState)
-
-    sendPollRequestToRemoteBox
-      .map(transactionImageMaybe => {
-        log.debug(s"Remote box answered poll request with outgoing transaction $transactionImageMaybe")
-
-        boxService ! UpdateBoxOnlineStatus(box.id, online = true)
-
-        transactionImageMaybe match {
-          case Some(transactionImage) =>
-            self ! RemoteOutgoingTransactionImageFound(transactionImage)
-          case None =>
-            self ! RemoteOutgoingEmpty
-        }
-      })
-      .recover {
-        case exception: Exception =>
-          boxService ! UpdateBoxOnlineStatus(box.id, online = false)
-          self ! PollRemoteBoxFailed(exception)
-      }
-  }
-
-  def fetchFileForRemoteOutgoingTransaction(transactionImage: OutgoingTransactionImage): Unit =
-    getRemoteOutgoingFile(transactionImage)
-      .onComplete {
-
-        case Success(response) =>
-          if (response.status.intValue < 300) {
-            val bytes = decompress(response.entity.data.toByteArray)
-            val dataset = loadDataset(bytes, withPixelData = true, useBulkDataURI = false)
-
-            if (dataset == null)
-              self ! FetchFileFailedPermanently(transactionImage, new IllegalArgumentException("Dataset could not be read"))
-
-            else
-              anonymizationService.ask(ReverseAnonymization(dataset)).mapTo[Attributes]
-                .onComplete {
-
-                  case Success(reversedDataset) =>
-                    val source = Source(SourceType.BOX, box.name, box.id)
-                    storageService.ask(CheckDataset(dataset, restrictSopClass = false)).mapTo[Boolean].flatMap { status =>
-                      metaDataService.ask(AddMetaData(dataset, source)).mapTo[MetaDataAdded].flatMap { metaData =>
-                        storageService.ask(AddDataset(reversedDataset, source, metaData.image)).mapTo[DatasetAdded]
-                      }
-                    }.onComplete {
-                        case Success(DatasetAdded(image, overwrite)) =>
-                          self ! RemoteOutgoingFileFetched(transactionImage, image.id, overwrite)
-                        case Failure(exception) =>
-                          self ! FetchFileFailedPermanently(transactionImage, exception)
-                      }
-
-                  case Failure(exception) =>
-                    self ! FetchFileFailedPermanently(transactionImage, exception)
-                }
-          } else
-            response.status.intValue match {
-              case s if s < 500 =>
-                self ! FetchFileFailedPermanently(transactionImage, new RuntimeException(s"Server responded with status code ${response.status.intValue} and message ${response.message.entity.asString}"))
-              case _ =>
-                self ! FetchFileFailedTemporarily(transactionImage, new RuntimeException(s"Server responded with status code ${response.status.intValue} and message ${response.message.entity.asString}"))
-            }
-
-        case Failure(exception) =>
-          self ! FetchFileFailedTemporarily(transactionImage, exception)
-      }
 
 }
 

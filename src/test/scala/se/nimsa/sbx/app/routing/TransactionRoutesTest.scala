@@ -2,7 +2,6 @@ package se.nimsa.sbx.app.routing
 
 import java.util.UUID
 
-import scala.math.abs
 import scala.slick.driver.H2Driver
 
 import org.scalatest.FlatSpec
@@ -133,7 +132,7 @@ class TransactionRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       val transactionImage = responseAs[OutgoingTransactionImage]
 
       transactionImage.transaction.boxId should be(uniBox.id)
-      transactionImage.transaction.id should not be (0)
+      transactionImage.transaction.id should not be 0
       transactionImage.transaction.sentImageCount shouldBe 0
       transactionImage.transaction.totalImageCount should be(1)
       transactionImage.transaction.status shouldBe TransactionStatus.WAITING
@@ -168,7 +167,7 @@ class TransactionRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       contentType should be(ContentTypes.`application/octet-stream`)
 
       val dataset = DicomUtil.loadDataset(decompress(responseAs[Array[Byte]]), withPixelData = true, useBulkDataURI = false)
-      dataset should not be (null)
+      dataset should not be null
     }
   }
 
@@ -206,7 +205,7 @@ class TransactionRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       status should be(NotFound)
     }
 
-        db.withSession { implicit session =>
+    db.withSession { implicit session =>
       boxDao.listOutgoingImages.head.sent shouldBe true
     }
 
@@ -214,7 +213,7 @@ class TransactionRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       status shouldBe OK
       responseAs[List[Image]] should have length 1
     }
-    
+
     db.withSession { implicit session =>
       boxDao.listOutgoingImages should have length 1
       boxDao.listOutgoingImages.head.sent shouldBe true
@@ -256,9 +255,26 @@ class TransactionRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     GetAsUser("/api/boxes/outgoing") ~> routes ~> check {
       val outgoingEntries = responseAs[Seq[OutgoingTransaction]]
       outgoingEntries should have length 1
-      outgoingEntries(0).status shouldBe TransactionStatus.FAILED
+      outgoingEntries.head.status shouldBe TransactionStatus.FAILED
     }
 
+  }
+
+  it should "report a transaction as failed it is marked as failed in the database" in {
+    val uniBox = addPollBox("hosp6")
+
+    val transId = 12345
+
+    val transaction =
+      db.withSession { implicit session =>
+        boxDao.insertIncomingTransaction(IncomingTransaction(-1, uniBox.id, uniBox.name, transId, 45, 45, 48, 0, 0, TransactionStatus.FAILED))
+      }
+
+    val reportedStatus =
+      Get(s"/api/transactions/${uniBox.token}/status?transactionid=$transId") ~> routes ~> check {
+        status shouldBe OK
+        responseAs[String] shouldBe "FAILED"
+      }
   }
 
   it should "correctly map dicom attributes according to supplied mapping when sending images" in {
@@ -272,7 +288,7 @@ class TransactionRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
     // create attribute mappings
     val patient = GetAsUser(s"/api/metadata/patients") ~> routes ~> check {
-      responseAs[List[Patient]].apply(0)
+      responseAs[List[Patient]].head
     }
 
     val imageTagValues = ImageTagValues(1, Seq(
