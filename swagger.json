@@ -2361,7 +2361,7 @@
       }
     },
 
-    "/transactions/{token}/image": {
+    "/transactions/{token}/status": {
       "get": {
         "description": "get the status of the remote incoming transaction with the supplied transaction ID",
         "tags": ["Transactions"],
