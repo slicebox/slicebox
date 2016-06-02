@@ -133,13 +133,13 @@ object BoxProtocol {
 
   case object OutgoingTransactionStatusUpdated
 
-  case class SetIncomingTransactionStatus(boxId: Long, transactionImage: OutgoingTransactionImage, status: TransactionStatus) extends BoxRequest
-
   case object IncomingTransactionStatusUpdated
 
   case class UpdateBoxOnlineStatus(boxId: Long, online: Boolean) extends BoxRequest
 
   case class GetIncomingTransactionStatus(box: Box, transactionId: Long) extends BoxRequest
+
+  case class SetIncomingTransactionStatus(boxId: Long, transactionId: Long, status: TransactionStatus) extends BoxRequest
 
   case class RemoveIncomingTransaction(incomingTransactionId: Long) extends BoxRequest
   

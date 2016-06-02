@@ -229,9 +229,10 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
             setOutgoingTransactionStatus(transaction, status)
             sender ! OutgoingTransactionStatusUpdated
 
-          case SetIncomingTransactionStatus(boxId, transactionImage, status) =>
-            setIncomingTransactionStatus(boxId, transactionImage, status)
-            sender ! IncomingTransactionStatusUpdated
+          case SetIncomingTransactionStatus(boxId, transactionId, status) =>
+            sender ! setIncomingTransactionStatus(boxId, transactionId, status).map { _ =>
+              IncomingTransactionStatusUpdated
+            }
 
           case UpdateBoxOnlineStatus(boxId, online) =>
             updateBoxOnlineStatus(boxId, online)
@@ -350,10 +351,11 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
     }
   }
 
-  def setIncomingTransactionStatus(boxId: Long, transactionImage: OutgoingTransactionImage, status: TransactionStatus): Unit =
+  def setIncomingTransactionStatus(boxId: Long, transactionId: Long, status: TransactionStatus): Option[Unit] =
     db.withSession { implicit session =>
-      boxDao.incomingTransactionByOutgoingTransactionId(boxId, transactionImage.transaction.id).foreach(incomingTransaction =>
-        boxDao.setIncomingTransactionStatus(incomingTransaction.id, status))
+      boxDao.incomingTransactionByOutgoingTransactionId(boxId, transactionId).map { incomingTransaction =>
+        boxDao.setIncomingTransactionStatus(incomingTransaction.id, status)
+      }
     }
 
   def addImagesToOutgoing(boxId: Long, boxName: String, imageTagValuesSeq: Seq[ImageTagValues]) =

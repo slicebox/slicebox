@@ -277,6 +277,46 @@ class TransactionRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       }
   }
 
+  it should "return 404 NotFound when asking for transaction status with an invalid transaction ID" in {
+    val uniBox = addPollBox("hosp7")
+
+    val transId = 666
+
+    Get(s"/api/transactions/${uniBox.token}/status?transactionid=$transId") ~> routes ~> check {
+      status shouldBe NotFound
+    }
+  }
+
+  it should "return 204 NoContent and update the status of a transaction" in {
+    val uniBox = addPollBox("hosp8")
+
+    val transId = 12345
+
+    val transaction =
+      db.withSession { implicit session =>
+        boxDao.insertIncomingTransaction(IncomingTransaction(-1, uniBox.id, uniBox.name, transId, 45, 45, 48, 0, 0, TransactionStatus.PROCESSING))
+      }
+
+    Put(s"/api/transactions/${uniBox.token}/status?transactionid=$transId", TransactionStatus.FAILED.toString) ~> routes ~> check {
+      status shouldBe NoContent
+    }
+
+    Get(s"/api/transactions/${uniBox.token}/status?transactionid=$transId") ~> routes ~> check {
+      status shouldBe OK
+      responseAs[String] shouldBe "FAILED"
+    }
+  }
+
+  it should "return 404 NotFound when updating transaction status with an invalid transaction ID" in {
+    val uniBox = addPollBox("hosp7")
+
+    val transId = 666
+
+    Put(s"/api/transactions/${uniBox.token}/status?transactionid=$transId", TransactionStatus.FAILED.toString) ~> routes ~> check {
+      status shouldBe NotFound
+    }
+  }
+
   it should "correctly map dicom attributes according to supplied mapping when sending images" in {
     // add image (image will get id 1)
     val file = TestUtil.testImageFile

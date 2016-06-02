@@ -16,29 +16,26 @@
 
 package se.nimsa.sbx.box
 
-import scala.concurrent.Future
-import scala.concurrent.duration.DurationInt
-import scala.concurrent.duration.FiniteDuration
-import org.dcm4che3.data.Attributes
-import BoxProtocol._
-import akka.actor.Actor
-import akka.actor.Props
-import akka.event.Logging
-import akka.event.LoggingReceive
+import akka.actor.{Actor, Props}
+import akka.event.{Logging, LoggingReceive}
 import akka.pattern.ask
 import akka.util.Timeout
+import org.dcm4che3.data.Attributes
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.Anonymize
 import se.nimsa.sbx.app.GeneralProtocol._
-import se.nimsa.sbx.dicom.DicomUtil.toByteArray
+import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
+import se.nimsa.sbx.dicom.DicomUtil.toByteArray
 import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.metadata.MetaDataProtocol.GetImage
 import se.nimsa.sbx.storage.StorageProtocol.GetDataset
 import se.nimsa.sbx.util.CompressionUtil.compress
-import spray.client.pipelining.{Get, Post}
-import spray.client.pipelining.sendReceive
-import spray.http.{HttpData, HttpResponse}
+import spray.client.pipelining.{Get, Post, Put, sendReceive}
+import spray.http.StatusCodes.NoContent
+import spray.http.{HttpData, HttpEntity, HttpResponse}
 
+import scala.concurrent.Future
+import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.util.{Failure, Success}
 
 class BoxPushActor(box: Box,
@@ -68,8 +65,9 @@ class BoxPushActor(box: Box,
 
   object EmptyTransactionException extends RuntimeException()
   object RemoteBoxUnavailableException extends RuntimeException()
+  object RemoteTransactionFailedException extends RuntimeException()
 
-  def sendFilePipeline = sendReceive
+  def pipeline = sendReceive
 
   def receive = LoggingReceive {
     case PollOutgoing =>
@@ -116,10 +114,12 @@ class BoxPushActor(box: Box,
         handleFileSendFailedForOutgoingTransaction(transactionImage, statusCode, new Exception(s"File send failed with status code $statusCode: $errorMessage"))
       }
     }).recoverWith {
+      case exception: RemoteTransactionFailedException.type =>
+        handleFileSendFailedForOutgoingTransaction(transactionImage, 502, exception)
       case exception: IllegalArgumentException =>
         handleFileSendFailedForOutgoingTransaction(transactionImage, 400, exception)
       case exception: Exception =>
-        handleFileSendFailedForOutgoingTransaction(transactionImage, 500, exception)
+        handleFileSendFailedForOutgoingTransaction(transactionImage, 503, exception)
     }
   }
 
@@ -130,7 +130,7 @@ class BoxPushActor(box: Box,
           case Some(dataset) =>
             anonymizationService.ask(Anonymize(transactionImage.image.imageId, dataset, tagValues.map(_.tagValue))).mapTo[Attributes].flatMap { anonymizedDataset =>
               val compressedBytes = compress(toByteArray(anonymizedDataset))
-              sendFilePipeline(Post(s"${box.baseUrl}/image?transactionid=${transactionImage.transaction.id}&sequencenumber=${transactionImage.image.sequenceNumber}&totalimagecount=${transactionImage.transaction.totalImageCount}", HttpData(compressedBytes)))
+              pipeline(Post(s"${box.baseUrl}/image?transactionid=${transactionImage.transaction.id}&sequencenumber=${transactionImage.image.sequenceNumber}&totalimagecount=${transactionImage.transaction.totalImageCount}", HttpData(compressedBytes)))
             }
           case None =>
             Future.failed(new IllegalArgumentException("No dataset found for image id " + image.id))
@@ -154,36 +154,47 @@ class BoxPushActor(box: Box,
   def handleFileSendFailedForOutgoingTransaction(transactionImage: OutgoingTransactionImage, statusCode: Int, exception: Exception): Future[Unit] = {
     log.debug(s"Failed to send file to box ${box.name}: ${exception.getMessage}")
     statusCode match {
-      case code if code >= 500 =>
-        // server-side error, remote box is most likely down
+      case 503 =>
+        // service unavailable, remote box is most likely down
         boxService.ask(SetOutgoingTransactionStatus(transactionImage.transaction, TransactionStatus.WAITING)).map {
           throw RemoteBoxUnavailableException
         }
-
-      case _ =>
-        boxService.ask(SetOutgoingTransactionStatus(transactionImage.transaction, TransactionStatus.FAILED)).map {
+      case 502 =>
+        // remote box reported transaction failed. Report it here also
+        boxService.ask(SetOutgoingTransactionStatus(transactionImage.transaction, TransactionStatus.FAILED)).map { _ =>
           throw exception
+        }
+      case _ =>
+        // other error in communication. Report the transaction as failed here and on remote
+        boxService.ask(SetOutgoingTransactionStatus(transactionImage.transaction, TransactionStatus.FAILED)).flatMap { _ =>
+          pipeline(Put(s"${box.baseUrl}/status?transactionid=${transactionImage.transaction.id}", HttpData(TransactionStatus.FAILED.toString)))
+            .recover {
+              case e: Exception =>
+                SbxLog.warn("Box", "Unable to set remote transaction status.")
+                HttpResponse(status = NoContent)
+            }
+            .map { response =>
+              throw exception
+            }
         }
     }
   }
 
   def handleTransactionFinished(outgoingTransaction: OutgoingTransaction): Future[Unit] =
     boxService.ask(GetOutgoingImageIdsForTransaction(outgoingTransaction)).mapTo[Seq[Long]].flatMap { imageIds =>
-      sendFilePipeline(Get(s"${box.baseUrl}/status?transactionid=${outgoingTransaction.id}")).flatMap { response =>
+      pipeline(Get(s"${box.baseUrl}/status?transactionid=${outgoingTransaction.id}")).recover {
+        case _ =>
+          SbxLog.warn("Box", "Unable to get remote status of finished transaction, assuming all is well.")
+          HttpResponse(entity = HttpEntity(TransactionStatus.FINISHED.toString))
+      }.map { response =>
         val status = TransactionStatus.withName(response.entity.asString)
         status match {
           case TransactionStatus.FINISHED =>
             SbxLog.info("Box", s"Finished sending ${outgoingTransaction.totalImageCount} images to box ${box.name}")
             context.system.eventStream.publish(ImagesSent(Destination(DestinationType.BOX, box.name, box.id), imageIds))
-            Future.successful({})
           case _ =>
-            boxService.ask(SetOutgoingTransactionStatus(outgoingTransaction, TransactionStatus.FAILED)).map {
-              throw new Exception("Remote box reported transaction failed")
-            }
+            throw RemoteTransactionFailedException
         }
-      }.recover {
-        case _ =>
-          SbxLog.warn("Box", "Unable to get remote status of finished transaction, assuming all is well.")
       }
     }
 

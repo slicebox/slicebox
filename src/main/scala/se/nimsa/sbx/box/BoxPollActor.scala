@@ -184,14 +184,14 @@ class BoxPollActor(box: Box,
     }
 
   def signalFetchFileFailedTemporarily(transactionImage: OutgoingTransactionImage, exception: Exception): Future[Unit] =
-    boxService.ask(SetIncomingTransactionStatus(box.id, transactionImage, TransactionStatus.WAITING)).map { _ =>
+    boxService.ask(SetIncomingTransactionStatus(box.id, transactionImage.transaction.id, TransactionStatus.WAITING)).map { _ =>
       log.info("Box", s"Failed to fetch file from box ${box.name}: " + exception.getMessage + ", trying again later.")
       throw RemoteBoxUnavailableException
     }
 
   def signalFetchFileFailedPermanently(transactionImage: OutgoingTransactionImage, exception: Exception): Future[Unit] =
     sendRemoteOutgoingFileFailed(FailedOutgoingTransactionImage(transactionImage, exception.getMessage)).flatMap { _ =>
-      boxService.ask(SetIncomingTransactionStatus(box.id, transactionImage, TransactionStatus.FAILED)).map { _ =>
+      boxService.ask(SetIncomingTransactionStatus(box.id, transactionImage.transaction.id, TransactionStatus.FAILED)).map { _ =>
         throw exception;
       }
     }

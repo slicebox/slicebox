@@ -16,8 +16,8 @@ import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.metadata.MetaDataDAO
 import se.nimsa.sbx.metadata.MetaDataProtocol.GetImage
 import se.nimsa.sbx.util.TestUtil
-import spray.http.{HttpEntity, HttpMethods, HttpRequest, HttpResponse}
-import spray.http.StatusCodes.InternalServerError
+import spray.http._
+import spray.http.StatusCodes.{NoContent, InternalServerError, ServiceUnavailable}
 
 class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
   with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {
@@ -43,9 +43,12 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
     }
 
   val capturedFileSendRequests = ArrayBuffer.empty[HttpRequest]
+  val capturedStatusUpdateRequests = ArrayBuffer.empty[HttpRequest]
   val failedResponseSendIndices = ArrayBuffer.empty[Int]
+  val noResponseSendIndices = ArrayBuffer.empty[Int]
 
   val okResponse = HttpResponse()
+  val noResponse = HttpResponse(status = ServiceUnavailable)
   val failResponse = HttpResponse(InternalServerError)
 
   val metaDataService = system.actorOf(Props(new Actor() {
@@ -65,7 +68,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
   val boxPushActorRef = system.actorOf(Props(new BoxPushActor(testBox, 1000.hours, 1000.hours, "../BoxService", "../MetaDataService", "../StorageService", "../AnonymizationService") {
 
-    override def sendFilePipeline = {
+    override def pipeline = {
       (req: HttpRequest) =>
         req.method match {
           case HttpMethods.POST =>
@@ -73,6 +76,8 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
             Future {
               if (failedResponseSendIndices.contains(capturedFileSendRequests.size))
                 failResponse
+              else if (noResponseSendIndices.contains(capturedFileSendRequests.size))
+                noResponse
               else
                 okResponse
             }
@@ -82,6 +87,11 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
                 HttpResponse(entity = HttpEntity(TransactionStatus.FAILED.toString))
               else
                 HttpResponse(entity = HttpEntity(TransactionStatus.FINISHED.toString))
+            }
+          case HttpMethods.PUT =>
+            capturedStatusUpdateRequests += req
+            Future {
+              HttpResponse(status = NoContent)
             }
         }
     }
@@ -94,7 +104,9 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
   override def beforeEach() {
     capturedFileSendRequests.clear()
+    capturedStatusUpdateRequests.clear()
     failedResponseSendIndices.clear()
+    noResponseSendIndices.clear()
     reportTransactionAsFailed = false
 
     db.withSession { implicit session =>
@@ -117,7 +129,8 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
       expectNoMsg()
 
-      capturedFileSendRequests.size should be(1)
+      capturedFileSendRequests should have length 1
+      capturedStatusUpdateRequests shouldBe empty
       capturedFileSendRequests(0).uri.toString() should be(s"${testBox.baseUrl}/image?transactionid=${transaction.id}&sequencenumber=${image.sequenceNumber}&totalimagecount=${transaction.totalImageCount}")
     }
 
@@ -133,6 +146,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
         expectNoMsg()
 
         capturedFileSendRequests.size should be(2)
+        capturedStatusUpdateRequests shouldBe empty
         capturedFileSendRequests(0).uri.toString() should be(s"${testBox.baseUrl}/image?transactionid=${transaction.id}&sequencenumber=${image2.sequenceNumber}&totalimagecount=${transaction.totalImageCount}")
         capturedFileSendRequests(1).uri.toString() should be(s"${testBox.baseUrl}/image?transactionid=${transaction.id}&sequencenumber=${image1.sequenceNumber}&totalimagecount=${transaction.totalImageCount}")
       }
@@ -161,7 +175,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
         val invalidImageId = 666
 
         val transaction = boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, testBox.id, testBox.name, 0, 1, 1000, 1000, TransactionStatus.WAITING))
-        val image = boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, invalidImageId, 1, sent = false))
+        boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, invalidImageId, 1, sent = false))
 
         boxPushActorRef ! PollOutgoing
 
@@ -170,6 +184,8 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
         val outgoingTransactions = boxDao.listOutgoingTransactions(0, 10)
         outgoingTransactions.size should be(1)
         outgoingTransactions.foreach(_.status shouldBe TransactionStatus.FAILED)
+
+        capturedStatusUpdateRequests should have length 1
       }
     }
 
@@ -193,6 +209,8 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
           else
             transaction.status shouldBe TransactionStatus.WAITING
         }
+
+        capturedStatusUpdateRequests should have length 1
       }
     }
 
@@ -214,6 +232,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
         expectNoMsg()
 
         capturedFileSendRequests.size should be(1)
+        capturedStatusUpdateRequests should have length 1
 
         val outgoingTransactions = boxDao.listOutgoingTransactions(0, 10)
         outgoingTransactions.size should be(2)
@@ -234,7 +253,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
         boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage2.id, 2, sent = false))
         boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage3.id, 3, sent = false))
 
-        failedResponseSendIndices ++= Seq(2, 3)
+        noResponseSendIndices ++= Seq(2, 3)
 
         boxPushActorRef ! PollOutgoing
         expectNoMsg()
@@ -242,12 +261,14 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
         boxDao.listOutgoingImagesForOutgoingTransactionId(transaction.id).count(_.sent == false) should be(2)
 
         // server back up
-        failedResponseSendIndices.clear()
+        noResponseSendIndices.clear()
 
         boxPushActorRef ! PollOutgoing
         expectNoMsg()
 
         boxDao.listOutgoingImagesForOutgoingTransactionId(transaction.id).count(_.sent == false) should be(0)
+
+        capturedStatusUpdateRequests shouldBe empty
       }
     }
 
@@ -266,6 +287,8 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
         expectNoMsg() // both images will be sent
 
         boxDao.listOutgoingTransactions(0, 1).head.status shouldBe TransactionStatus.FAILED
+
+        capturedStatusUpdateRequests shouldBe empty
       }
     }
   }
