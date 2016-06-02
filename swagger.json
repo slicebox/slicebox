@@ -2361,6 +2361,41 @@
       }
     },
 
+    "/transactions/{token}/image": {
+      "get": {
+        "description": "get the status of the remote incoming transaction with the supplied transaction ID",
+        "tags": ["Transactions"],
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "description": "authentication token identifying the current box-to-box connection",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "transactionid",
+            "in": "query",
+            "description": "the ID of the client's outgoing transaction",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "string representation of the transaction status (FINISHED, FAILED, WAITING or PROCESSING)",
+          },
+          "401": {
+            "description": "unauthorized, invalid token"
+          },
+          "404": {
+            "description": "no transaction found for the supplied transaction ID"
+          }
+        }                
+      }
+    },
+
     "/transactions/{token}/outgoing/poll": {
       "get": {
         "description": "get next outgoing transaction and image (information on the next image that the connected box wishes to send to you), if any. This method is used when sending images using the poll method from a public slicebox.",
