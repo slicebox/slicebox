@@ -2384,7 +2384,7 @@
         ],
         "responses": {
           "200": {
-            "description": "string representation of the transaction status (FINISHED, FAILED, WAITING or PROCESSING)"
+            "description": "string representation of the transaction status (FINISHED, FAILED, WAITING or PROCESSING)",
             "type": "string"
           },
           "401": {
