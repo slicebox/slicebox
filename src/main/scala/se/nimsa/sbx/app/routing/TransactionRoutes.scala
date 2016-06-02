@@ -38,7 +38,9 @@ import se.nimsa.sbx.util.CompressionUtil._
 trait TransactionRoutes {
   this: SliceboxService =>
 
-  def entityAsString = extract { _.request.entity.asString }
+  def entityAsString = extract {
+    _.request.entity.asString
+  }
 
   def transactionRoutes: Route =
     pathPrefix("transactions" / Segment) { token =>
@@ -63,7 +65,11 @@ trait TransactionRoutes {
                           onSuccess(storageService.ask(AddDataset(reversedDataset, source, metaData.image))) {
                             case DatasetAdded(image, overwrite) =>
                               onSuccess(boxService.ask(UpdateIncoming(box, outgoingTransactionId, sequenceNumber, totalImageCount, image.id, overwrite))) {
-                                case IncomingUpdated(_) => complete(NoContent)
+                                case IncomingUpdated(transaction) =>
+                                  transaction.status match {
+                                    case TransactionStatus.FAILED => complete(InternalServerError)
+                                    case _ => complete(NoContent)
+                                  }
                               }
                           }
                         }
@@ -84,7 +90,7 @@ trait TransactionRoutes {
                   val status = TransactionStatus.withName(statusString)
                   status match {
                     case TransactionStatus.UNKNOWN => complete((BadRequest, s"Invalid status format: $statusString"))
-                    case _ =>
+                    case s =>
                       onSuccess(boxService.ask(SetIncomingTransactionStatus(box.id, outgoingTransactionId, status)).mapTo[Option[Unit]]) {
                         case Some(_) => complete(NoContent)
                         case None => complete(NotFound)

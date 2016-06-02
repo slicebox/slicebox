@@ -74,9 +74,6 @@ class BoxPollActor(box: Box,
   override def postStop() =
     poller.cancel()
 
-  object EmptyTransactionException extends RuntimeException()
-  object RemoteBoxUnavailableException extends RuntimeException()
-
   def receive = LoggingReceive {
     case PollIncoming =>
       context.become(inTransferState)
@@ -127,8 +124,15 @@ class BoxPollActor(box: Box,
     pollRemoteBoxOutgoingPipeline(Get(s"${box.baseUrl}/outgoing/poll"))
   }
 
-  def fetchFileForRemoteOutgoingTransaction(transactionImage: OutgoingTransactionImage): Future[Unit] =
-    getRemoteOutgoingFile(transactionImage).flatMap { response =>
+  def fetchFileForRemoteOutgoingTransaction(transactionImage: OutgoingTransactionImage): Future[Unit] = {
+    val futureResponse = getRemoteOutgoingFile(transactionImage).recoverWith {
+      case e: Exception =>
+        signalFetchFileFailedTemporarily(transactionImage, e).map { _ =>
+          HttpResponse() // just to get type right, future is failed at this point
+        }
+    }
+
+    futureResponse.flatMap { response =>
       val statusCode = response.status.intValue
       if (statusCode >= 200 && statusCode < 300) {
         val bytes = decompress(response.entity.data.toByteArray)
@@ -143,9 +147,14 @@ class BoxPollActor(box: Box,
             storageService.ask(CheckDataset(dataset, restrictSopClass = false)).mapTo[Boolean].flatMap { status =>
               metaDataService.ask(AddMetaData(dataset, source)).mapTo[MetaDataAdded].flatMap { metaData =>
                 storageService.ask(AddDataset(reversedDataset, source, metaData.image)).mapTo[DatasetAdded].flatMap { datasetAdded =>
-                  boxService.ask(UpdateIncoming(box, transactionImage.transaction.id, transactionImage.image.sequenceNumber, transactionImage.transaction.totalImageCount, datasetAdded.image.id, datasetAdded.overwrite)).flatMap { _ =>
-                    sendRemoteOutgoingFileCompleted(transactionImage).map { response =>
-                    }
+                  boxService.ask(UpdateIncoming(box, transactionImage.transaction.id, transactionImage.image.sequenceNumber, transactionImage.transaction.totalImageCount, datasetAdded.image.id, datasetAdded.overwrite)).flatMap {
+                    case IncomingUpdated(transaction) =>
+                      transaction.status match {
+                        case TransactionStatus.FAILED =>
+                          throw new RuntimeException("Invalid transaction")
+                        case _ =>
+                          sendRemoteOutgoingFileCompleted(transactionImage).map(_ => {})
+                      }
                   }
                 }
               }
@@ -156,16 +165,9 @@ class BoxPollActor(box: Box,
           }
 
       } else
-        statusCode match {
-          case s if s < 500 =>
-            signalFetchFileFailedPermanently(transactionImage, new RuntimeException(s"Server responded with status code $statusCode and message ${response.message.entity.asString}"))
-          case _ =>
-            signalFetchFileFailedTemporarily(transactionImage, new RuntimeException(s"Server responded with status code $statusCode and message ${response.message.entity.asString}"))
-        }
-    }.recoverWith {
-      case e: Exception =>
-        signalFetchFileFailedTemporarily(transactionImage, e)
+        signalFetchFileFailedPermanently(transactionImage, new RuntimeException(s"Server responded with status code $statusCode and message ${response.message.entity.asString}"))
     }
+  }
 
   def getRemoteOutgoingFile(transactionImage: OutgoingTransactionImage): Future[HttpResponse] = {
     log.debug(s"Fetching remote outgoing image $transactionImage")

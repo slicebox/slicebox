@@ -68,6 +68,10 @@ object BoxProtocol {
     }
   }
 
+  object EmptyTransactionException extends RuntimeException()
+  object RemoteBoxUnavailableException extends RuntimeException()
+  class RemoteTransactionFailedException() extends RuntimeException("Remote transaction reported failure")
+
   case class RemoteBox(name: String, baseUrl: String)
 
   case class RemoteBoxConnectionData(name: String)

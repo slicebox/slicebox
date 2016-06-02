@@ -63,10 +63,6 @@ class BoxPushActor(box: Box,
   override def postStop() =
     poller.cancel()
 
-  object EmptyTransactionException extends RuntimeException()
-  object RemoteBoxUnavailableException extends RuntimeException()
-  object RemoteTransactionFailedException extends RuntimeException()
-
   def pipeline = sendReceive
 
   def receive = LoggingReceive {
@@ -114,7 +110,7 @@ class BoxPushActor(box: Box,
         handleFileSendFailedForOutgoingTransaction(transactionImage, statusCode, new Exception(s"File send failed with status code $statusCode: $errorMessage"))
       }
     }).recoverWith {
-      case exception: RemoteTransactionFailedException.type =>
+      case exception: RemoteTransactionFailedException =>
         handleFileSendFailedForOutgoingTransaction(transactionImage, 502, exception)
       case exception: IllegalArgumentException =>
         handleFileSendFailedForOutgoingTransaction(transactionImage, 400, exception)
@@ -193,7 +189,7 @@ class BoxPushActor(box: Box,
             SbxLog.info("Box", s"Finished sending ${outgoingTransaction.totalImageCount} images to box ${box.name}")
             context.system.eventStream.publish(ImagesSent(Destination(DestinationType.BOX, box.name, box.id), imageIds))
           case _ =>
-            throw RemoteTransactionFailedException
+            throw new RemoteTransactionFailedException()
         }
       }
     }
