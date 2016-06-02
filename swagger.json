@@ -2391,10 +2391,46 @@
             "description": "unauthorized, invalid token"
           },
           "404": {
-            "description": "no transaction found for the supplied transaction ID"
+            "description": "no transaction found for the supplied transaction ID and box token"
           }
         }                
-      }
+      },
+      "put": {
+        "description": "update the status of the transaction with the supplied ID",
+        "tags": ["Transactions"],
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "description": "authentication token identifying the current box-to-box connection",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "transactionid",
+            "in": "query",
+            "description": "the ID of the client's outgoing transaction",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "status",
+            "in": "body",
+            "description": "the updated status of the transaction",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "status update successfully applied to transaction"
+          },
+          "404": {
+            "description": "no transaction found for the supplied transaction ID and box token"
+          }
+        }
+      },
     },
 
     "/transactions/{token}/outgoing/poll": {
