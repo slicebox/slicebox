@@ -96,7 +96,14 @@ class BoxPollActor(box: Box,
   }
 
   def processNextIncomingTransaction(): Future[Unit] = {
-    sendPollRequestToRemoteBox.flatMap { transactionImageMaybe =>
+    val futurePoll = sendPollRequestToRemoteBox.recover {
+      case exception: Exception =>
+        boxService ! UpdateBoxOnlineStatus(box.id, online = false)
+        log.debug("Failed to poll remote box: " + exception.getMessage)
+        throw RemoteBoxUnavailableException
+    }
+
+    futurePoll.flatMap { transactionImageMaybe =>
       log.debug(s"Remote box answered poll request with outgoing transaction $transactionImageMaybe")
 
       boxService ! UpdateBoxOnlineStatus(box.id, online = true)
@@ -109,11 +116,6 @@ class BoxPollActor(box: Box,
           log.debug("Remote outgoing is empty")
           Future.failed(EmptyTransactionException)
       }
-    }.recover {
-      case exception: Exception =>
-        boxService ! UpdateBoxOnlineStatus(box.id, online = false)
-        log.debug("Failed to poll remote box: " + exception.getMessage)
-        throw RemoteBoxUnavailableException
     }
   }
 
