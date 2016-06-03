@@ -2414,7 +2414,7 @@
             "format": "int64"
           },
           {
-            "name": "status",
+            "name": "transaction status",
             "in": "body",
             "description": "the updated status of the transaction",
             "required": true,
