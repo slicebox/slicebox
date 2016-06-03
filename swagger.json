@@ -2384,8 +2384,7 @@
         ],
         "responses": {
           "200": {
-            "description": "string representation of the transaction status (FINISHED, FAILED, WAITING or PROCESSING)",
-            "type": "string"
+            "description": "string representation of the transaction status (FINISHED, FAILED, WAITING or PROCESSING)"
           },
           "401": {
             "description": "unauthorized, invalid token"
