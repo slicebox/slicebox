@@ -2430,7 +2430,7 @@
             "description": "no transaction found for the supplied transaction ID and box token"
           }
         }
-      },
+      }
     },
 
     "/transactions/{token}/outgoing/poll": {
