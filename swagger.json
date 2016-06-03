@@ -3355,7 +3355,7 @@
     "exportSetId": {
       "properties": {
         "value": {
-          "id": "integer",
+          "type": "integer",
           "format": "int64"          
         }
       }
