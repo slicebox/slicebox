@@ -54,7 +54,7 @@ object Jpeg2Dcm {
     try {
 
       val attrs = new Attributes()
-      attrs.setString(Tag.SOPClassUID, VR.UI, "1.2.840.10008.5.1.4.1.1.7")
+      attrs.setString(Tag.SOPClassUID, VR.UI, UID.SecondaryCaptureImageStorage)
       attrs.setString(Tag.PatientName, VR.PN, patient.patientName.value)
       attrs.setString(Tag.PatientID, VR.LO, patient.patientID.value)
       attrs.setString(Tag.PatientSex, VR.CS, patient.patientSex.value)

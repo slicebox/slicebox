@@ -20,7 +20,8 @@ import java.nio.file.NoSuchFileException
 
 import akka.actor.{Actor, Props}
 import akka.event.{Logging, LoggingReceive}
-import org.dcm4che3.data.{Attributes, Tag}
+import org.dcm4che3.data.{Attributes, Tag, UID}
+import org.dcm4che3.imageio.codec.Decompressor
 import se.nimsa.sbx.app.GeneralProtocol.ImageAdded
 import se.nimsa.sbx.dicom.DicomUtil
 import se.nimsa.sbx.storage.StorageProtocol._

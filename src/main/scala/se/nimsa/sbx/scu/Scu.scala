@@ -16,44 +16,22 @@
 
 package se.nimsa.sbx.scu
 
-import java.util.Properties
 import java.util.concurrent.Executors
 
 import com.typesafe.scalalogging.LazyLogging
 import org.dcm4che3.data.{Attributes, Tag, UID}
-import org.dcm4che3.imageio.codec.Decompressor
 import org.dcm4che3.net._
-import org.dcm4che3.net.pdu.{AAssociateRQ, CommonExtendedNegotiation, PresentationContext}
-import org.dcm4che3.util.{StringUtils, TagUtils}
+import org.dcm4che3.net.pdu.{AAssociateRQ, PresentationContext}
+import org.dcm4che3.util.TagUtils
 import se.nimsa.sbx.dicom.DicomUtil
 import se.nimsa.sbx.scu.ScuProtocol.ScuData
 import se.nimsa.sbx.util.FutureUtil.traverseSequentially
 import se.nimsa.sbx.util.SbxExtensions._
 
-import scala.collection.JavaConversions._
 import scala.concurrent.{ExecutionContext, Future, Promise}
 
 trait DatasetProvider {
   def getDataset(imageId: Long, withPixelData: Boolean): Future[Option[Attributes]]
-}
-
-class RelatedGeneralSOPClasses {
-
-  import scala.collection.mutable
-
-  val commonExtNegs = mutable.Map.empty[String, CommonExtendedNegotiation]
-
-  def init(props: Properties): Unit =
-    for (cuid <- props.stringPropertyNames())
-      commonExtNegs.put(cuid, new CommonExtendedNegotiation(cuid, UID.StorageServiceClass, StringUtils.split(props.getProperty(cuid), ','): _*))
-
-  def getCommonExtendedNegotiation(cuid: String): CommonExtendedNegotiation = {
-    val commonExtNeg = commonExtNegs(cuid)
-    if (commonExtNeg != null)
-      commonExtNeg
-    else
-      new CommonExtendedNegotiation(cuid, UID.StorageServiceClass)
-  }
 }
 
 case class DatasetInfo(iuid: String, cuid: String, ts: String, imageId: Long)
@@ -61,8 +39,6 @@ case class DatasetInfo(iuid: String, cuid: String, ts: String, imageId: Long)
 class Scu(ae: ApplicationEntity, scuData: ScuData)(implicit ec: ExecutionContext) extends LazyLogging {
   val remote = new Connection()
   val rq = new AAssociateRQ()
-
-  val relSOPClasses = new RelatedGeneralSOPClasses()
 
   val priority: Int = 0
   var as: Association = null
@@ -89,11 +65,14 @@ class Scu(ae: ApplicationEntity, scuData: ScuData)(implicit ec: ExecutionContext
   }
 
   def addDataset(imageId: Long, dataset: Attributes): Option[DatasetInfo] = {
-    val fmi = dataset.createFileMetaInformation(DicomUtil.defaultTransferSyntax)
+    val ts = if (dataset.getString(Tag.SOPClassUID) == UID.SecondaryCaptureImageStorage)
+      UID.JPEGBaseline1
+    else
+      DicomUtil.defaultTransferSyntax
+    val fmi = dataset.createFileMetaInformation(ts)
 
     val cuid = fmi.getString(Tag.MediaStorageSOPClassUID)
     val iuid = fmi.getString(Tag.MediaStorageSOPInstanceUID)
-    val ts = fmi.getString(Tag.TransferSyntaxUID)
     if (cuid == null || iuid == null)
       return None
 
@@ -129,7 +108,6 @@ class Scu(ae: ApplicationEntity, scuData: ScuData)(implicit ec: ExecutionContext
 
   def send(dataset: Attributes, cuid: String, iuid: String, filets: String, imageId: Long): Future[Long] = {
     val ts = selectTransferSyntax(cuid, filets)
-    Decompressor.decompress(dataset, filets)
     val promise = Promise[Long]()
     as.cstore(cuid, iuid, priority, new DataWriterAdapter(dataset), ts, rspHandlerFactory.createDimseRSPHandler(imageId, promise))
     promise.future

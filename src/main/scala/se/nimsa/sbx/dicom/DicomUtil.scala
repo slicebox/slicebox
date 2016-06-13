@@ -57,7 +57,11 @@ object DicomUtil {
     var dos: DicomOutputStream = null
     try {
       dos = new DicomOutputStream(outputStream, defaultTransferSyntax)
-      val metaInformation = dataset.createFileMetaInformation(defaultTransferSyntax)
+      val ts = if (dataset.getString(Tag.SOPClassUID) == UID.SecondaryCaptureImageStorage)
+        UID.JPEGBaseline1
+      else
+        defaultTransferSyntax
+      val metaInformation = dataset.createFileMetaInformation(ts)
       dos.writeDataset(metaInformation, dataset)
     } finally {
       SafeClose.close(dos)
@@ -77,10 +81,10 @@ object DicomUtil {
 
       val dataset =
         if (withPixelData) {
-          if (useBulkDataURI)
+          //if (useBulkDataURI)
             dis.setIncludeBulkData(IncludeBulkData.URI)
-          else
-            dis.setIncludeBulkData(IncludeBulkData.YES)
+          //else
+          //  dis.setIncludeBulkData(IncludeBulkData.YES)
           dis.readDataset(-1, -1)
         } else {
           dis.setIncludeBulkData(IncludeBulkData.NO)
