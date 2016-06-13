@@ -138,17 +138,17 @@ class BoxPollActor(box: Box,
       val statusCode = response.status.intValue
       if (statusCode >= 200 && statusCode < 300) {
         val bytes = decompress(response.entity.data.toByteArray)
-        val dataset = loadDataset(bytes, withPixelData = true, useBulkDataURI = false)
+        val dicomData = loadDataset(bytes, withPixelData = true, useBulkDataURI = false)
 
-        if (dataset == null)
+        if (dicomData == null)
           signalFetchFileFailedPermanently(transactionImage, new IllegalArgumentException("Dataset could not be read"))
 
         else
-          anonymizationService.ask(ReverseAnonymization(dataset)).mapTo[Attributes].flatMap { reversedDataset =>
+          anonymizationService.ask(ReverseAnonymization(dicomData.attributes)).mapTo[Attributes].flatMap { reversedAttributes =>
             val source = Source(SourceType.BOX, box.name, box.id)
-            storageService.ask(CheckDataset(dataset, restrictSopClass = false)).mapTo[Boolean].flatMap { status =>
-              metaDataService.ask(AddMetaData(dataset, source)).mapTo[MetaDataAdded].flatMap { metaData =>
-                storageService.ask(AddDataset(reversedDataset, source, metaData.image)).mapTo[DatasetAdded].flatMap { datasetAdded =>
+            storageService.ask(CheckDataset(dicomData, useExtendedContexts = true)).mapTo[Boolean].flatMap { status =>
+              metaDataService.ask(AddMetaData(dicomData.attributes, source)).mapTo[MetaDataAdded].flatMap { metaData =>
+                storageService.ask(AddDataset(dicomData.copy(attributes = reversedAttributes), source, metaData.image)).mapTo[DatasetAdded].flatMap { datasetAdded =>
                   boxService.ask(UpdateIncoming(box, transactionImage.transaction.id, transactionImage.image.sequenceNumber, transactionImage.transaction.totalImageCount, datasetAdded.image.id, datasetAdded.overwrite)).flatMap {
                     case IncomingUpdated(transaction) =>
                       transaction.status match {

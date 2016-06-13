@@ -21,6 +21,7 @@ import java.nio.file.Path
 import org.dcm4che3.data.Attributes
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.app.GeneralProtocol._
+import se.nimsa.sbx.dicom.DicomData
 
 object StorageProtocol {
 
@@ -45,12 +46,10 @@ object StorageProtocol {
 
   case class GetPngImageData(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int) extends ImageRequest
 
-  case class CheckDataset(dataset: Attributes, restrictSopClass: Boolean) extends ImageRequest
+  case class CheckDataset(dicomData: DicomData, useExtendedContexts: Boolean) extends ImageRequest
 
-  case class AddDataset(dataset: Attributes, source: Source, image: Image) extends ImageRequest
+  case class AddDataset(dicomData: DicomData, source: Source, image: Image) extends ImageRequest
   
-  case class AddJpeg(dataset: Attributes, source: Source, image: Image) extends ImageRequest
-
   case class DeleteDataset(image: Image) extends ImageRequest
 
   case class CreateExportSet(imageIds: Seq[Long]) extends ImageRequest
@@ -65,8 +64,6 @@ object StorageProtocol {
   case object PngImageDataNotAvailable
 
   case class DatasetAdded(image: Image, overwrite: Boolean)
-
-  case class JpegAdded(image: Image)
 
   case class DatasetDeleted(image: Image)
 

@@ -32,6 +32,7 @@ import org.dcm4che3.data.Attributes
 import spray.httpx.SprayJsonSupport._
 import spray.httpx.unmarshalling.BasicUnmarshallers.ByteArrayUnmarshaller
 import se.nimsa.sbx.app.GeneralProtocol._
+import se.nimsa.sbx.dicom.DicomData
 import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, GetImage, MetaDataAdded}
 import se.nimsa.sbx.util.CompressionUtil._
 
@@ -54,15 +55,15 @@ trait TransactionRoutes {
               post {
                 entity(as[Array[Byte]]) { compressedBytes =>
                   val bytes = decompress(compressedBytes)
-                  val dataset = loadDataset(bytes, withPixelData = true, useBulkDataURI = false)
-                  if (dataset == null)
+                  val dicomData = loadDataset(bytes, withPixelData = true, useBulkDataURI = false)
+                  if (dicomData == null)
                     complete((BadRequest, "Dataset could not be read"))
                   else
-                    onSuccess(storageService.ask(CheckDataset(dataset, restrictSopClass = false)).mapTo[Boolean]) { status =>
-                      onSuccess(anonymizationService.ask(ReverseAnonymization(dataset)).mapTo[Attributes]) { reversedDataset =>
+                    onSuccess(storageService.ask(CheckDataset(dicomData, useExtendedContexts = true)).mapTo[Boolean]) { status =>
+                      onSuccess(anonymizationService.ask(ReverseAnonymization(dicomData.attributes)).mapTo[Attributes]) { reversedAttributes =>
                         val source = Source(SourceType.BOX, box.name, box.id)
-                        onSuccess(metaDataService.ask(AddMetaData(reversedDataset, source)).mapTo[MetaDataAdded]) { metaData =>
-                          onSuccess(storageService.ask(AddDataset(reversedDataset, source, metaData.image))) {
+                        onSuccess(metaDataService.ask(AddMetaData(reversedAttributes, source)).mapTo[MetaDataAdded]) { metaData =>
+                          onSuccess(storageService.ask(AddDataset(dicomData.copy(attributes = reversedAttributes), source, metaData.image))) {
                             case DatasetAdded(image, overwrite) =>
                               onSuccess(boxService.ask(UpdateIncoming(box, outgoingTransactionId, sequenceNumber, totalImageCount, image.id, overwrite))) {
                                 case IncomingUpdated(transaction) =>
@@ -130,12 +131,12 @@ trait TransactionRoutes {
                         case transactionTagValues =>
                           onSuccess(metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]]) {
                             case Some(image) =>
-                              onSuccess(storageService.ask(GetDataset(image, withPixelData = true)).mapTo[Option[Attributes]]) {
-                                case Some(dataset) =>
+                              onSuccess(storageService.ask(GetDataset(image, withPixelData = true)).mapTo[Option[DicomData]]) {
+                                case Some(dicomData) =>
 
-                                  onSuccess(anonymizationService.ask(Anonymize(imageId, dataset, transactionTagValues.map(_.tagValue)))) {
-                                    case anonymizedDataset: Attributes =>
-                                      val compressedBytes = compress(toByteArray(anonymizedDataset))
+                                  onSuccess(anonymizationService.ask(Anonymize(imageId, dicomData.attributes, transactionTagValues.map(_.tagValue)))) {
+                                    case anonymizedAttributes: Attributes =>
+                                      val compressedBytes = compress(toByteArray(dicomData.copy(attributes = anonymizedAttributes)))
                                       complete(HttpEntity(ContentTypes.`application/octet-stream`, HttpData(compressedBytes)))
                                   }
                                 case None =>

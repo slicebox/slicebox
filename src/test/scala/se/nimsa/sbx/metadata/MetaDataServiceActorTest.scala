@@ -33,7 +33,7 @@ class MetaDataServiceActorTest(_system: ActorSystem) extends TestKit(_system) wi
     propertiesDao.create
   }
 
-  val dataset = TestUtil.testImageDataset()
+  val dicomData = TestUtil.testImageDicomData()
 
   val metaDataActorRef = TestActorRef(new MetaDataServiceActor(dbProps))
   val metaDataActor = metaDataActorRef.underlyingActor
@@ -86,7 +86,7 @@ class MetaDataServiceActorTest(_system: ActorSystem) extends TestKit(_system) wi
 
     "return a list of one object when asking for all patients" in {
       val source = Source(SourceType.UNKNOWN, "unknown", -1)
-      metaDataActorRef ! AddMetaData(dataset, source)
+      metaDataActorRef ! AddMetaData(dicomData.attributes, source)
       expectMsgType[MetaDataAdded]
 
       metaDataActorRef ! GetPatients(0, 10000, None, orderAscending = true, None, Array.empty, Array.empty, Array.empty)
@@ -103,12 +103,8 @@ class MetaDataServiceActorTest(_system: ActorSystem) extends TestKit(_system) wi
       seriesEvents shouldBe empty
       imageEvents shouldBe empty
 
-      metaDataActorRef ! AddMetaData(dataset, source)
+      metaDataActorRef ! AddMetaData(dicomData.attributes, source)
       expectMsgType[MetaDataAdded]
-      //      val (patient, study, series, image) =
-      //      expectMsgPF() {
-      //        case MetaDataAdded(patient, study, series, image, seriesSource) => (patient, study, series, image)
-      //      }
 
       Thread.sleep(500)
 
@@ -119,9 +115,9 @@ class MetaDataServiceActorTest(_system: ActorSystem) extends TestKit(_system) wi
 
       // changing series level
 
-      val dataset2 = new Attributes(dataset)
-      dataset2.setString(Tag.SeriesInstanceUID, VR.UI, "seuid2")
-      metaDataActorRef ! AddMetaData(dataset2, source)
+      val attributes2 = new Attributes(dicomData.attributes)
+      attributes2.setString(Tag.SeriesInstanceUID, VR.UI, "seuid2")
+      metaDataActorRef ! AddMetaData(attributes2, source)
       expectMsgType[MetaDataAdded]
 
       Thread.sleep(500)
@@ -133,9 +129,9 @@ class MetaDataServiceActorTest(_system: ActorSystem) extends TestKit(_system) wi
 
       // changing patient level
 
-      val dataset3 = new Attributes(dataset)
-      dataset3.setString(Tag.PatientName, VR.PN, "pat2")
-      metaDataActorRef ! AddMetaData(dataset3, source)
+      val attributes3 = new Attributes(dicomData.attributes)
+      attributes3.setString(Tag.PatientName, VR.PN, "pat2")
+      metaDataActorRef ! AddMetaData(attributes3, source)
       expectMsgType[MetaDataAdded]
 
       Thread.sleep(500)
@@ -147,7 +143,7 @@ class MetaDataServiceActorTest(_system: ActorSystem) extends TestKit(_system) wi
 
       // duplicate, changing nothing
 
-      metaDataActorRef ! AddMetaData(dataset3, source)
+      metaDataActorRef ! AddMetaData(attributes3, source)
       expectMsgType[MetaDataAdded]
 
       Thread.sleep(500)
@@ -161,25 +157,25 @@ class MetaDataServiceActorTest(_system: ActorSystem) extends TestKit(_system) wi
     "emit the approprite xxxDeleted events when deleting meta data" in {
       val source = Source(SourceType.UNKNOWN, "unknown", -1)
 
-      metaDataActorRef ! AddMetaData(dataset, source)
+      metaDataActorRef ! AddMetaData(dicomData.attributes, source)
       val image1 = expectMsgPF() { case MetaDataAdded(_, _, _, im, _, _, _, _, _) => im }
 
-      val dataset2 = new Attributes(dataset)
+      val dataset2 = new Attributes(dicomData.attributes)
       dataset2.setString(Tag.PatientName, VR.PN, "pat2")
       metaDataActorRef ! AddMetaData(dataset2, source)
       val image2 = expectMsgPF() { case MetaDataAdded(_, _, _, im, _, _, _, _, _) => im }
 
-      val dataset3 = new Attributes(dataset)
+      val dataset3 = new Attributes(dicomData.attributes)
       dataset3.setString(Tag.StudyInstanceUID, VR.UI, "stuid2")
       metaDataActorRef ! AddMetaData(dataset3, source)
       val image3 = expectMsgPF() { case MetaDataAdded(_, _, _, im, _, _, _, _, _) => im }
 
-      val dataset4 = new Attributes(dataset)
+      val dataset4 = new Attributes(dicomData.attributes)
       dataset4.setString(Tag.SeriesInstanceUID, VR.UI, "seuid2")
       metaDataActorRef ! AddMetaData(dataset4, source)
       val image4 = expectMsgPF() { case MetaDataAdded(_, _, _, im, _, _, _, _, _) => im }
 
-      val dataset5 = new Attributes(dataset)
+      val dataset5 = new Attributes(dicomData.attributes)
       dataset5.setString(Tag.SOPInstanceUID, VR.UI, "sopuid2")
       metaDataActorRef ! AddMetaData(dataset5, source)
       val image5 = expectMsgPF() { case MetaDataAdded(_, _, _, im, _, _, _, _, _) => im }

@@ -355,11 +355,11 @@ class TransactionRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       status should be(OK)
       responseAs[Array[Byte]]
     }
-    val dataset = DicomUtil.loadDataset(decompress(compressedArray), withPixelData = false, useBulkDataURI = false)
-    dataset.getString(PatientName.dicomTag) should be("TEST NAME") // mapped
-    dataset.getString(PatientID.dicomTag) should be("TEST ID") // mapped
-    dataset.getString(PatientBirthDate.dicomTag) should be("19601010") // mapped
-    dataset.getString(PatientSex.dicomTag) should be(patient.patientSex.value) // not mapped
+    val dicomData = DicomUtil.loadDataset(decompress(compressedArray), withPixelData = false, useBulkDataURI = false)
+    dicomData.attributes.getString(PatientName.dicomTag) should be("TEST NAME") // mapped
+    dicomData.attributes.getString(PatientID.dicomTag) should be("TEST ID") // mapped
+    dicomData.attributes.getString(PatientBirthDate.dicomTag) should be("19601010") // mapped
+    dicomData.attributes.getString(PatientSex.dicomTag) should be(patient.patientSex.value) // not mapped
 
     // send done
     Post(s"/api/transactions/${uniBox.token}/outgoing/done", transactionImage) ~> routes ~> check {

@@ -47,7 +47,7 @@ object Jpeg2Dcm {
 
   private val transferSyntax = UID.JPEGBaseline1
 
-  def apply(bytes: Array[Byte], patient: Patient, study: Study): Attributes = {
+  def apply(bytes: Array[Byte], patient: Patient, study: Study): DicomData = {
 
     val jpgInput = new DataInputStream(new ByteArrayInputStream(bytes))
 

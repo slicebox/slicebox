@@ -99,18 +99,18 @@ trait ImportRoutes {
   def addImageToImportSessionRoute(bytes: Array[Byte], importSessionId: Long): Route = {
     import spray.httpx.SprayJsonSupport._
 
-    val dataset = DicomUtil.loadDataset(bytes, withPixelData = true, useBulkDataURI = false)
+    val dicomData = DicomUtil.loadDataset(bytes, withPixelData = true, useBulkDataURI = false)
     onSuccess(importService.ask(GetImportSession(importSessionId)).mapTo[Option[ImportSession]]) {
       case Some(importSession) =>
 
         val source = Source(SourceType.IMPORT, importSession.name, importSessionId)
 
-        onComplete(storageService.ask(CheckDataset(dataset, restrictSopClass = true)).mapTo[Boolean]) {
+        onComplete(storageService.ask(CheckDataset(dicomData, useExtendedContexts = false)).mapTo[Boolean]) {
 
           case Success(status) =>
-            onSuccess(anonymizationService.ask(ReverseAnonymization(dataset)).mapTo[Attributes]) { reversedDataset =>
-              onSuccess(metaDataService.ask(AddMetaData(reversedDataset, source)).mapTo[MetaDataAdded]) { metaData =>
-                onSuccess(storageService.ask(AddDataset(reversedDataset, source, metaData.image)).mapTo[DatasetAdded]) { datasetAdded =>
+            onSuccess(anonymizationService.ask(ReverseAnonymization(dicomData.attributes)).mapTo[Attributes]) { reversedAttributes =>
+              onSuccess(metaDataService.ask(AddMetaData(reversedAttributes, source)).mapTo[MetaDataAdded]) { metaData =>
+                onSuccess(storageService.ask(AddDataset(dicomData.copy(attributes = reversedAttributes), source, metaData.image)).mapTo[DatasetAdded]) { datasetAdded =>
                   onSuccess(importService.ask(AddImageToSession(importSession.id, datasetAdded.image, datasetAdded.overwrite)).mapTo[ImageAddedToSession]) { importSessionImage =>
                     if (datasetAdded.overwrite)
                       complete((OK, datasetAdded.image))

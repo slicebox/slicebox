@@ -100,29 +100,29 @@ class AnonymizationRoutesTest extends FlatSpec with Matchers with RoutesTestBase
 
     val anonPatientName = "Anon Pat 1"
     val tagValues = Seq(TagValue(PatientName.dicomTag, anonPatientName))
-    val anonDataset =
+    val anonAttributes =
       PostAsUser(s"/api/images/${image.id}/anonymized", tagValues) ~> routes ~> check {
         status should be(OK)
-        DicomUtil.loadDataset(responseAs[Array[Byte]], withPixelData = true, useBulkDataURI = false)
+        DicomUtil.loadDataset(responseAs[Array[Byte]], withPixelData = true, useBulkDataURI = false).attributes
       }
 
-    anonDataset.getString(Tag.PatientName) shouldBe anonPatientName
-    anonDataset.getString(Tag.PatientID) should not be flatSeries.patient.patientName.value
+    anonAttributes.getString(Tag.PatientName) shouldBe anonPatientName
+    anonAttributes.getString(Tag.PatientID) should not be flatSeries.patient.patientName.value
   }
 
   it should "return 200 OK and the image IDs of the new anonymized images when bulk anonymizing a sequence of images" in {
-    val ds1 = TestUtil.testImageDataset(true)
-    val ds2 = TestUtil.testImageDataset(true)
-    ds2.setString(Tag.PatientName, VR.PN, "John^Doe")
+    val dd1 = TestUtil.testImageDicomData(true)
+    val dd2 = TestUtil.testImageDicomData(true)
+    dd2.attributes.setString(Tag.PatientName, VR.PN, "John^Doe")
 
     val image1 =
-      PostAsUser("/api/images", HttpData(DicomUtil.toByteArray(ds1))) ~> routes ~> check {
+      PostAsUser("/api/images", HttpData(DicomUtil.toByteArray(dd1))) ~> routes ~> check {
         status should be(Created)
         responseAs[Image]
       }
 
     val image2 =
-      PostAsUser("/api/images", HttpData(DicomUtil.toByteArray(ds2))) ~> routes ~> check {
+      PostAsUser("/api/images", HttpData(DicomUtil.toByteArray(dd2))) ~> routes ~> check {
         status should be(Created)
         responseAs[Image]
       }
@@ -169,8 +169,8 @@ class AnonymizationRoutesTest extends FlatSpec with Matchers with RoutesTestBase
 
   it should "provide a list of anonymization keys" in {
     db.withSession { implicit session =>
-      val dataset = TestUtil.createDataset()
-      val key1 = TestUtil.createAnonymizationKey(dataset)
+      val dicomData = TestUtil.createDicomData()
+      val key1 = TestUtil.createAnonymizationKey(dicomData.attributes)
       val key2 = key1.copy(patientName = "pat name 2", anonPatientName = "anon pat name 2")
       val insertedKey1 = dao.insertAnonymizationKey(key1)
       val insertedKey2 = dao.insertAnonymizationKey(key2)
@@ -183,8 +183,8 @@ class AnonymizationRoutesTest extends FlatSpec with Matchers with RoutesTestBase
 
   it should "return 200 OK and the requested anonymization key" in {
     db.withSession { implicit session =>
-      val dataset = TestUtil.createDataset()
-      val key1 = TestUtil.createAnonymizationKey(dataset)
+      val dicomData = TestUtil.createDicomData()
+      val key1 = TestUtil.createAnonymizationKey(dicomData.attributes)
       val insertedKey1 = dao.insertAnonymizationKey(key1)
       GetAsUser(s"/api/anonymization/keys/${insertedKey1.id}") ~> routes ~> check {
         status shouldBe OK
@@ -201,8 +201,8 @@ class AnonymizationRoutesTest extends FlatSpec with Matchers with RoutesTestBase
 
   it should "provide a list of sorted anonymization keys supporting startindex and count" in {
     db.withSession { implicit session =>
-      val dataset = TestUtil.createDataset(patientName = "B")
-      val key1 = TestUtil.createAnonymizationKey(dataset, anonPatientName = "anon B")
+      val dicomData = TestUtil.createDicomData(patientName = "B")
+      val key1 = TestUtil.createAnonymizationKey(dicomData.attributes, anonPatientName = "anon B")
       val key2 = key1.copy(patientName = "A", anonPatientName = "anon A")
       dao.insertAnonymizationKey(key1)
       val insertedKey2 = dao.insertAnonymizationKey(key2)

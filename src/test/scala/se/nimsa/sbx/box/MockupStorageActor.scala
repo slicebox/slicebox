@@ -41,7 +41,7 @@ class MockupStorageActor extends Actor {
         sender ! Failure(exception)
       else
         sender ! (image.id match {
-          case id if id <= nStoredDatasets => Some(TestUtil.createDataset())
+          case id if id <= nStoredDatasets => Some(TestUtil.createDicomData())
           case _ =>
             None
         })

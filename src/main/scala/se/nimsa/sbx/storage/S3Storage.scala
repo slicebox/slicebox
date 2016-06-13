@@ -1,13 +1,12 @@
 package se.nimsa.sbx.storage
 
-import java.io.{InputStream, ByteArrayOutputStream}
+import java.io.{ByteArrayOutputStream, InputStream}
 import java.nio.file.{Files, Path}
 import javax.imageio.ImageIO
 
-import org.dcm4che3.data.Attributes
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.DicomUtil._
-import se.nimsa.sbx.dicom.{DicomUtil, ImageAttribute}
+import se.nimsa.sbx.dicom.{DicomData, DicomUtil, ImageAttribute}
 import se.nimsa.sbx.storage.StorageProtocol.ImageInformation
 
 import scala.util.control.NonFatal
@@ -25,19 +24,19 @@ class S3Storage(val bucket: String, val s3Prefix: String) extends StorageService
     s3Prefix + "/" + imageName(image)
 
 
-  def storeDataset(dataset: Attributes, image: Image): Boolean = {
+  def storeDataset(dicomData: DicomData, image: Image): Boolean = {
     val storedId = s3Id(image)
     val overwrite = s3Client.exists(storedId)
-    try saveDatasetToS3(dataset, storedId) catch {
+    try saveDatasetToS3(dicomData, storedId) catch {
       case NonFatal(e) =>
         throw new IllegalArgumentException("Dataset file could not be stored", e)
     }
     overwrite
   }
 
-  def saveDatasetToS3(dataset: Attributes, s3Key: String): Unit = {
+  def saveDatasetToS3(dicomData: DicomData, s3Key: String): Unit = {
     val os = new ByteArrayOutputStream()
-    try saveDataset(dataset, os) catch {
+    try saveDataset(dicomData, os) catch {
       case NonFatal(e) =>
         throw new IllegalArgumentException("Dataset file could not be stored", e)
     }
@@ -52,14 +51,14 @@ class S3Storage(val bucket: String, val s3Prefix: String) extends StorageService
 
   def deleteFromStorage(image: Image): Unit = s3Client.delete(s3Id(image))
 
-  def readDataset(image: Image, withPixelData: Boolean, useBulkDataURI: Boolean): Option[Attributes] = {
+  def readDataset(image: Image, withPixelData: Boolean, useBulkDataURI: Boolean): Option[DicomData] = {
     val s3InputStream = s3Client.get(s3Id(image))
     Some(loadDataset(s3InputStream, withPixelData, useBulkDataURI))
   }
 
   def readImageAttributes(image: Image): Option[List[ImageAttribute]] = {
     val s3InputStream = s3Client.get(s3Id(image))
-    Some(DicomUtil.readImageAttributes(loadDataset(s3InputStream, withPixelData = false, useBulkDataURI = false)))
+    Some(DicomUtil.readImageAttributes(loadDataset(s3InputStream, withPixelData = false, useBulkDataURI = false).attributes))
   }
 
   def readImageInformation(image: Image): Option[ImageInformation] = {

@@ -1,13 +1,13 @@
 package se.nimsa.sbx.storage
 
-import java.io.{InputStream, BufferedInputStream}
-import java.nio.file.{Path, Paths, Files}
+import java.io.{BufferedInputStream, InputStream}
+import java.nio.file.{Files, Path, Paths}
 import javax.imageio.ImageIO
 
 import org.dcm4che3.data.Attributes
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.DicomUtil._
-import se.nimsa.sbx.dicom.{DicomUtil, ImageAttribute}
+import se.nimsa.sbx.dicom.{DicomData, DicomUtil, ImageAttribute}
 import se.nimsa.sbx.storage.StorageProtocol.ImageInformation
 
 import scala.util.control.NonFatal
@@ -21,10 +21,10 @@ class FileStorage(val path: Path) extends StorageService {
 
   createStorageDirectoryIfNecessary()
 
-  def storeDataset(dataset: Attributes, image: Image): Boolean = {
+  def storeDataset(dicomData: DicomData, image: Image): Boolean = {
     val storedPath = filePath(image)
     val overwrite = Files.exists(storedPath)
-    try saveDataset(dataset, storedPath) catch {
+    try saveDataset(dicomData, storedPath) catch {
       case NonFatal(e) =>
         throw new IllegalArgumentException("Dataset file could not be stored", e)
     }
@@ -50,14 +50,14 @@ class FileStorage(val path: Path) extends StorageService {
         //log.warning(s"No DICOM file found for image with id ${image.id} when deleting dataset")
     }
 
-  def readDataset(image: Image, withPixelData: Boolean, useBulkDataURI: Boolean): Option[Attributes] =
+  def readDataset(image: Image, withPixelData: Boolean, useBulkDataURI: Boolean): Option[DicomData] =
     resolvePath(image).map { imagePath =>
       loadDataset(imagePath, withPixelData, useBulkDataURI)
     }
 
   def readImageAttributes(image: Image): Option[List[ImageAttribute]] =
     resolvePath(image).map { imagePath =>
-      DicomUtil.readImageAttributes(loadDataset(imagePath, withPixelData = false, useBulkDataURI = false))
+      DicomUtil.readImageAttributes(loadDataset(imagePath, withPixelData = false, useBulkDataURI = false).attributes)
     }
 
   def readImageInformation(image: Image): Option[ImageInformation] =

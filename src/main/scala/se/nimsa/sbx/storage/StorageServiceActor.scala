@@ -20,10 +20,8 @@ import java.nio.file.NoSuchFileException
 
 import akka.actor.{Actor, Props}
 import akka.event.{Logging, LoggingReceive}
-import org.dcm4che3.data.{Attributes, Tag, UID}
-import org.dcm4che3.imageio.codec.Decompressor
 import se.nimsa.sbx.app.GeneralProtocol.ImageAdded
-import se.nimsa.sbx.dicom.DicomUtil
+import se.nimsa.sbx.dicom.{Contexts, DicomData, DicomUtil}
 import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.util.ExceptionCatching
 
@@ -49,11 +47,12 @@ class StorageServiceActor(storage: StorageService) extends Actor with ExceptionC
     case msg: ImageRequest => catchAndReport {
       msg match {
 
-        case CheckDataset(dataset, restrictSopClass) =>
-          sender ! checkDataset(dataset, restrictSopClass)
+        case CheckDataset(dicomData, useExtendedContexts) =>
+          checkDataset(dicomData, useExtendedContexts)
+          sender ! true
 
-        case AddDataset(dataset, source, image) =>
-          val overwrite = storage.storeDataset(dataset, image)
+        case AddDataset(dicomData, source, image) =>
+          val overwrite = storage.storeDataset(dicomData, image)
           if (overwrite)
             log.info(s"Updated existing file with image id ${image.id}")
           else
@@ -62,14 +61,6 @@ class StorageServiceActor(storage: StorageService) extends Actor with ExceptionC
           val imageAdded = ImageAdded(image, source, overwrite)
           context.system.eventStream.publish(imageAdded)
           sender ! datasetAdded
-
-        case AddJpeg(dataset, source, image) =>
-          storage.storeDataset(dataset, image)
-          log.info(s"Stored encapsulated JPEG with image id ${image.id}")
-          val jpegAdded = JpegAdded(image)
-          val imageAdded = ImageAdded(image, source, overwrite = false)
-          context.system.eventStream.publish(imageAdded)
-          sender ! jpegAdded
 
         case DeleteDataset(image) =>
           val datasetDeleted = DatasetDeleted(image)
@@ -127,12 +118,11 @@ class StorageServiceActor(storage: StorageService) extends Actor with ExceptionC
 
   }
 
-  def checkDataset(dataset: Attributes, restrictSopClass: Boolean): Boolean = {
-    if (dataset == null)
-      throw new IllegalArgumentException("Not a DICOM file")
-    else if (restrictSopClass & !DicomUtil.checkSopClass(dataset))
-      throw new IllegalArgumentException(s"Unsupported SOP Class UID ${dataset.getString(Tag.SOPClassUID)}")
-    true
+  def checkDataset(dicomData: DicomData, useExtendedContexts: Boolean): Unit = {
+    if (dicomData == null || dicomData.attributes == null || dicomData.metaInformation == null)
+      throw new IllegalArgumentException("Invalid DICOM data")
+    val allowedContexts = if (useExtendedContexts) Contexts.imageDataContexts else Contexts.extendedContexts
+    DicomUtil.checkContext(dicomData.metaInformation, allowedContexts)
   }
 
 }

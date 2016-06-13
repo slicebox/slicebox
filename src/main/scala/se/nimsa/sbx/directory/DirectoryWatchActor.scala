@@ -25,6 +25,7 @@ import akka.util.Timeout
 import org.dcm4che3.data.Attributes
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.ReverseAnonymization
 import se.nimsa.sbx.app.GeneralProtocol._
+import se.nimsa.sbx.dicom.DicomData
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.directory.DirectoryWatchProtocol._
 import se.nimsa.sbx.dicom.DicomUtil._
@@ -33,7 +34,7 @@ import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, MetaDataAdded}
 import se.nimsa.sbx.storage.StorageProtocol.{AddDataset, CheckDataset, DatasetAdded}
 
 import scala.concurrent.Future
-import scala.util.{Success, Failure}
+import scala.util.{Failure, Success}
 import scala.util.control.NonFatal
 
 class DirectoryWatchActor(watchedDirectory: WatchedDirectory,
@@ -71,13 +72,14 @@ class DirectoryWatchActor(watchedDirectory: WatchedDirectory,
 
     case FileAddedToWatchedDirectory(path) =>
       if (Files.isRegularFile(path)) {
-        val dataset = loadDataset(path, withPixelData = true, useBulkDataURI = false)
+        val dicomData = loadDataset(path, withPixelData = true, useBulkDataURI = false)
         val source = Source(SourceType.DIRECTORY, watchedDirectory.name, watchedDirectory.id)
         context.become(waitForDatasetProcessed)
-        checkDataset(dataset).flatMap { status =>
-          reverseAnonymization(dataset).flatMap { reversedDataset =>
-            addMetadata(reversedDataset, source).flatMap { image =>
-              addDataset(reversedDataset, source, image).map { overwrite =>
+        checkDataset(dicomData).flatMap { status =>
+          reverseAnonymization(dicomData.attributes).flatMap { reversedAttributes =>
+            val reversedDicomData = DicomData(reversedAttributes, dicomData.metaInformation)
+            addMetadata(reversedAttributes, source).flatMap { image =>
+              addDataset(reversedDicomData, source, image).map { overwrite =>
               }
             }
           }
@@ -106,16 +108,16 @@ class DirectoryWatchActor(watchedDirectory: WatchedDirectory,
       .mapTo[MetaDataAdded]
       .map(_.image)
 
-  def addDataset(dataset: Attributes, source: Source, image: Image): Future[Boolean] =
-    storageService.ask(AddDataset(dataset, source, image))
+  def addDataset(dicomData: DicomData, source: Source, image: Image): Future[Boolean] =
+    storageService.ask(AddDataset(dicomData, source, image))
       .mapTo[DatasetAdded]
       .map(_.overwrite)
 
-  def checkDataset(dataset: Attributes): Future[Boolean] =
-    storageService.ask(CheckDataset(dataset, restrictSopClass = true)).mapTo[Boolean]
+  def checkDataset(dicomData: DicomData): Future[Boolean] =
+    storageService.ask(CheckDataset(dicomData, useExtendedContexts = false)).mapTo[Boolean]
 
-  def reverseAnonymization(dataset: Attributes): Future[Attributes] =
-    anonymizationService.ask(ReverseAnonymization(dataset)).mapTo[Attributes]
+  def reverseAnonymization(attributes: Attributes): Future[Attributes] =
+    anonymizationService.ask(ReverseAnonymization(attributes)).mapTo[Attributes]
 
 }
 

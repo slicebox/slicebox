@@ -47,7 +47,7 @@ class MetaDataServiceActor(dbProps: DbProps) extends Actor with ExceptionCatchin
           datasetToPatient(dataset),
           datasetToStudy(dataset),
           datasetToSeries(dataset),
-          datasetToImage(dataset),
+          attributesToImage(dataset),
           source)
         log.debug(s"Added metadata $metaData")
         context.system.eventStream.publish(metaData)

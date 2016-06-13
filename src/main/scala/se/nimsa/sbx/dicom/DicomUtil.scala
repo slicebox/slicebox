@@ -26,6 +26,7 @@ import org.dcm4che3.io.DicomOutputStream
 import java.nio.file.Files
 import java.io.BufferedInputStream
 import java.nio.file.Path
+
 import org.dcm4che3.data.UID
 import org.dcm4che3.io.DicomInputStream.IncludeBulkData
 import java.io.InputStream
@@ -33,14 +34,18 @@ import java.io.ByteArrayInputStream
 import java.io.OutputStream
 import java.awt.image.BufferedImage
 import javax.imageio.ImageIO
+
 import org.dcm4che3.imageio.plugins.dcm.DicomImageReadParam
 import java.io.ByteArrayOutputStream
+
 import org.dcm4che3.data.Attributes.Visitor
 import org.dcm4che3.data.VR
+
 import scala.collection.mutable.ListBuffer
 import org.dcm4che3.util.TagUtils
 import org.dcm4che3.data.Keyword
 import org.dcm4che3.io.BulkDataDescriptor
+import se.nimsa.sbx.dicom.Contexts.Context
 
 object DicomUtil {
 
@@ -50,35 +55,33 @@ object DicomUtil {
 
   def cloneDataset(dataset: Attributes): Attributes = new Attributes(dataset)
 
-  def saveDataset(dataset: Attributes, filePath: Path): Unit =
-    saveDataset(dataset, Files.newOutputStream(filePath))
+  def saveDataset(dicomData: DicomData, filePath: Path): Unit =
+    saveDataset(dicomData, Files.newOutputStream(filePath))
 
-  def saveDataset(dataset: Attributes, outputStream: OutputStream): Unit = {
+  def saveDataset(dicomData: DicomData, outputStream: OutputStream): Unit = {
     var dos: DicomOutputStream = null
     try {
-      dos = new DicomOutputStream(outputStream, defaultTransferSyntax)
-      val ts = if (dataset.getString(Tag.SOPClassUID) == UID.SecondaryCaptureImageStorage)
-        UID.JPEGBaseline1
-      else
-        defaultTransferSyntax
-      val metaInformation = dataset.createFileMetaInformation(ts)
-      dos.writeDataset(metaInformation, dataset)
+      val transferSyntaxUID = dicomData.metaInformation.getString(Tag.TransferSyntaxUID)
+      if (transferSyntaxUID == null || transferSyntaxUID.isEmpty)
+        throw new IllegalArgumentException("DICOM meta information is missing transfer syntax UID")
+      dos = new DicomOutputStream(outputStream, transferSyntaxUID)
+      dos.writeDataset(dicomData.metaInformation, dicomData.attributes)
     } finally {
       SafeClose.close(dos)
     }
   }
 
-  def loadDataset(path: Path, withPixelData: Boolean, useBulkDataURI: Boolean): Attributes =
+  def loadDataset(path: Path, withPixelData: Boolean, useBulkDataURI: Boolean): DicomData =
     loadDataset(new BufferedInputStream(Files.newInputStream(path)), withPixelData, useBulkDataURI)
 
-  def loadDataset(byteArray: Array[Byte], withPixelData: Boolean, useBulkDataURI: Boolean): Attributes =
+  def loadDataset(byteArray: Array[Byte], withPixelData: Boolean, useBulkDataURI: Boolean): DicomData =
     loadDataset(new BufferedInputStream(new ByteArrayInputStream(byteArray)), withPixelData, useBulkDataURI)
 
-  def loadDataset(inputStream: InputStream, withPixelData: Boolean, useBulkDataURI: Boolean): Attributes = {
+  def loadDataset(inputStream: InputStream, withPixelData: Boolean, useBulkDataURI: Boolean): DicomData = {
     var dis: DicomInputStream = null
     try {
       dis = new DicomInputStream(inputStream)
-
+      val fmi = dis.getFileMetaInformation
       val dataset =
         if (withPixelData) {
           //if (useBulkDataURI)
@@ -91,7 +94,7 @@ object DicomUtil {
           dis.readDataset(-1, Tag.PixelData)
         }
 
-      dataset
+      DicomData(dataset, fmi)
     } catch {
       case _: Exception => null
     } finally {
@@ -117,9 +120,9 @@ object DicomUtil {
   }
   def toByteArray(path: Path): Array[Byte] = toByteArray(loadDataset(path, withPixelData = true, useBulkDataURI = false))
 
-  def toByteArray(dataset: Attributes): Array[Byte] = {
+  def toByteArray(dicomData: DicomData): Array[Byte] = {
     val bos = new ByteArrayOutputStream
-    saveDataset(dataset, bos)
+    saveDataset(dicomData, bos)
     bos.close()
     bos.toByteArray
   }
@@ -157,7 +160,7 @@ object DicomUtil {
       StationName(valueOrEmpty(dataset, DicomProperty.StationName.dicomTag)),
       FrameOfReferenceUID(valueOrEmpty(dataset, DicomProperty.FrameOfReferenceUID.dicomTag)))
 
-  def datasetToImage(dataset: Attributes): Image =
+  def attributesToImage(dataset: Attributes): Image =
     Image(
       -1,
       -1,
@@ -173,11 +176,14 @@ object DicomUtil {
     else
       values.tail.foldLeft(values.head)((result, part) => result + "/" + part)
 
-  def checkSopClass(dataset: Attributes) =
-    SopClasses.sopClasses
-      .filter(sopClass => sopClass.included)
-      .map(_.sopClassUID)
-      .contains(dataset.getString(Tag.SOPClassUID))
+  def checkContext(metaInformation: Attributes, contexts: Seq[Context]): Unit = {
+    val tsUid = metaInformation.getString(Tag.TransferSyntaxUID)
+    val scUid = metaInformation.getString(Tag.MediaStorageSOPClassUID)
+    if (tsUid == null || scUid == null)
+      throw new IllegalArgumentException("DICOM attributes must contain meta information (transfer syntax UID and SOP class UID")
+    if (!contexts.exists(context => context.sopClass.uid == scUid && context.transferSyntaxes.map(_.uid).contains(tsUid)))
+      throw new IllegalArgumentException(s"The presentation context [SOPClassUID = $scUid, TransferSyntaxUID = $tsUid] is not supported")
+  }
 
   def fileToBufferedImages(path: Path): Seq[BufferedImage] = {
     val iter = ImageIO.getImageReadersByFormatName("DICOM")
@@ -190,13 +196,13 @@ object DicomUtil {
     Seq(bufferedImage)
   }
 
-  def readImageAttributes(dataset: Attributes): List[ImageAttribute] =
-    readImageAttributes(dataset, 0, Nil, Nil)
+  def readImageAttributes(attributes: Attributes): List[ImageAttribute] =
+    readImageAttributes(attributes, 0, Nil, Nil)
 
-  def readImageAttributes(dataset: Attributes, depth: Int, tagPath: List[Int], namePath: List[String]): List[ImageAttribute] = {
+  def readImageAttributes(attributes: Attributes, depth: Int, tagPath: List[Int], namePath: List[String]): List[ImageAttribute] = {
     val attributesBuffer = ListBuffer.empty[ImageAttribute]
-    if (dataset != null) {
-      dataset.accept(new Visitor() {
+    if (attributes != null) {
+      attributes.accept(new Visitor() {
         override def visit(attrs: Attributes, tag: Int, vr: VR, value: AnyRef): Boolean = {
           val length = lengthOf(attrs.getBytes(tag))
           val group = TagUtils.groupNumber(tag)

@@ -4,10 +4,9 @@ import java.io.{ByteArrayInputStream, InputStream}
 import java.nio.file.{Files, Path}
 import javax.imageio.ImageIO
 
-import org.dcm4che3.data.Attributes
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.DicomUtil._
-import se.nimsa.sbx.dicom.{DicomUtil, ImageAttribute}
+import se.nimsa.sbx.dicom.{DicomData, DicomUtil, ImageAttribute}
 import se.nimsa.sbx.storage.StorageProtocol.ImageInformation
 
 class RuntimeStorage extends StorageService {
@@ -16,9 +15,9 @@ class RuntimeStorage extends StorageService {
 
   val storage = mutable.Map.empty[String, Array[Byte]]
 
-  def storeDataset(dataset: Attributes, image: Image): Boolean = {
+  def storeDataset(dicomData: DicomData, image: Image): Boolean = {
     val overwrite = storage.contains(imageName(image))
-    storage.put(imageName(image), toByteArray(dataset))
+    storage.put(imageName(image), toByteArray(dicomData))
     overwrite
   }
 
@@ -30,11 +29,11 @@ class RuntimeStorage extends StorageService {
   def deleteFromStorage(image: Image): Unit =
     storage.remove(imageName(image))
 
-  def readDataset(image: Image, withPixelData: Boolean, useBulkDataURI: Boolean): Option[Attributes] =
+  def readDataset(image: Image, withPixelData: Boolean, useBulkDataURI: Boolean): Option[DicomData] =
     storage.get(imageName(image)).map(bytes => loadDataset(bytes, withPixelData, useBulkDataURI))
 
   def readImageAttributes(image: Image): Option[List[ImageAttribute]] =
-    storage.get(imageName(image)).map(bytes => DicomUtil.readImageAttributes(loadDataset(bytes, withPixelData = false, useBulkDataURI = false)))
+    storage.get(imageName(image)).map(bytes => DicomUtil.readImageAttributes(loadDataset(bytes, withPixelData = false, useBulkDataURI = false).attributes))
 
   def readImageInformation(image: Image): Option[ImageInformation] =
     imageAsInputStream(image).map(is => super.readImageInformation(is))

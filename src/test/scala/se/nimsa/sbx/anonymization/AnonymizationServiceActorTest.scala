@@ -19,9 +19,9 @@ import akka.actor.Props
 import akka.testkit.ImplicitSender
 import akka.testkit.TestKit
 import se.nimsa.sbx.app.DbProps
-import se.nimsa.sbx.dicom.DicomUtil.datasetToImage
+import se.nimsa.sbx.dicom.DicomUtil.attributesToImage
 import se.nimsa.sbx.util.TestUtil.createAnonymizationKey
-import se.nimsa.sbx.util.TestUtil.createDataset
+import se.nimsa.sbx.util.TestUtil.createDicomData
 
 class AnonymizationServiceActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
     with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {
@@ -52,9 +52,9 @@ class AnonymizationServiceActorTest(_system: ActorSystem) extends TestKit(_syste
 
     "harmonize anonymization with respect to relevant anonymization keys when sending a file" in {
       db.withSession { implicit session =>
-        val dataset = createDataset()
-        val key = insertAnonymizationKey(dataset)
-        anonymizationService ! Anonymize(1, dataset, Seq.empty)
+        val dicomData = createDicomData()
+        val key = insertAnonymizationKey(dicomData.attributes)
+        anonymizationService ! Anonymize(1, dicomData.attributes, Seq.empty)
         expectMsgPF() {
           case harmonized: Attributes =>
             harmonized.getString(Tag.PatientID) should be(key.anonPatientID)
@@ -67,9 +67,9 @@ class AnonymizationServiceActorTest(_system: ActorSystem) extends TestKit(_syste
 
     "reverse anonymization in an anonymous dataset based on anonymization keys" in {
       db.withSession { implicit session =>
-        val dataset = createDataset()
-        val key = insertAnonymizationKey(dataset)
-        val anonymizedDataset = anonymizeDataset(dataset)
+        val dicomData = createDicomData()
+        val key = insertAnonymizationKey(dicomData.attributes)
+        val anonymizedDataset = anonymizeDataset(dicomData.attributes)
         anonymizedDataset.setString(Tag.PatientName, VR.PN, key.anonPatientName)
         anonymizedDataset.setString(Tag.PatientID, VR.SH, key.anonPatientID)
         anonymizedDataset.setString(Tag.StudyInstanceUID, VR.UI, key.anonStudyInstanceUID)
@@ -92,23 +92,23 @@ class AnonymizationServiceActorTest(_system: ActorSystem) extends TestKit(_syste
         }
       }
     }
-    
+
     "add anonymization image records to an anonymization key when several datasets from the same series are anonymized" in {
       db.withSession { implicit session =>
-        val dataset1 = createDataset()
-        val dataset2 = new Attributes(dataset1)
-        val dataset3 = new Attributes(dataset1)
-        dataset1.setString(Tag.SOPInstanceUID, VR.UI, "sopuid1")
-        dataset2.setString(Tag.SOPInstanceUID, VR.UI, "sopuid2")
-        dataset3.setString(Tag.SOPInstanceUID, VR.UI, "sopuid3")
-        val image1 = datasetToImage(dataset1).copy(id = 1)
-        val image2 = datasetToImage(dataset2).copy(id = 2)
-        val image3 = datasetToImage(dataset3).copy(id = 3)
-        anonymizationService ! Anonymize(image1.id, dataset1, Seq.empty)
+        val dicomData1 = createDicomData()
+        val dicomData2 = dicomData1.copy(attributes = new Attributes(dicomData1.attributes))
+        val dicomData3 = dicomData1.copy(attributes = new Attributes(dicomData1.attributes))
+        dicomData1.attributes.setString(Tag.SOPInstanceUID, VR.UI, "sopuid1")
+        dicomData2.attributes.setString(Tag.SOPInstanceUID, VR.UI, "sopuid2")
+        dicomData3.attributes.setString(Tag.SOPInstanceUID, VR.UI, "sopuid3")
+        val image1 = attributesToImage(dicomData1.attributes).copy(id = 1)
+        val image2 = attributesToImage(dicomData2.attributes).copy(id = 2)
+        val image3 = attributesToImage(dicomData3.attributes).copy(id = 3)
+        anonymizationService ! Anonymize(image1.id, dicomData1.attributes, Seq.empty)
         expectMsgType[Attributes]
-        anonymizationService ! Anonymize(image2.id, dataset2, Seq.empty)
+        anonymizationService ! Anonymize(image2.id, dicomData2.attributes, Seq.empty)
         expectMsgType[Attributes]
-        anonymizationService ! Anonymize(image3.id, dataset3, Seq.empty)
+        anonymizationService ! Anonymize(image3.id, dicomData3.attributes, Seq.empty)
         expectMsgType[Attributes]
         val anonImages = anonymizationDao.listAnonymizationKeyImages
         anonImages should have length 3

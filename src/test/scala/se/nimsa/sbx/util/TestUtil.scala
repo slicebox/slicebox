@@ -16,7 +16,7 @@ import se.nimsa.sbx.anonymization.AnonymizationProtocol.AnonymizationKey
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomPropertyValue._
-import se.nimsa.sbx.dicom.DicomUtil
+import se.nimsa.sbx.dicom.{DicomData, DicomUtil}
 import se.nimsa.sbx.metadata.MetaDataDAO
 import se.nimsa.sbx.metadata.MetaDataProtocol.SeriesSource
 import se.nimsa.sbx.metadata.MetaDataProtocol.SeriesTag
@@ -59,7 +59,7 @@ object TestUtil {
     val dbImage6 = metaDataDao.insert(image6.copy(seriesId = dbSeries3.id))
     val dbImage7 = metaDataDao.insert(image7.copy(seriesId = dbSeries4.id))
     val dbImage8 = metaDataDao.insert(image8.copy(seriesId = dbSeries4.id))
-    
+
     (dbPatient1, (dbStudy1, dbStudy2), (dbSeries1, dbSeries2, dbSeries3, dbSeries4), (dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8))
   }
 
@@ -70,7 +70,7 @@ object TestUtil {
     val seriesSource4 = SeriesSource(-1, Source(SourceType.SCP, "scp", 1))
     val seriesType1 = SeriesType(-1, "Test Type 1")
     val seriesType2 = SeriesType(-1, "Test Type 2")
-    
+
     val dbSeriesSource1 = propertiesDao.insertSeriesSource(seriesSource1.copy(id = dbSeries1.id))
     val dbSeriesSource2 = propertiesDao.insertSeriesSource(seriesSource2.copy(id = dbSeries2.id))
     val dbSeriesSource3 = propertiesDao.insertSeriesSource(seriesSource3.copy(id = dbSeries3.id))
@@ -80,10 +80,10 @@ object TestUtil {
     propertiesDao.addAndInsertSeriesTagForSeriesId(SeriesTag(-1, "Tag2"), dbSeries1.id)
     propertiesDao.addAndInsertSeriesTagForSeriesId(SeriesTag(-1, "Tag1"), dbSeries2.id)
     propertiesDao.addAndInsertSeriesTagForSeriesId(SeriesTag(-1, "Tag2"), dbSeries3.id)
-    
+
     val dbSeriesType1 = seriesTypeDao.insertSeriesType(seriesType1)
     val dbSeriesType2 = seriesTypeDao.insertSeriesType(seriesType2)
-    
+
     val seriesSeriesType1 = SeriesSeriesType(dbSeries1.id, dbSeriesType1.id)
     val seriesSeriesType2 = SeriesSeriesType(dbSeries2.id, dbSeriesType1.id)
     val seriesSeriesType3 = SeriesSeriesType(dbSeries2.id, dbSeriesType2.id)
@@ -93,75 +93,77 @@ object TestUtil {
     val dbSeriesSeriesType2 = seriesTypeDao.insertSeriesSeriesType(seriesSeriesType2)
     val dbSeriesSeriesType3 = seriesTypeDao.insertSeriesSeriesType(seriesSeriesType3)
     val dbSeriesSeriesType4 = seriesTypeDao.insertSeriesSeriesType(seriesSeriesType4)
-    
+
     ((dbSeriesSource1, dbSeriesSource2, dbSeriesSource3, dbSeriesSource4), (dbSeriesSeriesType1, dbSeriesSeriesType2, dbSeriesSeriesType3, dbSeriesSeriesType4))
   }
-  
+
   def testImageFile = new File(getClass.getResource("test.dcm").toURI)
   def testSecondaryCaptureFile = new File(getClass.getResource("sc.dcm").toURI)
-  def testImageDataset(withPixelData: Boolean = true) = DicomUtil.loadDataset(testImageFile.toPath, withPixelData, useBulkDataURI = false)
+  def testImageDicomData(withPixelData: Boolean = true) = DicomUtil.loadDataset(testImageFile.toPath, withPixelData, useBulkDataURI = true)
   def testImageByteArray = DicomUtil.toByteArray(testImageFile.toPath)
 
   def jpegFile = new File(getClass.getResource("cat.jpg").toURI)
   def jpegByteArray = Files.readAllBytes(jpegFile.toPath)
-  
+
   def invalidImageFile = new File(getClass.getResource("invalid.dcm").toURI)
-  
-  def createDataset(
-    patientName: String = "pat name",
-    patientID: String = "pat id",
-    patientBirthDate: String = "20010101",
-    patientSex: String = "F",
-    studyInstanceUID: String = "study instance uid",
-    studyDescription: String = "study description",
-    studyID: String = "study id",
-    accessionNumber: String = "accession number",
-    seriesInstanceUID: String = "series instance uid",
-    seriesDescription: String = "series description",
-    stationName: String = "station name",
-    manufacturer: String = "manufacturer",
-    protocolName: String = "protocol name",
-    frameOfReferenceUID: String = "frame of reference uid",
-    sopInstanceUID: String = "sop instance uid") = {
-    val dataset = new Attributes()
-    dataset.setString(Tag.SOPClassUID, VR.UI, "1.2.840.10008.5.1.4.1.1.2")
-    dataset.setString(Tag.PatientName, VR.PN, patientName)
-    dataset.setString(Tag.PatientID, VR.LO, patientID)
-    dataset.setString(Tag.PatientBirthDate, VR.DA, patientBirthDate)
-    dataset.setString(Tag.PatientSex, VR.CS, patientSex)
-    dataset.setString(Tag.StudyInstanceUID, VR.UI, studyInstanceUID)
-    dataset.setString(Tag.StudyDescription, VR.LO, studyDescription)
-    dataset.setString(Tag.StudyID, VR.LO, studyID)
-    dataset.setString(Tag.AccessionNumber, VR.SH, accessionNumber)
-    dataset.setString(Tag.SeriesInstanceUID, VR.UI, seriesInstanceUID)
-    dataset.setString(Tag.SeriesDescription, VR.UI, seriesDescription)
-    dataset.setString(Tag.StationName, VR.LO, stationName)
-    dataset.setString(Tag.Manufacturer, VR.LO, manufacturer)
-    dataset.setString(Tag.ProtocolName, VR.LO, protocolName)
-    dataset.setString(Tag.FrameOfReferenceUID, VR.UI, frameOfReferenceUID)
-    dataset.setString(Tag.SOPInstanceUID, VR.UI, sopInstanceUID)
-    dataset
+
+  def createDicomData(patientName: String = "pat name",
+                      patientID: String = "pat id",
+                      patientBirthDate: String = "20010101",
+                      patientSex: String = "F",
+                      studyInstanceUID: String = "study instance uid",
+                      studyDescription: String = "study description",
+                      studyID: String = "study id",
+                      accessionNumber: String = "accession number",
+                      seriesInstanceUID: String = "series instance uid",
+                      seriesDescription: String = "series description",
+                      stationName: String = "station name",
+                      manufacturer: String = "manufacturer",
+                      protocolName: String = "protocol name",
+                      frameOfReferenceUID: String = "frame of reference uid",
+                      sopInstanceUID: String = "sop instance uid") = {
+    val attributes = new Attributes()
+    attributes.setString(Tag.PatientName, VR.PN, patientName)
+    attributes.setString(Tag.PatientID, VR.LO, patientID)
+    attributes.setString(Tag.PatientBirthDate, VR.DA, patientBirthDate)
+    attributes.setString(Tag.PatientSex, VR.CS, patientSex)
+    attributes.setString(Tag.StudyInstanceUID, VR.UI, studyInstanceUID)
+    attributes.setString(Tag.StudyDescription, VR.LO, studyDescription)
+    attributes.setString(Tag.StudyID, VR.LO, studyID)
+    attributes.setString(Tag.AccessionNumber, VR.SH, accessionNumber)
+    attributes.setString(Tag.SeriesInstanceUID, VR.UI, seriesInstanceUID)
+    attributes.setString(Tag.SeriesDescription, VR.UI, seriesDescription)
+    attributes.setString(Tag.StationName, VR.LO, stationName)
+    attributes.setString(Tag.Manufacturer, VR.LO, manufacturer)
+    attributes.setString(Tag.ProtocolName, VR.LO, protocolName)
+    attributes.setString(Tag.FrameOfReferenceUID, VR.UI, frameOfReferenceUID)
+    attributes.setString(Tag.SOPInstanceUID, VR.UI, sopInstanceUID)
+
+    val metaInformation = new Attributes()
+    metaInformation.setString(Tag.MediaStorageSOPClassUID, VR.UI, "1.2.840.10008.5.1.4.1.1.2")
+    metaInformation.setString(Tag.TransferSyntaxUID, VR.UI, "1.2.840.10008.5.1.4.1.1.2")
+
+    DicomData(attributes, metaInformation)
   }
 
-  def createAnonymizationKey(
-    dataset: Attributes,
-    anonPatientName: String = "anon patient name",
-    anonPatientID: String = "anon patient ID",
-    anonStudyInstanceUID: String = "anon study instance UID",
-    anonSeriesInstanceUID: String = "anon series instance UID",
-    anonFrameOfReferenceUID: String = "anon frame of reference UID") =
+  def createAnonymizationKey(attributes: Attributes,
+                             anonPatientName: String = "anon patient name",
+                             anonPatientID: String = "anon patient ID",
+                             anonStudyInstanceUID: String = "anon study instance UID",
+                             anonSeriesInstanceUID: String = "anon series instance UID",
+                             anonFrameOfReferenceUID: String = "anon frame of reference UID") =
     AnonymizationKey(-1, new Date().getTime,
-      dataset.getString(Tag.PatientName), anonPatientName,
-      dataset.getString(Tag.PatientID), anonPatientID,
-      dataset.getString(Tag.PatientBirthDate),
-      dataset.getString(Tag.StudyInstanceUID), anonStudyInstanceUID,
-      dataset.getString(Tag.StudyDescription),
-      dataset.getString(Tag.StudyID),
-      dataset.getString(Tag.AccessionNumber),
-      dataset.getString(Tag.SeriesInstanceUID), anonSeriesInstanceUID,
-      dataset.getString(Tag.SeriesDescription),
-      dataset.getString(Tag.ProtocolName),
-      dataset.getString(Tag.FrameOfReferenceUID), anonFrameOfReferenceUID)
+      attributes.getString(Tag.PatientName), anonPatientName,
+      attributes.getString(Tag.PatientID), anonPatientID,
+      attributes.getString(Tag.PatientBirthDate),
+      attributes.getString(Tag.StudyInstanceUID), anonStudyInstanceUID,
+      attributes.getString(Tag.StudyDescription),
+      attributes.getString(Tag.StudyID),
+      attributes.getString(Tag.AccessionNumber),
+      attributes.getString(Tag.SeriesInstanceUID), anonSeriesInstanceUID,
+      attributes.getString(Tag.SeriesDescription),
+      attributes.getString(Tag.ProtocolName),
+      attributes.getString(Tag.FrameOfReferenceUID), anonFrameOfReferenceUID)
 
   def deleteFolderContents(path: Path) =
     Files.list(path).collect(Collectors.toList()).asScala.foreach { path =>

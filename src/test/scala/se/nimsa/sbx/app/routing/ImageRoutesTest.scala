@@ -263,13 +263,13 @@ class ImageRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     val image = PostAsUser("/api/images", HttpData(TestUtil.testImageByteArray)) ~> routes ~> check {
       responseAs[Image]
     }
-    val dataset = DicomUtil.loadDataset(TestUtil.testImageByteArray, withPixelData = false, useBulkDataURI = false)
+    val dicomData = DicomUtil.loadDataset(TestUtil.testImageByteArray, withPixelData = false, useBulkDataURI = false)
     GetAsUser(s"/api/images/${image.id}/imageinformation") ~> routes ~> check {
       status shouldBe OK
       val info = responseAs[ImageInformation]
-      info.minimumPixelValue shouldBe dataset.getInt(Tag.SmallestImagePixelValue, 0)
-      info.maximumPixelValue shouldBe dataset.getInt(Tag.LargestImagePixelValue, 0)
-      info.numberOfFrames shouldBe dataset.getInt(Tag.NumberOfFrames, 1)
+      info.minimumPixelValue shouldBe dicomData.attributes.getInt(Tag.SmallestImagePixelValue, 0)
+      info.maximumPixelValue shouldBe dicomData.attributes.getInt(Tag.LargestImagePixelValue, 0)
+      info.numberOfFrames shouldBe dicomData.attributes.getInt(Tag.NumberOfFrames, 1)
     }
   }
 

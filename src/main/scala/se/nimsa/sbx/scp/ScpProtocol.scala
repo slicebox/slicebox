@@ -16,8 +16,8 @@
 
 package se.nimsa.sbx.scp
 
+import se.nimsa.sbx.dicom.DicomData
 import se.nimsa.sbx.model.Entity
-import org.dcm4che3.data.Attributes
 
 object ScpProtocol {
   
@@ -39,6 +39,6 @@ object ScpProtocol {
 
   case class ScpRemoved(scpDataId: Long)
 
-  case class DatasetReceivedByScp(dataset: Attributes)
+  case class DicomDataReceivedByScp(dicomData: DicomData)
 
 }

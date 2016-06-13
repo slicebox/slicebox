@@ -26,7 +26,7 @@ import se.nimsa.sbx.anonymization.AnonymizationProtocol.ReverseAnonymization
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.app.SliceboxService
 import se.nimsa.sbx.dicom.DicomHierarchy.{FlatSeries, Image, Patient, Study}
-import se.nimsa.sbx.dicom.{DicomUtil, ImageAttribute, Jpeg2Dcm}
+import se.nimsa.sbx.dicom._
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.user.UserProtocol.ApiUser
@@ -161,9 +161,9 @@ trait ImageRoutes {
                 studyMaybe.map { study =>
                   metaDataService.ask(GetPatient(study.patientId)).mapTo[Option[Patient]].map { patientMaybe =>
                     patientMaybe.map { patient =>
-                      val encapsulatedJpeg = Jpeg2Dcm(jpegBytes, patient, study)
-                      metaDataService.ask(AddMetaData(encapsulatedJpeg, source)).mapTo[MetaDataAdded].flatMap { metaData =>
-                        storageService.ask(AddJpeg(encapsulatedJpeg, source, metaData.image)).map { _ => metaData.image }
+                      val dicomData = Jpeg2Dcm(jpegBytes, patient, study)
+                      metaDataService.ask(AddMetaData(dicomData.attributes, source)).mapTo[MetaDataAdded].flatMap { metaData =>
+                        storageService.ask(AddDataset(dicomData, source, metaData.image)).map { _ => metaData.image }
                       }
                     }
                   }
@@ -184,13 +184,13 @@ trait ImageRoutes {
   private def addDatasetRoute(bytes: Array[Byte], apiUser: ApiUser) = {
     import spray.httpx.SprayJsonSupport._
 
-    val dataset = DicomUtil.loadDataset(bytes, withPixelData = true, useBulkDataURI = false)
+    val dicomData = DicomUtil.loadDataset(bytes, withPixelData = true, useBulkDataURI = false)
     val source = Source(SourceType.USER, apiUser.user, apiUser.id)
     val futureImageAndOverwrite =
-      storageService.ask(CheckDataset(dataset, restrictSopClass = false)).mapTo[Boolean].flatMap { status =>
-        anonymizationService.ask(ReverseAnonymization(dataset)).mapTo[Attributes].flatMap { reversedDataset =>
-          metaDataService.ask(AddMetaData(reversedDataset, source)).mapTo[MetaDataAdded].flatMap { metaData =>
-            storageService.ask(AddDataset(reversedDataset, source, metaData.image)).mapTo[DatasetAdded].map { datasetAdded =>
+      storageService.ask(CheckDataset(dicomData, useExtendedContexts = true)).mapTo[Boolean].flatMap { status =>
+        anonymizationService.ask(ReverseAnonymization(dicomData.attributes)).mapTo[Attributes].flatMap { reversedAttributes =>
+          metaDataService.ask(AddMetaData(reversedAttributes, source)).mapTo[MetaDataAdded].flatMap { metaData =>
+            storageService.ask(AddDataset(dicomData.copy(attributes = reversedAttributes), source, metaData.image)).mapTo[DatasetAdded].map { datasetAdded =>
               (metaData.image, datasetAdded.overwrite)
             }
           }
