@@ -13,7 +13,7 @@ import se.nimsa.sbx.dicom.DicomHierarchy.Series
 import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, MetaDataAdded}
 import se.nimsa.sbx.metadata.{MetaDataDAO, MetaDataServiceActor, PropertiesDAO}
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
-import se.nimsa.sbx.storage.StorageProtocol.AddDataset
+import se.nimsa.sbx.storage.StorageProtocol.AddDicomData
 import se.nimsa.sbx.storage.{RuntimeStorage, StorageServiceActor}
 import se.nimsa.sbx.util.TestUtil
 
@@ -70,7 +70,7 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
       val seriesType = addSeriesType()
       addMatchingRuleToSeriesType(seriesType)
 
-      val series = addTestDataset()
+      val series = addTestDicomData()
 
       seriesTypeUpdateService ! UpdateSeriesTypesForSeries(series.id)
       expectNoMsg
@@ -88,7 +88,7 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
       val seriesType = addSeriesType()
       addNotMatchingRuleToSeriesType(seriesType)
 
-      val series = addTestDataset()
+      val series = addTestDicomData()
 
       seriesTypeUpdateService ! UpdateSeriesTypesForSeries(series.id)
       expectNoMsg
@@ -104,7 +104,7 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
 
       addNotMatchingRuleToSeriesType(seriesType)
 
-      val series = addTestDataset()
+      val series = addTestDicomData()
 
       db.withSession { implicit session =>
         seriesTypeDao.insertSeriesSeriesType(SeriesSeriesType(series.id, seriesType.id))
@@ -119,8 +119,8 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
     }
 
     "be able to update series type for all series" in {
-      val series1 = addTestDataset(sopInstanceUID = "sop id 1", seriesInstanceUID = "series 1")
-      val series2 = addTestDataset(sopInstanceUID = "sop id 2", seriesInstanceUID = "series 2")
+      val series1 = addTestDicomData(sopInstanceUID = "sop id 1", seriesInstanceUID = "series 1")
+      val series2 = addTestDicomData(sopInstanceUID = "sop id 2", seriesInstanceUID = "series 2")
 
       val seriesType = addSeriesType()
       addMatchingRuleToSeriesType(seriesType)
@@ -141,7 +141,7 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
       addSeriesTypeRuleAttribute(seriesTypeRule, Tag.PatientName, "xyz")
       addSeriesTypeRuleAttribute(seriesTypeRule, Tag.PatientSex, "M")
 
-      val series = addTestDataset(patientName = "xyz", patientSex = "M")
+      val series = addTestDicomData(patientName = "xyz", patientSex = "M")
 
       seriesTypeUpdateService ! UpdateSeriesTypesForSeries(series.id)
       expectNoMsg
@@ -157,7 +157,7 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
       addSeriesTypeRuleAttribute(seriesTypeRule, Tag.PatientName, "xyz")
       addSeriesTypeRuleAttribute(seriesTypeRule, Tag.PatientSex, "M")
 
-      val series = addTestDataset(patientName = "xyz", patientSex = "F")
+      val series = addTestDicomData(patientName = "xyz", patientSex = "F")
 
       seriesTypeUpdateService ! UpdateSeriesTypesForSeries(series.id)
       expectNoMsg
@@ -168,7 +168,7 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
     }
   }
 
-  def addTestDataset(
+  def addTestDicomData(
                       sopInstanceUID: String = "sop id 1",
                       seriesInstanceUID: String = "series 1",
                       patientName: String = "abc",
@@ -186,7 +186,7 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
       metaDataService.ask(AddMetaData(dicomData.attributes, source))
         .mapTo[MetaDataAdded]
         .flatMap { metaData =>
-          storageService.ask(AddDataset(dicomData, source, metaData.image))
+          storageService.ask(AddDicomData(dicomData, source, metaData.image))
         }.map { _ =>
         val series = db.withSession { implicit session =>
           metaDataDao.series

@@ -99,23 +99,23 @@ trait ImportRoutes {
   def addImageToImportSessionRoute(bytes: Array[Byte], importSessionId: Long): Route = {
     import spray.httpx.SprayJsonSupport._
 
-    val dicomData = DicomUtil.loadDataset(bytes, withPixelData = true, useBulkDataURI = false)
+    val dicomData = DicomUtil.loadDicomData(bytes, withPixelData = true, useBulkDataURI = false)
     onSuccess(importService.ask(GetImportSession(importSessionId)).mapTo[Option[ImportSession]]) {
       case Some(importSession) =>
 
         val source = Source(SourceType.IMPORT, importSession.name, importSessionId)
 
-        onComplete(storageService.ask(CheckDataset(dicomData, useExtendedContexts = false)).mapTo[Boolean]) {
+        onComplete(storageService.ask(CheckDicomData(dicomData, useExtendedContexts = false)).mapTo[Boolean]) {
 
           case Success(status) =>
             onSuccess(anonymizationService.ask(ReverseAnonymization(dicomData.attributes)).mapTo[Attributes]) { reversedAttributes =>
               onSuccess(metaDataService.ask(AddMetaData(reversedAttributes, source)).mapTo[MetaDataAdded]) { metaData =>
-                onSuccess(storageService.ask(AddDataset(dicomData.copy(attributes = reversedAttributes), source, metaData.image)).mapTo[DatasetAdded]) { datasetAdded =>
-                  onSuccess(importService.ask(AddImageToSession(importSession.id, datasetAdded.image, datasetAdded.overwrite)).mapTo[ImageAddedToSession]) { importSessionImage =>
-                    if (datasetAdded.overwrite)
-                      complete((OK, datasetAdded.image))
+                onSuccess(storageService.ask(AddDicomData(dicomData.copy(attributes = reversedAttributes), source, metaData.image)).mapTo[DicomDataAdded]) { dicomDataAdded =>
+                  onSuccess(importService.ask(AddImageToSession(importSession.id, dicomDataAdded.image, dicomDataAdded.overwrite)).mapTo[ImageAddedToSession]) { importSessionImage =>
+                    if (dicomDataAdded.overwrite)
+                      complete((OK, dicomDataAdded.image))
                     else
-                      complete((Created, datasetAdded.image))
+                      complete((Created, dicomDataAdded.image))
                   }
                 }
               }

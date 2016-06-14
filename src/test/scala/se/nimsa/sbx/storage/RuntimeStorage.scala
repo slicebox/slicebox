@@ -15,7 +15,7 @@ class RuntimeStorage extends StorageService {
 
   val storage = mutable.Map.empty[String, Array[Byte]]
 
-  def storeDataset(dicomData: DicomData, image: Image): Boolean = {
+  def storeDicomData(dicomData: DicomData, image: Image): Boolean = {
     val overwrite = storage.contains(imageName(image))
     storage.put(imageName(image), toByteArray(dicomData))
     overwrite
@@ -29,11 +29,11 @@ class RuntimeStorage extends StorageService {
   def deleteFromStorage(image: Image): Unit =
     storage.remove(imageName(image))
 
-  def readDataset(image: Image, withPixelData: Boolean, useBulkDataURI: Boolean): Option[DicomData] =
-    storage.get(imageName(image)).map(bytes => loadDataset(bytes, withPixelData, useBulkDataURI))
+  def readDicomData(image: Image, withPixelData: Boolean, useBulkDataURI: Boolean): Option[DicomData] =
+    storage.get(imageName(image)).map(bytes => loadDicomData(bytes, withPixelData, useBulkDataURI))
 
   def readImageAttributes(image: Image): Option[List[ImageAttribute]] =
-    storage.get(imageName(image)).map(bytes => DicomUtil.readImageAttributes(loadDataset(bytes, withPixelData = false, useBulkDataURI = false).attributes))
+    storage.get(imageName(image)).map(bytes => DicomUtil.readImageAttributes(loadDicomData(bytes, withPixelData = false, useBulkDataURI = false).attributes))
 
   def readImageInformation(image: Image): Option[ImageInformation] =
     imageAsInputStream(image).map(is => super.readImageInformation(is))

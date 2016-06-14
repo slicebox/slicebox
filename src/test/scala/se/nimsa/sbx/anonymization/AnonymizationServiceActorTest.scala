@@ -13,7 +13,7 @@ import org.scalatest.WordSpecLike
 
 import AnonymizationProtocol.Anonymize
 import AnonymizationProtocol.ReverseAnonymization
-import AnonymizationUtil.anonymizeDataset
+import AnonymizationUtil.anonymizeAttributes
 import akka.actor.ActorSystem
 import akka.actor.Props
 import akka.testkit.ImplicitSender
@@ -69,13 +69,13 @@ class AnonymizationServiceActorTest(_system: ActorSystem) extends TestKit(_syste
       db.withSession { implicit session =>
         val dicomData = createDicomData()
         val key = insertAnonymizationKey(dicomData.attributes)
-        val anonymizedDataset = anonymizeDataset(dicomData.attributes)
-        anonymizedDataset.setString(Tag.PatientName, VR.PN, key.anonPatientName)
-        anonymizedDataset.setString(Tag.PatientID, VR.SH, key.anonPatientID)
-        anonymizedDataset.setString(Tag.StudyInstanceUID, VR.UI, key.anonStudyInstanceUID)
-        anonymizedDataset.setString(Tag.SeriesInstanceUID, VR.UI, key.anonSeriesInstanceUID)
-        anonymizedDataset.setString(Tag.FrameOfReferenceUID, VR.UI, key.anonFrameOfReferenceUID)
-        anonymizationService ! ReverseAnonymization(anonymizedDataset)
+        val anonymizedAttributes = anonymizeAttributes(dicomData.attributes)
+        anonymizedAttributes.setString(Tag.PatientName, VR.PN, key.anonPatientName)
+        anonymizedAttributes.setString(Tag.PatientID, VR.SH, key.anonPatientID)
+        anonymizedAttributes.setString(Tag.StudyInstanceUID, VR.UI, key.anonStudyInstanceUID)
+        anonymizedAttributes.setString(Tag.SeriesInstanceUID, VR.UI, key.anonSeriesInstanceUID)
+        anonymizedAttributes.setString(Tag.FrameOfReferenceUID, VR.UI, key.anonFrameOfReferenceUID)
+        anonymizationService ! ReverseAnonymization(anonymizedAttributes)
 
         expectMsgPF() {
           case reversed: Attributes =>
@@ -117,8 +117,8 @@ class AnonymizationServiceActorTest(_system: ActorSystem) extends TestKit(_syste
     }
   }
 
-  def insertAnonymizationKey(dataset: Attributes)(implicit session: H2Driver.simple.Session) = {
-    val key = createAnonymizationKey(dataset)
+  def insertAnonymizationKey(attributes: Attributes)(implicit session: H2Driver.simple.Session) = {
+    val key = createAnonymizationKey(attributes)
     anonymizationDao.insertAnonymizationKey(key)
     key
   }

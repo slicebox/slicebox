@@ -103,7 +103,7 @@ class AnonymizationRoutesTest extends FlatSpec with Matchers with RoutesTestBase
     val anonAttributes =
       PostAsUser(s"/api/images/${image.id}/anonymized", tagValues) ~> routes ~> check {
         status should be(OK)
-        DicomUtil.loadDataset(responseAs[Array[Byte]], withPixelData = true, useBulkDataURI = false).attributes
+        DicomUtil.loadDicomData(responseAs[Array[Byte]], withPixelData = true, useBulkDataURI = false).attributes
       }
 
     anonAttributes.getString(Tag.PatientName) shouldBe anonPatientName

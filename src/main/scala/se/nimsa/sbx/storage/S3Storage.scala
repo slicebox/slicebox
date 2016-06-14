@@ -24,21 +24,21 @@ class S3Storage(val bucket: String, val s3Prefix: String) extends StorageService
     s3Prefix + "/" + imageName(image)
 
 
-  def storeDataset(dicomData: DicomData, image: Image): Boolean = {
+  def storeDicomData(dicomData: DicomData, image: Image): Boolean = {
     val storedId = s3Id(image)
     val overwrite = s3Client.exists(storedId)
-    try saveDatasetToS3(dicomData, storedId) catch {
+    try saveDicomDataToS3(dicomData, storedId) catch {
       case NonFatal(e) =>
-        throw new IllegalArgumentException("Dataset file could not be stored", e)
+        throw new IllegalArgumentException("Dicom data could not be stored", e)
     }
     overwrite
   }
 
-  def saveDatasetToS3(dicomData: DicomData, s3Key: String): Unit = {
+  def saveDicomDataToS3(dicomData: DicomData, s3Key: String): Unit = {
     val os = new ByteArrayOutputStream()
-    try saveDataset(dicomData, os) catch {
+    try saveDicomData(dicomData, os) catch {
       case NonFatal(e) =>
-        throw new IllegalArgumentException("Dataset file could not be stored", e)
+        throw new IllegalArgumentException("Dicom data could not be stored", e)
     }
     val buffer = os.toByteArray
     s3Client.upload(s3Key, buffer)
@@ -51,14 +51,14 @@ class S3Storage(val bucket: String, val s3Prefix: String) extends StorageService
 
   def deleteFromStorage(image: Image): Unit = s3Client.delete(s3Id(image))
 
-  def readDataset(image: Image, withPixelData: Boolean, useBulkDataURI: Boolean): Option[DicomData] = {
+  def readDicomData(image: Image, withPixelData: Boolean, useBulkDataURI: Boolean): Option[DicomData] = {
     val s3InputStream = s3Client.get(s3Id(image))
-    Some(loadDataset(s3InputStream, withPixelData, useBulkDataURI))
+    Some(loadDicomData(s3InputStream, withPixelData, useBulkDataURI))
   }
 
   def readImageAttributes(image: Image): Option[List[ImageAttribute]] = {
     val s3InputStream = s3Client.get(s3Id(image))
-    Some(DicomUtil.readImageAttributes(loadDataset(s3InputStream, withPixelData = false, useBulkDataURI = false).attributes))
+    Some(DicomUtil.readImageAttributes(loadDicomData(s3InputStream, withPixelData = false, useBulkDataURI = false).attributes))
   }
 
   def readImageInformation(image: Image): Option[ImageInformation] = {

@@ -30,27 +30,27 @@ import AnonymizationProtocol._
 
 object AnonymizationUtil {
 
-  def setAnonymous(dataset: Attributes, anonymous: Boolean): Unit =
+  def setAnonymous(attributes: Attributes, anonymous: Boolean): Unit =
     if (anonymous)
-      dataset.setString(Tag.PatientIdentityRemoved, VR.CS, "YES")
+      attributes.setString(Tag.PatientIdentityRemoved, VR.CS, "YES")
     else
-      dataset.setString(Tag.PatientIdentityRemoved, VR.CS, "NO")
+      attributes.setString(Tag.PatientIdentityRemoved, VR.CS, "NO")
 
-  def anonymizeDataset(dataset: Attributes): Attributes = {
+  def anonymizeAttributes(attributes: Attributes): Attributes = {
     val emptyString = ""
 
-    if (isAnonymous(dataset)) {
+    if (isAnonymous(attributes)) {
 
-      cloneDataset(dataset)
+      cloneAttributes(attributes)
 
     } else {
 
-      val patientName = dataset.getString(Tag.PatientName)
-      val patientID = dataset.getString(Tag.PatientID)
-      val sex = dataset.getString(Tag.PatientSex)
-      val age = dataset.getString(Tag.PatientAge)
+      val patientName = attributes.getString(Tag.PatientName)
+      val patientID = attributes.getString(Tag.PatientID)
+      val sex = attributes.getString(Tag.PatientSex)
+      val age = attributes.getString(Tag.PatientAge)
 
-      val modified = cloneDataset(dataset)
+      val modified = cloneAttributes(attributes)
 
       // this section from standard PS3.15 Table E.1-1
 
@@ -287,21 +287,21 @@ object AnonymizationUtil {
 
   }
 
-  def setStringTag(dataset: Attributes, tag: Int, vr: VR, value: String): Unit = dataset.setString(tag, vr, value)
-  def setDateTag(dataset: Attributes, tag: Int, vr: VR, value: Date): Unit = dataset.setDate(tag, vr, value)
-  def setUidTag(dataset: Attributes, tag: Int) = setStringTag(dataset, tag, VR.UI, createUid(dataset.getString(tag)))
+  def setStringTag(attributes: Attributes, tag: Int, vr: VR, value: String): Unit = attributes.setString(tag, vr, value)
+  def setDateTag(attributes: Attributes, tag: Int, vr: VR, value: Date): Unit = attributes.setDate(tag, vr, value)
+  def setUidTag(attributes: Attributes, tag: Int) = setStringTag(attributes, tag, VR.UI, createUid(attributes.getString(tag)))
 
-  def removeTag(dataset: Attributes, tag: Int): Unit = dataset.remove(tag)
+  def removeTag(attributes: Attributes, tag: Int): Unit = attributes.remove(tag)
 
-  def setStringTagIfPresent(dataset: Attributes, tag: Int, vr: VR, valueFunction: => String) =
-    if (isPresent(dataset, tag))
-      setStringTag(dataset, tag, vr, valueFunction)
+  def setStringTagIfPresent(attributes: Attributes, tag: Int, vr: VR, valueFunction: => String) =
+    if (isPresent(attributes, tag))
+      setStringTag(attributes, tag, vr, valueFunction)
 
-  def setUidTagIfPresent(dataset: Attributes, tag: Int): Unit =
-    setStringTagIfPresent(dataset, tag, VR.UI, createUid(dataset.getString(tag)))
+  def setUidTagIfPresent(attributes: Attributes, tag: Int): Unit =
+    setStringTagIfPresent(attributes, tag, VR.UI, createUid(attributes.getString(tag)))
 
-  def isPresent(dataset: Attributes, tag: Int): Boolean = {
-    val value = dataset.getString(tag)
+  def isPresent(attributes: Attributes, tag: Int): Boolean = {
+    val value = attributes.getString(tag)
     value != null && !value.isEmpty
   }
 
@@ -325,19 +325,19 @@ object AnonymizationUtil {
     (1 to 16).foldLeft("")((s, i) => s + rand.nextInt(10).toString)
   }
 
-  def applyTagValues(dataset: Attributes, tagValues: Seq[TagValue]): Unit =
+  def applyTagValues(attributes: Attributes, tagValues: Seq[TagValue]): Unit =
     tagValues.foreach(tagValue => {
-      val vr = if (dataset.contains(tagValue.tag)) dataset.getVR(tagValue.tag) else VR.SH
-      dataset.setString(tagValue.tag, vr, tagValue.value)
+      val vr = if (attributes.contains(tagValue.tag)) attributes.getVR(tagValue.tag) else VR.SH
+      attributes.setString(tagValue.tag, vr, tagValue.value)
     })
 
-  def createAnonymizationKey(dataset: Attributes, anonDataset: Attributes): AnonymizationKey = {
-    val patient = datasetToPatient(dataset)
-    val study = datasetToStudy(dataset)
-    val series = datasetToSeries(dataset)
-    val anonPatient = datasetToPatient(anonDataset)
-    val anonStudy = datasetToStudy(anonDataset)
-    val anonSeries = datasetToSeries(anonDataset)
+  def createAnonymizationKey(attributes: Attributes, anonAttributes: Attributes): AnonymizationKey = {
+    val patient = attributesToPatient(attributes)
+    val study = attributesToStudy(attributes)
+    val series = attributesToSeries(attributes)
+    val anonPatient = attributesToPatient(anonAttributes)
+    val anonStudy = attributesToStudy(anonAttributes)
+    val anonSeries = attributesToSeries(anonAttributes)
     AnonymizationKey(-1, new Date().getTime,
       patient.patientName.value, anonPatient.patientName.value,
       patient.patientID.value, anonPatient.patientID.value, patient.patientBirthDate.value,
@@ -354,53 +354,53 @@ object AnonymizationUtil {
       key1.studyInstanceUID == key2.studyInstanceUID && key1.anonStudyInstanceUID == key2.anonStudyInstanceUID &&
       key1.seriesInstanceUID == key2.seriesInstanceUID && key1.anonSeriesInstanceUID == key2.anonSeriesInstanceUID
 
-  def reverseAnonymization(keys: List[AnonymizationKey], dataset: Attributes) = {
-    if (isAnonymous(dataset)) {
+  def reverseAnonymization(keys: List[AnonymizationKey], attributes: Attributes) = {
+    if (isAnonymous(attributes)) {
       keys.headOption.foreach(key => {
-        dataset.setString(Tag.PatientName, VR.PN, key.patientName)
-        dataset.setString(Tag.PatientID, VR.LO, key.patientID)
-        dataset.setString(Tag.PatientBirthDate, VR.DA, key.patientBirthDate)
-        val anonStudy = datasetToStudy(dataset)
+        attributes.setString(Tag.PatientName, VR.PN, key.patientName)
+        attributes.setString(Tag.PatientID, VR.LO, key.patientID)
+        attributes.setString(Tag.PatientBirthDate, VR.DA, key.patientBirthDate)
+        val anonStudy = attributesToStudy(attributes)
         val studyKeys = keys.filter(_.anonStudyInstanceUID == anonStudy.studyInstanceUID.value)
         studyKeys.headOption.foreach(studyKey => {
-          dataset.setString(Tag.StudyInstanceUID, VR.UI, studyKey.studyInstanceUID)
-          dataset.setString(Tag.StudyDescription, VR.LO, studyKey.studyDescription)
-          dataset.setString(Tag.StudyID, VR.SH, studyKey.studyID)
-          dataset.setString(Tag.AccessionNumber, VR.SH, studyKey.accessionNumber)
-          val anonSeries = datasetToSeries(dataset)
+          attributes.setString(Tag.StudyInstanceUID, VR.UI, studyKey.studyInstanceUID)
+          attributes.setString(Tag.StudyDescription, VR.LO, studyKey.studyDescription)
+          attributes.setString(Tag.StudyID, VR.SH, studyKey.studyID)
+          attributes.setString(Tag.AccessionNumber, VR.SH, studyKey.accessionNumber)
+          val anonSeries = attributesToSeries(attributes)
           val seriesKeys = studyKeys.filter(_.anonSeriesInstanceUID == anonSeries.seriesInstanceUID.value)
           seriesKeys.headOption.foreach(seriesKey => {
-            dataset.setString(Tag.SeriesInstanceUID, VR.UI, seriesKey.seriesInstanceUID)
-            dataset.setString(Tag.SeriesDescription, VR.LO, seriesKey.seriesDescription)
-            dataset.setString(Tag.ProtocolName, VR.LO, seriesKey.protocolName)
-            dataset.setString(Tag.FrameOfReferenceUID, VR.UI, seriesKey.frameOfReferenceUID)
+            attributes.setString(Tag.SeriesInstanceUID, VR.UI, seriesKey.seriesInstanceUID)
+            attributes.setString(Tag.SeriesDescription, VR.LO, seriesKey.seriesDescription)
+            attributes.setString(Tag.ProtocolName, VR.LO, seriesKey.protocolName)
+            attributes.setString(Tag.FrameOfReferenceUID, VR.UI, seriesKey.frameOfReferenceUID)
           })
         })
       })
       if (keys.nonEmpty)
-        setAnonymous(dataset, anonymous = false)
+        setAnonymous(attributes, anonymous = false)
     }
-    dataset
+    attributes
   }
 
-  def harmonizeAnonymization(keys: List[AnonymizationKey], dataset: Attributes, anonDataset: Attributes) = {
-    if (!isAnonymous(dataset)) {
+  def harmonizeAnonymization(keys: List[AnonymizationKey], attributes: Attributes, anonAttributes: Attributes) = {
+    if (!isAnonymous(attributes)) {
       keys.headOption.foreach(key => {
-        anonDataset.setString(Tag.PatientID, VR.LO, key.anonPatientID)
-        val study = datasetToStudy(dataset)
+        anonAttributes.setString(Tag.PatientID, VR.LO, key.anonPatientID)
+        val study = attributesToStudy(attributes)
         val studyKeys = keys.filter(_.studyInstanceUID == study.studyInstanceUID.value)
         studyKeys.headOption.foreach(studyKey => {
-          anonDataset.setString(Tag.StudyInstanceUID, VR.UI, studyKey.anonStudyInstanceUID)
-          val series = datasetToSeries(dataset)
+          anonAttributes.setString(Tag.StudyInstanceUID, VR.UI, studyKey.anonStudyInstanceUID)
+          val series = attributesToSeries(attributes)
           val seriesKeys = studyKeys.filter(_.seriesInstanceUID == series.seriesInstanceUID.value)
           seriesKeys.headOption.foreach(seriesKey => {
-            anonDataset.setString(Tag.SeriesInstanceUID, VR.UI, seriesKey.anonSeriesInstanceUID)
-            anonDataset.setString(Tag.FrameOfReferenceUID, VR.UI, seriesKey.anonFrameOfReferenceUID)
+            anonAttributes.setString(Tag.SeriesInstanceUID, VR.UI, seriesKey.anonSeriesInstanceUID)
+            anonAttributes.setString(Tag.FrameOfReferenceUID, VR.UI, seriesKey.anonFrameOfReferenceUID)
           })
         })
       })
     }
-    anonDataset
+    anonAttributes
   }
 
 }

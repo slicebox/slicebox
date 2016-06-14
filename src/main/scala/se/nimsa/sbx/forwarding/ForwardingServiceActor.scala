@@ -245,7 +245,7 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
 
   def addImageToForwardingQueue(forwardingTransaction: ForwardingTransaction, image: Image) =
     db.withTransaction { implicit session =>
-      // a dataset may be added multiple times (with overwrite), check if it has been added before
+      // dicom data may be added multiple times (with overwrite), check if it has been added before
       forwardingDao.getTransactionImageForTransactionIdAndImageId(forwardingTransaction.id, image.id)
         .getOrElse(
           forwardingDao.insertForwardingTransactionImage(ForwardingTransactionImage(-1, forwardingTransaction.id, image.id)))

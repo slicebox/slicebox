@@ -160,24 +160,24 @@ class MetaDataServiceActorTest(_system: ActorSystem) extends TestKit(_system) wi
       metaDataActorRef ! AddMetaData(dicomData.attributes, source)
       val image1 = expectMsgPF() { case MetaDataAdded(_, _, _, im, _, _, _, _, _) => im }
 
-      val dataset2 = new Attributes(dicomData.attributes)
-      dataset2.setString(Tag.PatientName, VR.PN, "pat2")
-      metaDataActorRef ! AddMetaData(dataset2, source)
+      val attributes2 = new Attributes(dicomData.attributes)
+      attributes2.setString(Tag.PatientName, VR.PN, "pat2")
+      metaDataActorRef ! AddMetaData(attributes2, source)
       val image2 = expectMsgPF() { case MetaDataAdded(_, _, _, im, _, _, _, _, _) => im }
 
-      val dataset3 = new Attributes(dicomData.attributes)
-      dataset3.setString(Tag.StudyInstanceUID, VR.UI, "stuid2")
-      metaDataActorRef ! AddMetaData(dataset3, source)
+      val attributes3 = new Attributes(dicomData.attributes)
+      attributes3.setString(Tag.StudyInstanceUID, VR.UI, "stuid2")
+      metaDataActorRef ! AddMetaData(attributes3, source)
       val image3 = expectMsgPF() { case MetaDataAdded(_, _, _, im, _, _, _, _, _) => im }
 
-      val dataset4 = new Attributes(dicomData.attributes)
-      dataset4.setString(Tag.SeriesInstanceUID, VR.UI, "seuid2")
-      metaDataActorRef ! AddMetaData(dataset4, source)
+      val attributes4 = new Attributes(dicomData.attributes)
+      attributes4.setString(Tag.SeriesInstanceUID, VR.UI, "seuid2")
+      metaDataActorRef ! AddMetaData(attributes4, source)
       val image4 = expectMsgPF() { case MetaDataAdded(_, _, _, im, _, _, _, _, _) => im }
 
-      val dataset5 = new Attributes(dicomData.attributes)
-      dataset5.setString(Tag.SOPInstanceUID, VR.UI, "sopuid2")
-      metaDataActorRef ! AddMetaData(dataset5, source)
+      val attributes5 = new Attributes(dicomData.attributes)
+      attributes5.setString(Tag.SOPInstanceUID, VR.UI, "sopuid2")
+      metaDataActorRef ! AddMetaData(attributes5, source)
       val image5 = expectMsgPF() { case MetaDataAdded(_, _, _, im, _, _, _, _, _) => im }
 
       Thread.sleep(500)

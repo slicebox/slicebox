@@ -47,30 +47,30 @@ class StorageServiceActor(storage: StorageService) extends Actor with ExceptionC
     case msg: ImageRequest => catchAndReport {
       msg match {
 
-        case CheckDataset(dicomData, useExtendedContexts) =>
-          checkDataset(dicomData, useExtendedContexts)
+        case CheckDicomData(dicomData, useExtendedContexts) =>
+          checkDicomData(dicomData, useExtendedContexts)
           sender ! true
 
-        case AddDataset(dicomData, source, image) =>
-          val overwrite = storage.storeDataset(dicomData, image)
+        case AddDicomData(dicomData, source, image) =>
+          val overwrite = storage.storeDicomData(dicomData, image)
           if (overwrite)
             log.info(s"Updated existing file with image id ${image.id}")
           else
             log.info(s"Stored file with image id ${image.id}")
-          val datasetAdded = DatasetAdded(image, overwrite)
+          val dicomDataAdded = DicomDataAdded(image, overwrite)
           val imageAdded = ImageAdded(image, source, overwrite)
           context.system.eventStream.publish(imageAdded)
-          sender ! datasetAdded
+          sender ! dicomDataAdded
 
-        case DeleteDataset(image) =>
-          val datasetDeleted = DatasetDeleted(image)
+        case DeleteDicomData(image) =>
+          val dicomDataDeleted = DicomDataDeleted(image)
           try {
             storage.deleteFromStorage(image)
-            context.system.eventStream.publish(datasetDeleted)
+            context.system.eventStream.publish(dicomDataDeleted)
           } catch {
             case e: NoSuchFileException => log.info(s"DICOM file for image with id ${image.id} could not be found, no need to delete.")
           }
-          sender ! datasetDeleted
+          sender ! dicomDataDeleted
 
         case CreateExportSet(imageIds) =>
           val exportSetId = if (exportSets.isEmpty) 1 else exportSets.keys.max + 1
@@ -82,11 +82,11 @@ class StorageServiceActor(storage: StorageService) extends Actor with ExceptionC
           sender ! exportSets.get(exportSetId)
 
         case GetImageData(image) =>
-          val data = storage.imageAsByteArray(image).map(ImageData(_))
+          val data = storage.imageAsByteArray(image).map(DicomDataArray(_))
           sender ! data
 
-        case GetDataset(image, withPixelData, useBulkDataURI) =>
-          sender ! storage.readDataset(image, withPixelData, useBulkDataURI)
+        case GetDicomData(image, withPixelData, useBulkDataURI) =>
+          sender ! storage.readDicomData(image, withPixelData, useBulkDataURI)
 
         case GetImageAttributes(image) =>
           sender ! storage.readImageAttributes(image)
@@ -94,18 +94,18 @@ class StorageServiceActor(storage: StorageService) extends Actor with ExceptionC
         case GetImageInformation(image) =>
           sender ! storage.readImageInformation(image)
 
-        case GetPngImageData(image, frameNumber, windowMin, windowMax, imageHeight) =>
+        case GetPngDataArray(image, frameNumber, windowMin, windowMax, imageHeight) =>
           val pngResponse =
             try
-              storage.readPngImageData(image, frameNumber, windowMin, windowMax, imageHeight).map(PngImageData(_))
+              storage.readPngImageData(image, frameNumber, windowMin, windowMax, imageHeight).map(PngDataArray(_))
             catch {
               case NonFatal(e1) =>
                 try
-                  storage.readSecondaryCaptureJpeg(image, imageHeight).map(PngImageData(_))
+                  storage.readSecondaryCaptureJpeg(image, imageHeight).map(PngDataArray(_))
                 catch {
                   case NonFatal(e2) =>
                     log.debug(s"Could not create PNG image data for image with ID ${image.id}, returning empty response")
-                    Some(PngImageDataNotAvailable)
+                    Some(PngDataArrayNotAvailable)
                 }
             }
           sender ! pngResponse
@@ -118,7 +118,7 @@ class StorageServiceActor(storage: StorageService) extends Actor with ExceptionC
 
   }
 
-  def checkDataset(dicomData: DicomData, useExtendedContexts: Boolean): Unit = {
+  def checkDicomData(dicomData: DicomData, useExtendedContexts: Boolean): Unit = {
     if (dicomData == null || dicomData.attributes == null || dicomData.metaInformation == null)
       throw new IllegalArgumentException("Invalid DICOM data")
     val allowedContexts = if (useExtendedContexts) Contexts.extendedContexts else Contexts.imageDataContexts

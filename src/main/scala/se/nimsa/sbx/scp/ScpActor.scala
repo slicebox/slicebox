@@ -30,7 +30,7 @@ import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, MetaDataAdded}
 import se.nimsa.sbx.scp.ScpProtocol._
-import se.nimsa.sbx.storage.StorageProtocol.{AddDataset, CheckDataset, DatasetAdded}
+import se.nimsa.sbx.storage.StorageProtocol.{AddDicomData, CheckDicomData, DicomDataAdded}
 
 import scala.concurrent.Future
 import scala.util.control.NonFatal
@@ -68,40 +68,40 @@ class ScpActor(scpData: ScpData, executor: Executor, implicit val timeout: Timeo
 
   def receive = LoggingReceive {
     case DicomDataReceivedByScp(dicomData) =>
-      log.debug("SCP", s"Dataset received using SCP ${scpData.name}")
+      log.debug("SCP", s"Dicom data received using SCP ${scpData.name}")
       val source = Source(SourceType.SCP, scpData.name, scpData.id)
-      val addDatasetFuture =
-        checkDataset(dicomData).flatMap { status =>
+      val addDicomDataFuture =
+        checkDicomData(dicomData).flatMap { status =>
           reverseAnonymization(dicomData.attributes).flatMap { reversedAttributes =>
             val reversedDicomData = DicomData(reversedAttributes, dicomData.metaInformation)
             addMetadata(reversedAttributes, source).flatMap { image =>
-              addDataset(reversedDicomData, source, image).map { overwrite =>
+              addDicomData(reversedDicomData, source, image).map { overwrite =>
               }
             }
           }
         }
 
-      addDatasetFuture.onFailure {
+      addDicomDataFuture.onFailure {
         case NonFatal(e) =>
           SbxLog.error("Directory", s"Could not add file: ${e.getMessage}")
       }
 
-      addDatasetFuture.pipeTo(sender)
+      addDicomDataFuture.pipeTo(sender)
   }
 
-  def addMetadata(dataset: Attributes, source: Source): Future[Image] =
+  def addMetadata(attributes: Attributes, source: Source): Future[Image] =
     metaDataService.ask(
-      AddMetaData(dataset, source))
+      AddMetaData(attributes, source))
       .mapTo[MetaDataAdded]
       .map(_.image)
 
-  def addDataset(dicomData: DicomData, source: Source, image: Image): Future[Boolean] =
-    storageService.ask(AddDataset(dicomData, source, image))
-      .mapTo[DatasetAdded]
+  def addDicomData(dicomData: DicomData, source: Source, image: Image): Future[Boolean] =
+    storageService.ask(AddDicomData(dicomData, source, image))
+      .mapTo[DicomDataAdded]
       .map(_.overwrite)
 
-  def checkDataset(dicomData: DicomData): Future[Boolean] =
-    storageService.ask(CheckDataset(dicomData, useExtendedContexts = false)).mapTo[Boolean]
+  def checkDicomData(dicomData: DicomData): Future[Boolean] =
+    storageService.ask(CheckDicomData(dicomData, useExtendedContexts = false)).mapTo[Boolean]
 
   def reverseAnonymization(attributes: Attributes): Future[Attributes] =
     anonymizationService.ask(ReverseAnonymization(attributes)).mapTo[Attributes]

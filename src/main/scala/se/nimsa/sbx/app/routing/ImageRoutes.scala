@@ -52,9 +52,9 @@ trait ImageRoutes {
       pathEndOrSingleSlash {
         post {
           formField('file.as[FormFile]) { file =>
-            addDatasetRoute(file.entity.data.toByteArray, apiUser)
+            addDicomDataRoute(file.entity.data.toByteArray, apiUser)
           } ~ entity(as[Array[Byte]]) { bytes =>
-            addDatasetRoute(bytes, apiUser)
+            addDicomDataRoute(bytes, apiUser)
           }
         }
       } ~ noop {
@@ -64,14 +64,14 @@ trait ImageRoutes {
             case Some(image) =>
               pathEndOrSingleSlash {
                 get {
-                  onSuccess(storageService.ask(GetImageData(image)).mapTo[Option[ImageData]]) {
+                  onSuccess(storageService.ask(GetImageData(image)).mapTo[Option[DicomDataArray]]) {
                     case Some(imageData) =>
                       complete(HttpEntity(`application/octet-stream`, HttpData(imageData.data)))
                     case None =>
                       complete((NotFound, s"No image data found for image id $imageId"))
                   }
                 } ~ delete {
-                  onSuccess(storageService.ask(DeleteDataset(image)).flatMap { _ =>
+                  onSuccess(storageService.ask(DeleteDicomData(image)).flatMap { _ =>
                     metaDataService.ask(DeleteMetaData(image.id))
                   }) {
                     case _ =>
@@ -97,9 +97,9 @@ trait ImageRoutes {
                   'windowmax.as[Int] ? 0,
                   'imageheight.as[Int] ? 0) { (frameNumber, min, max, height) =>
                   get {
-                    onSuccess(storageService.ask(GetPngImageData(image, frameNumber, min, max, height))) {
-                      case Some(PngImageData(bytes)) => complete(HttpEntity(`image/png`, HttpData(bytes)))
-                      case Some(PngImageDataNotAvailable) => complete(NoContent)
+                    onSuccess(storageService.ask(GetPngDataArray(image, frameNumber, min, max, height))) {
+                      case Some(PngDataArray(bytes)) => complete(HttpEntity(`image/png`, HttpData(bytes)))
+                      case Some(PngDataArrayNotAvailable) => complete(NoContent)
                       case None => complete(NotFound)
                     }
                   }
@@ -115,7 +115,7 @@ trait ImageRoutes {
                 imageIds.map { imageId =>
                   metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]].map { imageMaybe =>
                     imageMaybe.map { image =>
-                      storageService.ask(DeleteDataset(image)).flatMap { _ =>
+                      storageService.ask(DeleteDicomData(image)).flatMap { _ =>
                         metaDataService.ask(DeleteMetaData(image.id))
                       }
                     }
@@ -163,7 +163,7 @@ trait ImageRoutes {
                     patientMaybe.map { patient =>
                       val dicomData = Jpeg2Dcm(jpegBytes, patient, study)
                       metaDataService.ask(AddMetaData(dicomData.attributes, source)).mapTo[MetaDataAdded].flatMap { metaData =>
-                        storageService.ask(AddDataset(dicomData, source, metaData.image)).map { _ => metaData.image }
+                        storageService.ask(AddDicomData(dicomData, source, metaData.image)).map { _ => metaData.image }
                       }
                     }
                   }
@@ -181,17 +181,17 @@ trait ImageRoutes {
       }
     }
 
-  private def addDatasetRoute(bytes: Array[Byte], apiUser: ApiUser) = {
+  private def addDicomDataRoute(bytes: Array[Byte], apiUser: ApiUser) = {
     import spray.httpx.SprayJsonSupport._
 
-    val dicomData = DicomUtil.loadDataset(bytes, withPixelData = true, useBulkDataURI = false)
+    val dicomData = DicomUtil.loadDicomData(bytes, withPixelData = true, useBulkDataURI = false)
     val source = Source(SourceType.USER, apiUser.user, apiUser.id)
     val futureImageAndOverwrite =
-      storageService.ask(CheckDataset(dicomData, useExtendedContexts = true)).mapTo[Boolean].flatMap { status =>
+      storageService.ask(CheckDicomData(dicomData, useExtendedContexts = true)).mapTo[Boolean].flatMap { status =>
         anonymizationService.ask(ReverseAnonymization(dicomData.attributes)).mapTo[Attributes].flatMap { reversedAttributes =>
           metaDataService.ask(AddMetaData(reversedAttributes, source)).mapTo[MetaDataAdded].flatMap { metaData =>
-            storageService.ask(AddDataset(dicomData.copy(attributes = reversedAttributes), source, metaData.image)).mapTo[DatasetAdded].map { datasetAdded =>
-              (metaData.image, datasetAdded.overwrite)
+            storageService.ask(AddDicomData(dicomData.copy(attributes = reversedAttributes), source, metaData.image)).mapTo[DicomDataAdded].map { dicomDataAdded =>
+              (metaData.image, dicomDataAdded.overwrite)
             }
           }
         }
@@ -248,12 +248,12 @@ trait ImageRoutes {
         context.stop(self)
     }
 
-    def getImageData(imageId: Long): Future[Option[(Image, FlatSeries, ImageData)]] =
+    def getImageData(imageId: Long): Future[Option[(Image, FlatSeries, DicomDataArray)]] =
       metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]].flatMap { imageMaybe =>
         imageMaybe.map { image =>
           metaDataService.ask(GetSingleFlatSeries(image.seriesId)).mapTo[Option[FlatSeries]].flatMap { flatSeriesMaybe =>
             flatSeriesMaybe.map { flatSeries =>
-              storageService.ask(GetImageData(image)).mapTo[Option[ImageData]].map { imageDataMaybe =>
+              storageService.ask(GetImageData(image)).mapTo[Option[DicomDataArray]].map { imageDataMaybe =>
                 imageDataMaybe.map { imageData =>
                   (image, flatSeries, imageData)
                 }

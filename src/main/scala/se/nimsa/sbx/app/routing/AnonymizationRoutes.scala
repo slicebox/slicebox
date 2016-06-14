@@ -53,7 +53,7 @@ trait AnonymizationRoutes {
         entity(as[Seq[TagValue]]) { tagValues =>
           onSuccess(metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]]) {
             case Some(image) =>
-              onSuccess(storageService.ask(GetDataset(image, withPixelData = true, useBulkDataURI = false)).mapTo[Option[DicomData]]) {
+              onSuccess(storageService.ask(GetDicomData(image, withPixelData = true, useBulkDataURI = false)).mapTo[Option[DicomData]]) {
                 case Some(dicomData) =>
                   onSuccess(anonymizationService.ask(Anonymize(imageId, dicomData.attributes, tagValues)).mapTo[Attributes]) { anonAttributes =>
                     complete(HttpEntity(`application/octet-stream`, HttpData(DicomUtil.toByteArray(dicomData.copy(attributes = anonAttributes)))))
@@ -126,20 +126,20 @@ trait AnonymizationRoutes {
       }
     }
 
-  def anonymizeOne(apiUser: ApiUser, imageId: Long, tagValues: Seq[TagValue]): Future[Option[DatasetAdded]] =
+  def anonymizeOne(apiUser: ApiUser, imageId: Long, tagValues: Seq[TagValue]): Future[Option[DicomDataAdded]] =
     metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]].flatMap { imageMaybe =>
       imageMaybe.map { image =>
         metaDataService.ask(GetSourceForSeries(image.seriesId)).mapTo[Option[SeriesSource]].flatMap { seriesSourceMaybe =>
           seriesSourceMaybe.map { seriesSource =>
             val source = seriesSource.source
-            storageService.ask(GetDataset(image, withPixelData = true)).mapTo[Option[DicomData]].map { optionalDicomData =>
+            storageService.ask(GetDicomData(image, withPixelData = true)).mapTo[Option[DicomData]].map { optionalDicomData =>
               optionalDicomData.map { dicomData =>
                 AnonymizationUtil.setAnonymous(dicomData.attributes, anonymous = false) // pretend not anonymized to force anonymization
                 anonymizationService.ask(Anonymize(imageId, dicomData.attributes, tagValues)).mapTo[Attributes].flatMap { anonAttributes =>
                   metaDataService.ask(DeleteMetaData(image.id)).flatMap { _ =>
-                    storageService.ask(DeleteDataset(image)).flatMap { _ =>
+                    storageService.ask(DeleteDicomData(image)).flatMap { _ =>
                       metaDataService.ask(AddMetaData(anonAttributes, source)).mapTo[MetaDataAdded].flatMap { metaData =>
-                        storageService.ask(AddDataset(dicomData.copy(attributes = anonAttributes), source, metaData.image)).mapTo[DatasetAdded]
+                        storageService.ask(AddDicomData(dicomData.copy(attributes = anonAttributes), source, metaData.image)).mapTo[DicomDataAdded]
                       }
                     }
                   }

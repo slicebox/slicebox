@@ -30,7 +30,7 @@ import se.nimsa.sbx.lang.{BadGatewayException, NotFoundException}
 import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.metadata.MetaDataProtocol.GetImage
 import se.nimsa.sbx.scu.ScuProtocol._
-import se.nimsa.sbx.storage.StorageProtocol.GetDataset
+import se.nimsa.sbx.storage.StorageProtocol.GetDicomData
 import se.nimsa.sbx.util.ExceptionCatching
 import se.nimsa.sbx.util.SbxExtensions._
 
@@ -54,7 +54,7 @@ class ScuServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extends Actor
     override def getDicomData(imageId: Long, withPixelData: Boolean): Future[Option[DicomData]] = {
       metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]].flatMap { imageMaybe =>
         imageMaybe.map { image =>
-          storageService.ask(GetDataset(image, withPixelData, useBulkDataURI = withPixelData)).mapTo[Option[DicomData]]
+          storageService.ask(GetDicomData(image, withPixelData, useBulkDataURI = withPixelData)).mapTo[Option[DicomData]]
         }.unwrap
       }
     }

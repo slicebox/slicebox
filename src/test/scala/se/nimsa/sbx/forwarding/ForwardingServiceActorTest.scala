@@ -57,9 +57,9 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     var deletedImages = Seq.empty[Long]
 
     def receive = {
-      case DeleteDataset(image) =>
+      case DeleteDicomData(image) =>
         deletedImages = deletedImages :+ image.id
-        sender ! DatasetDeleted(image)
+        sender ! DicomDataDeleted(image)
       case ResetDeletedImages =>
         deletedImages = Seq.empty[Long]
       case GetDeletedImages =>

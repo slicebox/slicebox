@@ -73,7 +73,7 @@ object MetaDataProtocol {
 
   // messages
 
-  case class AddMetaData(dataset: Attributes, source: Source)
+  case class AddMetaData(attributes: Attributes, source: Source)
   
   case class DeleteMetaData(imageId: Long)  
     

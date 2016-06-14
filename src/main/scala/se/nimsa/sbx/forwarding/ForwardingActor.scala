@@ -12,7 +12,7 @@ import se.nimsa.sbx.forwarding.ForwardingProtocol._
 import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.metadata.MetaDataProtocol.{DeleteMetaData, GetImage}
 import se.nimsa.sbx.scu.ScuProtocol.SendImagesToScp
-import se.nimsa.sbx.storage.StorageProtocol.DeleteDataset
+import se.nimsa.sbx.storage.StorageProtocol.DeleteDicomData
 import se.nimsa.sbx.util.SbxExtensions._
 
 import scala.concurrent.Future
@@ -74,7 +74,7 @@ class ForwardingActor(rule: ForwardingRule, transaction: ForwardingTransaction, 
         metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]].map { imageMaybe =>
           imageMaybe.map { image =>
             metaDataService.ask(DeleteMetaData(imageId)).flatMap { _ =>
-              storageService.ask(DeleteDataset(image)).map { _ =>
+              storageService.ask(DeleteDicomData(image)).map { _ =>
                 imageId
               }
             }

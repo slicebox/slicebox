@@ -55,16 +55,16 @@ trait TransactionRoutes {
               post {
                 entity(as[Array[Byte]]) { compressedBytes =>
                   val bytes = decompress(compressedBytes)
-                  val dicomData = loadDataset(bytes, withPixelData = true, useBulkDataURI = false)
+                  val dicomData = loadDicomData(bytes, withPixelData = true, useBulkDataURI = false)
                   if (dicomData == null)
-                    complete((BadRequest, "Dataset could not be read"))
+                    complete((BadRequest, "Dicom data could not be read"))
                   else
-                    onSuccess(storageService.ask(CheckDataset(dicomData, useExtendedContexts = true)).mapTo[Boolean]) { status =>
+                    onSuccess(storageService.ask(CheckDicomData(dicomData, useExtendedContexts = true)).mapTo[Boolean]) { status =>
                       onSuccess(anonymizationService.ask(ReverseAnonymization(dicomData.attributes)).mapTo[Attributes]) { reversedAttributes =>
                         val source = Source(SourceType.BOX, box.name, box.id)
                         onSuccess(metaDataService.ask(AddMetaData(reversedAttributes, source)).mapTo[MetaDataAdded]) { metaData =>
-                          onSuccess(storageService.ask(AddDataset(dicomData.copy(attributes = reversedAttributes), source, metaData.image))) {
-                            case DatasetAdded(image, overwrite) =>
+                          onSuccess(storageService.ask(AddDicomData(dicomData.copy(attributes = reversedAttributes), source, metaData.image))) {
+                            case DicomDataAdded(image, overwrite) =>
                               onSuccess(boxService.ask(UpdateIncoming(box, outgoingTransactionId, sequenceNumber, totalImageCount, image.id, overwrite))) {
                                 case IncomingUpdated(transaction) =>
                                   transaction.status match {
@@ -131,7 +131,7 @@ trait TransactionRoutes {
                         case transactionTagValues =>
                           onSuccess(metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]]) {
                             case Some(image) =>
-                              onSuccess(storageService.ask(GetDataset(image, withPixelData = true)).mapTo[Option[DicomData]]) {
+                              onSuccess(storageService.ask(GetDicomData(image, withPixelData = true)).mapTo[Option[DicomData]]) {
                                 case Some(dicomData) =>
 
                                   onSuccess(anonymizationService.ask(Anonymize(imageId, dicomData.attributes, transactionTagValues.map(_.tagValue)))) {

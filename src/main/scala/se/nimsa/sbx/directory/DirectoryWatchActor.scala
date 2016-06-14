@@ -31,7 +31,7 @@ import se.nimsa.sbx.directory.DirectoryWatchProtocol._
 import se.nimsa.sbx.dicom.DicomUtil._
 import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, MetaDataAdded}
-import se.nimsa.sbx.storage.StorageProtocol.{AddDataset, CheckDataset, DatasetAdded}
+import se.nimsa.sbx.storage.StorageProtocol.{AddDicomData, CheckDicomData, DicomDataAdded}
 
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
@@ -56,7 +56,7 @@ class DirectoryWatchActor(watchedDirectory: WatchedDirectory,
   implicit val system = context.system
   implicit val ec = context.dispatcher
 
-  case object DatasetProcessed
+  case object DicomDataProcessed
 
   override def preStart() {
     watchThread.setDaemon(true)
@@ -72,23 +72,23 @@ class DirectoryWatchActor(watchedDirectory: WatchedDirectory,
 
     case FileAddedToWatchedDirectory(path) =>
       if (Files.isRegularFile(path)) {
-        val dicomData = loadDataset(path, withPixelData = true, useBulkDataURI = false)
+        val dicomData = loadDicomData(path, withPixelData = true, useBulkDataURI = false)
         val source = Source(SourceType.DIRECTORY, watchedDirectory.name, watchedDirectory.id)
         context.become(waitForDatasetProcessed)
-        checkDataset(dicomData).flatMap { status =>
+        checkDicomData(dicomData).flatMap { status =>
           reverseAnonymization(dicomData.attributes).flatMap { reversedAttributes =>
             val reversedDicomData = DicomData(reversedAttributes, dicomData.metaInformation)
             addMetadata(reversedAttributes, source).flatMap { image =>
-              addDataset(reversedDicomData, source, image).map { overwrite =>
+              addDicomData(reversedDicomData, source, image).map { overwrite =>
               }
             }
           }
         }.onComplete {
           case Success(_) =>
-            self ! DatasetProcessed
+            self ! DicomDataProcessed
           case Failure(NonFatal(e)) =>
             SbxLog.error("Directory", s"Could not add file: ${e.getMessage}")
-            self ! DatasetProcessed
+            self ! DicomDataProcessed
         }
       }
 
@@ -97,24 +97,24 @@ class DirectoryWatchActor(watchedDirectory: WatchedDirectory,
   def waitForDatasetProcessed = LoggingReceive {
     case msg: FileAddedToWatchedDirectory =>
       stash()
-    case DatasetProcessed =>
+    case DicomDataProcessed =>
       context.unbecome()
       unstashAll()
   }
 
-  def addMetadata(dataset: Attributes, source: Source): Future[Image] =
+  def addMetadata(attributes: Attributes, source: Source): Future[Image] =
     metaDataService.ask(
-      AddMetaData(dataset, source))
+      AddMetaData(attributes, source))
       .mapTo[MetaDataAdded]
       .map(_.image)
 
-  def addDataset(dicomData: DicomData, source: Source, image: Image): Future[Boolean] =
-    storageService.ask(AddDataset(dicomData, source, image))
-      .mapTo[DatasetAdded]
+  def addDicomData(dicomData: DicomData, source: Source, image: Image): Future[Boolean] =
+    storageService.ask(AddDicomData(dicomData, source, image))
+      .mapTo[DicomDataAdded]
       .map(_.overwrite)
 
-  def checkDataset(dicomData: DicomData): Future[Boolean] =
-    storageService.ask(CheckDataset(dicomData, useExtendedContexts = false)).mapTo[Boolean]
+  def checkDicomData(dicomData: DicomData): Future[Boolean] =
+    storageService.ask(CheckDicomData(dicomData, useExtendedContexts = false)).mapTo[Boolean]
 
   def reverseAnonymization(attributes: Attributes): Future[Attributes] =
     anonymizationService.ask(ReverseAnonymization(attributes)).mapTo[Attributes]

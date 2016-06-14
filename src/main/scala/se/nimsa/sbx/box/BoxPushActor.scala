@@ -29,7 +29,7 @@ import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.DicomUtil.toByteArray
 import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.metadata.MetaDataProtocol.GetImage
-import se.nimsa.sbx.storage.StorageProtocol.GetDataset
+import se.nimsa.sbx.storage.StorageProtocol.GetDicomData
 import se.nimsa.sbx.util.CompressionUtil.compress
 import spray.client.pipelining.{Get, Post, Put, sendReceive}
 import spray.http.StatusCodes.NoContent
@@ -123,17 +123,17 @@ class BoxPushActor(box: Box,
   def pushImagePipeline(transactionImage: OutgoingTransactionImage, tagValues: Seq[OutgoingTagValue]): Future[HttpResponse] =
     metaDataService.ask(GetImage(transactionImage.image.imageId)).mapTo[Option[Image]].flatMap {
       case Some(image) =>
-        storageService.ask(GetDataset(image, withPixelData = true)).mapTo[Option[DicomData]].flatMap {
+        storageService.ask(GetDicomData(image, withPixelData = true)).mapTo[Option[DicomData]].flatMap {
           case Some(dicomData) =>
             anonymizationService.ask(Anonymize(transactionImage.image.imageId, dicomData.attributes, tagValues.map(_.tagValue))).mapTo[Attributes].flatMap { anonymizedAttributes =>
               val compressedBytes = compress(toByteArray(dicomData.copy(attributes = anonymizedAttributes)))
               pipeline(Post(s"${box.baseUrl}/image?transactionid=${transactionImage.transaction.id}&sequencenumber=${transactionImage.image.sequenceNumber}&totalimagecount=${transactionImage.transaction.totalImageCount}", HttpData(compressedBytes)))
             }
           case None =>
-            Future.failed(new IllegalArgumentException("No dataset found for image id " + image.id))
+            Future.failed(new IllegalArgumentException("Dicom data not found for image id " + image.id))
         }
       case None =>
-        Future.failed(new IllegalArgumentException("No image found for image id " + transactionImage.image.imageId))
+        Future.failed(new IllegalArgumentException("Image not found for image id " + transactionImage.image.imageId))
     }
 
   def handleFileSentForOutgoingTransaction(transactionImage: OutgoingTransactionImage): Future[Unit] = {

@@ -16,47 +16,33 @@
 
 package se.nimsa.sbx.dicom
 
-import org.dcm4che3.data.Attributes
-import se.nimsa.sbx.dicom.DicomHierarchy._
-import se.nimsa.sbx.dicom.DicomPropertyValue._
-import org.dcm4che3.data.Tag
-import org.dcm4che3.util.SafeClose
-import org.dcm4che3.io.DicomInputStream
-import org.dcm4che3.io.DicomOutputStream
-import java.nio.file.Files
-import java.io.BufferedInputStream
-import java.nio.file.Path
-
-import org.dcm4che3.data.UID
-import org.dcm4che3.io.DicomInputStream.IncludeBulkData
-import java.io.InputStream
-import java.io.ByteArrayInputStream
-import java.io.OutputStream
 import java.awt.image.BufferedImage
+import java.io._
+import java.nio.file.{Files, Path}
 import javax.imageio.ImageIO
 
-import org.dcm4che3.imageio.plugins.dcm.DicomImageReadParam
-import java.io.ByteArrayOutputStream
-
+import org.dcm4che3.data.{Attributes, Keyword, Tag, VR}
 import org.dcm4che3.data.Attributes.Visitor
-import org.dcm4che3.data.VR
+import org.dcm4che3.imageio.plugins.dcm.DicomImageReadParam
+import org.dcm4che3.io.{BulkDataDescriptor, DicomInputStream, DicomOutputStream}
+import org.dcm4che3.io.DicomInputStream.IncludeBulkData
+import org.dcm4che3.util.{SafeClose, TagUtils}
+import se.nimsa.sbx.dicom.Contexts.Context
+import se.nimsa.sbx.dicom.DicomHierarchy._
+import se.nimsa.sbx.dicom.DicomPropertyValue._
 
 import scala.collection.mutable.ListBuffer
-import org.dcm4che3.util.TagUtils
-import org.dcm4che3.data.Keyword
-import org.dcm4che3.io.BulkDataDescriptor
-import se.nimsa.sbx.dicom.Contexts.Context
 
 object DicomUtil {
 
-  def isAnonymous(dataset: Attributes) = dataset.getString(Tag.PatientIdentityRemoved, "NO") == "YES"
+  def isAnonymous(attributes: Attributes) = attributes.getString(Tag.PatientIdentityRemoved, "NO") == "YES"
 
-  def cloneDataset(dataset: Attributes): Attributes = new Attributes(dataset)
+  def cloneAttributes(attributes: Attributes): Attributes = new Attributes(attributes)
 
-  def saveDataset(dicomData: DicomData, filePath: Path): Unit =
-    saveDataset(dicomData, Files.newOutputStream(filePath))
+  def saveDicomData(dicomData: DicomData, filePath: Path): Unit =
+    saveDicomData(dicomData, Files.newOutputStream(filePath))
 
-  def saveDataset(dicomData: DicomData, outputStream: OutputStream): Unit = {
+  def saveDicomData(dicomData: DicomData, outputStream: OutputStream): Unit = {
     var dos: DicomOutputStream = null
     try {
       val transferSyntaxUID = dicomData.metaInformation.getString(Tag.TransferSyntaxUID)
@@ -69,18 +55,18 @@ object DicomUtil {
     }
   }
 
-  def loadDataset(path: Path, withPixelData: Boolean, useBulkDataURI: Boolean): DicomData =
-    loadDataset(new BufferedInputStream(Files.newInputStream(path)), withPixelData, useBulkDataURI)
+  def loadDicomData(path: Path, withPixelData: Boolean, useBulkDataURI: Boolean): DicomData =
+    loadDicomData(new BufferedInputStream(Files.newInputStream(path)), withPixelData, useBulkDataURI)
 
-  def loadDataset(byteArray: Array[Byte], withPixelData: Boolean, useBulkDataURI: Boolean): DicomData =
-    loadDataset(new BufferedInputStream(new ByteArrayInputStream(byteArray)), withPixelData, useBulkDataURI)
+  def loadDicomData(byteArray: Array[Byte], withPixelData: Boolean, useBulkDataURI: Boolean): DicomData =
+    loadDicomData(new BufferedInputStream(new ByteArrayInputStream(byteArray)), withPixelData, useBulkDataURI)
 
-  def loadDataset(inputStream: InputStream, withPixelData: Boolean, useBulkDataURI: Boolean): DicomData = {
+  def loadDicomData(inputStream: InputStream, withPixelData: Boolean, useBulkDataURI: Boolean): DicomData = {
     var dis: DicomInputStream = null
     try {
       dis = new DicomInputStream(inputStream)
       val fmi = dis.getFileMetaInformation
-      val dataset =
+      val attributes =
         if (withPixelData) {
           //if (useBulkDataURI)
             dis.setIncludeBulkData(IncludeBulkData.URI)
@@ -92,7 +78,7 @@ object DicomUtil {
           dis.readDataset(-1, Tag.PixelData)
         }
 
-      DicomData(dataset, fmi)
+      DicomData(attributes, fmi)
     } catch {
       case _: Exception => null
     } finally {
@@ -100,10 +86,10 @@ object DicomUtil {
     }
   }
 
-  def loadJpegDataset(path: Path): Attributes =
-    loadJpegDataset(new BufferedInputStream(Files.newInputStream(path)))
+  def loadJpegAttributes(path: Path): Attributes =
+    loadJpegAttributes(new BufferedInputStream(Files.newInputStream(path)))
 
-  def loadJpegDataset(inputStream: InputStream): Attributes = {
+  def loadJpegAttributes(inputStream: InputStream): Attributes = {
     var dis: DicomInputStream = null
     try {
       dis = new DicomInputStream(inputStream)
@@ -116,57 +102,57 @@ object DicomUtil {
       SafeClose.close(dis)
     }
   }
-  def toByteArray(path: Path): Array[Byte] = toByteArray(loadDataset(path, withPixelData = true, useBulkDataURI = false))
+  def toByteArray(path: Path): Array[Byte] = toByteArray(loadDicomData(path, withPixelData = true, useBulkDataURI = false))
 
   def toByteArray(dicomData: DicomData): Array[Byte] = {
     val bos = new ByteArrayOutputStream
-    saveDataset(dicomData, bos)
+    saveDicomData(dicomData, bos)
     bos.close()
     bos.toByteArray
   }
 
-  def datasetToPatient(dataset: Attributes): Patient =
+  def attributesToPatient(attributes: Attributes): Patient =
     Patient(
       -1,
-      PatientName(valueOrEmpty(dataset, DicomProperty.PatientName.dicomTag)),
-      PatientID(valueOrEmpty(dataset, DicomProperty.PatientID.dicomTag)),
-      PatientBirthDate(valueOrEmpty(dataset, DicomProperty.PatientBirthDate.dicomTag)),
-      PatientSex(valueOrEmpty(dataset, DicomProperty.PatientSex.dicomTag)))
+      PatientName(valueOrEmpty(attributes, DicomProperty.PatientName.dicomTag)),
+      PatientID(valueOrEmpty(attributes, DicomProperty.PatientID.dicomTag)),
+      PatientBirthDate(valueOrEmpty(attributes, DicomProperty.PatientBirthDate.dicomTag)),
+      PatientSex(valueOrEmpty(attributes, DicomProperty.PatientSex.dicomTag)))
 
-  def datasetToStudy(dataset: Attributes): Study =
+  def attributesToStudy(attributes: Attributes): Study =
     Study(
       -1,
       -1,
-      StudyInstanceUID(valueOrEmpty(dataset, DicomProperty.StudyInstanceUID.dicomTag)),
-      StudyDescription(valueOrEmpty(dataset, DicomProperty.StudyDescription.dicomTag)),
-      StudyDate(valueOrEmpty(dataset, DicomProperty.StudyDate.dicomTag)),
-      StudyID(valueOrEmpty(dataset, DicomProperty.StudyID.dicomTag)),
-      AccessionNumber(valueOrEmpty(dataset, DicomProperty.AccessionNumber.dicomTag)),
-      PatientAge(valueOrEmpty(dataset, DicomProperty.PatientAge.dicomTag)))
+      StudyInstanceUID(valueOrEmpty(attributes, DicomProperty.StudyInstanceUID.dicomTag)),
+      StudyDescription(valueOrEmpty(attributes, DicomProperty.StudyDescription.dicomTag)),
+      StudyDate(valueOrEmpty(attributes, DicomProperty.StudyDate.dicomTag)),
+      StudyID(valueOrEmpty(attributes, DicomProperty.StudyID.dicomTag)),
+      AccessionNumber(valueOrEmpty(attributes, DicomProperty.AccessionNumber.dicomTag)),
+      PatientAge(valueOrEmpty(attributes, DicomProperty.PatientAge.dicomTag)))
 
-  def datasetToSeries(dataset: Attributes): Series =
+  def attributesToSeries(attributes: Attributes): Series =
     Series(
       -1,
       -1,
-      SeriesInstanceUID(valueOrEmpty(dataset, DicomProperty.SeriesInstanceUID.dicomTag)),
-      SeriesDescription(valueOrEmpty(dataset, DicomProperty.SeriesDescription.dicomTag)),
-      SeriesDate(valueOrEmpty(dataset, DicomProperty.SeriesDate.dicomTag)),
-      Modality(valueOrEmpty(dataset, DicomProperty.Modality.dicomTag)),
-      ProtocolName(valueOrEmpty(dataset, DicomProperty.ProtocolName.dicomTag)),
-      BodyPartExamined(valueOrEmpty(dataset, DicomProperty.BodyPartExamined.dicomTag)),
-      Manufacturer(valueOrEmpty(dataset, DicomProperty.Manufacturer.dicomTag)),
-      StationName(valueOrEmpty(dataset, DicomProperty.StationName.dicomTag)),
-      FrameOfReferenceUID(valueOrEmpty(dataset, DicomProperty.FrameOfReferenceUID.dicomTag)))
+      SeriesInstanceUID(valueOrEmpty(attributes, DicomProperty.SeriesInstanceUID.dicomTag)),
+      SeriesDescription(valueOrEmpty(attributes, DicomProperty.SeriesDescription.dicomTag)),
+      SeriesDate(valueOrEmpty(attributes, DicomProperty.SeriesDate.dicomTag)),
+      Modality(valueOrEmpty(attributes, DicomProperty.Modality.dicomTag)),
+      ProtocolName(valueOrEmpty(attributes, DicomProperty.ProtocolName.dicomTag)),
+      BodyPartExamined(valueOrEmpty(attributes, DicomProperty.BodyPartExamined.dicomTag)),
+      Manufacturer(valueOrEmpty(attributes, DicomProperty.Manufacturer.dicomTag)),
+      StationName(valueOrEmpty(attributes, DicomProperty.StationName.dicomTag)),
+      FrameOfReferenceUID(valueOrEmpty(attributes, DicomProperty.FrameOfReferenceUID.dicomTag)))
 
-  def attributesToImage(dataset: Attributes): Image =
+  def attributesToImage(attributes: Attributes): Image =
     Image(
       -1,
       -1,
-      SOPInstanceUID(valueOrEmpty(dataset, DicomProperty.SOPInstanceUID.dicomTag)),
-      ImageType(readMultiple(dataset.getStrings(DicomProperty.ImageType.dicomTag))),
-      InstanceNumber(valueOrEmpty(dataset, DicomProperty.InstanceNumber.dicomTag)))
+      SOPInstanceUID(valueOrEmpty(attributes, DicomProperty.SOPInstanceUID.dicomTag)),
+      ImageType(readMultiple(attributes.getStrings(DicomProperty.ImageType.dicomTag))),
+      InstanceNumber(valueOrEmpty(attributes, DicomProperty.InstanceNumber.dicomTag)))
 
-  private def valueOrEmpty(dataset: Attributes, tag: Int) = Option(dataset.getString(tag)).getOrElse("")
+  private def valueOrEmpty(attributes: Attributes, tag: Int) = Option(attributes.getString(tag)).getOrElse("")
 
   def readMultiple(values: Array[String]): String =
     if (values == null || values.length == 0)

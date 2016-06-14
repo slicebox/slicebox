@@ -49,7 +49,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
   val metaDataService = system.actorOf(Props(new Actor() {
     def receive = {
-      case AddMetaData(dataset, source) =>
+      case AddMetaData(attributes, source) =>
         sender ! MetaDataAdded(null, null, null, Image(12, 22, null, null, null), patientAdded = false, studyAdded = false, seriesAdded = false, imageAdded = true, null)
     }
   }), name = "MetaDataService")
@@ -309,7 +309,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
     }
 
     "should tell the box it is pulling images from that a transaction has failed when an image cannot be stored" in {
-      storageService ! ShowBadBehavior(new IllegalArgumentException("Pretending I cannot store dataset."))
+      storageService ! ShowBadBehavior(new IllegalArgumentException("Pretending I cannot store dicom data."))
 
       val outgoingTransactionId = 999
       val transaction = OutgoingTransaction(outgoingTransactionId, 987, "some box", 1, 2, 2, 2, TransactionStatus.WAITING)

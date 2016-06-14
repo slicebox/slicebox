@@ -6,14 +6,14 @@ import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.DicomPropertyValue.ImageType
 import se.nimsa.sbx.dicom.DicomPropertyValue.InstanceNumber
 import se.nimsa.sbx.dicom.DicomPropertyValue.SOPInstanceUID
-import se.nimsa.sbx.storage.StorageProtocol.{AddDataset, CheckDataset, DatasetAdded, GetDataset}
+import se.nimsa.sbx.storage.StorageProtocol.{AddDicomData, CheckDicomData, DicomDataAdded, GetDicomData}
 import se.nimsa.sbx.util.TestUtil
 
 class MockupStorageActor extends Actor {
 
   import MockupStorageActor._
   
-  var nStoredDatasets = 3
+  var nStoredDicomDatas = 3
 
   var badBehavior = false
   var exception: Exception = null
@@ -25,23 +25,23 @@ class MockupStorageActor extends Actor {
 
     case ShowGoodBehavior(n) =>
       badBehavior = false
-      nStoredDatasets = n
+      nStoredDicomDatas = n
 
-    case CheckDataset(dataset, restrictSopClass) =>
+    case CheckDicomData(dicomData, restrictSopClass) =>
       sender ! true
 
-    case AddDataset(dataset, source, image) =>
+    case AddDicomData(dicomData, source, image) =>
       if (badBehavior)
         sender ! Failure(exception)
       else
-        sender ! DatasetAdded(Image((math.random * 1000).toLong, (math.random * 1000).toLong, SOPInstanceUID("sop uid"), ImageType("image type"), InstanceNumber("instance number")), overwrite = false)
+        sender ! DicomDataAdded(Image((math.random * 1000).toLong, (math.random * 1000).toLong, SOPInstanceUID("sop uid"), ImageType("image type"), InstanceNumber("instance number")), overwrite = false)
 
-    case GetDataset(image, withPixelData, useBulkDataURI) =>
+    case GetDicomData(image, withPixelData, useBulkDataURI) =>
       if (badBehavior)
         sender ! Failure(exception)
       else
         sender ! (image.id match {
-          case id if id <= nStoredDatasets => Some(TestUtil.createDicomData())
+          case id if id <= nStoredDicomDatas => Some(TestUtil.createDicomData())
           case _ =>
             None
         })
@@ -49,6 +49,6 @@ class MockupStorageActor extends Actor {
 }
 
 object MockupStorageActor {
-  case class ShowGoodBehavior(nStoredDatasets: Int)
+  case class ShowGoodBehavior(nStoredDicomDatas: Int)
   case class ShowBadBehavior(e: Exception)
 }

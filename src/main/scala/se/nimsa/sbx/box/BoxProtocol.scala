@@ -92,9 +92,7 @@ object BoxProtocol {
   
   case class FailedOutgoingTransactionImage(transactionImage: OutgoingTransactionImage, message: String)
   
-  // case class PushImageData(transactionId: Long, imageId: Long, totalImageCount: Long, dataset: Attributes)
-  
-  
+
   sealed trait BoxRequest
 
   case class CreateConnection(remoteoxConnectionData: RemoteBoxConnectionData) extends BoxRequest

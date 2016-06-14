@@ -138,18 +138,18 @@ class BoxPollActor(box: Box,
       val statusCode = response.status.intValue
       if (statusCode >= 200 && statusCode < 300) {
         val bytes = decompress(response.entity.data.toByteArray)
-        val dicomData = loadDataset(bytes, withPixelData = true, useBulkDataURI = false)
+        val dicomData = loadDicomData(bytes, withPixelData = true, useBulkDataURI = false)
 
         if (dicomData == null)
-          signalFetchFileFailedPermanently(transactionImage, new IllegalArgumentException("Dataset could not be read"))
+          signalFetchFileFailedPermanently(transactionImage, new IllegalArgumentException("Dicom data could not be read"))
 
         else
           anonymizationService.ask(ReverseAnonymization(dicomData.attributes)).mapTo[Attributes].flatMap { reversedAttributes =>
             val source = Source(SourceType.BOX, box.name, box.id)
-            storageService.ask(CheckDataset(dicomData, useExtendedContexts = true)).mapTo[Boolean].flatMap { status =>
+            storageService.ask(CheckDicomData(dicomData, useExtendedContexts = true)).mapTo[Boolean].flatMap { status =>
               metaDataService.ask(AddMetaData(dicomData.attributes, source)).mapTo[MetaDataAdded].flatMap { metaData =>
-                storageService.ask(AddDataset(dicomData.copy(attributes = reversedAttributes), source, metaData.image)).mapTo[DatasetAdded].flatMap { datasetAdded =>
-                  boxService.ask(UpdateIncoming(box, transactionImage.transaction.id, transactionImage.image.sequenceNumber, transactionImage.transaction.totalImageCount, datasetAdded.image.id, datasetAdded.overwrite)).flatMap {
+                storageService.ask(AddDicomData(dicomData.copy(attributes = reversedAttributes), source, metaData.image)).mapTo[DicomDataAdded].flatMap { dicomDataAdded =>
+                  boxService.ask(UpdateIncoming(box, transactionImage.transaction.id, transactionImage.image.sequenceNumber, transactionImage.transaction.totalImageCount, dicomDataAdded.image.id, dicomDataAdded.overwrite)).flatMap {
                     case IncomingUpdated(transaction) =>
                       transaction.status match {
                         case TransactionStatus.FAILED =>

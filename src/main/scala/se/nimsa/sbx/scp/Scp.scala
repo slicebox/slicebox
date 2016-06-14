@@ -65,7 +65,7 @@ class Scp(val name: String,
       /*
        * This is the interface between a synchronous callback and a async actor system. To avoid sending too many large
        * messages to the notification actor, risking heap overflow, we block and wait here, ensuring one-at-a-time
-       * processing of datasets.
+       * processing of dicom data.
        */
       Await.ready(notifyActor.ask(DicomDataReceivedByScp(dicomData)), timeout.duration)
     }

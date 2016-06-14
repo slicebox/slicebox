@@ -21,12 +21,12 @@ class FileStorage(val path: Path) extends StorageService {
 
   createStorageDirectoryIfNecessary()
 
-  def storeDataset(dicomData: DicomData, image: Image): Boolean = {
+  def storeDicomData(dicomData: DicomData, image: Image): Boolean = {
     val storedPath = filePath(image)
     val overwrite = Files.exists(storedPath)
-    try saveDataset(dicomData, storedPath) catch {
+    try saveDicomData(dicomData, storedPath) catch {
       case NonFatal(e) =>
-        throw new IllegalArgumentException("Dataset file could not be stored", e)
+        throw new IllegalArgumentException("Dicom data could not be stored", e)
     }
     overwrite
   }
@@ -45,19 +45,17 @@ class FileStorage(val path: Path) extends StorageService {
     resolvePath(image) match {
       case Some(imagePath) =>
         Files.delete(imagePath)
-        //log.info(s"Deleted dataset with image id ${image.id}")
       case None =>
-        //log.warning(s"No DICOM file found for image with id ${image.id} when deleting dataset")
     }
 
-  def readDataset(image: Image, withPixelData: Boolean, useBulkDataURI: Boolean): Option[DicomData] =
+  def readDicomData(image: Image, withPixelData: Boolean, useBulkDataURI: Boolean): Option[DicomData] =
     resolvePath(image).map { imagePath =>
-      loadDataset(imagePath, withPixelData, useBulkDataURI)
+      loadDicomData(imagePath, withPixelData, useBulkDataURI)
     }
 
   def readImageAttributes(image: Image): Option[List[ImageAttribute]] =
     resolvePath(image).map { imagePath =>
-      DicomUtil.readImageAttributes(loadDataset(imagePath, withPixelData = false, useBulkDataURI = false).attributes)
+      DicomUtil.readImageAttributes(loadDicomData(imagePath, withPixelData = false, useBulkDataURI = false).attributes)
     }
 
   def readImageInformation(image: Image): Option[ImageInformation] =

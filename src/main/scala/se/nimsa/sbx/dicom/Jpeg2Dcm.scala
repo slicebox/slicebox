@@ -98,7 +98,7 @@ object Jpeg2Dcm {
         if ((jpgLen & 1) != 0)
           dos.write(0)
         dos.writeHeader(Tag.SequenceDelimitationItem, null, 0)
-        DicomUtil.loadDataset(baos.toByteArray, withPixelData = true, useBulkDataURI = false)
+        DicomUtil.loadDicomData(baos.toByteArray, withPixelData = true, useBulkDataURI = false)
       } finally {
         dos.close()
       }

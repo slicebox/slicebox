@@ -22,7 +22,7 @@ trait StorageService {
 
   val bufferSize = 524288
 
-  def storeDataset(dicomData: DicomData, image: Image): Boolean
+  def storeDicomData(dicomData: DicomData, image: Image): Boolean
 
   def storeEncapsulated(image: Image, dcmTempPath: Path): Unit
 
@@ -32,14 +32,14 @@ trait StorageService {
 
   def deleteFromStorage(image: Image): Unit
 
-  def readDataset(image: Image, withPixelData: Boolean, useBulkDataURI: Boolean): Option[DicomData]
+  def readDicomData(image: Image, withPixelData: Boolean, useBulkDataURI: Boolean): Option[DicomData]
 
   def readImageAttributes(image: Image): Option[List[ImageAttribute]]
 
   def readImageInformation(image: Image): Option[ImageInformation]
 
   def readImageInformation(inputStream: InputStream): ImageInformation = {
-    val dicomData = loadDataset(inputStream, withPixelData = false, useBulkDataURI = false)
+    val dicomData = loadDicomData(inputStream, withPixelData = false, useBulkDataURI = false)
     val attributes = dicomData.attributes
     val instanceNumber = attributes.getInt(Tag.InstanceNumber, 1)
     val imageIndex = attributes.getInt(Tag.ImageIndex, 1)
@@ -97,7 +97,7 @@ trait StorageService {
   def readSecondaryCaptureJpeg(image: Image, imageHeight: Int): Option[Array[Byte]]
 
   def readSecondaryCaptureJpeg(inputStream: InputStream, imageHeight: Int) = {
-    val ds = loadJpegDataset(inputStream)
+    val ds = loadJpegAttributes(inputStream)
     val pd = ds.getValue(Tag.PixelData)
     if (pd != null && pd.isInstanceOf[Fragments]) {
       val fragments = pd.asInstanceOf[Fragments]

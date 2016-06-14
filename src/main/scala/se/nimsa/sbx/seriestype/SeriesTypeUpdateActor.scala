@@ -25,7 +25,7 @@ import se.nimsa.sbx.dicom.DicomHierarchy.{Image, Series}
 import se.nimsa.sbx.dicom.{DicomData, DicomUtil}
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
-import se.nimsa.sbx.storage.StorageProtocol.GetDataset
+import se.nimsa.sbx.storage.StorageProtocol.GetDicomData
 import se.nimsa.sbx.util.ExceptionCatching
 
 import scala.concurrent.Future
@@ -107,7 +107,7 @@ class SeriesTypeUpdateActor(implicit val timeout: Timeout) extends Actor with Ex
 
     futureImageMaybe.flatMap {
       case Some(image) =>
-        val futureDicomDataMaybe = storageService.ask(GetDataset(image, withPixelData = false)).mapTo[Option[DicomData]]
+        val futureDicomDataMaybe = storageService.ask(GetDicomData(image, withPixelData = false)).mapTo[Option[DicomData]]
 
         val updateSeriesTypes = futureDicomDataMaybe.flatMap(_.map(dicomData => handleLoadedDicomData(dicomData, series)).getOrElse(Future.successful(Seq.empty)))
 
@@ -125,10 +125,10 @@ class SeriesTypeUpdateActor(implicit val timeout: Timeout) extends Actor with Ex
 
   def handleLoadedDicomData(dicomData: DicomData, series: Series): Future[Seq[Boolean]] = {
     getSeriesTypes.flatMap(allSeriesTypes =>
-      updateSeriesTypesForDataset(dicomData, series, allSeriesTypes))
+      updateSeriesTypesForDicomData(dicomData, series, allSeriesTypes))
   }
 
-  def updateSeriesTypesForDataset(dicomData: DicomData, series: Series, allSeriesTypes: Seq[SeriesType]): Future[Seq[Boolean]] = {
+  def updateSeriesTypesForDicomData(dicomData: DicomData, series: Series, allSeriesTypes: Seq[SeriesType]): Future[Seq[Boolean]] = {
     Future.sequence(
       allSeriesTypes.map { seriesType =>
         evaluateSeriesTypeForSeries(seriesType, dicomData, series)
@@ -156,7 +156,7 @@ class SeriesTypeUpdateActor(implicit val timeout: Timeout) extends Actor with Ex
     futureAttributes.map(attributes =>
       attributes.foldLeft(true) { (acc, attribute) =>
         if (!acc) {
-          false // A previous attribute already failed matching the dataset so no need to evaluate more attributes
+          false // A previous attribute already failed matching the dicom data so no need to evaluate more attributes
         } else {
           evaluateRuleAttributeForToSeries(attribute, dicomData, series)
         }

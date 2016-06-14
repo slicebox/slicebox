@@ -41,13 +41,13 @@ class MetaDataServiceActor(dbProps: DbProps) extends Actor with ExceptionCatchin
 
   def receive = LoggingReceive {
 
-    case AddMetaData(dataset, source) =>
+    case AddMetaData(attributes, source) =>
       catchAndReport {
         val metaData = addMetaData(
-          datasetToPatient(dataset),
-          datasetToStudy(dataset),
-          datasetToSeries(dataset),
-          attributesToImage(dataset),
+          attributesToPatient(attributes),
+          attributesToStudy(attributes),
+          attributesToSeries(attributes),
+          attributesToImage(attributes),
           source)
         log.debug(s"Added metadata $metaData")
         context.system.eventStream.publish(metaData)

@@ -60,9 +60,9 @@ object AnonymizationProtocol {
       
   trait AnonymizationRequest
 
-  case class ReverseAnonymization(dataset: Attributes) extends AnonymizationRequest
+  case class ReverseAnonymization(attributes: Attributes) extends AnonymizationRequest
 
-  case class Anonymize(imageId: Long, dataset: Attributes, tagValues: Seq[TagValue]) extends AnonymizationRequest
+  case class Anonymize(imageId: Long, attributes: Attributes, tagValues: Seq[TagValue]) extends AnonymizationRequest
 
   case class GetAnonymizationKeys(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String]) extends AnonymizationRequest
 
