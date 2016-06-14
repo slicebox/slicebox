@@ -49,8 +49,6 @@ import se.nimsa.sbx.dicom.Contexts.Context
 
 object DicomUtil {
 
-  val defaultTransferSyntax = UID.ExplicitVRLittleEndian
-
   def isAnonymous(dataset: Attributes) = dataset.getString(Tag.PatientIdentityRemoved, "NO") == "YES"
 
   def cloneDataset(dataset: Attributes): Attributes = new Attributes(dataset)

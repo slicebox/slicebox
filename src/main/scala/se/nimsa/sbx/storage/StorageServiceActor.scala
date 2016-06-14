@@ -121,7 +121,7 @@ class StorageServiceActor(storage: StorageService) extends Actor with ExceptionC
   def checkDataset(dicomData: DicomData, useExtendedContexts: Boolean): Unit = {
     if (dicomData == null || dicomData.attributes == null || dicomData.metaInformation == null)
       throw new IllegalArgumentException("Invalid DICOM data")
-    val allowedContexts = if (useExtendedContexts) Contexts.imageDataContexts else Contexts.extendedContexts
+    val allowedContexts = if (useExtendedContexts) Contexts.extendedContexts else Contexts.imageDataContexts
     DicomUtil.checkContext(dicomData.metaInformation, allowedContexts)
   }
 

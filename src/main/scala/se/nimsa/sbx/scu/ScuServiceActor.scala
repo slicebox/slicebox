@@ -22,9 +22,9 @@ import akka.actor.{Actor, Props}
 import akka.event.{Logging, LoggingReceive}
 import akka.pattern.{ask, pipe}
 import akka.util.Timeout
-import org.dcm4che3.data.Attributes
 import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.app.GeneralProtocol._
+import se.nimsa.sbx.dicom.DicomData
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.lang.{BadGatewayException, NotFoundException}
 import se.nimsa.sbx.log.SbxLog
@@ -50,11 +50,11 @@ class ScuServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extends Actor
   val metaDataService = context.actorSelection("../MetaDataService")
   val storageService = context.actorSelection("../StorageService")
 
-  val datasetProvider = new DatasetProvider {
-    override def getDataset(imageId: Long, withPixelData: Boolean): Future[Option[Attributes]] = {
+  val dicomDataProvider = new DicomDataProvider {
+    override def getDicomData(imageId: Long, withPixelData: Boolean): Future[Option[DicomData]] = {
       metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]].flatMap { imageMaybe =>
         imageMaybe.map { image =>
-          storageService.ask(GetDataset(image, withPixelData, useBulkDataURI = withPixelData)).mapTo[Option[Attributes]]
+          storageService.ask(GetDataset(image, withPixelData, useBulkDataURI = withPixelData)).mapTo[Option[DicomData]]
         }.unwrap
       }
     }
@@ -108,7 +108,7 @@ class ScuServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extends Actor
           case SendImagesToScp(imageIds, scuId) =>
             scuForId(scuId).map(scu => {
               SbxLog.info("SCU", s"Sending ${imageIds.length} images using SCU ${scu.name}")
-              Scu.sendFiles(scu, datasetProvider, imageIds)
+              Scu.sendFiles(scu, dicomDataProvider, imageIds)
                 .map(r => {
                   SbxLog.info("SCU", s"Finished sending ${imageIds.length} images using SCU ${scu.name}")
                   val nNotFound = imageIds.length - r.length

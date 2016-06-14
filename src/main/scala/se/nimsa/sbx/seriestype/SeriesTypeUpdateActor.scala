@@ -20,10 +20,9 @@ import akka.actor.{Actor, Props}
 import akka.event.{Logging, LoggingReceive}
 import akka.pattern.ask
 import akka.util.Timeout
-import org.dcm4che3.data.Attributes
 import se.nimsa.sbx.app.GeneralProtocol.ImageAdded
 import se.nimsa.sbx.dicom.DicomHierarchy.{Image, Series}
-import se.nimsa.sbx.dicom.DicomUtil
+import se.nimsa.sbx.dicom.{DicomData, DicomUtil}
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
 import se.nimsa.sbx.storage.StorageProtocol.GetDataset
@@ -108,9 +107,9 @@ class SeriesTypeUpdateActor(implicit val timeout: Timeout) extends Actor with Ex
 
     futureImageMaybe.flatMap {
       case Some(image) =>
-        val futureDatasetMaybe = storageService.ask(GetDataset(image, withPixelData = false)).mapTo[Option[Attributes]]
+        val futureDicomDataMaybe = storageService.ask(GetDataset(image, withPixelData = false)).mapTo[Option[DicomData]]
 
-        val updateSeriesTypes = futureDatasetMaybe.flatMap(_.map(dataset => handleLoadedDataset(dataset, series)).getOrElse(Future.successful(Seq.empty)))
+        val updateSeriesTypes = futureDicomDataMaybe.flatMap(_.map(dicomData => handleLoadedDicomData(dicomData, series)).getOrElse(Future.successful(Seq.empty)))
 
         updateSeriesTypes onComplete {
           _ => self ! PollSeriesTypesUpdateQueue
@@ -124,25 +123,25 @@ class SeriesTypeUpdateActor(implicit val timeout: Timeout) extends Actor with Ex
     }
   }
 
-  def handleLoadedDataset(dataset: Attributes, series: Series): Future[Seq[Boolean]] = {
+  def handleLoadedDicomData(dicomData: DicomData, series: Series): Future[Seq[Boolean]] = {
     getSeriesTypes.flatMap(allSeriesTypes =>
-      updateSeriesTypesForDataset(dataset, series, allSeriesTypes))
+      updateSeriesTypesForDataset(dicomData, series, allSeriesTypes))
   }
 
-  def updateSeriesTypesForDataset(dataset: Attributes, series: Series, allSeriesTypes: Seq[SeriesType]): Future[Seq[Boolean]] = {
+  def updateSeriesTypesForDataset(dicomData: DicomData, series: Series, allSeriesTypes: Seq[SeriesType]): Future[Seq[Boolean]] = {
     Future.sequence(
       allSeriesTypes.map { seriesType =>
-        evaluateSeriesTypeForSeries(seriesType, dataset, series)
+        evaluateSeriesTypeForSeries(seriesType, dicomData, series)
       })
   }
 
-  def evaluateSeriesTypeForSeries(seriesType: SeriesType, dataset: Attributes, series: Series): Future[Boolean] = {
+  def evaluateSeriesTypeForSeries(seriesType: SeriesType, dicomData: DicomData, series: Series): Future[Boolean] = {
     val futureRules = getSeriesTypeRules(seriesType)
 
     val futureRuleEvals = futureRules.flatMap(rules =>
       Future.sequence(
         rules.map(rule =>
-          evaluateRuleForSeries(rule, dataset, series))))
+          evaluateRuleForSeries(rule, dicomData, series))))
 
     futureRuleEvals.flatMap(ruleEvals =>
       if (ruleEvals.contains(true))
@@ -151,7 +150,7 @@ class SeriesTypeUpdateActor(implicit val timeout: Timeout) extends Actor with Ex
         Future.successful(false))
   }
 
-  def evaluateRuleForSeries(rule: SeriesTypeRule, dataset: Attributes, series: Series): Future[Boolean] = {
+  def evaluateRuleForSeries(rule: SeriesTypeRule, dicomData: DicomData, series: Series): Future[Boolean] = {
     val futureAttributes = getSeriesTypeRuleAttributes(rule)
 
     futureAttributes.map(attributes =>
@@ -159,21 +158,21 @@ class SeriesTypeUpdateActor(implicit val timeout: Timeout) extends Actor with Ex
         if (!acc) {
           false // A previous attribute already failed matching the dataset so no need to evaluate more attributes
         } else {
-          evaluateRuleAttributeForToSeries(attribute, dataset, series)
+          evaluateRuleAttributeForToSeries(attribute, dicomData, series)
         }
       })
   }
 
-  def evaluateRuleAttributeForToSeries(attribute: SeriesTypeRuleAttribute, dataset: Attributes, series: Series): Boolean = {
+  def evaluateRuleAttributeForToSeries(attribute: SeriesTypeRuleAttribute, dicomData: DicomData, series: Series): Boolean = {
     val attrs = attribute.tagPath.map(pathString => {
       try {
         val pathTags = pathString.split(",").map(_.toInt)
-        pathTags.foldLeft(dataset)((nested, tag) => nested.getNestedDataset(tag))
+        pathTags.foldLeft(dicomData.attributes)((nested, tag) => nested.getNestedDataset(tag))
       } catch {
         case e: Exception =>
-          dataset
+          dicomData.attributes
       }
-    }).getOrElse(dataset)
+    }).getOrElse(dicomData.attributes)
     DicomUtil.concatenatedStringForTag(attrs, attribute.tag) == attribute.values
   }
 

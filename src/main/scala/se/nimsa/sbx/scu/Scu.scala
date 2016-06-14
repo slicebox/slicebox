@@ -23,18 +23,18 @@ import org.dcm4che3.data.{Attributes, Tag, UID}
 import org.dcm4che3.net._
 import org.dcm4che3.net.pdu.{AAssociateRQ, PresentationContext}
 import org.dcm4che3.util.TagUtils
-import se.nimsa.sbx.dicom.DicomUtil
+import se.nimsa.sbx.dicom.{DicomData, DicomUtil}
 import se.nimsa.sbx.scu.ScuProtocol.ScuData
 import se.nimsa.sbx.util.FutureUtil.traverseSequentially
 import se.nimsa.sbx.util.SbxExtensions._
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
 
-trait DatasetProvider {
-  def getDataset(imageId: Long, withPixelData: Boolean): Future[Option[Attributes]]
+trait DicomDataProvider {
+  def getDicomData(imageId: Long, withPixelData: Boolean): Future[Option[DicomData]]
 }
 
-case class DatasetInfo(iuid: String, cuid: String, ts: String, imageId: Long)
+case class DicomDataInfo(iuid: String, cuid: String, ts: String, imageId: Long)
 
 class Scu(ae: ApplicationEntity, scuData: ScuData)(implicit ec: ExecutionContext) extends LazyLogging {
   val remote = new Connection()
@@ -64,19 +64,16 @@ class Scu(ae: ApplicationEntity, scuData: ScuData)(implicit ec: ExecutionContext
       }
   }
 
-  def addDataset(imageId: Long, dataset: Attributes): Option[DatasetInfo] = {
-    val ts = if (dataset.getString(Tag.SOPClassUID) == UID.SecondaryCaptureImageStorage)
-      UID.JPEGBaseline1
-    else
-      DicomUtil.defaultTransferSyntax
-    val fmi = dataset.createFileMetaInformation(ts)
+  def addDicomData(imageId: Long, dicomData: DicomData): Option[DicomDataInfo] = {
+    val fmi = dicomData.metaInformation
 
+    val ts = fmi.getString(Tag.TransferSyntaxUID)
     val cuid = fmi.getString(Tag.MediaStorageSOPClassUID)
     val iuid = fmi.getString(Tag.MediaStorageSOPInstanceUID)
-    if (cuid == null || iuid == null)
+    if (ts == null || cuid == null || iuid == null)
       return None
 
-    val datasetInfo = DatasetInfo(iuid, cuid, ts, imageId)
+    val dicomDataInfo = DicomDataInfo(iuid, cuid, ts, imageId)
 
     if (!rq.containsPresentationContextFor(cuid, ts)) {
       if (!rq.containsPresentationContextFor(cuid)) {
@@ -88,15 +85,15 @@ class Scu(ae: ApplicationEntity, scuData: ScuData)(implicit ec: ExecutionContext
       rq.addPresentationContext(new PresentationContext(rq.getNumberOfPresentationContexts * 2 + 1, cuid, ts))
     }
 
-    Some(datasetInfo)
+    Some(dicomDataInfo)
   }
 
-  def sendFiles(datasetInfos: Seq[DatasetInfo], datasetProvider: DatasetProvider): Future[Seq[Option[Long]]] = {
+  def sendFiles(dicomDataInfos: Seq[DicomDataInfo], dicomDataProvider: DicomDataProvider): Future[Seq[Option[Long]]] = {
 
-    val futureSentFiles = traverseSequentially(datasetInfos) { datasetInfo =>
-      datasetProvider.getDataset(datasetInfo.imageId, withPixelData = true).map { datasetMaybe =>
-        datasetMaybe.filter(_ => as.isReadyForDataTransfer).map { dataset =>
-          send(dataset, datasetInfo.cuid, datasetInfo.iuid, datasetInfo.ts, datasetInfo.imageId)
+    val futureSentFiles = traverseSequentially(dicomDataInfos) { dicomDataInfo =>
+      dicomDataProvider.getDicomData(dicomDataInfo.imageId, withPixelData = true).map { dicomDataMaybe =>
+        dicomDataMaybe.filter(_ => as.isReadyForDataTransfer).map { dicomData =>
+          send(dicomData, dicomDataInfo.cuid, dicomDataInfo.iuid, dicomDataInfo.ts, dicomDataInfo.imageId)
         }
       }.unwrap
     }
@@ -106,10 +103,10 @@ class Scu(ae: ApplicationEntity, scuData: ScuData)(implicit ec: ExecutionContext
     }
   }
 
-  def send(dataset: Attributes, cuid: String, iuid: String, filets: String, imageId: Long): Future[Long] = {
+  def send(dicomData: DicomData, cuid: String, iuid: String, filets: String, imageId: Long): Future[Long] = {
     val ts = selectTransferSyntax(cuid, filets)
     val promise = Promise[Long]()
-    as.cstore(cuid, iuid, priority, new DataWriterAdapter(dataset), ts, rspHandlerFactory.createDimseRSPHandler(imageId, promise))
+    as.cstore(cuid, iuid, priority, new DataWriterAdapter(dicomData.attributes), ts, rspHandlerFactory.createDimseRSPHandler(imageId, promise))
     promise.future
   }
 
@@ -153,7 +150,7 @@ class Scu(ae: ApplicationEntity, scuData: ScuData)(implicit ec: ExecutionContext
 
 object Scu {
 
-  def sendFiles(scuData: ScuData, datasetProvider: DatasetProvider, imageIds: Seq[Long])(implicit ec: ExecutionContext): Future[Seq[Option[Long]]] = {
+  def sendFiles(scuData: ScuData, dicomDataProvider: DicomDataProvider, imageIds: Seq[Long])(implicit ec: ExecutionContext): Future[Seq[Option[Long]]] = {
     val device = new Device("slicebox-scu")
     val connection = new Connection()
     connection.setMaxOpsInvoked(0)
@@ -165,22 +162,22 @@ object Scu {
 
     val scu = new Scu(ae, scuData)
 
-    val futureDatasetInfos = traverseSequentially(imageIds) { imageId =>
-      datasetProvider.getDataset(imageId, withPixelData = false).map { datasetMaybe =>
-        datasetMaybe.flatMap { dataset =>
-          scu.addDataset(imageId, dataset)
+    val futureDicomDataInfos = traverseSequentially(imageIds) { imageId =>
+      dicomDataProvider.getDicomData(imageId, withPixelData = false).map { dicomDataMaybe =>
+        dicomDataMaybe.flatMap { dicomData =>
+          scu.addDicomData(imageId, dicomData)
         }
       }
     }.map(_.flatten)
 
-    futureDatasetInfos.flatMap { datasetInfos =>
+    futureDicomDataInfos.flatMap { dicomDataInfos =>
       val executorService = Executors.newSingleThreadExecutor()
       val scheduledExecutorService = Executors.newSingleThreadScheduledExecutor()
       device.setExecutor(executorService)
       device.setScheduledExecutor(scheduledExecutorService)
 
       scu.open()
-      scu.sendFiles(datasetInfos, datasetProvider).andThen {
+      scu.sendFiles(dicomDataInfos, dicomDataProvider).andThen {
         case _ =>
           scu.close()
           executorService.shutdown()
