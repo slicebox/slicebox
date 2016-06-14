@@ -67,7 +67,7 @@ class ImageRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     GetAsUser(s"/api/images/${image.id}") ~> routes ~> check {
       status shouldBe OK
       contentType should be(ContentTypes.`application/octet-stream`)
-      val dicomData = DicomUtil.loadDicomData(responseAs[Array[Byte]], withPixelData = true, useBulkDataURI = false)
+      val dicomData = DicomUtil.loadDicomData(responseAs[Array[Byte]], withPixelData = true)
       dicomData should not be null
     }
   }
@@ -263,7 +263,7 @@ class ImageRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     val image = PostAsUser("/api/images", HttpData(TestUtil.testImageByteArray)) ~> routes ~> check {
       responseAs[Image]
     }
-    val dicomData = DicomUtil.loadDicomData(TestUtil.testImageByteArray, withPixelData = false, useBulkDataURI = false)
+    val dicomData = DicomUtil.loadDicomData(TestUtil.testImageByteArray, withPixelData = false)
     GetAsUser(s"/api/images/${image.id}/imageinformation") ~> routes ~> check {
       status shouldBe OK
       val info = responseAs[ImageInformation]

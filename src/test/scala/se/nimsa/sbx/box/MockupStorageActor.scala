@@ -36,7 +36,7 @@ class MockupStorageActor extends Actor {
       else
         sender ! DicomDataAdded(Image((math.random * 1000).toLong, (math.random * 1000).toLong, SOPInstanceUID("sop uid"), ImageType("image type"), InstanceNumber("instance number")), overwrite = false)
 
-    case GetDicomData(image, withPixelData, useBulkDataURI) =>
+    case GetDicomData(image, withPixelData) =>
       if (badBehavior)
         sender ! Failure(exception)
       else

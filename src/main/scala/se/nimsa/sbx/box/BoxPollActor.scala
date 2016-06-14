@@ -138,7 +138,7 @@ class BoxPollActor(box: Box,
       val statusCode = response.status.intValue
       if (statusCode >= 200 && statusCode < 300) {
         val bytes = decompress(response.entity.data.toByteArray)
-        val dicomData = loadDicomData(bytes, withPixelData = true, useBulkDataURI = false)
+        val dicomData = loadDicomData(bytes, withPixelData = true)
 
         if (dicomData == null)
           signalFetchFileFailedPermanently(transactionImage, new IllegalArgumentException("Dicom data could not be read"))

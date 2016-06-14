@@ -85,8 +85,8 @@ class StorageServiceActor(storage: StorageService) extends Actor with ExceptionC
           val data = storage.imageAsByteArray(image).map(DicomDataArray(_))
           sender ! data
 
-        case GetDicomData(image, withPixelData, useBulkDataURI) =>
-          sender ! storage.readDicomData(image, withPixelData, useBulkDataURI)
+        case GetDicomData(image, withPixelData) =>
+          sender ! storage.readDicomData(image, withPixelData)
 
         case GetImageAttributes(image) =>
           sender ! storage.readImageAttributes(image)

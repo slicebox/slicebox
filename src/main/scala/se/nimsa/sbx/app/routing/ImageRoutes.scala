@@ -184,7 +184,7 @@ trait ImageRoutes {
   private def addDicomDataRoute(bytes: Array[Byte], apiUser: ApiUser) = {
     import spray.httpx.SprayJsonSupport._
 
-    val dicomData = DicomUtil.loadDicomData(bytes, withPixelData = true, useBulkDataURI = false)
+    val dicomData = DicomUtil.loadDicomData(bytes, withPixelData = true)
     val source = Source(SourceType.USER, apiUser.user, apiUser.id)
     val futureImageAndOverwrite =
       storageService.ask(CheckDicomData(dicomData, useExtendedContexts = true)).mapTo[Boolean].flatMap { status =>

@@ -55,23 +55,20 @@ object DicomUtil {
     }
   }
 
-  def loadDicomData(path: Path, withPixelData: Boolean, useBulkDataURI: Boolean): DicomData =
-    loadDicomData(new BufferedInputStream(Files.newInputStream(path)), withPixelData, useBulkDataURI)
+  def loadDicomData(path: Path, withPixelData: Boolean): DicomData =
+    loadDicomData(new BufferedInputStream(Files.newInputStream(path)), withPixelData)
 
-  def loadDicomData(byteArray: Array[Byte], withPixelData: Boolean, useBulkDataURI: Boolean): DicomData =
-    loadDicomData(new BufferedInputStream(new ByteArrayInputStream(byteArray)), withPixelData, useBulkDataURI)
+  def loadDicomData(byteArray: Array[Byte], withPixelData: Boolean): DicomData =
+    loadDicomData(new BufferedInputStream(new ByteArrayInputStream(byteArray)), withPixelData)
 
-  def loadDicomData(inputStream: InputStream, withPixelData: Boolean, useBulkDataURI: Boolean): DicomData = {
+  def loadDicomData(inputStream: InputStream, withPixelData: Boolean): DicomData = {
     var dis: DicomInputStream = null
     try {
       dis = new DicomInputStream(inputStream)
       val fmi = dis.getFileMetaInformation
       val attributes =
         if (withPixelData) {
-          //if (useBulkDataURI)
-            dis.setIncludeBulkData(IncludeBulkData.URI)
-          //else
-          //  dis.setIncludeBulkData(IncludeBulkData.YES)
+          dis.setIncludeBulkData(IncludeBulkData.URI)
           dis.readDataset(-1, -1)
         } else {
           dis.setIncludeBulkData(IncludeBulkData.NO)
@@ -102,7 +99,7 @@ object DicomUtil {
       SafeClose.close(dis)
     }
   }
-  def toByteArray(path: Path): Array[Byte] = toByteArray(loadDicomData(path, withPixelData = true, useBulkDataURI = false))
+  def toByteArray(path: Path): Array[Byte] = toByteArray(loadDicomData(path, withPixelData = true))
 
   def toByteArray(dicomData: DicomData): Array[Byte] = {
     val bos = new ByteArrayOutputStream

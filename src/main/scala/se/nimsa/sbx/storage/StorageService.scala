@@ -32,14 +32,14 @@ trait StorageService {
 
   def deleteFromStorage(image: Image): Unit
 
-  def readDicomData(image: Image, withPixelData: Boolean, useBulkDataURI: Boolean): Option[DicomData]
+  def readDicomData(image: Image, withPixelData: Boolean): Option[DicomData]
 
   def readImageAttributes(image: Image): Option[List[ImageAttribute]]
 
   def readImageInformation(image: Image): Option[ImageInformation]
 
   def readImageInformation(inputStream: InputStream): ImageInformation = {
-    val dicomData = loadDicomData(inputStream, withPixelData = false, useBulkDataURI = false)
+    val dicomData = loadDicomData(inputStream, withPixelData = false)
     val attributes = dicomData.attributes
     val instanceNumber = attributes.getInt(Tag.InstanceNumber, 1)
     val imageIndex = attributes.getInt(Tag.ImageIndex, 1)

@@ -53,7 +53,7 @@ trait AnonymizationRoutes {
         entity(as[Seq[TagValue]]) { tagValues =>
           onSuccess(metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]]) {
             case Some(image) =>
-              onSuccess(storageService.ask(GetDicomData(image, withPixelData = true, useBulkDataURI = false)).mapTo[Option[DicomData]]) {
+              onSuccess(storageService.ask(GetDicomData(image, withPixelData = true)).mapTo[Option[DicomData]]) {
                 case Some(dicomData) =>
                   onSuccess(anonymizationService.ask(Anonymize(imageId, dicomData.attributes, tagValues)).mapTo[Attributes]) { anonAttributes =>
                     complete(HttpEntity(`application/octet-stream`, HttpData(DicomUtil.toByteArray(dicomData.copy(attributes = anonAttributes)))))

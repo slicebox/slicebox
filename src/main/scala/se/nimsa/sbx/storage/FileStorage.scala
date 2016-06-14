@@ -48,14 +48,14 @@ class FileStorage(val path: Path) extends StorageService {
       case None =>
     }
 
-  def readDicomData(image: Image, withPixelData: Boolean, useBulkDataURI: Boolean): Option[DicomData] =
+  def readDicomData(image: Image, withPixelData: Boolean): Option[DicomData] =
     resolvePath(image).map { imagePath =>
-      loadDicomData(imagePath, withPixelData, useBulkDataURI)
+      loadDicomData(imagePath, withPixelData)
     }
 
   def readImageAttributes(image: Image): Option[List[ImageAttribute]] =
     resolvePath(image).map { imagePath =>
-      DicomUtil.readImageAttributes(loadDicomData(imagePath, withPixelData = false, useBulkDataURI = false).attributes)
+      DicomUtil.readImageAttributes(loadDicomData(imagePath, withPixelData = false).attributes)
     }
 
   def readImageInformation(image: Image): Option[ImageInformation] =

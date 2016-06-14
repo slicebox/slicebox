@@ -72,7 +72,7 @@ class DirectoryWatchActor(watchedDirectory: WatchedDirectory,
 
     case FileAddedToWatchedDirectory(path) =>
       if (Files.isRegularFile(path)) {
-        val dicomData = loadDicomData(path, withPixelData = true, useBulkDataURI = false)
+        val dicomData = loadDicomData(path, withPixelData = true)
         val source = Source(SourceType.DIRECTORY, watchedDirectory.name, watchedDirectory.id)
         context.become(waitForDatasetProcessed)
         checkDicomData(dicomData).flatMap { status =>

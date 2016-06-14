@@ -29,11 +29,11 @@ class RuntimeStorage extends StorageService {
   def deleteFromStorage(image: Image): Unit =
     storage.remove(imageName(image))
 
-  def readDicomData(image: Image, withPixelData: Boolean, useBulkDataURI: Boolean): Option[DicomData] =
-    storage.get(imageName(image)).map(bytes => loadDicomData(bytes, withPixelData, useBulkDataURI))
+  def readDicomData(image: Image, withPixelData: Boolean): Option[DicomData] =
+    storage.get(imageName(image)).map(bytes => loadDicomData(bytes, withPixelData))
 
   def readImageAttributes(image: Image): Option[List[ImageAttribute]] =
-    storage.get(imageName(image)).map(bytes => DicomUtil.readImageAttributes(loadDicomData(bytes, withPixelData = false, useBulkDataURI = false).attributes))
+    storage.get(imageName(image)).map(bytes => DicomUtil.readImageAttributes(loadDicomData(bytes, withPixelData = false).attributes))
 
   def readImageInformation(image: Image): Option[ImageInformation] =
     imageAsInputStream(image).map(is => super.readImageInformation(is))

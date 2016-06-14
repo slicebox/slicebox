@@ -99,7 +99,7 @@ trait ImportRoutes {
   def addImageToImportSessionRoute(bytes: Array[Byte], importSessionId: Long): Route = {
     import spray.httpx.SprayJsonSupport._
 
-    val dicomData = DicomUtil.loadDicomData(bytes, withPixelData = true, useBulkDataURI = false)
+    val dicomData = DicomUtil.loadDicomData(bytes, withPixelData = true)
     onSuccess(importService.ask(GetImportSession(importSessionId)).mapTo[Option[ImportSession]]) {
       case Some(importSession) =>
 

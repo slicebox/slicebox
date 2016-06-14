@@ -55,7 +55,7 @@ trait TransactionRoutes {
               post {
                 entity(as[Array[Byte]]) { compressedBytes =>
                   val bytes = decompress(compressedBytes)
-                  val dicomData = loadDicomData(bytes, withPixelData = true, useBulkDataURI = false)
+                  val dicomData = loadDicomData(bytes, withPixelData = true)
                   if (dicomData == null)
                     complete((BadRequest, "Dicom data could not be read"))
                   else

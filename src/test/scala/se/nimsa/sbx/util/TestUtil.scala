@@ -99,7 +99,7 @@ object TestUtil {
 
   def testImageFile = new File(getClass.getResource("test.dcm").toURI)
   def testSecondaryCaptureFile = new File(getClass.getResource("sc.dcm").toURI)
-  def testImageDicomData(withPixelData: Boolean = true) = DicomUtil.loadDicomData(testImageFile.toPath, withPixelData, useBulkDataURI = true)
+  def testImageDicomData(withPixelData: Boolean = true) = DicomUtil.loadDicomData(testImageFile.toPath, withPixelData)
   def testImageByteArray = DicomUtil.toByteArray(testImageFile.toPath)
 
   def jpegFile = new File(getClass.getResource("cat.jpg").toURI)

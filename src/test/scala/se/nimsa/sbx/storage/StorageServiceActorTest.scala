@@ -61,12 +61,12 @@ class StorageServiceActorTest(_system: ActorSystem) extends TestKit(_system) wit
     }
 
     "return a failure message when checking a secondary capture dataset with the standard list of accepted contexts" in {
-      storageActorRef ! CheckDicomData(DicomUtil.loadDicomData(TestUtil.testSecondaryCaptureFile.toPath, withPixelData = true, useBulkDataURI = true), useExtendedContexts = false)
+      storageActorRef ! CheckDicomData(DicomUtil.loadDicomData(TestUtil.testSecondaryCaptureFile.toPath, withPixelData = true), useExtendedContexts = false)
       expectMsgType[Failure]
     }
 
     "return a success message when checking a secondary capture dataset with the extended list of accepted contexts" in {
-      storageActorRef ! CheckDicomData(DicomUtil.loadDicomData(TestUtil.testSecondaryCaptureFile.toPath, withPixelData = true, useBulkDataURI = true), useExtendedContexts = true)
+      storageActorRef ! CheckDicomData(DicomUtil.loadDicomData(TestUtil.testSecondaryCaptureFile.toPath, withPixelData = true), useExtendedContexts = true)
       expectMsg(true)
     }
   }

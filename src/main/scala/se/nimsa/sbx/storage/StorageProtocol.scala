@@ -35,7 +35,7 @@ object StorageProtocol {
 
   case class GetImageData(image: Image) extends ImageRequest
 
-  case class GetDicomData(image: Image, withPixelData: Boolean, useBulkDataURI: Boolean = false) extends ImageRequest
+  case class GetDicomData(image: Image, withPixelData: Boolean) extends ImageRequest
 
   case class GetImageAttributes(image: Image) extends ImageRequest
 

@@ -64,7 +64,7 @@ class DicomUtilTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     val attributes1 = TestUtil.testImageDicomData(withPixelData = false)
     val savePath = tempDir.resolve("attributes1.dcm")
     saveDicomData(attributes1, savePath)
-    val attributes2 = loadDicomData(savePath, withPixelData = false, useBulkDataURI = true)
+    val attributes2 = loadDicomData(savePath, withPixelData = false)
     attributes1 should equal (attributes2)
   }
 
@@ -74,7 +74,7 @@ class DicomUtilTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     val anonymizedDicomData1 = dicomData.copy(attributes = anonymizedAttributes)
     val savePath = tempDir.resolve("anonymized.dcm")
     saveDicomData(anonymizedDicomData1, savePath)
-    val anonymizedDicomData2 = loadDicomData(savePath, withPixelData = true, useBulkDataURI = true)
+    val anonymizedDicomData2 = loadDicomData(savePath, withPixelData = true)
     // pixel data is different since URL:s are different
     anonymizedDicomData1.attributes.remove(Tag.PixelData)
     anonymizedDicomData2.attributes.remove(Tag.PixelData)

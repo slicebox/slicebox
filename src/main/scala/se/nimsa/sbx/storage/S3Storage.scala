@@ -51,14 +51,14 @@ class S3Storage(val bucket: String, val s3Prefix: String) extends StorageService
 
   def deleteFromStorage(image: Image): Unit = s3Client.delete(s3Id(image))
 
-  def readDicomData(image: Image, withPixelData: Boolean, useBulkDataURI: Boolean): Option[DicomData] = {
+  def readDicomData(image: Image, withPixelData: Boolean): Option[DicomData] = {
     val s3InputStream = s3Client.get(s3Id(image))
-    Some(loadDicomData(s3InputStream, withPixelData, useBulkDataURI))
+    Some(loadDicomData(s3InputStream, withPixelData))
   }
 
   def readImageAttributes(image: Image): Option[List[ImageAttribute]] = {
     val s3InputStream = s3Client.get(s3Id(image))
-    Some(DicomUtil.readImageAttributes(loadDicomData(s3InputStream, withPixelData = false, useBulkDataURI = false).attributes))
+    Some(DicomUtil.readImageAttributes(loadDicomData(s3InputStream, withPixelData = false).attributes))
   }
 
   def readImageInformation(image: Image): Option[ImageInformation] = {
