@@ -94,31 +94,6 @@ trait StorageService {
     }
   }
 
-  def readSecondaryCaptureJpeg(image: Image, imageHeight: Int): Option[Array[Byte]]
-
-  def readSecondaryCaptureJpeg(inputStream: InputStream, imageHeight: Int) = {
-    val ds = loadJpegAttributes(inputStream)
-    val pd = ds.getValue(Tag.PixelData)
-    if (pd != null && pd.isInstanceOf[Fragments]) {
-      val fragments = pd.asInstanceOf[Fragments]
-      if (fragments.size == 2) {
-        fragments.get(1) match {
-          case bd: BulkData =>
-            val bytes = bd.toBytes(null, bd.bigEndian)
-            val bi = scaleImage(ImageIO.read(new ByteArrayInputStream(bytes)), imageHeight)
-            val baos = new ByteArrayOutputStream
-            ImageIO.write(bi, "png", baos)
-            baos.close()
-            baos.toByteArray
-          case _ =>
-            throw new IllegalArgumentException("JPEG bytes not an instance of BulkData")
-        }
-      } else throw new IllegalArgumentException(s"JPEG fragements are expected to contain 2 entries, contained ${
-        fragments.size
-      }")
-    } else throw new IllegalArgumentException("JPEG bytes not contained in Fragments")
-  }
-
   def scaleImage(image: BufferedImage, imageHeight: Int): BufferedImage = {
     val ratio = imageHeight / image.getHeight.asInstanceOf[Double]
     if (ratio != 0.0 && ratio != 1.0) {

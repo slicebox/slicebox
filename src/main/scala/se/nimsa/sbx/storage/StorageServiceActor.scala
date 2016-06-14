@@ -17,6 +17,7 @@
 package se.nimsa.sbx.storage
 
 import java.nio.file.NoSuchFileException
+import javax.imageio.ImageIO
 
 import akka.actor.{Actor, Props}
 import akka.event.{Logging, LoggingReceive}
@@ -39,6 +40,10 @@ class StorageServiceActor(storage: StorageService) extends Actor with ExceptionC
   val exportSets = mutable.Map.empty[Long, Seq[Long]]
 
   case class RemoveExportSet(id: Long)
+
+  // ensure dcm4che uses standard ImageIO image readers for parsing compressed image data
+  // (see https://github.com/dcm4che/dcm4che/blob/3.3.7/dcm4che-imageio/src/main/java/org/dcm4che3/imageio/codec/ImageReaderFactory.java#L242)
+  System.setProperty("dcm4che.useImageIOServiceRegistry", "true")
 
   log.info("Storage service started")
 
@@ -95,19 +100,16 @@ class StorageServiceActor(storage: StorageService) extends Actor with ExceptionC
           sender ! storage.readImageInformation(image)
 
         case GetPngDataArray(image, frameNumber, windowMin, windowMax, imageHeight) =>
+          val iter = ImageIO.getImageReadersByFormatName("jpeg")
+          while (iter.hasNext)
+            println(iter.next())
           val pngResponse =
             try
               storage.readPngImageData(image, frameNumber, windowMin, windowMax, imageHeight).map(PngDataArray(_))
             catch {
-              case NonFatal(e1) =>
-                try {
-                  log.info("Dcm4che image creation failed. Trying specialized jpeg viewing.")
-                  storage.readSecondaryCaptureJpeg(image, imageHeight).map(PngDataArray(_))
-                } catch {
-                  case NonFatal(e2) =>
-                    log.debug(s"Could not create PNG image data for image with ID ${image.id}, returning empty response")
-                    Some(PngDataArrayNotAvailable)
-                }
+              case NonFatal(e) =>
+                log.warning(s"Could not create PNG image data for image with ID ${image.id}: " + e.getMessage)
+                Some(PngDataArrayNotAvailable)
             }
           sender ! pngResponse
 

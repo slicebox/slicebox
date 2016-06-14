@@ -21,7 +21,7 @@ class FileStorage(val path: Path) extends StorageService {
 
   createStorageDirectoryIfNecessary()
 
-  def storeDicomData(dicomData: DicomData, image: Image): Boolean = {
+  override def storeDicomData(dicomData: DicomData, image: Image): Boolean = {
     val storedPath = filePath(image)
     val overwrite = Files.exists(storedPath)
     try saveDicomData(dicomData, storedPath) catch {
@@ -31,29 +31,29 @@ class FileStorage(val path: Path) extends StorageService {
     overwrite
   }
 
-  def filePath(image: Image) =
+  private def filePath(image: Image) =
     path.resolve(imageName(image))
 
-  def storeEncapsulated(image: Image, dcmTempPath: Path): Unit =
+  override def storeEncapsulated(image: Image, dcmTempPath: Path): Unit =
     Files.move(dcmTempPath, filePath(image))
 
-  def resolvePath(image: Image): Option[Path] =
+  private def resolvePath(image: Image): Option[Path] =
     Option(filePath(image))
       .filter(p => Files.exists(p) && Files.isReadable(p))
 
-  def deleteFromStorage(image: Image): Unit =
+  override def deleteFromStorage(image: Image): Unit =
     resolvePath(image) match {
       case Some(imagePath) =>
         Files.delete(imagePath)
       case None =>
     }
 
-  def readDicomData(image: Image, withPixelData: Boolean): Option[DicomData] =
+  override def readDicomData(image: Image, withPixelData: Boolean): Option[DicomData] =
     resolvePath(image).map { imagePath =>
       loadDicomData(imagePath, withPixelData)
     }
 
-  def readImageAttributes(image: Image): Option[List[ImageAttribute]] =
+  override def readImageAttributes(image: Image): Option[List[ImageAttribute]] =
     resolvePath(image).map { imagePath =>
       DicomUtil.readImageAttributes(loadDicomData(imagePath, withPixelData = false).attributes)
     }
@@ -63,19 +63,14 @@ class FileStorage(val path: Path) extends StorageService {
       super.readImageInformation(new BufferedInputStream(Files.newInputStream(imagePath)))
     }
 
-  def readPngImageData(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int): Option[Array[Byte]] =
+  override def readPngImageData(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int): Option[Array[Byte]] =
     resolvePath(image).map { imagePath =>
       val file = imagePath.toFile
       val iis = ImageIO.createImageInputStream(file)
       super.readPngImageData(iis, frameNumber, windowMin, windowMax, imageHeight)
     }
 
-  def readSecondaryCaptureJpeg(image: Image, imageHeight: Int): Option[Array[Byte]] =
-    resolvePath(image).map { imagePath =>
-      super.readSecondaryCaptureJpeg(new BufferedInputStream(Files.newInputStream(imagePath)), imageHeight)
-    }
-
-  def imageAsInputStream(image: Image): Option[InputStream] =
+  override def imageAsInputStream(image: Image): Option[InputStream] =
     resolvePath(image).map { imagePath =>
       new BufferedInputStream(Files.newInputStream(imagePath))
     }
