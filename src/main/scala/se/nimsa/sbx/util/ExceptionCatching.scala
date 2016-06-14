@@ -20,6 +20,8 @@ import akka.actor.Actor
 import akka.actor.Status.Failure
 import se.nimsa.sbx.log.SbxLog
 
+import scala.annotation.tailrec
+
 trait ExceptionCatching { this: Actor =>
 
   def catchAndReport[A](op: => A): Option[A] =
@@ -28,9 +30,9 @@ trait ExceptionCatching { this: Actor =>
     } catch {
       case e: Exception =>
         if (e.isInstanceOf[IllegalArgumentException]) 
-           SbxLog.info("System", "Bad request caused error: " + e.getMessage)(context.system)
+           SbxLog.info("System", createMessageString(e))(context.system)
          else
-        	 SbxLog.error("System", "" + e.getMessage)(context.system)
+        	 SbxLog.error("System", "" + createMessageString(e))(context.system)
         sender ! Failure(e)
         None
     }
@@ -41,11 +43,17 @@ trait ExceptionCatching { this: Actor =>
     } catch {
       case e: Exception =>
         if (e.isInstanceOf[IllegalArgumentException]) 
-           SbxLog.info("System", "Bad request caused error: " + e.getMessage)(context.system)
+           SbxLog.info("System", createMessageString(e))(context.system)
          else
-           SbxLog.error("System", "" + e.getMessage)(context.system)
+           SbxLog.error("System", "" + createMessageString(e))(context.system)
         sender ! Failure(e)
         throw e
     }
 
+  private def createMessageString(e: Throwable): String = {
+    if (e.getCause == null)
+      e.getMessage
+    else
+      s"${e.getMessage}: " + createMessageString(e.getCause)
+  }
 }

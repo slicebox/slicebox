@@ -123,7 +123,7 @@ trait ImportRoutes {
 
           case Failure(e) =>
             importService.ask(UpdateSessionWithRejection(importSession))
-            complete(BadRequest)
+            complete((BadRequest, e.getMessage))
 
         }
 

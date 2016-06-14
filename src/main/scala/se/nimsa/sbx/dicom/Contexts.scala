@@ -10,6 +10,7 @@ object Contexts {
   private val standardTS = Seq(ImplicitVrLittleEndian, ExplicitVrLittleEndian, ExplicitVrBigEndian, JpegBaselineProcess1)
   
   val imageDataContexts = Seq(
+    Context(ComputedRadiographyImageStorage, standardTS),
     Context(DigitalXRayImageStorageForPresentation, standardTS),
     Context(DigitalXRayImageStorageForProcessing, standardTS),
     Context(DigitalMammographyXRayImageStorageForPresentation, standardTS),

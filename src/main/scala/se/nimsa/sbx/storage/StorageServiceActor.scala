@@ -100,9 +100,10 @@ class StorageServiceActor(storage: StorageService) extends Actor with ExceptionC
               storage.readPngImageData(image, frameNumber, windowMin, windowMax, imageHeight).map(PngDataArray(_))
             catch {
               case NonFatal(e1) =>
-                try
+                try {
+                  log.info("Dcm4che image creation failed. Trying specialized jpeg viewing.")
                   storage.readSecondaryCaptureJpeg(image, imageHeight).map(PngDataArray(_))
-                catch {
+                } catch {
                   case NonFatal(e2) =>
                     log.debug(s"Could not create PNG image data for image with ID ${image.id}, returning empty response")
                     Some(PngDataArrayNotAvailable)
@@ -119,10 +120,12 @@ class StorageServiceActor(storage: StorageService) extends Actor with ExceptionC
   }
 
   def checkDicomData(dicomData: DicomData, useExtendedContexts: Boolean): Unit = {
-    if (dicomData == null || dicomData.attributes == null || dicomData.metaInformation == null)
+    if (dicomData == null || dicomData.attributes == null)
       throw new IllegalArgumentException("Invalid DICOM data")
+    if (dicomData.metaInformation == null)
+      throw new IllegalArgumentException("DICOM data does not contain necessary meta information")
     val allowedContexts = if (useExtendedContexts) Contexts.extendedContexts else Contexts.imageDataContexts
-    DicomUtil.checkContext(dicomData.metaInformation, allowedContexts)
+    DicomUtil.checkContext(dicomData, allowedContexts)
   }
 
 }

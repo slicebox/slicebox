@@ -48,7 +48,7 @@ object DicomUtil {
       val transferSyntaxUID = dicomData.metaInformation.getString(Tag.TransferSyntaxUID)
       if (transferSyntaxUID == null || transferSyntaxUID.isEmpty)
         throw new IllegalArgumentException("DICOM meta information is missing transfer syntax UID")
-      dos = new DicomOutputStream(outputStream, transferSyntaxUID)
+      dos = new DicomOutputStream(outputStream, TransferSyntaxes.ExplicitVrLittleEndian.uid)
       dos.writeDataset(dicomData.metaInformation, dicomData.attributes)
     } finally {
       SafeClose.close(dos)
@@ -65,7 +65,9 @@ object DicomUtil {
     var dis: DicomInputStream = null
     try {
       dis = new DicomInputStream(inputStream)
-      val fmi = dis.getFileMetaInformation
+      val fmi = if (dis.getFileMetaInformation == null) new Attributes() else dis.getFileMetaInformation
+      if (fmi.getString(Tag.TransferSyntaxUID) == null || fmi.getString(Tag.TransferSyntaxUID).isEmpty)
+        fmi.setString(Tag.TransferSyntaxUID, VR.UI, dis.getTransferSyntax)
       val attributes =
         if (withPixelData) {
           dis.setIncludeBulkData(IncludeBulkData.URI)
@@ -157,11 +159,13 @@ object DicomUtil {
     else
       values.tail.foldLeft(values.head)((result, part) => result + "/" + part)
 
-  def checkContext(metaInformation: Attributes, contexts: Seq[Context]): Unit = {
-    val tsUid = metaInformation.getString(Tag.TransferSyntaxUID)
-    val scUid = metaInformation.getString(Tag.MediaStorageSOPClassUID)
+  def checkContext(dicomData: DicomData, contexts: Seq[Context]): Unit = {
+    val tsUid = dicomData.metaInformation.getString(Tag.TransferSyntaxUID)
+    val mScUid = dicomData.metaInformation.getString(Tag.MediaStorageSOPClassUID)
+    val dScUid = dicomData.attributes.getString(Tag.SOPClassUID)
+    val scUid = if (mScUid == null || mScUid.isEmpty) dScUid else mScUid
     if (tsUid == null || scUid == null)
-      throw new IllegalArgumentException("DICOM attributes must contain meta information (transfer syntax UID and SOP class UID")
+      throw new IllegalArgumentException("DICOM attributes must contain meta information (transfer syntax UID and SOP class UID)")
     if (!contexts.exists(context => context.sopClass.uid == scUid && context.transferSyntaxes.map(_.uid).contains(tsUid)))
       throw new IllegalArgumentException(s"The presentation context [SOPClassUID = $scUid, TransferSyntaxUID = $tsUid] is not supported")
   }
