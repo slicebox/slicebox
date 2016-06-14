@@ -24,8 +24,6 @@ trait StorageService {
 
   def storeDicomData(dicomData: DicomData, image: Image): Boolean
 
-  def storeEncapsulated(image: Image, dcmTempPath: Path): Unit
-
   def imageName(image: Image) = image.id.toString
 
   def deleteFromStorage(images: Seq[Image]): Unit = images foreach (deleteFromStorage(_))

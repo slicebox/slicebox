@@ -17,7 +17,6 @@
 package se.nimsa.sbx.storage
 
 import java.nio.file.NoSuchFileException
-import javax.imageio.ImageIO
 
 import akka.actor.{Actor, Props}
 import akka.event.{Logging, LoggingReceive}
@@ -100,9 +99,6 @@ class StorageServiceActor(storage: StorageService) extends Actor with ExceptionC
           sender ! storage.readImageInformation(image)
 
         case GetPngDataArray(image, frameNumber, windowMin, windowMax, imageHeight) =>
-          val iter = ImageIO.getImageReadersByFormatName("jpeg")
-          while (iter.hasNext)
-            println(iter.next())
           val pngResponse =
             try
               storage.readPngImageData(image, frameNumber, windowMin, windowMax, imageHeight).map(PngDataArray(_))

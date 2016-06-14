@@ -34,9 +34,6 @@ class FileStorage(val path: Path) extends StorageService {
   private def filePath(image: Image) =
     path.resolve(imageName(image))
 
-  override def storeEncapsulated(image: Image, dcmTempPath: Path): Unit =
-    Files.move(dcmTempPath, filePath(image))
-
   private def resolvePath(image: Image): Option[Path] =
     Option(filePath(image))
       .filter(p => Files.exists(p) && Files.isReadable(p))

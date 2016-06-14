@@ -44,11 +44,6 @@ class S3Storage(val bucket: String, val s3Prefix: String) extends StorageService
     s3Client.upload(s3Key, buffer)
   }
 
-  override def storeEncapsulated(image: Image, dcmTempPath: Path): Unit = {
-    s3Client.upload(s3Id(image),Files.readAllBytes(dcmTempPath))
-    Files.delete(dcmTempPath)
-  }
-
   override def deleteFromStorage(image: Image): Unit = s3Client.delete(s3Id(image))
 
   override def readDicomData(image: Image, withPixelData: Boolean): Option[DicomData] = {

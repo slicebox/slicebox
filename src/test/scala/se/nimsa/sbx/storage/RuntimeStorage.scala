@@ -15,36 +15,28 @@ class RuntimeStorage extends StorageService {
 
   val storage = mutable.Map.empty[String, Array[Byte]]
 
-  def storeDicomData(dicomData: DicomData, image: Image): Boolean = {
+  override def storeDicomData(dicomData: DicomData, image: Image): Boolean = {
     val overwrite = storage.contains(imageName(image))
     storage.put(imageName(image), toByteArray(dicomData))
     overwrite
   }
 
-  def storeEncapsulated(image: Image, dcmTempPath: Path): Unit = {
-    storage.put(imageName(image), Files.readAllBytes(dcmTempPath))
-    Files.delete(dcmTempPath)
-  }
-
-  def deleteFromStorage(image: Image): Unit =
+  override def deleteFromStorage(image: Image): Unit =
     storage.remove(imageName(image))
 
-  def readDicomData(image: Image, withPixelData: Boolean): Option[DicomData] =
+  override def readDicomData(image: Image, withPixelData: Boolean): Option[DicomData] =
     storage.get(imageName(image)).map(bytes => loadDicomData(bytes, withPixelData))
 
-  def readImageAttributes(image: Image): Option[List[ImageAttribute]] =
+  override def readImageAttributes(image: Image): Option[List[ImageAttribute]] =
     storage.get(imageName(image)).map(bytes => DicomUtil.readImageAttributes(loadDicomData(bytes, withPixelData = false).attributes))
 
-  def readImageInformation(image: Image): Option[ImageInformation] =
+  override def readImageInformation(image: Image): Option[ImageInformation] =
     imageAsInputStream(image).map(is => super.readImageInformation(is))
 
-  def readPngImageData(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int): Option[Array[Byte]] =
+  override def readPngImageData(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int): Option[Array[Byte]] =
     imageAsInputStream(image).map(is => super.readPngImageData( ImageIO.createImageInputStream(is), frameNumber, windowMin, windowMax, imageHeight))
 
-  def readSecondaryCaptureJpeg(image: Image, imageHeight: Int): Option[Array[Byte]] =
-    imageAsInputStream(image).map(is => super.readSecondaryCaptureJpeg(is, imageHeight))
-
-  def imageAsInputStream(image: Image): Option[InputStream] =
+  override def imageAsInputStream(image: Image): Option[InputStream] =
     storage.get(imageName(image)).map(bytes => new ByteArrayInputStream(bytes))
 
   def clear() =
