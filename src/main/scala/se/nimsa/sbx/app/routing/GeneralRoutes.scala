@@ -37,7 +37,8 @@ import spray.httpx.SprayJsonSupport._
 import spray.routing.Route
 import spray.http.StatusCodes.OK
 
-trait GeneralRoutes { this: SliceboxService =>
+trait GeneralRoutes {
+  this: SliceboxService =>
 
   def generalRoutes(apiUser: ApiUser): Route =
     pathPrefix("system") {
@@ -46,18 +47,7 @@ trait GeneralRoutes { this: SliceboxService =>
           authorize(apiUser.hasPermission(UserRole.ADMINISTRATOR)) {
             complete {
               val stop =
-                gracefulStop(forwardingService, 5.seconds, PoisonPill) andThen
-                  { case _ => gracefulStop(importService, 5.seconds, PoisonPill) } andThen
-                  { case _ => gracefulStop(directoryService, 5.seconds, PoisonPill) } andThen
-                  { case _ => gracefulStop(scpService, 5.seconds, PoisonPill) } andThen
-                  { case _ => gracefulStop(scuService, 5.seconds, PoisonPill) } andThen
-                  { case _ => gracefulStop(seriesTypeService, 5.seconds, PoisonPill) } andThen
-                  { case _ => gracefulStop(logService, 5.seconds, PoisonPill) } andThen
-                  { case _ => gracefulStop(storageService, 5.seconds, PoisonPill) } andThen
-                  { case _ => gracefulStop(metaDataService, 5.seconds, PoisonPill) } andThen
-                  { case _ => gracefulStop(boxService, 5.seconds, PoisonPill) } andThen
-                  { case _ => gracefulStop(anonymizationService, 5.seconds, PoisonPill) } andThen
-                  { case _ => gracefulStop(userService, 5.seconds, PoisonPill) }
+                gracefulStop(forwardingService, 5.seconds, PoisonPill) andThen { case _ => gracefulStop(importService, 5.seconds, PoisonPill) } andThen { case _ => gracefulStop(directoryService, 5.seconds, PoisonPill) } andThen { case _ => gracefulStop(scpService, 5.seconds, PoisonPill) } andThen { case _ => gracefulStop(scuService, 5.seconds, PoisonPill) } andThen { case _ => gracefulStop(seriesTypeService, 5.seconds, PoisonPill) } andThen { case _ => gracefulStop(logService, 5.seconds, PoisonPill) } andThen { case _ => gracefulStop(storageService, 5.seconds, PoisonPill) } andThen { case _ => gracefulStop(metaDataService, 5.seconds, PoisonPill) } andThen { case _ => gracefulStop(boxService, 5.seconds, PoisonPill) } andThen { case _ => gracefulStop(anonymizationService, 5.seconds, PoisonPill) } andThen { case _ => gracefulStop(userService, 5.seconds, PoisonPill) }
               Await.ready(stop, 5.seconds)
 
               val system = actorRefFactory.asInstanceOf[ActorContext].system
@@ -66,8 +56,6 @@ trait GeneralRoutes { this: SliceboxService =>
             }
           }
         }
-      } ~ path("health") {
-        complete(OK)
       }
     } ~ path("sources") {
       get {
@@ -104,4 +92,10 @@ trait GeneralRoutes { this: SliceboxService =>
         }
       }
     }
+
+  def healthCheckRoute: Route =
+    path("system" / "health") {
+      complete(OK)
+    }
+
 }

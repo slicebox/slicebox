@@ -54,7 +54,7 @@ class GeneralRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   }
 
   it should "return 200 OK when health status is checked and the service in running" in {
-    GetAsUser("/api/system/health") ~> routes ~> check {
+    Get("/api/system/health") ~> routes ~> check {
       status shouldBe OK
     }
   }

@@ -3,7 +3,6 @@ package se.nimsa.sbx.dicom
 import java.nio.file.Files
 
 import org.dcm4che3.data.{Attributes, Tag, VR}
-import org.dcm4che3.util.TagUtils
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 import se.nimsa.sbx.anonymization.AnonymizationUtil._
 import se.nimsa.sbx.dicom.DicomUtil._
@@ -13,34 +12,42 @@ class DicomUtilTest extends FlatSpec with Matchers with BeforeAndAfterAll {
 
   "Validating a DICOM file" should "throw an exception for a non-supported context" in {
     val attributes = new Attributes()
-    attributes.setString(Tag.MediaStorageSOPClassUID, VR.UI, SopClasses.SecondaryCaptureImageStorage.uid)
-    attributes.setString(Tag.TransferSyntaxUID, VR.UI, TransferSyntaxes.ExplicitVrLittleEndian.uid)
+    val metaInformation = new Attributes()
+    metaInformation.setString(Tag.MediaStorageSOPClassUID, VR.UI, SopClasses.SecondaryCaptureImageStorage.uid)
+    metaInformation.setString(Tag.TransferSyntaxUID, VR.UI, TransferSyntaxes.ExplicitVrLittleEndian.uid)
+    val dicomData = DicomData(attributes, metaInformation)
     intercept[IllegalArgumentException] {
-      checkContext(attributes, Contexts.imageDataContexts)
+      checkContext(dicomData, Contexts.imageDataContexts)
     }
   }
 
   it should "pass a supported context" in {
     val attributes = new Attributes()
-    attributes.setString(Tag.MediaStorageSOPClassUID, VR.UI, SopClasses.NuclearMedicineImageStorage.uid)
-    attributes.setString(Tag.TransferSyntaxUID, VR.UI, TransferSyntaxes.ExplicitVrLittleEndian.uid)
-    checkContext(attributes, Contexts.imageDataContexts)
+    val metaInformation = new Attributes()
+    metaInformation.setString(Tag.MediaStorageSOPClassUID, VR.UI, SopClasses.NuclearMedicineImageStorage.uid)
+    metaInformation.setString(Tag.TransferSyntaxUID, VR.UI, TransferSyntaxes.ExplicitVrLittleEndian.uid)
+    val dicomData = DicomData(attributes, metaInformation)
+    checkContext(dicomData, Contexts.imageDataContexts)
   }
 
   it should "throw an exception for a context with an unknown SOP Class UID" in {
     val notASopClassUid = "this is now a known UID" // any non-SopClassUID string is fine
     val attributes = new Attributes()
-    attributes.setString(Tag.MediaStorageSOPClassUID, VR.UI, notASopClassUid)
-    attributes.setString(Tag.TransferSyntaxUID, VR.UI, TransferSyntaxes.ExplicitVrLittleEndian.uid)
+    val metaInformation = new Attributes()
+    metaInformation.setString(Tag.MediaStorageSOPClassUID, VR.UI, notASopClassUid)
+    metaInformation.setString(Tag.TransferSyntaxUID, VR.UI, TransferSyntaxes.ExplicitVrLittleEndian.uid)
+    val dicomData = DicomData(attributes, metaInformation)
     intercept[IllegalArgumentException] {
-      checkContext(attributes, Contexts.imageDataContexts)
+      checkContext(dicomData, Contexts.imageDataContexts)
     }
   }
 
   it should "throw an exception for a attributes with missing file meta information" in {
     val attributes = new Attributes()
+    val metaInformation = new Attributes()
+    val dicomData = DicomData(attributes, metaInformation)
     intercept[IllegalArgumentException] {
-      checkContext(attributes, Contexts.imageDataContexts)
+      checkContext(dicomData, Contexts.imageDataContexts)
     }
   }
 
