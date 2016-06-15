@@ -238,6 +238,60 @@ class MetaDataServiceActorTest(_system: ActorSystem) extends TestKit(_system) wi
       imageEvents shouldBe empty
     }
 
+    "support updating metadata without creating new metadata instances if key attributes are unchanged" in {
+      val source = Source(SourceType.UNKNOWN, "unknown", -1)
+
+      metaDataActorRef ! AddMetaData(dicomData.attributes, source)
+      expectMsgType[MetaDataAdded]
+
+      val attributes2 = new Attributes(dicomData.attributes)
+      attributes2.setString(Tag.PatientBirthDate, VR.DA, "new date")
+      attributes2.setString(Tag.StudyID, VR.LO, "new id")
+      attributes2.setString(Tag.Modality, VR.CS, "new modality")
+      attributes2.setString(Tag.InstanceNumber, VR.SS, "666")
+
+      metaDataActorRef ! AddMetaData(attributes2, source)
+      expectMsgType[MetaDataAdded]
+
+      db.withSession { implicit session =>
+        metaDataDao.patients should have length 1
+        metaDataDao.studies should have length 1
+        metaDataDao.series should have length 1
+        metaDataDao.images should have length 1
+
+        metaDataDao.patients.head.patientBirthDate.value shouldBe "new date"
+        metaDataDao.studies.head.studyID.value shouldBe "new id"
+        metaDataDao.series.head.modality.value shouldBe "new modality"
+        metaDataDao.images.head.instanceNumber.value shouldBe "666"
+      }
+    }
+
+    "support updating metadata and creating new metadata instances if key attributes are changed" in {
+      val source1 = Source(SourceType.UNKNOWN, "unknown", -1)
+      val source2 = Source(SourceType.SCP, "scp", -1)
+
+      metaDataActorRef ! AddMetaData(dicomData.attributes, source1)
+      expectMsgType[MetaDataAdded]
+
+      val attributes2 = new Attributes(dicomData.attributes)
+      attributes2.setString(Tag.SeriesInstanceUID, VR.UI, "new ui")
+
+      metaDataActorRef ! AddMetaData(attributes2, source2)
+      expectMsgType[MetaDataAdded]
+
+      db.withSession { implicit session =>
+        metaDataDao.patients should have length 1
+        metaDataDao.studies should have length 1
+        metaDataDao.series should have length 2
+        metaDataDao.images should have length 2
+
+        val seriesSources = propertiesDao.seriesSources
+        seriesSources should have length 2
+        seriesSources.head.source shouldBe source1
+        seriesSources(1).source shouldBe source2
+      }
+    }
+
   }
 
 }

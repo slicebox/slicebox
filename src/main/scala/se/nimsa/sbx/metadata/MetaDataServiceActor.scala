@@ -220,28 +220,44 @@ class MetaDataServiceActor(dbProps: DbProps) extends Actor with ExceptionCatchin
 
         val seriesSource = SeriesSource(-1, source)
 
-        val dbPatient = dao.patientByNameAndID(patient).getOrElse {
+        val dbPatient = dao.patientByNameAndID(patient).map { dbp =>
+          val updatePatient = patient.copy(id = dbp.id)
+          dao.updatePatient(updatePatient)
+          updatePatient
+        }.getOrElse {
           patientAdded = true
           dao.insert(patient)
         }
-        val dbStudy = dao.studyByUidAndPatient(study, dbPatient).getOrElse {
+        val dbStudy = dao.studyByUidAndPatient(study, dbPatient).map { dbs =>
+          val updateStudy = study.copy(id = dbs.id, patientId = dbs.patientId)
+          dao.updateStudy(updateStudy)
+          updateStudy
+        }.getOrElse {
           studyAdded = true
           dao.insert(study.copy(patientId = dbPatient.id))
         }
-        val dbSeries = dao.seriesByUidAndStudy(series, dbStudy).getOrElse {
+        val dbSeries = dao.seriesByUidAndStudy(series, dbStudy).map { dbs =>
+          val updateSeries = series.copy(id = dbs.id, studyId = dbs.studyId)
+          dao.updateSeries(updateSeries)
+          updateSeries
+        }.getOrElse {
           seriesAdded = true
           dao.insert(series.copy(studyId = dbStudy.id))
         }
-        val dbImage = dao.imageByUidAndSeries(image, dbSeries).getOrElse {
+        val dbImage = dao.imageByUidAndSeries(image, dbSeries).map { dbi =>
+          val updateImage = image.copy(id = dbi.id, seriesId = dbi.seriesId)
+          dao.updateImage(updateImage)
+          updateImage
+        }.getOrElse {
           imageAdded = true
           dao.insert(image.copy(seriesId = dbSeries.id))
         }
-        val dbSeriesSource = propertiesDao.seriesSourceById(dbSeries.id)
-          .getOrElse(propertiesDao.insertSeriesSource(seriesSource.copy(id = dbSeries.id)))
-
-        if (dbSeriesSource.source.sourceType != source.sourceType || dbSeriesSource.source.sourceId != source.sourceId)
-          SbxLog.warn("Storage", s"Existing series source does not match source of added image (${dbSeriesSource.source} vs $source). Source of added image will be lost.")
-
+        val dbSeriesSource = propertiesDao.seriesSourceById(dbSeries.id).map { dbss =>
+          val updateSeriesSource = seriesSource.copy(id = dbss.id)
+          propertiesDao.updateSeriesSource(updateSeriesSource)
+          updateSeriesSource
+        }.getOrElse(propertiesDao.insertSeriesSource(seriesSource.copy(id = dbSeries.id)))
+        
         (dbPatient, dbStudy, dbSeries, dbImage, dbSeriesSource)
       }
 

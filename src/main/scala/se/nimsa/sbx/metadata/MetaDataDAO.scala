@@ -17,7 +17,7 @@
 package se.nimsa.sbx.metadata
 
 import scala.slick.driver.JdbcProfile
-import scala.slick.jdbc.{ GetResult, StaticQuery => Q }
+import scala.slick.jdbc.{GetResult, StaticQuery => Q}
 import se.nimsa.sbx.dicom.DicomProperty
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomPropertyValue._
@@ -26,6 +26,7 @@ import MetaDataProtocol._
 import MetaDataProtocol.QueryOperator._
 
 class MetaDataDAO(val driver: JdbcProfile) {
+
   import driver.simple._
   import MetaDataDAO._
 
@@ -42,7 +43,7 @@ class MetaDataDAO(val driver: JdbcProfile) {
     def patientID = column[String](DicomProperty.PatientID.name)
     def patientBirthDate = column[String](DicomProperty.PatientBirthDate.name)
     def patientSex = column[String](DicomProperty.PatientSex.name)
-    def * = (id, patientName, patientID, patientBirthDate, patientSex) <> (toPatient.tupled, fromPatient)
+    def * = (id, patientName, patientID, patientBirthDate, patientSex) <>(toPatient.tupled, fromPatient)
   }
 
   val patientsQuery = TableQuery[Patients]
@@ -63,7 +64,7 @@ class MetaDataDAO(val driver: JdbcProfile) {
     def studyID = column[String](DicomProperty.StudyID.name)
     def accessionNumber = column[String](DicomProperty.AccessionNumber.name)
     def patientAge = column[String](DicomProperty.PatientAge.name)
-    def * = (id, patientId, studyInstanceUID, studyDescription, studyDate, studyID, accessionNumber, patientAge) <> (toStudy.tupled, fromStudy)
+    def * = (id, patientId, studyInstanceUID, studyDescription, studyDate, studyID, accessionNumber, patientAge) <>(toStudy.tupled, fromStudy)
 
     def patientFKey = foreignKey("patientFKey", patientId, patientsQuery)(_.id, onUpdate = ForeignKeyAction.Cascade, onDelete = ForeignKeyAction.Cascade)
   }
@@ -89,7 +90,7 @@ class MetaDataDAO(val driver: JdbcProfile) {
     def manufacturer = column[String](DicomProperty.Manufacturer.name)
     def stationName = column[String](DicomProperty.StationName.name)
     def frameOfReferenceUID = column[String](DicomProperty.FrameOfReferenceUID.name)
-    def * = (id, studyId, seriesInstanceUID, seriesDescription, seriesDate, modality, protocolName, bodyPartExamined, manufacturer, stationName, frameOfReferenceUID) <> (toSeries.tupled, fromSeries)
+    def * = (id, studyId, seriesInstanceUID, seriesDescription, seriesDate, modality, protocolName, bodyPartExamined, manufacturer, stationName, frameOfReferenceUID) <>(toSeries.tupled, fromSeries)
 
     def studyFKey = foreignKey("studyFKey", studyId, studiesQuery)(_.id, onUpdate = ForeignKeyAction.Cascade, onDelete = ForeignKeyAction.Cascade)
   }
@@ -109,7 +110,7 @@ class MetaDataDAO(val driver: JdbcProfile) {
     def sopInstanceUID = column[String](DicomProperty.SOPInstanceUID.name)
     def imageType = column[String](DicomProperty.ImageType.name)
     def instanceNumber = column[String](DicomProperty.InstanceNumber.name)
-    def * = (id, seriesId, sopInstanceUID, imageType, instanceNumber) <> (toImage.tupled, fromImage)
+    def * = (id, seriesId, sopInstanceUID, imageType, instanceNumber) <>(toImage.tupled, fromImage)
 
     def seriesFKey = foreignKey("seriesFKey", seriesId, seriesQuery)(_.id, onUpdate = ForeignKeyAction.Cascade, onDelete = ForeignKeyAction.Cascade)
   }
@@ -228,7 +229,8 @@ class MetaDataDAO(val driver: JdbcProfile) {
     })
       .getOrElse("")
 
-  val queryPatientsSelectPart = """select distinct("Patients"."id"),
+  val queryPatientsSelectPart =
+    """select distinct("Patients"."id"),
       "Patients"."patientName",
       "Patients"."patientID",
       "Patients"."patientBirthDate",
@@ -254,7 +256,8 @@ class MetaDataDAO(val driver: JdbcProfile) {
   val studiesGetResult = GetResult(r =>
     Study(r.nextLong, r.nextLong, StudyInstanceUID(r.nextString), StudyDescription(r.nextString), StudyDate(r.nextString), StudyID(r.nextString), AccessionNumber(r.nextString), PatientAge(r.nextString)))
 
-  val queryStudiesSelectPart = """select distinct("Studies"."id"),
+  val queryStudiesSelectPart =
+    """select distinct("Studies"."id"),
       "Studies"."patientId",
       "Studies"."studyInstanceUID",
       "Studies"."studyDescription",
@@ -283,7 +286,8 @@ class MetaDataDAO(val driver: JdbcProfile) {
   val seriesGetResult = GetResult(r =>
     Series(r.nextLong, r.nextLong, SeriesInstanceUID(r.nextString), SeriesDescription(r.nextString), SeriesDate(r.nextString), Modality(r.nextString), ProtocolName(r.nextString), BodyPartExamined(r.nextString), Manufacturer(r.nextString), StationName(r.nextString), FrameOfReferenceUID(r.nextString)))
 
-  val querySeriesSelectPart = """select distinct("Series"."id"),
+  val querySeriesSelectPart =
+    """select distinct("Series"."id"),
       "Series"."studyId",
       "Series"."seriesInstanceUID",
       "Series"."seriesDescription",
@@ -315,7 +319,8 @@ class MetaDataDAO(val driver: JdbcProfile) {
   val imagesGetResult = GetResult(r =>
     Image(r.nextLong, r.nextLong, SOPInstanceUID(r.nextString), ImageType(r.nextString), InstanceNumber(r.nextString)))
 
-  val queryImagesSelectPart = """select distinct("Images"."id"),
+  val queryImagesSelectPart =
+    """select distinct("Images"."id"),
       "Images"."seriesId",
       "Images"."sopInstanceUID",
       "Images"."imageType",
@@ -354,7 +359,8 @@ class MetaDataDAO(val driver: JdbcProfile) {
     Q.queryNA(query).list
   }
 
-  val flatSeriesBasePart = """select distinct("Series"."id"), 
+  val flatSeriesBasePart =
+    """select distinct("Series"."id"),
       "Patients"."id","Patients"."patientName","Patients"."patientID","Patients"."patientBirthDate","Patients"."patientSex", 
       "Studies"."id","Studies"."patientId","Studies"."studyInstanceUID","Studies"."studyDescription","Studies"."studyDate","Studies"."studyID","Studies"."accessionNumber","Studies"."patientAge",
       "Series"."id","Series"."studyId","Series"."seriesInstanceUID","Series"."seriesDescription","Series"."seriesDate","Series"."modality","Series"."protocolName","Series"."bodyPartExamined","Series"."manufacturer","Series"."stationName","Series"."frameOfReferenceUID"
@@ -461,6 +467,20 @@ class MetaDataDAO(val driver: JdbcProfile) {
       .filter(_.seriesId === series.id)
       .firstOption
 
+  // *** Updates ***
+
+  def updatePatient(patient: Patient)(implicit session: Session): Int =
+    patientsQuery.filter(_.id === patient.id).update(patient)
+
+  def updateStudy(study: Study)(implicit session: Session): Int =
+    studiesQuery.filter(_.id === study.id).update(study)
+
+  def updateSeries(series: Series)(implicit session: Session): Int =
+    seriesQuery.filter(_.id === series.id).update(series)
+
+  def updateImage(image: Image)(implicit session: Session): Int =
+    imagesQuery.filter(_.id === image.id).update(image)
+
   // *** Deletes ***
 
   def deletePatient(patientId: Long)(implicit session: Session): Int = {
@@ -501,7 +521,9 @@ class MetaDataDAO(val driver: JdbcProfile) {
     val studiesDeleted = deleteStudy(study.id)
     val patientMaybe = patientById(study.patientId)
       .filter(patient => studiesForPatient(0, 2, patient.id).isEmpty)
-      .map(patient => { deletePatient(patient.id); patient })
+      .map(patient => {
+        deletePatient(patient.id); patient
+      })
     val studyMaybe = if (studiesDeleted == 0) None else Some(study)
     (patientMaybe, studyMaybe)
   }

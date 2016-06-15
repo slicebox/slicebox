@@ -17,7 +17,7 @@
 package se.nimsa.sbx.metadata
 
 import scala.slick.driver.JdbcProfile
-import scala.slick.jdbc.{ GetResult, StaticQuery => Q }
+import scala.slick.jdbc.{GetResult, StaticQuery => Q}
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomPropertyValue._
 import se.nimsa.sbx.seriestype.SeriesTypeDAO
@@ -26,9 +26,10 @@ import se.nimsa.sbx.app.GeneralProtocol._
 import MetaDataProtocol._
 
 class PropertiesDAO(val driver: JdbcProfile) {
+
   import driver.simple._
   import MetaDataDAO._
-  
+
   val metaDataDao = new MetaDataDAO(driver)
   val seriesTypeDao = new SeriesTypeDAO(driver)
 
@@ -43,7 +44,7 @@ class PropertiesDAO(val driver: JdbcProfile) {
     def sourceType = column[String]("sourcetype")
     def sourceName = column[String]("sourcename")
     def sourceId = column[Long]("sourceid")
-    def * = (id, sourceType, sourceName, sourceId) <> (toSeriesSource.tupled, fromSeriesSource)
+    def * = (id, sourceType, sourceName, sourceId) <>(toSeriesSource.tupled, fromSeriesSource)
 
     def seriesSourceToImageFKey = foreignKey("seriesSourceToImageFKey", id, metaDataDao.seriesQuery)(_.id, onUpdate = ForeignKeyAction.Cascade, onDelete = ForeignKeyAction.Cascade)
     def seriesIdJoin = metaDataDao.seriesQuery.filter(_.id === id)
@@ -61,7 +62,7 @@ class PropertiesDAO(val driver: JdbcProfile) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def name = column[String]("name")
     def idxUniqueName = index("idx_unique_series_tag_name", name, unique = true)
-    def * = (id, name) <> (toSeriesTag.tupled, fromSeriesTag)
+    def * = (id, name) <>(toSeriesTag.tupled, fromSeriesTag)
   }
 
   private val seriesTagQuery = TableQuery[SeriesTagTable]
@@ -76,7 +77,7 @@ class PropertiesDAO(val driver: JdbcProfile) {
     def pk = primaryKey("pk_tag", (seriesId, seriesTagId))
     def fkSeries = foreignKey("fk_series_seriesseriestag", seriesId, metaDataDao.seriesQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
     def fkSeriesType = foreignKey("fk_seriestag_seriesseriestag", seriesTagId, seriesTagQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
-    def * = (seriesId, seriesTagId) <> (toSeriesSeriesTagRule.tupled, fromSeriesSeriesTagRule)
+    def * = (seriesId, seriesTagId) <>(toSeriesSeriesTagRule.tupled, fromSeriesSeriesTagRule)
   }
 
   private val seriesSeriesTagQuery = TableQuery[SeriesSeriesTagTable]
@@ -105,6 +106,11 @@ class PropertiesDAO(val driver: JdbcProfile) {
     seriesSourceQuery += seriesSource
     seriesSource
   }
+
+  def updateSeriesSource(seriesSource: SeriesSource)(implicit session: Session): Int =
+    seriesSourceQuery
+      .filter(_.id === seriesSource.id)
+      .update(seriesSource)
 
   def seriesSourceById(seriesId: Long)(implicit session: Session): Option[SeriesSource] =
     seriesSourceQuery.filter(_.id === seriesId).firstOption
@@ -401,7 +407,8 @@ class PropertiesDAO(val driver: JdbcProfile) {
 
   def isWithAdvancedFiltering(arrays: Seq[_ <: Any]*) = arrays.exists(_.nonEmpty)
 
-  def patientsBasePart = s"""select distinct("Patients"."id"),
+  def patientsBasePart =
+    s"""select distinct("Patients"."id"),
        "Patients"."patientName","Patients"."patientID","Patients"."patientBirthDate","Patients"."patientSex"
        from "Series"
        inner join "Studies" on "Series"."studyId" = "Studies"."id"
@@ -454,12 +461,14 @@ class PropertiesDAO(val driver: JdbcProfile) {
 
       implicit val getResult = studiesGetResult
 
-      val basePart = s"""select distinct("Studies"."id"),
+      val basePart =
+        s"""select distinct("Studies"."id"),
         "Studies"."patientId","Studies"."studyInstanceUID","Studies"."studyDescription","Studies"."studyDate","Studies"."studyID","Studies"."accessionNumber","Studies"."patientAge"
         from "Series" 
         inner join "Studies" on "Series"."studyId" = "Studies"."id""""
 
-      val wherePart = s"""
+      val wherePart =
+        s"""
         where
         "Studies"."patientId" = $patientId"""
 
@@ -489,11 +498,13 @@ class PropertiesDAO(val driver: JdbcProfile) {
 
       implicit val getResult = seriesGetResult
 
-      val basePart = s"""select distinct("Series"."id"),
+      val basePart =
+        s"""select distinct("Series"."id"),
         "Series"."studyId","Series"."seriesInstanceUID","Series"."seriesDescription","Series"."seriesDate","Series"."modality","Series"."protocolName","Series"."bodyPartExamined","Series"."manufacturer","Series"."stationName","Series"."frameOfReferenceUID"
         from "Series""""
 
-      val wherePart = s"""
+      val wherePart =
+        s"""
         where
         "Series"."studyId" = $studyId"""
 
