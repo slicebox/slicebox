@@ -16,6 +16,7 @@
 
 package se.nimsa.sbx.storage
 
+import java.io.{File, FileFilter}
 import java.nio.file.NoSuchFileException
 
 import akka.actor.{Actor, Props}
@@ -25,10 +26,12 @@ import se.nimsa.sbx.dicom.{Contexts, DicomData, DicomUtil}
 import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.util.ExceptionCatching
 
-import scala.concurrent.duration.DurationInt
+import scala.concurrent.duration.{FiniteDuration, DurationInt}
 import scala.util.control.NonFatal
 
-class StorageServiceActor(storage: StorageService) extends Actor with ExceptionCatching {
+class StorageServiceActor(storage: StorageService,
+                          cleanupInterval: FiniteDuration = 6.hours,
+                          cleanupMinimumFileAge: FiniteDuration = 6.hours) extends Actor with ExceptionCatching {
 
   import scala.collection.mutable
 
@@ -39,6 +42,15 @@ class StorageServiceActor(storage: StorageService) extends Actor with ExceptionC
   val exportSets = mutable.Map.empty[Long, Seq[Long]]
 
   case class RemoveExportSet(id: Long)
+
+  val cleanup = context.system.scheduler.schedule(1.second, cleanupInterval) {
+    self ! CleanupTemporaryFiles
+  }
+
+  override def postStop() =
+    cleanup.cancel()
+
+  case object CleanupTemporaryFiles
 
   // ensure dcm4che uses standard ImageIO image readers for parsing compressed image data
   // (see https://github.com/dcm4che/dcm4che/blob/3.3.7/dcm4che-imageio/src/main/java/org/dcm4che3/imageio/codec/ImageReaderFactory.java#L242)
@@ -79,7 +91,7 @@ class StorageServiceActor(storage: StorageService) extends Actor with ExceptionC
         case CreateExportSet(imageIds) =>
           val exportSetId = if (exportSets.isEmpty) 1 else exportSets.keys.max + 1
           exportSets(exportSetId) = imageIds
-          context.system.scheduler.scheduleOnce(12.hours, self, RemoveExportSet(exportSetId))
+          context.system.scheduler.scheduleOnce(cleanupInterval, self, RemoveExportSet(exportSetId))
           sender ! ExportSetId(exportSetId)
 
         case GetExportSetImageIds(exportSetId) =>
@@ -115,6 +127,8 @@ class StorageServiceActor(storage: StorageService) extends Actor with ExceptionC
     case RemoveExportSet(id) =>
       exportSets.remove(id)
 
+    case CleanupTemporaryFiles =>
+      cleanupTemporaryFiles()
   }
 
   def checkDicomData(dicomData: DicomData, useExtendedContexts: Boolean): Unit = {
@@ -125,6 +139,14 @@ class StorageServiceActor(storage: StorageService) extends Actor with ExceptionC
     val allowedContexts = if (useExtendedContexts) Contexts.extendedContexts else Contexts.imageDataContexts
     DicomUtil.checkContext(dicomData, allowedContexts)
   }
+
+  def cleanupTemporaryFiles(): Unit =
+    new File(DicomUtil.bulkDataTempFileDirectory).listFiles(new FileFilter {
+      override def accept(file: File): Boolean = {
+        file.getName.startsWith(DicomUtil.bulkDataTempFilePrefix) &&
+          (System.currentTimeMillis - file.lastModified) >= cleanupMinimumFileAge.toMillis
+      }
+    }).foreach(_.delete())
 
 }
 

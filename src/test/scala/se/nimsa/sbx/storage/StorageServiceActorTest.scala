@@ -1,15 +1,18 @@
 package se.nimsa.sbx.storage
 
+import java.nio.file.Files
+
 import akka.actor.ActorSystem
 import akka.actor.Status.Failure
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit}
 import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpecLike}
 import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.app.GeneralProtocol.{Source, SourceType}
-import se.nimsa.sbx.dicom.DicomUtil
-import se.nimsa.sbx.storage.StorageProtocol.{AddDicomData, CheckDicomData, DicomDataAdded}
+import se.nimsa.sbx.dicom.{DicomData, DicomUtil}
+import se.nimsa.sbx.storage.StorageProtocol.{AddDicomData, CheckDicomData, DicomDataAdded, GetDicomData}
 import se.nimsa.sbx.util.TestUtil
 
+import scala.concurrent.duration.DurationInt
 import scala.slick.driver.H2Driver
 import scala.slick.jdbc.JdbcBackend.Database
 
@@ -26,7 +29,7 @@ class StorageServiceActorTest(_system: ActorSystem) extends TestKit(_system) wit
 
   val storage = new RuntimeStorage
 
-  val storageActorRef = TestActorRef(new StorageServiceActor(storage))
+  val storageActorRef = TestActorRef(new StorageServiceActor(storage, cleanupMinimumFileAge = 0.seconds))
   val storageActor = storageActorRef.underlyingActor
 
   val source = Source(SourceType.BOX, "remote box", 1)
@@ -68,6 +71,27 @@ class StorageServiceActorTest(_system: ActorSystem) extends TestKit(_system) wit
     "return a success message when checking a secondary capture dataset with the extended list of accepted contexts" in {
       storageActorRef ! CheckDicomData(DicomUtil.loadDicomData(TestUtil.testSecondaryCaptureFile.toPath, withPixelData = true), useExtendedContexts = true)
       expectMsg(true)
+    }
+
+    "cleanup temporary DICOM files regularly" in {
+      val tempDir = Files.createTempDirectory("sbx-test-temp-dir-")
+      DicomUtil.bulkDataTempFileDirectory = tempDir.toString
+      tempDir.toFile.listFiles shouldBe empty
+
+      storageActorRef ! AddDicomData(dicomData, source, image)
+      expectMsgType[DicomDataAdded]
+
+      storageActorRef ! GetDicomData(image, withPixelData = true)
+      expectMsgType[Option[DicomData]]
+
+      tempDir.toFile.listFiles should have length 1
+
+      storageActor.cleanupTemporaryFiles()
+      expectNoMsg
+
+      tempDir.toFile.listFiles shouldBe empty
+
+      TestUtil.deleteFolder(tempDir)
     }
   }
 

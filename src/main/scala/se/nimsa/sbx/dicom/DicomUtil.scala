@@ -35,6 +35,9 @@ import scala.collection.mutable.ListBuffer
 
 object DicomUtil {
 
+  var bulkDataTempFilePrefix: String = "sbx-blk-"
+  var bulkDataTempFileDirectory: String = System.getProperty("java.io.tmpdir")
+
   def isAnonymous(attributes: Attributes) = attributes.getString(Tag.PatientIdentityRemoved, "NO") == "YES"
 
   def cloneAttributes(attributes: Attributes): Attributes = new Attributes(attributes)
@@ -70,6 +73,8 @@ object DicomUtil {
         fmi.setString(Tag.TransferSyntaxUID, VR.UI, dis.getTransferSyntax)
       val attributes =
         if (withPixelData) {
+          dis.setBulkDataFilePrefix(bulkDataTempFilePrefix)
+          dis.setBulkDataDirectory(new File(bulkDataTempFileDirectory))
           dis.setIncludeBulkData(IncludeBulkData.URI)
           dis.readDataset(-1, -1)
         } else {
