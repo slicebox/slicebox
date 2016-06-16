@@ -73,7 +73,7 @@ class StorageServiceActorTest(_system: ActorSystem) extends TestKit(_system) wit
       expectMsg(true)
     }
 
-    "cleanup temporary DICOM files regularly" in {
+    "cleanup temporary DICOM bulk data files regularly" in {
       val tempDir = Files.createTempDirectory("sbx-test-temp-dir-")
       DicomUtil.bulkDataTempFileDirectory = tempDir.toString
       tempDir.toFile.listFiles shouldBe empty
