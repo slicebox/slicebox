@@ -20,10 +20,11 @@ import java.util.concurrent.Executors
 
 import com.typesafe.scalalogging.LazyLogging
 import org.dcm4che3.data.{Attributes, Tag, UID}
+import org.dcm4che3.imageio.codec.Decompressor
 import org.dcm4che3.net._
 import org.dcm4che3.net.pdu.{AAssociateRQ, PresentationContext}
 import org.dcm4che3.util.TagUtils
-import se.nimsa.sbx.dicom.{DicomData, DicomUtil}
+import se.nimsa.sbx.dicom.DicomData
 import se.nimsa.sbx.scu.ScuProtocol.ScuData
 import se.nimsa.sbx.util.FutureUtil.traverseSequentially
 import se.nimsa.sbx.util.SbxExtensions._
@@ -105,8 +106,16 @@ class Scu(ae: ApplicationEntity, scuData: ScuData)(implicit ec: ExecutionContext
 
   def send(dicomData: DicomData, cuid: String, iuid: String, filets: String, imageId: Long): Future[Long] = {
     val ts = selectTransferSyntax(cuid, filets)
+    if (!ts.equals(filets)) {
+      Decompressor.decompress(dicomData.attributes, filets)
+    }
     val promise = Promise[Long]()
-    as.cstore(cuid, iuid, priority, new DataWriterAdapter(dicomData.attributes), ts, rspHandlerFactory.createDimseRSPHandler(imageId, promise))
+    try
+      as.cstore(cuid, iuid, priority, new DataWriterAdapter(dicomData.attributes), ts, rspHandlerFactory.createDimseRSPHandler(imageId, promise))
+    catch {
+      case e: Exception =>
+        promise.failure(e)
+    }
     promise.future
   }
 

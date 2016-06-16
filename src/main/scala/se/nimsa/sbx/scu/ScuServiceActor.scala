@@ -22,6 +22,7 @@ import akka.actor.{Actor, Props}
 import akka.event.{Logging, LoggingReceive}
 import akka.pattern.{ask, pipe}
 import akka.util.Timeout
+import org.dcm4che3.net.NoPresentationContextException
 import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.dicom.DicomData
@@ -124,6 +125,8 @@ class ScuServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extends Actor
                     throw new BadGatewayException(s"Connection refused on host ${scu.aeTitle}@${scu.host}:${scu.port}")
                   case e: NoRouteToHostException =>
                     throw new BadGatewayException(s"No route found to host ${scu.aeTitle}@${scu.host}:${scu.port}")
+                  case e: NoPresentationContextException =>
+                    throw new BadGatewayException(s"${scu.aeTitle}@${scu.host}:${scu.port}: ${e.getMessage}")
                 }
                 .pipeTo(sender)
             }).orElse(throw new NotFoundException(s"SCU with id $scuId not found"))
