@@ -143,13 +143,18 @@ class StorageServiceActor(storage: StorageService,
   def cleanupTemporaryFiles(): Unit =
     new File(DicomUtil.bulkDataTempFileDirectory).listFiles(new FileFilter {
       override def accept(file: File): Boolean = {
-        file.getName.startsWith(DicomUtil.bulkDataTempFilePrefix) &&
+        file != null && file.isFile &&
+          file.getName.startsWith(DicomUtil.bulkDataTempFilePrefix) &&
           (System.currentTimeMillis - file.lastModified) >= cleanupMinimumFileAge.toMillis
       }
-    }).foreach(_.delete())
+    }).foreach { file =>
+      try file.delete() catch {
+        case e: Exception =>
+          log.warning("Temporary bulk data file could not be deleted: " + e.getMessage)
+      }
+    }
 
 }
-
 object StorageServiceActor {
   def props(storage: StorageService): Props = Props(new StorageServiceActor(storage))
 }

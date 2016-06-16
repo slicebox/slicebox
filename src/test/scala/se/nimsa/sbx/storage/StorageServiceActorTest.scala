@@ -91,6 +91,7 @@ class StorageServiceActorTest(_system: ActorSystem) extends TestKit(_system) wit
 
       tempDir.toFile.listFiles shouldBe empty
 
+      DicomUtil.bulkDataTempFileDirectory = System.getProperty("java.io.tmpdir")
       TestUtil.deleteFolder(tempDir)
     }
   }
