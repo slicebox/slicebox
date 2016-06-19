@@ -37,9 +37,9 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     def receive = {
       case GetImage(imageId) =>
         sender ! (imageId match {
-          case 1 => Some(image1)
-          case 2 => Some(image2)
-          case 3 => Some(image3)
+          case 10 => Some(image1)
+          case 23 => Some(image2)
+          case 38 => Some(image3)
           case _ => None
         })
       case GetSourceForSeries(seriesId) =>
@@ -67,11 +67,19 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     }
   }), name = "StorageService")
 
+  case object ResetSentImages
+  case object GetSentImages
   val boxService = system.actorOf(Props(new Actor {
+    var sentImages = Seq.empty[Long]
 
     def receive = {
       case SendToRemoteBox(box, tagValues) =>
+        sentImages = sentImages ++ tagValues.map(_.imageId)
         sender ! ImagesAddedToOutgoing(box.id, tagValues.map(_.imageId))
+      case ResetSentImages =>
+        sentImages = Seq.empty[Long]
+      case GetSentImages =>
+        sender ! sentImages
     }
   }), name = "BoxService")
 
@@ -82,6 +90,7 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
       forwardingDao.clear
       metaDataService ! SetSource(null)
       storageService ! ResetDeletedImages
+      boxService ! ResetSentImages
     }
 
   override def afterAll {
@@ -417,6 +426,35 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     }
   }
 
+  "forward the correct list of images" in {
+    val rule = userToBoxRule
+    metaDataService ! SetSource(userSource)
+
+    forwardingService ! AddForwardingRule(rule)
+    expectMsgType[ForwardingRuleAdded]
+
+    forwardingService ! ImageAdded(image1, userSource, overwrite = false)
+    forwardingService ! ImageAdded(image3, userSource, overwrite = false)
+    forwardingService ! ImageAdded(image2, userSource, overwrite = false)
+    expectMsgType[ImageRegisteredForForwarding]
+    expectMsgType[ImageRegisteredForForwarding]
+    expectMsgType[ImageRegisteredForForwarding]
+
+    db.withSession { implicit session =>
+      forwardingDao.listForwardingTransactions should have length 1
+    }
+
+    expireTransaction(0)
+
+    forwardingService ! PollForwardingQueue
+    expectMsgPF() {
+      case TransactionsEnroute(transactions) => transactions should have length 1
+    }
+
+    boxService ! GetSentImages
+    expectMsg(Seq(image1.id, image3.id, image2.id))
+  }
+
   def scpSource = Source(SourceType.SCP, "My SCP", 1)
   def userSource = Source(SourceType.USER, "Admin", 35)
   def boxSource = Source(SourceType.BOX, "Source box", 11)
@@ -429,9 +467,9 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
   def boxToBoxRule = ForwardingRule(-1, boxSource, boxDestination, keepImages = false)
   def userToBoxRuleKeepImages = ForwardingRule(-1, userSource, boxDestination, keepImages = true)
 
-  def image1 = Image(1, 22, SOPInstanceUID("sopuid1"), ImageType("it"), InstanceNumber("in1"))
-  def image2 = Image(2, 22, SOPInstanceUID("sopuid2"), ImageType("it"), InstanceNumber("in2"))
-  def image3 = Image(3, 22, SOPInstanceUID("sopuid3"), ImageType("it"), InstanceNumber("in3"))
+  def image1 = Image(10, 22, SOPInstanceUID("sopuid1"), ImageType("it"), InstanceNumber("in1"))
+  def image2 = Image(23, 22, SOPInstanceUID("sopuid2"), ImageType("it"), InstanceNumber("in2"))
+  def image3 = Image(38, 22, SOPInstanceUID("sopuid3"), ImageType("it"), InstanceNumber("in3"))
 
   def expireTransaction(index: Int) =
     db.withSession { implicit session =>

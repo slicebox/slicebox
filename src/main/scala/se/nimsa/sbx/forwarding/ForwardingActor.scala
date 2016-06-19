@@ -47,7 +47,7 @@ class ForwardingActor(rule: ForwardingRule, transaction: ForwardingTransaction, 
     val destinationName = rule.destination.destinationName
     val box = Box(destinationId, destinationName, "", "", null, online = false)
 
-    val imageIds = images.map(_.id)
+    val imageIds = images.map(_.imageId)
 
     rule.destination.destinationType match {
       case DestinationType.BOX =>
