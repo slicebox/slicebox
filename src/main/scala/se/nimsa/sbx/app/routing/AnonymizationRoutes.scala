@@ -53,13 +53,10 @@ trait AnonymizationRoutes {
         entity(as[Seq[TagValue]]) { tagValues =>
           onSuccess(metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]]) {
             case Some(image) =>
-              onSuccess(storageService.ask(GetDicomData(image, withPixelData = true)).mapTo[Option[DicomData]]) {
-                case Some(dicomData) =>
-                  onSuccess(anonymizationService.ask(Anonymize(imageId, dicomData.attributes, tagValues)).mapTo[Attributes]) { anonAttributes =>
-                    complete(HttpEntity(`application/octet-stream`, HttpData(DicomUtil.toByteArray(dicomData.copy(attributes = anonAttributes)))))
-                  }
-                case None =>
-                  complete((NotFound, s"No image data found for image id $imageId"))
+              onSuccess(storageService.ask(GetDicomData(image, withPixelData = true)).mapTo[DicomData]) { dicomData =>
+                onSuccess(anonymizationService.ask(Anonymize(imageId, dicomData.attributes, tagValues)).mapTo[Attributes]) { anonAttributes =>
+                  complete(HttpEntity(`application/octet-stream`, HttpData(DicomUtil.toByteArray(dicomData.copy(attributes = anonAttributes)))))
+                }
               }
             case None =>
               complete((NotFound, s"No image meta data found for image id $imageId"))
@@ -129,25 +126,23 @@ trait AnonymizationRoutes {
   def anonymizeOne(apiUser: ApiUser, imageId: Long, tagValues: Seq[TagValue]): Future[Option[DicomDataAdded]] =
     metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]].flatMap { imageMaybe =>
       imageMaybe.map { image =>
-        metaDataService.ask(GetSourceForSeries(image.seriesId)).mapTo[Option[SeriesSource]].flatMap { seriesSourceMaybe =>
+        metaDataService.ask(GetSourceForSeries(image.seriesId)).mapTo[Option[SeriesSource]].map { seriesSourceMaybe =>
           seriesSourceMaybe.map { seriesSource =>
             val source = seriesSource.source
-            storageService.ask(GetDicomData(image, withPixelData = true)).mapTo[Option[DicomData]].map { optionalDicomData =>
-              optionalDicomData.map { dicomData =>
-                AnonymizationUtil.setAnonymous(dicomData.attributes, anonymous = false) // pretend not anonymized to force anonymization
-                anonymizationService.ask(Anonymize(imageId, dicomData.attributes, tagValues)).mapTo[Attributes].flatMap { anonAttributes =>
-                  metaDataService.ask(DeleteMetaData(image.id)).flatMap { _ =>
-                    storageService.ask(DeleteDicomData(image)).flatMap { _ =>
-                      metaDataService.ask(AddMetaData(anonAttributes, source)).mapTo[MetaDataAdded].flatMap { metaData =>
-                        storageService.ask(AddDicomData(dicomData.copy(attributes = anonAttributes), source, metaData.image)).mapTo[DicomDataAdded]
-                      }
+            storageService.ask(GetDicomData(image, withPixelData = true)).mapTo[DicomData].flatMap { dicomData =>
+              AnonymizationUtil.setAnonymous(dicomData.attributes, anonymous = false) // pretend not anonymized to force anonymization
+              anonymizationService.ask(Anonymize(imageId, dicomData.attributes, tagValues)).mapTo[Attributes].flatMap { anonAttributes =>
+                metaDataService.ask(DeleteMetaData(image.id)).flatMap { _ =>
+                  storageService.ask(DeleteDicomData(image)).flatMap { _ =>
+                    metaDataService.ask(AddMetaData(anonAttributes, source)).mapTo[MetaDataAdded].flatMap { metaData =>
+                      storageService.ask(AddDicomData(dicomData.copy(attributes = anonAttributes), source, metaData.image)).mapTo[DicomDataAdded]
                     }
                   }
                 }
               }
-            }.unwrap
-          }.unwrap
-        }
+            }
+          }
+        }.unwrap
       }.unwrap
     }
 

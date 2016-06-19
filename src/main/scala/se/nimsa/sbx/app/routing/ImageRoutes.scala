@@ -21,6 +21,7 @@ import java.util.zip.{ZipEntry, ZipOutputStream}
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.pattern.ask
+import scala.util.{Success, Failure}
 import org.dcm4che3.data.Attributes
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.ReverseAnonymization
 import se.nimsa.sbx.app.GeneralProtocol._
@@ -64,11 +65,8 @@ trait ImageRoutes {
             case Some(image) =>
               pathEndOrSingleSlash {
                 get {
-                  onSuccess(storageService.ask(GetImageData(image)).mapTo[Option[DicomDataArray]]) {
-                    case Some(imageData) =>
-                      complete(HttpEntity(`application/octet-stream`, HttpData(imageData.data)))
-                    case None =>
-                      complete((NotFound, s"No image data found for image id $imageId"))
+                  onSuccess(storageService.ask(GetImageData(image)).mapTo[DicomDataArray]) { imageData =>
+                    complete(HttpEntity(`application/octet-stream`, HttpData(imageData.data)))
                   }
                 } ~ delete {
                   onSuccess(storageService.ask(DeleteDicomData(image)).flatMap { _ =>
@@ -80,13 +78,13 @@ trait ImageRoutes {
                 }
               } ~ path("attributes") {
                 get {
-                  onSuccess(storageService.ask(GetImageAttributes(image)).mapTo[Option[List[ImageAttribute]]]) {
+                  onSuccess(storageService.ask(GetImageAttributes(image)).mapTo[List[ImageAttribute]]) {
                     complete(_)
                   }
                 }
               } ~ path("imageinformation") {
                 get {
-                  onSuccess(storageService.ask(GetImageInformation(image)).mapTo[Option[ImageInformation]]) {
+                  onSuccess(storageService.ask(GetImageInformation(image)).mapTo[ImageInformation]) {
                     complete(_)
                   }
                 }
@@ -97,10 +95,10 @@ trait ImageRoutes {
                   'windowmax.as[Int] ? 0,
                   'imageheight.as[Int] ? 0) { (frameNumber, min, max, height) =>
                   get {
-                    onSuccess(storageService.ask(GetPngDataArray(image, frameNumber, min, max, height))) {
-                      case Some(PngDataArray(bytes)) => complete(HttpEntity(`image/png`, HttpData(bytes)))
-                      case Some(PngDataArrayNotAvailable) => complete(NoContent)
-                      case None => complete(NotFound)
+                    onComplete(storageService.ask(GetPngDataArray(image, frameNumber, min, max, height))) {
+                      case Success(PngDataArray(bytes)) => complete(HttpEntity(`image/png`, HttpData(bytes)))
+                      case Failure(e) => complete(NoContent)
+                      case _ => complete(InternalServerError)
                     }
                   }
                 }
@@ -251,15 +249,13 @@ trait ImageRoutes {
     def getImageData(imageId: Long): Future[Option[(Image, FlatSeries, DicomDataArray)]] =
       metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]].flatMap { imageMaybe =>
         imageMaybe.map { image =>
-          metaDataService.ask(GetSingleFlatSeries(image.seriesId)).mapTo[Option[FlatSeries]].flatMap { flatSeriesMaybe =>
+          metaDataService.ask(GetSingleFlatSeries(image.seriesId)).mapTo[Option[FlatSeries]].map { flatSeriesMaybe =>
             flatSeriesMaybe.map { flatSeries =>
-              storageService.ask(GetImageData(image)).mapTo[Option[DicomDataArray]].map { imageDataMaybe =>
-                imageDataMaybe.map { imageData =>
-                  (image, flatSeries, imageData)
-                }
+              storageService.ask(GetImageData(image)).mapTo[DicomDataArray].map { imageData =>
+                (image, flatSeries, imageData)
               }
-            }.unwrap
-          }
+            }
+          }.unwrap
         }.unwrap
       }
 

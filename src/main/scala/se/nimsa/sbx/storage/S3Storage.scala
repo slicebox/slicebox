@@ -46,30 +46,30 @@ class S3Storage(val bucket: String, val s3Prefix: String) extends StorageService
 
   override def deleteFromStorage(image: Image): Unit = s3Client.delete(s3Id(image))
 
-  override def readDicomData(image: Image, withPixelData: Boolean): Option[DicomData] = {
+  override def readDicomData(image: Image, withPixelData: Boolean): DicomData = {
     val s3InputStream = s3Client.get(s3Id(image))
-    Some(loadDicomData(s3InputStream, withPixelData))
+    loadDicomData(s3InputStream, withPixelData)
   }
 
-  override def readImageAttributes(image: Image): Option[List[ImageAttribute]] = {
+  override def readImageAttributes(image: Image): List[ImageAttribute] = {
     val s3InputStream = s3Client.get(s3Id(image))
-    Some(DicomUtil.readImageAttributes(loadDicomData(s3InputStream, withPixelData = false).attributes))
+    DicomUtil.readImageAttributes(loadDicomData(s3InputStream, withPixelData = false).attributes)
   }
 
-  override def readImageInformation(image: Image): Option[ImageInformation] = {
+  override def readImageInformation(image: Image): ImageInformation = {
     val s3InputStream = s3Client.get(s3Id(image))
-    Some(super.readImageInformation(s3InputStream))
+    super.readImageInformation(s3InputStream)
   }
 
-  override def readPngImageData(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int): Option[Array[Byte]] = {
+  override def readPngImageData(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int): Array[Byte] = {
     val s3InputStream = s3Client.get(s3Id(image))
     val iis = ImageIO.createImageInputStream(s3InputStream)
-    Some(super.readPngImageData(iis, frameNumber, windowMin, windowMax, imageHeight))
+    super.readPngImageData(iis, frameNumber, windowMin, windowMax, imageHeight)
   }
 
-  override def imageAsInputStream(image: Image): Option[InputStream] = {
+  override def imageAsInputStream(image: Image): InputStream = {
     val s3InputStream = s3Client.get(s3Id(image))
-    Some(s3InputStream)
+    s3InputStream
   }
 
 }

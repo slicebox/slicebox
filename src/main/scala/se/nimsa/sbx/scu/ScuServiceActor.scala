@@ -53,11 +53,11 @@ class ScuServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extends Actor
 
   val dicomDataProvider = new DicomDataProvider {
     override def getDicomData(imageId: Long, withPixelData: Boolean): Future[Option[DicomData]] = {
-      metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]].flatMap { imageMaybe =>
+      metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]].map { imageMaybe =>
         imageMaybe.map { image =>
-          storageService.ask(GetDicomData(image, withPixelData)).mapTo[Option[DicomData]]
-        }.unwrap
-      }
+          storageService.ask(GetDicomData(image, withPixelData)).mapTo[DicomData]
+        }
+      }.unwrap
     }
   }
 

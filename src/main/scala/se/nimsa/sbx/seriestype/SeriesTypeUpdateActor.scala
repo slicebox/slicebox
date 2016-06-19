@@ -107,9 +107,9 @@ class SeriesTypeUpdateActor(implicit val timeout: Timeout) extends Actor with Ex
 
     futureImageMaybe.flatMap {
       case Some(image) =>
-        val futureDicomDataMaybe = storageService.ask(GetDicomData(image, withPixelData = false)).mapTo[Option[DicomData]]
+        val futureDicomDataMaybe = storageService.ask(GetDicomData(image, withPixelData = false)).mapTo[DicomData]
 
-        val updateSeriesTypes = futureDicomDataMaybe.flatMap(_.map(dicomData => handleLoadedDicomData(dicomData, series)).getOrElse(Future.successful(Seq.empty)))
+        val updateSeriesTypes = futureDicomDataMaybe.flatMap(dicomData => handleLoadedDicomData(dicomData, series))
 
         updateSeriesTypes onComplete {
           _ => self ! PollSeriesTypesUpdateQueue

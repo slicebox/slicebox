@@ -27,7 +27,6 @@ import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.util.ExceptionCatching
 
 import scala.concurrent.duration.{FiniteDuration, DurationInt}
-import scala.util.control.NonFatal
 
 class StorageServiceActor(storage: StorageService,
                           cleanupInterval: FiniteDuration = 6.hours,
@@ -98,8 +97,7 @@ class StorageServiceActor(storage: StorageService,
           sender ! exportSets.get(exportSetId)
 
         case GetImageData(image) =>
-          val data = storage.imageAsByteArray(image).map(DicomDataArray(_))
-          sender ! data
+          sender ! DicomDataArray(storage.imageAsByteArray(image))
 
         case GetDicomData(image, withPixelData) =>
           sender ! storage.readDicomData(image, withPixelData)
@@ -111,16 +109,7 @@ class StorageServiceActor(storage: StorageService,
           sender ! storage.readImageInformation(image)
 
         case GetPngDataArray(image, frameNumber, windowMin, windowMax, imageHeight) =>
-          val pngResponse =
-            try
-              storage.readPngImageData(image, frameNumber, windowMin, windowMax, imageHeight).map(PngDataArray(_))
-            catch {
-              case NonFatal(e) =>
-                log.warning(s"Could not create PNG image data for image with ID ${image.id}: " + e.getMessage)
-                Some(PngDataArrayNotAvailable)
-            }
-          sender ! pngResponse
-
+          sender ! PngDataArray(storage.readPngImageData(image, frameNumber, windowMin, windowMax, imageHeight))
       }
     }
 

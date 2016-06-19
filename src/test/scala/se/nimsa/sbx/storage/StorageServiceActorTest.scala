@@ -82,7 +82,7 @@ class StorageServiceActorTest(_system: ActorSystem) extends TestKit(_system) wit
       expectMsgType[DicomDataAdded]
 
       storageActorRef ! GetDicomData(image, withPixelData = true)
-      expectMsgType[Option[DicomData]]
+      expectMsgType[DicomData]
 
       tempDir.toFile.listFiles should have length 1
 

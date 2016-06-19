@@ -131,16 +131,12 @@ trait TransactionRoutes {
                         case transactionTagValues =>
                           onSuccess(metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]]) {
                             case Some(image) =>
-                              onSuccess(storageService.ask(GetDicomData(image, withPixelData = true)).mapTo[Option[DicomData]]) {
-                                case Some(dicomData) =>
-
-                                  onSuccess(anonymizationService.ask(Anonymize(imageId, dicomData.attributes, transactionTagValues.map(_.tagValue)))) {
-                                    case anonymizedAttributes: Attributes =>
-                                      val compressedBytes = compress(toByteArray(dicomData.copy(attributes = anonymizedAttributes)))
-                                      complete(HttpEntity(ContentTypes.`application/octet-stream`, HttpData(compressedBytes)))
-                                  }
-                                case None =>
-                                  complete((NotFound, s"File not found for image id $imageId"))
+                              onSuccess(storageService.ask(GetDicomData(image, withPixelData = true)).mapTo[DicomData]) { dicomData =>
+                                onSuccess(anonymizationService.ask(Anonymize(imageId, dicomData.attributes, transactionTagValues.map(_.tagValue)))) {
+                                  case anonymizedAttributes: Attributes =>
+                                    val compressedBytes = compress(toByteArray(dicomData.copy(attributes = anonymizedAttributes)))
+                                    complete(HttpEntity(ContentTypes.`application/octet-stream`, HttpData(compressedBytes)))
+                                }
                               }
                             case None =>
                               complete((NotFound, s"Image not found for image id $imageId"))

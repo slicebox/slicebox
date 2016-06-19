@@ -16,6 +16,9 @@
 
 package se.nimsa.sbx.app.routing
 
+import java.io.FileNotFoundException
+import java.nio.file.NoSuchFileException
+
 import spray.routing._
 import spray.http.StatusCodes._
 import se.nimsa.sbx.app.SliceboxService
@@ -45,6 +48,10 @@ trait SliceboxRoutes extends DirectoryRoutes
         complete((BadRequest, e.getMessage))
       case e: NotFoundException =>
         complete((NotFound, e.getMessage))
+      case e: FileNotFoundException =>
+        complete((NotFound, "File not found: " + e.getMessage))
+      case e: NoSuchFileException =>
+        complete((NotFound, "File not found: " + e.getMessage))
       case e: BadGatewayException =>
         complete((BadGateway, e.getMessage))
     }

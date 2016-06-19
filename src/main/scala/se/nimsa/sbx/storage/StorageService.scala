@@ -30,11 +30,11 @@ trait StorageService {
 
   def deleteFromStorage(image: Image): Unit
 
-  def readDicomData(image: Image, withPixelData: Boolean): Option[DicomData]
+  def readDicomData(image: Image, withPixelData: Boolean): DicomData
 
-  def readImageAttributes(image: Image): Option[List[ImageAttribute]]
+  def readImageAttributes(image: Image): List[ImageAttribute]
 
-  def readImageInformation(image: Image): Option[ImageInformation]
+  def readImageInformation(image: Image): ImageInformation
 
   def readImageInformation(inputStream: InputStream): ImageInformation = {
     val dicomData = loadDicomData(inputStream, withPixelData = false)
@@ -49,7 +49,7 @@ trait StorageService {
       attributes.getInt(Tag.LargestImagePixelValue, 0))
   }
 
-  def readPngImageData(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int): Option[Array[Byte]]
+  def readPngImageData(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int): Array[Byte]
 
   def readPngImageData(iis: ImageInputStream, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int): Array[Byte] = {
     try {
@@ -74,21 +74,14 @@ trait StorageService {
     }
   }
 
-  def imageAsInputStream(image: Image): Option[InputStream]
+  def imageAsInputStream(image: Image): InputStream
 
-  def imageAsByteArray(image: Image): Option[Array[Byte]] = {
-    imageAsInputStream(image) match {
-      case None => None
-      case Some(is: InputStream) =>
-        try {
-          val bytes = IOUtils.toByteArray(is)
-          Some(bytes)
-        } catch {
-          case e: IOException =>
-            None
-        } finally {
-          IOUtils.closeQuietly(is, null)
-        }
+  def imageAsByteArray(image: Image): Array[Byte] = {
+    val is = imageAsInputStream(image)
+    try {
+      IOUtils.toByteArray(is)
+    } finally {
+      IOUtils.closeQuietly(is, null)
     }
   }
 

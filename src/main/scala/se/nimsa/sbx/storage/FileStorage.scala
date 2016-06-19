@@ -31,46 +31,29 @@ class FileStorage(val path: Path) extends StorageService {
     overwrite
   }
 
-  private def filePath(image: Image) =
+  private def filePath(image: Image): Path =
     path.resolve(imageName(image))
 
-  private def resolvePath(image: Image): Option[Path] =
-    Option(filePath(image))
-      .filter(p => Files.exists(p) && Files.isReadable(p))
-
   override def deleteFromStorage(image: Image): Unit =
-    resolvePath(image) match {
-      case Some(imagePath) =>
-        Files.delete(imagePath)
-      case None =>
-    }
+    Files.delete(filePath(image))
 
-  override def readDicomData(image: Image, withPixelData: Boolean): Option[DicomData] =
-    resolvePath(image).map { imagePath =>
-      loadDicomData(imagePath, withPixelData)
-    }
+  override def readDicomData(image: Image, withPixelData: Boolean): DicomData =
+    loadDicomData(filePath(image), withPixelData)
 
-  override def readImageAttributes(image: Image): Option[List[ImageAttribute]] =
-    resolvePath(image).map { imagePath =>
-      DicomUtil.readImageAttributes(loadDicomData(imagePath, withPixelData = false).attributes)
-    }
+  override def readImageAttributes(image: Image): List[ImageAttribute] =
+    DicomUtil.readImageAttributes(loadDicomData(filePath(image), withPixelData = false).attributes)
 
-  def readImageInformation(image: Image): Option[ImageInformation] =
-    resolvePath(image).map { imagePath =>
-      super.readImageInformation(new BufferedInputStream(Files.newInputStream(imagePath)))
-    }
+  def readImageInformation(image: Image): ImageInformation =
+    super.readImageInformation(new BufferedInputStream(Files.newInputStream(filePath(image))))
 
-  override def readPngImageData(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int): Option[Array[Byte]] =
-    resolvePath(image).map { imagePath =>
-      val file = imagePath.toFile
-      val iis = ImageIO.createImageInputStream(file)
-      super.readPngImageData(iis, frameNumber, windowMin, windowMax, imageHeight)
-    }
+  override def readPngImageData(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int): Array[Byte] = {
+    val file = filePath(image).toFile
+    val iis = ImageIO.createImageInputStream(file)
+    super.readPngImageData(iis, frameNumber, windowMin, windowMax, imageHeight)
+  }
 
-  override def imageAsInputStream(image: Image): Option[InputStream] =
-    resolvePath(image).map { imagePath =>
-      new BufferedInputStream(Files.newInputStream(imagePath))
-    }
+  override def imageAsInputStream(image: Image): InputStream =
+    new BufferedInputStream(Files.newInputStream(filePath(image)))
 
   private def createStorageDirectoryIfNecessary(): Unit = {
     if (!Files.exists(path))

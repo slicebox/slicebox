@@ -12,7 +12,7 @@ import se.nimsa.sbx.util.TestUtil
 class MockupStorageActor extends Actor {
 
   import MockupStorageActor._
-  
+
   var nStoredDicomDatas = 3
 
   var badBehavior = false
@@ -41,9 +41,9 @@ class MockupStorageActor extends Actor {
         sender ! Failure(exception)
       else
         sender ! (image.id match {
-          case id if id <= nStoredDicomDatas => Some(TestUtil.createDicomData())
+          case id if id <= nStoredDicomDatas => TestUtil.createDicomData()
           case _ =>
-            None
+            Failure(new IllegalArgumentException("Dicom data not found"))
         })
   }
 }

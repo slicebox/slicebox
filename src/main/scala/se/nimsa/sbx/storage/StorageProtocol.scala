@@ -58,8 +58,6 @@ object StorageProtocol {
 
   case class PngDataArray(data: Array[Byte])
 
-  case object PngDataArrayNotAvailable
-
   case class DicomDataAdded(image: Image, overwrite: Boolean)
 
   case class DicomDataDeleted(image: Image)
