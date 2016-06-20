@@ -82,8 +82,6 @@ class Scu(ae: ApplicationEntity, scuData: ScuData)(implicit ec: ExecutionContext
           rq.addPresentationContext(new PresentationContext(rq.getNumberOfPresentationContexts * 2 + 1, cuid, UID.ExplicitVRLittleEndian))
         if (!ts.equals(UID.ImplicitVRLittleEndian))
           rq.addPresentationContext(new PresentationContext(rq.getNumberOfPresentationContexts * 2 + 1, cuid, UID.ImplicitVRLittleEndian))
-        if (!ts.equals(UID.ExplicitVRBigEndianRetired))
-          rq.addPresentationContext(new PresentationContext(rq.getNumberOfPresentationContexts * 2 + 1, cuid, UID.ExplicitVRBigEndianRetired))
       }
       rq.addPresentationContext(new PresentationContext(rq.getNumberOfPresentationContexts * 2 + 1, cuid, ts))
     }
@@ -128,8 +126,6 @@ class Scu(ae: ApplicationEntity, scuData: ScuData)(implicit ec: ExecutionContext
 
     if (tss.contains(UID.ExplicitVRLittleEndian))
       return UID.ExplicitVRLittleEndian
-    if (tss.contains(UID.ExplicitVRBigEndianRetired))
-      return UID.ExplicitVRBigEndianRetired
 
     UID.ImplicitVRLittleEndian
   }
