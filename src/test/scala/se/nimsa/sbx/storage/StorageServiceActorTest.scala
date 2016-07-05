@@ -1,15 +1,13 @@
 package se.nimsa.sbx.storage
 
-import java.nio.file.Files
-
 import akka.actor.ActorSystem
 import akka.actor.Status.Failure
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit}
 import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpecLike}
 import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.app.GeneralProtocol.{Source, SourceType}
-import se.nimsa.sbx.dicom.{DicomData, DicomUtil}
-import se.nimsa.sbx.storage.StorageProtocol.{AddDicomData, CheckDicomData, DicomDataAdded, GetDicomData}
+import se.nimsa.sbx.dicom.DicomUtil
+import se.nimsa.sbx.storage.StorageProtocol.{AddDicomData, CheckDicomData, DicomDataAdded}
 import se.nimsa.sbx.util.TestUtil
 
 import scala.concurrent.duration.DurationInt
@@ -73,27 +71,6 @@ class StorageServiceActorTest(_system: ActorSystem) extends TestKit(_system) wit
       expectMsg(true)
     }
 
-    "cleanup temporary DICOM bulk data files regularly" in {
-      val tempDir = Files.createTempDirectory("sbx-test-temp-dir-")
-      DicomUtil.bulkDataTempFileDirectory = tempDir.toString
-      tempDir.toFile.listFiles shouldBe empty
-
-      storageActorRef ! AddDicomData(dicomData, source, image)
-      expectMsgType[DicomDataAdded]
-
-      storageActorRef ! GetDicomData(image, withPixelData = true)
-      expectMsgType[DicomData]
-
-      tempDir.toFile.listFiles should have length 1
-
-      storageActor.cleanupTemporaryFiles()
-      expectNoMsg
-
-      tempDir.toFile.listFiles shouldBe empty
-
-      DicomUtil.bulkDataTempFileDirectory = System.getProperty("java.io.tmpdir")
-      TestUtil.deleteFolder(tempDir)
-    }
   }
 
 }

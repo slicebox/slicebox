@@ -21,11 +21,11 @@ import java.io._
 import java.nio.file.{Files, Path}
 import javax.imageio.ImageIO
 
-import org.dcm4che3.data.{Attributes, Keyword, Tag, VR}
 import org.dcm4che3.data.Attributes.Visitor
+import org.dcm4che3.data.{Attributes, Keyword, Tag, VR}
 import org.dcm4che3.imageio.plugins.dcm.DicomImageReadParam
-import org.dcm4che3.io.{BulkDataDescriptor, DicomInputStream, DicomOutputStream}
 import org.dcm4che3.io.DicomInputStream.IncludeBulkData
+import org.dcm4che3.io.{DicomInputStream, DicomOutputStream}
 import org.dcm4che3.util.{SafeClose, TagUtils}
 import se.nimsa.sbx.dicom.Contexts.Context
 import se.nimsa.sbx.dicom.DicomHierarchy._
@@ -34,9 +34,6 @@ import se.nimsa.sbx.dicom.DicomPropertyValue._
 import scala.collection.mutable.ListBuffer
 
 object DicomUtil {
-
-  var bulkDataTempFilePrefix: String = "sbx-blk-"
-  var bulkDataTempFileDirectory: String = System.getProperty("java.io.tmpdir")
 
   def isAnonymous(attributes: Attributes) = attributes.getString(Tag.PatientIdentityRemoved, "NO") == "YES"
 
@@ -73,9 +70,7 @@ object DicomUtil {
         fmi.setString(Tag.TransferSyntaxUID, VR.UI, dis.getTransferSyntax)
       val attributes =
         if (withPixelData) {
-          dis.setBulkDataFilePrefix(bulkDataTempFilePrefix)
-          dis.setBulkDataDirectory(new File(bulkDataTempFileDirectory))
-          dis.setIncludeBulkData(IncludeBulkData.URI)
+          dis.setIncludeBulkData(IncludeBulkData.YES)
           dis.readDataset(-1, -1)
         } else {
           dis.setIncludeBulkData(IncludeBulkData.NO)
@@ -90,22 +85,6 @@ object DicomUtil {
     }
   }
 
-  def loadJpegAttributes(path: Path): Attributes =
-    loadJpegAttributes(new BufferedInputStream(Files.newInputStream(path)))
-
-  def loadJpegAttributes(inputStream: InputStream): Attributes = {
-    var dis: DicomInputStream = null
-    try {
-      dis = new DicomInputStream(inputStream)
-      dis.setIncludeBulkData(IncludeBulkData.URI)
-      dis.setBulkDataDescriptor(BulkDataDescriptor.PIXELDATA)
-      dis.readDataset(-1, -1)
-    } catch {
-      case _: Exception => null
-    } finally {
-      SafeClose.close(dis)
-    }
-  }
   def toByteArray(path: Path): Array[Byte] = toByteArray(loadDicomData(path, withPixelData = true))
 
   def toByteArray(dicomData: DicomData): Array[Byte] = {
