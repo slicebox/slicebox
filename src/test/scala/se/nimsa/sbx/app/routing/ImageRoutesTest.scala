@@ -12,7 +12,7 @@ import se.nimsa.sbx.metadata.MetaDataDAO
 import se.nimsa.sbx.storage.RuntimeStorage
 import se.nimsa.sbx.storage.StorageProtocol.{ExportSetId, ImageInformation}
 import se.nimsa.sbx.util.TestUtil
-import spray.http.{BodyPart, ContentTypes, HttpData, MultipartFormData}
+import spray.http._
 import spray.http.StatusCodes._
 import spray.httpx.SprayJsonSupport._
 import spray.httpx.unmarshalling.BasicUnmarshallers.ByteArrayUnmarshaller
@@ -169,6 +169,29 @@ class ImageRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       status shouldBe Created
       val image = responseAs[Image]
       image shouldNot be(null)
+    }
+  }
+
+  it should "return 200 OK and the added secondary capture with series description filled out" in {
+    val image = PostAsUser("/api/images", HttpData(TestUtil.testImageByteArray)) ~> routes ~> check {
+      responseAs[Image]
+    }
+    val series = GetAsUser(s"/api/metadata/series/${image.seriesId}") ~> routes ~> check {
+      responseAs[Series]
+    }
+    val study = GetAsUser(s"/api/metadata/studies/${series.studyId}") ~> routes ~> check {
+      responseAs[Study]
+    }
+    val description = "this is the description"
+    val sc =
+      PostAsUser(Uri(s"/api/images/jpeg").withQuery("studyid" -> study.id.toString, "description" -> description).toString, HttpData(TestUtil.jpegByteArray)) ~> routes ~> check {
+        responseAs[Image]
+      }
+    GetAsUser(s"/api/images/${sc.id}") ~> routes ~> check {
+      status shouldBe OK
+      val dcmBytes = responseAs[Array[Byte]]
+      val dcm = DicomUtil.loadDicomData(dcmBytes, withPixelData = false)
+      dcm.attributes.getString(Tag.SeriesDescription) shouldBe description
     }
   }
 
