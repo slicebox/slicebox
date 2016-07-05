@@ -1262,6 +1262,13 @@
             "format": "int64"
           },
           {
+            "name": "description",
+            "in": "query",
+            "description": "DICOM series description of the resulting secondary capture series",
+            "required": false,
+            "type": "string"
+          },
+          {
             "name": "jpeg bytes",
             "in": "body",
             "description": "The jpeg image data",
