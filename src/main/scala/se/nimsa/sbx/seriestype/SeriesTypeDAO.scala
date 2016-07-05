@@ -152,8 +152,8 @@ class SeriesTypeDAO(val driver: JdbcProfile) {
   def removeSeriesTypeRuleAttribute(seriesTypeRuleAttributeId: Long)(implicit session: Session): Unit =
     seriesTypeRuleAttributeQuery.filter(_.id === seriesTypeRuleAttributeId).delete
 
-  def insertSeriesSeriesType(seriesSeriesType: SeriesSeriesType)(implicit session: Session): SeriesSeriesType = {
-    seriesSeriesTypeQuery += seriesSeriesType
+  def upsertSeriesSeriesType(seriesSeriesType: SeriesSeriesType)(implicit session: Session): SeriesSeriesType = {
+    seriesSeriesTypeQuery insertOrUpdate seriesSeriesType
     seriesSeriesType
   }
 

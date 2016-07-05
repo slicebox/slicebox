@@ -107,7 +107,7 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
       val series = addTestDicomData()
 
       db.withSession { implicit session =>
-        seriesTypeDao.insertSeriesSeriesType(SeriesSeriesType(series.id, seriesType.id))
+        seriesTypeDao.upsertSeriesSeriesType(SeriesSeriesType(series.id, seriesType.id))
       }
 
       seriesTypeUpdateService ! UpdateSeriesTypesForSeries(series.id)

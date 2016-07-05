@@ -30,7 +30,7 @@ import se.nimsa.sbx.user.UserProtocol._
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.scp.ScpProtocol._
 import se.nimsa.sbx.directory.DirectoryWatchProtocol._
-import se.nimsa.sbx.seriestype.SeriesTypeProtocol.{AddSeriesTypeToSeries, GetSeriesTypesForSeries, SeriesTypes}
+import se.nimsa.sbx.seriestype.SeriesTypeProtocol.{AddSeriesTypeToSeries, GetSeriesTypesForSeries, RemoveSeriesTypesFromSeries, SeriesTypes}
 
 import scala.concurrent.Future
 import se.nimsa.sbx.scu.ScuProtocol.GetScus
@@ -196,6 +196,11 @@ trait MetadataRoutes { this: SliceboxService =>
                 onSuccess(seriesTypeService.ask(GetSeriesTypesForSeries(seriesId))) {
                   case SeriesTypes(seriesTypes) =>
                     complete(seriesTypes)
+                }
+              } ~ delete {
+                onSuccess(seriesTypeService.ask(RemoveSeriesTypesFromSeries(seriesId))) {
+                  case _ =>
+                    complete(NoContent)
                 }
               }
             } ~ path(LongNumber) { seriesTypeId =>

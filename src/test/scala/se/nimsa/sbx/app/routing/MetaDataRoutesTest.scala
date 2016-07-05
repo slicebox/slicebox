@@ -455,7 +455,6 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
     val mfd = MultipartFormData(Seq(BodyPart(testImageFile, "file")))
     val addedSeriesId = PostAsUser("/api/images", mfd) ~> routes ~> check {
-      status should be(Created)
       responseAs[Image].seriesId
     }
 
@@ -471,6 +470,63 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       val seriesTypes = responseAs[List[SeriesType]]
       seriesTypes should have length 1
       seriesTypes(0) shouldBe addedSeriesType
+    }
+  }
+
+  it should "return 204 NoContent and not add a series type twice for a specific series when setting the same type twice" in {
+    val addedSeriesType = db.withSession { implicit session =>
+      seriesTypeDao.insertSeriesType(SeriesType(-1, "st0"))
+    }
+
+    val addedSeriesId = PostAsUser("/api/images", MultipartFormData(Seq(BodyPart(testImageFile, "file")))) ~> routes ~> check {
+      responseAs[Image].seriesId
+    }
+
+    GetAsUser(s"/api/metadata/series/$addedSeriesId/seriestypes") ~> routes ~> check {
+      responseAs[List[SeriesType]] shouldBe empty
+    }
+
+    PutAsUser(s"/api/metadata/series/$addedSeriesId/seriestypes/${addedSeriesType.id}") ~> routes ~> check {
+      status shouldBe NoContent
+    }
+    PutAsUser(s"/api/metadata/series/$addedSeriesId/seriestypes/${addedSeriesType.id}") ~> routes ~> check {
+      status shouldBe NoContent
+    }
+
+    GetAsUser(s"/api/metadata/series/$addedSeriesId/seriestypes") ~> routes ~> check {
+      responseAs[List[SeriesType]] should have length 1
+    }
+  }
+
+  it should "return 204 NoContent when removing all series types from a series" in {
+    val seriesType1 = db.withSession { implicit session =>
+      seriesTypeDao.insertSeriesType(SeriesType(-1, "st1"))
+    }
+    val seriesType2 = db.withSession { implicit session =>
+      seriesTypeDao.insertSeriesType(SeriesType(-1, "st2"))
+    }
+
+    val addedSeriesId = PostAsUser("/api/images", MultipartFormData(Seq(BodyPart(testImageFile, "file")))) ~> routes ~> check {
+      responseAs[Image].seriesId
+    }
+
+    PutAsUser(s"/api/metadata/series/$addedSeriesId/seriestypes/${seriesType1.id}") ~> routes ~> check {
+      status shouldBe NoContent
+    }
+    PutAsUser(s"/api/metadata/series/$addedSeriesId/seriestypes/${seriesType2.id}") ~> routes ~> check {
+      status shouldBe NoContent
+    }
+
+    GetAsUser(s"/api/metadata/series/$addedSeriesId/seriestypes") ~> routes ~> check {
+      responseAs[List[SeriesType]] should have length 2
+    }
+
+    DeleteAsUser(s"/api/metadata/series/$addedSeriesId/seriestypes") ~> routes ~> check {
+      status shouldBe NoContent
+    }
+
+    GetAsUser(s"/api/metadata/series/$addedSeriesId/seriestypes") ~> routes ~> check {
+      responseAs[List[SeriesType]] shouldBe empty
     }
   }
 

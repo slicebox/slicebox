@@ -89,10 +89,10 @@ object TestUtil {
     val seriesSeriesType3 = SeriesSeriesType(dbSeries2.id, dbSeriesType2.id)
     val seriesSeriesType4 = SeriesSeriesType(dbSeries3.id, dbSeriesType2.id)
 
-    val dbSeriesSeriesType1 = seriesTypeDao.insertSeriesSeriesType(seriesSeriesType1)
-    val dbSeriesSeriesType2 = seriesTypeDao.insertSeriesSeriesType(seriesSeriesType2)
-    val dbSeriesSeriesType3 = seriesTypeDao.insertSeriesSeriesType(seriesSeriesType3)
-    val dbSeriesSeriesType4 = seriesTypeDao.insertSeriesSeriesType(seriesSeriesType4)
+    val dbSeriesSeriesType1 = seriesTypeDao.upsertSeriesSeriesType(seriesSeriesType1)
+    val dbSeriesSeriesType2 = seriesTypeDao.upsertSeriesSeriesType(seriesSeriesType2)
+    val dbSeriesSeriesType3 = seriesTypeDao.upsertSeriesSeriesType(seriesSeriesType3)
+    val dbSeriesSeriesType4 = seriesTypeDao.upsertSeriesSeriesType(seriesSeriesType4)
 
     ((dbSeriesSource1, dbSeriesSource2, dbSeriesSource3, dbSeriesSource4), (dbSeriesSeriesType1, dbSeriesSeriesType2, dbSeriesSeriesType3, dbSeriesSeriesType4))
   }

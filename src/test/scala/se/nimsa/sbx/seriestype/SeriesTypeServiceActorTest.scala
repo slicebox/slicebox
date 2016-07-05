@@ -297,7 +297,7 @@ class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
 
       val seriesId = 45
       db.withSession { implicit session =>
-        seriesTypeDao.insertSeriesSeriesType(SeriesSeriesType(seriesId, addedSeriesType.id))
+        seriesTypeDao.upsertSeriesSeriesType(SeriesSeriesType(seriesId, addedSeriesType.id))
       }
       
       seriesTypeService ! MetaDataDeleted(None, None, Some(Series(seriesId, -1, null, null, null, null, null, null, null, null, null)), None)

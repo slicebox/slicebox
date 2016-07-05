@@ -184,7 +184,7 @@ class SeriesTypeServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extend
 
   def addSeriesTypeToSeries(seriesSeriesType: SeriesSeriesType) =
     db.withSession { implicit session =>
-      seriesTypeDao.insertSeriesSeriesType(seriesSeriesType)
+      seriesTypeDao.upsertSeriesSeriesType(seriesSeriesType)
     }
 
   def removeSeriesTypesFromSeries(seriesId: Long) =
