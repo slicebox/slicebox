@@ -47,7 +47,7 @@ object Jpeg2Dcm {
 
   private val transferSyntax = UID.JPEGBaseline1
 
-  def apply(bytes: Array[Byte], patient: Patient, study: Study): DicomData = {
+  def apply(bytes: Array[Byte], patient: Patient, study: Study, optionalDescription: Option[String]): DicomData = {
 
     val jpgInput = new DataInputStream(new ByteArrayInputStream(bytes))
 
@@ -66,6 +66,9 @@ object Jpeg2Dcm {
       attrs.setString(Tag.StudyID, VR.LO, study.studyID.value)
       attrs.setString(Tag.StudyInstanceUID, VR.UI, study.studyInstanceUID.value)
       attrs.setString(Tag.SpecificCharacterSet, VR.CS, charset)
+
+      // add series description if it exists
+      optionalDescription.foreach(description => attrs.setString(Tag.SeriesDescription, VR.LO, description))
 
       val buffer = new Array[Byte](8192)
       val jpgLen = bytes.length

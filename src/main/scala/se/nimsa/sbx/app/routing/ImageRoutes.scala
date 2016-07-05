@@ -149,7 +149,7 @@ trait ImageRoutes {
           }
         }
       } ~ path("jpeg") {
-        parameters('studyid.as[Long]) { studyId =>
+        parameters('studyid.as[Long], 'description.?) { (studyId, optionalDescription) =>
           post {
             entity(as[Array[Byte]]) { jpegBytes =>
               import spray.httpx.SprayJsonSupport._
@@ -159,7 +159,7 @@ trait ImageRoutes {
                 studyMaybe.map { study =>
                   metaDataService.ask(GetPatient(study.patientId)).mapTo[Option[Patient]].map { patientMaybe =>
                     patientMaybe.map { patient =>
-                      val dicomData = Jpeg2Dcm(jpegBytes, patient, study)
+                      val dicomData = Jpeg2Dcm(jpegBytes, patient, study, optionalDescription)
                       metaDataService.ask(AddMetaData(dicomData.attributes, source)).mapTo[MetaDataAdded].flatMap { metaData =>
                         storageService.ask(AddDicomData(dicomData, source, metaData.image)).map { _ => metaData.image }
                       }
