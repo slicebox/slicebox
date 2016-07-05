@@ -2470,7 +2470,9 @@
             "in": "body",
             "description": "the updated status of the transaction",
             "required": true,
-            "type": "string"
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
