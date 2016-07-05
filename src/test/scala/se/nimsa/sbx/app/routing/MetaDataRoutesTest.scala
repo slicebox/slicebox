@@ -448,6 +448,32 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
   }
 
+  it should "return 204 NoContent when setting the series type for a specific series" in {
+    val addedSeriesType = db.withSession { implicit session =>
+      seriesTypeDao.insertSeriesType(SeriesType(-1, "st0"))
+    }
+
+    val mfd = MultipartFormData(Seq(BodyPart(testImageFile, "file")))
+    val addedSeriesId = PostAsUser("/api/images", mfd) ~> routes ~> check {
+      status should be(Created)
+      responseAs[Image].seriesId
+    }
+
+    GetAsUser(s"/api/metadata/series/$addedSeriesId/seriestypes") ~> routes ~> check {
+      responseAs[List[SeriesType]] shouldBe empty
+    }
+
+    PutAsUser(s"/api/metadata/series/$addedSeriesId/seriestypes/${addedSeriesType.id}") ~> routes ~> check {
+      status shouldBe NoContent
+    }
+
+    GetAsUser(s"/api/metadata/series/$addedSeriesId/seriestypes") ~> routes ~> check {
+      val seriesTypes = responseAs[List[SeriesType]]
+      seriesTypes should have length 1
+      seriesTypes(0) shouldBe addedSeriesType
+    }
+  }
+
   it should "return 200 OK and all images for a study" in {
     val studies =
       db.withSession { implicit session =>
@@ -468,9 +494,9 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     GetAsUser(s"/api/metadata/studies/666/images") ~> routes ~> check {
       status shouldBe OK
       responseAs[List[Image]] shouldBe empty
-    }    
+    }
   }
-  
+
   it should "return 200 OK and all images for a patient" in {
     val patients =
       db.withSession { implicit session =>
@@ -489,7 +515,7 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     GetAsUser(s"/api/metadata/patients/666/images") ~> routes ~> check {
       status shouldBe OK
       responseAs[List[Image]] shouldBe empty
-    }    
+    }
   }
-  
+
 }

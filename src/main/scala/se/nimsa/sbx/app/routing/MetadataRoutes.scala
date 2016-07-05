@@ -30,11 +30,11 @@ import se.nimsa.sbx.user.UserProtocol._
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.scp.ScpProtocol._
 import se.nimsa.sbx.directory.DirectoryWatchProtocol._
-import se.nimsa.sbx.seriestype.SeriesTypeProtocol.SeriesTypes
+import se.nimsa.sbx.seriestype.SeriesTypeProtocol.{AddSeriesTypeToSeries, GetSeriesTypesForSeries, SeriesTypes}
+
 import scala.concurrent.Future
 import se.nimsa.sbx.scu.ScuProtocol.GetScus
 import se.nimsa.sbx.scu.ScuProtocol.Scus
-import se.nimsa.sbx.seriestype.SeriesTypeProtocol.GetSeriesTypesForSeries
 
 trait MetadataRoutes { this: SliceboxService =>
 
@@ -190,11 +190,20 @@ trait MetadataRoutes { this: SliceboxService =>
                 complete(seriesSourceMaybe.map(_.source))
               }
             }
-          } ~ path("seriestypes") {
-            get {
-              onSuccess(seriesTypeService.ask(GetSeriesTypesForSeries(seriesId))) {
-                case SeriesTypes(seriesTypes) =>
-                  complete(seriesTypes)
+          } ~ pathPrefix("seriestypes") {
+            pathEndOrSingleSlash {
+              get {
+                onSuccess(seriesTypeService.ask(GetSeriesTypesForSeries(seriesId))) {
+                  case SeriesTypes(seriesTypes) =>
+                    complete(seriesTypes)
+                }
+              }
+            } ~ path(LongNumber) { seriesTypeId =>
+              put {
+                onSuccess(seriesTypeService.ask(AddSeriesTypeToSeries(seriesId, seriesTypeId))) {
+                  case _ =>
+                    complete(NoContent)
+                }
               }
             }
           } ~ pathPrefix("seriestags") {

@@ -84,12 +84,12 @@ object SeriesTypeProtocol {
   case class SeriesTypeRuleAttributeRemoved(seriesTypeRuleAttributeId: Long)
   
   
-  case class AddSeriesTypeToSeries(seriesType: SeriesType, series: Series) extends SeriesTypeRequest
+  case class AddSeriesTypeToSeries(seriesId: Long, seriesTypeId: Long) extends SeriesTypeRequest
 
   case class RemoveSeriesTypesFromSeries(seriesId: Long) extends SeriesTypeRequest
   
   case class GetSeriesTypesForSeries(seriesId: Long) extends SeriesTypeRequest
-  
+
   case class SeriesTypeAddedToSeries(seriesSeriesType: SeriesSeriesType)
   
   case class SeriesTypesRemovedFromSeries(seriesId: Long)

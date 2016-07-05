@@ -103,8 +103,8 @@ class SeriesTypeServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extend
             updateSeriesTypesForAllSeries()
             sender ! SeriesTypeRuleAttributeRemoved(seriesTypeRuleAttributeId)
 
-          case AddSeriesTypeToSeries(seriesType, series) =>
-            val seriesSeriesType = addSeriesTypeToSeries(SeriesSeriesType(series.id, seriesType.id))
+          case AddSeriesTypeToSeries(seriesId, seriesTypeId) =>
+            val seriesSeriesType = addSeriesTypeToSeries(SeriesSeriesType(seriesId, seriesTypeId))
             sender ! SeriesTypeAddedToSeries(seriesSeriesType)
 
           case RemoveSeriesTypesFromSeries(seriesId) =>
