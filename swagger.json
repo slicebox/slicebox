@@ -847,6 +847,58 @@
             "description": "series not found (invalid ID)"
           }
         }
+      },
+      "delete": {
+        "description": "Delete all series types for the series with the supplied ID",
+        "tags": ["Meta Data"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of series",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "series types deleted"
+          }
+        }        
+      }
+    },
+
+    "/metadata/series/{seriesId}/seriestypes/{seriesTypeId}": {
+      "put": {
+        "description": "Add the series type with the supplied series type ID to the series with the supplied series ID",
+        "tags": ["Meta Data"],
+        "parameters": [
+          {
+            "name": "seriesId",
+            "in": "path",
+            "description": "ID of series",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "seriesTypeId",
+            "in": "path",
+            "description": "ID of series type to add",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "series type added"
+          },
+          "404": {
+            "description": "no series or series type found for the supplied ID(s)"
+          }
+        }        
       }
     },
 
