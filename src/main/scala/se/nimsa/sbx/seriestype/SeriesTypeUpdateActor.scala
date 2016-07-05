@@ -196,7 +196,7 @@ class SeriesTypeUpdateActor(implicit val timeout: Timeout) extends Actor with Ex
     seriesTypeService.ask(GetSeriesTypeRuleAttributes(seriesTypeRule.id)).mapTo[SeriesTypeRuleAttributes].map(_.seriesTypeRuleAttributes)
 
   def addSeriesTypeForSeries(seriesType: SeriesType, series: Series): Future[SeriesTypeAddedToSeries] =
-    seriesTypeService.ask(AddSeriesTypeToSeries(series.id, seriesType.id)).mapTo[SeriesTypeAddedToSeries]
+    seriesTypeService.ask(AddSeriesTypeToSeries(series, seriesType)).mapTo[SeriesTypeAddedToSeries]
 
   def removeAllSeriesTypesForSeries(series: Series): Future[SeriesTypesRemovedFromSeries] =
     seriesTypeService.ask(RemoveSeriesTypesFromSeries(series.id)).mapTo[SeriesTypesRemovedFromSeries]

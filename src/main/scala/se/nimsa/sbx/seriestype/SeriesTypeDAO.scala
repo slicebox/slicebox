@@ -143,6 +143,9 @@ class SeriesTypeDAO(val driver: JdbcProfile) {
   def listSeriesSeriesTypes(implicit session: Session): List[SeriesSeriesType] =
     seriesSeriesTypeQuery.list
 
+  def seriesTypeForId(seriesTypeId: Long)(implicit session: Session) =
+    seriesTypeQuery.filter(_.id === seriesTypeId).firstOption
+
   def removeSeriesType(seriesTypeId: Long)(implicit session: Session): Unit =
     seriesTypeQuery.filter(_.id === seriesTypeId).delete
 

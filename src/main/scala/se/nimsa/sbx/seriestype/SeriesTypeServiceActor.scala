@@ -71,6 +71,9 @@ class SeriesTypeServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extend
             updateSeriesTypeInDb(seriesType)
             sender ! SeriesTypeUpdated
 
+          case GetSeriesType(seriesTypeId) =>
+            sender ! getSeriesTypeForId(seriesTypeId)
+
           case RemoveSeriesType(seriesTypeId) =>
             removeSeriesTypeFromDb(seriesTypeId)
             updateSeriesTypesForAllSeries()
@@ -103,8 +106,8 @@ class SeriesTypeServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extend
             updateSeriesTypesForAllSeries()
             sender ! SeriesTypeRuleAttributeRemoved(seriesTypeRuleAttributeId)
 
-          case AddSeriesTypeToSeries(seriesId, seriesTypeId) =>
-            val seriesSeriesType = addSeriesTypeToSeries(SeriesSeriesType(seriesId, seriesTypeId))
+          case AddSeriesTypeToSeries(series, seriesType) =>
+            val seriesSeriesType = addSeriesTypeToSeries(SeriesSeriesType(series.id, seriesType.id))
             sender ! SeriesTypeAddedToSeries(seriesSeriesType)
 
           case RemoveSeriesTypesFromSeries(seriesId) =>
@@ -175,6 +178,11 @@ class SeriesTypeServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extend
   def removeSeriesTypeRuleAttributeFromDb(seriesTypeRuleAttributeId: Long): Unit =
     db.withSession { implicit session =>
       seriesTypeDao.removeSeriesTypeRuleAttribute(seriesTypeRuleAttributeId)
+    }
+
+  def getSeriesTypeForId(seriesTypeId: Long): Option[SeriesType] =
+    db.withSession { implicit session =>
+      seriesTypeDao.seriesTypeForId(seriesTypeId)
     }
 
   def getSeriesTypesForSeries(seriesId: Long) =

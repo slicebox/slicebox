@@ -17,24 +17,14 @@
 package se.nimsa.sbx.app.routing
 
 import akka.pattern.ask
-import spray.http.StatusCodes.NoContent
-import spray.http.StatusCodes.Created
-import spray.httpx.SprayJsonSupport._
-import spray.routing._
+import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.app.SliceboxService
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.metadata.MetaDataProtocol._
-import se.nimsa.sbx.app.GeneralProtocol._
-import se.nimsa.sbx.app.GeneralProtocol.SourceType._
-import se.nimsa.sbx.user.UserProtocol._
-import se.nimsa.sbx.box.BoxProtocol._
-import se.nimsa.sbx.scp.ScpProtocol._
-import se.nimsa.sbx.directory.DirectoryWatchProtocol._
-import se.nimsa.sbx.seriestype.SeriesTypeProtocol.{AddSeriesTypeToSeries, GetSeriesTypesForSeries, RemoveSeriesTypesFromSeries, SeriesTypes}
-
-import scala.concurrent.Future
-import se.nimsa.sbx.scu.ScuProtocol.GetScus
-import se.nimsa.sbx.scu.ScuProtocol.Scus
+import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
+import spray.http.StatusCodes.{Created, NoContent, NotFound}
+import spray.httpx.SprayJsonSupport._
+import spray.routing._
 
 trait MetadataRoutes { this: SliceboxService =>
 
@@ -205,9 +195,19 @@ trait MetadataRoutes { this: SliceboxService =>
               }
             } ~ path(LongNumber) { seriesTypeId =>
               put {
-                onSuccess(seriesTypeService.ask(AddSeriesTypeToSeries(seriesId, seriesTypeId))) {
-                  case _ =>
-                    complete(NoContent)
+                onSuccess(metaDataService.ask(GetSingleSeries(seriesId)).mapTo[Option[Series]]) {
+                  case Some(series) =>
+                    onSuccess(seriesTypeService.ask(GetSeriesType(seriesTypeId)).mapTo[Option[SeriesType]]) {
+                      case Some(seriesType) =>
+                        onSuccess(seriesTypeService.ask(AddSeriesTypeToSeries(series, seriesType))) {
+                          case _ =>
+                            complete(NoContent)
+                        }
+                      case None =>
+                        complete(NotFound)
+                    }
+                  case None =>
+                    complete(NotFound)
                 }
               }
             }

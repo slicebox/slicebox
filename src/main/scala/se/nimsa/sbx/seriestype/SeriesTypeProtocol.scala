@@ -51,7 +51,9 @@ object SeriesTypeProtocol {
   case class AddSeriesType(seriesType: SeriesType) extends SeriesTypeRequest
   
   case class UpdateSeriesType(seriesType: SeriesType) extends SeriesTypeRequest
-  
+
+  case class GetSeriesType(seriesTypeId: Long) extends SeriesTypeRequest
+
   case class RemoveSeriesType(seriesTypeId: Long) extends SeriesTypeRequest
   
 
@@ -84,7 +86,7 @@ object SeriesTypeProtocol {
   case class SeriesTypeRuleAttributeRemoved(seriesTypeRuleAttributeId: Long)
   
   
-  case class AddSeriesTypeToSeries(seriesId: Long, seriesTypeId: Long) extends SeriesTypeRequest
+  case class AddSeriesTypeToSeries(series: Series, seriesType: SeriesType) extends SeriesTypeRequest
 
   case class RemoveSeriesTypesFromSeries(seriesId: Long) extends SeriesTypeRequest
   

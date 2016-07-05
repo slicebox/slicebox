@@ -498,6 +498,26 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
   }
 
+  it should "return 404 NotFound when adding a series types to a series that does not exist" in {
+    val addedSeriesType = db.withSession { implicit session =>
+      seriesTypeDao.insertSeriesType(SeriesType(-1, "st0"))
+    }
+
+    PutAsUser(s"/api/metadata/series/666/seriestypes/${addedSeriesType.id}") ~> routes ~> check {
+      status shouldBe NotFound
+    }
+  }
+
+  it should "return 404 NotFound when adding a series type that does not exist to a series" in {
+    val addedSeriesId = PostAsUser("/api/images", MultipartFormData(Seq(BodyPart(testImageFile, "file")))) ~> routes ~> check {
+      responseAs[Image].seriesId
+    }
+
+    PutAsUser(s"/api/metadata/series/$addedSeriesId/seriestypes/666") ~> routes ~> check {
+      status shouldBe NotFound
+    }
+  }
+
   it should "return 204 NoContent when removing all series types from a series" in {
     val seriesType1 = db.withSession { implicit session =>
       seriesTypeDao.insertSeriesType(SeriesType(-1, "st1"))
@@ -527,6 +547,12 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
     GetAsUser(s"/api/metadata/series/$addedSeriesId/seriestypes") ~> routes ~> check {
       responseAs[List[SeriesType]] shouldBe empty
+    }
+  }
+
+  it should "return 204 NoContent when removing series types for a series that does not exist" in {
+    DeleteAsUser("/api/metadata/series/666/seriestypes") ~> routes ~> check {
+      status shouldBe NoContent
     }
   }
 
