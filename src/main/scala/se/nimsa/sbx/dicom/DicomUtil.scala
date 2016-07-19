@@ -48,7 +48,11 @@ object DicomUtil {
       val transferSyntaxUID = dicomData.metaInformation.getString(Tag.TransferSyntaxUID)
       if (transferSyntaxUID == null || transferSyntaxUID.isEmpty)
         throw new IllegalArgumentException("DICOM meta information is missing transfer syntax UID")
+
+      // the transfer syntax uid given below is for the meta info block. The TS UID in the meta itself is used for the
+      // remainder of the file
       dos = new DicomOutputStream(outputStream, TransferSyntaxes.ExplicitVrLittleEndian.uid)
+
       dos.writeDataset(dicomData.metaInformation, dicomData.attributes)
     } finally {
       SafeClose.close(dos)

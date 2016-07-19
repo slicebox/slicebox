@@ -81,16 +81,16 @@ import de.heikoseeberger.sbtheader.license.Apache2_0
             "com.typesafe.akka"             %% "akka-slf4j"             % akkaVersion,
             "ch.qos.logback"                 % "logback-classic"        % "1.1.7",
             "com.typesafe.slick"            %% "slick"                  % "2.1.0",
-            "com.h2database"                 % "h2"                     % "1.4.191",
-            "mysql"                          % "mysql-connector-java"   %  "6.0.2",
-            "com.zaxxer"                     % "HikariCP"               % "2.4.6",
+            "com.h2database"                 % "h2"                     % "1.4.192",
+            "mysql"                          % "mysql-connector-java"   % "6.0.3",
+            "com.zaxxer"                     % "HikariCP"               % "2.4.7",
             "com.github.t3hnar"             %% "scala-bcrypt"           % "2.6",
-            "com.amazonaws"                  % "aws-java-sdk-s3"        % "1.11.0",
-            "org.scalatest"                 %% "scalatest"              % "2.2.5"           % "test",
+            "com.amazonaws"                  % "aws-java-sdk-s3"        % "1.11.18",
+            "org.scalatest"                 %% "scalatest"              % "2.2.6"           % "test",
             "io.spray"                      %% "spray-testkit"          % sprayVersion      % "test",
             "com.typesafe.akka"             %% "akka-testkit"           % akkaVersion       % "test",
-            "org.webjars"                    % "angularjs"              % "1.5.5",
-            "org.webjars"                    % "angular-material"       % "1.0.7",
+            "org.webjars"                    % "angularjs"              % "1.5.7",
+            "org.webjars"                    % "angular-material"       % "1.0.9",
             "org.webjars"                    % "angular-file-upload"    % "11.0.0"
           )
     }
