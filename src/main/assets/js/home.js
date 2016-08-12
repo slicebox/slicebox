@@ -173,6 +173,9 @@ angular.module('slicebox.home', ['ngRoute'])
         windowMax: 100,
         tagState: {
             searchText: ""
+        },
+        typeState: {
+            searchText: ""
         }
     };
     $scope.uiState.advancedFiltering = {
@@ -191,16 +194,38 @@ angular.module('slicebox.home', ['ngRoute'])
         }); 
     });
 
-    $scope.uiState.advancedFiltering.seriesTypesPromise = $http.get('/api/seriestypes').then(function (seriesTypesData) {        
+    $scope.uiState.advancedFiltering.seriesTypesPromise = $http.get('/api/seriestypes').then(function (seriesTypesData) {
         return seriesTypesData.data.map(function (seriesType) {
             seriesType.selected = false;
             return seriesType;
-        }); 
+        });
     });
-    
+
     updateSeriesTagsPromise();
 
     // Scope functions
+
+    $scope.findSeriesTypes = function(searchText) {
+        var lcSearchText = angular.lowercase(searchText);
+        var selectedTypeNames = $scope.uiState.seriesDetails.selectedSeriesSeriesTypes.map(function (seriesType) { return seriesType.name; });
+        return searchText ? $scope.uiState.advancedFiltering.seriesTypesPromise.then(function (seriesTypes) {
+            return seriesTypes.filter(function (seriesType) {
+                var lcName = angular.lowercase(seriesType.name);
+                return lcName.indexOf(lcSearchText) === 0;
+            }).filter(function (seriesType) {
+                return selectedTypeNames.indexOf(seriesType.name) < 0;
+            });
+        }) : [];
+    };
+
+    $scope.seriesTypeAdded = function(seriesType) {
+        $http.put('/api/metadata/series/' + $scope.uiState.selectedSeries.id + '/seriestypes/' + seriesType.id);
+        return seriesType;
+    };
+
+    $scope.seriesTypeRemoved = function(seriesType) {
+        $http.delete('/api/metadata/series/' + $scope.uiState.selectedSeries.id + '/seriestypes/' + seriesType.id);
+    };
 
     $scope.findSeriesTags = function(searchText) {
         var lcSearchText = angular.lowercase(searchText);

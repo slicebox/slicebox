@@ -345,10 +345,27 @@
                         <md-card-content>
                             <h4 class="md-flex card-header">Series Types</h4>
                             <md-content>
-                                <p ng-if="uiState.selectedSeries && uiState.seriesDetails.selectedSeriesSeriesTypes.length === 0"><i>There are no series types assigned to this series</i></p>
-                                <ul>
-                                    <li ng-repeat="seriesType in uiState.seriesDetails.selectedSeriesSeriesTypes">{{seriesType.name}}</li>
-                                </ul>
+                                <md-content>
+                                    <md-chips
+                                            ng-model="uiState.seriesDetails.selectedSeriesSeriesTypes"
+                                            md-autocomplete-snap
+                                            md-require-match="true"
+                                            md-on-remove="seriesTypeRemoved($chip)"
+                                            md-on-add="seriesTypeAdded($chip)">
+                                        <md-autocomplete
+                                                md-search-text="uiState.seriesDetails.typeState.searchText"
+                                                md-items="item in findSeriesTypes(uiState.seriesDetails.typeState.searchText)"
+                                                md-item-text="item.name"
+                                                md-min-length="1"
+                                                md-no-cache
+                                                placeholder="+type">
+                                            <span md-highlight-text="uiState.seriesDetails.typeState.searchText">{{item.name}}</span>
+                                        </md-autocomplete>
+                                        <md-chip-template>
+                                            <span>{{$chip.name}} </span>
+                                        </md-chip-template>
+                                    </md-chips>
+                                </md-content>
                             </md-content>
                         </md-card-content>
                     </md-card>
@@ -361,7 +378,7 @@
                                     md-autocomplete-snap 
                                     md-require-match="false"
                                     md-on-remove="seriesTagRemoved($chip)"
-                                    md-on-append="seriesTagAdded($chip)">
+                                    md-on-add="seriesTagAdded($chip)">
                                     <md-autocomplete
                                         md-search-text="uiState.seriesDetails.tagState.searchText"
                                         md-items="item in findSeriesTags(uiState.seriesDetails.tagState.searchText)"

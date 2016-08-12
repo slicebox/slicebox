@@ -89,15 +89,19 @@ object SeriesTypeProtocol {
   case class AddSeriesTypeToSeries(series: Series, seriesType: SeriesType) extends SeriesTypeRequest
 
   case class RemoveSeriesTypesFromSeries(seriesId: Long) extends SeriesTypeRequest
-  
+
+  case class RemoveSeriesTypeFromSeries(seriesId: Long, seriesTypeId: Long) extends SeriesTypeRequest
+
   case class GetSeriesTypesForSeries(seriesId: Long) extends SeriesTypeRequest
 
   case class SeriesTypeAddedToSeries(seriesSeriesType: SeriesSeriesType)
   
   case class SeriesTypesRemovedFromSeries(seriesId: Long)
-  
 
-  
+  case class SeriesTypeRemovedFromSeries(seriesId: Long, seriesTypeId: Long)
+
+
+
   sealed trait SeriesTypesUpdateRequest
   
   case object UpdateSeriesTypesForAllSeries extends SeriesTypesUpdateRequest

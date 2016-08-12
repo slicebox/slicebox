@@ -166,6 +166,9 @@ class SeriesTypeDAO(val driver: JdbcProfile) {
   def removeSeriesTypesForSeriesId(seriesId: Long)(implicit session: Session): Unit =
     seriesSeriesTypeQuery.filter(_.seriesId === seriesId).delete
 
+  def removeSeriesTypeForSeriesId(seriesId: Long, seriesTypeId: Long)(implicit session: Session): Unit =
+    seriesSeriesTypeQuery.filter(_.seriesId === seriesId).filter(_.seriesTypeId === seriesTypeId).delete
+
   def seriesTypesForSeries(seriesId: Long)(implicit session: Session) =
     seriesSeriesTypeQuery.filter(_.seriesId === seriesId)
       .innerJoin(seriesTypeQuery).on(_.seriesTypeId === _.id)

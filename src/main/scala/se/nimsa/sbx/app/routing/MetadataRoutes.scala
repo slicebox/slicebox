@@ -26,7 +26,8 @@ import spray.http.StatusCodes.{Created, NoContent, NotFound}
 import spray.httpx.SprayJsonSupport._
 import spray.routing._
 
-trait MetadataRoutes { this: SliceboxService =>
+trait MetadataRoutes {
+  this: SliceboxService =>
 
   def metaDataRoutes: Route =
     pathPrefix("metadata") {
@@ -49,14 +50,14 @@ trait MetadataRoutes { this: SliceboxService =>
               'sources.as[String].?,
               'seriestypes.as[String].?,
               'seriestags.as[String].?) { (startIndex, count, orderBy, orderAscending, filter, sourcesString, seriesTypesString, seriesTagsString) =>
-                val sources = sourcesString.map(parseSourcesString(_)).getOrElse(Array.empty)
-                val seriesTypes = seriesTypesString.map(parseIdsString(_)).getOrElse(Array.empty)
-                val seriesTags = seriesTagsString.map(parseIdsString(_)).getOrElse(Array.empty)
-                onSuccess(metaDataService.ask(GetPatients(startIndex, count, orderBy, orderAscending, filter, sources, seriesTypes, seriesTags))) {
-                  case Patients(patients) =>
-                    complete(patients)
-                }
+              val sources = sourcesString.map(parseSourcesString(_)).getOrElse(Array.empty)
+              val seriesTypes = seriesTypesString.map(parseIdsString(_)).getOrElse(Array.empty)
+              val seriesTags = seriesTagsString.map(parseIdsString(_)).getOrElse(Array.empty)
+              onSuccess(metaDataService.ask(GetPatients(startIndex, count, orderBy, orderAscending, filter, sources, seriesTypes, seriesTags))) {
+                case Patients(patients) =>
+                  complete(patients)
               }
+            }
           }
         } ~ path("query") {
           post {
@@ -79,14 +80,14 @@ trait MetadataRoutes { this: SliceboxService =>
               'sources.as[String].?,
               'seriestypes.as[String].?,
               'seriestags.as[String].?) { (sourcesString, seriesTypesString, seriesTagsString) =>
-                val sources = sourcesString.map(parseSourcesString(_)).getOrElse(Array.empty)
-                val seriesTypes = seriesTypesString.map(parseIdsString(_)).getOrElse(Array.empty)
-                val seriesTags = seriesTagsString.map(parseIdsString(_)).getOrElse(Array.empty)
-                onSuccess(metaDataService.ask(GetImagesForPatient(patientId, sources, seriesTypes, seriesTags))) {
-                  case Images(images) =>
-                    complete(images)
-                }
+              val sources = sourcesString.map(parseSourcesString(_)).getOrElse(Array.empty)
+              val seriesTypes = seriesTypesString.map(parseIdsString(_)).getOrElse(Array.empty)
+              val seriesTags = seriesTagsString.map(parseIdsString(_)).getOrElse(Array.empty)
+              onSuccess(metaDataService.ask(GetImagesForPatient(patientId, sources, seriesTypes, seriesTags))) {
+                case Images(images) =>
+                  complete(images)
               }
+            }
           }
         }
       } ~ pathPrefix("studies") {
@@ -99,14 +100,14 @@ trait MetadataRoutes { this: SliceboxService =>
               'sources.as[String].?,
               'seriestypes.as[String].?,
               'seriestags.as[String].?) { (startIndex, count, patientId, sourcesString, seriesTypesString, seriesTagsString) =>
-                val sources = sourcesString.map(parseSourcesString(_)).getOrElse(Array.empty)
-                val seriesTypes = seriesTypesString.map(parseIdsString(_)).getOrElse(Array.empty)
-                val seriesTags = seriesTagsString.map(parseIdsString(_)).getOrElse(Array.empty)
-                onSuccess(metaDataService.ask(GetStudies(startIndex, count, patientId, sources, seriesTypes, seriesTags))) {
-                  case Studies(studies) =>
-                    complete(studies)
-                }
+              val sources = sourcesString.map(parseSourcesString(_)).getOrElse(Array.empty)
+              val seriesTypes = seriesTypesString.map(parseIdsString(_)).getOrElse(Array.empty)
+              val seriesTags = seriesTagsString.map(parseIdsString(_)).getOrElse(Array.empty)
+              onSuccess(metaDataService.ask(GetStudies(startIndex, count, patientId, sources, seriesTypes, seriesTags))) {
+                case Studies(studies) =>
+                  complete(studies)
               }
+            }
           }
         } ~ path("query") {
           post {
@@ -129,14 +130,14 @@ trait MetadataRoutes { this: SliceboxService =>
               'sources.as[String].?,
               'seriestypes.as[String].?,
               'seriestags.as[String].?) { (sourcesString, seriesTypesString, seriesTagsString) =>
-                val sources = sourcesString.map(parseSourcesString(_)).getOrElse(Array.empty)
-                val seriesTypes = seriesTypesString.map(parseIdsString(_)).getOrElse(Array.empty)
-                val seriesTags = seriesTagsString.map(parseIdsString(_)).getOrElse(Array.empty)
-                onSuccess(metaDataService.ask(GetImagesForStudy(studyId, sources, seriesTypes, seriesTags))) {
-                  case Images(images) =>
-                    complete(images)
-                }
+              val sources = sourcesString.map(parseSourcesString(_)).getOrElse(Array.empty)
+              val seriesTypes = seriesTypesString.map(parseIdsString(_)).getOrElse(Array.empty)
+              val seriesTags = seriesTagsString.map(parseIdsString(_)).getOrElse(Array.empty)
+              onSuccess(metaDataService.ask(GetImagesForStudy(studyId, sources, seriesTypes, seriesTags))) {
+                case Images(images) =>
+                  complete(images)
               }
+            }
           }
         }
       } ~ pathPrefix("series") {
@@ -149,14 +150,14 @@ trait MetadataRoutes { this: SliceboxService =>
               'sources.as[String].?,
               'seriestypes.as[String].?,
               'seriestags.as[String].?) { (startIndex, count, studyId, sourcesString, seriesTypesString, seriesTagsString) =>
-                val sources = sourcesString.map(parseSourcesString(_)).getOrElse(Array.empty)
-                val seriesTypes = seriesTypesString.map(parseIdsString(_)).getOrElse(Array.empty)
-                val seriesTags = seriesTagsString.map(parseIdsString(_)).getOrElse(Array.empty)
-                onSuccess(metaDataService.ask(GetSeries(startIndex, count, studyId, sources, seriesTypes, seriesTags))) {
-                  case SeriesCollection(series) =>
-                    complete(series)
-                }
+              val sources = sourcesString.map(parseSourcesString(_)).getOrElse(Array.empty)
+              val seriesTypes = seriesTypesString.map(parseIdsString(_)).getOrElse(Array.empty)
+              val seriesTags = seriesTagsString.map(parseIdsString(_)).getOrElse(Array.empty)
+              onSuccess(metaDataService.ask(GetSeries(startIndex, count, studyId, sources, seriesTypes, seriesTags))) {
+                case SeriesCollection(series) =>
+                  complete(series)
               }
+            }
           }
         } ~ path("query") {
           post {
@@ -209,6 +210,11 @@ trait MetadataRoutes { this: SliceboxService =>
                   case None =>
                     complete(NotFound)
                 }
+              } ~ delete {
+                onSuccess(seriesTypeService.ask(RemoveSeriesTypeFromSeries(seriesId, seriesTypeId))) {
+                  case _ =>
+                    complete(NoContent)
+                }
               }
             }
           } ~ pathPrefix("seriestags") {
@@ -243,11 +249,11 @@ trait MetadataRoutes { this: SliceboxService =>
               'startindex.as[Long] ? 0,
               'count.as[Long] ? 20,
               'seriesid.as[Long]) { (startIndex, count, seriesId) =>
-                onSuccess(metaDataService.ask(GetImages(startIndex, count, seriesId))) {
-                  case Images(images) =>
-                    complete(images)
-                }
+              onSuccess(metaDataService.ask(GetImages(startIndex, count, seriesId))) {
+                case Images(images) =>
+                  complete(images)
               }
+            }
           }
         } ~ path("query") {
           post {
@@ -277,14 +283,14 @@ trait MetadataRoutes { this: SliceboxService =>
               'sources.as[String].?,
               'seriestypes.as[String].?,
               'seriestags.as[String].?) { (startIndex, count, orderBy, orderAscending, filter, sourcesString, seriesTypesString, seriesTagsString) =>
-                val sources = sourcesString.map(parseSourcesString(_)).getOrElse(Array.empty)
-                val seriesTypes = seriesTypesString.map(parseIdsString(_)).getOrElse(Array.empty)
-                val seriesTags = seriesTagsString.map(parseIdsString(_)).getOrElse(Array.empty)
-                onSuccess(metaDataService.ask(GetFlatSeries(startIndex, count, orderBy, orderAscending, filter, sources, seriesTypes, seriesTags))) {
-                  case FlatSeriesCollection(flatSeries) =>
-                    complete(flatSeries)
-                }
+              val sources = sourcesString.map(parseSourcesString(_)).getOrElse(Array.empty)
+              val seriesTypes = seriesTypesString.map(parseIdsString(_)).getOrElse(Array.empty)
+              val seriesTags = seriesTagsString.map(parseIdsString(_)).getOrElse(Array.empty)
+              onSuccess(metaDataService.ask(GetFlatSeries(startIndex, count, orderBy, orderAscending, filter, sources, seriesTypes, seriesTags))) {
+                case FlatSeriesCollection(flatSeries) =>
+                  complete(flatSeries)
               }
+            }
           }
         } ~ path("query") {
           post {
