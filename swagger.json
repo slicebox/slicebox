@@ -899,6 +899,33 @@
             "description": "no series or series type found for the supplied ID(s)"
           }
         }        
+      },
+      "delete": {
+        "description": "Delete the series type with the supplied series type ID from the series with the supplied series ID",
+        "tags": ["Meta Data"],
+        "parameters": [
+          {
+            "name": "seriesId",
+            "in": "path",
+            "description": "ID of series",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "seriesTypeId",
+            "in": "path",
+            "description": "ID of series type to remove",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "series type removed"
+          }
+        }                
       }
     },
 
