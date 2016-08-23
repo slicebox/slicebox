@@ -43,8 +43,6 @@ class SeriesTypeServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extend
 
   log.info("Series type service started")
 
-  updateSeriesTypesForAllSeries()
-
   def receive = LoggingReceive {
 
     case MetaDataDeleted(patientMaybe, studyMaybe, seriesMaybe, imageMaybe) =>
