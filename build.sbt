@@ -32,9 +32,7 @@ import de.heikoseeberger.sbtheader.license.Apache2_0
         conf -> "conf/logback.xml"
     }
 
-    javaOptions in Universal ++= Seq("-J-Xmx3072m","-J-Xms2048m")
-
-    batScriptExtraDefines += """set _JAVA_OPTS=%_JAVA_OPTS% -Xmx1024m -Dconfig.file=%SLICEBOX_HOME%\\conf\\slicebox.conf -Dlogback.configurationFile=%SLICEBOX_HOME%\\conf\\logback.xml"""
+    batScriptExtraDefines += """-Dconfig.file=%SLICEBOX_HOME%\\conf\\slicebox.conf -Dlogback.configurationFile=%SLICEBOX_HOME%\\conf\\logback.xml"""
 
     // native packaging - linux
 
