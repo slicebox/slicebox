@@ -986,6 +986,36 @@
       }
     },
 
+    "/metadata/series/{seriesId}/seriestags/{seriesTagId}": {
+      "delete": {
+        "description": "Delete the series tag with the supplied series tag ID from the series with the supplied series ID",
+        "tags": ["Meta Data"],
+        "parameters": [
+          {
+            "name": "seriesId",
+            "in": "path",
+            "description": "ID of series",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "seriesTagId",
+            "in": "path",
+            "description": "ID of series tag to remove",
+            "required": true,
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "series tag removed"
+          }
+        }                
+      }
+    },
+
     "/metadata/seriestags": {
       "get": {
         "description": "Returns a list of series tags currently currently in use.",
