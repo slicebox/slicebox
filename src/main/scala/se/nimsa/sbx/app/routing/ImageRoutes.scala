@@ -23,7 +23,7 @@ import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.pattern.ask
 import scala.util.{Success, Failure}
 import org.dcm4che3.data.Attributes
-import se.nimsa.sbx.anonymization.AnonymizationProtocol.ReverseAnonymization
+import se.nimsa.sbx.anonymization.AnonymizationProtocol.{AnonymizationKeyIdForImageId, RemoveAnonymizationKey, ReverseAnonymization}
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.app.SliceboxService
 import se.nimsa.sbx.dicom.DicomHierarchy.{FlatSeries, Image, Patient, Study}
@@ -69,9 +69,20 @@ trait ImageRoutes {
                     complete(HttpEntity(`application/octet-stream`, HttpData(imageData.data)))
                   }
                 } ~ delete {
-                  onSuccess(storageService.ask(DeleteDicomData(image)).flatMap { _ =>
-                    metaDataService.ask(DeleteMetaData(image.id))
-                  }) {
+                  onSuccess(
+                    storageService.ask(DeleteDicomData(image)).flatMap { _ =>
+                      metaDataService.ask(DeleteMetaData(image.id)).flatMap { _ =>
+                        if(Option(sliceboxConfig.getBoolean("delete-anonymization-with-patient")).getOrElse(false))
+                          anonymizationService.ask(AnonymizationKeyIdForImageId(image.id)).flatMap {qq =>
+                            qq.asInstanceOf[Option[Long]] match {
+                              case Some(id) => anonymizationService.ask(RemoveAnonymizationKey(id))
+                            }
+                          }
+                        else
+                          Future{}
+                      }
+                    }
+                  ) {
                     case _ =>
                       complete(NoContent)
                   }

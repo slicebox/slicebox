@@ -99,6 +99,9 @@ class AnonymizationDAO(val driver: JdbcProfile) {
 
   def listAnonymizationKeyImages(implicit session: Session) = anonymizationKeyImageQuery.list
 
+  def anonymizationKeyIdForImageId(imageId: Long)(implicit session: Session) =
+    anonymizationKeyImageQuery.list.find(_.imageId == imageId).map(_.anonymizationKeyId)
+
   def anonymizationKeys(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String])(implicit session: Session): List[AnonymizationKey] = {
 
     checkOrderBy(orderBy, "AnonymizationKeys")
