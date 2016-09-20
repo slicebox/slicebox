@@ -37,7 +37,7 @@ class AnonymizationServiceActorTest(_system: ActorSystem) extends TestKit(_syste
     anonymizationDao.create
   }
 
-  val anonymizationService = system.actorOf(Props(new AnonymizationServiceActor(dbProps)), name = "AnonymizationService")
+  val anonymizationService = system.actorOf(Props(new AnonymizationServiceActor(dbProps, purgeEmptyAnonymizationKeys = false)), name = "AnonymizationService")
 
   override def afterEach() =
     db.withSession { implicit session =>

@@ -105,5 +105,58 @@ class AnonymizationDAOTest extends FlatSpec with Matchers with BeforeAndAfterEac
           .map(_.patientName) shouldBe List("pn3", "pn2", "pn1")
     }
   }
-  
+
+  it should "not remove empty anonymization keys when there are no associated images left and purging of empty keys is off" in {
+    db.withSession { implicit session =>
+      val imageId = 55
+      val key = dao.insertAnonymizationKey(key1)
+      dao.insertAnonymizationKeyImage(AnonymizationKeyImage(-1, key.id, imageId))
+
+      dao.listAnonymizationKeys should have length 1
+      dao.listAnonymizationKeyImages should have length 1
+
+      dao.removeAnonymizationKeyImagesForImageId(imageId, purgeEmptyAnonymizationKeys = false)
+
+      dao.listAnonymizationKeys should have length 1
+      dao.listAnonymizationKeyImages shouldBe empty
+    }
+  }
+
+  it should "remove empty anonymization keys when there are no associated images left and purging of empty keys is on" in {
+    db.withSession { implicit session =>
+      val imageId = 55
+      val key = dao.insertAnonymizationKey(key1)
+      dao.insertAnonymizationKeyImage(AnonymizationKeyImage(-1, key.id, imageId))
+
+      dao.listAnonymizationKeys should have length 1
+      dao.listAnonymizationKeyImages should have length 1
+
+      dao.removeAnonymizationKeyImagesForImageId(imageId, purgeEmptyAnonymizationKeys = true)
+
+      dao.listAnonymizationKeys shouldBe empty
+      dao.listAnonymizationKeyImages shouldBe empty
+    }
+  }
+
+  it should "remove all empty anonymization keys containing a certain image id but not other empty or non-empty keys" in {
+    db.withSession { implicit session =>
+      val imageId = 55
+      val dbKey1 = dao.insertAnonymizationKey(key1)
+      val dbKey2 = dao.insertAnonymizationKey(key2)
+      val dbKey3 = dao.insertAnonymizationKey(key3)
+      dao.insertAnonymizationKeyImage(AnonymizationKeyImage(-1, dbKey1.id, imageId))
+
+      dao.insertAnonymizationKeyImage(AnonymizationKeyImage(-1, dbKey2.id, imageId))
+      dao.insertAnonymizationKeyImage(AnonymizationKeyImage(-1, dbKey2.id, imageId + 1))
+
+      dao.listAnonymizationKeys should have length 3
+      dao.listAnonymizationKeyImages should have length 3
+
+      dao.removeAnonymizationKeyImagesForImageId(imageId, purgeEmptyAnonymizationKeys = true)
+
+      dao.anonymizationKeyForId(dbKey1.id) shouldBe None // purged
+      dao.anonymizationKeyForId(dbKey2.id) shouldBe Some(dbKey2) // not yet empty
+      dao.anonymizationKeyForId(dbKey3.id) shouldBe Some(dbKey3) // empty but does not contain image id
+    }
+  }
 }
