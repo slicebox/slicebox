@@ -20,7 +20,7 @@ import java.nio.file.NoSuchFileException
 
 import akka.actor.{Actor, Props}
 import akka.event.{Logging, LoggingReceive}
-import se.nimsa.sbx.app.GeneralProtocol.ImageAdded
+import se.nimsa.sbx.app.GeneralProtocol.{ImageAdded, ImageDeleted}
 import se.nimsa.sbx.dicom.{Contexts, DicomData, DicomUtil}
 import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.util.ExceptionCatching
@@ -71,7 +71,8 @@ class StorageServiceActor(storage: StorageService,
           val dicomDataDeleted = DicomDataDeleted(image)
           try {
             storage.deleteFromStorage(image)
-            context.system.eventStream.publish(dicomDataDeleted)
+            val imageDeleted = ImageDeleted(image.id)
+            context.system.eventStream.publish(imageDeleted)
           } catch {
             case e: NoSuchFileException => log.info(s"DICOM file for image with id ${image.id} could not be found, no need to delete.")
           }
