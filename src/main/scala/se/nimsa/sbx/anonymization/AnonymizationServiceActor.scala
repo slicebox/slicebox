@@ -87,6 +87,9 @@ class AnonymizationServiceActor(dbProps: DbProps) extends Actor with ExceptionCa
 
           case QueryAnonymizationKeys(query) =>
             sender ! queryAnonymizationKeys(query)
+
+          case AnonymizationKeyIdForImageId(imageId) =>
+            sender ! getAnonymizationKeyIdForImageId(imageId)
         }
 
       }
@@ -157,6 +160,11 @@ class AnonymizationServiceActor(dbProps: DbProps) extends Actor with ExceptionCa
       val order = query.order.map(_.orderBy)
       val orderAscending = query.order.forall(_.orderAscending)
       dao.queryAnonymizationKeys(query.startIndex, query.count, order, orderAscending, query.queryProperties)
+    }
+
+  def getAnonymizationKeyIdForImageId(imageId: Long) =
+    db.withSession { implicit session =>
+      dao.anonymizationKeyIdForImageId(imageId)
     }
 
 }

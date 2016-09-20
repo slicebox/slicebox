@@ -78,4 +78,6 @@ object AnonymizationProtocol {
 
   case class AnonymizationKeys(anonymizationKeys: Seq[AnonymizationKey])
 
+  case class AnonymizationKeyIdForImageId(imageId: Long) extends AnonymizationRequest
+
 }
