@@ -17,14 +17,14 @@
 package se.nimsa.sbx.anonymization
 
 import scala.slick.driver.JdbcProfile
-import org.h2.jdbc.JdbcSQLException
 import scala.slick.jdbc.meta.MTable
-import scala.slick.jdbc.{ GetResult, StaticQuery => Q }
+import scala.slick.jdbc.{GetResult, StaticQuery => Q}
 import se.nimsa.sbx.dicom.DicomProperty
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 import AnonymizationProtocol._
 
 class AnonymizationDAO(val driver: JdbcProfile) {
+
   import driver.simple._
 
   class AnonymizationKeyTable(tag: Tag) extends Table[AnonymizationKey](tag, "AnonymizationKeys") {
@@ -110,7 +110,8 @@ class AnonymizationDAO(val driver: JdbcProfile) {
 
     filter.foreach(filterValue => {
       val filterValueLike = s"'%$filterValue%'".toLowerCase
-      query += s""" where 
+      query +=
+        s""" where
         lcase("patientName") like $filterValueLike or 
           lcase("anonPatientName") like $filterValueLike or 
             lcase("patientID") like $filterValueLike or 
@@ -162,10 +163,10 @@ class AnonymizationDAO(val driver: JdbcProfile) {
 
   def anonymizationKeyImageForAnonymizationKeyIdAndImageId(anonymizationKeyId: Long, imageId: Long)(implicit session: Session): Option[AnonymizationKeyImage] =
     anonymizationKeyImageQuery
-    .filter(_.anonymizationKeyId === anonymizationKeyId)
-    .filter(_.imageId === imageId)
-    .firstOption
-    
+      .filter(_.anonymizationKeyId === anonymizationKeyId)
+      .filter(_.imageId === imageId)
+      .firstOption
+
   def anonymizationKeysForImageId(imageId: Long)(implicit session: Session): List[AnonymizationKey] = {
     val join = for {
       key <- anonymizationKeyQuery
@@ -174,7 +175,18 @@ class AnonymizationDAO(val driver: JdbcProfile) {
     join.filter(_._2.imageId === imageId).map(_._1).list
   }
 
-  def removeAnonymizationKeyImagesForImageId(imageId: Long)(implicit session: Session) =
+  def removeAnonymizationKeyImagesForImageId(imageId: Long, purgeEmptyAnonymizationKeys: Boolean)(implicit session: Session) = {
+    if (purgeEmptyAnonymizationKeys) {
+      val keysForImage = anonymizationKeysForImageId(imageId)
+      deleteAnonymizationKeyImagesForImageId(imageId)
+      keysForImage
+        .filter(key => anonymizationKeyImagesForAnonymizationKeyId(key.id).isEmpty)
+        .foreach(key => removeAnonymizationKey(key.id))
+    } else
+      deleteAnonymizationKeyImagesForImageId(imageId)
+  }
+
+  private def deleteAnonymizationKeyImagesForImageId(imageId: Long)(implicit session: Session) =
     anonymizationKeyImageQuery.filter(_.imageId === imageId).delete
 
   val anonymizationKeysGetResult = GetResult(r =>

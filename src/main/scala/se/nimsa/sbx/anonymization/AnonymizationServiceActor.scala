@@ -26,7 +26,7 @@ import se.nimsa.sbx.app.GeneralProtocol.ImageDeleted
 import se.nimsa.sbx.dicom.DicomUtil.{cloneAttributes, attributesToPatient}
 import se.nimsa.sbx.util.ExceptionCatching
 
-class AnonymizationServiceActor(dbProps: DbProps) extends Actor with ExceptionCatching {
+class AnonymizationServiceActor(dbProps: DbProps, purgeEmptyAnonymizationKeys: Boolean) extends Actor with ExceptionCatching {
 
   val log = Logging(context.system, this)
 
@@ -139,7 +139,7 @@ class AnonymizationServiceActor(dbProps: DbProps) extends Actor with ExceptionCa
 
   def removeImageFromAnonymizationKeyImages(imageId: Long) =
     db.withSession { implicit session =>
-      dao.removeAnonymizationKeyImagesForImageId(imageId)
+      dao.removeAnonymizationKeyImagesForImageId(imageId, purgeEmptyAnonymizationKeys)
     }
 
   def getAnonymizationKeyImagesByAnonymizationKeyId(anonymizationKeyId: Long) =
@@ -162,5 +162,5 @@ class AnonymizationServiceActor(dbProps: DbProps) extends Actor with ExceptionCa
 }
 
 object AnonymizationServiceActor {
-  def props(dbProps: DbProps): Props = Props(new AnonymizationServiceActor(dbProps))
+  def props(dbProps: DbProps, purgeEmptyAnonymizationKeys: Boolean): Props = Props(new AnonymizationServiceActor(dbProps, purgeEmptyAnonymizationKeys))
 }
