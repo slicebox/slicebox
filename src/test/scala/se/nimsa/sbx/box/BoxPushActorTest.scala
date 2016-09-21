@@ -61,7 +61,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
     }
   }), name = "MetaDataService")
   val storageService = system.actorOf(Props[MockupStorageActor], name = "StorageService")
-  val anonymizationService = system.actorOf(AnonymizationServiceActor.props(dbProps), name = "AnonymizationService")
+  val anonymizationService = system.actorOf(AnonymizationServiceActor.props(dbProps, purgeEmptyAnonymizationKeys = false), name = "AnonymizationService")
   val boxService = system.actorOf(BoxServiceActor.props(dbProps, "http://testhost:1234", 1.minute), name = "BoxService")
 
   var reportTransactionAsFailed = false
