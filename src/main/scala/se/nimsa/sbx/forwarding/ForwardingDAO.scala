@@ -170,6 +170,18 @@ class ForwardingDAO(val driver: JdbcProfile) {
   def getForwardingRuleForId(forwardingRuleId: Long)(implicit session: Session) =
     ruleQuery.filter(_.id === forwardingRuleId).firstOption
 
+  def getForwardingRuleForSourceIdAndTypeAndDestinationIdAndType(sourceId: Long,
+                                                                 sourceType: SourceType,
+                                                                 destinationId: Long,
+                                                                 destinationType: DestinationType)(implicit session: Session) = {
+    ruleQuery
+      .filter(_.sourceId === sourceId)
+      .filter(_.sourceType === sourceType.toString())
+      .filter(_.destinationId === destinationId)
+      .filter(_.destinationType === destinationType.toString())
+      .firstOption
+  }
+
   def getTransactionImagesForTransactionId(transactionId: Long)(implicit session: Session) =
     transactionImageQuery.filter(_.forwardingTransactionId === transactionId).list
 

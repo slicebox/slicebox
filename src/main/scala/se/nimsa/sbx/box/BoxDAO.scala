@@ -240,12 +240,6 @@ class BoxDAO(val driver: JdbcProfile) {
   def boxByName(name: String)(implicit session: Session): Option[Box] =
     boxQuery.filter(_.name === name).firstOption
 
-  def pushBoxByBaseUrl(baseUrl: String)(implicit session: Session): Option[Box] =
-    boxQuery
-      .filter(_.sendMethod === (PUSH: BoxSendMethod))
-      .filter(_.baseUrl === baseUrl)
-      .firstOption
-
   def pollBoxByToken(token: String)(implicit session: Session): Option[Box] =
     boxQuery
       .filter(_.sendMethod === (POLL: BoxSendMethod))

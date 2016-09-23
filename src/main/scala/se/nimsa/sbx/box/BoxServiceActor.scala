@@ -41,6 +41,7 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
 
   val db = dbProps.db
   val boxDao = new BoxDAO(dbProps.driver)
+
   import dbProps.driver.simple.Session
 
   val pollBoxOnlineStatusTimeoutMillis: Long = 15000
@@ -82,16 +83,26 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
         msg match {
 
           case CreateConnection(remoteBoxConnectionData) =>
-            val token = UUID.randomUUID().toString
-            val baseUrl = s"$apiBaseURL/transactions/$token"
-            val name = remoteBoxConnectionData.name
-            val box = addBoxToDb(Box(-1, name, token, baseUrl, BoxSendMethod.POLL, online = false))
+            val box = boxByName(remoteBoxConnectionData.name) match {
+              case Some(existingBox) if existingBox.sendMethod == BoxSendMethod.PUSH =>
+                throw new IllegalArgumentException(s"A box with name ${existingBox.name} but with a different type already exists")
+              case Some(existingBox) => existingBox
+              case None =>
+                val token = UUID.randomUUID().toString
+                val baseUrl = s"$apiBaseURL/transactions/$token"
+                val name = remoteBoxConnectionData.name
+                addBoxToDb(Box(-1, name, token, baseUrl, BoxSendMethod.POLL, online = false))
+            }
             sender ! RemoteBoxAdded(box)
 
           case Connect(remoteBox) =>
-            val box = pushBoxByBaseUrl(remoteBox.baseUrl) getOrElse {
-              val token = baseUrlToToken(remoteBox.baseUrl)
-              addBoxToDb(Box(-1, remoteBox.name, token, remoteBox.baseUrl, BoxSendMethod.PUSH, online = false))
+            val box = boxByName(remoteBox.name) match {
+              case Some(existingBox) if existingBox.sendMethod == BoxSendMethod.POLL || existingBox.baseUrl != remoteBox.baseUrl =>
+                throw new IllegalArgumentException(s"A box with name ${existingBox.name} but with a different url and/or type already exists")
+              case Some(existingBox) => existingBox
+              case None =>
+                val token = baseUrlToToken(remoteBox.baseUrl)
+                addBoxToDb(Box(-1, remoteBox.name, token, remoteBox.baseUrl, BoxSendMethod.PUSH, online = false))
             }
             maybeStartPushActor(box)
             maybeStartPollActor(box)
@@ -132,7 +143,7 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
                 boxDao.updateIncomingTransaction(incomingTransaction)
                 boxDao.incomingImageByIncomingTransactionIdAndSequenceNumber(incomingTransaction.id, sequenceNumber) match {
                   case Some(image) => boxDao.updateIncomingImage(image.copy(imageId = imageId))
-                  case None        => boxDao.insertIncomingImage(IncomingImage(-1, incomingTransaction.id, imageId, sequenceNumber, overwrite))
+                  case None => boxDao.insertIncomingImage(IncomingImage(-1, incomingTransaction.id, imageId, sequenceNumber, overwrite))
                 }
 
                 val resultingTransaction =
@@ -282,8 +293,6 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
 
   def addBoxToDb(box: Box): Box =
     db.withSession { implicit session =>
-      if (boxDao.boxByName(box.name).isDefined)
-        throw new IllegalArgumentException(s"A box with name ${box.name} already exists")
       boxDao.insertBox(box)
     }
 
@@ -292,9 +301,9 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
       boxDao.boxById(boxId)
     }
 
-  def pushBoxByBaseUrl(baseUrl: String): Option[Box] =
+  def boxByName(name: String): Option[Box] =
     db.withSession { implicit session =>
-      boxDao.pushBoxByBaseUrl(baseUrl)
+      boxDao.boxByName(name)
     }
 
   def removeBoxFromDb(boxId: Long) =

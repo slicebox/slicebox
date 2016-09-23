@@ -24,7 +24,6 @@ import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.forwarding.ForwardingProtocol._
 import se.nimsa.sbx.log.SbxLog
-import se.nimsa.sbx.metadata.MetaDataProtocol._
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
@@ -220,7 +219,12 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
 
   def addForwardingRuleToDb(forwardingRule: ForwardingRule): ForwardingRule =
     db.withSession { implicit session =>
-      forwardingDao.insertForwardingRule(forwardingRule)
+      forwardingDao.getForwardingRuleForSourceIdAndTypeAndDestinationIdAndType(
+        forwardingRule.source.sourceId,
+        forwardingRule.source.sourceType,
+        forwardingRule.destination.destinationId,
+        forwardingRule.destination.destinationType)
+        .getOrElse(forwardingDao.insertForwardingRule(forwardingRule))
     }
 
   def removeForwardingRuleFromDb(forwardingRuleId: Long): Unit =
