@@ -35,8 +35,10 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       response
     }
 
-  def addPushBox(name: String) =
-    PostAsAdmin("/api/boxes/connect", RemoteBox(name, "http://some.url/api/box/" + UUID.randomUUID())) ~> routes ~> check {
+  def addPushBox(name: String): Unit = addPushBox(name, "http://some.url/api/box/" + UUID.randomUUID())
+
+  def addPushBox(name: String, url: String): Unit =
+    PostAsAdmin("/api/boxes/connect", RemoteBox(name, url)) ~> routes ~> check {
       status should be(Created)
       val box = responseAs[Box]
       box.sendMethod should be(BoxSendMethod.PUSH)
@@ -55,14 +57,50 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
   }
 
-  it should "return a bad request message when adding two boxes with the same name" in {
+  it should "return 201 Created when adding two poll boxes with the same name" in {
     addPollBox("hosp")
     PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData("hosp")) ~> sealRoute(routes) ~> check {
+      status shouldBe Created
+    }
+    GetAsUser("/api/boxes") ~> routes ~> check {
+      responseAs[List[Box]] should have length 1
+    }
+  }
+
+  it should "return 400 bad request message when adding two boxes, one push and one poll, with the same name" in {
+    addPushBox("mybox")
+    PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData("mybox")) ~> sealRoute(routes) ~> check {
       status should be(BadRequest)
     }
   }
+
   it should "return a success message when asked to add a remote box" in {
     addPushBox("uni")
+  }
+
+  it should "return 201 Created when adding two push boxes with the same name and url" in {
+    val url = "http://some.url/api/box/" + UUID.randomUUID()
+    addPushBox("mybox", url)
+    addPushBox("mybox", url)
+    GetAsUser("/api/boxes") ~> routes ~> check {
+      responseAs[List[Box]] should have length 1
+    }
+  }
+
+  it should "return 400 bad request when adding two push boxes with the same name different urls" in {
+    addPushBox("mybox")
+    PostAsAdmin("/api/boxes/connect", RemoteBox("mybox", "http://some.url/api/box/" + UUID.randomUUID())) ~> routes ~> check {
+      status shouldBe BadRequest
+    }
+  }
+
+  it should "return 201 Created when adding two push boxes with different names but the same urls" in {
+    val url = "http://some.url/api/box/" + UUID.randomUUID()
+    addPushBox("mybox1", url)
+    addPushBox("mybox2", url)
+    GetAsUser("/api/boxes") ~> routes ~> check {
+      responseAs[List[Box]] should have length 2
+    }
   }
 
   it should "return a bad request message when asked to add a remote box with a malformed base url" in {

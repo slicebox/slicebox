@@ -32,6 +32,30 @@ class ForwardingRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
   }
 
+  it should "return 201 Created when adding an already added rule" in {
+    PostAsAdmin("/api/forwarding/rules", rule) ~> routes ~> check {
+      status shouldBe Created
+    }
+    PostAsAdmin("/api/forwarding/rules", rule) ~> routes ~> check {
+      status shouldBe Created
+    }
+    GetAsUser("/api/forwarding/rules") ~> routes ~> check {
+      responseAs[List[ForwardingRule]] should have length 1
+    }
+  }
+
+  it should "return 201 Created when adding an already added rule but with different keepImages setting" in {
+    PostAsAdmin("/api/forwarding/rules", rule) ~> routes ~> check {
+      status shouldBe Created
+    }
+    PostAsAdmin("/api/forwarding/rules", rule.copy(keepImages = !rule.keepImages)) ~> routes ~> check {
+      status shouldBe Created
+    }
+    GetAsUser("/api/forwarding/rules") ~> routes ~> check {
+      responseAs[List[ForwardingRule]] should have length 1
+    }
+  }
+
   it should "return 200 and a list or forwarding rule when listing rules" in {
     val addedRule = PostAsAdmin("/api/forwarding/rules", rule) ~> routes ~> check {
       responseAs[ForwardingRule]
