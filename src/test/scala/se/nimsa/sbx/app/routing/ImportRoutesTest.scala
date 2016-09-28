@@ -5,6 +5,7 @@ import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.importing.ImportDAO
 import se.nimsa.sbx.importing.ImportProtocol._
 import se.nimsa.sbx.metadata.MetaDataDAO
+import se.nimsa.sbx.user.UserProtocol.UserRole
 import se.nimsa.sbx.util.TestUtil
 import spray.http.StatusCodes._
 import spray.http._
@@ -19,7 +20,7 @@ class ImportRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   val importDao = new ImportDAO(H2Driver)
   val metaDataDao = new MetaDataDAO(H2Driver)
 
-  val importSession = ImportSession(id = 12, name = "importSessionName", userId = 123, user = "userName", filesImported = 0, filesAdded = 0, filesRejected = 0, created = System.currentTimeMillis(), lastUpdated = System.currentTimeMillis())
+  val importSession = ImportSession(id = -1, name = "importSessionName", userId = -1, user = "", filesImported = -1, filesAdded = -1, filesRejected = -1, created = -1, lastUpdated = -1)
 
   override def afterEach() {
     db.withSession { implicit session =>
@@ -67,11 +68,21 @@ class ImportRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
   }
 
-  it should "return 400 BadRequest when adding an import session with a name that already exists" in {
+  it should "return 201 Created when adding an import session with a name that already exists" in {
     val addedSession = PostAsUser("/api/import/sessions", importSession) ~> routes ~> check {
       responseAs[ImportSession]
     }
     PostAsUser("/api/import/sessions", importSession) ~> routes ~> check {
+      status shouldBe Created
+    }
+  }
+
+  it should "return 400 BadRequest when adding an import session with a name that already exists but aa another user" in {
+    addUser("otheruser", "otherpassword", UserRole.USER)
+    val addedSession = PostAsUser("/api/import/sessions", importSession) ~> routes ~> check {
+      responseAs[ImportSession]
+    }
+    PostWithHeaders("/api/import/sessions", importSession) ~> addCredentials(BasicHttpCredentials("otheruser", "otherpassword")) ~> routes ~> check {
       status shouldBe BadRequest
     }
   }
