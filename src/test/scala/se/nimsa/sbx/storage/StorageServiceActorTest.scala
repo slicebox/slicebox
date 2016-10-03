@@ -7,7 +7,7 @@ import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpecLike}
 import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.app.GeneralProtocol.{Source, SourceType}
 import se.nimsa.sbx.dicom.DicomUtil
-import se.nimsa.sbx.storage.StorageProtocol.{AddDicomData, CheckDicomData, DicomDataAdded}
+import se.nimsa.sbx.storage.StorageProtocol.{AddDicomData, CheckDicomData, DicomDataAdded, GetDicomData}
 import se.nimsa.sbx.util.TestUtil
 
 import scala.concurrent.duration.DurationInt
@@ -23,7 +23,7 @@ class StorageServiceActorTest(_system: ActorSystem) extends TestKit(_system) wit
   val dbProps = DbProps(db, H2Driver)
 
   val dicomData = TestUtil.testImageDicomData()
-  val image = DicomUtil.attributesToImage(dicomData.attributes)
+  val image = DicomUtil.attributesToImage(dicomData.attributes).copy(id = 33)
 
   val storage = new RuntimeStorage
 
@@ -69,6 +69,14 @@ class StorageServiceActorTest(_system: ActorSystem) extends TestKit(_system) wit
     "return a success message when checking a secondary capture dataset with the extended list of accepted contexts" in {
       storageActorRef ! CheckDicomData(DicomUtil.loadDicomData(TestUtil.testSecondaryCaptureFile.toPath, withPixelData = true), useExtendedContexts = true)
       expectMsg(true)
+    }
+
+    "return a failure message when asking for a dataset that does not exist" in {
+      storageActorRef ! AddDicomData(dicomData, source, image)
+      expectMsgType[DicomDataAdded]
+      storage.deleteFromStorage(image)
+      storageActorRef ! GetDicomData(image, withPixelData = true)
+      expectMsgType[Failure]
     }
 
   }

@@ -22,6 +22,7 @@ import akka.actor.{Actor, Props}
 import akka.event.{Logging, LoggingReceive}
 import se.nimsa.sbx.app.GeneralProtocol.{ImageAdded, ImageDeleted}
 import se.nimsa.sbx.dicom.{Contexts, DicomData, DicomUtil}
+import se.nimsa.sbx.lang.NotFoundException
 import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.util.ExceptionCatching
 
@@ -91,7 +92,12 @@ class StorageServiceActor(storage: StorageService,
           sender ! DicomDataArray(storage.imageAsByteArray(image))
 
         case GetDicomData(image, withPixelData) =>
-          sender ! storage.readDicomData(image, withPixelData)
+          val dicomData = storage.readDicomData(image, withPixelData)
+          if (dicomData == null)
+            throw new NotFoundException(s"DICOM data not found for image ID ${image.id}")
+          if (dicomData.attributes == null || dicomData.metaInformation == null)
+            throw new RuntimeException(s"DICOM data corrupt for image ID ${image.id}")
+          sender ! dicomData
 
         case GetImageAttributes(image) =>
           sender ! storage.readImageAttributes(image)

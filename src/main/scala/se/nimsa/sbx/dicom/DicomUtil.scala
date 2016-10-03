@@ -60,10 +60,18 @@ object DicomUtil {
   }
 
   def loadDicomData(path: Path, withPixelData: Boolean): DicomData =
-    loadDicomData(new BufferedInputStream(Files.newInputStream(path)), withPixelData)
+    try
+      loadDicomData(new BufferedInputStream(Files.newInputStream(path)), withPixelData)
+    catch {
+      case _: Exception => null
+    }
 
   def loadDicomData(byteArray: Array[Byte], withPixelData: Boolean): DicomData =
-    loadDicomData(new BufferedInputStream(new ByteArrayInputStream(byteArray)), withPixelData)
+    try
+      loadDicomData(new BufferedInputStream(new ByteArrayInputStream(byteArray)), withPixelData)
+    catch {
+      case _: Exception => null
+    }
 
   def loadDicomData(inputStream: InputStream, withPixelData: Boolean): DicomData = {
     var dis: DicomInputStream = null

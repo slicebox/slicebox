@@ -24,10 +24,10 @@ class RuntimeStorage extends StorageService {
     storage.remove(imageName(image))
 
   override def readDicomData(image: Image, withPixelData: Boolean): DicomData =
-    loadDicomData(storage(imageName(image)), withPixelData)
+    loadDicomData(storage.get(imageName(image)).getOrElse(null), withPixelData)
 
   override def readImageAttributes(image: Image): List[ImageAttribute] =
-    DicomUtil.readImageAttributes(loadDicomData(storage(imageName(image)), withPixelData = false).attributes)
+    DicomUtil.readImageAttributes(loadDicomData(storage.get(imageName(image)).getOrElse(null), withPixelData = false).attributes)
 
   override def readImageInformation(image: Image): ImageInformation =
     super.readImageInformation(imageAsInputStream(image))
