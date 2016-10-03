@@ -65,26 +65,26 @@ class LogDAO(val driver: JdbcProfile) {
   def logEntriesBySubject(subject: String, startIndex: Long, count: Long)(implicit session: Session): List[LogEntry] =
     logQuery
       .sortBy(_.created.desc)
+      .filter(_.subject === subject)
       .drop(startIndex)
       .take(count)
-      .filter(_.subject === subject)
       .list
 
   def logEntriesByType(entryType: LogEntryType, startIndex: Long, count: Long)(implicit session: Session): List[LogEntry] =
     logQuery
       .sortBy(_.created.desc)
+      .filter(_.entryType === entryType.toString)
       .drop(startIndex)
       .take(count)
-      .filter(_.entryType === entryType.toString)
       .list
 
   def logEntriesBySubjectAndType(subject: String, entryType: LogEntryType, startIndex: Long, count: Long)(implicit session: Session): List[LogEntry] =
     logQuery
       .sortBy(_.created.desc)
-      .drop(startIndex)
-      .take(count)
       .filter(_.subject === subject)
       .filter(_.entryType === entryType.toString)
+      .drop(startIndex)
+      .take(count)
       .list
 
 }

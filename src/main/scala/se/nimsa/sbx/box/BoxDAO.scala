@@ -338,9 +338,9 @@ class BoxDAO(val driver: JdbcProfile) {
 
   def listOutgoingTransactions(startIndex: Long, count: Long)(implicit session: Session): List[OutgoingTransaction] =
     outgoingTransactionQuery
+      .sortBy(_.updated.desc)
       .drop(startIndex)
       .take(count)
-      .sortBy(_.updated.desc)
       .list
 
   def listOutgoingImages(implicit session: Session): List[OutgoingImage] =
@@ -348,9 +348,9 @@ class BoxDAO(val driver: JdbcProfile) {
 
   def listIncomingTransactions(startIndex: Long, count: Long)(implicit session: Session): List[IncomingTransaction] =
     incomingTransactionQuery
+      .sortBy(_.updated.desc)
       .drop(startIndex)
       .take(count)
-      .sortBy(_.updated.desc)
       .list
 
   def listIncomingImages(implicit session: Session): List[IncomingImage] =
