@@ -32,6 +32,7 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
   }
 
   case class SetSource(source: Source)
+  val setSourceReply = "Source set"
   val metaDataService = system.actorOf(Props(new Actor {
     var source: Option[Source] = None
     def receive = {
@@ -48,11 +49,13 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
         sender ! MetaDataDeleted(None, None, None, None)
       case SetSource(newSource) =>
         source = Option(newSource)
+        sender ! setSourceReply
     }
   }), name = "MetaDataService")
 
   case object ResetDeletedImages
   case object GetDeletedImages
+  val resetDeletedImagesReply = "Deleted Images reset"
   val storageService = system.actorOf(Props(new Actor {
     var deletedImages = Seq.empty[Long]
 
@@ -62,6 +65,7 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
         sender ! DicomDataDeleted(image)
       case ResetDeletedImages =>
         deletedImages = Seq.empty[Long]
+        sender ! resetDeletedImagesReply
       case GetDeletedImages =>
         sender ! deletedImages
     }
@@ -69,6 +73,7 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
 
   case object ResetSentImages
   case object GetSentImages
+  val resetSentImagesReply = "Send images reset"
   val boxService = system.actorOf(Props(new Actor {
     var sentImages = Seq.empty[Long]
 
@@ -78,6 +83,7 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
         sender ! ImagesAddedToOutgoing(box.id, tagValues.map(_.imageId))
       case ResetSentImages =>
         sentImages = Seq.empty[Long]
+        sender ! resetSentImagesReply
       case GetSentImages =>
         sender ! sentImages
     }
@@ -89,8 +95,11 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     db.withSession { implicit session =>
       forwardingDao.clear
       metaDataService ! SetSource(null)
+      expectMsg(setSourceReply)
       storageService ! ResetDeletedImages
+      expectMsg(resetDeletedImagesReply)
       boxService ! ResetSentImages
+      expectMsg(resetSentImagesReply)
     }
 
   override def afterAll {
@@ -171,6 +180,7 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
   "forward an added image if there are matching forwarding rules" in {
     val rule = userToBoxRule
     metaDataService ! SetSource(userSource)
+    expectMsg(setSourceReply)
 
     forwardingService ! AddForwardingRule(rule)
     expectMsgType[ForwardingRuleAdded]
@@ -193,6 +203,7 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     val rule2 = userToAnotherBoxRule
 
     metaDataService ! SetSource(userSource)
+    expectMsg(setSourceReply)
 
     forwardingService ! AddForwardingRule(rule1)
     forwardingService ! AddForwardingRule(rule2)
@@ -216,6 +227,7 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     val rule = userToBoxRule
 
     metaDataService ! SetSource(userSource)
+    expectMsg(setSourceReply)
 
     forwardingService ! AddForwardingRule(rule)
     expectMsgType[ForwardingRuleAdded]
@@ -236,6 +248,7 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     val rule = userToBoxRule
 
     metaDataService ! SetSource(userSource)
+    expectMsg(setSourceReply)
 
     forwardingService ! AddForwardingRule(rule)
     expectMsgType[ForwardingRuleAdded]
@@ -263,6 +276,7 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     val rule = userToBoxRule
 
     metaDataService ! SetSource(userSource)
+    expectMsg(setSourceReply)
 
     forwardingService ! AddForwardingRule(rule)
     expectMsgType[ForwardingRuleAdded]
@@ -296,6 +310,7 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     val rule = userToBoxRule
 
     metaDataService ! SetSource(userSource)
+    expectMsg(setSourceReply)
 
     forwardingService ! AddForwardingRule(rule)
     expectMsgType[ForwardingRuleAdded]
@@ -338,6 +353,7 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     val rule = userToBoxRuleKeepImages
 
     metaDataService ! SetSource(userSource)
+    expectMsg(setSourceReply)
 
     forwardingService ! AddForwardingRule(rule)
     expectMsgType[ForwardingRuleAdded]
@@ -376,6 +392,7 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     val rule = userToBoxRule
 
     metaDataService ! SetSource(userSource)
+    expectMsg(setSourceReply)
 
     forwardingService ! AddForwardingRule(rule)
     expectMsgType[ForwardingRuleAdded]
@@ -410,6 +427,7 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     val rule = boxToBoxRule
 
     metaDataService ! SetSource(boxSource)
+    expectMsg(setSourceReply)
 
     forwardingService ! AddForwardingRule(rule)
     expectMsgType[ForwardingRuleAdded]
@@ -429,6 +447,7 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
   "forward the correct list of images" in {
     val rule = userToBoxRule
     metaDataService ! SetSource(userSource)
+    expectMsg(setSourceReply)
 
     forwardingService ! AddForwardingRule(rule)
     expectMsgType[ForwardingRuleAdded]
