@@ -32,6 +32,7 @@ import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomPropertyValue._
 
 import scala.collection.mutable.ListBuffer
+import scala.util.control.NonFatal
 
 object DicomUtil {
 
@@ -63,14 +64,14 @@ object DicomUtil {
     try
       loadDicomData(new BufferedInputStream(Files.newInputStream(path)), withPixelData)
     catch {
-      case _: Exception => null
+      case NonFatal(_) => null
     }
 
   def loadDicomData(byteArray: Array[Byte], withPixelData: Boolean): DicomData =
     try
       loadDicomData(new BufferedInputStream(new ByteArrayInputStream(byteArray)), withPixelData)
     catch {
-      case _: Exception => null
+      case NonFatal(_) => null
     }
 
   def loadDicomData(inputStream: InputStream, withPixelData: Boolean): DicomData = {
@@ -91,7 +92,7 @@ object DicomUtil {
 
       DicomData(attributes, fmi)
     } catch {
-      case _: Exception => null
+      case NonFatal(_) => null
     } finally {
       SafeClose.close(dis)
     }
