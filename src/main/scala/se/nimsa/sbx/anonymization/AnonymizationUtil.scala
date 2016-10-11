@@ -31,9 +31,10 @@ import AnonymizationProtocol._
 object AnonymizationUtil {
 
   def setAnonymous(attributes: Attributes, anonymous: Boolean): Unit =
-    if (anonymous)
+    if (anonymous) {
       attributes.setString(Tag.PatientIdentityRemoved, VR.CS, "YES")
-    else
+      attributes.setString(Tag.DeidentificationMethod, VR.LO, "Retain Longitudinal Full Dates Option")
+    } else
       attributes.setString(Tag.PatientIdentityRemoved, VR.CS, "NO")
 
   def anonymizeAttributes(attributes: Attributes): Attributes = {
