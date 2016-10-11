@@ -1,7 +1,7 @@
 import de.heikoseeberger.sbtheader.license.Apache2_0
 
 name := "slicebox"
-version := "1.2.2"
+version := "1.3-SNAPSHOT"
 organization := "se.nimsa"
 scalaVersion := "2.11.8"
 scalacOptions := Seq("-encoding", "UTF-8", "-Xlint", "-deprecation", "-unchecked", "-feature", "-target:jvm-1.8")
