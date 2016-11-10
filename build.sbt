@@ -73,9 +73,9 @@ resolvers ++= Seq(
 
 libraryDependencies ++= {
   val akkaVersion = "2.3.9"
-  val sprayVersion = "1.3.3"
+  val sprayVersion = "1.3.4"
   Seq(
-    "com.typesafe.scala-logging" %% "scala-logging" % "3.4.0",
+    "com.typesafe.scala-logging" %% "scala-logging" % "3.5.0",
     "com.typesafe.akka" %% "akka-actor" % akkaVersion,
     "io.spray" %% "spray-can" % sprayVersion,
     "io.spray" %% "spray-routing" % sprayVersion,
@@ -84,16 +84,16 @@ libraryDependencies ++= {
     "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
     "ch.qos.logback" % "logback-classic" % "1.1.7",
     "com.typesafe.slick" %% "slick" % "2.1.0",
-    "com.h2database" % "h2" % "1.4.192",
-    "mysql" % "mysql-connector-java" % "6.0.3",
-    "com.zaxxer" % "HikariCP" % "2.4.7",
-    "com.github.t3hnar" %% "scala-bcrypt" % "2.6",
-    "com.amazonaws" % "aws-java-sdk-s3" % "1.11.18",
-    "org.scalatest" %% "scalatest" % "2.2.6" % "test",
+    "com.h2database" % "h2" % "1.4.193",
+    "mysql" % "mysql-connector-java" % "6.0.5",
+    "com.zaxxer" % "HikariCP" % "2.5.1",
+    "com.github.t3hnar" %% "scala-bcrypt" % "3.0",
+    "com.amazonaws" % "aws-java-sdk-s3" % "1.11.52",
+    "org.scalatest" %% "scalatest" % "3.0.1" % "test",
     "io.spray" %% "spray-testkit" % sprayVersion % "test",
     "com.typesafe.akka" %% "akka-testkit" % akkaVersion % "test",
-    "org.webjars" % "angularjs" % "1.5.7",
-    "org.webjars" % "angular-material" % "1.0.9",
+    "org.webjars" % "angularjs" % "1.5.8",
+    "org.webjars" % "angular-material" % "1.1.1",
     "org.webjars" % "angular-file-upload" % "11.0.0"
   )
 }
