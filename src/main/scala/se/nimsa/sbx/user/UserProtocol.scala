@@ -16,12 +16,10 @@
 
 package se.nimsa.sbx.user
 
-import org.mindrot.jbcrypt.BCrypt
+import akka.http.scaladsl.server.directives.Credentials
 import com.github.t3hnar.bcrypt.Password
 import com.github.t3hnar.bcrypt.generateSalt
 import se.nimsa.sbx.model.Entity
-import java.net.InetAddress
-import spray.routing.authentication.UserPass
 
 object UserProtocol {
 
@@ -45,6 +43,8 @@ object UserProtocol {
     }
   }
 
+  case class UserPass(user: String, pass: String)
+
   case class ClearTextUser(user: String, role: UserRole, password: String)
 
   case class UserInfo(id: Long, user: String, role: UserRole)
@@ -53,7 +53,9 @@ object UserProtocol {
 
     def withPassword(password: String) = copy(hashedPassword = Some(password.bcrypt(generateSalt)))
 
-    def passwordMatches(password: String): Boolean = hashedPassword.exists(hp => BCrypt.checkpw(password, hp))
+    def passwordMatches(password: String): Boolean = hashedPassword.exists(hp => password.isBcrypted(hp))
+
+    def passwordMatches(credentials: Credentials.Provided): Boolean = hashedPassword.exists(hp => credentials.verify(hp, hasher))
 
     def hasPermission(challengeRole: UserRole): Boolean = (role, challengeRole) match {
       case (UserRole.SUPERUSER, _) => true
@@ -62,7 +64,9 @@ object UserProtocol {
       case (UserRole.USER, UserRole.USER) => true
       case _ => false
     }
-  } 
+
+    private def hasher(password: String) = password.bcrypt
+  }
 
   case class ApiSession(id: Long, userId: Long, token: String, ip: String, userAgent: String, updated: Long) extends Entity
 

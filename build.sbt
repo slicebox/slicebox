@@ -65,23 +65,19 @@ headers := Map(
 
 resolvers ++= Seq(
   "Typesafe Repository" at "http://repo.typesafe.com/typesafe/releases/",
-  "Sonatype snapshots" at "http://oss.sonatype.org/content/repositories/snapshots/",
-  "Spray Repository" at "http://repo.spray.io",
-  "Spray Nightlies" at "http://nightlies.spray.io/")
+  "Sonatype snapshots" at "http://oss.sonatype.org/content/repositories/snapshots/")
 
 // deps
 
 libraryDependencies ++= {
-  val akkaVersion = "2.3.9"
-  val sprayVersion = "1.3.4"
+  val akkaVersion = "2.4.12"
+  val akkaHttpVersion = "2.4.11"
   Seq(
     "com.typesafe.scala-logging" %% "scala-logging" % "3.5.0",
     "com.typesafe.akka" %% "akka-actor" % akkaVersion,
-    "io.spray" %% "spray-can" % sprayVersion,
-    "io.spray" %% "spray-routing" % sprayVersion,
-    "io.spray" %% "spray-client" % sprayVersion,
-    "io.spray" %% "spray-json" % "1.3.2",
     "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
+    "com.typesafe.akka" %% "akka-http-experimental" % akkaHttpVersion,
+    "com.typesafe.akka" %% "akka-http-spray-json-experimental" % akkaHttpVersion,
     "ch.qos.logback" % "logback-classic" % "1.1.7",
     "com.typesafe.slick" %% "slick" % "2.1.0",
     "com.h2database" % "h2" % "1.4.193",
@@ -90,8 +86,8 @@ libraryDependencies ++= {
     "com.github.t3hnar" %% "scala-bcrypt" % "3.0",
     "com.amazonaws" % "aws-java-sdk-s3" % "1.11.52",
     "org.scalatest" %% "scalatest" % "3.0.1" % "test",
-    "io.spray" %% "spray-testkit" % sprayVersion % "test",
     "com.typesafe.akka" %% "akka-testkit" % akkaVersion % "test",
+    "com.typesafe.akka" %% "akka-http-testkit" % akkaHttpVersion % "test",
     "org.webjars" % "angularjs" % "1.5.8",
     "org.webjars" % "angular-material" % "1.1.1",
     "org.webjars" % "angular-file-upload" % "11.0.0"

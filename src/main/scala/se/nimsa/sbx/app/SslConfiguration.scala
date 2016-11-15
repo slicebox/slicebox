@@ -21,15 +21,17 @@ import java.security.SecureRandom
 import javax.net.ssl.KeyManagerFactory
 import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManagerFactory
-import spray.io.ServerSSLEngineProvider
+
 import com.typesafe.config.ConfigFactory
 import java.nio.file.Paths
 import java.nio.file.Files
 
-// for SSL support (if enabled in config)
-trait SslConfiguration {
+import akka.http.scaladsl.ConnectionContext
 
-  implicit def sslContext: SSLContext =
+// for SSL support (if enabled in config)
+object SslConfiguration {
+
+  def sslContext(): SSLContext =
     try {
       val config = ConfigFactory.load()
       val keystorePath = config.getString("slicebox.ssl.keystore.path")
@@ -48,10 +50,6 @@ trait SslConfiguration {
       case e: Exception => SSLContext.getDefault
     }
 
-  implicit def sslEngineProvider: ServerSSLEngineProvider =
-    ServerSSLEngineProvider { engine =>
-      engine.setEnabledProtocols(Array("SSLv3", "TLSv1"))
-      engine
-    }
+  def httpsContext = ConnectionContext.https(sslContext())
 
 }  

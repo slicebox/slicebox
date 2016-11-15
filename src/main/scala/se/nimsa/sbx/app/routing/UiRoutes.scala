@@ -16,21 +16,16 @@
 
 package se.nimsa.sbx.app.routing
 
-import akka.pattern.ask
+import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.server.Route
+import se.nimsa.sbx.app.SliceboxServices
 
-import spray.httpx.SprayJsonSupport._
-import spray.routing._
-import spray.routing.authentication.UserPass
-
-import se.nimsa.sbx.app.SliceboxService
-import se.nimsa.sbx.user.UserProtocol._
-
-trait UiRoutes { this: SliceboxService =>
+trait UiRoutes { this: SliceboxServices =>
 
   def staticResourcesRoute =
     get {
-      path(Rest) { path =>
-        getFromResource("public/" + path)
+      path(Remaining) { remaining =>
+        getFromResource("public/" + remaining)
       }
     }
 

@@ -18,7 +18,12 @@ package se.nimsa.sbx.box
 
 import akka.actor.{Actor, Props}
 import akka.event.{Logging, LoggingReceive}
+import akka.http.scaladsl.Http
+import akka.http.scaladsl.model.StatusCodes.NoContent
+import akka.http.scaladsl.model._
 import akka.pattern.ask
+import akka.stream.ActorMaterializer
+import akka.stream.scaladsl.{Sink, Source => StreamSource}
 import akka.util.Timeout
 import org.dcm4che3.data.Attributes
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.Anonymize
@@ -31,9 +36,6 @@ import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.metadata.MetaDataProtocol.GetImage
 import se.nimsa.sbx.storage.StorageProtocol.GetDicomData
 import se.nimsa.sbx.util.CompressionUtil.compress
-import spray.client.pipelining.{Get, Post, Put, sendReceive}
-import spray.http.StatusCodes.NoContent
-import spray.http.{HttpData, HttpEntity, HttpResponse}
 
 import scala.concurrent.Future
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
@@ -56,6 +58,7 @@ class BoxPushActor(box: Box,
 
   implicit val system = context.system
   implicit val ec = context.dispatcher
+  implicit val materializer = ActorMaterializer()
 
   val poller = system.scheduler.schedule(pollInterval, pollInterval) {
     self ! PollOutgoing
@@ -64,7 +67,7 @@ class BoxPushActor(box: Box,
   override def postStop() =
     poller.cancel()
 
-  def pipeline = sendReceive
+  val pool = Http().superPool[String]()
 
   def receive = LoggingReceive {
     case PollOutgoing =>
@@ -107,8 +110,10 @@ class BoxPushActor(box: Box,
       if (statusCode >= 200 && statusCode < 300)
         handleFileSentForOutgoingTransaction(transactionImage)
       else {
-        val errorMessage = response.entity.asString
-        handleFileSendFailedForOutgoingTransaction(transactionImage, statusCode, new Exception(s"File send failed with status code $statusCode: $errorMessage"))
+        response.entity.toStrict(timeout.duration).flatMap { strictEntity =>
+          val errorMessage = strictEntity.toString
+          handleFileSendFailedForOutgoingTransaction(transactionImage, statusCode, new Exception(s"File send failed with status code $statusCode: $errorMessage"))
+        }
       }
     }).recoverWith {
       case exception: RemoteTransactionFailedException =>
@@ -126,7 +131,9 @@ class BoxPushActor(box: Box,
         storageService.ask(GetDicomData(image, withPixelData = true)).mapTo[DicomData].flatMap { dicomData =>
           anonymizationService.ask(Anonymize(transactionImage.image.imageId, dicomData.attributes, tagValues.map(_.tagValue))).mapTo[Attributes].flatMap { anonymizedAttributes =>
             val compressedBytes = compress(toByteArray(dicomData.copy(attributes = anonymizedAttributes)))
-            pipeline(Post(s"${box.baseUrl}/image?transactionid=${transactionImage.transaction.id}&sequencenumber=${transactionImage.image.sequenceNumber}&totalimagecount=${transactionImage.transaction.totalImageCount}", HttpData(compressedBytes)))
+            val uri = s"${box.baseUrl}/image?transactionid=${transactionImage.transaction.id}&sequencenumber=${transactionImage.image.sequenceNumber}&totalimagecount=${transactionImage.transaction.totalImageCount}"
+            val connectionId = s"${transactionImage.transaction.id},${transactionImage.image.sequenceNumber}"
+            sliceboxRequest(HttpMethods.POST, uri, HttpEntity(compressedBytes), connectionId)
           }
         }
       case None =>
@@ -161,7 +168,9 @@ class BoxPushActor(box: Box,
       case _ =>
         // other error in communication. Report the transaction as failed here and on remote
         boxService.ask(SetOutgoingTransactionStatus(transactionImage.transaction, TransactionStatus.FAILED)).flatMap { _ =>
-          pipeline(Put(s"${box.baseUrl}/status?transactionid=${transactionImage.transaction.id}", HttpData(TransactionStatus.FAILED.toString)))
+          val uri = s"${box.baseUrl}/status?transactionid=${transactionImage.transaction.id}"
+          val connectionId = transactionImage.transaction.id.toString
+          sliceboxRequest(HttpMethods.PUT, uri, HttpEntity(TransactionStatus.FAILED.toString), connectionId)
             .recover {
               case e: Exception =>
                 SbxLog.warn("Box", "Unable to set remote transaction status.")
@@ -176,21 +185,36 @@ class BoxPushActor(box: Box,
 
   def handleTransactionFinished(outgoingTransaction: OutgoingTransaction): Future[Unit] =
     boxService.ask(GetOutgoingImageIdsForTransaction(outgoingTransaction)).mapTo[Seq[Long]].flatMap { imageIds =>
-      pipeline(Get(s"${box.baseUrl}/status?transactionid=${outgoingTransaction.id}")).recover {
+      val uri = s"${box.baseUrl}/status?transactionid=${outgoingTransaction.id}"
+      val connectionId = outgoingTransaction.id.toString
+      sliceboxRequest(HttpMethods.GET, uri, HttpEntity.Empty, connectionId)
+        .recover {
         case _ =>
           SbxLog.warn("Box", "Unable to get remote status of finished transaction, assuming all is well.")
           HttpResponse(entity = HttpEntity(TransactionStatus.FINISHED.toString))
-      }.map { response =>
-        val status = TransactionStatus.withName(response.entity.asString)
-        status match {
-          case TransactionStatus.FINISHED =>
-            SbxLog.info("Box", s"Finished sending ${outgoingTransaction.totalImageCount} images to box ${box.name}")
-            context.system.eventStream.publish(ImagesSent(Destination(DestinationType.BOX, box.name, box.id), imageIds))
-          case _ =>
-            throw new RemoteTransactionFailedException()
+      }.flatMap { response =>
+        response.entity.toStrict(timeout.duration).map { strictEntity =>
+          val status = TransactionStatus.withName(strictEntity.toString)
+          status match {
+            case TransactionStatus.FINISHED =>
+              SbxLog.info("Box", s"Finished sending ${outgoingTransaction.totalImageCount} images to box ${box.name}")
+              context.system.eventStream.publish(ImagesSent(Destination(DestinationType.BOX, box.name, box.id), imageIds))
+            case _ =>
+              throw new RemoteTransactionFailedException()
+          }
         }
       }
     }
+
+  private def sliceboxRequest(method: HttpMethod, uri: String, entity: RequestEntity, connectionId: String): Future[HttpResponse] =
+    StreamSource
+      .single(HttpRequest(method = method, uri = uri, entity = entity) -> connectionId)
+      .via(pool)
+      .runWith(Sink.head)
+      .map {
+        case (Success(response), _) => response
+        case (Failure(error), _) => throw error
+      }
 
 }
 

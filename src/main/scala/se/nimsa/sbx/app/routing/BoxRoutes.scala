@@ -18,22 +18,21 @@ package se.nimsa.sbx.app.routing
 
 import akka.pattern.ask
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.ImageTagValues
-import se.nimsa.sbx.app.SliceboxService
+import se.nimsa.sbx.app.SliceboxServices
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.metadata.MetaDataProtocol.{GetImage, Images}
 import se.nimsa.sbx.user.UserProtocol.ApiUser
 import se.nimsa.sbx.user.UserProtocol.UserRole
-import spray.http.StatusCodes.Created
-import spray.http.StatusCodes.NoContent
-import spray.http.StatusCodes.NotFound
-import spray.httpx.SprayJsonSupport._
-import spray.routing.Route
+import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.model.MediaTypes._
+import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.server.Route
 
 import scala.concurrent.Future
 
 trait BoxRoutes {
-  this: SliceboxService =>
+  this: SliceboxServices =>
 
   def boxRoutes(apiUser: ApiUser): Route =
     pathPrefix("boxes") {

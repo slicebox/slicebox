@@ -18,16 +18,16 @@ package se.nimsa.sbx.app.routing
 
 import akka.pattern.ask
 import se.nimsa.sbx.app.GeneralProtocol._
-import se.nimsa.sbx.app.SliceboxService
+import se.nimsa.sbx.app.SliceboxServices
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
-import spray.http.StatusCodes.{Created, NoContent, NotFound}
-import spray.httpx.SprayJsonSupport._
-import spray.routing._
+import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.server.Route
 
 trait MetadataRoutes {
-  this: SliceboxService =>
+  this: SliceboxServices =>
 
   def metaDataRoutes: Route =
     pathPrefix("metadata") {

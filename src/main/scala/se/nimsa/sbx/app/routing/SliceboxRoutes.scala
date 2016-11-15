@@ -19,10 +19,11 @@ package se.nimsa.sbx.app.routing
 import java.io.FileNotFoundException
 import java.nio.file.NoSuchFileException
 
-import spray.routing._
-import spray.http.StatusCodes._
-import se.nimsa.sbx.app.SliceboxService
-import spray.routing.ExceptionHandler
+import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.server.directives.Credentials
+import akka.http.scaladsl.server.{AuthenticationFailedRejection, ExceptionHandler, RejectionHandler, Route}
+import se.nimsa.sbx.app.SliceboxServices
 import se.nimsa.sbx.lang.NotFoundException
 import se.nimsa.sbx.lang.BadGatewayException
 
@@ -40,7 +41,7 @@ trait SliceboxRoutes extends DirectoryRoutes
     with UiRoutes
     with GeneralRoutes
     with SeriesTypeRoutes
-    with ImportRoutes { this: SliceboxService =>
+    with ImportRoutes { this: SliceboxServices =>
 
   implicit val knownExceptionHandler =
     ExceptionHandler {
@@ -56,8 +57,8 @@ trait SliceboxRoutes extends DirectoryRoutes
         complete((BadGateway, e.getMessage))
     }
 
-  implicit val authRejectionHandler = RejectionHandler {
-    case AuthenticationFailedRejection(cause, headers) :: _ =>
+  implicit val authRejectionHandler = RejectionHandler.newBuilder().handle {
+    case AuthenticationFailedRejection(cause, headers) =>
       complete((Unauthorized, "This resource requires authentication. Use either basic auth, or supply the session cookie obtained by logging in."))
   }
 
@@ -66,7 +67,7 @@ trait SliceboxRoutes extends DirectoryRoutes
       extractAuthKey { authKey =>
         loginRoute(authKey) ~
           currentUserRoute(authKey) ~
-          authenticate(authenticator.newAuthenticator(authKey)) { apiUser =>
+          authenticateBasicAsync(realm = "slicebox", authenticator(authKey)) { apiUser =>
             userRoutes(apiUser, authKey) ~
               directoryRoutes(apiUser) ~
               scpRoutes(apiUser) ~

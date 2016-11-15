@@ -27,14 +27,13 @@
     </appender>
 
     <logger name="akka" level="WARN" />
-    <logger name="spray" level="ERROR" />
 	<logger name="scala.slick" level="WARN" />
     <logger name="com.zaxxer.hikari" level="WARN" />
+    <logger name="com.typesafe.sslconfig" level="WARN" />
 	<!-- <logger name="scala.slick.jdbc.JdbcBackend.statement" level="DEBUG" /> -->
 	<logger name="org.dcm4che3" level="WARN" />
-    <logger name="se.nimsa.sbx" level="INFO" />
 
-    <root level="DEBUG">
+    <root level="INFO">
         <appender-ref ref="CONSOLE"/>
         <appender-ref ref="FILE"/>
     </root>
