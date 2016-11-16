@@ -19,7 +19,7 @@ package se.nimsa.sbx.app
 import java.nio.file.Paths
 import java.util.concurrent.TimeUnit.MILLISECONDS
 
-import akka.actor.{Actor, ActorRef, ActorSystem}
+import akka.actor.{ActorRef, ActorSystem}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import akka.stream.ActorMaterializer
@@ -67,6 +67,9 @@ trait SliceboxServices extends SliceboxRoutes with JsonFormats with SprayJsonSup
   val importService: ActorRef
 
   val authenticator: Authenticator
+
+  val superUser: String
+  val superPassword: String
 }
 
 object Main extends App with SliceboxServices {
@@ -144,8 +147,8 @@ object Main extends App with SliceboxServices {
       s"http$ssl://$publicHost:$publicPort/api"
   }
 
-  val superUser = sliceboxConfig.getString("superuser.user")
-  val superPassword = sliceboxConfig.getString("superuser.password")
+  override val superUser = sliceboxConfig.getString("superuser.user")
+  override val superPassword = sliceboxConfig.getString("superuser.password")
   val sessionTimeout = sliceboxConfig.getDuration("session-timeout", MILLISECONDS)
 
   val storage =

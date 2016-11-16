@@ -53,10 +53,8 @@ class UserServiceActor(dbProps: DbProps, superUser: String, superPassword: Strin
         msg match {
 
           case Login(userPass, authKey) =>
-            println("input: " + userPass + ", " + authKey)
             userByName(userPass.user) match {
               case Some(user) if user.passwordMatches(userPass.pass) =>
-                println("user found in db: " + user)
                 val result = authKey.ip.flatMap(ip =>
                   authKey.userAgent.map(userAgent => {
                     val session = createOrUpdateSession(user, ip, userAgent)
