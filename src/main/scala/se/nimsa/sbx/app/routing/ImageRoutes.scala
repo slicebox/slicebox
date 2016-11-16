@@ -138,9 +138,9 @@ trait ImageRoutes {
             respondWithHeader(`Content-Disposition`(ContentDispositionTypes.attachment, Map("filename" -> "slicebox-export.zip"))) {
               onSuccess(storageService.ask(GetExportSetImageIds(exportSetId)).mapTo[Option[Seq[Long]]]) {
                 case Some(imageIds) =>
-                  val source = StreamSource.queue[ByteString](0, OverflowStrategy.fail)
-                  source.mapMaterializedValue(queue => new ImageZipper(queue).zipNext(imageIds))
                   implicit val streamSupport = new ByteStringEntityStreamingSupport()
+                  val source = StreamSource.queue[ByteString](0, OverflowStrategy.fail)
+                    .mapMaterializedValue(queue => new ImageZipper(queue).zipNext(imageIds))
                   complete(source)
                 case None =>
                   complete(NotFound)
@@ -208,7 +208,8 @@ trait ImageRoutes {
 
   final class ByteStringEntityStreamingSupport(override val parallelism: Int,
                                                override val unordered: Boolean) extends EntityStreamingSupport {
-    import akka.http.javadsl.{ model => jm }
+
+    import akka.http.javadsl.{model => jm}
 
     def this() = this(1, false)
 
@@ -253,7 +254,7 @@ trait ImageRoutes {
       new ZipEntry(entryName)
     }
 
-    def zipNext(imageIds: Seq[Long]): Unit =
+    def zipNext(imageIds: Seq[Long]): Unit = {
       if (imageIds.nonEmpty) {
         val imageId = imageIds.head
         getImageData(imageId).onComplete {
@@ -284,9 +285,14 @@ trait ImageRoutes {
             zipStream.close()
         }
       } else {
-        queue.complete()
         zipStream.close()
+        val zippedBytes = byteStream.toByteArray
+        queue.offer(ByteString(zippedBytes)).onComplete {
+          case Success(_) => queue.complete()
+          case Failure(error) => queue.fail(error)
+        }
       }
+    }
 
   }
 
