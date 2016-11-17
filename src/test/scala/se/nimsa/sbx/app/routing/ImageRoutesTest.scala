@@ -12,10 +12,9 @@ import se.nimsa.sbx.metadata.MetaDataDAO
 import se.nimsa.sbx.storage.RuntimeStorage
 import se.nimsa.sbx.storage.StorageProtocol.{ExportSetId, ImageInformation}
 import se.nimsa.sbx.util.TestUtil
-import spray.http._
-import spray.http.StatusCodes._
-import spray.httpx.SprayJsonSupport._
-import spray.httpx.unmarshalling.BasicUnmarshallers.ByteArrayUnmarshaller
+import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.server._
+import Directives._
 
 import scala.slick.driver.H2Driver
 

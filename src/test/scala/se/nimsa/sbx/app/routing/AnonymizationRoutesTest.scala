@@ -11,10 +11,9 @@ import se.nimsa.sbx.metadata.MetaDataDAO
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.storage.RuntimeStorage
 import se.nimsa.sbx.util.TestUtil
-import spray.http.{BodyPart, HttpData, MultipartFormData}
-import spray.http.StatusCodes._
-import spray.httpx.unmarshalling.BasicUnmarshallers.ByteArrayUnmarshaller
-import spray.httpx.SprayJsonSupport._
+import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.server._
+import Directives._
 
 import scala.slick.driver.H2Driver
 

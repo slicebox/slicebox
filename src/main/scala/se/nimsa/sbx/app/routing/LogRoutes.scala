@@ -31,7 +31,11 @@ trait LogRoutes { this: SliceboxServices =>
     pathPrefix("log") {
       pathEndOrSingleSlash {
         get {
-          parameters('startindex.as[Long].?(0), 'count.as[Long].?(20), 'subject.?, 'type.?) { (startIndex, count, subjectMaybe, typeMaybe) =>
+          parameters(
+            'startindex.as(nonNegativeFromStringUnmarshaller).?(0),
+            'count.as(nonNegativeFromStringUnmarshaller).?(20),
+            'subject.?,
+            'type.?) { (startIndex, count, subjectMaybe, typeMaybe) =>
             val msg =
               subjectMaybe.flatMap(subject => typeMaybe.map(entryType => GetLogEntriesBySubjectAndType(subject, LogEntryType.withName(entryType), startIndex, count)))
                 .orElse(subjectMaybe.map(subject => GetLogEntriesBySubject(subject, startIndex, count)))

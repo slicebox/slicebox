@@ -55,7 +55,7 @@ object UserProtocol {
 
     def passwordMatches(password: String): Boolean = hashedPassword.exists(hp => password.isBcrypted(hp))
 
-    def passwordMatches(credentials: Credentials.Provided): Boolean = hashedPassword.exists(hp => credentials.verify(hp, hasher))
+    def passwordMatches(credentials: Credentials.Provided): Boolean = hashedPassword.exists(hp => credentials.verify(hp, hasher(hp)))
 
     def hasPermission(challengeRole: UserRole): Boolean = (role, challengeRole) match {
       case (UserRole.SUPERUSER, _) => true
@@ -65,7 +65,7 @@ object UserProtocol {
       case _ => false
     }
 
-    private def hasher(password: String) = password.bcrypt
+    private def hasher(hashed: String)(plaintext: String) = plaintext.bcrypt(hashed)
   }
 
   case class ApiSession(id: Long, userId: Long, token: String, ip: String, userAgent: String, updated: Long) extends Entity

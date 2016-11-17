@@ -7,9 +7,9 @@ import se.nimsa.sbx.importing.ImportProtocol._
 import se.nimsa.sbx.metadata.MetaDataDAO
 import se.nimsa.sbx.user.UserProtocol.UserRole
 import se.nimsa.sbx.util.TestUtil
-import spray.http.StatusCodes._
-import spray.http._
-import spray.httpx.SprayJsonSupport._
+import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.server._
+import Directives._
 
 import scala.slick.driver.H2Driver
 

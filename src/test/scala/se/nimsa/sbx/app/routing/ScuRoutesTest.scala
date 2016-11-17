@@ -8,9 +8,9 @@ import se.nimsa.sbx.scp.ScpProtocol.ScpData
 import se.nimsa.sbx.scu.ScuDAO
 import se.nimsa.sbx.scu.ScuProtocol._
 import se.nimsa.sbx.util.TestUtil
-import spray.http.{BodyPart, MultipartFormData}
-import spray.http.StatusCodes._
-import spray.httpx.SprayJsonSupport._
+import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.server._
+import Directives._
 
 import scala.slick.driver.H2Driver
 

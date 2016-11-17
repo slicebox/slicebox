@@ -1,12 +1,14 @@
 package se.nimsa.sbx.app.routing
 
 import scala.concurrent.Future
-import org.scalatest.FlatSpec
-import org.scalatest.Matchers
-import spray.http.StatusCodes._
-import spray.httpx.SprayJsonSupport._
 import se.nimsa.sbx.lang.NotFoundException
 import se.nimsa.sbx.lang.BadGatewayException
+
+import org.scalatest.{ Matchers, FlatSpec }
+import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.server._
+import Directives._
 
 class AppRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
@@ -35,8 +37,8 @@ class AppRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   
   "The system" should "respond with BadRequest when a route throws an IllegalArgumentException" in {
     Get("/illegalargumentexception") ~> illegalArgumentRoute ~> check {
-    	status should be (BadRequest)
-      responseAs[String] should be ("Oups")
+    	status shouldBe BadRequest
+      responseAs[String] shouldBe "Oups"
     }    
   }
   
@@ -55,13 +57,13 @@ class AppRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   }
   
   it should "respond with NotFound when requesting a non-existant asset" in {
-    Get("/assets/someasset") ~> sealRoute(routes) ~> check {
+    Get("/assets/someasset") ~> Route.seal(routes) ~> check {
       status should be (NotFound)
     }
   }
  
   it should "respond with Forbidden when requesting an admin resource as a user" in {
-    DeleteAsUser("/api/users/1") ~> sealRoute(routes) ~> check {
+    DeleteAsUser("/api/users/1") ~> Route.seal(routes) ~> check {
       status should be (Forbidden)
     }
   }

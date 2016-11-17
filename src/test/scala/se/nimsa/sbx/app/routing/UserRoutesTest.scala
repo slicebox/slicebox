@@ -2,17 +2,14 @@ package se.nimsa.sbx.app.routing
 
 import org.scalatest.FlatSpec
 import org.scalatest.Matchers
-import spray.httpx.SprayJsonSupport._
 import se.nimsa.sbx.user.UserProtocol._
 import se.nimsa.sbx.user.UserProtocol.UserRole._
-import spray.http.StatusCodes._
-import spray.http.HttpHeaders._
-import spray.http.BasicHttpCredentials
-import spray.routing.authentication.UserPass
-import spray.http.HttpCookie
 import java.util.UUID
 import se.nimsa.sbx.user.UserDAO
 import scala.slick.driver.H2Driver
+import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.server._
+import Directives._
 
 class UserRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 

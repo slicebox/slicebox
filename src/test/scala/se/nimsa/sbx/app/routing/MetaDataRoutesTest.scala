@@ -13,12 +13,11 @@ import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.util.TestUtil._
-import spray.http.StatusCodes._
-import spray.httpx.SprayJsonSupport._
 import se.nimsa.sbx.seriestype.SeriesTypeDAO
 import se.nimsa.sbx.metadata.PropertiesDAO
-import spray.http.MultipartFormData
-import spray.http.BodyPart
+import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.server._
+import Directives._
 
 class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 

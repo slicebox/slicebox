@@ -77,7 +77,9 @@ trait UserRoutes { this: SliceboxServices =>
     pathPrefix("users") {
       pathEndOrSingleSlash {
         get {
-          parameters('startindex.as[Long] ? 0, 'count.as[Long] ? 20) { (startIndex, count) =>
+          parameters(
+            'startindex.as(nonNegativeFromStringUnmarshaller) ? 0,
+            'count.as(nonNegativeFromStringUnmarshaller) ? 20) { (startIndex, count) =>
             onSuccess(userService.ask(GetUsers(startIndex, count))) {
               case Users(users) =>
                 complete(users)

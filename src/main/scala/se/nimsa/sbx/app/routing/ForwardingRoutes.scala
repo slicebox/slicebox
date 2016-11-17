@@ -31,7 +31,9 @@ trait ForwardingRoutes { this: SliceboxServices =>
       pathPrefix("rules") {
         pathEndOrSingleSlash {
           get {
-            parameters('startindex.as[Long] ? 0, 'count.as[Long] ? 20) { (startIndex, count) =>
+            parameters(
+              'startindex.as(nonNegativeFromStringUnmarshaller) ? 0,
+              'count.as(nonNegativeFromStringUnmarshaller) ? 20) { (startIndex, count) =>
               onSuccess(forwardingService.ask(GetForwardingRules(startIndex, count))) {
                 case ForwardingRules(forwardingRules) =>
                   complete(forwardingRules)

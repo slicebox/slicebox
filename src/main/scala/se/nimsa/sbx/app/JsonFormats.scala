@@ -197,5 +197,5 @@ trait JsonFormats extends DefaultJsonProtocol {
   implicit val forwardingRuleFormat = jsonFormat4(ForwardingRule)
   
   implicit val importSessionFormat = jsonFormat9(ImportSession)
-  
+
 }

@@ -8,8 +8,9 @@ import org.scalatest.Matchers
 import se.nimsa.sbx.dicom.DicomHierarchy.Patient
 import se.nimsa.sbx.directory.DirectoryWatchProtocol._
 import se.nimsa.sbx.util.TestUtil
-import spray.http.StatusCodes._
-import spray.httpx.SprayJsonSupport._
+import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.server._
+import Directives._
 
 class DirectoryRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 

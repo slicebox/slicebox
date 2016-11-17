@@ -3,8 +3,9 @@ package se.nimsa.sbx.app.routing
 import org.scalatest.{FlatSpec, Matchers}
 import se.nimsa.sbx.scp.ScpDAO
 import se.nimsa.sbx.scp.ScpProtocol._
-import spray.http.StatusCodes._
-import spray.httpx.SprayJsonSupport._
+import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.server._
+import Directives._
 
 import scala.slick.driver.H2Driver
 

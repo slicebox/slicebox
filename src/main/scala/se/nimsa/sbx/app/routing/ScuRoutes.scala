@@ -32,7 +32,9 @@ trait ScuRoutes { this: SliceboxServices =>
     pathPrefix("scus") {
       pathEndOrSingleSlash {
         get {
-          parameters('startindex.as[Long] ? 0, 'count.as[Long] ? 20) { (startIndex, count) =>
+          parameters(
+            'startindex.as(nonNegativeFromStringUnmarshaller) ? 0,
+            'count.as(nonNegativeFromStringUnmarshaller) ? 20) { (startIndex, count) =>
             onSuccess(scuService.ask(GetScus(startIndex, count))) {
               case Scus(scus) =>
                 complete(scus)

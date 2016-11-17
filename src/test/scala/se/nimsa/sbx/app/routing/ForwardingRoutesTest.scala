@@ -4,8 +4,9 @@ import org.scalatest.{FlatSpec, Matchers}
 import se.nimsa.sbx.app.GeneralProtocol.{Destination, DestinationType, Source, SourceType}
 import se.nimsa.sbx.forwarding.ForwardingDAO
 import se.nimsa.sbx.forwarding.ForwardingProtocol.ForwardingRule
-import spray.http.StatusCodes.{Created, NoContent, OK}
-import spray.httpx.SprayJsonSupport._
+import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.server._
+import Directives._
 
 import scala.slick.driver.H2Driver
 

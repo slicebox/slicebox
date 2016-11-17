@@ -5,10 +5,11 @@ import org.scalatest.FlatSpec
 import org.scalatest.Matchers
 import se.nimsa.sbx.log.LogProtocol.LogEntry
 import se.nimsa.sbx.log.SbxLog
-import spray.http.StatusCodes._
-import spray.httpx.SprayJsonSupport._
 import scala.slick.driver.H2Driver
 import se.nimsa.sbx.log.LogDAO
+import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.server._
+import Directives._
 
 class LogRoutesTest extends FlatSpec with Matchers with RoutesTestBase with BeforeAndAfterAll {
 

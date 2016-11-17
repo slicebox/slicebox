@@ -25,6 +25,7 @@ import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
+import akka.http.scaladsl.unmarshalling.{PredefinedFromStringUnmarshallers, Unmarshaller}
 
 trait MetadataRoutes {
   this: SliceboxServices =>
@@ -42,17 +43,17 @@ trait MetadataRoutes {
         pathEndOrSingleSlash {
           get {
             parameters(
-              'startindex.as[Long] ? 0,
-              'count.as[Long] ? 20,
+              'startindex.as(nonNegativeFromStringUnmarshaller) ? 0,
+              'count.as(nonNegativeFromStringUnmarshaller) ? 20,
               'orderby.as[String].?,
               'orderascending.as[Boolean] ? true,
               'filter.as[String].?,
               'sources.as[String].?,
               'seriestypes.as[String].?,
               'seriestags.as[String].?) { (startIndex, count, orderBy, orderAscending, filter, sourcesString, seriesTypesString, seriesTagsString) =>
-              val sources = sourcesString.map(parseSourcesString(_)).getOrElse(Array.empty)
-              val seriesTypes = seriesTypesString.map(parseIdsString(_)).getOrElse(Array.empty)
-              val seriesTags = seriesTagsString.map(parseIdsString(_)).getOrElse(Array.empty)
+              val sources = sourcesString.map(parseSourcesString).getOrElse(Array.empty)
+              val seriesTypes = seriesTypesString.map(parseIdsString).getOrElse(Array.empty)
+              val seriesTags = seriesTagsString.map(parseIdsString).getOrElse(Array.empty)
               onSuccess(metaDataService.ask(GetPatients(startIndex, count, orderBy, orderAscending, filter, sources, seriesTypes, seriesTags))) {
                 case Patients(patients) =>
                   complete(patients)
@@ -94,8 +95,8 @@ trait MetadataRoutes {
         pathEndOrSingleSlash {
           get {
             parameters(
-              'startindex.as[Long] ? 0,
-              'count.as[Long] ? 20,
+              'startindex.as(nonNegativeFromStringUnmarshaller) ? 0,
+              'count.as(nonNegativeFromStringUnmarshaller) ? 20,
               'patientid.as[Long],
               'sources.as[String].?,
               'seriestypes.as[String].?,
@@ -144,8 +145,8 @@ trait MetadataRoutes {
         pathEndOrSingleSlash {
           get {
             parameters(
-              'startindex.as[Long] ? 0,
-              'count.as[Long] ? 20,
+              'startindex.as(nonNegativeFromStringUnmarshaller) ? 0,
+              'count.as(nonNegativeFromStringUnmarshaller) ? 20,
               'studyid.as[Long],
               'sources.as[String].?,
               'seriestypes.as[String].?,
@@ -246,8 +247,8 @@ trait MetadataRoutes {
         pathEndOrSingleSlash {
           get {
             parameters(
-              'startindex.as[Long] ? 0,
-              'count.as[Long] ? 20,
+              'startindex.as(nonNegativeFromStringUnmarshaller) ? 0,
+              'count.as(nonNegativeFromStringUnmarshaller) ? 20,
               'seriesid.as[Long]) { (startIndex, count, seriesId) =>
               onSuccess(metaDataService.ask(GetImages(startIndex, count, seriesId))) {
                 case Images(images) =>
@@ -275,8 +276,8 @@ trait MetadataRoutes {
         pathEndOrSingleSlash {
           get {
             parameters(
-              'startindex.as[Long] ? 0,
-              'count.as[Long] ? 20,
+              'startindex.as(nonNegativeFromStringUnmarshaller) ? 0,
+              'count.as(nonNegativeFromStringUnmarshaller) ? 20,
               'orderby.as[String].?,
               'orderascending.as[Boolean] ? true,
               'filter.as[String].?,

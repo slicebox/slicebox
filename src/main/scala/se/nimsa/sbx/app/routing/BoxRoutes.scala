@@ -38,7 +38,9 @@ trait BoxRoutes {
     pathPrefix("boxes") {
       pathEndOrSingleSlash {
         get {
-          parameters('startindex.as[Long] ? 0, 'count.as[Long] ? 20) { (startIndex, count) =>
+          parameters(
+            'startindex.as(nonNegativeFromStringUnmarshaller) ? 0,
+            'count.as(nonNegativeFromStringUnmarshaller) ? 20) { (startIndex, count) =>
             onSuccess(boxService.ask(GetBoxes(startIndex, count))) {
               case Boxes(boxes) =>
                 complete(boxes)
@@ -95,7 +97,9 @@ trait BoxRoutes {
     pathPrefix("incoming") {
       pathEndOrSingleSlash {
         get {
-          parameters('startindex.as[Long] ? 0, 'count.as[Long] ? 20) { (startIndex, count) =>
+          parameters(
+            'startindex.as(nonNegativeFromStringUnmarshaller) ? 0,
+            'count.as(nonNegativeFromStringUnmarshaller) ? 20) { (startIndex, count) =>
             onSuccess(boxService.ask(GetIncomingTransactions(startIndex, count))) {
               case IncomingTransactions(transactions) =>
                 complete(transactions)
@@ -128,7 +132,9 @@ trait BoxRoutes {
     pathPrefix("outgoing") {
       pathEndOrSingleSlash {
         get {
-          parameters('startindex.as[Long] ? 0, 'count.as[Long] ? 20) { (startIndex, count) =>
+          parameters(
+            'startindex.as(nonNegativeFromStringUnmarshaller) ? 0,
+            'count.as(nonNegativeFromStringUnmarshaller) ? 20) { (startIndex, count) =>
             onSuccess(boxService.ask(GetOutgoingTransactions(startIndex, count))) {
               case OutgoingTransactions(transactions) =>
                 complete(transactions)

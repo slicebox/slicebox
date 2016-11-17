@@ -22,6 +22,7 @@ import java.util.concurrent.TimeUnit.MILLISECONDS
 import akka.actor.{ActorRef, ActorSystem}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
+import akka.http.scaladsl.unmarshalling.PredefinedFromStringUnmarshallers
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import com.typesafe.config.ConfigFactory
@@ -37,11 +38,12 @@ import se.nimsa.sbx.metadata.{MetaDataDAO, MetaDataServiceActor, PropertiesDAO}
 import se.nimsa.sbx.scp.{ScpDAO, ScpServiceActor}
 import se.nimsa.sbx.scu.{ScuDAO, ScuServiceActor}
 import se.nimsa.sbx.seriestype.{SeriesTypeDAO, SeriesTypeServiceActor}
-import se.nimsa.sbx.storage.{FileStorage, S3Storage, StorageServiceActor}
+import se.nimsa.sbx.storage.{FileStorage, S3Storage, StorageService, StorageServiceActor}
 import se.nimsa.sbx.user.{Authenticator, UserDAO, UserServiceActor}
 
 import scala.concurrent.ExecutionContextExecutor
 import scala.slick.driver.{H2Driver, MySQLDriver}
+import scala.slick.jdbc.JdbcBackend
 import scala.slick.jdbc.JdbcBackend.Database
 import scala.util.{Failure, Success}
 
@@ -70,6 +72,14 @@ trait SliceboxServices extends SliceboxRoutes with JsonFormats with SprayJsonSup
 
   val superUser: String
   val superPassword: String
+
+  val db: JdbcBackend.DatabaseDef
+  val storage: StorageService
+
+  val nonNegativeFromStringUnmarshaller = PredefinedFromStringUnmarshallers.longFromStringUnmarshaller.map { number =>
+    if (number < 0) throw new IllegalArgumentException("number must be non-negative")
+    number
+  }
 }
 
 object Main extends App with SliceboxServices {
@@ -87,7 +97,7 @@ object Main extends App with SliceboxServices {
 
   val dbUrl = sliceboxConfig.getString("database.path")
 
-  val db = {
+  override val db = {
     val config = new HikariConfig()
     config.setJdbcUrl(dbUrl)
     if (sliceboxConfig.hasPath("database.user") && sliceboxConfig.getString("database.user").nonEmpty)
@@ -151,7 +161,7 @@ object Main extends App with SliceboxServices {
   override val superPassword = sliceboxConfig.getString("superuser.password")
   val sessionTimeout = sliceboxConfig.getDuration("session-timeout", MILLISECONDS)
 
-  val storage =
+  override val storage =
     if (sliceboxConfig.getString("dicom-storage.config.name") == "s3")
       new S3Storage(sliceboxConfig.getString("dicom-storage.config.bucket"), sliceboxConfig.getString("dicom-storage.config.prefix"))
     else
@@ -174,7 +184,7 @@ object Main extends App with SliceboxServices {
 
   if (useSsl) Http().setDefaultClientHttpsContext(SslConfiguration.httpsContext)
 
-  Http().bindAndHandle(sliceboxRoutes, host, port) onComplete {
+  Http().bindAndHandle(routes, host, port) onComplete {
     case Success(_) =>
       SbxLog.info("System", s"Slicebox bound to $host:$port")
     case Failure(e) =>

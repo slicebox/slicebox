@@ -21,7 +21,6 @@ import java.nio.file.NoSuchFileException
 
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.server.directives.Credentials
 import akka.http.scaladsl.server.{AuthenticationFailedRejection, ExceptionHandler, RejectionHandler, Route}
 import se.nimsa.sbx.app.SliceboxServices
 import se.nimsa.sbx.lang.NotFoundException
@@ -62,7 +61,7 @@ trait SliceboxRoutes extends DirectoryRoutes
       complete((Unauthorized, "This resource requires authentication. Use either basic auth, or supply the session cookie obtained by logging in."))
   }
 
-  def sliceboxRoutes: Route =
+  def routes: Route =
     pathPrefix("api") {
       extractAuthKey { authKey =>
         loginRoute(authKey) ~

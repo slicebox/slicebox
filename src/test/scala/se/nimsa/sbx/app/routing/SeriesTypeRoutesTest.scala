@@ -5,12 +5,11 @@ import org.scalatest.FlatSpec
 import se.nimsa.sbx.seriestype.SeriesTypeDAO
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
 import scala.slick.driver.H2Driver
-import spray.httpx.SprayJsonSupport._
-import spray.http.StatusCodes._
 import se.nimsa.sbx.util.TestUtil
-import spray.http.BodyPart
-import spray.http.MultipartFormData
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
+import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.server._
+import Directives._
 
 class SeriesTypeRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 

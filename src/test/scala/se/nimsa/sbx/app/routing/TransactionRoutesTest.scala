@@ -15,14 +15,10 @@ import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.DicomProperty._
 import se.nimsa.sbx.dicom.DicomUtil
 import se.nimsa.sbx.util.TestUtil
-import spray.http.BodyPart
-import spray.http.ContentTypes
-import spray.http.HttpData
-import spray.http.MultipartFormData
-import spray.http.StatusCodes._
-import spray.httpx.SprayJsonSupport._
-import spray.httpx.unmarshalling.BasicUnmarshallers.ByteArrayUnmarshaller
 import se.nimsa.sbx.util.CompressionUtil._
+import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.server._
+import Directives._
 
 class TransactionRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
