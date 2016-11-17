@@ -43,6 +43,7 @@ class MetaDataDAO(val driver: JdbcProfile) {
     def patientID = column[String](DicomProperty.PatientID.name)
     def patientBirthDate = column[String](DicomProperty.PatientBirthDate.name)
     def patientSex = column[String](DicomProperty.PatientSex.name)
+    def idxUniquePatient = index("idx_unique_patient", (patientName, patientID), unique = true)
     def * = (id, patientName, patientID, patientBirthDate, patientSex) <>(toPatient.tupled, fromPatient)
   }
 
@@ -64,6 +65,7 @@ class MetaDataDAO(val driver: JdbcProfile) {
     def studyID = column[String](DicomProperty.StudyID.name)
     def accessionNumber = column[String](DicomProperty.AccessionNumber.name)
     def patientAge = column[String](DicomProperty.PatientAge.name)
+    def idxUniqueStudy = index("idx_unique_study", (patientId, studyInstanceUID), unique = true)
     def * = (id, patientId, studyInstanceUID, studyDescription, studyDate, studyID, accessionNumber, patientAge) <>(toStudy.tupled, fromStudy)
 
     def patientFKey = foreignKey("patientFKey", patientId, patientsQuery)(_.id, onUpdate = ForeignKeyAction.Cascade, onDelete = ForeignKeyAction.Cascade)
@@ -90,6 +92,7 @@ class MetaDataDAO(val driver: JdbcProfile) {
     def manufacturer = column[String](DicomProperty.Manufacturer.name)
     def stationName = column[String](DicomProperty.StationName.name)
     def frameOfReferenceUID = column[String](DicomProperty.FrameOfReferenceUID.name)
+    def idxUniqueStudy = index("idx_unique_series", (studyId, seriesInstanceUID), unique = true)
     def * = (id, studyId, seriesInstanceUID, seriesDescription, seriesDate, modality, protocolName, bodyPartExamined, manufacturer, stationName, frameOfReferenceUID) <>(toSeries.tupled, fromSeries)
 
     def studyFKey = foreignKey("studyFKey", studyId, studiesQuery)(_.id, onUpdate = ForeignKeyAction.Cascade, onDelete = ForeignKeyAction.Cascade)
@@ -110,6 +113,7 @@ class MetaDataDAO(val driver: JdbcProfile) {
     def sopInstanceUID = column[String](DicomProperty.SOPInstanceUID.name)
     def imageType = column[String](DicomProperty.ImageType.name)
     def instanceNumber = column[String](DicomProperty.InstanceNumber.name)
+    def idxUniqueImage = index("idx_unique_image", (seriesId, sopInstanceUID), unique = true)
     def * = (id, seriesId, sopInstanceUID, imageType, instanceNumber) <>(toImage.tupled, fromImage)
 
     def seriesFKey = foreignKey("seriesFKey", seriesId, seriesQuery)(_.id, onUpdate = ForeignKeyAction.Cascade, onDelete = ForeignKeyAction.Cascade)
