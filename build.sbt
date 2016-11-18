@@ -9,7 +9,7 @@ scalacOptions := Seq("-encoding", "UTF-8", "-Xlint", "-deprecation", "-unchecked
 // define the project
 
 lazy val slicebox = (project in file(".")).enablePlugins(SbtWeb, JavaServerAppPackaging, GitBranchPrompt)
-mainClass in Compile := Some("se.nimsa.sbx.app.Main")
+mainClass in Compile := Some("se.nimsa.sbx.app.Slicebox")
 
 // for sbt-resolver, (the re-start and re-stop commands)
 

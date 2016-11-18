@@ -120,7 +120,7 @@ trait SliceboxBase extends SliceboxRoutes with JsonFormats with SprayJsonSupport
 
 }
 
-object Main extends {
+object Slicebox extends {
   implicit val system = ActorSystem("slicebox")
   implicit val materializer = ActorMaterializer()
   implicit val executor = system.dispatcher
