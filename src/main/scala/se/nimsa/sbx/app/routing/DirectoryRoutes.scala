@@ -20,11 +20,11 @@ import akka.pattern.ask
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
-import se.nimsa.sbx.app.SliceboxServices
+import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.directory.DirectoryWatchProtocol._
 import se.nimsa.sbx.user.UserProtocol._
 
-trait DirectoryRoutes { this: SliceboxServices =>
+trait DirectoryRoutes { this: SliceboxBase =>
 
   def directoryRoutes(apiUser: ApiUser): Route =
     pathPrefix("directorywatches") {

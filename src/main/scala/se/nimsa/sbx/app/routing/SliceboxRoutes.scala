@@ -21,10 +21,10 @@ import java.nio.file.NoSuchFileException
 
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.server.{AuthenticationFailedRejection, ExceptionHandler, RejectionHandler, Route}
-import se.nimsa.sbx.app.SliceboxServices
-import se.nimsa.sbx.lang.NotFoundException
-import se.nimsa.sbx.lang.BadGatewayException
+import akka.http.scaladsl.server.{ExceptionHandler, Route}
+import se.nimsa.sbx.app.SliceboxBase
+import se.nimsa.sbx.lang.{BadGatewayException, NotFoundException}
+import se.nimsa.sbx.user.Authenticator
 
 trait SliceboxRoutes extends DirectoryRoutes
     with ScpRoutes
@@ -40,7 +40,7 @@ trait SliceboxRoutes extends DirectoryRoutes
     with UiRoutes
     with GeneralRoutes
     with SeriesTypeRoutes
-    with ImportRoutes { this: SliceboxServices =>
+    with ImportRoutes { this: SliceboxBase =>
 
   implicit val knownExceptionHandler =
     ExceptionHandler {
@@ -56,10 +56,7 @@ trait SliceboxRoutes extends DirectoryRoutes
         complete((BadGateway, e.getMessage))
     }
 
-  implicit val authRejectionHandler = RejectionHandler.newBuilder().handle {
-    case AuthenticationFailedRejection(cause, headers) =>
-      complete((Unauthorized, "This resource requires authentication. Use either basic auth, or supply the session cookie obtained by logging in."))
-  }
+  lazy val authenticator = new Authenticator(userService)
 
   def routes: Route =
     pathPrefix("api") {

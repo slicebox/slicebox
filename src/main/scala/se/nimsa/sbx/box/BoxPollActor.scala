@@ -19,7 +19,7 @@ package se.nimsa.sbx.box
 import akka.actor.{Actor, Props}
 import akka.event.{Logging, LoggingReceive}
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
+import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import akka.http.scaladsl.marshalling.Marshal
 import akka.http.scaladsl.model.StatusCodes.NotFound
 import akka.http.scaladsl.model._
@@ -48,7 +48,7 @@ class BoxPollActor(box: Box,
                    boxServicePath: String = "../../BoxService",
                    metaDataServicePath: String = "../../MetaDataService",
                    storageServicePath: String = "../../StorageService",
-                   anonymizationServicePath: String = "../../AnonymizationService") extends Actor with BoxJsonFormats {
+                   anonymizationServicePath: String = "../../AnonymizationService") extends Actor with BoxJsonFormats with SprayJsonSupport {
 
   val log = Logging(context.system, this)
 
@@ -170,8 +170,8 @@ class BoxPollActor(box: Box,
             }
         }
       } else
-        response.entity.toStrict(timeout.duration).map { strictEntity =>
-          signalFetchFileFailedPermanently(transactionImage, new RuntimeException(s"Server responded with status code $statusCode and message ${strictEntity.toString}"))
+        Unmarshal(response).to[String].flatMap { message =>
+          signalFetchFileFailedPermanently(transactionImage, new RuntimeException(s"Server responded with status code $statusCode and message $message"))
         }
     }
   }

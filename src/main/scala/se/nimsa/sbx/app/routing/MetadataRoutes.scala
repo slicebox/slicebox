@@ -18,7 +18,7 @@ package se.nimsa.sbx.app.routing
 
 import akka.pattern.ask
 import se.nimsa.sbx.app.GeneralProtocol._
-import se.nimsa.sbx.app.SliceboxServices
+import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
@@ -28,7 +28,7 @@ import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.unmarshalling.{PredefinedFromStringUnmarshallers, Unmarshaller}
 
 trait MetadataRoutes {
-  this: SliceboxServices =>
+  this: SliceboxBase =>
 
   def metaDataRoutes: Route =
     pathPrefix("metadata") {
@@ -71,7 +71,7 @@ trait MetadataRoutes {
           }
         } ~ pathPrefix(LongNumber) { patientId =>
           pathEndOrSingleSlash {
-            get {
+            (get & rejectEmptyResponse) {
               onSuccess(metaDataService.ask(GetPatient(patientId)).mapTo[Option[Patient]]) {
                 complete(_)
               }
@@ -121,7 +121,7 @@ trait MetadataRoutes {
           }
         } ~ pathPrefix(LongNumber) { studyId =>
           pathEndOrSingleSlash {
-            get {
+            (get & rejectEmptyResponse) {
               onSuccess(metaDataService.ask(GetStudy(studyId)).mapTo[Option[Study]]) {
                 complete(_)
               }
@@ -171,13 +171,13 @@ trait MetadataRoutes {
           }
         } ~ pathPrefix(LongNumber) { seriesId =>
           pathEndOrSingleSlash {
-            get {
+            (get & rejectEmptyResponse) {
               onSuccess(metaDataService.ask(GetSingleSeries(seriesId)).mapTo[Option[Series]]) {
                 complete(_)
               }
             }
           } ~ path("source") {
-            get {
+            (get & rejectEmptyResponse) {
               onSuccess(metaDataService.ask(GetSourceForSeries(seriesId)).mapTo[Option[SeriesSource]]) { seriesSourceMaybe =>
                 complete(seriesSourceMaybe.map(_.source))
               }
@@ -266,7 +266,7 @@ trait MetadataRoutes {
             }
           }
         } ~ path(LongNumber) { imageId =>
-          get {
+          (get & rejectEmptyResponse) {
             onSuccess(metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]]) {
               complete(_)
             }
@@ -303,7 +303,7 @@ trait MetadataRoutes {
             }
           }
         } ~ path(LongNumber) { seriesId =>
-          get {
+          (get & rejectEmptyResponse) {
             onSuccess(metaDataService.ask(GetSingleFlatSeries(seriesId)).mapTo[Option[FlatSeries]]) {
               complete(_)
             }

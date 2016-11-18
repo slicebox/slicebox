@@ -23,7 +23,7 @@ import akka.actor.PoisonPill
 import akka.pattern.ask
 import akka.pattern.gracefulStop
 import se.nimsa.sbx.app.GeneralProtocol._
-import se.nimsa.sbx.app.SliceboxServices
+import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.box.BoxProtocol.Boxes
 import se.nimsa.sbx.box.BoxProtocol.GetBoxes
 import se.nimsa.sbx.directory.DirectoryWatchProtocol.GetWatchedDirectories
@@ -37,7 +37,7 @@ import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 
 trait GeneralRoutes {
-  this: SliceboxServices =>
+  this: SliceboxBase =>
 
   def generalRoutes(apiUser: ApiUser): Route =
     pathPrefix("system") {

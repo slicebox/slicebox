@@ -22,10 +22,10 @@ import akka.http.scaladsl.model.headers._
 import akka.http.scaladsl.model.{HttpHeader, RemoteAddress}
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.{Directive1, Route}
-import se.nimsa.sbx.app.SliceboxServices
+import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.user.UserProtocol.{AuthKey, _}
 
-trait UserRoutes { this: SliceboxServices =>
+trait UserRoutes { this: SliceboxBase =>
 
   val extractUserAgent: HttpHeader => Option[String] = {
     case a: `User-Agent` => Some(a.value)

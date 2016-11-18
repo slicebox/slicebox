@@ -18,9 +18,9 @@ package se.nimsa.sbx.app.routing
 
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
-import se.nimsa.sbx.app.SliceboxServices
+import se.nimsa.sbx.app.SliceboxBase
 
-trait UiRoutes { this: SliceboxServices =>
+trait UiRoutes { this: SliceboxBase =>
 
   def staticResourcesRoute =
     get {

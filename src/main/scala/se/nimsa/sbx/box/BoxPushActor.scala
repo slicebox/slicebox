@@ -21,6 +21,7 @@ import akka.event.{Logging, LoggingReceive}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.StatusCodes.NoContent
 import akka.http.scaladsl.model._
+import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.pattern.ask
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{Sink, Source => StreamSource}
@@ -110,8 +111,7 @@ class BoxPushActor(box: Box,
       if (statusCode >= 200 && statusCode < 300)
         handleFileSentForOutgoingTransaction(transactionImage)
       else {
-        response.entity.toStrict(timeout.duration).flatMap { strictEntity =>
-          val errorMessage = strictEntity.toString
+        Unmarshal(response).to[String].flatMap { errorMessage =>
           handleFileSendFailedForOutgoingTransaction(transactionImage, statusCode, new Exception(s"File send failed with status code $statusCode: $errorMessage"))
         }
       }
@@ -193,8 +193,8 @@ class BoxPushActor(box: Box,
           SbxLog.warn("Box", "Unable to get remote status of finished transaction, assuming all is well.")
           HttpResponse(entity = HttpEntity(TransactionStatus.FINISHED.toString))
       }.flatMap { response =>
-        response.entity.toStrict(timeout.duration).map { strictEntity =>
-          val status = TransactionStatus.withName(strictEntity.toString)
+        Unmarshal(response).to[String].map { statusString =>
+          val status = TransactionStatus.withName(statusString)
           status match {
             case TransactionStatus.FINISHED =>
               SbxLog.info("Box", s"Finished sending ${outgoingTransaction.totalImageCount} images to box ${box.name}")

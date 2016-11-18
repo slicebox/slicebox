@@ -22,7 +22,7 @@ import akka.pattern.ask
 import org.dcm4che3.data.Attributes
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.ReverseAnonymization
 import se.nimsa.sbx.app.GeneralProtocol._
-import se.nimsa.sbx.app.SliceboxServices
+import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.dicom.DicomUtil
 import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.user.UserProtocol.ApiUser
@@ -39,7 +39,7 @@ import se.nimsa.sbx.importing.ImportProtocol._
 import scala.util.{Failure, Success}
 
 trait ImportRoutes {
-  this: SliceboxServices =>
+  this: SliceboxBase =>
 
   def importRoutes(apiUser: ApiUser): Route =
     path("import" / "sessions" / LongNumber / "images") { id =>
@@ -73,7 +73,7 @@ trait ImportRoutes {
           }
         } ~ pathPrefix(LongNumber) { id =>
           pathEndOrSingleSlash {
-            get {
+            (get & rejectEmptyResponse) {
               complete(importService.ask(GetImportSession(id)).mapTo[Option[ImportSession]])
             } ~ delete {
               complete(importService.ask(DeleteImportSession(id)).map(_ =>

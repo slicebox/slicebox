@@ -71,13 +71,13 @@ resolvers ++= Seq(
 
 libraryDependencies ++= {
   val akkaVersion = "2.4.12"
-  val akkaHttpVersion = "2.4.11"
+  val akkaHttpVersion = "3.0.0-RC1"
   Seq(
     "com.typesafe.scala-logging" %% "scala-logging" % "3.5.0",
     "com.typesafe.akka" %% "akka-actor" % akkaVersion,
     "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
-    "com.typesafe.akka" %% "akka-http-experimental" % akkaHttpVersion,
-    "com.typesafe.akka" %% "akka-http-spray-json-experimental" % akkaHttpVersion,
+    "com.typesafe.akka" %% "akka-http" % akkaHttpVersion,
+    "com.typesafe.akka" %% "akka-http-spray-json" % akkaHttpVersion,
     "ch.qos.logback" % "logback-classic" % "1.1.7",
     "com.typesafe.slick" %% "slick" % "2.1.0",
     "com.h2database" % "h2" % "1.4.193",

@@ -2,28 +2,29 @@ package se.nimsa.sbx.app.routing
 
 import java.util.UUID
 
-import org.scalatest.{FlatSpec, Matchers}
+import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.server._
+import org.scalatest.{FlatSpecLike, Matchers}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.box.BoxDAO
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.metadata.MetaDataDAO
+import se.nimsa.sbx.storage.RuntimeStorage
 import se.nimsa.sbx.util.TestUtil
-import akka.http.scaladsl.model.StatusCodes._
-import akka.http.scaladsl.server._
-import Directives._
 
-import scala.slick.driver.H2Driver
+class BoxRoutesTest extends {
+  val dbProps = TestUtil.createTestDb("boxroutestest")
+  val storage = new RuntimeStorage
+} with FlatSpecLike with Matchers with RoutesTestBase {
 
-class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
-
-  def dbUrl = "jdbc:h2:mem:boxroutestest;DB_CLOSE_DELAY=-1"
-
-  val boxDao = new BoxDAO(H2Driver)
-  val metaDataDao = new MetaDataDAO(H2Driver)
+  val db = dbProps.db
+  val boxDao = new BoxDAO(dbProps.driver)
+  val metaDataDao = new MetaDataDAO(dbProps.driver)
 
   override def afterEach() {
     db.withSession { implicit session =>
+      metaDataDao.clear
       boxDao.clear
     }
   }
@@ -52,14 +53,14 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
   it should "return a bad request message when asking to generate a new base url with a malformed request body" in {
     val malformedEntity = Seq.empty[Box]
-    PostAsAdmin("/api/boxes/createconnection", malformedEntity) ~> sealRoute(routes) ~> check {
+    PostAsAdmin("/api/boxes/createconnection", malformedEntity) ~> Route.seal(routes) ~> check {
       status should be(BadRequest)
     }
   }
 
   it should "return 201 Created when adding two poll boxes with the same name" in {
     addPollBox("hosp")
-    PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData("hosp")) ~> sealRoute(routes) ~> check {
+    PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData("hosp")) ~> Route.seal(routes) ~> check {
       status shouldBe Created
     }
     GetAsUser("/api/boxes") ~> routes ~> check {
@@ -69,7 +70,7 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
   it should "return 400 bad request message when adding two boxes, one push and one poll, with the same name" in {
     addPushBox("mybox")
-    PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData("mybox")) ~> sealRoute(routes) ~> check {
+    PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData("mybox")) ~> Route.seal(routes) ~> check {
       status should be(BadRequest)
     }
   }
@@ -104,10 +105,10 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   }
 
   it should "return a bad request message when asked to add a remote box with a malformed base url" in {
-    PostAsAdmin("/api/boxes/connect", RemoteBox("uni2", "")) ~> sealRoute(routes) ~> check {
+    PostAsAdmin("/api/boxes/connect", RemoteBox("uni2", "")) ~> Route.seal(routes) ~> check {
       status should be(BadRequest)
     }
-    PostAsAdmin("/api/boxes/connect", RemoteBox("uni2", "malformed/url")) ~> sealRoute(routes) ~> check {
+    PostAsAdmin("/api/boxes/connect", RemoteBox("uni2", "malformed/url")) ~> Route.seal(routes) ~> check {
       status should be(BadRequest)
     }
   }
@@ -145,7 +146,7 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   }
 
   it should "return a not found message when asked to send images with unknown box id" in {
-    PostAsAdmin("/api/boxes/999/send", Seq(ImageTagValues(1, Seq.empty))) ~> sealRoute(routes) ~> check {
+    PostAsAdmin("/api/boxes/999/send", Seq(ImageTagValues(1, Seq.empty))) ~> Route.seal(routes) ~> check {
       status should be(NotFound)
     }
   }
@@ -227,8 +228,8 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
         val (_, (_, _), (_, _, _, _), (dbImage1, dbImage2, _, _, _, _, _, _)) =
           TestUtil.insertMetaData(metaDataDao)
         val entry = boxDao.insertIncomingTransaction(IncomingTransaction(-1, 1, "some box", 2, 3, 3, 4, System.currentTimeMillis(), System.currentTimeMillis(), TransactionStatus.WAITING))
-        boxDao.insertIncomingImage(IncomingImage(-1, entry.id, dbImage1.id, 1, false))
-        boxDao.insertIncomingImage(IncomingImage(-1, entry.id, dbImage2.id, 2, false))
+        boxDao.insertIncomingImage(IncomingImage(-1, entry.id, dbImage1.id, 1, overwrite = false))
+        boxDao.insertIncomingImage(IncomingImage(-1, entry.id, dbImage2.id, 2, overwrite = false))
         entry
       }
 
@@ -244,9 +245,9 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
         val (_, (_, _), (_, _, _, _), (dbImage1, dbImage2, _, _, _, _, _, _)) =
           TestUtil.insertMetaData(metaDataDao)
         val entry = boxDao.insertIncomingTransaction(IncomingTransaction(-1, 1, "some box", 2, 3, 3, 4, System.currentTimeMillis(), System.currentTimeMillis(), TransactionStatus.WAITING))
-        boxDao.insertIncomingImage(IncomingImage(-1, entry.id, dbImage1.id, 1, false))
-        boxDao.insertIncomingImage(IncomingImage(-1, entry.id, dbImage2.id, 2, false))
-        boxDao.insertIncomingImage(IncomingImage(-1, entry.id, 666, 3, false))
+        boxDao.insertIncomingImage(IncomingImage(-1, entry.id, dbImage1.id, 1, overwrite = false))
+        boxDao.insertIncomingImage(IncomingImage(-1, entry.id, dbImage2.id, 2, overwrite = false))
+        boxDao.insertIncomingImage(IncomingImage(-1, entry.id, 666, 3, overwrite = false))
         entry
       }
 
@@ -292,10 +293,8 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   }
 
   it should "remove related image record in incoming when an image is deleted" in {
-    val file = TestUtil.testImageFile
-    val mfd = MultipartFormData(Seq(BodyPart(file, "file")))
     val image =
-      PostAsUser("/api/images", mfd) ~> routes ~> check {
+      PostAsUser("/api/images", TestUtil.testImageFormData) ~> routes ~> check {
         status shouldBe Created
         responseAs[Image]
       }
@@ -325,10 +324,8 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   }
 
   it should "remove related image record in outgoing when an image is deleted" in {
-    val file = TestUtil.testImageFile
-    val mfd = MultipartFormData(Seq(BodyPart(file, "file")))
     val image =
-      PostAsUser("/api/images", mfd) ~> routes ~> check {
+      PostAsUser("/api/images", TestUtil.testImageFormData) ~> routes ~> check {
         status shouldBe Created
         responseAs[Image]
       }
@@ -336,7 +333,7 @@ class BoxRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     val (entry, imageTransaction) =
       db.withSession { implicit session =>
         val entry = boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, 1, "some box", 3, 4, System.currentTimeMillis(), System.currentTimeMillis(), TransactionStatus.WAITING))
-        val imageTransaction = boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, image.id, 1, false))
+        val imageTransaction = boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, image.id, 1, sent = false))
         (entry, imageTransaction)
       }
 

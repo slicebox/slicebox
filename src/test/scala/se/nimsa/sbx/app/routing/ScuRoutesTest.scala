@@ -1,26 +1,25 @@
 package se.nimsa.sbx.app.routing
 
-import org.scalatest.{FlatSpec, Matchers}
+import akka.http.scaladsl.model.StatusCodes._
+import org.scalatest.{FlatSpecLike, Matchers}
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.metadata.MetaDataDAO
 import se.nimsa.sbx.scp.ScpDAO
 import se.nimsa.sbx.scp.ScpProtocol.ScpData
 import se.nimsa.sbx.scu.ScuDAO
 import se.nimsa.sbx.scu.ScuProtocol._
+import se.nimsa.sbx.storage.RuntimeStorage
 import se.nimsa.sbx.util.TestUtil
-import akka.http.scaladsl.model.StatusCodes._
-import akka.http.scaladsl.server._
-import Directives._
 
-import scala.slick.driver.H2Driver
+class ScuRoutesTest extends {
+  val dbProps = TestUtil.createTestDb("scuroutestest")
+  val storage = new RuntimeStorage
+} with FlatSpecLike with Matchers with RoutesTestBase {
 
-class ScuRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
-
-  def dbUrl = "jdbc:h2:mem:scuroutestest;DB_CLOSE_DELAY=-1"
-
-  val scpDao = new ScpDAO(H2Driver)
-  val scuDao = new ScuDAO(H2Driver)
-  val metaDataDao = new MetaDataDAO(H2Driver)
+  val db = dbProps.db
+  val scpDao = new ScpDAO(dbProps.driver)
+  val scuDao = new ScuDAO(dbProps.driver)
+  val metaDataDao = new MetaDataDAO(dbProps.driver)
 
   "SCU routes" should "return a success message when asked to setup a new SCP and SCU" in {
     PostAsAdmin("/api/scps", ScpData(-1, "ScpName", "TestAeTitle", 12347)) ~> routes ~> check {
@@ -47,9 +46,7 @@ class ScuRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   }
 
   it should "return 502 BadGateway when sending an image to an SCP that is unavailable" in {
-    val file = TestUtil.testImageFile
-    val mfd = MultipartFormData(Seq(BodyPart(file, "file")))
-    val image = PostAsUser("/api/images", mfd) ~> routes ~> check {
+    val image = PostAsUser("/api/images", TestUtil.testImageFormData) ~> routes ~> check {
       status should be(Created)
       responseAs[Image]
     }

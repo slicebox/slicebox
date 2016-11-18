@@ -21,7 +21,7 @@ import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import akka.util.ByteString
-import se.nimsa.sbx.app.SliceboxServices
+import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.dicom.DicomUtil._
@@ -34,15 +34,10 @@ import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, GetImage, MetaDataAd
 import se.nimsa.sbx.util.CompressionUtil._
 
 trait TransactionRoutes {
-  this: SliceboxServices =>
-
-  def extractStrictEntity = extract {
-    _.request.entity.toStrict(timeout.duration)
-  }
+  this: SliceboxBase =>
 
   def transactionRoutes: Route =
     pathPrefix("transactions" / Segment) { token =>
-
       onSuccess(boxService.ask(GetBoxByToken(token)).mapTo[Option[Box]]) {
         case None =>
           complete((Unauthorized, s"No box found for token $token"))
@@ -50,8 +45,8 @@ trait TransactionRoutes {
           path("image") {
             parameters('transactionid.as[Long], 'sequencenumber.as[Long], 'totalimagecount.as[Long]) { (outgoingTransactionId, sequenceNumber, totalImageCount) =>
               post {
-                entity(as[Array[Byte]]) { compressedBytes =>
-                  val bytes = decompress(compressedBytes)
+                entity(as[ByteString]) { compressedBytes =>
+                  val bytes = decompress(compressedBytes.toArray)
                   val dicomData = loadDicomData(bytes, withPixelData = true)
                   if (dicomData == null)
                     complete((BadRequest, "Dicom data could not be read"))
@@ -84,18 +79,15 @@ trait TransactionRoutes {
                   case None => complete(NotFound)
                 }
               } ~ put {
-                extractStrictEntity { f =>
-                  onSuccess(f) { strictEntity =>
-                    val statusString = strictEntity.toString
-                    val status = TransactionStatus.withName(statusString)
-                    status match {
-                      case TransactionStatus.UNKNOWN => complete((BadRequest, s"Invalid status format: $statusString"))
-                      case s =>
-                        onSuccess(boxService.ask(SetIncomingTransactionStatus(box.id, outgoingTransactionId, status)).mapTo[Option[Unit]]) {
-                          case Some(_) => complete(NoContent)
-                          case None => complete(NotFound)
-                        }
-                    }
+                entity(as[String]) { statusString =>
+                  val status = TransactionStatus.withName(statusString)
+                  status match {
+                    case TransactionStatus.UNKNOWN => complete((BadRequest, s"Invalid status format: $statusString"))
+                    case s =>
+                      onSuccess(boxService.ask(SetIncomingTransactionStatus(box.id, outgoingTransactionId, status)).mapTo[Option[Unit]]) {
+                        case Some(_) => complete(NoContent)
+                        case None => complete(NotFound)
+                      }
                   }
                 }
               }
@@ -103,7 +95,10 @@ trait TransactionRoutes {
           } ~ pathPrefix("outgoing") {
             path("poll") {
               get {
-                complete(boxService.ask(PollOutgoing(box)).mapTo[Option[OutgoingTransactionImage]])
+                onSuccess(boxService.ask(PollOutgoing(box)).mapTo[Option[OutgoingTransactionImage]]) {
+                  case Some(outgoingTransactionImage) => complete(outgoingTransactionImage)
+                  case None => complete(NotFound)
+                }
               }
             } ~ path("done") {
               post {

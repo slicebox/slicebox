@@ -1,24 +1,25 @@
 package se.nimsa.sbx.app.routing
 
-import org.scalatest.{FlatSpec, Matchers}
+import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.model.headers.BasicHttpCredentials
+import akka.http.scaladsl.server.Route
+import org.scalatest.{FlatSpecLike, Matchers}
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.importing.ImportDAO
 import se.nimsa.sbx.importing.ImportProtocol._
 import se.nimsa.sbx.metadata.MetaDataDAO
+import se.nimsa.sbx.storage.RuntimeStorage
 import se.nimsa.sbx.user.UserProtocol.UserRole
 import se.nimsa.sbx.util.TestUtil
-import akka.http.scaladsl.model.StatusCodes._
-import akka.http.scaladsl.server._
-import Directives._
 
-import scala.slick.driver.H2Driver
+class ImportRoutesTest extends {
+  val dbProps = TestUtil.createTestDb("importroutestest")
+  val storage = new RuntimeStorage
+} with FlatSpecLike with Matchers with RoutesTestBase {
 
-class ImportRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
-
-  override def dbUrl = "jdbc:h2:mem:importroutestest;DB_CLOSE_DELAY=-1"
-
-  val importDao = new ImportDAO(H2Driver)
-  val metaDataDao = new MetaDataDAO(H2Driver)
+  val db = dbProps.db
+  val importDao = new ImportDAO(dbProps.driver)
+  val metaDataDao = new MetaDataDAO(dbProps.driver)
 
   val importSession = ImportSession(id = -1, name = "importSessionName", userId = -1, user = "", filesImported = -1, filesAdded = -1, filesRejected = -1, created = -1, lastUpdated = -1)
 
@@ -69,7 +70,7 @@ class ImportRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   }
 
   it should "return 201 Created when adding an import session with a name that already exists" in {
-    val addedSession = PostAsUser("/api/import/sessions", importSession) ~> routes ~> check {
+    PostAsUser("/api/import/sessions", importSession) ~> routes ~> check {
       responseAs[ImportSession]
     }
     PostAsUser("/api/import/sessions", importSession) ~> routes ~> check {
@@ -79,10 +80,10 @@ class ImportRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
   it should "return 400 BadRequest when adding an import session with a name that already exists but aa another user" in {
     addUser("otheruser", "otherpassword", UserRole.USER)
-    val addedSession = PostAsUser("/api/import/sessions", importSession) ~> routes ~> check {
+    PostAsUser("/api/import/sessions", importSession) ~> routes ~> check {
       responseAs[ImportSession]
     }
-    PostWithHeaders("/api/import/sessions", importSession) ~> addCredentials(BasicHttpCredentials("otheruser", "otherpassword")) ~> routes ~> check {
+    PostWithHeaders("/api/import/sessions", importSession).addCredentials(BasicHttpCredentials("otheruser", "otherpassword")) ~> routes ~> check {
       status shouldBe BadRequest
     }
   }
@@ -97,7 +98,7 @@ class ImportRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   }
 
   it should "return 404 NotFound when fetching an import session that does not exist" in {
-    GetAsUser("/api/import/sessions/666") ~> routes ~> check {
+    GetAsUser("/api/import/sessions/666") ~> Route.seal(routes) ~> check {
       status should be(NotFound)
     }
   }
@@ -107,9 +108,7 @@ class ImportRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       responseAs[ImportSession]
     }
 
-    val file = TestUtil.testImageFile
-    val mfd = MultipartFormData(Seq(BodyPart(file, "file")))
-    PostAsUser(s"/api/import/sessions/${addedSession.id}/images", mfd) ~> routes ~> check {
+    PostAsUser(s"/api/import/sessions/${addedSession.id}/images", TestUtil.testImageFormData) ~> routes ~> check {
       status should be(Created)
       val image = responseAs[Image]
       image.id should not be -1
@@ -128,14 +127,11 @@ class ImportRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       responseAs[ImportSession]
     }
 
-    val file = TestUtil.testImageFile
-    val mfd = MultipartFormData(Seq(BodyPart(file, "file")))
-    PostAsUser(s"/api/import/sessions/${addedSession.id}/images", mfd) ~> routes ~> check {
+    PostAsUser(s"/api/import/sessions/${addedSession.id}/images", TestUtil.testImageFormData) ~> routes ~> check {
       status should be(Created)
     }
 
-    val mfd2 = MultipartFormData(Seq(BodyPart(file, "file")))
-    PostAsUser(s"/api/import/sessions/${addedSession.id}/images", mfd2) ~> routes ~> check {
+    PostAsUser(s"/api/import/sessions/${addedSession.id}/images", TestUtil.testImageFormData) ~> routes ~> check {
       status should be(OK)
       val image = responseAs[Image]
       image.id should not be -1
@@ -154,14 +150,12 @@ class ImportRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       responseAs[ImportSession]
     }
 
-    val file = TestUtil.testImageFile
-    val mfd = MultipartFormData(Seq(BodyPart(file, "file")))
     val addedImage =
-      PostAsUser(s"/api/import/sessions/${addedSession.id}/images", mfd) ~> routes ~> check {
+      PostAsUser(s"/api/import/sessions/${addedSession.id}/images", TestUtil.testImageFormData) ~> routes ~> check {
         responseAs[Image]
       }
 
-    val updatedSession = GetAsUser(s"/api/import/sessions/${addedSession.id}/images") ~> routes ~> check {
+    GetAsUser(s"/api/import/sessions/${addedSession.id}/images") ~> routes ~> check {
       status shouldBe OK
       val images = responseAs[Seq[Image]]
       images should have length 1
@@ -174,7 +168,7 @@ class ImportRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       responseAs[ImportSession]
     }
     val file = TestUtil.jpegFile
-    val mfd = MultipartFormData(Seq(BodyPart(file, "file")))
+    val mfd = TestUtil.createMultipartFormWithFile(file)
     PostAsUser(s"/api/import/sessions/${addedSession.id}/images", mfd) ~> routes ~> check {
       status should be(BadRequest)
     }

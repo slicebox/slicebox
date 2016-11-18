@@ -18,7 +18,7 @@ package se.nimsa.sbx.app.routing
 
 import akka.pattern.ask
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.ImageTagValues
-import se.nimsa.sbx.app.SliceboxServices
+import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.metadata.MetaDataProtocol.{GetImage, Images}
@@ -32,7 +32,7 @@ import akka.http.scaladsl.server.Route
 import scala.concurrent.Future
 
 trait BoxRoutes {
-  this: SliceboxServices =>
+  this: SliceboxBase =>
 
   def boxRoutes(apiUser: ApiUser): Route =
     pathPrefix("boxes") {

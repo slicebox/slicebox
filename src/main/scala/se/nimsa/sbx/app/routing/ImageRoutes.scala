@@ -19,24 +19,21 @@ package se.nimsa.sbx.app.routing
 import java.io.ByteArrayOutputStream
 import java.util.zip.{ZipEntry, ZipOutputStream}
 
-import akka.NotUsed
-import akka.actor.ActorRef
 import akka.http.scaladsl.common.EntityStreamingSupport
 import akka.http.scaladsl.model.MediaTypes._
-import akka.http.scaladsl.model.ContentTypes
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.headers._
-import akka.http.scaladsl.model.{ContentType, ContentTypeRange, HttpEntity}
+import akka.http.scaladsl.model.{ContentTypeRange, ContentTypes, HttpEntity}
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
+import akka.stream.scaladsl.{Flow, Sink, SourceQueueWithComplete, StreamConverters, Source => StreamSource}
 import akka.stream.{OverflowStrategy, QueueOfferResult}
-import akka.stream.scaladsl.{Flow, Sink, SourceQueue, SourceQueueWithComplete, StreamConverters, Source => StreamSource}
 import akka.util.ByteString
 import org.dcm4che3.data.Attributes
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.ReverseAnonymization
 import se.nimsa.sbx.app.GeneralProtocol._
-import se.nimsa.sbx.app.SliceboxServices
+import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.dicom.DicomHierarchy.{FlatSeries, Image, Patient, Study}
 import se.nimsa.sbx.dicom._
 import se.nimsa.sbx.metadata.MetaDataProtocol._
@@ -48,7 +45,7 @@ import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
 trait ImageRoutes {
-  this: SliceboxServices =>
+  this: SliceboxBase =>
 
   val chunkSize = 524288
   val bufferSize = chunkSize

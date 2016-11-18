@@ -6,7 +6,6 @@ import akka.testkit.{ImplicitSender, TestActorRef, TestKit}
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
 import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.user.UserProtocol._
-import spray.routing.authentication.UserPass
 
 import scala.slick.driver.H2Driver
 import scala.slick.jdbc.JdbcBackend.Database

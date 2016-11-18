@@ -22,11 +22,11 @@ import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 
-import se.nimsa.sbx.app.SliceboxServices
+import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.user.UserProtocol._
 import se.nimsa.sbx.scu.ScuProtocol._
 
-trait ScuRoutes { this: SliceboxServices =>
+trait ScuRoutes { this: SliceboxBase =>
 
   def scuRoutes(apiUser: ApiUser): Route =
     pathPrefix("scus") {

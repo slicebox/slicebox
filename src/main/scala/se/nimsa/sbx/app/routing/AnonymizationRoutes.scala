@@ -20,7 +20,7 @@ import akka.pattern.ask
 import org.dcm4che3.data.Attributes
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.anonymization.AnonymizationUtil
-import se.nimsa.sbx.app.SliceboxServices
+import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.{DicomData, DicomUtil}
 import se.nimsa.sbx.metadata.MetaDataProtocol._
@@ -37,7 +37,7 @@ import akka.util.ByteString
 import scala.concurrent.Future
 
 trait AnonymizationRoutes {
-  this: SliceboxServices =>
+  this: SliceboxBase =>
 
   def anonymizationRoutes(apiUser: ApiUser): Route =
     path("images" / LongNumber / "anonymize") { imageId =>

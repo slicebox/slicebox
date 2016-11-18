@@ -22,10 +22,10 @@ import spray.json.DefaultJsonProtocol._
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
-import se.nimsa.sbx.app.SliceboxServices
+import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.log.LogProtocol._
 
-trait LogRoutes { this: SliceboxServices =>
+trait LogRoutes { this: SliceboxBase =>
 
   def logRoutes: Route =
     pathPrefix("log") {

@@ -20,11 +20,11 @@ import akka.pattern.ask
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
-import se.nimsa.sbx.app.SliceboxServices
+import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.user.UserProtocol._
 import se.nimsa.sbx.forwarding.ForwardingProtocol._
 
-trait ForwardingRoutes { this: SliceboxServices =>
+trait ForwardingRoutes { this: SliceboxBase =>
 
   def forwardingRoutes(apiUser: ApiUser): Route =
     pathPrefix("forwarding") {

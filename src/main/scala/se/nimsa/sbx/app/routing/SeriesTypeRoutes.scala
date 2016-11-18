@@ -20,12 +20,12 @@ import akka.pattern.ask
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
-import se.nimsa.sbx.app.SliceboxServices
+import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
 import se.nimsa.sbx.user.UserProtocol._
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 
-trait SeriesTypeRoutes { this: SliceboxServices =>
+trait SeriesTypeRoutes { this: SliceboxBase =>
 
   def seriesTypeRoutes(apiUser: ApiUser): Route =
     pathPrefix("seriestypes") {

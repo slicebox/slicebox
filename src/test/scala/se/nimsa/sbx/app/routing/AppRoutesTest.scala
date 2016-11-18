@@ -3,16 +3,17 @@ package se.nimsa.sbx.app.routing
 import scala.concurrent.Future
 import se.nimsa.sbx.lang.NotFoundException
 import se.nimsa.sbx.lang.BadGatewayException
-
-import org.scalatest.{ Matchers, FlatSpec }
-import akka.http.scaladsl.model.StatusCodes._
+import org.scalatest.{FlatSpecLike, Matchers}
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server._
 import Directives._
+import se.nimsa.sbx.storage.RuntimeStorage
+import se.nimsa.sbx.util.TestUtil
 
-class AppRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
-
-  def dbUrl = "jdbc:h2:mem:approutestest;DB_CLOSE_DELAY=-1"
+class AppRoutesTest extends {
+  val dbProps = TestUtil.createTestDb("approutestest")
+  val storage = new RuntimeStorage
+} with FlatSpecLike with Matchers with RoutesTestBase {
 
   def illegalArgumentRoute =
     path("illegalargumentexception") {
