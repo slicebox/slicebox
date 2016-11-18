@@ -156,9 +156,13 @@ object Main extends {
       new FileStorage(Paths.get(cfg.getString("dicom-storage.file-system.path")))
 } with SliceboxBase with App {
 
-  if (useSsl) Http().setDefaultClientHttpsContext(SslConfiguration.httpsContext)
+  val bindFuture = if (useSsl) {
+    Http().setDefaultClientHttpsContext(SslConfiguration.httpsContext)
+    Http().bindAndHandle(routes, host, port, SslConfiguration.httpsContext)
+  } else
+    Http().bindAndHandle(routes, host, port)
 
-  Http().bindAndHandle(routes, host, port) onComplete {
+  bindFuture onComplete {
     case Success(_) =>
       SbxLog.info("System", s"Slicebox bound to $host:$port")
     case Failure(e) =>
