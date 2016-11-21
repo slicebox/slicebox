@@ -17,35 +17,27 @@
 package se.nimsa.sbx.app.routing
 
 import akka.pattern.ask
-import spray.http.ContentTypes
-import spray.http.HttpData
-import spray.http.HttpEntity
-import spray.http.StatusCodes._
-import spray.routing._
-import se.nimsa.sbx.app.SliceboxService
+import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.server.Route
+import akka.util.ByteString
+import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.dicom.DicomUtil._
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import org.dcm4che3.data.Attributes
-import spray.httpx.SprayJsonSupport._
-import spray.httpx.unmarshalling.BasicUnmarshallers.ByteArrayUnmarshaller
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.dicom.DicomData
 import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, GetImage, MetaDataAdded}
 import se.nimsa.sbx.util.CompressionUtil._
 
 trait TransactionRoutes {
-  this: SliceboxService =>
-
-  def entityAsString = extract {
-    _.request.entity.asString
-  }
+  this: SliceboxBase =>
 
   def transactionRoutes: Route =
     pathPrefix("transactions" / Segment) { token =>
-
       onSuccess(boxService.ask(GetBoxByToken(token)).mapTo[Option[Box]]) {
         case None =>
           complete((Unauthorized, s"No box found for token $token"))
@@ -53,8 +45,8 @@ trait TransactionRoutes {
           path("image") {
             parameters('transactionid.as[Long], 'sequencenumber.as[Long], 'totalimagecount.as[Long]) { (outgoingTransactionId, sequenceNumber, totalImageCount) =>
               post {
-                entity(as[Array[Byte]]) { compressedBytes =>
-                  val bytes = decompress(compressedBytes)
+                entity(as[ByteString]) { compressedBytes =>
+                  val bytes = decompress(compressedBytes.toArray)
                   val dicomData = loadDicomData(bytes, withPixelData = true)
                   if (dicomData == null)
                     complete((BadRequest, "Dicom data could not be read"))
@@ -87,7 +79,7 @@ trait TransactionRoutes {
                   case None => complete(NotFound)
                 }
               } ~ put {
-                entityAsString { statusString =>
+                entity(as[String]) { statusString =>
                   val status = TransactionStatus.withName(statusString)
                   status match {
                     case TransactionStatus.UNKNOWN => complete((BadRequest, s"Invalid status format: $statusString"))
@@ -103,7 +95,10 @@ trait TransactionRoutes {
           } ~ pathPrefix("outgoing") {
             path("poll") {
               get {
-                complete(boxService.ask(PollOutgoing(box)).mapTo[Option[OutgoingTransactionImage]])
+                onSuccess(boxService.ask(PollOutgoing(box)).mapTo[Option[OutgoingTransactionImage]]) {
+                  case Some(outgoingTransactionImage) => complete(outgoingTransactionImage)
+                  case None => complete(NotFound)
+                }
               }
             } ~ path("done") {
               post {
@@ -127,20 +122,19 @@ trait TransactionRoutes {
                   onSuccess(boxService.ask(GetOutgoingTransactionImage(box, outgoingTransactionId, outgoingImageId)).mapTo[Option[OutgoingTransactionImage]]) {
                     case Some(transactionImage) =>
                       val imageId = transactionImage.image.imageId
-                      onSuccess(boxService.ask(GetOutgoingTagValues(transactionImage)).mapTo[Seq[OutgoingTagValue]]) {
-                        case transactionTagValues =>
-                          onSuccess(metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]]) {
-                            case Some(image) =>
-                              onSuccess(storageService.ask(GetDicomData(image, withPixelData = true)).mapTo[DicomData]) { dicomData =>
-                                onSuccess(anonymizationService.ask(Anonymize(imageId, dicomData.attributes, transactionTagValues.map(_.tagValue)))) {
-                                  case anonymizedAttributes: Attributes =>
-                                    val compressedBytes = compress(toByteArray(dicomData.copy(attributes = anonymizedAttributes)))
-                                    complete(HttpEntity(ContentTypes.`application/octet-stream`, HttpData(compressedBytes)))
-                                }
+                      onSuccess(boxService.ask(GetOutgoingTagValues(transactionImage)).mapTo[Seq[OutgoingTagValue]]) { transactionTagValues =>
+                        onSuccess(metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]]) {
+                          case Some(image) =>
+                            onSuccess(storageService.ask(GetDicomData(image, withPixelData = true)).mapTo[DicomData]) { dicomData =>
+                              onSuccess(anonymizationService.ask(Anonymize(imageId, dicomData.attributes, transactionTagValues.map(_.tagValue)))) {
+                                case anonymizedAttributes: Attributes =>
+                                  val compressedBytes = compress(toByteArray(dicomData.copy(attributes = anonymizedAttributes)))
+                                  complete(ByteString(compressedBytes))
                               }
-                            case None =>
-                              complete((NotFound, s"Image not found for image id $imageId"))
-                          }
+                            }
+                          case None =>
+                            complete((NotFound, s"Image not found for image id $imageId"))
+                        }
                       }
                     case None =>
                       complete((NotFound, s"No outgoing image found for transaction id $outgoingTransactionId and outgoing image id $outgoingImageId"))

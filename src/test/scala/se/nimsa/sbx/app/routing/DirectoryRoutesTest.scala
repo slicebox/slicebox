@@ -2,18 +2,17 @@ package se.nimsa.sbx.app.routing
 
 import java.nio.file.Files
 
-import org.scalatest.FlatSpec
-import org.scalatest.Matchers
-
+import org.scalatest.{FlatSpecLike, Matchers}
 import se.nimsa.sbx.dicom.DicomHierarchy.Patient
 import se.nimsa.sbx.directory.DirectoryWatchProtocol._
 import se.nimsa.sbx.util.TestUtil
-import spray.http.StatusCodes._
-import spray.httpx.SprayJsonSupport._
+import akka.http.scaladsl.model.StatusCodes._
+import se.nimsa.sbx.storage.RuntimeStorage
 
-class DirectoryRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
-
-  def dbUrl = "jdbc:h2:mem:directoryroutestest;DB_CLOSE_DELAY=-1"
+class DirectoryRoutesTest extends {
+  val dbProps = TestUtil.createTestDb("directoryroutestest")
+  val storage = new RuntimeStorage
+} with FlatSpecLike with Matchers with RoutesTestBase {
 
   val tempDir = Files.createTempDirectory("slicebox-watch-dir-")
   val watchDir = WatchedDirectory(-1, "test dir", tempDir.toString)
@@ -95,7 +94,7 @@ class DirectoryRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   }
 
   it should "be possible to remove a watched directory" in {
-    // TODO: this doesn't test that the watched directory is actually removed from db and that actor is stopped, it only tests that the request can be handled
+    // this doesn't test that the watched directory is actually removed from db and that actor is stopped, it only tests that the request can be handled
     DeleteAsAdmin("/api/directorywatches/1") ~> routes ~> check {
       status should be (NoContent)
     }

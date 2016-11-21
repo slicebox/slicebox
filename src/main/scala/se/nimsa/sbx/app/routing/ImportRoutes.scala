@@ -22,13 +22,16 @@ import akka.pattern.ask
 import org.dcm4che3.data.Attributes
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.ReverseAnonymization
 import se.nimsa.sbx.app.GeneralProtocol._
-import se.nimsa.sbx.app.SliceboxService
+import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.dicom.DicomUtil
 import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.user.UserProtocol.ApiUser
-import spray.http.FormFile
-import spray.http.StatusCodes._
-import spray.routing.Route
+import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.server.Route
+import akka.stream.scaladsl.StreamConverters
+import akka.stream.scaladsl.{Source => StreamSource}
+import akka.util.ByteString
 import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, GetImage, MetaDataAdded}
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.importing.ImportProtocol._
@@ -36,24 +39,25 @@ import se.nimsa.sbx.importing.ImportProtocol._
 import scala.util.{Failure, Success}
 
 trait ImportRoutes {
-  this: SliceboxService =>
+  this: SliceboxBase =>
 
   def importRoutes(apiUser: ApiUser): Route =
     path("import" / "sessions" / LongNumber / "images") { id =>
       post {
-        formField('file.as[FormFile]) { file =>
-          addImageToImportSessionRoute(file.entity.data.toByteArray, id)
-        } ~ entity(as[Array[Byte]]) { bytes =>
+        fileUpload("file") {
+          case (_, bytes) => addImageToImportSessionRoute(bytes, id)
+        } ~ extractDataBytes { bytes =>
           addImageToImportSessionRoute(bytes, id)
         }
       }
     } ~ pathPrefix("import") {
-      import spray.httpx.SprayJsonSupport._
 
       pathPrefix("sessions") {
         pathEndOrSingleSlash {
           get {
-            parameters('startindex.as[Long] ? 0, 'count.as[Long] ? 20) { (startIndex, count) =>
+            parameters(
+              'startindex.as(nonNegativeFromStringUnmarshaller) ? 0,
+              'count.as(nonNegativeFromStringUnmarshaller) ? 20) { (startIndex, count) =>
               onSuccess(importService.ask(GetImportSessions(startIndex, count))) {
                 case ImportSessions(importSessions) =>
                   complete(importSessions)
@@ -69,13 +73,11 @@ trait ImportRoutes {
           }
         } ~ pathPrefix(LongNumber) { id =>
           pathEndOrSingleSlash {
-            get {
+            (get & rejectEmptyResponse) {
               complete(importService.ask(GetImportSession(id)).mapTo[Option[ImportSession]])
             } ~ delete {
-              onSuccess(importService.ask(DeleteImportSession(id))) {
-                case _ =>
-                  complete(NoContent)
-              }
+              complete(importService.ask(DeleteImportSession(id)).map(_ =>
+                NoContent))
             }
           } ~ path("images") {
             get {
@@ -96,10 +98,9 @@ trait ImportRoutes {
 
     }
 
-  def addImageToImportSessionRoute(bytes: Array[Byte], importSessionId: Long): Route = {
-    import spray.httpx.SprayJsonSupport._
-
-    val dicomData = DicomUtil.loadDicomData(bytes, withPixelData = true)
+  def addImageToImportSessionRoute(bytes: StreamSource[ByteString, Any], importSessionId: Long): Route = {
+    val is = bytes.runWith(StreamConverters.asInputStream())
+    val dicomData = DicomUtil.loadDicomData(is, withPixelData = true)
     onSuccess(importService.ask(GetImportSession(importSessionId)).mapTo[Option[ImportSession]]) {
       case Some(importSession) =>
 

@@ -1,14 +1,11 @@
 package se.nimsa.sbx.box
 
-import scala.collection.mutable.ArrayBuffer
-import scala.concurrent.Future
-import scala.concurrent.duration.DurationInt
-import scala.slick.driver.H2Driver
-import scala.slick.jdbc.JdbcBackend.Database
-import org.scalatest._
 import akka.actor.{Actor, ActorSystem, Props}
-import akka.testkit.ImplicitSender
-import akka.testkit.TestKit
+import akka.http.scaladsl.model.StatusCodes.{InternalServerError, NoContent, ServiceUnavailable}
+import akka.http.scaladsl.model._
+import akka.stream.scaladsl.Flow
+import akka.testkit.{ImplicitSender, TestKit}
+import org.scalatest._
 import se.nimsa.sbx.anonymization.AnonymizationServiceActor
 import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.box.BoxProtocol._
@@ -16,8 +13,12 @@ import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.metadata.MetaDataDAO
 import se.nimsa.sbx.metadata.MetaDataProtocol.GetImage
 import se.nimsa.sbx.util.TestUtil
-import spray.http._
-import spray.http.StatusCodes.{NoContent, InternalServerError, ServiceUnavailable}
+
+import scala.collection.mutable.ArrayBuffer
+import scala.concurrent.duration.DurationInt
+import scala.slick.driver.H2Driver
+import scala.slick.jdbc.JdbcBackend.Database
+import scala.util.{Success, Try}
 
 class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
   with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {
@@ -27,8 +28,8 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
   val db = Database.forURL("jdbc:h2:mem:boxpushactortest;DB_CLOSE_DELAY=-1", driver = "org.h2.Driver")
   val dbProps = DbProps(db, H2Driver)
 
-  val boxDao = new BoxDAO(H2Driver)
-  val metaDataDao = new MetaDataDAO(H2Driver)
+  val boxDao = new BoxDAO(dbProps.driver)
+  val metaDataDao = new MetaDataDAO(dbProps.driver)
 
   db.withSession { implicit session =>
     boxDao.create
@@ -68,31 +69,25 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
   val boxPushActorRef = system.actorOf(Props(new BoxPushActor(testBox, 1000.hours, 1000.hours, "../BoxService", "../MetaDataService", "../StorageService", "../AnonymizationService") {
 
-    override def pipeline = {
-      (req: HttpRequest) =>
-        req.method match {
+    override val pool = Flow.fromFunction[(HttpRequest, String), (Try[HttpResponse], String)] {
+      case (request, id) =>
+        request.method match {
           case HttpMethods.POST =>
-            capturedFileSendRequests += req
-            Future {
-              if (failedResponseSendIndices.contains(capturedFileSendRequests.size))
-                failResponse
-              else if (noResponseSendIndices.contains(capturedFileSendRequests.size))
-                noResponse
-              else
-                okResponse
-            }
+            capturedFileSendRequests += request
+            if (failedResponseSendIndices.contains(capturedFileSendRequests.size))
+              (Success(failResponse), id)
+            else if (noResponseSendIndices.contains(capturedFileSendRequests.size))
+              (Success(noResponse), id)
+            else
+              (Success(okResponse), id)
           case HttpMethods.GET =>
-            Future {
-              if (reportTransactionAsFailed)
-                HttpResponse(entity = HttpEntity(TransactionStatus.FAILED.toString))
-              else
-                HttpResponse(entity = HttpEntity(TransactionStatus.FINISHED.toString))
-            }
+            if (reportTransactionAsFailed)
+              (Success(HttpResponse(entity = HttpEntity(TransactionStatus.FAILED.toString))), id)
+            else
+              (Success(HttpResponse(entity = HttpEntity(TransactionStatus.FINISHED.toString))), id)
           case HttpMethods.PUT =>
-            capturedStatusUpdateRequests += req
-            Future {
-              HttpResponse(status = NoContent)
-            }
+            capturedStatusUpdateRequests += request
+            (Success(HttpResponse(status = NoContent)), id)
         }
     }
 

@@ -1,22 +1,20 @@
 package se.nimsa.sbx.app.routing
 
-import org.scalatest.Matchers
-import org.scalatest.FlatSpec
+import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.server._
+import org.scalatest.{FlatSpecLike, Matchers}
 import se.nimsa.sbx.seriestype.SeriesTypeDAO
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
-import scala.slick.driver.H2Driver
-import spray.httpx.SprayJsonSupport._
-import spray.http.StatusCodes._
+import se.nimsa.sbx.storage.RuntimeStorage
 import se.nimsa.sbx.util.TestUtil
-import spray.http.BodyPart
-import spray.http.MultipartFormData
-import se.nimsa.sbx.dicom.DicomHierarchy.Image
 
-class SeriesTypeRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
+class SeriesTypeRoutesTest extends {
+  val dbProps = TestUtil.createTestDb("seriestyperoutestest")
+  val storage = new RuntimeStorage
+} with FlatSpecLike with Matchers with RoutesTestBase {
 
-  def dbUrl = "jdbc:h2:mem:seriestyperoutestest;DB_CLOSE_DELAY=-1"
-
-  val seriesTypeDao = new SeriesTypeDAO(H2Driver)
+  val db = dbProps.db
+  val seriesTypeDao = new SeriesTypeDAO(dbProps.driver)
 
   override def beforeEach() {
     db.withSession { implicit session =>
@@ -49,7 +47,7 @@ class SeriesTypeRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       status should be(Created)
       val returnedSeriesType = responseAs[SeriesType]
 
-      returnedSeriesType.id should be > (0L)
+      returnedSeriesType.id should be > 0L
       returnedSeriesType.name should be(seriesType.name)
     }
   }
@@ -57,7 +55,7 @@ class SeriesTypeRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   it should "return 403 forbidden when adding new series type as non-admin user" in {
     val seriesType = SeriesType(-1, "s1")
 
-    PostAsUser("/api/seriestypes", seriesType) ~> sealRoute(routes) ~> check {
+    PostAsUser("/api/seriestypes", seriesType) ~> Route.seal(routes) ~> check {
       status should be(Forbidden)
     }
   }
@@ -76,7 +74,7 @@ class SeriesTypeRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     GetAsUser("/api/seriestypes") ~> routes ~> check {
       val seriesTypes = responseAs[List[SeriesType]]
       seriesTypes.size should be(1)
-      seriesTypes(0).name should be(updatedSeriesType.name)
+      seriesTypes.head.name should be(updatedSeriesType.name)
     }
   }
 
@@ -99,7 +97,7 @@ class SeriesTypeRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       seriesTypeDao.insertSeriesType(SeriesType(-1, "st1"))
     }
 
-    DeleteAsUser(s"/api/seriestypes/${addedSeriesType.id}") ~> sealRoute(routes) ~> check {
+    DeleteAsUser(s"/api/seriestypes/${addedSeriesType.id}") ~> Route.seal(routes) ~> check {
       status should be(Forbidden)
     }
 
@@ -114,7 +112,7 @@ class SeriesTypeRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       seriesTypeDao.insertSeriesType(SeriesType(-1, "st1"))
     }
 
-    val addedSeriesTypeRule = db.withSession { implicit session =>
+    db.withSession { implicit session =>
       seriesTypeDao.insertSeriesTypeRule(SeriesTypeRule(-1, addedSeriesType.id))
     }
 
@@ -135,7 +133,7 @@ class SeriesTypeRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       status should be(Created)
       val returnedSeriesTypeRule = responseAs[SeriesTypeRule]
 
-      returnedSeriesTypeRule.id should be > (0L)
+      returnedSeriesTypeRule.id should be > 0L
       returnedSeriesTypeRule.seriesTypeId should be(addedSeriesType.id)
     }
   }
@@ -147,7 +145,7 @@ class SeriesTypeRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
     val seriesTypeRule = SeriesTypeRule(-1, addedSeriesType.id)
 
-    PostAsUser(s"/api/seriestypes/rules", seriesTypeRule) ~> sealRoute(routes) ~> check {
+    PostAsUser(s"/api/seriestypes/rules", seriesTypeRule) ~> Route.seal(routes) ~> check {
       status should be(Forbidden)
     }
   }
@@ -179,7 +177,7 @@ class SeriesTypeRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       seriesTypeDao.insertSeriesTypeRule(SeriesTypeRule(-1, addedSeriesType.id))
     }
 
-    DeleteAsUser(s"/api/seriestypes/rules/${addedSeriesTypeRule.id}") ~> sealRoute(routes) ~> check {
+    DeleteAsUser(s"/api/seriestypes/rules/${addedSeriesTypeRule.id}") ~> Route.seal(routes) ~> check {
       status should be(Forbidden)
     }
 
@@ -198,7 +196,7 @@ class SeriesTypeRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       seriesTypeDao.insertSeriesTypeRule(SeriesTypeRule(-1, addedSeriesType.id))
     }
 
-    val addedSeriesTypeRuleAttribute = db.withSession { implicit session =>
+    db.withSession { implicit session =>
       seriesTypeDao.insertSeriesTypeRuleAttribute(SeriesTypeRuleAttribute(-1, addedSeriesTypeRule.id, 1, "Name", None, None, "test"))
     }
 
@@ -223,7 +221,7 @@ class SeriesTypeRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       status should be(Created)
       val returnedSeriesTypeRuleAttribute = responseAs[SeriesTypeRuleAttribute]
 
-      returnedSeriesTypeRuleAttribute.id should be > (0L)
+      returnedSeriesTypeRuleAttribute.id should be > 0L
       returnedSeriesTypeRuleAttribute.seriesTypeRuleId should be(addedSeriesTypeRule.id)
       returnedSeriesTypeRuleAttribute.tag should be(seriesTypeRuleAttribute.tag)
       returnedSeriesTypeRuleAttribute.name should be(seriesTypeRuleAttribute.name)
@@ -242,7 +240,7 @@ class SeriesTypeRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
     val seriesTypeRuleAttribute = SeriesTypeRuleAttribute(-1, addedSeriesTypeRule.id, 1, "Name", None, None, "test")
 
-    PostAsUser(s"/api/seriestypes/rules/${addedSeriesTypeRule.id}/attributes", seriesTypeRuleAttribute) ~> sealRoute(routes) ~> check {
+    PostAsUser(s"/api/seriestypes/rules/${addedSeriesTypeRule.id}/attributes", seriesTypeRuleAttribute) ~> Route.seal(routes) ~> check {
       status should be(Forbidden)
     }
   }
@@ -282,7 +280,7 @@ class SeriesTypeRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       seriesTypeDao.insertSeriesTypeRuleAttribute(SeriesTypeRuleAttribute(-1, addedSeriesTypeRule.id, 1, "Name", None, None, "test"))
     }
 
-    DeleteAsUser(s"/api/seriestypes/rules/${addedSeriesTypeRule.id}/attributes/${addedSeriesTypeRuleAttribute.id}") ~> sealRoute(routes) ~> check {
+    DeleteAsUser(s"/api/seriestypes/rules/${addedSeriesTypeRule.id}/attributes/${addedSeriesTypeRuleAttribute.id}") ~> Route.seal(routes) ~> check {
       status should be(Forbidden)
     }
 

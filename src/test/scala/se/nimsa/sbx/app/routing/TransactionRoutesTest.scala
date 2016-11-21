@@ -2,33 +2,28 @@ package se.nimsa.sbx.app.routing
 
 import java.util.UUID
 
-import scala.slick.driver.H2Driver
-
-import org.scalatest.FlatSpec
-import org.scalatest.Matchers
-
+import akka.http.scaladsl.model.{ContentTypes, HttpEntity}
+import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.server._
+import akka.util.ByteString
+import org.scalatest.{FlatSpecLike, Matchers}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.box.BoxDAO
 import se.nimsa.sbx.box.BoxProtocol._
-import se.nimsa.sbx.dicom.DicomHierarchy.Patient
-import se.nimsa.sbx.dicom.DicomHierarchy.Image
+import se.nimsa.sbx.dicom.DicomHierarchy.{Image, Patient}
 import se.nimsa.sbx.dicom.DicomProperty._
 import se.nimsa.sbx.dicom.DicomUtil
-import se.nimsa.sbx.util.TestUtil
-import spray.http.BodyPart
-import spray.http.ContentTypes
-import spray.http.HttpData
-import spray.http.MultipartFormData
-import spray.http.StatusCodes._
-import spray.httpx.SprayJsonSupport._
-import spray.httpx.unmarshalling.BasicUnmarshallers.ByteArrayUnmarshaller
+import se.nimsa.sbx.storage.RuntimeStorage
 import se.nimsa.sbx.util.CompressionUtil._
+import se.nimsa.sbx.util.TestUtil
 
-class TransactionRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
+class TransactionRoutesTest extends {
+  val dbProps = TestUtil.createTestDb("transactionroutestest")
+  val storage = new RuntimeStorage
+} with FlatSpecLike with Matchers with RoutesTestBase {
 
-  def dbUrl = "jdbc:h2:mem:transactionroutestest;DB_CLOSE_DELAY=-1;DEFAULT_LOCK_TIMEOUT=10000"
-
-  val boxDao = new BoxDAO(H2Driver)
+  val db = dbProps.db
+  val boxDao = new BoxDAO(dbProps.driver)
 
   override def afterEach() {
     db.withSession { implicit session =>
@@ -39,8 +34,7 @@ class TransactionRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   def addPollBox(name: String) =
     PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData(name)) ~> routes ~> check {
       status should be(Created)
-      val response = responseAs[Box]
-      response
+      responseAs[Box]
     }
 
   def addPushBox(name: String) =
@@ -56,10 +50,10 @@ class TransactionRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
     // first, add a box on the poll (university) side
     val uniBox =
-      PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData("hosp")) ~> routes ~> check {
-        status should be(Created)
-        responseAs[Box]
-      }
+    PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData("hosp")) ~> routes ~> check {
+      status should be(Created)
+      responseAs[Box]
+    }
 
     // then, push an image from the hospital to the uni box we just set up
     val compressedBytes = compress(TestUtil.testImageByteArray)
@@ -68,7 +62,7 @@ class TransactionRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     val sequenceNumber = 1L
     val totalImageCount = 1L
 
-    Post(s"/api/transactions/${uniBox.token}/image?transactionid=$testTransactionId&sequencenumber=$sequenceNumber&totalimagecount=$totalImageCount", HttpData(compressedBytes)) ~> routes ~> check {
+    Post(s"/api/transactions/${uniBox.token}/image?transactionid=$testTransactionId&sequencenumber=$sequenceNumber&totalimagecount=$totalImageCount", HttpEntity(compressedBytes)) ~> routes ~> check {
       status should be(NoContent)
     }
   }
@@ -77,9 +71,9 @@ class TransactionRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
     // first, add a box on the poll (university) side
     val uniBox =
-      PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData("hosp")) ~> routes ~> check {
-        responseAs[Box]
-      }
+    PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData("hosp")) ~> routes ~> check {
+      responseAs[Box]
+    }
 
     // then, push an image from the hospital to the uni box we just set up
     val compressedBytes = compress(TestUtil.testImageByteArray)
@@ -88,7 +82,7 @@ class TransactionRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     val sequenceNumber = 1L
     val totalImageCount = 1L
 
-    Post(s"/api/transactions/${uniBox.token}/image?transactionid=$testTransactionId&sequencenumber=$sequenceNumber&totalimagecount=$totalImageCount", HttpData(compressedBytes)) ~> routes ~> check {
+    Post(s"/api/transactions/${uniBox.token}/image?transactionid=$testTransactionId&sequencenumber=$sequenceNumber&totalimagecount=$totalImageCount", HttpEntity(compressedBytes)) ~> routes ~> check {
       status should be(NoContent)
     }
 
@@ -98,20 +92,16 @@ class TransactionRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   }
 
   it should "return unauthorized when polling outgoing with unvalid token" in {
-    Get(s"/api/transactions/abc/outgoing/poll") ~> sealRoute(routes) ~> check {
+    Get(s"/api/transactions/abc/outgoing/poll") ~> Route.seal(routes) ~> check {
       status should be(Unauthorized)
     }
   }
 
   it should "return not found when polling empty outgoing" in {
     // first, add a box on the poll (university) side
-    val uniBox =
-      PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData("hosp2")) ~> routes ~> check {
-        status should be(Created)
-        responseAs[Box]
-      }
+    val uniBox = addPollBox("hosp2")
 
-    Get(s"/api/transactions/${uniBox.token}/outgoing/poll") ~> sealRoute(routes) ~> check {
+    Get(s"/api/transactions/${uniBox.token}/outgoing/poll") ~> Route.seal(routes) ~> check {
       status should be(NotFound)
     }
   }
@@ -141,9 +131,7 @@ class TransactionRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
   it should "return an image file when requesting outgoing transaction" in {
     // add image (image will get id 1)
-    val file = TestUtil.testImageFile
-    val mfd = MultipartFormData(Seq(BodyPart(file, "file")))
-    PostAsUser("/api/images", mfd)
+    PostAsUser("/api/images", TestUtil.testImageFormData)
 
     // first, add a box on the poll (university) side
     val uniBox = addPollBox("hosp4")
@@ -155,10 +143,10 @@ class TransactionRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
     // poll outgoing
     val transactionImage =
-      Get(s"/api/transactions/${uniBox.token}/outgoing/poll") ~> routes ~> check {
-        status should be(OK)
-        responseAs[OutgoingTransactionImage]
-      }
+    Get(s"/api/transactions/${uniBox.token}/outgoing/poll") ~> routes ~> check {
+      status should be(OK)
+      responseAs[OutgoingTransactionImage]
+    }
 
     // get image
     Get(s"/api/transactions/${uniBox.token}/outgoing?transactionid=${transactionImage.transaction.id}&imageid=${transactionImage.image.id}") ~> routes ~> check {
@@ -166,16 +154,14 @@ class TransactionRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
       contentType should be(ContentTypes.`application/octet-stream`)
 
-      val dicomData = DicomUtil.loadDicomData(decompress(responseAs[Array[Byte]]), withPixelData = true)
+      val dicomData = DicomUtil.loadDicomData(decompress(responseAs[ByteString].toArray), withPixelData = true)
       dicomData should not be null
     }
   }
 
   it should "mark outgoing image as sent when done is received" in {
     // add image (image will get id 1)
-    val file = TestUtil.testImageFile
-    val mfd = MultipartFormData(Seq(BodyPart(file, "file")))
-    PostAsUser("/api/images", mfd)
+    PostAsUser("/api/images", TestUtil.testImageFormData)
 
     // first, add a box on the poll (university) side
     val uniBox = addPollBox("hosp5")
@@ -187,10 +173,10 @@ class TransactionRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
     // poll outgoing
     val transactionImage =
-      Get(s"/api/transactions/${uniBox.token}/outgoing/poll") ~> routes ~> check {
-        status should be(OK)
-        responseAs[OutgoingTransactionImage]
-      }
+    Get(s"/api/transactions/${uniBox.token}/outgoing/poll") ~> routes ~> check {
+      status should be(OK)
+      responseAs[OutgoingTransactionImage]
+    }
 
     // check that outgoing image is not marked as sent at this stage
     transactionImage.image.sent shouldBe false
@@ -222,9 +208,7 @@ class TransactionRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
   it should "mark correct transaction as failed when failed message is received" in {
     // add image (image will get id 1)
-    val file = TestUtil.testImageFile
-    val mfd = MultipartFormData(Seq(BodyPart(file, "file")))
-    PostAsUser("/api/images", mfd)
+    PostAsUser("/api/images", TestUtil.testImageFormData)
 
     // first, add a box on the poll (university) side
     val uniBox = addPollBox("hosp5")
@@ -236,10 +220,10 @@ class TransactionRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
     // poll outgoing
     val transactionImage =
-      Get(s"/api/transactions/${uniBox.token}/outgoing/poll") ~> routes ~> check {
-        status should be(OK)
-        responseAs[OutgoingTransactionImage]
-      }
+    Get(s"/api/transactions/${uniBox.token}/outgoing/poll") ~> routes ~> check {
+      status should be(OK)
+      responseAs[OutgoingTransactionImage]
+    }
 
     // send failed
     Post(s"/api/transactions/${uniBox.token}/outgoing/failed", FailedOutgoingTransactionImage(transactionImage, "error message")) ~> routes ~> check {
@@ -265,16 +249,14 @@ class TransactionRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
     val transId = 12345
 
-    val transaction =
-      db.withSession { implicit session =>
-        boxDao.insertIncomingTransaction(IncomingTransaction(-1, uniBox.id, uniBox.name, transId, 45, 45, 48, 0, 0, TransactionStatus.FAILED))
-      }
+    db.withSession { implicit session =>
+      boxDao.insertIncomingTransaction(IncomingTransaction(-1, uniBox.id, uniBox.name, transId, 45, 45, 48, 0, 0, TransactionStatus.FAILED))
+    }
 
-    val reportedStatus =
-      Get(s"/api/transactions/${uniBox.token}/status?transactionid=$transId") ~> routes ~> check {
-        status shouldBe OK
-        responseAs[String] shouldBe "FAILED"
-      }
+    Get(s"/api/transactions/${uniBox.token}/status?transactionid=$transId") ~> routes ~> check {
+      status shouldBe OK
+      responseAs[String] shouldBe "FAILED"
+    }
   }
 
   it should "return 404 NotFound when asking for transaction status with an invalid transaction ID" in {
@@ -292,10 +274,9 @@ class TransactionRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
     val transId = 12345
 
-    val transaction =
-      db.withSession { implicit session =>
-        boxDao.insertIncomingTransaction(IncomingTransaction(-1, uniBox.id, uniBox.name, transId, 45, 45, 48, 0, 0, TransactionStatus.PROCESSING))
-      }
+    db.withSession { implicit session =>
+      boxDao.insertIncomingTransaction(IncomingTransaction(-1, uniBox.id, uniBox.name, transId, 45, 45, 48, 0, 0, TransactionStatus.PROCESSING))
+    }
 
     Put(s"/api/transactions/${uniBox.token}/status?transactionid=$transId", TransactionStatus.FAILED.toString) ~> routes ~> check {
       status shouldBe NoContent
@@ -319,9 +300,7 @@ class TransactionRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
   it should "correctly map dicom attributes according to supplied mapping when sending images" in {
     // add image (image will get id 1)
-    val file = TestUtil.testImageFile
-    val mfd = MultipartFormData(Seq(BodyPart(file, "file")))
-    PostAsUser("/api/images", mfd)
+    PostAsUser("/api/images", TestUtil.testImageFormData)
 
     // first, add a box on the poll (university) side
     val uniBox = addPollBox("hosp6")
@@ -343,19 +322,19 @@ class TransactionRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
 
     // poll outgoing
     val transactionImage =
-      Get(s"/api/transactions/${uniBox.token}/outgoing/poll") ~> routes ~> check {
-        status should be(OK)
-        responseAs[OutgoingTransactionImage]
-      }
+    Get(s"/api/transactions/${uniBox.token}/outgoing/poll") ~> routes ~> check {
+      status should be(OK)
+      responseAs[OutgoingTransactionImage]
+    }
 
     // get image
     val transactionId = transactionImage.transaction.id
     val imageId = transactionImage.image.id
     val compressedArray = Get(s"/api/transactions/${uniBox.token}/outgoing?transactionid=$transactionId&imageid=$imageId") ~> routes ~> check {
       status should be(OK)
-      responseAs[Array[Byte]]
+      responseAs[ByteString]
     }
-    val dicomData = DicomUtil.loadDicomData(decompress(compressedArray), withPixelData = false)
+    val dicomData = DicomUtil.loadDicomData(decompress(compressedArray.toArray), withPixelData = false)
     dicomData.attributes.getString(PatientName.dicomTag) should be("TEST NAME") // mapped
     dicomData.attributes.getString(PatientID.dicomTag) should be("TEST ID") // mapped
     dicomData.attributes.getString(PatientBirthDate.dicomTag) should be("19601010") // mapped

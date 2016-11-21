@@ -7,12 +7,16 @@ import java.nio.file.attribute.BasicFileAttributes
 import java.util.Date
 import java.util.stream.Collectors
 
+import akka.http.scaladsl.model.{ContentTypes, HttpEntity, Multipart}
+import akka.http.scaladsl.model.Multipart.FormData.BodyPart
+
 import scala.collection.JavaConverters._
 import scala.slick.jdbc.JdbcBackend.Session
 import org.dcm4che3.data.Attributes
 import org.dcm4che3.data.Tag
 import org.dcm4che3.data.VR
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.AnonymizationKey
+import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomPropertyValue._
@@ -25,7 +29,19 @@ import se.nimsa.sbx.seriestype.SeriesTypeDAO
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol.SeriesSeriesType
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol.SeriesType
 
+import scala.slick.driver.H2Driver
+
 object TestUtil {
+
+  def createMultipartFormWithFile(file: File) = Multipart.FormData(
+    BodyPart("file", HttpEntity.fromPath(
+      ContentTypes.`application/octet-stream`, file.toPath), Map("filename" -> file.getName)))
+
+  def createTestDb(name: String) = {
+    import scala.slick.jdbc.JdbcBackend.Database
+    val db = Database.forURL(s"jdbc:h2:mem:$name;DB_CLOSE_DELAY=-1", classOf[H2Driver].getName)
+    DbProps(db, H2Driver)
+  }
 
   def insertMetaData(metaDataDao: MetaDataDAO)(implicit session: Session) = {
     val pat1 = Patient(-1, PatientName("p1"), PatientID("s1"), PatientBirthDate("2000-01-01"), PatientSex("M"))
@@ -98,6 +114,7 @@ object TestUtil {
   }
 
   def testImageFile = new File(getClass.getResource("test.dcm").toURI)
+  def testImageFormData = createMultipartFormWithFile(testImageFile)
   def testSecondaryCaptureFile = new File(getClass.getResource("sc.dcm").toURI)
   def testImageDicomData(withPixelData: Boolean = true) = DicomUtil.loadDicomData(testImageFile.toPath, withPixelData)
   def testImageByteArray = DicomUtil.toByteArray(testImageFile.toPath)

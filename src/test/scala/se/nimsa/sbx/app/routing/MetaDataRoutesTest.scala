@@ -1,32 +1,28 @@
 package se.nimsa.sbx.app.routing
 
-import scala.slick.driver.H2Driver
-import org.scalatest.FlatSpec
-import org.scalatest.Matchers
-import se.nimsa.sbx.user.UserProtocol._
-import se.nimsa.sbx.user.UserProtocol.UserRole._
+import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.server._
+import org.scalatest.{FlatSpecLike, Matchers}
+import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomPropertyValue._
-import se.nimsa.sbx.metadata.MetaDataDAO
 import se.nimsa.sbx.metadata.MetaDataProtocol._
-import se.nimsa.sbx.storage.StorageProtocol._
-import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
-import se.nimsa.sbx.app.GeneralProtocol._
-import se.nimsa.sbx.util.TestUtil._
-import spray.http.StatusCodes._
-import spray.httpx.SprayJsonSupport._
+import se.nimsa.sbx.metadata.{MetaDataDAO, PropertiesDAO}
 import se.nimsa.sbx.seriestype.SeriesTypeDAO
-import se.nimsa.sbx.metadata.PropertiesDAO
-import spray.http.MultipartFormData
-import spray.http.BodyPart
+import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
+import se.nimsa.sbx.storage.RuntimeStorage
+import se.nimsa.sbx.util.TestUtil
+import se.nimsa.sbx.util.TestUtil._
 
-class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
+class MetaDataRoutesTest extends {
+  val dbProps = TestUtil.createTestDb("metadataroutestest")
+  val storage = new RuntimeStorage
+} with FlatSpecLike with Matchers with RoutesTestBase {
 
-  def dbUrl = "jdbc:h2:mem:metadataroutestest;DB_CLOSE_DELAY=-1"
-
-  val dao = new MetaDataDAO(H2Driver)
-  val seriesTypeDao = new SeriesTypeDAO(H2Driver)
-  val propertiesDao = new PropertiesDAO(H2Driver)
+  val db = dbProps.db
+  val dao = new MetaDataDAO(dbProps.driver)
+  val seriesTypeDao = new SeriesTypeDAO(dbProps.driver)
+  val propertiesDao = new PropertiesDAO(dbProps.driver)
 
   override def afterEach() {
     db.withSession { implicit session =>
@@ -60,7 +56,7 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     // given nothing
 
     // then
-    GetAsUser("/api/metadata/patients/1234") ~> routes ~> check {
+    GetAsUser("/api/metadata/patients/1234") ~> Route.seal(routes) ~> check {
       status should be(NotFound)
     }
   }
@@ -108,7 +104,7 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       val patients = responseAs[List[Patient]]
 
       patients should have size 2
-      patients(0).patientName.value should be("p1")
+      patients.head.patientName.value should be("p1")
       patients(1).patientName.value should be("p2")
     }
   }
@@ -121,14 +117,14 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
 
     // then
-    val query = Query(0, 10, Some(QueryOrder("patientName", false)), Seq[QueryProperty](), None)
+    val query = Query(0, 10, Some(QueryOrder("patientName", orderAscending = false)), Seq[QueryProperty](), None)
 
     PostAsUser("/api/metadata/patients/query", query) ~> routes ~> check {
       status should be(OK)
       val patients = responseAs[List[Patient]]
 
       patients should have size 2
-      patients(0).patientName.value should be("p2")
+      patients.head.patientName.value should be("p2")
       patients(1).patientName.value should be("p1")
     }
   }
@@ -141,21 +137,21 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     }
 
     // then
-    val query = Query(1, 1, Some(QueryOrder("patientName", false)), Seq[QueryProperty](), None)
+    val query = Query(1, 1, Some(QueryOrder("patientName", orderAscending = false)), Seq[QueryProperty](), None)
 
     PostAsUser("/api/metadata/patients/query", query) ~> routes ~> check {
       status should be(OK)
       val patients = responseAs[List[Patient]]
 
       patients should have size 1
-      patients(0).patientName.value should be("p1")
+      patients.head.patientName.value should be("p1")
     }
   }
 
   it should "be able to filter results by source when querying patients" in {
     // given
     db.withSession { implicit session =>
-      val (dbPatient1, (dbStudy1, dbStudy2), (dbSeries1, dbSeries2, dbSeries3, dbSeries4), (dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)) =
+      val (_, (_, _), (dbSeries1, dbSeries2, dbSeries3, dbSeries4), (dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)) =
         insertMetaData(dao)
       insertProperties(seriesTypeDao, propertiesDao, dbSeries1, dbSeries2, dbSeries3, dbSeries4, dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)
     }
@@ -180,7 +176,7 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   it should "be able to filter results by series type when querying patients" in {
     // given
     db.withSession { implicit session =>
-      val (dbPatient1, (dbStudy1, dbStudy2), (dbSeries1, dbSeries2, dbSeries3, dbSeries4), (dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)) =
+      val (_, (_, _), (dbSeries1, dbSeries2, dbSeries3, dbSeries4), (dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)) =
         insertMetaData(dao)
       insertProperties(seriesTypeDao, propertiesDao, dbSeries1, dbSeries2, dbSeries3, dbSeries4, dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)
     }
@@ -211,7 +207,7 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   it should "be able to filter results by series tags when querying patients" in {
     // given
     db.withSession { implicit session =>
-      val (dbPatient1, (dbStudy1, dbStudy2), (dbSeries1, dbSeries2, dbSeries3, dbSeries4), (dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)) =
+      val (_, (_, _), (dbSeries1, dbSeries2, dbSeries3, dbSeries4), (dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)) =
         insertMetaData(dao)
       insertProperties(seriesTypeDao, propertiesDao, dbSeries1, dbSeries2, dbSeries3, dbSeries4, dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)
     }
@@ -297,7 +293,7 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     val queryProperties = Seq(QueryProperty("seriesInstanceUID", QueryOperator.EQUALS, "seuid1"))
     val query = Query(0, 10, None, queryProperties, None)
 
-    PostAsUser("/api/metadata/flatseries/query", query) ~> sealRoute(routes) ~> check {
+    PostAsUser("/api/metadata/flatseries/query", query) ~> Route.seal(routes) ~> check {
       status should be(OK)
       responseAs[List[FlatSeries]].size should be(1)
     }
@@ -430,9 +426,7 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       seriesTypeDao.insertSeriesTypeRuleAttribute(SeriesTypeRuleAttribute(-1, addedSeriesTypeRule.id, 0x00100010, "PatientName", None, None, "anon270"))
     }
 
-    val file = testImageFile
-    val mfd = MultipartFormData(Seq(BodyPart(file, "file")))
-    val addedSeriesId = PostAsUser("/api/images", mfd) ~> routes ~> check {
+    val addedSeriesId = PostAsUser("/api/images", TestUtil.testImageFormData) ~> routes ~> check {
       status should be(Created)
       responseAs[Image].seriesId
     }
@@ -444,7 +438,7 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       status should be(OK)
       val seriesTypes = responseAs[List[SeriesType]]
       seriesTypes.length should be(1)
-      seriesTypes(0).name should be("st1")
+      seriesTypes.head.name should be("st1")
     }
   }
 
@@ -453,8 +447,7 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       seriesTypeDao.insertSeriesType(SeriesType(-1, "st0"))
     }
 
-    val mfd = MultipartFormData(Seq(BodyPart(testImageFile, "file")))
-    val addedSeriesId = PostAsUser("/api/images", mfd) ~> routes ~> check {
+    val addedSeriesId = PostAsUser("/api/images", TestUtil.testImageFormData) ~> routes ~> check {
       responseAs[Image].seriesId
     }
 
@@ -469,7 +462,7 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     GetAsUser(s"/api/metadata/series/$addedSeriesId/seriestypes") ~> routes ~> check {
       val seriesTypes = responseAs[List[SeriesType]]
       seriesTypes should have length 1
-      seriesTypes(0) shouldBe addedSeriesType
+      seriesTypes.head shouldBe addedSeriesType
     }
   }
 
@@ -478,7 +471,7 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       seriesTypeDao.insertSeriesType(SeriesType(-1, "st0"))
     }
 
-    val addedSeriesId = PostAsUser("/api/images", MultipartFormData(Seq(BodyPart(testImageFile, "file")))) ~> routes ~> check {
+    val addedSeriesId = PostAsUser("/api/images", TestUtil.testImageFormData) ~> routes ~> check {
       responseAs[Image].seriesId
     }
 
@@ -509,7 +502,7 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   }
 
   it should "return 404 NotFound when adding a series type that does not exist to a series" in {
-    val addedSeriesId = PostAsUser("/api/images", MultipartFormData(Seq(BodyPart(testImageFile, "file")))) ~> routes ~> check {
+    val addedSeriesId = PostAsUser("/api/images", TestUtil.testImageFormData) ~> routes ~> check {
       responseAs[Image].seriesId
     }
 
@@ -526,7 +519,7 @@ class MetaDataRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       seriesTypeDao.insertSeriesType(SeriesType(-1, "st2"))
     }
 
-    val addedSeriesId = PostAsUser("/api/images", MultipartFormData(Seq(BodyPart(testImageFile, "file")))) ~> routes ~> check {
+    val addedSeriesId = PostAsUser("/api/images", TestUtil.testImageFormData) ~> routes ~> check {
       responseAs[Image].seriesId
     }
 

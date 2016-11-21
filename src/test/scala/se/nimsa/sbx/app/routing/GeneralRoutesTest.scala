@@ -1,31 +1,20 @@
 package se.nimsa.sbx.app.routing
 
-import scala.slick.driver.H2Driver
-import org.scalatest.FlatSpec
-import org.scalatest.Matchers
+import org.scalatest.{FlatSpecLike, Matchers}
 import se.nimsa.sbx.user.UserProtocol._
 import se.nimsa.sbx.user.UserProtocol.UserRole._
 import se.nimsa.sbx.box.BoxProtocol.RemoteBoxConnectionData
-import se.nimsa.sbx.dicom.DicomHierarchy._
-import se.nimsa.sbx.dicom.DicomPropertyValue._
-import se.nimsa.sbx.metadata.MetaDataDAO
-import se.nimsa.sbx.metadata.MetaDataProtocol._
-import se.nimsa.sbx.storage.StorageProtocol._
-import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
 import se.nimsa.sbx.util.TestUtil
-import spray.http.StatusCodes._
-import spray.httpx.SprayJsonSupport._
-import se.nimsa.sbx.seriestype.SeriesTypeDAO
-import se.nimsa.sbx.metadata.PropertiesDAO
-import spray.http.MultipartFormData
-import spray.http.BodyPart
 import se.nimsa.sbx.scu.ScuProtocol.ScuData
 import se.nimsa.sbx.scp.ScpProtocol.ScpData
 import se.nimsa.sbx.app.GeneralProtocol._
+import akka.http.scaladsl.model.StatusCodes._
+import se.nimsa.sbx.storage.RuntimeStorage
 
-class GeneralRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
-
-  def dbUrl = "jdbc:h2:mem:generalroutestest;DB_CLOSE_DELAY=-1"
+class GeneralRoutesTest extends {
+  val dbProps = TestUtil.createTestDb("generalroutestest")
+  val storage = new RuntimeStorage
+} with FlatSpecLike with Matchers with RoutesTestBase {
 
   "General routes" should "return a list of sources of the correct length" in {
     PostAsAdmin("/api/users", ClearTextUser("name", ADMINISTRATOR, "password")) ~> routes ~> check {

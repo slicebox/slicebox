@@ -18,22 +18,23 @@ package se.nimsa.sbx.app.routing
 
 import akka.pattern.ask
 
-import spray.http.StatusCodes.NoContent
-import spray.http.StatusCodes.Created
-import spray.httpx.SprayJsonSupport._
-import spray.routing._
+import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.server.Route
 
-import se.nimsa.sbx.app.SliceboxService
+import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.user.UserProtocol._
 import se.nimsa.sbx.scp.ScpProtocol._
 
-trait ScpRoutes { this: SliceboxService =>
+trait ScpRoutes { this: SliceboxBase =>
 
 def scpRoutes(apiUser: ApiUser): Route =
     pathPrefix("scps") {
       pathEndOrSingleSlash {
         get {
-          parameters('startindex.as[Long] ? 0, 'count.as[Long] ? 20) { (startIndex, count) =>
+          parameters(
+            'startindex.as(nonNegativeFromStringUnmarshaller) ? 0,
+            'count.as(nonNegativeFromStringUnmarshaller) ? 20) { (startIndex, count) =>
             onSuccess(scpService.ask(GetScps(startIndex, count))) {
               case Scps(scps) =>
                 complete(scps)

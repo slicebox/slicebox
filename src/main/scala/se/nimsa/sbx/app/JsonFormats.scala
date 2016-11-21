@@ -24,6 +24,7 @@ import se.nimsa.sbx.dicom.DicomPropertyValue._
 import se.nimsa.sbx.dicom.ImageAttribute
 import se.nimsa.sbx.directory.DirectoryWatchProtocol._
 import se.nimsa.sbx.forwarding.ForwardingProtocol._
+import se.nimsa.sbx.importing.ImportProtocol._
 import se.nimsa.sbx.log.LogProtocol._
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.scp.ScpProtocol._
@@ -32,8 +33,6 @@ import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
 import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.user.UserProtocol._
 import spray.json._
-import spray.routing.authentication.UserPass
-import se.nimsa.sbx.importing.ImportProtocol._
 
 trait JsonFormats extends DefaultJsonProtocol {
 
@@ -198,5 +197,5 @@ trait JsonFormats extends DefaultJsonProtocol {
   implicit val forwardingRuleFormat = jsonFormat4(ForwardingRule)
   
   implicit val importSessionFormat = jsonFormat9(ImportSession)
-  
+
 }

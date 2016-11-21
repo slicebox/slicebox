@@ -19,28 +19,30 @@ package se.nimsa.sbx.app.routing
 import java.io.FileNotFoundException
 import java.nio.file.NoSuchFileException
 
-import spray.routing._
-import spray.http.StatusCodes._
-import se.nimsa.sbx.app.SliceboxService
-import spray.routing.ExceptionHandler
-import se.nimsa.sbx.lang.NotFoundException
-import se.nimsa.sbx.lang.BadGatewayException
+import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.server.AuthenticationFailedRejection.{CredentialsMissing, CredentialsRejected}
+import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.server.{AuthenticationFailedRejection, ExceptionHandler, RejectionHandler, Route}
+import se.nimsa.sbx.app.SliceboxBase
+import se.nimsa.sbx.lang.{BadGatewayException, NotFoundException}
+import se.nimsa.sbx.user.Authenticator
 
 trait SliceboxRoutes extends DirectoryRoutes
-    with ScpRoutes
-    with ScuRoutes
-    with MetadataRoutes
-    with ImageRoutes
-    with AnonymizationRoutes
-    with BoxRoutes
-    with TransactionRoutes
-    with ForwardingRoutes
-    with UserRoutes
-    with LogRoutes
-    with UiRoutes
-    with GeneralRoutes
-    with SeriesTypeRoutes
-    with ImportRoutes { this: SliceboxService =>
+  with ScpRoutes
+  with ScuRoutes
+  with MetadataRoutes
+  with ImageRoutes
+  with AnonymizationRoutes
+  with BoxRoutes
+  with TransactionRoutes
+  with ForwardingRoutes
+  with UserRoutes
+  with LogRoutes
+  with UiRoutes
+  with GeneralRoutes
+  with SeriesTypeRoutes
+  with ImportRoutes {
+  this: SliceboxBase =>
 
   implicit val knownExceptionHandler =
     ExceptionHandler {
@@ -56,32 +58,40 @@ trait SliceboxRoutes extends DirectoryRoutes
         complete((BadGateway, e.getMessage))
     }
 
-  implicit val authRejectionHandler = RejectionHandler {
-    case AuthenticationFailedRejection(cause, headers) :: _ =>
-      complete((Unauthorized, "This resource requires authentication. Use either basic auth, or supply the session cookie obtained by logging in."))
-  }
+  lazy val authenticator = new Authenticator(userService)
 
-  def sliceboxRoutes: Route =
+  val authenticationFailedWithoutChallenge = RejectionHandler.newBuilder().handle {
+    case AuthenticationFailedRejection(cause, _) =>
+      val message = cause match {
+        case CredentialsMissing => "The resource requires authentication, which was not supplied with the request"
+        case CredentialsRejected => "The supplied authentication is invalid"
+      }
+      complete((Unauthorized, message))
+  }.result()
+
+  def routes: Route =
     pathPrefix("api") {
-      extractAuthKey { authKey =>
-        loginRoute(authKey) ~
-          currentUserRoute(authKey) ~
-          authenticate(authenticator.newAuthenticator(authKey)) { apiUser =>
-            userRoutes(apiUser, authKey) ~
-              directoryRoutes(apiUser) ~
-              scpRoutes(apiUser) ~
-              scuRoutes(apiUser) ~
-              metaDataRoutes ~
-              imageRoutes(apiUser) ~
-              anonymizationRoutes(apiUser) ~
-              boxRoutes(apiUser) ~
-              logRoutes ~
-              generalRoutes(apiUser) ~
-              seriesTypeRoutes(apiUser) ~
-              forwardingRoutes(apiUser) ~
-              importRoutes(apiUser)
-          }
-      } ~ transactionRoutes ~ healthCheckRoute
+      handleRejections(authenticationFailedWithoutChallenge) {
+        extractAuthKey { authKey =>
+          loginRoute(authKey) ~
+            currentUserRoute(authKey) ~
+            authenticateBasicAsync(realm = "slicebox", authenticator(authKey)) { apiUser =>
+              userRoutes(apiUser, authKey) ~
+                directoryRoutes(apiUser) ~
+                scpRoutes(apiUser) ~
+                scuRoutes(apiUser) ~
+                metaDataRoutes ~
+                imageRoutes(apiUser) ~
+                anonymizationRoutes(apiUser) ~
+                boxRoutes(apiUser) ~
+                logRoutes ~
+                generalRoutes(apiUser) ~
+                seriesTypeRoutes(apiUser) ~
+                forwardingRoutes(apiUser) ~
+                importRoutes(apiUser)
+            }
+        } ~ transactionRoutes ~ healthCheckRoute
+      }
     } ~
       pathPrefixTest(!"api") {
         pathPrefix("assets") {

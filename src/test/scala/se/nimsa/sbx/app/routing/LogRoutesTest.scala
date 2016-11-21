@@ -1,20 +1,19 @@
 package se.nimsa.sbx.app.routing
 
-import org.scalatest.BeforeAndAfterAll
-import org.scalatest.FlatSpec
-import org.scalatest.Matchers
+import akka.http.scaladsl.model.StatusCodes._
+import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 import se.nimsa.sbx.log.LogProtocol.LogEntry
-import se.nimsa.sbx.log.SbxLog
-import spray.http.StatusCodes._
-import spray.httpx.SprayJsonSupport._
-import scala.slick.driver.H2Driver
-import se.nimsa.sbx.log.LogDAO
+import se.nimsa.sbx.log.{LogDAO, SbxLog}
+import se.nimsa.sbx.storage.RuntimeStorage
+import se.nimsa.sbx.util.TestUtil
 
-class LogRoutesTest extends FlatSpec with Matchers with RoutesTestBase with BeforeAndAfterAll {
+class LogRoutesTest extends {
+  val dbProps = TestUtil.createTestDb("logroutestest")
+  val storage = new RuntimeStorage
+} with FlatSpecLike with Matchers with RoutesTestBase with BeforeAndAfterAll {
 
-  def dbUrl = "jdbc:h2:mem:logroutestest;DB_CLOSE_DELAY=-1"
-  
-  val logDao = new LogDAO(H2Driver)
+  val db = dbProps.db
+  val logDao = new LogDAO(dbProps.driver)
 
   override def beforeEach() {
     db.withSession { implicit session =>
@@ -48,7 +47,7 @@ class LogRoutesTest extends FlatSpec with Matchers with RoutesTestBase with Befo
       logDao.listLogEntries(0, 2)
     }
     
-    DeleteAsUser(s"/api/log/${logEntries(0).id}") ~> routes ~> check {
+    DeleteAsUser(s"/api/log/${logEntries.head.id}") ~> routes ~> check {
       status should be (NoContent)
     }
     

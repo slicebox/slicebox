@@ -17,24 +17,23 @@
 package se.nimsa.sbx.app.routing
 
 import akka.pattern.ask
-import spray.http.ContentTypes
-import spray.http.HttpData
-import spray.http.HttpEntity
-import spray.http.StatusCodes._
-import spray.httpx.SprayJsonSupport._
-import spray.routing._
-import se.nimsa.sbx.app.SliceboxService
+import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.server.Route
+import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.user.UserProtocol._
 import se.nimsa.sbx.forwarding.ForwardingProtocol._
 
-trait ForwardingRoutes { this: SliceboxService =>
+trait ForwardingRoutes { this: SliceboxBase =>
 
   def forwardingRoutes(apiUser: ApiUser): Route =
     pathPrefix("forwarding") {
       pathPrefix("rules") {
         pathEndOrSingleSlash {
           get {
-            parameters('startindex.as[Long] ? 0, 'count.as[Long] ? 20) { (startIndex, count) =>
+            parameters(
+              'startindex.as(nonNegativeFromStringUnmarshaller) ? 0,
+              'count.as(nonNegativeFromStringUnmarshaller) ? 20) { (startIndex, count) =>
               onSuccess(forwardingService.ask(GetForwardingRules(startIndex, count))) {
                 case ForwardingRules(forwardingRules) =>
                   complete(forwardingRules)

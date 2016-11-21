@@ -18,24 +18,25 @@ package se.nimsa.sbx.box
 
 import akka.actor.{Actor, Props}
 import akka.event.{Logging, LoggingReceive}
+import akka.http.scaladsl.Http
+import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
+import akka.http.scaladsl.marshalling.Marshal
+import akka.http.scaladsl.model.StatusCodes.NotFound
+import akka.http.scaladsl.model._
+import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.pattern.ask
-import akka.util.Timeout
+import akka.stream.ActorMaterializer
+import akka.stream.scaladsl.{Sink, Source => StreamSource}
+import akka.util.{ByteString, Timeout}
 import org.dcm4che3.data.Attributes
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.app.GeneralProtocol._
-import se.nimsa.sbx.app.JsonFormats
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.dicom.DicomUtil._
 import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, MetaDataAdded}
 import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.util.CompressionUtil._
-import spray.client.pipelining._
-import spray.http.HttpResponse
-import spray.http.StatusCodes._
-import spray.httpx.SprayJsonSupport._
-import spray.httpx.marshalling.marshal
-import spray.httpx.unmarshalling.FromResponseUnmarshaller
 
 import scala.concurrent.Future
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
@@ -47,7 +48,7 @@ class BoxPollActor(box: Box,
                    boxServicePath: String = "../../BoxService",
                    metaDataServicePath: String = "../../MetaDataService",
                    storageServicePath: String = "../../StorageService",
-                   anonymizationServicePath: String = "../../AnonymizationService") extends Actor with JsonFormats {
+                   anonymizationServicePath: String = "../../AnonymizationService") extends Actor with BoxJsonFormats with SprayJsonSupport {
 
   val log = Logging(context.system, this)
 
@@ -58,14 +59,9 @@ class BoxPollActor(box: Box,
 
   implicit val system = context.system
   implicit val ec = context.dispatcher
+  implicit val materializer = ActorMaterializer()
 
-  def convertOption[T](implicit unmarshaller: FromResponseUnmarshaller[T]): Future[HttpResponse] => Future[Option[T]] =
-    (futureResponse: Future[HttpResponse]) => futureResponse.map { response =>
-      if (response.status == NotFound) None
-      else Some(unmarshal[T](unmarshaller)(response))
-    }
-
-  def sendRequestToRemoteBoxPipeline = sendReceive
+  val pool = Http().superPool[String]()
 
   val poller = system.scheduler.schedule(pollInterval, pollInterval) {
     self ! PollIncoming
@@ -119,11 +115,17 @@ class BoxPollActor(box: Box,
     }
   }
 
-  def pollRemoteBoxOutgoingPipeline = sendRequestToRemoteBoxPipeline ~> convertOption[OutgoingTransactionImage]
-
   def sendPollRequestToRemoteBox: Future[Option[OutgoingTransactionImage]] = {
     log.debug(s"Polling remote box ${box.name}")
-    pollRemoteBoxOutgoingPipeline(Get(s"${box.baseUrl}/outgoing/poll"))
+    val uri = s"${box.baseUrl}/outgoing/poll"
+    val connectionId = s"poll-${box.id}"
+    sliceboxRequest(HttpMethods.GET, uri, HttpEntity.Empty, connectionId)
+      .flatMap {
+        case response if response.status == NotFound =>
+          Future.successful(None)
+        case response =>
+          Unmarshal(response).to[OutgoingTransactionImage].map(Some(_))
+      }
   }
 
   def fetchFileForRemoteOutgoingTransaction(transactionImage: OutgoingTransactionImage): Future[Unit] = {
@@ -137,54 +139,57 @@ class BoxPollActor(box: Box,
     futureResponse.flatMap { response =>
       val statusCode = response.status.intValue
       if (statusCode >= 200 && statusCode < 300) {
-        val bytes = decompress(response.entity.data.toByteArray)
-        val dicomData = loadDicomData(bytes, withPixelData = true)
+        response.entity.dataBytes.fold(ByteString.empty)(_ ++ _).runWith(Sink.head).flatMap { compressedBytes =>
+          val bytes = decompress(compressedBytes.toArray)
+          val dicomData = loadDicomData(bytes, withPixelData = true)
 
-        if (dicomData == null)
-          signalFetchFileFailedPermanently(transactionImage, new IllegalArgumentException("Dicom data could not be read"))
+          if (dicomData == null)
+            signalFetchFileFailedPermanently(transactionImage, new IllegalArgumentException("Dicom data could not be read"))
 
-        else
-          anonymizationService.ask(ReverseAnonymization(dicomData.attributes)).mapTo[Attributes].flatMap { reversedAttributes =>
-            val source = Source(SourceType.BOX, box.name, box.id)
-            storageService.ask(CheckDicomData(dicomData, useExtendedContexts = true)).mapTo[Boolean].flatMap { status =>
-              metaDataService.ask(AddMetaData(dicomData.attributes, source)).mapTo[MetaDataAdded].flatMap { metaData =>
-                storageService.ask(AddDicomData(dicomData.copy(attributes = reversedAttributes), source, metaData.image)).mapTo[DicomDataAdded].flatMap { dicomDataAdded =>
-                  boxService.ask(UpdateIncoming(box, transactionImage.transaction.id, transactionImage.image.sequenceNumber, transactionImage.transaction.totalImageCount, dicomDataAdded.image.id, dicomDataAdded.overwrite)).flatMap {
-                    case IncomingUpdated(transaction) =>
-                      transaction.status match {
-                        case TransactionStatus.FAILED =>
-                          throw new RuntimeException("Invalid transaction")
-                        case _ =>
-                          sendRemoteOutgoingFileCompleted(transactionImage).map(_ => {})
-                      }
+          else
+            anonymizationService.ask(ReverseAnonymization(dicomData.attributes)).mapTo[Attributes].flatMap { reversedAttributes =>
+              val source = Source(SourceType.BOX, box.name, box.id)
+              storageService.ask(CheckDicomData(dicomData, useExtendedContexts = true)).mapTo[Boolean].flatMap { status =>
+                metaDataService.ask(AddMetaData(dicomData.attributes, source)).mapTo[MetaDataAdded].flatMap { metaData =>
+                  storageService.ask(AddDicomData(dicomData.copy(attributes = reversedAttributes), source, metaData.image)).mapTo[DicomDataAdded].flatMap { dicomDataAdded =>
+                    boxService.ask(UpdateIncoming(box, transactionImage.transaction.id, transactionImage.image.sequenceNumber, transactionImage.transaction.totalImageCount, dicomDataAdded.image.id, dicomDataAdded.overwrite)).flatMap {
+                      case IncomingUpdated(transaction) =>
+                        transaction.status match {
+                          case TransactionStatus.FAILED =>
+                            throw new RuntimeException("Invalid transaction")
+                          case _ =>
+                            sendRemoteOutgoingFileCompleted(transactionImage).map(_ => {})
+                        }
+                    }
                   }
                 }
               }
+            }.recoverWith {
+              case e: Exception =>
+                signalFetchFileFailedPermanently(transactionImage, e)
             }
-          }.recoverWith {
-            case e: Exception =>
-              signalFetchFileFailedPermanently(transactionImage, e)
-          }
-
+        }
       } else
-        signalFetchFileFailedPermanently(transactionImage, new RuntimeException(s"Server responded with status code $statusCode and message ${response.message.entity.asString}"))
+        Unmarshal(response).to[String].flatMap { message =>
+          signalFetchFileFailedPermanently(transactionImage, new RuntimeException(s"Server responded with status code $statusCode and message $message"))
+        }
     }
   }
 
   def getRemoteOutgoingFile(transactionImage: OutgoingTransactionImage): Future[HttpResponse] = {
     log.debug(s"Fetching remote outgoing image $transactionImage")
-    sendRequestToRemoteBoxPipeline(Get(s"${box.baseUrl}/outgoing?transactionid=${transactionImage.transaction.id}&imageid=${transactionImage.image.id}"))
+    val uri = s"${box.baseUrl}/outgoing?transactionid=${transactionImage.transaction.id}&imageid=${transactionImage.image.id}"
+    val connectionId = s"${transactionImage.transaction.id},${transactionImage.image.id}"
+    sliceboxRequest(HttpMethods.GET, uri, HttpEntity.Empty, connectionId)
   }
 
-  // We don't need to wait for done message to be sent since it is not critical that it is received by the remote box
   def sendRemoteOutgoingFileCompleted(transactionImage: OutgoingTransactionImage): Future[HttpResponse] =
-    marshal(transactionImage) match {
-      case Right(entity) =>
-        log.debug(s"Sending done for remote outgoing image $transactionImage")
-        sendRequestToRemoteBoxPipeline(Post(s"${box.baseUrl}/outgoing/done", entity))
-      case Left(e) =>
-        SbxLog.error("Box", s"Failed to send done message to box ${box.name}, data=$transactionImage")
-        Future.failed(e)
+    Marshal(transactionImage).to[MessageEntity].flatMap { entity =>
+      log.debug(s"Sending done for remote outgoing image $transactionImage")
+      val uri = s"${box.baseUrl}/outgoing/done"
+      val connectionId = s"done-${box.id}"
+      // We don't need to wait for done message to be sent since it is not critical that it is received by the remote box
+      sliceboxRequest(HttpMethods.POST, uri, entity, connectionId)
     }
 
   def signalFetchFileFailedTemporarily(transactionImage: OutgoingTransactionImage, exception: Exception): Future[Unit] =
@@ -201,13 +206,21 @@ class BoxPollActor(box: Box,
     }
 
   def sendRemoteOutgoingFileFailed(failedTransactionImage: FailedOutgoingTransactionImage): Future[HttpResponse] =
-    marshal(failedTransactionImage) match {
-      case Right(entity) =>
-        sendRequestToRemoteBoxPipeline(Post(s"${box.baseUrl}/outgoing/failed", entity))
-      case Left(e) =>
-        SbxLog.error("Box", s"Failed to send failed message to box ${box.name}, data=$failedTransactionImage")
-        Future.failed(e)
+    Marshal(failedTransactionImage).to[MessageEntity].flatMap { entity =>
+      val uri = s"${box.baseUrl}/outgoing/failed"
+      val connectionId = s"failed-${box.id}"
+      sliceboxRequest(HttpMethods.POST, uri, entity, connectionId)
     }
+
+  private def sliceboxRequest(method: HttpMethod, uri: String, entity: MessageEntity, connectionId: String): Future[HttpResponse] =
+    StreamSource
+      .single(HttpRequest(method = method, uri = uri, entity = entity) -> connectionId)
+      .via(pool)
+      .runWith(Sink.head)
+      .map {
+        case (Success(response), _) => response
+        case (Failure(error), _) => throw error
+      }
 
 }
 

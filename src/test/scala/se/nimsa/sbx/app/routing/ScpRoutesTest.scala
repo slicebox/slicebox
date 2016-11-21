@@ -1,18 +1,19 @@
 package se.nimsa.sbx.app.routing
 
-import org.scalatest.{FlatSpec, Matchers}
+import akka.http.scaladsl.model.StatusCodes._
+import org.scalatest.{FlatSpecLike, Matchers}
 import se.nimsa.sbx.scp.ScpDAO
 import se.nimsa.sbx.scp.ScpProtocol._
-import spray.http.StatusCodes._
-import spray.httpx.SprayJsonSupport._
+import se.nimsa.sbx.storage.RuntimeStorage
+import se.nimsa.sbx.util.TestUtil
 
-import scala.slick.driver.H2Driver
+class ScpRoutesTest extends {
+  val dbProps = TestUtil.createTestDb("scproutestest")
+  val storage = new RuntimeStorage
+} with FlatSpecLike with Matchers with RoutesTestBase {
 
-class ScpRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
-
-  def dbUrl = "jdbc:h2:mem:scproutestest;DB_CLOSE_DELAY=-1"
-  
-  val scpDao = new ScpDAO(H2Driver)
+  val db = dbProps.db
+  val scpDao = new ScpDAO(dbProps.driver)
   
   "SCP routes" should "return a success message when asked to start a new SCP" in {
     PostAsAdmin("/api/scps", ScpData(-1, "TestName", "TestAeTitle", 13579)) ~> routes ~> check {

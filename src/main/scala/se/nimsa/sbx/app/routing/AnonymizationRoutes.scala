@@ -20,24 +20,24 @@ import akka.pattern.ask
 import org.dcm4che3.data.Attributes
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.anonymization.AnonymizationUtil
-import se.nimsa.sbx.app.GeneralProtocol._
-import se.nimsa.sbx.app.SliceboxService
+import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.{DicomData, DicomUtil}
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.user.UserProtocol.ApiUser
 import se.nimsa.sbx.util.SbxExtensions._
-import spray.http.{HttpData, HttpEntity}
-import spray.http.MediaTypes._
-import spray.http.StatusCodes._
-import spray.httpx.SprayJsonSupport._
-import spray.routing.Route
+import akka.http.scaladsl.model.HttpEntity
+import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.model.MediaTypes._
+import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.server.Route
+import akka.util.ByteString
 
 import scala.concurrent.Future
 
 trait AnonymizationRoutes {
-  this: SliceboxService =>
+  this: SliceboxBase =>
 
   def anonymizationRoutes(apiUser: ApiUser): Route =
     path("images" / LongNumber / "anonymize") { imageId =>
@@ -55,7 +55,7 @@ trait AnonymizationRoutes {
             case Some(image) =>
               onSuccess(storageService.ask(GetDicomData(image, withPixelData = true)).mapTo[DicomData]) { dicomData =>
                 onSuccess(anonymizationService.ask(Anonymize(imageId, dicomData.attributes, tagValues)).mapTo[Attributes]) { anonAttributes =>
-                  complete(HttpEntity(`application/octet-stream`, HttpData(DicomUtil.toByteArray(dicomData.copy(attributes = anonAttributes)))))
+                  complete(ByteString(DicomUtil.toByteArray(dicomData.copy(attributes = anonAttributes))))
                 }
               }
             case None =>

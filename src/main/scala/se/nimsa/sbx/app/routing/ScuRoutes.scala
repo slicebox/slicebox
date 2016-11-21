@@ -18,22 +18,23 @@ package se.nimsa.sbx.app.routing
 
 import akka.pattern.ask
 
-import spray.http.StatusCodes.NoContent
-import spray.http.StatusCodes.Created
-import spray.httpx.SprayJsonSupport._
-import spray.routing._
+import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.server.Route
 
-import se.nimsa.sbx.app.SliceboxService
+import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.user.UserProtocol._
 import se.nimsa.sbx.scu.ScuProtocol._
 
-trait ScuRoutes { this: SliceboxService =>
+trait ScuRoutes { this: SliceboxBase =>
 
   def scuRoutes(apiUser: ApiUser): Route =
     pathPrefix("scus") {
       pathEndOrSingleSlash {
         get {
-          parameters('startindex.as[Long] ? 0, 'count.as[Long] ? 20) { (startIndex, count) =>
+          parameters(
+            'startindex.as(nonNegativeFromStringUnmarshaller) ? 0,
+            'count.as(nonNegativeFromStringUnmarshaller) ? 20) { (startIndex, count) =>
             onSuccess(scuService.ask(GetScus(startIndex, count))) {
               case Scus(scus) =>
                 complete(scus)

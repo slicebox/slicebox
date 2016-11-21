@@ -1,36 +1,41 @@
 package se.nimsa.sbx.box
 
 import akka.actor.{Actor, ActorSystem, Props}
+import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
+import akka.http.scaladsl.marshalling.Marshal
+import akka.http.scaladsl.model.ContentTypes._
+import akka.http.scaladsl.model.StatusCodes.{BadGateway, NoContent, NotFound, OK}
+import akka.http.scaladsl.model._
+import akka.stream.scaladsl.Flow
 import akka.testkit.{ImplicitSender, TestKit}
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
 import se.nimsa.sbx.anonymization.AnonymizationServiceActor
 import se.nimsa.sbx.app.{DbProps, JsonFormats}
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.box.MockupStorageActor.{ShowBadBehavior, ShowGoodBehavior}
+import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, MetaDataAdded}
 import se.nimsa.sbx.util.CompressionUtil._
 import se.nimsa.sbx.util.TestUtil
-import se.nimsa.sbx.dicom.DicomHierarchy.Image
-import spray.http.StatusCodes._
-import spray.http._
-import spray.httpx.marshalling._
-import spray.httpx.SprayJsonSupport._
 
 import scala.collection.mutable.ArrayBuffer
-import scala.concurrent.Future
+import scala.concurrent.Await
 import scala.concurrent.duration.DurationInt
 import scala.slick.driver.H2Driver
 import scala.slick.jdbc.JdbcBackend.Database
+import scala.util.{Success, Try}
 
 class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
-    with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach with JsonFormats {
+  with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach with JsonFormats with SprayJsonSupport {
 
   def this() = this(ActorSystem("BoxPollActorTestSystem"))
+
+  implicit val executor = system.dispatcher
 
   val db = Database.forURL("jdbc:h2:mem:boxpollactortest;DB_CLOSE_DELAY=-1", driver = "org.h2.Driver")
   val dbProps = DbProps(db, H2Driver)
 
-  val boxDao = new BoxDAO(H2Driver)
+  val boxDao = new BoxDAO(dbProps.driver)
 
   db.withSession { implicit session =>
     boxDao.create
@@ -42,7 +47,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       boxDao.insertBox(Box(-1, "some remote box", "abc", remoteBoxBaseUrl, BoxSendMethod.PUSH, online = false))
     }
 
-  val notFoundResponse = HttpResponse(NotFound)
+  val notFoundResponse = HttpResponse(status = NotFound)
   var responseCounter = -1
   val mockHttpResponses: ArrayBuffer[HttpResponse] = ArrayBuffer()
   val capturedRequests: ArrayBuffer[HttpRequest] = ArrayBuffer()
@@ -58,17 +63,16 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
   val boxService = system.actorOf(BoxServiceActor.props(dbProps, "http://testhost:1234", 1.minute), name = "BoxService")
   val pollBoxActorRef = system.actorOf(Props(new BoxPollActor(remoteBox, 1.hour, 1000.hours, "../BoxService", "../MetaDataService", "../StorageService", "../AnonymizationService") {
 
-    override def sendRequestToRemoteBoxPipeline = {
-      (req: HttpRequest) =>
-        {
-          capturedRequests += req
-          responseCounter = responseCounter + 1
-          Future {
-            if (responseCounter < mockHttpResponses.size) mockHttpResponses(responseCounter)
-            else notFoundResponse
-          }
-        }
+    override val pool = Flow.fromFunction[(HttpRequest, String), (Try[HttpResponse], String)] {
+      case (request, id) =>
+        capturedRequests += request
+        responseCounter = responseCounter + 1
+        if (responseCounter < mockHttpResponses.size)
+          (Success(mockHttpResponses(responseCounter)), id)
+        else
+          (Success(notFoundResponse), id)
     }
+
   }))
 
   override def beforeEach() {
@@ -107,11 +111,9 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       val transaction = OutgoingTransaction(outgoingTransactionId, 987, "some box", 1, 2, 112233, 112233, TransactionStatus.WAITING)
       val image = OutgoingImage(outgoingImageId, outgoingTransactionId, 666, 1, sent = false)
       val transactionImage = OutgoingTransactionImage(transaction, image)
-      
-      marshal(transactionImage) match {
-        case Right(entity) => mockHttpResponses += HttpResponse(StatusCodes.OK, entity)
-        case Left(e)       => fail(e)
-      }
+
+      val entity = Await.result(Marshal(transactionImage).to[MessageEntity], 30.seconds)
+      mockHttpResponses += HttpResponse(status = OK, entity = entity)
 
       pollBoxActorRef ! PollIncoming
 
@@ -127,15 +129,13 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       val image = OutgoingImage(outgoingImageId, outgoingTransactionId, 666, 1, sent = false)
       val transactionImage = OutgoingTransactionImage(transaction, image)
 
-      marshal(transactionImage) match {
-        case Right(entity) => mockHttpResponses += HttpResponse(StatusCodes.OK, entity)
-        case Left(e)       => fail(e)
-      }
+      val entity = Await.result(Marshal(transactionImage).to[MessageEntity], 30.seconds)
+      mockHttpResponses += HttpResponse(status = OK, entity = entity)
 
       val bytes = compress(TestUtil.testImageByteArray)
 
-      mockHttpResponses += HttpResponse(StatusCodes.OK, HttpEntity(ContentTypes.`application/octet-stream`, HttpData(bytes)))
-      mockHttpResponses += HttpResponse(StatusCodes.OK)
+      mockHttpResponses += HttpResponse(status = OK, entity = HttpEntity(`application/octet-stream`, bytes))
+      mockHttpResponses += HttpResponse(status = OK)
 
       pollBoxActorRef ! PollIncoming
 
@@ -181,22 +181,21 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       val image2 = OutgoingImage(2, outgoingTransactionId, 2, 2, sent = false)
       val transactionImage1 = OutgoingTransactionImage(transaction.copy(sentImageCount = 1), image1)
       val transactionImage2 = OutgoingTransactionImage(transaction.copy(sentImageCount = 2), image2)
-  
+
       val bytes = compress(TestUtil.testImageByteArray)
-      
+
       // insert mock responses for fetching two images
-      marshal(transactionImage1) match {
-        case Right(entity) => mockHttpResponses += HttpResponse(StatusCodes.OK, entity)
-        case Left(e)       => fail(e)
-      }
-      mockHttpResponses += HttpResponse(StatusCodes.OK, HttpEntity(ContentTypes.`application/octet-stream`, HttpData(bytes)))
-      mockHttpResponses += HttpResponse(StatusCodes.NoContent) // done reply
-      marshal(transactionImage2) match {
-        case Right(entity) => mockHttpResponses += HttpResponse(StatusCodes.OK, entity)
-        case Left(e)       => fail(e)
-      }
-      mockHttpResponses += HttpResponse(StatusCodes.OK, HttpEntity(ContentTypes.`application/octet-stream`, HttpData(bytes)))
-      mockHttpResponses += HttpResponse(StatusCodes.NoContent) // done reply
+      val entity1 = Await.result(Marshal(transactionImage1).to[MessageEntity], 30.seconds)
+      mockHttpResponses += HttpResponse(status = OK, entity = entity1)
+
+      mockHttpResponses += HttpResponse(status = OK, entity = HttpEntity(`application/octet-stream`, bytes))
+      mockHttpResponses += HttpResponse(NoContent)
+      // done reply
+      val entity2 = Await.result(Marshal(transactionImage2).to[MessageEntity], 30.seconds)
+      mockHttpResponses += HttpResponse(status = OK, entity = entity2)
+
+      mockHttpResponses += HttpResponse(status = OK, entity = HttpEntity(`application/octet-stream`, bytes))
+      mockHttpResponses += HttpResponse(NoContent) // done reply
 
       pollBoxActorRef ! PollIncoming
 
@@ -208,7 +207,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
         incomingTransactions.head.status shouldBe TransactionStatus.FINISHED
       }
     }
-    
+
     "mark incoming transaction as failed if the number of received files does not match the number of images in the transaction (the highest sequence number)" in {
       val outgoingTransactionId = 999
       val transaction = OutgoingTransaction(outgoingTransactionId, 987, "some box", 0, 3, 112233, 112233, TransactionStatus.WAITING)
@@ -216,22 +215,21 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       val image2 = OutgoingImage(3, outgoingTransactionId, 2, 3, sent = false)
       val transactionImage1 = OutgoingTransactionImage(transaction.copy(sentImageCount = 1), image1)
       val transactionImage2 = OutgoingTransactionImage(transaction.copy(sentImageCount = 3), image2)
-  
+
       val bytes = compress(TestUtil.testImageByteArray)
-      
+
       // insert mock responses for fetching two images
-      marshal(transactionImage1) match {
-        case Right(entity) => mockHttpResponses += HttpResponse(StatusCodes.OK, entity)
-        case Left(e)       => fail(e)
-      }
-      mockHttpResponses += HttpResponse(StatusCodes.OK, HttpEntity(ContentTypes.`application/octet-stream`, HttpData(bytes)))
-      mockHttpResponses += HttpResponse(StatusCodes.NoContent) // done reply
-      marshal(transactionImage2) match {
-        case Right(entity) => mockHttpResponses += HttpResponse(StatusCodes.OK, entity)
-        case Left(e)       => fail(e)
-      }
-      mockHttpResponses += HttpResponse(StatusCodes.OK, HttpEntity(ContentTypes.`application/octet-stream`, HttpData(bytes)))
-      mockHttpResponses += HttpResponse(StatusCodes.NoContent) // done reply
+      val entity1 = Await.result(Marshal(transactionImage1).to[MessageEntity], 30.seconds)
+      mockHttpResponses += HttpResponse(status = OK, entity = entity1)
+
+      mockHttpResponses += HttpResponse(status = OK, entity = HttpEntity(`application/octet-stream`, bytes))
+      mockHttpResponses += HttpResponse(NoContent)
+      // done reply
+      val entity2 = Await.result(Marshal(transactionImage2).to[MessageEntity], 30.seconds)
+      mockHttpResponses += HttpResponse(status = OK, entity = entity2)
+
+      mockHttpResponses += HttpResponse(status = OK, entity = HttpEntity(`application/octet-stream`, bytes))
+      mockHttpResponses += HttpResponse(NoContent) // done reply
 
       pollBoxActorRef ! PollIncoming
 
@@ -243,27 +241,24 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
         incomingTransactions.head.status shouldBe TransactionStatus.FAILED
       }
     }
-    
+
     "keep trying to fetch remote file until fetching succeeds" in {
       val outgoingTransactionId = 999
       val transaction = OutgoingTransaction(outgoingTransactionId, 987, "some box", 1, 2, 2, 2, TransactionStatus.WAITING)
       val image = OutgoingImage(456, outgoingTransactionId, 33, 1, sent = false)
       val transactionImage = OutgoingTransactionImage(transaction, image)
 
-      marshal(transactionImage) match {
-        case Right(entity) =>
-          mockHttpResponses += HttpResponse(StatusCodes.OK, entity)
-          mockHttpResponses += HttpResponse(StatusCodes.BadGateway)
-          mockHttpResponses += HttpResponse(StatusCodes.OK, entity)
-          mockHttpResponses += HttpResponse(StatusCodes.BadGateway)
-          mockHttpResponses += HttpResponse(StatusCodes.OK, entity)
-        case Left(e) => fail(e)
-      }
+      val entity = Await.result(Marshal(transactionImage).to[MessageEntity], 30.seconds)
+      mockHttpResponses += HttpResponse(status = OK, entity = entity)
+      mockHttpResponses += HttpResponse(status = BadGateway)
+      mockHttpResponses += HttpResponse(status = OK, entity = entity)
+      mockHttpResponses += HttpResponse(status = BadGateway)
+      mockHttpResponses += HttpResponse(status = OK, entity = entity)
 
       val bytes = compress(TestUtil.testImageByteArray)
 
-      mockHttpResponses += HttpResponse(StatusCodes.OK, HttpEntity(ContentTypes.`application/octet-stream`, HttpData(bytes)))
-      mockHttpResponses += HttpResponse(StatusCodes.NoContent)
+      mockHttpResponses += HttpResponse(status = OK, entity = HttpEntity(`application/octet-stream`, bytes))
+      mockHttpResponses += HttpResponse(NoContent)
 
       // poll box, outgoing transaction will be found and an attempt to fetch the file will fail
       pollBoxActorRef ! PollIncoming
@@ -289,15 +284,13 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       val image = OutgoingImage(456, outgoingTransactionId, 33, 1, sent = false)
       val transactionImage = OutgoingTransactionImage(transaction, image)
 
-      marshal(transactionImage) match {
-        case Right(entity) => mockHttpResponses += HttpResponse(StatusCodes.OK, entity)
-        case Left(e)       => fail(e)
-      }
+      val entity = Await.result(Marshal(transactionImage).to[MessageEntity], 30.seconds)
+      mockHttpResponses += HttpResponse(status = OK, entity = entity)
 
       val bytes = compress(Array[Byte](1, 24, 45, 65, 4, 54, 33, 22))
 
-      mockHttpResponses += HttpResponse(StatusCodes.OK, HttpEntity(ContentTypes.`application/octet-stream`, HttpData(bytes)))
-      mockHttpResponses += HttpResponse(StatusCodes.NoContent)
+      mockHttpResponses += HttpResponse(status = OK, entity = HttpEntity(`application/octet-stream`, bytes))
+      mockHttpResponses += HttpResponse(status = NoContent)
 
       // poll box, reading the file will fail, failed message will be sent
       pollBoxActorRef ! PollIncoming
@@ -316,15 +309,13 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       val image = OutgoingImage(456, outgoingTransactionId, 33, 1, sent = false)
       val transactionImage = OutgoingTransactionImage(transaction, image)
 
-      marshal(transactionImage) match {
-        case Right(entity) => mockHttpResponses += HttpResponse(StatusCodes.OK, entity)
-        case Left(e)       => fail(e)
-      }
+      val entity = Await.result(Marshal(transactionImage).to[MessageEntity], 30.seconds)
+      mockHttpResponses += HttpResponse(status = OK, entity = entity)
 
       val bytes = compress(TestUtil.testImageByteArray)
 
-      mockHttpResponses += HttpResponse(StatusCodes.OK, HttpEntity(ContentTypes.`application/octet-stream`, HttpData(bytes)))
-      mockHttpResponses += HttpResponse(StatusCodes.NoContent)
+      mockHttpResponses += HttpResponse(status = OK, entity = HttpEntity(`application/octet-stream`, bytes))
+      mockHttpResponses += HttpResponse(status = NoContent)
 
       // poll box, storing the file will fail, failed message will be sent
       pollBoxActorRef ! PollIncoming

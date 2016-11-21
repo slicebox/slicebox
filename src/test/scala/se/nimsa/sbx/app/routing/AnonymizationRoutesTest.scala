@@ -1,7 +1,11 @@
 package se.nimsa.sbx.app.routing
 
+import akka.http.scaladsl.model.HttpEntity
+import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.server._
+import akka.util.ByteString
 import org.dcm4che3.data.{Tag, VR}
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.{FlatSpecLike, Matchers}
 import se.nimsa.sbx.anonymization.AnonymizationDAO
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy._
@@ -11,19 +15,15 @@ import se.nimsa.sbx.metadata.MetaDataDAO
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.storage.RuntimeStorage
 import se.nimsa.sbx.util.TestUtil
-import spray.http.{BodyPart, HttpData, MultipartFormData}
-import spray.http.StatusCodes._
-import spray.httpx.unmarshalling.BasicUnmarshallers.ByteArrayUnmarshaller
-import spray.httpx.SprayJsonSupport._
 
-import scala.slick.driver.H2Driver
+class AnonymizationRoutesTest extends {
+  val dbProps = TestUtil.createTestDb("anonymizationroutestest")
+  val storage = new RuntimeStorage
+} with FlatSpecLike with Matchers with RoutesTestBase {
 
-class AnonymizationRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
-
-  def dbUrl = "jdbc:h2:mem:anonymizationroutestest;DB_CLOSE_DELAY=-1"
-
-  val dao = new AnonymizationDAO(H2Driver)
-  val metaDataDao = new MetaDataDAO(H2Driver)
+  val db = dbProps.db
+  val dao = new AnonymizationDAO(dbProps.driver)
+  val metaDataDao = new MetaDataDAO(dbProps.driver)
 
   override def afterEach() {
     db.withSession { implicit session =>
@@ -34,10 +34,8 @@ class AnonymizationRoutesTest extends FlatSpec with Matchers with RoutesTestBase
   }
 
   "Anonymization routes" should "return 200 OK and anonymize the data by removing the old data and inserting new anonymized data upon manual anonymization" in {
-    val file = TestUtil.testImageFile
-    val mfd = MultipartFormData(Seq(BodyPart(file, "file")))
     val image =
-      PostAsUser("/api/images", mfd) ~> routes ~> check {
+      PostAsUser("/api/images", TestUtil.testImageFormData) ~> routes ~> check {
         status shouldBe Created
         responseAs[Image]
       }
@@ -54,7 +52,7 @@ class AnonymizationRoutesTest extends FlatSpec with Matchers with RoutesTestBase
 
     image.id should not be anonImage.id
 
-    GetAsUser("/api/metadata/patients/1") ~> routes ~> check {
+    GetAsUser("/api/metadata/patients/1") ~> Route.seal(routes) ~> check {
       status should be(NotFound)
     }
     GetAsUser("/api/metadata/patients/2") ~> routes ~> check {
@@ -64,19 +62,19 @@ class AnonymizationRoutesTest extends FlatSpec with Matchers with RoutesTestBase
       anonPatient.patientID should not be flatSeries.patient.patientID
       anonPatient.patientSex should be(flatSeries.patient.patientSex)
     }
-    GetAsUser("/api/metadata/studies/1") ~> routes ~> check {
+    GetAsUser("/api/metadata/studies/1") ~> Route.seal(routes) ~> check {
       status should be(NotFound)
     }
     GetAsUser("/api/metadata/studies/2") ~> routes ~> check {
       status should be(OK)
     }
-    GetAsUser("/api/metadata/series/1") ~> routes ~> check {
+    GetAsUser("/api/metadata/series/1") ~> Route.seal(routes) ~> check {
       status should be(NotFound)
     }
     GetAsUser("/api/metadata/series/2") ~> routes ~> check {
       status should be(OK)
     }
-    GetAsUser("/api/metadata/images/1") ~> routes ~> check {
+    GetAsUser("/api/metadata/images/1") ~> Route.seal(routes) ~> check {
       status should be(NotFound)
     }
     GetAsUser("/api/metadata/images/2") ~> routes ~> check {
@@ -85,10 +83,8 @@ class AnonymizationRoutesTest extends FlatSpec with Matchers with RoutesTestBase
   }
 
   it should "return 200 OK and an anonymized version of the image with the supplied ID" in {
-    val file = TestUtil.testImageFile
-    val mfd = MultipartFormData(Seq(BodyPart(file, "file")))
     val image =
-      PostAsUser("/api/images", mfd) ~> routes ~> check {
+      PostAsUser("/api/images", TestUtil.testImageFormData) ~> routes ~> check {
         status shouldBe Created
         responseAs[Image]
       }
@@ -103,7 +99,7 @@ class AnonymizationRoutesTest extends FlatSpec with Matchers with RoutesTestBase
     val anonAttributes =
       PostAsUser(s"/api/images/${image.id}/anonymized", tagValues) ~> routes ~> check {
         status should be(OK)
-        DicomUtil.loadDicomData(responseAs[Array[Byte]], withPixelData = true).attributes
+        DicomUtil.loadDicomData(responseAs[ByteString].toArray, withPixelData = true).attributes
       }
 
     anonAttributes.getString(Tag.PatientName) shouldBe anonPatientName
@@ -116,13 +112,13 @@ class AnonymizationRoutesTest extends FlatSpec with Matchers with RoutesTestBase
     dd2.attributes.setString(Tag.PatientName, VR.PN, "John^Doe")
 
     val image1 =
-      PostAsUser("/api/images", HttpData(DicomUtil.toByteArray(dd1))) ~> routes ~> check {
+      PostAsUser("/api/images", HttpEntity(DicomUtil.toByteArray(dd1))) ~> routes ~> check {
         status should be(Created)
         responseAs[Image]
       }
 
     val image2 =
-      PostAsUser("/api/images", HttpData(DicomUtil.toByteArray(dd2))) ~> routes ~> check {
+      PostAsUser("/api/images", HttpEntity(DicomUtil.toByteArray(dd2))) ~> routes ~> check {
         status should be(Created)
         responseAs[Image]
       }
@@ -194,7 +190,7 @@ class AnonymizationRoutesTest extends FlatSpec with Matchers with RoutesTestBase
   }
 
   it should "return 404 NotFound when the requested anonymization key does not exist" in {
-    GetAsUser("/api/anonymization/keys/666") ~> sealRoute(routes) ~> check {
+    GetAsUser("/api/anonymization/keys/666") ~> Route.seal(routes) ~> check {
       status shouldBe NotFound
     }
   }
@@ -259,10 +255,8 @@ class AnonymizationRoutesTest extends FlatSpec with Matchers with RoutesTestBase
   }
 
   it should "remove related anonymization image record when an image is deleted" in {
-    val file = TestUtil.testImageFile
-    val mfd = MultipartFormData(Seq(BodyPart(file, "file")))
     val image =
-      PostAsUser("/api/images", mfd) ~> routes ~> check {
+      PostAsUser("/api/images", TestUtil.testImageFormData) ~> routes ~> check {
         status shouldBe Created
         responseAs[Image]
       }

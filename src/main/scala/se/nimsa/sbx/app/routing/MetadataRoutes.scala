@@ -18,16 +18,17 @@ package se.nimsa.sbx.app.routing
 
 import akka.pattern.ask
 import se.nimsa.sbx.app.GeneralProtocol._
-import se.nimsa.sbx.app.SliceboxService
+import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
-import spray.http.StatusCodes.{Created, NoContent, NotFound}
-import spray.httpx.SprayJsonSupport._
-import spray.routing._
+import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.server.Route
+import akka.http.scaladsl.unmarshalling.{PredefinedFromStringUnmarshallers, Unmarshaller}
 
 trait MetadataRoutes {
-  this: SliceboxService =>
+  this: SliceboxBase =>
 
   def metaDataRoutes: Route =
     pathPrefix("metadata") {
@@ -42,17 +43,17 @@ trait MetadataRoutes {
         pathEndOrSingleSlash {
           get {
             parameters(
-              'startindex.as[Long] ? 0,
-              'count.as[Long] ? 20,
+              'startindex.as(nonNegativeFromStringUnmarshaller) ? 0,
+              'count.as(nonNegativeFromStringUnmarshaller) ? 20,
               'orderby.as[String].?,
               'orderascending.as[Boolean] ? true,
               'filter.as[String].?,
               'sources.as[String].?,
               'seriestypes.as[String].?,
               'seriestags.as[String].?) { (startIndex, count, orderBy, orderAscending, filter, sourcesString, seriesTypesString, seriesTagsString) =>
-              val sources = sourcesString.map(parseSourcesString(_)).getOrElse(Array.empty)
-              val seriesTypes = seriesTypesString.map(parseIdsString(_)).getOrElse(Array.empty)
-              val seriesTags = seriesTagsString.map(parseIdsString(_)).getOrElse(Array.empty)
+              val sources = sourcesString.map(parseSourcesString).getOrElse(Array.empty)
+              val seriesTypes = seriesTypesString.map(parseIdsString).getOrElse(Array.empty)
+              val seriesTags = seriesTagsString.map(parseIdsString).getOrElse(Array.empty)
               onSuccess(metaDataService.ask(GetPatients(startIndex, count, orderBy, orderAscending, filter, sources, seriesTypes, seriesTags))) {
                 case Patients(patients) =>
                   complete(patients)
@@ -70,7 +71,7 @@ trait MetadataRoutes {
           }
         } ~ pathPrefix(LongNumber) { patientId =>
           pathEndOrSingleSlash {
-            get {
+            (get & rejectEmptyResponse) {
               onSuccess(metaDataService.ask(GetPatient(patientId)).mapTo[Option[Patient]]) {
                 complete(_)
               }
@@ -94,8 +95,8 @@ trait MetadataRoutes {
         pathEndOrSingleSlash {
           get {
             parameters(
-              'startindex.as[Long] ? 0,
-              'count.as[Long] ? 20,
+              'startindex.as(nonNegativeFromStringUnmarshaller) ? 0,
+              'count.as(nonNegativeFromStringUnmarshaller) ? 20,
               'patientid.as[Long],
               'sources.as[String].?,
               'seriestypes.as[String].?,
@@ -120,7 +121,7 @@ trait MetadataRoutes {
           }
         } ~ pathPrefix(LongNumber) { studyId =>
           pathEndOrSingleSlash {
-            get {
+            (get & rejectEmptyResponse) {
               onSuccess(metaDataService.ask(GetStudy(studyId)).mapTo[Option[Study]]) {
                 complete(_)
               }
@@ -144,8 +145,8 @@ trait MetadataRoutes {
         pathEndOrSingleSlash {
           get {
             parameters(
-              'startindex.as[Long] ? 0,
-              'count.as[Long] ? 20,
+              'startindex.as(nonNegativeFromStringUnmarshaller) ? 0,
+              'count.as(nonNegativeFromStringUnmarshaller) ? 20,
               'studyid.as[Long],
               'sources.as[String].?,
               'seriestypes.as[String].?,
@@ -170,13 +171,13 @@ trait MetadataRoutes {
           }
         } ~ pathPrefix(LongNumber) { seriesId =>
           pathEndOrSingleSlash {
-            get {
+            (get & rejectEmptyResponse) {
               onSuccess(metaDataService.ask(GetSingleSeries(seriesId)).mapTo[Option[Series]]) {
                 complete(_)
               }
             }
           } ~ path("source") {
-            get {
+            (get & rejectEmptyResponse) {
               onSuccess(metaDataService.ask(GetSourceForSeries(seriesId)).mapTo[Option[SeriesSource]]) { seriesSourceMaybe =>
                 complete(seriesSourceMaybe.map(_.source))
               }
@@ -246,8 +247,8 @@ trait MetadataRoutes {
         pathEndOrSingleSlash {
           get {
             parameters(
-              'startindex.as[Long] ? 0,
-              'count.as[Long] ? 20,
+              'startindex.as(nonNegativeFromStringUnmarshaller) ? 0,
+              'count.as(nonNegativeFromStringUnmarshaller) ? 20,
               'seriesid.as[Long]) { (startIndex, count, seriesId) =>
               onSuccess(metaDataService.ask(GetImages(startIndex, count, seriesId))) {
                 case Images(images) =>
@@ -265,7 +266,7 @@ trait MetadataRoutes {
             }
           }
         } ~ path(LongNumber) { imageId =>
-          get {
+          (get & rejectEmptyResponse) {
             onSuccess(metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]]) {
               complete(_)
             }
@@ -275,8 +276,8 @@ trait MetadataRoutes {
         pathEndOrSingleSlash {
           get {
             parameters(
-              'startindex.as[Long] ? 0,
-              'count.as[Long] ? 20,
+              'startindex.as(nonNegativeFromStringUnmarshaller) ? 0,
+              'count.as(nonNegativeFromStringUnmarshaller) ? 20,
               'orderby.as[String].?,
               'orderascending.as[Boolean] ? true,
               'filter.as[String].?,
@@ -302,7 +303,7 @@ trait MetadataRoutes {
             }
           }
         } ~ path(LongNumber) { seriesId =>
-          get {
+          (get & rejectEmptyResponse) {
             onSuccess(metaDataService.ask(GetSingleFlatSeries(seriesId)).mapTo[Option[FlatSeries]]) {
               complete(_)
             }

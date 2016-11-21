@@ -19,12 +19,11 @@ package se.nimsa.sbx.app.routing
 import scala.concurrent.Await
 import scala.concurrent.duration.DurationInt
 
-import akka.actor.ActorContext
 import akka.actor.PoisonPill
 import akka.pattern.ask
 import akka.pattern.gracefulStop
 import se.nimsa.sbx.app.GeneralProtocol._
-import se.nimsa.sbx.app.SliceboxService
+import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.box.BoxProtocol.Boxes
 import se.nimsa.sbx.box.BoxProtocol.GetBoxes
 import se.nimsa.sbx.directory.DirectoryWatchProtocol.GetWatchedDirectories
@@ -33,12 +32,12 @@ import se.nimsa.sbx.importing.ImportProtocol.{GetImportSessions, ImportSessions}
 import se.nimsa.sbx.scp.ScpProtocol._
 import se.nimsa.sbx.scu.ScuProtocol._
 import se.nimsa.sbx.user.UserProtocol._
-import spray.httpx.SprayJsonSupport._
-import spray.routing.Route
-import spray.http.StatusCodes.OK
+import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.server.Route
 
 trait GeneralRoutes {
-  this: SliceboxService =>
+  this: SliceboxBase =>
 
   def generalRoutes(apiUser: ApiUser): Route =
     pathPrefix("system") {
@@ -50,8 +49,7 @@ trait GeneralRoutes {
                 gracefulStop(forwardingService, 5.seconds, PoisonPill) andThen { case _ => gracefulStop(importService, 5.seconds, PoisonPill) } andThen { case _ => gracefulStop(directoryService, 5.seconds, PoisonPill) } andThen { case _ => gracefulStop(scpService, 5.seconds, PoisonPill) } andThen { case _ => gracefulStop(scuService, 5.seconds, PoisonPill) } andThen { case _ => gracefulStop(seriesTypeService, 5.seconds, PoisonPill) } andThen { case _ => gracefulStop(logService, 5.seconds, PoisonPill) } andThen { case _ => gracefulStop(storageService, 5.seconds, PoisonPill) } andThen { case _ => gracefulStop(metaDataService, 5.seconds, PoisonPill) } andThen { case _ => gracefulStop(boxService, 5.seconds, PoisonPill) } andThen { case _ => gracefulStop(anonymizationService, 5.seconds, PoisonPill) } andThen { case _ => gracefulStop(userService, 5.seconds, PoisonPill) }
               Await.ready(stop, 5.seconds)
 
-              val system = actorRefFactory.asInstanceOf[ActorContext].system
-              system.scheduler.scheduleOnce(1.second)(system.shutdown())(system.dispatcher)
+              system.scheduler.scheduleOnce(1.second)(system.terminate())
               "Shutting down in 1 second..."
             }
           }

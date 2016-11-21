@@ -19,31 +19,33 @@ package se.nimsa.sbx.app.routing
 import java.io.ByteArrayOutputStream
 import java.util.zip.{ZipEntry, ZipOutputStream}
 
-import akka.actor.{Actor, ActorLogging, ActorRef, Props}
+import akka.http.scaladsl.common.EntityStreamingSupport
+import akka.http.scaladsl.model.MediaTypes._
+import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.model.headers._
+import akka.http.scaladsl.model.{ContentTypeRange, ContentTypes, HttpEntity}
+import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.server.Route
 import akka.pattern.ask
-import scala.util.{Success, Failure}
+import akka.stream.scaladsl.{Flow, Sink, SourceQueueWithComplete, StreamConverters, Source => StreamSource}
+import akka.stream.{OverflowStrategy, QueueOfferResult}
+import akka.util.ByteString
 import org.dcm4che3.data.Attributes
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.ReverseAnonymization
 import se.nimsa.sbx.app.GeneralProtocol._
-import se.nimsa.sbx.app.SliceboxService
+import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.dicom.DicomHierarchy.{FlatSeries, Image, Patient, Study}
 import se.nimsa.sbx.dicom._
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.user.UserProtocol.ApiUser
 import se.nimsa.sbx.util.SbxExtensions._
-import spray.can.Http
-import spray.http.ContentType.apply
-import spray.http.HttpHeaders._
-import spray.http.MediaTypes._
-import spray.http.StatusCodes._
-import spray.http._
-import spray.routing.Route
 
 import scala.concurrent.Future
+import scala.util.{Failure, Success}
 
 trait ImageRoutes {
-  this: SliceboxService =>
+  this: SliceboxBase =>
 
   val chunkSize = 524288
   val bufferSize = chunkSize
@@ -52,98 +54,93 @@ trait ImageRoutes {
     pathPrefix("images") {
       pathEndOrSingleSlash {
         post {
-          formField('file.as[FormFile]) { file =>
-            addDicomDataRoute(file.entity.data.toByteArray, apiUser)
-          } ~ entity(as[Array[Byte]]) { bytes =>
+          fileUpload("file") {
+            case (_, bytes) => addDicomDataRoute(bytes, apiUser)
+          } ~ extractDataBytes { bytes =>
             addDicomDataRoute(bytes, apiUser)
           }
         }
-      } ~ noop {
-        import spray.httpx.SprayJsonSupport._
-        pathPrefix(LongNumber) { imageId =>
-          onSuccess(metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]]) {
-            case Some(image) =>
-              pathEndOrSingleSlash {
-                get {
-                  onSuccess(storageService.ask(GetImageData(image)).mapTo[DicomDataArray]) { imageData =>
-                    complete(HttpEntity(`application/octet-stream`, HttpData(imageData.data)))
-                  }
-                } ~ delete {
-                  onSuccess(storageService.ask(DeleteDicomData(image)).flatMap { _ =>
-                    metaDataService.ask(DeleteMetaData(image.id))
-                  }) {
-                    case _ =>
-                      complete(NoContent)
-                  }
+      } ~ pathPrefix(LongNumber) { imageId =>
+        onSuccess(metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]]) {
+          case Some(image) =>
+            pathEndOrSingleSlash {
+              get {
+                onSuccess(storageService.ask(GetImageData(image)).mapTo[DicomDataArray]) { imageData =>
+                  complete(ByteString(imageData.data))
                 }
-              } ~ path("attributes") {
-                get {
-                  onSuccess(storageService.ask(GetImageAttributes(image)).mapTo[List[ImageAttribute]]) {
-                    complete(_)
-                  }
-                }
-              } ~ path("imageinformation") {
-                get {
-                  onSuccess(storageService.ask(GetImageInformation(image)).mapTo[ImageInformation]) {
-                    complete(_)
-                  }
-                }
-              } ~ path("png") {
-                parameters(
-                  'framenumber.as[Int] ? 1,
-                  'windowmin.as[Int] ? 0,
-                  'windowmax.as[Int] ? 0,
-                  'imageheight.as[Int] ? 0) { (frameNumber, min, max, height) =>
-                  get {
-                    onComplete(storageService.ask(GetPngDataArray(image, frameNumber, min, max, height))) {
-                      case Success(PngDataArray(bytes)) => complete(HttpEntity(`image/png`, HttpData(bytes)))
-                      case Failure(e) => complete(NoContent)
-                      case _ => complete(InternalServerError)
-                    }
-                  }
+              } ~ delete {
+                complete(storageService.ask(DeleteDicomData(image)).flatMap(_ =>
+                  metaDataService.ask(DeleteMetaData(image.id)).map(_ =>
+                    NoContent)))
+              }
+            } ~ path("attributes") {
+              get {
+                onSuccess(storageService.ask(GetImageAttributes(image)).mapTo[List[ImageAttribute]]) {
+                  complete(_)
                 }
               }
-            case None =>
-              complete((NotFound, s"No image meta data found for image id $imageId"))
-          }
-        } ~ path("delete") {
-          post {
-            entity(as[Seq[Long]]) { imageIds =>
-              val futureDeleted = Future.sequence {
-                imageIds.map { imageId =>
-                  metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]].map { imageMaybe =>
-                    imageMaybe.map { image =>
-                      storageService.ask(DeleteDicomData(image)).flatMap { _ =>
-                        metaDataService.ask(DeleteMetaData(image.id))
-                      }
-                    }
-                  }.unwrap
+            } ~ path("imageinformation") {
+              get {
+                onSuccess(storageService.ask(GetImageInformation(image)).mapTo[ImageInformation]) {
+                  complete(_)
                 }
               }
-              onSuccess(futureDeleted) { m =>
-                complete(NoContent)
+            } ~ path("png") {
+              parameters(
+                'framenumber.as[Int] ? 1,
+                'windowmin.as[Int] ? 0,
+                'windowmax.as[Int] ? 0,
+                'imageheight.as[Int] ? 0) { (frameNumber, min, max, height) =>
+                get {
+                  onComplete(storageService.ask(GetPngDataArray(image, frameNumber, min, max, height))) {
+                    case Success(PngDataArray(bytes)) => complete(HttpEntity(`image/png`, bytes))
+                    case Failure(e) => complete(NoContent)
+                    case _ => complete(InternalServerError)
+                  }
+                }
               }
             }
-          }
-        } ~ path("export") {
-          post {
-            entity(as[Seq[Long]]) { imageIds =>
-              if (imageIds.isEmpty)
-                complete(NoContent)
-              else
-                complete(storageService.ask(CreateExportSet(imageIds)).mapTo[ExportSetId])
-            }
-          } ~ get {
-            parameter('id.as[Long]) { exportSetId =>
-              respondWithHeader(`Content-Disposition`("attachment; filename=\"slicebox-export.zip\"")) {
-                onSuccess(storageService.ask(GetExportSetImageIds(exportSetId)).mapTo[Option[Seq[Long]]]) {
-                  case Some(imageIds) =>
-                    ctx => {
-                      val streamer = actorRefFactory.actorOf(Props(new ChunkedZipStreamer(ctx.responder, imageIds)))
+          case None =>
+            complete((NotFound, s"No image meta data found for image id $imageId"))
+        }
+      } ~ path("delete") {
+        post {
+          entity(as[Seq[Long]]) { imageIds =>
+            val futureDeleted = Future.sequence {
+              imageIds.map { imageId =>
+                metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]].map { imageMaybe =>
+                  imageMaybe.map { image =>
+                    storageService.ask(DeleteDicomData(image)).flatMap { _ =>
+                      metaDataService.ask(DeleteMetaData(image.id))
                     }
-                  case None =>
-                    complete(NotFound)
-                }
+                  }
+                }.unwrap
+              }
+            }
+            onSuccess(futureDeleted) { m =>
+              complete(NoContent)
+            }
+          }
+        }
+      } ~ path("export") {
+        post {
+          entity(as[Seq[Long]]) { imageIds =>
+            if (imageIds.isEmpty)
+              complete(NoContent)
+            else
+              complete(storageService.ask(CreateExportSet(imageIds)).mapTo[ExportSetId])
+          }
+        } ~ get {
+          parameter('id.as[Long]) { exportSetId =>
+            respondWithHeader(`Content-Disposition`(ContentDispositionTypes.attachment, Map("filename" -> "slicebox-export.zip"))) {
+              onSuccess(storageService.ask(GetExportSetImageIds(exportSetId)).mapTo[Option[Seq[Long]]]) {
+                case Some(imageIds) =>
+                  implicit val streamSupport = new ByteStringEntityStreamingSupport()
+                  val source = StreamSource.queue[ByteString](0, OverflowStrategy.fail)
+                    .mapMaterializedValue(queue => new ImageZipper(queue).zipNext(imageIds))
+                  complete(source)
+                case None =>
+                  complete(NotFound)
               }
             }
           }
@@ -151,20 +148,20 @@ trait ImageRoutes {
       } ~ path("jpeg") {
         parameters('studyid.as[Long], 'description.?) { (studyId, optionalDescription) =>
           post {
-            entity(as[Array[Byte]]) { jpegBytes =>
-              import spray.httpx.SprayJsonSupport._
-
+            extractDataBytes { bytes =>
               val source = Source(SourceType.USER, apiUser.user, apiUser.id)
               val addedJpegFuture = metaDataService.ask(GetStudy(studyId)).mapTo[Option[Study]].flatMap { studyMaybe =>
                 studyMaybe.map { study =>
                   metaDataService.ask(GetPatient(study.patientId)).mapTo[Option[Patient]].map { patientMaybe =>
                     patientMaybe.map { patient =>
-                      val dicomData = Jpeg2Dcm(jpegBytes, patient, study, optionalDescription)
-                      metaDataService.ask(AddMetaData(dicomData.attributes, source)).mapTo[MetaDataAdded].flatMap { metaData =>
-                        storageService.ask(AddDicomData(dicomData, source, metaData.image)).map { _ => metaData.image }
+                      bytes.fold(ByteString.empty)(_ ++ _).runWith(Sink.head).map { allBytes =>
+                        val dicomData = Jpeg2Dcm(allBytes.toArray, patient, study, optionalDescription)
+                        metaDataService.ask(AddMetaData(dicomData.attributes, source)).mapTo[MetaDataAdded].flatMap { metaData =>
+                          storageService.ask(AddDicomData(dicomData, source, metaData.image)).map { _ => metaData.image }
+                        }
                       }
                     }
-                  }
+                  }.unwrap
                 }.unwrap
               }.unwrap
               onSuccess(addedJpegFuture) {
@@ -179,20 +176,23 @@ trait ImageRoutes {
       }
     }
 
-  private def addDicomDataRoute(bytes: Array[Byte], apiUser: ApiUser) = {
-    import spray.httpx.SprayJsonSupport._
-
-    val dicomData = DicomUtil.loadDicomData(bytes, withPixelData = true)
+  private def addDicomDataRoute(bytes: StreamSource[ByteString, Any], apiUser: ApiUser) = {
+    val is = bytes.runWith(StreamConverters.asInputStream())
+    val dicomData = DicomUtil.loadDicomData(is, withPixelData = true)
     val source = Source(SourceType.USER, apiUser.user, apiUser.id)
     val futureImageAndOverwrite =
-      storageService.ask(CheckDicomData(dicomData, useExtendedContexts = true)).mapTo[Boolean].flatMap { status =>
-        anonymizationService.ask(ReverseAnonymization(dicomData.attributes)).mapTo[Attributes].flatMap { reversedAttributes =>
-          metaDataService.ask(AddMetaData(reversedAttributes, source)).mapTo[MetaDataAdded].flatMap { metaData =>
-            storageService.ask(AddDicomData(dicomData.copy(attributes = reversedAttributes), source, metaData.image)).mapTo[DicomDataAdded].map { dicomDataAdded =>
-              (metaData.image, dicomDataAdded.overwrite)
-            }
+      storageService.ask(CheckDicomData(dicomData, useExtendedContexts = true)).mapTo[Boolean].flatMap {
+        status =>
+          anonymizationService.ask(ReverseAnonymization(dicomData.attributes)).mapTo[Attributes].flatMap {
+            reversedAttributes =>
+              metaDataService.ask(AddMetaData(reversedAttributes, source)).mapTo[MetaDataAdded].flatMap {
+                metaData =>
+                  storageService.ask(AddDicomData(dicomData.copy(attributes = reversedAttributes), source, metaData.image)).mapTo[DicomDataAdded].map {
+                    dicomDataAdded =>
+                      (metaData.image, dicomDataAdded.overwrite)
+                  }
+              }
           }
-        }
       }
     onSuccess(futureImageAndOverwrite) {
       case (image, overwrite) =>
@@ -203,50 +203,30 @@ trait ImageRoutes {
     }
   }
 
-  class ChunkedZipStreamer(recipient: ActorRef, imageIds: Seq[Long]) extends Actor with ActorLogging {
+  final class ByteStringEntityStreamingSupport(override val parallelism: Int,
+                                               override val unordered: Boolean) extends EntityStreamingSupport {
 
-    case class Ok(imageIds: Seq[Long])
-    case object Finalize
+    import akka.http.javadsl.{model => jm}
+
+    def this() = this(1, false)
+
+    private val identityFlow = Flow.fromFunction((i: ByteString) => i)
+
+    override val supported = ContentTypeRange(`application/octet-stream`)
+    override val contentType = ContentTypes.`application/octet-stream`
+    override val framingDecoder = identityFlow
+    override val framingRenderer = identityFlow
+    override def withSupported(sup: jm.ContentTypeRange) = new ByteStringEntityStreamingSupport(parallelism, unordered)
+    override def withContentType(ct: jm.ContentType) = new ByteStringEntityStreamingSupport(parallelism, unordered)
+    override def withParallelMarshalling(p: Int, u: Boolean) = new ByteStringEntityStreamingSupport(p, u)
+  }
+
+  class ImageZipper(queue: SourceQueueWithComplete[ByteString]) {
 
     val byteStream = new ByteArrayOutputStream()
     val zipStream = new ZipOutputStream(byteStream)
-    log.debug("Starting export zip stream")
 
-    recipient ! ChunkedResponseStart(HttpResponse()).withAck(Ok(imageIds))
-
-    def receive = {
-      case Finalize =>
-        log.debug("Finalizing images export zip stream")
-        recipient ! ChunkedMessageEnd
-        context.stop(self)
-
-      case Ok(Nil) =>
-        log.debug("Sending final chunk")
-        zipStream.close()
-        val zippedBytes = byteStream.toByteArray
-        recipient ! MessageChunk(zippedBytes).withAck(Finalize)
-
-      case Ok(remainingImageIds) =>
-        val imageId = remainingImageIds.head
-        log.debug(s"Sending images export zip stream chunk for image id $imageId")
-        getImageData(imageId).foreach {
-          case Some((image, flatSeries, imageData)) =>
-            val zipEntry = createZipEntry(image, flatSeries)
-            zipStream.putNextEntry(zipEntry)
-            zipStream.write(imageData.data)
-            val zippedBytes = byteStream.toByteArray
-            byteStream.reset()
-            recipient ! MessageChunk(zippedBytes).withAck(Ok(remainingImageIds.tail))
-          case _ =>
-            self ! Ok(remainingImageIds.tail)
-        }
-
-      case x: Http.ConnectionClosed =>
-        log.debug("Canceling images export zip stream due to {}", x)
-        context.stop(self)
-    }
-
-    def getImageData(imageId: Long): Future[Option[(Image, FlatSeries, DicomDataArray)]] =
+    private def getImageData(imageId: Long): Future[Option[(Image, FlatSeries, DicomDataArray)]] =
       metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]].flatMap { imageMaybe =>
         imageMaybe.map { image =>
           metaDataService.ask(GetSingleFlatSeries(image.seriesId)).mapTo[Option[FlatSeries]].map { flatSeriesMaybe =>
@@ -259,7 +239,7 @@ trait ImageRoutes {
         }.unwrap
       }
 
-    def createZipEntry(image: Image, flatSeries: FlatSeries): ZipEntry = {
+    private def createZipEntry(image: Image, flatSeries: FlatSeries): ZipEntry = {
 
       def sanitize(string: String) = string.replace('/', '-').replace('\\', '-')
 
@@ -269,6 +249,46 @@ trait ImageRoutes {
       val imageName = s"${image.id}.dcm"
       val entryName = s"$patientFolder/$studyFolder/$seriesFolder/$imageName"
       new ZipEntry(entryName)
+    }
+
+    def zipNext(imageIds: Seq[Long]): Unit = {
+      if (imageIds.nonEmpty) {
+        val imageId = imageIds.head
+        getImageData(imageId).onComplete {
+
+          case Success(Some((image, flatSeries, imageData))) =>
+            val zipEntry = createZipEntry(image, flatSeries)
+            zipStream.putNextEntry(zipEntry)
+            zipStream.write(imageData.data)
+            val zippedBytes = byteStream.toByteArray
+            byteStream.reset()
+            queue.offer(ByteString(zippedBytes)).onComplete {
+
+              case Success(QueueOfferResult.Enqueued) =>
+                zipNext(imageIds.tail)
+
+              case Success(result) =>
+                queue.fail(new Exception(s"Unable to add image $imageId to export stream: $result"))
+
+              case Failure(error) =>
+                queue.fail(error)
+            }
+
+          case Success(None) =>
+            queue.fail(new Exception(s"Could not find image data for image id $imageId"))
+
+          case Failure(error) =>
+            queue.fail(error)
+            zipStream.close()
+        }
+      } else {
+        zipStream.close()
+        val zippedBytes = byteStream.toByteArray
+        queue.offer(ByteString(zippedBytes)).onComplete {
+          case Success(_) => queue.complete()
+          case Failure(error) => queue.fail(error)
+        }
+      }
     }
 
   }

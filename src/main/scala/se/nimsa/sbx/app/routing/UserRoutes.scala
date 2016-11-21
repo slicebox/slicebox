@@ -17,24 +17,15 @@
 package se.nimsa.sbx.app.routing
 
 import akka.pattern.ask
-import spray.http.StatusCodes._
-import spray.httpx.SprayJsonSupport._
-import spray.routing._
-import se.nimsa.sbx.app.SliceboxService
-import se.nimsa.sbx.user.UserProtocol._
-import spray.routing.authentication.UserPass
-import spray.http.HttpCookie
-import spray.http.HttpHeader
-import spray.http.HttpHeaders.`User-Agent`
-import se.nimsa.sbx.user.UserProtocol.AuthKey
-import spray.http.HttpHeader
-import spray.http.HttpHeaders._
-import spray.http.RemoteAddress
-import shapeless._
-import se.nimsa.sbx.user.UserServiceActor
-import spray.http.DateTime
+import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.model.headers._
+import akka.http.scaladsl.model.{HttpHeader, RemoteAddress}
+import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.server.{Directive1, Route}
+import se.nimsa.sbx.app.SliceboxBase
+import se.nimsa.sbx.user.UserProtocol.{AuthKey, _}
 
-trait UserRoutes { this: SliceboxService =>
+trait UserRoutes { this: SliceboxBase =>
 
   val extractUserAgent: HttpHeader => Option[String] = {
     case a: `User-Agent` => Some(a.value)
@@ -42,15 +33,16 @@ trait UserRoutes { this: SliceboxService =>
   }
 
   val extractIP: Directive1[RemoteAddress] =
-    headerValuePF { case `X-Forwarded-For`(Seq(address, _*)) => address } |
-      headerValuePF { case `Remote-Address`(address) => address } |
-      headerValuePF { case h if h.is("x-real-ip") => RemoteAddress(h.value) } |
-      provide(RemoteAddress.Unknown)
+    headerValuePF {
+      case `X-Forwarded-For`(Seq(address, _*)) => address
+      case `Remote-Address`(address) => address
+      case `X-Real-Ip`(address) => address
+    } | provide(RemoteAddress.Unknown)
 
   def extractAuthKey: Directive1[AuthKey] =
-    (optionalCookie(sessionField) & extractIP & optionalHeaderValue(extractUserAgent)).hmap {
-      case optionalCookie :: ip :: optionalUserAgent :: HNil =>
-        AuthKey(optionalCookie.map(_.content), ip.toOption.map(_.getHostAddress), optionalUserAgent)
+    (optionalCookie(sessionField) & extractIP & optionalHeaderValue(extractUserAgent)).tmap {
+      case (optionalCookie, ip, optionalUserAgent) =>
+        AuthKey(optionalCookie.map(_.value), ip.toOption.map(_.getHostAddress), optionalUserAgent)
     }
 
   def loginRoute(authKey: AuthKey): Route =
@@ -59,7 +51,7 @@ trait UserRoutes { this: SliceboxService =>
         entity(as[UserPass]) { userPass =>
           onSuccess(userService.ask(Login(userPass, authKey))) {
             case LoggedIn(user, session) =>
-              setCookie(HttpCookie(sessionField, content = session.token, path = Some("/api"), httpOnly = true)) {
+              setCookie(HttpCookie(sessionField, value = session.token, path = Some("/api"), httpOnly = true)) {
                 complete(NoContent)
               }
             case LoginFailed =>
@@ -85,7 +77,9 @@ trait UserRoutes { this: SliceboxService =>
     pathPrefix("users") {
       pathEndOrSingleSlash {
         get {
-          parameters('startindex.as[Long] ? 0, 'count.as[Long] ? 20) { (startIndex, count) =>
+          parameters(
+            'startindex.as(nonNegativeFromStringUnmarshaller) ? 0,
+            'count.as(nonNegativeFromStringUnmarshaller) ? 20) { (startIndex, count) =>
             onSuccess(userService.ask(GetUsers(startIndex, count))) {
               case Users(users) =>
                 complete(users)

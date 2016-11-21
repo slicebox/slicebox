@@ -44,10 +44,8 @@ class PropertiesDAO(val driver: JdbcProfile) {
     def sourceType = column[String]("sourcetype")
     def sourceName = column[String]("sourcename")
     def sourceId = column[Long]("sourceid")
-    def * = (id, sourceType, sourceName, sourceId) <>(toSeriesSource.tupled, fromSeriesSource)
-
     def seriesSourceToImageFKey = foreignKey("seriesSourceToImageFKey", id, metaDataDao.seriesQuery)(_.id, onUpdate = ForeignKeyAction.Cascade, onDelete = ForeignKeyAction.Cascade)
-    def seriesIdJoin = metaDataDao.seriesQuery.filter(_.id === id)
+    def * = (id, sourceType, sourceName, sourceId) <>(toSeriesSource.tupled, fromSeriesSource)
   }
 
   private val seriesSourceQuery = TableQuery[SeriesSources]

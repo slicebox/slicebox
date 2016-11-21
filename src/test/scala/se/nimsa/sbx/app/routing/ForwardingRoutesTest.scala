@@ -1,19 +1,20 @@
 package se.nimsa.sbx.app.routing
 
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.{FlatSpecLike, Matchers}
 import se.nimsa.sbx.app.GeneralProtocol.{Destination, DestinationType, Source, SourceType}
 import se.nimsa.sbx.forwarding.ForwardingDAO
 import se.nimsa.sbx.forwarding.ForwardingProtocol.ForwardingRule
-import spray.http.StatusCodes.{Created, NoContent, OK}
-import spray.httpx.SprayJsonSupport._
+import akka.http.scaladsl.model.StatusCodes._
+import se.nimsa.sbx.storage.RuntimeStorage
+import se.nimsa.sbx.util.TestUtil
 
-import scala.slick.driver.H2Driver
+class ForwardingRoutesTest extends {
+  val dbProps = TestUtil.createTestDb("forwardingroutestest")
+  val storage = new RuntimeStorage
+} with FlatSpecLike with Matchers with RoutesTestBase {
 
-class ForwardingRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
-
-  def dbUrl = "jdbc:h2:mem:forwardingroutestest;DB_CLOSE_DELAY=-1"
-
-  val dao = new ForwardingDAO(H2Driver)
+  val db = dbProps.db
+  val dao = new ForwardingDAO(dbProps.driver)
 
   override def afterEach() {
     db.withSession { implicit session =>

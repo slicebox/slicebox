@@ -16,54 +16,22 @@
 
 package se.nimsa.sbx.user
 
-import scala.Left
-import scala.Right
-import scala.concurrent.ExecutionContext
-import scala.concurrent.Future
-
-import UserProtocol._
 import akka.actor.ActorRef
+import akka.http.scaladsl.server.directives.Credentials
 import akka.pattern.ask
 import akka.util.Timeout
-import spray.http.BasicHttpCredentials
-import spray.http.HttpHeaders.Authorization
-import spray.routing._
-import spray.routing.AuthenticationFailedRejection._
-import spray.routing.RequestContext
-import spray.routing.authentication.ContextAuthenticator
-import spray.routing.authentication.UserPass
-import spray.util.pimpSeq
+import se.nimsa.sbx.user.UserProtocol._
+
+import scala.concurrent.{ExecutionContext, Future}
 
 class Authenticator(userService: ActorRef)(implicit ec: ExecutionContext, timeout: Timeout) {
 
-  def newAuthenticator(authKey: AuthKey) =
-    new SliceboxAuthenticator(userService, authKey)
-}
-
-class SliceboxAuthenticator(userService: ActorRef, authKey: AuthKey)(implicit ec: ExecutionContext, timeout: Timeout) extends ContextAuthenticator[ApiUser] {
-
-  def apply(ctx: RequestContext) = {
-    val authHeader = ctx.request.headers.findByType[`Authorization`]
-    val credentials = authHeader.map { case Authorization(creds) => creds }
-    val optionalUserPass = credentials.flatMap {
-      case BasicHttpCredentials(user, pass) ⇒ Some(UserPass(user, pass))
-      case _                                ⇒ None
+  def apply(authKey: AuthKey)(credentials: Credentials): Future[Option[ApiUser]] =
+    credentials match {
+      case p @ Credentials.Provided(name) =>
+        userService.ask(GetUserByName(name)).mapTo[Option[ApiUser]]
+          .map(_.filter(_.passwordMatches(p)))
+      case _ =>
+        userService.ask(GetAndRefreshUserByAuthKey(authKey)).mapTo[Option[ApiUser]]
     }
-    authenticate(optionalUserPass, ctx) map {
-      case Some(user) => Right(user)
-      case None =>
-        val cause = if (authHeader.isEmpty) CredentialsMissing else CredentialsRejected
-        Left(AuthenticationFailedRejection(cause, Nil))
-    }
-  }
-
-  def authenticate(optionalUserPass: Option[UserPass], ctx: RequestContext): Future[Option[ApiUser]] = {
-    optionalUserPass
-      .map(userPass =>
-        userService.ask(GetUserByName(userPass.user)).mapTo[Option[ApiUser]]
-          .map(_.filter(_.passwordMatches(userPass.pass))))
-      .getOrElse(
-        userService.ask(GetAndRefreshUserByAuthKey(authKey)).mapTo[Option[ApiUser]])
-  }
-
 }

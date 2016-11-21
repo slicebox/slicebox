@@ -17,20 +17,22 @@
 package se.nimsa.sbx.app.routing
 
 import akka.pattern.ask
-import spray.httpx.SprayJsonSupport._
-import spray.routing._
-import spray.http.StatusCodes._
-import se.nimsa.sbx.app.SliceboxService
+import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.server.Route
+import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.directory.DirectoryWatchProtocol._
 import se.nimsa.sbx.user.UserProtocol._
 
-trait DirectoryRoutes { this: SliceboxService =>
+trait DirectoryRoutes { this: SliceboxBase =>
 
   def directoryRoutes(apiUser: ApiUser): Route =
     pathPrefix("directorywatches") {
       pathEndOrSingleSlash {
         get {
-          parameters('startindex.as[Long] ? 0, 'count.as[Long] ? 20) { (startIndex, count) =>
+          parameters(
+            'startindex.as(nonNegativeFromStringUnmarshaller) ? 0,
+            'count.as(nonNegativeFromStringUnmarshaller) ? 20) { (startIndex, count) =>
             onSuccess(directoryService.ask(GetWatchedDirectories(startIndex, count))) {
               case WatchedDirectories(directories) =>
                 complete(directories)

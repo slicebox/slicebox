@@ -94,7 +94,7 @@ class DirectoryWatchActor(watchedDirectory: WatchedDirectory,
 
   }
 
-  def waitForDatasetProcessed = LoggingReceive {
+  def waitForDatasetProcessed: Receive = LoggingReceive {
     case msg: FileAddedToWatchedDirectory =>
       stash()
     case DicomDataProcessed =>

@@ -1,6 +1,8 @@
 package se.nimsa.sbx.app.routing
 
 
+import java.net.InetAddress
+
 import com.typesafe.scalalogging.Logger
 import org.slf4j.LoggerFactory
 
@@ -8,20 +10,22 @@ import scala.concurrent.duration.DurationInt
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.Suite
-import se.nimsa.sbx.app.SliceboxService
 import se.nimsa.sbx.storage.RuntimeStorage
 import se.nimsa.sbx.user.UserProtocol.ClearTextUser
 import se.nimsa.sbx.user.UserProtocol.UserRole
-import spray.http.BasicHttpCredentials
-import spray.http.HttpRequest
-import spray.http.StatusCodes.OK
-import spray.httpx.SprayJsonSupport._
-import spray.httpx.marshalling.Marshaller
-import spray.testkit.ScalatestRouteTest
-import spray.http.HttpHeaders.`Remote-Address`
-import spray.http.HttpHeaders.`User-Agent`
+import akka.http.scaladsl.testkit.{RouteTestTimeout, ScalatestRouteTest}
+import akka.http.scaladsl.server._
+import akka.http.scaladsl.model.headers._
+import akka.http.scaladsl.model.StatusCodes.OK
+import akka.http.scaladsl.marshalling._
+import akka.http.scaladsl.model.{HttpHeader, HttpRequest, RemoteAddress}
+import akka.http.scaladsl.model.headers.BasicHttpCredentials
+import se.nimsa.sbx.app.SliceboxBase
 
-trait RoutesTestBase extends ScalatestRouteTest with SliceboxService with BeforeAndAfterAll with BeforeAndAfterEach { this: Suite =>
+import scala.concurrent.ExecutionContext
+
+trait RoutesTestBase extends ScalatestRouteTest with SliceboxBase with BeforeAndAfterAll with BeforeAndAfterEach {
+  this: Suite =>
 
   val logger = Logger(LoggerFactory.getLogger("se.nimsa.sbx"))
   implicit val routeTestTimeout = RouteTestTimeout(10.seconds)
@@ -29,19 +33,9 @@ trait RoutesTestBase extends ScalatestRouteTest with SliceboxService with Before
   val adminCredentials = BasicHttpCredentials(superUser, superPassword)
   val userCredentials = BasicHttpCredentials("user", "userpassword")
 
-  def actorRefFactory = system
-
-  /*
-   * Both test trait RouteTest and RestApi defines an implicit execution context (named executor and executionContext respectively). 
-   * Make sure they point to the test one to avoid ambiguous implicits.
-   */
-  override def executionContext = executor
-
-  def createStorageService() = new RuntimeStorage
-
   def addUser(name: String, password: String, role: UserRole) = {
     val user = ClearTextUser(name, role, password)
-    PostAsAdmin("/api/users", user) ~> sealRoute(routes) ~> check {
+    PostAsAdmin("/api/users", user) ~> Route.seal(routes) ~> check {
       status === OK
     }
   }
@@ -50,24 +44,26 @@ trait RoutesTestBase extends ScalatestRouteTest with SliceboxService with Before
     addUser(userCredentials.username, userCredentials.password, UserRole.USER)
   }
 
-  def GetWithHeaders(url: String): HttpRequest = Get(url) ~> addHeader(`Remote-Address`("1.2.3.4")) ~> addHeader(`User-Agent`("spray-test"))
-  def DeleteWithHeaders(url: String): HttpRequest = Delete(url) ~> addHeader(`Remote-Address`("1.2.3.4")) ~> addHeader(`User-Agent`("spray-test"))
-  def PutWithHeaders[E: Marshaller](url: String, e: E): HttpRequest = Put(url, e) ~> addHeader(`Remote-Address`("1.2.3.4")) ~> addHeader(`User-Agent`("spray-test"))
-  def PutWithHeaders(url: String): HttpRequest = Put(url) ~> addHeader(`Remote-Address`("1.2.3.4")) ~> addHeader(`User-Agent`("spray-test"))
-  def PostWithHeaders[E: Marshaller](url: String, e: E): HttpRequest = Post(url, e) ~> addHeader(`Remote-Address`("1.2.3.4")) ~> addHeader(`User-Agent`("spray-test"))
-  def PostWithHeaders(url: String): HttpRequest = Post(url) ~> addHeader(`Remote-Address`("1.2.3.4")) ~> addHeader(`User-Agent`("spray-test"))
-  
-  def GetAsAdmin(url: String): HttpRequest = GetWithHeaders(url) ~> addCredentials(adminCredentials)
-  def GetAsUser(url: String): HttpRequest = GetWithHeaders(url) ~> addCredentials(userCredentials)
-  def DeleteAsAdmin(url: String): HttpRequest = DeleteWithHeaders(url) ~> addCredentials(adminCredentials)
-  def DeleteAsUser(url: String): HttpRequest = DeleteWithHeaders(url) ~> addCredentials(userCredentials)
-  def PutAsAdmin[E: Marshaller](url: String, e: E): HttpRequest = PutWithHeaders(url, e) ~> addCredentials(adminCredentials)
-  def PutAsUser[E: Marshaller](url: String, e: E): HttpRequest = PutWithHeaders(url, e) ~> addCredentials(userCredentials)
-  def PutAsAdmin(url: String): HttpRequest = PutWithHeaders(url) ~> addCredentials(adminCredentials)
-  def PutAsUser(url: String): HttpRequest = PutWithHeaders(url) ~> addCredentials(userCredentials)
-  def PostAsAdmin[E: Marshaller](url: String, e: E): HttpRequest = PostWithHeaders(url, e) ~> addCredentials(adminCredentials)
-  def PostAsUser[E: Marshaller](url: String, e: E): HttpRequest = PostWithHeaders(url, e) ~> addCredentials(userCredentials)
-  def PostAsAdmin(url: String): HttpRequest = PostWithHeaders(url) ~> addCredentials(adminCredentials)
-  def PostAsUser(url: String): HttpRequest = PostWithHeaders(url) ~> addCredentials(userCredentials)
+  val testHeaders: scala.collection.immutable.Seq[HttpHeader] = scala.collection.immutable.Seq(`Remote-Address`(RemoteAddress(InetAddress.getByName("1.2.3.4"))), `User-Agent`(ProductVersion("slicebox-test")))
+
+  def GetWithHeaders(url: String): HttpRequest = Get(url).withHeaders(testHeaders)
+  def DeleteWithHeaders(url: String): HttpRequest = Delete(url).withHeaders(testHeaders)
+  def PutWithHeaders[E](url: String, e: E)(implicit m: ToEntityMarshaller[E], ec: ExecutionContext): HttpRequest = Put(url, e).withHeaders(testHeaders)
+  def PutWithHeaders(url: String): HttpRequest = Put(url).withHeaders(testHeaders)
+  def PostWithHeaders[E](url: String, e: E)(implicit m: ToEntityMarshaller[E], ec: ExecutionContext): HttpRequest = Post(url, e).withHeaders(testHeaders)
+  def PostWithHeaders(url: String): HttpRequest = Post(url).withHeaders(testHeaders)
+
+  def GetAsAdmin(url: String): HttpRequest = GetWithHeaders(url).addCredentials(adminCredentials)
+  def GetAsUser(url: String): HttpRequest = GetWithHeaders(url).addCredentials(userCredentials)
+  def DeleteAsAdmin(url: String): HttpRequest = DeleteWithHeaders(url).addCredentials(adminCredentials)
+  def DeleteAsUser(url: String): HttpRequest = DeleteWithHeaders(url).addCredentials(userCredentials)
+  def PutAsAdmin[E](url: String, e: E)(implicit m: ToEntityMarshaller[E], ec: ExecutionContext): HttpRequest = PutWithHeaders(url, e).addCredentials(adminCredentials)
+  def PutAsUser[E](url: String, e: E)(implicit m: ToEntityMarshaller[E], ec: ExecutionContext): HttpRequest = PutWithHeaders(url, e).addCredentials(userCredentials)
+  def PutAsAdmin(url: String): HttpRequest = PutWithHeaders(url).addCredentials(adminCredentials)
+  def PutAsUser(url: String): HttpRequest = PutWithHeaders(url).addCredentials(userCredentials)
+  def PostAsAdmin[E](url: String, e: E)(implicit m: ToEntityMarshaller[E], ec: ExecutionContext): HttpRequest = PostWithHeaders(url, e).addCredentials(adminCredentials)
+  def PostAsUser[E](url: String, e: E)(implicit m: ToEntityMarshaller[E], ec: ExecutionContext): HttpRequest = PostWithHeaders(url, e).addCredentials(userCredentials)
+  def PostAsAdmin(url: String): HttpRequest = PostWithHeaders(url).addCredentials(adminCredentials)
+  def PostAsUser(url: String): HttpRequest = PostWithHeaders(url).addCredentials(userCredentials)
 
 }

@@ -1,28 +1,31 @@
 package se.nimsa.sbx.app.routing
 
-import org.scalatest.FlatSpec
-import org.scalatest.Matchers
-import spray.httpx.SprayJsonSupport._
+import java.net.InetAddress
+
+import org.scalatest.{FlatSpecLike, Matchers}
 import se.nimsa.sbx.user.UserProtocol._
 import se.nimsa.sbx.user.UserProtocol.UserRole._
-import spray.http.StatusCodes._
-import spray.http.HttpHeaders._
-import spray.http.BasicHttpCredentials
-import spray.routing.authentication.UserPass
-import spray.http.HttpCookie
 import java.util.UUID
+
+import akka.http.scaladsl.model.RemoteAddress
 import se.nimsa.sbx.user.UserDAO
-import scala.slick.driver.H2Driver
+import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.model.headers.{ProductVersion, _}
+import akka.http.scaladsl.server._
+import se.nimsa.sbx.storage.RuntimeStorage
+import se.nimsa.sbx.util.TestUtil
 
-class UserRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
-
-  def dbUrl = "jdbc:h2:mem:userroutestest;DB_CLOSE_DELAY=-1"
+class UserRoutesTest extends {
+  val dbProps = TestUtil.createTestDb("userroutestest")
+  val storage = new RuntimeStorage
+} with FlatSpecLike with Matchers with RoutesTestBase {
 
   val user = ClearTextUser("name", ADMINISTRATOR, "password")
 
   val invalidCredentials = BasicHttpCredentials("john", "password")
 
-  val userDao = new UserDAO(H2Driver)
+  val db = dbProps.db
+  val userDao = new UserDAO(dbProps.driver)
 
   override def afterEach() {
     db.withSession { implicit session =>
@@ -59,7 +62,7 @@ class UserRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
     val users = GetAsAdmin("/api/users") ~> routes ~> check {
       responseAs[List[ApiUser]]
     }
-    DeleteAsAdmin("/api/users/" + users.head.id) ~> sealRoute(routes) ~> check {
+    DeleteAsAdmin("/api/users/" + users.head.id) ~> Route.seal(routes) ~> check {
       status should be(BadRequest)
     }
   }
@@ -71,10 +74,10 @@ class UserRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   }
 
   it should "return a list of users when asking for all users" in {
-    val addedUser1 = PostAsAdmin("/api/users", user) ~> routes ~> check {
+    PostAsAdmin("/api/users", user) ~> routes ~> check {
       responseAs[ApiUser]
     }
-    val addedUser2 = PostAsAdmin("/api/users", ClearTextUser("name2", ADMINISTRATOR, "password2")) ~> routes ~> check {
+    PostAsAdmin("/api/users", ClearTextUser("name2", ADMINISTRATOR, "password2")) ~> routes ~> check {
       responseAs[ApiUser]
     }
     GetAsAdmin("/api/users") ~> routes ~> check {
@@ -84,22 +87,22 @@ class UserRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   }
 
   it should "respond with Unautorized when requesting an arbitrary URL under /api without any credentials" in {
-    Get("/api/some/url") ~> sealRoute(routes) ~> check {
+    Get("/api/some/url") ~> Route.seal(routes) ~> check {
       status should be(Unauthorized)
     }
   }
 
   it should "respond with Unautorized when requesting an arbitrary URL under /api with bad credentials" in {
-    Get("/api/some/url") ~> addCredentials(invalidCredentials) ~> sealRoute(routes) ~> check {
+    Get("/api/some/url").addCredentials(invalidCredentials) ~> Route.seal(routes) ~> check {
       status should be(Unauthorized)
     }
   }
 
   it should "respond with OK when using a bad session cookie but valid basic auth credentials" in {
-    Get(s"/api/metadata/patients") ~> addHeader(Cookie(HttpCookie(sessionField, "badtoken"))) ~> addCredentials(adminCredentials) ~> routes ~> check {
+    Get(s"/api/metadata/patients").withHeaders(Cookie(sessionField, "badtoken")).addCredentials(adminCredentials) ~> routes ~> check {
       status should be(OK)
     }
-    GetWithHeaders(s"/api/metadata/patients") ~> addHeader(Cookie(HttpCookie(sessionField, "badtoken"))) ~> addCredentials(adminCredentials) ~> routes ~> check {
+    GetWithHeaders(s"/api/metadata/patients").withHeaders(Cookie(sessionField, "badtoken")).addCredentials(adminCredentials) ~> routes ~> check {
       status should be(OK)
     }
   }
@@ -109,7 +112,7 @@ class UserRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
       status should be(NoContent)
       val cookies = headers.map { case `Set-Cookie`(x) => x }
       cookies.head.name should be(sessionField)
-      UUID.fromString(cookies.head.content) should not be (null)
+      UUID.fromString(cookies.head.value) should not be null
     }
   }
 
@@ -124,9 +127,10 @@ class UserRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   it should "provide information on the currently logged in user when request is with auth cookie" in {
     val cookie = PostWithHeaders("/api/users/login", UserPass(superUser, superPassword)) ~> routes ~> check {
       status should be(NoContent)
-      headers.map { case `Set-Cookie`(x) => x }.head
+      val c = headers.map { case `Set-Cookie`(x) => x }.head
+      c.name -> c.value
     }
-    GetWithHeaders(s"/api/users/current") ~> addHeader(Cookie(cookie)) ~> routes ~> check {
+    GetWithHeaders(s"/api/users/current").addHeader(Cookie(cookie)) ~> routes ~> check {
       status should be(OK)
       val info = responseAs[UserInfo]
       info.user shouldBe superUser
@@ -135,7 +139,7 @@ class UserRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   }
 
   it should "return 404 NotFound when asking for information on the currently logged in user with invalid headers" in {
-    GetWithHeaders(s"/api/users/current") ~> sealRoute(routes) ~> check {
+    GetWithHeaders(s"/api/users/current") ~> Route.seal(routes) ~> check {
       status should be(NotFound)
     }
   }
@@ -143,15 +147,16 @@ class UserRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   it should "support logging out again such that subsequent API calls will return 401 Unauthorized" in {
     val cookie = PostWithHeaders("/api/users/login", UserPass(superUser, superPassword)) ~> routes ~> check {
       status should be(NoContent)
-      headers.map { case `Set-Cookie`(x) => x }.head
+      val c = headers.map { case `Set-Cookie`(x) => x }.head
+      c.name -> c.value
     }
-    GetWithHeaders(s"/api/metadata/patients") ~> addHeader(Cookie(cookie)) ~> routes ~> check {
+    GetWithHeaders(s"/api/metadata/patients").addHeader(Cookie(cookie)) ~> routes ~> check {
       status should be(OK)
     }
-    PostWithHeaders("/api/users/logout") ~> addHeader(Cookie(cookie)) ~> routes ~> check {
+    PostWithHeaders("/api/users/logout").addHeader(Cookie(cookie)) ~> routes ~> check {
       status should be(NoContent)
     }
-    GetWithHeaders(s"/api/metadata/patients") ~> addHeader(Cookie(cookie)) ~> sealRoute(routes) ~> check {
+    GetWithHeaders(s"/api/metadata/patients").addHeader(Cookie(cookie)) ~> Route.seal(routes) ~> check {
       status should be(Unauthorized)
     }
   }
@@ -159,12 +164,13 @@ class UserRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   it should "authorize a logged in user based on token only" in {
     val cookie = PostWithHeaders("/api/users/login", UserPass(superUser, superPassword)) ~> routes ~> check {
       status should be(NoContent)
-      headers.map { case `Set-Cookie`(x) => x }.head
+      val c = headers.map { case `Set-Cookie`(x) => x }.head
+      c.name -> c.value
     }
     db.withSession { implicit session =>
-      userDao.userSessionsByToken(cookie.content).length should be(1)
+      userDao.userSessionsByToken(cookie._2).length should be(1)
     }
-    GetWithHeaders(s"/api/metadata/patients") ~> addHeader(Cookie(cookie)) ~> routes ~> check {
+    GetWithHeaders(s"/api/metadata/patients").addHeader(Cookie(cookie)) ~> routes ~> check {
       status should be(OK)
     }
   }
@@ -172,21 +178,22 @@ class UserRoutesTest extends FlatSpec with Matchers with RoutesTestBase {
   it should "not authorize users with clients not disclosing their ip and/or user agent" in {
     val cookie = PostWithHeaders("/api/users/login", UserPass(superUser, superPassword)) ~> routes ~> check {
       status should be(NoContent)
-      headers.map { case `Set-Cookie`(x) => x }.head
+      val c = headers.map { case `Set-Cookie`(x) => x }.head
+      c.name -> c.value
     }
-    Get(s"/api/metadata/patients") ~> sealRoute(routes) ~> check {
+    Get(s"/api/metadata/patients") ~> Route.seal(routes) ~> check {
       status should be(Unauthorized)
     }
-    Get(s"/api/metadata/patients") ~> addHeader(Cookie(cookie)) ~> sealRoute(routes) ~> check {
+    Get(s"/api/metadata/patients").withHeaders(Cookie(cookie)) ~> Route.seal(routes) ~> check {
       status should be(Unauthorized)
     }
-    Get(s"/api/metadata/patients") ~> addHeader(Cookie(cookie)) ~> addHeader(`Remote-Address`("1.2.3.4")) ~> sealRoute(routes) ~> check {
+    Get(s"/api/metadata/patients").withHeaders(Cookie(cookie), `Remote-Address`(RemoteAddress(InetAddress.getByName("1.2.3.4")))) ~> Route.seal(routes) ~> check {
       status should be(Unauthorized)
     }
-    Get(s"/api/metadata/patients") ~> addHeader(Cookie(cookie)) ~> addHeader(`User-Agent`("spray-test")) ~> sealRoute(routes) ~> check {
+    Get(s"/api/metadata/patients").withHeaders(Cookie(cookie), `User-Agent`(ProductVersion("slicebox-test"))) ~> Route.seal(routes) ~> check {
       status should be(Unauthorized)
     }
-    Get(s"/api/metadata/patients") ~> addHeader(`Remote-Address`("1.2.3.4")) ~> addHeader(`User-Agent`("spray-test")) ~> sealRoute(routes) ~> check {
+    Get(s"/api/metadata/patients").withHeaders(`Remote-Address`(RemoteAddress(InetAddress.getByName("1.2.3.4"))), `User-Agent`(ProductVersion("slicebox-test"))) ~> Route.seal(routes) ~> check {
       status should be(Unauthorized)
     }
   }

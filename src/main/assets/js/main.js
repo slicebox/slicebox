@@ -29,7 +29,7 @@ angular.module('slicebox', [
 
     $mdThemingProvider.theme('default')
         .primaryPalette('blue-grey', {
-            'default': '600',
+            'default': '600'
         })
         .accentPalette('pink')
         .warnPalette('red');
