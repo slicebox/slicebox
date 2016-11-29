@@ -36,7 +36,7 @@ object UserProtocol {
     case object ADMINISTRATOR extends UserRole
     case object USER extends UserRole
 
-    def withName(string: String) = string match {
+    def withName(string: String): UserRole = string match {
       case "SUPERUSER"     => SUPERUSER
       case "ADMINISTRATOR" => ADMINISTRATOR
       case "USER"          => USER

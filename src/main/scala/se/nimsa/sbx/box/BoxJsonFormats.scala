@@ -1,21 +1,19 @@
 package se.nimsa.sbx.box
 
+import play.api.libs.json._
 import se.nimsa.sbx.box.BoxProtocol._
-import spray.json._
 
-trait BoxJsonFormats extends DefaultJsonProtocol {
+trait BoxJsonFormats {
 
-  implicit object TransactionStatusFormat extends JsonFormat[TransactionStatus] {
-    def write(obj: TransactionStatus) = JsString(obj.toString())
+  private def enumFormat[A](f: String => A) = Format(Reads[A] {
+    case JsString(string) => JsSuccess(f(string))
+    case _ => throw new IllegalArgumentException("Enumeration expected")
+  }, Writes[A](a => JsString(a.toString)))
 
-    def read(json: JsValue): TransactionStatus = json match {
-      case JsString(string) => TransactionStatus.withName(string)
-      case _                => deserializationError("Enumeration expected")
-    }
-  }
-  implicit val outgoingEntryFormat = jsonFormat8(OutgoingTransaction)
-  implicit val outgoingImageFormat = jsonFormat5(OutgoingImage)
-  implicit val outgoingEntryImageFormat = jsonFormat2(OutgoingTransactionImage)
-  implicit val failedOutgoingEntryFormat = jsonFormat2(FailedOutgoingTransactionImage)
+  implicit val transactionStatusFormat: Format[TransactionStatus] = enumFormat(TransactionStatus.withName)
+  implicit val outgoingEntryFormat: Format[OutgoingTransaction] = Json.format[OutgoingTransaction]
+  implicit val outgoingImageFormat: Format[OutgoingImage] = Json.format[OutgoingImage]
+  implicit val outgoingEntryImageFormat: Format[OutgoingTransactionImage] = Json.format[OutgoingTransactionImage]
+  implicit val failedOutgoingEntryFormat: Format[FailedOutgoingTransactionImage] = Json.format[FailedOutgoingTransactionImage]
 
 }

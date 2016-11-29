@@ -16,6 +16,7 @@
 
 package se.nimsa.sbx.app.routing
 
+import akka.http.scaladsl.model.HttpEntity
 import akka.pattern.ask
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.Directives._
@@ -51,7 +52,7 @@ trait TransactionRoutes {
                   if (dicomData == null)
                     complete((BadRequest, "Dicom data could not be read"))
                   else
-                    onSuccess(storageService.ask(CheckDicomData(dicomData, useExtendedContexts = true)).mapTo[Boolean]) { status =>
+                    onSuccess(storageService.ask(CheckDicomData(dicomData, useExtendedContexts = true)).mapTo[Boolean]) { _ =>
                       onSuccess(anonymizationService.ask(ReverseAnonymization(dicomData.attributes)).mapTo[Attributes]) { reversedAttributes =>
                         val source = Source(SourceType.BOX, box.name, box.id)
                         onSuccess(metaDataService.ask(AddMetaData(reversedAttributes, source)).mapTo[MetaDataAdded]) { metaData =>
@@ -83,7 +84,7 @@ trait TransactionRoutes {
                   val status = TransactionStatus.withName(statusString)
                   status match {
                     case TransactionStatus.UNKNOWN => complete((BadRequest, s"Invalid status format: $statusString"))
-                    case s =>
+                    case _ =>
                       onSuccess(boxService.ask(SetIncomingTransactionStatus(box.id, outgoingTransactionId, status)).mapTo[Option[Unit]]) {
                         case Some(_) => complete(NoContent)
                         case None => complete(NotFound)
@@ -129,7 +130,7 @@ trait TransactionRoutes {
                               onSuccess(anonymizationService.ask(Anonymize(imageId, dicomData.attributes, transactionTagValues.map(_.tagValue)))) {
                                 case anonymizedAttributes: Attributes =>
                                   val compressedBytes = compress(toByteArray(dicomData.copy(attributes = anonymizedAttributes)))
-                                  complete(ByteString(compressedBytes))
+                                  complete(HttpEntity(ByteString(compressedBytes)))
                               }
                             }
                           case None =>

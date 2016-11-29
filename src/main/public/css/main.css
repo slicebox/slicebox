@@ -43,6 +43,10 @@
 	padding:  10px 20px;
 }
 
+.slicebox md-card-content md-content {
+	background-color: rgba(0, 0, 0, 0);
+}
+
 .import-drop-box-container {
 	transition: background-color 0.3s ease, border-color 0.3s ease;
 	background-color: #CFD8DC;

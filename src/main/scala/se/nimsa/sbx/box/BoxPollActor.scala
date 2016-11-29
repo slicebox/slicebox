@@ -19,7 +19,6 @@ package se.nimsa.sbx.box
 import akka.actor.{Actor, Props}
 import akka.event.{Logging, LoggingReceive}
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import akka.http.scaladsl.marshalling.Marshal
 import akka.http.scaladsl.model.StatusCodes.NotFound
 import akka.http.scaladsl.model._
@@ -28,6 +27,7 @@ import akka.pattern.ask
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{Sink, Source => StreamSource}
 import akka.util.{ByteString, Timeout}
+import de.heikoseeberger.akkahttpplayjson.PlayJsonSupport
 import org.dcm4che3.data.Attributes
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.app.GeneralProtocol._
@@ -48,7 +48,7 @@ class BoxPollActor(box: Box,
                    boxServicePath: String = "../../BoxService",
                    metaDataServicePath: String = "../../MetaDataService",
                    storageServicePath: String = "../../StorageService",
-                   anonymizationServicePath: String = "../../AnonymizationService") extends Actor with BoxJsonFormats with SprayJsonSupport {
+                   anonymizationServicePath: String = "../../AnonymizationService") extends Actor with BoxJsonFormats with PlayJsonSupport {
 
   val log = Logging(context.system, this)
 

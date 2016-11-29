@@ -6,11 +6,12 @@ import javax.imageio.ImageIO
 
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.Uri.Query
-import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse, Uri}
+import akka.http.scaladsl.model.{ContentTypes, HttpEntity, Uri}
 import akka.http.scaladsl.server.Route
 import akka.util.ByteString
 import org.dcm4che3.data.Tag
 import org.scalatest.{FlatSpecLike, Matchers}
+import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.{DicomUtil, ImageAttribute}
 import se.nimsa.sbx.metadata.MetaDataDAO
@@ -18,12 +19,14 @@ import se.nimsa.sbx.storage.RuntimeStorage
 import se.nimsa.sbx.storage.StorageProtocol.{ExportSetId, ImageInformation}
 import se.nimsa.sbx.util.TestUtil
 
+import scala.slick.jdbc.JdbcBackend.Database
+
 class ImageRoutesTest extends {
-  val dbProps = TestUtil.createTestDb("imageroutestest")
+  val dbProps: DbProps = TestUtil.createTestDb("imageroutestest")
   val storage = new RuntimeStorage
 } with FlatSpecLike with Matchers with RoutesTestBase {
 
-  val db = dbProps.db
+  val db: Database = dbProps.db
   val metaDataDao = new MetaDataDAO(dbProps.driver)
 
   override def afterEach() {
@@ -312,6 +315,7 @@ class ImageRoutesTest extends {
     val byteChunks =
       GetAsUser(s"/api/images/export?id=$exportSetId") ~> routes ~> check {
         status shouldBe OK
+        contentType shouldBe ContentTypes.`application/octet-stream`
         chunks
       }
     byteChunks should not be empty

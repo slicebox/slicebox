@@ -17,7 +17,6 @@
 package se.nimsa.sbx.app
 
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
-import org.dcm4che3.data.Attributes
 
 object GeneralProtocol {
   
@@ -40,7 +39,7 @@ object GeneralProtocol {
     case object UNKNOWN extends SourceType
     case object IMPORT extends SourceType
 
-    def withName(string: String) = string match {
+    def withName(string: String): SourceType = string match {
       case "scp" => SCP
       case "directory" => DIRECTORY
       case "box" => BOX
@@ -63,7 +62,7 @@ object GeneralProtocol {
     case object BOX extends DestinationType
     case object UNKNOWN extends DestinationType
 
-    def withName(string: String) = string match {
+    def withName(string: String): DestinationType = string match {
       case "scu" => SCU
       case "box" => BOX
       case _ => UNKNOWN
