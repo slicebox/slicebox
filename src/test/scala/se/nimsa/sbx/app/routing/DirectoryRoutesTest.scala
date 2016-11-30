@@ -65,7 +65,7 @@ class DirectoryRoutesTest extends {
     Files.copy(dcmFile.toPath, tempDir.resolve(dcmFile.getName))
 
     // sleep for a while and let the OS find out there was a new file in the watched directory. It will be picked up by slicebox
-    Thread.sleep(1000)
+    Thread.sleep(10000)
     
     GetAsUser("/api/metadata/patients") ~> routes ~> check {
       status should be(OK)
@@ -79,7 +79,7 @@ class DirectoryRoutesTest extends {
     Files.copy(scFile.toPath, tempDir.resolve(scFile.getName))
 
     // sleep for a while and let the OS find out there was a new file in the watched directory. It will be picked up by slicebox
-    Thread.sleep(1000)
+    Thread.sleep(10000)
 
     GetAsUser("/api/metadata/patients") ~> routes ~> check {
       status should be(OK)
