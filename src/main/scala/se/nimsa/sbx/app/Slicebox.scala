@@ -21,11 +21,11 @@ import java.util.concurrent.TimeUnit.MILLISECONDS
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import com.typesafe.config.ConfigFactory
 import com.zaxxer.hikari.{HikariConfig, HikariDataSource}
+import de.heikoseeberger.akkahttpplayjson.PlayJsonSupport
 import se.nimsa.sbx.anonymization.AnonymizationServiceActor
 import se.nimsa.sbx.app.routing.SliceboxRoutes
 import se.nimsa.sbx.box.{BoxDAO, BoxServiceActor}
@@ -45,7 +45,7 @@ import scala.slick.driver.{H2Driver, MySQLDriver}
 import scala.slick.jdbc.JdbcBackend.Database
 import scala.util.{Failure, Success}
 
-trait SliceboxBase extends SliceboxRoutes with JsonFormats with SprayJsonSupport {
+trait SliceboxBase extends SliceboxRoutes with JsonFormats with PlayJsonSupport {
 
   val appConfig = ConfigFactory.load()
   val sliceboxConfig = appConfig.getConfig("slicebox")

@@ -19,15 +19,14 @@ package se.nimsa.sbx.app.routing
 import java.io.ByteArrayOutputStream
 import java.util.zip.{ZipEntry, ZipOutputStream}
 
-import akka.http.scaladsl.common.EntityStreamingSupport
 import akka.http.scaladsl.model.MediaTypes._
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.headers._
-import akka.http.scaladsl.model.{ContentTypeRange, ContentTypes, HttpEntity}
+import akka.http.scaladsl.model.{ContentTypes, HttpEntity}
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
-import akka.stream.scaladsl.{Flow, Sink, SourceQueueWithComplete, StreamConverters, Source => StreamSource}
+import akka.stream.scaladsl.{Sink, SourceQueueWithComplete, StreamConverters, Source => StreamSource}
 import akka.stream.{OverflowStrategy, QueueOfferResult}
 import akka.util.ByteString
 import org.dcm4che3.data.Attributes
@@ -47,9 +46,6 @@ import scala.util.{Failure, Success}
 trait ImageRoutes {
   this: SliceboxBase =>
 
-  val chunkSize = 524288
-  val bufferSize = chunkSize
-
   def imageRoutes(apiUser: ApiUser): Route =
     pathPrefix("images") {
       pathEndOrSingleSlash {
@@ -66,7 +62,7 @@ trait ImageRoutes {
             pathEndOrSingleSlash {
               get {
                 onSuccess(storageService.ask(GetImageData(image)).mapTo[DicomDataArray]) { imageData =>
-                  complete(ByteString(imageData.data))
+                  complete(HttpEntity(ByteString(imageData.data)))
                 }
               } ~ delete {
                 complete(storageService.ask(DeleteDicomData(image)).flatMap(_ =>
@@ -94,7 +90,7 @@ trait ImageRoutes {
                 get {
                   onComplete(storageService.ask(GetPngDataArray(image, frameNumber, min, max, height))) {
                     case Success(PngDataArray(bytes)) => complete(HttpEntity(`image/png`, bytes))
-                    case Failure(e) => complete(NoContent)
+                    case Failure(_) => complete(NoContent)
                     case _ => complete(InternalServerError)
                   }
                 }
@@ -117,7 +113,7 @@ trait ImageRoutes {
                 }.unwrap
               }
             }
-            onSuccess(futureDeleted) { m =>
+            onSuccess(futureDeleted) { _ =>
               complete(NoContent)
             }
           }
@@ -135,10 +131,9 @@ trait ImageRoutes {
             respondWithHeader(`Content-Disposition`(ContentDispositionTypes.attachment, Map("filename" -> "slicebox-export.zip"))) {
               onSuccess(storageService.ask(GetExportSetImageIds(exportSetId)).mapTo[Option[Seq[Long]]]) {
                 case Some(imageIds) =>
-                  implicit val streamSupport = new ByteStringEntityStreamingSupport()
-                  val source = StreamSource.queue[ByteString](0, OverflowStrategy.fail)
+                  val source: StreamSource[ByteString, _] = StreamSource.queue[ByteString](0, OverflowStrategy.fail)
                     .mapMaterializedValue(queue => new ImageZipper(queue).zipNext(imageIds))
-                  complete(source)
+                  complete(HttpEntity(ContentTypes.`application/octet-stream`, source))
                 case None =>
                   complete(NotFound)
               }
@@ -182,7 +177,7 @@ trait ImageRoutes {
     val source = Source(SourceType.USER, apiUser.user, apiUser.id)
     val futureImageAndOverwrite =
       storageService.ask(CheckDicomData(dicomData, useExtendedContexts = true)).mapTo[Boolean].flatMap {
-        status =>
+        _ =>
           anonymizationService.ask(ReverseAnonymization(dicomData.attributes)).mapTo[Attributes].flatMap {
             reversedAttributes =>
               metaDataService.ask(AddMetaData(reversedAttributes, source)).mapTo[MetaDataAdded].flatMap {
@@ -201,24 +196,6 @@ trait ImageRoutes {
         else
           complete((Created, image))
     }
-  }
-
-  final class ByteStringEntityStreamingSupport(override val parallelism: Int,
-                                               override val unordered: Boolean) extends EntityStreamingSupport {
-
-    import akka.http.javadsl.{model => jm}
-
-    def this() = this(1, false)
-
-    private val identityFlow = Flow.fromFunction((i: ByteString) => i)
-
-    override val supported = ContentTypeRange(`application/octet-stream`)
-    override val contentType = ContentTypes.`application/octet-stream`
-    override val framingDecoder = identityFlow
-    override val framingRenderer = identityFlow
-    override def withSupported(sup: jm.ContentTypeRange) = new ByteStringEntityStreamingSupport(parallelism, unordered)
-    override def withContentType(ct: jm.ContentType) = new ByteStringEntityStreamingSupport(parallelism, unordered)
-    override def withParallelMarshalling(p: Int, u: Boolean) = new ByteStringEntityStreamingSupport(p, u)
   }
 
   class ImageZipper(queue: SourceQueueWithComplete[ByteString]) {

@@ -16,6 +16,7 @@
 
 package se.nimsa.sbx.app
 
+import play.api.libs.json._
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.box.BoxProtocol._
@@ -32,170 +33,125 @@ import se.nimsa.sbx.scu.ScuProtocol._
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
 import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.user.UserProtocol._
-import spray.json._
 
-trait JsonFormats extends DefaultJsonProtocol {
+trait JsonFormats {
 
-  implicit val unWatchDirectoryFormat = jsonFormat1(UnWatchDirectory)
-  implicit val watchedDirectoryFormat = jsonFormat3(WatchedDirectory)
+  private def enumFormat[A](f: String => A) = Format(Reads[A] {
+    case JsString(string) => JsSuccess(f(string))
+    case _ => throw new IllegalArgumentException("Enumeration expected")
+  }, Writes[A](a => JsString(a.toString)))
 
-  implicit val scpDataFormat = jsonFormat4(ScpData)
-  implicit val scuDataFormat = jsonFormat5(ScuData)
+  implicit val unWatchDirectoryFormat: Format[UnWatchDirectory] = Json.format[UnWatchDirectory]
+  implicit val watchedDirectoryFormat: Format[WatchedDirectory] = Json.format[WatchedDirectory]
 
-  implicit val remoteBoxFormat = jsonFormat2(RemoteBox)
-  implicit val remoteBoxConnectionDataFormat = jsonFormat1(RemoteBoxConnectionData)
+  implicit val scpDataFormat: Format[ScpData] = Json.format[ScpData]
+  implicit val scuDataFormat: Format[ScuData] = Json.format[ScuData]
 
-  implicit object SourceTypeFormat extends JsonFormat[SourceType] {
-    def write(obj: SourceType) = JsString(obj.toString())
+  implicit val remoteBoxFormat: Format[RemoteBox] = Json.format[RemoteBox]
+  implicit val remoteBoxConnectionDataFormat: Format[RemoteBoxConnectionData] = Json.format[RemoteBoxConnectionData]
 
-    def read(json: JsValue): SourceType = json match {
-      case JsString(string) => SourceType.withName(string)
-      case _                => deserializationError("Enumeration expected")
-    }
-  }
+  implicit val sourceTypeFormat: Format[SourceType] = enumFormat(SourceType.withName)
 
-  implicit object DestinationTypeFormat extends JsonFormat[DestinationType] {
-    def write(obj: DestinationType) = JsString(obj.toString())
+  implicit val destinationTypeFormat: Format[DestinationType] = enumFormat(DestinationType.withName)
 
-    def read(json: JsValue): DestinationType = json match {
-      case JsString(string) => DestinationType.withName(string)
-      case _                => deserializationError("Enumeration expected")
-    }
-  }
+  implicit val boxSendMethodFormat: Format[BoxSendMethod] = enumFormat(BoxSendMethod.withName)
 
-  implicit object BoxSendMethodFormat extends JsonFormat[BoxSendMethod] {
-    def write(obj: BoxSendMethod) = JsString(obj.toString())
+  implicit val transactionStatusFormat: Format[TransactionStatus] = enumFormat(TransactionStatus.withName)
 
-    def read(json: JsValue): BoxSendMethod = json match {
-      case JsString(string) => BoxSendMethod.withName(string)
-      case _                => deserializationError("Enumeration expected")
-    }
-  }
+  implicit val boxFormat: Format[Box] = Json.format[Box]
 
-  implicit object TransactionStatusFormat extends JsonFormat[TransactionStatus] {
-    def write(obj: TransactionStatus) = JsString(obj.toString())
+  implicit val outgoingEntryFormat: Format[OutgoingTransaction] = Json.format[OutgoingTransaction]
+  implicit val outgoingImageFormat: Format[OutgoingImage] = Json.format[OutgoingImage]
+  implicit val outgoingEntryImageFormat: Format[OutgoingTransactionImage] = Json.format[OutgoingTransactionImage]
 
-    def read(json: JsValue): TransactionStatus = json match {
-      case JsString(string) => TransactionStatus.withName(string)
-      case _                => deserializationError("Enumeration expected")
-    }
-  }
+  implicit val failedOutgoingEntryFormat: Format[FailedOutgoingTransactionImage] = Json.format[FailedOutgoingTransactionImage]
 
-  implicit val boxFormat = jsonFormat6(Box)
+  implicit val incomingEntryFormat: Format[IncomingTransaction] = Json.format[IncomingTransaction]
 
-  implicit val outgoingEntryFormat = jsonFormat8(OutgoingTransaction)
-  implicit val outgoingImageFormat = jsonFormat5(OutgoingImage)
-  implicit val outgoingEntryImageFormat = jsonFormat2(OutgoingTransactionImage)
-  
-  implicit val failedOutgoingEntryFormat = jsonFormat2(FailedOutgoingTransactionImage)
-  
-  implicit val incomingEntryFormat = jsonFormat10(IncomingTransaction)
+  implicit val tagValueFormat: Format[TagValue] = Json.format[TagValue]
+  implicit val anonymizationKeyFormat: Format[AnonymizationKey] = Json.format[AnonymizationKey]
 
-  implicit val tagValueFormat = jsonFormat2(TagValue)
-  implicit val anonymizationKeyFormat = jsonFormat18(AnonymizationKey)
+  implicit val entityTagValueFormat: Format[ImageTagValues] = Json.format[ImageTagValues]
 
-  implicit val entityTagValueFormat = jsonFormat2(ImageTagValues)
+  implicit val roleFormat: Format[UserRole] = enumFormat(UserRole.withName)
 
-  implicit object RoleFormat extends JsonFormat[UserRole] {
-    def write(obj: UserRole) = JsString(obj.toString())
+  implicit val clearTextUserFormat: Format[ClearTextUser] = Json.format[ClearTextUser]
+  implicit val apiUserFormat: Format[ApiUser] = Json.format[ApiUser]
+  implicit val userPassFormat: Format[UserPass] = Json.format[UserPass]
+  implicit val userInfoFormat: Format[UserInfo] = Json.format[UserInfo]
 
-    def read(json: JsValue): UserRole = json match {
-      case JsString(string) => UserRole.withName(string)
-      case _                => deserializationError("Enumeration expected")
-    }
-  }
+  implicit val patientNameFormat: Format[PatientName] = Json.format[PatientName]
+  implicit val patientIdFormat: Format[PatientID] = Json.format[PatientID]
+  implicit val patientBirthDateFormat: Format[PatientBirthDate] = Json.format[PatientBirthDate]
+  implicit val patientSexFormat: Format[PatientSex] = Json.format[PatientSex]
 
-  implicit val clearTextUserFormat = jsonFormat3(ClearTextUser)
-  implicit val apiUserFormat = jsonFormat4(ApiUser)
-  implicit val userPassFormat = jsonFormat2(UserPass)
-  implicit val userInfoFormat = jsonFormat3(UserInfo)
-  
-  implicit val patientNameFormat = jsonFormat1(PatientName)
-  implicit val patientIdFormat = jsonFormat1(PatientID)
-  implicit val patientBirthDateFormat = jsonFormat1(PatientBirthDate)
-  implicit val patientSexFormat = jsonFormat1(PatientSex)
+  implicit val patientFormat: Format[Patient] = Json.format[Patient]
 
-  implicit val patientFormat = jsonFormat5(Patient)
+  implicit val studyInstanceUidFormat: Format[StudyInstanceUID] = Json.format[StudyInstanceUID]
+  implicit val studyDescriptionFormat: Format[StudyDescription] = Json.format[StudyDescription]
+  implicit val studyDateFormat: Format[StudyDate] = Json.format[StudyDate]
+  implicit val studyIdFormat: Format[StudyID] = Json.format[StudyID]
+  implicit val accessionNumberFormat: Format[AccessionNumber] = Json.format[AccessionNumber]
+  implicit val patientAgeFormat: Format[PatientAge] = Json.format[PatientAge]
 
-  implicit val studyInstanceUidFormat = jsonFormat1(StudyInstanceUID)
-  implicit val studyDescriptionFormat = jsonFormat1(StudyDescription)
-  implicit val studyDateFormat = jsonFormat1(StudyDate)
-  implicit val studyIdFormat = jsonFormat1(StudyID)
-  implicit val accessionNumberFormat = jsonFormat1(AccessionNumber)
-  implicit val patientAgeFormat = jsonFormat1(PatientAge)
+  implicit val studyFormat: Format[Study] = Json.format[Study]
 
-  implicit val studyFormat = jsonFormat8(Study)
+  implicit val manufacturerFormat: Format[Manufacturer] = Json.format[Manufacturer]
+  implicit val stationNameFormat: Format[StationName] = Json.format[StationName]
 
-  implicit val manufacturerFormat = jsonFormat1(Manufacturer)
-  implicit val stationNameFormat = jsonFormat1(StationName)
+  implicit val frameOfReferenceUidFormat: Format[FrameOfReferenceUID] = Json.format[FrameOfReferenceUID]
 
-  implicit val frameOfReferenceUidFormat = jsonFormat1(FrameOfReferenceUID)
+  implicit val seriesInstanceUidFormat: Format[SeriesInstanceUID] = Json.format[SeriesInstanceUID]
+  implicit val seriesDescriptionFormat: Format[SeriesDescription] = Json.format[SeriesDescription]
+  implicit val seriesDateFormat: Format[SeriesDate] = Json.format[SeriesDate]
+  implicit val modalityFormat: Format[Modality] = Json.format[Modality]
+  implicit val protocolNameFormat: Format[ProtocolName] = Json.format[ProtocolName]
+  implicit val bodyPartExaminedFormat: Format[BodyPartExamined] = Json.format[BodyPartExamined]
 
-  implicit val seriesInstanceUidFormat = jsonFormat1(SeriesInstanceUID)
-  implicit val seriesDescriptionFormat = jsonFormat1(SeriesDescription)
-  implicit val seriesDateFormat = jsonFormat1(SeriesDate)
-  implicit val modalityFormat = jsonFormat1(Modality)
-  implicit val protocolNameFormat = jsonFormat1(ProtocolName)
-  implicit val bodyPartExaminedFormat = jsonFormat1(BodyPartExamined)
+  implicit val sourceFormat: Format[Source] = Json.format[Source]
+  implicit val sourceRefFormat: Format[SourceRef] = Json.format[SourceRef]
 
-  implicit val sourceFormat = jsonFormat3(Source)
-  implicit val sourceRefFormat = jsonFormat2(SourceRef)
-  
-  implicit val destinationFormat = jsonFormat3(Destination)
-  
-  implicit val seriesFormat = jsonFormat11(Series)
-  implicit val flatSeriesFormat = jsonFormat4(FlatSeries)
+  implicit val destinationFormat: Format[Destination] = Json.format[Destination]
 
-  implicit val sopInstanceUidFormat = jsonFormat1(SOPInstanceUID)
-  implicit val imageTypeFormat = jsonFormat1(ImageType)
-  implicit val instanceNumberFormat = jsonFormat1(InstanceNumber)
+  implicit val seriesFormat: Format[Series] = Json.format[Series]
+  implicit val flatSeriesFormat: Format[FlatSeries] = Json.format[FlatSeries]
 
-  implicit val imageFormat = jsonFormat5(Image)
+  implicit val sopInstanceUidFormat: Format[SOPInstanceUID] = Json.format[SOPInstanceUID]
+  implicit val imageTypeFormat: Format[ImageType] = Json.format[ImageType]
+  implicit val instanceNumberFormat: Format[InstanceNumber] = Json.format[InstanceNumber]
 
-  implicit val exportSetFormat = jsonFormat1(ExportSetId)
-  implicit val imageAttributeFormat = jsonFormat11(ImageAttribute)
-  
-  implicit val imagesFormat = jsonFormat1(Images)
-  
-  implicit val numberOfImageFramesFormat = jsonFormat4(ImageInformation)
-  
-  implicit object LogEntryTypeFormat extends JsonFormat[LogEntryType] {
-    def write(obj: LogEntryType) = JsString(obj.toString())
+  implicit val imageFormat: Format[Image] = Json.format[Image]
 
-    def read(json: JsValue): LogEntryType = json match {
-      case JsString(string) => LogEntryType.withName(string)
-      case _                => deserializationError("Enumeration expected")
-    }
-  }
-  
-  implicit val logEntryFormat = jsonFormat5(LogEntry)
-  
-  implicit object QueryOperatorFormat extends JsonFormat[QueryOperator] {
-    def write(obj: QueryOperator) = JsString(obj.toString)
+  implicit val exportSetFormat: Format[ExportSetId] = Json.format[ExportSetId]
+  implicit val imageAttributeFormat: Format[ImageAttribute] = Json.format[ImageAttribute]
 
-    def read(json: JsValue): QueryOperator = json match {
-      case JsString(string) => QueryOperator.withName(string)
-      case _                => deserializationError("Enumeration expected")
-    }
-  }
-  
-  implicit val queryOrderFormat = jsonFormat2(QueryOrder)
-  implicit val queryPropertyFormat = jsonFormat3(QueryProperty)
-  implicit val queryFiltersFormat = jsonFormat3(QueryFilters)
-  implicit val queryFormat = jsonFormat5(Query)
-  
-  implicit val anonymizationKeyQueryFormat = jsonFormat4(AnonymizationKeyQuery)
-  
-  implicit val seriesTypeFormat = jsonFormat2(SeriesType)
-  
-  implicit val seriesTagFormat = jsonFormat2(SeriesTag)
-  
-  implicit val seriesTypeRuleFormat = jsonFormat2(SeriesTypeRule)
-  
-  implicit val seriesTypeRuleAttributeFormat = jsonFormat7(SeriesTypeRuleAttribute)
-  
-  implicit val forwardingRuleFormat = jsonFormat4(ForwardingRule)
-  
-  implicit val importSessionFormat = jsonFormat9(ImportSession)
+  implicit val imagesFormat: Format[Images] = Json.format[Images]
+
+  implicit val numberOfImageFramesFormat: Format[ImageInformation] = Json.format[ImageInformation]
+
+  implicit val logEntryTypeFormat: Format[LogEntryType] = enumFormat(LogEntryType.withName)
+
+  implicit val logEntryFormat: Format[LogEntry] = Json.format[LogEntry]
+
+  implicit val queryOperatorFormat: Format[QueryOperator] = enumFormat(QueryOperator.withName)
+
+  implicit val queryOrderFormat: Format[QueryOrder] = Json.format[QueryOrder]
+  implicit val queryPropertyFormat: Format[QueryProperty] = Json.format[QueryProperty]
+  implicit val queryFiltersFormat: Format[QueryFilters] = Json.format[QueryFilters]
+  implicit val queryFormat: Format[Query] = Json.format[Query]
+
+  implicit val anonymizationKeyQueryFormat: Format[AnonymizationKeyQuery] = Json.format[AnonymizationKeyQuery]
+
+  implicit val seriesTypeFormat: Format[SeriesType] = Json.format[SeriesType]
+
+  implicit val seriesTagFormat: Format[SeriesTag] = Json.format[SeriesTag]
+
+  implicit val seriesTypeRuleFormat: Format[SeriesTypeRule] = Json.format[SeriesTypeRule]
+
+  implicit val seriesTypeRuleAttributeFormat: Format[SeriesTypeRuleAttribute] = Json.format[SeriesTypeRuleAttribute]
+
+  implicit val forwardingRuleFormat: Format[ForwardingRule] = Json.format[ForwardingRule]
+
+  implicit val importSessionFormat: Format[ImportSession] = Json.format[ImportSession]
 
 }

@@ -26,6 +26,8 @@ class LogRoutesTest extends {
     SbxLog.warn("Category2", "Message4")
     SbxLog.default("Category2", "Message5")
     SbxLog.error("Category2", "Message6")
+
+    Thread.sleep(1000) // make sure log messages are persisted
   }
   
   "Log routes" should "support listing log messages" in {

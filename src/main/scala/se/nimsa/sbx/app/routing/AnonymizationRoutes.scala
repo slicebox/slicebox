@@ -29,7 +29,6 @@ import se.nimsa.sbx.user.UserProtocol.ApiUser
 import se.nimsa.sbx.util.SbxExtensions._
 import akka.http.scaladsl.model.HttpEntity
 import akka.http.scaladsl.model.StatusCodes._
-import akka.http.scaladsl.model.MediaTypes._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import akka.util.ByteString
@@ -55,7 +54,7 @@ trait AnonymizationRoutes {
             case Some(image) =>
               onSuccess(storageService.ask(GetDicomData(image, withPixelData = true)).mapTo[DicomData]) { dicomData =>
                 onSuccess(anonymizationService.ask(Anonymize(imageId, dicomData.attributes, tagValues)).mapTo[Attributes]) { anonAttributes =>
-                  complete(ByteString(DicomUtil.toByteArray(dicomData.copy(attributes = anonAttributes))))
+                  complete(HttpEntity(ByteString(DicomUtil.toByteArray(dicomData.copy(attributes = anonAttributes)))))
                 }
               }
             case None =>

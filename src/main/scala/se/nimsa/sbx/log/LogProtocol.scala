@@ -36,7 +36,7 @@ object LogProtocol {
     case object WARN extends LogEntryType
     case object ERROR extends LogEntryType
 
-    def withName(string: String) = string match {
+    def withName(string: String): LogEntryType = string match {
       case "DEFAULT" => DEFAULT
       case "INFO" => INFO
       case "WARN" => WARN

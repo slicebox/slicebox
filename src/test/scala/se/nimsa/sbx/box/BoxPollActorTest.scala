@@ -1,13 +1,13 @@
 package se.nimsa.sbx.box
 
 import akka.actor.{Actor, ActorSystem, Props}
-import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import akka.http.scaladsl.marshalling.Marshal
 import akka.http.scaladsl.model.ContentTypes._
 import akka.http.scaladsl.model.StatusCodes.{BadGateway, NoContent, NotFound, OK}
 import akka.http.scaladsl.model._
 import akka.stream.scaladsl.Flow
 import akka.testkit.{ImplicitSender, TestKit}
+import de.heikoseeberger.akkahttpplayjson.PlayJsonSupport
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
 import se.nimsa.sbx.anonymization.AnonymizationServiceActor
 import se.nimsa.sbx.app.{DbProps, JsonFormats}
@@ -26,7 +26,7 @@ import scala.slick.jdbc.JdbcBackend.Database
 import scala.util.{Success, Try}
 
 class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
-  with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach with JsonFormats with SprayJsonSupport {
+  with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach with JsonFormats with PlayJsonSupport {
 
   def this() = this(ActorSystem("BoxPollActorTestSystem"))
 

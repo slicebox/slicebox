@@ -44,7 +44,7 @@ object MetaDataProtocol {
     case object EQUALS extends QueryOperator
     case object LIKE extends QueryOperator
 
-    def withName(string: String) = string match {
+    def withName(string: String): QueryOperator = string match {
       case "="    => EQUALS
       case "like" => LIKE
     }
