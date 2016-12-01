@@ -38,7 +38,7 @@ trait JsonFormats {
 
   private def enumFormat[A](f: String => A) = Format(Reads[A] {
     case JsString(string) => JsSuccess(f(string))
-    case _ => throw new IllegalArgumentException("Enumeration expected")
+    case _ => JsError("Enumeration expected")
   }, Writes[A](a => JsString(a.toString)))
 
   implicit val unWatchDirectoryFormat: Format[UnWatchDirectory] = Json.format[UnWatchDirectory]
