@@ -81,7 +81,7 @@ libraryDependencies ++= {
     "ch.qos.logback" % "logback-classic" % "1.1.7",
     "com.typesafe.slick" %% "slick" % "2.1.0",
     "com.h2database" % "h2" % "1.4.193",
-    "mysql" % "mysql-connector-java" % "6.0.5",
+    "mysql" % "mysql-connector-java" % "5.1.40",
     "com.zaxxer" % "HikariCP" % "2.5.1",
     "com.github.t3hnar" %% "scala-bcrypt" % "3.0",
     "com.amazonaws" % "aws-java-sdk-s3" % "1.11.52",
