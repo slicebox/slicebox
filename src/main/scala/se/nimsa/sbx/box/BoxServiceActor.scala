@@ -331,12 +331,7 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
 
     pollBoxesLastPollTimestamp.foreach {
       case (boxId, lastPollTime) =>
-        val online =
-          if (now - lastPollTime < pollBoxOnlineStatusTimeoutMillis)
-            true
-          else
-            false
-
+        val online = (now - lastPollTime) < pollBoxOnlineStatusTimeoutMillis
         boxDao.updateBoxOnlineStatus(boxId, online)
     }
   }
@@ -350,12 +345,12 @@ class BoxServiceActor(dbProps: DbProps, apiBaseURL: String, implicit val timeout
     val now = System.currentTimeMillis
 
     getIncomingTransactionsInProcess.foreach { transaction =>
-      if (now - transaction.updated < pollBoxOnlineStatusTimeoutMillis)
+      if ((now - transaction.updated) > pollBoxOnlineStatusTimeoutMillis)
         boxDao.setIncomingTransactionStatus(transaction.id, TransactionStatus.WAITING)
     }
 
     getOutgoingTransactionsInProcess.foreach { transaction =>
-      if (now - transaction.updated < pollBoxOnlineStatusTimeoutMillis)
+      if ((now - transaction.updated) > pollBoxOnlineStatusTimeoutMillis)
         boxDao.setOutgoingTransactionStatus(transaction.id, TransactionStatus.WAITING)
     }
   }
