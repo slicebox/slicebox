@@ -5,6 +5,7 @@ import java.util.UUID
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity}
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server._
+import akka.http.scaladsl.unmarshalling.PredefinedFromEntityUnmarshallers
 import akka.util.ByteString
 import org.scalatest.{FlatSpecLike, Matchers}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
@@ -16,6 +17,11 @@ import se.nimsa.sbx.dicom.DicomUtil
 import se.nimsa.sbx.storage.RuntimeStorage
 import se.nimsa.sbx.util.CompressionUtil._
 import se.nimsa.sbx.util.TestUtil
+
+import scala.concurrent.Await
+import scala.concurrent.duration.Duration
+import scala.concurrent.duration.DurationInt
+import scala.reflect.ClassTag
 
 class TransactionRoutesTest extends {
   val dbProps = TestUtil.createTestDb("transactionroutestest")
@@ -255,7 +261,7 @@ class TransactionRoutesTest extends {
 
     Get(s"/api/transactions/${uniBox.token}/status?transactionid=$transId") ~> routes ~> check {
       status shouldBe OK
-      responseAs[String] shouldBe "FAILED"
+      Await.result(response.entity.toStrict(5.seconds), 5.seconds).data.decodeString("utf-8") shouldBe "FAILED"
     }
   }
 
@@ -284,7 +290,7 @@ class TransactionRoutesTest extends {
 
     Get(s"/api/transactions/${uniBox.token}/status?transactionid=$transId") ~> routes ~> check {
       status shouldBe OK
-      responseAs[String] shouldBe "FAILED"
+      Await.result(response.entity.toStrict(5.seconds), 5.seconds).data.decodeString("utf-8") shouldBe "FAILED"
     }
   }
 
