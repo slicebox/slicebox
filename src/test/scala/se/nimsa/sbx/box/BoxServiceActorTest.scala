@@ -116,15 +116,19 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
       }
     }
 
-    "return first outgoing transaction when receiving poll message" in {
+    "return first outgoing transaction image from the least recent outgoing transaction when receiving poll message" in {
       db.withSession { implicit session =>
         val imageId = 123
         val box = boxDao.insertBox(Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, online = false))
 
         // insert images with sequence numbers out of order
-        val transaction = boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, box.id, box.name, 0, 1, 123, 123, TransactionStatus.WAITING))
-        boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, imageId, 2, sent = false))
-        boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, imageId, 1, sent = false))
+        val transaction1 = boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, box.id, box.name, 0, 1, 123, 123, TransactionStatus.WAITING))
+        boxDao.insertOutgoingImage(OutgoingImage(-1, transaction1.id, imageId, 5, sent = false))
+        boxDao.insertOutgoingImage(OutgoingImage(-1, transaction1.id, imageId, 4, sent = false))
+
+        val transaction2 = boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, box.id, box.name, 0, 1, 124, 124, TransactionStatus.WAITING))
+        boxDao.insertOutgoingImage(OutgoingImage(-1, transaction2.id, imageId, 2, sent = false))
+        boxDao.insertOutgoingImage(OutgoingImage(-1, transaction2.id, imageId, 1, sent = false))
 
         boxService ! PollOutgoing(box)
 
@@ -135,9 +139,9 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
             dbTransaction.sentImageCount should be(0)
             dbTransaction.totalImageCount should be(1)
             image.imageId should be(imageId)
-            image.sequenceNumber should be(1)
+            image.sequenceNumber should be(4)
             image.sent should be(false)
-            image.outgoingTransactionId should be(transaction.id)
+            image.outgoingTransactionId should be(transaction1.id)
         }
       }
     }

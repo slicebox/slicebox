@@ -241,7 +241,7 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
 
       expectMsgPF() { case UpdateSeriesTypesRunningStatus(running) => statusUpdateRunning = running }
 
-      Thread.sleep(500)
+      Thread.sleep(1000)
       attempt += 1
     }
   }
