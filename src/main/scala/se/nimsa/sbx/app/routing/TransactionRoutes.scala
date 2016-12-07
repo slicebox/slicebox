@@ -76,7 +76,7 @@ trait TransactionRoutes {
             parameters('transactionid.as[Long]) { outgoingTransactionId =>
               get {
                 onSuccess(boxService.ask(GetIncomingTransactionStatus(box, outgoingTransactionId)).mapTo[Option[TransactionStatus]]) {
-                  case Some(status) => complete(status.toString)
+                  case Some(status) => complete(HttpEntity(status.toString))
                   case None => complete(NotFound)
                 }
               } ~ put {
