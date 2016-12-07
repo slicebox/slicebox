@@ -470,6 +470,9 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
       case TransactionsEnroute(transactions) => transactions should have length 1
     }
 
+    // wait for box transfer to complete
+    Thread.sleep(3000)
+
     boxService ! GetSentImages
     expectMsg(Seq(image1.id, image3.id, image2.id))
   }
