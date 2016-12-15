@@ -19,7 +19,6 @@ package se.nimsa.sbx.seriestype
 import akka.actor.{Actor, Props}
 import akka.event.{Logging, LoggingReceive}
 import akka.util.Timeout
-import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.dicom.DicomUtil
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._

@@ -29,7 +29,6 @@ import akka.event.Logging
 import akka.event.LoggingReceive
 import akka.util.Timeout
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
-import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.log.SbxLog

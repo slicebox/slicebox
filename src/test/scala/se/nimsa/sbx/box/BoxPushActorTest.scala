@@ -7,7 +7,6 @@ import akka.stream.scaladsl.Flow
 import akka.testkit.{ImplicitSender, TestKit}
 import org.scalatest._
 import se.nimsa.sbx.anonymization.AnonymizationServiceActor
-import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.metadata.MetaDataDAO

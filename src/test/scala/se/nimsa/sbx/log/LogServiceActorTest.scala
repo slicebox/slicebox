@@ -7,7 +7,6 @@ import akka.actor.ActorSystem
 import org.scalatest.Matchers
 import org.scalatest.WordSpecLike
 import scala.slick.driver.H2Driver
-import se.nimsa.sbx.app.DbProps
 import scala.slick.jdbc.JdbcBackend.Database
 import akka.actor.Props
 import se.nimsa.sbx.log.LogProtocol._

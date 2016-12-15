@@ -21,7 +21,6 @@ import java.util.concurrent.Executors
 import akka.actor.{Actor, PoisonPill, Props}
 import akka.event.{Logging, LoggingReceive}
 import akka.util.Timeout
-import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.scp.ScpProtocol._
 import se.nimsa.sbx.util.ExceptionCatching
 

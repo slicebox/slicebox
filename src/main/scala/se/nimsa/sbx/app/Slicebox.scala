@@ -39,10 +39,11 @@ import se.nimsa.sbx.scu.{ScuDAO, ScuServiceActor}
 import se.nimsa.sbx.seriestype.{SeriesTypeDAO, SeriesTypeServiceActor}
 import se.nimsa.sbx.storage.{FileStorage, S3Storage, StorageService, StorageServiceActor}
 import se.nimsa.sbx.user.{UserDAO, UserServiceActor}
+import slick.backend.DatabaseConfig
+import slick.driver.JdbcProfile
 
-import scala.concurrent.ExecutionContextExecutor
-import scala.slick.driver.{H2Driver, MySQLDriver}
-import scala.slick.jdbc.JdbcBackend.Database
+import scala.concurrent.{Await, ExecutionContextExecutor, Future}
+import scala.concurrent.duration.DurationInt
 import scala.util.{Failure, Success}
 
 trait SliceboxBase extends SliceboxRoutes with JsonFormats with PlayJsonSupport {
@@ -51,29 +52,32 @@ trait SliceboxBase extends SliceboxRoutes with JsonFormats with PlayJsonSupport 
   val sliceboxConfig = appConfig.getConfig("slicebox")
 
   implicit def system: ActorSystem
+
   implicit def materializer: ActorMaterializer
+
   implicit def executor: ExecutionContextExecutor
+
   implicit val timeout = {
     val clientTimeout = appConfig.getDuration("akka.http.client.connecting-timeout", MILLISECONDS)
     val serverTimeout = appConfig.getDuration("akka.http.server.request-timeout", MILLISECONDS)
     Timeout(math.max(clientTimeout, serverTimeout) + 10, MILLISECONDS)
   }
 
-  def dbProps: DbProps
+  def dbConfig: DatabaseConfig[JdbcProfile]
 
-  dbProps.db.withSession { implicit session =>
-    new LogDAO(dbProps.driver).create
-    new UserDAO(dbProps.driver).create
-    new SeriesTypeDAO(dbProps.driver).create
-    new ForwardingDAO(dbProps.driver).create
-    new MetaDataDAO(dbProps.driver).create
-    new PropertiesDAO(dbProps.driver).create
-    new DirectoryWatchDAO(dbProps.driver).create
-    new ScpDAO(dbProps.driver).create
-    new ScuDAO(dbProps.driver).create
-    new BoxDAO(dbProps.driver).create
-    new ImportDAO(dbProps.driver).create
-  }
+  new LogDAO(dbConfig).create
+  val userDao = new UserDAO(dbConfig)
+  new SeriesTypeDAO(dbConfig).create
+  new ForwardingDAO(dbConfig).create
+  new MetaDataDAO(dbConfig).create
+  new PropertiesDAO(dbConfig).create
+  new DirectoryWatchDAO(dbConfig).create
+  new ScpDAO(dbConfig).create
+  new ScuDAO(dbConfig).create
+  new BoxDAO(dbConfig).create
+  new ImportDAO(dbConfig).create
+
+  Await.ready(Future.sequence(Seq(userDao.create())), 1.minute)
 
   val host = sliceboxConfig.getString("host")
   val port = sliceboxConfig.getInt("port")
@@ -101,7 +105,7 @@ trait SliceboxBase extends SliceboxRoutes with JsonFormats with PlayJsonSupport 
 
   val userService = {
     val sessionTimeout = sliceboxConfig.getDuration("session-timeout", MILLISECONDS)
-    system.actorOf(UserServiceActor.props(dbProps, superUser, superPassword, sessionTimeout), name = "UserService")
+    system.actorOf(UserServiceActor.props(userDao, superUser, superPassword, sessionTimeout), name = "UserService")
   }
   val logService = system.actorOf(LogServiceActor.props(dbProps), name = "LogService")
   val metaDataService = system.actorOf(MetaDataServiceActor.props(dbProps).withDispatcher("akka.prio-dispatcher"), name = "MetaDataService")

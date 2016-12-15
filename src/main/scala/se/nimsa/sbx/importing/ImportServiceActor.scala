@@ -1,7 +1,6 @@
 package se.nimsa.sbx.importing
 
 import akka.actor.Actor
-import se.nimsa.sbx.app.DbProps
 import akka.event.Logging
 import akka.actor.Props
 import akka.event.LoggingReceive

@@ -5,7 +5,6 @@ import akka.actor.Status.Failure
 import akka.testkit.{ImplicitSender, TestKit}
 import akka.util.Timeout.durationToTimeout
 import org.scalatest._
-import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.dicom.DicomHierarchy.Series
 import se.nimsa.sbx.metadata.MetaDataProtocol.MetaDataDeleted
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._

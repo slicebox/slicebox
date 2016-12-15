@@ -21,7 +21,6 @@ import akka.event.{Logging, LoggingReceive}
 import org.dcm4che3.data.Attributes
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.anonymization.AnonymizationUtil._
-import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.app.GeneralProtocol.ImageDeleted
 import se.nimsa.sbx.dicom.DicomUtil._
 import se.nimsa.sbx.util.ExceptionCatching

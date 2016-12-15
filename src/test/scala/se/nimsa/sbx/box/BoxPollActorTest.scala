@@ -10,7 +10,7 @@ import akka.testkit.{ImplicitSender, TestKit}
 import de.heikoseeberger.akkahttpplayjson.PlayJsonSupport
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
 import se.nimsa.sbx.anonymization.AnonymizationServiceActor
-import se.nimsa.sbx.app.{DbProps, JsonFormats}
+import se.nimsa.sbx.app.JsonFormats
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.box.MockupStorageActor.{ShowBadBehavior, ShowGoodBehavior}
 import se.nimsa.sbx.dicom.DicomHierarchy.Image

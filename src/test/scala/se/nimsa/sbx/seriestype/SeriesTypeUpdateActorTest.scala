@@ -7,7 +7,6 @@ import akka.testkit.{ImplicitSender, TestKit}
 import akka.util.Timeout
 import org.dcm4che3.data.{Keyword, Tag}
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
-import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.app.GeneralProtocol.{Source, SourceType}
 import se.nimsa.sbx.dicom.DicomHierarchy.Series
 import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, MetaDataAdded}

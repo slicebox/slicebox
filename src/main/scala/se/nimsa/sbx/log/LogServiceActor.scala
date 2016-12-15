@@ -20,7 +20,6 @@ import akka.actor.Actor
 import akka.actor.Props
 import akka.event.Logging
 import akka.event.LoggingReceive
-import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.log.LogProtocol._
 import se.nimsa.sbx.log.LogProtocol.LogEntryType._
 

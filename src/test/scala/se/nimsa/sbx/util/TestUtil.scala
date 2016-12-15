@@ -16,7 +16,6 @@ import org.dcm4che3.data.Attributes
 import org.dcm4che3.data.Tag
 import org.dcm4che3.data.VR
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.AnonymizationKey
-import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomPropertyValue._

@@ -15,7 +15,6 @@ import akka.actor.ActorSystem
 import akka.actor.Props
 import akka.testkit.ImplicitSender
 import akka.testkit.TestKit
-import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.dicom.DicomUtil._
 import se.nimsa.sbx.util.TestUtil.createAnonymizationKey
 import se.nimsa.sbx.util.TestUtil.createDicomData

@@ -25,14 +25,10 @@ import se.nimsa.sbx.util.ExceptionCatching
 import scala.concurrent.duration.DurationInt
 import java.util.UUID
 import akka.actor.actorRef2Scala
-import se.nimsa.sbx.app.DbProps
 import UserServiceActor._
 
-class UserServiceActor(dbProps: DbProps, superUser: String, superPassword: String, sessionTimeout: Long) extends Actor with ExceptionCatching {
+class UserServiceActor(dao: UserDAO, superUser: String, superPassword: String, sessionTimeout: Long) extends Actor with ExceptionCatching {
   val log = Logging(context.system, this)
-
-  val db = dbProps.db
-  val dao = new UserDAO(dbProps.driver)
 
   addSuperUser()
 
@@ -179,7 +175,7 @@ class UserServiceActor(dbProps: DbProps, superUser: String, superPassword: Strin
 }
 
 object UserServiceActor {
-  def props(dbProps: DbProps, superUser: String, superPassword: String, sessionTimeout: Long): Props = Props(new UserServiceActor(dbProps, superUser, superPassword, sessionTimeout))
+  def props(dao: UserDAO, superUser: String, superPassword: String, sessionTimeout: Long): Props = Props(new UserServiceActor(dao, superUser, superPassword, sessionTimeout))
 
   def newSessionToken = UUID.randomUUID.toString
 

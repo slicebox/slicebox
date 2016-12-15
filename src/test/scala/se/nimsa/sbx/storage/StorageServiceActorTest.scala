@@ -4,7 +4,6 @@ import akka.actor.ActorSystem
 import akka.actor.Status.Failure
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit}
 import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpecLike}
-import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.app.GeneralProtocol.{Source, SourceType}
 import se.nimsa.sbx.dicom.DicomUtil
 import se.nimsa.sbx.storage.StorageProtocol.{AddDicomData, CheckDicomData, DicomDataAdded, GetDicomData}

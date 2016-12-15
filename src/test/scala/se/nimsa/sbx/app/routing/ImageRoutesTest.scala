@@ -11,7 +11,6 @@ import akka.http.scaladsl.server.Route
 import akka.util.ByteString
 import org.dcm4che3.data.Tag
 import org.scalatest.{FlatSpecLike, Matchers}
-import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.{DicomUtil, ImageAttribute}
 import se.nimsa.sbx.metadata.MetaDataDAO

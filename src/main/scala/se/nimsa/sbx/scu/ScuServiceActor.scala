@@ -23,7 +23,6 @@ import akka.event.{Logging, LoggingReceive}
 import akka.pattern.{ask, pipe}
 import akka.util.Timeout
 import org.dcm4che3.net.NoPresentationContextException
-import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.dicom.DicomData
 import se.nimsa.sbx.dicom.DicomHierarchy.Image

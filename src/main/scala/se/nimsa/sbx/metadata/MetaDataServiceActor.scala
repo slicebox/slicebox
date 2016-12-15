@@ -18,7 +18,6 @@ package se.nimsa.sbx.metadata
 
 import akka.actor.{Actor, Props}
 import akka.event.{Logging, LoggingReceive}
-import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.app.GeneralProtocol.Source
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomUtil._

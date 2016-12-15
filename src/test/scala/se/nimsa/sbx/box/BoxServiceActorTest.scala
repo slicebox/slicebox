@@ -5,7 +5,6 @@ import akka.testkit.{ImplicitSender, TestKit}
 import akka.util.Timeout.durationToTimeout
 import org.scalatest._
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
-import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.app.GeneralProtocol.ImageDeleted
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy._

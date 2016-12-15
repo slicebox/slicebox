@@ -19,7 +19,6 @@ package se.nimsa.sbx.forwarding
 import akka.actor.{Actor, ActorRef, Props}
 import akka.event.{Logging, LoggingReceive}
 import akka.util.Timeout
-import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.forwarding.ForwardingProtocol._

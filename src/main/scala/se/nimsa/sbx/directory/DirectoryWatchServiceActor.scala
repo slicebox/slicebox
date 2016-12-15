@@ -21,7 +21,6 @@ import java.nio.file.{Files, Paths}
 import akka.actor.{Actor, PoisonPill, Props}
 import akka.event.{Logging, LoggingReceive}
 import akka.util.Timeout
-import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.directory.DirectoryWatchProtocol._
 import se.nimsa.sbx.util.ExceptionCatching
 
