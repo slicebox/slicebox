@@ -24,9 +24,9 @@ import slick.backend.DatabaseConfig
 import slick.driver.JdbcProfile
 import slick.jdbc.GetResult
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
-class AnonymizationDAO(val dbConf: DatabaseConfig[JdbcProfile]) {
+class AnonymizationDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionContext) {
 
   import dbConf.driver.api._
 

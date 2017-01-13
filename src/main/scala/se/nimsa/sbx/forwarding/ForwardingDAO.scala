@@ -22,9 +22,9 @@ import se.nimsa.sbx.util.DbUtil.createTables
 import slick.backend.DatabaseConfig
 import slick.driver.JdbcProfile
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
-class ForwardingDAO(val dbConf: DatabaseConfig[JdbcProfile]) {
+class ForwardingDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionContext) {
 
   import dbConf.driver.api._
 
@@ -119,20 +119,23 @@ class ForwardingDAO(val dbConf: DatabaseConfig[JdbcProfile]) {
     ruleQuery.filter(_.id === forwardingRuleId).delete.map(_ => {})
   }
 
-  def getForwardingRulesForSourceTypeAndId(sourceType: SourceType, sourceId: Long): Future[Seq[ForwardingRule]] = db.run {
+  def getForwardingRulesForSourceTypeAndIdAction(sourceType: SourceType, sourceId: Long) =
     ruleQuery
       .filter(_.sourceType === sourceType.toString)
       .filter(_.sourceId === sourceId)
       .result
-  }
+
+  def getForwardingRulesForSourceTypeAndId(sourceType: SourceType, sourceId: Long): Future[Seq[ForwardingRule]] =
+    db.run(getForwardingRulesForSourceTypeAndIdAction(sourceType, sourceId))
 
   def createOrUpdateForwardingTransaction(forwardingRule: ForwardingRule): Future[ForwardingTransaction] = db.run {
     getFreshTransactionForRuleAction(forwardingRule).flatMap {
-      case Some(transaction) =>
+      _.map { transaction =>
         val updatedTransaction = transaction.copy(updated = System.currentTimeMillis())
         updateForwardingTransactionAction(updatedTransaction).map(_ => updatedTransaction)
-      case None =>
+      }.getOrElse {
         insertForwardingTransactionAction(ForwardingTransaction(-1, forwardingRule.id, System.currentTimeMillis, System.currentTimeMillis, enroute = false, delivered = false))
+      }
     }
   }
 
@@ -160,11 +163,12 @@ class ForwardingDAO(val dbConf: DatabaseConfig[JdbcProfile]) {
   def insertForwardingTransaction(forwardingTransaction: ForwardingTransaction): Future[ForwardingTransaction] =
     db.run(insertForwardingTransactionAction(forwardingTransaction))
 
+  def insertForwardingTransactionImageAction(forwardingTransactionImage: ForwardingTransactionImage) =
+    (transactionImageQuery returning transactionImageQuery.map(_.id) += forwardingTransactionImage)
+      .map(generatedId => forwardingTransactionImage.copy(id = generatedId))
+
   def insertForwardingTransactionImage(forwardingTransactionImage: ForwardingTransactionImage): Future[ForwardingTransactionImage] =
-    db.run {
-      (transactionImageQuery returning transactionImageQuery.map(_.id) += forwardingTransactionImage)
-        .map(generatedId => forwardingTransactionImage.copy(id = generatedId))
-    }
+    db.run(insertForwardingTransactionImageAction(forwardingTransactionImage))
 
   def listFreshExpiredTransactions(timeLimit: Long): Future[Seq[ForwardingTransaction]] = db.run {
     transactionQuery
@@ -196,14 +200,15 @@ class ForwardingDAO(val dbConf: DatabaseConfig[JdbcProfile]) {
     transactionImageQuery.filter(_.forwardingTransactionId === transactionId).result
   }
 
+  def getTransactionImageForTransactionIdAndImageIdAction(transactionId: Long, imageId: Long) =
+    transactionImageQuery
+      .filter(_.forwardingTransactionId === transactionId)
+      .filter(_.imageId === imageId)
+      .result
+      .headOption
+
   def getTransactionImageForTransactionIdAndImageId(transactionId: Long, imageId: Long): Future[Option[ForwardingTransactionImage]] =
-    db.run {
-      transactionImageQuery
-        .filter(_.forwardingTransactionId === transactionId)
-        .filter(_.imageId === imageId)
-        .result
-        .headOption
-    }
+    db.run(getTransactionImageForTransactionIdAndImageIdAction(transactionId, imageId))
 
   def removeTransactionForId(transactionId: Long): Future[Unit] = db.run {
     transactionQuery.filter(_.id === transactionId).delete.map(_ => {})
@@ -246,4 +251,14 @@ class ForwardingDAO(val dbConf: DatabaseConfig[JdbcProfile]) {
     transactionImageQuery.filter(_.imageId === imageId).delete.map(_ => {})
   }
 
+  def addImageToForwardingQueue(transactionId: Long, imageId: Long): Future[ForwardingTransactionImage] = {
+    val action = getTransactionImageForTransactionIdAndImageIdAction(transactionId, imageId).flatMap { maybeImage =>
+      maybeImage
+        .map(DBIO.successful)
+        .getOrElse(
+          insertForwardingTransactionImageAction(ForwardingTransactionImage(-1, transactionId, imageId)))
+    }
+
+    db.run(action.transactionally)
+  }
 }

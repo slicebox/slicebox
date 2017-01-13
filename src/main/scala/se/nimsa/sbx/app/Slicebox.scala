@@ -24,9 +24,8 @@ import akka.http.scaladsl.Http
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import com.typesafe.config.ConfigFactory
-import com.zaxxer.hikari.{HikariConfig, HikariDataSource}
 import de.heikoseeberger.akkahttpplayjson.PlayJsonSupport
-import se.nimsa.sbx.anonymization.AnonymizationServiceActor
+import se.nimsa.sbx.anonymization.{AnonymizationDAO, AnonymizationServiceActor}
 import se.nimsa.sbx.app.routing.SliceboxRoutes
 import se.nimsa.sbx.box.{BoxDAO, BoxServiceActor}
 import se.nimsa.sbx.directory.{DirectoryWatchDAO, DirectoryWatchServiceActor}
@@ -65,19 +64,24 @@ trait SliceboxBase extends SliceboxRoutes with JsonFormats with PlayJsonSupport 
 
   def dbConfig: DatabaseConfig[JdbcProfile]
 
-  new LogDAO(dbConfig).create
   val userDao = new UserDAO(dbConfig)
-  new SeriesTypeDAO(dbConfig).create
-  new ForwardingDAO(dbConfig).create
-  new MetaDataDAO(dbConfig).create
-  new PropertiesDAO(dbConfig).create
-  new DirectoryWatchDAO(dbConfig).create
-  new ScpDAO(dbConfig).create
-  new ScuDAO(dbConfig).create
-  new BoxDAO(dbConfig).create
-  new ImportDAO(dbConfig).create
+  val logDao = new LogDAO(dbConfig)
+  val seriesTypeDao = new SeriesTypeDAO(dbConfig)
+  val forwardingDao = new ForwardingDAO(dbConfig)
+  val metaDataDao = new MetaDataDAO(dbConfig)
+  val propertiesDao = new PropertiesDAO(dbConfig)
+  val directoryWatchDao = new DirectoryWatchDAO(dbConfig)
+  val scpDao = new ScpDAO(dbConfig)
+  val scuDao = new ScuDAO(dbConfig)
+  val boxDao = new BoxDAO(dbConfig)
+  val importDao = new ImportDAO(dbConfig)
+  val anonymizationDao = new AnonymizationDAO(dbConfig)
 
-  Await.ready(Future.sequence(Seq(userDao.create())), 1.minute)
+  Await.ready(Future.sequence(Seq(
+    logDao.create(), seriesTypeDao.create(), forwardingDao.create(), metaDataDao.create(), propertiesDao.create(),
+    directoryWatchDao.create(), scpDao.create(), scuDao.create(), boxDao.create(), importDao.create(),
+    userDao.create(), anonymizationDao.create()
+  )), 1.minute)
 
   val host = sliceboxConfig.getString("host")
   val port = sliceboxConfig.getInt("port")
@@ -105,22 +109,22 @@ trait SliceboxBase extends SliceboxRoutes with JsonFormats with PlayJsonSupport 
 
   val userService = {
     val sessionTimeout = sliceboxConfig.getDuration("session-timeout", MILLISECONDS)
-    system.actorOf(UserServiceActor.props(userDao, superUser, superPassword, sessionTimeout), name = "UserService")
+    system.actorOf(UserServiceActor.props(userDao, superUser, superPassword, sessionTimeout, timeout), name = "UserService")
   }
-  val logService = system.actorOf(LogServiceActor.props(dbProps), name = "LogService")
-  val metaDataService = system.actorOf(MetaDataServiceActor.props(dbProps).withDispatcher("akka.prio-dispatcher"), name = "MetaDataService")
+  val logService = system.actorOf(LogServiceActor.props(logDao), name = "LogService")
+  val metaDataService = system.actorOf(MetaDataServiceActor.props(metaDataDao, propertiesDao, timeout).withDispatcher("akka.prio-dispatcher"), name = "MetaDataService")
   val storageService = system.actorOf(StorageServiceActor.props(storage), name = "StorageService")
   val anonymizationService = {
     val purgeEmptyAnonymizationKeys = sliceboxConfig.getBoolean("anonymization.purge-empty-keys")
-    system.actorOf(AnonymizationServiceActor.props(dbProps, purgeEmptyAnonymizationKeys), name = "AnonymizationService")
+    system.actorOf(AnonymizationServiceActor.props(anonymizationDao, purgeEmptyAnonymizationKeys, timeout), name = "AnonymizationService")
   }
-  val boxService = system.actorOf(BoxServiceActor.props(dbProps, apiBaseURL, timeout), name = "BoxService")
-  val scpService = system.actorOf(ScpServiceActor.props(dbProps, timeout), name = "ScpService")
-  val scuService = system.actorOf(ScuServiceActor.props(dbProps, timeout), name = "ScuService")
-  val directoryService = system.actorOf(DirectoryWatchServiceActor.props(dbProps, timeout), name = "DirectoryService")
-  val seriesTypeService = system.actorOf(SeriesTypeServiceActor.props(dbProps, timeout), name = "SeriesTypeService")
-  val forwardingService = system.actorOf(ForwardingServiceActor.props(dbProps, timeout), name = "ForwardingService")
-  val importService = system.actorOf(ImportServiceActor.props(dbProps), name = "ImportService")
+  val boxService = system.actorOf(BoxServiceActor.props(boxDao, apiBaseURL, timeout), name = "BoxService")
+  val scpService = system.actorOf(ScpServiceActor.props(scpDao, timeout), name = "ScpService")
+  val scuService = system.actorOf(ScuServiceActor.props(scuDao, timeout), name = "ScuService")
+  val directoryService = system.actorOf(DirectoryWatchServiceActor.props(directoryWatchDao, timeout), name = "DirectoryService")
+  val seriesTypeService = system.actorOf(SeriesTypeServiceActor.props(seriesTypeDao, timeout), name = "SeriesTypeService")
+  val forwardingService = system.actorOf(ForwardingServiceActor.props(forwardingDao, timeout), name = "ForwardingService")
+  val importService = system.actorOf(ImportServiceActor.props(importDao, timeout), name = "ImportService")
 
 }
 
@@ -129,30 +133,9 @@ object Slicebox extends {
   implicit val materializer = ActorMaterializer()
   implicit val executor = system.dispatcher
   val cfg = ConfigFactory.load().getConfig("slicebox")
-  val dbProps = {
-    val dbUrl = cfg.getString("database.path")
-    val db = {
-      val config = new HikariConfig()
-      config.setJdbcUrl(dbUrl)
-      if (cfg.hasPath("database.user") && cfg.getString("database.user").nonEmpty)
-        config.setUsername(cfg.getString("database.user"))
-      if (cfg.hasPath("database.password") && cfg.getString("database.password").nonEmpty)
-        config.setPassword(cfg.getString("database.password"))
-      Database.forDataSource(new HikariDataSource(config))
-    }
-    val driver = {
-      val pattern = "jdbc:(.*?):".r
-      val driverString = pattern.findFirstMatchIn(dbUrl).map(_ group 1)
-      if (driverString.isEmpty)
-        throw new IllegalArgumentException(s"Malformed database URL: $dbUrl")
-      driverString.get.toLowerCase match {
-        case "h2" => H2Driver
-        case "mysql" => MySQLDriver
-        case s => throw new IllegalArgumentException(s"Database not supported: $s")
-      }
-    }
-    DbProps(db, driver)
-  }
+
+  val dbConfig = DatabaseConfig.forConfig[JdbcProfile]("slicebox.database.config")
+
   val storage =
     if (cfg.getString("dicom-storage.config.name") == "s3")
       new S3Storage(cfg.getString("dicom-storage.config.bucket"), cfg.getString("dicom-storage.config.prefix"))

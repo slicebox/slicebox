@@ -26,9 +26,9 @@ import slick.backend.DatabaseConfig
 import slick.driver.JdbcProfile
 import slick.jdbc.GetResult
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
-class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile]) {
+class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionContext) {
 
   import MetaDataDAO._
   import dbConf.driver.api._
@@ -190,21 +190,29 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile]) {
 
   // *** Inserts ***
 
-  def insert(patient: Patient): Future[Patient] = db.run {
-    patientsQuery returning patientsQuery.map(_.id) += patient
-  }.map(generatedId => patient.copy(id = generatedId))
+  def insertPatientAction(patient: Patient) =
+    (patientsQuery returning patientsQuery.map(_.id) += patient)
+      .map(generatedId => patient.copy(id = generatedId))
 
-  def insert(study: Study): Future[Study] = db.run {
-    studiesQuery returning studiesQuery.map(_.id) += study
-  }.map(generatedId => study.copy(id = generatedId))
+  def insert(patient: Patient): Future[Patient] = db.run(insertPatientAction(patient))
 
-  def insert(series: Series): Future[Series] = db.run {
-    seriesQuery returning seriesQuery.map(_.id) += series
-  }.map(generatedId => series.copy(id = generatedId))
+  def insertStudyAction(study: Study) =
+    (studiesQuery returning studiesQuery.map(_.id) += study)
+      .map(generatedId => study.copy(id = generatedId))
 
-  def insert(image: Image): Future[Image] = db.run {
-    imagesQuery returning imagesQuery.map(_.id) += image
-  }.map(generatedId => image.copy(id = generatedId))
+  def insert(study: Study): Future[Study] = db.run(insertStudyAction(study))
+
+  def insertSeriesAction(series: Series) =
+    (seriesQuery returning seriesQuery.map(_.id) += series)
+      .map(generatedId => series.copy(id = generatedId))
+
+  def insert(series: Series): Future[Series] = db.run(insertSeriesAction(series))
+
+  def insertImageAction(image: Image) =
+    (imagesQuery returning imagesQuery.map(_.id) += image)
+      .map(generatedId => image.copy(id = generatedId))
+
+  def insert(image: Image): Future[Image] = db.run(insertImageAction(image))
 
   // *** Listing all patients, studies etc ***
 
@@ -465,51 +473,62 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile]) {
       .result
   }
 
-  def patientByNameAndID(patient: Patient): Future[Option[Patient]] = db.run {
+  def patientByNameAndIDAction(patient: Patient) =
     patientsQuery
       .filter(_.patientName === patient.patientName.value)
       .filter(_.patientID === patient.patientID.value)
       .result.headOption
-  }
 
-  def studyByUidAndPatient(study: Study, patient: Patient): Future[Option[Study]] = db.run {
+  def patientByNameAndID(patient: Patient): Future[Option[Patient]] = db.run(patientByNameAndIDAction(patient))
+
+  def studyByUidAndPatientAction(study: Study, patient: Patient) =
     studiesQuery
       .filter(_.studyInstanceUID === study.studyInstanceUID.value)
       .filter(_.patientId === patient.id)
       .result.headOption
-  }
 
-  def seriesByUidAndStudy(series: Series, study: Study): Future[Option[Series]] = db.run {
+  def studyByUidAndPatient(study: Study, patient: Patient): Future[Option[Study]] =
+    db.run(studyByUidAndPatientAction(study, patient))
+
+  def seriesByUidAndStudyAction(series: Series, study: Study) =
     seriesQuery
       .filter(_.seriesInstanceUID === series.seriesInstanceUID.value)
       .filter(_.studyId === study.id)
       .result.headOption
-  }
 
-  def imageByUidAndSeries(image: Image, series: Series): Future[Option[Image]] = db.run {
+  def seriesByUidAndStudy(series: Series, study: Study): Future[Option[Series]] =
+    db.run(seriesByUidAndStudyAction(series, study))
+
+  def imageByUidAndSeriesAction(image: Image, series: Series) =
     imagesQuery
       .filter(_.sopInstanceUID === image.sopInstanceUID.value)
       .filter(_.seriesId === series.id)
       .result.headOption
-  }
+
+  def imageByUidAndSeries(image: Image, series: Series): Future[Option[Image]] =
+    db.run(imageByUidAndSeriesAction(image, series))
 
   // *** Updates ***
 
-  def updatePatient(patient: Patient): Future[Int] = db.run {
+  def updatePatientAction(patient: Patient) =
     patientsQuery.filter(_.id === patient.id).update(patient)
-  }
 
-  def updateStudy(study: Study): Future[Int] = db.run {
+  def updatePatient(patient: Patient): Future[Int] = db.run(updatePatientAction(patient))
+
+  def updateStudyAction(study: Study) =
     studiesQuery.filter(_.id === study.id).update(study)
-  }
 
-  def updateSeries(series: Series): Future[Int] = db.run {
+  def updateStudy(study: Study): Future[Int] = db.run(updateStudyAction(study))
+
+  def updateSeriesAction(series: Series) =
     seriesQuery.filter(_.id === series.id).update(series)
-  }
 
-  def updateImage(image: Image): Future[Int] = db.run {
+  def updateSeries(series: Series): Future[Int] = db.run(updateSeriesAction(series))
+
+  def updateImageAction(image: Image) =
     imagesQuery.filter(_.id === image.id).update(image)
-  }
+
+  def updateImage(image: Image): Future[Int] = db.run(updateImageAction(image))
 
   // *** Deletes ***
 
@@ -530,9 +549,9 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile]) {
   def deleteImage(imageId: Long): Future[Int] = db.run(deleteImageAction(imageId))
 
   def deleteFully(series: Series): Future[(Option[Patient], Option[Study], Option[Series])] =
-    db.run(deleteFullyAction(series).transactionally)
+    db.run(deleteSeriesFullyAction(series).transactionally)
 
-  def deleteFullyAction(series: Series) =
+  def deleteSeriesFullyAction(series: Series) =
     deleteSeriesAction(series.id)
       .flatMap { nSeriesDeleted =>
         seriesQuery.filter(_.studyId === series.studyId).result.headOption
@@ -540,7 +559,7 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile]) {
             maybeOtherSeries.map { _ =>
               studyByIdAction(series.studyId)
                 .map { maybeStudy =>
-                  maybeStudy.map(deleteFullyAction)
+                  maybeStudy.map(deleteStudyFullyAction)
                 }.unwrap
                 .map(_.getOrElse((None, None)))
             }
@@ -554,9 +573,9 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile]) {
       }
 
   def deleteFully(study: Study): Future[(Option[Patient], Option[Study])] =
-    db.run(deleteFullyAction(study).transactionally)
+    db.run(deleteStudyFullyAction(study).transactionally)
 
-  def deleteFullyAction(study: Study) =
+  def deleteStudyFullyAction(study: Study) =
     deleteStudyAction(study.id)
       .flatMap { nStudiesDeleted =>
         studiesQuery.filter(_.patientId === study.patientId).result.headOption
@@ -576,6 +595,7 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile]) {
               }
           }
       }
+
 }
 
 object MetaDataDAO {
@@ -604,5 +624,4 @@ object MetaDataDAO {
         s"'%${queryProperty.propertyValue}%'"
     s""""${queryProperty.propertyName}" ${queryProperty.operator.toString()} $valuePart"""
   }
-
 }

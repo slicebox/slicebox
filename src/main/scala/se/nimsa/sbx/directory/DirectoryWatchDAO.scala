@@ -21,9 +21,9 @@ import se.nimsa.sbx.util.DbUtil.createTables
 import slick.backend.DatabaseConfig
 import slick.driver.JdbcProfile
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
-class DirectoryWatchDAO(val dbConf: DatabaseConfig[JdbcProfile]) {
+class DirectoryWatchDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionContext) {
 
   import dbConf.driver.api._
 

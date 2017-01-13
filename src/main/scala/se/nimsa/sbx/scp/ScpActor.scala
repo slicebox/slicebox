@@ -71,11 +71,11 @@ class ScpActor(scpData: ScpData, executor: Executor, implicit val timeout: Timeo
       log.debug("SCP", s"Dicom data received using SCP ${scpData.name}")
       val source = Source(SourceType.SCP, scpData.name, scpData.id)
       val addDicomDataFuture =
-        checkDicomData(dicomData).flatMap { status =>
+        checkDicomData(dicomData).flatMap { _ =>
           reverseAnonymization(dicomData.attributes).flatMap { reversedAttributes =>
             val reversedDicomData = DicomData(reversedAttributes, dicomData.metaInformation)
             addMetadata(reversedAttributes, source).flatMap { image =>
-              addDicomData(reversedDicomData, source, image).map { overwrite =>
+              addDicomData(reversedDicomData, source, image).map { _ =>
               }
             }
           }

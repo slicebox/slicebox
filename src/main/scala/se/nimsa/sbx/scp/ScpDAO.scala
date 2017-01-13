@@ -21,9 +21,9 @@ import se.nimsa.sbx.util.DbUtil._
 import slick.backend.DatabaseConfig
 import slick.driver.JdbcProfile
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
-class ScpDAO(val dbConf: DatabaseConfig[JdbcProfile]) {
+class ScpDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionContext) {
 
   import dbConf.driver.api._
 
@@ -43,13 +43,13 @@ class ScpDAO(val dbConf: DatabaseConfig[JdbcProfile]) {
 
   val scpDatas = TableQuery[ScpDataTable]
 
-  def create = createTables(dbConf, Seq((ScpDataTable.name, scpDatas)))
+  def create() = createTables(dbConf, Seq((ScpDataTable.name, scpDatas)))
 
-  def drop = db.run {
+  def drop() = db.run {
     scpDatas.schema.drop
   }
 
-  def clear = db.run {
+  def clear() = db.run {
     scpDatas.delete
   }
 

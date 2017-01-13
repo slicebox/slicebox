@@ -23,14 +23,12 @@ import akka.event.{Logging, LoggingReceive}
 import akka.util.Timeout
 import se.nimsa.sbx.directory.DirectoryWatchProtocol._
 import se.nimsa.sbx.util.ExceptionCatching
+import se.nimsa.sbx.util.FutureUtil.await
 
 import scala.language.postfixOps
 
-class DirectoryWatchServiceActor(dbProps: DbProps, timeout: Timeout) extends Actor with ExceptionCatching {
+class DirectoryWatchServiceActor(directoryWatchDao: DirectoryWatchDAO)(implicit timeout: Timeout) extends Actor with ExceptionCatching {
   val log = Logging(context.system, this)
-
-  val db = dbProps.db
-  val dao = new DirectoryWatchDAO(dbProps.driver)
 
   setupWatches()
 
@@ -71,7 +69,7 @@ class DirectoryWatchServiceActor(dbProps: DbProps, timeout: Timeout) extends Act
             }
 
           case UnWatchDirectory(watchedDirectoryId) =>
-            watchedDirectoryForId(watchedDirectoryId).foreach(dir => deleteDirectory(watchedDirectoryId))
+            watchedDirectoryForId(watchedDirectoryId).foreach(_ => deleteDirectory(watchedDirectoryId))
             context.child(watchedDirectoryId.toString).foreach(_ ! PoisonPill)
             sender ! DirectoryUnwatched(watchedDirectoryId)
 
@@ -79,19 +77,14 @@ class DirectoryWatchServiceActor(dbProps: DbProps, timeout: Timeout) extends Act
             sender ! WatchedDirectories(getWatchedDirectories(startIndex, count))
 
           case GetWatchedDirectoryById(id) =>
-            db.withSession { implicit session =>
-              sender ! dao.watchedDirectoryForId(id)
-            }
+              sender ! await(directoryWatchDao.watchedDirectoryForId(id))
         }
       }
 
   }
 
   def setupWatches() = {
-    val watchedDirectories =
-      db.withSession { implicit session =>
-        dao.listWatchedDirectories(0, 1000000)
-      }
+    val watchedDirectories = await(directoryWatchDao.listWatchedDirectories(0, 1000000))
 
     watchedDirectories foreach (watchedDirectory => {
       val path = Paths.get(watchedDirectory.path)
@@ -103,32 +96,22 @@ class DirectoryWatchServiceActor(dbProps: DbProps, timeout: Timeout) extends Act
   }
 
   def addDirectory(directory: WatchedDirectory): WatchedDirectory =
-    db.withSession { implicit session =>
-      dao.insert(directory)
-    }
+    await(directoryWatchDao.insert(directory))
 
   def deleteDirectory(id: Long) =
-    db.withSession { implicit session =>
-      dao.deleteWatchedDirectoryWithId(id)
-    }
+    await(directoryWatchDao.deleteWatchedDirectoryWithId(id))
 
   def watchedDirectoryForId(watchedDirectoryId: Long) =
-    db.withSession { implicit session =>
-      dao.watchedDirectoryForId(watchedDirectoryId)
-    }
+    await(directoryWatchDao.watchedDirectoryForId(watchedDirectoryId))
 
   def watchedDirectoryForPath(path: String) =
-    db.withSession { implicit session =>
-      dao.watchedDirectoryForPath(path)
-    }
+    await(directoryWatchDao.watchedDirectoryForPath(path))
 
   def getWatchedDirectories(startIndex: Long, count: Long) =
-    db.withSession { implicit session =>
-      dao.listWatchedDirectories(startIndex, count)
-    }
+    await(directoryWatchDao.listWatchedDirectories(startIndex, count))
 
 }
 
 object DirectoryWatchServiceActor {
-  def props(dbProps: DbProps, timeout: Timeout): Props = Props(new DirectoryWatchServiceActor(dbProps, timeout))
+  def props(directoryWatchDao: DirectoryWatchDAO, timeout: Timeout): Props = Props(new DirectoryWatchServiceActor(directoryWatchDao)(timeout))
 }

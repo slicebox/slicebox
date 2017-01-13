@@ -16,11 +16,9 @@
 
 package se.nimsa.sbx.forwarding
 
-import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.app.GeneralProtocol._
-import se.nimsa.sbx.model.Entity
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
-import akka.actor.ActorRef
+import se.nimsa.sbx.model.Entity
 
 object ForwardingProtocol {
 
@@ -40,7 +38,7 @@ object ForwardingProtocol {
   case class RemoveForwardingRule(forwardingRuleId: Long) extends ForwardingRequest
   
   
-  case class ForwardingRules(forwardingRules: List[ForwardingRule])
+  case class ForwardingRules(forwardingRules: Seq[ForwardingRule])
   
   case class ForwardingRuleAdded(forwardingRule: ForwardingRule)
   
@@ -56,11 +54,11 @@ object ForwardingProtocol {
   case class UpdateTransaction(transaction: ForwardingTransaction)
 
 
-  case class ImageRegisteredForForwarding(image: Image, applicableRules: List[ForwardingRule])
+  case class ImageRegisteredForForwarding(image: Image, applicableRules: Seq[ForwardingRule])
   
-  case class TransactionsEnroute(transactions: List[ForwardingTransaction])
+  case class TransactionsEnroute(transactions: Seq[ForwardingTransaction])
   
   case class TransactionMarkedAsDelivered(transactionMaybe: Option[ForwardingTransaction])
   
-  case class TransactionsFinalized(removedTransactions: List[ForwardingTransaction])
+  case class TransactionsFinalized(removedTransactions: Seq[ForwardingTransaction])
 }

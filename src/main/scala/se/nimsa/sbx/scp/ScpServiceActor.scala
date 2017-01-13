@@ -23,14 +23,12 @@ import akka.event.{Logging, LoggingReceive}
 import akka.util.Timeout
 import se.nimsa.sbx.scp.ScpProtocol._
 import se.nimsa.sbx.util.ExceptionCatching
+import se.nimsa.sbx.util.FutureUtil.await
 
 import scala.language.postfixOps
 
-class ScpServiceActor(dbProps: DbProps, timeout: Timeout) extends Actor with ExceptionCatching {
+class ScpServiceActor(scpDao: ScpDAO)(implicit timeout: Timeout) extends Actor with ExceptionCatching {
   val log = Logging(context.system, this)
-
-  val db = dbProps.db
-  val dao = new ScpDAO(dbProps.driver)
 
   val executor = Executors.newCachedThreadPool()
 
@@ -82,7 +80,7 @@ class ScpServiceActor(dbProps: DbProps, timeout: Timeout) extends Actor with Exc
             }
 
           case RemoveScp(scpDataId) =>
-            scpForId(scpDataId).foreach(scpData => deleteScpWithId(scpDataId))
+            scpForId(scpDataId).foreach(_ => deleteScpWithId(scpDataId))
             context.child(scpDataId.toString).foreach(_ ! PoisonPill)
             sender ! ScpRemoved(scpDataId)
 
@@ -90,54 +88,37 @@ class ScpServiceActor(dbProps: DbProps, timeout: Timeout) extends Actor with Exc
             sender ! Scps(getScps(startIndex, count))
 
           case GetScpById(id) =>
-            db.withSession { implicit session =>
-              sender ! dao.scpDataForId(id)
-            }
+            sender ! await(scpDao.scpDataForId(id))
         }
       }
 
   }
 
   def addScp(scpData: ScpData) =
-    db.withSession { implicit session =>
-      dao.insert(scpData)
-    }
+    await(scpDao.insert(scpData))
 
   def scpForId(id: Long) =
-    db.withSession { implicit session =>
-      dao.scpDataForId(id)
-    }
+    await(scpDao.scpDataForId(id))
 
   def scpForName(name: String) =
-    db.withSession { implicit session =>
-      dao.scpDataForName(name)
-    }
+    await(scpDao.scpDataForName(name))
 
   def scpForPort(port: Int) =
-    db.withSession { implicit session =>
-      dao.scpDataForPort(port)
-    }
+    await(scpDao.scpDataForPort(port))
 
   def deleteScpWithId(id: Long) =
-    db.withSession { implicit session =>
-      dao.deleteScpDataWithId(id)
-    }
+    await(scpDao.deleteScpDataWithId(id))
 
   def getScps(startIndex: Long, count: Long) =
-    db.withSession { implicit session =>
-      dao.listScpDatas(startIndex, count)
-    }
+    await(scpDao.listScpDatas(startIndex, count))
 
   def setupScps() = {
-    val scps =
-      db.withSession { implicit session =>
-        dao.listScpDatas(0, 10000000)
-      }
+    val scps = await(scpDao.listScpDatas(0, 10000000))
     scps foreach (scpData => context.actorOf(ScpActor.props(scpData, executor, timeout), scpData.id.toString))
   }
 
 }
 
 object ScpServiceActor {
-  def props(dbProps: DbProps, timeout: Timeout): Props = Props(new ScpServiceActor(dbProps, timeout))
+  def props(scpDao: ScpDAO, timeout: Timeout): Props = Props(new ScpServiceActor(scpDao)(timeout))
 }

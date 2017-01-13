@@ -21,9 +21,9 @@ import se.nimsa.sbx.util.DbUtil._
 import slick.backend.DatabaseConfig
 import slick.driver.JdbcProfile
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
-class ScuDAO(val dbConf: DatabaseConfig[JdbcProfile]) {
+class ScuDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionContext) {
 
   import dbConf.driver.api._
 
@@ -46,11 +46,11 @@ class ScuDAO(val dbConf: DatabaseConfig[JdbcProfile]) {
 
   def create() = createTables(dbConf, Seq((ScuDataTable.name, scuDatas)))
 
-  def drop = db.run {
+  def drop() = db.run {
     scuDatas.schema.drop
   }
 
-  def clear = db.run {
+  def clear() = db.run {
     scuDatas.delete
   }
 

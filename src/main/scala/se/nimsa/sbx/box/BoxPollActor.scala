@@ -78,7 +78,7 @@ class BoxPollActor(box: Box,
           self ! TransferFinished
           self ! PollIncoming
         case Failure(e) => e match {
-          case e@(EmptyTransactionException | RemoteBoxUnavailableException) =>
+          case _@(EmptyTransactionException | RemoteBoxUnavailableException) =>
             self ! TransferFinished
           case e: Exception =>
             SbxLog.error("Box", s"Failed to receive file from box ${box.name}: ${e.getMessage}")
@@ -149,7 +149,7 @@ class BoxPollActor(box: Box,
           else
             anonymizationService.ask(ReverseAnonymization(dicomData.attributes)).mapTo[Attributes].flatMap { reversedAttributes =>
               val source = Source(SourceType.BOX, box.name, box.id)
-              storageService.ask(CheckDicomData(dicomData, useExtendedContexts = true)).mapTo[Boolean].flatMap { status =>
+              storageService.ask(CheckDicomData(dicomData, useExtendedContexts = true)).mapTo[Boolean].flatMap { _ =>
                 metaDataService.ask(AddMetaData(dicomData.attributes, source)).mapTo[MetaDataAdded].flatMap { metaData =>
                   storageService.ask(AddDicomData(dicomData.copy(attributes = reversedAttributes), source, metaData.image)).mapTo[DicomDataAdded].flatMap { dicomDataAdded =>
                     boxService.ask(UpdateIncoming(box, transactionImage.transaction.id, transactionImage.image.sequenceNumber, transactionImage.transaction.totalImageCount, dicomDataAdded.image.id, dicomDataAdded.overwrite)).flatMap {

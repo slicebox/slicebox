@@ -4,15 +4,14 @@ import akka.actor.Actor
 import akka.event.Logging
 import akka.actor.Props
 import akka.event.LoggingReceive
+import akka.util.Timeout
 import se.nimsa.sbx.importing.ImportProtocol._
 import se.nimsa.sbx.lang.NotFoundException
 import se.nimsa.sbx.util.ExceptionCatching
+import se.nimsa.sbx.util.FutureUtil.await
 
-class ImportServiceActor(dbProps: DbProps) extends Actor with ExceptionCatching {
+class ImportServiceActor(importDao: ImportDAO)(implicit timeout: Timeout) extends Actor with ExceptionCatching {
   val log = Logging(context.system, this)
-
-  val db = dbProps.db
-  val dao = new ImportDAO(dbProps.driver)
 
   log.info("Import service started")
 
@@ -22,61 +21,50 @@ class ImportServiceActor(dbProps: DbProps) extends Actor with ExceptionCatching 
       msg match {
 
         case AddImportSession(importSession) =>
-          db.withSession { implicit session =>
-            dao.importSessionForName(importSession.name) match {
-              case Some(existingImportSession) if existingImportSession.userId != importSession.userId =>
-                throw new IllegalArgumentException(s"An import session with name ${existingImportSession.name} and user ${existingImportSession.user} already exists")
-              case Some(existingImportSession) =>
-                sender ! existingImportSession
-              case None =>
-                val newImportSession = importSession.copy(filesImported = 0, filesAdded = 0, filesRejected = 0, created = now, lastUpdated = now)
-                sender ! dao.addImportSession(newImportSession)
-            }
+          await(importDao.importSessionForName(importSession.name)) match {
+            case Some(existingImportSession) if existingImportSession.userId != importSession.userId =>
+              throw new IllegalArgumentException(s"An import session with name ${existingImportSession.name} and user ${existingImportSession.user} already exists")
+            case Some(existingImportSession) =>
+              sender ! existingImportSession
+            case None =>
+              val newImportSession = importSession.copy(filesImported = 0, filesAdded = 0, filesRejected = 0, created = now, lastUpdated = now)
+              sender ! await(importDao.addImportSession(newImportSession))
           }
 
         case GetImportSessions(startIndex, count) =>
-          db.withSession { implicit session =>
-            sender ! ImportSessions(dao.getImportSessions(startIndex, count))
-          }
+          sender ! ImportSessions(await(importDao.getImportSessions(startIndex, count)))
 
         case GetImportSession(id) =>
-          db.withSession { implicit session =>
-            sender ! dao.getImportSession(id)
-          }
+          sender ! await(importDao.getImportSession(id))
 
         case DeleteImportSession(id) =>
-          db.withSession { implicit session =>
-            sender ! dao.removeImportSession(id)
-          }
+          sender ! await(importDao.removeImportSession(id))
 
         case GetImportSessionImages(id) =>
-          db.withSession { implicit session =>
-            sender ! ImportSessionImages(dao.listImagesForImportSessionId(id))
-          }
+          sender ! ImportSessionImages(await(importDao.listImagesForImportSessionId(id)))
 
         case AddImageToSession(importSessionId, image, overwrite) =>
-          db.withSession { implicit session =>
-            dao.getImportSession(importSessionId).map { importSession =>
+          await(importDao.getImportSession(importSessionId)) match {
+            case Some(importSession) =>
               val importSessionImage =
                 if (overwrite) {
                   val updatedImportSession = importSession.copy(filesImported = importSession.filesImported + 1, lastUpdated = now)
-                  dao.updateImportSession(updatedImportSession)
-                  dao.importSessionImageForImportSessionIdAndImageId(importSession.id, image.id)
-                    .getOrElse(dao.insertImportSessionImage(ImportSessionImage(-1, updatedImportSession.id, image.id)))
+                  await(importDao.updateImportSession(updatedImportSession))
+                  await(importDao.importSessionImageForImportSessionIdAndImageId(importSession.id, image.id))
+                    .getOrElse(await(importDao.insertImportSessionImage(ImportSessionImage(-1, updatedImportSession.id, image.id))))
                 } else {
                   val updatedImportSession = importSession.copy(filesImported = importSession.filesImported + 1, filesAdded = importSession.filesAdded + 1, lastUpdated = now)
-                  dao.updateImportSession(updatedImportSession)
-                  dao.insertImportSessionImage(ImportSessionImage(-1, updatedImportSession.id, image.id))
+                  await(importDao.updateImportSession(updatedImportSession))
+                  await(importDao.insertImportSessionImage(ImportSessionImage(-1, updatedImportSession.id, image.id)))
                 }
               sender ! ImageAddedToSession(importSessionImage)
-            }.orElse(throw new NotFoundException(s"Import session not found for id $importSessionId"))
+            case None =>
+              throw new NotFoundException(s"Import session not found for id $importSessionId")
           }
 
         case UpdateSessionWithRejection(importSession) =>
-          db.withSession { implicit session =>
-            val updatedImportSession = importSession.copy(filesRejected = importSession.filesRejected + 1, lastUpdated = now)
-            sender ! dao.updateImportSession(updatedImportSession)
-          }
+          val updatedImportSession = importSession.copy(filesRejected = importSession.filesRejected + 1, lastUpdated = now)
+          sender ! await(importDao.updateImportSession(updatedImportSession))
 
       }
     }
@@ -88,5 +76,5 @@ class ImportServiceActor(dbProps: DbProps) extends Actor with ExceptionCatching 
 }
 
 object ImportServiceActor {
-  def props(dbProps: DbProps): Props = Props(new ImportServiceActor(dbProps))
+  def props(importDao: ImportDAO, timeout: Timeout): Props = Props(new ImportServiceActor(importDao)(timeout))
 }

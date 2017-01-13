@@ -18,21 +18,18 @@ package se.nimsa.sbx.anonymization
 
 import akka.actor.{Actor, Props}
 import akka.event.{Logging, LoggingReceive}
+import akka.util.Timeout
 import org.dcm4che3.data.Attributes
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.anonymization.AnonymizationUtil._
 import se.nimsa.sbx.app.GeneralProtocol.ImageDeleted
 import se.nimsa.sbx.dicom.DicomUtil._
 import se.nimsa.sbx.util.ExceptionCatching
+import se.nimsa.sbx.util.FutureUtil.await
 
-class AnonymizationServiceActor(dbProps: DbProps, purgeEmptyAnonymizationKeys: Boolean) extends Actor with ExceptionCatching {
+class AnonymizationServiceActor(anonymizationDao: AnonymizationDAO, purgeEmptyAnonymizationKeys: Boolean)(implicit timeout: Timeout) extends Actor with ExceptionCatching {
 
   val log = Logging(context.system, this)
-
-  val db = dbProps.db
-  val dao = new AnonymizationDAO(dbProps.driver)
-
-  setupDb()
 
   override def preStart {
     context.system.eventStream.subscribe(context.self, classOf[ImageDeleted])
@@ -98,75 +95,51 @@ class AnonymizationServiceActor(dbProps: DbProps, purgeEmptyAnonymizationKeys: B
       }
   }
 
-  def setupDb(): Unit =
-    db.withSession { implicit session =>
-      dao.create
-    }
-
   def addAnonymizationKey(anonymizationKey: AnonymizationKey): AnonymizationKey =
-    db.withSession { implicit session =>
-      dao.insertAnonymizationKey(anonymizationKey)
-    }
+    await(anonymizationDao.insertAnonymizationKey(anonymizationKey))
 
   def maybeAddAnonymizationKeyImage(anonymizationKeyId: Long, imageId: Long): AnonymizationKeyImage =
-    db.withSession { implicit session =>
-      dao.anonymizationKeyImageForAnonymizationKeyIdAndImageId(anonymizationKeyId, imageId)
-        .getOrElse(
-          dao.insertAnonymizationKeyImage(
-            AnonymizationKeyImage(-1, anonymizationKeyId, imageId)))
-    }
+    await(anonymizationDao.anonymizationKeyImageForAnonymizationKeyIdAndImageId(anonymizationKeyId, imageId))
+      .getOrElse(
+        await(anonymizationDao.insertAnonymizationKeyImage(
+          AnonymizationKeyImage(-1, anonymizationKeyId, imageId))))
 
   def removeAnonymizationKey(anonymizationKeyId: Long) =
-    db.withSession { implicit session =>
-      dao.removeAnonymizationKey(anonymizationKeyId)
-    }
+    await(anonymizationDao.removeAnonymizationKey(anonymizationKeyId))
 
   def listAnonymizationKeys(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String]) =
-    db.withSession { implicit session =>
-      dao.anonymizationKeys(startIndex, count, orderBy, orderAscending, filter)
-    }
+    await(anonymizationDao.anonymizationKeys(startIndex, count, orderBy, orderAscending, filter))
 
   def getAnonymizationKeys(anonymizationKeyId: Long): Option[AnonymizationKey] =
-    db.withSession { implicit session =>
-      dao.anonymizationKeyForId(anonymizationKeyId)
-    }
+    await(anonymizationDao.anonymizationKeyForId(anonymizationKeyId))
 
-  def anonymizationKeysForAnonPatient(attributes: Attributes) =
-    db.withSession { implicit session =>
-      val anonPatient = attributesToPatient(attributes)
-      dao.anonymizationKeysForAnonPatient(anonPatient.patientName.value, anonPatient.patientID.value)
-    }
+  def anonymizationKeysForAnonPatient(attributes: Attributes) = {
+    val anonPatient = attributesToPatient(attributes)
+    await(anonymizationDao.anonymizationKeysForAnonPatient(anonPatient.patientName.value, anonPatient.patientID.value))
+  }
 
-  def anonymizationKeysForPatient(attributes: Attributes) =
-    db.withSession { implicit session =>
-      val patient = attributesToPatient(attributes)
-      dao.anonymizationKeysForPatient(patient.patientName.value, patient.patientID.value)
-    }
+  def anonymizationKeysForPatient(attributes: Attributes) = {
+    val patient = attributesToPatient(attributes)
+    await(anonymizationDao.anonymizationKeysForPatient(patient.patientName.value, patient.patientID.value))
+  }
 
   def removeImageFromAnonymizationKeyImages(imageId: Long) =
-    db.withSession { implicit session =>
-      dao.removeAnonymizationKeyImagesForImageId(imageId, purgeEmptyAnonymizationKeys)
-    }
+    await(anonymizationDao.removeAnonymizationKeyImagesForImageId(imageId, purgeEmptyAnonymizationKeys))
 
   def getAnonymizationKeyImagesByAnonymizationKeyId(anonymizationKeyId: Long) =
-    db.withSession { implicit session =>
-      dao.anonymizationKeyImagesForAnonymizationKeyId(anonymizationKeyId)
-    }
+    await(anonymizationDao.anonymizationKeyImagesForAnonymizationKeyId(anonymizationKeyId))
 
   def getAnonymizationKeyForId(id: Long): Option[AnonymizationKey] =
-    db.withSession { implicit session =>
-      dao.anonymizationKeyForId(id)
-    }
+    await(anonymizationDao.anonymizationKeyForId(id))
 
-  def queryAnonymizationKeys(query: AnonymizationKeyQuery): List[AnonymizationKey] =
-    db.withSession { implicit session =>
-      val order = query.order.map(_.orderBy)
-      val orderAscending = query.order.forall(_.orderAscending)
-      dao.queryAnonymizationKeys(query.startIndex, query.count, order, orderAscending, query.queryProperties)
-    }
+  def queryAnonymizationKeys(query: AnonymizationKeyQuery): Seq[AnonymizationKey] = {
+    val order = query.order.map(_.orderBy)
+    val orderAscending = query.order.forall(_.orderAscending)
+    await(anonymizationDao.queryAnonymizationKeys(query.startIndex, query.count, order, orderAscending, query.queryProperties))
+  }
 
 }
 
 object AnonymizationServiceActor {
-  def props(dbProps: DbProps, purgeEmptyAnonymizationKeys: Boolean): Props = Props(new AnonymizationServiceActor(dbProps, purgeEmptyAnonymizationKeys))
+  def props(anonymizationDao: AnonymizationDAO, purgeEmptyAnonymizationKeys: Boolean, timeout: Timeout): Props = Props(new AnonymizationServiceActor(anonymizationDao, purgeEmptyAnonymizationKeys)(timeout))
 }

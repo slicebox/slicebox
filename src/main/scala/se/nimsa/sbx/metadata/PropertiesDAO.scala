@@ -26,9 +26,9 @@ import slick.backend.DatabaseConfig
 import slick.driver.JdbcProfile
 import slick.jdbc.GetResult
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
-class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile]) {
+class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionContext) {
 
   import MetaDataDAO._
   import dbConf.driver.api._
@@ -113,19 +113,21 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile]) {
 
   // Functions
 
-  def insertSeriesSource(seriesSource: SeriesSource): Future[SeriesSource] = db.run {
-    seriesSourceQuery += seriesSource
-  }.map(_ => seriesSource)
+  def insertSeriesSourceAction(seriesSource: SeriesSource) = (seriesSourceQuery += seriesSource).map(_ => seriesSource)
 
-  def updateSeriesSource(seriesSource: SeriesSource): Future[Int] = db.run {
+  def insertSeriesSource(seriesSource: SeriesSource): Future[SeriesSource] = db.run(insertSeriesSourceAction(seriesSource))
+
+  def updateSeriesSourceAction(seriesSource: SeriesSource) =
     seriesSourceQuery
       .filter(_.id === seriesSource.id)
       .update(seriesSource)
-  }
 
-  def seriesSourceById(seriesId: Long): Future[Option[SeriesSource]] = db.run {
+  def updateSeriesSource(seriesSource: SeriesSource): Future[Int] = db.run(updateSeriesSourceAction(seriesSource))
+
+  def seriesSourceByIdAction(seriesId: Long) =
     seriesSourceQuery.filter(_.id === seriesId).result.headOption
-  }
+
+  def seriesSourceById(seriesId: Long): Future[Option[SeriesSource]] = db.run(seriesSourceByIdAction(seriesId))
 
   def seriesSources: Future[Seq[SeriesSource]] = db.run {
     seriesSourceQuery.result
@@ -167,7 +169,7 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile]) {
     seriesSeriesTagQuery.filter(_.seriesId === seriesId).result
   }
 
-  def listSeriesSeriesTagsForSeriesTagIdAction(seriesTagId: Long) =
+  private def listSeriesSeriesTagsForSeriesTagIdAction(seriesTagId: Long) =
     seriesSeriesTagQuery.filter(_.seriesTagId === seriesTagId).result
 
   def listSeriesSeriesTagsForSeriesTagId(seriesTagId: Long): Future[Seq[SeriesSeriesTag]] =
@@ -229,7 +231,7 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile]) {
         imagesQuery.filter(_.seriesId === image.seriesId).result.headOption.flatMap { otherImages =>
           maybeParentSeries
             .filter(_ => otherImages.isEmpty)
-            .map(series => deleteFullyAction(series))
+            .map(series => deleteSeriesFullyAction(series))
             .getOrElse(DBIO.successful((None, None, None)))
         }.map {
           case (maybePatient, maybeStudy, maybeSeries) =>
@@ -240,9 +242,9 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile]) {
     }
   }
 
-  def deleteFullyAction(series: Series) = {
+  def deleteSeriesFullyAction(series: Series) = {
     seriesTagsForSeriesAction(series.id).flatMap { seriesSeriesTags =>
-      metaDataDao.deleteFullyAction(series).flatMap { r =>
+      metaDataDao.deleteSeriesFullyAction(series).flatMap { r =>
         DBIO.sequence(seriesSeriesTags.map(seriesTag => cleanupSeriesTagAction(seriesTag.id)))
           .map(_ => r)
       }
@@ -250,7 +252,7 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile]) {
   }
 
   def deleteFully(series: Series): Future[(Option[Patient], Option[Study], Option[Series])] =
-    db.run(deleteFullyAction(series))
+    db.run(deleteSeriesFullyAction(series))
 
   def flatSeries(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String], sourceRefs: Seq[SourceRef], seriesTypeIds: Seq[Long], seriesTagIds: Seq[Long]): Future[Seq[FlatSeries]] =
     if (isWithAdvancedFiltering(sourceRefs, seriesTypeIds, seriesTagIds))
@@ -592,6 +594,66 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile]) {
       }
     else
       metaDataDao.seriesForStudy(startIndex, count, studyId)
+  }
+
+  def addMetaData(patient: Patient, study: Study, series: Series, image: Image, source: Source): Future[MetaDataAdded] = {
+    val seriesSource = SeriesSource(-1, source)
+
+    val addAction =
+      patientByNameAndIDAction(patient).flatMap { patientMaybe =>
+        patientMaybe.map { dbp =>
+          val updatePatient = patient.copy(id = dbp.id)
+          updatePatientAction(updatePatient).map(_ => (updatePatient, false))
+        }.getOrElse {
+          insertPatientAction(patient).map((_, true))
+        }
+      }.flatMap {
+        case (dbPatient, patientAdded) =>
+          studyByUidAndPatientAction(study, dbPatient).flatMap { studyMaybe =>
+            studyMaybe.map { dbs =>
+              val updateStudy = study.copy(id = dbs.id, patientId = dbs.patientId)
+              updateStudyAction(updateStudy).map(_ => (updateStudy, false))
+            }.getOrElse {
+              insertStudyAction(study.copy(patientId = dbPatient.id)).map((_, true))
+            }
+          }.flatMap {
+            case (dbStudy, studyAdded) =>
+              seriesByUidAndStudyAction(series, dbStudy).flatMap { seriesMaybe =>
+                seriesMaybe.map { dbs =>
+                  val updateSeries = series.copy(id = dbs.id, studyId = dbs.studyId)
+                  updateSeriesAction(updateSeries).map(_ => (updateSeries, false))
+                }.getOrElse {
+                  insertSeriesAction(series.copy(studyId = dbStudy.id)).map((_, true))
+                }
+              }.flatMap {
+                case (dbSeries, seriesAdded) =>
+                  imageByUidAndSeriesAction(image, dbSeries).flatMap { imageMaybe =>
+                    imageMaybe.map { dbi =>
+                      val updateImage = image.copy(id = dbi.id, seriesId = dbi.seriesId)
+                      updateImageAction(updateImage).map(_ => (updateImage, false))
+                    }.getOrElse {
+                      insertImageAction(image.copy(seriesId = dbSeries.id)).map((_, true))
+                    }
+                  }.flatMap {
+                    case (dbImage, imageAdded) =>
+                      seriesSourceByIdAction(dbSeries.id).flatMap { seriesSourceMaybe =>
+                        seriesSourceMaybe.map { dbss =>
+                          val updateSeriesSource = seriesSource.copy(id = dbss.id)
+                          updateSeriesSourceAction(updateSeriesSource).map(_ => updateSeriesSource)
+                        }.getOrElse {
+                          insertSeriesSourceAction(seriesSource.copy(id = dbSeries.id))
+                        }
+                      }.map { dbSeriesSource =>
+                        MetaDataAdded(dbPatient, dbStudy, dbSeries, dbImage,
+                          patientAdded, studyAdded, seriesAdded, imageAdded,
+                          dbSeriesSource.source)
+                      }
+                  }
+              }
+          }
+      }
+
+    db.run(addAction.transactionally)
   }
 
 }

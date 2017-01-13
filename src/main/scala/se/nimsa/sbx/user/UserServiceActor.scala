@@ -16,18 +16,19 @@
 
 package se.nimsa.sbx.user
 
-import UserProtocol._
-import akka.actor.Actor
-import akka.actor.Props
-import akka.event.Logging
-import akka.event.LoggingReceive
-import se.nimsa.sbx.util.ExceptionCatching
-import scala.concurrent.duration.DurationInt
 import java.util.UUID
-import akka.actor.actorRef2Scala
-import UserServiceActor._
 
-class UserServiceActor(dao: UserDAO, superUser: String, superPassword: String, sessionTimeout: Long) extends Actor with ExceptionCatching {
+import akka.actor.{Actor, Props, actorRef2Scala}
+import akka.event.{Logging, LoggingReceive}
+import akka.util.Timeout
+import se.nimsa.sbx.user.UserProtocol._
+import se.nimsa.sbx.user.UserServiceActor._
+import se.nimsa.sbx.util.ExceptionCatching
+import se.nimsa.sbx.util.FutureUtil.await
+
+import scala.concurrent.duration.DurationInt
+
+class UserServiceActor(userDao: UserDAO, superUser: String, superPassword: String, sessionTimeout: Long)(implicit timeout: Timeout) extends Actor with ExceptionCatching {
   val log = Logging(context.system, this)
 
   addSuperUser()
@@ -93,89 +94,75 @@ class UserServiceActor(dao: UserDAO, superUser: String, superPassword: String, s
 
   }
 
-  def addSuperUser(): Unit =
-    db.withSession { implicit session =>
-      val superUsers = dao.listUsers(0, 1000000).filter(_.role == UserRole.SUPERUSER)
-      if (superUsers.isEmpty || superUsers.head.user != superUser || !superUsers.head.passwordMatches(superPassword)) {
-        superUsers.foreach(superUser => dao.deleteUserByUserId(superUser.id))
-        dao.insert(ApiUser(-1, superUser, UserRole.SUPERUSER).withPassword(superPassword))
-      }
+  def addSuperUser(): Unit = {
+    val superUsers = await(userDao.listUsers(0, 1000000)).filter(_.role == UserRole.SUPERUSER)
+    if (superUsers.isEmpty || superUsers.head.user != superUser || !superUsers.head.passwordMatches(superPassword)) {
+      superUsers.foreach(superUser => userDao.deleteUserByUserId(superUser.id))
+      await(userDao.insert(ApiUser(-1, superUser, UserRole.SUPERUSER).withPassword(superPassword)))
     }
+  }
 
   def userByName(name: String): Option[ApiUser] =
-    db.withSession { implicit session =>
-      dao.userByName(name)
-    }
+    await(userDao.userByName(name))
 
-  def createOrUpdateSession(user: ApiUser, ip: String, userAgent: String): ApiSession =
-    db.withSession { implicit session =>
-      dao.userSessionByUserIdIpAndUserAgent(user.id, ip, userAgent)
-        .map(apiSession => {
-          val updatedSession = apiSession.copy(updated = currentTime)
-          dao.updateSession(updatedSession)
-          updatedSession
-        })
-        .getOrElse(
-          dao.insertSession(ApiSession(-1, user.id, newSessionToken, ip, userAgent, currentTime)))
-    }
+  def createOrUpdateSession(user: ApiUser, ip: String, userAgent: String): ApiSession = {
+    await(userDao.userSessionByUserIdIpAndUserAgent(user.id, ip, userAgent))
+      .map(apiSession => {
+        val updatedSession = apiSession.copy(updated = currentTime)
+        await(userDao.updateSession(updatedSession))
+        updatedSession
+      })
+      .getOrElse(
+        await(userDao.insertSession(ApiSession(-1, user.id, newSessionToken, ip, userAgent, currentTime))))
+  }
 
   def deleteSession(user: ApiUser, authKey: AuthKey): Option[Int] =
-    db.withSession { implicit session =>
-      authKey.ip.flatMap(ip =>
-        authKey.userAgent.map(userAgent =>
-          dao.deleteSessionByUserIdIpAndUserAgent(user.id, ip, userAgent)))
+    authKey.ip.flatMap(ip =>
+      authKey.userAgent.map(userAgent =>
+        await(userDao.deleteSessionByUserIdIpAndUserAgent(user.id, ip, userAgent))))
+
+  def getAndRefreshUser(authKey: AuthKey): Option[ApiUser] = {
+    val validUserAndSession =
+      authKey.token.flatMap(token =>
+        authKey.ip.flatMap(ip =>
+          authKey.userAgent.flatMap(userAgent =>
+            await(userDao.userSessionByTokenIpAndUserAgent(token, ip, userAgent)))))
+        .filter {
+          case (_, apiSession) =>
+            apiSession.updated > (currentTime - sessionTimeout)
+        }
+
+    validUserAndSession.foreach {
+      case (_, apiSession) =>
+        await(userDao.updateSession(apiSession.copy(updated = currentTime)))
     }
 
-  def getAndRefreshUser(authKey: AuthKey): Option[ApiUser] =
-    db.withSession { implicit session =>
-      val validUserAndSession =
-        authKey.token.flatMap(token =>
-          authKey.ip.flatMap(ip =>
-            authKey.userAgent.flatMap(userAgent =>
-              dao.userSessionByTokenIpAndUserAgent(token, ip, userAgent))))
-          .filter {
-            case (user, apiSession) =>
-              apiSession.updated > (currentTime - sessionTimeout)
-          }
-
-      validUserAndSession.foreach {
-        case (user, apiSession) =>
-          dao.updateSession(apiSession.copy(updated = currentTime))
-      }
-
-      validUserAndSession.map(_._1)
-    }
+    validUserAndSession.map(_._1)
+  }
 
   def getOrCreateUser(user: ApiUser): ApiUser =
-    db.withSession { implicit session =>
-      dao.userByName(user.user).getOrElse(dao.insert(user))
-    }
+    await(userDao.userByName(user.user)).getOrElse(await(userDao.insert(user)))
 
-  def deleteUser(userId: Long): Unit =
-    db.withSession { implicit session =>
-      dao.userById(userId)
-        .filter(_.role == UserRole.SUPERUSER)
-        .foreach(superuser => throw new IllegalArgumentException("Superuser may not be deleted"))
+  def deleteUser(userId: Long): Unit = {
+    await(userDao.userById(userId))
+      .filter(_.role == UserRole.SUPERUSER)
+      .foreach(_ => throw new IllegalArgumentException("Superuser may not be deleted"))
 
-      dao.deleteUserByUserId(userId)
-      sender ! UserDeleted(userId)
-    }
+    await(userDao.deleteUserByUserId(userId))
+    sender ! UserDeleted(userId)
+  }
 
   def removeExpiredSessions(): Unit =
-    db.withSession { implicit session =>
-      dao.listSessions
-        .filter(_.updated < currentTime - sessionTimeout)
-        .foreach(expiredSession => dao.deleteSessionById(expiredSession.id))
-    }
+    await(userDao.listSessions)
+      .filter(_.updated < currentTime - sessionTimeout)
+      .foreach(expiredSession => userDao.deleteSessionById(expiredSession.id))
 
-  def listUsers(startIndex: Long, count: Long): List[ApiUser] =
-    db.withSession { implicit session =>
-      dao.listUsers(startIndex, count)
-    }
+  def listUsers(startIndex: Long, count: Long): Seq[ApiUser] =
+    await(userDao.listUsers(startIndex, count))
 }
 
 object UserServiceActor {
-  def props(dao: UserDAO, superUser: String, superPassword: String, sessionTimeout: Long): Props = Props(new UserServiceActor(dao, superUser, superPassword, sessionTimeout))
+  def props(dao: UserDAO, superUser: String, superPassword: String, sessionTimeout: Long, timeout: Timeout): Props = Props(new UserServiceActor(dao, superUser, superPassword, sessionTimeout)(timeout))
 
   def newSessionToken = UUID.randomUUID.toString
 

@@ -16,17 +16,15 @@
 
 package se.nimsa.sbx.directory
 
-import java.nio.file.FileSystems
-import java.nio.file.FileVisitResult
-import java.nio.file.Files
-import java.nio.file.Path
-import java.nio.file.SimpleFileVisitor
+import java.nio.file._
 import java.nio.file.StandardWatchEventKinds._
 import java.nio.file.attribute.BasicFileAttributes
-import scala.collection.JavaConversions.asScalaBuffer
-import com.typesafe.scalalogging.LazyLogging
+
 import akka.actor.ActorRef
-import DirectoryWatchProtocol.FileAddedToWatchedDirectory
+import com.typesafe.scalalogging.LazyLogging
+import se.nimsa.sbx.directory.DirectoryWatchProtocol.FileAddedToWatchedDirectory
+
+import scala.collection.JavaConversions.asScalaBuffer
 
 class DirectoryWatch(notifyActor: ActorRef) extends Runnable with LazyLogging {
 
@@ -58,7 +56,7 @@ class DirectoryWatch(notifyActor: ActorRef) extends Runnable with LazyLogging {
       Thread.sleep(100)
     }
   }
-  
+
   def run() = {
 
     try {
@@ -77,11 +75,11 @@ class DirectoryWatch(notifyActor: ActorRef) extends Runnable with LazyLogging {
 
                 if (Files.isDirectory(path))
                   watchRecursively(path)
-                else {                  
+                else {
                   makeSureFileIsNotInUse(path)
                   notifyActor ! FileAddedToWatchedDirectory(path)
                 }
-                
+
               case x =>
 
                 logger.warn(s"Unknown event $x")
@@ -90,7 +88,7 @@ class DirectoryWatch(notifyActor: ActorRef) extends Runnable with LazyLogging {
         key.reset()
       }
     } catch {
-      case e: InterruptedException =>
+      case _: InterruptedException =>
         logger.debug("Directory watcher interrupted, shutting down")
     } finally {
       watchService.close()
