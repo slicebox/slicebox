@@ -16,83 +16,73 @@
 
 package se.nimsa.sbx.box
 
-import scala.slick.driver.JdbcProfile
-import org.h2.jdbc.JdbcSQLException
-import scala.slick.jdbc.meta.MTable
-import BoxProtocol._
-import BoxProtocol.BoxSendMethod._
-import BoxProtocol.TransactionStatus._
-import scala.slick.jdbc.{GetResult, StaticQuery => Q}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.TagValue
+import se.nimsa.sbx.box.BoxProtocol.BoxSendMethod._
+import se.nimsa.sbx.box.BoxProtocol.TransactionStatus._
+import se.nimsa.sbx.box.BoxProtocol._
+import se.nimsa.sbx.util.DbUtil.createTables
+import slick.backend.DatabaseConfig
+import slick.driver.JdbcProfile
 
-class BoxDAO(val driver: JdbcProfile) {
+import scala.concurrent.Future
 
-  import driver.simple._
+class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile]) {
+
+  import dbConf.driver.api._
+
+  val db = dbConf.db
 
   implicit val statusColumnType =
-    MappedColumnType.base[TransactionStatus, String](ts => ts.toString(), TransactionStatus.withName)
+    MappedColumnType.base[TransactionStatus, String](ts => ts.toString, TransactionStatus.withName)
 
   implicit val sendMethodColumnType =
-    MappedColumnType.base[BoxSendMethod, String](bsm => bsm.toString(), BoxSendMethod.withName)
+    MappedColumnType.base[BoxSendMethod, String](bsm => bsm.toString, BoxSendMethod.withName)
 
-  class BoxTable(tag: Tag) extends Table[Box](tag, "Boxes") {
+  class BoxTable(tag: Tag) extends Table[Box](tag, BoxTable.name) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
-
     def name = column[String]("name")
-
     def token = column[String]("token")
-
     def baseUrl = column[String]("baseurl")
-
     def sendMethod = column[BoxSendMethod]("sendmethod")
-
     def online = column[Boolean]("online")
-
     def idxUniqueName = index("idx_unique_box_name", name, unique = true)
-
     def * = (id, name, token, baseUrl, sendMethod, online) <>(Box.tupled, Box.unapply)
+  }
+  object BoxTable {
+    val name = "Boxes"
   }
 
   val boxQuery = TableQuery[BoxTable]
 
-  class OutgoingTransactionTable(tag: Tag) extends Table[OutgoingTransaction](tag, "OutgoingTransactions") {
+  class OutgoingTransactionTable(tag: Tag) extends Table[OutgoingTransaction](tag, OutgoingTransactionTable.name) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
-
     def boxId = column[Long]("boxid")
-
     def boxName = column[String]("boxname")
-
     def sentImageCount = column[Long]("sentimagecount")
-
     def totalImageCount = column[Long]("totalimagecount")
-
     def created = column[Long]("created")
-
     def updated = column[Long]("updated")
-
     def status = column[TransactionStatus]("status")
-
     def * = (id, boxId, boxName, sentImageCount, totalImageCount, created, updated, status) <>(OutgoingTransaction.tupled, OutgoingTransaction.unapply)
+  }
+  object OutgoingTransactionTable {
+    val name = "OutgoingTransactions"
   }
 
   val outgoingTransactionQuery = TableQuery[OutgoingTransactionTable]
 
-  class OutgoingImageTable(tag: Tag) extends Table[OutgoingImage](tag, "OutgoingImages") {
+  class OutgoingImageTable(tag: Tag) extends Table[OutgoingImage](tag, OutgoingImageTable.name) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
-
     def outgoingTransactionId = column[Long]("outgoingtransactionid")
-
     def imageId = column[Long]("imageid")
-
     def sequenceNumber = column[Long]("sequencenumber")
-
     def sent = column[Boolean]("sent")
-
     def fkOutgoingTransaction = foreignKey("fk_outgoing_transaction_id", outgoingTransactionId, outgoingTransactionQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
-
     def idxUniqueTransactionAndNumber = index("idx_unique_outgoing_image", (outgoingTransactionId, sequenceNumber), unique = true)
-
     def * = (id, outgoingTransactionId, imageId, sequenceNumber, sent) <>(OutgoingImage.tupled, OutgoingImage.unapply)
+  }
+  object OutgoingImageTable {
+    val name = "OutgoingImages"
   }
 
   val outgoingImageQuery = TableQuery[OutgoingImageTable]
@@ -100,103 +90,84 @@ class BoxDAO(val driver: JdbcProfile) {
   val toOutgoingTagValue = (id: Long, outgoingImageId: Long, tag: Int, value: String) => OutgoingTagValue(id, outgoingImageId, TagValue(tag, value))
   val fromOutgoingTagValue = (tagValue: OutgoingTagValue) => Option((tagValue.id, tagValue.outgoingImageId, tagValue.tagValue.tag, tagValue.tagValue.value))
 
-  class OutgoingTagValueTable(tag: Tag) extends Table[OutgoingTagValue](tag, "OutgoingTagValues") {
+  class OutgoingTagValueTable(tag: Tag) extends Table[OutgoingTagValue](tag, OutgoingTagValueTable.name) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
-
     def outgoingImageId = column[Long]("outgoingimageid")
-
     def dicomTag = column[Int]("tag")
-
     def value = column[String]("value")
-
     def fkOutgoingImage = foreignKey("fk_outgoing_image_id", outgoingImageId, outgoingImageQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
-
     def * = (id, outgoingImageId, dicomTag, value) <>(toOutgoingTagValue.tupled, fromOutgoingTagValue)
+  }
+  object OutgoingTagValueTable {
+    val name = "OutgoingTagValues"
   }
 
   val outgoingTagValueQuery = TableQuery[OutgoingTagValueTable]
 
-  class IncomingTransactionTable(tag: Tag) extends Table[IncomingTransaction](tag, "IncomingTransactions") {
+  class IncomingTransactionTable(tag: Tag) extends Table[IncomingTransaction](tag, IncomingTransactionTable.name) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
-
     def boxId = column[Long]("boxid")
-
     def boxName = column[String]("boxname")
-
     def outgoingTransactionId = column[Long]("outgoingtransactionid")
-
     def receivedImageCount = column[Long]("receivedimagecount")
-
     def addedImageCount = column[Long]("addedimagecount")
-
     def totalImageCount = column[Long]("totalimagecount")
-
     def created = column[Long]("created")
-
     def updated = column[Long]("updated")
-
     def status = column[TransactionStatus]("status")
-
     def * = (id, boxId, boxName, outgoingTransactionId, receivedImageCount, addedImageCount, totalImageCount, created, updated, status) <>(IncomingTransaction.tupled, IncomingTransaction.unapply)
+  }
+  object IncomingTransactionTable {
+    val name = "IncomingTransactions"
   }
 
   val incomingTransactionQuery = TableQuery[IncomingTransactionTable]
 
-  class IncomingImageTable(tag: Tag) extends Table[IncomingImage](tag, "IncomingImages") {
+  class IncomingImageTable(tag: Tag) extends Table[IncomingImage](tag, IncomingImageTable.name) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
-
     def incomingTransactionId = column[Long]("incomingtransactionid")
-
     def imageId = column[Long]("imageid")
-
     def sequenceNumber = column[Long]("sequencenumber")
-
     def overwrite = column[Boolean]("overwrite")
-
     def fkIncomingTransaction = foreignKey("fk_incoming_transaction_id", incomingTransactionId, incomingTransactionQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
-
     def idxUniqueTransactionAndNumber = index("idx_unique_incoming_image", (incomingTransactionId, sequenceNumber), unique = true)
-
     def * = (id, incomingTransactionId, imageId, sequenceNumber, overwrite) <>(IncomingImage.tupled, IncomingImage.unapply)
+  }
+  object IncomingImageTable {
+    val name = "IncomingImages"
   }
 
   val incomingImageQuery = TableQuery[IncomingImageTable]
 
-  def columnExists(tableName: String, columnName: String)(implicit session: Session): Boolean = {
-    val tables = MTable.getTables(tableName).list
-    if (tables.isEmpty)
-      false
-    else
-      tables.head.getColumns.list.exists(_.name == columnName)
+  def create() = createTables(dbConf, Seq(
+    (BoxTable.name, boxQuery),
+    (OutgoingTransactionTable.name, outgoingTransactionQuery),
+    (OutgoingImageTable.name, outgoingImageQuery),
+    (OutgoingTagValueTable.name, outgoingTagValueQuery),
+    (IncomingTransactionTable.name, incomingTransactionQuery),
+    (IncomingImageTable.name, incomingImageQuery)))
+
+  def drop() = db.run {
+    (boxQuery.schema ++ outgoingTransactionQuery.schema ++ incomingTransactionQuery.schema ++ outgoingImageQuery.schema ++ outgoingTagValueQuery.schema ++ incomingImageQuery.schema).drop
   }
 
-  def create(implicit session: Session): Unit = {
-    if (MTable.getTables("Boxes").list.isEmpty) boxQuery.ddl.create
-    if (MTable.getTables("OutgoingTransactions").list.isEmpty) outgoingTransactionQuery.ddl.create
-    if (MTable.getTables("OutgoingImages").list.isEmpty) outgoingImageQuery.ddl.create
-    if (MTable.getTables("OutgoingTagValues").list.isEmpty) outgoingTagValueQuery.ddl.create
-    if (MTable.getTables("IncomingTransactions").list.isEmpty) incomingTransactionQuery.ddl.create
-    if (MTable.getTables("IncomingImages").list.isEmpty) incomingImageQuery.ddl.create
+  def clear() = db.run {
+    DBIO.seq(
+      boxQuery.delete,
+      outgoingTransactionQuery.delete, // cascade deletes images and tag values
+      incomingTransactionQuery.delete) // cascade deletes images
   }
 
-  def drop(implicit session: Session): Unit =
-    (boxQuery.ddl ++ outgoingTransactionQuery.ddl ++ incomingTransactionQuery.ddl ++ outgoingImageQuery.ddl ++ outgoingTagValueQuery.ddl ++ incomingImageQuery.ddl).drop
-
-  def clear(implicit session: Session): Unit = {
-    boxQuery.delete
-    outgoingTransactionQuery.delete // cascade deletes images and tag values
-    incomingTransactionQuery.delete // cascade deletes images
+  def listOutgoingTagValues: Future[Seq[OutgoingTagValue]] = db.run {
+    outgoingTagValueQuery.result
   }
 
-  def listOutgoingTagValues(implicit session: Session): List[OutgoingTagValue] =
-    outgoingTagValueQuery.list
-
-  def insertOutgoingTagValue(tagValue: OutgoingTagValue)(implicit session: Session): OutgoingTagValue = {
-    val generatedId = (outgoingTagValueQuery returning outgoingTagValueQuery.map(_.id)) += tagValue
-    tagValue.copy(id = generatedId)
+  def insertOutgoingTagValue(tagValue: OutgoingTagValue): Future[OutgoingTagValue] = db.run {
+    (outgoingTagValueQuery returning outgoingTagValueQuery.map(_.id) += tagValue)
+      .map(generatedId => tagValue.copy(id = generatedId))
   }
 
-  def tagValuesByOutgoingTransactionImage(outgoingTransactionId: Long, outgoingImageId: Long)(implicit session: Session): List[OutgoingTagValue] = {
+  def tagValuesByOutgoingTransactionImage(outgoingTransactionId: Long, outgoingImageId: Long): Future[Seq[OutgoingTagValue]] = db.run {
     val join = for {
       transaction <- outgoingTransactionQuery
       image <- outgoingImageQuery if transaction.id === image.outgoingTransactionId
@@ -206,65 +177,74 @@ class BoxDAO(val driver: JdbcProfile) {
       .filter(_._1.id === outgoingTransactionId)
       .filter(_._2.id === outgoingImageId)
       .map(_._3)
-      .list
+      .result
   }
 
-  def insertBox(box: Box)(implicit session: Session): Box = {
-    val generatedId = (boxQuery returning boxQuery.map(_.id)) += box
-    box.copy(id = generatedId)
+  def insertBox(box: Box): Future[Box] = db.run {
+    (boxQuery returning boxQuery.map(_.id) += box)
+      .map(generatedId => box.copy(id = generatedId))
   }
 
-  def insertOutgoingTransaction(transaction: OutgoingTransaction)(implicit session: Session): OutgoingTransaction = {
-    val generatedId = (outgoingTransactionQuery returning outgoingTransactionQuery.map(_.id)) += transaction
-    transaction.copy(id = generatedId)
+  def insertOutgoingTransaction(transaction: OutgoingTransaction): Future[OutgoingTransaction] = db.run {
+    (outgoingTransactionQuery returning outgoingTransactionQuery.map(_.id) += transaction)
+      .map(generatedId => transaction.copy(id = generatedId))
   }
 
-  def insertIncomingTransaction(transaction: IncomingTransaction)(implicit session: Session): IncomingTransaction = {
-    val generatedId = (incomingTransactionQuery returning incomingTransactionQuery.map(_.id)) += transaction
-    transaction.copy(id = generatedId)
+  def insertIncomingTransaction(transaction: IncomingTransaction): Future[IncomingTransaction] = db.run {
+    (incomingTransactionQuery returning incomingTransactionQuery.map(_.id) += transaction)
+      .map(generatedId => transaction.copy(id = generatedId))
   }
 
-  def insertOutgoingImage(outgoingImage: OutgoingImage)(implicit session: Session): OutgoingImage = {
-    val generatedId = (outgoingImageQuery returning outgoingImageQuery.map(_.id)) += outgoingImage
-    outgoingImage.copy(id = generatedId)
+  def insertOutgoingImage(outgoingImage: OutgoingImage): Future[OutgoingImage] = db.run {
+    (outgoingImageQuery returning outgoingImageQuery.map(_.id) += outgoingImage)
+      .map(generatedId => outgoingImage.copy(id = generatedId))
   }
 
-  def insertIncomingImage(incomingImage: IncomingImage)(implicit session: Session): IncomingImage = {
-    val generatedId = (incomingImageQuery returning incomingImageQuery.map(_.id)) += incomingImage
-    incomingImage.copy(id = generatedId)
+  def insertIncomingImage(incomingImage: IncomingImage): Future[IncomingImage] = db.run {
+    (incomingImageQuery returning incomingImageQuery.map(_.id) += incomingImage)
+      .map(generatedId => incomingImage.copy(id = generatedId))
   }
 
-  def boxById(boxId: Long)(implicit session: Session): Option[Box] =
-    boxQuery.filter(_.id === boxId).firstOption
+  def boxById(boxId: Long): Future[Option[Box]] = db.run {
+    boxQuery.filter(_.id === boxId).result.headOption
+  }
 
-  def boxByName(name: String)(implicit session: Session): Option[Box] =
-    boxQuery.filter(_.name === name).firstOption
+  def boxByName(name: String): Future[Option[Box]] = db.run {
+    boxQuery.filter(_.name === name).result.headOption
+  }
 
-  def pollBoxByToken(token: String)(implicit session: Session): Option[Box] =
+  def pollBoxByToken(token: String): Future[Option[Box]] = db.run {
     boxQuery
       .filter(_.sendMethod === (POLL: BoxSendMethod))
       .filter(_.token === token)
-      .firstOption
+      .result.headOption
+  }
 
-  def updateBoxOnlineStatus(boxId: Long, online: Boolean)(implicit session: Session): Unit =
+  def updateBoxOnlineStatus(boxId: Long, online: Boolean): Future[Unit] = db.run {
     boxQuery
       .filter(_.id === boxId)
       .map(_.online)
       .update(online)
+      .map(_ => {})
+  }
 
-  def updateIncomingTransaction(transaction: IncomingTransaction)(implicit session: Session): Unit =
-    incomingTransactionQuery.filter(_.id === transaction.id).update(transaction)
+  def updateIncomingTransaction(transaction: IncomingTransaction): Future[Unit] = db.run {
+    incomingTransactionQuery.filter(_.id === transaction.id).update(transaction).map(_ => {})
+  }
 
-  def updateOutgoingTransaction(transaction: OutgoingTransaction)(implicit session: Session): Unit =
-    outgoingTransactionQuery.filter(_.id === transaction.id).update(transaction)
+  def updateOutgoingTransaction(transaction: OutgoingTransaction): Future[Unit] = db.run {
+    outgoingTransactionQuery.filter(_.id === transaction.id).update(transaction).map(_ => {})
+  }
 
-  def updateOutgoingImage(image: OutgoingImage)(implicit session: Session): Unit =
-    outgoingImageQuery.filter(_.id === image.id).update(image)
+  def updateOutgoingImage(image: OutgoingImage): Future[Unit] = db.run {
+    outgoingImageQuery.filter(_.id === image.id).update(image).map(_ => {})
+  }
 
-  def updateIncomingImage(image: IncomingImage)(implicit session: Session): Unit =
-    incomingImageQuery.filter(_.id === image.id).update(image)
+  def updateIncomingImage(image: IncomingImage): Future[Unit] = db.run {
+    incomingImageQuery.filter(_.id === image.id).update(image).map(_ => {})
+  }
 
-  def nextOutgoingTransactionImageForBoxId(boxId: Long)(implicit session: Session): Option[OutgoingTransactionImage] = {
+  def nextOutgoingTransactionImageForBoxId(boxId: Long): Future[Option[OutgoingTransactionImage]] = db.run {
     val join = for {
       transaction <- outgoingTransactionQuery
       image <- outgoingImageQuery if transaction.id === image.outgoingTransactionId
@@ -275,11 +255,11 @@ class BoxDAO(val driver: JdbcProfile) {
       .filterNot(_._1.status === (FINISHED: TransactionStatus))
       .filter(_._2.sent === false)
       .sortBy(t => (t._1.created.asc, t._2.sequenceNumber.asc))
-      .firstOption
-      .map(OutgoingTransactionImage.tupled)
+      .result.headOption
+      .map(_.map(OutgoingTransactionImage.tupled))
   }
 
-  def outgoingTransactionImageByOutgoingTransactionIdAndOutgoingImageId(boxId: Long, outgoingTransactionId: Long, outgoingImageId: Long)(implicit session: Session): Option[OutgoingTransactionImage] = {
+  def outgoingTransactionImageByOutgoingTransactionIdAndOutgoingImageId(boxId: Long, outgoingTransactionId: Long, outgoingImageId: Long): Future[Option[OutgoingTransactionImage]] = db.run {
     val join = for {
       transaction <- outgoingTransactionQuery
       image <- outgoingImageQuery if transaction.id === image.outgoingTransactionId
@@ -288,109 +268,137 @@ class BoxDAO(val driver: JdbcProfile) {
       .filter(_._1.boxId === boxId)
       .filter(_._1.id === outgoingTransactionId)
       .filter(_._2.id === outgoingImageId)
-      .firstOption
-      .map(OutgoingTransactionImage.tupled)
+      .result.headOption
+      .map(_.map(OutgoingTransactionImage.tupled))
   }
 
-  def setOutgoingTransactionStatus(outgoingTransactionId: Long, status: TransactionStatus)(implicit session: Session): Unit =
+  def setOutgoingTransactionStatus(outgoingTransactionId: Long, status: TransactionStatus): Future[Unit] = db.run {
     outgoingTransactionQuery
       .filter(_.id === outgoingTransactionId)
       .map(_.status)
       .update(status)
+      .map(_ => {})
+  }
 
-  def setIncomingTransactionStatus(incomingTransactionId: Long, status: TransactionStatus)(implicit session: Session): Unit =
+  def setIncomingTransactionStatus(incomingTransactionId: Long, status: TransactionStatus): Future[Unit] = db.run {
     incomingTransactionQuery
       .filter(_.id === incomingTransactionId)
       .map(_.status)
       .update(status)
+      .map(_ => {})
+  }
 
-  def incomingTransactionByOutgoingTransactionId(boxId: Long, outgoingTransactionId: Long)(implicit session: Session): Option[IncomingTransaction] =
+  def incomingTransactionByOutgoingTransactionId(boxId: Long, outgoingTransactionId: Long): Future[Option[IncomingTransaction]] = db.run {
     incomingTransactionQuery
       .filter(_.boxId === boxId)
       .filter(_.outgoingTransactionId === outgoingTransactionId)
-      .firstOption
+      .result.headOption
+  }
 
-  def incomingImageByIncomingTransactionIdAndSequenceNumber(incomingTransactionId: Long, sequenceNumber: Long)(implicit session: Session): Option[IncomingImage] =
+  def incomingImageByIncomingTransactionIdAndSequenceNumber(incomingTransactionId: Long, sequenceNumber: Long): Future[Option[IncomingImage]] = db.run {
     incomingImageQuery
       .filter(_.incomingTransactionId === incomingTransactionId)
       .filter(_.sequenceNumber === sequenceNumber)
-      .firstOption
+      .result.headOption
+  }
 
-  def outgoingTransactionById(outgoingTransactionId: Long)(implicit session: Session): Option[OutgoingTransaction] =
+  def outgoingTransactionById(outgoingTransactionId: Long): Future[Option[OutgoingTransaction]] = db.run {
     outgoingTransactionQuery
       .filter(_.id === outgoingTransactionId)
-      .firstOption
+      .result.headOption
+  }
 
-  def removeIncomingTransaction(incomingTransactionId: Long)(implicit session: Session): Unit =
+  def removeIncomingTransaction(incomingTransactionId: Long): Future[Unit] = db.run {
     incomingTransactionQuery.filter(_.id === incomingTransactionId).delete
+      .map(_ => {})
+  }
 
-  def removeBox(boxId: Long)(implicit session: Session): Unit =
+  def removeBox(boxId: Long): Future[Unit] = db.run {
     boxQuery.filter(_.id === boxId).delete
+      .map(_ => {})
+  }
 
-  def removeOutgoingTransaction(outgoingTransactionId: Long)(implicit session: Session): Unit =
+  def removeOutgoingTransaction(outgoingTransactionId: Long): Future[Unit] = db.run {
     outgoingTransactionQuery.filter(_.id === outgoingTransactionId).delete
+      .map(_ => {})
+  }
 
-  def removeOutgoingTransactions(outgoingTransactionIds: Seq[Long])(implicit session: Session): Unit =
+  def removeOutgoingTransactions(outgoingTransactionIds: Seq[Long]): Future[Unit] = db.run {
     outgoingTransactionQuery.filter(_.id inSet outgoingTransactionIds).delete
+      .map(_ => {})
+  }
 
-  def listBoxes(startIndex: Long, count: Long)(implicit session: Session): List[Box] =
-    boxQuery.drop(startIndex).take(count).list
+  def listBoxes(startIndex: Long, count: Long): Future[Seq[Box]] = db.run {
+    boxQuery.drop(startIndex).take(count).result
+  }
 
-  def listOutgoingTransactions(startIndex: Long, count: Long)(implicit session: Session): List[OutgoingTransaction] =
+  def listOutgoingTransactions(startIndex: Long, count: Long): Future[Seq[OutgoingTransaction]] = db.run {
     outgoingTransactionQuery
       .sortBy(_.updated.desc)
       .drop(startIndex)
       .take(count)
-      .list
+      .result
+  }
 
-  def listOutgoingImages(implicit session: Session): List[OutgoingImage] =
-    outgoingImageQuery.list
+  def listOutgoingImages: Future[Seq[OutgoingImage]] = db.run {
+    outgoingImageQuery.result
+  }
 
-  def listIncomingTransactions(startIndex: Long, count: Long)(implicit session: Session): List[IncomingTransaction] =
+  def listIncomingTransactions(startIndex: Long, count: Long): Future[Seq[IncomingTransaction]] = db.run {
     incomingTransactionQuery
       .sortBy(_.updated.desc)
       .drop(startIndex)
       .take(count)
-      .list
+      .result
+  }
 
-  def listIncomingImages(implicit session: Session): List[IncomingImage] =
+  def listIncomingImages: Future[Seq[IncomingImage]] = db.run {
     incomingImageQuery
-      .list
+      .result
+  }
 
-  def listOutgoingTransactionsInProcess(implicit session: Session): List[OutgoingTransaction] =
+  def listOutgoingTransactionsInProcess: Future[Seq[OutgoingTransaction]] = db.run {
     outgoingTransactionQuery
       .filter(_.status === (PROCESSING: TransactionStatus))
-      .list
+      .result
+  }
 
-  def listIncomingTransactionsInProcess(implicit session: Session): List[IncomingTransaction] =
+  def listIncomingTransactionsInProcess: Future[Seq[IncomingTransaction]] = db.run {
     incomingTransactionQuery
       .filter(_.status === (PROCESSING: TransactionStatus))
-      .list
+      .result
+  }
 
-  def countOutgoingImagesForOutgoingTransactionId(outgoingTransactionId: Long)(implicit session: Session): Int =
-    outgoingImageQuery.filter(_.outgoingTransactionId === outgoingTransactionId).length.run
+  def countOutgoingImagesForOutgoingTransactionId(outgoingTransactionId: Long): Future[Int] = db.run {
+    outgoingImageQuery.filter(_.outgoingTransactionId === outgoingTransactionId).length.result
+  }
 
-  def listOutgoingImagesForOutgoingTransactionId(outgoingTransactionId: Long)(implicit session: Session): List[OutgoingImage] =
-    outgoingImageQuery.filter(_.outgoingTransactionId === outgoingTransactionId).list
+  def listOutgoingImagesForOutgoingTransactionId(outgoingTransactionId: Long): Future[Seq[OutgoingImage]] = db.run {
+    outgoingImageQuery.filter(_.outgoingTransactionId === outgoingTransactionId).result
+  }
 
-  def countIncomingImagesForIncomingTransactionId(incomingTransactionId: Long)(implicit session: Session): Int =
-    incomingImageQuery.filter(_.incomingTransactionId === incomingTransactionId).length.run
+  def countIncomingImagesForIncomingTransactionId(incomingTransactionId: Long): Future[Int] = db.run {
+    incomingImageQuery.filter(_.incomingTransactionId === incomingTransactionId).length.result
+  }
 
-  def listIncomingImagesForIncomingTransactionId(incomingTransactionId: Long)(implicit session: Session): List[IncomingImage] =
-    incomingImageQuery.filter(_.incomingTransactionId === incomingTransactionId).list
+  def listIncomingImagesForIncomingTransactionId(incomingTransactionId: Long): Future[Seq[IncomingImage]] = db.run {
+    incomingImageQuery.filter(_.incomingTransactionId === incomingTransactionId).result
+  }
 
-  def outgoingImagesByOutgoingTransactionId(outgoingTransactionId: Long)(implicit session: Session): List[OutgoingImage] = {
+  def outgoingImagesByOutgoingTransactionId(outgoingTransactionId: Long): Future[Seq[OutgoingImage]] = db.run {
     val join = for {
       transaction <- outgoingTransactionQuery
       image <- outgoingImageQuery if transaction.id === image.outgoingTransactionId
     } yield (transaction, image)
-    join.filter(_._1.id === outgoingTransactionId).map(_._2).list
+    join.filter(_._1.id === outgoingTransactionId).map(_._2).result
   }
 
-  def removeOutgoingImagesForImageId(imageId: Long)(implicit session: Session) =
+  def removeOutgoingImagesForImageId(imageId: Long) = db.run {
     outgoingImageQuery.filter(_.imageId === imageId).delete
+  }
 
-  def removeIncomingImagesForImageId(imageId: Long)(implicit session: Session) =
+  def removeIncomingImagesForImageId(imageId: Long) = db.run {
     incomingImageQuery.filter(_.imageId === imageId).delete
+  }
 
 }

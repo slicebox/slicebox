@@ -16,185 +16,200 @@
 
 package se.nimsa.sbx.forwarding
 
-import ForwardingProtocol._
-import scala.slick.driver.JdbcProfile
-import scala.slick.jdbc.meta.MTable
 import se.nimsa.sbx.app.GeneralProtocol._
+import se.nimsa.sbx.forwarding.ForwardingProtocol._
+import se.nimsa.sbx.util.DbUtil.createTables
+import slick.backend.DatabaseConfig
+import slick.driver.JdbcProfile
 
-class ForwardingDAO(val driver: JdbcProfile) {
+import scala.concurrent.Future
 
-  import driver.simple._
+class ForwardingDAO(val dbConf: DatabaseConfig[JdbcProfile]) {
+
+  import dbConf.driver.api._
+
+  val db = dbConf.db
 
   private val toForwardingRule = (id: Long, sourceType: String, sourceName: String, sourceId: Long, destinationType: String, destinationName: String, destinationId: Long, keepImages: Boolean) => ForwardingRule(id, Source(SourceType.withName(sourceType), sourceName, sourceId), Destination(DestinationType.withName(destinationType), destinationName, destinationId), keepImages)
-
   private val fromForwardingRule = (rule: ForwardingRule) => Option((rule.id, rule.source.sourceType.toString(), rule.source.sourceName, rule.source.sourceId, rule.destination.destinationType.toString(), rule.destination.destinationName, rule.destination.destinationId, rule.keepImages))
 
-  class ForwardingRuleTable(tag: Tag) extends Table[ForwardingRule](tag, "ForwardingRules") {
+  class ForwardingRuleTable(tag: Tag) extends Table[ForwardingRule](tag, ForwardingRuleTable.name) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
-
     def sourceType = column[String]("sourcetype")
-
     def sourceName = column[String]("sourcename")
-
     def sourceId = column[Long]("sourceid")
-
     def destinationType = column[String]("destinationtype")
-
     def destinationName = column[String]("destinationname")
-
     def destinationId = column[Long]("destinationid")
-
     def keepImages = column[Boolean]("keepimages")
-
     def idxUnique = index("idx_unique_forwarding_rule", (sourceType, sourceId, destinationType, destinationId), unique = true)
+    def * = (id, sourceType, sourceName, sourceId, destinationType, destinationName, destinationId, keepImages) <> (toForwardingRule.tupled, fromForwardingRule)
+  }
 
-    def * = (id, sourceType, sourceName, sourceId, destinationType, destinationName, destinationId, keepImages) <>(toForwardingRule.tupled, fromForwardingRule)
+  object ForwardingRuleTable {
+    val name = "ForwardingRules"
   }
 
   val ruleQuery = TableQuery[ForwardingRuleTable]
 
-  class ForwardingTransactionTable(tag: Tag) extends Table[ForwardingTransaction](tag, "ForwardingTransactions") {
+  class ForwardingTransactionTable(tag: Tag) extends Table[ForwardingTransaction](tag, ForwardingTransactionTable.name) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
-
     def forwardingRuleId = column[Long]("forwardingruleid")
-
     def created = column[Long]("created")
-
     def updated = column[Long]("updated")
-
     def enroute = column[Boolean]("enroute")
-
     def delivered = column[Boolean]("delivered")
-
     def fkForwardingRule = foreignKey("fk_forwarding_rule", forwardingRuleId, ruleQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
+    def * = (id, forwardingRuleId, created, updated, enroute, delivered) <> (ForwardingTransaction.tupled, ForwardingTransaction.unapply)
+  }
 
-    def * = (id, forwardingRuleId, created, updated, enroute, delivered) <>(ForwardingTransaction.tupled, ForwardingTransaction.unapply)
+  object ForwardingTransactionTable {
+    val name = "ForwardingTransactions"
   }
 
   val transactionQuery = TableQuery[ForwardingTransactionTable]
 
-  class ForwardingTransactionImageTable(tag: Tag) extends Table[ForwardingTransactionImage](tag, "ForwardingTransactionImages") {
+  class ForwardingTransactionImageTable(tag: Tag) extends Table[ForwardingTransactionImage](tag, ForwardingTransactionImageTable.name) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
-
     def forwardingTransactionId = column[Long]("forwardingtransactionid")
-
     def imageId = column[Long]("imageid")
-
     def fkForwardingTransaction = foreignKey("fk_forwarding_transaction", forwardingTransactionId, transactionQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
+    def * = (id, forwardingTransactionId, imageId) <> (ForwardingTransactionImage.tupled, ForwardingTransactionImage.unapply)
+  }
 
-    def * = (id, forwardingTransactionId, imageId) <>(ForwardingTransactionImage.tupled, ForwardingTransactionImage.unapply)
+  object ForwardingTransactionImageTable {
+    val name = "ForwardingTransactionImages"
   }
 
   val transactionImageQuery = TableQuery[ForwardingTransactionImageTable]
 
-  def create(implicit session: Session): Unit = {
-    if (MTable.getTables("ForwardingRules").list.isEmpty) ruleQuery.ddl.create
-    if (MTable.getTables("ForwardingTransactions").list.isEmpty) transactionQuery.ddl.create
-    if (MTable.getTables("ForwardingTransactionImages").list.isEmpty) transactionImageQuery.ddl.create
+  def create() = createTables(dbConf, Seq((ForwardingRuleTable.name, ruleQuery), (ForwardingTransactionTable.name, transactionQuery), (ForwardingTransactionImageTable.name, transactionImageQuery)))
+
+  def drop() = db.run {
+    (ruleQuery.schema ++ transactionQuery.schema ++ transactionImageQuery.schema).drop
   }
 
-  def drop(implicit session: Session): Unit =
-    (ruleQuery.ddl ++ transactionQuery.ddl ++ transactionImageQuery.ddl).drop
-
-  def clear(implicit session: Session) = {
-    ruleQuery.delete
-    transactionQuery.delete
-    transactionImageQuery.delete
+  def clear() = db.run {
+    DBIO.seq(ruleQuery.delete, transactionQuery.delete, transactionImageQuery.delete)
   }
 
-  def getNumberOfForwardingRules(implicit session: Session): Int = ruleQuery.length.run
+  def getNumberOfForwardingRules: Future[Int] = db.run(ruleQuery.length.result)
 
-  def insertForwardingRule(forwardingRule: ForwardingRule)(implicit session: Session): ForwardingRule = {
-    val generatedId = (ruleQuery returning ruleQuery.map(_.id)) += forwardingRule
-    forwardingRule.copy(id = generatedId)
+  def insertForwardingRule(forwardingRule: ForwardingRule): Future[ForwardingRule] = db.run {
+    (ruleQuery returning ruleQuery.map(_.id) += forwardingRule)
+      .map(generatedId => forwardingRule.copy(id = generatedId))
   }
 
-  def listForwardingRules(startIndex: Long, count: Long)(implicit session: Session): List[ForwardingRule] =
+  def listForwardingRules(startIndex: Long, count: Long): Future[Seq[ForwardingRule]] = db.run {
     ruleQuery
       .drop(startIndex)
       .take(count)
-      .list
+      .result
+  }
 
-  def listForwardingTransactions(implicit session: Session): List[ForwardingTransaction] =
-    transactionQuery.list
+  def listForwardingTransactions: Future[Seq[ForwardingTransaction]] = db.run {
+    transactionQuery.result
+  }
 
-  def listForwardingTransactionImages(implicit session: Session): List[ForwardingTransactionImage] =
-    transactionImageQuery.list
+  def listForwardingTransactionImages: Future[Seq[ForwardingTransactionImage]] = db.run {
+    transactionImageQuery.result
+  }
 
-  def removeForwardingRule(forwardingRuleId: Long)(implicit session: Session): Unit =
-    ruleQuery.filter(_.id === forwardingRuleId).delete
+  def removeForwardingRule(forwardingRuleId: Long): Future[Unit] = db.run {
+    ruleQuery.filter(_.id === forwardingRuleId).delete.map(_ => {})
+  }
 
-  def getForwardingRulesForSourceTypeAndId(sourceType: SourceType, sourceId: Long)(implicit session: Session) =
+  def getForwardingRulesForSourceTypeAndId(sourceType: SourceType, sourceId: Long): Future[Seq[ForwardingRule]] = db.run {
     ruleQuery
       .filter(_.sourceType === sourceType.toString)
       .filter(_.sourceId === sourceId)
-      .list
+      .result
+  }
 
-  def createOrUpdateForwardingTransaction(forwardingRule: ForwardingRule)(implicit session: Session): ForwardingTransaction =
-    getFreshTransactionForRule(forwardingRule) match {
+  def createOrUpdateForwardingTransaction(forwardingRule: ForwardingRule): Future[ForwardingTransaction] = db.run {
+    getFreshTransactionForRuleAction(forwardingRule).flatMap {
       case Some(transaction) =>
         val updatedTransaction = transaction.copy(updated = System.currentTimeMillis())
-        updateForwardingTransaction(updatedTransaction)
-        updatedTransaction
+        updateForwardingTransactionAction(updatedTransaction).map(_ => updatedTransaction)
       case None =>
-        insertForwardingTransaction(ForwardingTransaction(-1, forwardingRule.id, System.currentTimeMillis, System.currentTimeMillis, enroute = false, delivered = false))
+        insertForwardingTransactionAction(ForwardingTransaction(-1, forwardingRule.id, System.currentTimeMillis, System.currentTimeMillis, enroute = false, delivered = false))
     }
+  }
 
-  def getFreshTransactionForRule(forwardingRule: ForwardingRule)(implicit session: Session): Option[ForwardingTransaction] =
+  def getFreshTransactionForRuleAction(forwardingRule: ForwardingRule) =
     transactionQuery
       .filter(_.forwardingRuleId === forwardingRule.id)
       .filter(_.enroute === false)
       .filter(_.delivered === false)
-      .firstOption
+      .result
+      .headOption
 
-  def updateForwardingTransaction(forwardingTransaction: ForwardingTransaction)(implicit session: Session) =
+  def getFreshTransactionForRule(forwardingRule: ForwardingRule): Future[Option[ForwardingTransaction]] =
+    db.run(getFreshTransactionForRuleAction(forwardingRule))
+
+  def updateForwardingTransactionAction(forwardingTransaction: ForwardingTransaction) =
     transactionQuery.filter(_.id === forwardingTransaction.id).update(forwardingTransaction)
 
-  def insertForwardingTransaction(forwardingTransaction: ForwardingTransaction)(implicit session: Session): ForwardingTransaction = {
-    val generatedId = (transactionQuery returning transactionQuery.map(_.id)) += forwardingTransaction
-    forwardingTransaction.copy(id = generatedId)
-  }
+  def updateForwardingTransaction(forwardingTransaction: ForwardingTransaction): Future[Int] =
+    db.run(updateForwardingTransactionAction(forwardingTransaction))
 
-  def insertForwardingTransactionImage(forwardingTransactionImage: ForwardingTransactionImage)(implicit session: Session) = {
-    val generatedId = (transactionImageQuery returning transactionImageQuery.map(_.id)) += forwardingTransactionImage
-    forwardingTransactionImage.copy(id = generatedId)
-  }
+  def insertForwardingTransactionAction(forwardingTransaction: ForwardingTransaction) =
+    (transactionQuery returning transactionQuery.map(_.id) += forwardingTransaction)
+      .map(generatedId => forwardingTransaction.copy(id = generatedId))
 
-  def listFreshExpiredTransactions(timeLimit: Long)(implicit session: Session) =
+  def insertForwardingTransaction(forwardingTransaction: ForwardingTransaction): Future[ForwardingTransaction] =
+    db.run(insertForwardingTransactionAction(forwardingTransaction))
+
+  def insertForwardingTransactionImage(forwardingTransactionImage: ForwardingTransactionImage): Future[ForwardingTransactionImage] =
+    db.run {
+      (transactionImageQuery returning transactionImageQuery.map(_.id) += forwardingTransactionImage)
+        .map(generatedId => forwardingTransactionImage.copy(id = generatedId))
+    }
+
+  def listFreshExpiredTransactions(timeLimit: Long): Future[Seq[ForwardingTransaction]] = db.run {
     transactionQuery
       .filter(_.updated < timeLimit)
       .filter(_.enroute === false)
       .filter(_.delivered === false)
-      .list
+      .result
+  }
 
-  def getForwardingRuleForId(forwardingRuleId: Long)(implicit session: Session) =
-    ruleQuery.filter(_.id === forwardingRuleId).firstOption
+  def getForwardingRuleForId(forwardingRuleId: Long): Future[Option[ForwardingRule]] = db.run {
+    ruleQuery.filter(_.id === forwardingRuleId).result.headOption
+  }
 
   def getForwardingRuleForSourceIdAndTypeAndDestinationIdAndType(sourceId: Long,
                                                                  sourceType: SourceType,
                                                                  destinationId: Long,
-                                                                 destinationType: DestinationType)(implicit session: Session) = {
-    ruleQuery
-      .filter(_.sourceId === sourceId)
-      .filter(_.sourceType === sourceType.toString())
-      .filter(_.destinationId === destinationId)
-      .filter(_.destinationType === destinationType.toString())
-      .firstOption
+                                                                 destinationType: DestinationType): Future[Option[ForwardingRule]] =
+    db.run {
+      ruleQuery
+        .filter(_.sourceId === sourceId)
+        .filter(_.sourceType === sourceType.toString())
+        .filter(_.destinationId === destinationId)
+        .filter(_.destinationType === destinationType.toString())
+        .result
+        .headOption
+    }
+
+  def getTransactionImagesForTransactionId(transactionId: Long): Future[Seq[ForwardingTransactionImage]] = db.run {
+    transactionImageQuery.filter(_.forwardingTransactionId === transactionId).result
   }
 
-  def getTransactionImagesForTransactionId(transactionId: Long)(implicit session: Session) =
-    transactionImageQuery.filter(_.forwardingTransactionId === transactionId).list
+  def getTransactionImageForTransactionIdAndImageId(transactionId: Long, imageId: Long): Future[Option[ForwardingTransactionImage]] =
+    db.run {
+      transactionImageQuery
+        .filter(_.forwardingTransactionId === transactionId)
+        .filter(_.imageId === imageId)
+        .result
+        .headOption
+    }
 
-  def getTransactionImageForTransactionIdAndImageId(transactionId: Long, imageId: Long)(implicit session: Session) =
-    transactionImageQuery
-      .filter(_.forwardingTransactionId === transactionId)
-      .filter(_.imageId === imageId)
-      .firstOption
+  def removeTransactionForId(transactionId: Long): Future[Unit] = db.run {
+    transactionQuery.filter(_.id === transactionId).delete.map(_ => {})
+  }
 
-  def removeTransactionForId(transactionId: Long)(implicit session: Session) =
-    transactionQuery.filter(_.id === transactionId).delete
-
-  def getTransactionForDestinationAndImageId(destination: Destination, imageId: Long)(implicit session: Session) = {
+  def getTransactionForDestinationAndImageId(destination: Destination, imageId: Long): Future[Option[ForwardingTransaction]] = db.run {
     val join = for {
       ruleEntry <- ruleQuery
       transactionEntry <- transactionQuery if ruleEntry.id === transactionEntry.forwardingRuleId
@@ -204,26 +219,31 @@ class ForwardingDAO(val driver: JdbcProfile) {
       .filter(_._3.imageId === imageId)
       .filter(_._1.destinationType === destination.destinationType.toString)
       .filter(_._1.destinationId === destination.destinationId)
-      .map(_._2).firstOption
-  }
-
-  def getDeliveredTransactions(implicit session: Session) =
-    transactionQuery.filter(_.delivered === true).list
-
-  def getUndeliveredTransactionsForSourceTypeAndId(sourceType: SourceType, sourceId: Long)(implicit session: Session) = {
-    val join = for {
-      ruleEntry <- ruleQuery
-      transactionEntry <- transactionQuery if ruleEntry.id === transactionEntry.forwardingRuleId
-    } yield (ruleEntry, transactionEntry)
-    join
-      .filter(_._1.sourceType === sourceType.toString)
-      .filter(_._1.sourceId === sourceId)
-      .filter(_._2.delivered === false)
       .map(_._2)
-      .list
+      .result
+      .headOption
   }
 
-  def removeTransactionImagesForImageId(imageId: Long)(implicit session: Session) =
-    transactionImageQuery.filter(_.imageId === imageId).delete
+  def getDeliveredTransactions: Future[Seq[ForwardingTransaction]] = db.run {
+    transactionQuery.filter(_.delivered === true).result
+  }
+
+  def getUndeliveredTransactionsForSourceTypeAndId(sourceType: SourceType, sourceId: Long): Future[Seq[ForwardingTransaction]] =
+    db.run {
+      val join = for {
+        ruleEntry <- ruleQuery
+        transactionEntry <- transactionQuery if ruleEntry.id === transactionEntry.forwardingRuleId
+      } yield (ruleEntry, transactionEntry)
+      join
+        .filter(_._1.sourceType === sourceType.toString)
+        .filter(_._1.sourceId === sourceId)
+        .filter(_._2.delivered === false)
+        .map(_._2)
+        .result
+    }
+
+  def removeTransactionImagesForImageId(imageId: Long): Future[Unit] = db.run {
+    transactionImageQuery.filter(_.imageId === imageId).delete.map(_ => {})
+  }
 
 }

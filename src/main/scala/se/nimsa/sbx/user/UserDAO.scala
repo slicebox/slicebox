@@ -17,9 +17,9 @@
 package se.nimsa.sbx.user
 
 import se.nimsa.sbx.user.UserProtocol._
+import se.nimsa.sbx.util.DbUtil._
 import slick.backend.DatabaseConfig
 import slick.driver.JdbcProfile
-import slick.jdbc.meta.MTable
 
 import scala.concurrent.Future
 
@@ -61,15 +61,7 @@ class UserDAO(val dbConf: DatabaseConfig[JdbcProfile]) {
   }
   val sessions = TableQuery[SessionTable]
 
-  def create() =
-    db.run(MTable.getTables("%")).map(_.toList).flatMap { existingTables =>
-      val requiredTables = List((UserTable.name, users), (SessionTable.name, sessions))
-      val tablesToCreate = requiredTables.filter(required => !existingTables.exists(_.name.name == required._1)).map(_._2)
-      if (tablesToCreate.nonEmpty)
-        db.run(tablesToCreate.map(_.schema).reduceLeft(_ ++ _).create)
-      else
-        Future.successful({})
-    }
+  def create() = createTables(dbConf, Seq((UserTable.name, users), (SessionTable.name, sessions)))
 
   def drop = db.run {
     (users.schema ++ sessions.schema).drop
