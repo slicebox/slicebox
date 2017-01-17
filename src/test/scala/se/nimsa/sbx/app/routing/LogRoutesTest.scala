@@ -3,22 +3,18 @@ package se.nimsa.sbx.app.routing
 import akka.http.scaladsl.model.StatusCodes._
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 import se.nimsa.sbx.log.LogProtocol.LogEntry
-import se.nimsa.sbx.log.{LogDAO, SbxLog}
+import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.storage.RuntimeStorage
+import se.nimsa.sbx.util.FutureUtil.await
 import se.nimsa.sbx.util.TestUtil
 
 class LogRoutesTest extends {
-  val dbProps = TestUtil.createTestDb("logroutestest")
+  val dbConfig = TestUtil.createTestDb("logroutestest")
   val storage = new RuntimeStorage
 } with FlatSpecLike with Matchers with RoutesTestBase with BeforeAndAfterAll {
 
-  val db = dbProps.db
-  val logDao = new LogDAO(dbProps.driver)
-
-  override def beforeEach() {
-    db.withSession { implicit session =>
-      logDao.clear
-    }
+  override def beforeEach() = {
+    await(logDao.clear())
     
     SbxLog.info("Category1", "Message1")
     SbxLog.info("Category1", "Message2")
@@ -45,9 +41,7 @@ class LogRoutesTest extends {
   }
   
   it should "support removing log messages" in {
-    val logEntries = db.withSession { implicit session =>
-      logDao.listLogEntries(0, 2)
-    }
+    val logEntries = await(logDao.listLogEntries(0, 2))
     
     DeleteAsUser(s"/api/log/${logEntries.head.id}") ~> routes ~> check {
       status should be (NoContent)

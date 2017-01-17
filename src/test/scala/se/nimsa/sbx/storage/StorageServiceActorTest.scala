@@ -10,16 +10,11 @@ import se.nimsa.sbx.storage.StorageProtocol.{AddDicomData, CheckDicomData, Dicom
 import se.nimsa.sbx.util.TestUtil
 
 import scala.concurrent.duration.DurationInt
-import scala.slick.driver.H2Driver
-import scala.slick.jdbc.JdbcBackend.Database
 
 class StorageServiceActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
   with WordSpecLike with Matchers with BeforeAndAfterAll {
 
   def this() = this(ActorSystem("StorageTestSystem"))
-
-  val db = Database.forURL("jdbc:h2:mem:storageserviceactortest;DB_CLOSE_DELAY=-1", driver = "org.h2.Driver")
-  val dbProps = DbProps(db, H2Driver)
 
   val dicomData = TestUtil.testImageDicomData()
   val image = DicomUtil.attributesToImage(dicomData.attributes).copy(id = 33)

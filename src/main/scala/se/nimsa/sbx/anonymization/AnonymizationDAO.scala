@@ -87,7 +87,7 @@ class AnonymizationDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Exe
 
   def listAnonymizationKeys = db.run(anonymizationKeyQuery.result)
 
-  def listAnonymizationKeyImages = anonymizationKeyImageQuery.result
+  def listAnonymizationKeyImages = db.run(anonymizationKeyImageQuery.result)
 
   def anonymizationKeys(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String]): Future[Seq[AnonymizationKey]] =
     checkColumnExists(dbConf, orderBy, AnonymizationKeyTable.name).flatMap { _ =>

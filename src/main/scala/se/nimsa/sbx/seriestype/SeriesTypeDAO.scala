@@ -93,11 +93,11 @@ class SeriesTypeDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
     (SeriesTypeRuleAttributeTable.name, seriesTypeRuleAttributes),
     (SeriesSeriesTypeTable.name, seriesSeriesTypes)))
 
-  def drop = db.run {
+  def drop() = db.run {
     (seriesTypes.schema ++ seriesTypeRules.schema ++ seriesTypeRuleAttributes.schema ++ seriesSeriesTypes.schema).drop
   }
 
-  def clear = db.run {
+  def clear() = db.run {
     DBIO.seq(seriesTypes.delete, seriesTypeRules.delete, seriesTypeRuleAttributes.delete, seriesSeriesTypes.delete)
   }
 

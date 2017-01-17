@@ -5,30 +5,26 @@ import akka.http.scaladsl.model.headers.BasicHttpCredentials
 import akka.http.scaladsl.server.Route
 import org.scalatest.{FlatSpecLike, Matchers}
 import se.nimsa.sbx.dicom.DicomHierarchy._
-import se.nimsa.sbx.importing.ImportDAO
 import se.nimsa.sbx.importing.ImportProtocol._
-import se.nimsa.sbx.metadata.MetaDataDAO
 import se.nimsa.sbx.storage.RuntimeStorage
 import se.nimsa.sbx.user.UserProtocol.UserRole
+import se.nimsa.sbx.util.FutureUtil.await
 import se.nimsa.sbx.util.TestUtil
 
+import scala.concurrent.Future
+
 class ImportRoutesTest extends {
-  val dbProps = TestUtil.createTestDb("importroutestest")
+  val dbConfig = TestUtil.createTestDb("importroutestest")
   val storage = new RuntimeStorage
 } with FlatSpecLike with Matchers with RoutesTestBase {
 
-  val db = dbProps.db
-  val importDao = new ImportDAO(dbProps.driver)
-  val metaDataDao = new MetaDataDAO(dbProps.driver)
+  override def afterEach() =
+    await(Future.sequence(Seq(
+      metaDataDao.clear(),
+      importDao.clear()
+    )))
 
   val importSession = ImportSession(id = -1, name = "importSessionName", userId = -1, user = "", filesImported = -1, filesAdded = -1, filesRejected = -1, created = -1, lastUpdated = -1)
-
-  override def afterEach() {
-    db.withSession { implicit session =>
-      importDao.clear
-      metaDataDao.clear
-    }
-  }
 
   it should "return 200 OK and a list of import sessions when listing sessions" in {
     PostAsUser("/api/import/sessions", importSession) ~> routes ~> check {
@@ -58,9 +54,7 @@ class ImportRoutesTest extends {
     DeleteAsUser(s"/api/import/sessions/${addedSession.id}") ~> routes ~> check {
       status should be(NoContent)
     }
-    db.withSession { implicit session =>
-      importDao.getImportSessions(0, 10) shouldBe empty
-    }
+    await(importDao.getImportSessions(0, 10)) shouldBe empty
   }
 
   it should "return 204 NoContent when deleting an import session that does not exist" in {

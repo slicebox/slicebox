@@ -13,25 +13,18 @@ import org.dcm4che3.data.Tag
 import org.scalatest.{FlatSpecLike, Matchers}
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.{DicomUtil, ImageAttribute}
-import se.nimsa.sbx.metadata.MetaDataDAO
 import se.nimsa.sbx.storage.RuntimeStorage
 import se.nimsa.sbx.storage.StorageProtocol.{ExportSetId, ImageInformation}
+import se.nimsa.sbx.util.FutureUtil.await
 import se.nimsa.sbx.util.TestUtil
 
-import scala.slick.jdbc.JdbcBackend.Database
-
 class ImageRoutesTest extends {
-  val dbProps: DbProps = TestUtil.createTestDb("imageroutestest")
+  val dbConfig = TestUtil.createTestDb("imageroutestest")
   val storage = new RuntimeStorage
 } with FlatSpecLike with Matchers with RoutesTestBase {
 
-  val db: Database = dbProps.db
-  val metaDataDao = new MetaDataDAO(dbProps.driver)
-
   override def afterEach() {
-    db.withSession { implicit session =>
-      metaDataDao.clear
-    }
+    await(metaDataDao.clear())
     storage.asInstanceOf[RuntimeStorage].clear()
   }
 

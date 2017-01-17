@@ -63,11 +63,11 @@ class UserDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCon
 
   def create() = createTables(dbConf, Seq((UserTable.name, users), (SessionTable.name, sessions)))
 
-  def drop = db.run {
+  def drop() = db.run {
     (users.schema ++ sessions.schema).drop
   }
 
-  def clear = db.run {
+  def clear() = db.run {
     DBIO.seq(users.delete, sessions.delete)
   }
 

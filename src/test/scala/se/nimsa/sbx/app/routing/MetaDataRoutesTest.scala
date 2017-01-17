@@ -7,30 +7,24 @@ import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomPropertyValue._
 import se.nimsa.sbx.metadata.MetaDataProtocol._
-import se.nimsa.sbx.metadata.{MetaDataDAO, PropertiesDAO}
-import se.nimsa.sbx.seriestype.SeriesTypeDAO
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
 import se.nimsa.sbx.storage.RuntimeStorage
+import se.nimsa.sbx.util.FutureUtil.await
 import se.nimsa.sbx.util.TestUtil
 import se.nimsa.sbx.util.TestUtil._
 
+import scala.concurrent.Future
+
 class MetaDataRoutesTest extends {
-  val dbProps = TestUtil.createTestDb("metadataroutestest")
+  val dbConfig = TestUtil.createTestDb("metadataroutestest")
   val storage = new RuntimeStorage
 } with FlatSpecLike with Matchers with RoutesTestBase {
 
-  val db = dbProps.db
-  val dao = new MetaDataDAO(dbProps.driver)
-  val seriesTypeDao = new SeriesTypeDAO(dbProps.driver)
-  val propertiesDao = new PropertiesDAO(dbProps.driver)
-
-  override def afterEach() {
-    db.withSession { implicit session =>
-      dao.clear
-      seriesTypeDao.clear
-      propertiesDao.clear
-    }
-  }
+  override def afterEach() = await(Future.sequence(Seq(
+    metaDataDao.clear(),
+    seriesTypeDao.clear(),
+    propertiesDao.clear()
+  )))
 
   "Meta data routes" should "return 200 OK and return an empty list of images when asking for all images" in {
     GetAsUser("/api/metadata/patients") ~> routes ~> check {
@@ -41,9 +35,7 @@ class MetaDataRoutesTest extends {
 
   it should "return 200 OK when listing patients with valid orderby parameter" in {
     // given
-    db.withSession { implicit session =>
-      insertMetaData(dao)
-    }
+    await(insertMetaData(metaDataDao))
 
     // then    
     GetAsUser("/api/metadata/patients?orderby=patientID") ~> routes ~> check {
@@ -63,9 +55,7 @@ class MetaDataRoutesTest extends {
 
   it should "return 400 Bad Request when listing patients with invalid orderby parameter" in {
     // given
-    db.withSession { implicit session =>
-      insertMetaData(dao)
-    }
+    await(insertMetaData(metaDataDao))
 
     // then
     GetAsUser("/api/metadata/patients?orderby=syntaxerror") ~> routes ~> check {
@@ -75,9 +65,7 @@ class MetaDataRoutesTest extends {
 
   it should "return 200 OK and return patient when querying patients" in {
     // given
-    db.withSession { implicit session =>
-      insertMetaData(dao)
-    }
+    await(insertMetaData(metaDataDao))
 
     // then
     val queryProperties = Seq(QueryProperty("patientName", QueryOperator.EQUALS, "p1"))
@@ -91,10 +79,8 @@ class MetaDataRoutesTest extends {
 
   it should "be able to do like querying of patients" in {
     // given
-    db.withSession { implicit session =>
-      dao.insert(Patient(-1, PatientName("p1"), PatientID("s1"), PatientBirthDate(""), PatientSex("")))
-      dao.insert(Patient(-1, PatientName("p2"), PatientID("s2"), PatientBirthDate(""), PatientSex("")))
-    }
+    await(metaDataDao.insert(Patient(-1, PatientName("p1"), PatientID("s1"), PatientBirthDate(""), PatientSex(""))))
+    await(metaDataDao.insert(Patient(-1, PatientName("p2"), PatientID("s2"), PatientBirthDate(""), PatientSex(""))))
 
     // then
     val query = Query(0, 10, None, Seq(QueryProperty("patientName", QueryOperator.LIKE, "%p%")), None)
@@ -111,10 +97,8 @@ class MetaDataRoutesTest extends {
 
   it should "be able to sort when querying patients" in {
     // given
-    db.withSession { implicit session =>
-      dao.insert(Patient(-1, PatientName("p1"), PatientID("s1"), PatientBirthDate(""), PatientSex("")))
-      dao.insert(Patient(-1, PatientName("p2"), PatientID("s2"), PatientBirthDate(""), PatientSex("")))
-    }
+    await(metaDataDao.insert(Patient(-1, PatientName("p1"), PatientID("s1"), PatientBirthDate(""), PatientSex(""))))
+    await(metaDataDao.insert(Patient(-1, PatientName("p2"), PatientID("s2"), PatientBirthDate(""), PatientSex(""))))
 
     // then
     val query = Query(0, 10, Some(QueryOrder("patientName", orderAscending = false)), Seq[QueryProperty](), None)
@@ -131,10 +115,8 @@ class MetaDataRoutesTest extends {
 
   it should "be able to page results when querying patients" in {
     // given
-    db.withSession { implicit session =>
-      dao.insert(Patient(-1, PatientName("p1"), PatientID("s1"), PatientBirthDate(""), PatientSex("")))
-      dao.insert(Patient(-1, PatientName("p2"), PatientID("s2"), PatientBirthDate(""), PatientSex("")))
-    }
+    await(metaDataDao.insert(Patient(-1, PatientName("p1"), PatientID("s1"), PatientBirthDate(""), PatientSex(""))))
+    await(metaDataDao.insert(Patient(-1, PatientName("p2"), PatientID("s2"), PatientBirthDate(""), PatientSex(""))))
 
     // then
     val query = Query(1, 1, Some(QueryOrder("patientName", orderAscending = false)), Seq[QueryProperty](), None)
@@ -150,11 +132,8 @@ class MetaDataRoutesTest extends {
 
   it should "be able to filter results by source when querying patients" in {
     // given
-    db.withSession { implicit session =>
-      val (_, (_, _), (dbSeries1, dbSeries2, dbSeries3, dbSeries4), (dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)) =
-        insertMetaData(dao)
-      insertProperties(seriesTypeDao, propertiesDao, dbSeries1, dbSeries2, dbSeries3, dbSeries4, dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)
-    }
+    val (_, (_, _), (dbSeries1, dbSeries2, dbSeries3, dbSeries4), (dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)) = await(insertMetaData(metaDataDao))
+    await(insertProperties(seriesTypeDao, propertiesDao, dbSeries1, dbSeries2, dbSeries3, dbSeries4, dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8))
 
     // then
     val query1 = Query(0, 10, None, Seq.empty, Some(QueryFilters(Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq.empty)))
@@ -175,11 +154,8 @@ class MetaDataRoutesTest extends {
 
   it should "be able to filter results by series type when querying patients" in {
     // given
-    db.withSession { implicit session =>
-      val (_, (_, _), (dbSeries1, dbSeries2, dbSeries3, dbSeries4), (dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)) =
-        insertMetaData(dao)
-      insertProperties(seriesTypeDao, propertiesDao, dbSeries1, dbSeries2, dbSeries3, dbSeries4, dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)
-    }
+    val (_, (_, _), (dbSeries1, dbSeries2, dbSeries3, dbSeries4), (dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)) = await(insertMetaData(metaDataDao))
+    await(insertProperties(seriesTypeDao, propertiesDao, dbSeries1, dbSeries2, dbSeries3, dbSeries4, dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8))
 
     val seriesTypes =
       GetAsUser("/api/seriestypes") ~> routes ~> check {
@@ -206,11 +182,8 @@ class MetaDataRoutesTest extends {
 
   it should "be able to filter results by series tags when querying patients" in {
     // given
-    db.withSession { implicit session =>
-      val (_, (_, _), (dbSeries1, dbSeries2, dbSeries3, dbSeries4), (dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)) =
-        insertMetaData(dao)
-      insertProperties(seriesTypeDao, propertiesDao, dbSeries1, dbSeries2, dbSeries3, dbSeries4, dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)
-    }
+    val (_, (_, _), (dbSeries1, dbSeries2, dbSeries3, dbSeries4), (dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)) = await(insertMetaData(metaDataDao))
+    await(insertProperties(seriesTypeDao, propertiesDao, dbSeries1, dbSeries2, dbSeries3, dbSeries4, dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8))
 
     val seriesTags =
       GetAsUser("/api/metadata/seriestags") ~> routes ~> check {
@@ -237,9 +210,7 @@ class MetaDataRoutesTest extends {
 
   it should "return 200 OK and return studies when querying studies" in {
     // given
-    db.withSession { implicit session =>
-      insertMetaData(dao)
-    }
+    await(insertMetaData(metaDataDao))
 
     // then
     val queryProperties = Seq(QueryProperty("studyInstanceUID", QueryOperator.EQUALS, "stuid1"))
@@ -253,9 +224,7 @@ class MetaDataRoutesTest extends {
 
   it should "return 200 OK and return series when querying series" in {
     // given
-    db.withSession { implicit session =>
-      insertMetaData(dao)
-    }
+    await(insertMetaData(metaDataDao))
 
     // then
     val queryProperties = Seq(QueryProperty("seriesInstanceUID", QueryOperator.EQUALS, "seuid1"))
@@ -269,9 +238,7 @@ class MetaDataRoutesTest extends {
 
   it should "return 200 OK and return images when querying images" in {
     // given
-    db.withSession { implicit session =>
-      insertMetaData(dao)
-    }
+    await(insertMetaData(metaDataDao))
 
     // then
     val queryProperties = Seq(QueryProperty("instanceNumber", QueryOperator.EQUALS, "1"))
@@ -285,9 +252,7 @@ class MetaDataRoutesTest extends {
 
   it should "return 200 OK and return flat series when querying flat series" in {
     // given
-    db.withSession { implicit session =>
-      insertMetaData(dao)
-    }
+    await(insertMetaData(metaDataDao))
 
     // then
     val queryProperties = Seq(QueryProperty("seriesInstanceUID", QueryOperator.EQUALS, "seuid1"))
@@ -301,9 +266,7 @@ class MetaDataRoutesTest extends {
 
   it should "return 200 OK when listing flat series" in {
     // given
-    db.withSession { implicit session =>
-      insertMetaData(dao)
-    }
+    await(insertMetaData(metaDataDao))
 
     // then    
     GetAsUser("/api/metadata/flatseries") ~> routes ~> check {
@@ -314,9 +277,7 @@ class MetaDataRoutesTest extends {
 
   it should "return 200 OK when listing flat series with valid orderby parameter" in {
     // given
-    db.withSession { implicit session =>
-      insertMetaData(dao)
-    }
+    await(insertMetaData(metaDataDao))
 
     // then    
     GetAsUser("/api/metadata/flatseries?orderby=patientID") ~> routes ~> check {
@@ -340,11 +301,8 @@ class MetaDataRoutesTest extends {
   }
 
   it should "be possible to label a series with series tags" in {
-    val someSeries =
-      db.withSession { implicit session =>
-        insertMetaData(dao)
-        dao.series.head
-      }
+    await(insertMetaData(metaDataDao))
+    val someSeries = await(metaDataDao.series).head
 
     PostAsUser(s"/api/metadata/series/${someSeries.id}/seriestags", SeriesTag(-1, "Tag1")) ~> routes ~> check {
       status should be(Created)
@@ -365,11 +323,8 @@ class MetaDataRoutesTest extends {
   }
 
   it should "be possible to list series tag for a series" in {
-    val someSeries =
-      db.withSession { implicit session =>
-        insertMetaData(dao)
-        dao.series.head
-      }
+    await(insertMetaData(metaDataDao))
+    val someSeries = await(metaDataDao.series).head
 
     PostAsUser(s"/api/metadata/series/${someSeries.id}/seriestags", SeriesTag(-1, "Tag1")) ~> routes ~> check {
       status should be(Created)
@@ -387,11 +342,8 @@ class MetaDataRoutesTest extends {
   }
 
   it should "be possible to delete series tags for a series" in {
-    val someSeries =
-      db.withSession { implicit session =>
-        insertMetaData(dao)
-        dao.series.head
-      }
+    await(insertMetaData(metaDataDao))
+    val someSeries = await(metaDataDao.series).head
 
     PostAsUser(s"/api/metadata/series/${someSeries.id}/seriestags", SeriesTag(-1, "Tag1")) ~> routes ~> check {
       status should be(Created)
@@ -413,18 +365,13 @@ class MetaDataRoutesTest extends {
   }
 
   it should "return 200 OK with the list of series types when asked to list series types for a specific series" in {
-    val addedSeriesType = db.withSession { implicit session =>
-      seriesTypeDao.insertSeriesType(SeriesType(-1, "st0"))
-      seriesTypeDao.insertSeriesType(SeriesType(-1, "st1"))
-    }
 
-    val addedSeriesTypeRule = db.withSession { implicit session =>
-      seriesTypeDao.insertSeriesTypeRule(SeriesTypeRule(-1, addedSeriesType.id))
-    }
+    await(seriesTypeDao.insertSeriesType(SeriesType(-1, "st0")))
+    val addedSeriesType = await(seriesTypeDao.insertSeriesType(SeriesType(-1, "st1")))
 
-    db.withSession { implicit session =>
-      seriesTypeDao.insertSeriesTypeRuleAttribute(SeriesTypeRuleAttribute(-1, addedSeriesTypeRule.id, 0x00100010, "PatientName", None, None, "anon270"))
-    }
+    val addedSeriesTypeRule = await(seriesTypeDao.insertSeriesTypeRule(SeriesTypeRule(-1, addedSeriesType.id)))
+
+    await(seriesTypeDao.insertSeriesTypeRuleAttribute(SeriesTypeRuleAttribute(-1, addedSeriesTypeRule.id, 0x00100010, "PatientName", None, None, "anon270")))
 
     val addedSeriesId = PostAsUser("/api/images", TestUtil.testImageFormData) ~> routes ~> check {
       status should be(Created)
@@ -443,9 +390,7 @@ class MetaDataRoutesTest extends {
   }
 
   it should "return 204 NoContent when setting the series type for a specific series" in {
-    val addedSeriesType = db.withSession { implicit session =>
-      seriesTypeDao.insertSeriesType(SeriesType(-1, "st0"))
-    }
+    val addedSeriesType = await(seriesTypeDao.insertSeriesType(SeriesType(-1, "st0")))
 
     val addedSeriesId = PostAsUser("/api/images", TestUtil.testImageFormData) ~> routes ~> check {
       responseAs[Image].seriesId
@@ -467,9 +412,7 @@ class MetaDataRoutesTest extends {
   }
 
   it should "return 204 NoContent and not add a series type twice for a specific series when setting the same type twice" in {
-    val addedSeriesType = db.withSession { implicit session =>
-      seriesTypeDao.insertSeriesType(SeriesType(-1, "st0"))
-    }
+    val addedSeriesType = await(seriesTypeDao.insertSeriesType(SeriesType(-1, "st0")))
 
     val addedSeriesId = PostAsUser("/api/images", TestUtil.testImageFormData) ~> routes ~> check {
       responseAs[Image].seriesId
@@ -492,9 +435,7 @@ class MetaDataRoutesTest extends {
   }
 
   it should "return 404 NotFound when adding a series types to a series that does not exist" in {
-    val addedSeriesType = db.withSession { implicit session =>
-      seriesTypeDao.insertSeriesType(SeriesType(-1, "st0"))
-    }
+    val addedSeriesType = await(seriesTypeDao.insertSeriesType(SeriesType(-1, "st0")))
 
     PutAsUser(s"/api/metadata/series/666/seriestypes/${addedSeriesType.id}") ~> routes ~> check {
       status shouldBe NotFound
@@ -512,12 +453,8 @@ class MetaDataRoutesTest extends {
   }
 
   it should "return 204 NoContent when removing all series types from a series" in {
-    val seriesType1 = db.withSession { implicit session =>
-      seriesTypeDao.insertSeriesType(SeriesType(-1, "st1"))
-    }
-    val seriesType2 = db.withSession { implicit session =>
-      seriesTypeDao.insertSeriesType(SeriesType(-1, "st2"))
-    }
+    val seriesType1 = await(seriesTypeDao.insertSeriesType(SeriesType(-1, "st1")))
+    val seriesType2 = await(seriesTypeDao.insertSeriesType(SeriesType(-1, "st2")))
 
     val addedSeriesId = PostAsUser("/api/images", TestUtil.testImageFormData) ~> routes ~> check {
       responseAs[Image].seriesId
@@ -550,11 +487,8 @@ class MetaDataRoutesTest extends {
   }
 
   it should "return 200 OK and all images for a study" in {
-    val studies =
-      db.withSession { implicit session =>
-        insertMetaData(dao)
-        dao.studies
-      }
+    await(insertMetaData(metaDataDao))
+    val studies = await(metaDataDao.studies)
 
     GetAsUser(s"/api/metadata/studies/${studies.head.id}/images") ~> routes ~> check {
       status shouldBe OK
@@ -573,11 +507,8 @@ class MetaDataRoutesTest extends {
   }
 
   it should "return 200 OK and all images for a patient" in {
-    val patients =
-      db.withSession { implicit session =>
-        insertMetaData(dao)
-        dao.patients
-      }
+    await(insertMetaData(metaDataDao))
+    val patients = await(metaDataDao.patients)
 
     GetAsUser(s"/api/metadata/patients/${patients.head.id}/images") ~> routes ~> check {
       status shouldBe OK

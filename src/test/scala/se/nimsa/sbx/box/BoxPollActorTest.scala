@@ -7,22 +7,25 @@ import akka.http.scaladsl.model.StatusCodes.{BadGateway, NoContent, NotFound, OK
 import akka.http.scaladsl.model._
 import akka.stream.scaladsl.Flow
 import akka.testkit.{ImplicitSender, TestKit}
+import akka.util.Timeout
 import de.heikoseeberger.akkahttpplayjson.PlayJsonSupport
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
-import se.nimsa.sbx.anonymization.AnonymizationServiceActor
+import se.nimsa.sbx.anonymization.{AnonymizationDAO, AnonymizationServiceActor}
 import se.nimsa.sbx.app.JsonFormats
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.box.MockupStorageActor.{ShowBadBehavior, ShowGoodBehavior}
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
+import se.nimsa.sbx.metadata.MetaDataDAO
 import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, MetaDataAdded}
 import se.nimsa.sbx.util.CompressionUtil._
+import se.nimsa.sbx.util.FutureUtil.await
 import se.nimsa.sbx.util.TestUtil
+import slick.backend.DatabaseConfig
+import slick.driver.JdbcProfile
 
 import scala.collection.mutable.ArrayBuffer
-import scala.concurrent.Await
 import scala.concurrent.duration.DurationInt
-import scala.slick.driver.H2Driver
-import scala.slick.jdbc.JdbcBackend.Database
+import scala.concurrent.{Await, Future}
 import scala.util.{Success, Try}
 
 class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
@@ -30,22 +33,24 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
   def this() = this(ActorSystem("BoxPollActorTestSystem"))
 
-  implicit val executor = system.dispatcher
+  implicit val ec = system.dispatcher
+  implicit val timeout = Timeout(30.seconds)
 
-  val db = Database.forURL("jdbc:h2:mem:boxpollactortest;DB_CLOSE_DELAY=-1", driver = "org.h2.Driver")
-  val dbProps = DbProps(db, H2Driver)
+  val dbConfig = DatabaseConfig.forConfig[JdbcProfile]("slicebox.database.in-memory")
+  val db = dbConfig.db
 
-  val boxDao = new BoxDAO(dbProps.driver)
+  val boxDao = new BoxDAO(dbConfig)
+  val metaDataDao = new MetaDataDAO(dbConfig)
+  val anonymizationDao = new AnonymizationDAO(dbConfig)
 
-  db.withSession { implicit session =>
-    boxDao.create
-  }
+  await(Future.sequence(Seq(
+    boxDao.create(),
+    metaDataDao.create(),
+    anonymizationDao.create()
+  )))
 
   val remoteBoxBaseUrl = "https://someurl.com"
-  val remoteBox =
-    db.withSession { implicit session =>
-      boxDao.insertBox(Box(-1, "some remote box", "abc", remoteBoxBaseUrl, BoxSendMethod.PUSH, online = false))
-    }
+  val remoteBox = await(boxDao.insertBox(Box(-1, "some remote box", "abc", remoteBoxBaseUrl, BoxSendMethod.PUSH, online = false)))
 
   val notFoundResponse = HttpResponse(status = NotFound)
   var responseCounter = -1
@@ -54,13 +59,13 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
   val metaDataService = system.actorOf(Props(new Actor() {
     def receive = {
-      case AddMetaData(attributes, source) =>
+      case AddMetaData(_, _) =>
         sender ! MetaDataAdded(null, null, null, Image(12, 22, null, null, null), patientAdded = false, studyAdded = false, seriesAdded = false, imageAdded = true, null)
     }
   }), name = "MetaDataService")
   val storageService = system.actorOf(Props[MockupStorageActor], name = "StorageService")
-  val anonymizationService = system.actorOf(AnonymizationServiceActor.props(dbProps, purgeEmptyAnonymizationKeys = false), name = "AnonymizationService")
-  val boxService = system.actorOf(BoxServiceActor.props(dbProps, "http://testhost:1234", 1.minute), name = "BoxService")
+  val anonymizationService = system.actorOf(AnonymizationServiceActor.props(anonymizationDao, purgeEmptyAnonymizationKeys = false, timeout), name = "AnonymizationService")
+  val boxService = system.actorOf(BoxServiceActor.props(boxDao, "http://testhost:1234", 1.minute), name = "BoxService")
   val pollBoxActorRef = system.actorOf(Props(new BoxPollActor(remoteBox, 1.hour, 1000.hours, "../BoxService", "../MetaDataService", "../StorageService", "../AnonymizationService") {
 
     override val pool = Flow.fromFunction[(HttpRequest, String), (Try[HttpResponse], String)] {
@@ -83,14 +88,10 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
     mockHttpResponses.clear()
     responseCounter = -1
 
-    db.withSession { implicit session =>
-      boxDao.clear
-    }
+    await(boxDao.clear())
   }
 
-  override def afterAll {
-    TestKit.shutdownActorSystem(system)
-  }
+  override def afterAll = TestKit.shutdownActorSystem(system)
 
   "A BoxPollActor" should {
 
@@ -142,17 +143,15 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       expectNoMsg
 
       // Check that incoming transaction has been created
-      db.withSession { implicit session =>
-        val incomingTransactions = boxDao.listIncomingTransactions(0, 10)
-        incomingTransactions should have length 1
+      val incomingTransactions = await(boxDao.listIncomingTransactions(0, 10))
+      incomingTransactions should have length 1
 
-        incomingTransactions.foreach(incomingTransaction => {
-          incomingTransaction.outgoingTransactionId should be(outgoingTransactionId)
-          incomingTransaction.boxId should be(remoteBox.id)
-          incomingTransaction.receivedImageCount should be(1)
-          incomingTransaction.totalImageCount should be(2)
-        })
-      }
+      incomingTransactions.foreach(incomingTransaction => {
+        incomingTransaction.outgoingTransactionId should be(outgoingTransactionId)
+        incomingTransaction.boxId should be(remoteBox.id)
+        incomingTransaction.receivedImageCount should be(1)
+        incomingTransaction.totalImageCount should be(2)
+      })
 
       // Check that poll + get image + done + poll message is sent
 
@@ -201,11 +200,9 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
       expectNoMsg
 
-      db.withSession { implicit session =>
-        val incomingTransactions = boxDao.listIncomingTransactions(0, 10)
-        incomingTransactions should have length 1
-        incomingTransactions.head.status shouldBe TransactionStatus.FINISHED
-      }
+      val incomingTransactions = await(boxDao.listIncomingTransactions(0, 10))
+      incomingTransactions should have length 1
+      incomingTransactions.head.status shouldBe TransactionStatus.FINISHED
     }
 
     "mark incoming transaction as failed if the number of received files does not match the number of images in the transaction (the highest sequence number)" in {
@@ -235,11 +232,9 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
       expectNoMsg
 
-      db.withSession { implicit session =>
-        val incomingTransactions = boxDao.listIncomingTransactions(0, 10)
-        incomingTransactions should have length 1
-        incomingTransactions.head.status shouldBe TransactionStatus.FAILED
-      }
+      val incomingTransactions = await(boxDao.listIncomingTransactions(0, 10))
+      incomingTransactions should have length 1
+      incomingTransactions.head.status shouldBe TransactionStatus.FAILED
     }
 
     "keep trying to fetch remote file until fetching succeeds" in {
