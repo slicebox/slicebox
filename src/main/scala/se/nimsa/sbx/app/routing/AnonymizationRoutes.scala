@@ -103,7 +103,7 @@ trait AnonymizationRoutes {
             }
           } ~ path("images") {
             get {
-              complete(anonymizationService.ask(GetImageIdsForAnonymizationKey(anonymizationKeyId)).mapTo[List[Long]].flatMap { imageIds =>
+              complete(anonymizationService.ask(GetImageIdsForAnonymizationKey(anonymizationKeyId)).mapTo[Seq[Long]].flatMap { imageIds =>
                 Future.sequence {
                   imageIds.map { imageId =>
                     metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]]
@@ -115,7 +115,7 @@ trait AnonymizationRoutes {
         } ~ path("query") {
           post {
             entity(as[AnonymizationKeyQuery]) { query =>
-              complete(anonymizationService.ask(QueryAnonymizationKeys(query)).mapTo[List[AnonymizationKey]])
+              complete(anonymizationService.ask(QueryAnonymizationKeys(query)).mapTo[Seq[AnonymizationKey]])
             }
           }
         }

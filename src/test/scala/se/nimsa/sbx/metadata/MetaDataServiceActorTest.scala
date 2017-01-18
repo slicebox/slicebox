@@ -11,8 +11,6 @@ import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.seriestype.SeriesTypeDAO
 import se.nimsa.sbx.util.FutureUtil.await
 import se.nimsa.sbx.util.TestUtil
-import slick.backend.DatabaseConfig
-import slick.driver.JdbcProfile
 
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.Future
@@ -26,7 +24,7 @@ class MetaDataServiceActorTest(_system: ActorSystem) extends TestKit(_system) wi
   implicit val ec = system.dispatcher
   implicit val timeout = Timeout(30.seconds)
 
-  val dbConfig = DatabaseConfig.forConfig[JdbcProfile]("slicebox.database.in-memory")
+  val dbConfig = TestUtil.createTestDb("metadataserviceactortest")
   val db = dbConfig.db
 
   val seriesTypeDao = new SeriesTypeDAO(dbConfig)

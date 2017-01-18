@@ -20,8 +20,6 @@ import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, MetaDataAdded}
 import se.nimsa.sbx.util.CompressionUtil._
 import se.nimsa.sbx.util.FutureUtil.await
 import se.nimsa.sbx.util.TestUtil
-import slick.backend.DatabaseConfig
-import slick.driver.JdbcProfile
 
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.duration.DurationInt
@@ -36,7 +34,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
   implicit val ec = system.dispatcher
   implicit val timeout = Timeout(30.seconds)
 
-  val dbConfig = DatabaseConfig.forConfig[JdbcProfile]("slicebox.database.in-memory")
+  val dbConfig = TestUtil.createTestDb("bopollactortest")
   val db = dbConfig.db
 
   val boxDao = new BoxDAO(dbConfig)

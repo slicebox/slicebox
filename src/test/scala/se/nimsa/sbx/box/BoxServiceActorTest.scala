@@ -12,8 +12,7 @@ import se.nimsa.sbx.dicom.DicomPropertyValue._
 import se.nimsa.sbx.metadata.MetaDataDAO
 import se.nimsa.sbx.storage.{RuntimeStorage, StorageServiceActor}
 import se.nimsa.sbx.util.FutureUtil.await
-import slick.backend.DatabaseConfig
-import slick.driver.JdbcProfile
+import se.nimsa.sbx.util.TestUtil
 
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
@@ -26,8 +25,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
   implicit val ec = system.dispatcher
   implicit val timeout = Timeout(30.seconds)
 
-  val dbConfig = DatabaseConfig.forConfig[JdbcProfile]("slicebox.database.in-memory")
-  val db = dbConfig.db
+  val dbConfig = TestUtil.createTestDb("boxserviceactortest")
 
   val storage = new RuntimeStorage
 

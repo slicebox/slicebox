@@ -16,11 +16,9 @@ import se.nimsa.sbx.storage.StorageProtocol.AddDicomData
 import se.nimsa.sbx.storage.{RuntimeStorage, StorageServiceActor}
 import se.nimsa.sbx.util.FutureUtil.await
 import se.nimsa.sbx.util.TestUtil
-import slick.backend.DatabaseConfig
-import slick.driver.JdbcProfile
 
-import scala.concurrent.{Await, Future}
 import scala.concurrent.duration.DurationInt
+import scala.concurrent.{Await, Future}
 
 class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
   with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {
@@ -30,8 +28,7 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
   implicit val ec = system.dispatcher
   implicit val timeout = Timeout(30.seconds)
 
-  val dbConfig = DatabaseConfig.forConfig[JdbcProfile]("slicebox.database.in-memory")
-  val db = dbConfig.db
+  val dbConfig = TestUtil.createTestDb("seriestypeupdateactortest")
   val dao = new MetaDataDAO(dbConfig)
 
   val storage = new RuntimeStorage

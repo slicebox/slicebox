@@ -117,7 +117,7 @@ class AnonymizationDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Exe
 
         query += s""" limit $count offset $startIndex"""
 
-        sql"$query".as[AnonymizationKey]
+        sql"#$query".as[AnonymizationKey]
       }
     }
 

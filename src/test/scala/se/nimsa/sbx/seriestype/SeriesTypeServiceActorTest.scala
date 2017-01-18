@@ -11,8 +11,7 @@ import se.nimsa.sbx.metadata.MetaDataDAO
 import se.nimsa.sbx.metadata.MetaDataProtocol.MetaDataDeleted
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
 import se.nimsa.sbx.util.FutureUtil.await
-import slick.backend.DatabaseConfig
-import slick.driver.JdbcProfile
+import se.nimsa.sbx.util.TestUtil
 
 import scala.concurrent.duration.DurationInt
 
@@ -24,8 +23,7 @@ class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
   implicit val ec = system.dispatcher
   implicit val timeout = Timeout(30.seconds)
 
-  val dbConfig = DatabaseConfig.forConfig[JdbcProfile]("slicebox.database.in-memory")
-  val db = dbConfig.db
+  val dbConfig = TestUtil.createTestDb("seriestypeserviceactortest")
   val dao = new MetaDataDAO(dbConfig)
 
   val seriesTypeDao = new SeriesTypeDAO(dbConfig)

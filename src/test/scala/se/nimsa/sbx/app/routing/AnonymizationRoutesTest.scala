@@ -26,7 +26,8 @@ class AnonymizationRoutesTest extends {
     await(Future.sequence(Seq(
       metaDataDao.clear(),
       seriesTypeDao.clear(),
-      propertiesDao.clear()
+      propertiesDao.clear(),
+      anonymizationDao.clear()
     )))
     storage.asInstanceOf[RuntimeStorage].clear()
   }

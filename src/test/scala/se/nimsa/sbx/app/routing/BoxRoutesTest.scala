@@ -23,7 +23,8 @@ class BoxRoutesTest extends {
     await(Future.sequence(Seq(
       metaDataDao.clear(),
       seriesTypeDao.clear(),
-      propertiesDao.clear()
+      propertiesDao.clear(),
+      boxDao.clear()
     )))
 
   def addPollBox(name: String) =

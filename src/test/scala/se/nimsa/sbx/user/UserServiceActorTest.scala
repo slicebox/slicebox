@@ -7,8 +7,7 @@ import akka.util.Timeout
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
 import se.nimsa.sbx.user.UserProtocol._
 import se.nimsa.sbx.util.FutureUtil.await
-import slick.backend.DatabaseConfig
-import slick.driver.JdbcProfile
+import se.nimsa.sbx.util.TestUtil
 
 import scala.concurrent.duration.DurationInt
 
@@ -20,8 +19,7 @@ class UserServiceActorTest(_system: ActorSystem) extends TestKit(_system) with I
   implicit val ec = system.dispatcher
   implicit val timeout = Timeout(30.seconds)
 
-  val dbConfig = DatabaseConfig.forConfig[JdbcProfile]("slicebox.database.in-memory")
-  val db = dbConfig.db
+  val dbConfig = TestUtil.createTestDb("userserviceactortest")
   val dao = new UserDAO(dbConfig)
 
   await(dao.create())

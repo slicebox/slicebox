@@ -41,7 +41,7 @@ import se.nimsa.sbx.user.{UserDAO, UserServiceActor}
 import slick.backend.DatabaseConfig
 import slick.driver.JdbcProfile
 
-import scala.concurrent.{Await, ExecutionContextExecutor, Future}
+import scala.concurrent.{Await, ExecutionContextExecutor}
 import scala.concurrent.duration.DurationInt
 import scala.util.{Failure, Success}
 

@@ -14,8 +14,6 @@ import se.nimsa.sbx.metadata.MetaDataDAO
 import se.nimsa.sbx.metadata.MetaDataProtocol.GetImage
 import se.nimsa.sbx.util.FutureUtil.await
 import se.nimsa.sbx.util.TestUtil
-import slick.backend.DatabaseConfig
-import slick.driver.JdbcProfile
 
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.Future
@@ -30,8 +28,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
   implicit val ec = system.dispatcher
   implicit val timeout = Timeout(30.seconds)
 
-  val dbConfig = DatabaseConfig.forConfig[JdbcProfile]("slicebox.database.in-memory")
-  val db = dbConfig.db
+  val dbConfig = TestUtil.createTestDb("boxpushactortest")
 
   val boxDao = new BoxDAO(dbConfig)
   val metaDataDao = new MetaDataDAO(dbConfig)
