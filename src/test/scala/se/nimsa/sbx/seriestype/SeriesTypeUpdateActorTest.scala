@@ -37,11 +37,11 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
   val metaDataDao = new MetaDataDAO(dbConfig)
   val propertiesDao = new PropertiesDAO(dbConfig)
 
-  override def beforeAll() = await(Future.sequence(Seq(
-    seriesTypeDao.create(),
-    metaDataDao.create(),
-    propertiesDao.create()
-  )))
+  override def beforeAll() = {
+    await(metaDataDao.create())
+    await(propertiesDao.create())
+    await(seriesTypeDao.create())
+  }
 
   val storageService = system.actorOf(StorageServiceActor.props(storage), name = "StorageService")
   val metaDataService = system.actorOf(MetaDataServiceActor.props(metaDataDao, propertiesDao, timeout), name = "MetaDataService")

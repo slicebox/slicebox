@@ -31,23 +31,23 @@ class MetaDataServiceActorTest(_system: ActorSystem) extends TestKit(_system) wi
   val metaDataDao = new MetaDataDAO(dbConfig)
   val propertiesDao = new PropertiesDAO(dbConfig)
 
-  await(Future.successful(Seq(
-    seriesTypeDao.create(),
-    metaDataDao.create(),
-    propertiesDao.create()
-  )))
-
   val dicomData = TestUtil.testImageDicomData()
 
   val metaDataActorRef = TestActorRef(new MetaDataServiceActor(metaDataDao, propertiesDao))
   val metaDataActor = metaDataActorRef.underlyingActor
 
-  override def afterAll = TestKit.shutdownActorSystem(system)
-
   val patientEvents = new ListBuffer[Patient]()
   val studyEvents = new ListBuffer[Study]()
   val seriesEvents = new ListBuffer[Series]()
   val imageEvents = new ListBuffer[Image]()
+
+  override def beforeAll() = {
+    await(metaDataDao.create())
+    await(propertiesDao.create())
+    await(seriesTypeDao.create())
+  }
+
+  override def afterAll = TestKit.shutdownActorSystem(system)
 
   override def afterEach = {
     patientEvents.clear()

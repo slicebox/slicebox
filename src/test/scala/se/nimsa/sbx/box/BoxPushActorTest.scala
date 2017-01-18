@@ -34,11 +34,9 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
   val metaDataDao = new MetaDataDAO(dbConfig)
   val anonymizationDao = new AnonymizationDAO(dbConfig)
 
-  await(Future.sequence(Seq(
-    boxDao.create(),
-    metaDataDao.create(),
-    anonymizationDao.create()
-  )))
+  await(metaDataDao.create())
+  await(anonymizationDao.create())
+  await(boxDao.create())
 
   val testBox = Box(1, "Test Box", "abc123", "testbox.com", BoxSendMethod.PUSH, online = false)
 

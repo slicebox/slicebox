@@ -32,10 +32,8 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
   val boxDao = new BoxDAO(dbConfig)
   val metaDataDao = new MetaDataDAO(dbConfig)
 
-  await(Future.sequence(Seq(
-    boxDao.create(),
-    metaDataDao.create()
-  )))
+  await(metaDataDao.create())
+  await(boxDao.create())
 
   val storageService = system.actorOf(Props(new StorageServiceActor(storage)), name = "StorageService")
   val boxService = system.actorOf(Props(new BoxServiceActor(boxDao, "http://testhost:1234")), name = "BoxService")
