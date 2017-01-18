@@ -55,7 +55,7 @@ rpmRelease := {
 
 // for automatic license stub generation
 
-val licenceYear = "2016"
+val licenceYear = "2017"
 val licencedTo = "Lars Edenbrandt"
 headers := Map(
   "scala" -> Apache2_0(licenceYear, licencedTo),
