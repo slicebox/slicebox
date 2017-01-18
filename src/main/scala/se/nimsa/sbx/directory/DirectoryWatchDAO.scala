@@ -42,7 +42,7 @@ class DirectoryWatchDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Ex
 
   val watchedDirectoriesQuery = TableQuery[DirectoryWatchDataTable]
 
-  def create() = createTables(dbConf, Seq((DirectoryWatchDataTable.name, watchedDirectoriesQuery)))
+  def create() = createTables(dbConf, (DirectoryWatchDataTable.name, watchedDirectoriesQuery))
 
   def drop() = db.run(watchedDirectoriesQuery.schema.drop)
 

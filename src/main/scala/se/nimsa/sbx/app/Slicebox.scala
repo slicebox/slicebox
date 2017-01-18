@@ -77,11 +77,20 @@ trait SliceboxBase extends SliceboxRoutes with JsonFormats with PlayJsonSupport 
   val importDao = new ImportDAO(dbConfig)
   val anonymizationDao = new AnonymizationDAO(dbConfig)
 
-  Await.ready(Future.sequence(Seq(
-    logDao.create(), seriesTypeDao.create(), forwardingDao.create(), metaDataDao.create(), propertiesDao.create(),
-    directoryWatchDao.create(), scpDao.create(), scuDao.create(), boxDao.create(), importDao.create(),
-    userDao.create(), anonymizationDao.create()
-  )), 1.minute)
+  Await.ready(for {
+    _ <- logDao.create()
+    _ <- seriesTypeDao.create()
+    _ <- forwardingDao.create()
+    _ <- metaDataDao.create()
+    _ <- propertiesDao.create()
+    _ <- directoryWatchDao.create()
+    _ <- scpDao.create()
+    _ <- scuDao.create()
+    _ <- boxDao.create()
+    _ <- importDao.create()
+    _ <- userDao.create()
+    _ <- anonymizationDao.create()
+  } yield Unit, 1.minute)
 
   val host = sliceboxConfig.getString("host")
   val port = sliceboxConfig.getInt("port")

@@ -43,7 +43,7 @@ class ScpDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
 
   val scpDatas = TableQuery[ScpDataTable]
 
-  def create() = createTables(dbConf, Seq((ScpDataTable.name, scpDatas)))
+  def create() = createTables(dbConf, (ScpDataTable.name, scpDatas))
 
   def drop() = db.run {
     scpDatas.schema.drop

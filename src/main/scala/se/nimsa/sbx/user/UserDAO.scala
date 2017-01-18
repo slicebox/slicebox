@@ -61,7 +61,7 @@ class UserDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCon
   }
   val sessions = TableQuery[SessionTable]
 
-  def create() = createTables(dbConf, Seq((UserTable.name, users), (SessionTable.name, sessions)))
+  def create() = createTables(dbConf, (UserTable.name, users), (SessionTable.name, sessions))
 
   def drop() = db.run {
     (users.schema ++ sessions.schema).drop

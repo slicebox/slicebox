@@ -75,7 +75,7 @@ class AnonymizationDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Exe
 
   val anonymizationKeyImageQuery = TableQuery[AnonymizationKeyImageTable]
 
-  def create() = createTables(dbConf, Seq((AnonymizationKeyTable.name, anonymizationKeyQuery), (AnonymizationKeyImageTable.name, anonymizationKeyImageQuery)))
+  def create() = createTables(dbConf, (AnonymizationKeyTable.name, anonymizationKeyQuery), (AnonymizationKeyImageTable.name, anonymizationKeyImageQuery))
 
   def drop() = db.run {
     (anonymizationKeyQuery.schema ++ anonymizationKeyImageQuery.schema).drop
@@ -204,7 +204,7 @@ class AnonymizationDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Exe
   val anonymizationKeysGetResult = GetResult(r =>
     AnonymizationKey(r.nextLong, r.nextLong, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString))
 
-  val queryAnonymizationKeysSelectPart = """select * from "AnonymizationKeys""""
+  val queryAnonymizationKeysSelectPart = s"""select * from "${AnonymizationKeyTable.name}""""
 
   def queryAnonymizationKeys(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, queryProperties: Seq[QueryProperty]): Future[Seq[AnonymizationKey]] =
     checkColumnExists(dbConf, orderBy, AnonymizationKeyTable.name).flatMap { _ =>
@@ -219,7 +219,7 @@ class AnonymizationDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Exe
             orderByPart(orderBy, orderAscending) +
             pagePart(startIndex, count)
 
-          sql"$query".as[AnonymizationKey]
+          sql"#$query".as[AnonymizationKey]
         }
       }
     }

@@ -87,11 +87,11 @@ class SeriesTypeDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
 
   private val seriesSeriesTypes = TableQuery[SeriesSeriesTypeTable]
 
-  def create() = createTables(dbConf, Seq(
+  def create() = createTables(dbConf,
     (SeriesTypeTable.name, seriesTypes),
     (SeriesTypeRuleTable.name, seriesTypeRules),
     (SeriesTypeRuleAttributeTable.name, seriesTypeRuleAttributes),
-    (SeriesSeriesTypeTable.name, seriesSeriesTypes)))
+    (SeriesSeriesTypeTable.name, seriesSeriesTypes))
 
   def drop() = db.run {
     (seriesTypes.schema ++ seriesTypeRules.schema ++ seriesTypeRuleAttributes.schema ++ seriesSeriesTypes.schema).drop

@@ -142,7 +142,7 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
 
   val imagesQuery = TableQuery[ImagesTable]
 
-  def create() = createTables(dbConf, Seq((PatientsTable.name, patientsQuery), (StudiesTable.name, studiesQuery), (SeriesTable.name, seriesQuery), (ImagesTable.name, imagesQuery)))
+  def create() = createTables(dbConf, (PatientsTable.name, patientsQuery), (StudiesTable.name, studiesQuery), (SeriesTable.name, seriesQuery), (ImagesTable.name, imagesQuery))
 
   def drop() = db.run {
     (patientsQuery.schema ++ studiesQuery.schema ++ seriesQuery.schema ++ imagesQuery.schema).drop
@@ -232,7 +232,7 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
             orderByPart(orderBy, orderAscending) +
             pagePart(startIndex, count)
 
-        sql"$query".as[Patient]
+        sql"#$query".as[Patient]
       }
     }
 
@@ -259,7 +259,7 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
 
   def queryPatients(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, queryProperties: Seq[QueryProperty]): Future[Seq[Patient]] =
 
-    checkColumnExists(dbConf, orderBy, PatientsTable.name).flatMap { _ =>
+    checkColumnExists(dbConf, orderBy, PatientsTable.name, StudiesTable.name, SeriesTable.name).flatMap { _ =>
       Future.sequence(queryProperties.map(qp => checkColumnExists(dbConf, qp.propertyName, PatientsTable.name, StudiesTable.name, SeriesTable.name))).flatMap { _ =>
         db.run {
           implicit val getResult = patientsGetResult
@@ -269,7 +269,7 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
             orderByPart(orderBy, orderAscending) +
             pagePart(startIndex, count)
 
-          sql"$query".as[Patient]
+          sql"#$query".as[Patient]
         }
       }
     }
@@ -291,7 +291,7 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
 
   def queryStudies(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, queryProperties: Seq[QueryProperty]): Future[Seq[Study]] =
 
-    checkColumnExists(dbConf, orderBy, PatientsTable.name).flatMap { _ =>
+    checkColumnExists(dbConf, orderBy, PatientsTable.name, StudiesTable.name, SeriesTable.name).flatMap { _ =>
       Future.sequence(queryProperties.map(qp => checkColumnExists(dbConf, qp.propertyName, PatientsTable.name, StudiesTable.name, SeriesTable.name))).flatMap { _ =>
         db.run {
           implicit val getResult = studiesGetResult
@@ -301,7 +301,7 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
             orderByPart(orderBy, orderAscending) +
             pagePart(startIndex, count)
 
-          sql"$query".as[Study]
+          sql"#$query".as[Study]
         }
       }
     }
@@ -326,7 +326,7 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
 
   def querySeries(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, queryProperties: Seq[QueryProperty]): Future[Seq[Series]] =
 
-    checkColumnExists(dbConf, orderBy, SeriesTable.name).flatMap { _ =>
+    checkColumnExists(dbConf, orderBy, PatientsTable.name, StudiesTable.name, SeriesTable.name).flatMap { _ =>
       Future.sequence(queryProperties.map(qp => checkColumnExists(dbConf, qp.propertyName, PatientsTable.name, StudiesTable.name, SeriesTable.name))).flatMap { _ =>
         db.run {
           implicit val getResult = seriesGetResult
@@ -336,7 +336,7 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
             orderByPart(orderBy, orderAscending) +
             pagePart(startIndex, count)
 
-          sql"$query".as[Series]
+          sql"#$query".as[Series]
         }
       }
     }
@@ -356,8 +356,8 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
 
   def queryImages(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, queryProperties: Seq[QueryProperty]): Future[Seq[Image]] =
 
-    checkColumnExists(dbConf, orderBy, ImagesTable.name).flatMap { _ =>
-      Future.sequence(queryProperties.map(qp => checkColumnExists(dbConf, qp.propertyName, PatientsTable.name, StudiesTable.name, SeriesTable.name))).flatMap { _ =>
+    checkColumnExists(dbConf, orderBy, PatientsTable.name, StudiesTable.name, SeriesTable.name, ImagesTable.name).flatMap { _ =>
+      Future.sequence(queryProperties.map(qp => checkColumnExists(dbConf, qp.propertyName, PatientsTable.name, StudiesTable.name, SeriesTable.name, ImagesTable.name))).flatMap { _ =>
         db.run {
           implicit val getResult = imagesGetResult
 
@@ -366,7 +366,7 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
             orderByPart(orderBy, orderAscending) +
             pagePart(startIndex, count)
 
-          sql"$query".as[Image]
+          sql"#$query".as[Image]
         }
       }
     }
@@ -382,7 +382,7 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
             orderByPart(orderBy, orderAscending) +
             pagePart(startIndex, count)
 
-          sql"$query".as[FlatSeries]
+          sql"#$query".as[FlatSeries]
         }
       }
     }
@@ -414,7 +414,7 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
           orderByPart(orderBy, orderAscending) +
           pagePart(startIndex, count)
 
-        sql"$query".as[FlatSeries]
+        sql"#$query".as[FlatSeries]
       }
     }
 
@@ -444,7 +444,7 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
   def flatSeriesById(seriesId: Long): Future[Option[FlatSeries]] = db.run {
     implicit val getResult = flatSeriesGetResult
     val query = flatSeriesBasePart + s""" where "Series"."id" = $seriesId"""
-    sql"$query".as[FlatSeries].headOption
+    sql"#$query".as[FlatSeries].headOption
   }
 
   // *** Grouped listings ***
@@ -554,17 +554,16 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
   def deleteSeriesFullyAction(series: Series) =
     deleteSeriesAction(series.id)
       .flatMap { nSeriesDeleted =>
-        seriesQuery.filter(_.studyId === series.studyId).result.headOption
-          .map { maybeOtherSeries =>
-            maybeOtherSeries.map { _ =>
+        seriesQuery.filter(_.studyId === series.studyId).take(1).result
+          .flatMap { otherSeries =>
+            if (otherSeries.isEmpty)
               studyByIdAction(series.studyId)
                 .map { maybeStudy =>
                   maybeStudy.map(deleteStudyFullyAction)
-                }.unwrap
-                .map(_.getOrElse((None, None)))
-            }
-          }.unwrap
-          .map(_.getOrElse((None, None)))
+                }.unwrap.map(_.getOrElse((None, None)))
+            else
+              DBIO.successful((None, None))
+          }
           .map {
             case (maybePatient, maybeStudy) =>
               val maybeSeries = if (nSeriesDeleted == 0) None else Some(series)
@@ -578,21 +577,22 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
   def deleteStudyFullyAction(study: Study) =
     deleteStudyAction(study.id)
       .flatMap { nStudiesDeleted =>
-        studiesQuery.filter(_.patientId === study.patientId).result.headOption
-          .flatMap { maybeOtherStudy =>
-            maybeOtherStudy.map { _ =>
+        studiesQuery.filter(_.patientId === study.patientId).take(1).result
+          .flatMap { otherStudies =>
+            if (otherStudies.isEmpty)
               patientByIdAction(study.patientId)
                 .map { maybePatient =>
                   maybePatient.map { patient =>
-                    deletePatientAction(study.patientId)
+                    deletePatientAction(patient.id)
                       .map(_ => patient)
                   }
                 }.unwrap
-            }.unwrap
-              .map { maybePatient =>
-                val maybeStudy = if (nStudiesDeleted == 0) None else Some(study)
-                (maybePatient, maybeStudy)
-              }
+            else
+              DBIO.successful(None)
+          }
+          .map { maybePatient =>
+            val maybeStudy = if (nStudiesDeleted == 0) None else Some(study)
+            (maybePatient, maybeStudy)
           }
       }
 

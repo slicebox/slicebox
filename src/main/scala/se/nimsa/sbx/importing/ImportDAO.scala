@@ -47,7 +47,7 @@ class ImportDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionC
 
   val importSessionImageQuery = TableQuery[ImportSessionImageTable]
 
-  def create() = createTables(dbConf, Seq((ImportSessionTable.name, importSessionQuery), (ImportSessionImageTable.name, importSessionImageQuery)))
+  def create() = createTables(dbConf, (ImportSessionTable.name, importSessionQuery), (ImportSessionImageTable.name, importSessionImageQuery))
 
   def drop() = db.run {
     (importSessionQuery.schema ++ importSessionImageQuery.schema).drop

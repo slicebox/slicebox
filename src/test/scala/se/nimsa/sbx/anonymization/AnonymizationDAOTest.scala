@@ -5,25 +5,21 @@ import org.scalatest.{AsyncFlatSpec, BeforeAndAfterEach, Matchers}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.util.FutureUtil.await
-import slick.backend.DatabaseConfig
-import slick.driver.JdbcProfile
+import se.nimsa.sbx.util.TestUtil
 
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.DurationInt
 
 class AnonymizationDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterEach {
 
-  val dbConfig = DatabaseConfig.forConfig[JdbcProfile]("slicebox.database.in-memory")
-  val db = dbConfig.db
-
+  val dbConfig = TestUtil.createTestDb("anonymizationdaotest")
   val dao = new AnonymizationDAO(dbConfig)
 
   implicit val timeout = Timeout(30.seconds)
 
-  override def beforeEach() =
-    await(dao.create())
+  override def beforeEach() = await(dao.create())
 
-  override def afterEach() =
-    await(dao.drop())
+  override def afterEach() = await(dao.drop())
 
   val key1 = AnonymizationKey(-1, 123456789, "pn1", "anonPn1", "pid1", "anonPid1", "pBD1", "stuid1", "anonStuid1", "", "", "", "", "", "", "", "", "")
   val key2 = AnonymizationKey(-1, 123456789, "pn2", "anonPn2", "pid2", "anonPid2", "pBD2", "stuid2", "anonStuid2", "", "", "", "", "", "", "", "", "")
@@ -67,10 +63,10 @@ class AnonymizationDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAft
   it should "throw IllegalArgumentException when querying anonymization keys for properties (columns) that does not exist" in {
     val qp = Seq(QueryProperty("misspelled property", QueryOperator.EQUALS, "value"))
     recoverToSucceededIf[IllegalArgumentException] {
-      dao.queryAnonymizationKeys(0, 10, None, orderAscending = false, qp).map(fail())
+      dao.queryAnonymizationKeys(0, 10, None, orderAscending = false, qp)
     }
     recoverToSucceededIf[IllegalArgumentException] {
-      dao.queryAnonymizationKeys(0, 10, Some("patientName"), orderAscending = false, qp).map(fail())
+      dao.queryAnonymizationKeys(0, 10, Some("patientName"), orderAscending = false, qp)
     }
   }
 

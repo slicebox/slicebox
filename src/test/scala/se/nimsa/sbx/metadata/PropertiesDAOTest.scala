@@ -1,42 +1,40 @@
 package se.nimsa.sbx.metadata
 
-import org.scalatest.{AsyncFlatSpec, BeforeAndAfterEach, Matchers}
-import org.h2.jdbc.JdbcSQLException
-import se.nimsa.sbx.util.TestUtil._
-import se.nimsa.sbx.seriestype.SeriesTypeDAO
-import se.nimsa.sbx.app.GeneralProtocol._
-import MetaDataProtocol._
 import akka.util.Timeout
+import org.h2.jdbc.JdbcSQLException
+import org.scalatest.{AsyncFlatSpec, BeforeAndAfterAll, BeforeAndAfterEach, Matchers}
+import se.nimsa.sbx.app.GeneralProtocol._
+import se.nimsa.sbx.metadata.MetaDataProtocol._
+import se.nimsa.sbx.seriestype.SeriesTypeDAO
 import se.nimsa.sbx.util.FutureUtil.await
-import slick.backend.DatabaseConfig
-import slick.driver.JdbcProfile
+import se.nimsa.sbx.util.TestUtil
+import se.nimsa.sbx.util.TestUtil._
 
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 
-class PropertiesDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterEach {
+class PropertiesDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {
 
-  val dbConfig = DatabaseConfig.forConfig[JdbcProfile]("slicebox.database.in-memory")
-  val db = dbConfig.db
-
+  val dbConfig = TestUtil.createTestDb("propertiesdaotest")
   implicit val timeout = Timeout(30.seconds)
 
   val metaDataDao = new MetaDataDAO(dbConfig)
   val propertiesDao = new PropertiesDAO(dbConfig)
   val seriesTypeDao = new SeriesTypeDAO(dbConfig)
 
-  override def beforeEach() =
-    await(Future.sequence(Seq(
-      seriesTypeDao.create(),
-      metaDataDao.create(),
-      propertiesDao.create()
-    )))
+  override def beforeAll() =
+    await(for {
+      _ <- seriesTypeDao.create()
+      _ <- metaDataDao.create()
+      _ <- propertiesDao.create()
+    } yield Unit)
 
   override def afterEach() =
     await(Future.sequence(Seq(
-      propertiesDao.drop(),
-      metaDataDao.drop(),
-      seriesTypeDao.drop()
+      propertiesDao.clear(),
+      metaDataDao.clear(),
+      seriesTypeDao.clear()
     )))
 
   "The properties db" should "be empty before anything has been added" in {
@@ -65,7 +63,7 @@ class PropertiesDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterE
 
   it should "not support adding a series source which links to a non-existing series" in {
     recoverToSucceededIf[JdbcSQLException] {
-      propertiesDao.insertSeriesSource(SeriesSource(666, Source(SourceType.USER, "user", 1))).map(fail())
+      propertiesDao.insertSeriesSource(SeriesSource(666, Source(SourceType.USER, "user", 1)))
     }
   }
 
@@ -100,10 +98,11 @@ class PropertiesDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterE
   it should "support filtering studies by source" in {
     for {
       _ <- insertMetaDataAndProperties()
-      s1 <- propertiesDao.studiesForPatient(0, 20, 1, Seq.empty, Seq.empty, Seq.empty)
-      s2 <- propertiesDao.studiesForPatient(0, 20, 1, Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq.empty)
-      s3 <- propertiesDao.studiesForPatient(0, 20, 1, Seq(SourceRef(SourceType.BOX, 2)), Seq.empty, Seq.empty)
-      s4 <- propertiesDao.studiesForPatient(0, 20, 1, Seq(SourceRef(SourceType.UNKNOWN, 1)), Seq.empty, Seq.empty)
+      p <- metaDataDao.patients.map(_.head)
+      s1 <- propertiesDao.studiesForPatient(0, 20, p.id, Seq.empty, Seq.empty, Seq.empty)
+      s2 <- propertiesDao.studiesForPatient(0, 20, p.id, Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq.empty)
+      s3 <- propertiesDao.studiesForPatient(0, 20, p.id, Seq(SourceRef(SourceType.BOX, 2)), Seq.empty, Seq.empty)
+      s4 <- propertiesDao.studiesForPatient(0, 20, p.id, Seq(SourceRef(SourceType.UNKNOWN, 1)), Seq.empty, Seq.empty)
     } yield {
       s1.size should be(2)
       s2.size should be(1)
@@ -115,12 +114,13 @@ class PropertiesDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterE
   it should "support filtering series by source" in {
     for {
       _ <- insertMetaDataAndProperties()
-      s1 <- propertiesDao.seriesForStudy(0, 20, 1, Seq.empty, Seq.empty, Seq.empty)
-      s2 <- propertiesDao.seriesForStudy(0, 20, 1, Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq.empty)
-      s3 <- propertiesDao.seriesForStudy(0, 20, 2, Seq(SourceRef(SourceType.SCP, 1)), Seq.empty, Seq.empty)
-      s4 <- propertiesDao.seriesForStudy(0, 20, 2, Seq(SourceRef(SourceType.DIRECTORY, 1)), Seq.empty, Seq.empty)
-      s5 <- propertiesDao.seriesForStudy(0, 20, 1, Seq(SourceRef(SourceType.BOX, 2)), Seq.empty, Seq.empty)
-      s6 <- propertiesDao.seriesForStudy(0, 20, 1, Seq(SourceRef(SourceType.SCP, 2)), Seq.empty, Seq.empty)
+      (st1, st2) <- metaDataDao.studies.map(ss => ss.zip(ss.tail).head)
+      s1 <- propertiesDao.seriesForStudy(0, 20, st1.id, Seq.empty, Seq.empty, Seq.empty)
+      s2 <- propertiesDao.seriesForStudy(0, 20, st1.id, Seq(SourceRef(SourceType.BOX, 1)), Seq.empty, Seq.empty)
+      s3 <- propertiesDao.seriesForStudy(0, 20, st2.id, Seq(SourceRef(SourceType.SCP, 1)), Seq.empty, Seq.empty)
+      s4 <- propertiesDao.seriesForStudy(0, 20, st2.id, Seq(SourceRef(SourceType.DIRECTORY, 1)), Seq.empty, Seq.empty)
+      s5 <- propertiesDao.seriesForStudy(0, 20, st1.id, Seq(SourceRef(SourceType.BOX, 2)), Seq.empty, Seq.empty)
+      s6 <- propertiesDao.seriesForStudy(0, 20, st1.id, Seq(SourceRef(SourceType.SCP, 2)), Seq.empty, Seq.empty)
     } yield {
       s1.size should be(2)
       s2.size should be(1)
@@ -134,10 +134,11 @@ class PropertiesDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterE
   it should "support filtering flat series by series tag" in {
     for {
       _ <- insertMetaDataAndProperties()
-      f1 <- propertiesDao.flatSeries(0, 20, None, orderAscending = true, None, Seq.empty, Seq.empty, Seq(1, 2))
-      f2 <- propertiesDao.flatSeries(0, 20, None, orderAscending = true, None, Seq.empty, Seq.empty, Seq(1))
-      f3 <- propertiesDao.flatSeries(0, 20, None, orderAscending = true, None, Seq.empty, Seq.empty, Seq(1, 3))
-      f4 <- propertiesDao.flatSeries(0, 20, None, orderAscending = true, None, Seq.empty, Seq.empty, Seq(3))
+      (st1, st2) <- propertiesDao.seriesTags.map(st => st.zip(st.tail).head)
+      f1 <- propertiesDao.flatSeries(0, 20, None, orderAscending = true, None, Seq.empty, Seq.empty, Seq(st1.id, st2.id))
+      f2 <- propertiesDao.flatSeries(0, 20, None, orderAscending = true, None, Seq.empty, Seq.empty, Seq(st1.id))
+      f3 <- propertiesDao.flatSeries(0, 20, None, orderAscending = true, None, Seq.empty, Seq.empty, Seq(st1.id, 666))
+      f4 <- propertiesDao.flatSeries(0, 20, None, orderAscending = true, None, Seq.empty, Seq.empty, Seq(666))
     } yield {
       f1.size should be(3)
       f2.size should be(2)
@@ -149,10 +150,11 @@ class PropertiesDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterE
   it should "support filtering patients by series tag" in {
     for {
       _ <- insertMetaDataAndProperties()
-      p1 <- propertiesDao.patients(0, 20, None, orderAscending = true, None, Seq.empty, Seq.empty, Seq(1, 2))
-      p2 <- propertiesDao.patients(0, 20, None, orderAscending = true, None, Seq.empty, Seq.empty, Seq(1))
-      p3 <- propertiesDao.patients(0, 20, None, orderAscending = true, None, Seq.empty, Seq.empty, Seq(1, 3))
-      p4 <- propertiesDao.patients(0, 20, None, orderAscending = true, None, Seq.empty, Seq.empty, Seq(3))
+      (st1, st2) <- propertiesDao.seriesTags.map(st => st.zip(st.tail).head)
+      p1 <- propertiesDao.patients(0, 20, None, orderAscending = true, None, Seq.empty, Seq.empty, Seq(st1.id, st2.id))
+      p2 <- propertiesDao.patients(0, 20, None, orderAscending = true, None, Seq.empty, Seq.empty, Seq(st1.id))
+      p3 <- propertiesDao.patients(0, 20, None, orderAscending = true, None, Seq.empty, Seq.empty, Seq(st1.id, 666))
+      p4 <- propertiesDao.patients(0, 20, None, orderAscending = true, None, Seq.empty, Seq.empty, Seq(666))
     } yield {
       p1.size should be(1)
       p2.size should be(1)
@@ -164,10 +166,12 @@ class PropertiesDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterE
   it should "support filtering studies by series tag" in {
     for {
       _ <- insertMetaDataAndProperties()
-      s1 <- propertiesDao.studiesForPatient(0, 20, 1, Seq.empty, Seq.empty, Seq(1, 2))
-      s2 <- propertiesDao.studiesForPatient(0, 20, 1, Seq.empty, Seq.empty, Seq(1))
-      s3 <- propertiesDao.studiesForPatient(0, 20, 1, Seq.empty, Seq.empty, Seq(1, 3))
-      s4 <- propertiesDao.studiesForPatient(0, 20, 1, Seq.empty, Seq.empty, Seq(3))
+      p <- metaDataDao.patients.map(_.head)
+      (st1, st2) <- propertiesDao.seriesTags.map(st => st.zip(st.tail).head)
+      s1 <- propertiesDao.studiesForPatient(0, 20, p.id, Seq.empty, Seq.empty, Seq(st1.id, st2.id))
+      s2 <- propertiesDao.studiesForPatient(0, 20, p.id, Seq.empty, Seq.empty, Seq(st1.id))
+      s3 <- propertiesDao.studiesForPatient(0, 20, p.id, Seq.empty, Seq.empty, Seq(st1.id, 666))
+      s4 <- propertiesDao.studiesForPatient(0, 20, p.id, Seq.empty, Seq.empty, Seq(666))
     } yield {
       s1.size should be(2)
       s2.size should be(1)
@@ -179,13 +183,15 @@ class PropertiesDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterE
   it should "support filtering series by series tag" in {
     for {
       _ <- insertMetaDataAndProperties()
-      s1 <- propertiesDao.seriesForStudy(0, 20, 1, Seq.empty, Seq.empty, Seq(1, 2))
-      s2 <- propertiesDao.seriesForStudy(0, 20, 1, Seq.empty, Seq.empty, Seq(1))
-      s3 <- propertiesDao.seriesForStudy(0, 20, 1, Seq.empty, Seq.empty, Seq(1, 3))
-      s4 <- propertiesDao.seriesForStudy(0, 20, 1, Seq.empty, Seq.empty, Seq(3))
-      s5 <- propertiesDao.seriesForStudy(0, 20, 2, Seq.empty, Seq.empty, Seq(1, 2))
-      s6 <- propertiesDao.seriesForStudy(0, 20, 2, Seq.empty, Seq.empty, Seq(1))
-      s7 <- propertiesDao.seriesForStudy(0, 20, 2, Seq.empty, Seq.empty, Seq(3))
+      (st1, st2) <- propertiesDao.seriesTags.map(st => st.zip(st.tail).head)
+      (stu1, stu2) <- metaDataDao.studies.map(ss => ss.zip(ss.tail).head)
+      s1 <- propertiesDao.seriesForStudy(0, 20, stu1.id, Seq.empty, Seq.empty, Seq(st1.id, st2.id))
+      s2 <- propertiesDao.seriesForStudy(0, 20, stu1.id, Seq.empty, Seq.empty, Seq(st1.id))
+      s3 <- propertiesDao.seriesForStudy(0, 20, stu1.id, Seq.empty, Seq.empty, Seq(st1.id, 666))
+      s4 <- propertiesDao.seriesForStudy(0, 20, stu1.id, Seq.empty, Seq.empty, Seq(666))
+      s5 <- propertiesDao.seriesForStudy(0, 20, stu2.id, Seq.empty, Seq.empty, Seq(st1.id, st2.id))
+      s6 <- propertiesDao.seriesForStudy(0, 20, stu2.id, Seq.empty, Seq.empty, Seq(st1.id))
+      s7 <- propertiesDao.seriesForStudy(0, 20, stu2.id, Seq.empty, Seq.empty, Seq(666))
     } yield {
       s1.size should be(2)
       s2.size should be(2)
@@ -200,10 +206,11 @@ class PropertiesDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterE
   it should "support filtering patients by series type" in {
     for {
       _ <- insertMetaDataAndProperties()
-      p1 <- propertiesDao.patients(0, 20, None, orderAscending = true, None, Seq.empty, Seq(1), Seq.empty)
-      p2 <- propertiesDao.patients(0, 20, None, orderAscending = true, None, Seq.empty, Seq(1, 2), Seq.empty)
-      p3 <- propertiesDao.patients(0, 20, None, orderAscending = true, None, Seq.empty, Seq(1, 2, 3), Seq.empty)
-      p4 <- propertiesDao.patients(0, 20, None, orderAscending = true, None, Seq.empty, Seq(3), Seq.empty)
+      (st1, st2) <- seriesTypeDao.listSeriesTypes(0,2).map(st => st.zip(st.tail).head)
+      p1 <- propertiesDao.patients(0, 20, None, orderAscending = true, None, Seq.empty, Seq(st1.id), Seq.empty)
+      p2 <- propertiesDao.patients(0, 20, None, orderAscending = true, None, Seq.empty, Seq(st1.id, st2.id), Seq.empty)
+      p3 <- propertiesDao.patients(0, 20, None, orderAscending = true, None, Seq.empty, Seq(st1.id, st2.id, 666), Seq.empty)
+      p4 <- propertiesDao.patients(0, 20, None, orderAscending = true, None, Seq.empty, Seq(666), Seq.empty)
     } yield {
       p1.size should be(1)
       p2.size should be(1)
@@ -215,10 +222,12 @@ class PropertiesDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterE
   it should "support filtering studies by series type" in {
     for {
       _ <- insertMetaDataAndProperties()
-      s1 <- propertiesDao.studiesForPatient(0, 20, 1, Seq.empty, Seq(1), Seq.empty)
-      s2 <- propertiesDao.studiesForPatient(0, 20, 1, Seq.empty, Seq(1, 2), Seq.empty)
-      s3 <- propertiesDao.studiesForPatient(0, 20, 1, Seq.empty, Seq(1, 2, 3), Seq.empty)
-      s4 <- propertiesDao.studiesForPatient(0, 20, 1, Seq.empty, Seq(3), Seq.empty)
+      p <- metaDataDao.patients.map(_.head)
+      (st1, st2) <- seriesTypeDao.listSeriesTypes(0,2).map(st => st.zip(st.tail).head)
+      s1 <- propertiesDao.studiesForPatient(0, 20, p.id, Seq.empty, Seq(st1.id), Seq.empty)
+      s2 <- propertiesDao.studiesForPatient(0, 20, p.id, Seq.empty, Seq(st1.id, st2.id), Seq.empty)
+      s3 <- propertiesDao.studiesForPatient(0, 20, p.id, Seq.empty, Seq(st1.id, st2.id, 666), Seq.empty)
+      s4 <- propertiesDao.studiesForPatient(0, 20, p.id, Seq.empty, Seq(666), Seq.empty)
     } yield {
       s1.size should be(1)
       s2.size should be(2)
@@ -230,14 +239,16 @@ class PropertiesDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterE
   it should "support filtering series by series type" in {
     for {
       _ <- insertMetaDataAndProperties()
-      s1 <- propertiesDao.seriesForStudy(0, 20, 1, Seq.empty, Seq(1), Seq.empty)
-      s2 <- propertiesDao.seriesForStudy(0, 20, 1, Seq.empty, Seq(1, 2), Seq.empty)
-      s3 <- propertiesDao.seriesForStudy(0, 20, 1, Seq.empty, Seq(1, 2, 3), Seq.empty)
-      s4 <- propertiesDao.seriesForStudy(0, 20, 1, Seq.empty, Seq(3), Seq.empty)
-      s5 <- propertiesDao.seriesForStudy(0, 20, 2, Seq.empty, Seq(1), Seq.empty)
-      s6 <- propertiesDao.seriesForStudy(0, 20, 2, Seq.empty, Seq(1, 2), Seq.empty)
-      s7 <- propertiesDao.seriesForStudy(0, 20, 2, Seq.empty, Seq(1, 2, 3), Seq.empty)
-      s8 <- propertiesDao.seriesForStudy(0, 20, 2, Seq.empty, Seq(3), Seq.empty)
+      (stu1, stu2) <- metaDataDao.studies.map(ss => ss.zip(ss.tail).head)
+      (st1, st2) <- seriesTypeDao.listSeriesTypes(0,2).map(st => st.zip(st.tail).head)
+      s1 <- propertiesDao.seriesForStudy(0, 20, stu1.id, Seq.empty, Seq(st1.id), Seq.empty)
+      s2 <- propertiesDao.seriesForStudy(0, 20, stu1.id, Seq.empty, Seq(st1.id, st2.id), Seq.empty)
+      s3 <- propertiesDao.seriesForStudy(0, 20, stu1.id, Seq.empty, Seq(st1.id, st2.id, 666), Seq.empty)
+      s4 <- propertiesDao.seriesForStudy(0, 20, stu1.id, Seq.empty, Seq(666), Seq.empty)
+      s5 <- propertiesDao.seriesForStudy(0, 20, stu2.id, Seq.empty, Seq(st1.id), Seq.empty)
+      s6 <- propertiesDao.seriesForStudy(0, 20, stu2.id, Seq.empty, Seq(st1.id, st2.id), Seq.empty)
+      s7 <- propertiesDao.seriesForStudy(0, 20, stu2.id, Seq.empty, Seq(st1.id, st2.id, 666), Seq.empty)
+      s8 <- propertiesDao.seriesForStudy(0, 20, stu2.id, Seq.empty, Seq(666), Seq.empty)
     } yield {
       s1.size should be(2)
       s2.size should be(2)
@@ -253,10 +264,11 @@ class PropertiesDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterE
   it should "support filtering flat series by series type" in {
     for {
       _ <- insertMetaDataAndProperties()
-      f1 <- propertiesDao.flatSeries(0, 20, None, orderAscending = true, None, Seq.empty, Seq(1), Seq.empty)
-      f2 <- propertiesDao.flatSeries(0, 20, None, orderAscending = true, None, Seq.empty, Seq(1, 2), Seq.empty)
-      f3 <- propertiesDao.flatSeries(0, 20, None, orderAscending = true, None, Seq.empty, Seq(1, 2, 3), Seq.empty)
-      f4 <- propertiesDao.flatSeries(0, 20, None, orderAscending = true, None, Seq.empty, Seq(3), Seq.empty)
+      (st1, st2) <- seriesTypeDao.listSeriesTypes(0,2).map(st => st.zip(st.tail).head)
+      f1 <- propertiesDao.flatSeries(0, 20, None, orderAscending = true, None, Seq.empty, Seq(st1.id), Seq.empty)
+      f2 <- propertiesDao.flatSeries(0, 20, None, orderAscending = true, None, Seq.empty, Seq(st1.id, st2.id), Seq.empty)
+      f3 <- propertiesDao.flatSeries(0, 20, None, orderAscending = true, None, Seq.empty, Seq(st1.id, st2.id, 666), Seq.empty)
+      f4 <- propertiesDao.flatSeries(0, 20, None, orderAscending = true, None, Seq.empty, Seq(666), Seq.empty)
     } yield {
       f1.size should be(2)
       f2.size should be(3)
@@ -654,10 +666,10 @@ class PropertiesDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterE
     val qp = Seq(QueryProperty("misspelled property", QueryOperator.EQUALS, "value"))
 
     recoverToSucceededIf[IllegalArgumentException] {
-      insertMetaDataAndProperties().map(_ => propertiesDao.queryPatients(0, 20, None, qp, None))
+      insertMetaDataAndProperties().flatMap(_ => propertiesDao.queryPatients(0, 20, None, qp, None))
     }.flatMap { _ =>
       recoverToSucceededIf[IllegalArgumentException] {
-        insertMetaDataAndProperties().map(_ => propertiesDao.queryPatients(0, 20, None, qp, qf))
+        propertiesDao.queryPatients(0, 20, None, qp, qf)
       }
     }
   }
@@ -667,7 +679,7 @@ class PropertiesDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterE
     val qp = Seq(QueryProperty("misspelled property", QueryOperator.EQUALS, "value"))
 
     recoverToSucceededIf[IllegalArgumentException] {
-      insertMetaDataAndProperties().map(_ => propertiesDao.queryStudies(0, 20, None, qp, None))
+      insertMetaDataAndProperties().flatMap(_ => propertiesDao.queryStudies(0, 20, None, qp, None))
     }.flatMap { _ =>
       recoverToSucceededIf[IllegalArgumentException] {
         propertiesDao.queryStudies(0, 20, None, qp, qf)
@@ -680,7 +692,7 @@ class PropertiesDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterE
     val qp = Seq(QueryProperty("misspelled property", QueryOperator.EQUALS, "value"))
 
     recoverToSucceededIf[IllegalArgumentException] {
-      insertMetaDataAndProperties().map(_ => propertiesDao.querySeries(0, 20, None, qp, None))
+      insertMetaDataAndProperties().flatMap(_ => propertiesDao.querySeries(0, 20, None, qp, None))
     }.flatMap { _ =>
       recoverToSucceededIf[IllegalArgumentException] {
         propertiesDao.querySeries(0, 20, None, qp, qf)
@@ -693,7 +705,7 @@ class PropertiesDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterE
     val qp = Seq(QueryProperty("misspelled property", QueryOperator.EQUALS, "value"))
 
     recoverToSucceededIf[IllegalArgumentException] {
-      insertMetaDataAndProperties().map(_ => propertiesDao.queryFlatSeries(0, 20, None, qp, None))
+      insertMetaDataAndProperties().flatMap(_ => propertiesDao.queryFlatSeries(0, 20, None, qp, None))
     }.flatMap { _ =>
       recoverToSucceededIf[IllegalArgumentException] {
         propertiesDao.queryFlatSeries(0, 20, None, qp, qf)
@@ -706,7 +718,7 @@ class PropertiesDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterE
     val qp = Seq(QueryProperty("misspelled property", QueryOperator.EQUALS, "value"))
 
     recoverToSucceededIf[IllegalArgumentException] {
-      insertMetaDataAndProperties().map(_ => propertiesDao.queryImages(0, 20, None, qp, None))
+      insertMetaDataAndProperties().flatMap(_ => propertiesDao.queryImages(0, 20, None, qp, None))
     }.flatMap { _ =>
       recoverToSucceededIf[IllegalArgumentException] {
         propertiesDao.queryImages(0, 20, None, qp, qf)

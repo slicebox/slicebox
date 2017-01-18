@@ -101,7 +101,7 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
 
   // Setup
 
-  def create() = createTables(dbConf, Seq((SeriesSources.name, seriesSourceQuery), (SeriesTagTable.name, seriesTagQuery), (SeriesSeriesTagTable.name, seriesSeriesTagQuery)))
+  def create() = createTables(dbConf, (SeriesSources.name, seriesSourceQuery), (SeriesTagTable.name, seriesTagQuery), (SeriesSeriesTagTable.name, seriesSeriesTagQuery))
 
   def drop() = db.run {
     (seriesSourceQuery.schema ++ seriesTagQuery.schema ++ seriesSeriesTagQuery.schema).drop
@@ -131,6 +131,10 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
 
   def seriesSources: Future[Seq[SeriesSource]] = db.run {
     seriesSourceQuery.result
+  }
+
+  def seriesTags: Future[Seq[SeriesTag]] = db.run {
+    seriesTagQuery.result
   }
 
   def insertSeriesTagAction(seriesTag: SeriesTag) =
@@ -210,13 +214,12 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
   }
 
   def cleanupSeriesTagAction(seriesTagId: Long) =
-    listSeriesSeriesTagsForSeriesTagIdAction(seriesTagId)
-      .flatMap { otherSeriesWithSameTag =>
-        if (otherSeriesWithSameTag.isEmpty)
-          removeSeriesTagAction(seriesTagId)
-        else
-          DBIO.successful({})
-      }
+    listSeriesSeriesTagsForSeriesTagIdAction(seriesTagId).flatMap { otherSeriesWithSameTag =>
+      if (otherSeriesWithSameTag.isEmpty)
+        removeSeriesTagAction(seriesTagId)
+      else
+        DBIO.successful({})
+    }
 
   def cleanupSeriesTag(seriesTagId: Long) = db.run(cleanupSeriesTagAction(seriesTagId))
 
@@ -228,7 +231,7 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
   def deleteFully(image: Image): Future[(Option[Patient], Option[Study], Option[Series], Option[Image])] = db.run {
     metaDataDao.deleteImageAction(image.id).flatMap { imagesDeleted =>
       metaDataDao.seriesByIdAction(image.seriesId).flatMap { maybeParentSeries =>
-        imagesQuery.filter(_.seriesId === image.seriesId).result.headOption.flatMap { otherImages =>
+        imagesQuery.filter(_.seriesId === image.seriesId).take(1).result.flatMap { otherImages =>
           maybeParentSeries
             .filter(_ => otherImages.isEmpty)
             .map(series => deleteSeriesFullyAction(series))
@@ -239,20 +242,19 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
             (maybePatient, maybeStudy, maybeSeries, maybeImage)
         }
       }
-    }
+    }.transactionally
   }
 
-  def deleteSeriesFullyAction(series: Series) = {
+  def deleteSeriesFullyAction(series: Series) =
     seriesTagsForSeriesAction(series.id).flatMap { seriesSeriesTags =>
-      metaDataDao.deleteSeriesFullyAction(series).flatMap { r =>
+      metaDataDao.deleteSeriesFullyAction(series).flatMap { result =>
         DBIO.sequence(seriesSeriesTags.map(seriesTag => cleanupSeriesTagAction(seriesTag.id)))
-          .map(_ => r)
+          .map(_ => result)
       }
     }
-  }
 
   def deleteFully(series: Series): Future[(Option[Patient], Option[Study], Option[Series])] =
-    db.run(deleteSeriesFullyAction(series))
+    db.run(deleteSeriesFullyAction(series).transactionally)
 
   def flatSeries(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String], sourceRefs: Seq[SourceRef], seriesTypeIds: Seq[Long], seriesTagIds: Seq[Long]): Future[Seq[FlatSeries]] =
     if (isWithAdvancedFiltering(sourceRefs, seriesTypeIds, seriesTagIds))
@@ -275,7 +277,7 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
               orderByPart(orderBy, orderAscending) +
               pagePart(startIndex, count)
 
-          sql"$query".as[FlatSeries]
+          sql"#$query".as[FlatSeries]
         }
       }
     else
@@ -309,7 +311,7 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
               orderByPart(orderBy, orderAscending) +
               pagePart(startIndex, count)
 
-          sql"$query".as[Patient]
+          sql"#$query".as[Patient]
         }
       }
     else
@@ -345,7 +347,7 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
       isWithAdvancedFiltering(filters.seriesTagIds, filters.seriesTypeIds, filters.sourceRefs)
     }.map { filters =>
 
-      checkColumnExists(dbConf, orderBy, PatientsTable.name).flatMap { _ =>
+      checkColumnExists(dbConf, orderBy, PatientsTable.name, StudiesTable.name, SeriesTable.name).flatMap { _ =>
         Future.sequence(queryProperties.map(qp => checkColumnExists(dbConf, qp.propertyName, PatientsTable.name, StudiesTable.name, SeriesTable.name))).flatMap { _ =>
           db.run {
 
@@ -355,7 +357,7 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
               metaDataDao.queryPatientsSelectPart +
                 queryMainPart(startIndex, count, orderBy, orderAscending, filters.sourceRefs, filters.seriesTypeIds, filters.seriesTagIds, queryProperties)
 
-            sql"$query".as[Patient]
+            sql"#$query".as[Patient]
           }
         }
       }
@@ -372,7 +374,7 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
       isWithAdvancedFiltering(filters.seriesTagIds, filters.seriesTypeIds, filters.sourceRefs)
     }.map { filters =>
 
-      checkColumnExists(dbConf, orderBy, StudiesTable.name).flatMap { _ =>
+      checkColumnExists(dbConf, orderBy, PatientsTable.name, StudiesTable.name, SeriesTable.name).flatMap { _ =>
         Future.sequence(queryProperties.map(qp => checkColumnExists(dbConf, qp.propertyName, PatientsTable.name, StudiesTable.name, SeriesTable.name))).flatMap { _ =>
           db.run {
 
@@ -382,7 +384,7 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
               metaDataDao.queryStudiesSelectPart +
                 queryMainPart(startIndex, count, orderBy, orderAscending, filters.sourceRefs, filters.seriesTypeIds, filters.seriesTagIds, queryProperties)
 
-            sql"$query".as[Study]
+            sql"#$query".as[Study]
           }
         }
       }
@@ -399,7 +401,7 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
       isWithAdvancedFiltering(filters.seriesTagIds, filters.seriesTypeIds, filters.sourceRefs)
     }.map { filters =>
 
-      checkColumnExists(dbConf, orderBy, SeriesTable.name).flatMap { _ =>
+      checkColumnExists(dbConf, orderBy, PatientsTable.name, StudiesTable.name, SeriesTable.name).flatMap { _ =>
         Future.sequence(queryProperties.map(qp => checkColumnExists(dbConf, qp.propertyName, PatientsTable.name, StudiesTable.name, SeriesTable.name))).flatMap { _ =>
           db.run {
 
@@ -409,7 +411,7 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
               metaDataDao.querySeriesSelectPart +
                 queryMainPart(startIndex, count, orderBy, orderAscending, filters.sourceRefs, filters.seriesTypeIds, filters.seriesTagIds, queryProperties)
 
-            sql"$query".as[Series]
+            sql"#$query".as[Series]
           }
         }
       }
@@ -426,7 +428,7 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
       isWithAdvancedFiltering(filters.seriesTagIds, filters.seriesTypeIds, filters.sourceRefs)
     }.map { filters =>
 
-      checkColumnExists(dbConf, orderBy, ImagesTable.name).flatMap { _ =>
+      checkColumnExists(dbConf, orderBy, PatientsTable.name, StudiesTable.name, SeriesTable.name, ImagesTable.name).flatMap { _ =>
         Future.sequence(queryProperties.map(qp => checkColumnExists(dbConf, qp.propertyName, PatientsTable.name, StudiesTable.name, SeriesTable.name, ImagesTable.name))).flatMap { _ =>
           db.run {
 
@@ -436,7 +438,7 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
               metaDataDao.queryImagesSelectPart +
                 queryMainPart(startIndex, count, orderBy, orderAscending, filters.sourceRefs, filters.seriesTypeIds, filters.seriesTagIds, queryProperties)
 
-            sql"$query".as[Image]
+            sql"#$query".as[Image]
           }
         }
       }
@@ -463,7 +465,7 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
               metaDataDao.flatSeriesBasePart +
                 queryMainPart(startIndex, count, orderBy, orderAscending, filters.sourceRefs, filters.seriesTypeIds, filters.seriesTagIds, queryProperties)
 
-            sql"$query".as[FlatSeries]
+            sql"#$query".as[FlatSeries]
           }
         }
       }
@@ -551,7 +553,7 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
           seriesTagsPart(seriesTagIds) +
           pagePart(startIndex, count)
 
-        sql"$query".as[Study]
+        sql"#$query".as[Study]
 
       }
     else
@@ -589,7 +591,7 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
           seriesTagsPart(seriesTagIds) +
           pagePart(startIndex, count)
 
-        sql"$query".as[Series]
+        sql"#$query".as[Series]
 
       }
     else

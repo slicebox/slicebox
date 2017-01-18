@@ -83,7 +83,7 @@ class ForwardingDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
 
   val transactionImageQuery = TableQuery[ForwardingTransactionImageTable]
 
-  def create() = createTables(dbConf, Seq((ForwardingRuleTable.name, ruleQuery), (ForwardingTransactionTable.name, transactionQuery), (ForwardingTransactionImageTable.name, transactionImageQuery)))
+  def create() = createTables(dbConf, (ForwardingRuleTable.name, ruleQuery), (ForwardingTransactionTable.name, transactionQuery), (ForwardingTransactionImageTable.name, transactionImageQuery))
 
   def drop() = db.run {
     (ruleQuery.schema ++ transactionQuery.schema ++ transactionImageQuery.schema).drop

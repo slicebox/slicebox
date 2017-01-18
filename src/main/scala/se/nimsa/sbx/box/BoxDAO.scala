@@ -145,13 +145,13 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
 
   val incomingImageQuery = TableQuery[IncomingImageTable]
 
-  def create() = createTables(dbConf, Seq(
+  def create() = createTables(dbConf,
     (BoxTable.name, boxQuery),
     (OutgoingTransactionTable.name, outgoingTransactionQuery),
     (OutgoingImageTable.name, outgoingImageQuery),
     (OutgoingTagValueTable.name, outgoingTagValueQuery),
     (IncomingTransactionTable.name, incomingTransactionQuery),
-    (IncomingImageTable.name, incomingImageQuery)))
+    (IncomingImageTable.name, incomingImageQuery))
 
   def drop() = db.run {
     (boxQuery.schema ++ outgoingTransactionQuery.schema ++ incomingTransactionQuery.schema ++ outgoingImageQuery.schema ++ outgoingTagValueQuery.schema ++ incomingImageQuery.schema).drop

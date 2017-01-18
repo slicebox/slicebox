@@ -44,7 +44,7 @@ class ScuDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
 
   val scuDatas = TableQuery[ScuDataTable]
 
-  def create() = createTables(dbConf, Seq((ScuDataTable.name, scuDatas)))
+  def create() = createTables(dbConf, (ScuDataTable.name, scuDatas))
 
   def drop() = db.run {
     scuDatas.schema.drop

@@ -27,13 +27,11 @@ import scala.concurrent.ExecutionContext
 
 object TestUtil {
 
-  def createTestDb(name: String) = DatabaseConfig.forConfig[JdbcProfile](
-    "slicebox.database.in-memory",
-    ConfigFactory.load().withValue(
+  def createTestDb(name: String) =
+    DatabaseConfig.forConfig[JdbcProfile]("slicebox.database.in-memory", ConfigFactory.load().withValue(
       "slicebox.database.in-memory.db.url",
       ConfigValueFactory.fromAnyRef(s"jdbc:h2:mem:./$name")
-    )
-  )
+    ))
 
   def createMultipartFormWithFile(file: File) = Multipart.FormData(
     BodyPart("file", HttpEntity.fromPath(

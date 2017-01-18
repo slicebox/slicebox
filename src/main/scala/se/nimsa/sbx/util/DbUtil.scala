@@ -11,7 +11,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 object DbUtil {
 
-  def createTables[P <: RelationalProfile](dbConf: DatabaseConfig[JdbcProfile], requiredTables: Seq[(String, TableQuery[_ <: P#Table[_]])])(implicit ec: ExecutionContext) = {
+  def createTables[P <: RelationalProfile](dbConf: DatabaseConfig[JdbcProfile], requiredTables: (String, TableQuery[_ <: P#Table[_]])*)(implicit ec: ExecutionContext) = {
 
     import dbConf.driver.api._
     val db = dbConf.db

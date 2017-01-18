@@ -7,19 +7,18 @@ import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomPropertyValue._
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.util.FutureUtil.await
-import slick.backend.DatabaseConfig
-import slick.driver.JdbcProfile
+import se.nimsa.sbx.util.TestUtil
 
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 
 class MetaDataDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterAll {
 
-  val dbConfig = DatabaseConfig.forConfig[JdbcProfile]("slicebox.database.in-memory")
-  val db = dbConfig.db
+  val dbConfig = TestUtil.createTestDb("metadatadaotest")
   val dao = new MetaDataDAO(dbConfig)
 
-  implicit val timeout = Timeout(30.seconds)
+  implicit val timeout = Timeout(200.seconds)
 
   override def beforeAll() = await(dao.create())
 
@@ -49,7 +48,7 @@ class MetaDataDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterAll
     dao.images.map(_.size should be(0))
   }
 
-  it should "contain one entry in each table after inserting one patient, study, series, equipent, frame of referenc and image" in {
+  it should "contain one entry in each table after inserting one patient, study, series, equipment, frame of reference and image" in {
     for {
       dbPat <- dao.insert(pat1)
       dbStudy <- dao.insert(study1.copy(patientId = dbPat.id))
@@ -91,7 +90,7 @@ class MetaDataDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterAll
 
   it should "not support adding a study which links to a non-existing patient" in {
     recoverToSucceededIf[JdbcSQLException] {
-      dao.insert(study1).map(fail())
+      dao.insert(study1)
     }
   }
 
@@ -353,11 +352,65 @@ class MetaDataDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterAll
     } yield {
       flatSeries.foreach {
         case (s, fs) =>
-        fs shouldBe defined
-        fs.get.id shouldBe s.id
+          fs shouldBe defined
+          fs.get.id shouldBe s.id
       }
 
       succeed
     }
   }
+
+  it should "remove empty patients when fully deleting a study" in {
+    for {
+      p1 <- dao.patients
+      s1 <- dao.studies.map(_.head)
+      _ <- dao.deleteFully(s1)
+      p2 <- dao.patients
+      s2 <- dao.studies.map(_.head)
+      _ <- dao.deleteFully(s2)
+      p3 <- dao.patients
+    } yield {
+      p1 should have length 1
+      p2 should have length 1
+      p3 shouldBe empty
+    }
+  }
+
+  it should "remove empty studies and patients when fully deleting a series" in {
+    for {
+      dbPat <- dao.insert(pat1)
+      dbStudy1 <- dao.insert(study1.copy(patientId = dbPat.id))
+      dbStudy2 <- dao.insert(study2.copy(patientId = dbPat.id))
+      dbSeries1 <- dao.insert(series1.copy(studyId = dbStudy1.id))
+      dbSeries2 <- dao.insert(series2.copy(studyId = dbStudy2.id))
+      dbSeries3 <- dao.insert(series3.copy(studyId = dbStudy1.id))
+      dbSeries4 <- dao.insert(series4.copy(studyId = dbStudy2.id))
+      p1 <- dao.patients
+      s1 <- dao.studies
+      _ <- dao.deleteFully(dbSeries1)
+      p2 <- dao.patients
+      s2 <- dao.studies
+      _ <- dao.deleteFully(dbSeries3)
+      p3 <- dao.patients
+      s3 <- dao.studies
+      _ <- dao.deleteFully(dbSeries2)
+      p4 <- dao.patients
+      s4 <- dao.studies
+      _ <- dao.deleteFully(dbSeries4)
+      p5 <- dao.patients
+      s5 <- dao.studies
+    } yield {
+      p1 should have length 1
+      s1 should have length 2
+      p2 should have length 1
+      s2 should have length 2
+      p3 should have length 1
+      s3 should have length 1
+      p4 should have length 1
+      s4 should have length 1
+      p5 should have length 0
+      s5 should have length 0
+    }
+  }
+
 }

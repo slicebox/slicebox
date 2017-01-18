@@ -47,7 +47,7 @@ class LogDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
 
   val logQuery = TableQuery[LogTable]
 
-  def create() = createTables(dbConf, Seq((LogTable.name, logQuery)))
+  def create() = createTables(dbConf, (LogTable.name, logQuery))
 
   def drop() = db.run(logQuery.schema.drop)
 
