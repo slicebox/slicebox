@@ -41,7 +41,7 @@ class LogServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
       logServiceActorRef ! AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.DEFAULT, "Category2", "Message5"))
       logServiceActorRef ! AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.ERROR, "Category2", "Message6"))
 
-      expectNoMsg
+      receiveN(6)
 
       logServiceActorRef ! GetLogEntries(0, 1000)
 

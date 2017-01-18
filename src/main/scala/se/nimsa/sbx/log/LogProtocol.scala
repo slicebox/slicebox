@@ -57,6 +57,7 @@ object LogProtocol {
   case class RemoveLogEntry(logId: Long)
   
   case class LogEntries(logEntries: Seq[LogEntry])
-  
+
+  case class LogEntryAdded(logEntry: LogEntry)
   case class LogEntryRemoved(logId: Long)
 }

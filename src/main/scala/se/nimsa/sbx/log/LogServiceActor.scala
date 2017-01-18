@@ -37,7 +37,8 @@ class LogServiceActor(logDao: LogDAO) extends Actor {
   log.info("Log service started")
 
   def receive = LoggingReceive {
-    case AddLogEntry(logEntry) => logDao.insertLogEntry(logEntry)
+    case AddLogEntry(logEntry) =>
+      pipe(logDao.insertLogEntry(logEntry).map(LogEntryAdded)).to(sender)
 
     case GetLogEntries(startIndex, count) =>
       pipe(logDao.listLogEntries(startIndex, count).map(LogEntries)).to(sender)
@@ -52,8 +53,7 @@ class LogServiceActor(logDao: LogDAO) extends Actor {
       pipe(logDao.logEntriesBySubjectAndType(subject, entryType, startIndex, count).map(LogEntries)).to(sender)
 
     case RemoveLogEntry(id) =>
-      logDao.removeLogEntry(id)
-      sender ! LogEntryRemoved(id)
+      pipe(logDao.removeLogEntry(id).map(_ => LogEntryRemoved(id))).to(sender)
   }
 
 }
