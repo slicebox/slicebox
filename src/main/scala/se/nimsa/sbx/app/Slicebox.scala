@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Lars Edenbrandt
+ * Copyright 2017 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,9 +24,8 @@ import akka.http.scaladsl.Http
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import com.typesafe.config.ConfigFactory
-import com.zaxxer.hikari.{HikariConfig, HikariDataSource}
 import de.heikoseeberger.akkahttpplayjson.PlayJsonSupport
-import se.nimsa.sbx.anonymization.AnonymizationServiceActor
+import se.nimsa.sbx.anonymization.{AnonymizationDAO, AnonymizationServiceActor}
 import se.nimsa.sbx.app.routing.SliceboxRoutes
 import se.nimsa.sbx.box.{BoxDAO, BoxServiceActor}
 import se.nimsa.sbx.directory.{DirectoryWatchDAO, DirectoryWatchServiceActor}
@@ -39,10 +38,11 @@ import se.nimsa.sbx.scu.{ScuDAO, ScuServiceActor}
 import se.nimsa.sbx.seriestype.{SeriesTypeDAO, SeriesTypeServiceActor}
 import se.nimsa.sbx.storage.{FileStorage, S3Storage, StorageService, StorageServiceActor}
 import se.nimsa.sbx.user.{UserDAO, UserServiceActor}
+import slick.backend.DatabaseConfig
+import slick.driver.JdbcProfile
 
-import scala.concurrent.ExecutionContextExecutor
-import scala.slick.driver.{H2Driver, MySQLDriver}
-import scala.slick.jdbc.JdbcBackend.Database
+import scala.concurrent.{Await, ExecutionContextExecutor}
+import scala.concurrent.duration.DurationInt
 import scala.util.{Failure, Success}
 
 trait SliceboxBase extends SliceboxRoutes with JsonFormats with PlayJsonSupport {
@@ -51,29 +51,46 @@ trait SliceboxBase extends SliceboxRoutes with JsonFormats with PlayJsonSupport 
   val sliceboxConfig = appConfig.getConfig("slicebox")
 
   implicit def system: ActorSystem
+
   implicit def materializer: ActorMaterializer
+
   implicit def executor: ExecutionContextExecutor
+
   implicit val timeout = {
     val clientTimeout = appConfig.getDuration("akka.http.client.connecting-timeout", MILLISECONDS)
     val serverTimeout = appConfig.getDuration("akka.http.server.request-timeout", MILLISECONDS)
     Timeout(math.max(clientTimeout, serverTimeout) + 10, MILLISECONDS)
   }
 
-  def dbProps: DbProps
+  def dbConfig: DatabaseConfig[JdbcProfile]
 
-  dbProps.db.withSession { implicit session =>
-    new LogDAO(dbProps.driver).create
-    new UserDAO(dbProps.driver).create
-    new SeriesTypeDAO(dbProps.driver).create
-    new ForwardingDAO(dbProps.driver).create
-    new MetaDataDAO(dbProps.driver).create
-    new PropertiesDAO(dbProps.driver).create
-    new DirectoryWatchDAO(dbProps.driver).create
-    new ScpDAO(dbProps.driver).create
-    new ScuDAO(dbProps.driver).create
-    new BoxDAO(dbProps.driver).create
-    new ImportDAO(dbProps.driver).create
-  }
+  val userDao = new UserDAO(dbConfig)
+  val logDao = new LogDAO(dbConfig)
+  val seriesTypeDao = new SeriesTypeDAO(dbConfig)
+  val forwardingDao = new ForwardingDAO(dbConfig)
+  val metaDataDao = new MetaDataDAO(dbConfig)
+  val propertiesDao = new PropertiesDAO(dbConfig)
+  val directoryWatchDao = new DirectoryWatchDAO(dbConfig)
+  val scpDao = new ScpDAO(dbConfig)
+  val scuDao = new ScuDAO(dbConfig)
+  val boxDao = new BoxDAO(dbConfig)
+  val importDao = new ImportDAO(dbConfig)
+  val anonymizationDao = new AnonymizationDAO(dbConfig)
+
+  Await.ready(for {
+    _ <- logDao.create()
+    _ <- seriesTypeDao.create()
+    _ <- forwardingDao.create()
+    _ <- metaDataDao.create()
+    _ <- propertiesDao.create()
+    _ <- directoryWatchDao.create()
+    _ <- scpDao.create()
+    _ <- scuDao.create()
+    _ <- boxDao.create()
+    _ <- importDao.create()
+    _ <- userDao.create()
+    _ <- anonymizationDao.create()
+  } yield Unit, 1.minute)
 
   val host = sliceboxConfig.getString("host")
   val port = sliceboxConfig.getInt("port")
@@ -101,22 +118,22 @@ trait SliceboxBase extends SliceboxRoutes with JsonFormats with PlayJsonSupport 
 
   val userService = {
     val sessionTimeout = sliceboxConfig.getDuration("session-timeout", MILLISECONDS)
-    system.actorOf(UserServiceActor.props(dbProps, superUser, superPassword, sessionTimeout), name = "UserService")
+    system.actorOf(UserServiceActor.props(userDao, superUser, superPassword, sessionTimeout, timeout), name = "UserService")
   }
-  val logService = system.actorOf(LogServiceActor.props(dbProps), name = "LogService")
-  val metaDataService = system.actorOf(MetaDataServiceActor.props(dbProps).withDispatcher("akka.prio-dispatcher"), name = "MetaDataService")
+  val logService = system.actorOf(LogServiceActor.props(logDao), name = "LogService")
+  val metaDataService = system.actorOf(MetaDataServiceActor.props(metaDataDao, propertiesDao, timeout).withDispatcher("akka.prio-dispatcher"), name = "MetaDataService")
   val storageService = system.actorOf(StorageServiceActor.props(storage), name = "StorageService")
   val anonymizationService = {
     val purgeEmptyAnonymizationKeys = sliceboxConfig.getBoolean("anonymization.purge-empty-keys")
-    system.actorOf(AnonymizationServiceActor.props(dbProps, purgeEmptyAnonymizationKeys), name = "AnonymizationService")
+    system.actorOf(AnonymizationServiceActor.props(anonymizationDao, purgeEmptyAnonymizationKeys, timeout), name = "AnonymizationService")
   }
-  val boxService = system.actorOf(BoxServiceActor.props(dbProps, apiBaseURL, timeout), name = "BoxService")
-  val scpService = system.actorOf(ScpServiceActor.props(dbProps, timeout), name = "ScpService")
-  val scuService = system.actorOf(ScuServiceActor.props(dbProps, timeout), name = "ScuService")
-  val directoryService = system.actorOf(DirectoryWatchServiceActor.props(dbProps, timeout), name = "DirectoryService")
-  val seriesTypeService = system.actorOf(SeriesTypeServiceActor.props(dbProps, timeout), name = "SeriesTypeService")
-  val forwardingService = system.actorOf(ForwardingServiceActor.props(dbProps, timeout), name = "ForwardingService")
-  val importService = system.actorOf(ImportServiceActor.props(dbProps), name = "ImportService")
+  val boxService = system.actorOf(BoxServiceActor.props(boxDao, apiBaseURL, timeout), name = "BoxService")
+  val scpService = system.actorOf(ScpServiceActor.props(scpDao, timeout), name = "ScpService")
+  val scuService = system.actorOf(ScuServiceActor.props(scuDao, timeout), name = "ScuService")
+  val directoryService = system.actorOf(DirectoryWatchServiceActor.props(directoryWatchDao, timeout), name = "DirectoryService")
+  val seriesTypeService = system.actorOf(SeriesTypeServiceActor.props(seriesTypeDao, timeout), name = "SeriesTypeService")
+  val forwardingService = system.actorOf(ForwardingServiceActor.props(forwardingDao, timeout), name = "ForwardingService")
+  val importService = system.actorOf(ImportServiceActor.props(importDao, timeout), name = "ImportService")
 
 }
 
@@ -125,30 +142,9 @@ object Slicebox extends {
   implicit val materializer = ActorMaterializer()
   implicit val executor = system.dispatcher
   val cfg = ConfigFactory.load().getConfig("slicebox")
-  val dbProps = {
-    val dbUrl = cfg.getString("database.path")
-    val db = {
-      val config = new HikariConfig()
-      config.setJdbcUrl(dbUrl)
-      if (cfg.hasPath("database.user") && cfg.getString("database.user").nonEmpty)
-        config.setUsername(cfg.getString("database.user"))
-      if (cfg.hasPath("database.password") && cfg.getString("database.password").nonEmpty)
-        config.setPassword(cfg.getString("database.password"))
-      Database.forDataSource(new HikariDataSource(config))
-    }
-    val driver = {
-      val pattern = "jdbc:(.*?):".r
-      val driverString = pattern.findFirstMatchIn(dbUrl).map(_ group 1)
-      if (driverString.isEmpty)
-        throw new IllegalArgumentException(s"Malformed database URL: $dbUrl")
-      driverString.get.toLowerCase match {
-        case "h2" => H2Driver
-        case "mysql" => MySQLDriver
-        case s => throw new IllegalArgumentException(s"Database not supported: $s")
-      }
-    }
-    DbProps(db, driver)
-  }
+
+  val dbConfig = DatabaseConfig.forConfig[JdbcProfile]("slicebox.database.config")
+
   val storage =
     if (cfg.getString("dicom-storage.config.name") == "s3")
       new S3Storage(cfg.getString("dicom-storage.config.bucket"), cfg.getString("dicom-storage.config.prefix"))

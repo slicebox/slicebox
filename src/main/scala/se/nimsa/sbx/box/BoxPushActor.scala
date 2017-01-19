@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Lars Edenbrandt
+ * Copyright 2017 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -78,7 +78,7 @@ class BoxPushActor(box: Box,
           self ! TransferFinished
           self ! PollOutgoing
         case Failure(e) => e match {
-          case e@(EmptyTransactionException | RemoteBoxUnavailableException) =>
+          case _@(EmptyTransactionException | RemoteBoxUnavailableException) =>
             self ! TransferFinished
           case e: Exception =>
             SbxLog.error("Box", s"Failed to send file to box ${box.name}: ${e.getMessage}")
@@ -172,11 +172,11 @@ class BoxPushActor(box: Box,
           val connectionId = transactionImage.transaction.id.toString
           sliceboxRequest(HttpMethods.PUT, uri, HttpEntity(TransactionStatus.FAILED.toString), connectionId)
             .recover {
-              case e: Exception =>
+              case _: Exception =>
                 SbxLog.warn("Box", "Unable to set remote transaction status.")
                 HttpResponse(status = NoContent)
             }
-            .map { response =>
+            .map { _ =>
               throw exception
             }
         }
@@ -189,10 +189,10 @@ class BoxPushActor(box: Box,
       val connectionId = outgoingTransaction.id.toString
       sliceboxRequest(HttpMethods.GET, uri, HttpEntity.Empty, connectionId)
         .recover {
-        case _ =>
-          SbxLog.warn("Box", "Unable to get remote status of finished transaction, assuming all is well.")
-          HttpResponse(entity = HttpEntity(TransactionStatus.FINISHED.toString))
-      }.flatMap { response =>
+          case _ =>
+            SbxLog.warn("Box", "Unable to get remote status of finished transaction, assuming all is well.")
+            HttpResponse(entity = HttpEntity(TransactionStatus.FINISHED.toString))
+        }.flatMap { response =>
         Unmarshal(response).to[String].map { statusString =>
           val status = TransactionStatus.withName(statusString)
           status match {

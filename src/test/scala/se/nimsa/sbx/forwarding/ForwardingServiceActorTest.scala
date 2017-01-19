@@ -4,7 +4,6 @@ import akka.actor.{Actor, ActorSystem, Props}
 import akka.testkit.{ImplicitSender, TestKit}
 import akka.util.Timeout
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
-import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
@@ -12,26 +11,28 @@ import se.nimsa.sbx.dicom.DicomPropertyValue._
 import se.nimsa.sbx.forwarding.ForwardingProtocol._
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.storage.StorageProtocol._
+import se.nimsa.sbx.util.FutureUtil.await
+import se.nimsa.sbx.util.TestUtil
 
 import scala.concurrent.duration.DurationInt
-import scala.slick.driver.H2Driver
-import scala.slick.jdbc.JdbcBackend.Database
 
 class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
   with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {
 
   def this() = this(ActorSystem("ForwardingServiceActorTestSystem"))
 
-  val db = Database.forURL("jdbc:h2:mem:forwardingserviceactortest;DB_CLOSE_DELAY=-1", driver = "org.h2.Driver")
-  val dbProps = DbProps(db, H2Driver)
+  implicit val ec = system.dispatcher
+  implicit val timeout = Timeout(30.seconds)
 
-  val forwardingDao = new ForwardingDAO(H2Driver)
+  val dbConfig = TestUtil.createTestDb("forwardingserviceactortest")
+  val db = dbConfig.db
 
-  db.withSession { implicit session =>
-    forwardingDao.create
-  }
+  val forwardingDao = new ForwardingDAO(dbConfig)
+
+  await(forwardingDao.create())
 
   case class SetSource(source: Source)
+
   val setSourceReply = "Source set"
   val metaDataService = system.actorOf(Props(new Actor {
     var source: Option[Source] = None
@@ -43,9 +44,9 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
           case 38 => Some(image3)
           case _ => None
         })
-      case GetSourceForSeries(seriesId) =>
+      case GetSourceForSeries(_) =>
         sender ! source.map(SeriesSource(-1, _))
-      case DeleteMetaData(imageId) =>
+      case DeleteMetaData(_) =>
         sender ! MetaDataDeleted(None, None, None, None)
       case SetSource(newSource) =>
         source = Option(newSource)
@@ -54,7 +55,9 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
   }), name = "MetaDataService")
 
   case object ResetDeletedImages
+
   case object GetDeletedImages
+
   val resetDeletedImagesReply = "Deleted Images reset"
   val storageService = system.actorOf(Props(new Actor {
     var deletedImages = Seq.empty[Long]
@@ -72,7 +75,9 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
   }), name = "StorageService")
 
   case object ResetSentImages
+
   case object GetSentImages
+
   val resetSentImagesReply = "Send images reset"
   val boxService = system.actorOf(Props(new Actor {
     var sentImages = Seq.empty[Long]
@@ -89,22 +94,19 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     }
   }), name = "BoxService")
 
-  val forwardingService = system.actorOf(Props(new ForwardingServiceActor(dbProps, 1000.hours)(Timeout(30.seconds))), name = "ForwardingService")
+  val forwardingService = system.actorOf(Props(new ForwardingServiceActor(forwardingDao, 1000.hours)(Timeout(30.seconds))), name = "ForwardingService")
 
-  override def afterEach() =
-    db.withSession { implicit session =>
-      forwardingDao.clear
-      metaDataService ! SetSource(null)
-      expectMsg(setSourceReply)
-      storageService ! ResetDeletedImages
-      expectMsg(resetDeletedImagesReply)
-      boxService ! ResetSentImages
-      expectMsg(resetSentImagesReply)
-    }
-
-  override def afterAll {
-    TestKit.shutdownActorSystem(system)
+  override def afterEach() = {
+    await(forwardingDao.clear())
+    metaDataService ! SetSource(null)
+    expectMsg(setSourceReply)
+    storageService ! ResetDeletedImages
+    expectMsg(resetDeletedImagesReply)
+    boxService ! ResetSentImages
+    expectMsg(resetSentImagesReply)
   }
+
+  override def afterAll = TestKit.shutdownActorSystem(system)
 
   "A ForwardingServiceActor" should {
 
@@ -151,11 +153,9 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
         applicableRules shouldBe empty
     }
     expectNoMsg
-    db.withSession { implicit session =>
-      forwardingDao.listForwardingRules(0, 1) should be(empty)
-      forwardingDao.listForwardingTransactions should be(empty)
-      forwardingDao.listForwardingTransactionImages should be(empty)
-    }
+    await(forwardingDao.listForwardingRules(0, 1)) should be(empty)
+    await(forwardingDao.listForwardingTransactions) should be(empty)
+    await(forwardingDao.listForwardingTransactionImages) should be(empty)
   }
 
   "not forward an added image if there are no matching forwarding rules" in {
@@ -171,10 +171,8 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
         applicableRules shouldBe empty
     }
 
-    db.withSession { implicit session =>
-      forwardingDao.listForwardingTransactions should be(empty)
-      forwardingDao.listForwardingTransactionImages should be(empty)
-    }
+    await(forwardingDao.listForwardingTransactions) should be(empty)
+    await(forwardingDao.listForwardingTransactionImages) should be(empty)
   }
 
   "forward an added image if there are matching forwarding rules" in {
@@ -192,10 +190,8 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
         applicableRules should have length 1
     }
 
-    db.withSession { implicit session =>
-      forwardingDao.listForwardingTransactions.length should be(1)
-      forwardingDao.listForwardingTransactionImages.length should be(1)
-    }
+    await(forwardingDao.listForwardingTransactions).length should be(1)
+    await(forwardingDao.listForwardingTransactionImages).length should be(1)
   }
 
   "create multiple transactions when there are multiple rules with the same source and an image with that source is received" in {
@@ -217,10 +213,8 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
         applicableRules should have length 2
     }
 
-    db.withSession { implicit session =>
-      forwardingDao.listForwardingTransactions.length should be(2)
-      forwardingDao.listForwardingTransactionImages.length should be(2)
-    }
+    await(forwardingDao.listForwardingTransactions).length should be(2)
+    await(forwardingDao.listForwardingTransactionImages).length should be(2)
   }
 
   "not send queued images if the corresponding transaction was recently updated" in {
@@ -238,10 +232,8 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     forwardingService ! PollForwardingQueue
     expectMsg(TransactionsEnroute(List.empty))
 
-    db.withSession { implicit session =>
-      forwardingDao.listForwardingTransactions.length should be(1)
-      forwardingDao.listForwardingTransactionImages.length should be(1)
-    }
+    await(forwardingDao.listForwardingTransactions).length should be(1)
+    await(forwardingDao.listForwardingTransactionImages).length should be(1)
   }
 
   "send queued images if the corresponding transaction has expired (i.e. has not been updated in a while)" in {
@@ -263,13 +255,11 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
       case TransactionsEnroute(transactions) => transactions.length should be(1)
     }
 
-    db.withSession { implicit session =>
-      forwardingDao.listForwardingTransactions.length should be(1)
-      forwardingDao.listForwardingTransactionImages.length should be(1)
-      val transaction = forwardingDao.listForwardingTransactions.head
-      transaction.enroute should be(true)
-      transaction.delivered should be(false)
-    }
+    await(forwardingDao.listForwardingTransactions).length should be(1)
+    await(forwardingDao.listForwardingTransactionImages).length should be(1)
+    val transaction = await(forwardingDao.listForwardingTransactions).head
+    transaction.enroute should be(true)
+    transaction.delivered should be(false)
   }
 
   "mark forwarding transaction as delivered after images have been sent" in {
@@ -297,13 +287,11 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
       case TransactionMarkedAsDelivered(transactionMaybe) => transactionMaybe should be(defined)
     }
 
-    db.withSession { implicit session =>
-      forwardingDao.listForwardingTransactions.length should be(1)
-      forwardingDao.listForwardingTransactionImages.length should be(1)
-      val transaction = forwardingDao.listForwardingTransactions.head
-      transaction.enroute should be(false)
-      transaction.delivered should be(true)
-    }
+    await(forwardingDao.listForwardingTransactions).length should be(1)
+    await(forwardingDao.listForwardingTransactionImages).length should be(1)
+    val transaction = await(forwardingDao.listForwardingTransactions).head
+    transaction.enroute should be(false)
+    transaction.delivered should be(true)
   }
 
   "remove transaction, transaction images and stored images when a forwarding transaction is finalized" in {
@@ -337,10 +325,8 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
         removedTransactions.length should be(1)
     }
 
-    db.withSession { implicit session =>
-      forwardingDao.listForwardingTransactions should be(empty)
-      forwardingDao.listForwardingTransactionImages should be(empty)
-    }
+    await(forwardingDao.listForwardingTransactions) should be(empty)
+    await(forwardingDao.listForwardingTransactionImages) should be(empty)
 
     // wait for deletion of images to finish
     expectNoMsg
@@ -380,10 +366,8 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
         removedTransactions.length should be(1)
     }
 
-    db.withSession { implicit session =>
-      forwardingDao.listForwardingTransactions should be(empty)
-      forwardingDao.listForwardingTransactionImages should be(empty)
-    }
+    await(forwardingDao.listForwardingTransactions) should be(empty)
+    await(forwardingDao.listForwardingTransactionImages) should be(empty)
     storageService ! GetDeletedImages
     expectMsg(Seq.empty)
   }
@@ -404,23 +388,20 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
 
     forwardingService ! PollForwardingQueue
     expectMsgPF() {
-      case TransactionsEnroute(transactions) => transactions.length should be(1)
+      case TransactionsEnroute(trans) => trans.length should be(1)
     }
 
     forwardingService ! ImageAdded(image2, userSource, overwrite = false)
     expectMsgType[ImageRegisteredForForwarding]
 
-    db.withSession { implicit session =>
-      val transactions = forwardingDao.listForwardingTransactions
-      transactions.length should be(2)
-      val transaction1 = transactions.head
-      val transaction2 = transactions(1)
-      transaction1.enroute should be(true)
-      transaction1.delivered should be(false)
-      transaction2.enroute should be(false)
-      transaction2.delivered should be(false)
-    }
-
+    val transactions = await(forwardingDao.listForwardingTransactions)
+    transactions.length should be(2)
+    val transaction1 = transactions.head
+    val transaction2 = transactions(1)
+    transaction1.enroute should be(true)
+    transaction1.delivered should be(false)
+    transaction2.enroute should be(false)
+    transaction2.delivered should be(false)
   }
 
   "create a single transaction when forwarding multiple transactions in succession with a box source" in {
@@ -438,10 +419,8 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     forwardingService ! ImageAdded(image1, boxSource, overwrite = false)
     expectMsgType[ImageRegisteredForForwarding]
 
-    db.withSession { implicit session =>
-      val transactions = forwardingDao.listForwardingTransactions
+      val transactions = await(forwardingDao.listForwardingTransactions)
       transactions.length should be(1)
-    }
   }
 
   "forward the correct list of images" in {
@@ -459,9 +438,7 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     expectMsgType[ImageRegisteredForForwarding]
     expectMsgType[ImageRegisteredForForwarding]
 
-    db.withSession { implicit session =>
-      forwardingDao.listForwardingTransactions should have length 1
-    }
+    await(forwardingDao.listForwardingTransactions) should have length 1
 
     expireTransaction(0)
 
@@ -493,9 +470,8 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
   def image2 = Image(23, 22, SOPInstanceUID("sopuid2"), ImageType("it"), InstanceNumber("in2"))
   def image3 = Image(38, 22, SOPInstanceUID("sopuid3"), ImageType("it"), InstanceNumber("in3"))
 
-  def expireTransaction(index: Int) =
-    db.withSession { implicit session =>
-      val transaction = forwardingDao.listForwardingTransactions(session)(index)
-      forwardingDao.updateForwardingTransaction(transaction.copy(updated = 0))
-    }
+  def expireTransaction(index: Int) = {
+    val transactions = await(forwardingDao.listForwardingTransactions)
+    await(forwardingDao.updateForwardingTransaction(transactions(index).copy(updated = 0)))
+  }
 }

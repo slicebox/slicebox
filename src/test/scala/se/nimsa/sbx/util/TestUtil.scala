@@ -1,49 +1,43 @@
 package se.nimsa.sbx.util
 
-import java.io.File
-import java.io.IOException
+import java.io.{File, IOException}
 import java.nio.file._
 import java.nio.file.attribute.BasicFileAttributes
 import java.util.Date
 import java.util.stream.Collectors
 
-import akka.http.scaladsl.model.{ContentTypes, HttpEntity, Multipart}
 import akka.http.scaladsl.model.Multipart.FormData.BodyPart
-
-import scala.collection.JavaConverters._
-import scala.slick.jdbc.JdbcBackend.Session
-import org.dcm4che3.data.Attributes
-import org.dcm4che3.data.Tag
-import org.dcm4che3.data.VR
+import akka.http.scaladsl.model.{ContentTypes, HttpEntity, Multipart}
+import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
+import org.dcm4che3.data.{Attributes, Tag, VR}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.AnonymizationKey
-import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomPropertyValue._
 import se.nimsa.sbx.dicom.{DicomData, DicomUtil}
-import se.nimsa.sbx.metadata.MetaDataDAO
-import se.nimsa.sbx.metadata.MetaDataProtocol.SeriesSource
-import se.nimsa.sbx.metadata.MetaDataProtocol.SeriesTag
-import se.nimsa.sbx.metadata.PropertiesDAO
+import se.nimsa.sbx.metadata.MetaDataProtocol.{SeriesSource, SeriesTag}
+import se.nimsa.sbx.metadata.{MetaDataDAO, PropertiesDAO}
 import se.nimsa.sbx.seriestype.SeriesTypeDAO
-import se.nimsa.sbx.seriestype.SeriesTypeProtocol.SeriesSeriesType
-import se.nimsa.sbx.seriestype.SeriesTypeProtocol.SeriesType
+import se.nimsa.sbx.seriestype.SeriesTypeProtocol.{SeriesSeriesType, SeriesType}
+import slick.backend.DatabaseConfig
+import slick.driver.JdbcProfile
 
-import scala.slick.driver.H2Driver
+import scala.collection.JavaConverters._
+import scala.concurrent.ExecutionContext
 
 object TestUtil {
+
+  def createTestDb(name: String) =
+    DatabaseConfig.forConfig[JdbcProfile]("slicebox.database.in-memory", ConfigFactory.load().withValue(
+      "slicebox.database.in-memory.db.url",
+      ConfigValueFactory.fromAnyRef(s"jdbc:h2:mem:./$name")
+    ))
 
   def createMultipartFormWithFile(file: File) = Multipart.FormData(
     BodyPart("file", HttpEntity.fromPath(
       ContentTypes.`application/octet-stream`, file.toPath), Map("filename" -> file.getName)))
 
-  def createTestDb(name: String) = {
-    import scala.slick.jdbc.JdbcBackend.Database
-    val db = Database.forURL(s"jdbc:h2:mem:$name;DB_CLOSE_DELAY=-1", classOf[H2Driver].getName)
-    DbProps(db, H2Driver)
-  }
-
-  def insertMetaData(metaDataDao: MetaDataDAO)(implicit session: Session) = {
+  def insertMetaData(metaDataDao: MetaDataDAO)(implicit ec: ExecutionContext) = {
     val pat1 = Patient(-1, PatientName("p1"), PatientID("s1"), PatientBirthDate("2000-01-01"), PatientSex("M"))
     val study1 = Study(-1, -1, StudyInstanceUID("stuid1"), StudyDescription("stdesc1"), StudyDate("19990101"), StudyID("stid1"), AccessionNumber("acc1"), PatientAge("12Y"))
     val study2 = Study(-1, -1, StudyInstanceUID("stuid2"), StudyDescription("stdesc2"), StudyDate("19990102"), StudyID("stid2"), AccessionNumber("acc2"), PatientAge("14Y"))
@@ -60,26 +54,28 @@ object TestUtil {
     val image7 = Image(-1, -1, SOPInstanceUID("souid7"), ImageType("PRIMARY/RECON/TOMO"), InstanceNumber("1"))
     val image8 = Image(-1, -1, SOPInstanceUID("souid8"), ImageType("PRIMARY/RECON/TOMO"), InstanceNumber("1"))
 
-    val dbPatient1 = metaDataDao.insert(pat1)
-    val dbStudy1 = metaDataDao.insert(study1.copy(patientId = dbPatient1.id))
-    val dbStudy2 = metaDataDao.insert(study2.copy(patientId = dbPatient1.id))
-    val dbSeries1 = metaDataDao.insert(series1.copy(studyId = dbStudy1.id))
-    val dbSeries2 = metaDataDao.insert(series2.copy(studyId = dbStudy1.id))
-    val dbSeries3 = metaDataDao.insert(series3.copy(studyId = dbStudy2.id))
-    val dbSeries4 = metaDataDao.insert(series4.copy(studyId = dbStudy2.id))
-    val dbImage1 = metaDataDao.insert(image1.copy(seriesId = dbSeries1.id))
-    val dbImage2 = metaDataDao.insert(image2.copy(seriesId = dbSeries1.id))
-    val dbImage3 = metaDataDao.insert(image3.copy(seriesId = dbSeries2.id))
-    val dbImage4 = metaDataDao.insert(image4.copy(seriesId = dbSeries2.id))
-    val dbImage5 = metaDataDao.insert(image5.copy(seriesId = dbSeries3.id))
-    val dbImage6 = metaDataDao.insert(image6.copy(seriesId = dbSeries3.id))
-    val dbImage7 = metaDataDao.insert(image7.copy(seriesId = dbSeries4.id))
-    val dbImage8 = metaDataDao.insert(image8.copy(seriesId = dbSeries4.id))
-
-    (dbPatient1, (dbStudy1, dbStudy2), (dbSeries1, dbSeries2, dbSeries3, dbSeries4), (dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8))
+    for {
+      dbPatient1 <- metaDataDao.insert(pat1)
+      dbStudy1 <- metaDataDao.insert(study1.copy(patientId = dbPatient1.id))
+      dbStudy2 <- metaDataDao.insert(study2.copy(patientId = dbPatient1.id))
+      dbSeries1 <- metaDataDao.insert(series1.copy(studyId = dbStudy1.id))
+      dbSeries2 <- metaDataDao.insert(series2.copy(studyId = dbStudy1.id))
+      dbSeries3 <- metaDataDao.insert(series3.copy(studyId = dbStudy2.id))
+      dbSeries4 <- metaDataDao.insert(series4.copy(studyId = dbStudy2.id))
+      dbImage1 <- metaDataDao.insert(image1.copy(seriesId = dbSeries1.id))
+      dbImage2 <- metaDataDao.insert(image2.copy(seriesId = dbSeries1.id))
+      dbImage3 <- metaDataDao.insert(image3.copy(seriesId = dbSeries2.id))
+      dbImage4 <- metaDataDao.insert(image4.copy(seriesId = dbSeries2.id))
+      dbImage5 <- metaDataDao.insert(image5.copy(seriesId = dbSeries3.id))
+      dbImage6 <- metaDataDao.insert(image6.copy(seriesId = dbSeries3.id))
+      dbImage7 <- metaDataDao.insert(image7.copy(seriesId = dbSeries4.id))
+      dbImage8 <- metaDataDao.insert(image8.copy(seriesId = dbSeries4.id))
+    } yield {
+      (dbPatient1, (dbStudy1, dbStudy2), (dbSeries1, dbSeries2, dbSeries3, dbSeries4), (dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8))
+    }
   }
 
-  def insertProperties(seriesTypeDao: SeriesTypeDAO, propertiesDao: PropertiesDAO, dbSeries1: Series, dbSeries2: Series, dbSeries3: Series, dbSeries4: Series, dbImage1: Image, dbImage2: Image, dbImage3: Image, dbImage4: Image, dbImage5: Image, dbImage6: Image, dbImage7: Image, dbImage8: Image)(implicit session: Session) = {
+  def insertProperties(seriesTypeDao: SeriesTypeDAO, propertiesDao: PropertiesDAO, dbSeries1: Series, dbSeries2: Series, dbSeries3: Series, dbSeries4: Series, dbImage1: Image, dbImage2: Image, dbImage3: Image, dbImage4: Image, dbImage5: Image, dbImage6: Image, dbImage7: Image, dbImage8: Image)(implicit ec: ExecutionContext) = {
     val seriesSource1 = SeriesSource(-1, Source(SourceType.USER, "user", 1))
     val seriesSource2 = SeriesSource(-1, Source(SourceType.BOX, "box", 1))
     val seriesSource3 = SeriesSource(-1, Source(SourceType.DIRECTORY, "directory", 1))
@@ -87,30 +83,27 @@ object TestUtil {
     val seriesType1 = SeriesType(-1, "Test Type 1")
     val seriesType2 = SeriesType(-1, "Test Type 2")
 
-    val dbSeriesSource1 = propertiesDao.insertSeriesSource(seriesSource1.copy(id = dbSeries1.id))
-    val dbSeriesSource2 = propertiesDao.insertSeriesSource(seriesSource2.copy(id = dbSeries2.id))
-    val dbSeriesSource3 = propertiesDao.insertSeriesSource(seriesSource3.copy(id = dbSeries3.id))
-    val dbSeriesSource4 = propertiesDao.insertSeriesSource(seriesSource4.copy(id = dbSeries4.id))
+    for {
+      dbSeriesSource1 <- propertiesDao.insertSeriesSource(seriesSource1.copy(id = dbSeries1.id))
+      dbSeriesSource2 <- propertiesDao.insertSeriesSource(seriesSource2.copy(id = dbSeries2.id))
+      dbSeriesSource3 <- propertiesDao.insertSeriesSource(seriesSource3.copy(id = dbSeries3.id))
+      dbSeriesSource4 <- propertiesDao.insertSeriesSource(seriesSource4.copy(id = dbSeries4.id))
 
-    propertiesDao.addAndInsertSeriesTagForSeriesId(SeriesTag(-1, "Tag1"), dbSeries1.id)
-    propertiesDao.addAndInsertSeriesTagForSeriesId(SeriesTag(-1, "Tag2"), dbSeries1.id)
-    propertiesDao.addAndInsertSeriesTagForSeriesId(SeriesTag(-1, "Tag1"), dbSeries2.id)
-    propertiesDao.addAndInsertSeriesTagForSeriesId(SeriesTag(-1, "Tag2"), dbSeries3.id)
+      _ <- propertiesDao.addAndInsertSeriesTagForSeriesId(SeriesTag(-1, "Tag1"), dbSeries1.id)
+      _ <- propertiesDao.addAndInsertSeriesTagForSeriesId(SeriesTag(-1, "Tag2"), dbSeries1.id)
+      _ <- propertiesDao.addAndInsertSeriesTagForSeriesId(SeriesTag(-1, "Tag1"), dbSeries2.id)
+      _ <- propertiesDao.addAndInsertSeriesTagForSeriesId(SeriesTag(-1, "Tag2"), dbSeries3.id)
 
-    val dbSeriesType1 = seriesTypeDao.insertSeriesType(seriesType1)
-    val dbSeriesType2 = seriesTypeDao.insertSeriesType(seriesType2)
+      dbSeriesType1 <- seriesTypeDao.insertSeriesType(seriesType1)
+      dbSeriesType2 <- seriesTypeDao.insertSeriesType(seriesType2)
 
-    val seriesSeriesType1 = SeriesSeriesType(dbSeries1.id, dbSeriesType1.id)
-    val seriesSeriesType2 = SeriesSeriesType(dbSeries2.id, dbSeriesType1.id)
-    val seriesSeriesType3 = SeriesSeriesType(dbSeries2.id, dbSeriesType2.id)
-    val seriesSeriesType4 = SeriesSeriesType(dbSeries3.id, dbSeriesType2.id)
-
-    val dbSeriesSeriesType1 = seriesTypeDao.upsertSeriesSeriesType(seriesSeriesType1)
-    val dbSeriesSeriesType2 = seriesTypeDao.upsertSeriesSeriesType(seriesSeriesType2)
-    val dbSeriesSeriesType3 = seriesTypeDao.upsertSeriesSeriesType(seriesSeriesType3)
-    val dbSeriesSeriesType4 = seriesTypeDao.upsertSeriesSeriesType(seriesSeriesType4)
-
-    ((dbSeriesSource1, dbSeriesSource2, dbSeriesSource3, dbSeriesSource4), (dbSeriesSeriesType1, dbSeriesSeriesType2, dbSeriesSeriesType3, dbSeriesSeriesType4))
+      dbSeriesSeriesType1 <- seriesTypeDao.upsertSeriesSeriesType(SeriesSeriesType(dbSeries1.id, dbSeriesType1.id))
+      dbSeriesSeriesType2 <- seriesTypeDao.upsertSeriesSeriesType(SeriesSeriesType(dbSeries2.id, dbSeriesType1.id))
+      dbSeriesSeriesType3 <- seriesTypeDao.upsertSeriesSeriesType(SeriesSeriesType(dbSeries2.id, dbSeriesType2.id))
+      dbSeriesSeriesType4 <- seriesTypeDao.upsertSeriesSeriesType(SeriesSeriesType(dbSeries3.id, dbSeriesType2.id))
+    } yield {
+      ((dbSeriesSource1, dbSeriesSource2, dbSeriesSource3, dbSeriesSource4), (dbSeriesSeriesType1, dbSeriesSeriesType2, dbSeriesSeriesType3, dbSeriesSeriesType4))
+    }
   }
 
   def testImageFile = new File(getClass.getResource("test.dcm").toURI)

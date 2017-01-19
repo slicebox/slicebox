@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Lars Edenbrandt
+ * Copyright 2017 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -71,11 +71,11 @@ class ScpActor(scpData: ScpData, executor: Executor, implicit val timeout: Timeo
       log.debug("SCP", s"Dicom data received using SCP ${scpData.name}")
       val source = Source(SourceType.SCP, scpData.name, scpData.id)
       val addDicomDataFuture =
-        checkDicomData(dicomData).flatMap { status =>
+        checkDicomData(dicomData).flatMap { _ =>
           reverseAnonymization(dicomData.attributes).flatMap { reversedAttributes =>
             val reversedDicomData = DicomData(reversedAttributes, dicomData.metaInformation)
             addMetadata(reversedAttributes, source).flatMap { image =>
-              addDicomData(reversedDicomData, source, image).map { overwrite =>
+              addDicomData(reversedDicomData, source, image).map { _ =>
               }
             }
           }

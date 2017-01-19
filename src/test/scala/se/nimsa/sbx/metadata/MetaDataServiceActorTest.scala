@@ -2,57 +2,63 @@ package se.nimsa.sbx.metadata
 
 import akka.actor.{Actor, ActorSystem, Props}
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit}
+import akka.util.Timeout
 import org.dcm4che3.data.{Attributes, Tag, VR}
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
-import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.app.GeneralProtocol.{Source, SourceType}
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.seriestype.SeriesTypeDAO
+import se.nimsa.sbx.util.FutureUtil.await
 import se.nimsa.sbx.util.TestUtil
 
 import scala.collection.mutable.ListBuffer
-import scala.slick.driver.H2Driver
-import scala.slick.jdbc.JdbcBackend.Database
+import scala.concurrent.Future
+import scala.concurrent.duration.DurationInt
 
 class MetaDataServiceActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
   with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {
 
   def this() = this(ActorSystem("MetaDataTestSystem"))
 
-  val db = Database.forURL("jdbc:h2:mem:metadataserviceactortest;DB_CLOSE_DELAY=-1", driver = "org.h2.Driver")
-  val dbProps = DbProps(db, H2Driver)
+  implicit val ec = system.dispatcher
+  implicit val timeout = Timeout(30.seconds)
 
-  val seriesTypeDao = new SeriesTypeDAO(dbProps.driver)
-  val metaDataDao = new MetaDataDAO(dbProps.driver)
-  val propertiesDao = new PropertiesDAO(dbProps.driver)
+  val dbConfig = TestUtil.createTestDb("metadataserviceactortest")
+  val db = dbConfig.db
 
-  db.withSession { implicit session =>
-    seriesTypeDao.create
-    metaDataDao.create
-    propertiesDao.create
-  }
+  val seriesTypeDao = new SeriesTypeDAO(dbConfig)
+  val metaDataDao = new MetaDataDAO(dbConfig)
+  val propertiesDao = new PropertiesDAO(dbConfig)
 
   val dicomData = TestUtil.testImageDicomData()
 
-  val metaDataActorRef = TestActorRef(new MetaDataServiceActor(dbProps))
+  val metaDataActorRef = TestActorRef(new MetaDataServiceActor(metaDataDao, propertiesDao))
   val metaDataActor = metaDataActorRef.underlyingActor
-
-  override def afterAll {
-    TestKit.shutdownActorSystem(system)
-  }
 
   val patientEvents = new ListBuffer[Patient]()
   val studyEvents = new ListBuffer[Study]()
   val seriesEvents = new ListBuffer[Series]()
   val imageEvents = new ListBuffer[Image]()
 
-  override def afterEach {
-    db.withSession { implicit session => seriesTypeDao.clear; metaDataDao.clear; propertiesDao.clear }
-    patientEvents.clear
-    studyEvents.clear
-    seriesEvents.clear
-    imageEvents.clear
+  override def beforeAll() = {
+    await(metaDataDao.create())
+    await(propertiesDao.create())
+    await(seriesTypeDao.create())
+  }
+
+  override def afterAll = TestKit.shutdownActorSystem(system)
+
+  override def afterEach = {
+    patientEvents.clear()
+    studyEvents.clear()
+    seriesEvents.clear()
+    imageEvents.clear()
+    await(Future.sequence(Seq(
+      seriesTypeDao.clear(),
+      metaDataDao.clear(),
+      propertiesDao.clear()
+    )))
   }
 
   val listeningService = system.actorOf(Props(new Actor {
@@ -63,7 +69,7 @@ class MetaDataServiceActorTest(_system: ActorSystem) extends TestKit(_system) wi
     }
 
     def receive = {
-      case MetaDataAdded(patient, study, series, image, patientAdded, studyAdded, seriesAdded, imageAdded, source) =>
+      case MetaDataAdded(patient, study, series, image, patientAdded, studyAdded, seriesAdded, imageAdded, _) =>
         if (patientAdded) patientEvents += patient
         if (studyAdded) studyEvents += study
         if (seriesAdded) seriesEvents += series
@@ -253,17 +259,15 @@ class MetaDataServiceActorTest(_system: ActorSystem) extends TestKit(_system) wi
       metaDataActorRef ! AddMetaData(attributes2, source)
       expectMsgType[MetaDataAdded]
 
-      db.withSession { implicit session =>
-        metaDataDao.patients should have length 1
-        metaDataDao.studies should have length 1
-        metaDataDao.series should have length 1
-        metaDataDao.images should have length 1
+      await(metaDataDao.patients) should have length 1
+      await(metaDataDao.studies) should have length 1
+      await(metaDataDao.series) should have length 1
+      await(metaDataDao.images) should have length 1
 
-        metaDataDao.patients.head.patientBirthDate.value shouldBe "new date"
-        metaDataDao.studies.head.studyID.value shouldBe "new id"
-        metaDataDao.series.head.modality.value shouldBe "new modality"
-        metaDataDao.images.head.instanceNumber.value shouldBe "666"
-      }
+      await(metaDataDao.patients).head.patientBirthDate.value shouldBe "new date"
+      await(metaDataDao.studies).head.studyID.value shouldBe "new id"
+      await(metaDataDao.series).head.modality.value shouldBe "new modality"
+      await(metaDataDao.images).head.instanceNumber.value shouldBe "666"
     }
 
     "support updating metadata and creating new metadata instances if key attributes are changed" in {
@@ -279,17 +283,15 @@ class MetaDataServiceActorTest(_system: ActorSystem) extends TestKit(_system) wi
       metaDataActorRef ! AddMetaData(attributes2, source2)
       expectMsgType[MetaDataAdded]
 
-      db.withSession { implicit session =>
-        metaDataDao.patients should have length 1
-        metaDataDao.studies should have length 1
-        metaDataDao.series should have length 2
-        metaDataDao.images should have length 2
+      await(metaDataDao.patients) should have length 1
+      await(metaDataDao.studies) should have length 1
+      await(metaDataDao.series) should have length 2
+      await(metaDataDao.images) should have length 2
 
-        val seriesSources = propertiesDao.seriesSources
-        seriesSources should have length 2
-        seriesSources.head.source shouldBe source1
-        seriesSources(1).source shouldBe source2
-      }
+      val seriesSources = await(propertiesDao.seriesSources)
+      seriesSources should have length 2
+      seriesSources.head.source shouldBe source1
+      seriesSources(1).source shouldBe source2
     }
 
   }

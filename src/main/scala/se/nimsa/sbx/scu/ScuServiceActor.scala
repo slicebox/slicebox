@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Lars Edenbrandt
+ * Copyright 2017 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,6 @@ import akka.event.{Logging, LoggingReceive}
 import akka.pattern.{ask, pipe}
 import akka.util.Timeout
 import org.dcm4che3.net.NoPresentationContextException
-import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.dicom.DicomData
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
@@ -33,16 +32,14 @@ import se.nimsa.sbx.metadata.MetaDataProtocol.GetImage
 import se.nimsa.sbx.scu.ScuProtocol._
 import se.nimsa.sbx.storage.StorageProtocol.GetDicomData
 import se.nimsa.sbx.util.ExceptionCatching
+import se.nimsa.sbx.util.FutureUtil.await
 import se.nimsa.sbx.util.SbxExtensions._
 
 import scala.concurrent.Future
 import scala.language.postfixOps
 
-class ScuServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extends Actor with ExceptionCatching {
+class ScuServiceActor(scuDao: ScuDAO)(implicit timeout: Timeout) extends Actor with ExceptionCatching {
   val log = Logging(context.system, this)
-
-  val db = dbProps.db
-  val dao = new ScuDAO(dbProps.driver)
 
   import context.system
 
@@ -100,7 +97,7 @@ class ScuServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extends Actor
             }
 
           case RemoveScu(scuDataId) =>
-            scuForId(scuDataId).foreach(scuData => deleteScuWithId(scuDataId))
+            scuForId(scuDataId).foreach(_ => deleteScuWithId(scuDataId))
             sender ! ScuRemoved(scuDataId)
 
           case GetScus(startIndex, count) =>
@@ -119,11 +116,11 @@ class ScuServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extends Actor
                   ImagesSentToScp(scuId, imageIds)
                 })
                 .recover {
-                  case e: UnknownHostException =>
+                  case _: UnknownHostException =>
                     throw new BadGatewayException(s"Unable to reach host ${scu.aeTitle}@${scu.host}:${scu.port}")
-                  case e: ConnectException =>
+                  case _: ConnectException =>
                     throw new BadGatewayException(s"Connection refused on host ${scu.aeTitle}@${scu.host}:${scu.port}")
-                  case e: NoRouteToHostException =>
+                  case _: NoRouteToHostException =>
                     throw new BadGatewayException(s"No route found to host ${scu.aeTitle}@${scu.host}:${scu.port}")
                   case e: NoPresentationContextException =>
                     throw new BadGatewayException(s"${scu.aeTitle}@${scu.host}:${scu.port}: ${e.getMessage}")
@@ -136,37 +133,25 @@ class ScuServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extends Actor
   }
 
   def addScu(scuData: ScuData) =
-    db.withSession { implicit session =>
-      dao.insert(scuData)
-    }
+    await(scuDao.insert(scuData))
 
   def scuForId(id: Long) =
-    db.withSession { implicit session =>
-      dao.scuDataForId(id)
-    }
+    await(scuDao.scuDataForId(id))
 
   def scuForName(name: String) =
-    db.withSession { implicit session =>
-      dao.scuDataForName(name)
-    }
+    await(scuDao.scuDataForName(name))
 
   def scuForHostAndPort(host: String, port: Int) =
-    db.withSession { implicit session =>
-      dao.scuDataForHostAndPort(host, port)
-    }
+    await(scuDao.scuDataForHostAndPort(host, port))
 
   def deleteScuWithId(id: Long) =
-    db.withSession { implicit session =>
-      dao.deleteScuDataWithId(id)
-    }
+    await(scuDao.deleteScuDataWithId(id))
 
   def getScus(startIndex: Long, count: Long) =
-    db.withSession { implicit session =>
-      dao.listScuDatas(startIndex, count)
-    }
+    await(scuDao.listScuDatas(startIndex, count))
 
 }
 
 object ScuServiceActor {
-  def props(dbProps: DbProps, timeout: Timeout): Props = Props(new ScuServiceActor(dbProps)(timeout))
+  def props(scuDao: ScuDAO, timeout: Timeout): Props = Props(new ScuServiceActor(scuDao)(timeout))
 }

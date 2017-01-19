@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Lars Edenbrandt
+ * Copyright 2017 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -46,8 +46,6 @@ object AnonymizationUtil {
 
     } else {
 
-      val patientName = attributes.getString(Tag.PatientName)
-      val patientID = attributes.getString(Tag.PatientID)
       val sex = attributes.getString(Tag.PatientSex)
       val age = attributes.getString(Tag.PatientAge)
 
@@ -323,7 +321,7 @@ object AnonymizationUtil {
   def createAccessionNumber(accessionNumber: String): String = {
     val seed = UUID.nameUUIDFromBytes(accessionNumber.getBytes).getMostSignificantBits
     val rand = new Random(seed)
-    (1 to 16).foldLeft("")((s, i) => s + rand.nextInt(10).toString)
+    (1 to 16).foldLeft("")((s, _) => s + rand.nextInt(10).toString)
   }
 
   def applyTagValues(attributes: Attributes, tagValues: Seq[TagValue]): Unit =
@@ -355,7 +353,7 @@ object AnonymizationUtil {
       key1.studyInstanceUID == key2.studyInstanceUID && key1.anonStudyInstanceUID == key2.anonStudyInstanceUID &&
       key1.seriesInstanceUID == key2.seriesInstanceUID && key1.anonSeriesInstanceUID == key2.anonSeriesInstanceUID
 
-  def reverseAnonymization(keys: List[AnonymizationKey], attributes: Attributes) = {
+  def reverseAnonymization(keys: Seq[AnonymizationKey], attributes: Attributes) = {
     if (isAnonymous(attributes)) {
       keys.headOption.foreach(key => {
         attributes.setString(Tag.PatientName, VR.PN, key.patientName)
@@ -384,7 +382,7 @@ object AnonymizationUtil {
     attributes
   }
 
-  def harmonizeAnonymization(keys: List[AnonymizationKey], attributes: Attributes, anonAttributes: Attributes) = {
+  def harmonizeAnonymization(keys: Seq[AnonymizationKey], attributes: Attributes, anonAttributes: Attributes) = {
     if (!isAnonymous(attributes)) {
       keys.headOption.foreach(key => {
         anonAttributes.setString(Tag.PatientID, VR.LO, key.anonPatientID)

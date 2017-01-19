@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Lars Edenbrandt
+ * Copyright 2017 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -103,7 +103,7 @@ trait AnonymizationRoutes {
             }
           } ~ path("images") {
             get {
-              complete(anonymizationService.ask(GetImageIdsForAnonymizationKey(anonymizationKeyId)).mapTo[List[Long]].flatMap { imageIds =>
+              complete(anonymizationService.ask(GetImageIdsForAnonymizationKey(anonymizationKeyId)).mapTo[Seq[Long]].flatMap { imageIds =>
                 Future.sequence {
                   imageIds.map { imageId =>
                     metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]]
@@ -115,7 +115,7 @@ trait AnonymizationRoutes {
         } ~ path("query") {
           post {
             entity(as[AnonymizationKeyQuery]) { query =>
-              complete(anonymizationService.ask(QueryAnonymizationKeys(query)).mapTo[List[AnonymizationKey]])
+              complete(anonymizationService.ask(QueryAnonymizationKeys(query)).mapTo[Seq[AnonymizationKey]])
             }
           }
         }

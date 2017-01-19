@@ -1,37 +1,35 @@
 package se.nimsa.sbx.log
 
-import akka.testkit.TestKit
-import akka.testkit.ImplicitSender
-import org.scalatest.BeforeAndAfterAll
-import akka.actor.ActorSystem
-import org.scalatest.Matchers
-import org.scalatest.WordSpecLike
-import scala.slick.driver.H2Driver
-import se.nimsa.sbx.app.DbProps
-import scala.slick.jdbc.JdbcBackend.Database
-import akka.actor.Props
-import se.nimsa.sbx.log.LogProtocol._
 import java.util.Date
+
+import akka.actor.ActorSystem
+import akka.testkit.{ImplicitSender, TestKit}
+import akka.util.Timeout
+import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpecLike}
+import se.nimsa.sbx.log.LogProtocol._
+import se.nimsa.sbx.util.FutureUtil.await
+import se.nimsa.sbx.util.TestUtil
+
+import scala.concurrent.duration.DurationInt
 
 class LogServiceActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
   with WordSpecLike with Matchers with BeforeAndAfterAll {
 
   def this() = this(ActorSystem("LogServiceActorTestSystem"))
 
-  val db = Database.forURL("jdbc:h2:mem:logserviceactortest;DB_CLOSE_DELAY=-1", driver = "org.h2.Driver")
-  val dbProps = DbProps(db, H2Driver)
+  implicit val ec = system.dispatcher
+  implicit val timeout = Timeout(30.seconds)
 
-  val logDao = new LogDAO(H2Driver)
+  val dbConfig = TestUtil.createTestDb("logserviceactortest")
+  val db = dbConfig.db
 
-  db.withSession { implicit session =>
-    logDao.create
-  }
-  
-  val logServiceActorRef = _system.actorOf(LogServiceActor.props(dbProps))
+  val logDao = new LogDAO(dbConfig)
 
-  override def afterAll = {
-    TestKit.shutdownActorSystem(_system)
-  }
+  await(logDao.create())
+
+  val logServiceActorRef = _system.actorOf(LogServiceActor.props(logDao))
+
+  override def afterAll = TestKit.shutdownActorSystem(_system)
 
   "A LogServiceActor" should {
 
@@ -43,8 +41,8 @@ class LogServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
       logServiceActorRef ! AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.DEFAULT, "Category2", "Message5"))
       logServiceActorRef ! AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.ERROR, "Category2", "Message6"))
 
-      expectNoMsg
-      
+      receiveN(6)
+
       logServiceActorRef ! GetLogEntries(0, 1000)
 
       expectMsgPF() {
@@ -85,8 +83,8 @@ class LogServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
 
       expectMsgPF() {
         case LogEntries(logEntries) if logEntries.size == 1 &&
-          logEntries(0).subject == "Category2" &&
-          logEntries(0).entryType == LogEntryType.DEFAULT => true
+          logEntries.head.subject == "Category2" &&
+          logEntries.head.entryType == LogEntryType.DEFAULT => true
       }
     }
 

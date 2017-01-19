@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Lars Edenbrandt
+ * Copyright 2017 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -71,7 +71,7 @@ class SeriesTypeUpdateActor(implicit val timeout: Timeout) extends Actor with Ex
     case MarkSeriesAsProcessed(seriesId) =>
       seriesBeingUpdated -= seriesId
 
-    case ImageAdded(image, source, overwrite) =>
+    case ImageAdded(image, _, _) =>
       self ! UpdateSeriesTypesForSeries(image.seriesId)
 
     case PollSeriesTypesUpdateQueue => pollSeriesTypesUpdateQueue()
@@ -103,7 +103,7 @@ class SeriesTypeUpdateActor(implicit val timeout: Timeout) extends Actor with Ex
 
   def updateSeriesTypesForSeries(series: Series) = {
     val futureImageMaybe = removeAllSeriesTypesForSeries(series)
-      .flatMap(u => getImageForSeries(series))
+      .flatMap(_ => getImageForSeries(series))
 
     futureImageMaybe.flatMap {
       case Some(image) =>
@@ -145,7 +145,7 @@ class SeriesTypeUpdateActor(implicit val timeout: Timeout) extends Actor with Ex
 
     futureRuleEvals.flatMap(ruleEvals =>
       if (ruleEvals.contains(true))
-        addSeriesTypeForSeries(seriesType, series).map(u => true)
+        addSeriesTypeForSeries(seriesType, series).map(_ => true)
       else
         Future.successful(false))
   }
@@ -169,7 +169,7 @@ class SeriesTypeUpdateActor(implicit val timeout: Timeout) extends Actor with Ex
         val pathTags = pathString.split(",").map(_.toInt)
         pathTags.foldLeft(dicomData.attributes)((nested, tag) => nested.getNestedDataset(tag))
       } catch {
-        case e: Exception =>
+        case _: Exception =>
           dicomData.attributes
       }
     }).getOrElse(dicomData.attributes)

@@ -3,13 +3,13 @@ package se.nimsa.sbx.util
 import java.util.concurrent.Executors
 
 import akka.dispatch.ExecutionContexts
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.{AsyncFlatSpec, FlatSpec, Matchers}
 import se.nimsa.sbx.util.FutureUtil._
 
 import scala.concurrent.{Await, Future}
 import scala.concurrent.duration.DurationInt
 
-class FutureUtilTest extends FlatSpec with Matchers {
+class FutureUtilTest extends AsyncFlatSpec with Matchers {
 
   implicit val ec = ExecutionContexts.fromExecutor(Executors.newFixedThreadPool(8))
 
@@ -43,11 +43,13 @@ class FutureUtilTest extends FlatSpec with Matchers {
       index
     })
 
-    val list = Await.result(futureList, 20.seconds)
+    futureList.map { list =>
+      integers.foreach { i =>
+        finishedFutures(i) shouldBe i
+        list(i) shouldBe i
+      }
 
-    integers.foreach { i =>
-      finishedFutures(i) shouldBe i
-      list(i) shouldBe i
+      succeed
     }
   }
 
@@ -55,8 +57,8 @@ class FutureUtilTest extends FlatSpec with Matchers {
     def futureFun = (index: Int) => if (index == 3) Future.failed(new Exception("fail")) else Future(index)
     val integers = (0 until 8).toList
     val futureList = traverseSequentially(integers)(futureFun)
-    intercept[Exception] {
-      Await.result(futureList, 20.seconds)
+    recoverToSucceededIf[Exception] {
+      futureList
     }
   }
 }

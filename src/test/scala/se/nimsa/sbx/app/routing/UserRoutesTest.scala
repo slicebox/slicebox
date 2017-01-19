@@ -1,22 +1,21 @@
 package se.nimsa.sbx.app.routing
 
 import java.net.InetAddress
-
-import org.scalatest.{FlatSpecLike, Matchers}
-import se.nimsa.sbx.user.UserProtocol._
-import se.nimsa.sbx.user.UserProtocol.UserRole._
 import java.util.UUID
 
 import akka.http.scaladsl.model.RemoteAddress
-import se.nimsa.sbx.user.UserDAO
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.headers.{ProductVersion, _}
 import akka.http.scaladsl.server._
+import org.scalatest.{FlatSpecLike, Matchers}
 import se.nimsa.sbx.storage.RuntimeStorage
+import se.nimsa.sbx.user.UserProtocol.UserRole._
+import se.nimsa.sbx.user.UserProtocol._
+import se.nimsa.sbx.util.FutureUtil.await
 import se.nimsa.sbx.util.TestUtil
 
 class UserRoutesTest extends {
-  val dbProps = TestUtil.createTestDb("userroutestest")
+  val dbConfig = TestUtil.createTestDb("userroutestest")
   val storage = new RuntimeStorage
 } with FlatSpecLike with Matchers with RoutesTestBase {
 
@@ -24,14 +23,9 @@ class UserRoutesTest extends {
 
   val invalidCredentials = BasicHttpCredentials("john", "password")
 
-  val db = dbProps.db
-  val userDao = new UserDAO(dbProps.driver)
-
   override def afterEach() {
-    db.withSession { implicit session =>
-      userDao.clear
-      userDao.insert(ApiUser(-1, superUser, UserRole.SUPERUSER).withPassword(superPassword))
-    }
+    await(userDao.clear())
+    await(userDao.insert(ApiUser(-1, superUser, UserRole.SUPERUSER).withPassword(superPassword)))
   }
 
   "The system" should "return the new user when a new user is added" in {
@@ -160,16 +154,14 @@ class UserRoutesTest extends {
       status should be(Unauthorized)
     }
   }
-  
+
   it should "authorize a logged in user based on token only" in {
     val cookie = PostWithHeaders("/api/users/login", UserPass(superUser, superPassword)) ~> routes ~> check {
       status should be(NoContent)
       val c = headers.map { case `Set-Cookie`(x) => x }.head
       c.name -> c.value
     }
-    db.withSession { implicit session =>
-      userDao.userSessionsByToken(cookie._2).length should be(1)
-    }
+    await(userDao.userSessionsByToken(cookie._2)).length should be(1)
     GetWithHeaders(s"/api/metadata/patients").addHeader(Cookie(cookie)) ~> routes ~> check {
       status should be(OK)
     }

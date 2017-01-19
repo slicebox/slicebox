@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Lars Edenbrandt
+ * Copyright 2017 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,15 +27,15 @@ import se.nimsa.sbx.anonymization.AnonymizationProtocol.ReverseAnonymization
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.dicom.DicomData
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
-import se.nimsa.sbx.directory.DirectoryWatchProtocol._
 import se.nimsa.sbx.dicom.DicomUtil._
+import se.nimsa.sbx.directory.DirectoryWatchProtocol._
 import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, MetaDataAdded}
 import se.nimsa.sbx.storage.StorageProtocol.{AddDicomData, CheckDicomData, DicomDataAdded}
 
 import scala.concurrent.Future
-import scala.util.{Failure, Success}
 import scala.util.control.NonFatal
+import scala.util.{Failure, Success}
 
 class DirectoryWatchActor(watchedDirectory: WatchedDirectory,
                           implicit val timeout: Timeout,
@@ -75,11 +75,11 @@ class DirectoryWatchActor(watchedDirectory: WatchedDirectory,
         val dicomData = loadDicomData(path, withPixelData = true)
         val source = Source(SourceType.DIRECTORY, watchedDirectory.name, watchedDirectory.id)
         context.become(waitForDatasetProcessed)
-        checkDicomData(dicomData).flatMap { status =>
+        checkDicomData(dicomData).flatMap { _ =>
           reverseAnonymization(dicomData.attributes).flatMap { reversedAttributes =>
             val reversedDicomData = DicomData(reversedAttributes, dicomData.metaInformation)
             addMetadata(reversedAttributes, source).flatMap { image =>
-              addDicomData(reversedDicomData, source, image).map { overwrite =>
+              addDicomData(reversedDicomData, source, image).map { _ =>
               }
             }
           }
@@ -95,7 +95,7 @@ class DirectoryWatchActor(watchedDirectory: WatchedDirectory,
   }
 
   def waitForDatasetProcessed: Receive = LoggingReceive {
-    case msg: FileAddedToWatchedDirectory =>
+    case _: FileAddedToWatchedDirectory =>
       stash()
     case DicomDataProcessed =>
       context.unbecome()

@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Lars Edenbrandt
+ * Copyright 2017 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,21 +19,18 @@ package se.nimsa.sbx.seriestype
 import akka.actor.{Actor, Props}
 import akka.event.{Logging, LoggingReceive}
 import akka.util.Timeout
-import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.dicom.DicomUtil
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
 import se.nimsa.sbx.util.ExceptionCatching
+import se.nimsa.sbx.util.FutureUtil.await
 
-class SeriesTypeServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extends Actor with ExceptionCatching {
+class SeriesTypeServiceActor(seriesTypeDao: SeriesTypeDAO)(implicit timeout: Timeout) extends Actor with ExceptionCatching {
 
   val log = Logging(context.system, this)
 
   implicit val system = context.system
   implicit val ec = context.dispatcher
-
-  val db = dbProps.db
-  val seriesTypeDao = new SeriesTypeDAO(dbProps.driver)
 
   val seriesTypeUpdateService = context.actorOf(SeriesTypeUpdateActor.props(timeout), name = "SeriesTypeUpdate")
 
@@ -45,7 +42,7 @@ class SeriesTypeServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extend
 
   def receive = LoggingReceive {
 
-    case MetaDataDeleted(patientMaybe, studyMaybe, seriesMaybe, imageMaybe) =>
+    case MetaDataDeleted(_, _, seriesMaybe, _) =>
       seriesMaybe.foreach { series =>
         removeSeriesTypesFromSeries(series.id)
         sender ! SeriesTypesRemovedFromSeries(series.id)
@@ -127,85 +124,57 @@ class SeriesTypeServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extend
   }
 
   def getSeriesTypesFromDb(startIndex: Long, count: Long): Seq[SeriesType] =
-    db.withSession { implicit session =>
-      seriesTypeDao.listSeriesTypes(startIndex, count)
-    }
+    await(seriesTypeDao.listSeriesTypes(startIndex, count))
 
-  def addSeriesTypeToDb(seriesType: SeriesType): SeriesType =
-    db.withSession { implicit session =>
-      seriesTypeDao.seriesTypeForName(seriesType.name).foreach(st =>
-        throw new IllegalArgumentException(s"A series type with name ${seriesType.name} already exists"))
-      seriesTypeDao.insertSeriesType(seriesType)
-    }
+  def addSeriesTypeToDb(seriesType: SeriesType): SeriesType = {
+    await(seriesTypeDao.seriesTypeForName(seriesType.name)).foreach(_ =>
+      throw new IllegalArgumentException(s"A series type with name ${seriesType.name} already exists"))
+    await(seriesTypeDao.insertSeriesType(seriesType))
+  }
 
   def updateSeriesTypeInDb(seriesType: SeriesType): Unit =
-    db.withSession { implicit session =>
-      seriesTypeDao.updateSeriesType(seriesType)
-    }
+    await(seriesTypeDao.updateSeriesType(seriesType))
 
   def removeSeriesTypeFromDb(seriesTypeId: Long): Unit =
-    db.withSession { implicit session =>
-      seriesTypeDao.removeSeriesType(seriesTypeId)
-    }
+    await(seriesTypeDao.removeSeriesType(seriesTypeId))
 
   def getSeriesTypeRulesFromDb(seriesTypeId: Long): Seq[SeriesTypeRule] =
-    db.withSession { implicit session =>
-      seriesTypeDao.listSeriesTypeRulesForSeriesTypeId(seriesTypeId)
-    }
+    await(seriesTypeDao.listSeriesTypeRulesForSeriesTypeId(seriesTypeId))
 
   def getSeriesTypeRuleAttributesFromDb(seriesTypeRuleId: Long): Seq[SeriesTypeRuleAttribute] =
-    db.withSession { implicit session =>
-      seriesTypeDao.listSeriesTypeRuleAttributesForSeriesTypeRuleId(seriesTypeRuleId)
-    }
+    await(seriesTypeDao.listSeriesTypeRuleAttributesForSeriesTypeRuleId(seriesTypeRuleId))
 
   def addSeriesTypeRuleToDb(seriesTypeRule: SeriesTypeRule): SeriesTypeRule =
-    db.withSession { implicit session =>
-      seriesTypeDao.insertSeriesTypeRule(seriesTypeRule)
-    }
+    await(seriesTypeDao.insertSeriesTypeRule(seriesTypeRule))
 
   def removeSeriesTypeRuleFromDb(seriesTypeRuleId: Long): Unit =
-    db.withSession { implicit session =>
-      seriesTypeDao.removeSeriesTypeRule(seriesTypeRuleId)
-    }
+    await(seriesTypeDao.removeSeriesTypeRule(seriesTypeRuleId))
 
-  def addSeriesTypeRuleAttributeToDb(seriesTypeRuleAttribute: SeriesTypeRuleAttribute): SeriesTypeRuleAttribute =
-    db.withSession { implicit session =>
-      val updatedAttribute = if (seriesTypeRuleAttribute.name == null || seriesTypeRuleAttribute.name.isEmpty)
-        seriesTypeRuleAttribute.copy(name = DicomUtil.nameForTag(seriesTypeRuleAttribute.tag))
-      else
-        seriesTypeRuleAttribute
-      seriesTypeDao.insertSeriesTypeRuleAttribute(updatedAttribute)
-    }
+  def addSeriesTypeRuleAttributeToDb(seriesTypeRuleAttribute: SeriesTypeRuleAttribute): SeriesTypeRuleAttribute = {
+    val updatedAttribute = if (seriesTypeRuleAttribute.name == null || seriesTypeRuleAttribute.name.isEmpty)
+      seriesTypeRuleAttribute.copy(name = DicomUtil.nameForTag(seriesTypeRuleAttribute.tag))
+    else
+      seriesTypeRuleAttribute
+    await(seriesTypeDao.insertSeriesTypeRuleAttribute(updatedAttribute))
+  }
 
   def removeSeriesTypeRuleAttributeFromDb(seriesTypeRuleAttributeId: Long): Unit =
-    db.withSession { implicit session =>
-      seriesTypeDao.removeSeriesTypeRuleAttribute(seriesTypeRuleAttributeId)
-    }
+    await(seriesTypeDao.removeSeriesTypeRuleAttribute(seriesTypeRuleAttributeId))
 
   def getSeriesTypeForId(seriesTypeId: Long): Option[SeriesType] =
-    db.withSession { implicit session =>
-      seriesTypeDao.seriesTypeForId(seriesTypeId)
-    }
+    await(seriesTypeDao.seriesTypeForId(seriesTypeId))
 
   def getSeriesTypesForSeries(seriesId: Long) =
-    db.withSession { implicit session =>
-      seriesTypeDao.seriesTypesForSeries(seriesId)
-    }
+    await(seriesTypeDao.seriesTypesForSeries(seriesId))
 
   def addSeriesTypeToSeries(seriesSeriesType: SeriesSeriesType) =
-    db.withSession { implicit session =>
-      seriesTypeDao.upsertSeriesSeriesType(seriesSeriesType)
-    }
+    await(seriesTypeDao.upsertSeriesSeriesType(seriesSeriesType))
 
   def removeSeriesTypesFromSeries(seriesId: Long) =
-    db.withSession { implicit session =>
-      seriesTypeDao.removeSeriesTypesForSeriesId(seriesId)
-    }
+    await(seriesTypeDao.removeSeriesTypesForSeriesId(seriesId))
 
   def removeSeriesTypeFromSeries(seriesId: Long, seriesTypeId: Long) =
-    db.withSession { implicit session =>
-      seriesTypeDao.removeSeriesTypeForSeriesId(seriesId, seriesTypeId)
-    }
+    await(seriesTypeDao.removeSeriesTypeForSeriesId(seriesId, seriesTypeId))
 
   def updateSeriesTypesForAllSeries() =
     seriesTypeUpdateService ! UpdateSeriesTypesForAllSeries
@@ -213,5 +182,5 @@ class SeriesTypeServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extend
 }
 
 object SeriesTypeServiceActor {
-  def props(dbProps: DbProps, timeout: Timeout): Props = Props(new SeriesTypeServiceActor(dbProps)(timeout))
+  def props(seriesTypeDao: SeriesTypeDAO, timeout: Timeout): Props = Props(new SeriesTypeServiceActor(seriesTypeDao)(timeout))
 }

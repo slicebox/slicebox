@@ -7,7 +7,6 @@ import akka.testkit.{ImplicitSender, TestKit}
 import akka.util.Timeout
 import org.dcm4che3.data.{Keyword, Tag}
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
-import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.app.GeneralProtocol.{Source, SourceType}
 import se.nimsa.sbx.dicom.DicomHierarchy.Series
 import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, MetaDataAdded}
@@ -15,53 +14,48 @@ import se.nimsa.sbx.metadata.{MetaDataDAO, MetaDataServiceActor, PropertiesDAO}
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
 import se.nimsa.sbx.storage.StorageProtocol.AddDicomData
 import se.nimsa.sbx.storage.{RuntimeStorage, StorageServiceActor}
+import se.nimsa.sbx.util.FutureUtil.await
 import se.nimsa.sbx.util.TestUtil
 
-import scala.concurrent.Await
 import scala.concurrent.duration.DurationInt
-import scala.slick.driver.H2Driver
-import scala.slick.jdbc.JdbcBackend.Database
+import scala.concurrent.{Await, Future}
 
 class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
   with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {
 
   def this() = this(ActorSystem("SeriesTypesUpdateActorSystem"))
 
-  val db = Database.forURL("jdbc:h2:mem:seriestypeserviceactortest;DB_CLOSE_DELAY=-1", driver = "org.h2.Driver")
-  val dbProps = DbProps(db, H2Driver)
+  implicit val ec = system.dispatcher
+  implicit val timeout = Timeout(30.seconds)
+
+  val dbConfig = TestUtil.createTestDb("seriestypeupdateactortest")
+  val dao = new MetaDataDAO(dbConfig)
 
   val storage = new RuntimeStorage
 
-  val seriesTypeDao = new SeriesTypeDAO(H2Driver)
-  val metaDataDao = new MetaDataDAO(H2Driver)
-  val propertiesDao = new PropertiesDAO(H2Driver)
+  val seriesTypeDao = new SeriesTypeDAO(dbConfig)
+  val metaDataDao = new MetaDataDAO(dbConfig)
+  val propertiesDao = new PropertiesDAO(dbConfig)
 
-  implicit val timeout = Timeout(30.seconds)
-  implicit val ec = system.dispatcher
-
-  db.withSession { implicit session =>
-    seriesTypeDao.create
-    metaDataDao.create
-    propertiesDao.create
+  override def beforeAll() = {
+    await(metaDataDao.create())
+    await(propertiesDao.create())
+    await(seriesTypeDao.create())
   }
 
   val storageService = system.actorOf(StorageServiceActor.props(storage), name = "StorageService")
-  val metaDataService = system.actorOf(MetaDataServiceActor.props(dbProps), name = "MetaDataService")
-  val seriesTypeService = system.actorOf(SeriesTypeServiceActor.props(dbProps, timeout), name = "SeriesTypeService")
+  val metaDataService = system.actorOf(MetaDataServiceActor.props(metaDataDao, propertiesDao, timeout), name = "MetaDataService")
+  val seriesTypeService = system.actorOf(SeriesTypeServiceActor.props(seriesTypeDao, timeout), name = "SeriesTypeService")
   val seriesTypeUpdateService = system.actorSelection("user/SeriesTypeService/SeriesTypeUpdate")
 
-  override def afterAll {
-    TestKit.shutdownActorSystem(system)
-  }
+  override def afterAll() = TestKit.shutdownActorSystem(system)
 
-  override def afterEach() {
-    db.withSession { implicit session =>
-      seriesTypeDao.clear
-      metaDataDao.clear
-      propertiesDao.clear
-      storage.clear()
-    }
-  }
+  override def afterEach() = await(Future.sequence(Seq(
+    seriesTypeDao.clear(),
+    metaDataDao.clear(),
+    propertiesDao.clear(),
+    Future.successful(storage.clear())
+  )))
 
   "A SeriesTypeUpdateActor" should {
 
@@ -106,9 +100,7 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
 
       val series = addTestDicomData()
 
-      db.withSession { implicit session =>
-        seriesTypeDao.upsertSeriesSeriesType(SeriesSeriesType(series.id, seriesType.id))
-      }
+      await(seriesTypeDao.upsertSeriesSeriesType(SeriesSeriesType(series.id, seriesType.id)))
 
       seriesTypeUpdateService ! UpdateSeriesTypesForSeries(series.id)
       expectNoMsg
@@ -119,7 +111,7 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
     }
 
     "be able to update series type for all series" in {
-      val series1 = addTestDicomData(sopInstanceUID = "sop id 1", seriesInstanceUID = "series 1")
+      val series1 = addTestDicomData()
       val series2 = addTestDicomData(sopInstanceUID = "sop id 2", seriesInstanceUID = "series 2")
 
       val seriesType = addSeriesType()
@@ -157,7 +149,7 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
       addSeriesTypeRuleAttribute(seriesTypeRule, Tag.PatientName, "xyz")
       addSeriesTypeRuleAttribute(seriesTypeRule, Tag.PatientSex, "M")
 
-      val series = addTestDicomData(patientName = "xyz", patientSex = "F")
+      val series = addTestDicomData(patientName = "xyz")
 
       seriesTypeUpdateService ! UpdateSeriesTypesForSeries(series.id)
       expectNoMsg
@@ -169,10 +161,10 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
   }
 
   def addTestDicomData(
-                      sopInstanceUID: String = "sop id 1",
-                      seriesInstanceUID: String = "series 1",
-                      patientName: String = "abc",
-                      patientSex: String = "F"): Series = {
+                        sopInstanceUID: String = "sop id 1",
+                        seriesInstanceUID: String = "series 1",
+                        patientName: String = "abc",
+                        patientSex: String = "F"): Series = {
 
     val dicomData = TestUtil.createDicomData(
       sopInstanceUID = sopInstanceUID,
@@ -188,17 +180,13 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
         .flatMap { metaData =>
           storageService.ask(AddDicomData(dicomData, source, metaData.image))
         }.map { _ =>
-        val series = db.withSession { implicit session =>
-          metaDataDao.series
-        }
+        val series = await(metaDataDao.series)
         series.last
       }, 30.seconds)
   }
 
   def addSeriesType(): SeriesType =
-    db.withSession { implicit session =>
-      seriesTypeDao.insertSeriesType(SeriesType(-1, "st1"))
-    }
+    await(seriesTypeDao.insertSeriesType(SeriesType(-1, "st1")))
 
   def addMatchingRuleToSeriesType(seriesType: SeriesType): Unit = {
     val seriesTypeRule = addSeriesTypeRule(seriesType)
@@ -213,24 +201,19 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
   }
 
   def addSeriesTypeRule(seriesType: SeriesType): SeriesTypeRule =
-    db.withSession { implicit session =>
-      seriesTypeDao.insertSeriesTypeRule(SeriesTypeRule(-1, seriesType.id))
-    }
+    await(seriesTypeDao.insertSeriesTypeRule(SeriesTypeRule(-1, seriesType.id)))
 
-  def addSeriesTypeRuleAttribute(
-                                  seriesTypeRule: SeriesTypeRule,
-                                  tag: Int,
-                                  values: String): SeriesTypeRuleAttribute =
-    db.withSession { implicit session =>
-      seriesTypeDao.insertSeriesTypeRuleAttribute(
-        SeriesTypeRuleAttribute(-1,
-          seriesTypeRule.id,
-          tag,
-          Keyword.valueOf(tag),
-          None,
-          None,
-          values))
-    }
+  def addSeriesTypeRuleAttribute(seriesTypeRule: SeriesTypeRule,
+                                 tag: Int,
+                                 values: String): SeriesTypeRuleAttribute =
+    await(seriesTypeDao.insertSeriesTypeRuleAttribute(
+      SeriesTypeRuleAttribute(-1,
+        seriesTypeRule.id,
+        tag,
+        Keyword.valueOf(tag),
+        None,
+        None,
+        values)))
 
   def waitForSeriesTypesUpdateCompletion(): Unit = {
     val nAttempts = 10
@@ -239,7 +222,9 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
     while (statusUpdateRunning && attempt <= nAttempts) {
       seriesTypeUpdateService ! GetUpdateSeriesTypesRunningStatus
 
-      expectMsgPF() { case UpdateSeriesTypesRunningStatus(running) => statusUpdateRunning = running }
+      expectMsgPF() {
+        case UpdateSeriesTypesRunningStatus(running) => statusUpdateRunning = running
+      }
 
       Thread.sleep(1000)
       attempt += 1
@@ -247,7 +232,5 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
   }
 
   def seriesSeriesTypesForSeries(series: Series): Seq[SeriesSeriesType] =
-    db.withSession { implicit session =>
-      seriesTypeDao.listSeriesSeriesTypesForSeriesId(series.id)
-    }
+    await(seriesTypeDao.listSeriesSeriesTypesForSeriesId(series.id))
 }

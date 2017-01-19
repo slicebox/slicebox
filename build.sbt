@@ -55,7 +55,7 @@ rpmRelease := {
 
 // for automatic license stub generation
 
-val licenceYear = "2016"
+val licenceYear = "2017"
 val licencedTo = "Lars Edenbrandt"
 headers := Map(
   "scala" -> Apache2_0(licenceYear, licencedTo),
@@ -71,7 +71,7 @@ resolvers ++= Seq(
 // deps
 
 libraryDependencies ++= {
-  val akkaVersion = "2.4.12"
+  val akkaVersion = "2.4.14"
   val akkaHttpVersion = "10.0.0"
   Seq(
     "com.typesafe.scala-logging" %% "scala-logging" % "3.5.0",
@@ -79,16 +79,17 @@ libraryDependencies ++= {
     "com.typesafe.akka" %% "akka-http" % akkaHttpVersion,
     "de.heikoseeberger" %% "akka-http-play-json" % "1.10.1",
     "ch.qos.logback" % "logback-classic" % "1.1.7",
-    "com.typesafe.slick" %% "slick" % "2.1.0",
+    "com.typesafe.slick" %% "slick" % "3.1.1",
+    "com.typesafe.slick" %% "slick-hikaricp" % "3.1.1",
     "com.h2database" % "h2" % "1.4.193",
     "mysql" % "mysql-connector-java" % "5.1.40",
     "com.zaxxer" % "HikariCP" % "2.5.1",
     "com.github.t3hnar" %% "scala-bcrypt" % "3.0",
-    "com.amazonaws" % "aws-java-sdk-s3" % "1.11.52",
+    "com.amazonaws" % "aws-java-sdk-s3" % "1.11.65",
     "org.scalatest" %% "scalatest" % "3.0.1" % "test",
     "com.typesafe.akka" %% "akka-testkit" % akkaVersion % "test",
     "com.typesafe.akka" %% "akka-http-testkit" % akkaHttpVersion % "test",
-    "org.webjars" % "angularjs" % "1.5.8",
+    "org.webjars" % "angularjs" % "1.5.9",
     "org.webjars" % "angular-material" % "1.1.1",
     "org.webjars" % "angular-file-upload" % "11.0.0"
   )

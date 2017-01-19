@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Lars Edenbrandt
+ * Copyright 2017 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,57 +16,70 @@
 
 package se.nimsa.sbx.scu
 
-import scala.slick.driver.JdbcProfile
-import scala.slick.jdbc.meta.MTable
-import ScuProtocol.ScuData
+import se.nimsa.sbx.scu.ScuProtocol.ScuData
+import se.nimsa.sbx.util.DbUtil._
+import slick.backend.DatabaseConfig
+import slick.driver.JdbcProfile
 
-class ScuDAO(val driver: JdbcProfile) {
+import scala.concurrent.{ExecutionContext, Future}
 
-  import driver.simple._
+class ScuDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionContext) {
 
-  class ScuDataTable(tag: Tag) extends Table[ScuData](tag, "ScuData") {
+  import dbConf.driver.api._
+
+  val db = dbConf.db
+
+  class ScuDataTable(tag: Tag) extends Table[ScuData](tag, ScuDataTable.name) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
-
     def name = column[String]("name")
-
     def aeTitle = column[String]("aeTitle")
-
     def host = column[String]("host")
-
     def port = column[Int]("port")
-
-    def * = (id, name, aeTitle, host, port) <>(ScuData.tupled, ScuData.unapply)
+    def * = (id, name, aeTitle, host, port) <> (ScuData.tupled, ScuData.unapply)
   }
 
-  val scuDataQuery = TableQuery[ScuDataTable]
-
-  def create(implicit session: Session) =
-    if (MTable.getTables("ScuData").list.isEmpty) scuDataQuery.ddl.create
-
-
-  def insert(scuData: ScuData)(implicit session: Session): ScuData = {
-    val generatedId = (scuDataQuery returning scuDataQuery.map(_.id)) += scuData
-    scuData.copy(id = generatedId)
+  object ScuDataTable {
+    val name = "ScuData"
   }
 
-  def deleteScuDataWithId(scuDataId: Long)(implicit session: Session): Int = {
-    scuDataQuery
+  val scuDatas = TableQuery[ScuDataTable]
+
+  def create() = createTables(dbConf, (ScuDataTable.name, scuDatas))
+
+  def drop() = db.run {
+    scuDatas.schema.drop
+  }
+
+  def clear() = db.run {
+    scuDatas.delete
+  }
+
+  def insert(scuData: ScuData): Future[ScuData] = db.run {
+    scuDatas returning scuDatas.map(_.id) += scuData
+  }.map(generatedId => scuData.copy(id = generatedId))
+
+  def deleteScuDataWithId(scuDataId: Long): Future[Int] = db.run {
+    scuDatas
       .filter(_.id === scuDataId)
       .delete
   }
 
-  def scuDataForId(id: Long)(implicit session: Session): Option[ScuData] =
-    scuDataQuery.filter(_.id === id).firstOption
+  def scuDataForId(id: Long): Future[Option[ScuData]] = db.run {
+    scuDatas.filter(_.id === id).result.headOption
+  }
 
-  def scuDataForName(name: String)(implicit session: Session): Option[ScuData] =
-    scuDataQuery.filter(_.name === name).firstOption
+  def scuDataForName(name: String): Future[Option[ScuData]] = db.run {
+    scuDatas.filter(_.name === name).result.headOption
+  }
 
-  def scuDataForHostAndPort(host: String, port: Int)(implicit session: Session): Option[ScuData] =
-    scuDataQuery.filter(_.host === host).filter(_.port === port).firstOption
+  def scuDataForHostAndPort(host: String, port: Int): Future[Option[ScuData]] = db.run {
+    scuDatas.filter(_.host === host).filter(_.port === port).result.headOption
+  }
 
-  def listScuDatas(startIndex: Long, count: Long)(implicit session: Session): List[ScuData] =
-    scuDataQuery
+  def listScuDatas(startIndex: Long, count: Long): Future[Seq[ScuData]] = db.run {
+    scuDatas
       .drop(startIndex)
       .take(count)
-      .list
+      .result
+  }
 }

@@ -1,18 +1,35 @@
+/*
+ * Copyright 2017 Lars Edenbrandt
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package se.nimsa.sbx.importing
 
-import scala.slick.driver.JdbcProfile
-import scala.slick.jdbc.meta.MTable
+import se.nimsa.sbx.importing.ImportProtocol._
+import se.nimsa.sbx.util.DbUtil.createTables
+import slick.backend.DatabaseConfig
+import slick.driver.JdbcProfile
 
-import ImportProtocol._
+import scala.concurrent.{ExecutionContext, Future}
 
-class ImportDAO(val driver: JdbcProfile) {
+class ImportDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionContext) {
 
-  import driver.simple._
+  import dbConf.driver.api._
 
-  val importSessionTableName = "ImportSessions"
-  val importSessionImageTableName = "ImportSessionImages"
+  val db = dbConf.db
 
-  class ImportSessionTable(tag: Tag) extends Table[ImportSession](tag, importSessionTableName) {
+  class ImportSessionTable(tag: Tag) extends Table[ImportSession](tag, ImportSessionTable.name) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def name = column[String]("name")
     def userId = column[Long]("userid")
@@ -23,71 +40,82 @@ class ImportDAO(val driver: JdbcProfile) {
     def created = column[Long]("created")
     def lastUpdated = column[Long]("lastupdated")
     def idxUniqueName = index("idx_unique_import_session_name", name, unique = true)
-    def * = (id, name, userId, user, filesImported, filesAdded, filesRejected, created, lastUpdated) <>(ImportSession.tupled, ImportSession.unapply)
+    def * = (id, name, userId, user, filesImported, filesAdded, filesRejected, created, lastUpdated) <> (ImportSession.tupled, ImportSession.unapply)
+  }
+
+  object ImportSessionTable {
+    val name = "ImportSessions"
   }
 
   val importSessionQuery = TableQuery[ImportSessionTable]
 
-  class ImportSessionImageTable(tag: Tag) extends Table[ImportSessionImage](tag, importSessionImageTableName) {
+  class ImportSessionImageTable(tag: Tag) extends Table[ImportSessionImage](tag, ImportSessionImageTable.name) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def importSessionId = column[Long]("importsessionid")
     def imageId = column[Long]("imageid")
     def fkImportSession = foreignKey("fk_import_session_id", importSessionId, importSessionQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
-    def * = (id, importSessionId, imageId) <>(ImportSessionImage.tupled, ImportSessionImage.unapply)
+    def * = (id, importSessionId, imageId) <> (ImportSessionImage.tupled, ImportSessionImage.unapply)
+  }
+
+  object ImportSessionImageTable {
+    val name = "ImportSessionImages"
   }
 
   val importSessionImageQuery = TableQuery[ImportSessionImageTable]
 
-  def create(implicit session: Session): Unit = {
-    if (MTable.getTables(importSessionTableName).list.isEmpty) importSessionQuery.ddl.create
-    if (MTable.getTables(importSessionImageTableName).list.isEmpty) importSessionImageQuery.ddl.create
+  def create() = createTables(dbConf, (ImportSessionTable.name, importSessionQuery), (ImportSessionImageTable.name, importSessionImageQuery))
+
+  def drop() = db.run {
+    (importSessionQuery.schema ++ importSessionImageQuery.schema).drop
   }
 
-  def drop(implicit session: Session): Unit =
-    (importSessionQuery.ddl ++ importSessionImageQuery.ddl).drop
-
-  def clear(implicit session: Session): Unit = {
+  def clear() = db.run {
     importSessionQuery.delete //Cascade deletes ImportSessionImages
   }
 
-  def getImportSessions(startIndex: Long, count: Long)(implicit session: Session): List[ImportSession] = {
+  def getImportSessions(startIndex: Long, count: Long): Future[Seq[ImportSession]] = db.run {
     importSessionQuery
       .drop(startIndex)
       .take(count)
-      .list
+      .result
   }
 
-  def getImportSession(importSessionId: Long)(implicit session: Session): Option[ImportSession] = {
-    importSessionQuery.filter(_.id === importSessionId).firstOption
+  def getImportSession(importSessionId: Long): Future[Option[ImportSession]] = db.run {
+    importSessionQuery.filter(_.id === importSessionId).result.headOption
   }
 
-  def addImportSession(importSession: ImportSession)(implicit session: Session): ImportSession = {
-    val generatedId = (importSessionQuery returning importSessionQuery.map(_.id)) += importSession
-    importSession.copy(id = generatedId)
+  def addImportSession(importSession: ImportSession): Future[ImportSession] = db.run {
+    (importSessionQuery returning importSessionQuery.map(_.id) += importSession)
+      .map(generatedId => importSession.copy(id = generatedId))
   }
 
-  def removeImportSession(importSessionId: Long)(implicit session: Session): Unit =
-    importSessionQuery.filter(_.id === importSessionId).delete
+  def removeImportSession(importSessionId: Long): Future[Unit] = db.run {
+    importSessionQuery.filter(_.id === importSessionId).delete.map(_ => {})
+  }
 
-  def importSessionForName(importSessionName: String)(implicit session: Session): Option[ImportSession] =
-    importSessionQuery.filter(_.name === importSessionName).firstOption
+  def importSessionForName(importSessionName: String): Future[Option[ImportSession]] = db.run {
+    importSessionQuery.filter(_.name === importSessionName).result.headOption
+  }
 
-  def listImagesForImportSessionId(importSessionId: Long)(implicit session: Session): List[ImportSessionImage] =
-    importSessionImageQuery.filter(_.importSessionId === importSessionId).list
+  def listImagesForImportSessionId(importSessionId: Long): Future[Seq[ImportSessionImage]] = db.run {
+    importSessionImageQuery.filter(_.importSessionId === importSessionId).result
+  }
 
-  def importSessionImageForImportSessionIdAndImageId(importSessionId: Long, imageId: Long)(implicit session: Session): Option[ImportSessionImage] =
+  def importSessionImageForImportSessionIdAndImageId(importSessionId: Long, imageId: Long): Future[Option[ImportSessionImage]] = db.run {
     importSessionImageQuery
       .filter(_.importSessionId === importSessionId)
       .filter(_.imageId === imageId)
-      .firstOption
-
-  def insertImportSessionImage(importSessionImage: ImportSessionImage)(implicit session: Session): ImportSessionImage = {
-    val generatedId = (importSessionImageQuery returning importSessionImageQuery.map(_.id)) += importSessionImage
-    importSessionImage.copy(id = generatedId)
+      .result
+      .headOption
   }
 
-  def updateImportSession(importSession: ImportSession)(implicit session: Session): ImportSession = {
+  def insertImportSessionImage(importSessionImage: ImportSessionImage): Future[ImportSessionImage] = db.run {
+    (importSessionImageQuery returning importSessionImageQuery.map(_.id) += importSessionImage)
+      .map(generatedId => importSessionImage.copy(id = generatedId))
+  }
+
+  def updateImportSession(importSession: ImportSession): Future[ImportSession] = db.run {
     importSessionQuery.filter(_.id === importSession.id).update(importSession)
-    importSession
+      .map(_ => importSession)
   }
 }

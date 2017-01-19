@@ -3,49 +3,43 @@ package se.nimsa.sbx.seriestype
 import akka.actor.ActorSystem
 import akka.actor.Status.Failure
 import akka.testkit.{ImplicitSender, TestKit}
+import akka.util.Timeout
 import akka.util.Timeout.durationToTimeout
 import org.scalatest._
-import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.dicom.DicomHierarchy.Series
+import se.nimsa.sbx.metadata.MetaDataDAO
 import se.nimsa.sbx.metadata.MetaDataProtocol.MetaDataDeleted
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
+import se.nimsa.sbx.util.FutureUtil.await
+import se.nimsa.sbx.util.TestUtil
 
 import scala.concurrent.duration.DurationInt
-import scala.slick.driver.H2Driver
-import scala.slick.jdbc.JdbcBackend.Database
 
 class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
-    with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {
+  with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {
 
   def this() = this(ActorSystem("SeriesTypeServiceActorTestSystem"))
 
-  val db = Database.forURL("jdbc:h2:mem:seriestypeserviceactortest;DB_CLOSE_DELAY=-1", driver = "org.h2.Driver")
-  val dbProps = DbProps(db, H2Driver)
+  implicit val ec = system.dispatcher
+  implicit val timeout = Timeout(30.seconds)
 
-  val seriesTypeDao = new SeriesTypeDAO(dbProps.driver)
+  val dbConfig = TestUtil.createTestDb("seriestypeserviceactortest")
+  val dao = new MetaDataDAO(dbConfig)
 
-  db.withSession { implicit session =>
-    seriesTypeDao.create
-  }
+  val seriesTypeDao = new SeriesTypeDAO(dbConfig)
 
-  val seriesTypeService = system.actorOf(SeriesTypeServiceActor.props(dbProps, 1.minute), name = "SeriesTypeService")
+  val seriesTypeService = system.actorOf(SeriesTypeServiceActor.props(seriesTypeDao, 1.minute), name = "SeriesTypeService")
 
-  override def afterAll {
-    TestKit.shutdownActorSystem(system)
-  }
+  override def beforeAll() = await(seriesTypeDao.create())
 
-  override def afterEach() {
-    db.withSession { implicit session =>
-      seriesTypeDao.clear
-    }
-  }
+  override def afterAll = TestKit.shutdownActorSystem(system)
+
+  override def afterEach() = await(seriesTypeDao.clear())
 
   "A SeriesTypeServiceActor" should {
 
     "return all series types in database" in {
-      db.withSession { implicit session =>
-        seriesTypeDao.insertSeriesType(SeriesType(-1, "st1"))
-      }
+      await(seriesTypeDao.insertSeriesType(SeriesType(-1, "st1")))
 
       seriesTypeService ! GetSeriesTypes(0, 10)
 
@@ -121,9 +115,7 @@ class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     }
 
     "be able to delete existing series type" in {
-      val addedSeriesType = db.withSession { implicit session =>
-        seriesTypeDao.insertSeriesType(SeriesType(-1, "st1"))
-      }
+      val addedSeriesType = await(seriesTypeDao.insertSeriesType(SeriesType(-1, "st1")))
 
       seriesTypeService ! RemoveSeriesType(addedSeriesType.id)
       expectMsgPF() {
@@ -140,9 +132,7 @@ class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     }
 
     "be able to add and get series type rule" in {
-      val addedSeriesType = db.withSession { implicit session =>
-        seriesTypeDao.insertSeriesType(SeriesType(-1, "st1"))
-      }
+      val addedSeriesType = await(seriesTypeDao.insertSeriesType(SeriesType(-1, "st1")))
 
       val seriesTypeRule = SeriesTypeRule(-1, addedSeriesType.id)
 
@@ -164,13 +154,9 @@ class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     }
 
     "be able to delete existing series type rule" in {
-      val addedSeriesType = db.withSession { implicit session =>
-        seriesTypeDao.insertSeriesType(SeriesType(-1, "st1"))
-      }
+      val addedSeriesType = await(seriesTypeDao.insertSeriesType(SeriesType(-1, "st1")))
 
-      val addedSeriesTypeRule = db.withSession { implicit session =>
-        seriesTypeDao.insertSeriesTypeRule(SeriesTypeRule(-1, addedSeriesType.id))
-      }
+      val addedSeriesTypeRule = await(seriesTypeDao.insertSeriesTypeRule(SeriesTypeRule(-1, addedSeriesType.id)))
 
       seriesTypeService ! RemoveSeriesTypeRule(addedSeriesTypeRule.id)
       expectMsgPF() {
@@ -187,18 +173,14 @@ class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     }
 
     "deletes series type rules when a series type is deleted" in {
-      val addedSeriesType = db.withSession { implicit session =>
-        seriesTypeDao.insertSeriesType(SeriesType(-1, "st1"))
-      }
+      val addedSeriesType = await(seriesTypeDao.insertSeriesType(SeriesType(-1, "st1")))
 
-      db.withSession { implicit session =>
-        seriesTypeDao.insertSeriesTypeRule(SeriesTypeRule(-1, addedSeriesType.id))
-      }
+      await(seriesTypeDao.insertSeriesTypeRule(SeriesTypeRule(-1, addedSeriesType.id)))
 
       seriesTypeService ! RemoveSeriesType(addedSeriesType.id)
 
       expectMsgPF() {
-        case SeriesTypeRemoved(seriesTypeId) => true
+        case SeriesTypeRemoved(_) => true
       }
 
       seriesTypeService ! GetSeriesTypeRules(addedSeriesType.id)
@@ -210,13 +192,9 @@ class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     }
 
     "be able to add and get series type rule attribute" in {
-      val addedSeriesType = db.withSession { implicit session =>
-        seriesTypeDao.insertSeriesType(SeriesType(-1, "st1"))
-      }
+      val addedSeriesType = await(seriesTypeDao.insertSeriesType(SeriesType(-1, "st1")))
 
-      val addedSeriesTypeRule = db.withSession { implicit session =>
-        seriesTypeDao.insertSeriesTypeRule(SeriesTypeRule(-1, addedSeriesType.id))
-      }
+      val addedSeriesTypeRule = await(seriesTypeDao.insertSeriesTypeRule(SeriesTypeRule(-1, addedSeriesType.id)))
 
       val seriesTypeRuleAttribute = SeriesTypeRuleAttribute(-1, addedSeriesTypeRule.id, 1, "Name", None, None, "test")
 
@@ -238,17 +216,11 @@ class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     }
 
     "be able to delete existing series type rule attribute" in {
-      val addedSeriesType = db.withSession { implicit session =>
-        seriesTypeDao.insertSeriesType(SeriesType(-1, "st1"))
-      }
+      val addedSeriesType = await(seriesTypeDao.insertSeriesType(SeriesType(-1, "st1")))
 
-      val addedSeriesTypeRule = db.withSession { implicit session =>
-        seriesTypeDao.insertSeriesTypeRule(SeriesTypeRule(-1, addedSeriesType.id))
-      }
+      val addedSeriesTypeRule = await(seriesTypeDao.insertSeriesTypeRule(SeriesTypeRule(-1, addedSeriesType.id)))
 
-      val addedSeriesTypeRuleAttribute = db.withSession { implicit session =>
-        seriesTypeDao.insertSeriesTypeRuleAttribute(SeriesTypeRuleAttribute(-1, addedSeriesTypeRule.id, 1, "Name", None, None, "test"))
-      }
+      val addedSeriesTypeRuleAttribute = await(seriesTypeDao.insertSeriesTypeRuleAttribute(SeriesTypeRuleAttribute(-1, addedSeriesTypeRule.id, 1, "Name", None, None, "test")))
 
       seriesTypeService ! RemoveSeriesTypeRuleAttribute(addedSeriesTypeRuleAttribute.id)
       expectMsgPF() {
@@ -265,21 +237,15 @@ class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     }
 
     "delete series type rule attributes when a series type rule is deleted" in {
-      val addedSeriesType = db.withSession { implicit session =>
-        seriesTypeDao.insertSeriesType(SeriesType(-1, "st1"))
-      }
+      val addedSeriesType = await(seriesTypeDao.insertSeriesType(SeriesType(-1, "st1")))
 
-      val addedSeriesTypeRule = db.withSession { implicit session =>
-        seriesTypeDao.insertSeriesTypeRule(SeriesTypeRule(-1, addedSeriesType.id))
-      }
+      val addedSeriesTypeRule = await(seriesTypeDao.insertSeriesTypeRule(SeriesTypeRule(-1, addedSeriesType.id)))
 
-      db.withSession { implicit session =>
-        seriesTypeDao.insertSeriesTypeRuleAttribute(SeriesTypeRuleAttribute(-1, addedSeriesTypeRule.id, 1, "Name", None, None, "test"))
-      }
+      await(seriesTypeDao.insertSeriesTypeRuleAttribute(SeriesTypeRuleAttribute(-1, addedSeriesTypeRule.id, 1, "Name", None, None, "test")))
 
       seriesTypeService ! RemoveSeriesTypeRule(addedSeriesTypeRule.id)
       expectMsgPF() {
-        case SeriesTypeRuleRemoved(seriesTypeRuleId) => true
+        case SeriesTypeRuleRemoved(_) => true
       }
 
       seriesTypeService ! GetSeriesTypeRuleAttributes(addedSeriesTypeRule.id)
@@ -291,21 +257,15 @@ class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     }
 
     "delete series type to series connection when series is deleted" in {
-      val addedSeriesType = db.withSession { implicit session =>
-        seriesTypeDao.insertSeriesType(SeriesType(-1, "st1"))
-      }
+      val addedSeriesType = await(seriesTypeDao.insertSeriesType(SeriesType(-1, "st1")))
 
       val seriesId = 45
-      db.withSession { implicit session =>
-        seriesTypeDao.upsertSeriesSeriesType(SeriesSeriesType(seriesId, addedSeriesType.id))
-      }
-      
+      await(seriesTypeDao.upsertSeriesSeriesType(SeriesSeriesType(seriesId, addedSeriesType.id)))
+
       seriesTypeService ! MetaDataDeleted(None, None, Some(Series(seriesId, -1, null, null, null, null, null, null, null, null, null)), None)
       expectMsgType[SeriesTypesRemovedFromSeries]
-      
-      db.withSession { implicit session =>
-        seriesTypeDao.listSeriesSeriesTypes shouldBe empty
-      }      
+
+      await(seriesTypeDao.listSeriesSeriesTypes) shouldBe empty
     }
   }
 }

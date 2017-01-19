@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Lars Edenbrandt
+ * Copyright 2017 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -116,7 +116,7 @@ trait BoxRoutes {
           }
         } ~ path("images") {
           get {
-            complete(boxService.ask(GetImageIdsForIncomingTransaction(incomingTransactionId)).mapTo[List[Long]].flatMap { imageIds =>
+            complete(boxService.ask(GetImageIdsForIncomingTransaction(incomingTransactionId)).mapTo[Seq[Long]].flatMap { imageIds =>
               Future.sequence {
                 imageIds.map { imageId =>
                   metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]]
@@ -151,7 +151,7 @@ trait BoxRoutes {
           }
         } ~ path("images") {
           get {
-            complete(boxService.ask(GetImageIdsForOutgoingTransaction(outgoingTransactionId)).mapTo[List[Long]].flatMap { imageIds =>
+            complete(boxService.ask(GetImageIdsForOutgoingTransaction(outgoingTransactionId)).mapTo[Seq[Long]].flatMap { imageIds =>
               Future.sequence {
                 imageIds.map { imageId =>
                   metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]]

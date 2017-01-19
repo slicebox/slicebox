@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Lars Edenbrandt
+ * Copyright 2017 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -57,6 +57,7 @@ object LogProtocol {
   case class RemoveLogEntry(logId: Long)
   
   case class LogEntries(logEntries: Seq[LogEntry])
-  
+
+  case class LogEntryAdded(logEntry: LogEntry)
   case class LogEntryRemoved(logId: Long)
 }

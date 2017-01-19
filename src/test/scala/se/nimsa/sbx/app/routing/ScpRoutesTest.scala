@@ -2,19 +2,16 @@ package se.nimsa.sbx.app.routing
 
 import akka.http.scaladsl.model.StatusCodes._
 import org.scalatest.{FlatSpecLike, Matchers}
-import se.nimsa.sbx.scp.ScpDAO
 import se.nimsa.sbx.scp.ScpProtocol._
 import se.nimsa.sbx.storage.RuntimeStorage
+import se.nimsa.sbx.util.FutureUtil.await
 import se.nimsa.sbx.util.TestUtil
 
 class ScpRoutesTest extends {
-  val dbProps = TestUtil.createTestDb("scproutestest")
+  val dbConfig = TestUtil.createTestDb("scproutestest")
   val storage = new RuntimeStorage
 } with FlatSpecLike with Matchers with RoutesTestBase {
 
-  val db = dbProps.db
-  val scpDao = new ScpDAO(dbProps.driver)
-  
   "SCP routes" should "return a success message when asked to start a new SCP" in {
     PostAsAdmin("/api/scps", ScpData(-1, "TestName", "TestAeTitle", 13579)) ~> routes ~> check {
       status should be (Created)
@@ -30,9 +27,8 @@ class ScpRoutesTest extends {
     }    
   }
   it should "be possible to remove the SCP again" in {
-    val scp = db.withSession { implicit session =>
-      scpDao.listScpDatas(0, 1).head
-    }
+    val scp = await(scpDao.listScpDatas(0, 1)).head
+
     DeleteAsAdmin(s"/api/scps/${scp.id}") ~> routes ~> check {
       status should be(NoContent)
     }
