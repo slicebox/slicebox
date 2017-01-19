@@ -200,7 +200,7 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
 
   def seriesTagsForSeries(seriesId: Long): Future[Seq[SeriesTag]] = db.run(seriesTagsForSeriesAction(seriesId))
 
-  def addAndInsertSeriesTagForSeriesId(seriesTag: SeriesTag, seriesId: Long): Future[SeriesTag] = db.run {
+  def addAndInsertSeriesTagForSeriesIdAction(seriesTag: SeriesTag, seriesId: Long) =
     seriesTagForNameAction(seriesTag.name)
       .flatMap(_
         .map(DBIO.successful)
@@ -211,7 +211,9 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
             .map(_ => DBIO.successful(dbSeriesTag))
             .getOrElse(insertSeriesSeriesTagAction(SeriesSeriesTag(seriesId, dbSeriesTag.id)).map(_ => dbSeriesTag)))
       }
-  }
+
+  def addAndInsertSeriesTagForSeriesId(seriesTag: SeriesTag, seriesId: Long): Future[SeriesTag] =
+    db.run(addAndInsertSeriesTagForSeriesIdAction(seriesTag, seriesId).transactionally)
 
   def cleanupSeriesTagAction(seriesTagId: Long) =
     listSeriesSeriesTagsForSeriesTagIdAction(seriesTagId).flatMap { otherSeriesWithSameTag =>
@@ -228,7 +230,7 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
       .flatMap(_ => cleanupSeriesTagAction(seriesTagId))
   }
 
-  def deleteFully(image: Image): Future[(Option[Patient], Option[Study], Option[Series], Option[Image])] = db.run {
+  def deleteImageFullyAction(image: Image) =
     metaDataDao.deleteImageAction(image.id).flatMap { imagesDeleted =>
       metaDataDao.seriesByIdAction(image.seriesId).flatMap { maybeParentSeries =>
         imagesQuery.filter(_.seriesId === image.seriesId).take(1).result.flatMap { otherImages =>
@@ -242,8 +244,7 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
             (maybePatient, maybeStudy, maybeSeries, maybeImage)
         }
       }
-    }.transactionally
-  }
+    }
 
   def deleteSeriesFullyAction(series: Series) =
     seriesTagsForSeriesAction(series.id).flatMap { seriesSeriesTags =>
@@ -255,6 +256,14 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
 
   def deleteFully(series: Series): Future[(Option[Patient], Option[Study], Option[Series])] =
     db.run(deleteSeriesFullyAction(series).transactionally)
+
+  def deleteFully(imageId: Long): Future[(Option[Patient], Option[Study], Option[Series], Option[Image])] = db.run {
+    metaDataDao.imageByIdAction(imageId)
+      .flatMap(_
+        .map(deleteImageFullyAction)
+        .getOrElse(DBIO.successful((None, None, None, None))))
+      .transactionally
+  }
 
   def flatSeries(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String], sourceRefs: Seq[SourceRef], seriesTypeIds: Seq[Long], seriesTagIds: Seq[Long]): Future[Seq[FlatSeries]] =
     if (isWithAdvancedFiltering(sourceRefs, seriesTypeIds, seriesTagIds))
@@ -656,6 +665,12 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
       }
 
     db.run(addAction.transactionally)
+  }
+
+  def addSeriesTagToSeries(seriesTag: SeriesTag, seriesId: Long): Future[Option[SeriesTag]] = db.run {
+    metaDataDao.seriesByIdAction(seriesId)
+      .map(_.map(_ => addAndInsertSeriesTagForSeriesIdAction(seriesTag, seriesId)))
+      .unwrap
   }
 
 }

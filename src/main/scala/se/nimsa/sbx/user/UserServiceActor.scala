@@ -20,15 +20,17 @@ import java.util.UUID
 
 import akka.actor.{Actor, Props, actorRef2Scala}
 import akka.event.{Logging, LoggingReceive}
+import akka.pattern.pipe
 import akka.util.Timeout
 import se.nimsa.sbx.user.UserProtocol._
 import se.nimsa.sbx.user.UserServiceActor._
-import se.nimsa.sbx.util.ExceptionCatching
 import se.nimsa.sbx.util.FutureUtil.await
+import se.nimsa.sbx.util.SbxExtensions._
 
+import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 
-class UserServiceActor(userDao: UserDAO, superUser: String, superPassword: String, sessionTimeout: Long)(implicit timeout: Timeout) extends Actor with ExceptionCatching {
+class UserServiceActor(userDao: UserDAO, superUser: String, superPassword: String, sessionTimeout: Long)(implicit timeout: Timeout) extends Actor {
   val log = Logging(context.system, this)
 
   addSuperUser()
@@ -45,49 +47,45 @@ class UserServiceActor(userDao: UserDAO, superUser: String, superPassword: Strin
   def receive = LoggingReceive {
 
     case msg: UserRequest =>
-      catchAndReport {
+      msg match {
 
-        msg match {
-
-          case Login(userPass, authKey) =>
-            userByName(userPass.user) match {
+        case Login(userPass, authKey) =>
+          pipe(
+            userByName(userPass.user).flatMap {
               case Some(user) if user.passwordMatches(userPass.pass) =>
-                val result = authKey.ip.flatMap(ip =>
-                  authKey.userAgent.map(userAgent => {
-                    val session = createOrUpdateSession(user, ip, userAgent)
-                    LoggedIn(user, session)
-                  }))
-                  .getOrElse(LoginFailed)
-                sender ! result
+                authKey.ip.flatMap(ip =>
+                  authKey.userAgent.map { userAgent =>
+                    createOrUpdateSession(user, ip, userAgent)
+                      .map(session => LoggedIn(user, session))
+                  }).getOrElse(Future.successful(LoginFailed))
               case _ =>
-                sender ! LoginFailed
+                Future.successful(LoginFailed)
             }
+          ).to(sender)
 
-          case Logout(apiUser, authKey) =>
-            deleteSession(apiUser, authKey)
-            sender ! LoggedOut
+        case Logout(apiUser, authKey) =>
+          pipe(deleteSession(apiUser, authKey).map(_ => LoggedOut)).to(sender)
 
-          case AddUser(apiUser) =>
+        case AddUser(apiUser) =>
+          pipe(
             if (apiUser.role == UserRole.SUPERUSER)
-              throw new IllegalArgumentException("Superusers may not be added")
-            sender ! UserAdded(getOrCreateUser(apiUser))
+              Future.failed(new IllegalArgumentException("Superusers may not be added"))
+            else
+              getOrCreateUser(apiUser).map(UserAdded)
+          ).to(sender)
 
-          case GetUserByName(user) =>
-            sender ! userByName(user)
+        case GetUserByName(user) =>
+          pipe(userByName(user)).to(sender)
 
-          case GetAndRefreshUserByAuthKey(authKey) =>
-            val optionalUser = getAndRefreshUser(authKey)
-            sender ! optionalUser
+        case GetAndRefreshUserByAuthKey(authKey) =>
+          pipe(getAndRefreshUser(authKey)).to(sender)
 
-          case GetUsers(startIndex, count) =>
-            val users = listUsers(startIndex, count)
-            sender ! Users(users)
+        case GetUsers(startIndex, count) =>
+          pipe(listUsers(startIndex, count).map(Users)).to(sender)
 
-          case DeleteUser(userId) =>
-            deleteUser(userId)
-            sender ! UserDeleted(userId)
+        case DeleteUser(userId) =>
+          pipe(deleteUser(userId).map(_ => UserDeleted(userId))).to(sender)
 
-        }
       }
 
     case RemoveExpiredSessions => removeExpiredSessions()
@@ -102,63 +100,64 @@ class UserServiceActor(userDao: UserDAO, superUser: String, superPassword: Strin
     }
   }
 
-  def userByName(name: String): Option[ApiUser] =
-    await(userDao.userByName(name))
+  def userByName(name: String): Future[Option[ApiUser]] = userDao.userByName(name)
 
-  def createOrUpdateSession(user: ApiUser, ip: String, userAgent: String): ApiSession = {
-    await(userDao.userSessionByUserIdIpAndUserAgent(user.id, ip, userAgent))
-      .map(apiSession => {
+  def createOrUpdateSession(user: ApiUser, ip: String, userAgent: String): Future[ApiSession] =
+    userDao.userSessionByUserIdIpAndUserAgent(user.id, ip, userAgent)
+      .flatMap(_.map(apiSession => {
         val updatedSession = apiSession.copy(updated = currentTime)
-        await(userDao.updateSession(updatedSession))
-        updatedSession
-      })
-      .getOrElse(
-        await(userDao.insertSession(ApiSession(-1, user.id, newSessionToken, ip, userAgent, currentTime))))
-  }
+        userDao.updateSession(updatedSession).map(_ => updatedSession)
+      }).getOrElse(
+        userDao.insertSession(ApiSession(-1, user.id, newSessionToken, ip, userAgent, currentTime))))
 
-  def deleteSession(user: ApiUser, authKey: AuthKey): Option[Int] =
+  def deleteSession(user: ApiUser, authKey: AuthKey): Future[Option[Unit]] =
     authKey.ip.flatMap(ip =>
       authKey.userAgent.map(userAgent =>
-        await(userDao.deleteSessionByUserIdIpAndUserAgent(user.id, ip, userAgent))))
+        userDao.deleteSessionByUserIdIpAndUserAgent(user.id, ip, userAgent)
+          .map(n => if (n == 0) None else Some({})))).unwrap
 
-  def getAndRefreshUser(authKey: AuthKey): Option[ApiUser] = {
-    val validUserAndSession =
-      authKey.token.flatMap(token =>
-        authKey.ip.flatMap(ip =>
-          authKey.userAgent.flatMap(userAgent =>
-            await(userDao.userSessionByTokenIpAndUserAgent(token, ip, userAgent)))))
-        .filter {
-          case (_, apiSession) =>
-            apiSession.updated > (currentTime - sessionTimeout)
-        }
-
-    validUserAndSession.foreach {
-      case (_, apiSession) =>
-        await(userDao.updateSession(apiSession.copy(updated = currentTime)))
-    }
-
-    validUserAndSession.map(_._1)
+  def getAndRefreshUser(authKey: AuthKey): Future[Option[ApiUser]] = {
+    authKey.token.flatMap(token =>
+      authKey.ip.flatMap(ip =>
+        authKey.userAgent.map(userAgent =>
+          userDao.userSessionByTokenIpAndUserAgent(token, ip, userAgent))))
+      .unwrap
+      .map(_.filter {
+        case (_, apiSession) =>
+          apiSession.updated > (currentTime - sessionTimeout)
+      })
+      .map(_.map {
+        case (apiUser, apiSession) =>
+          userDao.updateSession(apiSession.copy(updated = currentTime)).map(_ => apiUser)
+      })
+      .unwrap
   }
 
-  def getOrCreateUser(user: ApiUser): ApiUser =
-    await(userDao.userByName(user.user)).getOrElse(await(userDao.insert(user)))
+  def getOrCreateUser(user: ApiUser): Future[ApiUser] =
+    userDao.userByName(user.user)
+      .flatMap(_
+        .map(Future.successful)
+        .getOrElse(userDao.insert(user)))
 
-  def deleteUser(userId: Long): Unit = {
-    await(userDao.userById(userId))
-      .filter(_.role == UserRole.SUPERUSER)
-      .foreach(_ => throw new IllegalArgumentException("Superuser may not be deleted"))
-
-    await(userDao.deleteUserByUserId(userId))
-    sender ! UserDeleted(userId)
+  def deleteUser(userId: Long): Future[Unit] = {
+    userDao.userById(userId)
+      .map {
+        case Some(user) if user.role == UserRole.SUPERUSER =>
+          throw new IllegalArgumentException("Superuser may not be deleted")
+        case _ =>
+      }
+      .flatMap(_ => userDao.deleteUserByUserId(userId))
+      .map(_ => {})
   }
 
-  def removeExpiredSessions(): Unit =
-    await(userDao.listSessions)
-      .filter(_.updated < currentTime - sessionTimeout)
-      .foreach(expiredSession => userDao.deleteSessionById(expiredSession.id))
+  def removeExpiredSessions(): Future[Seq[Int]] =
+    userDao.listSessions.flatMap(sessions => Future.sequence(
+      sessions
+        .filter(_.updated < currentTime - sessionTimeout)
+        .map(expiredSession => userDao.deleteSessionById(expiredSession.id))
+    ))
 
-  def listUsers(startIndex: Long, count: Long): Seq[ApiUser] =
-    await(userDao.listUsers(startIndex, count))
+  def listUsers(startIndex: Long, count: Long): Future[Seq[ApiUser]] = userDao.listUsers(startIndex, count)
 }
 
 object UserServiceActor {

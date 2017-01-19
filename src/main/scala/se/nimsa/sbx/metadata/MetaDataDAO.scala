@@ -184,9 +184,9 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
 
   def seriesById(id: Long): Future[Option[Series]] = db.run(seriesByIdAction(id))
 
-  def imageById(id: Long): Future[Option[Image]] = db.run {
-    imagesQuery.filter(_.id === id).result.headOption
-  }
+  def imageByIdAction(id: Long) = imagesQuery.filter(_.id === id).result.headOption
+
+  def imageById(id: Long): Future[Option[Image]] = db.run(imageByIdAction(id))
 
   // *** Inserts ***
 

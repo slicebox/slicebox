@@ -44,7 +44,7 @@ class UserServiceActorTest(_system: ActorSystem) extends TestKit(_system) with I
       await(dao.listUsers(0, 10)) should have length 2
       await(dao.listSessions) should have length 2
 
-      userActor.removeExpiredSessions()
+      await(userActor.removeExpiredSessions())
 
       await(dao.listSessions) should have length 1
     }
@@ -54,7 +54,7 @@ class UserServiceActorTest(_system: ActorSystem) extends TestKit(_system) with I
       val sessionTime = System.currentTimeMillis - 1000
       await(dao.insertSession(ApiSession(-1, user.id, "token", "ip", "user agent", sessionTime)))
 
-      userActor.getAndRefreshUser(AuthKey(Some("token"), Some("ip"), Some("user agent")))
+      await(userActor.getAndRefreshUser(AuthKey(Some("token"), Some("ip"), Some("user agent"))))
 
       val optionalSession = await(dao.userSessionByTokenIpAndUserAgent("token", "ip", "user agent"))
       optionalSession.isDefined shouldBe true
@@ -66,7 +66,7 @@ class UserServiceActorTest(_system: ActorSystem) extends TestKit(_system) with I
       val sessionTime = 1000
       await(dao.insertSession(ApiSession(-1, user.id, "token", "ip", "user agent", sessionTime)))
 
-      userActor.getAndRefreshUser(AuthKey(Some("token"), Some("ip"), Some("user agent")))
+      await(userActor.getAndRefreshUser(AuthKey(Some("token"), Some("ip"), Some("user agent"))))
 
       val optionalSession = await(dao.userSessionByTokenIpAndUserAgent("token", "ip", "user agent"))
       optionalSession.isDefined shouldBe true
@@ -78,23 +78,23 @@ class UserServiceActorTest(_system: ActorSystem) extends TestKit(_system) with I
 
       await(dao.listSessions) should have length 0
 
-      val session1 = userActor.createOrUpdateSession(user, "ip", "userAgent")
+      val session1 = await(userActor.createOrUpdateSession(user, "ip", "userAgent"))
       await(dao.listSessions) should have length 1
 
       Thread.sleep(100)
 
-      val session2 = userActor.createOrUpdateSession(user, "ip", "userAgent")
+      val session2 = await(userActor.createOrUpdateSession(user, "ip", "userAgent"))
       await(dao.listSessions) should have length 1
       session2.updated shouldBe >(session1.updated)
     }
 
     "remove a session based on user id, IP and user agent when logging out" in {
       val user = await(dao.insert(ApiUser(-1, "user", UserRole.USER).withPassword("pass")))
-      val session1 = userActor.createOrUpdateSession(user, "ip", "userAgent")
+      val session1 = await(userActor.createOrUpdateSession(user, "ip", "userAgent"))
       await(dao.listSessions) should have length 1
-      userActor.deleteSession(user, AuthKey(Some(session1.token), Some("Other IP"), Some(session1.userAgent)))
+      await(userActor.deleteSession(user, AuthKey(Some(session1.token), Some("Other IP"), Some(session1.userAgent))))
       await(dao.listSessions) should have length 1
-      userActor.deleteSession(user, AuthKey(Some(session1.token), Some(session1.ip), Some(session1.userAgent)))
+      await(userActor.deleteSession(user, AuthKey(Some(session1.token), Some(session1.ip), Some(session1.userAgent))))
       await(dao.listSessions) should have length 0
     }
 

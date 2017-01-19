@@ -18,16 +18,19 @@ package se.nimsa.sbx.metadata
 
 import akka.actor.{Actor, Props}
 import akka.event.{Logging, LoggingReceive}
+import akka.pattern.pipe
 import akka.util.Timeout
 import se.nimsa.sbx.dicom.DicomUtil._
 import se.nimsa.sbx.lang.NotFoundException
 import se.nimsa.sbx.metadata.MetaDataProtocol._
-import se.nimsa.sbx.util.ExceptionCatching
-import se.nimsa.sbx.util.FutureUtil.await
 
-class MetaDataServiceActor(metaDataDao: MetaDataDAO, propertiesDao: PropertiesDAO)(implicit timeout: Timeout) extends Actor with ExceptionCatching {
+import scala.concurrent.Future
+
+class MetaDataServiceActor(metaDataDao: MetaDataDAO, propertiesDao: PropertiesDAO)(implicit timeout: Timeout) extends Actor {
 
   import context.system
+
+  implicit val executor = system.dispatcher
 
   val log = Logging(context.system, this)
 
@@ -36,124 +39,113 @@ class MetaDataServiceActor(metaDataDao: MetaDataDAO, propertiesDao: PropertiesDA
   def receive = LoggingReceive {
 
     case AddMetaData(attributes, source) =>
-      catchAndReport {
-        val metaData = await(propertiesDao.addMetaData(
-          attributesToPatient(attributes),
-          attributesToStudy(attributes),
-          attributesToSeries(attributes),
-          attributesToImage(attributes),
-          source))
-        log.debug(s"Added metadata $metaData")
-        context.system.eventStream.publish(metaData)
-        sender ! metaData
-      }
+      val addFuture = propertiesDao.addMetaData(
+        attributesToPatient(attributes),
+        attributesToStudy(attributes),
+        attributesToSeries(attributes),
+        attributesToImage(attributes),
+        source)
+      addFuture.map(metaData => s"Added metadata $metaData").foreach(log.debug)
+      addFuture.foreach(context.system.eventStream.publish)
+      pipe(addFuture).to(sender)
 
     case DeleteMetaData(imageId) =>
-      catchAndReport {
-        val (deletedPatient, deletedStudy, deletedSeries, deletedImage) =
-          await(metaDataDao.imageById(imageId)).map(image => await(propertiesDao.deleteFully(image))).getOrElse((None, None, None, None))
+      val deleteFuture = propertiesDao.deleteFully(imageId).map(MetaDataDeleted.tupled)
+      deleteFuture.foreach(system.eventStream.publish)
+      pipe(deleteFuture).to(sender)
 
-        val metaDataDeleted = MetaDataDeleted(deletedPatient, deletedStudy, deletedSeries, deletedImage)
-        system.eventStream.publish(metaDataDeleted)
-
-        sender ! metaDataDeleted
-      }
-
-    case msg: PropertiesRequest => catchAndReport {
+    case msg: PropertiesRequest =>
       msg match {
 
         case GetSeriesTags =>
-          sender ! SeriesTags(getSeriesTags)
+          pipe(propertiesDao.listSeriesTags.map(SeriesTags)).to(sender)
 
         case GetSourceForSeries(seriesId) =>
-          sender ! await(propertiesDao.seriesSourceById(seriesId))
+          pipe(propertiesDao.seriesSourceById(seriesId)).to(sender)
 
         case GetSeriesTagsForSeries(seriesId) =>
-          val seriesTags = getSeriesTagsForSeries(seriesId)
-          sender ! SeriesTags(seriesTags)
+          pipe(propertiesDao.seriesTagsForSeries(seriesId).map(SeriesTags)).to(sender)
 
         case AddSeriesTagToSeries(seriesTag, seriesId) =>
-          await(metaDataDao.seriesById(seriesId)).getOrElse {
-            throw new NotFoundException("Series not found")
-          }
-          val dbSeriesTag = await(propertiesDao.addAndInsertSeriesTagForSeriesId(seriesTag, seriesId))
-          sender ! SeriesTagAddedToSeries(dbSeriesTag)
+          pipe(
+            propertiesDao.addSeriesTagToSeries(seriesTag, seriesId).map(_.getOrElse {
+              throw new NotFoundException("Series not found")
+            }).map(SeriesTagAddedToSeries)
+          ).to(sender)
 
         case RemoveSeriesTagFromSeries(seriesTagId, seriesId) =>
-          await(propertiesDao.removeAndCleanupSeriesTagForSeriesId(seriesTagId, seriesId))
-          sender ! SeriesTagRemovedFromSeries(seriesId)
+          pipe(
+            propertiesDao.removeAndCleanupSeriesTagForSeriesId(seriesTagId, seriesId)
+              .map(_ => SeriesTagRemovedFromSeries(seriesId))
+          ).to(sender)
       }
-    }
 
-    case msg: MetaDataQuery => catchAndReport {
+    case msg: MetaDataQuery =>
       msg match {
         case GetPatients(startIndex, count, orderBy, orderAscending, filter, sourceIds, seriesTypeIds, seriesTagIds) =>
-          sender ! Patients(await(propertiesDao.patients(startIndex, count, orderBy, orderAscending, filter, sourceIds, seriesTypeIds, seriesTagIds)))
+          pipe(propertiesDao.patients(startIndex, count, orderBy, orderAscending, filter, sourceIds, seriesTypeIds, seriesTagIds).map(Patients)).to(sender)
 
         case GetStudies(startIndex, count, patientId, sourceRefs, seriesTypeIds, seriesTagIds) =>
-          sender ! Studies(await(propertiesDao.studiesForPatient(startIndex, count, patientId, sourceRefs, seriesTypeIds, seriesTagIds)))
+          pipe(propertiesDao.studiesForPatient(startIndex, count, patientId, sourceRefs, seriesTypeIds, seriesTagIds).map(Studies)).to(sender)
 
         case GetSeries(startIndex, count, studyId, sourceRefs, seriesTypeIds, seriesTagIds) =>
-          sender ! SeriesCollection(await(propertiesDao.seriesForStudy(startIndex, count, studyId, sourceRefs, seriesTypeIds, seriesTagIds)))
+          pipe(propertiesDao.seriesForStudy(startIndex, count, studyId, sourceRefs, seriesTypeIds, seriesTagIds).map(SeriesCollection)).to(sender)
 
         case GetImages(startIndex, count, seriesId) =>
-          sender ! Images(await(metaDataDao.imagesForSeries(startIndex, count, seriesId)))
+          pipe(metaDataDao.imagesForSeries(startIndex, count, seriesId).map(Images)).to(sender)
 
         case GetFlatSeries(startIndex, count, orderBy, orderAscending, filter, sourceRefs, seriesTypeIds, seriesTagIds) =>
-          sender ! FlatSeriesCollection(await(propertiesDao.flatSeries(startIndex, count, orderBy, orderAscending, filter, sourceRefs, seriesTypeIds, seriesTagIds)))
+          pipe(propertiesDao.flatSeries(startIndex, count, orderBy, orderAscending, filter, sourceRefs, seriesTypeIds, seriesTagIds).map(FlatSeriesCollection)).to(sender)
 
         case GetPatient(patientId) =>
-          sender ! await(metaDataDao.patientById(patientId))
+          pipe(metaDataDao.patientById(patientId)).to(sender).to(sender)
 
         case GetStudy(studyId) =>
-          sender ! await(metaDataDao.studyById(studyId))
+          pipe(metaDataDao.studyById(studyId)).to(sender)
 
         case GetSingleSeries(seriesId) =>
-          sender ! await(metaDataDao.seriesById(seriesId))
+          pipe(metaDataDao.seriesById(seriesId)).to(sender)
 
         case GetAllSeries =>
-          sender ! SeriesCollection(await(metaDataDao.series))
+          pipe(metaDataDao.series.map(SeriesCollection)).to(sender)
 
         case GetImage(imageId) =>
-          sender ! await(metaDataDao.imageById(imageId))
+          pipe(metaDataDao.imageById(imageId)).to(sender)
 
         case GetSingleFlatSeries(seriesId) =>
-          sender ! await(metaDataDao.flatSeriesById(seriesId))
+          pipe(metaDataDao.flatSeriesById(seriesId)).to(sender)
 
         case QueryPatients(query) =>
-          sender ! Patients(await(propertiesDao.queryPatients(query.startIndex, query.count, query.order, query.queryProperties, query.filters)))
+          pipe(propertiesDao.queryPatients(query.startIndex, query.count, query.order, query.queryProperties, query.filters).map(Patients)).to(sender)
 
         case QueryStudies(query) =>
-          sender ! Studies(await(propertiesDao.queryStudies(query.startIndex, query.count, query.order, query.queryProperties, query.filters)))
+          pipe(propertiesDao.queryStudies(query.startIndex, query.count, query.order, query.queryProperties, query.filters).map(Studies)).to(sender)
 
         case QuerySeries(query) =>
-          sender ! SeriesCollection(await(propertiesDao.querySeries(query.startIndex, query.count, query.order, query.queryProperties, query.filters)))
+          pipe(propertiesDao.querySeries(query.startIndex, query.count, query.order, query.queryProperties, query.filters).map(SeriesCollection)).to(sender)
 
         case QueryImages(query) =>
-          sender ! Images(await(propertiesDao.queryImages(query.startIndex, query.count, query.order, query.queryProperties, query.filters)))
+          pipe(propertiesDao.queryImages(query.startIndex, query.count, query.order, query.queryProperties, query.filters).map(Images)).to(sender)
 
         case QueryFlatSeries(query) =>
-          sender ! FlatSeriesCollection(await(propertiesDao.queryFlatSeries(query.startIndex, query.count, query.order, query.queryProperties, query.filters)))
+          pipe(propertiesDao.queryFlatSeries(query.startIndex, query.count, query.order, query.queryProperties, query.filters).map(FlatSeriesCollection)).to(sender)
 
         case GetImagesForStudy(studyId, sourceRefs, seriesTypeIds, seriesTagIds) =>
-          sender ! Images(await(propertiesDao.seriesForStudy(0, 100000000, studyId, sourceRefs, seriesTypeIds, seriesTagIds))
-            .flatMap(series => await(metaDataDao.imagesForSeries(0, 100000000, series.id))))
+          val imagesFuture = propertiesDao.seriesForStudy(0, 100000000, studyId, sourceRefs, seriesTypeIds, seriesTagIds)
+            .flatMap(series => Future.sequence(series.map(s => metaDataDao.imagesForSeries(0, 100000000, s.id))))
+            .map(_.flatten)
+          pipe(imagesFuture.map(Images)).to(sender)
 
         case GetImagesForPatient(patientId, sourceRefs, seriesTypeIds, seriesTagIds) =>
-          sender ! Images(await(propertiesDao.studiesForPatient(0, 100000000, patientId, sourceRefs, seriesTypeIds, seriesTagIds))
-            .flatMap(study => await(propertiesDao.seriesForStudy(0, 100000000, study.id, sourceRefs, seriesTypeIds, seriesTagIds))
-              .flatMap(series => await(metaDataDao.imagesForSeries(0, 100000000, series.id)))))
-
+          val imagesFuture = propertiesDao.studiesForPatient(0, 100000000, patientId, sourceRefs, seriesTypeIds, seriesTagIds)
+            .flatMap(studies => Future.sequence(studies.map(study => propertiesDao.seriesForStudy(0, 100000000, study.id, sourceRefs, seriesTypeIds, seriesTagIds)
+              .flatMap(series => Future.sequence(series.map(s => metaDataDao.imagesForSeries(0, 100000000, s.id)))
+                .map(_.flatten))))
+              .map(_.flatten))
+          pipe(imagesFuture.map(Images)).to(sender)
       }
-    }
 
   }
-
-  def getSeriesTags =
-    await(propertiesDao.listSeriesTags)
-
-  def getSeriesTagsForSeries(seriesId: Long) =
-    await(propertiesDao.seriesTagsForSeries(seriesId))
 
 }
 
