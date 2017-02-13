@@ -71,7 +71,16 @@ class UserServiceActor(userDao: UserDAO, superUser: String, superPassword: Strin
             if (apiUser.role == UserRole.SUPERUSER)
               Future.failed(new IllegalArgumentException("Superusers may not be added"))
             else
-              getOrCreateUser(apiUser).map(UserAdded)
+              userDao
+                .insert(apiUser)
+                .recoverWith {
+                  case e: Exception =>
+                    userDao.userByName(apiUser.user).map {
+                      case Some(user) => user
+                      case None => throw e
+                    }
+                }
+                .map(UserAdded)
           ).to(sender)
 
         case GetUserByName(user) =>
@@ -132,12 +141,6 @@ class UserServiceActor(userDao: UserDAO, superUser: String, superPassword: Strin
       })
       .unwrap
   }
-
-  def getOrCreateUser(user: ApiUser): Future[ApiUser] =
-    userDao.userByName(user.user)
-      .flatMap(_
-        .map(Future.successful)
-        .getOrElse(userDao.insert(user)))
 
   def deleteUser(userId: Long): Future[Unit] = {
     userDao.userById(userId)
