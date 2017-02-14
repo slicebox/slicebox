@@ -16,13 +16,12 @@
 
 package se.nimsa.sbx.storage
 
-import com.amazonaws.ClientConfiguration
-import com.amazonaws.Protocol
-import com.amazonaws.auth.DefaultAWSCredentialsProviderChain
-import com.amazonaws.services.s3.AmazonS3Client
-import com.amazonaws.services.s3.model.ObjectMetadata
-import com.amazonaws.services.s3.model.PutObjectRequest
 import java.io.{ByteArrayInputStream, InputStream}
+
+import com.amazonaws.{ClientConfiguration, Protocol}
+import com.amazonaws.auth.DefaultAWSCredentialsProviderChain
+import com.amazonaws.services.s3.AmazonS3ClientBuilder
+import com.amazonaws.services.s3.model.{ObjectMetadata, PutObjectRequest}
 
 /**
   * S3 client for storage.
@@ -35,7 +34,10 @@ class S3Facade(val bucket: String) {
   // Environment Variables - AWS_ACCESS_KEY_ID and AWS_SECRET_KEY
   // Java System Properties - aws.accessKeyId and aws.secretKey
   // Instance profile credentials delivered through the Amazon EC2 metadata service
-  val s3 = new AmazonS3Client(new DefaultAWSCredentialsProviderChain(), new ClientConfiguration().withProtocol(Protocol.HTTPS))
+  val s3 = AmazonS3ClientBuilder.standard()
+    .withCredentials(new DefaultAWSCredentialsProviderChain())
+    .withClientConfiguration(new ClientConfiguration().withProtocol(Protocol.HTTPS))
+    .build()
 
 
   def delete(key: String): Unit = {

@@ -66,31 +66,37 @@ headers := Map(
 resolvers ++= Seq(
   "Typesafe Repository" at "http://repo.typesafe.com/typesafe/releases/",
   "Sonatype snapshots" at "http://oss.sonatype.org/content/repositories/snapshots/",
+  "dcm4che Repository" at "http://www.dcm4che.org/maven2/",
   Resolver.bintrayRepo("hseeberger", "maven"))
 
 // deps
 
 libraryDependencies ++= {
-  val akkaVersion = "2.4.14"
-  val akkaHttpVersion = "10.0.0"
+  val akkaVersion = "2.4.17"
+  val akkaHttpVersion = "10.0.3"
+  val dcm4cheVersion = "3.3.8"
   Seq(
     "com.typesafe.scala-logging" %% "scala-logging" % "3.5.0",
     "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
     "com.typesafe.akka" %% "akka-http" % akkaHttpVersion,
-    "de.heikoseeberger" %% "akka-http-play-json" % "1.10.1",
-    "ch.qos.logback" % "logback-classic" % "1.1.7",
+    "de.heikoseeberger" %% "akka-http-play-json" % "1.12.0",
+    "ch.qos.logback" % "logback-classic" % "1.2.1",
     "com.typesafe.slick" %% "slick" % "3.1.1",
     "com.typesafe.slick" %% "slick-hikaricp" % "3.1.1",
     "com.h2database" % "h2" % "1.4.193",
-    "mysql" % "mysql-connector-java" % "5.1.40",
-    "com.zaxxer" % "HikariCP" % "2.5.1",
+    "mysql" % "mysql-connector-java" % "6.0.5",
+    "com.zaxxer" % "HikariCP" % "2.6.0",
     "com.github.t3hnar" %% "scala-bcrypt" % "3.0",
-    "com.amazonaws" % "aws-java-sdk-s3" % "1.11.65",
+    "com.amazonaws" % "aws-java-sdk-s3" % "1.11.89",
     "org.scalatest" %% "scalatest" % "3.0.1" % "test",
+    "org.dcm4che" % "dcm4che-core" % dcm4cheVersion,
+    "org.dcm4che" % "dcm4che-image" % dcm4cheVersion,
+    "org.dcm4che" % "dcm4che-imageio" % dcm4cheVersion,
+    "org.dcm4che" % "dcm4che-net" % dcm4cheVersion,
     "com.typesafe.akka" %% "akka-testkit" % akkaVersion % "test",
     "com.typesafe.akka" %% "akka-http-testkit" % akkaHttpVersion % "test",
-    "org.webjars" % "angularjs" % "1.5.9",
-    "org.webjars" % "angular-material" % "1.1.1",
+    "org.webjars" % "angularjs" % "1.6.1",
+    "org.webjars" % "angular-material" % "1.1.3",
     "org.webjars" % "angular-file-upload" % "11.0.0"
   )
 }

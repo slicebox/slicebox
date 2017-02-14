@@ -16,13 +16,14 @@
 
 package se.nimsa.sbx.scu
 
+import java.io.IOException
 import java.net.{ConnectException, NoRouteToHostException, UnknownHostException}
 
 import akka.actor.{Actor, Props}
 import akka.event.{Logging, LoggingReceive}
 import akka.pattern.{ask, pipe}
 import akka.util.Timeout
-import org.dcm4che3.net.NoPresentationContextException
+import org.dcm4che3.net.{IncompatibleConnectionException, NoPresentationContextException}
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.dicom.DicomData
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
@@ -117,13 +118,18 @@ class ScuServiceActor(scuDao: ScuDAO)(implicit timeout: Timeout) extends Actor w
                 })
                 .recover {
                   case _: UnknownHostException =>
-                    throw new BadGatewayException(s"Unable to reach host ${scu.aeTitle}@${scu.host}:${scu.port}")
-                  case _: ConnectException =>
-                    throw new BadGatewayException(s"Connection refused on host ${scu.aeTitle}@${scu.host}:${scu.port}")
-                  case _: NoRouteToHostException =>
-                    throw new BadGatewayException(s"No route found to host ${scu.aeTitle}@${scu.host}:${scu.port}")
-                  case e: NoPresentationContextException =>
-                    throw new BadGatewayException(s"${scu.aeTitle}@${scu.host}:${scu.port}: ${e.getMessage}")
+                    throw new BadGatewayException(s"Unknown host ${scu.aeTitle}@${scu.host}:${scu.port}")
+                  case _: IncompatibleConnectionException =>
+                    throw new BadGatewayException(s"Incompatible connection to ${scu.aeTitle}@${scu.host}:${scu.port}")
+                  case e: IOException if e.getCause != null =>
+                    e.getCause match {
+                      case _: ConnectException =>
+                        throw new BadGatewayException(s"Connection refused on host ${scu.aeTitle}@${scu.host}:${scu.port}")
+                      case _: NoRouteToHostException =>
+                        throw new BadGatewayException(s"No route found to host ${scu.aeTitle}@${scu.host}:${scu.port}")
+                      case e: NoPresentationContextException =>
+                        throw new BadGatewayException(s"${scu.aeTitle}@${scu.host}:${scu.port}: ${e.getMessage}")
+                    }
                 }
                 .pipeTo(sender)
             }).orElse(throw new NotFoundException(s"SCU with id $scuId not found"))
