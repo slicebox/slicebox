@@ -9,14 +9,19 @@ import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.util.FutureUtil.await
 import se.nimsa.sbx.util.TestUtil
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.DurationInt
 
 class MetaDataDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterAll {
 
+  /*
+  The ExecutionContext provided by ScalaTest only works inside tests, but here we have async stuff in beforeEach and
+  afterEach so we must roll our own EC.
+  */
+  lazy val ec = ExecutionContext.global
+
   val dbConfig = TestUtil.createTestDb("metadatadaotest")
-  val dao = new MetaDataDAO(dbConfig)
+  val dao = new MetaDataDAO(dbConfig)(ec)
 
   implicit val timeout = Timeout(200.seconds)
 

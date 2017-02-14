@@ -16,7 +16,7 @@
 
 package se.nimsa.sbx.scp
 
-import java.util.concurrent.{Executor, Executors, ThreadFactory}
+import java.util.concurrent.{Executor, Executors}
 
 import akka.actor.{Actor, Props}
 import akka.event.{Logging, LoggingReceive}
@@ -33,7 +33,7 @@ import se.nimsa.sbx.scp.ScpProtocol._
 import se.nimsa.sbx.storage.StorageProtocol.{AddDicomData, CheckDicomData, DicomDataAdded}
 
 import scala.concurrent.Future
-import scala.util.control.NonFatal
+import scala.util.{Failure, Success}
 
 class ScpActor(scpData: ScpData, executor: Executor, implicit val timeout: Timeout,
                metaDataServicePath: String = "../../MetaDataService",
@@ -49,13 +49,11 @@ class ScpActor(scpData: ScpData, executor: Executor, implicit val timeout: Timeo
 
   val log = Logging(context.system, this)
 
-  val scheduledExecutor = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
-    override def newThread(runnable: Runnable): Thread = {
-      val thread = Executors.defaultThreadFactory().newThread(runnable)
-      thread.setDaemon(true)
-      thread
-    }
-  })
+  val scheduledExecutor = Executors.newSingleThreadScheduledExecutor { runnable =>
+    val thread = Executors.defaultThreadFactory().newThread(runnable)
+    thread.setDaemon(true)
+    thread
+  }
 
   val scp = new Scp(scpData.name, scpData.aeTitle, scpData.port, executor, scheduledExecutor, self, timeout)
   SbxLog.info("SCP", s"Started SCP ${scpData.name} with AE title ${scpData.aeTitle} on port ${scpData.port}")
@@ -81,8 +79,9 @@ class ScpActor(scpData: ScpData, executor: Executor, implicit val timeout: Timeo
           }
         }
 
-      addDicomDataFuture.onFailure {
-        case NonFatal(e) =>
+      addDicomDataFuture.onComplete {
+        case Success(_) =>
+        case Failure(e) =>
           SbxLog.error("Directory", s"Could not add file: ${e.getMessage}")
       }
 

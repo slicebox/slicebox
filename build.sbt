@@ -3,7 +3,7 @@ import de.heikoseeberger.sbtheader.license.Apache2_0
 name := "slicebox"
 version := "1.3-SNAPSHOT"
 organization := "se.nimsa"
-scalaVersion := "2.11.8"
+scalaVersion := "2.12.1"
 scalacOptions := Seq("-encoding", "UTF-8", "-Xlint", "-deprecation", "-unchecked", "-feature", "-target:jvm-1.8")
 
 // define the project
@@ -74,6 +74,7 @@ resolvers ++= Seq(
 libraryDependencies ++= {
   val akkaVersion = "2.4.17"
   val akkaHttpVersion = "10.0.3"
+  val slickVersion = "3.2.0-RC1"
   val dcm4cheVersion = "3.3.8"
   Seq(
     "com.typesafe.scala-logging" %% "scala-logging" % "3.5.0",
@@ -81,8 +82,8 @@ libraryDependencies ++= {
     "com.typesafe.akka" %% "akka-http" % akkaHttpVersion,
     "de.heikoseeberger" %% "akka-http-play-json" % "1.12.0",
     "ch.qos.logback" % "logback-classic" % "1.2.1",
-    "com.typesafe.slick" %% "slick" % "3.1.1",
-    "com.typesafe.slick" %% "slick-hikaricp" % "3.1.1",
+    "com.typesafe.slick" %% "slick" % slickVersion,
+    "com.typesafe.slick" %% "slick-hikaricp" % slickVersion,
     "com.h2database" % "h2" % "1.4.193",
     "mysql" % "mysql-connector-java" % "6.0.5",
     "com.zaxxer" % "HikariCP" % "2.5.1",

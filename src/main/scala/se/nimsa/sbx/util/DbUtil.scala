@@ -16,12 +16,12 @@
 
 package se.nimsa.sbx.util
 
-import slick.backend.DatabaseConfig
+import slick.basic.DatabaseConfig
 import slick.dbio.{DBIO, DBIOAction, Effect, NoStream}
-import slick.driver.JdbcProfile
+import slick.jdbc.JdbcProfile
 import slick.jdbc.meta.MTable
-import slick.lifted.{Query, TableQuery}
-import slick.profile.RelationalProfile
+import slick.lifted.TableQuery
+import slick.relational.RelationalProfile
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -29,7 +29,7 @@ object DbUtil {
 
   def createTables[P <: RelationalProfile](dbConf: DatabaseConfig[JdbcProfile], requiredTables: (String, TableQuery[_ <: P#Table[_]])*)(implicit ec: ExecutionContext) = {
 
-    import dbConf.driver.api._
+    import dbConf.profile.api._
     val db = dbConf.db
 
     db.run(MTable.getTables("%")).map(_.toList).flatMap { existingTables =>

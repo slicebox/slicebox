@@ -22,8 +22,8 @@ import se.nimsa.sbx.dicom.DicomPropertyValue._
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.seriestype.SeriesTypeDAO
 import se.nimsa.sbx.util.DbUtil._
-import slick.backend.DatabaseConfig
-import slick.driver.JdbcProfile
+import slick.basic.DatabaseConfig
+import slick.jdbc.JdbcProfile
 import slick.jdbc.GetResult
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -31,7 +31,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionContext) {
 
   import MetaDataDAO._
-  import dbConf.driver.api._
+  import dbConf.profile.api._
 
   val db = dbConf.db
 

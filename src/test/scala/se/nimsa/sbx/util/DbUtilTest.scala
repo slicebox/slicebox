@@ -13,9 +13,7 @@ class DbUtilTest extends AsyncFlatSpec with Matchers {
     val db = dbConfig.db
     implicit val timeout = Timeout(30.seconds)
 
-    import dbConfig.driver.api._
-
-    import scala.concurrent.ExecutionContext.Implicits.global
+    import dbConfig.profile.api._
 
     class TestTable1(tag: Tag) extends Table[(Int, String)](tag, TestTable1.name) {
       def i = column[Int]("i")

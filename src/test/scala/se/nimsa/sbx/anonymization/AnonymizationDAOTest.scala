@@ -7,13 +7,19 @@ import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.util.FutureUtil.await
 import se.nimsa.sbx.util.TestUtil
 
-import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.DurationInt
 
 class AnonymizationDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterEach {
 
+  /*
+  The ExecutionContext provided by ScalaTest only works inside tests, but here we have async stuff in beforeEach and
+  afterEach so we must roll our own EC.
+  */
+  lazy val ec = ExecutionContext.global
+
   val dbConfig = TestUtil.createTestDb("anonymizationdaotest")
-  val dao = new AnonymizationDAO(dbConfig)
+  val dao = new AnonymizationDAO(dbConfig)(ec)
 
   implicit val timeout = Timeout(30.seconds)
 

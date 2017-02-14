@@ -20,15 +20,15 @@ import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.dicom.DicomProperty
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.util.DbUtil.{checkColumnExists, createTables}
-import slick.backend.DatabaseConfig
-import slick.driver.JdbcProfile
+import slick.basic.DatabaseConfig
+import slick.jdbc.JdbcProfile
 import slick.jdbc.GetResult
 
 import scala.concurrent.{ExecutionContext, Future}
 
 class AnonymizationDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionContext) {
 
-  import dbConf.driver.api._
+  import dbConf.profile.api._
 
   val db = dbConf.db
 

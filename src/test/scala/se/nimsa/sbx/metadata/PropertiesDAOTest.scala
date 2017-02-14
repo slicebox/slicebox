@@ -10,32 +10,35 @@ import se.nimsa.sbx.util.FutureUtil.await
 import se.nimsa.sbx.util.TestUtil
 import se.nimsa.sbx.util.TestUtil._
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.DurationInt
 
 class PropertiesDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {
 
+  /*
+  The ExecutionContext provided by ScalaTest only works inside tests, but here we have async stuff in beforeEach and
+  afterEach so we must roll our own EC.
+  */
+  lazy val ec = ExecutionContext.global
+
   val dbConfig = TestUtil.createTestDb("propertiesdaotest")
   implicit val timeout = Timeout(30.seconds)
 
-  val metaDataDao = new MetaDataDAO(dbConfig)
-  val propertiesDao = new PropertiesDAO(dbConfig)
-  val seriesTypeDao = new SeriesTypeDAO(dbConfig)
+  val metaDataDao = new MetaDataDAO(dbConfig)(ec)
+  val propertiesDao = new PropertiesDAO(dbConfig)(ec)
+  val seriesTypeDao = new SeriesTypeDAO(dbConfig)(ec)
 
-  override def beforeAll() =
-    await(for {
-      _ <- seriesTypeDao.create()
-      _ <- metaDataDao.create()
-      _ <- propertiesDao.create()
-    } yield Unit)
-
-  override def afterEach() =
-    await(Future.sequence(Seq(
-      propertiesDao.clear(),
-      metaDataDao.clear(),
-      seriesTypeDao.clear()
-    )))
+  override def beforeAll() = {
+    await(seriesTypeDao.create())
+    await(metaDataDao.create())
+    await(propertiesDao.create())
+  }
+  
+  override def afterEach() = {
+    await(propertiesDao.clear())
+    await(metaDataDao.clear())
+    await(seriesTypeDao.clear())
+  }
 
   "The properties db" should "be empty before anything has been added" in {
     for {
@@ -206,7 +209,7 @@ class PropertiesDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterA
   it should "support filtering patients by series type" in {
     for {
       _ <- insertMetaDataAndProperties()
-      (st1, st2) <- seriesTypeDao.listSeriesTypes(0,2).map(st => st.zip(st.tail).head)
+      (st1, st2) <- seriesTypeDao.listSeriesTypes(0, 2).map(st => st.zip(st.tail).head)
       p1 <- propertiesDao.patients(0, 20, None, orderAscending = true, None, Seq.empty, Seq(st1.id), Seq.empty)
       p2 <- propertiesDao.patients(0, 20, None, orderAscending = true, None, Seq.empty, Seq(st1.id, st2.id), Seq.empty)
       p3 <- propertiesDao.patients(0, 20, None, orderAscending = true, None, Seq.empty, Seq(st1.id, st2.id, 666), Seq.empty)
@@ -223,7 +226,7 @@ class PropertiesDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterA
     for {
       _ <- insertMetaDataAndProperties()
       p <- metaDataDao.patients.map(_.head)
-      (st1, st2) <- seriesTypeDao.listSeriesTypes(0,2).map(st => st.zip(st.tail).head)
+      (st1, st2) <- seriesTypeDao.listSeriesTypes(0, 2).map(st => st.zip(st.tail).head)
       s1 <- propertiesDao.studiesForPatient(0, 20, p.id, Seq.empty, Seq(st1.id), Seq.empty)
       s2 <- propertiesDao.studiesForPatient(0, 20, p.id, Seq.empty, Seq(st1.id, st2.id), Seq.empty)
       s3 <- propertiesDao.studiesForPatient(0, 20, p.id, Seq.empty, Seq(st1.id, st2.id, 666), Seq.empty)
@@ -240,7 +243,7 @@ class PropertiesDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterA
     for {
       _ <- insertMetaDataAndProperties()
       (stu1, stu2) <- metaDataDao.studies.map(ss => ss.zip(ss.tail).head)
-      (st1, st2) <- seriesTypeDao.listSeriesTypes(0,2).map(st => st.zip(st.tail).head)
+      (st1, st2) <- seriesTypeDao.listSeriesTypes(0, 2).map(st => st.zip(st.tail).head)
       s1 <- propertiesDao.seriesForStudy(0, 20, stu1.id, Seq.empty, Seq(st1.id), Seq.empty)
       s2 <- propertiesDao.seriesForStudy(0, 20, stu1.id, Seq.empty, Seq(st1.id, st2.id), Seq.empty)
       s3 <- propertiesDao.seriesForStudy(0, 20, stu1.id, Seq.empty, Seq(st1.id, st2.id, 666), Seq.empty)
@@ -264,7 +267,7 @@ class PropertiesDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterA
   it should "support filtering flat series by series type" in {
     for {
       _ <- insertMetaDataAndProperties()
-      (st1, st2) <- seriesTypeDao.listSeriesTypes(0,2).map(st => st.zip(st.tail).head)
+      (st1, st2) <- seriesTypeDao.listSeriesTypes(0, 2).map(st => st.zip(st.tail).head)
       f1 <- propertiesDao.flatSeries(0, 20, None, orderAscending = true, None, Seq.empty, Seq(st1.id), Seq.empty)
       f2 <- propertiesDao.flatSeries(0, 20, None, orderAscending = true, None, Seq.empty, Seq(st1.id, st2.id), Seq.empty)
       f3 <- propertiesDao.flatSeries(0, 20, None, orderAscending = true, None, Seq.empty, Seq(st1.id, st2.id, 666), Seq.empty)

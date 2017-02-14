@@ -18,14 +18,14 @@ package se.nimsa.sbx.scp
 
 import se.nimsa.sbx.scp.ScpProtocol.ScpData
 import se.nimsa.sbx.util.DbUtil._
-import slick.backend.DatabaseConfig
-import slick.driver.JdbcProfile
+import slick.basic.DatabaseConfig
+import slick.jdbc.JdbcProfile
 
 import scala.concurrent.{ExecutionContext, Future}
 
 class ScpDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionContext) {
 
-  import dbConf.driver.api._
+  import dbConf.profile.api._
 
   val db = dbConf.db
 

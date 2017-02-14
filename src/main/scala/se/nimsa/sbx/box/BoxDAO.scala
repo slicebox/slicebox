@@ -21,14 +21,14 @@ import se.nimsa.sbx.box.BoxProtocol.BoxSendMethod._
 import se.nimsa.sbx.box.BoxProtocol.TransactionStatus._
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.util.DbUtil.createTables
-import slick.backend.DatabaseConfig
-import slick.driver.JdbcProfile
+import slick.basic.DatabaseConfig
+import slick.jdbc.JdbcProfile
 
 import scala.concurrent.{ExecutionContext, Future}
 
 class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionContext) {
 
-  import dbConf.driver.api._
+  import dbConf.profile.api._
 
   val db = dbConf.db
 

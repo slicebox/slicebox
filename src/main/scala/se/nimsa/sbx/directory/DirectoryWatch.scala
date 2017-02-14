@@ -24,7 +24,7 @@ import akka.actor.ActorRef
 import com.typesafe.scalalogging.LazyLogging
 import se.nimsa.sbx.directory.DirectoryWatchProtocol.FileAddedToWatchedDirectory
 
-import scala.collection.JavaConversions.asScalaBuffer
+import scala.collection.JavaConverters._
 
 class DirectoryWatch(notifyActor: ActorRef) extends Runnable with LazyLogging {
 
@@ -63,7 +63,7 @@ class DirectoryWatch(notifyActor: ActorRef) extends Runnable with LazyLogging {
       logger.debug("Directory watcher waiting for file system events")
       while (!Thread.currentThread().isInterrupted) {
         val key = watchService.take()
-        key.pollEvents() foreach {
+        key.pollEvents().asScala foreach {
           event =>
             logger.debug(s"Recevied event: $event")
 

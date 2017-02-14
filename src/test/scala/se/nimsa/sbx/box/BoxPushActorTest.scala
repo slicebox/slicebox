@@ -18,7 +18,7 @@ import se.nimsa.sbx.util.TestUtil
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
-import scala.util.{Success, Try}
+import scala.util.{Failure, Success, Try}
 
 class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
   with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {
@@ -88,6 +88,8 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
           case HttpMethods.PUT =>
             capturedStatusUpdateRequests += request
             (Success(HttpResponse(status = NoContent)), id)
+          case _ =>
+            (Failure(new IllegalArgumentException("Unsupported method")), "")
         }
     }
 

@@ -32,6 +32,7 @@ import se.nimsa.sbx.storage.StorageProtocol.DeleteDicomData
 import se.nimsa.sbx.util.SbxExtensions._
 
 import scala.concurrent.Future
+import scala.util.{Failure, Success}
 
 class ForwardingActor(rule: ForwardingRule, transaction: ForwardingTransaction, images: Seq[ForwardingTransactionImage], implicit val timeout: Timeout) extends Actor {
 
@@ -68,13 +69,15 @@ class ForwardingActor(rule: ForwardingRule, transaction: ForwardingTransaction, 
     rule.destination.destinationType match {
       case DestinationType.BOX =>
         boxService.ask(SendToRemoteBox(box, imageIds.map(ImageTagValues(_, Seq.empty))))
-          .onFailure {
-            case e: Throwable => SbxLog.error("Forwarding", "Could not forward images to remote box " + rule.destination.destinationName + ": " + e.getMessage)
+          .onComplete {
+            case Success(_) =>
+            case Failure(e) => SbxLog.error("Forwarding", "Could not forward images to remote box " + rule.destination.destinationName + ": " + e.getMessage)
           }
       case DestinationType.SCU =>
         scuService.ask(SendImagesToScp(imageIds, destinationId))
-          .onFailure {
-            case e: Throwable =>
+          .onComplete {
+            case Success(_) =>
+            case Failure(e) =>
               SbxLog.warn("Forwarding", "Could not forward images to SCP. Trying again later. Message: " + e.getMessage)
               context.parent ! UpdateTransaction(transaction.copy(enroute = false, delivered = false))
           }
@@ -99,8 +102,9 @@ class ForwardingActor(rule: ForwardingRule, transaction: ForwardingTransaction, 
       }
     }.map(_.flatten)
 
-    futureDeletedImageIds.onFailure {
-      case e: Throwable =>
+    futureDeletedImageIds.onComplete {
+      case Success(_) =>
+      case Failure(e) =>
         SbxLog.error("Forwarding", "Could not delete images after transfer: " + e.getMessage)
     }
 

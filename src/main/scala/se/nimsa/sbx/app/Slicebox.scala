@@ -23,7 +23,7 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
-import com.typesafe.config.ConfigFactory
+import com.typesafe.config.{Config, ConfigFactory}
 import de.heikoseeberger.akkahttpplayjson.PlayJsonSupport
 import se.nimsa.sbx.anonymization.{AnonymizationDAO, AnonymizationServiceActor}
 import se.nimsa.sbx.app.routing.SliceboxRoutes
@@ -38,8 +38,8 @@ import se.nimsa.sbx.scu.{ScuDAO, ScuServiceActor}
 import se.nimsa.sbx.seriestype.{SeriesTypeDAO, SeriesTypeServiceActor}
 import se.nimsa.sbx.storage.{FileStorage, S3Storage, StorageService, StorageServiceActor}
 import se.nimsa.sbx.user.{UserDAO, UserServiceActor}
-import slick.backend.DatabaseConfig
-import slick.driver.JdbcProfile
+import slick.basic.DatabaseConfig
+import slick.jdbc.JdbcProfile
 
 import scala.concurrent.{Await, ExecutionContextExecutor}
 import scala.concurrent.duration.DurationInt
@@ -47,7 +47,7 @@ import scala.util.{Failure, Success}
 
 trait SliceboxBase extends SliceboxRoutes with JsonFormats with PlayJsonSupport {
 
-  val appConfig = ConfigFactory.load()
+  val appConfig: Config  = ConfigFactory.load()
   val sliceboxConfig = appConfig.getConfig("slicebox")
 
   implicit def system: ActorSystem

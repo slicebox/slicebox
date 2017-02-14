@@ -19,14 +19,14 @@ package se.nimsa.sbx.forwarding
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.forwarding.ForwardingProtocol._
 import se.nimsa.sbx.util.DbUtil.createTables
-import slick.backend.DatabaseConfig
-import slick.driver.JdbcProfile
+import slick.basic.DatabaseConfig
+import slick.jdbc.JdbcProfile
 
 import scala.concurrent.{ExecutionContext, Future}
 
 class ForwardingDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionContext) {
 
-  import dbConf.driver.api._
+  import dbConf.profile.api._
 
   val db = dbConf.db
 
