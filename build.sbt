@@ -85,7 +85,7 @@ libraryDependencies ++= {
     "com.typesafe.slick" %% "slick-hikaricp" % "3.1.1",
     "com.h2database" % "h2" % "1.4.193",
     "mysql" % "mysql-connector-java" % "6.0.5",
-    "com.zaxxer" % "HikariCP" % "2.6.0",
+    "com.zaxxer" % "HikariCP" % "2.5.1",
     "com.github.t3hnar" %% "scala-bcrypt" % "3.0",
     "com.amazonaws" % "aws-java-sdk-s3" % "1.11.89",
     "org.scalatest" %% "scalatest" % "3.0.1" % "test",
@@ -95,7 +95,7 @@ libraryDependencies ++= {
     "org.dcm4che" % "dcm4che-net" % dcm4cheVersion,
     "com.typesafe.akka" %% "akka-testkit" % akkaVersion % "test",
     "com.typesafe.akka" %% "akka-http-testkit" % akkaHttpVersion % "test",
-    "org.webjars" % "angularjs" % "1.6.1",
+    "org.webjars" % "angularjs" % "1.5.9",
     "org.webjars" % "angular-material" % "1.1.3",
     "org.webjars" % "angular-file-upload" % "11.0.0"
   )
