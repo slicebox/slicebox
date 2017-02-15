@@ -92,7 +92,7 @@ class ForwardingActor(rule: ForwardingRule, transaction: ForwardingTransaction, 
       images.map(_.imageId).map { imageId =>
         metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]].map { imageMaybe =>
           imageMaybe.map { image =>
-            metaDataService.ask(DeleteMetaData(imageId)).flatMap { _ =>
+            metaDataService.ask(DeleteMetaData(image)).flatMap { _ =>
               storageService.ask(DeleteDicomData(image)).map { _ =>
                 imageId
               }

@@ -131,7 +131,7 @@ trait AnonymizationRoutes {
             storageService.ask(GetDicomData(image, withPixelData = true)).mapTo[DicomData].flatMap { dicomData =>
               AnonymizationUtil.setAnonymous(dicomData.attributes, anonymous = false) // pretend not anonymized to force anonymization
               anonymizationService.ask(Anonymize(imageId, dicomData.attributes, tagValues)).mapTo[Attributes].flatMap { anonAttributes =>
-                metaDataService.ask(DeleteMetaData(image.id)).flatMap { _ =>
+                metaDataService.ask(DeleteMetaData(image)).flatMap { _ =>
                   storageService.ask(DeleteDicomData(image)).flatMap { _ =>
                     metaDataService.ask(AddMetaData(anonAttributes, source)).mapTo[MetaDataAdded].flatMap { metaData =>
                       storageService.ask(AddDicomData(dicomData.copy(attributes = anonAttributes), source, metaData.image)).mapTo[DicomDataAdded]

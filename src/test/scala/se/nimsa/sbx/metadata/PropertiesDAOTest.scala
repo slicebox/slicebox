@@ -33,7 +33,7 @@ class PropertiesDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterA
     await(metaDataDao.create())
     await(propertiesDao.create())
   }
-  
+
   override def afterEach() = {
     await(propertiesDao.clear())
     await(metaDataDao.clear())

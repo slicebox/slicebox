@@ -75,7 +75,7 @@ object MetaDataProtocol {
 
   case class AddMetaData(attributes: Attributes, source: Source)
   
-  case class DeleteMetaData(imageId: Long)  
+  case class DeleteMetaData(image: Image)
     
   sealed trait MetaDataQuery
 

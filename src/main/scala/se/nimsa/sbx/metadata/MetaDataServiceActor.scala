@@ -16,17 +16,18 @@
 
 package se.nimsa.sbx.metadata
 
-import akka.actor.{Actor, Props}
+import akka.actor.{Actor, Props, Stash}
 import akka.event.{Logging, LoggingReceive}
 import akka.pattern.pipe
 import akka.util.Timeout
 import se.nimsa.sbx.dicom.DicomUtil._
 import se.nimsa.sbx.lang.NotFoundException
 import se.nimsa.sbx.metadata.MetaDataProtocol._
+import se.nimsa.sbx.util.SequentialPipeToSupport
 
 import scala.concurrent.Future
 
-class MetaDataServiceActor(metaDataDao: MetaDataDAO, propertiesDao: PropertiesDAO)(implicit timeout: Timeout) extends Actor {
+class MetaDataServiceActor(metaDataDao: MetaDataDAO, propertiesDao: PropertiesDAO)(implicit timeout: Timeout) extends Actor with Stash with SequentialPipeToSupport {
 
   import context.system
 
@@ -47,12 +48,12 @@ class MetaDataServiceActor(metaDataDao: MetaDataDAO, propertiesDao: PropertiesDA
         source)
       addFuture.map(metaData => s"Added metadata $metaData").foreach(log.debug)
       addFuture.foreach(context.system.eventStream.publish)
-      pipe(addFuture).to(sender)
+      addFuture.pipeSequentiallyTo(sender)
 
-    case DeleteMetaData(imageId) =>
-      val deleteFuture = propertiesDao.deleteFully(imageId).map(MetaDataDeleted.tupled)
+    case DeleteMetaData(image) =>
+      val deleteFuture = propertiesDao.deleteFully(image).map(MetaDataDeleted.tupled)
       deleteFuture.foreach(system.eventStream.publish)
-      pipe(deleteFuture).to(sender)
+      deleteFuture.pipeSequentiallyTo(sender)
 
     case msg: PropertiesRequest =>
       msg match {
@@ -67,17 +68,15 @@ class MetaDataServiceActor(metaDataDao: MetaDataDAO, propertiesDao: PropertiesDA
           pipe(propertiesDao.seriesTagsForSeries(seriesId).map(SeriesTags)).to(sender)
 
         case AddSeriesTagToSeries(seriesTag, seriesId) =>
-          pipe(
-            propertiesDao.addSeriesTagToSeries(seriesTag, seriesId).map(_.getOrElse {
-              throw new NotFoundException("Series not found")
-            }).map(SeriesTagAddedToSeries)
-          ).to(sender)
+          propertiesDao.addSeriesTagToSeries(seriesTag, seriesId).map(_.getOrElse {
+            throw new NotFoundException("Series not found")
+          }).map(SeriesTagAddedToSeries)
+            .pipeSequentiallyTo(sender)
 
         case RemoveSeriesTagFromSeries(seriesTagId, seriesId) =>
-          pipe(
-            propertiesDao.removeAndCleanupSeriesTagForSeriesId(seriesTagId, seriesId)
-              .map(_ => SeriesTagRemovedFromSeries(seriesId))
-          ).to(sender)
+          propertiesDao.removeAndCleanupSeriesTagForSeriesId(seriesTagId, seriesId)
+            .map(_ => SeriesTagRemovedFromSeries(seriesId))
+            .pipeSequentiallyTo(sender)
       }
 
     case msg: MetaDataQuery =>

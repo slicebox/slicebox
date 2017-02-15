@@ -257,12 +257,8 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
   def deleteFully(series: Series): Future[(Option[Patient], Option[Study], Option[Series])] =
     db.run(deleteSeriesFullyAction(series).transactionally)
 
-  def deleteFully(imageId: Long): Future[(Option[Patient], Option[Study], Option[Series], Option[Image])] = db.run {
-    metaDataDao.imageByIdAction(imageId)
-      .flatMap(_
-        .map(deleteImageFullyAction)
-        .getOrElse(DBIO.successful((None, None, None, None))))
-      .transactionally
+  def deleteFully(image: Image): Future[(Option[Patient], Option[Study], Option[Series], Option[Image])] = db.run {
+    deleteImageFullyAction(image).transactionally
   }
 
   def flatSeries(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String], sourceRefs: Seq[SourceRef], seriesTypeIds: Seq[Long], seriesTagIds: Seq[Long]): Future[Seq[FlatSeries]] =

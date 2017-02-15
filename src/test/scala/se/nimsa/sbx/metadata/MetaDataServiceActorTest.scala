@@ -193,7 +193,7 @@ class MetaDataServiceActorTest(_system: ActorSystem) extends TestKit(_system) wi
       seriesEvents should have length 4
       imageEvents should have length 5
 
-      metaDataActorRef ! DeleteMetaData(image5.id)
+      metaDataActorRef ! DeleteMetaData(image5)
       expectMsgType[MetaDataDeleted]
 
       Thread.sleep(500)
@@ -203,7 +203,7 @@ class MetaDataServiceActorTest(_system: ActorSystem) extends TestKit(_system) wi
       seriesEvents should have length 4
       imageEvents should have length 4
 
-      metaDataActorRef ! DeleteMetaData(image4.id)
+      metaDataActorRef ! DeleteMetaData(image4)
       expectMsgType[MetaDataDeleted]
 
       Thread.sleep(500)
@@ -213,7 +213,7 @@ class MetaDataServiceActorTest(_system: ActorSystem) extends TestKit(_system) wi
       seriesEvents should have length 3
       imageEvents should have length 3
 
-      metaDataActorRef ! DeleteMetaData(image3.id)
+      metaDataActorRef ! DeleteMetaData(image3)
       expectMsgType[MetaDataDeleted]
 
       Thread.sleep(500)
@@ -223,7 +223,7 @@ class MetaDataServiceActorTest(_system: ActorSystem) extends TestKit(_system) wi
       seriesEvents should have length 2
       imageEvents should have length 2
 
-      metaDataActorRef ! DeleteMetaData(image2.id)
+      metaDataActorRef ! DeleteMetaData(image2)
       expectMsgType[MetaDataDeleted]
 
       Thread.sleep(500)
@@ -233,7 +233,7 @@ class MetaDataServiceActorTest(_system: ActorSystem) extends TestKit(_system) wi
       seriesEvents should have length 1
       imageEvents should have length 1
 
-      metaDataActorRef ! DeleteMetaData(image1.id)
+      metaDataActorRef ! DeleteMetaData(image1)
       expectMsgType[MetaDataDeleted]
 
       Thread.sleep(500)

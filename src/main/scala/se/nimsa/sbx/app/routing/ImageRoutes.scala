@@ -66,7 +66,7 @@ trait ImageRoutes {
                 }
               } ~ delete {
                 complete(storageService.ask(DeleteDicomData(image)).flatMap(_ =>
-                  metaDataService.ask(DeleteMetaData(image.id)).map(_ =>
+                  metaDataService.ask(DeleteMetaData(image)).map(_ =>
                     NoContent)))
               }
             } ~ path("attributes") {
@@ -107,7 +107,7 @@ trait ImageRoutes {
                 metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]].map { imageMaybe =>
                   imageMaybe.map { image =>
                     storageService.ask(DeleteDicomData(image)).flatMap { _ =>
-                      metaDataService.ask(DeleteMetaData(image.id))
+                      metaDataService.ask(DeleteMetaData(image))
                     }
                   }
                 }.unwrap
