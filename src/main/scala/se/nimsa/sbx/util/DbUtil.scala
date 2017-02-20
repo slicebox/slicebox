@@ -29,15 +29,16 @@ object DbUtil {
 
   def createTables[P <: RelationalProfile](dbConf: DatabaseConfig[JdbcProfile], requiredTables: (String, TableQuery[_ <: P#Table[_]])*)(implicit ec: ExecutionContext) = {
 
-    import dbConf.profile.api._
-    val db = dbConf.db
+    import dbConf.profile.api.{tableQueryToTableQueryExtensionMethods, schemaActionExtensionMethods}
 
-    db.run(MTable.getTables("%")).map(_.toList).flatMap { existingTables =>
-      val tablesToCreate = requiredTables.filter(required => !existingTables.exists(_.name.name == required._1)).map(_._2)
-      if (tablesToCreate.nonEmpty)
-        db.run(tablesToCreate.map(_.schema).reduceLeft(_ ++ _).create)
-      else
-        Future.successful({})
+    dbConf.db.run {
+      MTable.getTables("%").flatMap { existingTables =>
+        val tablesToCreate = requiredTables.filter(required => !existingTables.exists(_.name.name == required._1)).map(_._2)
+        if (tablesToCreate.nonEmpty)
+          tablesToCreate.map(_.schema).reduceLeft(_ ++ _).create
+        else
+          DBIO.successful({})
+      }
     }
   }
 
@@ -67,4 +68,5 @@ object DbUtil {
     def unwrap(implicit ec: ExecutionContext): DBIOAction[Option[T], NoStream, A] =
       self.getOrElse(DBIO.successful(None))
   }
+
 }
