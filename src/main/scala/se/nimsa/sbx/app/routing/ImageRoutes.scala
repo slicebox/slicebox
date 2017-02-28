@@ -102,17 +102,15 @@ trait ImageRoutes {
       } ~ path("delete") {
         post {
           entity(as[Seq[Long]]) { imageIds =>
-            val futureDeleted = Future.sequence {
-              imageIds.map { imageId =>
-                metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]].map { imageMaybe =>
-                  imageMaybe.map { image =>
-                    storageService.ask(DeleteDicomData(image)).flatMap { _ =>
-                      metaDataService.ask(DeleteMetaData(image))
-                    }
+            val futureDeleted = StreamSource(imageIds.toList).mapAsync(20) { imageId =>
+              metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]].map { imageMaybe =>
+                imageMaybe.map { image =>
+                  storageService.ask(DeleteDicomData(image)).flatMap { _ =>
+                    metaDataService.ask(DeleteMetaData(image))
                   }
-                }.unwrap
-              }
-            }
+                }
+              }.unwrap
+            }.runWith(Sink.ignore)
             onSuccess(futureDeleted) { _ =>
               complete(NoContent)
             }
