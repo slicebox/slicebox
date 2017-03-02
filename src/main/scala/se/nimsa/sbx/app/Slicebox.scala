@@ -77,7 +77,7 @@ trait SliceboxBase extends SliceboxRoutes with JsonFormats with PlayJsonSupport 
   val importDao = new ImportDAO(dbConfig)
   val anonymizationDao = new AnonymizationDAO(dbConfig)
 
-  Await.ready(for {
+  val createDbTables = for {
     _ <- logDao.create()
     _ <- seriesTypeDao.create()
     _ <- forwardingDao.create()
@@ -90,7 +90,12 @@ trait SliceboxBase extends SliceboxRoutes with JsonFormats with PlayJsonSupport 
     _ <- importDao.create()
     _ <- userDao.create()
     _ <- anonymizationDao.create()
-  } yield Unit, 1.minute)
+  } yield Unit
+  createDbTables.onComplete {
+    case Success(v) => SbxLog.default("System", "Database tables created. ")
+    case Failure(e) => SbxLog.error("System", s"Could not create tables. ${e.getMessage}")
+  }
+  Await.ready(createDbTables, 1.minute)
 
   val host = sliceboxConfig.getString("host")
   val port = sliceboxConfig.getInt("port")
