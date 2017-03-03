@@ -74,7 +74,7 @@ resolvers ++= Seq(
 libraryDependencies ++= {
   val akkaVersion = "2.4.17"
   val akkaHttpVersion = "10.0.3"
-  val slickVersion = "3.2.0-RC1"
+  val slickVersion = "3.2.0"
   val dcm4cheVersion = "3.3.8"
   Seq(
     "com.typesafe.scala-logging" %% "scala-logging" % "3.5.0",
