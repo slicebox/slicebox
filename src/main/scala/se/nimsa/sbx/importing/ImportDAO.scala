@@ -31,7 +31,7 @@ class ImportDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionC
 
   class ImportSessionTable(tag: Tag) extends Table[ImportSession](tag, ImportSessionTable.name) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
-    def name = column[String]("name")
+    def name = column[String]("name", O.Length(255))
     def userId = column[Long]("userid")
     def user = column[String]("user")
     def filesImported = column[Int]("filesimported")

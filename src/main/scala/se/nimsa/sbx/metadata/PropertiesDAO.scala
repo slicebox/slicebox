@@ -69,7 +69,7 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
 
   class SeriesTagTable(tag: Tag) extends Table[SeriesTag](tag, SeriesTagTable.name) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
-    def name = column[String]("name")
+    def name = column[String]("name", O.Length(255))
     def idxUniqueName = index("idx_unique_series_tag_name", name, unique = true)
     def * = (id, name) <> (toSeriesTag.tupled, fromSeriesTag)
   }

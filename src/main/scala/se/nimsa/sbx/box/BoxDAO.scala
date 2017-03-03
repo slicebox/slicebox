@@ -40,7 +40,7 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
 
   class BoxTable(tag: Tag) extends Table[Box](tag, BoxTable.name) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
-    def name = column[String]("name")
+    def name = column[String]("name", O.Length(255))
     def token = column[String]("token")
     def baseUrl = column[String]("baseurl")
     def sendMethod = column[BoxSendMethod]("sendmethod")

@@ -31,7 +31,7 @@ class SeriesTypeDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
 
   class SeriesTypeTable(tag: Tag) extends Table[SeriesType](tag, SeriesTypeTable.name) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
-    def name = column[String]("name")
+    def name = column[String]("name", O.Length(255))
     def idxUniqueName = index("idx_unique_series_type_name", name, unique = true)
     def * = (id, name) <> (SeriesType.tupled, SeriesType.unapply)
   }

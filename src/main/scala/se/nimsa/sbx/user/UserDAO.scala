@@ -34,7 +34,7 @@ class UserDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCon
 
   class UserTable(tag: Tag) extends Table[ApiUser](tag, UserTable.name) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
-    def user = column[String]("user")
+    def user = column[String]("user", O.Length(255))
     def role = column[String]("role")
     def password = column[String]("password")
     def idxUniqueUser = index("idx_unique_user", user, unique = true)
@@ -48,9 +48,9 @@ class UserDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCon
   class SessionTable(tag: Tag) extends Table[ApiSession](tag, SessionTable.name) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def userId = column[Long]("userid")
-    def token = column[String]("token")
-    def ip = column[String]("ip")
-    def userAgent = column[String]("useragent")
+    def token = column[String]("token", O.Length(255))
+    def ip = column[String]("ip", O.Length(255))
+    def userAgent = column[String]("useragent", O.Length(255))
     def updated = column[Long]("updated")
     def fkUser = foreignKey("fk_user", userId, users)(_.id, onDelete = ForeignKeyAction.Cascade)
     def idxUniqueSession = index("idx_unique_session", (token, ip, userAgent), unique = true)
