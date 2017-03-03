@@ -33,7 +33,7 @@ object DbUtil {
 
     dbConf.db.run {
       MTable.getTables("%").flatMap { existingTables =>
-        val tablesToCreate = requiredTables.filter(required => !existingTables.exists(_.name.name == required._1)).map(_._2)
+        val tablesToCreate = requiredTables.filter(required => !existingTables.exists(_.name.name.equalsIgnoreCase(required._1))).map(_._2)
         if (tablesToCreate.nonEmpty)
           tablesToCreate.map(_.schema).reduceLeft(_ ++ _).create
         else
