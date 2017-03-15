@@ -20,6 +20,7 @@ import org.dcm4che3.data.Attributes
 import se.nimsa.sbx.app.GeneralProtocol.Source
 import se.nimsa.sbx.app.GeneralProtocol.SourceRef
 import se.nimsa.sbx.dicom.DicomHierarchy._
+import se.nimsa.sbx.seriestype.SeriesTypeProtocol.SeriesIdSeriesType
 
 object MetaDataProtocol {
   
@@ -150,5 +151,5 @@ object MetaDataProtocol {
 
   case class SeriesTags(seriesTags: Seq[SeriesTag])
 
-  
+  case class SeriesIdSeriesTypeCollection(seriesIdSeriesType: Seq[SeriesIdSeriesType])
 }

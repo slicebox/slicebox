@@ -169,6 +169,19 @@ trait MetadataRoutes {
               }
             }
           }
+        } ~ pathPrefix("seriestypes") {
+          path("get") {
+            pathEndOrSingleSlash {
+              post {
+                entity(as[Seq[Long]]) { seriesIds =>
+                  onSuccess(seriesTypeService.ask(GetSeriesTypesForListOfSeries(seriesIds))) {
+                    case SeriesIdSeriesTypeCollection(seriesIdSeriesTypesList) =>
+                      complete(seriesIdSeriesTypesList)
+                  }
+                }
+              }
+            }
+          }
         } ~ pathPrefix(LongNumber) { seriesId =>
           pathEndOrSingleSlash {
             (get & rejectEmptyResponse) {

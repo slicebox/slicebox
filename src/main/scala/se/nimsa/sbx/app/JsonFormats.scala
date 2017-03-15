@@ -146,6 +146,8 @@ trait JsonFormats {
 
   implicit val seriesTagFormat: Format[SeriesTag] = Json.format[SeriesTag]
 
+  implicit val seriesIdSeriesTypes: Format[SeriesIdSeriesType] = Json.format[SeriesIdSeriesType]
+
   implicit val seriesTypeRuleFormat: Format[SeriesTypeRule] = Json.format[SeriesTypeRule]
 
   implicit val seriesTypeRuleAttributeFormat: Format[SeriesTypeRuleAttribute] = Json.format[SeriesTypeRuleAttribute]

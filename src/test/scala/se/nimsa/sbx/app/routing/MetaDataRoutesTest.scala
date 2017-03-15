@@ -524,4 +524,31 @@ class MetaDataRoutesTest extends {
     }
   }
 
+  it should "return 200 OK and and empty list when bulk getting seriestypes for non existing series" in {
+    PostAsUser("/api/metadata/series/seriestypes/get", Seq(666, 667, 668)) ~> routes ~> check {
+      responseAs[List[SeriesIdSeriesType]] shouldBe empty
+    }
+  }
+
+  it should "return 200 OK and a list of SeriesIdSeriesType objects when bulk getting seriesTypes" in {
+    val seriesType1 = await(seriesTypeDao.insertSeriesType(SeriesType(-1, "st1")))
+    val seriesType2 = await(seriesTypeDao.insertSeriesType(SeriesType(-1, "st2")))
+
+    val addedSeriesId = PostAsUser("/api/images", TestUtil.testImageFormData) ~> routes ~> check {
+      responseAs[Image].seriesId
+    }
+
+    PutAsUser(s"/api/metadata/series/$addedSeriesId/seriestypes/${seriesType1.id}") ~> routes ~> check {
+      status shouldBe NoContent
+    }
+
+    PutAsUser(s"/api/metadata/series/$addedSeriesId/seriestypes/${seriesType2.id}") ~> routes ~> check {
+      status shouldBe NoContent
+    }
+
+    PostAsUser("/api/metadata/series/seriestypes/get", Seq(addedSeriesId, 666, 667)) ~> routes ~> check {
+      val responseList = responseAs[List[SeriesIdSeriesType]]
+      responseList should have length 2
+    }
+  }
 }
