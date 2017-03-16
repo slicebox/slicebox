@@ -525,8 +525,8 @@ class MetaDataRoutesTest extends {
   }
 
   it should "return 200 OK and and empty list when bulk getting seriestypes for non existing series" in {
-    PostAsUser("/api/metadata/series/seriestypes/get", Seq(666, 667, 668)) ~> routes ~> check {
-      responseAs[List[SeriesIdSeriesType]] shouldBe empty
+    PostAsUser("/api/metadata/series/seriestypes/query", IdsQuery(Seq(666, 667, 668))) ~> routes ~> check {
+      responseAs[SeriesIdSeriesTypesResult].seriesIdSeriesTypes shouldBe empty
     }
   }
 
@@ -546,9 +546,9 @@ class MetaDataRoutesTest extends {
       status shouldBe NoContent
     }
 
-    PostAsUser("/api/metadata/series/seriestypes/get", Seq(addedSeriesId, 666, 667)) ~> routes ~> check {
-      val responseList = responseAs[List[SeriesIdSeriesType]]
-      responseList should have length 2
+    PostAsUser("/api/metadata/series/seriestypes/query", IdsQuery(Seq(addedSeriesId, 666, 667))) ~> routes ~> check {
+      val queryResult = responseAs[SeriesIdSeriesTypesResult]
+      queryResult.seriesIdSeriesTypes should have length 2
     }
   }
 }

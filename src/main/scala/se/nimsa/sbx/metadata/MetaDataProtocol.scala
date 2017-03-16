@@ -150,6 +150,4 @@ object MetaDataProtocol {
   case class SeriesTagRemovedFromSeries(seriesId: Long)
 
   case class SeriesTags(seriesTags: Seq[SeriesTag])
-
-  case class SeriesIdSeriesTypeCollection(seriesIdSeriesType: Seq[SeriesIdSeriesType])
 }

@@ -170,13 +170,13 @@ trait MetadataRoutes {
             }
           }
         } ~ pathPrefix("seriestypes") {
-          path("get") {
+          path("query") {
             pathEndOrSingleSlash {
               post {
-                entity(as[Seq[Long]]) { seriesIds =>
-                  onSuccess(seriesTypeService.ask(GetSeriesTypesForListOfSeries(seriesIds))) {
-                    case SeriesIdSeriesTypeCollection(seriesIdSeriesTypesList) =>
-                      complete(seriesIdSeriesTypesList)
+                entity(as[IdsQuery]) { query =>
+                  onSuccess(seriesTypeService.ask(GetSeriesTypesForListOfSeries(query))) {
+                    case result: SeriesIdSeriesTypesResult =>
+                      complete(result)
                   }
                 }
               }
