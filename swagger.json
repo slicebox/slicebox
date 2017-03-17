@@ -869,32 +869,6 @@
       }
     },
 
-    "/metadata/series/seriestypes/query": {
-      "post": {
-        "description": "submit a query for seriestypes for a list of series",
-        "tags": ["Meta Data"],
-        "parameters": [
-          {
-            "name": "query",
-            "in": "body",
-            "description": "parameters of series query",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/idsquery"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "series",
-            "schema": {
-              "$ref": "#/definitions/seriesidseriestypesresult"
-            }
-          }
-        }
-      }
-    },
-
     "/metadata/series/{seriesId}/seriestypes/{seriesTypeId}": {
       "put": {
         "description": "Add the series type with the supplied series type ID to the series with the supplied series ID",
@@ -3110,6 +3084,32 @@
           }
         }        
       }      
+    },
+
+   "/seriestypes/series/query": {
+      "post": {
+        "description": "submit a query for seriestypes for a list of series",
+        "tags": ["Meta Data"],
+        "parameters": [
+          {
+            "name": "query",
+            "in": "body",
+            "description": "parameters of series query",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/idsquery"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "series",
+            "schema": {
+              "$ref": "#/definitions/seriesidseriestypesresult"
+            }
+          }
+        }
+      }
     },
 
     "/seriestypes/rules": {
