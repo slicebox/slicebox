@@ -235,13 +235,13 @@ class SeriesTypeRoutesTest extends {
     }
   }
 
-  it should "return 200 OK and and empty list when bulk getting seriestypes for non existing series" in {
+  it should "return 200 OK and a SeriesIdSeriesTypeResult containing an empty list when bulk getting seriestypes for non existing series" in {
     PostAsUser("/api/seriestypes/series/query", IdsQuery(Seq(666, 667, 668))) ~> routes ~> check {
       responseAs[SeriesIdSeriesTypesResult].seriesIdSeriesTypes shouldBe empty
     }
   }
 
-  it should "return 200 OK and a list of SeriesIdSeriesType objects when bulk getting seriesTypes" in {
+  it should "return 200 OK and a SeriesIdSeriesTypeResult object when bulk getting seriesTypes" in {
     val seriesType1 = await(seriesTypeDao.insertSeriesType(SeriesType(-1, "st1")))
     val seriesType2 = await(seriesTypeDao.insertSeriesType(SeriesType(-1, "st2")))
 
