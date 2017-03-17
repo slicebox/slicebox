@@ -140,7 +140,7 @@ trait JsonFormats {
   implicit val queryOrderFormat: Format[QueryOrder] = Json.format[QueryOrder]
   implicit val queryPropertyFormat: Format[QueryProperty] = Json.format[QueryProperty]
   implicit val queryFiltersFormat: Format[QueryFilters] = Json.format[QueryFilters]
-  implicit val queryFormat: Format[MetaDataProtocol.Query] = Json.format[MetaDataProtocol.Query]
+  implicit val queryFormat: Format[Query] = Json.format[Query]
   implicit val idsQueryFormat: Format[IdsQuery] = Json.format[IdsQuery]
   implicit val anonymizationKeyQueryFormat: Format[AnonymizationKeyQuery] = Json.format[AnonymizationKeyQuery]
 

@@ -34,7 +34,7 @@ object SeriesTypeProtocol {
 
   case class SeriesIdSeriesType(seriesId: Long, seriesType: SeriesType)
 
-  case class IdsQuery(seriesIds: Seq[Long])
+  case class IdsQuery(ids: Seq[Long])
 
   case class SeriesTypeRuleAttribute(
       id: Long,

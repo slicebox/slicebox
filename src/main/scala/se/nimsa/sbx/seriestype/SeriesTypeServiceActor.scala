@@ -171,7 +171,7 @@ class SeriesTypeServiceActor(seriesTypeDao: SeriesTypeDAO)(implicit timeout: Tim
     await(seriesTypeDao.seriesTypesForSeries(seriesId))
 
   def getSeriesTypesForListOfSeries(idsQuery: IdsQuery) =
-    await(seriesTypeDao.seriesTypesForListOfSeries(idsQuery.seriesIds))
+    await(seriesTypeDao.seriesTypesForListOfSeries(idsQuery.ids))
 
   def addSeriesTypeToSeries(seriesSeriesType: SeriesSeriesType) =
     await(seriesTypeDao.upsertSeriesSeriesType(seriesSeriesType))
