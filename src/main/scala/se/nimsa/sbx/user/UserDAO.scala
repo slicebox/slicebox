@@ -50,7 +50,7 @@ class UserDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCon
     def userId = column[Long]("userid")
     def token = column[String]("token", O.Length(255))
     def ip = column[String]("ip", O.Length(255))
-    def userAgent = column[String]("useragent", O.Length(255))
+    def userAgent = column[String]("useragent", O.Length(512))
     def updated = column[Long]("updated")
     def fkUser = foreignKey("fk_user", userId, users)(_.id, onDelete = ForeignKeyAction.Cascade)
     def idxUniqueSession = index("idx_unique_session", (token, ip, userAgent), unique = true)
