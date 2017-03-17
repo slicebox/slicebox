@@ -44,7 +44,7 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
 
   class PatientsTable(tag: Tag) extends Table[Patient](tag, PatientsTable.name) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
-    def patientName = column[String](DicomProperty.PatientName.name, O.Length(255))
+    def patientName = column[String](DicomProperty.PatientName.name, O.Length(512))
     def patientID = column[String](DicomProperty.PatientID.name, O.Length(255))
     def patientBirthDate = column[String](DicomProperty.PatientBirthDate.name)
     def patientSex = column[String](DicomProperty.PatientSex.name)
