@@ -118,7 +118,8 @@ class SeriesTypeServiceActor(seriesTypeDao: SeriesTypeDAO)(implicit timeout: Tim
             sender ! SeriesTypes(seriesTypes)
 
           case GetSeriesTypesForListOfSeries(seriesIds) =>
-            sender ! getSeriesTypesForListOfSeries(seriesIds)
+            val seriesIdSeriesTypes = getSeriesTypesForListOfSeries(seriesIds)
+            sender ! SeriesIdSeriesTypesResult(seriesIdSeriesTypes)
 
           case GetUpdateSeriesTypesRunningStatus =>
             seriesTypeUpdateService.forward(GetUpdateSeriesTypesRunningStatus)

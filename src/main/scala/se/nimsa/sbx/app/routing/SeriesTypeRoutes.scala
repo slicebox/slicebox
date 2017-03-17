@@ -141,13 +141,11 @@ trait SeriesTypeRoutes {
         }
       } ~ pathPrefix("series") {
         path("query") {
-          pathEndOrSingleSlash {
-            post {
-              entity(as[IdsQuery]) { query =>
-                onSuccess(seriesTypeService.ask(GetSeriesTypesForListOfSeries(query))) {
-                  case result: SeriesIdSeriesTypesResult =>
-                    complete(result)
-                }
+          post {
+            entity(as[IdsQuery]) { query =>
+              onSuccess(seriesTypeService.ask(GetSeriesTypesForListOfSeries(query))) {
+                case result: SeriesIdSeriesTypesResult =>
+                  complete(result)
               }
             }
           }
