@@ -27,9 +27,11 @@ import se.nimsa.sbx.directory.DirectoryWatchProtocol._
 import se.nimsa.sbx.forwarding.ForwardingProtocol._
 import se.nimsa.sbx.importing.ImportProtocol._
 import se.nimsa.sbx.log.LogProtocol._
+import se.nimsa.sbx.metadata.MetaDataProtocol
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.scp.ScpProtocol._
 import se.nimsa.sbx.scu.ScuProtocol._
+import se.nimsa.sbx.seriestype.SeriesTypeProtocol
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
 import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.user.UserProtocol._
@@ -139,12 +141,14 @@ trait JsonFormats {
   implicit val queryPropertyFormat: Format[QueryProperty] = Json.format[QueryProperty]
   implicit val queryFiltersFormat: Format[QueryFilters] = Json.format[QueryFilters]
   implicit val queryFormat: Format[Query] = Json.format[Query]
-
+  implicit val idsQueryFormat: Format[IdsQuery] = Json.format[IdsQuery]
   implicit val anonymizationKeyQueryFormat: Format[AnonymizationKeyQuery] = Json.format[AnonymizationKeyQuery]
 
   implicit val seriesTypeFormat: Format[SeriesType] = Json.format[SeriesType]
 
   implicit val seriesTagFormat: Format[SeriesTag] = Json.format[SeriesTag]
+
+  implicit val seriesIdSeriesTypes: Format[SeriesIdSeriesType] = Json.format[SeriesIdSeriesType]
 
   implicit val seriesTypeRuleFormat: Format[SeriesTypeRule] = Json.format[SeriesTypeRule]
 
@@ -153,5 +157,7 @@ trait JsonFormats {
   implicit val forwardingRuleFormat: Format[ForwardingRule] = Json.format[ForwardingRule]
 
   implicit val importSessionFormat: Format[ImportSession] = Json.format[ImportSession]
+
+  implicit val queryResultSeriesType: Format[SeriesIdSeriesTypesResult] = Json.format[SeriesIdSeriesTypesResult]
 
 }

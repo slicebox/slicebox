@@ -523,5 +523,4 @@ class MetaDataRoutesTest extends {
       responseAs[List[Image]] shouldBe empty
     }
   }
-
 }

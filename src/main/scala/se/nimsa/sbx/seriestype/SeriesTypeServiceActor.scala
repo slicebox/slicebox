@@ -117,6 +117,10 @@ class SeriesTypeServiceActor(seriesTypeDao: SeriesTypeDAO)(implicit timeout: Tim
             val seriesTypes = getSeriesTypesForSeries(seriesId)
             sender ! SeriesTypes(seriesTypes)
 
+          case GetSeriesTypesForListOfSeries(seriesIds) =>
+            val seriesIdSeriesTypes = getSeriesTypesForListOfSeries(seriesIds)
+            sender ! SeriesIdSeriesTypesResult(seriesIdSeriesTypes)
+
           case GetUpdateSeriesTypesRunningStatus =>
             seriesTypeUpdateService.forward(GetUpdateSeriesTypesRunningStatus)
         }
@@ -166,6 +170,9 @@ class SeriesTypeServiceActor(seriesTypeDao: SeriesTypeDAO)(implicit timeout: Tim
 
   def getSeriesTypesForSeries(seriesId: Long) =
     await(seriesTypeDao.seriesTypesForSeries(seriesId))
+
+  def getSeriesTypesForListOfSeries(idsQuery: IdsQuery) =
+    await(seriesTypeDao.seriesTypesForListOfSeries(idsQuery.ids))
 
   def addSeriesTypeToSeries(seriesSeriesType: SeriesSeriesType) =
     await(seriesTypeDao.upsertSeriesSeriesType(seriesSeriesType))

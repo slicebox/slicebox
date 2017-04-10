@@ -25,7 +25,8 @@ import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
 import se.nimsa.sbx.user.UserProtocol._
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 
-trait SeriesTypeRoutes { this: SliceboxBase =>
+trait SeriesTypeRoutes {
+  this: SliceboxBase =>
 
   def seriesTypeRoutes(apiUser: ApiUser): Route =
     pathPrefix("seriestypes") {
@@ -138,7 +139,17 @@ trait SeriesTypeRoutes { this: SliceboxBase =>
             }
           }
         }
-
+      } ~ pathPrefix("series") {
+        path("query") {
+          post {
+            entity(as[IdsQuery]) { query =>
+              onSuccess(seriesTypeService.ask(GetSeriesTypesForListOfSeries(query))) {
+                case result: SeriesIdSeriesTypesResult =>
+                  complete(result)
+              }
+            }
+          }
+        }
       }
     }
 }

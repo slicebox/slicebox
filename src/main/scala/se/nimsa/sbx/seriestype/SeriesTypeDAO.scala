@@ -187,4 +187,14 @@ class SeriesTypeDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
     } yield st
     innerJoin.result
   }
+
+  def seriesTypesForListOfSeries(seriesIds: Seq[Long]): Future[Seq[SeriesIdSeriesType]] = db.run {
+    val innerJoin = for {
+      sst <- seriesSeriesTypes.filter(_.seriesId inSet seriesIds)
+      st <- seriesTypes if sst.seriesTypeId === st.id
+    } yield (sst.seriesId, st.id, st.name)
+    innerJoin.result.map(
+      tuples => tuples.map(t => SeriesIdSeriesType(t._1, SeriesType(t._2, t._3)))
+    )
+  }
 }
