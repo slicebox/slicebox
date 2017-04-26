@@ -56,7 +56,8 @@ object Contexts {
     Context(OphthalmicTomographyImageStorage, standardTS),
     Context(VLWholeSlideMicroscopyImageStorage, standardTS),
     Context(PositronEmissionTomographyImageStorage, standardTS),
-    Context(RTImageStorage, standardTS)
+    Context(RTImageStorage, standardTS),
+    Context(SegmentationStorage, standardTS)
   )
 
   val extendedContexts = imageDataContexts ++ Seq(
