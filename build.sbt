@@ -73,23 +73,23 @@ resolvers ++= Seq(
 
 libraryDependencies ++= {
   val akkaVersion = "2.4.17"
-  val akkaHttpVersion = "10.0.3"
+  val akkaHttpVersion = "10.0.6"
   val slickVersion = "3.2.0"
   val dcm4cheVersion = "3.3.8"
   Seq(
     "com.typesafe.scala-logging" %% "scala-logging" % "3.5.0",
     "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
     "com.typesafe.akka" %% "akka-http" % akkaHttpVersion,
-    "de.heikoseeberger" %% "akka-http-play-json" % "1.12.0",
-    "ch.qos.logback" % "logback-classic" % "1.2.1",
+    "de.heikoseeberger" %% "akka-http-play-json" % "1.15.0",
+    "ch.qos.logback" % "logback-classic" % "1.2.3",
     "com.typesafe.slick" %% "slick" % slickVersion,
     "com.typesafe.slick" %% "slick-hikaricp" % slickVersion,
-    "com.h2database" % "h2" % "1.4.193",
-    "mysql" % "mysql-connector-java" % "6.0.5",
-    "com.zaxxer" % "HikariCP" % "2.5.1",
+    "com.h2database" % "h2" % "1.4.195",
+    "mysql" % "mysql-connector-java" % "6.0.6",
+    "com.zaxxer" % "HikariCP" % "2.6.1",
     "com.github.t3hnar" %% "scala-bcrypt" % "3.0",
-    "com.amazonaws" % "aws-java-sdk-s3" % "1.11.89",
-    "org.scalatest" %% "scalatest" % "3.0.1" % "test",
+    "com.amazonaws" % "aws-java-sdk-s3" % "1.11.126",
+    "org.scalatest" %% "scalatest" % "3.0.3" % "test",
     "org.dcm4che" % "dcm4che-core" % dcm4cheVersion,
     "org.dcm4che" % "dcm4che-image" % dcm4cheVersion,
     "org.dcm4che" % "dcm4che-imageio" % dcm4cheVersion,
@@ -97,7 +97,7 @@ libraryDependencies ++= {
     "com.typesafe.akka" %% "akka-testkit" % akkaVersion % "test",
     "com.typesafe.akka" %% "akka-http-testkit" % akkaHttpVersion % "test",
     "org.webjars" % "angularjs" % "1.5.9",
-    "org.webjars" % "angular-material" % "1.1.3",
+    "org.webjars" % "angular-material" % "1.1.4",
     "org.webjars" % "angular-file-upload" % "11.0.0"
   )
 }
