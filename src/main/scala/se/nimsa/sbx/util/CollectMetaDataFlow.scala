@@ -5,9 +5,9 @@ import akka.stream.{Attributes, FlowShape, Inlet, Outlet}
 import akka.stream.stage.{GraphStage, GraphStageLogic, InHandler, OutHandler}
 import akka.util.ByteString
 import se.nimsa.dcm4che.streams.DicomParts._
-
 import org.dcm4che3.data.Tag
 import org.dcm4che3.io.DicomStreamException
+import se.nimsa.sbx.anonymization.AnonymizationProtocol.AnonymizationKeys
 
 /**
   * A flow which buffers DICOM parts until PatientName, PatientId and PatientIdentityRemoved are known.
@@ -152,11 +152,13 @@ object CollectMetaDataFlow {
 }
 
 
-case class DicomMetaPart(patientId: String, patientName: String, identityRemoved: String) extends DicomPart {
+case class DicomMetaPart(patientId: String, patientName: String, identityRemoved: String, anonKeys: Option[AnonymizationKeys] = None) extends DicomPart {
 
   def bytes = ByteString.empty
 
   def bigEndian = false
+
+  def isAnonymized = identityRemoved.toUpperCase == "YES"
 }
 
 

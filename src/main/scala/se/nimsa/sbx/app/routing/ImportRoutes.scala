@@ -22,7 +22,7 @@ import akka.event.Logging
 import scala.concurrent.Future
 import akka.pattern.ask
 import org.dcm4che3.data.{Attributes, Tag}
-import se.nimsa.sbx.anonymization.AnonymizationProtocol.ReverseAnonymization
+import se.nimsa.sbx.anonymization.AnonymizationProtocol.{AnonymizationKeys, GetReverseAnonymizationKeys, ReverseAnonymization}
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.app.{Slicebox, SliceboxBase}
 import se.nimsa.sbx.dicom.{Contexts, DicomUtil}
@@ -45,7 +45,7 @@ import se.nimsa.dcm4che.streams.DicomPartFlow._
 import se.nimsa.dcm4che.streams.DicomParts._
 import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.storage.{S3Facade, S3Stream}
-import se.nimsa.sbx.util.{CollectMetaDataFlow, ReverseAnonymizationFlow}
+import se.nimsa.sbx.util.{CollectMetaDataFlow, DicomMetaPart, ReverseAnonymizationFlow}
 
 import scala.util.{Failure, Success}
 
@@ -113,7 +113,22 @@ trait ImportRoutes {
 
 
 
+  def maybeAnonymizationLookup(dicomPart: DicomPart): Future[DicomPart] = {
+    dicomPart match {
+      case meta: DicomMetaPart =>
+        if (meta.isAnonymized) {
+          anonymizationService.ask(GetReverseAnonymizationKeys(meta.patientName, meta.patientId)).mapTo[AnonymizationKeys].map { keys: AnonymizationKeys =>
+            println(">>>> KEYS: " + keys)
+            DicomMetaPart(meta.patientId, meta.patientName, meta.identityRemoved, Some(keys))
+          }
+        } else {
+          Future.successful(meta)
+        }
 
+      case part: DicomPart =>
+        Future.successful(part)
+    }
+  }
 
 
 
@@ -147,12 +162,11 @@ trait ImportRoutes {
           via(partFlow).
           via(groupLengthDiscardFilter).
           via(CollectMetaDataFlow.collectMetaDataFlow).
+          mapAsync(5)(maybeAnonymizationLookup).
           via(ReverseAnonymizationFlow.reverseAnonFlow)
         val dbAttributesSink = DicomAttributesSink.attributesSink
 
 
-        // validateFlow -> partFlow -> groupLengthDiscardFilter -> metaDataGather
-        // -> maybeReversAnonFlow -> broadcast -> (s3Sink, dbSink)
         // FIXME: in flows: deflated? change to inflated? change transferSyntax, group length
         val importGraph = RunnableGraph.fromGraph(GraphDSL.create(dicomFileSink, dbAttributesSink)(_ zip _) { implicit builder =>
           (dicomFileSink, dbAttributesSink) =>
@@ -163,10 +177,9 @@ trait ImportRoutes {
 
             bytes ~> flow ~> bcast.in
             bcast.out(0).map(_.bytes) ~> dicomFileSink
-            //bcast.out(1) ~> whitelistFilter(tagsToStoreInDB) ~> attributeFlow ~> dbAttributesSink  //printFlow[DicomPart]
-            bcast.out(1) ~> whitelistFilter(tagsToStoreInDB) ~> attributeFlow ~> dbAttributesSink
+            bcast.out(1) ~> whitelistFilter(tagsToStoreInDB) ~> attributeFlow ~> dbAttributesSink  //printFlow[DicomPart]
 
-            // FIXME: reverse anon, inflate flow
+            // FIXME: inflate flow?
 
             ClosedShape
         })
@@ -196,6 +209,7 @@ trait ImportRoutes {
       case None =>
         complete(NotFound)
     }
+
 
 
 

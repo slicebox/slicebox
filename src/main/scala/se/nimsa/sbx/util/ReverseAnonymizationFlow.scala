@@ -32,7 +32,7 @@ class ReverseAnonymizationFlow() extends GraphStage[FlowShape[DicomPart, DicomPa
 
 
     def isAnonymized = if (metaData.isDefined) {
-      metaData.get.identityRemoved.toUpperCase == "YES"
+      metaData.get.isAnonymized
     } else {
       false
     }
@@ -69,18 +69,21 @@ class ReverseAnonymizationFlow() extends GraphStage[FlowShape[DicomPart, DicomPa
 
 
           case valueChunk: DicomValueChunk if currentAttribute.isDefined =>
-            currentAttribute.map(attribute => attribute.copy(valueChunks = attribute.valueChunks :+ valueChunk))
+            println(">>>> value chunk for currentAttr: " + valueChunk)
+            currentAttribute = currentAttribute.map(attribute => attribute.copy(valueChunks = attribute.valueChunks :+ valueChunk))
             if (valueChunk.last) {
 
               // FIXME: reverseAnon()
-              if (currentAttribute.get.header.tag == Tag.PatientName) {
+              if (currentAttribute.get.header.tag == Tag.PatientName && false) {
                 val updatedAttribute = currentAttribute.get.updateStringValue("Theodore^Test") // FIXME: specific cs
-                println(">>>> updatedAttribute: " + updatedAttribute)
-                push(out, updatedAttribute)
+                println(">>>> emit updatedAttribute: " + updatedAttribute)
+                emitMultiple(out, (updatedAttribute.header +: updatedAttribute.valueChunks).iterator)
+                //push(out, updatedAttribute)
 
               } else {
-                println(">>>> currentAttribute: " + currentAttribute.get)
-                push(out, currentAttribute.get)
+                println(">>>> emit currentAttribute: " + currentAttribute.get)
+                emitMultiple(out, (currentAttribute.get.header +: currentAttribute.get.valueChunks).iterator)
+                //push(out, currentAttribute.get)
               }
 
               currentAttribute = None

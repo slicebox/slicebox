@@ -70,6 +70,10 @@ class AnonymizationServiceActor(anonymizationDao: AnonymizationDAO, purgeEmptyAn
             } else
               sender ! attributes
 
+          case GetReverseAnonymizationKeys(anonName, anonID) =>
+              val keys = anonymizationKeysForAnonPatient(anonName, anonID)
+              sender ! AnonymizationKeys(keys)
+
           case Anonymize(imageId, attributes, tagValues) =>
             if (isAnonymous(attributes) && tagValues.isEmpty)
               sender ! attributes
@@ -116,6 +120,10 @@ class AnonymizationServiceActor(anonymizationDao: AnonymizationDAO, purgeEmptyAn
   def anonymizationKeysForAnonPatient(attributes: Attributes) = {
     val anonPatient = attributesToPatient(attributes)
     await(anonymizationDao.anonymizationKeysForAnonPatient(anonPatient.patientName.value, anonPatient.patientID.value))
+  }
+
+  def anonymizationKeysForAnonPatient(anonPatientName: String, anonPatientID: String) = {
+    await(anonymizationDao.anonymizationKeysForAnonPatient(anonPatientName, anonPatientID))
   }
 
   def anonymizationKeysForPatient(attributes: Attributes) = {
