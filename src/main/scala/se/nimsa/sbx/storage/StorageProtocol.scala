@@ -49,6 +49,8 @@ object StorageProtocol {
   
   case class DeleteDicomData(image: Image) extends ImageRequest
 
+  case class MoveDicomData(sourceImageName: String, targetImageName: String) extends ImageRequest
+
   case class CreateExportSet(imageIds: Seq[Long]) extends ImageRequest
 
   case class GetExportSetImageIds(exportSetId: Long) extends ImageRequest
@@ -61,6 +63,8 @@ object StorageProtocol {
   case class DicomDataAdded(image: Image, overwrite: Boolean)
 
   case class DicomDataDeleted(image: Image)
+
+  case class DicomDataMoved(sourceImageName: String, targetImageName: String)
 
   case class ExportSetId(id: Long)
 

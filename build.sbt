@@ -3,7 +3,7 @@ import de.heikoseeberger.sbtheader.license.Apache2_0
 name := "slicebox"
 version := "1.3-SNAPSHOT"
 organization := "se.nimsa"
-scalaVersion := "2.12.1"
+scalaVersion := "2.12.2"
 scalacOptions := Seq("-encoding", "UTF-8", "-Xlint", "-deprecation", "-unchecked", "-feature", "-target:jvm-1.8")
 
 // define the project
@@ -63,11 +63,14 @@ headers := Map(
 
 // repos
 
+
 resolvers ++= Seq(
-  "Typesafe Repository" at "http://repo.typesafe.com/typesafe/releases/",
-  "Sonatype snapshots" at "http://oss.sonatype.org/content/repositories/snapshots/",
+  Resolver.typesafeRepo("releases"),
+  Resolver.sonatypeRepo("snapshots"),
   "dcm4che Repository" at "http://www.dcm4che.org/maven2/",
   Resolver.bintrayRepo("hseeberger", "maven"))
+
+
 
 // deps
 
@@ -99,6 +102,8 @@ libraryDependencies ++= {
     "org.webjars" % "angularjs" % "1.5.9",
     "org.webjars" % "angular-material" % "1.1.4",
     "org.webjars" % "angular-file-upload" % "11.0.0"
+    "se.nimsa" %% "dcm4che-streams" % "0.2.1-SNAPSHOT",
+    "com.lightbend.akka" %% "akka-stream-alpakka-s3" % "0.8"
   )
 }
 

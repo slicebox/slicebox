@@ -17,24 +17,35 @@
 package se.nimsa.sbx.app.routing
 
 
+import akka.event.Logging
+
 import scala.concurrent.Future
 import akka.pattern.ask
-import org.dcm4che3.data.Attributes
+import org.dcm4che3.data.{Attributes, Tag}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.ReverseAnonymization
 import se.nimsa.sbx.app.GeneralProtocol._
-import se.nimsa.sbx.app.SliceboxBase
-import se.nimsa.sbx.dicom.DicomUtil
+import se.nimsa.sbx.app.{Slicebox, SliceboxBase}
+import se.nimsa.sbx.dicom.{Contexts, DicomUtil}
 import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.user.UserProtocol.ApiUser
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
-import akka.stream.scaladsl.StreamConverters
-import akka.stream.scaladsl.{Source => StreamSource}
+import akka.stream.{ClosedShape, FlowShape}
+import akka.stream.alpakka.s3.scaladsl.S3Client
+import akka.stream.scaladsl.{Broadcast, GraphDSL, RunnableGraph, Sink, Source => StreamSource}
 import akka.util.ByteString
+import org.dcm4che3.io.DicomStreamException
+import se.nimsa.dcm4che.streams.DicomAttributesSink
 import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, GetImage, MetaDataAdded}
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.importing.ImportProtocol._
+import se.nimsa.dcm4che.streams.DicomFlows._
+import se.nimsa.dcm4che.streams.DicomPartFlow._
+import se.nimsa.dcm4che.streams.DicomParts._
+import se.nimsa.sbx.log.SbxLog
+import se.nimsa.sbx.storage.{S3Facade, S3Stream}
+import se.nimsa.sbx.util.{CollectMetaDataFlow, ReverseAnonymizationFlow}
 
 import scala.util.{Failure, Success}
 
@@ -98,7 +109,100 @@ trait ImportRoutes {
 
     }
 
+
+
+
+
+
+
+
+
+  private def tagsToStoreInDB = {
+    val patientTags = Seq(Tag.PatientName, Tag.PatientID, Tag.PatientSex, Tag.PatientBirthDate)
+    val studyTags = Seq(Tag.StudyInstanceUID, Tag.StudyDescription, Tag.StudyDate, Tag.AccessionNumber, Tag.PatientAge)
+    val seriesTags = Seq(Tag.SeriesInstanceUID, Tag.SeriesDescription, Tag.SeriesDate, Tag.Modality, Tag.ProtocolName, Tag.BodyPartExamined, Tag.Manufacturer, Tag.StationName, Tag.FrameOfReferenceUID)
+    val imageTags = Seq(Tag.SOPInstanceUID, Tag.ImageType, Tag.InstanceNumber)
+
+    patientTags ++ studyTags ++ seriesTags ++ imageTags
+  }
+
+
+
   def addImageToImportSessionRoute(bytes: StreamSource[ByteString, Any], importSessionId: Long): Route = {
+
+    val tmpId = java.util.UUID.randomUUID().toString
+    val tmpPath = s"tmp-$tmpId"
+    SbxLog.info("Import", s"Storing to tmpPath $tmpPath")
+
+    onSuccess(importService.ask(GetImportSession(importSessionId)).mapTo[Option[ImportSession]]) {
+      case Some(importSession) =>
+
+        val source = Source(SourceType.IMPORT, importSession.name, importSessionId)
+
+        val dicomFileSink = this.storage.fileSink(tmpPath)
+        val validationContexts = Contexts.asNamePairs(Contexts.imageDataContexts).map { pair =>
+          ValidationContext(pair._1, pair._2)
+        }
+        val flow = validateFlowWithContext(validationContexts).
+          via(partFlow).
+          via(groupLengthDiscardFilter).
+          via(CollectMetaDataFlow.collectMetaDataFlow).
+          via(ReverseAnonymizationFlow.reverseAnonFlow)
+        val dbAttributesSink = DicomAttributesSink.attributesSink
+
+
+        // validateFlow -> partFlow -> groupLengthDiscardFilter -> metaDataGather
+        // -> maybeReversAnonFlow -> broadcast -> (s3Sink, dbSink)
+        // FIXME: in flows: deflated? change to inflated? change transferSyntax, group length
+        val importGraph = RunnableGraph.fromGraph(GraphDSL.create(dicomFileSink, dbAttributesSink)(_ zip _) { implicit builder =>
+          (dicomFileSink, dbAttributesSink) =>
+            import GraphDSL.Implicits._
+
+            // importing the partial graph will return its shape (inlets & outlets)
+            val bcast = builder.add(Broadcast[DicomPart](2))
+
+            bytes ~> flow ~> bcast.in
+            bcast.out(0).map(_.bytes) ~> dicomFileSink
+            //bcast.out(1) ~> whitelistFilter(tagsToStoreInDB) ~> attributeFlow ~> dbAttributesSink  //printFlow[DicomPart]
+            bcast.out(1) ~> whitelistFilter(tagsToStoreInDB) ~> attributeFlow ~> dbAttributesSink
+
+            // FIXME: reverse anon, inflate flow
+
+            ClosedShape
+        })
+
+        onComplete(importGraph.run()) {
+          case Success((uploadResult, attributes)) =>
+            val dataAttributes: Attributes = attributes._2.get
+            onSuccess(metaDataService.ask(AddMetaData(dataAttributes, source)).mapTo[MetaDataAdded]) { metaData =>
+              onSuccess(importService.ask(AddImageToSession(importSession.id, metaData.image, !metaData.imageAdded)).mapTo[ImageAddedToSession]) { importSessionImage =>
+                onSuccess(storageService.ask(MoveDicomData(tmpPath, s"${metaData.image.id}")).mapTo[DicomDataMoved]) { dataMoved =>
+                  val httpStatus = if (metaData.imageAdded) Created else OK
+                  complete((httpStatus, metaData.image))
+                }
+              }
+            }
+          case Failure(dicomStreamException: DicomStreamException) =>
+            SbxLog.error("Exception during import", dicomStreamException.getMessage)
+            importService.ask(UpdateSessionWithRejection(importSession))
+            complete((BadRequest, dicomStreamException.getMessage))
+
+          case Failure(failure) =>
+            SbxLog.error("Exception during import", failure.getMessage)
+            importService.ask(UpdateSessionWithRejection(importSession))
+            complete(InternalServerError, failure.getMessage)
+        }
+
+      case None =>
+        complete(NotFound)
+    }
+
+
+
+
+
+/*
+
     val is = bytes.runWith(StreamConverters.asInputStream())
     val dicomData = DicomUtil.loadDicomData(is, withPixelData = true)
     onSuccess(importService.ask(GetImportSession(importSessionId)).mapTo[Option[ImportSession]]) {
@@ -130,7 +234,8 @@ trait ImportRoutes {
 
       case None =>
         complete(NotFound)
-    }
+
+    }*/
   }
 
 }

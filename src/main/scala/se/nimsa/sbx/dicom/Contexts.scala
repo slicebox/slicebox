@@ -19,6 +19,7 @@ package se.nimsa.sbx.dicom
 import se.nimsa.sbx.dicom.SopClasses._
 import se.nimsa.sbx.dicom.TransferSyntaxes._
 
+
 object Contexts {
 
   case class Context(sopClass: SopClass, transferSyntaxes: Seq[TransferSyntax])
@@ -66,4 +67,13 @@ object Contexts {
     Context(MultiframeGrayscaleWordSecondaryCaptureImageStorage, standardTS),
     Context(MultiframeColorSecondaryCaptureImageStorage, standardTS)
   )
+
+
+  def asNamePairs(contexts: Seq[Context]): Seq[(String, String)] = {
+    contexts.flatMap { context =>
+      context.transferSyntaxes.map((context.sopClass, _))
+    }.map { pair =>
+      (pair._1.uid, pair._2.uid)
+    }
+  }
 }

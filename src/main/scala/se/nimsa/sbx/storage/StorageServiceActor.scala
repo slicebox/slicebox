@@ -79,6 +79,17 @@ class StorageServiceActor(storage: StorageService,
           }
           sender ! dicomDataDeleted
 
+        case MoveDicomData(source, target) =>
+          val dicomDataMoved = DicomDataMoved(source, target)
+          try {
+            storage.move(source, target)
+          } catch {
+            case e: NoSuchFileException => log.error(s"DICOM file for image with id ${source} could not be found.")
+              throw new RuntimeException(s"DICOM file for image with id ${source} could not be found.")
+          }
+          sender ! dicomDataMoved
+
+
         case CreateExportSet(imageIds) =>
           val exportSetId = if (exportSets.isEmpty) 1 else exportSets.keys.max + 1
           exportSets(exportSetId) = imageIds

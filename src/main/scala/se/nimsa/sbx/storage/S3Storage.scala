@@ -17,14 +17,23 @@
 package se.nimsa.sbx.storage
 
 import java.io.{ByteArrayOutputStream, InputStream}
-import java.nio.file.{Files, Path}
 import javax.imageio.ImageIO
 
+import akka.actor.ActorSystem
+import akka.stream.{ClosedShape, Materializer}
+import akka.stream.alpakka.s3.scaladsl.S3Client
+import akka.stream.scaladsl.{Broadcast, FileIO, GraphDSL, RunnableGraph, Sink, Source => StreamSource}
+import akka.util.ByteString
+import org.dcm4che3.data.Attributes
+import se.nimsa.dcm4che.streams.DicomAttributesSink
+import se.nimsa.dcm4che.streams.DicomFlows._
+import se.nimsa.dcm4che.streams.DicomPartFlow._
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.DicomUtil._
-import se.nimsa.sbx.dicom.{DicomData, DicomUtil, ImageAttribute}
+import se.nimsa.sbx.dicom.{Contexts, DicomData, DicomUtil, ImageAttribute}
 import se.nimsa.sbx.storage.StorageProtocol.ImageInformation
 
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.control.NonFatal
 
 /**
@@ -32,13 +41,21 @@ import scala.util.control.NonFatal
   * @param s3Prefix prefix for keys
   * @param bucket S3 bucket
   */
-class S3Storage(val bucket: String, val s3Prefix: String) extends StorageService {
+class S3Storage(val bucket: String, val s3Prefix: String, val region: String) extends StorageService {
 
-  val s3Client = new S3Facade(bucket)
+  val s3Client = new S3Facade(bucket, region)
 
-  private def s3Id(image: Image) =
-    s3Prefix + "/" + imageName(image)
+  private def s3Id(image: Image): String =
+    s3Id(imageName(image))
 
+  private def s3Id(imageName: String): String =
+    s3Prefix + "/" + imageName
+
+  override def move(sourceImageName: String, targetImageName: String) = {
+    // FIXME: prefix source ?
+    s3Client.copy(sourceImageName, s3Id(targetImageName))
+    s3Client.delete(sourceImageName)
+  }
 
   override def storeDicomData(dicomData: DicomData, image: Image): Boolean = {
     val storedId = s3Id(image)
@@ -87,5 +104,11 @@ class S3Storage(val bucket: String, val s3Prefix: String) extends StorageService
     val s3InputStream = s3Client.get(s3Id(image))
     s3InputStream
   }
+
+  override def fileSink(tmpPath: String)(implicit actorSystem: ActorSystem, mat: Materializer):  Sink[ByteString, Future[Any]] = {
+    // FIXME:  config!!!
+    new S3Client(S3Facade.credentialsFromProviderChain(), "us-east-1").multipartUpload("dev-sbx-data.exiniaws.com", tmpPath)
+  }
+
 
 }

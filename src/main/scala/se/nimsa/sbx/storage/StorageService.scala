@@ -18,18 +18,23 @@ package se.nimsa.sbx.storage
 
 import java.awt.RenderingHints
 import java.awt.image.BufferedImage
-import java.io.{ByteArrayInputStream, ByteArrayOutputStream, IOException, InputStream}
-import java.nio.file.Path
+import java.io.{ByteArrayOutputStream, InputStream}
 import javax.imageio.ImageIO
 import javax.imageio.stream.ImageInputStream
 
+import akka.actor.ActorSystem
+import akka.stream.Materializer
+import akka.util.ByteString
+import akka.stream.scaladsl.{FileIO, RunnableGraph, Sink, Source => StreamSource}
 import com.amazonaws.util.IOUtils
-import org.dcm4che3.data.{BulkData, Fragments, Tag}
+import org.dcm4che3.data.{Attributes, Tag}
 import org.dcm4che3.imageio.plugins.dcm.DicomImageReadParam
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.DicomUtil._
 import se.nimsa.sbx.dicom.{DicomData, ImageAttribute}
 import se.nimsa.sbx.storage.StorageProtocol.ImageInformation
+
+import scala.concurrent.{ExecutionContext, Future}
 
 /**
   * Created by michaelkober on 2016-04-25.
@@ -45,6 +50,8 @@ trait StorageService {
   def deleteFromStorage(images: Seq[Image]): Unit = images foreach (deleteFromStorage(_))
 
   def deleteFromStorage(image: Image): Unit
+
+  def move(sourceImageName: String, targetImageName: String): Unit
 
   def readDicomData(image: Image, withPixelData: Boolean): DicomData
 
@@ -115,4 +122,7 @@ trait StorageService {
       image
   }
 
+  def fileSink(tmpPath: String)(implicit actorSystem: ActorSystem, mat: Materializer):  Sink[ByteString, Future[Any]]
+
 }
+

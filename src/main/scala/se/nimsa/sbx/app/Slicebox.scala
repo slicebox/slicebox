@@ -152,7 +152,7 @@ object Slicebox extends {
 
   val storage =
     if (cfg.getString("dicom-storage.config.name") == "s3")
-      new S3Storage(cfg.getString("dicom-storage.config.bucket"), cfg.getString("dicom-storage.config.prefix"))
+      new S3Storage(cfg.getString("dicom-storage.config.bucket"), cfg.getString("dicom-storage.config.prefix"), cfg.getString("dicom-storage.config.region"))
     else
       new FileStorage(Paths.get(cfg.getString("dicom-storage.file-system.path")))
 } with SliceboxBase with App {

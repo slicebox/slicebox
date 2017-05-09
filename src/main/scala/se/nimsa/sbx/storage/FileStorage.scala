@@ -17,15 +17,24 @@
 package se.nimsa.sbx.storage
 
 import java.io.{BufferedInputStream, InputStream}
-import java.nio.file.{Files, Path, Paths}
+import java.nio.file.{Files, Path, Paths, StandardCopyOption}
 import javax.imageio.ImageIO
 
+import akka.actor.ActorSystem
+import akka.stream.{ClosedShape, Materializer}
+import akka.stream.alpakka.s3.scaladsl.S3Client
+import akka.stream.scaladsl.{Broadcast, FileIO, GraphDSL, RunnableGraph, Sink, Source => StreamSource}
+import akka.util.ByteString
 import org.dcm4che3.data.Attributes
+import se.nimsa.dcm4che.streams.DicomAttributesSink
+import se.nimsa.dcm4che.streams.DicomFlows._
+import se.nimsa.dcm4che.streams.DicomPartFlow._
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.DicomUtil._
-import se.nimsa.sbx.dicom.{DicomData, DicomUtil, ImageAttribute}
+import se.nimsa.sbx.dicom.{Contexts, DicomData, DicomUtil, ImageAttribute}
 import se.nimsa.sbx.storage.StorageProtocol.ImageInformation
 
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.control.NonFatal
 
 /**
@@ -49,6 +58,10 @@ class FileStorage(val path: Path) extends StorageService {
 
   private def filePath(image: Image): Path =
     path.resolve(imageName(image))
+
+  override def move(sourceImageName: String, targetImageName: String): Unit = {
+    Files.move(path.resolve(sourceImageName), path.resolve(targetImageName), StandardCopyOption.REPLACE_EXISTING)
+  }
 
   override def deleteFromStorage(image: Image): Unit =
     Files.delete(filePath(image))
@@ -81,4 +94,9 @@ class FileStorage(val path: Path) extends StorageService {
     if (!Files.isDirectory(path))
       throw new IllegalArgumentException("Dicom-files directory is not a directory.")
   }
+
+
+  override def fileSink(tmpPath: String)(implicit actorSystem: ActorSystem, mat: Materializer):  Sink[ByteString, Future[Any]] = FileIO.toPath(path.resolve(tmpPath))
+
+
 }
