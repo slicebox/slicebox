@@ -3,7 +3,7 @@ import de.heikoseeberger.sbtheader.license.Apache2_0
 name := "slicebox"
 version := "1.3-SNAPSHOT"
 organization := "se.nimsa"
-scalaVersion := "2.12.2"
+scalaVersion := "2.12.1"
 scalacOptions := Seq("-encoding", "UTF-8", "-Xlint", "-deprecation", "-unchecked", "-feature", "-target:jvm-1.8")
 
 // define the project
@@ -102,7 +102,7 @@ libraryDependencies ++= {
     "org.webjars" % "angularjs" % "1.5.9",
     "org.webjars" % "angular-material" % "1.1.4",
     "org.webjars" % "angular-file-upload" % "11.0.0",
-    "se.nimsa" %% "dcm4che-streams" % "0.2.1-SNAPSHOT",
+    "se.nimsa" %% "dcm4che-streams" % "0.1.1",
     "com.lightbend.akka" %% "akka-stream-alpakka-s3" % "0.8"
   )
 }
