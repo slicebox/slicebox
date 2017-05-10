@@ -7,7 +7,8 @@ import akka.util.ByteString
 import se.nimsa.dcm4che.streams.DicomParts._
 import org.dcm4che3.data.Tag
 import org.dcm4che3.io.DicomStreamException
-import se.nimsa.sbx.anonymization.AnonymizationProtocol.AnonymizationKeys
+import se.nimsa.sbx.anonymization.AnonymizationProtocol.{AnonymizationKey, AnonymizationKeys}
+import se.nimsa.sbx.dicom.DicomPropertyValue.{SeriesInstanceUID, StudyInstanceUID}
 
 /**
   * A flow which buffers DICOM parts until PatientName, PatientId and PatientIdentityRemoved are known.
@@ -31,6 +32,8 @@ class CollectMetaDataFlow() extends GraphStage[FlowShape[DicomPart, DicomPart]] 
     var patientName: Option[DicomAttribute] = None
     var patientID: Option[DicomAttribute] = None
     var patientIdentityRemoved: Option[DicomAttribute] = None
+    var studyInstanceUID: Option[DicomAttribute] = None
+    var seriesInstanceUID: Option[DicomAttribute] = None
     var currentMeta: Option[String] = None
 
     setHandlers(in, out, new InHandler with OutHandler {
@@ -53,28 +56,33 @@ class CollectMetaDataFlow() extends GraphStage[FlowShape[DicomPart, DicomPart]] 
             failStage(new DicomStreamException("Error collecting meta data for reverse anonymization: max buffer size exceeded"))
           }
 
+          buffer = buffer :+ part
+
           part match {
             case header: DicomHeader if (header.tag == Tag.PatientName) =>
               patientName = Some(DicomAttribute(header, Seq.empty))
               currentMeta = Some("patientName")
-              buffer = buffer :+ header
 
             case header: DicomHeader if (header.tag == Tag.PatientID) =>
               patientID = Some(DicomAttribute(header, Seq.empty))
               currentMeta = Some("patientID")
-              buffer = buffer :+ header
 
             case header: DicomHeader if (header.tag == Tag.PatientIdentityRemoved) =>
               patientIdentityRemoved = Some(DicomAttribute(header, Seq.empty))
               currentMeta = Some("patientIdentityRemoved")
-              buffer = buffer :+ header
+
+            case header: DicomHeader if (header.tag == Tag.StudyInstanceUID) =>
+              studyInstanceUID = Some(DicomAttribute(header, Seq.empty))
+              currentMeta = Some("studyInstanceUID")
+
+            case header: DicomHeader if (header.tag == Tag.SeriesInstanceUID) =>
+              seriesInstanceUID = Some(DicomAttribute(header, Seq.empty))
+              currentMeta = Some("seriesInstanceUID")
 
             case header: DicomHeader =>
               currentMeta = None
-              buffer = buffer :+ header
 
             case valueChunk: DicomValueChunk =>
-              buffer = buffer :+ valueChunk
 
               currentMeta match {
 
@@ -94,6 +102,23 @@ class CollectMetaDataFlow() extends GraphStage[FlowShape[DicomPart, DicomPart]] 
                   patientIdentityRemoved = patientIdentityRemoved.map(attribute => attribute.copy(valueChunks = attribute.valueChunks :+ valueChunk))
                   if (valueChunk.last) {
                     currentMeta = None
+                    val isAnon = patientIdentityRemoved.get.bytes.decodeString("US-ASCII").trim.toUpperCase == "YES"
+                    if (!isAnon) {
+                      reachedEnd = true
+                      pushMetaAndBuffered()
+                    }
+                  }
+
+                case Some("studyInstanceUID") =>
+                  studyInstanceUID = studyInstanceUID.map(attribute => attribute.copy(valueChunks = attribute.valueChunks :+ valueChunk))
+                  if (valueChunk.last) {
+                    currentMeta = None
+                  }
+
+                case Some("seriesInstanceUID") =>
+                  seriesInstanceUID = seriesInstanceUID.map(attribute => attribute.copy(valueChunks = attribute.valueChunks :+ valueChunk))
+                  if (valueChunk.last) {
+                    currentMeta = None
                     reachedEnd = true
                     pushMetaAndBuffered()
                   }
@@ -101,8 +126,7 @@ class CollectMetaDataFlow() extends GraphStage[FlowShape[DicomPart, DicomPart]] 
                 case _ => // just do nothing
               }
 
-            case part: DicomPart =>
-              buffer = buffer :+ part
+            case _: DicomPart => // just do nothing
           }
 
           if (!reachedEnd) {
@@ -116,12 +140,16 @@ class CollectMetaDataFlow() extends GraphStage[FlowShape[DicomPart, DicomPart]] 
         * and all other parts that have been buffered so far.
         */
       def pushMetaAndBuffered() = {
-        val name = patientName.get.bytes
-        val id = patientID.get.bytes
-        val isAnon = patientIdentityRemoved.get.bytes
 
         // FIXME: handle specific character set!
-        val metaPart = new DicomMetaPart(name.decodeString("UTF-8").trim, id.decodeString("UTF-8").trim, isAnon.decodeString("UTF-8").trim)
+        val name = patientName.get.bytes.decodeString("US-ASCII").trim
+        val id = patientID.get.bytes.decodeString("US-ASCII").trim
+        val isAnon = if (patientIdentityRemoved.isDefined) patientIdentityRemoved.get.bytes.decodeString("US-ASCII").trim else "NO"
+        val studyUID = if (studyInstanceUID.isDefined) Some(studyInstanceUID.get.bytes.decodeString("US-ASCII").trim) else None
+        val seriesUID = if (seriesInstanceUID.isDefined) Some(seriesInstanceUID.get.bytes.decodeString("US-ASCII").trim) else None
+
+
+        val metaPart = new DicomMetaPart(name, id, isAnon, studyUID, seriesUID)
 
         emitMultiple(out, (metaPart +: buffer).iterator)
         buffer = Nil
@@ -152,7 +180,7 @@ object CollectMetaDataFlow {
 }
 
 
-case class DicomMetaPart(patientId: String, patientName: String, identityRemoved: String, anonKeys: Option[AnonymizationKeys] = None) extends DicomPart {
+case class DicomMetaPart(patientId: String, patientName: String, identityRemoved: String, studyInstanceUID: Option[String] = None, seriesInstanceUID: Option[String] = None, anonKeys: Option[AnonymizationKey] = None) extends DicomPart {
 
   def bytes = ByteString.empty
 

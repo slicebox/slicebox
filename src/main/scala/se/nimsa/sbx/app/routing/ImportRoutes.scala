@@ -16,23 +16,19 @@
 
 package se.nimsa.sbx.app.routing
 
-
-import akka.event.Logging
-
 import scala.concurrent.Future
 import akka.pattern.ask
 import org.dcm4che3.data.{Attributes, Tag}
-import se.nimsa.sbx.anonymization.AnonymizationProtocol.{AnonymizationKeys, GetReverseAnonymizationKeys, ReverseAnonymization}
+import se.nimsa.sbx.anonymization.AnonymizationProtocol.{AnonymizationKeys, GetReverseAnonymizationKeys}
 import se.nimsa.sbx.app.GeneralProtocol._
-import se.nimsa.sbx.app.{Slicebox, SliceboxBase}
-import se.nimsa.sbx.dicom.{Contexts, DicomUtil}
+import se.nimsa.sbx.app.SliceboxBase
+import se.nimsa.sbx.dicom.Contexts
 import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.user.UserProtocol.ApiUser
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
-import akka.stream.{ClosedShape, FlowShape}
-import akka.stream.alpakka.s3.scaladsl.S3Client
+import akka.stream.ClosedShape
 import akka.stream.scaladsl.{Broadcast, GraphDSL, RunnableGraph, Sink, Source => StreamSource}
 import akka.util.ByteString
 import org.dcm4che3.io.DicomStreamException
@@ -44,7 +40,6 @@ import se.nimsa.dcm4che.streams.DicomFlows._
 import se.nimsa.dcm4che.streams.DicomPartFlow._
 import se.nimsa.dcm4che.streams.DicomParts._
 import se.nimsa.sbx.log.SbxLog
-import se.nimsa.sbx.storage.{S3Facade, S3Stream}
 import se.nimsa.sbx.util.{CollectMetaDataFlow, DicomMetaPart, ReverseAnonymizationFlow}
 
 import scala.util.{Failure, Success}
@@ -110,16 +105,19 @@ trait ImportRoutes {
     }
 
 
-
-
-
   def maybeAnonymizationLookup(dicomPart: DicomPart): Future[DicomPart] = {
     dicomPart match {
       case meta: DicomMetaPart =>
         if (meta.isAnonymized) {
           anonymizationService.ask(GetReverseAnonymizationKeys(meta.patientName, meta.patientId)).mapTo[AnonymizationKeys].map { keys: AnonymizationKeys =>
-            println(">>>> KEYS: " + keys)
-            DicomMetaPart(meta.patientId, meta.patientName, meta.identityRemoved, Some(keys))
+            if (!meta.studyInstanceUID.isDefined) {
+              throw new RuntimeException("StudyInstanceUID not found in DicomMetaPart")
+            }
+            if (!meta.seriesInstanceUID.isDefined) {
+              throw new RuntimeException("SeriesInstanceUID not found in DicomMetaPart")
+            }
+            val filtered = keys.anonymizationKeys.filter(key => (key.anonStudyInstanceUID == meta.studyInstanceUID.get) && (key.anonSeriesInstanceUID == meta.seriesInstanceUID.get))
+            DicomMetaPart(meta.patientId, meta.patientName, meta.identityRemoved, meta.studyInstanceUID, meta.seriesInstanceUID, filtered.headOption)
           }
         } else {
           Future.successful(meta)
@@ -147,7 +145,6 @@ trait ImportRoutes {
 
     val tmpId = java.util.UUID.randomUUID().toString
     val tmpPath = s"tmp-$tmpId"
-    SbxLog.info("Import", s"Storing to tmpPath $tmpPath")
 
     onSuccess(importService.ask(GetImportSession(importSessionId)).mapTo[Option[ImportSession]]) {
       case Some(importSession) =>
@@ -155,31 +152,29 @@ trait ImportRoutes {
         val source = Source(SourceType.IMPORT, importSession.name, importSessionId)
 
         val dicomFileSink = this.storage.fileSink(tmpPath)
+        val dbAttributesSink = DicomAttributesSink.attributesSink
+
         val validationContexts = Contexts.asNamePairs(Contexts.imageDataContexts).map { pair =>
           ValidationContext(pair._1, pair._2)
         }
-        val flow = validateFlowWithContext(validationContexts).
-          via(partFlow).
-          via(groupLengthDiscardFilter).
-          via(CollectMetaDataFlow.collectMetaDataFlow).
-          mapAsync(5)(maybeAnonymizationLookup).
-          via(ReverseAnonymizationFlow.reverseAnonFlow)
-        val dbAttributesSink = DicomAttributesSink.attributesSink
-
 
         // FIXME: in flows: deflated? change to inflated? change transferSyntax, group length
         val importGraph = RunnableGraph.fromGraph(GraphDSL.create(dicomFileSink, dbAttributesSink)(_ zip _) { implicit builder =>
           (dicomFileSink, dbAttributesSink) =>
             import GraphDSL.Implicits._
 
-            // importing the partial graph will return its shape (inlets & outlets)
+            val flow = validateFlowWithContext(validationContexts).
+              via(partFlow).
+              via(groupLengthDiscardFilter).
+              via(CollectMetaDataFlow.collectMetaDataFlow).
+              mapAsync(5)(maybeAnonymizationLookup).
+              via(ReverseAnonymizationFlow.reverseAnonFlow)
+
             val bcast = builder.add(Broadcast[DicomPart](2))
 
             bytes ~> flow ~> bcast.in
             bcast.out(0).map(_.bytes) ~> dicomFileSink
-            bcast.out(1) ~> whitelistFilter(tagsToStoreInDB) ~> attributeFlow ~> dbAttributesSink  //printFlow[DicomPart]
-
-            // FIXME: inflate flow?
+            bcast.out(1) ~> whitelistFilter(tagsToStoreInDB) ~> attributeFlow ~> dbAttributesSink
 
             ClosedShape
         })
@@ -209,47 +204,5 @@ trait ImportRoutes {
       case None =>
         complete(NotFound)
     }
-
-
-
-
-
-
-/*
-
-    val is = bytes.runWith(StreamConverters.asInputStream())
-    val dicomData = DicomUtil.loadDicomData(is, withPixelData = true)
-    onSuccess(importService.ask(GetImportSession(importSessionId)).mapTo[Option[ImportSession]]) {
-      case Some(importSession) =>
-
-        val source = Source(SourceType.IMPORT, importSession.name, importSessionId)
-
-        onComplete(storageService.ask(CheckDicomData(dicomData, useExtendedContexts = false)).mapTo[Boolean]) {
-
-          case Success(status) =>
-            onSuccess(anonymizationService.ask(ReverseAnonymization(dicomData.attributes)).mapTo[Attributes]) { reversedAttributes =>
-              onSuccess(metaDataService.ask(AddMetaData(reversedAttributes, source)).mapTo[MetaDataAdded]) { metaData =>
-                onSuccess(storageService.ask(AddDicomData(dicomData.copy(attributes = reversedAttributes), source, metaData.image)).mapTo[DicomDataAdded]) { dicomDataAdded =>
-                  onSuccess(importService.ask(AddImageToSession(importSession.id, dicomDataAdded.image, dicomDataAdded.overwrite)).mapTo[ImageAddedToSession]) { importSessionImage =>
-                    if (dicomDataAdded.overwrite)
-                      complete((OK, dicomDataAdded.image))
-                    else
-                      complete((Created, dicomDataAdded.image))
-                  }
-                }
-              }
-            }
-
-          case Failure(e) =>
-            importService.ask(UpdateSessionWithRejection(importSession))
-            complete((BadRequest, e.getMessage))
-
-        }
-
-      case None =>
-        complete(NotFound)
-
-    }*/
   }
-
 }

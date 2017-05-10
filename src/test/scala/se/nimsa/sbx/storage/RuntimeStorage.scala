@@ -3,10 +3,16 @@ package se.nimsa.sbx.storage
 import java.io.{ByteArrayInputStream, InputStream}
 import javax.imageio.ImageIO
 
+import akka.actor.ActorSystem
+import akka.stream.Materializer
+import akka.stream.scaladsl.{FileIO, Sink}
+import akka.util.ByteString
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.DicomUtil._
 import se.nimsa.sbx.dicom.{DicomData, DicomUtil, ImageAttribute}
 import se.nimsa.sbx.storage.StorageProtocol.ImageInformation
+
+import scala.concurrent.Future
 
 class RuntimeStorage extends StorageService {
 
@@ -40,4 +46,7 @@ class RuntimeStorage extends StorageService {
 
   def clear() =
     storage.clear()
+
+  override def move(sourceImageName: String, targetImageName: String) = {}
+  override def fileSink(tmpPath: String)(implicit actorSystem: ActorSystem, mat: Materializer):  Sink[ByteString, Future[Any]] = Sink.ignore
 }

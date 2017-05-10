@@ -19,6 +19,7 @@ class ReverseAnonymizationFlow() extends GraphStage[FlowShape[DicomPart, DicomPa
     val REVERSE_ANON_TAGS = Seq(Tag.PatientName,
       Tag.PatientID,
       Tag.PatientBirthDate,
+      Tag.PatientIdentityRemoved,
       Tag.StudyInstanceUID,
       Tag.StudyDescription,
       Tag.StudyID,
@@ -46,21 +47,30 @@ class ReverseAnonymizationFlow() extends GraphStage[FlowShape[DicomPart, DicomPa
 
       override def onPush(): Unit = {
 
+        // do reverse anon if:
+        // metaData is defined and data is anonymized
+        // anomymization keys found in DB
+        // tag specifies attribute that needs to be reversed
+        def needReverseAnon(tag: Int): Boolean = {
+          canDoReverseAnon && REVERSE_ANON_TAGS.contains(tag)
+        }
+
+        def canDoReverseAnon: Boolean = {
+          metaData.isDefined && metaData.get.isAnonymized && metaData.get.anonKeys.isDefined
+        }
+
         val part = grab(in)
 
         part match {
           case metaPart: DicomMetaPart =>
             metaData = Some(metaPart)
+            // FIXME: remove println
             println(">>>> grabbed meta, isAnon: " + isAnonymized)
+            println(">>>> grabbed meta, canDoReverse: " + canDoReverseAnon)
             pull(in)
 
-
-
-          case header: DicomHeader if REVERSE_ANON_TAGS.contains(header.tag)  =>
-            // fixme
-            println(">>>> DO REVERSE ANON for: " + header.tag)
+          case header: DicomHeader if needReverseAnon(header.tag)  =>
             currentAttribute = Some(DicomAttribute(header, Seq.empty))
-            //push(out, part)
             pull(in)
 
           case header: DicomHeader =>
@@ -68,39 +78,63 @@ class ReverseAnonymizationFlow() extends GraphStage[FlowShape[DicomPart, DicomPa
             push(out, part)
 
 
-          case valueChunk: DicomValueChunk if currentAttribute.isDefined =>
-            println(">>>> value chunk for currentAttr: " + valueChunk)
+          case valueChunk: DicomValueChunk if currentAttribute.isDefined && canDoReverseAnon =>
             currentAttribute = currentAttribute.map(attribute => attribute.copy(valueChunks = attribute.valueChunks :+ valueChunk))
             if (valueChunk.last) {
 
-              // FIXME: reverseAnon()
-              if (currentAttribute.get.header.tag == Tag.PatientName && false) {
-                val updatedAttribute = currentAttribute.get.updateStringValue("Theodore^Test") // FIXME: specific cs
-                println(">>>> emit updatedAttribute: " + updatedAttribute)
-                emitMultiple(out, (updatedAttribute.header +: updatedAttribute.valueChunks).iterator)
-                //push(out, updatedAttribute)
+              val updatedAttribute = currentAttribute.get.header.tag match {
+                case Tag.PatientName =>
+                  currentAttribute.get.updateStringValue(metaData.get.anonKeys.get.patientName) // FIXME: specific cs ?
 
-              } else {
-                println(">>>> emit currentAttribute: " + currentAttribute.get)
-                emitMultiple(out, (currentAttribute.get.header +: currentAttribute.get.valueChunks).iterator)
-                //push(out, currentAttribute.get)
+                case Tag.PatientID =>
+                  currentAttribute.get.updateStringValue(metaData.get.anonKeys.get.patientID) // FIXME: specific cs ?
+
+                case Tag.PatientBirthDate =>
+                  currentAttribute.get.updateDateValue(metaData.get.anonKeys.get.patientBirthDate) // FIXME: specific cs ?
+
+                case Tag.PatientIdentityRemoved =>
+                  currentAttribute.get.updateStringValue("NO") // FIXME: specific cs ?
+
+                case Tag.StudyInstanceUID =>
+                  currentAttribute.get.updateStringValue(metaData.get.anonKeys.get.studyInstanceUID) // FIXME: specific cs ?
+
+                case Tag.StudyDescription =>
+                  currentAttribute.get.updateStringValue(metaData.get.anonKeys.get.studyDescription) // FIXME: specific cs ?
+
+                case Tag.StudyID =>
+                  currentAttribute.get.updateStringValue(metaData.get.anonKeys.get.studyID) // FIXME: specific cs ?
+
+                case Tag.AccessionNumber =>
+                  currentAttribute.get.updateStringValue(metaData.get.anonKeys.get.accessionNumber) // FIXME: specific cs ?
+
+                case Tag.SeriesInstanceUID =>
+                  currentAttribute.get.updateStringValue(metaData.get.anonKeys.get.seriesInstanceUID) // FIXME: specific cs ?
+
+                case Tag.SeriesDescription =>
+                  currentAttribute.get.updateStringValue(metaData.get.anonKeys.get.seriesDescription) // FIXME: specific cs ?
+
+                case Tag.ProtocolName =>
+                  currentAttribute.get.updateStringValue(metaData.get.anonKeys.get.protocolName) // FIXME: specific cs ?
+
+                case Tag.FrameOfReferenceUID =>
+                  currentAttribute.get.updateStringValue(metaData.get.anonKeys.get.frameOfReferenceUID) // FIXME: specific cs ?
+
+                case _ =>
+                  currentAttribute.get
               }
-
+              // FIMXE remove println
+              println(">>>> currentAttr: " + currentAttribute.get.header + " - " + currentAttribute.get.bytes.decodeString("ASCII"))
+              println(">>>> updatedAttr: " + updatedAttribute.header + " - " + updatedAttribute.bytes.decodeString("ASCII"))
+              emitMultiple(out, (updatedAttribute.header +: updatedAttribute.valueChunks).iterator)
               currentAttribute = None
             } else {
               pull(in)
             }
 
-
           case part: DicomPart =>
             push(out, part)
 
-          case _ => println(">>>>>> WOT???")
-
-
         }
-
-
       }
 
       override def onUpstreamFinish(): Unit = {
@@ -111,7 +145,6 @@ class ReverseAnonymizationFlow() extends GraphStage[FlowShape[DicomPart, DicomPa
   }
 
 }
-
 
 object ReverseAnonymizationFlow {
   val reverseAnonFlow = Flow[DicomPart].via(new ReverseAnonymizationFlow())

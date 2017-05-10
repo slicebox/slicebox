@@ -40,6 +40,7 @@ import scala.util.control.NonFatal
   * Service that stores DICOM files on AWS S3.
   * @param s3Prefix prefix for keys
   * @param bucket S3 bucket
+  * @param region aws region of the bucket
   */
 class S3Storage(val bucket: String, val s3Prefix: String, val region: String) extends StorageService {
 
@@ -106,9 +107,7 @@ class S3Storage(val bucket: String, val s3Prefix: String, val region: String) ex
   }
 
   override def fileSink(tmpPath: String)(implicit actorSystem: ActorSystem, mat: Materializer):  Sink[ByteString, Future[Any]] = {
-    // FIXME:  config!!!
-    new S3Client(S3Facade.credentialsFromProviderChain(), "us-east-1").multipartUpload("dev-sbx-data.exiniaws.com", tmpPath)
+    new S3Client(S3Facade.credentialsFromProviderChain(), region).multipartUpload(bucket, tmpPath)
   }
-
 
 }
