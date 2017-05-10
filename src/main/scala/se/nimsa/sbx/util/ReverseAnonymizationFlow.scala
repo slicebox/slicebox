@@ -84,40 +84,40 @@ class ReverseAnonymizationFlow() extends GraphStage[FlowShape[DicomPart, DicomPa
 
               val updatedAttribute = currentAttribute.get.header.tag match {
                 case Tag.PatientName =>
-                  currentAttribute.get.updateStringValue(metaData.get.anonKeys.get.patientName) // FIXME: specific cs ?
+                  currentAttribute.get.withUpdatedStringValue(metaData.get.anonKeys.get.patientName) // FIXME: specific cs ?
 
                 case Tag.PatientID =>
-                  currentAttribute.get.updateStringValue(metaData.get.anonKeys.get.patientID) // FIXME: specific cs ?
+                  currentAttribute.get.withUpdatedStringValue(metaData.get.anonKeys.get.patientID) // FIXME: specific cs ?
 
                 case Tag.PatientBirthDate =>
-                  currentAttribute.get.updateDateValue(metaData.get.anonKeys.get.patientBirthDate) // FIXME: specific cs ?
+                  currentAttribute.get.withUpdatedDateValue(metaData.get.anonKeys.get.patientBirthDate) // FIXME: specific cs ?
 
                 case Tag.PatientIdentityRemoved =>
-                  currentAttribute.get.updateStringValue("NO") // FIXME: specific cs ?
+                  currentAttribute.get.withUpdatedStringValue("NO") // FIXME: specific cs ?
 
                 case Tag.StudyInstanceUID =>
-                  currentAttribute.get.updateStringValue(metaData.get.anonKeys.get.studyInstanceUID) // FIXME: specific cs ?
+                  currentAttribute.get.withUpdatedStringValue(metaData.get.anonKeys.get.studyInstanceUID) // FIXME: specific cs ?
 
                 case Tag.StudyDescription =>
-                  currentAttribute.get.updateStringValue(metaData.get.anonKeys.get.studyDescription) // FIXME: specific cs ?
+                  currentAttribute.get.withUpdatedStringValue(metaData.get.anonKeys.get.studyDescription) // FIXME: specific cs ?
 
                 case Tag.StudyID =>
-                  currentAttribute.get.updateStringValue(metaData.get.anonKeys.get.studyID) // FIXME: specific cs ?
+                  currentAttribute.get.withUpdatedStringValue(metaData.get.anonKeys.get.studyID) // FIXME: specific cs ?
 
                 case Tag.AccessionNumber =>
-                  currentAttribute.get.updateStringValue(metaData.get.anonKeys.get.accessionNumber) // FIXME: specific cs ?
+                  currentAttribute.get.withUpdatedStringValue(metaData.get.anonKeys.get.accessionNumber) // FIXME: specific cs ?
 
                 case Tag.SeriesInstanceUID =>
-                  currentAttribute.get.updateStringValue(metaData.get.anonKeys.get.seriesInstanceUID) // FIXME: specific cs ?
+                  currentAttribute.get.withUpdatedStringValue(metaData.get.anonKeys.get.seriesInstanceUID) // FIXME: specific cs ?
 
                 case Tag.SeriesDescription =>
-                  currentAttribute.get.updateStringValue(metaData.get.anonKeys.get.seriesDescription) // FIXME: specific cs ?
+                  currentAttribute.get.withUpdatedStringValue(metaData.get.anonKeys.get.seriesDescription) // FIXME: specific cs ?
 
                 case Tag.ProtocolName =>
-                  currentAttribute.get.updateStringValue(metaData.get.anonKeys.get.protocolName) // FIXME: specific cs ?
+                  currentAttribute.get.withUpdatedStringValue(metaData.get.anonKeys.get.protocolName) // FIXME: specific cs ?
 
                 case Tag.FrameOfReferenceUID =>
-                  currentAttribute.get.updateStringValue(metaData.get.anonKeys.get.frameOfReferenceUID) // FIXME: specific cs ?
+                  currentAttribute.get.withUpdatedStringValue(metaData.get.anonKeys.get.frameOfReferenceUID) // FIXME: specific cs ?
 
                 case _ =>
                   currentAttribute.get
