@@ -67,7 +67,7 @@ class ReverseAnonymizationFlow() extends GraphStage[FlowShape[DicomPart, DicomPa
             // FIXME: remove println
             println(">>>> grabbed meta, isAnon: " + isAnonymized)
             println(">>>> grabbed meta, canDoReverse: " + canDoReverseAnon)
-            pull(in)
+            push(out, metaPart)
 
           case header: DicomHeader if needReverseAnon(header.tag)  =>
             currentAttribute = Some(DicomAttribute(header, Seq.empty))

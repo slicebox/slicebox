@@ -24,7 +24,7 @@ object Contexts {
 
   case class Context(sopClass: SopClass, transferSyntaxes: Seq[TransferSyntax])
 
-  private val standardTS = Seq(ImplicitVrLittleEndian, ExplicitVrLittleEndian, ExplicitVrBigEndian, JpegBaselineProcess1)
+  private val standardTS = Seq(ImplicitVrLittleEndian, ExplicitVrLittleEndian, ExplicitVrBigEndian, DeflatedExplicitVrLittleEndian, JpegBaselineProcess1)
   
   val imageDataContexts = Seq(
     Context(ComputedRadiographyImageStorage, standardTS),

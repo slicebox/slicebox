@@ -16,32 +16,33 @@
 
 package se.nimsa.sbx.app.routing
 
-import scala.concurrent.Future
+import akka.NotUsed
+import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.server.Route
 import akka.pattern.ask
+import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Merge, RunnableGraph, Sink, Source => StreamSource}
+import akka.stream.{ClosedShape, FlowShape, SinkShape}
+import akka.util.ByteString
 import org.dcm4che3.data.{Attributes, Tag}
+import org.dcm4che3.io.DicomStreamException
+import se.nimsa.dcm4che.streams.DicomFlows._
+import se.nimsa.dcm4che.streams.DicomPartFlow._
+import se.nimsa.dcm4che.streams.DicomParts._
+import se.nimsa.dcm4che.streams.{DicomAttributesSink, DicomFlows}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.{AnonymizationKeys, GetReverseAnonymizationKeys}
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.dicom.Contexts
-import se.nimsa.sbx.storage.StorageProtocol._
-import se.nimsa.sbx.user.UserProtocol.ApiUser
-import akka.http.scaladsl.model.StatusCodes._
-import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.server.Route
-import akka.stream.ClosedShape
-import akka.stream.scaladsl.{Broadcast, GraphDSL, RunnableGraph, Sink, Source => StreamSource}
-import akka.util.ByteString
-import org.dcm4che3.io.DicomStreamException
-import se.nimsa.dcm4che.streams.DicomAttributesSink
-import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, GetImage, MetaDataAdded}
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.importing.ImportProtocol._
-import se.nimsa.dcm4che.streams.DicomFlows._
-import se.nimsa.dcm4che.streams.DicomPartFlow._
-import se.nimsa.dcm4che.streams.DicomParts._
 import se.nimsa.sbx.log.SbxLog
+import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, GetImage, MetaDataAdded}
+import se.nimsa.sbx.storage.StorageProtocol._
+import se.nimsa.sbx.user.UserProtocol.ApiUser
 import se.nimsa.sbx.util.{CollectMetaDataFlow, DicomMetaPart, ReverseAnonymizationFlow}
 
+import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
 trait ImportRoutes {
@@ -117,7 +118,7 @@ trait ImportRoutes {
               throw new RuntimeException("SeriesInstanceUID not found in DicomMetaPart")
             }
             val filtered = keys.anonymizationKeys.filter(key => (key.anonStudyInstanceUID == meta.studyInstanceUID.get) && (key.anonSeriesInstanceUID == meta.seriesInstanceUID.get))
-            DicomMetaPart(meta.patientId, meta.patientName, meta.identityRemoved, meta.studyInstanceUID, meta.seriesInstanceUID, filtered.headOption)
+            DicomMetaPart(meta.transferSyntaxUid, meta.patientId, meta.patientName, meta.identityRemoved, meta.studyInstanceUID, meta.seriesInstanceUID, filtered.headOption)
           }
         } else {
           Future.successful(meta)
@@ -139,7 +140,42 @@ trait ImportRoutes {
     patientTags ++ studyTags ++ seriesTags ++ imageTags
   }
 
+  def maybeDeflateFlow: Flow[DicomPart, DicomPart, NotUsed] = Flow.fromGraph(GraphDSL.create() { implicit builder =>
+    import GraphDSL.Implicits._
 
+    var shouldDeflate = false // determines which path is taken in the graph, with or without deflating
+
+    // check transfer syntax in the meta part
+    val shouldDeflateFlow = builder.add {
+      Flow[DicomPart].map {
+        case p: DicomMetaPart =>
+          // TODO add constants for relevant transfer syntaxes in DicomParson (dcm4che-stream) and convenience method for checking if TS string is deflated
+          println(p)
+          if (p.transferSyntaxUid.contains("1.2.840.10008.1.2.1.99") || p.transferSyntaxUid.contains("1.2.840.10008.1.2.4.95"))
+            shouldDeflate = true
+          p
+        case p => p
+      }
+    }
+
+    // split the flow
+    val bcast = builder.add(Broadcast[DicomPart](2))
+
+    // define gates for each path, only one path is used
+    val deflateYes = Flow[DicomPart].filter(_ =>    shouldDeflate)
+    val deflateNo  = Flow[DicomPart].filterNot(_ => shouldDeflate)
+
+    // the deflate stage
+    val deflate = DicomFlows.deflateDatasetFlow()
+
+    // merge the two paths
+    val merge = builder.add(Merge[DicomPart](2))
+
+    shouldDeflateFlow ~> bcast ~> deflateYes ~> deflate ~> merge
+                         bcast ~> deflateNo             ~> merge
+
+    FlowShape(shouldDeflateFlow.in, merge.out)
+  })
 
   def addImageToImportSessionRoute(bytes: StreamSource[ByteString, Any], importSessionId: Long): Route = {
 
@@ -159,27 +195,29 @@ trait ImportRoutes {
         }
 
         // FIXME: in flows: deflated? change to inflated? change transferSyntax, group length
-        val importGraph = RunnableGraph.fromGraph(GraphDSL.create(dicomFileSink, dbAttributesSink)(_ zip _) { implicit builder =>
+        val importSink = Sink.fromGraph(GraphDSL.create(dicomFileSink, dbAttributesSink)(_ zip _) { implicit builder =>
           (dicomFileSink, dbAttributesSink) =>
             import GraphDSL.Implicits._
 
-            val flow = validateFlowWithContext(validationContexts).
-              via(partFlow).
-              via(groupLengthDiscardFilter).
-              via(CollectMetaDataFlow.collectMetaDataFlow).
-              mapAsync(5)(maybeAnonymizationLookup).
-              via(ReverseAnonymizationFlow.reverseAnonFlow)
+            val flow = builder.add {
+              validateFlowWithContext(validationContexts).
+                via(partFlow).
+                via(groupLengthDiscardFilter).
+                via(CollectMetaDataFlow.collectMetaDataFlow).
+                mapAsync(5)(maybeAnonymizationLookup).
+                via(ReverseAnonymizationFlow.reverseAnonFlow)
+            }
 
             val bcast = builder.add(Broadcast[DicomPart](2))
 
-            bytes ~> flow ~> bcast.in
-            bcast.out(0).map(_.bytes) ~> dicomFileSink
+            flow ~> bcast.in
+            bcast.out(0) ~> maybeDeflateFlow.map(_.bytes) ~> dicomFileSink
             bcast.out(1) ~> whitelistFilter(tagsToStoreInDB) ~> attributeFlow ~> dbAttributesSink
 
-            ClosedShape
+            SinkShape(flow.in)
         })
 
-        onComplete(importGraph.run()) {
+        onComplete(bytes.runWith(importSink)) {
           case Success((uploadResult, attributes)) =>
             val dataAttributes: Attributes = attributes._2.get
             onSuccess(metaDataService.ask(AddMetaData(dataAttributes, source)).mapTo[MetaDataAdded]) { metaData =>
@@ -199,7 +237,7 @@ trait ImportRoutes {
           case Failure(failure) =>
             SbxLog.error("Exception during import", failure.getMessage)
             importService.ask(UpdateSessionWithRejection(importSession))
-            complete(InternalServerError, failure.getMessage)
+            complete((InternalServerError, failure.getMessage))
         }
 
       case None =>
