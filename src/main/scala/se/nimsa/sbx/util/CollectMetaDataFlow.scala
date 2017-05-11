@@ -149,7 +149,7 @@ class CollectMetaDataFlow() extends GraphStage[FlowShape[DicomPart, DicomPart]] 
         val seriesUID = if (seriesInstanceUID.isDefined) Some(seriesInstanceUID.get.bytes.decodeString("US-ASCII").trim) else None
 
 
-        val metaPart = new DicomMetaPart(name, id, isAnon, studyUID, seriesUID)
+        val metaPart = new DicomMetaPart(id, name, isAnon, studyUID, seriesUID)
 
         emitMultiple(out, (metaPart +: buffer).iterator)
         buffer = Nil
