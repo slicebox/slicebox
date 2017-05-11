@@ -185,6 +185,7 @@ trait ImportRoutes {
             onSuccess(metaDataService.ask(AddMetaData(dataAttributes, source)).mapTo[MetaDataAdded]) { metaData =>
               onSuccess(importService.ask(AddImageToSession(importSession.id, metaData.image, !metaData.imageAdded)).mapTo[ImageAddedToSession]) { importSessionImage =>
                 onSuccess(storageService.ask(MoveDicomData(tmpPath, s"${metaData.image.id}")).mapTo[DicomDataMoved]) { dataMoved =>
+                  system.eventStream.publish(ImageAdded(metaData.image, source, !metaData.imageAdded))
                   val httpStatus = if (metaData.imageAdded) Created else OK
                   complete((httpStatus, metaData.image))
                 }

@@ -122,7 +122,7 @@ class ReverseAnonymizationFlow() extends GraphStage[FlowShape[DicomPart, DicomPa
                 case _ =>
                   currentAttribute.get
               }
-              // FIMXE remove println
+              // FIXME remove println
               println(">>>> currentAttr: " + currentAttribute.get.header + " - " + currentAttribute.get.bytes.decodeString("ASCII"))
               println(">>>> updatedAttr: " + updatedAttribute.header + " - " + updatedAttribute.bytes.decodeString("ASCII"))
               emitMultiple(out, (updatedAttribute.header +: updatedAttribute.valueChunks).iterator)
@@ -138,6 +138,7 @@ class ReverseAnonymizationFlow() extends GraphStage[FlowShape[DicomPart, DicomPa
       }
 
       override def onUpstreamFinish(): Unit = {
+        //FIXME
         complete(out)
       }
 
