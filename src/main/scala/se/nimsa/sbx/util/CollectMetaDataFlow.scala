@@ -29,6 +29,7 @@ class CollectMetaDataFlow() extends GraphStage[FlowShape[DicomPart, DicomPart]] 
     var reachedEnd = false
     var currentBufferSize = 0
 
+    var transferSyntaxUid: Option[DicomAttribute] = None
     var patientName: Option[DicomAttribute] = None
     var patientID: Option[DicomAttribute] = None
     var patientIdentityRemoved: Option[DicomAttribute] = None
@@ -59,6 +60,10 @@ class CollectMetaDataFlow() extends GraphStage[FlowShape[DicomPart, DicomPart]] 
           buffer = buffer :+ part
 
           part match {
+            case header: DicomHeader if header.tag == Tag.TransferSyntaxUID =>
+              transferSyntaxUid = Some(DicomAttribute(header, Seq.empty))
+              currentMeta = Some("transferSyntaxUid")
+
             case header: DicomHeader if (header.tag == Tag.PatientName) =>
               patientName = Some(DicomAttribute(header, Seq.empty))
               currentMeta = Some("patientName")
@@ -85,6 +90,12 @@ class CollectMetaDataFlow() extends GraphStage[FlowShape[DicomPart, DicomPart]] 
             case valueChunk: DicomValueChunk =>
 
               currentMeta match {
+
+                case Some("transferSyntaxUid") =>
+                  transferSyntaxUid = transferSyntaxUid.map(attribute => attribute.copy(valueChunks = attribute.valueChunks :+ valueChunk))
+                  if (valueChunk.last) {
+                    currentMeta = None
+                  }
 
                 case Some("patientName") =>
                   patientName = patientName.map(attribute => attribute.copy(valueChunks = attribute.valueChunks :+ valueChunk))
@@ -142,14 +153,15 @@ class CollectMetaDataFlow() extends GraphStage[FlowShape[DicomPart, DicomPart]] 
       def pushMetaAndBuffered() = {
 
         // FIXME: handle specific character set!
-        val name = patientName.get.bytes.decodeString("US-ASCII").trim
-        val id = patientID.get.bytes.decodeString("US-ASCII").trim
-        val isAnon = if (patientIdentityRemoved.isDefined) patientIdentityRemoved.get.bytes.decodeString("US-ASCII").trim else "NO"
-        val studyUID = if (studyInstanceUID.isDefined) Some(studyInstanceUID.get.bytes.decodeString("US-ASCII").trim) else None
-        val seriesUID = if (seriesInstanceUID.isDefined) Some(seriesInstanceUID.get.bytes.decodeString("US-ASCII").trim) else None
+        val tsuid = transferSyntaxUid.map(_.bytes.decodeString("US-ASCII").trim)
+        val name = patientName.map(_.bytes.decodeString("US-ASCII").trim).getOrElse("")
+        val id = patientID.map(_.bytes.decodeString("US-ASCII").trim).getOrElse("")
+        val isAnon = patientIdentityRemoved.map(_.bytes.decodeString("US-ASCII").trim).getOrElse("NO")
+        val studyUID = studyInstanceUID.map(_.bytes.decodeString("US-ASCII").trim)
+        val seriesUID = seriesInstanceUID.map(_.bytes.decodeString("US-ASCII").trim)
 
 
-        val metaPart = new DicomMetaPart(id, name, isAnon, studyUID, seriesUID)
+        val metaPart = new DicomMetaPart(tsuid, id, name, isAnon, studyUID, seriesUID)
 
         emitMultiple(out, (metaPart +: buffer).iterator)
         buffer = Nil
@@ -180,7 +192,7 @@ object CollectMetaDataFlow {
 }
 
 
-case class DicomMetaPart(patientId: String, patientName: String, identityRemoved: String, studyInstanceUID: Option[String] = None, seriesInstanceUID: Option[String] = None, anonKeys: Option[AnonymizationKey] = None) extends DicomPart {
+case class DicomMetaPart(transferSyntaxUid: Option[String], patientId: String, patientName: String, identityRemoved: String, studyInstanceUID: Option[String] = None, seriesInstanceUID: Option[String] = None, anonKeys: Option[AnonymizationKey] = None) extends DicomPart {
 
   def bytes = ByteString.empty
 
