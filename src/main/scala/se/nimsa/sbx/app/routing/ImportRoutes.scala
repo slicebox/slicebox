@@ -40,8 +40,7 @@ import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, GetImage, MetaDataAdded}
 import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.user.UserProtocol.ApiUser
-import se.nimsa.sbx.util.CollectMetaDataFlow.DicomMetaPart
-import se.nimsa.sbx.util.{CollectMetaDataFlow, ReverseAnonymizationFlow}
+import se.nimsa.sbx.util.{CollectMetaDataFlow, DicomMetaPart, ReverseAnonymizationFlow}
 
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
@@ -119,7 +118,8 @@ trait ImportRoutes {
               throw new RuntimeException("SeriesInstanceUID not found in DicomMetaPart")
             }
             val filtered = keys.anonymizationKeys.filter(key => (key.anonStudyInstanceUID == meta.studyInstanceUID.get) && (key.anonSeriesInstanceUID == meta.seriesInstanceUID.get))
-            DicomMetaPart(meta.transferSyntaxUid, meta.patientId, meta.patientName, meta.identityRemoved, meta.studyInstanceUID, meta.seriesInstanceUID, filtered.headOption)
+            // FIXME
+            DicomMetaPart(meta.transferSyntaxUid, meta.specificCharacterSet, meta.patientId, meta.patientName, meta.identityRemoved, meta.studyInstanceUID, meta.seriesInstanceUID, filtered.headOption)
           }
         } else {
           Future.successful(meta)
@@ -134,7 +134,7 @@ trait ImportRoutes {
 
   private def tagsToStoreInDB = {
     val patientTags = Seq(Tag.PatientName, Tag.PatientID, Tag.PatientSex, Tag.PatientBirthDate)
-    val studyTags = Seq(Tag.StudyInstanceUID, Tag.StudyDescription, Tag.StudyDate, Tag.AccessionNumber, Tag.PatientAge)
+    val studyTags = Seq(Tag.StudyInstanceUID, Tag.StudyDescription, Tag.StudyID, Tag.StudyDate, Tag.AccessionNumber, Tag.PatientAge)
     val seriesTags = Seq(Tag.SeriesInstanceUID, Tag.SeriesDescription, Tag.SeriesDate, Tag.Modality, Tag.ProtocolName, Tag.BodyPartExamined, Tag.Manufacturer, Tag.StationName, Tag.FrameOfReferenceUID)
     val imageTags = Seq(Tag.SOPInstanceUID, Tag.ImageType, Tag.InstanceNumber)
 
@@ -210,6 +210,7 @@ trait ImportRoutes {
 
             flow ~> bcast.in
             bcast.out(0) ~> maybeDeflateFlow.map(_.bytes) ~> dicomFileSink
+            //bcast.out(0) ~> printFlow[DicomPart].map(_.bytes) ~> dicomFileSink
             bcast.out(1) ~> whitelistFilter(tagsToStoreInDB) ~> attributeFlow ~> dbAttributesSink
 
             SinkShape(flow.in)

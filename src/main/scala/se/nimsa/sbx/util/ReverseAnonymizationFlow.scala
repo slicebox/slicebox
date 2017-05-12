@@ -3,9 +3,8 @@ package se.nimsa.sbx.util
 import akka.stream.scaladsl.Flow
 import akka.stream.stage.{GraphStage, GraphStageLogic, InHandler, OutHandler}
 import akka.stream.{Attributes, FlowShape, Inlet, Outlet}
-import org.dcm4che3.data.Tag
+import org.dcm4che3.data.{SpecificCharacterSet, Tag}
 import se.nimsa.dcm4che.streams.DicomParts._
-import se.nimsa.sbx.util.CollectMetaDataFlow.DicomMetaPart
 
 /**
   * A flow which expects a DicomMetaPart as first part, and does reverse anonymization based on anonymization data lookup in DB.
@@ -79,44 +78,45 @@ class ReverseAnonymizationFlow() extends GraphStage[FlowShape[DicomPart, DicomPa
 
           case valueChunk: DicomValueChunk if currentAttribute.isDefined && canDoReverseAnon =>
             currentAttribute = currentAttribute.map(attribute => attribute.copy(valueChunks = attribute.valueChunks :+ valueChunk))
+            val cs = if (metaData.get.specificCharacterSet.isDefined) metaData.get.specificCharacterSet.get else SpecificCharacterSet.ASCII
             if (valueChunk.last) {
 
               val updatedAttribute = currentAttribute.get.header.tag match {
                 case Tag.PatientName =>
-                  currentAttribute.get.withUpdatedStringValue(metaData.get.anonKeys.get.patientName) // FIXME: specific cs ?
+                  currentAttribute.get.withUpdatedStringValue(metaData.get.anonKeys.get.patientName, cs)
 
                 case Tag.PatientID =>
-                  currentAttribute.get.withUpdatedStringValue(metaData.get.anonKeys.get.patientID) // FIXME: specific cs ?
+                  currentAttribute.get.withUpdatedStringValue(metaData.get.anonKeys.get.patientID, cs)
 
                 case Tag.PatientBirthDate =>
-                  currentAttribute.get.withUpdatedDateValue(metaData.get.anonKeys.get.patientBirthDate) // FIXME: specific cs ?
+                  currentAttribute.get.withUpdatedDateValue(metaData.get.anonKeys.get.patientBirthDate) // ASCII
 
                 case Tag.PatientIdentityRemoved =>
-                  currentAttribute.get.withUpdatedStringValue("NO") // FIXME: specific cs ?
+                  currentAttribute.get.withUpdatedStringValue("NO") // ASCII
 
                 case Tag.StudyInstanceUID =>
-                  currentAttribute.get.withUpdatedStringValue(metaData.get.anonKeys.get.studyInstanceUID) // FIXME: specific cs ?
+                  currentAttribute.get.withUpdatedStringValue(metaData.get.anonKeys.get.studyInstanceUID) // ASCII
 
                 case Tag.StudyDescription =>
-                  currentAttribute.get.withUpdatedStringValue(metaData.get.anonKeys.get.studyDescription) // FIXME: specific cs ?
+                  currentAttribute.get.withUpdatedStringValue(metaData.get.anonKeys.get.studyDescription, cs)
 
                 case Tag.StudyID =>
-                  currentAttribute.get.withUpdatedStringValue(metaData.get.anonKeys.get.studyID) // FIXME: specific cs ?
+                  currentAttribute.get.withUpdatedStringValue(metaData.get.anonKeys.get.studyID, cs)
 
                 case Tag.AccessionNumber =>
-                  currentAttribute.get.withUpdatedStringValue(metaData.get.anonKeys.get.accessionNumber) // FIXME: specific cs ?
+                  currentAttribute.get.withUpdatedStringValue(metaData.get.anonKeys.get.accessionNumber, cs)
 
                 case Tag.SeriesInstanceUID =>
-                  currentAttribute.get.withUpdatedStringValue(metaData.get.anonKeys.get.seriesInstanceUID) // FIXME: specific cs ?
+                  currentAttribute.get.withUpdatedStringValue(metaData.get.anonKeys.get.seriesInstanceUID) // ASCII
 
                 case Tag.SeriesDescription =>
-                  currentAttribute.get.withUpdatedStringValue(metaData.get.anonKeys.get.seriesDescription) // FIXME: specific cs ?
+                  currentAttribute.get.withUpdatedStringValue(metaData.get.anonKeys.get.seriesDescription, cs)
 
                 case Tag.ProtocolName =>
-                  currentAttribute.get.withUpdatedStringValue(metaData.get.anonKeys.get.protocolName) // FIXME: specific cs ?
+                  currentAttribute.get.withUpdatedStringValue(metaData.get.anonKeys.get.protocolName, cs)
 
                 case Tag.FrameOfReferenceUID =>
-                  currentAttribute.get.withUpdatedStringValue(metaData.get.anonKeys.get.frameOfReferenceUID) // FIXME: specific cs ?
+                  currentAttribute.get.withUpdatedStringValue(metaData.get.anonKeys.get.frameOfReferenceUID) // ASCII
 
                 case _ =>
                   currentAttribute.get
