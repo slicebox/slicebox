@@ -21,10 +21,10 @@ import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
-import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Merge, RunnableGraph, Sink, Source => StreamSource}
-import akka.stream.{ClosedShape, FlowShape, SinkShape}
+import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Merge, Sink, Source => StreamSource}
+import akka.stream.{FlowShape, SinkShape}
 import akka.util.ByteString
-import org.dcm4che3.data.{Attributes, Tag}
+import org.dcm4che3.data.{Attributes, Tag, UID}
 import org.dcm4che3.io.DicomStreamException
 import se.nimsa.dcm4che.streams.DicomFlows._
 import se.nimsa.dcm4che.streams.DicomPartFlow._
@@ -111,10 +111,10 @@ trait ImportRoutes {
       case meta: DicomMetaPart =>
         if (meta.isAnonymized) {
           anonymizationService.ask(GetReverseAnonymizationKeys(meta.patientName, meta.patientId)).mapTo[AnonymizationKeys].map { keys: AnonymizationKeys =>
-            if (!meta.studyInstanceUID.isDefined) {
+            if (meta.studyInstanceUID.isEmpty) {
               throw new RuntimeException("StudyInstanceUID not found in DicomMetaPart")
             }
-            if (!meta.seriesInstanceUID.isDefined) {
+            if (meta.seriesInstanceUID.isEmpty) {
               throw new RuntimeException("SeriesInstanceUID not found in DicomMetaPart")
             }
             val filtered = keys.anonymizationKeys.filter(key => (key.anonStudyInstanceUID == meta.studyInstanceUID.get) && (key.anonSeriesInstanceUID == meta.seriesInstanceUID.get))
@@ -149,9 +149,7 @@ trait ImportRoutes {
     val shouldDeflateFlow = builder.add {
       Flow[DicomPart].map {
         case p: DicomMetaPart =>
-          // TODO add constants for relevant transfer syntaxes in DicomParson (dcm4che-stream) and convenience method for checking if TS string is deflated
-          println(p)
-          if (p.transferSyntaxUid.contains("1.2.840.10008.1.2.1.99") || p.transferSyntaxUid.contains("1.2.840.10008.1.2.4.95"))
+          if (p.transferSyntaxUid.contains(UID.DeflatedExplicitVRLittleEndian) || p.transferSyntaxUid.contains(UID.JPIPReferencedDeflate))
             shouldDeflate = true
           p
         case p => p
@@ -194,7 +192,6 @@ trait ImportRoutes {
           ValidationContext(pair._1, pair._2)
         }
 
-        // FIXME: in flows: deflated? change to inflated? change transferSyntax, group length
         val importSink = Sink.fromGraph(GraphDSL.create(dicomFileSink, dbAttributesSink)(_ zip _) { implicit builder =>
           (dicomFileSink, dbAttributesSink) =>
             import GraphDSL.Implicits._
@@ -218,11 +215,11 @@ trait ImportRoutes {
         })
 
         onComplete(bytes.runWith(importSink)) {
-          case Success((uploadResult, attributes)) =>
+          case Success((_, attributes)) =>
             val dataAttributes: Attributes = attributes._2.get
             onSuccess(metaDataService.ask(AddMetaData(dataAttributes, source)).mapTo[MetaDataAdded]) { metaData =>
-              onSuccess(importService.ask(AddImageToSession(importSession.id, metaData.image, !metaData.imageAdded)).mapTo[ImageAddedToSession]) { importSessionImage =>
-                onSuccess(storageService.ask(MoveDicomData(tmpPath, s"${metaData.image.id}")).mapTo[DicomDataMoved]) { dataMoved =>
+              onSuccess(importService.ask(AddImageToSession(importSession.id, metaData.image, !metaData.imageAdded)).mapTo[ImageAddedToSession]) { _ =>
+                onSuccess(storageService.ask(MoveDicomData(tmpPath, s"${metaData.image.id}")).mapTo[DicomDataMoved]) { _ =>
                   system.eventStream.publish(ImageAdded(metaData.image, source, !metaData.imageAdded))
                   val httpStatus = if (metaData.imageAdded) Created else OK
                   complete((httpStatus, metaData.image))
