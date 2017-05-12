@@ -1,204 +1,107 @@
 package se.nimsa.sbx.util
 
 import akka.stream.scaladsl.Flow
-import akka.stream.{Attributes, FlowShape, Inlet, Outlet}
-import akka.stream.stage.{GraphStage, GraphStageLogic, InHandler, OutHandler}
 import akka.util.ByteString
-import se.nimsa.dcm4che.streams.DicomParts._
-import org.dcm4che3.data.Tag
+import org.dcm4che3.data.{Attributes, Tag, VR}
 import org.dcm4che3.io.DicomStreamException
-import se.nimsa.sbx.anonymization.AnonymizationProtocol.{AnonymizationKey, AnonymizationKeys}
-import se.nimsa.sbx.dicom.DicomPropertyValue.{SeriesInstanceUID, StudyInstanceUID}
+import se.nimsa.dcm4che.streams.DicomParts._
+import se.nimsa.sbx.anonymization.AnonymizationProtocol.AnonymizationKey
 
-/**
-  * A flow which buffers DICOM parts until PatientName, PatientId and PatientIdentityRemoved are known.
-  * Pushes a DicomMetaPart first, and all buffered parts afterwards. Following parts a pushed downstream immediately.
-  *
-  * FIXME: Need to handle specific charactersets. default: ISO-IR-6
-  *
-  */
-class CollectMetaDataFlow() extends GraphStage[FlowShape[DicomPart, DicomPart]] {
-  val MAX_BUFFER_SIZE = 1000000 // 1 MB
-
-  val in = Inlet[DicomPart]("DicomAttributeBufferFlow.in")
-  val out = Outlet[DicomPart]("DicomAttributeBufferFlow.out")
-  override val shape = FlowShape.of(in, out)
-
-  override def createLogic(inheritedAttributes: Attributes): GraphStageLogic = new GraphStageLogic(shape) {
-    var buffer: Seq[DicomPart] = Nil
-    var reachedEnd = false
-    var currentBufferSize = 0
-
-    var transferSyntaxUid: Option[DicomAttribute] = None
-    var patientName: Option[DicomAttribute] = None
-    var patientID: Option[DicomAttribute] = None
-    var patientIdentityRemoved: Option[DicomAttribute] = None
-    var studyInstanceUID: Option[DicomAttribute] = None
-    var seriesInstanceUID: Option[DicomAttribute] = None
-    var currentMeta: Option[String] = None
-
-    setHandlers(in, out, new InHandler with OutHandler {
-
-      override def onPull(): Unit = {
-        pull(in)
-      }
-
-      override def onPush(): Unit = {
-
-        val part = grab(in)
-
-        if (reachedEnd) {
-          push(out,part)
-        } else {
-
-          currentBufferSize = currentBufferSize + part.bytes.size
-          if (currentBufferSize > MAX_BUFFER_SIZE) {
-            reachedEnd = true
-            failStage(new DicomStreamException("Error collecting meta data for reverse anonymization: max buffer size exceeded"))
-          }
-
-          buffer = buffer :+ part
-
-          part match {
-            case header: DicomHeader if header.tag == Tag.TransferSyntaxUID =>
-              transferSyntaxUid = Some(DicomAttribute(header, Seq.empty))
-              currentMeta = Some("transferSyntaxUid")
-
-            case header: DicomHeader if (header.tag == Tag.PatientName) =>
-              patientName = Some(DicomAttribute(header, Seq.empty))
-              currentMeta = Some("patientName")
-
-            case header: DicomHeader if (header.tag == Tag.PatientID) =>
-              patientID = Some(DicomAttribute(header, Seq.empty))
-              currentMeta = Some("patientID")
-
-            case header: DicomHeader if (header.tag == Tag.PatientIdentityRemoved) =>
-              patientIdentityRemoved = Some(DicomAttribute(header, Seq.empty))
-              currentMeta = Some("patientIdentityRemoved")
-
-            case header: DicomHeader if (header.tag == Tag.StudyInstanceUID) =>
-              studyInstanceUID = Some(DicomAttribute(header, Seq.empty))
-              currentMeta = Some("studyInstanceUID")
-
-            case header: DicomHeader if (header.tag == Tag.SeriesInstanceUID) =>
-              seriesInstanceUID = Some(DicomAttribute(header, Seq.empty))
-              currentMeta = Some("seriesInstanceUID")
-
-            case header: DicomHeader =>
-              currentMeta = None
-
-            case valueChunk: DicomValueChunk =>
-
-              currentMeta match {
-
-                case Some("transferSyntaxUid") =>
-                  transferSyntaxUid = transferSyntaxUid.map(attribute => attribute.copy(valueChunks = attribute.valueChunks :+ valueChunk))
-                  if (valueChunk.last) {
-                    currentMeta = None
-                  }
-
-                case Some("patientName") =>
-                  patientName = patientName.map(attribute => attribute.copy(valueChunks = attribute.valueChunks :+ valueChunk))
-                  if (valueChunk.last) {
-                    currentMeta = None
-                  }
-
-                case Some("patientID") =>
-                  patientID = patientID.map(attribute => attribute.copy(valueChunks = attribute.valueChunks :+ valueChunk))
-                  if (valueChunk.last) {
-                    currentMeta = None
-                  }
-
-                case Some("patientIdentityRemoved") =>
-                  patientIdentityRemoved = patientIdentityRemoved.map(attribute => attribute.copy(valueChunks = attribute.valueChunks :+ valueChunk))
-                  if (valueChunk.last) {
-                    currentMeta = None
-                    val isAnon = patientIdentityRemoved.get.bytes.decodeString("US-ASCII").trim.toUpperCase == "YES"
-                    if (!isAnon) {
-                      reachedEnd = true
-                      pushMetaAndBuffered()
-                    }
-                  }
-
-                case Some("studyInstanceUID") =>
-                  studyInstanceUID = studyInstanceUID.map(attribute => attribute.copy(valueChunks = attribute.valueChunks :+ valueChunk))
-                  if (valueChunk.last) {
-                    currentMeta = None
-                  }
-
-                case Some("seriesInstanceUID") =>
-                  seriesInstanceUID = seriesInstanceUID.map(attribute => attribute.copy(valueChunks = attribute.valueChunks :+ valueChunk))
-                  if (valueChunk.last) {
-                    currentMeta = None
-                    reachedEnd = true
-                    pushMetaAndBuffered()
-                  }
-
-                case _ => // just do nothing
-              }
-
-            case _: DicomPart => // just do nothing
-          }
-
-          if (!reachedEnd) {
-            pull(in)
-          }
-        }
-      }
-
-      /**
-        * Push the DicomMetaPart as first element of the stream,
-        * and all other parts that have been buffered so far.
-        */
-      def pushMetaAndBuffered() = {
-
-        // FIXME: handle specific character set!
-        val tsuid = transferSyntaxUid.map(_.bytes.decodeString("US-ASCII").trim)
-        val name = patientName.map(_.bytes.decodeString("US-ASCII").trim).getOrElse("")
-        val id = patientID.map(_.bytes.decodeString("US-ASCII").trim).getOrElse("")
-        val isAnon = patientIdentityRemoved.map(_.bytes.decodeString("US-ASCII").trim).getOrElse("NO")
-        val studyUID = studyInstanceUID.map(_.bytes.decodeString("US-ASCII").trim)
-        val seriesUID = seriesInstanceUID.map(_.bytes.decodeString("US-ASCII").trim)
-
-
-        val metaPart = new DicomMetaPart(tsuid, id, name, isAnon, studyUID, seriesUID)
-
-        emitMultiple(out, (metaPart +: buffer).iterator)
-        buffer = Nil
-      }
-
-      override def onUpstreamFinish(): Unit = {
-        if (!buffer.isEmpty) emitMultiple(out, buffer.iterator)
-        complete(out)
-      }
-
-    })
-  }
-}
-
+import scala.collection.mutable
 
 object CollectMetaDataFlow {
-  val collectMetaDataFlow = Flow[DicomPart].via(new CollectMetaDataFlow())
 
-  val stripMetaDataFlow = Flow[DicomPart]
-    .statefulMapConcat {
-      () =>
-      {
-        case meta: DicomMetaPart =>
-          Nil
-        case part => part :: Nil
-      }
+  case class DicomMetaPart(transferSyntaxUid: Option[String], patientId: String, patientName: String, identityRemoved: String, studyInstanceUID: Option[String] = None, seriesInstanceUID: Option[String] = None, anonKeys: Option[AnonymizationKey] = None) extends DicomPart {
+    def bytes = ByteString.empty
+    def bigEndian = false
+    def isAnonymized = identityRemoved.toUpperCase == "YES"
+  }
+
+  /**
+    * A flow which buffers DICOM parts until PatientName, PatientId and PatientIdentityRemoved are known.
+    * Pushes a DicomMetaPart first, and all buffered parts afterwards. Following parts a pushed downstream immediately.
+    */
+  val collectMetaDataFlow = Flow[DicomPart].statefulMapConcat {
+    val maxBufferSize = 1000000
+    val metaTags = Set(Tag.TransferSyntaxUID, Tag.SpecificCharacterSet, Tag.PatientName, Tag.PatientID, Tag.PatientIdentityRemoved, Tag.StudyInstanceUID, Tag.SeriesInstanceUID)
+    val stopTag = Tag.SeriesInstanceUID
+
+    () =>
+      var reachedEnd = false
+      var currentBufferSize = 0
+      var currentTag: Option[Int] = None
+      var buffer: List[DicomPart] = Nil
+      val metaAttr = mutable.Map.empty[Int, DicomAttribute]
+
+    {
+      case part if reachedEnd =>
+        part :: Nil
+
+      case part =>
+        currentBufferSize = currentBufferSize + part.bytes.size
+        if (currentBufferSize > maxBufferSize) {
+          throw new DicomStreamException("Error collecting meta data for reverse anonymization: max buffer size exceeded")
+        }
+
+        buffer = buffer :+ part
+
+        part match {
+          case header: DicomHeader if metaTags.contains(header.tag) =>
+            metaAttr(header.tag) = DicomAttribute(header, Seq.empty)
+            currentTag = Some(header.tag)
+            Nil
+
+          case _: DicomHeader =>
+            currentTag = None
+            Nil
+
+          case valueChunk: DicomValueChunk =>
+
+            currentTag match {
+
+              case Some(tag) if metaAttr.contains(tag) =>
+                metaAttr.get(tag).foreach(attribute => metaAttr.update(tag, attribute.copy(valueChunks = attribute.valueChunks :+ valueChunk)))
+                if (valueChunk.last) {
+                  currentTag = None
+                  if (tag == stopTag) {
+                    val attr = new Attributes()
+                    metaAttr.get(Tag.TransferSyntaxUID).foreach(attribute => attr.setBytes(Tag.TransferSyntaxUID, VR.UI, attribute.bytes.toArray))
+                    metaAttr.get(Tag.SpecificCharacterSet).foreach(attribute => attr.setBytes(Tag.SpecificCharacterSet, VR.CS, attribute.bytes.toArray))
+                    metaAttr.get(Tag.PatientName).foreach(attribute => attr.setBytes(Tag.PatientName, VR.PN, attribute.bytes.toArray))
+                    metaAttr.get(Tag.PatientID).foreach(attribute => attr.setBytes(Tag.PatientID, VR.LO, attribute.bytes.toArray))
+                    metaAttr.get(Tag.PatientIdentityRemoved).foreach(attribute => attr.setBytes(Tag.PatientIdentityRemoved, VR.CS, attribute.bytes.toArray))
+                    metaAttr.get(Tag.StudyInstanceUID).foreach(attribute => attr.setBytes(Tag.StudyInstanceUID, VR.UI, attribute.bytes.toArray))
+                    metaAttr.get(Tag.SeriesInstanceUID).foreach(attribute => attr.setBytes(Tag.SeriesInstanceUID, VR.UI, attribute.bytes.toArray))
+
+                    val metaPart = DicomMetaPart(
+                      Option(attr.getString(Tag.TransferSyntaxUID)),
+                      attr.getString(Tag.PatientID, ""),
+                      attr.getString(Tag.PatientName, ""),
+                      attr.getString(Tag.PatientIdentityRemoved, "NO"),
+                      Option(attr.getString(Tag.StudyInstanceUID)),
+                      Option(attr.getString(Tag.SeriesInstanceUID)))
+
+                    val parts = metaPart :: buffer
+
+                    reachedEnd = true
+                    buffer = Nil
+                    currentBufferSize = 0
+
+                    parts
+                  } else
+                    Nil
+                } else
+                  Nil
+
+              case _ => Nil
+            }
+
+          case _ => Nil
+        }
     }
-}
+  }
 
-
-case class DicomMetaPart(transferSyntaxUid: Option[String], patientId: String, patientName: String, identityRemoved: String, studyInstanceUID: Option[String] = None, seriesInstanceUID: Option[String] = None, anonKeys: Option[AnonymizationKey] = None) extends DicomPart {
-
-  def bytes = ByteString.empty
-
-  def bigEndian = false
-
-  def isAnonymized = identityRemoved.toUpperCase == "YES"
+  val stripMetaDataFlow = Flow[DicomPart].filterNot(_.isInstanceOf[DicomMetaPart])
 }
 
 

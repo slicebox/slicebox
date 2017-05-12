@@ -5,6 +5,7 @@ import akka.stream.stage.{GraphStage, GraphStageLogic, InHandler, OutHandler}
 import akka.stream.{Attributes, FlowShape, Inlet, Outlet}
 import org.dcm4che3.data.Tag
 import se.nimsa.dcm4che.streams.DicomParts._
+import se.nimsa.sbx.util.CollectMetaDataFlow.DicomMetaPart
 
 /**
   * A flow which expects a DicomMetaPart as first part, and does reverse anonymization based on anonymization data lookup in DB.
