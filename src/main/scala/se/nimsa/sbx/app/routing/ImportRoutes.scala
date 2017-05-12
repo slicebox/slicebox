@@ -40,7 +40,8 @@ import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, GetImage, MetaDataAdded}
 import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.user.UserProtocol.ApiUser
-import se.nimsa.sbx.util.{CollectMetaDataFlow, DicomMetaPart, ReverseAnonymizationFlow}
+import se.nimsa.sbx.util.CollectMetaDataFlow2.DicomMetaPart
+import se.nimsa.sbx.util.{CollectMetaDataFlow2, ReverseAnonymizationFlow}
 
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
@@ -200,7 +201,7 @@ trait ImportRoutes {
               validateFlowWithContext(validationContexts).
                 via(partFlow).
                 via(groupLengthDiscardFilter).
-                via(CollectMetaDataFlow.collectMetaDataFlow).
+                via(CollectMetaDataFlow2.collectMetaDataFlow).
                 mapAsync(5)(maybeAnonymizationLookup).
                 via(ReverseAnonymizationFlow.reverseAnonFlow)
             }
