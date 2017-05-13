@@ -84,6 +84,25 @@ class CollectMetaDataFlowTest extends TestKit(ActorSystem("CollectMetaDataFlowSp
       .expectDicomComplete()
   }
 
+  it should "apply the stop tag appropriately" in {
+    val attr = new Attributes()
+    attr.setString(Tag.PatientName, VR.PN, "John^Doe")
+    attr.setString(Tag.AcquisitionNumber, VR.DS, "123")
+    val bytes = toByteString(attr)
+
+    val source = Source.single(bytes)
+      .via(partFlow)
+      .via(collectMetaDataFlow)
+
+    source.runWith(TestSink.probe[DicomPart])
+      .expectMetaPart(DicomMetaPart(None, Some("John^Doe"), None, None, None, None, None))
+      .expectHeader(Tag.PatientName)
+      .expectValueChunk()
+      .expectHeader(Tag.AcquisitionNumber)
+      .expectValueChunk()
+      .expectDicomComplete()
+  }
+
   private def toByteString(attributes: Attributes) = {
     val baos = new ByteArrayOutputStream()
     val dos = new DicomOutputStream(baos, UID.ExplicitVRLittleEndian)

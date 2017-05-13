@@ -46,7 +46,7 @@ object CollectMetaDataFlow {
         var buffer: List[DicomPart] = Nil
         val metaAttr = mutable.Map.empty[Int, DicomAttribute]
 
-        def metaAndBuffer() = {
+        def metaDataAndBuffer() = {
           val attr = new Attributes()
           metaAttr.get(Tag.TransferSyntaxUID).foreach(attribute => attr.setBytes(Tag.TransferSyntaxUID, VR.UI, attribute.bytes.toArray))
           metaAttr.get(Tag.SpecificCharacterSet).foreach(attribute => attr.setBytes(Tag.SpecificCharacterSet, VR.CS, attribute.bytes.toArray))
@@ -108,7 +108,7 @@ object CollectMetaDataFlow {
                   if (valueChunk.last) {
                     currentTag = None
                     if (tag >= stopTag) {
-                      metaAndBuffer()
+                      metaDataAndBuffer()
                     } else
                       Nil
                   } else
@@ -118,7 +118,7 @@ object CollectMetaDataFlow {
               }
 
             case DicomEndMarker =>
-              metaAndBuffer()
+              metaDataAndBuffer()
 
             case _ => Nil
           }
