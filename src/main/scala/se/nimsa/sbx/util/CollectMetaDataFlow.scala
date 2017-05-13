@@ -77,6 +77,9 @@ object CollectMetaDataFlow {
         case DicomEndMarker if reachedEnd =>
           Nil
 
+        case DicomEndMarker =>
+          metaDataAndBuffer()
+
         case part if reachedEnd =>
           part :: Nil
 
@@ -86,8 +89,7 @@ object CollectMetaDataFlow {
             throw new DicomStreamException("Error collecting meta data for reverse anonymization: max buffer size exceeded")
           }
 
-          if (part != DicomEndMarker)
-            buffer = buffer :+ part
+          buffer = buffer :+ part
 
           part match {
             case header: DicomHeader if metaTags.contains(header.tag) =>
@@ -116,9 +118,6 @@ object CollectMetaDataFlow {
 
                 case _ => Nil
               }
-
-            case DicomEndMarker =>
-              metaDataAndBuffer()
 
             case _ => Nil
           }
