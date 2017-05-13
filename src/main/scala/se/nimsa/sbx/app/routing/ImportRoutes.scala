@@ -110,8 +110,8 @@ trait ImportRoutes {
   def maybeAnonymizationLookup(dicomPart: DicomPart): Future[DicomPart] = {
     dicomPart match {
       case meta: DicomMetaPart =>
-        if (meta.isAnonymized) {
-          anonymizationService.ask(GetReverseAnonymizationKeys(meta.patientName, meta.patientId)).mapTo[AnonymizationKeys].map { keys: AnonymizationKeys =>
+        if (meta.isAnonymized && meta.patientName.isDefined && meta.patientId.isDefined) {
+          anonymizationService.ask(GetReverseAnonymizationKeys(meta.patientName.get, meta.patientId.get)).mapTo[AnonymizationKeys].map { keys: AnonymizationKeys =>
             if (meta.studyInstanceUID.isEmpty) {
               throw new RuntimeException("StudyInstanceUID not found in DicomMetaPart")
             }

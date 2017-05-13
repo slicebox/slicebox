@@ -8,8 +8,11 @@ import java.util.stream.Collectors
 
 import akka.http.scaladsl.model.Multipart.FormData.BodyPart
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, Multipart}
+import akka.stream.testkit.TestSubscriber
+import akka.util.ByteString
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import org.dcm4che3.data.{Attributes, Tag, VR}
+import se.nimsa.dcm4che.streams.DicomParts._
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.AnonymizationKey
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy._
@@ -19,6 +22,7 @@ import se.nimsa.sbx.metadata.MetaDataProtocol.{SeriesSource, SeriesTag}
 import se.nimsa.sbx.metadata.{MetaDataDAO, PropertiesDAO}
 import se.nimsa.sbx.seriestype.SeriesTypeDAO
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol.{SeriesSeriesType, SeriesType}
+import se.nimsa.sbx.util.CollectMetaDataFlow.DicomMetaPart
 import slick.basic.DatabaseConfig
 import slick.jdbc.JdbcProfile
 
@@ -205,4 +209,61 @@ object TestUtil {
         }
     })
 
+  implicit class DicomPartProbe(probe: TestSubscriber.Probe[DicomPart]) {
+    def expectPreamble() = probe
+      .request(1)
+      .expectNextChainingPF {
+        case _: DicomPreamble => true
+      }
+
+    def expectValueChunk() = probe
+      .request(1)
+      .expectNextChainingPF {
+        case _: DicomValueChunk => true
+      }
+
+    def expectValueChunk(bytes: ByteString) = probe
+      .request(1)
+      .expectNextChainingPF {
+        case chunk: DicomValueChunk => chunk.bytes == bytes
+      }
+
+    def expectHeader(tag: Int) = probe
+      .request(1)
+      .expectNextChainingPF {
+        case h: DicomHeader => h.tag == tag
+      }
+
+    def expectHeader(tag: Int, vr: VR, length: Int) = probe
+      .request(1)
+      .expectNextChainingPF {
+        case h: DicomHeader => h.tag == tag && h.vr == vr && h.length == length
+      }
+
+    def expectDeflatedChunk() = probe
+      .request(1)
+      .expectNextChainingPF {
+        case _: DicomDeflatedChunk => true
+      }
+
+    def expectAttribute(tag: Int) = probe
+      .request(1)
+      .expectNextChainingPF {
+        case a: DicomAttribute => a.header.tag == tag
+      }
+
+    def expectDicomComplete() = probe
+      .request(1)
+      .expectComplete()
+
+    def expectDicomError() = probe
+      .request(1)
+      .expectError()
+
+    def expectMetaPart(metaPart: DicomMetaPart) = probe
+      .request(1)
+      .expectNextChainingPF {
+        case p: DicomMetaPart => p == metaPart
+      }
+  }
 }

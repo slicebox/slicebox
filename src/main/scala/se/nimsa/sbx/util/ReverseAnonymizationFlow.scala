@@ -56,9 +56,7 @@ class ReverseAnonymizationFlow() extends GraphStage[FlowShape[DicomPart, DicomPa
           canDoReverseAnon && REVERSE_ANON_TAGS.contains(tag)
         }
 
-        def canDoReverseAnon: Boolean = {
-          metaData.isDefined && metaData.get.isAnonymized && metaData.get.anonKeys.isDefined
-        }
+        def canDoReverseAnon: Boolean = metaData.exists(m => m.isAnonymized && m.anonKeys.isDefined)
 
         val part = grab(in)
 
