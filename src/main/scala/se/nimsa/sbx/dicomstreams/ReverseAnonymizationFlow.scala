@@ -63,7 +63,7 @@ class ReverseAnonymizationFlow() extends GraphStage[FlowShape[DicomPart, DicomPa
           case metaPart: DicomMetaPart =>
             metaData = Some(metaPart)
             // FIXME: remove println
-            println(">>>> grabbed meta, isAnon: " + isAnonymized)
+            println(">>>> grabbed meta: " + metaData)
             println(">>>> grabbed meta, canDoReverse: " + canDoReverseAnon)
             push(out, metaPart)
 
@@ -122,8 +122,8 @@ class ReverseAnonymizationFlow() extends GraphStage[FlowShape[DicomPart, DicomPa
                   currentAttribute.get
               }
               // FIXME remove println
-              println(">>>> currentAttr: " + currentAttribute.get.header + " - " + currentAttribute.get.bytes.decodeString("ASCII"))
-              println(">>>> updatedAttr: " + updatedAttribute.header + " - " + updatedAttribute.bytes.decodeString("ASCII"))
+              println(">>>> currentAttr: " + currentAttribute.get.header + " - " + currentAttribute.get.valueBytes.decodeString("ASCII"))
+              println(">>>> updatedAttr: " + updatedAttribute.header + " - " + updatedAttribute.valueBytes.decodeString("ASCII"))
               emitMultiple(out, (updatedAttribute.header +: updatedAttribute.valueChunks).iterator)
               currentAttribute = None
             } else {

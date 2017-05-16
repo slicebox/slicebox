@@ -130,7 +130,7 @@ class CollectMetaDataFlow() extends GraphStage[FlowShape[DicomPart, DicomPart]] 
                   patientIdentityRemoved = patientIdentityRemoved.map(attribute => attribute.copy(valueChunks = attribute.valueChunks :+ valueChunk))
                   if (valueChunk.last) {
                     currentMeta = None
-                    val isAnon = patientIdentityRemoved.get.bytes.decodeString(ASCII).trim.toUpperCase == "YES"
+                    val isAnon = patientIdentityRemoved.get.valueBytes.decodeString(ASCII).trim.toUpperCase == "YES"
                     if (!isAnon) {
                       reachedEnd = true
                       pushMetaAndBuffered()
@@ -170,24 +170,29 @@ class CollectMetaDataFlow() extends GraphStage[FlowShape[DicomPart, DicomPart]] 
       def pushMetaAndBuffered() = {
 
         val cs = if (specificCharacterSet.isDefined) {
-          val codes = specificCharacterSet.get.bytes.decodeString(ASCII).trim.split("\\\\")
+          val codes = specificCharacterSet.get.valueBytes.decodeString(ASCII).trim.split("\\\\")
           SpecificCharacterSet.valueOf(codes:_*)
         } else {
           SpecificCharacterSet.ASCII
         }
 
         // PN, LO: use specific character set to decode
-        val name = patientName.map(value => cs.decode(value.bytes.toArray).trim)
-        val id = patientID.map(value => cs.decode(value.bytes.toArray).trim)
+        val name = patientName.map(value => cs.decode(value.valueBytes.toArray).trim)
+        val id = patientID.map(value => cs.decode(value.valueBytes.toArray).trim)
+
+        println(">>>name: " + name)
 
         // UI, CS: use ASCII
-        val tsuid = transferSyntaxUid.map(_.bytes.decodeString(ASCII).trim)
-        val isAnon = patientIdentityRemoved.map(_.bytes.decodeString(ASCII).trim)
-        val studyUID = studyInstanceUID.map(_.bytes.decodeString(ASCII).trim)
-        val seriesUID = seriesInstanceUID.map(_.bytes.decodeString(ASCII).trim)
+        val tsuid = transferSyntaxUid.map(_.valueBytes.decodeString(ASCII).trim)
+        val isAnon = patientIdentityRemoved.map(_.valueBytes.decodeString(ASCII).trim)
+        val studyUID = studyInstanceUID.map(_.valueBytes.decodeString(ASCII).trim)
+        val seriesUID = seriesInstanceUID.map(_.valueBytes.decodeString(ASCII).trim)
 
+        println(">>>tsuid: " + tsuid)
+        println(">>>isAnon: " + isAnon)
 
         val metaPart = new DicomMetaPart(tsuid, Some(cs), id, name, isAnon, studyUID, seriesUID)
+
 
         emitMultiple(out, (metaPart +: buffer).iterator)
         buffer = Nil
