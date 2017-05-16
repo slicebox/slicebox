@@ -194,6 +194,9 @@ class CollectMetaDataFlow() extends GraphStage[FlowShape[DicomPart, DicomPart]] 
       }
 
       override def onUpstreamFinish(): Unit = {
+        if (!reachedEnd) {
+          buffer = DicomMetaPart(None, None, None, None, None, None, None, None) +: buffer
+        }
         if (!buffer.isEmpty) emitMultiple(out, buffer.iterator)
         complete(out)
       }

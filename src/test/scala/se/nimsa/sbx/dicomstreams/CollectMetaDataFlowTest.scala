@@ -1,4 +1,4 @@
-package se.nimsa.sbx.util
+package se.nimsa.sbx.dicomstreams
 
 import java.io.ByteArrayOutputStream
 
@@ -8,24 +8,24 @@ import akka.stream.scaladsl.Source
 import akka.stream.testkit.scaladsl.TestSink
 import akka.testkit.TestKit
 import akka.util.ByteString
-import org.dcm4che3.data.{Attributes, Tag, UID, VR}
+import org.dcm4che3.data._
 import org.dcm4che3.io.DicomOutputStream
 import org.scalatest.{FlatSpecLike, Matchers}
 import se.nimsa.dcm4che.streams.DicomPartFlow
 import se.nimsa.dcm4che.streams.DicomParts.DicomPart
+import se.nimsa.sbx.util.TestUtil._
 
 
 class CollectMetaDataFlowTest extends TestKit(ActorSystem("CollectMetaDataFlowSpec")) with FlatSpecLike with Matchers {
 
   import CollectMetaDataFlow._
   import DicomPartFlow.partFlow
-  import TestUtil._
 
   implicit val materializer = ActorMaterializer()
   implicit val ec = system.dispatcher
 
   "A collect metadata flow" should "first produce a meta data object followed by the input dicom parts" in {
-    val metaPart = DicomMetaPart(Some(UID.ExplicitVRLittleEndian), Some("John^Doe"), Some("12345678"), Some("NO"), Some("1.2.3.4"), Some("5.6.7.8"))
+    val metaPart = DicomMetaPart(Some(UID.ExplicitVRLittleEndian), Some(SpecificCharacterSet.ASCII), Some("John^Doe"), Some("12345678"), Some("NO"), Some("1.2.3.4"), Some("5.6.7.8"))
     val attr = new Attributes()
     attr.setString(Tag.PatientName, VR.PN, metaPart.patientName.get)
     attr.setString(Tag.PatientID, VR.LO, metaPart.patientId.get)
@@ -95,7 +95,7 @@ class CollectMetaDataFlowTest extends TestKit(ActorSystem("CollectMetaDataFlowSp
       .via(collectMetaDataFlow)
 
     source.runWith(TestSink.probe[DicomPart])
-      .expectMetaPart(DicomMetaPart(None, Some("John^Doe"), None, None, None, None, None))
+      .expectMetaPart(DicomMetaPart(None, None, Some("John^Doe"), None, None, None, None, None))
       .expectHeader(Tag.PatientName)
       .expectValueChunk()
       .expectHeader(Tag.AcquisitionNumber)
