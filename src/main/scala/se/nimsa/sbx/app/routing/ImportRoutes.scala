@@ -135,8 +135,16 @@ trait ImportRoutes {
     dicomPart match {
       case da: DicomAttributes =>
         StreamSource.fromIterator(() => da.attributes.iterator).runWith(DicomAttributesSink.attributesSink).map {
-          dataset =>
-            DicomMetaPart(None, None, None, None, None, None, None, None) // FIXME: convert info to some case class
+          case (fmiMaybe, dsMaybe) =>
+            DicomMetaPart(
+              fmiMaybe.flatMap(fmi => Option(fmi.getString(Tag.TransferSyntaxUID))),
+              dsMaybe.map(ds => ds.getSpecificCharacterSet),
+              dsMaybe.flatMap(ds => Option(ds.getString(Tag.PatientID))),
+              dsMaybe.flatMap(ds => Option(ds.getString(Tag.PatientName))),
+              dsMaybe.flatMap(ds => Option(ds.getString(Tag.PatientIdentityRemoved))),
+              dsMaybe.flatMap(ds => Option(ds.getString(Tag.StudyInstanceUID))),
+              dsMaybe.flatMap(ds => Option(ds.getString(Tag.SeriesInstanceUID))),
+              None)
         }
       case part: DicomPart => Future.successful(part)
     }
@@ -209,6 +217,7 @@ trait ImportRoutes {
           (dicomFileSink, dbAttributesSink) =>
             import GraphDSL.Implicits._
 
+
             val flow = builder.add {
               validateFlowWithContext(validationContexts).
                 via(partFlow).
@@ -219,7 +228,7 @@ trait ImportRoutes {
             }
 
             /*
-            FIXME: remove unused: collectAttributesFlow
+            // FIXME: remove unused: collectAttributesFlow
             val metaTags2Collect = Set(Tag.TransferSyntaxUID, Tag.SpecificCharacterSet, Tag.PatientName, Tag.PatientID, Tag.PatientIdentityRemoved, Tag.StudyInstanceUID, Tag.SeriesInstanceUID)
             val flow = builder.add {
               validateFlowWithContext(validationContexts).
@@ -229,8 +238,8 @@ trait ImportRoutes {
                 mapAsync(5)(maybeMapAttributes).
                 mapAsync(5)(maybeAnonymizationLookup).
                 via(ReverseAnonymizationFlow.reverseAnonFlow)
-            }*/
-
+            }
+            */
             val bcast = builder.add(Broadcast[DicomPart](2))
 
             flow ~> bcast.in
