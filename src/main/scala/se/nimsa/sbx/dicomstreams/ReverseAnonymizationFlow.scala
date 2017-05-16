@@ -1,4 +1,4 @@
-package se.nimsa.sbx.util
+package se.nimsa.sbx.dicomstreams
 
 import akka.stream.scaladsl.Flow
 import akka.stream.stage.{GraphStage, GraphStageLogic, InHandler, OutHandler}

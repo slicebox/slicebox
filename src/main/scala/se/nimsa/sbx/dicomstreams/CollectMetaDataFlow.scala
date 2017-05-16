@@ -1,12 +1,13 @@
-package se.nimsa.sbx.util
+package se.nimsa.sbx.dicomstreams
 
-import akka.stream.{Attributes, FlowShape, Inlet, Outlet}
+
 import akka.stream.scaladsl.Flow
 import akka.stream.stage.{GraphStage, GraphStageLogic, InHandler, OutHandler}
+import akka.stream.{Attributes, FlowShape, Inlet, Outlet}
 import akka.util.ByteString
-import se.nimsa.dcm4che.streams.DicomParts._
 import org.dcm4che3.data.{SpecificCharacterSet, Tag}
 import org.dcm4che3.io.DicomStreamException
+import se.nimsa.dcm4che.streams.DicomParts._
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.AnonymizationKey
 
 
@@ -32,6 +33,7 @@ class CollectMetaDataFlow() extends GraphStage[FlowShape[DicomPart, DicomPart]] 
     var buffer: Seq[DicomPart] = Nil
     var reachedEnd = false
     var currentBufferSize = 0
+
 
     var transferSyntaxUid: Option[DicomAttribute] = None
     var specificCharacterSet: Option[DicomAttribute] = None
