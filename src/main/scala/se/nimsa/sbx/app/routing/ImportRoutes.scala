@@ -35,7 +35,8 @@ import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.dicom.Contexts
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
-import se.nimsa.sbx.dicomstreams.{CollectMetaDataFlow, DicomMetaPart, ReverseAnonymizationFlow}
+import se.nimsa.sbx.dicom.streams.ReverseAnonymizationFlow
+import se.nimsa.sbx.dicom.streams.{CollectMetaDataFlow, DicomMetaPart}
 import se.nimsa.sbx.importing.ImportProtocol._
 import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, GetImage, MetaDataAdded}
@@ -118,7 +119,6 @@ trait ImportRoutes {
               throw new RuntimeException("SeriesInstanceUID not found in DicomMetaPart")
             }
             val filtered = keys.anonymizationKeys.filter(key => (key.anonStudyInstanceUID == meta.studyInstanceUID.get) && (key.anonSeriesInstanceUID == meta.seriesInstanceUID.get))
-            // FIXME
             DicomMetaPart(meta.transferSyntaxUid, meta.specificCharacterSet, meta.patientId, meta.patientName, meta.identityRemoved, meta.studyInstanceUID, meta.seriesInstanceUID, filtered.headOption)
           }
         } else {
@@ -130,7 +130,6 @@ trait ImportRoutes {
     }
   }
 
-  //FIXME: remove unused
   def maybeMapAttributes(dicomPart: DicomPart): Future[DicomPart] = {
     dicomPart match {
       case da: DicomAttributes =>
@@ -138,7 +137,7 @@ trait ImportRoutes {
           case (fmiMaybe, dsMaybe) =>
             DicomMetaPart(
               fmiMaybe.flatMap(fmi => Option(fmi.getString(Tag.TransferSyntaxUID))),
-              dsMaybe.map(ds => ds.getSpecificCharacterSet),
+              dsMaybe.flatMap(ds => Option(ds.getSpecificCharacterSet)),
               dsMaybe.flatMap(ds => Option(ds.getString(Tag.PatientID))),
               dsMaybe.flatMap(ds => Option(ds.getString(Tag.PatientName))),
               dsMaybe.flatMap(ds => Option(ds.getString(Tag.PatientIdentityRemoved))),
@@ -218,6 +217,7 @@ trait ImportRoutes {
             import GraphDSL.Implicits._
 
 
+            /*
             val flow = builder.add {
               validateFlowWithContext(validationContexts).
                 via(partFlow).
@@ -225,10 +225,8 @@ trait ImportRoutes {
                 via(CollectMetaDataFlow.collectMetaDataFlow).
                 mapAsync(5)(maybeAnonymizationLookup).
                 via(ReverseAnonymizationFlow.reverseAnonFlow)
-            }
+            }*/
 
-            /*
-            // FIXME: remove unused: collectAttributesFlow
             val metaTags2Collect = Set(Tag.TransferSyntaxUID, Tag.SpecificCharacterSet, Tag.PatientName, Tag.PatientID, Tag.PatientIdentityRemoved, Tag.StudyInstanceUID, Tag.SeriesInstanceUID)
             val flow = builder.add {
               validateFlowWithContext(validationContexts).
@@ -239,7 +237,7 @@ trait ImportRoutes {
                 mapAsync(5)(maybeAnonymizationLookup).
                 via(ReverseAnonymizationFlow.reverseAnonFlow)
             }
-            */
+
             val bcast = builder.add(Broadcast[DicomPart](2))
 
             flow ~> bcast.in
