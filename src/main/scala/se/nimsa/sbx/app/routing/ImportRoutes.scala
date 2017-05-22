@@ -103,12 +103,10 @@ trait ImportRoutes {
       case Some(importSession) =>
 
         val source = Source(SourceType.IMPORT, importSession.name, importSessionId)
-
         val tmpPath = createTempPath()
+        val futureImport = bytes.runWith(uploadSink(tmpPath, storage, anonymizationService))
 
-        val sink = uploadSink(tmpPath, storage, anonymizationService)
-
-        onComplete(bytes.runWith(sink)) {
+        onComplete(futureImport) {
           case Success((_, attributes)) =>
             val dataAttributes: Attributes = attributes._2.get
             onSuccess(metaDataService.ask(AddMetaData(dataAttributes, source)).mapTo[MetaDataAdded]) { metaData =>
