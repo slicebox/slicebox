@@ -53,7 +53,6 @@ class S3Storage(val bucket: String, val s3Prefix: String, val region: String) ex
     s3Prefix + "/" + imageName
 
   override def move(sourceImageName: String, targetImageName: String) = {
-    // FIXME: prefix source ?
     s3Client.copy(sourceImageName, s3Id(targetImageName))
     s3Client.delete(sourceImageName)
   }

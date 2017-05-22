@@ -1,7 +1,7 @@
-package se.nimsa.sbx.dicomstreams
+package se.nimsa.sbx.dicom.streams
 
 import akka.stream.scaladsl.Flow
-import akka.stream.stage.{GraphStage, GraphStageLogic, InHandler, OutHandler}
+import akka.stream.stage._
 import akka.stream.{Attributes, FlowShape, Inlet, Outlet}
 import org.dcm4che3.data.{SpecificCharacterSet, Tag}
 import se.nimsa.dcm4che.streams.DicomParts._
@@ -14,7 +14,7 @@ class ReverseAnonymizationFlow() extends GraphStage[FlowShape[DicomPart, DicomPa
   val out = Outlet[DicomPart]("DicomAttributeBufferFlow.out")
   override val shape = FlowShape.of(in, out)
 
-  override def createLogic(inheritedAttributes: Attributes): GraphStageLogic = new GraphStageLogic(shape) {
+  override def createLogic(inheritedAttributes: Attributes): GraphStageLogic = new GraphStageLogic(shape) with StageLogging {
     var metaData: Option[DicomMetaPart] = None
     val REVERSE_ANON_TAGS = Seq(Tag.PatientName,
       Tag.PatientID,
@@ -62,9 +62,8 @@ class ReverseAnonymizationFlow() extends GraphStage[FlowShape[DicomPart, DicomPa
         part match {
           case metaPart: DicomMetaPart =>
             metaData = Some(metaPart)
-            // FIXME: remove println
-            println(">>>> grabbed meta: " + metaData)
-            println(">>>> grabbed meta, canDoReverse: " + canDoReverseAnon)
+            log.info("Collected meta data - isAnonymous: [{}]", metaPart.isAnonymized)
+            log.info("Collected meta data - canDoReverse: [{}]", canDoReverseAnon)
             push(out, metaPart)
 
           case header: DicomHeader if needReverseAnon(header.tag)  =>
@@ -121,9 +120,6 @@ class ReverseAnonymizationFlow() extends GraphStage[FlowShape[DicomPart, DicomPa
                 case _ =>
                   currentAttribute.get
               }
-              // FIXME remove println
-              println(">>>> currentAttr: " + currentAttribute.get.header + " - " + currentAttribute.get.valueBytes.decodeString("ASCII"))
-              println(">>>> updatedAttr: " + updatedAttribute.header + " - " + updatedAttribute.valueBytes.decodeString("ASCII"))
               emitMultiple(out, (updatedAttribute.header +: updatedAttribute.valueChunks).iterator)
               currentAttribute = None
             } else {
@@ -137,7 +133,6 @@ class ReverseAnonymizationFlow() extends GraphStage[FlowShape[DicomPart, DicomPa
       }
 
       override def onUpstreamFinish(): Unit = {
-        //FIXME
         complete(out)
       }
 

@@ -1,5 +1,4 @@
-package se.nimsa.sbx.dicomstreams
-
+package se.nimsa.sbx.dicom.streams
 
 import akka.stream.scaladsl.Flow
 import akka.stream.stage.{GraphStage, GraphStageLogic, InHandler, OutHandler}
@@ -14,8 +13,6 @@ import se.nimsa.sbx.anonymization.AnonymizationProtocol.AnonymizationKey
 /**
   * A flow which buffers DICOM parts until PatientName, PatientId and PatientIdentityRemoved are known.
   * Pushes a DicomMetaPart first, and all buffered parts afterwards. Following parts a pushed downstream immediately.
-  *
-  * FIXME: Need to handle specific charactersets. default: ISO-IR-6
   *
   */
 class CollectMetaDataFlow() extends GraphStage[FlowShape[DicomPart, DicomPart]] {
@@ -180,16 +177,11 @@ class CollectMetaDataFlow() extends GraphStage[FlowShape[DicomPart, DicomPart]] 
         val name = patientName.map(value => cs.decode(value.valueBytes.toArray).trim)
         val id = patientID.map(value => cs.decode(value.valueBytes.toArray).trim)
 
-        println(">>>name: " + name)
-
         // UI, CS: use ASCII
         val tsuid = transferSyntaxUid.map(_.valueBytes.decodeString(ASCII).trim)
         val isAnon = patientIdentityRemoved.map(_.valueBytes.decodeString(ASCII).trim)
         val studyUID = studyInstanceUID.map(_.valueBytes.decodeString(ASCII).trim)
         val seriesUID = seriesInstanceUID.map(_.valueBytes.decodeString(ASCII).trim)
-
-        println(">>>tsuid: " + tsuid)
-        println(">>>isAnon: " + isAnon)
 
         val metaPart = new DicomMetaPart(tsuid, Some(cs), id, name, isAnon, studyUID, seriesUID)
 

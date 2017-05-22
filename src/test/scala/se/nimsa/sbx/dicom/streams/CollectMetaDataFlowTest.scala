@@ -1,4 +1,4 @@
-package se.nimsa.sbx.dicomstreams
+package se.nimsa.sbx.dicom.streams
 
 import java.io.ByteArrayOutputStream
 
