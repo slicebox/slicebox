@@ -16,27 +16,18 @@
 
 package se.nimsa.sbx.app.routing
 
-import akka.NotUsed
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
-import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Merge, Sink, Source => StreamSource}
-import akka.stream.{FlowShape, SinkShape}
+import akka.stream.scaladsl.{Source => StreamSource}
 import akka.util.ByteString
-import org.dcm4che3.data.{Attributes, Tag, UID}
+import org.dcm4che3.data.Attributes
 import org.dcm4che3.io.DicomStreamException
-import se.nimsa.dcm4che.streams.DicomFlows._
-import se.nimsa.dcm4che.streams.DicomPartFlow._
-import se.nimsa.dcm4che.streams.DicomParts._
-import se.nimsa.dcm4che.streams.{DicomAttributesSink, DicomFlows, DicomParsing}
-import se.nimsa.sbx.anonymization.AnonymizationProtocol.{AnonymizationKeys, GetReverseAnonymizationKeys}
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.app.SliceboxBase
-import se.nimsa.sbx.dicom.Contexts
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
-import se.nimsa.sbx.dicom.streams.ReverseAnonymizationFlow
-import se.nimsa.sbx.dicom.streams.DicomMetaPart
+import se.nimsa.sbx.dicom.streams.DicomStreams._
 import se.nimsa.sbx.importing.ImportProtocol._
 import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, GetImage, MetaDataAdded}
@@ -106,144 +97,23 @@ trait ImportRoutes {
 
     }
 
-
-  def maybeAnonymizationLookup(dicomPart: DicomPart): Future[DicomPart] = {
-    dicomPart match {
-      case meta: DicomMetaPart =>
-        if (meta.isAnonymized && meta.patientName.isDefined && meta.patientId.isDefined) {
-          anonymizationService.ask(GetReverseAnonymizationKeys(meta.patientName.get, meta.patientId.get)).mapTo[AnonymizationKeys].map { keys: AnonymizationKeys =>
-            if (meta.studyInstanceUID.isEmpty) {
-              throw new RuntimeException("StudyInstanceUID not found in DicomMetaPart")
-            }
-            if (meta.seriesInstanceUID.isEmpty) {
-              throw new RuntimeException("SeriesInstanceUID not found in DicomMetaPart")
-            }
-            val filtered = keys.anonymizationKeys.filter(key => (key.anonStudyInstanceUID == meta.studyInstanceUID.get) && (key.anonSeriesInstanceUID == meta.seriesInstanceUID.get))
-            DicomMetaPart(meta.transferSyntaxUid, meta.specificCharacterSet, meta.patientId, meta.patientName, meta.identityRemoved, meta.studyInstanceUID, meta.seriesInstanceUID, filtered.headOption)
-          }
-        } else {
-          Future.successful(meta)
-        }
-
-      case part: DicomPart =>
-        Future.successful(part)
-    }
-  }
-
-  def maybeMapAttributes(dicomPart: DicomPart): Future[DicomPart] = {
-    dicomPart match {
-      case da: DicomAttributes =>
-        StreamSource.fromIterator(() => da.attributes.iterator).runWith(DicomAttributesSink.attributesSink).map {
-          case (fmiMaybe, dsMaybe) =>
-            DicomMetaPart(
-              fmiMaybe.flatMap(fmi => Option(fmi.getString(Tag.TransferSyntaxUID))),
-              dsMaybe.flatMap(ds => Option(ds.getSpecificCharacterSet)),
-              dsMaybe.flatMap(ds => Option(ds.getString(Tag.PatientID))),
-              dsMaybe.flatMap(ds => Option(ds.getString(Tag.PatientName))),
-              dsMaybe.flatMap(ds => Option(ds.getString(Tag.PatientIdentityRemoved))),
-              dsMaybe.flatMap(ds => Option(ds.getString(Tag.StudyInstanceUID))),
-              dsMaybe.flatMap(ds => Option(ds.getString(Tag.SeriesInstanceUID))),
-              None)
-        }
-      case part: DicomPart => Future.successful(part)
-    }
-  }
-
-
-  private def tagsToStoreInDB = {
-    val patientTags = Seq(Tag.PatientName, Tag.PatientID, Tag.PatientSex, Tag.PatientBirthDate)
-    val studyTags = Seq(Tag.StudyInstanceUID, Tag.StudyDescription, Tag.StudyID, Tag.StudyDate, Tag.AccessionNumber, Tag.PatientAge)
-    val seriesTags = Seq(Tag.SeriesInstanceUID, Tag.SeriesDescription, Tag.SeriesDate, Tag.Modality, Tag.ProtocolName, Tag.BodyPartExamined, Tag.Manufacturer, Tag.StationName, Tag.FrameOfReferenceUID)
-    val imageTags = Seq(Tag.SOPInstanceUID, Tag.ImageType, Tag.InstanceNumber)
-    val other = Seq(Tag.SpecificCharacterSet) //needed to decode strings
-
-    patientTags ++ studyTags ++ seriesTags ++ imageTags ++ other
-  }
-
-  def maybeDeflateFlow: Flow[DicomPart, DicomPart, NotUsed] = Flow.fromGraph(GraphDSL.create() { implicit builder =>
-    import GraphDSL.Implicits._
-
-    var shouldDeflate = false // determines which path is taken in the graph, with or without deflating
-
-    // check transfer syntax in the meta part
-    val shouldDeflateFlow = builder.add {
-      Flow[DicomPart].map {
-        case p: DicomMetaPart =>
-          shouldDeflate = p.transferSyntaxUid.isDefined && DicomParsing.isDeflated(p.transferSyntaxUid.get)
-          p
-        case p => p
-      }
-    }
-
-    // split the flow
-    val bcast = builder.add(Broadcast[DicomPart](2))
-
-    // define gates for each path, only one path is used
-    val deflateYes = Flow[DicomPart].filter(_ =>    shouldDeflate)
-    val deflateNo  = Flow[DicomPart].filterNot(_ => shouldDeflate)
-
-    // the deflate stage
-    val deflate = DicomFlows.deflateDatasetFlow()
-
-    // merge the two paths
-    val merge = builder.add(Merge[DicomPart](2))
-
-    shouldDeflateFlow ~> bcast ~> deflateYes ~> deflate ~> merge
-                         bcast ~> deflateNo             ~> merge
-
-    FlowShape(shouldDeflateFlow.in, merge.out)
-  })
-
   def addImageToImportSessionRoute(bytes: StreamSource[ByteString, Any], importSessionId: Long): Route = {
-
-    val tmpId = java.util.UUID.randomUUID().toString
-    val tmpPath = s"tmp-$tmpId"
 
     onSuccess(importService.ask(GetImportSession(importSessionId)).mapTo[Option[ImportSession]]) {
       case Some(importSession) =>
 
         val source = Source(SourceType.IMPORT, importSession.name, importSessionId)
 
-        val dicomFileSink = this.storage.fileSink(tmpPath)
-        val dbAttributesSink = DicomAttributesSink.attributesSink
+        val tmpPath = createTempPath()
 
-        val validationContexts = Contexts.asNamePairs(Contexts.imageDataContexts).map { pair =>
-          ValidationContext(pair._1, pair._2)
-        }
+        val sink = uploadSink(tmpPath, storage, anonymizationService)
 
-        // use collectMetdaDataFlow
-        val importSink = Sink.fromGraph(GraphDSL.create(dicomFileSink, dbAttributesSink)(_ zip _) { implicit builder =>
-          (dicomFileSink, dbAttributesSink) =>
-            import GraphDSL.Implicits._
-
-
-            val metaTags2Collect = Set(Tag.TransferSyntaxUID, Tag.SpecificCharacterSet, Tag.PatientName, Tag.PatientID, Tag.PatientIdentityRemoved, Tag.StudyInstanceUID, Tag.SeriesInstanceUID)
-            val flow = builder.add {
-              validateFlowWithContext(validationContexts).
-                via(partFlow).
-                via(groupLengthDiscardFilter).
-                via(collectAttributesFlow(metaTags2Collect)).
-                mapAsync(5)(maybeMapAttributes).
-                mapAsync(5)(maybeAnonymizationLookup).
-                via(ReverseAnonymizationFlow.reverseAnonFlow)
-            }
-
-            val bcast = builder.add(Broadcast[DicomPart](2))
-
-            flow ~> bcast.in
-            bcast.out(0) ~> maybeDeflateFlow.map(_.bytes) ~> dicomFileSink
-            //bcast.out(0) ~> printFlow[DicomPart].map(_.bytes) ~> dicomFileSink
-            bcast.out(1) ~> whitelistFilter(tagsToStoreInDB) ~> attributeFlow ~> dbAttributesSink
-
-            SinkShape(flow.in)
-        })
-
-        onComplete(bytes.runWith(importSink)) {
+        onComplete(bytes.runWith(sink)) {
           case Success((_, attributes)) =>
             val dataAttributes: Attributes = attributes._2.get
             onSuccess(metaDataService.ask(AddMetaData(dataAttributes, source)).mapTo[MetaDataAdded]) { metaData =>
-              onSuccess(importService.ask(AddImageToSession(importSession.id, metaData.image, !metaData.imageAdded)).mapTo[ImageAddedToSession]) { importSessionImage =>
-                onSuccess(storageService.ask(MoveDicomData(tmpPath, s"${metaData.image.id}")).mapTo[DicomDataMoved]) { dataMoved =>
+              onSuccess(importService.ask(AddImageToSession(importSession.id, metaData.image, !metaData.imageAdded)).mapTo[ImageAddedToSession]) { _ =>
+                onSuccess(storageService.ask(MoveDicomData(tmpPath, s"${metaData.image.id}")).mapTo[DicomDataMoved]) { _ =>
                   system.eventStream.publish(ImageAdded(metaData.image, source, !metaData.imageAdded))
                   val httpStatus = if (metaData.imageAdded) Created else OK
                   complete((httpStatus, metaData.image))
