@@ -17,12 +17,12 @@ import se.nimsa.sbx.anonymization.AnonymizationProtocol.AnonymizationKey
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomPropertyValue._
+import se.nimsa.sbx.dicom.streams.DicomMetaPart
 import se.nimsa.sbx.dicom.{DicomData, DicomUtil}
 import se.nimsa.sbx.metadata.MetaDataProtocol.{SeriesSource, SeriesTag}
 import se.nimsa.sbx.metadata.{MetaDataDAO, PropertiesDAO}
 import se.nimsa.sbx.seriestype.SeriesTypeDAO
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol.{SeriesSeriesType, SeriesType}
-import se.nimsa.sbx.util.CollectMetaDataFlow.DicomMetaPart
 import slick.basic.DatabaseConfig
 import slick.jdbc.JdbcProfile
 
