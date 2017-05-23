@@ -17,7 +17,6 @@
 package se.nimsa.sbx.storage
 
 import java.io.{ByteArrayOutputStream, InputStream}
-import javax.imageio.ImageIO
 
 import akka.Done
 import akka.actor.ActorSystem
@@ -91,10 +90,11 @@ class S3Storage(val bucket: String, val s3Prefix: String, val region: String) ex
     super.readImageInformation(s3InputStream)
   }
 
-  override def readPngImageData(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int): Array[Byte] = {
-    val s3InputStream = s3Client.get(s3Id(image))
-    val iis = ImageIO.createImageInputStream(s3InputStream)
-    super.readPngImageData(iis, frameNumber, windowMin, windowMax, imageHeight)
+  override def readPngImageData(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int)
+                               (implicit system: ActorSystem, materializer: Materializer): Array[Byte] = {
+    // FIXME: use fileSource once implemented
+    val source = new S3Client(S3Facade.credentialsFromProviderChain(), region).download(bucket, s3Id(image))
+    super.readPngImageData(source, frameNumber, windowMin, windowMax, imageHeight)
   }
 
   override def imageAsInputStream(image: Image): InputStream = {

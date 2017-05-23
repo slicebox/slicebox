@@ -23,10 +23,11 @@ import javax.imageio.ImageIO
 import akka.Done
 import akka.actor.ActorSystem
 import akka.stream.Materializer
-import akka.stream.scaladsl.{FileIO, Sink}
+import akka.stream.scaladsl.{FileIO, Sink, StreamConverters}
 import akka.util.ByteString
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.DicomUtil._
+import se.nimsa.sbx.dicom.streams.DicomStreams
 import se.nimsa.sbx.dicom.{DicomData, DicomUtil, ImageAttribute}
 import se.nimsa.sbx.storage.StorageProtocol.ImageInformation
 
@@ -71,10 +72,11 @@ class FileStorage(val path: Path) extends StorageService {
   def readImageInformation(image: Image): ImageInformation =
     super.readImageInformation(new BufferedInputStream(Files.newInputStream(filePath(image))))
 
-  override def readPngImageData(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int): Array[Byte] = {
-    val file = filePath(image).toFile
-    val iis = ImageIO.createImageInputStream(file)
-    super.readPngImageData(iis, frameNumber, windowMin, windowMax, imageHeight)
+  override def readPngImageData(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int)
+                               (implicit system: ActorSystem, materializer: Materializer): Array[Byte] = {
+    val path = filePath(image)
+    val source = FileIO.fromPath(path)
+    super.readPngImageData(source, frameNumber, windowMin, windowMax, imageHeight)
   }
 
   override def imageAsInputStream(image: Image): InputStream =

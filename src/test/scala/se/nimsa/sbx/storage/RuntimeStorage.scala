@@ -1,12 +1,11 @@
 package se.nimsa.sbx.storage
 
 import java.io.{ByteArrayInputStream, InputStream}
-import javax.imageio.ImageIO
 
 import akka.Done
 import akka.actor.ActorSystem
 import akka.stream.Materializer
-import akka.stream.scaladsl.Sink
+import akka.stream.scaladsl.{Sink, Source}
 import akka.util.ByteString
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.DicomUtil._
@@ -37,10 +36,13 @@ class RuntimeStorage extends StorageService {
     DicomUtil.readImageAttributes(loadDicomData(storage.getOrElse(imageName(image), null).toArray, withPixelData = false).attributes)
 
   override def readImageInformation(image: Image): ImageInformation =
-    super.readImageInformation(imageAsInputStream(image))
+    readImageInformation(imageAsInputStream(image))
 
-  override def readPngImageData(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int): Array[Byte] =
-    super.readPngImageData(ImageIO.createImageInputStream(imageAsInputStream(image)), frameNumber, windowMin, windowMax, imageHeight)
+  override def readPngImageData(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int)
+                               (implicit system: ActorSystem, materializer: Materializer): Array[Byte] = {
+    val source = Source.single(storage(imageName(image)))
+    readPngImageData(source, frameNumber, windowMin, windowMax, imageHeight)
+  }
 
   override def imageAsInputStream(image: Image): InputStream =
     new ByteArrayInputStream(storage(imageName(image)).toArray)

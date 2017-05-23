@@ -91,8 +91,8 @@ trait ImageRoutes {
                 'windowmax.as[Int] ? 0,
                 'imageheight.as[Int] ? 0) { (frameNumber, min, max, height) =>
                 get {
-                  onComplete(storageService.ask(GetPngDataArray(image, frameNumber, min, max, height))) {
-                    case Success(PngDataArray(bytes)) => complete(HttpEntity(`image/png`, bytes))
+                  onComplete(Future(storage.readPngImageData(image, frameNumber, min, max, height))) {
+                    case Success(bytes) => complete(HttpEntity(`image/png`, bytes))
                     case Failure(_) => complete(NoContent)
                     case _ => complete(InternalServerError)
                   }

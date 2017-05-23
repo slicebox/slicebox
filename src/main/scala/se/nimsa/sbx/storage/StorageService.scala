@@ -20,18 +20,18 @@ import java.awt.RenderingHints
 import java.awt.image.BufferedImage
 import java.io.{ByteArrayOutputStream, InputStream}
 import javax.imageio.ImageIO
-import javax.imageio.stream.ImageInputStream
 
 import akka.Done
 import akka.actor.ActorSystem
 import akka.stream.Materializer
-import akka.stream.scaladsl.Sink
+import akka.stream.scaladsl.{Sink, Source, StreamConverters}
 import akka.util.ByteString
 import com.amazonaws.util.IOUtils
 import org.dcm4che3.data.Tag
 import org.dcm4che3.imageio.plugins.dcm.DicomImageReadParam
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.DicomUtil._
+import se.nimsa.sbx.dicom.streams.DicomStreams
 import se.nimsa.sbx.dicom.{DicomData, ImageAttribute}
 import se.nimsa.sbx.storage.StorageProtocol.ImageInformation
 
@@ -73,9 +73,16 @@ trait StorageService {
       attributes.getInt(Tag.LargestImagePixelValue, 0))
   }
 
-  def readPngImageData(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int): Array[Byte]
+  def readPngImageData(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int)
+                      (implicit system: ActorSystem, materializer: Materializer): Array[Byte]
 
-  def readPngImageData(iis: ImageInputStream, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int): Array[Byte] = {
+  def readPngImageData(source: Source[ByteString, _], frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int)
+                      (implicit system: ActorSystem, materializer: Materializer): Array[Byte] = {
+    // dcm4che does not support viewing of deflated data, cf. Github issue #42
+    // As a workaround, do streaming inflate and mapping of transfer syntax
+    val inflatedSource = DicomStreams.inflatedSource(source)
+    val is = inflatedSource.runWith(StreamConverters.asInputStream())
+    val iis = ImageIO.createImageInputStream(is)
     try {
       val imageReader = ImageIO.getImageReadersByFormatName("DICOM").next
       imageReader.setInput(iis)
@@ -123,7 +130,7 @@ trait StorageService {
       image
   }
 
-  def fileSink(tmpPath: String)(implicit actorSystem: ActorSystem, mat: Materializer, ec: ExecutionContext):  Sink[ByteString, Future[Done]]
+  def fileSink(tmpPath: String)(implicit actorSystem: ActorSystem, mat: Materializer, ec: ExecutionContext): Sink[ByteString, Future[Done]]
 
 }
 

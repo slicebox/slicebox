@@ -5,11 +5,11 @@ import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Merge, Sink, Source}
 import akka.stream.{ActorMaterializer, FlowShape, SinkShape}
 import akka.util.{ByteString, Timeout}
 import akka.{Done, NotUsed}
-import org.dcm4che3.data.{Attributes, Tag}
+import org.dcm4che3.data.{Attributes, Tag, UID}
 import se.nimsa.dcm4che.streams.DicomFlows._
 import se.nimsa.dcm4che.streams.DicomPartFlow.partFlow
 import se.nimsa.dcm4che.streams.DicomParts.{DicomAttributes, DicomPart}
-import se.nimsa.dcm4che.streams.{DicomAttributesSink, DicomFlows, DicomParsing}
+import se.nimsa.dcm4che.streams.{DicomAttributesSink, DicomFlows, DicomParsing, DicomPartFlow}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.AnonymizationKey
 import se.nimsa.sbx.dicom.Contexts
 
@@ -142,4 +142,15 @@ object DicomStreams {
 
 
   }
+
+  def inflatedSource(source: Source[ByteString, _]): Source[ByteString, _] = source
+    .via(DicomPartFlow.partFlow)
+    .via(DicomFlows.attributesTransformFlow(
+      (Tag.TransferSyntaxUID, valueBytes => {
+        new String(valueBytes.toArray, "US-ASCII") match {
+          case UID.DeflatedExplicitVRLittleEndian => ByteString(UID.ExplicitVRLittleEndian.getBytes("US-ASCII"))
+          case _ => valueBytes
+        }
+      })))
+    .map(_.bytes)
 }
