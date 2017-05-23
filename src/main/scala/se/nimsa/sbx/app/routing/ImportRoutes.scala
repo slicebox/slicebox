@@ -24,9 +24,11 @@ import akka.stream.scaladsl.{Source => StreamSource}
 import akka.util.ByteString
 import org.dcm4che3.data.Attributes
 import org.dcm4che3.io.DicomStreamException
+import se.nimsa.sbx.anonymization.AnonymizationProtocol.{AnonymizationKeys, GetReverseAnonymizationKeys}
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
+import se.nimsa.sbx.dicom.streams.DicomMetaPart
 import se.nimsa.sbx.dicom.streams.DicomStreams._
 import se.nimsa.sbx.importing.ImportProtocol._
 import se.nimsa.sbx.log.SbxLog
@@ -104,11 +106,15 @@ trait ImportRoutes {
 
         val source = Source(SourceType.IMPORT, importSession.name, importSessionId)
         val tmpPath = createTempPath()
-        val futureImport = bytes.runWith(uploadSink(tmpPath, storage, anonymizationService))
+        val anonQuery = (meta: DicomMetaPart) => anonymizationService
+          .ask(GetReverseAnonymizationKeys(meta.patientName.get, meta.patientId.get))
+          .mapTo[AnonymizationKeys].map(_.anonymizationKeys)
+
+        val futureImport = bytes.runWith(storeDicomDataSink(storage.fileSink(tmpPath), anonQuery))
 
         onComplete(futureImport) {
           case Success((_, attributes)) =>
-            val dataAttributes: Attributes = attributes._2.get
+            val dataAttributes: Attributes = attributes._2.getOrElse(throw new DicomStreamException("DICOM data has no dataset"))
             onSuccess(metaDataService.ask(AddMetaData(dataAttributes, source)).mapTo[MetaDataAdded]) { metaData =>
               onSuccess(importService.ask(AddImageToSession(importSession.id, metaData.image, !metaData.imageAdded)).mapTo[ImageAddedToSession]) { _ =>
                 onSuccess(storageService.ask(MoveDicomData(tmpPath, s"${metaData.image.id}")).mapTo[DicomDataMoved]) { _ =>

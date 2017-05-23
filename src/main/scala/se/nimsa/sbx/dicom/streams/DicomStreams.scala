@@ -1,19 +1,17 @@
 package se.nimsa.sbx.dicom.streams
 
-import akka.{Done, NotUsed}
-import akka.actor.{ActorRef, ActorSystem}
-import akka.pattern.ask
-import akka.stream.{ActorMaterializer, FlowShape, SinkShape}
+import akka.actor.ActorSystem
 import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Merge, Sink, Source}
+import akka.stream.{ActorMaterializer, FlowShape, SinkShape}
 import akka.util.{ByteString, Timeout}
+import akka.{Done, NotUsed}
 import org.dcm4che3.data.{Attributes, Tag}
 import se.nimsa.dcm4che.streams.DicomFlows._
 import se.nimsa.dcm4che.streams.DicomPartFlow.partFlow
 import se.nimsa.dcm4che.streams.DicomParts.{DicomAttributes, DicomPart}
 import se.nimsa.dcm4che.streams.{DicomAttributesSink, DicomFlows, DicomParsing}
-import se.nimsa.sbx.anonymization.AnonymizationProtocol.{AnonymizationKeys, GetReverseAnonymizationKeys}
+import se.nimsa.sbx.anonymization.AnonymizationProtocol.AnonymizationKey
 import se.nimsa.sbx.dicom.Contexts
-import se.nimsa.sbx.storage.StorageService
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -85,18 +83,18 @@ object DicomStreams {
     FlowShape(shouldDeflateFlow.in, merge.out)
   })
 
-  def maybeAnonymizationLookup(anonymizationService: ActorRef, dicomPart: DicomPart)(implicit ec: ExecutionContext, timeout: Timeout): Future[DicomPart] = {
+  def maybeAnonymizationLookup(anonymizationKeysQuery: DicomMetaPart => Future[Seq[AnonymizationKey]], dicomPart: DicomPart)(implicit ec: ExecutionContext, timeout: Timeout): Future[DicomPart] = {
     dicomPart match {
       case meta: DicomMetaPart =>
         if (meta.isAnonymized && meta.patientName.isDefined && meta.patientId.isDefined) {
-          anonymizationService.ask(GetReverseAnonymizationKeys(meta.patientName.get, meta.patientId.get)).mapTo[AnonymizationKeys].map { keys: AnonymizationKeys =>
+          anonymizationKeysQuery(meta).map { keys =>
             if (meta.studyInstanceUID.isEmpty) {
               throw new RuntimeException("StudyInstanceUID not found in DicomMetaPart")
             }
             if (meta.seriesInstanceUID.isEmpty) {
               throw new RuntimeException("SeriesInstanceUID not found in DicomMetaPart")
             }
-            val filtered = keys.anonymizationKeys.filter(key => (key.anonStudyInstanceUID == meta.studyInstanceUID.get) && (key.anonSeriesInstanceUID == meta.seriesInstanceUID.get))
+            val filtered = keys.filter(key => (key.anonStudyInstanceUID == meta.studyInstanceUID.get) && (key.anonSeriesInstanceUID == meta.seriesInstanceUID.get))
             DicomMetaPart(meta.transferSyntaxUid, meta.specificCharacterSet, meta.patientId, meta.patientName, meta.identityRemoved, meta.studyInstanceUID, meta.seriesInstanceUID, filtered.headOption)
           }
         } else {
@@ -110,17 +108,16 @@ object DicomStreams {
 
   def createTempPath() = s"tmp-${java.util.UUID.randomUUID().toString}"
 
-  def uploadSink(path: String, storage: StorageService, anonymizationService: ActorRef)
-                (implicit ec: ExecutionContext, system: ActorSystem, materializer: ActorMaterializer, timeout: Timeout): Sink[ByteString, Future[(Done, (Option[Attributes], Option[Attributes]))]] = {
+  def storeDicomDataSink(storageSink: Sink[ByteString, Future[Done]], anonymizationKeysQuery: DicomMetaPart => Future[Seq[AnonymizationKey]])
+                        (implicit ec: ExecutionContext, system: ActorSystem, materializer: ActorMaterializer, timeout: Timeout): Sink[ByteString, Future[(Done, (Option[Attributes], Option[Attributes]))]] = {
 
-    val dicomFileSink = storage.fileSink(path)
     val dbAttributesSink = DicomAttributesSink.attributesSink
 
     val validationContexts = Contexts.asNamePairs(Contexts.imageDataContexts).map { pair =>
       ValidationContext(pair._1, pair._2)
     }
 
-    Sink.fromGraph(GraphDSL.create(dicomFileSink, dbAttributesSink)(_ zip _) { implicit builder =>
+    Sink.fromGraph(GraphDSL.create(storageSink, dbAttributesSink)(_ zip _) { implicit builder =>
       (dicomFileSink, dbAttributesSink) =>
         import GraphDSL.Implicits._
 
@@ -130,7 +127,7 @@ object DicomStreams {
             via(groupLengthDiscardFilter).
             via(collectAttributesFlow(metaTags2Collect)).
             mapAsync(5)(maybeMapAttributes).
-            mapAsync(5)(maybeAnonymizationLookup(anonymizationService, _)).
+            mapAsync(5)(maybeAnonymizationLookup(anonymizationKeysQuery, _)).
             via(ReverseAnonymizationFlow.reverseAnonFlow)
         }
 

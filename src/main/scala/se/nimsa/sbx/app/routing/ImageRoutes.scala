@@ -31,10 +31,12 @@ import akka.stream.{OverflowStrategy, QueueOfferResult}
 import akka.util.ByteString
 import org.dcm4che3.data.Attributes
 import org.dcm4che3.io.DicomStreamException
+import se.nimsa.sbx.anonymization.AnonymizationProtocol.{AnonymizationKeys, GetReverseAnonymizationKeys}
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.dicom.DicomHierarchy.{FlatSeries, Image, Patient, Study}
 import se.nimsa.sbx.dicom._
+import se.nimsa.sbx.dicom.streams.DicomMetaPart
 import se.nimsa.sbx.dicom.streams.DicomStreams._
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.storage.StorageProtocol._
@@ -174,7 +176,11 @@ trait ImageRoutes {
 
     val source = Source(SourceType.USER, apiUser.user, apiUser.id)
     val tmpPath = createTempPath()
-    val futureUpload = bytes.runWith(uploadSink(tmpPath, storage, anonymizationService))
+    val anonQuery = (meta: DicomMetaPart) => anonymizationService
+      .ask(GetReverseAnonymizationKeys(meta.patientName.get, meta.patientId.get))
+      .mapTo[AnonymizationKeys].map(_.anonymizationKeys)
+
+    val futureUpload = bytes.runWith(storeDicomDataSink(storage.fileSink(tmpPath), anonQuery))
 
     onSuccess(futureUpload) {
       case (_, dicomData) =>
