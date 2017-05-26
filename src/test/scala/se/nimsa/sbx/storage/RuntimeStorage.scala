@@ -2,7 +2,7 @@ package se.nimsa.sbx.storage
 
 import java.io.{ByteArrayInputStream, InputStream}
 
-import akka.Done
+import akka.{Done, NotUsed}
 import akka.actor.ActorSystem
 import akka.stream.Materializer
 import akka.stream.scaladsl.{Sink, Source}
@@ -60,9 +60,6 @@ class RuntimeStorage extends StorageService {
     }
   }
 
-  override def fileSource(image: Image)(implicit actorSystem: ActorSystem, mat: Materializer) =
-    Source.single(storage(imageName(image)))
-
   override def fileSink(tmpPath: String)(implicit actorSystem: ActorSystem, mat: Materializer, ec: ExecutionContext): Sink[ByteString, Future[Done]] =
     Sink.reduce[ByteString](_ ++ _)
       .mapMaterializedValue {
@@ -72,4 +69,7 @@ class RuntimeStorage extends StorageService {
             Done
         }
       }
+
+  override def fileSource(path: String)(implicit actorSystem: ActorSystem, mat: Materializer, ec: ExecutionContext): Source[ByteString, NotUsed] = Source.single(storage(path))
+
 }

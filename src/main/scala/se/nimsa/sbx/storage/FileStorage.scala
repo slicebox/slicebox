@@ -21,7 +21,7 @@ import java.nio.file.{Files, Path, StandardCopyOption}
 
 import akka.actor.ActorSystem
 import akka.stream.Materializer
-import akka.stream.scaladsl.{FileIO, Sink}
+import akka.stream.scaladsl.{FileIO, Sink, Source}
 import akka.util.ByteString
 import akka.{Done, NotUsed}
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
@@ -92,9 +92,10 @@ class FileStorage(val path: Path) extends StorageService {
   }
 
 
-  override def fileSource(image: Image)(implicit actorSystem: ActorSystem, mat: Materializer) =
-    FileIO.fromPath(filePath(image)).mapMaterializedValue(_ => NotUsed)
-
-  override def fileSink(tmpPath: String)(implicit actorSystem: ActorSystem, mat: Materializer, ec: ExecutionContext): Sink[ByteString, Future[Done]] =
+  override def fileSink(tmpPath: String)(implicit actorSystem: ActorSystem, mat: Materializer, ec: ExecutionContext):  Sink[ByteString, Future[Done]] =
     FileIO.toPath(path.resolve(tmpPath)).mapMaterializedValue(_.map(_ => Done))
+
+  override def fileSource(srcPath: String)(implicit actorSystem: ActorSystem, mat: Materializer, ec: ExecutionContext): Source[ByteString, NotUsed] =
+    FileIO.fromPath(path.resolve(srcPath)).mapMaterializedValue(_ => NotUsed)
+
 }

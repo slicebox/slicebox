@@ -18,11 +18,11 @@ package se.nimsa.sbx.storage
 
 import java.io.{ByteArrayOutputStream, InputStream}
 
-import akka.Done
+import akka.{Done, NotUsed}
 import akka.actor.ActorSystem
 import akka.stream.Materializer
 import akka.stream.alpakka.s3.scaladsl.S3Client
-import akka.stream.scaladsl.Sink
+import akka.stream.scaladsl.{Sink, Source}
 import akka.util.ByteString
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.DicomUtil._
@@ -34,10 +34,9 @@ import scala.util.control.NonFatal
 
 /**
   * Service that stores DICOM files on AWS S3.
-  *
   * @param s3Prefix prefix for keys
-  * @param bucket   S3 bucket
-  * @param region   aws region of the bucket
+  * @param bucket S3 bucket
+  * @param region aws region of the bucket
   */
 class S3Storage(val bucket: String, val s3Prefix: String, val region: String) extends StorageService {
 
@@ -93,7 +92,9 @@ class S3Storage(val bucket: String, val s3Prefix: String, val region: String) ex
 
   override def readPngImageData(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int)
                                (implicit system: ActorSystem, materializer: Materializer): Array[Byte] = {
-    super.readPngImageData(fileSource(image), frameNumber, windowMin, windowMax, imageHeight)
+    // FIXME: use fileSource once implemented
+    val source = new S3Client(S3Facade.credentialsFromProviderChain(), region).download(bucket, s3Id(image))
+    super.readPngImageData(source, frameNumber, windowMin, windowMax, imageHeight)
   }
 
   override def imageAsInputStream(image: Image): InputStream = {
@@ -101,10 +102,11 @@ class S3Storage(val bucket: String, val s3Prefix: String, val region: String) ex
     s3InputStream
   }
 
-  override def fileSource(image: Image)(implicit actorSystem: ActorSystem, mat: Materializer) =
-    new S3Client(S3Facade.credentialsFromProviderChain(), region).download(bucket, s3Id(image))
-
-  override def fileSink(tmpPath: String)(implicit actorSystem: ActorSystem, mat: Materializer, ec: ExecutionContext): Sink[ByteString, Future[Done]] = {
+  override def fileSink(tmpPath: String)(implicit actorSystem: ActorSystem, mat: Materializer, ec: ExecutionContext):  Sink[ByteString, Future[Done]] = {
     new S3Client(S3Facade.credentialsFromProviderChain(), region).multipartUpload(bucket, tmpPath).mapMaterializedValue(_.map(_ => Done))
+  }
+
+  override def fileSource(path: String)(implicit actorSystem: ActorSystem, mat: Materializer, ec: ExecutionContext): Source[ByteString, NotUsed] = {
+    new S3Client(S3Facade.credentialsFromProviderChain(), region).download(bucket, s3Id(path))
   }
 }

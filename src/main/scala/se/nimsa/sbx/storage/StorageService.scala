@@ -130,8 +130,11 @@ trait StorageService {
       image
   }
 
-  def fileSource(image: Image)(implicit actorSystem: ActorSystem, mat: Materializer): Source[ByteString, NotUsed]
-  def fileSink(tmpPath: String)(implicit actorSystem: ActorSystem, mat: Materializer, ec: ExecutionContext): Sink[ByteString, Future[Done]]
+  /** Sink for dicom files. */
+  def fileSink(tmpPath: String)(implicit actorSystem: ActorSystem, mat: Materializer, ec: ExecutionContext):  Sink[ByteString, Future[Done]]
+
+  /** Source for dicom files. */
+  def fileSource(path: String)(implicit actorSystem: ActorSystem, mat: Materializer, ec: ExecutionContext):  Source[ByteString, NotUsed]
 
 }
 
