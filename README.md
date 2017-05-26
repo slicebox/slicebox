@@ -41,7 +41,7 @@ The user manual with information on installing, configuring and using slicebox i
 API
 ---
 
-A full specification of the Slicebox API is available at [slicebox.github.io/slicebox](http://slicebox.github.io/slicebox), displayed using [Swagger UI](http://swagger.io).
+A full specification of the Slicebox API is available at [slicebox.github.io/slicebox-api](http://slicebox.github.io/slicebox-api).
 
 Versioning
 ----------
