@@ -6,7 +6,7 @@ import javax.imageio.ImageIO
 import akka.Done
 import akka.actor.ActorSystem
 import akka.stream.Materializer
-import akka.stream.scaladsl.Sink
+import akka.stream.scaladsl.{Sink, Source}
 import akka.util.ByteString
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.DicomUtil._
@@ -67,5 +67,7 @@ class RuntimeStorage extends StorageService {
             Done
         }
       }
+
+  override def fileSource(path: String)(implicit actorSystem: ActorSystem, mat: Materializer, ec: ExecutionContext): Source[ByteString, Any] = Source.single(storage(path))
 
 }
