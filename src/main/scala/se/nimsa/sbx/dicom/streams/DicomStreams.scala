@@ -11,7 +11,9 @@ import se.nimsa.dcm4che.streams.DicomPartFlow.partFlow
 import se.nimsa.dcm4che.streams.DicomParts.{DicomAttributes, DicomPart}
 import se.nimsa.dcm4che.streams.{DicomAttributesSink, DicomFlows, DicomParsing, DicomPartFlow}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.AnonymizationKey
+import se.nimsa.sbx.box.BoxProtocol.OutgoingTagValue
 import se.nimsa.sbx.dicom.Contexts
+import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.DicomPropertyValue.{PatientID, PatientName}
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -77,8 +79,8 @@ object DicomStreams {
 
   def createTempPath() = s"tmp-${java.util.UUID.randomUUID().toString}"
 
-  def storeDicomDataSink(storageSink: Sink[ByteString, Future[Done]], reverseAnonymizationQuery: (PatientName, PatientID) => Future[Seq[AnonymizationKey]])
-                        (implicit ec: ExecutionContext, system: ActorSystem, materializer: ActorMaterializer, timeout: Timeout): Sink[ByteString, Future[(Done, (Option[Attributes], Option[Attributes]))]] = {
+  def dicomDataSink(storageSink: Sink[ByteString, Future[Done]], reverseAnonymizationQuery: (PatientName, PatientID) => Future[Seq[AnonymizationKey]])
+                   (implicit ec: ExecutionContext, system: ActorSystem, materializer: ActorMaterializer, timeout: Timeout): Sink[ByteString, Future[(Done, (Option[Attributes], Option[Attributes]))]] = {
 
     val dbAttributesSink = DicomAttributesSink.attributesSink
 
@@ -109,8 +111,15 @@ object DicomStreams {
 
         SinkShape(flow.in)
     })
+  }
 
-
+  def dicomDataSource(storageSource: Source[ByteString, NotUsed])
+                     (implicit ec: ExecutionContext, system: ActorSystem, materializer: ActorMaterializer, timeout: Timeout): Source[DicomPart, NotUsed] = {
+    storageSource
+      .via(DicomPartFlow.partFlow)
+      .via(collectAttributesFlow(metaTags2Collect))
+      .mapAsync(5)(attributesToMetaPart)
+      .via(AnonymizationFlow.maybeAnonFlow)
   }
 
   def inflatedSource(source: Source[ByteString, _]): Source[ByteString, _] = source

@@ -25,14 +25,14 @@ import akka.stream.scaladsl.Compression
 import akka.util.ByteString
 import org.dcm4che3.data.Attributes
 import org.dcm4che3.io.DicomStreamException
-import se.nimsa.dcm4che.streams.DicomFlows.{TagModification, collectAttributesFlow}
-import se.nimsa.dcm4che.streams.{DicomFlows, DicomPartFlow}
+import se.nimsa.dcm4che.streams.DicomFlows
+import se.nimsa.dcm4che.streams.DicomFlows.TagModification
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
-import se.nimsa.sbx.dicom.streams.AnonymizationFlow
-import se.nimsa.sbx.dicom.streams.DicomStreams.{attributesToMetaPart, createTempPath, metaTags2Collect, storeDicomDataSink}
+import se.nimsa.sbx.dicom.streams.DicomStreams
+import se.nimsa.sbx.dicom.streams.DicomStreams.{createTempPath, dicomDataSink}
 import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, GetImage, MetaDataAdded}
 import se.nimsa.sbx.storage.StorageProtocol._
 
@@ -54,7 +54,7 @@ trait TransactionRoutes {
 
                   val futureStored = compressedBytes
                     .via(Compression.inflate())
-                    .runWith(storeDicomDataSink(storage.fileSink(tmpPath), reverseAnonymizationQuery))
+                    .runWith(dicomDataSink(storage.fileSink(tmpPath), reverseAnonymizationQuery))
 
                   onSuccess(futureStored) {
                     case (_, dicomData) =>
@@ -130,12 +130,8 @@ trait TransactionRoutes {
                           TagModification(ttv.tagValue.tag, _ => ByteString(ttv.tagValue.value.getBytes("US-ASCII")), insert = true))
                         onSuccess(metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]]) {
                           case Some(image) =>
-                            val streamSource = storage
-                              .fileSource(image)
-                              .via(DicomPartFlow.partFlow)
-                              .via(collectAttributesFlow(metaTags2Collect))
-                              .mapAsync(5)(attributesToMetaPart)
-                              .via(AnonymizationFlow.maybeAnonFlow)
+                            val streamSource = DicomStreams
+                              .dicomDataSource(storage.fileSource(image))
                               .via(DicomFlows.modifyFlow(tagMods:_*))
                               .map(_.bytes)
                               .via(Compression.deflate)

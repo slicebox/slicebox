@@ -54,6 +54,9 @@ class FileStorage(val path: Path) extends StorageService {
   private def filePath(image: Image): Path =
     path.resolve(imageName(image))
 
+  private def filePath(filePath: String): Path =
+    path.resolve(filePath)
+
   override def move(sourceImageName: String, targetImageName: String): Unit = {
     Files.move(path.resolve(sourceImageName), path.resolve(targetImageName), StandardCopyOption.REPLACE_EXISTING)
   }
@@ -92,10 +95,10 @@ class FileStorage(val path: Path) extends StorageService {
   }
 
 
-  override def fileSink(filePath: String)(implicit actorSystem: ActorSystem, mat: Materializer, ec: ExecutionContext):  Sink[ByteString, Future[Done]] =
-    FileIO.toPath(path.resolve(filePath)).mapMaterializedValue(_.map(_ => Done))
+  override def fileSink(name: String)(implicit actorSystem: ActorSystem, mat: Materializer, ec: ExecutionContext):  Sink[ByteString, Future[Done]] =
+    FileIO.toPath(filePath(name)).mapMaterializedValue(_.map(_ => Done))
 
   override def fileSource(image: Image)(implicit actorSystem: ActorSystem, mat: Materializer): Source[ByteString, NotUsed] =
-    FileIO.fromPath(path.resolve(filePath(image))).mapMaterializedValue(_ => NotUsed)
+    FileIO.fromPath(filePath(image)).mapMaterializedValue(_ => NotUsed)
 
 }

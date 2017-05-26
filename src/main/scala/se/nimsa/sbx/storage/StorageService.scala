@@ -131,7 +131,7 @@ trait StorageService {
   }
 
   /** Sink for dicom files. */
-  def fileSink(path: String)(implicit actorSystem: ActorSystem, mat: Materializer, ec: ExecutionContext):  Sink[ByteString, Future[Done]]
+  def fileSink(name: String)(implicit actorSystem: ActorSystem, mat: Materializer, ec: ExecutionContext):  Sink[ByteString, Future[Done]]
 
   /** Source for dicom files. */
   def fileSource(image: Image)(implicit actorSystem: ActorSystem, mat: Materializer):  Source[ByteString, NotUsed]

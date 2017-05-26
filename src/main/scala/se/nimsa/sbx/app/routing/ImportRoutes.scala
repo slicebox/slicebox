@@ -106,7 +106,7 @@ trait ImportRoutes {
         val source = Source(SourceType.IMPORT, importSession.name, importSessionId)
         val tmpPath = createTempPath()
 
-        val futureImport = bytes.runWith(storeDicomDataSink(storage.fileSink(tmpPath), reverseAnonymizationQuery))
+        val futureImport = bytes.runWith(dicomDataSink(storage.fileSink(tmpPath), reverseAnonymizationQuery))
 
         onComplete(futureImport) {
           case Success((_, attributes)) =>
