@@ -133,7 +133,7 @@ trait TransactionRoutes {
                             val streamSource = storage
                               .fileSource(image)
                               .via(DicomPartFlow.partFlow)
-                              .via(AnonymizationFlow.anonFlow)
+                              .via(AnonymizationFlow.maybeAnonFlow)
                               .via(DicomFlows.modifyFlow(tagMods:_*))
                               .map(_.bytes)
                               .via(Compression.deflate)

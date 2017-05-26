@@ -258,6 +258,13 @@ object AnonymizationFlow {
     modify(Tag.UID, createUid _),
     clear(Tag.VerifyingObserverName)
   ))
+
+  val maybeAnonFlow = DicomStreams.conditionalFlow(
+    {
+      case p: DicomMetaPart => !p.isAnonymized
+      case _ => false
+    }, anonFlow)
+
 }
 
 

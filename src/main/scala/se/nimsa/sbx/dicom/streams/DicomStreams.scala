@@ -49,39 +49,11 @@ object DicomStreams {
     }
   }
 
-  def maybeDeflateFlow: Flow[DicomPart, DicomPart, NotUsed] = Flow.fromGraph(GraphDSL.create() { implicit builder =>
-    import GraphDSL.Implicits._
-
-    var shouldDeflate = false // determines which path is taken in the graph, with or without deflating
-
-    // check transfer syntax in the meta part
-    val shouldDeflateFlow = builder.add {
-      Flow[DicomPart].map {
-        case p: DicomMetaPart =>
-          shouldDeflate = p.transferSyntaxUid.isDefined && DicomParsing.isDeflated(p.transferSyntaxUid.get)
-          p
-        case p => p
-      }
-    }
-
-    // split the flow
-    val bcast = builder.add(Broadcast[DicomPart](2))
-
-    // define gates for each path, only one path is used
-    val deflateYes = Flow[DicomPart].filter(_ => shouldDeflate)
-    val deflateNo = Flow[DicomPart].filterNot(_ => shouldDeflate)
-
-    // the deflate stage
-    val deflate = DicomFlows.deflateDatasetFlow()
-
-    // merge the two paths
-    val merge = builder.add(Merge[DicomPart](2))
-
-    shouldDeflateFlow ~> bcast ~> deflateYes ~> deflate ~> merge
-    bcast ~> deflateNo ~> merge
-
-    FlowShape(shouldDeflateFlow.in, merge.out)
-  })
+  def maybeDeflateFlow: Flow[DicomPart, DicomPart, NotUsed] = conditionalFlow(
+    {
+      case p: DicomMetaPart => p.transferSyntaxUid.isDefined && DicomParsing.isDeflated(p.transferSyntaxUid.get)
+      case _ => false
+    }, DicomFlows.deflateDatasetFlow)
 
   def maybeAnonymizationLookup(reverseAnonymizationQuery: (PatientName, PatientID) => Future[Seq[AnonymizationKey]], dicomPart: DicomPart)(implicit ec: ExecutionContext, timeout: Timeout): Future[List[DicomPart]] = {
     dicomPart match {
@@ -127,7 +99,7 @@ object DicomStreams {
             .mapAsync(5)(attributesToMetaPart)
             .mapAsync(5)(maybeAnonymizationLookup(reverseAnonymizationQuery, _))
             .mapConcat(identity) // flatten stream of lists
-            .via(ReverseAnonymizationFlow.reverseAnonFlow)
+            .via(ReverseAnonymizationFlow.maybeReverseAnonFlow)
         }
 
         val bcast = builder.add(Broadcast[DicomPart](2))
@@ -152,4 +124,34 @@ object DicomStreams {
         }
       }, insert = false)))
     .map(_.bytes)
+
+  def conditionalFlow[M](alternateRouteIndicator: DicomPart => Boolean, alternateFlow: Flow[DicomPart, DicomPart, M]) = Flow.fromGraph(GraphDSL.create() { implicit builder =>
+    import GraphDSL.Implicits._
+
+    var alternateRoute = false // determines which path is taken in the graph
+
+    // if any part indicates that alternate route should be taken, remember this
+    val shouldTakeAlternateRouteFlow = builder.add {
+      Flow[DicomPart].map { part =>
+        if (alternateRouteIndicator(part))
+          alternateRoute = true
+        part
+      }
+    }
+
+    // split the flow
+    val bcast = builder.add(Broadcast[DicomPart](2))
+
+    // define gates for each path, only one path is used
+    val alternateYes = Flow[DicomPart].filter(_ => alternateRoute)
+    val alternateNo = Flow[DicomPart].filterNot(_ => alternateRoute)
+
+    // merge the two paths
+    val merge = builder.add(Merge[DicomPart](2))
+
+    shouldTakeAlternateRouteFlow ~> bcast ~> alternateYes ~> alternateFlow ~> merge
+    bcast ~> alternateNo ~> merge
+
+    FlowShape(shouldTakeAlternateRouteFlow.in, merge.out)
+  })
 }
