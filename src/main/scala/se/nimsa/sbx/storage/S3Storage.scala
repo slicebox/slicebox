@@ -19,18 +19,15 @@ package se.nimsa.sbx.storage
 import java.io.{ByteArrayOutputStream, InputStream}
 import javax.imageio.ImageIO
 
+import akka.Done
 import akka.actor.ActorSystem
-import akka.stream.{ClosedShape, Materializer}
+import akka.stream.Materializer
 import akka.stream.alpakka.s3.scaladsl.S3Client
-import akka.stream.scaladsl.{Broadcast, FileIO, GraphDSL, RunnableGraph, Sink, Source => StreamSource}
+import akka.stream.scaladsl.Sink
 import akka.util.ByteString
-import org.dcm4che3.data.Attributes
-import se.nimsa.dcm4che.streams.DicomAttributesSink
-import se.nimsa.dcm4che.streams.DicomFlows._
-import se.nimsa.dcm4che.streams.DicomPartFlow._
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.DicomUtil._
-import se.nimsa.sbx.dicom.{Contexts, DicomData, DicomUtil, ImageAttribute}
+import se.nimsa.sbx.dicom.{DicomData, DicomUtil, ImageAttribute}
 import se.nimsa.sbx.storage.StorageProtocol.ImageInformation
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -105,8 +102,8 @@ class S3Storage(val bucket: String, val s3Prefix: String, val region: String) ex
     s3InputStream
   }
 
-  override def fileSink(tmpPath: String)(implicit actorSystem: ActorSystem, mat: Materializer):  Sink[ByteString, Future[Any]] = {
-    new S3Client(S3Facade.credentialsFromProviderChain(), region).multipartUpload(bucket, tmpPath)
+  override def fileSink(tmpPath: String)(implicit actorSystem: ActorSystem, mat: Materializer, ec: ExecutionContext):  Sink[ByteString, Future[Done]] = {
+    new S3Client(S3Facade.credentialsFromProviderChain(), region).multipartUpload(bucket, tmpPath).mapMaterializedValue(_.map(_ => Done))
   }
 
 }

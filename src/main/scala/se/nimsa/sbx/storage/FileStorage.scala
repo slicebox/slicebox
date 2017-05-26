@@ -17,21 +17,17 @@
 package se.nimsa.sbx.storage
 
 import java.io.{BufferedInputStream, InputStream}
-import java.nio.file.{Files, Path, Paths, StandardCopyOption}
+import java.nio.file.{Files, Path, StandardCopyOption}
 import javax.imageio.ImageIO
 
+import akka.Done
 import akka.actor.ActorSystem
-import akka.stream.{ClosedShape, Materializer}
-import akka.stream.alpakka.s3.scaladsl.S3Client
-import akka.stream.scaladsl.{Broadcast, FileIO, GraphDSL, RunnableGraph, Sink, Source => StreamSource}
+import akka.stream.Materializer
+import akka.stream.scaladsl.{FileIO, Sink}
 import akka.util.ByteString
-import org.dcm4che3.data.Attributes
-import se.nimsa.dcm4che.streams.DicomAttributesSink
-import se.nimsa.dcm4che.streams.DicomFlows._
-import se.nimsa.dcm4che.streams.DicomPartFlow._
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.DicomUtil._
-import se.nimsa.sbx.dicom.{Contexts, DicomData, DicomUtil, ImageAttribute}
+import se.nimsa.sbx.dicom.{DicomData, DicomUtil, ImageAttribute}
 import se.nimsa.sbx.storage.StorageProtocol.ImageInformation
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -96,7 +92,8 @@ class FileStorage(val path: Path) extends StorageService {
   }
 
 
-  override def fileSink(tmpPath: String)(implicit actorSystem: ActorSystem, mat: Materializer):  Sink[ByteString, Future[Any]] = FileIO.toPath(path.resolve(tmpPath))
+  override def fileSink(tmpPath: String)(implicit actorSystem: ActorSystem, mat: Materializer, ec: ExecutionContext):  Sink[ByteString, Future[Done]] =
+    FileIO.toPath(path.resolve(tmpPath)).mapMaterializedValue(_.map(_ => Done))
 
 
 }

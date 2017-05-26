@@ -22,12 +22,13 @@ import java.io.{ByteArrayOutputStream, InputStream}
 import javax.imageio.ImageIO
 import javax.imageio.stream.ImageInputStream
 
+import akka.Done
 import akka.actor.ActorSystem
 import akka.stream.Materializer
+import akka.stream.scaladsl.Sink
 import akka.util.ByteString
-import akka.stream.scaladsl.{FileIO, RunnableGraph, Sink, Source => StreamSource}
 import com.amazonaws.util.IOUtils
-import org.dcm4che3.data.{Attributes, Tag}
+import org.dcm4che3.data.Tag
 import org.dcm4che3.imageio.plugins.dcm.DicomImageReadParam
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.DicomUtil._
@@ -47,7 +48,7 @@ trait StorageService {
 
   def imageName(image: Image) = image.id.toString
 
-  def deleteFromStorage(images: Seq[Image]): Unit = images foreach (deleteFromStorage(_))
+  def deleteFromStorage(images: Seq[Image]): Unit = images foreach deleteFromStorage
 
   def deleteFromStorage(image: Image): Unit
 
@@ -122,7 +123,7 @@ trait StorageService {
       image
   }
 
-  def fileSink(tmpPath: String)(implicit actorSystem: ActorSystem, mat: Materializer):  Sink[ByteString, Future[Any]]
+  def fileSink(tmpPath: String)(implicit actorSystem: ActorSystem, mat: Materializer, ec: ExecutionContext):  Sink[ByteString, Future[Done]]
 
 }
 

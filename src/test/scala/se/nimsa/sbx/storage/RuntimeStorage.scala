@@ -3,26 +3,27 @@ package se.nimsa.sbx.storage
 import java.io.{ByteArrayInputStream, InputStream}
 import javax.imageio.ImageIO
 
+import akka.Done
 import akka.actor.ActorSystem
 import akka.stream.Materializer
-import akka.stream.scaladsl.{FileIO, Sink}
+import akka.stream.scaladsl.Sink
 import akka.util.ByteString
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.DicomUtil._
 import se.nimsa.sbx.dicom.{DicomData, DicomUtil, ImageAttribute}
 import se.nimsa.sbx.storage.StorageProtocol.ImageInformation
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
 class RuntimeStorage extends StorageService {
 
   import scala.collection.mutable
 
-  val storage = mutable.Map.empty[String, Array[Byte]]
+  val storage = mutable.Map.empty[String, ByteString]
 
   override def storeDicomData(dicomData: DicomData, image: Image): Boolean = {
     val overwrite = storage.contains(imageName(image))
-    storage.put(imageName(image), toByteArray(dicomData))
+    storage.put(imageName(image), ByteString(toByteArray(dicomData)))
     overwrite
   }
 
@@ -30,10 +31,10 @@ class RuntimeStorage extends StorageService {
     storage.remove(imageName(image))
 
   override def readDicomData(image: Image, withPixelData: Boolean): DicomData =
-    loadDicomData(storage.get(imageName(image)).getOrElse(null), withPixelData)
+    loadDicomData(storage.getOrElse(imageName(image), null).toArray, withPixelData)
 
   override def readImageAttributes(image: Image): List[ImageAttribute] =
-    DicomUtil.readImageAttributes(loadDicomData(storage.get(imageName(image)).getOrElse(null), withPixelData = false).attributes)
+    DicomUtil.readImageAttributes(loadDicomData(storage.getOrElse(imageName(image), null).toArray, withPixelData = false).attributes)
 
   override def readImageInformation(image: Image): ImageInformation =
     super.readImageInformation(imageAsInputStream(image))
@@ -42,11 +43,29 @@ class RuntimeStorage extends StorageService {
     super.readPngImageData(ImageIO.createImageInputStream(imageAsInputStream(image)), frameNumber, windowMin, windowMax, imageHeight)
 
   override def imageAsInputStream(image: Image): InputStream =
-    new ByteArrayInputStream(storage(imageName(image)))
+    new ByteArrayInputStream(storage(imageName(image)).toArray)
 
   def clear() =
     storage.clear()
 
-  override def move(sourceImageName: String, targetImageName: String) = {}
-  override def fileSink(tmpPath: String)(implicit actorSystem: ActorSystem, mat: Materializer):  Sink[ByteString, Future[Any]] = Sink.ignore
+  override def move(sourceImageName: String, targetImageName: String) = {
+    storage.get(sourceImageName).map { sourceBytes =>
+      storage.remove(sourceImageName)
+      storage(targetImageName) = sourceBytes
+      Unit
+    }.getOrElse {
+      throw new RuntimeException(s"Dicom data not found for key $sourceImageName")
+    }
+  }
+
+  override def fileSink(tmpPath: String)(implicit actorSystem: ActorSystem, mat: Materializer, ec: ExecutionContext): Sink[ByteString, Future[Done]] =
+    Sink.reduce[ByteString](_ ++ _)
+      .mapMaterializedValue {
+        _.map {
+          bytes =>
+            storage(tmpPath) = bytes
+            Done
+        }
+      }
+
 }
