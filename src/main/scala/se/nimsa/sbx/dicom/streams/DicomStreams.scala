@@ -12,6 +12,7 @@ import se.nimsa.dcm4che.streams.DicomParts.{DicomAttributes, DicomPart}
 import se.nimsa.dcm4che.streams.{DicomAttributesSink, DicomFlows, DicomParsing, DicomPartFlow}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.AnonymizationKey
 import se.nimsa.sbx.dicom.Contexts
+import se.nimsa.sbx.dicom.DicomPropertyValue.{PatientID, PatientName}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -29,8 +30,8 @@ object DicomStreams {
 
   val metaTags2Collect = Set(Tag.TransferSyntaxUID, Tag.SpecificCharacterSet, Tag.PatientName, Tag.PatientID, Tag.PatientIdentityRemoved, Tag.StudyInstanceUID, Tag.SeriesInstanceUID)
 
-  def maybeMapAttributes(dicomPart: DicomPart)
-                        (implicit ec: ExecutionContext, system: ActorSystem, materializer: ActorMaterializer): Future[DicomPart] = {
+  def attributesToMetaPart(dicomPart: DicomPart)
+                          (implicit ec: ExecutionContext, system: ActorSystem, materializer: ActorMaterializer): Future[DicomPart] = {
     dicomPart match {
       case da: DicomAttributes =>
         Source.fromIterator(() => da.attributes.iterator).runWith(DicomAttributesSink.attributesSink).map {
@@ -42,8 +43,7 @@ object DicomStreams {
               dsMaybe.flatMap(ds => Option(ds.getString(Tag.PatientName))),
               dsMaybe.flatMap(ds => Option(ds.getString(Tag.PatientIdentityRemoved))),
               dsMaybe.flatMap(ds => Option(ds.getString(Tag.StudyInstanceUID))),
-              dsMaybe.flatMap(ds => Option(ds.getString(Tag.SeriesInstanceUID))),
-              None)
+              dsMaybe.flatMap(ds => Option(ds.getString(Tag.SeriesInstanceUID))))
         }
       case part: DicomPart => Future.successful(part)
     }
@@ -83,32 +83,30 @@ object DicomStreams {
     FlowShape(shouldDeflateFlow.in, merge.out)
   })
 
-  def maybeAnonymizationLookup(anonymizationKeysQuery: DicomMetaPart => Future[Seq[AnonymizationKey]], dicomPart: DicomPart)(implicit ec: ExecutionContext, timeout: Timeout): Future[DicomPart] = {
+  def maybeAnonymizationLookup(reverseAnonymizationQuery: (PatientName, PatientID) => Future[Seq[AnonymizationKey]], dicomPart: DicomPart)(implicit ec: ExecutionContext, timeout: Timeout): Future[List[DicomPart]] = {
     dicomPart match {
       case meta: DicomMetaPart =>
-        if (meta.isAnonymized && meta.patientName.isDefined && meta.patientId.isDefined) {
-          anonymizationKeysQuery(meta).map { keys =>
-            if (meta.studyInstanceUID.isEmpty) {
-              throw new RuntimeException("StudyInstanceUID not found in DicomMetaPart")
-            }
-            if (meta.seriesInstanceUID.isEmpty) {
-              throw new RuntimeException("SeriesInstanceUID not found in DicomMetaPart")
-            }
-            val filtered = keys.filter(key => (key.anonStudyInstanceUID == meta.studyInstanceUID.get) && (key.anonSeriesInstanceUID == meta.seriesInstanceUID.get))
-            DicomMetaPart(meta.transferSyntaxUid, meta.specificCharacterSet, meta.patientId, meta.patientName, meta.identityRemoved, meta.studyInstanceUID, meta.seriesInstanceUID, filtered.headOption)
+        val maybeFutureKey = for {
+          patientName <- meta.patientName if meta.isAnonymized
+          patientId <- meta.patientId
+          studyInstanceUID <- meta.studyInstanceUID
+          seriesInstanceUID <- meta.seriesInstanceUID
+        } yield {
+          reverseAnonymizationQuery(PatientName(patientName), PatientID(patientId)).map { keys =>
+            val filtered = keys.find(key =>
+              key.anonStudyInstanceUID == studyInstanceUID && key.anonSeriesInstanceUID == seriesInstanceUID)
+            AnonymizationKeyPart(filtered)
           }
-        } else {
-          Future.successful(meta)
         }
-
+        maybeFutureKey.map(_.map(meta :: _ :: Nil)).getOrElse(Future.successful(meta :: Nil))
       case part: DicomPart =>
-        Future.successful(part)
+        Future.successful(part :: Nil)
     }
   }
 
   def createTempPath() = s"tmp-${java.util.UUID.randomUUID().toString}"
 
-  def storeDicomDataSink(storageSink: Sink[ByteString, Future[Done]], anonymizationKeysQuery: DicomMetaPart => Future[Seq[AnonymizationKey]])
+  def storeDicomDataSink(storageSink: Sink[ByteString, Future[Done]], reverseAnonymizationQuery: (PatientName, PatientID) => Future[Seq[AnonymizationKey]])
                         (implicit ec: ExecutionContext, system: ActorSystem, materializer: ActorMaterializer, timeout: Timeout): Sink[ByteString, Future[(Done, (Option[Attributes], Option[Attributes]))]] = {
 
     val dbAttributesSink = DicomAttributesSink.attributesSink
@@ -122,13 +120,14 @@ object DicomStreams {
         import GraphDSL.Implicits._
 
         val flow = builder.add {
-          validateFlowWithContext(validationContexts).
-            via(partFlow).
-            via(groupLengthDiscardFilter).
-            via(collectAttributesFlow(metaTags2Collect)).
-            mapAsync(5)(maybeMapAttributes).
-            mapAsync(5)(maybeAnonymizationLookup(anonymizationKeysQuery, _)).
-            via(ReverseAnonymizationFlow.reverseAnonFlow)
+          validateFlowWithContext(validationContexts)
+            .via(partFlow)
+            .via(groupLengthDiscardFilter)
+            .via(collectAttributesFlow(metaTags2Collect))
+            .mapAsync(5)(attributesToMetaPart)
+            .mapAsync(5)(maybeAnonymizationLookup(reverseAnonymizationQuery, _))
+            .mapConcat(identity) // flatten stream of lists
+            .via(ReverseAnonymizationFlow.reverseAnonFlow)
         }
 
         val bcast = builder.add(Broadcast[DicomPart](2))
@@ -145,12 +144,12 @@ object DicomStreams {
 
   def inflatedSource(source: Source[ByteString, _]): Source[ByteString, _] = source
     .via(DicomPartFlow.partFlow)
-    .via(DicomFlows.attributesTransformFlow(
-      (Tag.TransferSyntaxUID, valueBytes => {
+    .via(DicomFlows.modifyFlow(
+      TagModification(Tag.TransferSyntaxUID, valueBytes => {
         new String(valueBytes.toArray, "US-ASCII") match {
           case UID.DeflatedExplicitVRLittleEndian => ByteString(UID.ExplicitVRLittleEndian.getBytes("US-ASCII"))
           case _ => valueBytes
         }
-      })))
+      }, insert = false)))
     .map(_.bytes)
 }

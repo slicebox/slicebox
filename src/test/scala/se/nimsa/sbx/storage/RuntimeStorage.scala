@@ -60,6 +60,9 @@ class RuntimeStorage extends StorageService {
     }
   }
 
+  override def fileSource(image: Image)(implicit actorSystem: ActorSystem, mat: Materializer) =
+    Source.single(storage(imageName(image)))
+
   override def fileSink(tmpPath: String)(implicit actorSystem: ActorSystem, mat: Materializer, ec: ExecutionContext): Sink[ByteString, Future[Done]] =
     Sink.reduce[ByteString](_ ++ _)
       .mapMaterializedValue {
@@ -69,5 +72,4 @@ class RuntimeStorage extends StorageService {
             Done
         }
       }
-
 }

@@ -18,16 +18,14 @@ package se.nimsa.sbx.storage
 
 import java.io.{BufferedInputStream, InputStream}
 import java.nio.file.{Files, Path, StandardCopyOption}
-import javax.imageio.ImageIO
 
-import akka.Done
 import akka.actor.ActorSystem
 import akka.stream.Materializer
-import akka.stream.scaladsl.{FileIO, Sink, StreamConverters}
+import akka.stream.scaladsl.{FileIO, Sink}
 import akka.util.ByteString
+import akka.{Done, NotUsed}
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.DicomUtil._
-import se.nimsa.sbx.dicom.streams.DicomStreams
 import se.nimsa.sbx.dicom.{DicomData, DicomUtil, ImageAttribute}
 import se.nimsa.sbx.storage.StorageProtocol.ImageInformation
 
@@ -94,8 +92,9 @@ class FileStorage(val path: Path) extends StorageService {
   }
 
 
-  override def fileSink(tmpPath: String)(implicit actorSystem: ActorSystem, mat: Materializer, ec: ExecutionContext):  Sink[ByteString, Future[Done]] =
+  override def fileSource(image: Image)(implicit actorSystem: ActorSystem, mat: Materializer) =
+    FileIO.fromPath(filePath(image)).mapMaterializedValue(_ => NotUsed)
+
+  override def fileSink(tmpPath: String)(implicit actorSystem: ActorSystem, mat: Materializer, ec: ExecutionContext): Sink[ByteString, Future[Done]] =
     FileIO.toPath(path.resolve(tmpPath)).mapMaterializedValue(_.map(_ => Done))
-
-
 }

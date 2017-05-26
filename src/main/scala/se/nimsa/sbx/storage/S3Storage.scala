@@ -34,9 +34,10 @@ import scala.util.control.NonFatal
 
 /**
   * Service that stores DICOM files on AWS S3.
+  *
   * @param s3Prefix prefix for keys
-  * @param bucket S3 bucket
-  * @param region aws region of the bucket
+  * @param bucket   S3 bucket
+  * @param region   aws region of the bucket
   */
 class S3Storage(val bucket: String, val s3Prefix: String, val region: String) extends StorageService {
 
@@ -92,9 +93,7 @@ class S3Storage(val bucket: String, val s3Prefix: String, val region: String) ex
 
   override def readPngImageData(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int)
                                (implicit system: ActorSystem, materializer: Materializer): Array[Byte] = {
-    // FIXME: use fileSource once implemented
-    val source = new S3Client(S3Facade.credentialsFromProviderChain(), region).download(bucket, s3Id(image))
-    super.readPngImageData(source, frameNumber, windowMin, windowMax, imageHeight)
+    super.readPngImageData(fileSource(image), frameNumber, windowMin, windowMax, imageHeight)
   }
 
   override def imageAsInputStream(image: Image): InputStream = {
@@ -102,8 +101,10 @@ class S3Storage(val bucket: String, val s3Prefix: String, val region: String) ex
     s3InputStream
   }
 
-  override def fileSink(tmpPath: String)(implicit actorSystem: ActorSystem, mat: Materializer, ec: ExecutionContext):  Sink[ByteString, Future[Done]] = {
+  override def fileSource(image: Image)(implicit actorSystem: ActorSystem, mat: Materializer) =
+    new S3Client(S3Facade.credentialsFromProviderChain(), region).download(bucket, s3Id(image))
+
+  override def fileSink(tmpPath: String)(implicit actorSystem: ActorSystem, mat: Materializer, ec: ExecutionContext): Sink[ByteString, Future[Done]] = {
     new S3Client(S3Facade.credentialsFromProviderChain(), region).multipartUpload(bucket, tmpPath).mapMaterializedValue(_.map(_ => Done))
   }
-
 }

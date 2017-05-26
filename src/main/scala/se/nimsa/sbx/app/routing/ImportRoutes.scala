@@ -25,11 +25,9 @@ import akka.stream.scaladsl.{Source => StreamSource}
 import akka.util.ByteString
 import org.dcm4che3.data.Attributes
 import org.dcm4che3.io.DicomStreamException
-import se.nimsa.sbx.anonymization.AnonymizationProtocol.{AnonymizationKeys, GetReverseAnonymizationKeys}
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
-import se.nimsa.sbx.dicom.streams.DicomMetaPart
 import se.nimsa.sbx.dicom.streams.DicomStreams._
 import se.nimsa.sbx.importing.ImportProtocol._
 import se.nimsa.sbx.log.SbxLog
@@ -107,11 +105,8 @@ trait ImportRoutes {
 
         val source = Source(SourceType.IMPORT, importSession.name, importSessionId)
         val tmpPath = createTempPath()
-        val anonQuery = (meta: DicomMetaPart) => anonymizationService
-          .ask(GetReverseAnonymizationKeys(meta.patientName.get, meta.patientId.get))
-          .mapTo[AnonymizationKeys].map(_.anonymizationKeys)
 
-        val futureImport = bytes.runWith(storeDicomDataSink(storage.fileSink(tmpPath), anonQuery))
+        val futureImport = bytes.runWith(storeDicomDataSink(storage.fileSink(tmpPath), reverseAnonymizationQuery))
 
         onComplete(futureImport) {
           case Success((_, attributes)) =>

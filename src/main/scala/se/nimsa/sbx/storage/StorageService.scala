@@ -21,7 +21,7 @@ import java.awt.image.BufferedImage
 import java.io.{ByteArrayOutputStream, InputStream}
 import javax.imageio.ImageIO
 
-import akka.Done
+import akka.{Done, NotUsed}
 import akka.actor.ActorSystem
 import akka.stream.Materializer
 import akka.stream.scaladsl.{Sink, Source, StreamConverters}
@@ -130,6 +130,7 @@ trait StorageService {
       image
   }
 
+  def fileSource(image: Image)(implicit actorSystem: ActorSystem, mat: Materializer): Source[ByteString, NotUsed]
   def fileSink(tmpPath: String)(implicit actorSystem: ActorSystem, mat: Materializer, ec: ExecutionContext): Sink[ByteString, Future[Done]]
 
 }

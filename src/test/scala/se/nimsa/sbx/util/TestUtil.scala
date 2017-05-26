@@ -225,19 +225,19 @@ object TestUtil {
     def expectValueChunk(bytes: ByteString) = probe
       .request(1)
       .expectNextChainingPF {
-        case chunk: DicomValueChunk => chunk.bytes == bytes
+        case chunk: DicomValueChunk if chunk.bytes == bytes => true
       }
 
     def expectHeader(tag: Int) = probe
       .request(1)
       .expectNextChainingPF {
-        case h: DicomHeader => h.tag == tag
+        case h: DicomHeader if h.tag == tag => true
       }
 
     def expectHeader(tag: Int, vr: VR, length: Int) = probe
       .request(1)
       .expectNextChainingPF {
-        case h: DicomHeader => h.tag == tag && h.vr == vr && h.length == length
+        case h: DicomHeader if h.tag == tag && h.vr == vr && h.length == length => true
       }
 
     def expectDeflatedChunk() = probe
@@ -249,7 +249,7 @@ object TestUtil {
     def expectAttribute(tag: Int) = probe
       .request(1)
       .expectNextChainingPF {
-        case a: DicomAttribute => a.header.tag == tag
+        case a: DicomAttribute if a.header.tag == tag => true
       }
 
     def expectDicomComplete() = probe
@@ -263,7 +263,10 @@ object TestUtil {
     def expectMetaPart(metaPart: DicomMetaPart) = probe
       .request(1)
       .expectNextChainingPF {
-        case p: DicomMetaPart => p == metaPart
+        case p: DicomMetaPart if p == metaPart => true
       }
+
+    def expectHeaderAndValueChunkPairs(tags: Int*) =
+      tags.foldLeft(probe)((probe, tag) => probe.expectHeader(tag).expectValueChunk())
   }
 }
