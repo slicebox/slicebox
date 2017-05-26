@@ -18,11 +18,11 @@ package se.nimsa.sbx.storage
 
 import java.io.{ByteArrayOutputStream, InputStream}
 
-import akka.Done
+import akka.{Done, NotUsed}
 import akka.actor.ActorSystem
 import akka.stream.Materializer
 import akka.stream.alpakka.s3.scaladsl.S3Client
-import akka.stream.scaladsl.Sink
+import akka.stream.scaladsl.{Sink, Source}
 import akka.util.ByteString
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.DicomUtil._
@@ -106,4 +106,7 @@ class S3Storage(val bucket: String, val s3Prefix: String, val region: String) ex
     new S3Client(S3Facade.credentialsFromProviderChain(), region).multipartUpload(bucket, tmpPath).mapMaterializedValue(_.map(_ => Done))
   }
 
+  override def fileSource(path: String)(implicit actorSystem: ActorSystem, mat: Materializer, ec: ExecutionContext): Source[ByteString, NotUsed] = {
+    new S3Client(S3Facade.credentialsFromProviderChain(), region).download(bucket, s3Id(path))
+  }
 }

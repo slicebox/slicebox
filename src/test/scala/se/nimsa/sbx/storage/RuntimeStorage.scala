@@ -2,7 +2,7 @@ package se.nimsa.sbx.storage
 
 import java.io.{ByteArrayInputStream, InputStream}
 
-import akka.Done
+import akka.{Done, NotUsed}
 import akka.actor.ActorSystem
 import akka.stream.Materializer
 import akka.stream.scaladsl.{Sink, Source}
@@ -69,5 +69,7 @@ class RuntimeStorage extends StorageService {
             Done
         }
       }
+
+  override def fileSource(path: String)(implicit actorSystem: ActorSystem, mat: Materializer, ec: ExecutionContext): Source[ByteString, NotUsed] = Source.single(storage(path))
 
 }
