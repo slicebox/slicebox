@@ -22,10 +22,10 @@ import java.io.{ByteArrayOutputStream, InputStream}
 import javax.imageio.ImageIO
 import javax.imageio.stream.ImageInputStream
 
-import akka.Done
+import akka.{Done, NotUsed}
 import akka.actor.ActorSystem
 import akka.stream.Materializer
-import akka.stream.scaladsl.Sink
+import akka.stream.scaladsl.{Sink, Source}
 import akka.util.ByteString
 import com.amazonaws.util.IOUtils
 import org.dcm4che3.data.Tag
@@ -123,7 +123,11 @@ trait StorageService {
       image
   }
 
+  /** Sink for dicom files. */
   def fileSink(tmpPath: String)(implicit actorSystem: ActorSystem, mat: Materializer, ec: ExecutionContext):  Sink[ByteString, Future[Done]]
+
+  /** Source for dicom files. */
+  def fileSource(path: String)(implicit actorSystem: ActorSystem, mat: Materializer, ec: ExecutionContext):  Source[ByteString, Any]
 
 }
 
