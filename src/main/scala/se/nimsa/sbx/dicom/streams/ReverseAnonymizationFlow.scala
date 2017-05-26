@@ -97,9 +97,8 @@ object ReverseAnonymizationFlow {
 
   val maybeReverseAnonFlow = DicomStreams.conditionalFlow(
     {
-      case p: AnonymizationKeyPart => true
-      case _ => false
-    }, reverseAnonFlow)
+      case _: AnonymizationKeyPart => false
+    }, Flow.fromFunction(identity), reverseAnonFlow)
 
 }
 

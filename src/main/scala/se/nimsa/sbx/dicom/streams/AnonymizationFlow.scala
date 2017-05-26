@@ -15,9 +15,7 @@ import scala.util.Random
 object AnonymizationFlow {
 
   private def toAsciiBytes(s: String) = ByteString(s.getBytes("US-ASCII"))
-  private def insert(tag: Int, bytes: ByteString) = TagModification(tag, _ => bytes, insert = true)
   private def insert(tag: Int, mod: ByteString => ByteString) = TagModification(tag, mod, insert = true)
-  private def modify(tag: Int, bytes: ByteString) = TagModification(tag, _ => bytes, insert = false)
   private def modify(tag: Int, mod: ByteString => ByteString) = TagModification(tag, mod, insert = false)
   private def clear(tag: Int) = TagModification(tag, _ => ByteString.empty, insert = false)
   private def createAccessionNumber(accessionNumberBytes: ByteString): ByteString = {
@@ -215,55 +213,61 @@ object AnonymizationFlow {
     .via(DicomFlows.blacklistFilter(removeTags.contains)) // remove tags from above list, if present
     .via(DicomFlows.modifyFlow( // modify, clear and insert
     modify(Tag.AccessionNumber, bytes => if (bytes.nonEmpty) createAccessionNumber(bytes) else bytes),
-    modify(Tag.ConcatenationUID, createUid _),
+    modify(Tag.ConcatenationUID, createUid),
     clear(Tag.ContentCreatorName),
-    modify(Tag.ContextGroupExtensionCreatorUID, createUid _),
+    modify(Tag.ContextGroupExtensionCreatorUID, createUid),
     clear(Tag.ContrastBolusAgent),
-    modify(Tag.CreatorVersionUID, createUid _),
-    insert(Tag.DeidentificationMethod, toAsciiBytes("Retain Longitudinal Full Dates Option")),
-    modify(Tag.DimensionOrganizationUID, createUid _),
-    modify(Tag.DoseReferenceUID, createUid _),
-    modify(Tag.FiducialUID, createUid _),
+    modify(Tag.CreatorVersionUID, createUid),
+    insert(Tag.DeidentificationMethod, _ => toAsciiBytes("Retain Longitudinal Full Dates Option")),
+    modify(Tag.DimensionOrganizationUID, createUid),
+    modify(Tag.DoseReferenceUID, createUid),
+    modify(Tag.FiducialUID, createUid),
     clear(Tag.FillerOrderNumberImagingServiceRequest),
-    modify(Tag.FrameOfReferenceUID, createUid(null)),
-    modify(Tag.InstanceCreatorUID, createUid _),
-    modify(Tag.IrradiationEventUID, createUid _),
-    modify(Tag.LargePaletteColorLookupTableUID, createUid _),
-    modify(Tag.MediaStorageSOPInstanceUID, createUid _),
-    modify(Tag.ObservationSubjectUIDTrial, createUid _),
-    modify(Tag.ObservationUID, createUid _),
-    modify(Tag.PaletteColorLookupTableUID, createUid _),
-    insert(Tag.PatientIdentityRemoved, toAsciiBytes("YES")),
-    insert(Tag.PatientID, createUid(null)),
-    insert(Tag.PatientName, createUid(null)),
+    modify(Tag.FrameOfReferenceUID, _ => createUid(null)),
+    modify(Tag.InstanceCreatorUID, createUid),
+    modify(Tag.IrradiationEventUID, createUid),
+    modify(Tag.LargePaletteColorLookupTableUID, createUid),
+    modify(Tag.MediaStorageSOPInstanceUID, createUid),
+    modify(Tag.ObservationSubjectUIDTrial, createUid),
+    modify(Tag.ObservationUID, createUid),
+    modify(Tag.PaletteColorLookupTableUID, createUid),
+    insert(Tag.PatientIdentityRemoved, _ => toAsciiBytes("YES")),
+    insert(Tag.PatientID, _ => createUid(null)),
+    insert(Tag.PatientName, _ => createUid(null)),
     clear(Tag.PlacerOrderNumberImagingServiceRequest),
-    modify(Tag.ReferencedFrameOfReferenceUID, createUid _),
-    modify(Tag.ReferencedGeneralPurposeScheduledProcedureStepTransactionUID, createUid _),
-    modify(Tag.ReferencedObservationUIDTrial, createUid _),
-    modify(Tag.ReferencedSOPInstanceUID, createUid _),
-    modify(Tag.ReferencedSOPInstanceUIDInFile, createUid _),
+    modify(Tag.ReferencedFrameOfReferenceUID, createUid),
+    modify(Tag.ReferencedGeneralPurposeScheduledProcedureStepTransactionUID, createUid),
+    modify(Tag.ReferencedObservationUIDTrial, createUid),
+    modify(Tag.ReferencedSOPInstanceUID, createUid),
+    modify(Tag.ReferencedSOPInstanceUIDInFile, createUid),
     clear(Tag.ReferringPhysicianName),
-    modify(Tag.RelatedFrameOfReferenceUID, createUid _),
-    modify(Tag.RequestedSOPInstanceUID, createUid _),
-    insert(Tag.SeriesInstanceUID, createUid(null)),
-    insert(Tag.SOPInstanceUID, createUid _),
-    modify(Tag.StorageMediaFileSetUID, createUid _),
+    modify(Tag.RelatedFrameOfReferenceUID, createUid),
+    modify(Tag.RequestedSOPInstanceUID, createUid),
+    insert(Tag.SeriesInstanceUID, _ => createUid(null)),
+    insert(Tag.SOPInstanceUID, createUid),
+    modify(Tag.StorageMediaFileSetUID, createUid),
     clear(Tag.StudyID),
-    insert(Tag.StudyInstanceUID, createUid(null)),
-    modify(Tag.SynchronizationFrameOfReferenceUID, createUid _),
-    modify(Tag.TargetUID, createUid _),
-    modify(Tag.TemplateExtensionCreatorUID, createUid _),
-    modify(Tag.TemplateExtensionOrganizationUID, createUid _),
-    modify(Tag.TransactionUID, createUid _),
-    modify(Tag.UID, createUid _),
+    insert(Tag.StudyInstanceUID, _ => createUid(null)),
+    modify(Tag.SynchronizationFrameOfReferenceUID, createUid),
+    modify(Tag.TargetUID, createUid),
+    modify(Tag.TemplateExtensionCreatorUID, createUid),
+    modify(Tag.TemplateExtensionOrganizationUID, createUid),
+    modify(Tag.TransactionUID, createUid),
+    modify(Tag.UID, createUid),
     clear(Tag.VerifyingObserverName)
   ))
 
-  val maybeAnonFlow = DicomStreams.conditionalFlow(
-    {
-      case p: DicomMetaPart => !p.isAnonymized
-      case _ => false
-    }, anonFlow)
+  /**
+    * Anonymize data if not already anonymized. Assumes first `DicomPart` is a `DicomMetaPart` that is used to determine
+    * if data has been anonymized or not.
+    * @return a `Flow` of `DicomParts` that will anonymize non-anonymized data but does nothing otherwise
+    */
+  def maybeAnonFlow = {
+    DicomStreams.conditionalFlow(
+      {
+        case p: DicomMetaPart => !p.isAnonymized
+      }, anonFlow, Flow.fromFunction(identity))
+  }
 
 }
 

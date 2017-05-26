@@ -25,14 +25,14 @@ import akka.stream.scaladsl.Compression
 import akka.util.ByteString
 import org.dcm4che3.data.Attributes
 import org.dcm4che3.io.DicomStreamException
-import se.nimsa.dcm4che.streams.DicomFlows.TagModification
+import se.nimsa.dcm4che.streams.DicomFlows.{TagModification, collectAttributesFlow}
 import se.nimsa.dcm4che.streams.{DicomFlows, DicomPartFlow}
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.streams.AnonymizationFlow
-import se.nimsa.sbx.dicom.streams.DicomStreams.{createTempPath, storeDicomDataSink}
+import se.nimsa.sbx.dicom.streams.DicomStreams.{attributesToMetaPart, createTempPath, metaTags2Collect, storeDicomDataSink}
 import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, GetImage, MetaDataAdded}
 import se.nimsa.sbx.storage.StorageProtocol._
 
@@ -133,6 +133,8 @@ trait TransactionRoutes {
                             val streamSource = storage
                               .fileSource(image)
                               .via(DicomPartFlow.partFlow)
+                              .via(collectAttributesFlow(metaTags2Collect))
+                              .mapAsync(5)(attributesToMetaPart)
                               .via(AnonymizationFlow.maybeAnonFlow)
                               .via(DicomFlows.modifyFlow(tagMods:_*))
                               .map(_.bytes)

@@ -52,8 +52,7 @@ object DicomStreams {
   def maybeDeflateFlow: Flow[DicomPart, DicomPart, NotUsed] = conditionalFlow(
     {
       case p: DicomMetaPart => p.transferSyntaxUid.isDefined && DicomParsing.isDeflated(p.transferSyntaxUid.get)
-      case _ => false
-    }, DicomFlows.deflateDatasetFlow)
+    }, DicomFlows.deflateDatasetFlow, Flow.fromFunction(identity))
 
   def maybeAnonymizationLookup(reverseAnonymizationQuery: (PatientName, PatientID) => Future[Seq[AnonymizationKey]], dicomPart: DicomPart)(implicit ec: ExecutionContext, timeout: Timeout): Future[List[DicomPart]] = {
     dicomPart match {
@@ -125,33 +124,34 @@ object DicomStreams {
       }, insert = false)))
     .map(_.bytes)
 
-  def conditionalFlow[M](alternateRouteIndicator: DicomPart => Boolean, alternateFlow: Flow[DicomPart, DicomPart, M]) = Flow.fromGraph(GraphDSL.create() { implicit builder =>
-    import GraphDSL.Implicits._
+  def conditionalFlow(goA: PartialFunction[DicomPart, Boolean], flowA: Flow[DicomPart, DicomPart, _], flowB: Flow[DicomPart, DicomPart, _], routeADefault: Boolean = true): Flow[DicomPart, DicomPart, NotUsed] =
+    Flow.fromGraph(GraphDSL.create() { implicit builder =>
+      import GraphDSL.Implicits._
 
-    var alternateRoute = false // determines which path is taken in the graph
+      var routeA = routeADefault // determines which path is taken in the graph
 
-    // if any part indicates that alternate route should be taken, remember this
-    val shouldTakeAlternateRouteFlow = builder.add {
-      Flow[DicomPart].map { part =>
-        if (alternateRouteIndicator(part))
-          alternateRoute = true
-        part
+      // if any part indicates that alternate route should be taken, remember this
+      val gateFlow = builder.add {
+        Flow[DicomPart].map { part =>
+          if (goA.isDefinedAt(part)) routeA = goA(part)
+          part
+        }
       }
-    }
 
-    // split the flow
-    val bcast = builder.add(Broadcast[DicomPart](2))
+      // split the flow
+      val bcast = builder.add(Broadcast[DicomPart](2))
 
-    // define gates for each path, only one path is used
-    val alternateYes = Flow[DicomPart].filter(_ => alternateRoute)
-    val alternateNo = Flow[DicomPart].filterNot(_ => alternateRoute)
+      // define gates for each path, only one path is used
+      val gateA = Flow[DicomPart].filter(_ => routeA)
+      val gateB = Flow[DicomPart].filterNot(_ => routeA)
 
-    // merge the two paths
-    val merge = builder.add(Merge[DicomPart](2))
+      // merge the two paths
+      val merge = builder.add(Merge[DicomPart](2))
 
-    shouldTakeAlternateRouteFlow ~> bcast ~> alternateYes ~> alternateFlow ~> merge
-    bcast ~> alternateNo ~> merge
+      // surround each flow by gates, remember that flows may produce items without input
+      gateFlow ~> bcast ~> gateA ~> flowA ~> gateA ~> merge
+                  bcast ~> gateB ~> flowB ~> gateB ~> merge
 
-    FlowShape(shouldTakeAlternateRouteFlow.in, merge.out)
-  })
+      FlowShape(gateFlow.in, merge.out)
+    })
 }

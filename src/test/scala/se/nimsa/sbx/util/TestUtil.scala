@@ -260,6 +260,12 @@ object TestUtil {
       .request(1)
       .expectError()
 
+    def expectMetaPart() = probe
+      .request(1)
+      .expectNextChainingPF {
+        case p: DicomMetaPart => true
+      }
+
     def expectMetaPart(metaPart: DicomMetaPart) = probe
       .request(1)
       .expectNextChainingPF {
