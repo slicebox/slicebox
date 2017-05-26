@@ -92,10 +92,10 @@ class FileStorage(val path: Path) extends StorageService {
   }
 
 
-  override def fileSink(tmpPath: String)(implicit actorSystem: ActorSystem, mat: Materializer, ec: ExecutionContext):  Sink[ByteString, Future[Done]] =
-    FileIO.toPath(path.resolve(tmpPath)).mapMaterializedValue(_.map(_ => Done))
+  override def fileSink(filePath: String)(implicit actorSystem: ActorSystem, mat: Materializer, ec: ExecutionContext):  Sink[ByteString, Future[Done]] =
+    FileIO.toPath(path.resolve(filePath)).mapMaterializedValue(_.map(_ => Done))
 
-  override def fileSource(srcPath: String)(implicit actorSystem: ActorSystem, mat: Materializer, ec: ExecutionContext): Source[ByteString, NotUsed] =
-    FileIO.fromPath(path.resolve(srcPath)).mapMaterializedValue(_ => NotUsed)
+  override def fileSource(image: Image)(implicit actorSystem: ActorSystem, mat: Materializer): Source[ByteString, NotUsed] =
+    FileIO.fromPath(path.resolve(filePath(image))).mapMaterializedValue(_ => NotUsed)
 
 }

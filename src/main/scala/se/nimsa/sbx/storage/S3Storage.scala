@@ -92,9 +92,7 @@ class S3Storage(val bucket: String, val s3Prefix: String, val region: String) ex
 
   override def readPngImageData(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int)
                                (implicit system: ActorSystem, materializer: Materializer): Array[Byte] = {
-    // FIXME: use fileSource once implemented
-    val source = new S3Client(S3Facade.credentialsFromProviderChain(), region).download(bucket, s3Id(image))
-    super.readPngImageData(source, frameNumber, windowMin, windowMax, imageHeight)
+    super.readPngImageData(fileSource(image), frameNumber, windowMin, windowMax, imageHeight)
   }
 
   override def imageAsInputStream(image: Image): InputStream = {
@@ -102,11 +100,11 @@ class S3Storage(val bucket: String, val s3Prefix: String, val region: String) ex
     s3InputStream
   }
 
-  override def fileSink(tmpPath: String)(implicit actorSystem: ActorSystem, mat: Materializer, ec: ExecutionContext):  Sink[ByteString, Future[Done]] = {
-    new S3Client(S3Facade.credentialsFromProviderChain(), region).multipartUpload(bucket, tmpPath).mapMaterializedValue(_.map(_ => Done))
+  override def fileSink(path: String)(implicit actorSystem: ActorSystem, mat: Materializer, ec: ExecutionContext):  Sink[ByteString, Future[Done]] = {
+    new S3Client(S3Facade.credentialsFromProviderChain(), region).multipartUpload(bucket, path).mapMaterializedValue(_.map(_ => Done))
   }
 
-  override def fileSource(path: String)(implicit actorSystem: ActorSystem, mat: Materializer, ec: ExecutionContext): Source[ByteString, NotUsed] = {
-    new S3Client(S3Facade.credentialsFromProviderChain(), region).download(bucket, s3Id(path))
+  override def fileSource(image: Image)(implicit actorSystem: ActorSystem, mat: Materializer): Source[ByteString, NotUsed] = {
+    new S3Client(S3Facade.credentialsFromProviderChain(), region).download(bucket, s3Id(image))
   }
 }

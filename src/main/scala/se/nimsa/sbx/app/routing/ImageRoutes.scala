@@ -64,7 +64,7 @@ trait ImageRoutes {
           case Some(image) =>
             pathEndOrSingleSlash {
               get {
-                complete(HttpEntity(ContentTypes.`application/octet-stream`, storage.fileSource(imageId.toString)))
+                complete(HttpEntity(ContentTypes.`application/octet-stream`, storage.fileSource(image)))
               } ~ delete {
                 complete(storageService.ask(DeleteDicomData(image)).flatMap(_ =>
                   metaDataService.ask(DeleteMetaData(image)).map(_ =>
