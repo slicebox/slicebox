@@ -34,7 +34,7 @@ import scala.collection.mutable
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 
-class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storageService: StorageService)(implicit val timeout: Timeout) extends Actor with Stash with PipeToSupport with SequentialPipeToSupport {
+class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageService)(implicit val timeout: Timeout) extends Actor with Stash with PipeToSupport with SequentialPipeToSupport {
 
   val log = Logging(context.system, this)
 
@@ -253,13 +253,13 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storageService: Storag
   def maybeStartPushActor(box: Box): Unit = {
     val actorName = pushActorName(box)
     if (context.child(actorName).isEmpty)
-      context.actorOf(BoxPushActor.props(box, storageService, timeout), actorName)
+      context.actorOf(BoxPushActor.props(box, storage, timeout), actorName)
   }
 
   def maybeStartPollActor(box: Box): Unit = {
     val actorName = pollActorName(box)
     if (context.child(actorName).isEmpty)
-      context.actorOf(BoxPollActor.props(box, timeout), actorName)
+      context.actorOf(BoxPollActor.props(box, storage, timeout), actorName)
   }
 
   def pushActorName(box: Box): String = BoxSendMethod.PUSH + "-" + box.id.toString
@@ -303,5 +303,5 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storageService: Storag
 }
 
 object BoxServiceActor {
-  def props(boxDao: BoxDAO, apiBaseURL: String, storageService: StorageService, timeout: Timeout): Props = Props(new BoxServiceActor(boxDao, apiBaseURL, storageService)(timeout))
+  def props(boxDao: BoxDAO, apiBaseURL: String, storage: StorageService, timeout: Timeout): Props = Props(new BoxServiceActor(boxDao, apiBaseURL, storage)(timeout))
 }

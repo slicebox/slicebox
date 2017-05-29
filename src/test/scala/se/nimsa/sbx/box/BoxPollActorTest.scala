@@ -5,7 +5,6 @@ import akka.http.scaladsl.marshalling.Marshal
 import akka.http.scaladsl.model.ContentTypes._
 import akka.http.scaladsl.model.StatusCodes.{BadGateway, NoContent, NotFound, OK}
 import akka.http.scaladsl.model._
-import akka.stream.scaladsl.Flow
 import akka.testkit.{ImplicitSender, TestKit}
 import akka.util.Timeout
 import de.heikoseeberger.akkahttpplayjson.PlayJsonSupport
@@ -23,9 +22,8 @@ import se.nimsa.sbx.util.FutureUtil.await
 import se.nimsa.sbx.util.TestUtil
 
 import scala.collection.mutable.ArrayBuffer
-import scala.concurrent.Await
 import scala.concurrent.duration.DurationInt
-import scala.util.{Success, Try}
+import scala.concurrent.{Await, Future}
 
 class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
   with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach with JsonFormats with PlayJsonSupport {
@@ -64,18 +62,17 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
   val storage = new RuntimeStorage()
   val anonymizationService = system.actorOf(AnonymizationServiceActor.props(anonymizationDao, purgeEmptyAnonymizationKeys = false, timeout), name = "AnonymizationService")
   val boxService = system.actorOf(BoxServiceActor.props(boxDao, "http://testhost:1234", storage, 1.minute), name = "BoxService")
-  val pollBoxActorRef = system.actorOf(Props(new BoxPollActor(remoteBox, 1.hour, 1000.hours, "../BoxService", "../MetaDataService", "../StorageService", "../AnonymizationService") {
+  val pollBoxActorRef = system.actorOf(Props(new BoxPollActor(remoteBox, storage, 1.hour, "../BoxService", "../MetaDataService", "../StorageService", "../AnonymizationService") {
 
-    override val pool = Flow.fromFunction[(HttpRequest, String), (Try[HttpResponse], String)] {
-      case (request, id) =>
-        capturedRequests += request
-        responseCounter = responseCounter + 1
-        if (responseCounter < mockHttpResponses.size)
-          (Success(mockHttpResponses(responseCounter)), id)
-        else
-          (Success(notFoundResponse), id)
+    override def sliceboxRequest(method: HttpMethod, uri: String, entity: MessageEntity, connectionId: String): Future[HttpResponse] = {
+      val request = HttpRequest(method = method, uri = uri, entity = entity)
+      capturedRequests += request
+      responseCounter = responseCounter + 1
+      if (responseCounter < mockHttpResponses.size)
+        Future.successful(mockHttpResponses(responseCounter))
+      else
+        Future.successful(notFoundResponse)
     }
-
   }))
 
   override def beforeEach() {

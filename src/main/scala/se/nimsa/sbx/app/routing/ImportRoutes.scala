@@ -109,8 +109,8 @@ trait ImportRoutes {
         val futureImport = bytes.runWith(dicomDataSink(storage.fileSink(tmpPath), reverseAnonymizationQuery))
 
         onComplete(futureImport) {
-          case Success((_, attributes)) =>
-            val dataAttributes: Attributes = attributes._2.getOrElse(throw new DicomStreamException("DICOM data has no dataset"))
+          case Success((_, maybeDataset)) =>
+            val dataAttributes: Attributes = maybeDataset.getOrElse(throw new DicomStreamException("DICOM data has no dataset"))
             onSuccess(metaDataService.ask(AddMetaData(dataAttributes, source)).mapTo[MetaDataAdded]) { metaData =>
               onSuccess(importService.ask(AddImageToSession(importSession.id, metaData.image, !metaData.imageAdded)).mapTo[ImageAddedToSession]) { _ =>
                 onSuccess(storageService.ask(MoveDicomData(tmpPath, s"${metaData.image.id}")).mapTo[DicomDataMoved]) { _ =>

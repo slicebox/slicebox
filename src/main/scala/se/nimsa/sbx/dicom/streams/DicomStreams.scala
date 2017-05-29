@@ -1,7 +1,7 @@
 package se.nimsa.sbx.dicom.streams
 
 import akka.actor.ActorSystem
-import akka.stream.scaladsl.{Broadcast, Compression, Flow, GraphDSL, Merge, Sink, Source}
+import akka.stream.scaladsl.{Broadcast, Compression, Flow, GraphDSL, Keep, Merge, Sink, Source}
 import akka.stream.{ActorMaterializer, FlowShape, SinkShape}
 import akka.util.{ByteString, Timeout}
 import akka.{Done, NotUsed}
@@ -100,7 +100,7 @@ object DicomStreams {
   }
 
   def dicomDataSink(storageSink: Sink[ByteString, Future[Done]], reverseAnonymizationQuery: (PatientName, PatientID) => Future[Seq[AnonymizationKey]])
-                   (implicit ec: ExecutionContext, system: ActorSystem, materializer: ActorMaterializer, timeout: Timeout): Sink[ByteString, Future[(Done, (Option[Attributes], Option[Attributes]))]] = {
+                   (implicit ec: ExecutionContext, system: ActorSystem, materializer: ActorMaterializer, timeout: Timeout): Sink[ByteString, Future[(Option[Attributes], Option[Attributes])]] = {
 
     val dbAttributesSink = DicomAttributesSink.attributesSink
 
@@ -108,7 +108,7 @@ object DicomStreams {
       ValidationContext(pair._1, pair._2)
     }
 
-    Sink.fromGraph(GraphDSL.create(storageSink, dbAttributesSink)(_ zip _) { implicit builder =>
+    Sink.fromGraph(GraphDSL.create(storageSink, dbAttributesSink)(Keep.right) { implicit builder =>
       (dicomFileSink, dbAttributesSink) =>
         import GraphDSL.Implicits._
 

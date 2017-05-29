@@ -63,6 +63,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
         sender ! None
     }
   }), name = "MetaDataService")
+
   val storage = new RuntimeStorage() {
     override def fileSource(image: Image)(implicit actorSystem: ActorSystem, mat: Materializer): Source[ByteString, NotUsed] =
       Source.single(ByteString(1,2,3))
