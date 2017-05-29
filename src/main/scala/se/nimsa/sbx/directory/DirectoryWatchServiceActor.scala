@@ -22,12 +22,13 @@ import akka.actor.{Actor, PoisonPill, Props}
 import akka.event.{Logging, LoggingReceive}
 import akka.util.Timeout
 import se.nimsa.sbx.directory.DirectoryWatchProtocol._
+import se.nimsa.sbx.storage.StorageService
 import se.nimsa.sbx.util.ExceptionCatching
 import se.nimsa.sbx.util.FutureUtil.await
 
 import scala.language.postfixOps
 
-class DirectoryWatchServiceActor(directoryWatchDao: DirectoryWatchDAO)(implicit timeout: Timeout) extends Actor with ExceptionCatching {
+class DirectoryWatchServiceActor(storage: StorageService, directoryWatchDao: DirectoryWatchDAO)(implicit timeout: Timeout) extends Actor with ExceptionCatching {
   val log = Logging(context.system, this)
 
   setupWatches()
@@ -63,7 +64,7 @@ class DirectoryWatchServiceActor(directoryWatchDao: DirectoryWatchDAO)(implicit 
                 val watchedDirectory = addDirectory(directory)
 
                 context.child(watchedDirectory.id.toString).getOrElse(
-                  context.actorOf(DirectoryWatchActor.props(watchedDirectory, timeout), watchedDirectory.id.toString))
+                  context.actorOf(DirectoryWatchActor.props(watchedDirectory, storage, timeout), watchedDirectory.id.toString))
 
                 sender ! watchedDirectory
             }
@@ -89,7 +90,7 @@ class DirectoryWatchServiceActor(directoryWatchDao: DirectoryWatchDAO)(implicit 
     watchedDirectories foreach (watchedDirectory => {
       val path = Paths.get(watchedDirectory.path)
       if (Files.isDirectory(path))
-        context.actorOf(DirectoryWatchActor.props(watchedDirectory, timeout), watchedDirectory.id.toString)
+        context.actorOf(DirectoryWatchActor.props(watchedDirectory, storage, timeout), watchedDirectory.id.toString)
       else
         deleteDirectory(watchedDirectory.id)
     })
@@ -113,5 +114,5 @@ class DirectoryWatchServiceActor(directoryWatchDao: DirectoryWatchDAO)(implicit 
 }
 
 object DirectoryWatchServiceActor {
-  def props(directoryWatchDao: DirectoryWatchDAO, timeout: Timeout): Props = Props(new DirectoryWatchServiceActor(directoryWatchDao)(timeout))
+  def props(storage: StorageService, directoryWatchDao: DirectoryWatchDAO, timeout: Timeout): Props = Props(new DirectoryWatchServiceActor(storage, directoryWatchDao)(timeout))
 }
