@@ -43,7 +43,7 @@ object ReverseAnonymizationFlow {
          */
         def needReverseAnon(tag: Int): Boolean = canDoReverseAnon && reverseTags.contains(tag)
 
-        def canDoReverseAnon: Boolean = maybeKeys.flatMap(_.patientKey).isDefined && maybeMeta.isDefined
+        def canDoReverseAnon: Boolean = maybeKeys.flatMap(_.patientKey).isDefined
 
       {
         case meta: DicomMetaPart =>

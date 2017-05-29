@@ -56,25 +56,9 @@ class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymiza
     val source = Source.single(anonKeyPart(dicomData))
       .concat(anonSource(dicomData))
       .via(ReverseAnonymizationFlow.reverseAnonFlow)
-      .via(DicomFlows.collectAttributesFlow(Set(
-        Tag.PatientName,
-        Tag.PatientID,
-        Tag.StudyInstanceUID,
-        Tag.SeriesInstanceUID,
-        Tag.FrameOfReferenceUID,
-        Tag.PatientBirthDate,
-        Tag.StudyDescription,
-        Tag.StudyID,
-        Tag.AccessionNumber,
-        Tag.SeriesDescription,
-        Tag.ProtocolName
-      )))
-      .filter(_.isInstanceOf[DicomAttributes])
-      .mapAsync(5) {
-        case as: DicomAttributes => Source(as.attributes.toList).runWith(DicomAttributesSink.attributesSink)
-      }
+      .via(DicomFlows.attributeFlow)
 
-    val (_, dsMaybe) = Await.result(source.runWith(Sink.head), 10.seconds)
+    val (_, dsMaybe) = Await.result(source.runWith(DicomAttributesSink.attributesSink), 10.seconds)
     val ds = dsMaybe.get
 
     ds.getString(Tag.PatientName) shouldBe dicomData.attributes.getString(Tag.PatientName)
@@ -101,6 +85,7 @@ class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymiza
           Tag.PatientID,
           Tag.PatientBirthDate,
           Tag.PatientIdentityRemoved,
+          Tag.DeidentificationMethod,
           Tag.StudyInstanceUID,
           Tag.StudyDescription,
           Tag.StudyID,

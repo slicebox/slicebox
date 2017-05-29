@@ -32,7 +32,7 @@ class DicomStreamsTest extends TestKit(ActorSystem("AnonymizationFlowSpec")) wit
     Source.single(ByteString(baos.toByteArray))
   }
 
-  "The wow" should "cool it" in {
+  "The DICOM data source with anonymization" should "anonymize the patient ID and harmonize it according to a anonymization key" in {
     val dicomData = TestUtil.createDicomData()
     val anonKey = TestUtil.createAnonymizationKey(dicomData.attributes)
     val source = toSource(dicomData)
