@@ -50,6 +50,7 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
     source.runWith(TestSink.probe[DicomPart])
       .expectHeaderAndValueChunkPairs(
         Tag.SOPInstanceUID,
+        Tag.Modality,
         Tag.PatientName,
         Tag.PatientID,
         Tag.PatientIdentityRemoved,
@@ -84,8 +85,10 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
       .expectDicomComplete()
   }
 
-  it should "add basic hierarchy attributes to an empty dataset" in {
-    val source = toAnonSource(new Attributes())
+  it should "add basic hierarchy attributes also when not present" in {
+    val attributes = new Attributes()
+    attributes.setString(Tag.Modality, VR.CS, "NM")
+    val source = toAnonSource(attributes)
     checkBasicAttributes(source)
   }
 
@@ -129,9 +132,12 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
 
   it should "create a UID for UID tags which define DICOM hierarchy, regardless of whether value exists, is empty or has a previous value" in {
     val attributes1 = new Attributes()
+    attributes1.setString(Tag.Modality, VR.CS, "NM")
     val attributes2 = new Attributes()
+    attributes2.setString(Tag.Modality, VR.CS, "NM")
     attributes2.setString(Tag.StudyInstanceUID, VR.UI, "")
     val attributes3 = new Attributes()
+    attributes3.setString(Tag.Modality, VR.CS, "NM")
     attributes3.setString(Tag.StudyInstanceUID, VR.UI, "1.2.3.4.5.6.7.8.9")
 
     val source1 = toAnonSource(attributes1)
@@ -142,6 +148,7 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
       source.runWith(TestSink.probe[DicomPart])
         .expectHeaderAndValueChunkPairs(
           Tag.SOPInstanceUID,
+          Tag.Modality,
           Tag.PatientName,
           Tag.PatientID,
           Tag.PatientIdentityRemoved,
@@ -176,6 +183,7 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
 
   it should "remove private tags" in {
     val attributes = new Attributes()
+    attributes.setString(Tag.Modality, VR.CS, "NM")
     attributes.setString(Tag.SOPInstanceUID, VR.UI, "1.2.3.4.5.6.7.8")
     attributes.setString(0x80030010, VR.LO, "Private tag value")
     val source = toAnonSource(attributes)
@@ -184,6 +192,7 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
 
   it should "remove overlay data" in {
     val attributes = new Attributes()
+    attributes.setString(Tag.Modality, VR.CS, "NM")
     attributes.setString(Tag.SOPInstanceUID, VR.UI, "1.2.3.4.5.6.7.8")
     attributes.setString(0x60020010, VR.PN, "34")
     val source = toAnonSource(attributes)
@@ -192,6 +201,7 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
 
   it should "remove birth date" in {
     val attributes = new Attributes()
+    attributes.setString(Tag.Modality, VR.CS, "NM")
     attributes.setDate(Tag.PatientBirthDate, VR.DA, new Date(123456789876L))
     val source = toAnonSource(attributes)
     checkBasicAttributes(source)

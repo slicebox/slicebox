@@ -7,7 +7,7 @@ import akka.stream.scaladsl.{Sink, Source}
 import akka.stream.testkit.scaladsl.TestSink
 import akka.testkit.TestKit
 import akka.util.ByteString
-import org.dcm4che3.data.Tag
+import org.dcm4che3.data.{Attributes, Tag, UID, VR}
 import org.scalatest.{FlatSpecLike, Matchers}
 import se.nimsa.dcm4che.streams.DicomFlows.TagModification
 import se.nimsa.dcm4che.streams.DicomParts.{DicomAttributes, DicomPart}
@@ -75,12 +75,18 @@ class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymiza
   }
 
   it should "insert anonymization key attributes into dataset even if they originally were not present" in {
-    val source = Source.empty
+    val attributes = new Attributes()
+    attributes.setString(Tag.Modality, VR.CS, "NM")
+    val fmi = new Attributes()
+    fmi.setString(Tag.TransferSyntaxUID, VR.UI, UID.ExplicitVRLittleEndian)
+    val dicomData = DicomData(attributes, fmi)
+    val source = attributesSource(dicomData)
       .via(ReverseAnonymizationFlow.reverseAnonFlow)
 
     source.runWith(TestSink.probe[DicomPart])
       .expectHeaderAndValueChunkPairs(
         List(
+          Tag.Modality,
           Tag.PatientName,
           Tag.PatientID,
           Tag.PatientBirthDate,
