@@ -1,56 +1,58 @@
 package se.nimsa.sbx.dicom.streams
 
 import akka.stream.scaladsl.Flow
-import com.typesafe.scalalogging.Logger
 import org.dcm4che3.data.{SpecificCharacterSet, Tag}
+import se.nimsa.dcm4che.streams.DicomFlows
+import se.nimsa.dcm4che.streams.DicomFlows.TagModification
 import se.nimsa.dcm4che.streams.DicomParts._
 
 /**
-  * A flow which expects a DicomMetaPart as first part, and does reverse anonymization based on anonymization data lookup in DB.
+  * A flow which performs reverse anonymization as soon as it has received an AnonymizationKeyPart (which means data is
+  * anonymized)
   */
 object ReverseAnonymizationFlow {
 
-  val reverseAnonFlow = Flow[DicomPart]
-    .statefulMapConcat {
-      val log = Logger("ReverseAnonymizationFlow")
+  private val reverseTags = Seq(
+    Tag.PatientName,
+    Tag.PatientID,
+    Tag.PatientBirthDate,
+    Tag.PatientIdentityRemoved,
+    Tag.DeidentificationMethod,
+    Tag.StudyInstanceUID,
+    Tag.StudyDescription,
+    Tag.StudyID,
+    Tag.AccessionNumber,
+    Tag.SeriesInstanceUID,
+    Tag.SeriesDescription,
+    Tag.ProtocolName,
+    Tag.FrameOfReferenceUID)
 
-      val REVERSE_ANON_TAGS = Seq(
-        Tag.PatientName,
-        Tag.PatientID,
-        Tag.PatientBirthDate,
-        Tag.PatientIdentityRemoved,
-        Tag.StudyInstanceUID,
-        Tag.StudyDescription,
-        Tag.StudyID,
-        Tag.AccessionNumber,
-        Tag.SeriesInstanceUID,
-        Tag.SeriesDescription,
-        Tag.ProtocolName,
-        Tag.FrameOfReferenceUID
-      )
+  val reverseAnonFlow = Flow[DicomPart]
+    .via(DicomFlows.modifyFlow(
+      reverseTags.map(tag => TagModification(tag, identity, insert = true)): _*))
+    .statefulMapConcat {
 
       () =>
-        var metaData: Option[DicomMetaPart] = None
+        var maybeMeta: Option[DicomMetaPart] = None
+        var maybeKeys: Option[AnonymizationKeysPart] = None
         var currentAttribute: Option[DicomAttribute] = None
+        /*
+         * do reverse anon if:
+         * - anomymization keys have been received in stream
+         * - tag specifies attribute that needs to be reversed
+         */
+        def needReverseAnon(tag: Int): Boolean = canDoReverseAnon && reverseTags.contains(tag)
 
-        /**
-          * do reverse anon if:
-          * - metaData is defined and data is anonymized
-          * - anomymization keys found in DB
-          * - tag specifies attribute that needs to be reversed
-          */
-        def needReverseAnon(tag: Int): Boolean = {
-          canDoReverseAnon && REVERSE_ANON_TAGS.contains(tag)
-        }
-
-        def canDoReverseAnon: Boolean = metaData.exists(m => m.isAnonymized && m.anonKeys.isDefined)
+        def canDoReverseAnon: Boolean = maybeKeys.flatMap(_.patientKey).isDefined
 
       {
-        case metaPart: DicomMetaPart =>
-          metaData = Some(metaPart)
-          log.debug(s"Collected meta data - isAnonymous: ${metaPart.isAnonymized}")
-          log.debug(s"Collected meta data - canDoReverse: $canDoReverseAnon")
-          metaPart :: Nil
+        case meta: DicomMetaPart =>
+          maybeMeta = Some(meta)
+          meta :: Nil
+
+        case keys: AnonymizationKeysPart =>
+          maybeKeys = Some(keys)
+          Nil
 
         case header: DicomHeader if needReverseAnon(header.tag) =>
           currentAttribute = Some(DicomAttribute(header, Seq.empty))
@@ -62,48 +64,26 @@ object ReverseAnonymizationFlow {
 
         case valueChunk: DicomValueChunk if currentAttribute.isDefined && canDoReverseAnon =>
           currentAttribute = currentAttribute.map(attribute => attribute.copy(valueChunks = attribute.valueChunks :+ valueChunk))
-          val cs = if (metaData.get.specificCharacterSet.isDefined) metaData.get.specificCharacterSet.get else SpecificCharacterSet.ASCII
+          val attribute = currentAttribute.get
+          val keys = maybeKeys.get
+          val cs = maybeMeta.flatMap(_.specificCharacterSet).getOrElse(SpecificCharacterSet.ASCII)
+
           if (valueChunk.last) {
-
-            val updatedAttribute = currentAttribute.get.header.tag match {
-              case Tag.PatientName =>
-                currentAttribute.get.withUpdatedStringValue(metaData.get.anonKeys.get.patientName, cs)
-
-              case Tag.PatientID =>
-                currentAttribute.get.withUpdatedStringValue(metaData.get.anonKeys.get.patientID, cs)
-
-              case Tag.PatientBirthDate =>
-                currentAttribute.get.withUpdatedDateValue(metaData.get.anonKeys.get.patientBirthDate) // ASCII
-
-              case Tag.PatientIdentityRemoved =>
-                currentAttribute.get.withUpdatedStringValue("NO") // ASCII
-
-              case Tag.StudyInstanceUID =>
-                currentAttribute.get.withUpdatedStringValue(metaData.get.anonKeys.get.studyInstanceUID) // ASCII
-
-              case Tag.StudyDescription =>
-                currentAttribute.get.withUpdatedStringValue(metaData.get.anonKeys.get.studyDescription, cs)
-
-              case Tag.StudyID =>
-                currentAttribute.get.withUpdatedStringValue(metaData.get.anonKeys.get.studyID, cs)
-
-              case Tag.AccessionNumber =>
-                currentAttribute.get.withUpdatedStringValue(metaData.get.anonKeys.get.accessionNumber, cs)
-
-              case Tag.SeriesInstanceUID =>
-                currentAttribute.get.withUpdatedStringValue(metaData.get.anonKeys.get.seriesInstanceUID) // ASCII
-
-              case Tag.SeriesDescription =>
-                currentAttribute.get.withUpdatedStringValue(metaData.get.anonKeys.get.seriesDescription, cs)
-
-              case Tag.ProtocolName =>
-                currentAttribute.get.withUpdatedStringValue(metaData.get.anonKeys.get.protocolName, cs)
-
-              case Tag.FrameOfReferenceUID =>
-                currentAttribute.get.withUpdatedStringValue(metaData.get.anonKeys.get.frameOfReferenceUID) // ASCII
-
-              case _ =>
-                currentAttribute.get
+            val updatedAttribute = attribute.header.tag match {
+              case Tag.PatientName => keys.patientKey.map(key => attribute.withUpdatedValue(key.patientName, cs)).getOrElse(attribute)
+              case Tag.PatientID => keys.patientKey.map(key => attribute.withUpdatedValue(key.patientID, cs)).getOrElse(attribute)
+              case Tag.PatientBirthDate => keys.patientKey.map(key => attribute.withUpdatedValue(key.patientBirthDate)).getOrElse(attribute) // ASCII
+              case Tag.PatientIdentityRemoved => attribute.withUpdatedValue("NO") // ASCII
+              case Tag.DeidentificationMethod => attribute.withUpdatedValue("")
+              case Tag.StudyInstanceUID => keys.studyKey.map(key => attribute.withUpdatedValue(key.studyInstanceUID)).getOrElse(attribute) // ASCII
+              case Tag.StudyDescription => keys.studyKey.map(key => attribute.withUpdatedValue(key.studyDescription, cs)).getOrElse(attribute)
+              case Tag.StudyID => keys.studyKey.map(key => attribute.withUpdatedValue(key.studyID, cs)).getOrElse(attribute)
+              case Tag.AccessionNumber => keys.studyKey.map(key => attribute.withUpdatedValue(key.accessionNumber, cs)).getOrElse(attribute)
+              case Tag.SeriesInstanceUID => keys.seriesKey.map(key => attribute.withUpdatedValue(key.seriesInstanceUID)).getOrElse(attribute) // ASCII
+              case Tag.SeriesDescription => keys.seriesKey.map(key => attribute.withUpdatedValue(key.seriesDescription, cs)).getOrElse(attribute)
+              case Tag.ProtocolName => keys.seriesKey.map(key => attribute.withUpdatedValue(key.protocolName, cs)).getOrElse(attribute)
+              case Tag.FrameOfReferenceUID => keys.seriesKey.map(key => attribute.withUpdatedValue(key.frameOfReferenceUID)).getOrElse(attribute) // ASCII
+              case _ => attribute
             }
 
             currentAttribute = None
@@ -115,6 +95,11 @@ object ReverseAnonymizationFlow {
           part :: Nil
       }
     }
+
+  val maybeReverseAnonFlow = DicomStreams.conditionalFlow(
+    {
+      case keys: AnonymizationKeysPart => keys.patientKey.isEmpty
+    }, Flow.fromFunction(identity), reverseAnonFlow)
 
 }
 

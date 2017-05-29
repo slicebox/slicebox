@@ -100,8 +100,8 @@ class S3Storage(val bucket: String, val s3Prefix: String, val region: String) ex
     s3InputStream
   }
 
-  override def fileSink(path: String)(implicit actorSystem: ActorSystem, mat: Materializer, ec: ExecutionContext):  Sink[ByteString, Future[Done]] = {
-    new S3Client(S3Facade.credentialsFromProviderChain(), region).multipartUpload(bucket, path).mapMaterializedValue(_.map(_ => Done))
+  override def fileSink(name: String)(implicit actorSystem: ActorSystem, mat: Materializer, ec: ExecutionContext):  Sink[ByteString, Future[Done]] = {
+    new S3Client(S3Facade.credentialsFromProviderChain(), region).multipartUpload(bucket, name).mapMaterializedValue(_.map(_ => Done))
   }
 
   override def fileSource(image: Image)(implicit actorSystem: ActorSystem, mat: Materializer): Source[ByteString, NotUsed] = {

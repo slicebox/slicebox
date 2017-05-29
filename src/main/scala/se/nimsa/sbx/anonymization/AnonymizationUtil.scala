@@ -385,6 +385,7 @@ object AnonymizationUtil {
   def harmonizeAnonymization(keys: Seq[AnonymizationKey], attributes: Attributes, anonAttributes: Attributes) = {
     if (!isAnonymous(attributes)) {
       keys.headOption.foreach(key => {
+        anonAttributes.setString(Tag.PatientName, VR.PN, key.anonPatientName)
         anonAttributes.setString(Tag.PatientID, VR.LO, key.anonPatientID)
         val study = attributesToStudy(attributes)
         val studyKeys = keys.filter(_.studyInstanceUID == study.studyInstanceUID.value)

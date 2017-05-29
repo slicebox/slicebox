@@ -23,8 +23,11 @@ import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.AuthenticationFailedRejection.{CredentialsMissing, CredentialsRejected}
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.{AuthenticationFailedRejection, ExceptionHandler, RejectionHandler, Route}
+import akka.pattern.ask
 import org.dcm4che3.io.DicomStreamException
+import se.nimsa.sbx.anonymization.AnonymizationProtocol.{AnonymizationKeys, GetAnonymizationKeysForPatient, GetReverseAnonymizationKeysForPatient}
 import se.nimsa.sbx.app.SliceboxBase
+import se.nimsa.sbx.dicom.DicomPropertyValue.{PatientID, PatientName}
 import se.nimsa.sbx.lang.{BadGatewayException, NotFoundException}
 import se.nimsa.sbx.user.Authenticator
 
@@ -71,6 +74,14 @@ trait SliceboxRoutes extends DirectoryRoutes
       }
       complete((Unauthorized, message))
   }.result()
+
+  val anonymizationQuery = (patientName: PatientName, patientID: PatientID) => anonymizationService
+    .ask(GetAnonymizationKeysForPatient(patientName.value, patientID.value))
+    .mapTo[AnonymizationKeys].map(_.anonymizationKeys)
+
+  val reverseAnonymizationQuery = (patientName: PatientName, patientID: PatientID) => anonymizationService
+    .ask(GetReverseAnonymizationKeysForPatient(patientName.value, patientID.value))
+    .mapTo[AnonymizationKeys].map(_.anonymizationKeys)
 
   def routes: Route =
     pathPrefix("api") {

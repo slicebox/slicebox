@@ -60,12 +60,12 @@ class RuntimeStorage extends StorageService {
     }
   }
 
-  override def fileSink(path: String)(implicit actorSystem: ActorSystem, mat: Materializer, ec: ExecutionContext): Sink[ByteString, Future[Done]] =
+  override def fileSink(name: String)(implicit actorSystem: ActorSystem, mat: Materializer, ec: ExecutionContext): Sink[ByteString, Future[Done]] =
     Sink.reduce[ByteString](_ ++ _)
       .mapMaterializedValue {
         _.map {
           bytes =>
-            storage(path) = bytes
+            storage(name) = bytes
             Done
         }
       }

@@ -62,7 +62,9 @@ object AnonymizationProtocol {
 
   case class ReverseAnonymization(attributes: Attributes) extends AnonymizationRequest
 
-  case class GetReverseAnonymizationKeys(anonPatientName: String, anonPatientId: String) extends AnonymizationRequest
+  case class GetAnonymizationKeysForPatient(patientName: String, patientId: String) extends AnonymizationRequest
+
+  case class GetReverseAnonymizationKeysForPatient(anonPatientName: String, anonPatientID: String) extends AnonymizationRequest
 
   case class Anonymize(imageId: Long, attributes: Attributes, tagValues: Seq[TagValue]) extends AnonymizationRequest
 
@@ -75,6 +77,10 @@ object AnonymizationProtocol {
   case class QueryAnonymizationKeys(query: AnonymizationKeyQuery) extends AnonymizationRequest
   
   case class RemoveAnonymizationKey(anonymizationKeyId: Long) extends AnonymizationRequest
+
+  case class AddAnonymizationKey(anonymizationKey: AnonymizationKey) extends AnonymizationRequest
+
+  case class AnonymizationKeyAdded(anonymizationKey: AnonymizationKey)
 
   case class AnonymizationKeyRemoved(anonymizationKeyId: Long)
 
