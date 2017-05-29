@@ -25,8 +25,8 @@ import akka.stream.scaladsl.Compression
 import akka.util.ByteString
 import org.dcm4che3.data.Attributes
 import org.dcm4che3.io.DicomStreamException
-import se.nimsa.dcm4che.streams.DicomFlows
 import se.nimsa.dcm4che.streams.DicomFlows.TagModification
+import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.box.BoxProtocol._
@@ -38,6 +38,10 @@ import se.nimsa.sbx.storage.StorageProtocol._
 
 trait TransactionRoutes {
   this: SliceboxBase =>
+
+  val anonymizationInsert = (anonymizationKey: AnonymizationKey) => anonymizationService
+    .ask(AddAnonymizationKey(anonymizationKey))
+    .mapTo[AnonymizationKeyAdded].map(_.anonymizationKey)
 
   def transactionRoutes: Route =
     pathPrefix("transactions" / Segment) { token =>
@@ -130,11 +134,7 @@ trait TransactionRoutes {
                           TagModification(ttv.tagValue.tag, _ => ByteString(ttv.tagValue.value.getBytes("US-ASCII")), insert = true))
                         onSuccess(metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]]) {
                           case Some(image) =>
-                            val streamSource = DicomStreams
-                              .dicomDataSource(storage.fileSource(image))
-                              .via(DicomFlows.modifyFlow(tagMods:_*))
-                              .map(_.bytes)
-                              .via(Compression.deflate)
+                            val streamSource = DicomStreams.anonymizedDicomDataSource(storage.fileSource(image), anonymizationQuery, anonymizationInsert, tagMods)
                             complete(HttpEntity(ContentTypes.`application/octet-stream`, streamSource))
                           case None =>
                             complete((NotFound, s"Image not found for image id $imageId"))

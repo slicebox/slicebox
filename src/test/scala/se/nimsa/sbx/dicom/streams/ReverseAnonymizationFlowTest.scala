@@ -7,7 +7,7 @@ import akka.stream.scaladsl.{Sink, Source}
 import akka.stream.testkit.scaladsl.TestSink
 import akka.testkit.TestKit
 import akka.util.ByteString
-import org.dcm4che3.data.{Attributes, Tag}
+import org.dcm4che3.data.Tag
 import org.scalatest.{FlatSpecLike, Matchers}
 import se.nimsa.dcm4che.streams.DicomFlows.TagModification
 import se.nimsa.dcm4che.streams.DicomParts.{DicomAttributes, DicomPart}
@@ -30,12 +30,15 @@ class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymiza
       .via(DicomFlows.blacklistFilter(DicomParsing.isFileMetaInformation, keepPreamble = false))
   }
 
-  def anonKeyPart(dicomData: DicomData) = AnonymizationKeyPart(Some(createAnonymizationKey(dicomData.attributes)))
+  def anonKeyPart(dicomData: DicomData) = {
+    val key = createAnonymizationKey(dicomData.attributes)
+    AnonymizationKeysPart(Seq(key), Some(key), Some(key), Some(key))
+  }
 
   private def toAsciiBytes(s: String) = ByteString(s.getBytes("US-ASCII"))
 
   def anonSource(dicomData: DicomData) = {
-    val key = anonKeyPart(dicomData).anonymizationKey.get
+    val key = anonKeyPart(dicomData).patientKey.get
     attributesSource(dicomData)
       .via(AnonymizationFlow.anonFlow)
       .via(DicomFlows.modifyFlow(
