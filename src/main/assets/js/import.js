@@ -79,7 +79,7 @@ angular.module('slicebox.import', ['ngRoute', 'ngFileUpload'])
                 importFirst(files);
             }).error(function (message, status, headers, config) {
                 if (status >= 300) { // && status !== 400
-                    sbxToast.showErrorMessage('Error importing file: ' + message);
+                    sbxToast.showErrorMessage(message);
                 }
 
                 files.shift();

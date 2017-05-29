@@ -19,6 +19,7 @@ package se.nimsa.sbx.app.routing
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
+import akka.http.scaladsl.server.directives.FileInfo
 import akka.pattern.ask
 import akka.stream.scaladsl.{Source => StreamSource}
 import akka.util.ByteString
@@ -46,9 +47,9 @@ trait ImportRoutes {
     path("import" / "sessions" / LongNumber / "images") { id =>
       post {
         fileUpload("file") {
-          case (_, bytes) => addImageToImportSessionRoute(bytes, id)
+          case (fileInfo, bytes) => addImageToImportSessionRoute(Some(fileInfo), bytes, id)
         } ~ extractDataBytes { bytes =>
-          addImageToImportSessionRoute(bytes, id)
+          addImageToImportSessionRoute(None, bytes, id)
         }
       }
     } ~ pathPrefix("import") {
@@ -99,7 +100,7 @@ trait ImportRoutes {
 
     }
 
-  def addImageToImportSessionRoute(bytes: StreamSource[ByteString, Any], importSessionId: Long): Route = {
+  def addImageToImportSessionRoute(fileInfo: Option[FileInfo], bytes: StreamSource[ByteString, Any], importSessionId: Long): Route = {
 
     onSuccess(importService.ask(GetImportSession(importSessionId)).mapTo[Option[ImportSession]]) {
       case Some(importSession) =>
@@ -124,17 +125,22 @@ trait ImportRoutes {
                 }
               }
             }
-          case Failure(dicomStreamException: DicomStreamException) =>
-            SbxLog.error("Exception during import", dicomStreamException.getMessage)
-            importService.ask(UpdateSessionWithRejection(importSession))
-            complete((BadRequest, dicomStreamException.getMessage))
-
           case Failure(failure) =>
-            SbxLog.error("Exception during import", failure.getMessage)
-            importService.ask(UpdateSessionWithRejection(importSession))
-            complete((InternalServerError, failure.getMessage))
+            val status = failure match {
+              case _: DicomStreamException => BadRequest
+              case _ => InternalServerError
+            }
+            fileInfo match {
+              case Some(fi) =>
+                SbxLog.error(s"Exception during import of ${fi.fileName}", failure.getMessage)
+                importService.ask(UpdateSessionWithRejection(importSession))
+                complete((status, s"${fi.fileName}: ${failure.getMessage}"))
+              case None =>
+                SbxLog.error("Exception during import", failure.getMessage)
+                importService.ask(UpdateSessionWithRejection(importSession))
+                complete((status, failure.getMessage))
+            }
         }
-
       case None =>
         complete(NotFound)
     }
