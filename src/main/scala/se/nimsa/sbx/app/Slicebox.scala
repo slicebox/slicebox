@@ -21,6 +21,7 @@ import java.util.concurrent.TimeUnit.MILLISECONDS
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
+import akka.pattern.ask
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import com.typesafe.config.{Config, ConfigFactory}
@@ -41,8 +42,9 @@ import se.nimsa.sbx.user.{UserDAO, UserServiceActor}
 import slick.basic.DatabaseConfig
 import slick.jdbc.JdbcProfile
 
-import scala.concurrent.{Await, ExecutionContextExecutor}
 import scala.concurrent.duration.DurationInt
+import scala.concurrent.{Await, ExecutionContextExecutor}
+import scala.reflect.ClassTag
 import scala.util.{Failure, Success}
 
 trait SliceboxBase extends SliceboxRoutes with AnonymizationServiceCalls with JsonFormats with PlayJsonSupport {
@@ -92,7 +94,7 @@ trait SliceboxBase extends SliceboxRoutes with AnonymizationServiceCalls with Js
     _ <- anonymizationDao.create()
   } yield Unit
   createDbTables.onComplete {
-    case Success(v) => SbxLog.default("System", "Database tables created. ")
+    case Success(_) => SbxLog.default("System", "Database tables created. ")
     case Failure(e) => SbxLog.error("System", s"Could not create tables. ${e.getMessage}")
   }
   Await.ready(createDbTables, 1.minute)
@@ -139,6 +141,8 @@ trait SliceboxBase extends SliceboxRoutes with AnonymizationServiceCalls with Js
   val seriesTypeService = system.actorOf(SeriesTypeServiceActor.props(seriesTypeDao, timeout), name = "SeriesTypeService")
   val forwardingService = system.actorOf(ForwardingServiceActor.props(forwardingDao, timeout), name = "ForwardingService")
   val importService = system.actorOf(ImportServiceActor.props(importDao, timeout), name = "ImportService")
+
+  override def callAnonymizationService[R: ClassTag](message: Any) = anonymizationService.ask(message).mapTo[R]
 
 }
 

@@ -27,11 +27,10 @@ import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{Sink, Source => StreamSource}
 import akka.util.{ByteString, Timeout}
 import se.nimsa.dcm4che.streams.DicomFlows.TagModification
-import se.nimsa.sbx.anonymization.AnonymizationProtocol._
+import se.nimsa.sbx.anonymization.AnonymizationServiceCalls
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
-import se.nimsa.sbx.dicom.DicomPropertyValue.{PatientID, PatientName}
 import se.nimsa.sbx.dicom.streams.DicomStreams
 import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.metadata.MetaDataProtocol.GetImage
@@ -39,6 +38,7 @@ import se.nimsa.sbx.storage.StorageService
 
 import scala.concurrent.Future
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
+import scala.reflect.ClassTag
 import scala.util.{Failure, Success}
 
 class BoxPushActor(box: Box,
@@ -47,7 +47,7 @@ class BoxPushActor(box: Box,
                    boxServicePath: String = "../../BoxService",
                    metaDataServicePath: String = "../../MetaDataService",
                    anonymizationServicePath: String = "../../AnonymizationService")
-                  (implicit val timeout: Timeout) extends Actor {
+                  (implicit val timeout: Timeout) extends Actor with AnonymizationServiceCalls {
 
   val log = Logging(context.system, this)
 
@@ -56,7 +56,7 @@ class BoxPushActor(box: Box,
   val boxService = context.actorSelection(boxServicePath)
 
   implicit val system = context.system
-  implicit val ec = context.dispatcher
+  implicit val executor = context.dispatcher
   implicit val materializer = ActorMaterializer()
 
   val poller = system.scheduler.schedule(pollInterval, pollInterval) {
@@ -67,6 +67,8 @@ class BoxPushActor(box: Box,
     poller.cancel()
 
   val pool = Http().superPool[String]()
+
+  override def callAnonymizationService[R: ClassTag](message: Any) = anonymizationService.ask(message).mapTo[R]
 
   def receive = LoggingReceive {
     case PollOutgoing =>
@@ -122,14 +124,6 @@ class BoxPushActor(box: Box,
         handleFileSendFailedForOutgoingTransaction(transactionImage, 503, exception)
     }
   }
-
-  val anonymizationQuery = (patientName: PatientName, patientID: PatientID) => anonymizationService
-    .ask(GetAnonymizationKeysForPatient(patientName.value, patientID.value))
-    .mapTo[AnonymizationKeys].map(_.anonymizationKeys)
-
-  val anonymizationInsert = (anonymizationKey: AnonymizationKey) => anonymizationService
-    .ask(AddAnonymizationKey(anonymizationKey))
-    .mapTo[AnonymizationKeyAdded].map(_.anonymizationKey)
 
   def pushImagePipeline(transactionImage: OutgoingTransactionImage, tagValues: Seq[OutgoingTagValue]): Future[HttpResponse] =
     metaDataService.ask(GetImage(transactionImage.image.imageId)).mapTo[Option[Image]].flatMap {
@@ -219,7 +213,6 @@ class BoxPushActor(box: Box,
         case (Success(response), _) => response
         case (Failure(error), _) => throw error
       }
-
 }
 
 object BoxPushActor {
