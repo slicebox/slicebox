@@ -115,9 +115,6 @@ class StorageServiceActor(storage: StorageService,
 
         case GetImageInformation(image) =>
           sender ! storage.readImageInformation(image)
-
-        case GetPngDataArray(image, frameNumber, windowMin, windowMax, imageHeight) =>
-          sender ! PngDataArray(storage.readPngImageData(image, frameNumber, windowMin, windowMax, imageHeight))
       }
     }
 

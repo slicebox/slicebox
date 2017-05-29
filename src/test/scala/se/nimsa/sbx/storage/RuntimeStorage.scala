@@ -1,9 +1,8 @@
 package se.nimsa.sbx.storage
 
 import java.io.{ByteArrayInputStream, InputStream}
-import javax.imageio.ImageIO
 
-import akka.Done
+import akka.{Done, NotUsed}
 import akka.actor.ActorSystem
 import akka.stream.Materializer
 import akka.stream.scaladsl.{Sink, Source}
@@ -37,10 +36,13 @@ class RuntimeStorage extends StorageService {
     DicomUtil.readImageAttributes(loadDicomData(storage.getOrElse(imageName(image), null).toArray, withPixelData = false).attributes)
 
   override def readImageInformation(image: Image): ImageInformation =
-    super.readImageInformation(imageAsInputStream(image))
+    readImageInformation(imageAsInputStream(image))
 
-  override def readPngImageData(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int): Array[Byte] =
-    super.readPngImageData(ImageIO.createImageInputStream(imageAsInputStream(image)), frameNumber, windowMin, windowMax, imageHeight)
+  override def readPngImageData(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int)
+                               (implicit system: ActorSystem, materializer: Materializer): Array[Byte] = {
+    val source = Source.single(storage(imageName(image)))
+    readPngImageData(source, frameNumber, windowMin, windowMax, imageHeight)
+  }
 
   override def imageAsInputStream(image: Image): InputStream =
     new ByteArrayInputStream(storage(imageName(image)).toArray)
@@ -58,16 +60,16 @@ class RuntimeStorage extends StorageService {
     }
   }
 
-  override def fileSink(tmpPath: String)(implicit actorSystem: ActorSystem, mat: Materializer, ec: ExecutionContext): Sink[ByteString, Future[Done]] =
+  override def fileSink(path: String)(implicit actorSystem: ActorSystem, mat: Materializer, ec: ExecutionContext): Sink[ByteString, Future[Done]] =
     Sink.reduce[ByteString](_ ++ _)
       .mapMaterializedValue {
         _.map {
           bytes =>
-            storage(tmpPath) = bytes
+            storage(path) = bytes
             Done
         }
       }
 
-  override def fileSource(path: String)(implicit actorSystem: ActorSystem, mat: Materializer, ec: ExecutionContext): Source[ByteString, Any] = Source.single(storage(path))
+  override def fileSource(image: Image)(implicit actorSystem: ActorSystem, mat: Materializer): Source[ByteString, NotUsed] = Source.single(storage(imageName(image)))
 
 }

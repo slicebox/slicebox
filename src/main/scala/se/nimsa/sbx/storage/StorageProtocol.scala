@@ -41,8 +41,6 @@ object StorageProtocol {
 
   case class GetImageInformation(image: Image) extends ImageRequest
 
-  case class GetPngDataArray(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int) extends ImageRequest
-
   case class CheckDicomData(dicomData: DicomData, useExtendedContexts: Boolean) extends ImageRequest
 
   case class AddDicomData(dicomData: DicomData, source: Source, image: Image) extends ImageRequest
@@ -57,8 +55,6 @@ object StorageProtocol {
 
 
   case class DicomDataArray(data: Array[Byte])
-
-  case class PngDataArray(data: Array[Byte])
 
   case class DicomDataAdded(image: Image, overwrite: Boolean)
 

@@ -18,13 +18,12 @@ package se.nimsa.sbx.storage
 
 import java.io.{BufferedInputStream, InputStream}
 import java.nio.file.{Files, Path, StandardCopyOption}
-import javax.imageio.ImageIO
 
-import akka.{Done, NotUsed}
 import akka.actor.ActorSystem
-import akka.stream.{IOResult, Materializer}
+import akka.stream.Materializer
 import akka.stream.scaladsl.{FileIO, Sink, Source}
 import akka.util.ByteString
+import akka.{Done, NotUsed}
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.DicomUtil._
 import se.nimsa.sbx.dicom.{DicomData, DicomUtil, ImageAttribute}
@@ -71,10 +70,11 @@ class FileStorage(val path: Path) extends StorageService {
   def readImageInformation(image: Image): ImageInformation =
     super.readImageInformation(new BufferedInputStream(Files.newInputStream(filePath(image))))
 
-  override def readPngImageData(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int): Array[Byte] = {
-    val file = filePath(image).toFile
-    val iis = ImageIO.createImageInputStream(file)
-    super.readPngImageData(iis, frameNumber, windowMin, windowMax, imageHeight)
+  override def readPngImageData(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int)
+                               (implicit system: ActorSystem, materializer: Materializer): Array[Byte] = {
+    val path = filePath(image)
+    val source = FileIO.fromPath(path)
+    super.readPngImageData(source, frameNumber, windowMin, windowMax, imageHeight)
   }
 
   override def imageAsInputStream(image: Image): InputStream =
@@ -92,10 +92,10 @@ class FileStorage(val path: Path) extends StorageService {
   }
 
 
-  override def fileSink(tmpPath: String)(implicit actorSystem: ActorSystem, mat: Materializer, ec: ExecutionContext):  Sink[ByteString, Future[Done]] =
-    FileIO.toPath(path.resolve(tmpPath)).mapMaterializedValue(_.map(_ => Done))
+  override def fileSink(filePath: String)(implicit actorSystem: ActorSystem, mat: Materializer, ec: ExecutionContext):  Sink[ByteString, Future[Done]] =
+    FileIO.toPath(path.resolve(filePath)).mapMaterializedValue(_.map(_ => Done))
 
-  override def fileSource(srcPath: String)(implicit actorSystem: ActorSystem, mat: Materializer, ec: ExecutionContext): Source[ByteString, Future[IOResult]] =
-    FileIO.fromPath(path.resolve(srcPath))
+  override def fileSource(image: Image)(implicit actorSystem: ActorSystem, mat: Materializer): Source[ByteString, NotUsed] =
+    FileIO.fromPath(path.resolve(filePath(image))).mapMaterializedValue(_ => NotUsed)
 
 }

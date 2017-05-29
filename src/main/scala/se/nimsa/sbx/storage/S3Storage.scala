@@ -17,7 +17,6 @@
 package se.nimsa.sbx.storage
 
 import java.io.{ByteArrayOutputStream, InputStream}
-import javax.imageio.ImageIO
 
 import akka.{Done, NotUsed}
 import akka.actor.ActorSystem
@@ -91,10 +90,9 @@ class S3Storage(val bucket: String, val s3Prefix: String, val region: String) ex
     super.readImageInformation(s3InputStream)
   }
 
-  override def readPngImageData(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int): Array[Byte] = {
-    val s3InputStream = s3Client.get(s3Id(image))
-    val iis = ImageIO.createImageInputStream(s3InputStream)
-    super.readPngImageData(iis, frameNumber, windowMin, windowMax, imageHeight)
+  override def readPngImageData(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int)
+                               (implicit system: ActorSystem, materializer: Materializer): Array[Byte] = {
+    super.readPngImageData(fileSource(image), frameNumber, windowMin, windowMax, imageHeight)
   }
 
   override def imageAsInputStream(image: Image): InputStream = {
@@ -102,11 +100,11 @@ class S3Storage(val bucket: String, val s3Prefix: String, val region: String) ex
     s3InputStream
   }
 
-  override def fileSink(tmpPath: String)(implicit actorSystem: ActorSystem, mat: Materializer, ec: ExecutionContext):  Sink[ByteString, Future[Done]] = {
-    new S3Client(S3Facade.credentialsFromProviderChain(), region).multipartUpload(bucket, tmpPath).mapMaterializedValue(_.map(_ => Done))
+  override def fileSink(path: String)(implicit actorSystem: ActorSystem, mat: Materializer, ec: ExecutionContext):  Sink[ByteString, Future[Done]] = {
+    new S3Client(S3Facade.credentialsFromProviderChain(), region).multipartUpload(bucket, path).mapMaterializedValue(_.map(_ => Done))
   }
 
-  override def fileSource(path: String)(implicit actorSystem: ActorSystem, mat: Materializer, ec: ExecutionContext): Source[ByteString, NotUsed] = {
-    new S3Client(S3Facade.credentialsFromProviderChain(), region).download(bucket, s3Id(path))
+  override def fileSource(image: Image)(implicit actorSystem: ActorSystem, mat: Materializer): Source[ByteString, NotUsed] = {
+    new S3Client(S3Facade.credentialsFromProviderChain(), region).download(bucket, s3Id(image))
   }
 }
