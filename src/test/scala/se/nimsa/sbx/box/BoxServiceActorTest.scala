@@ -36,7 +36,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
   await(boxDao.create())
 
   val storageService = system.actorOf(Props(new StorageServiceActor(storage)), name = "StorageService")
-  val boxService = system.actorOf(Props(new BoxServiceActor(boxDao, "http://testhost:1234")), name = "BoxService")
+  val boxService = system.actorOf(Props(new BoxServiceActor(boxDao, "http://testhost:1234", storage)), name = "BoxService")
 
   override def afterEach() = {
     storage.clear()

@@ -25,7 +25,7 @@ import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import com.typesafe.config.{Config, ConfigFactory}
 import de.heikoseeberger.akkahttpplayjson.PlayJsonSupport
-import se.nimsa.sbx.anonymization.{AnonymizationDAO, AnonymizationServiceActor}
+import se.nimsa.sbx.anonymization.{AnonymizationDAO, AnonymizationServiceActor, AnonymizationServiceCalls}
 import se.nimsa.sbx.app.routing.SliceboxRoutes
 import se.nimsa.sbx.box.{BoxDAO, BoxServiceActor}
 import se.nimsa.sbx.directory.{DirectoryWatchDAO, DirectoryWatchServiceActor}
@@ -45,7 +45,7 @@ import scala.concurrent.{Await, ExecutionContextExecutor}
 import scala.concurrent.duration.DurationInt
 import scala.util.{Failure, Success}
 
-trait SliceboxBase extends SliceboxRoutes with JsonFormats with PlayJsonSupport {
+trait SliceboxBase extends SliceboxRoutes with AnonymizationServiceCalls with JsonFormats with PlayJsonSupport {
 
   val appConfig: Config  = ConfigFactory.load()
   val sliceboxConfig = appConfig.getConfig("slicebox")
@@ -132,7 +132,7 @@ trait SliceboxBase extends SliceboxRoutes with JsonFormats with PlayJsonSupport 
     val purgeEmptyAnonymizationKeys = sliceboxConfig.getBoolean("anonymization.purge-empty-keys")
     system.actorOf(AnonymizationServiceActor.props(anonymizationDao, purgeEmptyAnonymizationKeys, timeout), name = "AnonymizationService")
   }
-  val boxService = system.actorOf(BoxServiceActor.props(boxDao, apiBaseURL, timeout), name = "BoxService")
+  val boxService = system.actorOf(BoxServiceActor.props(boxDao, apiBaseURL, storage, timeout), name = "BoxService")
   val scpService = system.actorOf(ScpServiceActor.props(scpDao, timeout), name = "ScpService")
   val scuService = system.actorOf(ScuServiceActor.props(scuDao, timeout), name = "ScuService")
   val directoryService = system.actorOf(DirectoryWatchServiceActor.props(directoryWatchDao, timeout), name = "DirectoryService")

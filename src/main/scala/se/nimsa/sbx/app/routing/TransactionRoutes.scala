@@ -39,10 +39,6 @@ import se.nimsa.sbx.storage.StorageProtocol._
 trait TransactionRoutes {
   this: SliceboxBase =>
 
-  val anonymizationInsert = (anonymizationKey: AnonymizationKey) => anonymizationService
-    .ask(AddAnonymizationKey(anonymizationKey))
-    .mapTo[AnonymizationKeyAdded].map(_.anonymizationKey)
-
   def transactionRoutes: Route =
     pathPrefix("transactions" / Segment) { token =>
       onSuccess(boxService.ask(GetBoxByToken(token)).mapTo[Option[Box]]) {

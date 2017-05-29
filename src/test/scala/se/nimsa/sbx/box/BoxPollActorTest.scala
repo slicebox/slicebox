@@ -17,13 +17,14 @@ import se.nimsa.sbx.box.MockupStorageActor.{ShowBadBehavior, ShowGoodBehavior}
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.metadata.MetaDataDAO
 import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, MetaDataAdded}
+import se.nimsa.sbx.storage.RuntimeStorage
 import se.nimsa.sbx.util.CompressionUtil._
 import se.nimsa.sbx.util.FutureUtil.await
 import se.nimsa.sbx.util.TestUtil
 
 import scala.collection.mutable.ArrayBuffer
+import scala.concurrent.Await
 import scala.concurrent.duration.DurationInt
-import scala.concurrent.{Await, Future}
 import scala.util.{Success, Try}
 
 class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
@@ -60,8 +61,9 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
     }
   }), name = "MetaDataService")
   val storageService = system.actorOf(Props[MockupStorageActor], name = "StorageService")
+  val storage = new RuntimeStorage()
   val anonymizationService = system.actorOf(AnonymizationServiceActor.props(anonymizationDao, purgeEmptyAnonymizationKeys = false, timeout), name = "AnonymizationService")
-  val boxService = system.actorOf(BoxServiceActor.props(boxDao, "http://testhost:1234", 1.minute), name = "BoxService")
+  val boxService = system.actorOf(BoxServiceActor.props(boxDao, "http://testhost:1234", storage, 1.minute), name = "BoxService")
   val pollBoxActorRef = system.actorOf(Props(new BoxPollActor(remoteBox, 1.hour, 1000.hours, "../BoxService", "../MetaDataService", "../StorageService", "../AnonymizationService") {
 
     override val pool = Flow.fromFunction[(HttpRequest, String), (Try[HttpResponse], String)] {
