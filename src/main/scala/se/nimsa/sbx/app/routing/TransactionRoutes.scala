@@ -26,7 +26,6 @@ import akka.util.ByteString
 import org.dcm4che3.data.Attributes
 import org.dcm4che3.io.DicomStreamException
 import se.nimsa.dcm4che.streams.DicomFlows.TagModification
-import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.box.BoxProtocol._
@@ -57,8 +56,8 @@ trait TransactionRoutes {
                     .runWith(dicomDataSink(storage.fileSink(tmpPath), reverseAnonymizationQuery))
 
                   onSuccess(futureStored) {
-                    case (_, dicomData) =>
-                      val attributes: Attributes = dicomData._2.getOrElse(throw new DicomStreamException("DICOM data has no dataset"))
+                    case (maybeFmi, maybeDataset) =>
+                      val attributes: Attributes = maybeDataset.getOrElse(throw new DicomStreamException("DICOM data has no dataset"))
                       onSuccess(metaDataService.ask(AddMetaData(attributes, source)).mapTo[MetaDataAdded]) { metaData =>
                         onSuccess(storageService.ask(MoveDicomData(tmpPath, s"${metaData.image.id}")).mapTo[DicomDataMoved]) { _ =>
                           onSuccess(boxService.ask(UpdateIncoming(box, outgoingTransactionId, sequenceNumber, totalImageCount, metaData.image.id, metaData.imageAdded))) {

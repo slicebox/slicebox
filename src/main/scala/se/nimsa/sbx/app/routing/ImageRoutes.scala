@@ -176,8 +176,8 @@ trait ImageRoutes {
     val futureUpload = bytes.runWith(dicomDataSink(storage.fileSink(tmpPath), reverseAnonymizationQuery))
 
     onSuccess(futureUpload) {
-      case (_, dicomData) =>
-        val attributes: Attributes = dicomData._2.getOrElse(throw new DicomStreamException("DICOM data has no dataset"))
+      case (_, maybeDataset) =>
+        val attributes: Attributes = maybeDataset.getOrElse(throw new DicomStreamException("DICOM data has no dataset"))
         onSuccess(metaDataService.ask(AddMetaData(attributes, source)).mapTo[MetaDataAdded]) { metaData =>
           onSuccess(storageService.ask(MoveDicomData(tmpPath, s"${metaData.image.id}")).mapTo[DicomDataMoved]) { _ =>
             system.eventStream.publish(ImageAdded(metaData.image, source, !metaData.imageAdded))
