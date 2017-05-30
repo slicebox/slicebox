@@ -24,7 +24,6 @@ import akka.http.scaladsl.model._
 import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.pattern.ask
 import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.{Sink, Source => StreamSource}
 import akka.util.{ByteString, Timeout}
 import se.nimsa.dcm4che.streams.DicomFlows.TagModification
 import se.nimsa.sbx.anonymization.AnonymizationServiceCalls
@@ -132,8 +131,7 @@ class BoxPushActor(box: Box,
           TagModification(ttv.tagValue.tag, _ => ByteString(ttv.tagValue.value.getBytes("US-ASCII")), insert = true))
         val source = DicomStreams.anonymizedDicomDataSource(storage.fileSource(image), anonymizationQuery, anonymizationInsert, tagMods)
         val uri = s"${box.baseUrl}/image?transactionid=${transactionImage.transaction.id}&sequencenumber=${transactionImage.image.sequenceNumber}&totalimagecount=${transactionImage.transaction.totalImageCount}"
-        val connectionId = s"${transactionImage.transaction.id},${transactionImage.image.sequenceNumber}"
-        sliceboxRequest(HttpMethods.POST, uri, HttpEntity(ContentTypes.`application/octet-stream`, source), connectionId)
+        sliceboxRequest(HttpMethods.POST, uri, HttpEntity(ContentTypes.`application/octet-stream`, source))
       case None =>
         Future.failed(new IllegalArgumentException("Image not found for image id " + transactionImage.image.imageId))
     }
@@ -167,8 +165,7 @@ class BoxPushActor(box: Box,
         // other error in communication. Report the transaction as failed here and on remote
         boxService.ask(SetOutgoingTransactionStatus(transactionImage.transaction, TransactionStatus.FAILED)).flatMap { _ =>
           val uri = s"${box.baseUrl}/status?transactionid=${transactionImage.transaction.id}"
-          val connectionId = transactionImage.transaction.id.toString
-          sliceboxRequest(HttpMethods.PUT, uri, HttpEntity(TransactionStatus.FAILED.toString), connectionId)
+          sliceboxRequest(HttpMethods.PUT, uri, HttpEntity(TransactionStatus.FAILED.toString))
             .recover {
               case _: Exception =>
                 SbxLog.warn("Box", "Unable to set remote transaction status.")
@@ -184,8 +181,7 @@ class BoxPushActor(box: Box,
   def handleTransactionFinished(outgoingTransaction: OutgoingTransaction): Future[Unit] =
     boxService.ask(GetOutgoingImageIdsForTransaction(outgoingTransaction)).mapTo[Seq[Long]].flatMap { imageIds =>
       val uri = s"${box.baseUrl}/status?transactionid=${outgoingTransaction.id}"
-      val connectionId = outgoingTransaction.id.toString
-      sliceboxRequest(HttpMethods.GET, uri, HttpEntity.Empty, connectionId)
+      sliceboxRequest(HttpMethods.GET, uri, HttpEntity.Empty)
         .recover {
           case _ =>
             SbxLog.warn("Box", "Unable to get remote status of finished transaction, assuming all is well.")
@@ -204,15 +200,8 @@ class BoxPushActor(box: Box,
       }
     }
 
-  private def sliceboxRequest(method: HttpMethod, uri: String, entity: RequestEntity, connectionId: String): Future[HttpResponse] =
-    StreamSource
-      .single(HttpRequest(method = method, uri = uri, entity = entity) -> connectionId)
-      .via(pool)
-      .runWith(Sink.head)
-      .map {
-        case (Success(response), _) => response
-        case (Failure(error), _) => throw error
-      }
+  private def sliceboxRequest(method: HttpMethod, uri: String, entity: RequestEntity): Future[HttpResponse] =
+    Http().singleRequest(HttpRequest(method = method, uri = uri, entity = entity))
 }
 
 object BoxPushActor {
