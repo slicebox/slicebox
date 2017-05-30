@@ -24,41 +24,38 @@ import akka.http.scaladsl.model._
 import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.pattern.ask
 import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.{Sink, Source => StreamSource}
-import akka.util.Timeout
-import org.dcm4che3.data.Attributes
-import se.nimsa.sbx.anonymization.AnonymizationProtocol.Anonymize
+import akka.util.{ByteString, Timeout}
+import se.nimsa.dcm4che.streams.DicomFlows.TagModification
+import se.nimsa.sbx.anonymization.AnonymizationServiceCalls
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.box.BoxProtocol._
-import se.nimsa.sbx.dicom.DicomData
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
-import se.nimsa.sbx.dicom.DicomUtil.toByteArray
+import se.nimsa.sbx.dicom.streams.DicomStreams
 import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.metadata.MetaDataProtocol.GetImage
-import se.nimsa.sbx.storage.StorageProtocol.GetDicomData
-import se.nimsa.sbx.util.CompressionUtil.compress
+import se.nimsa.sbx.storage.StorageService
 
 import scala.concurrent.Future
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
+import scala.reflect.ClassTag
 import scala.util.{Failure, Success}
 
 class BoxPushActor(box: Box,
-                   implicit val timeout: Timeout,
+                   storage: StorageService,
                    pollInterval: FiniteDuration = 5.seconds,
                    boxServicePath: String = "../../BoxService",
                    metaDataServicePath: String = "../../MetaDataService",
-                   storageServicePath: String = "../../StorageService",
-                   anonymizationServicePath: String = "../../AnonymizationService") extends Actor {
+                   anonymizationServicePath: String = "../../AnonymizationService")
+                  (implicit val timeout: Timeout) extends Actor with AnonymizationServiceCalls {
 
   val log = Logging(context.system, this)
 
   val metaDataService = context.actorSelection(metaDataServicePath)
-  val storageService = context.actorSelection(storageServicePath)
   val anonymizationService = context.actorSelection(anonymizationServicePath)
   val boxService = context.actorSelection(boxServicePath)
 
   implicit val system = context.system
-  implicit val ec = context.dispatcher
+  implicit val executor = context.dispatcher
   implicit val materializer = ActorMaterializer()
 
   val poller = system.scheduler.schedule(pollInterval, pollInterval) {
@@ -69,6 +66,8 @@ class BoxPushActor(box: Box,
     poller.cancel()
 
   val pool = Http().superPool[String]()
+
+  override def callAnonymizationService[R: ClassTag](message: Any) = anonymizationService.ask(message).mapTo[R]
 
   def receive = LoggingReceive {
     case PollOutgoing =>
@@ -128,14 +127,11 @@ class BoxPushActor(box: Box,
   def pushImagePipeline(transactionImage: OutgoingTransactionImage, tagValues: Seq[OutgoingTagValue]): Future[HttpResponse] =
     metaDataService.ask(GetImage(transactionImage.image.imageId)).mapTo[Option[Image]].flatMap {
       case Some(image) =>
-        storageService.ask(GetDicomData(image, withPixelData = true)).mapTo[DicomData].flatMap { dicomData =>
-          anonymizationService.ask(Anonymize(transactionImage.image.imageId, dicomData.attributes, tagValues.map(_.tagValue))).mapTo[Attributes].flatMap { anonymizedAttributes =>
-            val compressedBytes = compress(toByteArray(dicomData.copy(attributes = anonymizedAttributes)))
-            val uri = s"${box.baseUrl}/image?transactionid=${transactionImage.transaction.id}&sequencenumber=${transactionImage.image.sequenceNumber}&totalimagecount=${transactionImage.transaction.totalImageCount}"
-            val connectionId = s"${transactionImage.transaction.id},${transactionImage.image.sequenceNumber}"
-            sliceboxRequest(HttpMethods.POST, uri, HttpEntity(compressedBytes), connectionId)
-          }
-        }
+        val tagMods = tagValues.map(ttv =>
+          TagModification(ttv.tagValue.tag, _ => ByteString(ttv.tagValue.value.getBytes("US-ASCII")), insert = true))
+        val source = DicomStreams.anonymizedDicomDataSource(storage.fileSource(image), anonymizationQuery, anonymizationInsert, tagMods)
+        val uri = s"${box.baseUrl}/image?transactionid=${transactionImage.transaction.id}&sequencenumber=${transactionImage.image.sequenceNumber}&totalimagecount=${transactionImage.transaction.totalImageCount}"
+        sliceboxRequest(HttpMethods.POST, uri, HttpEntity(ContentTypes.`application/octet-stream`, source))
       case None =>
         Future.failed(new IllegalArgumentException("Image not found for image id " + transactionImage.image.imageId))
     }
@@ -169,8 +165,7 @@ class BoxPushActor(box: Box,
         // other error in communication. Report the transaction as failed here and on remote
         boxService.ask(SetOutgoingTransactionStatus(transactionImage.transaction, TransactionStatus.FAILED)).flatMap { _ =>
           val uri = s"${box.baseUrl}/status?transactionid=${transactionImage.transaction.id}"
-          val connectionId = transactionImage.transaction.id.toString
-          sliceboxRequest(HttpMethods.PUT, uri, HttpEntity(TransactionStatus.FAILED.toString), connectionId)
+          sliceboxRequest(HttpMethods.PUT, uri, HttpEntity(TransactionStatus.FAILED.toString))
             .recover {
               case _: Exception =>
                 SbxLog.warn("Box", "Unable to set remote transaction status.")
@@ -186,8 +181,7 @@ class BoxPushActor(box: Box,
   def handleTransactionFinished(outgoingTransaction: OutgoingTransaction): Future[Unit] =
     boxService.ask(GetOutgoingImageIdsForTransaction(outgoingTransaction)).mapTo[Seq[Long]].flatMap { imageIds =>
       val uri = s"${box.baseUrl}/status?transactionid=${outgoingTransaction.id}"
-      val connectionId = outgoingTransaction.id.toString
-      sliceboxRequest(HttpMethods.GET, uri, HttpEntity.Empty, connectionId)
+      sliceboxRequest(HttpMethods.GET, uri, HttpEntity.Empty)
         .recover {
           case _ =>
             SbxLog.warn("Box", "Unable to get remote status of finished transaction, assuming all is well.")
@@ -206,19 +200,11 @@ class BoxPushActor(box: Box,
       }
     }
 
-  private def sliceboxRequest(method: HttpMethod, uri: String, entity: RequestEntity, connectionId: String): Future[HttpResponse] =
-    StreamSource
-      .single(HttpRequest(method = method, uri = uri, entity = entity) -> connectionId)
-      .via(pool)
-      .runWith(Sink.head)
-      .map {
-        case (Success(response), _) => response
-        case (Failure(error), _) => throw error
-      }
-
+  protected def sliceboxRequest(method: HttpMethod, uri: String, entity: RequestEntity): Future[HttpResponse] =
+    Http().singleRequest(HttpRequest(method = method, uri = uri, entity = entity))
 }
 
 object BoxPushActor {
-  def props(box: Box, timeout: Timeout): Props = Props(new BoxPushActor(box, timeout))
+  def props(box: Box, storageService: StorageService, timeout: Timeout): Props = Props(new BoxPushActor(box, storageService)(timeout))
 
 }

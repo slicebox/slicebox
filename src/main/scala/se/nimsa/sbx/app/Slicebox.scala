@@ -21,11 +21,12 @@ import java.util.concurrent.TimeUnit.MILLISECONDS
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
+import akka.pattern.ask
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import com.typesafe.config.{Config, ConfigFactory}
 import de.heikoseeberger.akkahttpplayjson.PlayJsonSupport
-import se.nimsa.sbx.anonymization.{AnonymizationDAO, AnonymizationServiceActor}
+import se.nimsa.sbx.anonymization.{AnonymizationDAO, AnonymizationServiceActor, AnonymizationServiceCalls}
 import se.nimsa.sbx.app.routing.SliceboxRoutes
 import se.nimsa.sbx.box.{BoxDAO, BoxServiceActor}
 import se.nimsa.sbx.directory.{DirectoryWatchDAO, DirectoryWatchServiceActor}
@@ -41,11 +42,12 @@ import se.nimsa.sbx.user.{UserDAO, UserServiceActor}
 import slick.basic.DatabaseConfig
 import slick.jdbc.JdbcProfile
 
-import scala.concurrent.{Await, ExecutionContextExecutor}
 import scala.concurrent.duration.DurationInt
+import scala.concurrent.{Await, ExecutionContextExecutor}
+import scala.reflect.ClassTag
 import scala.util.{Failure, Success}
 
-trait SliceboxBase extends SliceboxRoutes with JsonFormats with PlayJsonSupport {
+trait SliceboxBase extends SliceboxRoutes with AnonymizationServiceCalls with JsonFormats with PlayJsonSupport {
 
   val appConfig: Config  = ConfigFactory.load()
   val sliceboxConfig = appConfig.getConfig("slicebox")
@@ -92,7 +94,7 @@ trait SliceboxBase extends SliceboxRoutes with JsonFormats with PlayJsonSupport 
     _ <- anonymizationDao.create()
   } yield Unit
   createDbTables.onComplete {
-    case Success(v) => SbxLog.default("System", "Database tables created. ")
+    case Success(_) => SbxLog.default("System", "Database tables created. ")
     case Failure(e) => SbxLog.error("System", s"Could not create tables. ${e.getMessage}")
   }
   Await.ready(createDbTables, 1.minute)
@@ -132,13 +134,15 @@ trait SliceboxBase extends SliceboxRoutes with JsonFormats with PlayJsonSupport 
     val purgeEmptyAnonymizationKeys = sliceboxConfig.getBoolean("anonymization.purge-empty-keys")
     system.actorOf(AnonymizationServiceActor.props(anonymizationDao, purgeEmptyAnonymizationKeys, timeout), name = "AnonymizationService")
   }
-  val boxService = system.actorOf(BoxServiceActor.props(boxDao, apiBaseURL, timeout), name = "BoxService")
+  val boxService = system.actorOf(BoxServiceActor.props(boxDao, apiBaseURL, storage, timeout), name = "BoxService")
   val scpService = system.actorOf(ScpServiceActor.props(scpDao, timeout), name = "ScpService")
   val scuService = system.actorOf(ScuServiceActor.props(scuDao, timeout), name = "ScuService")
   val directoryService = system.actorOf(DirectoryWatchServiceActor.props(directoryWatchDao, timeout), name = "DirectoryService")
   val seriesTypeService = system.actorOf(SeriesTypeServiceActor.props(seriesTypeDao, timeout), name = "SeriesTypeService")
   val forwardingService = system.actorOf(ForwardingServiceActor.props(forwardingDao, timeout), name = "ForwardingService")
   val importService = system.actorOf(ImportServiceActor.props(importDao, timeout), name = "ImportService")
+
+  override def callAnonymizationService[R: ClassTag](message: Any) = anonymizationService.ask(message).mapTo[R]
 
 }
 

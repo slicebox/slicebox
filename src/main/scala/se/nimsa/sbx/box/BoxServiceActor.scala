@@ -26,6 +26,7 @@ import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.log.SbxLog
+import se.nimsa.sbx.storage.StorageService
 import se.nimsa.sbx.util.SequentialPipeToSupport
 import se.nimsa.sbx.util.SbxExtensions._
 
@@ -33,7 +34,7 @@ import scala.collection.mutable
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 
-class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String)(implicit val timeout: Timeout) extends Actor with Stash with PipeToSupport with SequentialPipeToSupport {
+class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storageService: StorageService)(implicit val timeout: Timeout) extends Actor with Stash with PipeToSupport with SequentialPipeToSupport {
 
   val log = Logging(context.system, this)
 
@@ -252,7 +253,7 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String)(implicit val timeout: 
   def maybeStartPushActor(box: Box): Unit = {
     val actorName = pushActorName(box)
     if (context.child(actorName).isEmpty)
-      context.actorOf(BoxPushActor.props(box, timeout), actorName)
+      context.actorOf(BoxPushActor.props(box, storageService, timeout), actorName)
   }
 
   def maybeStartPollActor(box: Box): Unit = {
@@ -302,5 +303,5 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String)(implicit val timeout: 
 }
 
 object BoxServiceActor {
-  def props(boxDao: BoxDAO, apiBaseURL: String, timeout: Timeout): Props = Props(new BoxServiceActor(boxDao, apiBaseURL)(timeout))
+  def props(boxDao: BoxDAO, apiBaseURL: String, storageService: StorageService, timeout: Timeout): Props = Props(new BoxServiceActor(boxDao, apiBaseURL, storageService)(timeout))
 }
