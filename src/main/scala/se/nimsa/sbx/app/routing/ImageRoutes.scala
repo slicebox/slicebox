@@ -173,7 +173,7 @@ trait ImageRoutes {
     val source = Source(SourceType.USER, apiUser.user, apiUser.id)
     val tmpPath = createTempPath()
 
-    val futureUpload = bytes.runWith(dicomDataSink(storage.fileSink(tmpPath), reverseAnonymizationQuery))
+    val futureUpload = bytes.runWith(dicomDataSink(storage.fileSink(tmpPath), reverseAnonymizationQuery, Contexts.extendedContexts))
 
     onSuccess(futureUpload) {
       case (_, maybeDataset) =>

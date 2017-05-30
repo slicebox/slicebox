@@ -13,6 +13,7 @@ import se.nimsa.dcm4che.streams.{DicomAttributesSink, DicomFlows, DicomParsing, 
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.AnonymizationKey
 import se.nimsa.sbx.anonymization.AnonymizationUtil.isEqual
 import se.nimsa.sbx.dicom.Contexts
+import se.nimsa.sbx.dicom.Contexts.Context
 import se.nimsa.sbx.dicom.DicomPropertyValue.{PatientID, PatientName}
 import se.nimsa.sbx.dicom.DicomUtil.{attributesToPatient, attributesToSeries, attributesToStudy}
 
@@ -99,14 +100,12 @@ object DicomStreams {
       Future.successful(part :: Nil)
   }
 
-  def dicomDataSink(storageSink: Sink[ByteString, Future[Done]], reverseAnonymizationQuery: (PatientName, PatientID) => Future[Seq[AnonymizationKey]])
+  def dicomDataSink(storageSink: Sink[ByteString, Future[Done]], reverseAnonymizationQuery: (PatientName, PatientID) => Future[Seq[AnonymizationKey]], contexts: Seq[Context])
                    (implicit ec: ExecutionContext, system: ActorSystem, materializer: ActorMaterializer, timeout: Timeout): Sink[ByteString, Future[(Option[Attributes], Option[Attributes])]] = {
 
     val dbAttributesSink = DicomAttributesSink.attributesSink
 
-    val validationContexts = Contexts.asNamePairs(Contexts.imageDataContexts).map { pair =>
-      ValidationContext(pair._1, pair._2)
-    }
+    val validationContexts = Contexts.asNamePairs(contexts).map(ValidationContext.tupled)
 
     Sink.fromGraph(GraphDSL.create(storageSink, dbAttributesSink)(Keep.right) { implicit builder =>
       (dicomFileSink, dbAttributesSink) =>
