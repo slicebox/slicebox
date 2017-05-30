@@ -121,8 +121,7 @@ class BoxPollActor(box: Box,
   def sendPollRequestToRemoteBox: Future[Option[OutgoingTransactionImage]] = {
     log.debug(s"Polling remote box ${box.name}")
     val uri = s"${box.baseUrl}/outgoing/poll"
-    val connectionId = s"poll-${box.id}"
-    sliceboxRequest(HttpMethods.GET, uri, HttpEntity.Empty, connectionId)
+    sliceboxRequest(HttpMethods.GET, uri, HttpEntity.Empty)
       .flatMap {
         case response if response.status == NotFound =>
           Future.successful(None)
@@ -158,7 +157,9 @@ class BoxPollActor(box: Box,
                       case TransactionStatus.FAILED =>
                         throw new RuntimeException("Invalid transaction")
                       case _ =>
-                        sendRemoteOutgoingFileCompleted(transactionImage).map(_ => {})
+                        sendRemoteOutgoingFileCompleted(transactionImage).map { _ =>
+                          system.eventStream.publish(ImageAdded(metaData.image, source, !metaData.imageAdded))
+                        }
                     }
                 }
               }
@@ -177,17 +178,15 @@ class BoxPollActor(box: Box,
   def getRemoteOutgoingFile(transactionImage: OutgoingTransactionImage): Future[HttpResponse] = {
     log.debug(s"Fetching remote outgoing image $transactionImage")
     val uri = s"${box.baseUrl}/outgoing?transactionid=${transactionImage.transaction.id}&imageid=${transactionImage.image.id}"
-    val connectionId = s"${transactionImage.transaction.id},${transactionImage.image.id}"
-    sliceboxRequest(HttpMethods.GET, uri, HttpEntity.Empty, connectionId)
+    sliceboxRequest(HttpMethods.GET, uri, HttpEntity.Empty)
   }
 
   def sendRemoteOutgoingFileCompleted(transactionImage: OutgoingTransactionImage): Future[HttpResponse] =
     Marshal(transactionImage).to[MessageEntity].flatMap { entity =>
       log.debug(s"Sending done for remote outgoing image $transactionImage")
       val uri = s"${box.baseUrl}/outgoing/done"
-      val connectionId = s"done-${box.id}"
       // We don't need to wait for done message to be sent since it is not critical that it is received by the remote box
-      sliceboxRequest(HttpMethods.POST, uri, entity, connectionId)
+      sliceboxRequest(HttpMethods.POST, uri, entity)
     }
 
   def signalFetchFileFailedTemporarily(transactionImage: OutgoingTransactionImage, exception: Exception): Future[Unit] =
@@ -206,11 +205,10 @@ class BoxPollActor(box: Box,
   def sendRemoteOutgoingFileFailed(failedTransactionImage: FailedOutgoingTransactionImage): Future[HttpResponse] =
     Marshal(failedTransactionImage).to[MessageEntity].flatMap { entity =>
       val uri = s"${box.baseUrl}/outgoing/failed"
-      val connectionId = s"failed-${box.id}"
-      sliceboxRequest(HttpMethods.POST, uri, entity, connectionId)
+      sliceboxRequest(HttpMethods.POST, uri, entity)
     }
 
-  protected def sliceboxRequest(method: HttpMethod, uri: String, entity: MessageEntity, connectionId: String): Future[HttpResponse] =
+  protected def sliceboxRequest(method: HttpMethod, uri: String, entity: MessageEntity): Future[HttpResponse] =
     Http().singleRequest(HttpRequest(method = method, uri = uri, entity = entity))
 
 }
