@@ -16,13 +16,15 @@
 
 package se.nimsa.sbx.directory
 
-import java.nio.file.{Files, Paths}
+import java.nio.file.{FileSystems, Files, Paths}
 
-import akka.actor.{Actor, Props, Stash}
+import akka.actor.{Actor, Props}
 import akka.event.{Logging, LoggingReceive}
 import akka.pattern.ask
-import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.FileIO
+import akka.stream.alpakka.file.DirectoryChange
+import akka.stream.alpakka.file.scaladsl.{Directory, DirectoryChangesSource}
+import akka.stream.scaladsl.{FileIO, Keep, Sink}
+import akka.stream.{ActorMaterializer, KillSwitches, UniqueKillSwitch}
 import akka.util.Timeout
 import org.dcm4che3.data.Attributes
 import org.dcm4che3.io.DicomStreamException
@@ -36,22 +38,18 @@ import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, MetaDataAdded}
 import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.storage.StorageService
 
+import scala.concurrent.duration.DurationInt
 import scala.reflect.ClassTag
 import scala.util.control.NonFatal
-import scala.util.{Failure, Success}
 
 class DirectoryWatchActor(watchedDirectory: WatchedDirectory,
                           storage: StorageService,
                           metaDataServicePath: String = "../../MetaDataService",
                           storageServicePath: String = "../../StorageService",
                           anonymizationServicePath: String = "../../AnonymizationService")
-                         (implicit val timeout: Timeout) extends Actor with Stash with AnonymizationServiceCalls {
+                         (implicit val timeout: Timeout) extends Actor with AnonymizationServiceCalls {
 
   val log = Logging(context.system, this)
-
-  val watchServiceTask = new DirectoryWatch(self)
-
-  val watchThread = new Thread(watchServiceTask, "WatchService")
 
   val storageService = context.actorSelection(storageServicePath)
   val metaDataService = context.actorSelection(metaDataServicePath)
@@ -61,55 +59,51 @@ class DirectoryWatchActor(watchedDirectory: WatchedDirectory,
   implicit val materializer = ActorMaterializer()
   implicit val executor = context.dispatcher
 
+  val sbxSource = Source(SourceType.DIRECTORY, watchedDirectory.name, watchedDirectory.id)
+
+  val fs = FileSystems.getDefault
+  val source = Directory.walk(fs.getPath(watchedDirectory.path)).map(path => (path, DirectoryChange.Creation))
+    .concat(DirectoryChangesSource(fs.getPath(watchedDirectory.path), pollInterval = 5.seconds, maxBufferSize = 100000))
+    .filter {
+      case (path, change) => change == DirectoryChange.Creation || change == DirectoryChange.Modification && Files.isRegularFile(path)
+    }
+    .mapAsync(5) {
+      case (path, _) =>
+        val tempPath = DicomStreams.createTempPath()
+        FileIO.fromPath(path).runWith(dicomDataSink(storage.fileSink(tempPath), reverseAnonymizationQuery)).flatMap {
+          case (_, maybeDataset) =>
+            val attributes: Attributes = maybeDataset.getOrElse(throw new DicomStreamException("DICOM data has no dataset"))
+            metaDataService.ask(AddMetaData(attributes, sbxSource)).mapTo[MetaDataAdded].flatMap { metaData =>
+              storageService.ask(MoveDicomData(tempPath, s"${metaData.image.id}")).map { _ =>
+                system.eventStream.publish(ImageAdded(metaData.image, sbxSource, !metaData.imageAdded))
+              }
+            }
+        }.recover {
+          case NonFatal(e) =>
+            SbxLog.error("Directory", s"Could not add file ${Paths.get(watchedDirectory.path).relativize(path)}: ${e.getMessage}")
+        }
+    }
+    .viaMat(KillSwitches.single)(Keep.right)
+    .toMat(Sink.last)(Keep.both)
+
+  var killSwitch: UniqueKillSwitch = _
+
   case object DicomDataProcessed
 
-  override def preStart() {
-    watchThread.setDaemon(true)
-    watchThread.start()
-    watchServiceTask watchRecursively Paths.get(watchedDirectory.path)
+  override def preStart(): Unit = {
+    val (switch, _) = source.run()
+    killSwitch = switch
   }
 
-  override def postStop() {
-    watchThread.interrupt()
+  override def postStop(): Unit = {
+    killSwitch.shutdown()
   }
 
   override def callAnonymizationService[R: ClassTag](message: Any) = anonymizationService.ask(message).mapTo[R]
 
   def receive = LoggingReceive {
-
-    case FileAddedToWatchedDirectory(path) =>
-      if (Files.isRegularFile(path)) {
-        val source = Source(SourceType.DIRECTORY, watchedDirectory.name, watchedDirectory.id)
-        val tempPath = DicomStreams.createTempPath()
-        val futureImport = FileIO.fromPath(path).runWith(dicomDataSink(storage.fileSink(tempPath), reverseAnonymizationQuery))
-
-        context.become(waitForDatasetProcessed)
-
-        futureImport.flatMap {
-          case (_, maybeDataset) =>
-            val attributes: Attributes = maybeDataset.getOrElse(throw new DicomStreamException("DICOM data has no dataset"))
-            metaDataService.ask(AddMetaData(attributes, source)).mapTo[MetaDataAdded].flatMap { metaData =>
-              storageService.ask(MoveDicomData(tempPath, s"${metaData.image.id}"))
-            }
-        }.onComplete {
-          case Success(_) =>
-            self ! DicomDataProcessed
-          case Failure(NonFatal(e)) =>
-            SbxLog.error("Directory", s"Could not add file ${Paths.get(watchedDirectory.path).relativize(path)}: ${e.getMessage}")
-            self ! DicomDataProcessed
-        }
-      }
-
+    case _ =>
   }
-
-  def waitForDatasetProcessed: Receive = LoggingReceive {
-    case _: FileAddedToWatchedDirectory =>
-      stash()
-    case DicomDataProcessed =>
-      context.unbecome()
-      unstashAll()
-  }
-
 }
 
 object DirectoryWatchActor {
