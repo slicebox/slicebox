@@ -5,7 +5,7 @@ import akka.actor.{Actor, ActorSystem, Props}
 import akka.http.scaladsl.model.StatusCodes.{InternalServerError, NoContent, ServiceUnavailable}
 import akka.http.scaladsl.model._
 import akka.stream.Materializer
-import akka.stream.scaladsl.{Flow, Source}
+import akka.stream.scaladsl.Source
 import akka.testkit.{ImplicitSender, TestKit}
 import akka.util.{ByteString, Timeout}
 import org.scalatest._
@@ -19,8 +19,8 @@ import se.nimsa.sbx.util.FutureUtil.await
 import se.nimsa.sbx.util.TestUtil
 
 import scala.collection.mutable.ArrayBuffer
+import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
-import scala.util.{Failure, Success, Try}
 
 class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
   with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {
@@ -75,28 +75,28 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
   val boxPushActorRef = system.actorOf(Props(new BoxPushActor(testBox, storage, 1000.hours, "../BoxService", "../MetaDataService", "../AnonymizationService") {
 
-    override val pool = Flow.fromFunction[(HttpRequest, String), (Try[HttpResponse], String)] {
-      case (request, id) =>
-        request.method match {
-          case HttpMethods.POST =>
-            capturedFileSendRequests += request
-            if (failedResponseSendIndices.contains(capturedFileSendRequests.size))
-              (Success(failResponse), id)
-            else if (noResponseSendIndices.contains(capturedFileSendRequests.size))
-              (Success(noResponse), id)
-            else
-              (Success(okResponse), id)
-          case HttpMethods.GET =>
-            if (reportTransactionAsFailed)
-              (Success(HttpResponse(entity = HttpEntity(TransactionStatus.FAILED.toString))), id)
-            else
-              (Success(HttpResponse(entity = HttpEntity(TransactionStatus.FINISHED.toString))), id)
-          case HttpMethods.PUT =>
-            capturedStatusUpdateRequests += request
-            (Success(HttpResponse(status = NoContent)), id)
-          case _ =>
-            (Failure(new IllegalArgumentException("Unsupported method")), "")
-        }
+    override def sliceboxRequest(method: HttpMethod, uri: String, entity: MessageEntity): Future[HttpResponse] = {
+      val request = HttpRequest(method = method, uri = uri, entity = entity)
+      request.method match {
+        case HttpMethods.POST =>
+          capturedFileSendRequests += request
+          if (failedResponseSendIndices.contains(capturedFileSendRequests.size))
+            Future.successful(failResponse)
+          else if (noResponseSendIndices.contains(capturedFileSendRequests.size))
+            Future.successful(noResponse)
+          else
+            Future.successful(okResponse)
+        case HttpMethods.GET =>
+          if (reportTransactionAsFailed)
+            Future.successful(HttpResponse(entity = HttpEntity(TransactionStatus.FAILED.toString)))
+          else
+            Future.successful(HttpResponse(entity = HttpEntity(TransactionStatus.FINISHED.toString)))
+        case HttpMethods.PUT =>
+          capturedStatusUpdateRequests += request
+          Future.successful(HttpResponse(status = NoContent))
+        case _ =>
+          Future.failed(new IllegalArgumentException("Unsupported method"))
+      }
     }
 
   }), name = "PushBox")

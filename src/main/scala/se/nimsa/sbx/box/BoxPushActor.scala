@@ -200,7 +200,7 @@ class BoxPushActor(box: Box,
       }
     }
 
-  private def sliceboxRequest(method: HttpMethod, uri: String, entity: RequestEntity): Future[HttpResponse] =
+  protected def sliceboxRequest(method: HttpMethod, uri: String, entity: RequestEntity): Future[HttpResponse] =
     Http().singleRequest(HttpRequest(method = method, uri = uri, entity = entity))
 }
 
