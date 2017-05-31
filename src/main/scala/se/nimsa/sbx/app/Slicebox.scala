@@ -137,7 +137,7 @@ trait SliceboxBase extends SliceboxRoutes with AnonymizationServiceCalls with Js
   val boxService = system.actorOf(BoxServiceActor.props(boxDao, apiBaseURL, storage, timeout), name = "BoxService")
   val scpService = system.actorOf(ScpServiceActor.props(scpDao, timeout), name = "ScpService")
   val scuService = system.actorOf(ScuServiceActor.props(scuDao, timeout), name = "ScuService")
-  val directoryService = system.actorOf(DirectoryWatchServiceActor.props(directoryWatchDao, timeout), name = "DirectoryService")
+  val directoryService = system.actorOf(DirectoryWatchServiceActor.props(storage, directoryWatchDao, timeout), name = "DirectoryService")
   val seriesTypeService = system.actorOf(SeriesTypeServiceActor.props(seriesTypeDao, timeout), name = "SeriesTypeService")
   val forwardingService = system.actorOf(ForwardingServiceActor.props(forwardingDao, timeout), name = "ForwardingService")
   val importService = system.actorOf(ImportServiceActor.props(importDao, timeout), name = "ImportService")
