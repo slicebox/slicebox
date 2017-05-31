@@ -23,16 +23,13 @@ import akka.http.scaladsl.server.directives.FileInfo
 import akka.pattern.ask
 import akka.stream.scaladsl.{Source => StreamSource}
 import akka.util.ByteString
-import org.dcm4che3.data.Attributes
 import org.dcm4che3.io.DicomStreamException
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
-import se.nimsa.sbx.dicom.streams.DicomStreams._
 import se.nimsa.sbx.importing.ImportProtocol._
 import se.nimsa.sbx.log.SbxLog
-import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, GetImage, MetaDataAdded}
-import se.nimsa.sbx.storage.StorageProtocol._
+import se.nimsa.sbx.metadata.MetaDataProtocol.GetImage
 import se.nimsa.sbx.user.UserProtocol.ApiUser
 
 import scala.concurrent.Future
@@ -104,21 +101,14 @@ trait ImportRoutes {
       case Some(importSession) =>
 
         val source = Source(SourceType.IMPORT, importSession.name, importSessionId)
-        val tempPath = createTempPath()
-
-        val futureImport = bytes.runWith(dicomDataSink(storage.fileSink(tempPath), reverseAnonymizationQuery))
+        val futureImport = storeData(bytes, source, storage)
 
         onComplete(futureImport) {
-          case Success((_, maybeDataset)) =>
-            val dataAttributes: Attributes = maybeDataset.getOrElse(throw new DicomStreamException("DICOM data has no dataset"))
-            onSuccess(metaDataService.ask(AddMetaData(dataAttributes, source)).mapTo[MetaDataAdded]) { metaData =>
-              onSuccess(importService.ask(AddImageToSession(importSession.id, metaData.image, !metaData.imageAdded)).mapTo[ImageAddedToSession]) { _ =>
-                onSuccess(storageService.ask(MoveDicomData(tempPath, s"${metaData.image.id}")).mapTo[DicomDataMoved]) { _ =>
-                  system.eventStream.publish(ImageAdded(metaData.image, source, !metaData.imageAdded))
-                  val httpStatus = if (metaData.imageAdded) Created else OK
-                  complete((httpStatus, metaData.image))
-                }
-              }
+          case Success(metaData) =>
+            onSuccess(importService.ask(AddImageToSession(importSession.id, metaData.image, !metaData.imageAdded)).mapTo[ImageAddedToSession]) { _ =>
+              system.eventStream.publish(ImageAdded(metaData.image, source, !metaData.imageAdded))
+              val httpStatus = if (metaData.imageAdded) Created else OK
+              complete((httpStatus, metaData.image))
             }
           case Failure(failure) =>
             val status = failure match {
