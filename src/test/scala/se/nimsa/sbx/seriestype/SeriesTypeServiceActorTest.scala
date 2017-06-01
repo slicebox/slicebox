@@ -31,7 +31,7 @@ class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
 
   val storage = new RuntimeStorage()
 
-  val seriesTypeService = system.actorOf(SeriesTypeServiceActor.props(storage, seriesTypeDao, 1.minute), name = "SeriesTypeService")
+  val seriesTypeService = system.actorOf(SeriesTypeServiceActor.props(seriesTypeDao, storage, 1.minute), name = "SeriesTypeService")
 
   override def beforeAll() = await(seriesTypeDao.create())
 

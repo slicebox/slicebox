@@ -29,7 +29,7 @@ import org.dcm4che3.net.pdu.PresentationContext
 import org.dcm4che3.net.service.{BasicCEchoSCP, BasicCStoreSCP, DicomServiceRegistry}
 import se.nimsa.dcm4che.streams.DicomParsing
 import se.nimsa.dcm4che.streams.DicomParts.{DicomAttribute, DicomHeader, DicomValueChunk}
-import se.nimsa.sbx.dicom.Contexts
+import se.nimsa.sbx.dicom.{Contexts, DicomUtil}
 import se.nimsa.sbx.scp.ScpProtocol.DicomDataReceivedByScp
 
 import scala.concurrent.Await
@@ -48,11 +48,11 @@ class Scp(val name: String,
       rsp.setInt(Tag.Status, VR.US, 0)
 
       val versionName = as.getRemoteImplVersionName
-      val tsuidBytes = ByteString(pc.getTransferSyntax.getBytes("US-ASCII"))
+      val tsuidBytes = DicomUtil.padToEvenLength(ByteString(pc.getTransferSyntax.getBytes("US-ASCII")))
       val cuidBytes = ByteString(rq.getBytes(Tag.AffectedSOPClassUID))
       val iuidBytes = ByteString(rq.getBytes(Tag.AffectedSOPInstanceUID))
-      val rivnBytes = ByteString(as.getRemoteImplVersionName.getBytes("US-ASCII"))
-      val raetBytes = ByteString(as.getRemoteAET.getBytes("US-ASCII"))
+      val rivnBytes = DicomUtil.padToEvenLength(ByteString(as.getRemoteImplVersionName.getBytes("US-ASCII")))
+      val raetBytes = DicomUtil.padToEvenLength(ByteString(as.getRemoteAET.getBytes("US-ASCII")))
 
       // val bigEndian = tsuid == UID.ExplicitVRBigEndianRetired
 
@@ -62,7 +62,7 @@ class Scp(val name: String,
       val fmiTransferSyntax = DicomAttribute(DicomHeader(Tag.TransferSyntaxUID, VR.UI, tsuidBytes.length, isFmi = true, bigEndian = false, explicitVR = true), Seq(DicomValueChunk(bigEndian = true, tsuidBytes, last = true)))
       val fmiImplementationUID = DicomAttribute(DicomHeader(Tag.ImplementationClassUID, VR.UI, rivnBytes.length, isFmi = true, bigEndian = false, explicitVR = true), Seq(DicomValueChunk(bigEndian = true, rivnBytes, last = true)))
       val fmiVersionName = if (versionName != null) {
-        val versionNameBytes = ByteString(versionName.getBytes("US-ASCII"))
+        val versionNameBytes = DicomUtil.padToEvenLength(ByteString(versionName.getBytes("US-ASCII")))
         DicomAttribute(DicomHeader(Tag.ImplementationVersionName, VR.SH, versionNameBytes.length, isFmi = true, bigEndian = false, explicitVR = true), Seq(DicomValueChunk(bigEndian = true, versionNameBytes, last = true)))
       } else
         DicomAttribute(DicomHeader(Tag.ImplementationVersionName, VR.SH, 0, isFmi = true, bigEndian = false, explicitVR = true, ByteString.empty), Seq(DicomValueChunk(bigEndian = true, ByteString.empty, last = true)))

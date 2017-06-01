@@ -12,7 +12,7 @@ import se.nimsa.dcm4che.streams.DicomParts.{DicomAttributes, DicomPart}
 import se.nimsa.dcm4che.streams.{DicomAttributesSink, DicomFlows, DicomParsing, DicomPartFlow}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.AnonymizationKey
 import se.nimsa.sbx.anonymization.AnonymizationUtil.isEqual
-import se.nimsa.sbx.dicom.Contexts
+import se.nimsa.sbx.dicom.{Contexts, DicomUtil}
 import se.nimsa.sbx.dicom.DicomPropertyValue.{PatientID, PatientName}
 import se.nimsa.sbx.dicom.DicomUtil.{attributesToPatient, attributesToSeries, attributesToStudy}
 
@@ -255,8 +255,8 @@ object DicomStreams {
     .via(DicomPartFlow.partFlow)
     .via(DicomFlows.modifyFlow(
       TagModification(Tag.TransferSyntaxUID, valueBytes => {
-        new String(valueBytes.toArray, "US-ASCII") match {
-          case UID.DeflatedExplicitVRLittleEndian => ByteString(UID.ExplicitVRLittleEndian.getBytes("US-ASCII"))
+        valueBytes.utf8String.trim match {
+          case UID.DeflatedExplicitVRLittleEndian => DicomUtil.padToEvenLength(ByteString(UID.ExplicitVRLittleEndian.getBytes("US-ASCII")))
           case _ => valueBytes
         }
       }, insert = false)))

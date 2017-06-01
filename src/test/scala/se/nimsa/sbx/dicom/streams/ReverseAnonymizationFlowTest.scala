@@ -35,7 +35,7 @@ class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymiza
     AnonymizationKeysPart(Seq(key), Some(key), Some(key), Some(key))
   }
 
-  private def toAsciiBytes(s: String) = ByteString(s.getBytes("US-ASCII"))
+  private def toAsciiBytes(s: String) = DicomUtil.padToEvenLength(ByteString(s.getBytes("US-ASCII")))
 
   def anonSource(dicomData: DicomData) = {
     val key = anonKeyPart(dicomData).patientKey.get

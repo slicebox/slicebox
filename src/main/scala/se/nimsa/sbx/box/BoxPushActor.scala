@@ -29,6 +29,7 @@ import se.nimsa.dcm4che.streams.DicomFlows.TagModification
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
+import se.nimsa.sbx.dicom.DicomUtil
 import se.nimsa.sbx.dicom.streams.StreamLoadOps
 import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.metadata.MetaDataProtocol.GetImage
@@ -126,8 +127,10 @@ class BoxPushActor(box: Box,
   def pushImagePipeline(transactionImage: OutgoingTransactionImage, tagValues: Seq[OutgoingTagValue]): Future[HttpResponse] =
     metaDataService.ask(GetImage(transactionImage.image.imageId)).mapTo[Option[Image]].flatMap {
       case Some(image) =>
-        val tagMods = tagValues.map(ttv =>
-          TagModification(ttv.tagValue.tag, _ => ByteString(ttv.tagValue.value.getBytes("US-ASCII")), insert = true))
+        val tagMods = tagValues.map { ttv =>
+          val tagBytes = DicomUtil.padToEvenLength(ByteString(ttv.tagValue.value.getBytes("US-ASCII")))
+          TagModification(ttv.tagValue.tag, _ => tagBytes, insert = true)
+        }
         val source = anonymizedData(image, tagMods, storage)
         val uri = s"${box.baseUrl}/image?transactionid=${transactionImage.transaction.id}&sequencenumber=${transactionImage.image.sequenceNumber}&totalimagecount=${transactionImage.transaction.totalImageCount}"
         sliceboxRequest(HttpMethods.POST, uri, HttpEntity(ContentTypes.`application/octet-stream`, source))

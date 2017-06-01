@@ -123,7 +123,7 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
       .expectHeader(Tag.StudyInstanceUID)
       .request(1)
       .expectNextChainingPF {
-        case v: DicomValueChunk if new String(v.bytes.toArray, "US-ASCII") != attributes.getString(Tag.StudyInstanceUID) => true
+        case v: DicomValueChunk if v.bytes.utf8String.trim != attributes.getString(Tag.StudyInstanceUID) => true
       }
       .expectHeader(Tag.SeriesInstanceUID)
       .expectValueChunk()

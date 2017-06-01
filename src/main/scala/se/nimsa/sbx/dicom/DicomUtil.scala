@@ -21,6 +21,7 @@ import java.io._
 import java.nio.file.{Files, Path}
 import javax.imageio.ImageIO
 
+import akka.util.ByteString
 import org.dcm4che3.data.Attributes.Visitor
 import org.dcm4che3.data.{Attributes, Keyword, Tag, VR}
 import org.dcm4che3.imageio.plugins.dcm.DicomImageReadParam
@@ -243,4 +244,8 @@ object DicomUtil {
     if (name == null) "" else name
   }
 
+  def padToEvenLength(bytes: ByteString): ByteString = {
+    val padding = if (bytes.length % 2 != 0) ByteString(0) else ByteString.empty
+    bytes ++ padding
+  }
 }

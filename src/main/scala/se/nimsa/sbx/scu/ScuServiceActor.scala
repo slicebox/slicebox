@@ -23,6 +23,7 @@ import akka.NotUsed
 import akka.actor.{Actor, Props}
 import akka.event.{Logging, LoggingReceive}
 import akka.pattern.{ask, pipe}
+import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Source
 import akka.util.Timeout
 import org.dcm4che3.net.{IncompatibleConnectionException, NoPresentationContextException}
@@ -44,8 +45,8 @@ import scala.language.postfixOps
 class ScuServiceActor(scuDao: ScuDAO, storage: StorageService)(implicit timeout: Timeout) extends Actor with ExceptionCatching {
   val log = Logging(context.system, this)
 
-  import context.system
-
+  implicit val system = context.system
+  implicit val materializer = ActorMaterializer()
   implicit val ec = context.dispatcher
 
   val metaDataService = context.actorSelection("../MetaDataService")

@@ -9,12 +9,13 @@ import org.dcm4che3.util.UIDUtils
 import se.nimsa.dcm4che.streams.{DicomFlows, DicomParsing}
 import se.nimsa.dcm4che.streams.DicomFlows.TagModification
 import se.nimsa.dcm4che.streams.DicomParts._
+import se.nimsa.sbx.dicom.DicomUtil
 
 import scala.util.Random
 
 object AnonymizationFlow {
 
-  private def toAsciiBytes(s: String) = ByteString(s.getBytes("US-ASCII"))
+  private def toAsciiBytes(s: String) = DicomUtil.padToEvenLength(ByteString(s.getBytes("US-ASCII")))
   private def insert(tag: Int, mod: ByteString => ByteString) = TagModification(tag, mod, insert = true)
   private def modify(tag: Int, mod: ByteString => ByteString) = TagModification(tag, mod, insert = false)
   private def clear(tag: Int) = TagModification(tag, _ => ByteString.empty, insert = false)
