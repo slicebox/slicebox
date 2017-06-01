@@ -59,7 +59,7 @@ trait SliceboxBase extends SliceboxRoutes with StreamOps with JsonFormats with P
 
   implicit def executor: ExecutionContextExecutor
 
-  implicit val timeout = {
+  implicit val timeout: Timeout = {
     val clientTimeout = appConfig.getDuration("akka.http.client.connecting-timeout", MILLISECONDS)
     val serverTimeout = appConfig.getDuration("akka.http.server.request-timeout", MILLISECONDS)
     Timeout(math.max(clientTimeout, serverTimeout) + 10, MILLISECONDS)
@@ -137,7 +137,7 @@ trait SliceboxBase extends SliceboxRoutes with StreamOps with JsonFormats with P
   }
   val boxService = system.actorOf(BoxServiceActor.props(boxDao, apiBaseURL, storage, timeout), name = "BoxService")
   val scpService = system.actorOf(ScpServiceActor.props(scpDao, storage, timeout), name = "ScpService")
-  val scuService = system.actorOf(ScuServiceActor.props(scuDao, timeout), name = "ScuService")
+  val scuService = system.actorOf(ScuServiceActor.props(scuDao, storage, timeout), name = "ScuService")
   val directoryService = system.actorOf(DirectoryWatchServiceActor.props(directoryWatchDao, storage, timeout), name = "DirectoryService")
   val seriesTypeService = system.actorOf(SeriesTypeServiceActor.props(seriesTypeDao, timeout), name = "SeriesTypeService")
   val forwardingService = system.actorOf(ForwardingServiceActor.props(forwardingDao, timeout), name = "ForwardingService")

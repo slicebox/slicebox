@@ -12,7 +12,6 @@ import se.nimsa.sbx.dicom.DicomHierarchy.Series
 import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, MetaDataAdded}
 import se.nimsa.sbx.metadata.{MetaDataDAO, MetaDataServiceActor, PropertiesDAO}
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
-import se.nimsa.sbx.storage.StorageProtocol.AddDicomData
 import se.nimsa.sbx.storage.{RuntimeStorage, StorageServiceActor}
 import se.nimsa.sbx.util.FutureUtil.await
 import se.nimsa.sbx.util.TestUtil
@@ -45,7 +44,7 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
 
   val storageService = system.actorOf(StorageServiceActor.props(storage), name = "StorageService")
   val metaDataService = system.actorOf(MetaDataServiceActor.props(metaDataDao, propertiesDao, timeout), name = "MetaDataService")
-  val seriesTypeService = system.actorOf(SeriesTypeServiceActor.props(seriesTypeDao, timeout), name = "SeriesTypeService")
+  val seriesTypeService = system.actorOf(SeriesTypeServiceActor.props(storage, seriesTypeDao, timeout), name = "SeriesTypeService")
   val seriesTypeUpdateService = system.actorSelection("user/SeriesTypeService/SeriesTypeUpdate")
 
   override def afterAll() = TestKit.shutdownActorSystem(system)
@@ -177,12 +176,10 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
     Await.result(
       metaDataService.ask(AddMetaData(dicomData.attributes, source))
         .mapTo[MetaDataAdded]
-        .flatMap { metaData =>
-          storageService.ask(AddDicomData(dicomData, source, metaData.image))
-        }.map { _ =>
-        val series = await(metaDataDao.series)
-        series.last
-      }, 30.seconds)
+        .map { metaData =>
+          storage.storeDicomData(dicomData, metaData.image)
+          metaData
+        }.map(_.series), 30.seconds)
   }
 
   def addSeriesType(): SeriesType =

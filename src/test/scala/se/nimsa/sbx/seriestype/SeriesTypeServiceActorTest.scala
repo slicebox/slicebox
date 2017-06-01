@@ -10,6 +10,7 @@ import se.nimsa.sbx.dicom.DicomHierarchy.Series
 import se.nimsa.sbx.metadata.MetaDataDAO
 import se.nimsa.sbx.metadata.MetaDataProtocol.MetaDataDeleted
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
+import se.nimsa.sbx.storage.RuntimeStorage
 import se.nimsa.sbx.util.FutureUtil.await
 import se.nimsa.sbx.util.TestUtil
 
@@ -28,7 +29,9 @@ class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
 
   val seriesTypeDao = new SeriesTypeDAO(dbConfig)
 
-  val seriesTypeService = system.actorOf(SeriesTypeServiceActor.props(seriesTypeDao, 1.minute), name = "SeriesTypeService")
+  val storage = new RuntimeStorage()
+
+  val seriesTypeService = system.actorOf(SeriesTypeServiceActor.props(storage, seriesTypeDao, 1.minute), name = "SeriesTypeService")
 
   override def beforeAll() = await(seriesTypeDao.create())
 

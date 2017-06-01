@@ -16,11 +16,11 @@
 
 package se.nimsa.sbx.seriestype
 
-import SeriesTypeProtocol._
+import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
 import se.nimsa.sbx.util.DbUtil.createTables
 import slick.basic.DatabaseConfig
 import slick.jdbc.JdbcProfile
-import slick.driver.H2Driver
+
 import scala.concurrent.{ExecutionContext, Future}
 
 class SeriesTypeDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionContext) {
