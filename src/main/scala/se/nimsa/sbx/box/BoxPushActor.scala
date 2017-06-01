@@ -30,7 +30,7 @@ import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.DicomUtil
-import se.nimsa.sbx.dicom.streams.StreamLoadOps
+import se.nimsa.sbx.dicom.streams.DicomStreamLoadOps
 import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.metadata.MetaDataProtocol.GetImage
 import se.nimsa.sbx.storage.StorageService
@@ -46,7 +46,7 @@ class BoxPushActor(box: Box,
                    boxServicePath: String = "../../BoxService",
                    metaDataServicePath: String = "../../MetaDataService",
                    anonymizationServicePath: String = "../../AnonymizationService")
-                  (implicit val timeout: Timeout) extends Actor with StreamLoadOps {
+                  (implicit val timeout: Timeout) extends Actor with DicomStreamLoadOps {
 
   val log = Logging(context.system, this)
 

@@ -28,7 +28,7 @@ import se.nimsa.sbx.anonymization.AnonymizationProtocol.ReverseAnonymization
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.dicom.DicomData
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
-import se.nimsa.sbx.dicom.streams.StreamOps
+import se.nimsa.sbx.dicom.streams.DicomStreamOps
 import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, MetaDataAdded}
 import se.nimsa.sbx.scp.ScpProtocol._
@@ -43,7 +43,7 @@ class ScpActor(scpData: ScpData, storage: StorageService, executor: Executor,
                metaDataServicePath: String = "../../MetaDataService",
                storageServicePath: String = "../../StorageService",
                anonymizationServicePath: String = "../../AnonymizationService")
-              (implicit val timeout: Timeout) extends Actor with StreamOps {
+              (implicit val timeout: Timeout) extends Actor with DicomStreamOps {
 
   val metaDataService = context.actorSelection(metaDataServicePath)
   val storageService = context.actorSelection(storageServicePath)

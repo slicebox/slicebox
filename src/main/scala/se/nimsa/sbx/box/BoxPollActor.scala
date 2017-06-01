@@ -30,7 +30,7 @@ import akka.util.Timeout
 import de.heikoseeberger.akkahttpplayjson.PlayJsonSupport
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.box.BoxProtocol._
-import se.nimsa.sbx.dicom.streams.StreamOps
+import se.nimsa.sbx.dicom.streams.DicomStreamOps
 import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.storage.StorageService
 
@@ -46,7 +46,7 @@ class BoxPollActor(box: Box,
                    metaDataServicePath: String = "../../MetaDataService",
                    storageServicePath: String = "../../StorageService",
                    anonymizationServicePath: String = "../../AnonymizationService")
-                  (implicit val timeout: Timeout) extends Actor with StreamOps with BoxJsonFormats with PlayJsonSupport {
+                  (implicit val timeout: Timeout) extends Actor with DicomStreamOps with BoxJsonFormats with PlayJsonSupport {
 
   val log = Logging(context.system, this)
 

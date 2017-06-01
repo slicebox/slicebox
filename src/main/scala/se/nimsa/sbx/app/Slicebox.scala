@@ -29,7 +29,7 @@ import de.heikoseeberger.akkahttpplayjson.PlayJsonSupport
 import se.nimsa.sbx.anonymization.{AnonymizationDAO, AnonymizationServiceActor}
 import se.nimsa.sbx.app.routing.SliceboxRoutes
 import se.nimsa.sbx.box.{BoxDAO, BoxServiceActor}
-import se.nimsa.sbx.dicom.streams.StreamOps
+import se.nimsa.sbx.dicom.streams.DicomStreamOps
 import se.nimsa.sbx.directory.{DirectoryWatchDAO, DirectoryWatchServiceActor}
 import se.nimsa.sbx.forwarding.{ForwardingDAO, ForwardingServiceActor}
 import se.nimsa.sbx.importing.{ImportDAO, ImportServiceActor}
@@ -48,7 +48,7 @@ import scala.concurrent.{Await, ExecutionContextExecutor}
 import scala.reflect.ClassTag
 import scala.util.{Failure, Success}
 
-trait SliceboxBase extends SliceboxRoutes with StreamOps with JsonFormats with PlayJsonSupport {
+trait SliceboxBase extends SliceboxRoutes with DicomStreamOps with JsonFormats with PlayJsonSupport {
 
   val appConfig: Config  = ConfigFactory.load()
   val sliceboxConfig = appConfig.getConfig("slicebox")

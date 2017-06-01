@@ -27,7 +27,7 @@ import akka.stream.scaladsl.{FileIO, Keep, Sink, Source => StreamSource}
 import akka.stream.{ActorMaterializer, KillSwitches, UniqueKillSwitch}
 import akka.util.Timeout
 import se.nimsa.sbx.app.GeneralProtocol._
-import se.nimsa.sbx.dicom.streams.StreamOps
+import se.nimsa.sbx.dicom.streams.DicomStreamOps
 import se.nimsa.sbx.directory.DirectoryWatchProtocol._
 import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.storage.StorageService
@@ -41,7 +41,7 @@ class DirectoryWatchActor(watchedDirectory: WatchedDirectory,
                           metaDataServicePath: String = "../../MetaDataService",
                           storageServicePath: String = "../../StorageService",
                           anonymizationServicePath: String = "../../AnonymizationService")
-                         (implicit val timeout: Timeout) extends Actor with StreamOps {
+                         (implicit val timeout: Timeout) extends Actor with DicomStreamOps {
 
   val storageService = context.actorSelection(storageServicePath)
   val metaDataService = context.actorSelection(metaDataServicePath)

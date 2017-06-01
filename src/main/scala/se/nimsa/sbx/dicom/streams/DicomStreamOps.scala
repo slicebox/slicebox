@@ -19,7 +19,7 @@ import se.nimsa.sbx.storage.StorageService
 import scala.concurrent.{ExecutionContext, Future}
 import scala.reflect.ClassTag
 
-trait StreamLoadOps {
+trait DicomStreamLoadOps {
 
   def callAnonymizationService[R: ClassTag](message: Any): Future[R]
 
@@ -36,7 +36,7 @@ trait StreamLoadOps {
     DicomStreams.anonymizedDicomDataSource(storage.fileSource(image), anonymizationQuery, anonymizationInsert, tagMods)
 }
 
-trait StreamOps extends StreamLoadOps {
+trait DicomStreamOps extends DicomStreamLoadOps {
 
   private def reverseAnonymizationQuery(implicit ec: ExecutionContext) = (patientName: PatientName, patientID: PatientID) =>
     callAnonymizationService[AnonymizationKeys](GetReverseAnonymizationKeysForPatient(patientName.value, patientID.value))
