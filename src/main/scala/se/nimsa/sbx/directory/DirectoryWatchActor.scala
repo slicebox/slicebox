@@ -42,14 +42,13 @@ class DirectoryWatchActor(watchedDirectory: WatchedDirectory,
                           metaDataServicePath: String = "../../MetaDataService",
                           storageServicePath: String = "../../StorageService",
                           anonymizationServicePath: String = "../../AnonymizationService")
-                         (implicit val timeout: Timeout) extends Actor with DicomStreamOps {
+                         (implicit val materializer: ActorMaterializer, timeout: Timeout) extends Actor with DicomStreamOps {
 
   val storageService = context.actorSelection(storageServicePath)
   val metaDataService = context.actorSelection(metaDataServicePath)
   val anonymizationService = context.actorSelection(anonymizationServicePath)
 
   implicit val system = context.system
-  implicit val materializer = ActorMaterializer()
   implicit val executor = context.dispatcher
 
   val sbxSource = Source(SourceType.DIRECTORY, watchedDirectory.name, watchedDirectory.id)
@@ -104,5 +103,5 @@ class DirectoryWatchActor(watchedDirectory: WatchedDirectory,
 }
 
 object DirectoryWatchActor {
-  def props(watchedDirectory: WatchedDirectory, storage: StorageService, timeout: Timeout): Props = Props(new DirectoryWatchActor(watchedDirectory, storage)(timeout))
+  def props(watchedDirectory: WatchedDirectory, storage: StorageService)(implicit materializer: ActorMaterializer, timeout: Timeout): Props = Props(new DirectoryWatchActor(watchedDirectory, storage))
 }

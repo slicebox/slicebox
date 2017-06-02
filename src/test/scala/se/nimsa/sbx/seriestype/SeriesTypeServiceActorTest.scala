@@ -2,9 +2,9 @@ package se.nimsa.sbx.seriestype
 
 import akka.actor.ActorSystem
 import akka.actor.Status.Failure
+import akka.stream.ActorMaterializer
 import akka.testkit.{ImplicitSender, TestKit}
 import akka.util.Timeout
-import akka.util.Timeout.durationToTimeout
 import org.scalatest._
 import se.nimsa.sbx.dicom.DicomHierarchy.Series
 import se.nimsa.sbx.metadata.MetaDataDAO
@@ -23,6 +23,7 @@ class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
 
   implicit val ec = system.dispatcher
   implicit val timeout = Timeout(30.seconds)
+  implicit val materializer = ActorMaterializer()
 
   val dbConfig = TestUtil.createTestDb("seriestypeserviceactortest")
   val dao = new MetaDataDAO(dbConfig)
@@ -31,7 +32,7 @@ class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
 
   val storage = new RuntimeStorage()
 
-  val seriesTypeService = system.actorOf(SeriesTypeServiceActor.props(seriesTypeDao, storage, 1.minute), name = "SeriesTypeService")
+  val seriesTypeService = system.actorOf(SeriesTypeServiceActor.props(seriesTypeDao, storage), name = "SeriesTypeService")
 
   override def beforeAll() = await(seriesTypeDao.create())
 

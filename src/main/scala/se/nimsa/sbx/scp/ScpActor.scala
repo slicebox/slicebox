@@ -43,14 +43,13 @@ class ScpActor(scpData: ScpData, storage: StorageService, executor: Executor,
                metaDataServicePath: String = "../../MetaDataService",
                storageServicePath: String = "../../StorageService",
                anonymizationServicePath: String = "../../AnonymizationService")
-              (implicit val timeout: Timeout) extends Actor with DicomStreamOps {
+              (implicit val materializer: ActorMaterializer, timeout: Timeout) extends Actor with DicomStreamOps {
 
   val metaDataService = context.actorSelection(metaDataServicePath)
   val storageService = context.actorSelection(storageServicePath)
   val anonymizationService = context.actorSelection(anonymizationServicePath)
 
   implicit val system = context.system
-  implicit val materializer= ActorMaterializer()
   implicit val ec = context.dispatcher
 
   val log = Logging(context.system, this)
@@ -109,5 +108,5 @@ class ScpActor(scpData: ScpData, storage: StorageService, executor: Executor,
 }
 
 object ScpActor {
-  def props(scpData: ScpData, storage: StorageService, executor: Executor, timeout: Timeout): Props = Props(new ScpActor(scpData, storage, executor)(timeout))
+  def props(scpData: ScpData, storage: StorageService, executor: Executor)(implicit materializer: ActorMaterializer, timeout: Timeout): Props = Props(new ScpActor(scpData, storage, executor))
 }

@@ -5,6 +5,7 @@ import akka.http.scaladsl.marshalling.Marshal
 import akka.http.scaladsl.model.ContentTypes._
 import akka.http.scaladsl.model.StatusCodes.{BadGateway, NoContent, NotFound, OK}
 import akka.http.scaladsl.model._
+import akka.stream.ActorMaterializer
 import akka.testkit.{ImplicitSender, TestKit}
 import akka.util.Timeout
 import de.heikoseeberger.akkahttpplayjson.PlayJsonSupport
@@ -32,6 +33,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
   implicit val ec = system.dispatcher
   implicit val timeout = Timeout(30.seconds)
+  implicit val materializer = ActorMaterializer()
 
   val dbConfig = TestUtil.createTestDb("bopollactortest")
   val db = dbConfig.db
@@ -60,8 +62,8 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
   }), name = "MetaDataService")
   val storageService = system.actorOf(Props[MockupStorageActor], name = "StorageService")
   val storage = new RuntimeStorage()
-  val anonymizationService = system.actorOf(AnonymizationServiceActor.props(anonymizationDao, purgeEmptyAnonymizationKeys = false, timeout), name = "AnonymizationService")
-  val boxService = system.actorOf(BoxServiceActor.props(boxDao, "http://testhost:1234", storage, 1.minute), name = "BoxService")
+  val anonymizationService = system.actorOf(AnonymizationServiceActor.props(anonymizationDao, purgeEmptyAnonymizationKeys = false), name = "AnonymizationService")
+  val boxService = system.actorOf(BoxServiceActor.props(boxDao, "http://testhost:1234", storage), name = "BoxService")
   val pollBoxActorRef = system.actorOf(Props(new BoxPollActor(remoteBox, storage, 1.hour, "../BoxService", "../MetaDataService", "../StorageService", "../AnonymizationService") {
 
     override def sliceboxRequest(method: HttpMethod, uri: String, entity: MessageEntity): Future[HttpResponse] = {

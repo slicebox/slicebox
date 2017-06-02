@@ -126,22 +126,22 @@ trait SliceboxBase extends SliceboxRoutes with DicomStreamOps with JsonFormats w
 
   val userService = {
     val sessionTimeout = sliceboxConfig.getDuration("session-timeout", MILLISECONDS)
-    system.actorOf(UserServiceActor.props(userDao, superUser, superPassword, sessionTimeout, timeout), name = "UserService")
+    system.actorOf(UserServiceActor.props(userDao, superUser, superPassword, sessionTimeout), name = "UserService")
   }
   val logService = system.actorOf(LogServiceActor.props(logDao), name = "LogService")
-  val metaDataService = system.actorOf(MetaDataServiceActor.props(metaDataDao, propertiesDao, timeout), name = "MetaDataService")
+  val metaDataService = system.actorOf(MetaDataServiceActor.props(metaDataDao, propertiesDao), name = "MetaDataService")
   val storageService = system.actorOf(StorageServiceActor.props(storage), name = "StorageService")
   val anonymizationService = {
     val purgeEmptyAnonymizationKeys = sliceboxConfig.getBoolean("anonymization.purge-empty-keys")
-    system.actorOf(AnonymizationServiceActor.props(anonymizationDao, purgeEmptyAnonymizationKeys, timeout), name = "AnonymizationService")
+    system.actorOf(AnonymizationServiceActor.props(anonymizationDao, purgeEmptyAnonymizationKeys), name = "AnonymizationService")
   }
-  val boxService = system.actorOf(BoxServiceActor.props(boxDao, apiBaseURL, storage, timeout), name = "BoxService")
-  val scpService = system.actorOf(ScpServiceActor.props(scpDao, storage, timeout), name = "ScpService")
-  val scuService = system.actorOf(ScuServiceActor.props(scuDao, storage, timeout), name = "ScuService")
-  val directoryService = system.actorOf(DirectoryWatchServiceActor.props(directoryWatchDao, storage, timeout), name = "DirectoryService")
-  val seriesTypeService = system.actorOf(SeriesTypeServiceActor.props(seriesTypeDao, storage, timeout), name = "SeriesTypeService")
-  val forwardingService = system.actorOf(ForwardingServiceActor.props(forwardingDao, timeout), name = "ForwardingService")
-  val importService = system.actorOf(ImportServiceActor.props(importDao, timeout), name = "ImportService")
+  val boxService = system.actorOf(BoxServiceActor.props(boxDao, apiBaseURL, storage), name = "BoxService")
+  val scpService = system.actorOf(ScpServiceActor.props(scpDao, storage), name = "ScpService")
+  val scuService = system.actorOf(ScuServiceActor.props(scuDao, storage), name = "ScuService")
+  val directoryService = system.actorOf(DirectoryWatchServiceActor.props(directoryWatchDao, storage), name = "DirectoryService")
+  val seriesTypeService = system.actorOf(SeriesTypeServiceActor.props(seriesTypeDao, storage), name = "SeriesTypeService")
+  val forwardingService = system.actorOf(ForwardingServiceActor.props(forwardingDao), name = "ForwardingService")
+  val importService = system.actorOf(ImportServiceActor.props(importDao), name = "ImportService")
 
   override def callAnonymizationService[R: ClassTag](message: Any) = anonymizationService.ask(message).mapTo[R]
   override def callStorageService[R: ClassTag](message: Any) = storageService.ask(message).mapTo[R]
