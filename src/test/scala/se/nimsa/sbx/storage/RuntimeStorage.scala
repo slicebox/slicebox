@@ -26,8 +26,9 @@ class RuntimeStorage extends StorageService {
     overwrite
   }
 
-  override def deleteFromStorage(image: Image): Unit =
-    storage.remove(imageName(image))
+  override def deleteFromStorage(name: String): Unit = storage.remove(name)
+
+  override def deleteFromStorage(image: Image): Unit = deleteFromStorage(imageName(image))
 
   override def readDicomData(image: Image, withPixelData: Boolean): DicomData =
     loadDicomData(storage.getOrElse(imageName(image), null).toArray, withPixelData)

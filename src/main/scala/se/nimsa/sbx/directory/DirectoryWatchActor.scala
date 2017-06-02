@@ -33,7 +33,7 @@ import se.nimsa.sbx.directory.DirectoryWatchProtocol._
 import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.storage.StorageService
 
-import scala.concurrent.duration.DurationInt
+import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.reflect.ClassTag
 import scala.util.control.NonFatal
 
@@ -97,6 +97,7 @@ class DirectoryWatchActor(watchedDirectory: WatchedDirectory,
   override def callAnonymizationService[R: ClassTag](message: Any) = anonymizationService.ask(message).mapTo[R]
   override def callStorageService[R: ClassTag](message: Any) = storageService.ask(message).mapTo[R]
   override def callMetaDataService[R: ClassTag](message: Any) = metaDataService.ask(message).mapTo[R]
+  override def scheduleTask(delay: FiniteDuration)(task: => Unit) = system.scheduler.scheduleOnce(delay)(task)
 
   def receive = LoggingReceive {
     case _ =>

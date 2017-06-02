@@ -48,6 +48,8 @@ trait StorageService {
 
   def imageName(image: Image) = image.id.toString
 
+  def deleteFromStorage(name: String): Unit
+
   def deleteFromStorage(images: Seq[Image]): Unit = images foreach deleteFromStorage
 
   def deleteFromStorage(image: Image): Unit
