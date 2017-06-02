@@ -35,18 +35,18 @@ class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymiza
     AnonymizationKeysPart(Seq(key), Some(key), Some(key), Some(key))
   }
 
-  private def toAsciiBytes(s: String) = ByteString(s.getBytes("US-ASCII"))
+  private def toAsciiBytes(s: String, vr: VR) = DicomUtil.padToEvenLength(ByteString(s.getBytes("US-ASCII")), vr)
 
   def anonSource(dicomData: DicomData) = {
     val key = anonKeyPart(dicomData).patientKey.get
     attributesSource(dicomData)
       .via(AnonymizationFlow.anonFlow)
       .via(DicomFlows.modifyFlow(
-        TagModification(Tag.PatientName, _ => toAsciiBytes(key.anonPatientName), insert = false),
-        TagModification(Tag.PatientID, _ => toAsciiBytes(key.anonPatientID), insert = false),
-        TagModification(Tag.StudyInstanceUID, _ => toAsciiBytes(key.anonStudyInstanceUID), insert = false),
-        TagModification(Tag.SeriesInstanceUID, _ => toAsciiBytes(key.anonSeriesInstanceUID), insert = false),
-        TagModification(Tag.FrameOfReferenceUID, _ => toAsciiBytes(key.anonFrameOfReferenceUID), insert = false)
+        TagModification(Tag.PatientName, _ => toAsciiBytes(key.anonPatientName, VR.PN), insert = false),
+        TagModification(Tag.PatientID, _ => toAsciiBytes(key.anonPatientID, VR.LO), insert = false),
+        TagModification(Tag.StudyInstanceUID, _ => toAsciiBytes(key.anonStudyInstanceUID, VR.UI), insert = false),
+        TagModification(Tag.SeriesInstanceUID, _ => toAsciiBytes(key.anonSeriesInstanceUID, VR.UI), insert = false),
+        TagModification(Tag.FrameOfReferenceUID, _ => toAsciiBytes(key.anonFrameOfReferenceUID, VR.UI), insert = false)
       ))
   }
 

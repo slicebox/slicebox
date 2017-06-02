@@ -28,7 +28,7 @@ import se.nimsa.sbx.util.FutureUtil.await
 
 import scala.language.postfixOps
 
-class DirectoryWatchServiceActor(storage: StorageService, directoryWatchDao: DirectoryWatchDAO)(implicit timeout: Timeout) extends Actor with ExceptionCatching {
+class DirectoryWatchServiceActor(directoryWatchDao: DirectoryWatchDAO, storage: StorageService)(implicit timeout: Timeout) extends Actor with ExceptionCatching {
   val log = Logging(context.system, this)
 
   setupWatches()
@@ -114,5 +114,5 @@ class DirectoryWatchServiceActor(storage: StorageService, directoryWatchDao: Dir
 }
 
 object DirectoryWatchServiceActor {
-  def props(storage: StorageService, directoryWatchDao: DirectoryWatchDAO, timeout: Timeout): Props = Props(new DirectoryWatchServiceActor(storage, directoryWatchDao)(timeout))
+  def props(directoryWatchDao: DirectoryWatchDAO, storage: StorageService, timeout: Timeout): Props = Props(new DirectoryWatchServiceActor(directoryWatchDao, storage)(timeout))
 }

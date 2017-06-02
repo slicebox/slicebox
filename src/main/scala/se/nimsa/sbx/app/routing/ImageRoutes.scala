@@ -29,13 +29,10 @@ import akka.pattern.ask
 import akka.stream.scaladsl.{Sink, SourceQueueWithComplete, Source => StreamSource}
 import akka.stream.{OverflowStrategy, QueueOfferResult}
 import akka.util.ByteString
-import org.dcm4che3.data.Attributes
-import org.dcm4che3.io.DicomStreamException
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.dicom.DicomHierarchy.{FlatSeries, Image, Patient, Study}
 import se.nimsa.sbx.dicom._
-import se.nimsa.sbx.dicom.streams.DicomStreams._
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.user.UserProtocol.ApiUser
@@ -168,23 +165,14 @@ trait ImageRoutes {
       }
     }
 
-  private def addDicomDataRoute(bytes: StreamSource[ByteString, Any], apiUser: ApiUser): Route = {
-
+  private def addDicomDataRoute(bytes: StreamSource[ByteString, _], apiUser: ApiUser): Route = {
     val source = Source(SourceType.USER, apiUser.user, apiUser.id)
-    val tmpPath = createTempPath()
+    val futureUpload = storeData(bytes, source, storage, Contexts.extendedContexts)
 
-    val futureUpload = bytes.runWith(dicomDataSink(storage.fileSink(tmpPath), reverseAnonymizationQuery, Contexts.extendedContexts))
-
-    onSuccess(futureUpload) {
-      case (_, maybeDataset) =>
-        val attributes: Attributes = maybeDataset.getOrElse(throw new DicomStreamException("DICOM data has no dataset"))
-        onSuccess(metaDataService.ask(AddMetaData(attributes, source)).mapTo[MetaDataAdded]) { metaData =>
-          onSuccess(storageService.ask(MoveDicomData(tmpPath, s"${metaData.image.id}")).mapTo[DicomDataMoved]) { _ =>
-            system.eventStream.publish(ImageAdded(metaData.image, source, !metaData.imageAdded))
-            val httpStatus = if (metaData.imageAdded) Created else OK
-            complete((httpStatus, metaData.image))
-          }
-        }
+    onSuccess(futureUpload) { metaData =>
+      system.eventStream.publish(ImageAdded(metaData.image, source, !metaData.imageAdded))
+      val httpStatus = if (metaData.imageAdded) Created else OK
+      complete((httpStatus, metaData.image))
     }
   }
 

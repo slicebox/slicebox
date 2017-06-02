@@ -26,7 +26,7 @@ import se.nimsa.sbx.storage.StorageService
 import se.nimsa.sbx.util.ExceptionCatching
 import se.nimsa.sbx.util.FutureUtil.await
 
-class SeriesTypeServiceActor(storage: StorageService, seriesTypeDao: SeriesTypeDAO)(implicit timeout: Timeout) extends Actor with ExceptionCatching {
+class SeriesTypeServiceActor(seriesTypeDao: SeriesTypeDAO, storage: StorageService)(implicit timeout: Timeout) extends Actor with ExceptionCatching {
 
   val log = Logging(context.system, this)
 
@@ -190,5 +190,5 @@ class SeriesTypeServiceActor(storage: StorageService, seriesTypeDao: SeriesTypeD
 }
 
 object SeriesTypeServiceActor {
-  def props(storage: StorageService, seriesTypeDao: SeriesTypeDAO, timeout: Timeout): Props = Props(new SeriesTypeServiceActor(storage, seriesTypeDao)(timeout))
+  def props(seriesTypeDao: SeriesTypeDAO, storage: StorageService, timeout: Timeout): Props = Props(new SeriesTypeServiceActor(seriesTypeDao, storage)(timeout))
 }

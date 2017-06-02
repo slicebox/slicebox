@@ -23,18 +23,14 @@ import akka.http.scaladsl.server.Route
 import akka.pattern.ask
 import akka.stream.scaladsl.Compression
 import akka.util.ByteString
-import org.dcm4che3.data.Attributes
-import org.dcm4che3.io.DicomStreamException
 import se.nimsa.dcm4che.streams.DicomFlows.TagModification
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.dicom.Contexts
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
-import se.nimsa.sbx.dicom.streams.DicomStreams
-import se.nimsa.sbx.dicom.streams.DicomStreams.{createTempPath, dicomDataSink}
-import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, GetImage, MetaDataAdded}
-import se.nimsa.sbx.storage.StorageProtocol._
+import se.nimsa.sbx.dicom.DicomUtil
+import se.nimsa.sbx.metadata.MetaDataProtocol.GetImage
 
 trait TransactionRoutes {
   this: SliceboxBase =>
@@ -50,26 +46,14 @@ trait TransactionRoutes {
               post {
                 extractDataBytes { compressedBytes =>
                   val source = Source(SourceType.BOX, box.name, box.id)
-                  val tmpPath = createTempPath()
-
-                  val futureStored = compressedBytes
-                    .via(Compression.inflate())
-                    .runWith(dicomDataSink(storage.fileSink(tmpPath), reverseAnonymizationQuery, Contexts.extendedContexts))
-
-                  onSuccess(futureStored) {
-                    case (maybeFmi, maybeDataset) =>
-                      val attributes: Attributes = maybeDataset.getOrElse(throw new DicomStreamException("DICOM data has no dataset"))
-                      onSuccess(metaDataService.ask(AddMetaData(attributes, source)).mapTo[MetaDataAdded]) { metaData =>
-                        onSuccess(storageService.ask(MoveDicomData(tmpPath, s"${metaData.image.id}")).mapTo[DicomDataMoved]) { _ =>
-                          onSuccess(boxService.ask(UpdateIncoming(box, outgoingTransactionId, sequenceNumber, totalImageCount, metaData.image.id, metaData.imageAdded))) {
-                            case IncomingUpdated(transaction) =>
-                              transaction.status match {
-                                case TransactionStatus.FAILED => complete(InternalServerError)
-                                case _ => complete(NoContent)
-                              }
-                          }
+                  onSuccess(storeData(compressedBytes.via(Compression.inflate()), source, storage, Contexts.extendedContexts)) { metaData =>
+                    onSuccess(boxService.ask(UpdateIncoming(box, outgoingTransactionId, sequenceNumber, totalImageCount, metaData.image.id, metaData.imageAdded))) {
+                      case IncomingUpdated(transaction) =>
+                        transaction.status match {
+                          case TransactionStatus.FAILED => complete(InternalServerError)
+                          case _ => complete(NoContent)
                         }
-                      }
+                    }
                   }
                 }
               }
@@ -126,11 +110,13 @@ trait TransactionRoutes {
                     case Some(transactionImage) =>
                       val imageId = transactionImage.image.imageId
                       onSuccess(boxService.ask(GetOutgoingTagValues(transactionImage)).mapTo[Seq[OutgoingTagValue]]) { transactionTagValues =>
-                        val tagMods = transactionTagValues.map(ttv =>
-                          TagModification(ttv.tagValue.tag, _ => ByteString(ttv.tagValue.value.getBytes("US-ASCII")), insert = true))
+                        val tagMods = transactionTagValues.map { ttv =>
+                          val tagBytes = DicomUtil.padToEvenLength(ByteString(ttv.tagValue.value.getBytes("US-ASCII")), ttv.tagValue.tag)
+                          TagModification(ttv.tagValue.tag, _ => tagBytes, insert = true)
+                        }
                         onSuccess(metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]]) {
                           case Some(image) =>
-                            val streamSource = DicomStreams.anonymizedDicomDataSource(storage.fileSource(image), anonymizationQuery, anonymizationInsert, tagMods)
+                            val streamSource = anonymizedData(image, tagMods, storage)
                             complete(HttpEntity(ContentTypes.`application/octet-stream`, streamSource))
                           case None =>
                             complete((NotFound, s"Image not found for image id $imageId"))

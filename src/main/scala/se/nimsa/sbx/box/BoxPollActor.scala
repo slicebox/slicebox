@@ -28,16 +28,11 @@ import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Compression
 import akka.util.Timeout
 import de.heikoseeberger.akkahttpplayjson.PlayJsonSupport
-import org.dcm4che3.data.Attributes
-import org.dcm4che3.io.DicomStreamException
-import se.nimsa.sbx.anonymization.AnonymizationServiceCalls
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.dicom.Contexts
-import se.nimsa.sbx.dicom.streams.DicomStreams
+import se.nimsa.sbx.dicom.streams.DicomStreamOps
 import se.nimsa.sbx.log.SbxLog
-import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, MetaDataAdded}
-import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.storage.StorageService
 
 import scala.concurrent.Future
@@ -52,7 +47,7 @@ class BoxPollActor(box: Box,
                    metaDataServicePath: String = "../../MetaDataService",
                    storageServicePath: String = "../../StorageService",
                    anonymizationServicePath: String = "../../AnonymizationService")
-                  (implicit val timeout: Timeout) extends Actor with AnonymizationServiceCalls with BoxJsonFormats with PlayJsonSupport {
+                  (implicit val timeout: Timeout) extends Actor with DicomStreamOps with BoxJsonFormats with PlayJsonSupport {
 
   val log = Logging(context.system, this)
 
@@ -73,6 +68,8 @@ class BoxPollActor(box: Box,
     poller.cancel()
 
   override def callAnonymizationService[R: ClassTag](message: Any) = anonymizationService.ask(message).mapTo[R]
+  override def callStorageService[R: ClassTag](message: Any) = storageService.ask(message).mapTo[R]
+  override def callMetaDataService[R: ClassTag](message: Any) = metaDataService.ask(message).mapTo[R]
 
   def receive = LoggingReceive {
     case PollIncoming =>
@@ -143,28 +140,18 @@ class BoxPollActor(box: Box,
       val statusCode = response.status.intValue
       if (statusCode >= 200 && statusCode < 300) {
         val source = Source(SourceType.BOX, box.name, box.id)
-        val tempPath = DicomStreams.createTempPath()
-        val sink = DicomStreams.dicomDataSink(storage.fileSink(tempPath), reverseAnonymizationQuery, Contexts.extendedContexts)
-        response.entity.dataBytes
-          .via(Compression.inflate())
-          .runWith(sink).flatMap {
-          case (_, maybeDataset) =>
-            val attributes: Attributes = maybeDataset.getOrElse(throw new DicomStreamException("DICOM data has no dataset"))
-            metaDataService.ask(AddMetaData(attributes, source)).mapTo[MetaDataAdded].flatMap { metaData =>
-              storageService.ask(MoveDicomData(tempPath, s"${metaData.image.id}")).mapTo[DicomDataMoved].flatMap { _ =>
-                boxService.ask(UpdateIncoming(box, transactionImage.transaction.id, transactionImage.image.sequenceNumber, transactionImage.transaction.totalImageCount, metaData.image.id, metaData.imageAdded)).flatMap {
-                  case IncomingUpdated(transaction) =>
-                    transaction.status match {
-                      case TransactionStatus.FAILED =>
-                        throw new RuntimeException("Invalid transaction")
-                      case _ =>
-                        sendRemoteOutgoingFileCompleted(transactionImage).map { _ =>
-                          system.eventStream.publish(ImageAdded(metaData.image, source, !metaData.imageAdded))
-                        }
-                    }
-                }
+        storeData(response.entity.dataBytes.via(Compression.inflate()), source, storage, Contexts.extendedContexts).flatMap { metaData =>
+          boxService.ask(UpdateIncoming(box, transactionImage.transaction.id, transactionImage.image.sequenceNumber, transactionImage.transaction.totalImageCount, metaData.image.id, metaData.imageAdded)).flatMap {
+            case IncomingUpdated(transaction) =>
+              transaction.status match {
+                case TransactionStatus.FAILED =>
+                  throw new RuntimeException("Invalid transaction")
+                case _ =>
+                  sendRemoteOutgoingFileCompleted(transactionImage).map { _ =>
+                    system.eventStream.publish(ImageAdded(metaData.image, source, !metaData.imageAdded))
+                  }
               }
-            }
+          }
         }.recoverWith {
           case e: Exception =>
             signalFetchFileFailedPermanently(transactionImage, e)

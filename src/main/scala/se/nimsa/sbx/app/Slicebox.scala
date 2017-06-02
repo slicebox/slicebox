@@ -26,9 +26,10 @@ import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import com.typesafe.config.{Config, ConfigFactory}
 import de.heikoseeberger.akkahttpplayjson.PlayJsonSupport
-import se.nimsa.sbx.anonymization.{AnonymizationDAO, AnonymizationServiceActor, AnonymizationServiceCalls}
+import se.nimsa.sbx.anonymization.{AnonymizationDAO, AnonymizationServiceActor}
 import se.nimsa.sbx.app.routing.SliceboxRoutes
 import se.nimsa.sbx.box.{BoxDAO, BoxServiceActor}
+import se.nimsa.sbx.dicom.streams.DicomStreamOps
 import se.nimsa.sbx.directory.{DirectoryWatchDAO, DirectoryWatchServiceActor}
 import se.nimsa.sbx.forwarding.{ForwardingDAO, ForwardingServiceActor}
 import se.nimsa.sbx.importing.{ImportDAO, ImportServiceActor}
@@ -47,7 +48,7 @@ import scala.concurrent.{Await, ExecutionContextExecutor}
 import scala.reflect.ClassTag
 import scala.util.{Failure, Success}
 
-trait SliceboxBase extends SliceboxRoutes with AnonymizationServiceCalls with JsonFormats with PlayJsonSupport {
+trait SliceboxBase extends SliceboxRoutes with DicomStreamOps with JsonFormats with PlayJsonSupport {
 
   val appConfig: Config  = ConfigFactory.load()
   val sliceboxConfig = appConfig.getConfig("slicebox")
@@ -58,7 +59,7 @@ trait SliceboxBase extends SliceboxRoutes with AnonymizationServiceCalls with Js
 
   implicit def executor: ExecutionContextExecutor
 
-  implicit val timeout = {
+  implicit val timeout: Timeout = {
     val clientTimeout = appConfig.getDuration("akka.http.client.connecting-timeout", MILLISECONDS)
     val serverTimeout = appConfig.getDuration("akka.http.server.request-timeout", MILLISECONDS)
     Timeout(math.max(clientTimeout, serverTimeout) + 10, MILLISECONDS)
@@ -135,14 +136,16 @@ trait SliceboxBase extends SliceboxRoutes with AnonymizationServiceCalls with Js
     system.actorOf(AnonymizationServiceActor.props(anonymizationDao, purgeEmptyAnonymizationKeys, timeout), name = "AnonymizationService")
   }
   val boxService = system.actorOf(BoxServiceActor.props(boxDao, apiBaseURL, storage, timeout), name = "BoxService")
-  val scpService = system.actorOf(ScpServiceActor.props(scpDao, timeout), name = "ScpService")
-  val scuService = system.actorOf(ScuServiceActor.props(scuDao, timeout), name = "ScuService")
-  val directoryService = system.actorOf(DirectoryWatchServiceActor.props(storage, directoryWatchDao, timeout), name = "DirectoryService")
-  val seriesTypeService = system.actorOf(SeriesTypeServiceActor.props(storage, seriesTypeDao, timeout), name = "SeriesTypeService")
+  val scpService = system.actorOf(ScpServiceActor.props(scpDao, storage, timeout), name = "ScpService")
+  val scuService = system.actorOf(ScuServiceActor.props(scuDao, storage, timeout), name = "ScuService")
+  val directoryService = system.actorOf(DirectoryWatchServiceActor.props(directoryWatchDao, storage, timeout), name = "DirectoryService")
+  val seriesTypeService = system.actorOf(SeriesTypeServiceActor.props(seriesTypeDao, storage, timeout), name = "SeriesTypeService")
   val forwardingService = system.actorOf(ForwardingServiceActor.props(forwardingDao, timeout), name = "ForwardingService")
   val importService = system.actorOf(ImportServiceActor.props(importDao, timeout), name = "ImportService")
 
   override def callAnonymizationService[R: ClassTag](message: Any) = anonymizationService.ask(message).mapTo[R]
+  override def callStorageService[R: ClassTag](message: Any) = storageService.ask(message).mapTo[R]
+  override def callMetaDataService[R: ClassTag](message: Any) = metaDataService.ask(message).mapTo[R]
 
 }
 

@@ -5,14 +5,14 @@ import akka.stream.scaladsl.{Broadcast, Compression, Flow, GraphDSL, Keep, Merge
 import akka.stream.{ActorMaterializer, FlowShape, SinkShape}
 import akka.util.{ByteString, Timeout}
 import akka.{Done, NotUsed}
-import org.dcm4che3.data.{Attributes, Tag, UID}
+import org.dcm4che3.data.{Attributes, Tag, UID, VR}
 import se.nimsa.dcm4che.streams.DicomFlows._
 import se.nimsa.dcm4che.streams.DicomPartFlow.partFlow
 import se.nimsa.dcm4che.streams.DicomParts.{DicomAttributes, DicomPart}
 import se.nimsa.dcm4che.streams.{DicomAttributesSink, DicomFlows, DicomParsing, DicomPartFlow}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.AnonymizationKey
 import se.nimsa.sbx.anonymization.AnonymizationUtil.isEqual
-import se.nimsa.sbx.dicom.Contexts
+import se.nimsa.sbx.dicom.{Contexts, DicomUtil}
 import se.nimsa.sbx.dicom.Contexts.Context
 import se.nimsa.sbx.dicom.DicomPropertyValue.{PatientID, PatientName}
 import se.nimsa.sbx.dicom.DicomUtil.{attributesToPatient, attributesToSeries, attributesToStudy}
@@ -254,8 +254,8 @@ object DicomStreams {
     .via(DicomPartFlow.partFlow)
     .via(DicomFlows.modifyFlow(
       TagModification(Tag.TransferSyntaxUID, valueBytes => {
-        new String(valueBytes.toArray, "US-ASCII") match {
-          case UID.DeflatedExplicitVRLittleEndian => ByteString(UID.ExplicitVRLittleEndian.getBytes("US-ASCII"))
+        valueBytes.utf8String.trim match {
+          case UID.DeflatedExplicitVRLittleEndian => DicomUtil.padToEvenLength(ByteString(UID.ExplicitVRLittleEndian.getBytes("US-ASCII")), VR.UI)
           case _ => valueBytes
         }
       }, insert = false)))

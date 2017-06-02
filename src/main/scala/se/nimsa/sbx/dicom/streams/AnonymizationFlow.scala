@@ -4,17 +4,18 @@ import java.util.UUID
 
 import akka.stream.scaladsl.Flow
 import akka.util.ByteString
-import org.dcm4che3.data.Tag
+import org.dcm4che3.data.{Tag, VR}
 import org.dcm4che3.util.UIDUtils
 import se.nimsa.dcm4che.streams.{DicomFlows, DicomParsing}
 import se.nimsa.dcm4che.streams.DicomFlows.TagModification
 import se.nimsa.dcm4che.streams.DicomParts._
+import se.nimsa.sbx.dicom.DicomUtil
 
 import scala.util.Random
 
 object AnonymizationFlow {
 
-  private def toAsciiBytes(s: String) = ByteString(s.getBytes("US-ASCII"))
+  private def toAsciiBytes(s: String, vr: VR) = DicomUtil.padToEvenLength(ByteString(s.getBytes("US-ASCII")), vr)
   private def insert(tag: Int, mod: ByteString => ByteString) = TagModification(tag, mod, insert = true)
   private def modify(tag: Int, mod: ByteString => ByteString) = TagModification(tag, mod, insert = false)
   private def clear(tag: Int) = TagModification(tag, _ => ByteString.empty, insert = false)
@@ -22,13 +23,13 @@ object AnonymizationFlow {
     val seed = UUID.nameUUIDFromBytes(accessionNumberBytes.toArray).getMostSignificantBits
     val rand = new Random(seed)
     val newNumber = (1 to 16).foldLeft("")((s, _) => s + rand.nextInt(10).toString)
-    toAsciiBytes(newNumber)
+    toAsciiBytes(newNumber, VR.SH)
   }
   private def createUid(baseValue: ByteString): ByteString = toAsciiBytes(
     if (baseValue == null || baseValue.isEmpty)
       UIDUtils.createUID()
     else
-      UIDUtils.createNameBasedUID(baseValue.toArray))
+      UIDUtils.createNameBasedUID(baseValue.toArray), VR.UI)
   private def isOverlay(tag: Int): Boolean = {
     val group = DicomParsing.groupNumber(tag)
     group >= 0x6000 && group < 0x6100
@@ -218,7 +219,7 @@ object AnonymizationFlow {
     modify(Tag.ContextGroupExtensionCreatorUID, createUid),
     clear(Tag.ContrastBolusAgent),
     modify(Tag.CreatorVersionUID, createUid),
-    insert(Tag.DeidentificationMethod, _ => toAsciiBytes("Retain Longitudinal Full Dates Option")),
+    insert(Tag.DeidentificationMethod, _ => toAsciiBytes("Retain Longitudinal Full Dates Option", VR.LO)),
     modify(Tag.DimensionOrganizationUID, createUid),
     modify(Tag.DoseReferenceUID, createUid),
     modify(Tag.FiducialUID, createUid),
@@ -231,7 +232,7 @@ object AnonymizationFlow {
     modify(Tag.ObservationSubjectUIDTrial, createUid),
     modify(Tag.ObservationUID, createUid),
     modify(Tag.PaletteColorLookupTableUID, createUid),
-    insert(Tag.PatientIdentityRemoved, _ => toAsciiBytes("YES")),
+    insert(Tag.PatientIdentityRemoved, _ => toAsciiBytes("YES", VR.CS)),
     insert(Tag.PatientID, _ => createUid(null)),
     insert(Tag.PatientName, _ => createUid(null)),
     clear(Tag.PlacerOrderNumberImagingServiceRequest),

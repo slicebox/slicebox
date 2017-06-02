@@ -44,7 +44,7 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
 
   val storageService = system.actorOf(StorageServiceActor.props(storage), name = "StorageService")
   val metaDataService = system.actorOf(MetaDataServiceActor.props(metaDataDao, propertiesDao, timeout), name = "MetaDataService")
-  val seriesTypeService = system.actorOf(SeriesTypeServiceActor.props(storage, seriesTypeDao, timeout), name = "SeriesTypeService")
+  val seriesTypeService = system.actorOf(SeriesTypeServiceActor.props(seriesTypeDao, storage, timeout), name = "SeriesTypeService")
   val seriesTypeUpdateService = system.actorSelection("user/SeriesTypeService/SeriesTypeUpdate")
 
   override def afterAll() = TestKit.shutdownActorSystem(system)

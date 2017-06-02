@@ -26,17 +26,11 @@ import akka.stream.alpakka.file.scaladsl.{Directory, DirectoryChangesSource}
 import akka.stream.scaladsl.{FileIO, Keep, Sink, Source => StreamSource}
 import akka.stream.{ActorMaterializer, KillSwitches, UniqueKillSwitch}
 import akka.util.Timeout
-import org.dcm4che3.data.Attributes
-import org.dcm4che3.io.DicomStreamException
-import se.nimsa.sbx.anonymization.AnonymizationServiceCalls
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.dicom.Contexts
-import se.nimsa.sbx.dicom.streams.DicomStreams
-import se.nimsa.sbx.dicom.streams.DicomStreams.dicomDataSink
+import se.nimsa.sbx.dicom.streams.DicomStreamOps
 import se.nimsa.sbx.directory.DirectoryWatchProtocol._
 import se.nimsa.sbx.log.SbxLog
-import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, MetaDataAdded}
-import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.storage.StorageService
 
 import scala.concurrent.duration.DurationInt
@@ -48,7 +42,7 @@ class DirectoryWatchActor(watchedDirectory: WatchedDirectory,
                           metaDataServicePath: String = "../../MetaDataService",
                           storageServicePath: String = "../../StorageService",
                           anonymizationServicePath: String = "../../AnonymizationService")
-                         (implicit val timeout: Timeout) extends Actor with AnonymizationServiceCalls {
+                         (implicit val timeout: Timeout) extends Actor with DicomStreamOps {
 
   val storageService = context.actorSelection(storageServicePath)
   val metaDataService = context.actorSelection(metaDataServicePath)
@@ -66,8 +60,8 @@ class DirectoryWatchActor(watchedDirectory: WatchedDirectory,
     Directory.walk(fs.getPath(watchedDirectory.path)).map(path => (path, DirectoryChange.Creation)) // recurse on startup
       .concat(DirectoryChangesSource(fs.getPath(watchedDirectory.path), pollInterval = 5.seconds, maxBufferSize = 100000)) // watch
       .filter {
-        case (_, change) => change == DirectoryChange.Creation || change == DirectoryChange.Modification
-      }
+      case (_, change) => change == DirectoryChange.Creation || change == DirectoryChange.Modification
+    }
       .map(_._1)
       .flatMapConcat { path =>
         if (Files.isDirectory(path))
@@ -78,15 +72,8 @@ class DirectoryWatchActor(watchedDirectory: WatchedDirectory,
           StreamSource.empty // other (symlinks etc): ignore
       }
       .mapAsync(5) { path => // do import
-        val tempPath = DicomStreams.createTempPath()
-        FileIO.fromPath(path).runWith(dicomDataSink(storage.fileSink(tempPath), reverseAnonymizationQuery, Contexts.imageDataContexts)).flatMap {
-          case (_, maybeDataset) =>
-            val attributes: Attributes = maybeDataset.getOrElse(throw new DicomStreamException("DICOM data has no dataset"))
-            metaDataService.ask(AddMetaData(attributes, sbxSource)).mapTo[MetaDataAdded].flatMap { metaData =>
-              storageService.ask(MoveDicomData(tempPath, s"${metaData.image.id}")).map { _ =>
-                system.eventStream.publish(ImageAdded(metaData.image, sbxSource, !metaData.imageAdded))
-              }
-            }
+        storeData(FileIO.fromPath(path), sbxSource, storage, Contexts.imageDataContexts).map { metaData =>
+          system.eventStream.publish(ImageAdded(metaData.image, sbxSource, !metaData.imageAdded))
         }.recover {
           case NonFatal(e) =>
             SbxLog.error("Directory", s"Could not add file ${Paths.get(watchedDirectory.path).relativize(path)}: ${e.getMessage}")
@@ -108,6 +95,8 @@ class DirectoryWatchActor(watchedDirectory: WatchedDirectory,
   }
 
   override def callAnonymizationService[R: ClassTag](message: Any) = anonymizationService.ask(message).mapTo[R]
+  override def callStorageService[R: ClassTag](message: Any) = storageService.ask(message).mapTo[R]
+  override def callMetaDataService[R: ClassTag](message: Any) = metaDataService.ask(message).mapTo[R]
 
   def receive = LoggingReceive {
     case _ =>
