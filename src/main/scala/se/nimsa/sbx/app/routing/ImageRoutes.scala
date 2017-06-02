@@ -167,7 +167,7 @@ trait ImageRoutes {
 
   private def addDicomDataRoute(bytes: StreamSource[ByteString, _], apiUser: ApiUser): Route = {
     val source = Source(SourceType.USER, apiUser.user, apiUser.id)
-    val futureUpload = storeData(bytes, source, storage)
+    val futureUpload = storeData(bytes, source, storage, Contexts.extendedContexts)
 
     onSuccess(futureUpload) { metaData =>
       system.eventStream.publish(ImageAdded(metaData.image, source, !metaData.imageAdded))

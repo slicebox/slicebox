@@ -10,6 +10,7 @@ import org.dcm4che3.io.DicomStreamException
 import se.nimsa.dcm4che.streams.DicomFlows.TagModification
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.app.GeneralProtocol.Source
+import se.nimsa.sbx.dicom.Contexts.Context
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.DicomPropertyValue.{PatientID, PatientName}
 import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, MetaDataAdded}
@@ -45,10 +46,10 @@ trait DicomStreamOps extends DicomStreamLoadOps {
   def callStorageService[R: ClassTag](message: Any): Future[R]
   def callMetaDataService[R: ClassTag](message: Any): Future[R]
 
-  def storeData(bytesSource: StreamSource[ByteString, _], source: Source, storage: StorageService)
+  def storeData(bytesSource: StreamSource[ByteString, _], source: Source, storage: StorageService, contexts: Seq[Context])
                (implicit system: ActorSystem, mat: ActorMaterializer, ec: ExecutionContext, timeout: Timeout): Future[MetaDataAdded] = {
     val tempPath = DicomStreams.createTempPath()
-    val sink = DicomStreams.dicomDataSink(storage.fileSink(tempPath), reverseAnonymizationQuery)
+    val sink = DicomStreams.dicomDataSink(storage.fileSink(tempPath), reverseAnonymizationQuery, contexts)
     bytesSource.runWith(sink).flatMap {
       case (_, maybeDataset) =>
         val attributes: Attributes = maybeDataset.getOrElse(throw new DicomStreamException("DICOM data has no dataset"))

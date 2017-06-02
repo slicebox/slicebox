@@ -30,6 +30,7 @@ import akka.util.Timeout
 import de.heikoseeberger.akkahttpplayjson.PlayJsonSupport
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.box.BoxProtocol._
+import se.nimsa.sbx.dicom.Contexts
 import se.nimsa.sbx.dicom.streams.DicomStreamOps
 import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.storage.StorageService
@@ -139,7 +140,7 @@ class BoxPollActor(box: Box,
       val statusCode = response.status.intValue
       if (statusCode >= 200 && statusCode < 300) {
         val source = Source(SourceType.BOX, box.name, box.id)
-        storeData(response.entity.dataBytes.via(Compression.inflate()), source, storage).flatMap { metaData =>
+        storeData(response.entity.dataBytes.via(Compression.inflate()), source, storage, Contexts.extendedContexts).flatMap { metaData =>
           boxService.ask(UpdateIncoming(box, transactionImage.transaction.id, transactionImage.image.sequenceNumber, transactionImage.transaction.totalImageCount, metaData.image.id, metaData.imageAdded)).flatMap {
             case IncomingUpdated(transaction) =>
               transaction.status match {

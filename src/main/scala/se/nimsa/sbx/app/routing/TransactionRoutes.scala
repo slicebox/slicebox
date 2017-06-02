@@ -27,6 +27,7 @@ import se.nimsa.dcm4che.streams.DicomFlows.TagModification
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.box.BoxProtocol._
+import se.nimsa.sbx.dicom.Contexts
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.DicomUtil
 import se.nimsa.sbx.metadata.MetaDataProtocol.GetImage
@@ -45,7 +46,7 @@ trait TransactionRoutes {
               post {
                 extractDataBytes { compressedBytes =>
                   val source = Source(SourceType.BOX, box.name, box.id)
-                  onSuccess(storeData(compressedBytes.via(Compression.inflate()), source, storage)) { metaData =>
+                  onSuccess(storeData(compressedBytes.via(Compression.inflate()), source, storage, Contexts.extendedContexts)) { metaData =>
                     onSuccess(boxService.ask(UpdateIncoming(box, outgoingTransactionId, sequenceNumber, totalImageCount, metaData.image.id, metaData.imageAdded))) {
                       case IncomingUpdated(transaction) =>
                         transaction.status match {

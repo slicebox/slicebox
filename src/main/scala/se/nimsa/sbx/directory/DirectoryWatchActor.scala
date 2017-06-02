@@ -27,6 +27,7 @@ import akka.stream.scaladsl.{FileIO, Keep, Sink, Source => StreamSource}
 import akka.stream.{ActorMaterializer, KillSwitches, UniqueKillSwitch}
 import akka.util.Timeout
 import se.nimsa.sbx.app.GeneralProtocol._
+import se.nimsa.sbx.dicom.Contexts
 import se.nimsa.sbx.dicom.streams.DicomStreamOps
 import se.nimsa.sbx.directory.DirectoryWatchProtocol._
 import se.nimsa.sbx.log.SbxLog
@@ -71,7 +72,7 @@ class DirectoryWatchActor(watchedDirectory: WatchedDirectory,
           StreamSource.empty // other (symlinks etc): ignore
       }
       .mapAsync(5) { path => // do import
-        storeData(FileIO.fromPath(path), sbxSource, storage).map { metaData =>
+        storeData(FileIO.fromPath(path), sbxSource, storage, Contexts.imageDataContexts).map { metaData =>
           system.eventStream.publish(ImageAdded(metaData.image, sbxSource, !metaData.imageAdded))
         }.recover {
           case NonFatal(e) =>

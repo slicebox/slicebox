@@ -26,6 +26,7 @@ import akka.util.ByteString
 import org.dcm4che3.io.DicomStreamException
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.app.SliceboxBase
+import se.nimsa.sbx.dicom.Contexts
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.importing.ImportProtocol._
 import se.nimsa.sbx.log.SbxLog
@@ -101,7 +102,7 @@ trait ImportRoutes {
       case Some(importSession) =>
 
         val source = Source(SourceType.IMPORT, importSession.name, importSessionId)
-        val futureImport = storeData(bytes, source, storage)
+        val futureImport = storeData(bytes, source, storage, Contexts.imageDataContexts)
 
         onComplete(futureImport) {
           case Success(metaData) =>
