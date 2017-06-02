@@ -110,7 +110,7 @@ trait TransactionRoutes {
                       val imageId = transactionImage.image.imageId
                       onSuccess(boxService.ask(GetOutgoingTagValues(transactionImage)).mapTo[Seq[OutgoingTagValue]]) { transactionTagValues =>
                         val tagMods = transactionTagValues.map { ttv =>
-                          val tagBytes = DicomUtil.padToEvenLength(ByteString(ttv.tagValue.value.getBytes("US-ASCII")))
+                          val tagBytes = DicomUtil.padToEvenLength(ByteString(ttv.tagValue.value.getBytes("US-ASCII")), ttv.tagValue.tag)
                           TagModification(ttv.tagValue.tag, _ => tagBytes, insert = true)
                         }
                         onSuccess(metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]]) {

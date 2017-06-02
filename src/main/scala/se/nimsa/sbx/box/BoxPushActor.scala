@@ -128,7 +128,7 @@ class BoxPushActor(box: Box,
     metaDataService.ask(GetImage(transactionImage.image.imageId)).mapTo[Option[Image]].flatMap {
       case Some(image) =>
         val tagMods = tagValues.map { ttv =>
-          val tagBytes = DicomUtil.padToEvenLength(ByteString(ttv.tagValue.value.getBytes("US-ASCII")))
+          val tagBytes = DicomUtil.padToEvenLength(ByteString(ttv.tagValue.value.getBytes("US-ASCII")), ttv.tagValue.tag)
           TagModification(ttv.tagValue.tag, _ => tagBytes, insert = true)
         }
         val source = anonymizedData(image, tagMods, storage)

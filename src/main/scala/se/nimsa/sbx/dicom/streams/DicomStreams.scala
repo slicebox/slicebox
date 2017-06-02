@@ -5,7 +5,7 @@ import akka.stream.scaladsl.{Broadcast, Compression, Flow, GraphDSL, Keep, Merge
 import akka.stream.{ActorMaterializer, FlowShape, SinkShape}
 import akka.util.{ByteString, Timeout}
 import akka.{Done, NotUsed}
-import org.dcm4che3.data.{Attributes, Tag, UID}
+import org.dcm4che3.data.{Attributes, Tag, UID, VR}
 import se.nimsa.dcm4che.streams.DicomFlows._
 import se.nimsa.dcm4che.streams.DicomPartFlow.partFlow
 import se.nimsa.dcm4che.streams.DicomParts.{DicomAttributes, DicomPart}
@@ -256,7 +256,7 @@ object DicomStreams {
     .via(DicomFlows.modifyFlow(
       TagModification(Tag.TransferSyntaxUID, valueBytes => {
         valueBytes.utf8String.trim match {
-          case UID.DeflatedExplicitVRLittleEndian => DicomUtil.padToEvenLength(ByteString(UID.ExplicitVRLittleEndian.getBytes("US-ASCII")))
+          case UID.DeflatedExplicitVRLittleEndian => DicomUtil.padToEvenLength(ByteString(UID.ExplicitVRLittleEndian.getBytes("US-ASCII")), VR.UI)
           case _ => valueBytes
         }
       }, insert = false)))
