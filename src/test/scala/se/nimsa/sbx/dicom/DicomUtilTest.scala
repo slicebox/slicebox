@@ -2,7 +2,7 @@ package se.nimsa.sbx.dicom
 
 import java.nio.file.Files
 
-import org.dcm4che3.data.{Attributes, Tag, VR}
+import org.dcm4che3.data.{Attributes, Tag, UID, VR}
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 import se.nimsa.sbx.anonymization.AnonymizationUtil._
 import se.nimsa.sbx.dicom.DicomUtil._
@@ -13,8 +13,8 @@ class DicomUtilTest extends FlatSpec with Matchers with BeforeAndAfterAll {
   "Validating a DICOM file" should "throw an exception for a non-supported context" in {
     val attributes = new Attributes()
     val metaInformation = new Attributes()
-    metaInformation.setString(Tag.MediaStorageSOPClassUID, VR.UI, SopClasses.SecondaryCaptureImageStorage.uid)
-    metaInformation.setString(Tag.TransferSyntaxUID, VR.UI, TransferSyntaxes.ExplicitVrLittleEndian.uid)
+    metaInformation.setString(Tag.MediaStorageSOPClassUID, VR.UI, UID.SecondaryCaptureImageStorage)
+    metaInformation.setString(Tag.TransferSyntaxUID, VR.UI, UID.ExplicitVRLittleEndian)
     val dicomData = DicomData(attributes, metaInformation)
     intercept[IllegalArgumentException] {
       checkContext(dicomData, Contexts.imageDataContexts)
@@ -24,8 +24,8 @@ class DicomUtilTest extends FlatSpec with Matchers with BeforeAndAfterAll {
   it should "pass a supported context" in {
     val attributes = new Attributes()
     val metaInformation = new Attributes()
-    metaInformation.setString(Tag.MediaStorageSOPClassUID, VR.UI, SopClasses.NuclearMedicineImageStorage.uid)
-    metaInformation.setString(Tag.TransferSyntaxUID, VR.UI, TransferSyntaxes.ExplicitVrLittleEndian.uid)
+    metaInformation.setString(Tag.MediaStorageSOPClassUID, VR.UI, UID.NuclearMedicineImageStorage)
+    metaInformation.setString(Tag.TransferSyntaxUID, VR.UI, UID.ExplicitVRLittleEndian)
     val dicomData = DicomData(attributes, metaInformation)
     checkContext(dicomData, Contexts.imageDataContexts)
   }
@@ -35,7 +35,7 @@ class DicomUtilTest extends FlatSpec with Matchers with BeforeAndAfterAll {
     val attributes = new Attributes()
     val metaInformation = new Attributes()
     metaInformation.setString(Tag.MediaStorageSOPClassUID, VR.UI, notASopClassUid)
-    metaInformation.setString(Tag.TransferSyntaxUID, VR.UI, TransferSyntaxes.ExplicitVrLittleEndian.uid)
+    metaInformation.setString(Tag.TransferSyntaxUID, VR.UI, UID.ExplicitVRLittleEndian)
     val dicomData = DicomData(attributes, metaInformation)
     intercept[IllegalArgumentException] {
       checkContext(dicomData, Contexts.imageDataContexts)
@@ -60,7 +60,7 @@ class DicomUtilTest extends FlatSpec with Matchers with BeforeAndAfterAll {
 
   "Loading a attributes" should "return the same attributes, disregarding pixelData, when loading with and without pixelData" in {
     val dicomData1 = TestUtil.testImageDicomData(withPixelData = false)
-    val dicomData2 = TestUtil.testImageDicomData(withPixelData = true)
+    val dicomData2 = TestUtil.testImageDicomData()
     dicomData1 should not equal dicomData2
     dicomData1.attributes.remove(Tag.PixelData)
     dicomData2.attributes.remove(Tag.PixelData)
@@ -76,7 +76,7 @@ class DicomUtilTest extends FlatSpec with Matchers with BeforeAndAfterAll {
   }
 
   it should "work also in combination with anonymization and loading pixel data" in {
-    val dicomData = TestUtil.testImageDicomData(withPixelData = true)
+    val dicomData = TestUtil.testImageDicomData()
     val anonymizedAttributes = anonymizeAttributes(dicomData.attributes)
     val anonymizedDicomData1 = dicomData.copy(attributes = anonymizedAttributes)
     val savePath = tempDir.resolve("anonymized.dcm")

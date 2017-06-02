@@ -30,6 +30,7 @@ import org.dcm4che3.data.Attributes
 import org.dcm4che3.io.DicomStreamException
 import se.nimsa.sbx.anonymization.AnonymizationServiceCalls
 import se.nimsa.sbx.app.GeneralProtocol._
+import se.nimsa.sbx.dicom.Contexts
 import se.nimsa.sbx.dicom.streams.DicomStreams
 import se.nimsa.sbx.dicom.streams.DicomStreams.dicomDataSink
 import se.nimsa.sbx.directory.DirectoryWatchProtocol._
@@ -78,7 +79,7 @@ class DirectoryWatchActor(watchedDirectory: WatchedDirectory,
       }
       .mapAsync(5) { path => // do import
         val tempPath = DicomStreams.createTempPath()
-        FileIO.fromPath(path).runWith(dicomDataSink(storage.fileSink(tempPath), reverseAnonymizationQuery)).flatMap {
+        FileIO.fromPath(path).runWith(dicomDataSink(storage.fileSink(tempPath), reverseAnonymizationQuery, Contexts.imageDataContexts)).flatMap {
           case (_, maybeDataset) =>
             val attributes: Attributes = maybeDataset.getOrElse(throw new DicomStreamException("DICOM data has no dataset"))
             metaDataService.ask(AddMetaData(attributes, sbxSource)).mapTo[MetaDataAdded].flatMap { metaData =>

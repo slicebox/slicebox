@@ -27,6 +27,7 @@ import org.dcm4che3.data.Attributes
 import org.dcm4che3.io.DicomStreamException
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.app.SliceboxBase
+import se.nimsa.sbx.dicom.Contexts
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.streams.DicomStreams._
 import se.nimsa.sbx.importing.ImportProtocol._
@@ -106,7 +107,7 @@ trait ImportRoutes {
         val source = Source(SourceType.IMPORT, importSession.name, importSessionId)
         val tempPath = createTempPath()
 
-        val futureImport = bytes.runWith(dicomDataSink(storage.fileSink(tempPath), reverseAnonymizationQuery))
+        val futureImport = bytes.runWith(dicomDataSink(storage.fileSink(tempPath), reverseAnonymizationQuery, Contexts.imageDataContexts))
 
         onComplete(futureImport) {
           case Success((_, maybeDataset)) =>

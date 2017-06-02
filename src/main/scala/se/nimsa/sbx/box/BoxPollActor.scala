@@ -33,6 +33,7 @@ import org.dcm4che3.io.DicomStreamException
 import se.nimsa.sbx.anonymization.AnonymizationServiceCalls
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.box.BoxProtocol._
+import se.nimsa.sbx.dicom.Contexts
 import se.nimsa.sbx.dicom.streams.DicomStreams
 import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, MetaDataAdded}
@@ -143,7 +144,7 @@ class BoxPollActor(box: Box,
       if (statusCode >= 200 && statusCode < 300) {
         val source = Source(SourceType.BOX, box.name, box.id)
         val tempPath = DicomStreams.createTempPath()
-        val sink = DicomStreams.dicomDataSink(storage.fileSink(tempPath), reverseAnonymizationQuery)
+        val sink = DicomStreams.dicomDataSink(storage.fileSink(tempPath), reverseAnonymizationQuery, Contexts.extendedContexts)
         response.entity.dataBytes
           .via(Compression.inflate())
           .runWith(sink).flatMap {

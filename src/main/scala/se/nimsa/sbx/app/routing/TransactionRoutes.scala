@@ -29,6 +29,7 @@ import se.nimsa.dcm4che.streams.DicomFlows.TagModification
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.box.BoxProtocol._
+import se.nimsa.sbx.dicom.Contexts
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.streams.DicomStreams
 import se.nimsa.sbx.dicom.streams.DicomStreams.{createTempPath, dicomDataSink}
@@ -53,7 +54,7 @@ trait TransactionRoutes {
 
                   val futureStored = compressedBytes
                     .via(Compression.inflate())
-                    .runWith(dicomDataSink(storage.fileSink(tmpPath), reverseAnonymizationQuery))
+                    .runWith(dicomDataSink(storage.fileSink(tmpPath), reverseAnonymizationQuery, Contexts.extendedContexts))
 
                   onSuccess(futureStored) {
                     case (maybeFmi, maybeDataset) =>

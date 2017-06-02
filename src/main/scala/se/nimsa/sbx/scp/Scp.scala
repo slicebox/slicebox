@@ -78,7 +78,7 @@ class Scp(val name: String,
   ae.setAssociationAcceptor(true)
   ae.addConnection(conn)
   Contexts.imageDataContexts.foreach(context =>
-    ae.addTransferCapability(new TransferCapability(null, context.sopClass.uid, TransferCapability.Role.SCP, context.transferSyntaxes.map(_.uid): _*)))
+    ae.addTransferCapability(new TransferCapability(null, context.sopClassUid, TransferCapability.Role.SCP, context.transferSyntaxeUids: _*)))
 
   private val device = new Device("storescp")
   device.setExecutor(executor)
