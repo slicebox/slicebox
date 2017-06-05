@@ -128,7 +128,7 @@ class BoxPushActor(box: Box,
     metaDataService.ask(GetImage(transactionImage.image.imageId)).mapTo[Option[Image]].flatMap {
       case Some(image) =>
         val tagValues = outgoingTagValues.map(_.tagValue)
-        val source = anonymizedData(image, tagValues, storage)
+        val source = anonymizedDicomData(image, tagValues, storage)
         val uri = s"${box.baseUrl}/image?transactionid=${transactionImage.transaction.id}&sequencenumber=${transactionImage.image.sequenceNumber}&totalimagecount=${transactionImage.transaction.totalImageCount}"
         sliceboxRequest(HttpMethods.POST, uri, HttpEntity(ContentTypes.`application/octet-stream`, source))
       case None =>

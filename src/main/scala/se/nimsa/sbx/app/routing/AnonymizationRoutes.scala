@@ -47,7 +47,7 @@ trait AnonymizationRoutes {
         entity(as[Seq[TagValue]]) { tagValues =>
           onSuccess(metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]]) {
             case Some(image) =>
-              complete(HttpEntity(ContentTypes.`application/octet-stream`, anonymizedData(image, tagValues, storage)))
+              complete(HttpEntity(ContentTypes.`application/octet-stream`, anonymizedDicomData(image, tagValues, storage)))
             case None =>
               complete((NotFound, s"No image meta data found for image id $imageId"))
           }

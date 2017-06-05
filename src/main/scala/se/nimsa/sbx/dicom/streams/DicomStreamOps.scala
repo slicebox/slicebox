@@ -35,22 +35,22 @@ trait DicomStreamLoadOps {
     callAnonymizationService[AnonymizationKeys](GetAnonymizationKeysForPatient(patientName.value, patientID.value))
       .map(_.anonymizationKeys)
 
-  def anonymizedData(image: Image, tagValues: Seq[TagValue], storage: StorageService)
-                    (implicit system: ActorSystem, mat: ActorMaterializer, ec: ExecutionContext, timeout: Timeout): StreamSource[ByteString, NotUsed] =
+  def anonymizedDicomData(image: Image, tagValues: Seq[TagValue], storage: StorageService)
+                         (implicit system: ActorSystem, mat: ActorMaterializer, ec: ExecutionContext, timeout: Timeout): StreamSource[ByteString, NotUsed] =
     anonymizedDicomDataSource(storage.fileSource(image), anonymizationQuery, anonymizationInsert, tagValues)
 }
 
 trait DicomStreamOps extends DicomStreamLoadOps {
 
-  private def reverseAnonymizationQuery(implicit ec: ExecutionContext) = (patientName: PatientName, patientID: PatientID) =>
-    callAnonymizationService[AnonymizationKeys](GetReverseAnonymizationKeysForPatient(patientName.value, patientID.value))
-      .map(_.anonymizationKeys)
-
   def callStorageService[R: ClassTag](message: Any): Future[R]
   def callMetaDataService[R: ClassTag](message: Any): Future[R]
 
-  def storeData(bytesSource: StreamSource[ByteString, _], source: Source, storage: StorageService, contexts: Seq[Context], reverseAnonymization: Boolean = true)
-               (implicit system: ActorSystem, mat: ActorMaterializer, ec: ExecutionContext, timeout: Timeout): Future[MetaDataAdded] = {
+  protected def reverseAnonymizationQuery(implicit ec: ExecutionContext) = (patientName: PatientName, patientID: PatientID) =>
+    callAnonymizationService[AnonymizationKeys](GetReverseAnonymizationKeysForPatient(patientName.value, patientID.value))
+      .map(_.anonymizationKeys)
+
+  def storeDicomData(bytesSource: StreamSource[ByteString, _], source: Source, storage: StorageService, contexts: Seq[Context], reverseAnonymization: Boolean = true)
+                    (implicit system: ActorSystem, mat: ActorMaterializer, ec: ExecutionContext, timeout: Timeout): Future[MetaDataAdded] = {
     val tempPath = createTempPath()
     val sink = dicomDataSink(storage.fileSink(tempPath), reverseAnonymizationQuery, contexts, reverseAnonymization)
     bytesSource.runWith(sink).flatMap {
@@ -78,7 +78,7 @@ trait DicomStreamOps extends DicomStreamLoadOps {
           callStorageService[DicomDataDeleted](DeleteDicomData(image))
         ).map(_ => bytes)
       )
-    storeData(anonymizedSource, source, storage, Contexts.extendedContexts, reverseAnonymization = false)
+    storeDicomData(anonymizedSource, source, storage, Contexts.extendedContexts, reverseAnonymization = false)
   }
 
 }

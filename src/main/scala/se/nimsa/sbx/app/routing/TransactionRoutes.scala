@@ -43,7 +43,7 @@ trait TransactionRoutes {
               post {
                 extractDataBytes { compressedBytes =>
                   val source = Source(SourceType.BOX, box.name, box.id)
-                  onSuccess(storeData(compressedBytes.via(Compression.inflate()), source, storage, Contexts.extendedContexts)) { metaData =>
+                  onSuccess(storeDicomData(compressedBytes.via(Compression.inflate()), source, storage, Contexts.extendedContexts)) { metaData =>
                     onSuccess(boxService.ask(UpdateIncoming(box, outgoingTransactionId, sequenceNumber, totalImageCount, metaData.image.id, metaData.imageAdded))) {
                       case IncomingUpdated(transaction) =>
                         transaction.status match {
@@ -110,7 +110,7 @@ trait TransactionRoutes {
                         val tagValues = transactionTagValues.map(_.tagValue)
                         onSuccess(metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]]) {
                           case Some(image) =>
-                            val streamSource = anonymizedData(image, tagValues, storage)
+                            val streamSource = anonymizedDicomData(image, tagValues, storage)
                             complete(HttpEntity(ContentTypes.`application/octet-stream`, streamSource))
                           case None =>
                             complete((NotFound, s"Image not found for image id $imageId"))

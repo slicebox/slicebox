@@ -19,6 +19,7 @@ package se.nimsa.sbx.app.routing
 import java.io.ByteArrayOutputStream
 import java.util.zip.{ZipEntry, ZipOutputStream}
 
+import akka.NotUsed
 import akka.http.scaladsl.common.EntityStreamingSupport
 import akka.http.scaladsl.model.HttpEntity
 import akka.http.scaladsl.model.MediaTypes._
@@ -166,7 +167,7 @@ trait ImageRoutes {
 
   private def addDicomDataRoute(bytes: StreamSource[ByteString, _], apiUser: ApiUser): Route = {
     val source = Source(SourceType.USER, apiUser.user, apiUser.id)
-    val futureUpload = storeData(bytes, source, storage, Contexts.extendedContexts)
+    val futureUpload = storeDicomData(bytes, source, storage, Contexts.extendedContexts)
 
     onSuccess(futureUpload) { metaData =>
       system.eventStream.publish(ImageAdded(metaData.image, source, !metaData.imageAdded))
@@ -180,16 +181,14 @@ trait ImageRoutes {
     val byteStream = new ByteArrayOutputStream()
     val zipStream = new ZipOutputStream(byteStream)
 
-    private def getImageData(imageId: Long): Future[Option[(Image, FlatSeries, DicomDataArray)]] =
+    private def getImageData(imageId: Long): Future[Option[(Image, FlatSeries, StreamSource[ByteString, NotUsed])]] =
       metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]].flatMap { imageMaybe =>
         imageMaybe.map { image =>
           metaDataService.ask(GetSingleFlatSeries(image.seriesId)).mapTo[Option[FlatSeries]].map { flatSeriesMaybe =>
             flatSeriesMaybe.map { flatSeries =>
-              storageService.ask(GetImageData(image)).mapTo[DicomDataArray].map { imageData =>
-                (image, flatSeries, imageData)
-              }
+              (image, flatSeries, storage.fileSource(image))
             }
-          }.unwrap
+          }
         }.unwrap
       }
 
@@ -210,24 +209,25 @@ trait ImageRoutes {
         val imageId = imageIds.head
         getImageData(imageId).onComplete {
 
-          case Success(Some((image, flatSeries, imageData))) =>
+          case Success(Some((image, flatSeries, dicomDataSource))) =>
             val zipEntry = createZipEntry(image, flatSeries)
             zipStream.putNextEntry(zipEntry)
-            zipStream.write(imageData.data)
-            val zippedBytes = byteStream.toByteArray
-            byteStream.reset()
-            queue.offer(ByteString(zippedBytes)).onComplete {
+            dicomDataSource.map(_.toArray).runForeach(zipStream.write).andThen {
+              case Success(_) =>
+                val zippedBytes = byteStream.toByteArray
+                byteStream.reset()
+                queue.offer(ByteString(zippedBytes)).onComplete {
 
-              case Success(QueueOfferResult.Enqueued) =>
-                zipNext(imageIds.tail)
+                  case Success(QueueOfferResult.Enqueued) =>
+                    zipNext(imageIds.tail)
 
-              case Success(result) =>
-                queue.fail(new Exception(s"Unable to add image $imageId to export stream: $result"))
+                  case Success(result) =>
+                    queue.fail(new Exception(s"Unable to add image $imageId to export stream: $result"))
 
-              case Failure(error) =>
-                queue.fail(error)
+                  case Failure(error) =>
+                    queue.fail(error)
+                }
             }
-
           case Success(None) =>
             queue.fail(new Exception(s"Could not find image data for image id $imageId"))
 
