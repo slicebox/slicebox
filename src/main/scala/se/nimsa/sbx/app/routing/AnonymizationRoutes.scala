@@ -26,7 +26,6 @@ import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.user.UserProtocol.ApiUser
-import se.nimsa.sbx.util.SbxExtensions._
 
 import scala.concurrent.Future
 
@@ -37,17 +36,20 @@ trait AnonymizationRoutes {
     path("images" / LongNumber / "anonymize") { imageId =>
       put {
         entity(as[Seq[TagValue]]) { tagValues =>
-          complete {
-            anonymizeOne(apiUser, imageId, tagValues).map(_.map(_.image))
+          onSuccess(anonymizeData(imageId, tagValues, storage)) {
+            case Some(metaDataAdded) =>
+              complete(metaDataAdded.image)
+            case None =>
+              complete((NotFound, s"No image meta data found for image id $imageId"))
           }
         }
       }
     } ~ path("images" / LongNumber / "anonymized") { imageId =>
       post {
         entity(as[Seq[TagValue]]) { tagValues =>
-          onSuccess(metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]]) {
-            case Some(image) =>
-              complete(HttpEntity(ContentTypes.`application/octet-stream`, anonymizedDicomData(image, tagValues, storage)))
+          onSuccess(anonymizedDicomData(imageId, tagValues, storage)) {
+            case Some(source) =>
+              complete(HttpEntity(ContentTypes.`application/octet-stream`, source))
             case None =>
               complete((NotFound, s"No image meta data found for image id $imageId"))
           }
@@ -60,7 +62,7 @@ trait AnonymizationRoutes {
             complete {
               Future.sequence {
                 imageTagValuesSeq.map(imageTagValues =>
-                  anonymizeOne(apiUser, imageTagValues.imageId, imageTagValues.tagValues))
+                  anonymizeData(imageTagValues.imageId, imageTagValues.tagValues, storage))
               }.map(_.flatMap(_.map(_.image)))
             }
           }
@@ -112,17 +114,5 @@ trait AnonymizationRoutes {
         }
       }
     }
-
-  def anonymizeOne(apiUser: ApiUser, imageId: Long, tagValues: Seq[TagValue]): Future[Option[MetaDataAdded]] = {
-    metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]].flatMap { imageMaybe =>
-      imageMaybe.map { image =>
-        metaDataService.ask(GetSourceForSeries(image.seriesId)).mapTo[Option[SeriesSource]].map { seriesSourceMaybe =>
-          seriesSourceMaybe.map { seriesSource =>
-            anonymizeData(image, seriesSource.source, storage, tagValues)
-          }
-        }.unwrap
-      }.unwrap
-    }
-  }
 
 }

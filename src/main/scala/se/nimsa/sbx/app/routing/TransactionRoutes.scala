@@ -26,8 +26,6 @@ import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.dicom.Contexts
-import se.nimsa.sbx.dicom.DicomHierarchy.Image
-import se.nimsa.sbx.metadata.MetaDataProtocol.GetImage
 
 trait TransactionRoutes {
   this: SliceboxBase =>
@@ -108,9 +106,8 @@ trait TransactionRoutes {
                       val imageId = transactionImage.image.imageId
                       onSuccess(boxService.ask(GetOutgoingTagValues(transactionImage)).mapTo[Seq[OutgoingTagValue]]) { transactionTagValues =>
                         val tagValues = transactionTagValues.map(_.tagValue)
-                        onSuccess(metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]]) {
-                          case Some(image) =>
-                            val streamSource = anonymizedDicomData(image, tagValues, storage)
+                        onSuccess(anonymizedDicomData(imageId, tagValues, storage)) {
+                          case Some(streamSource) =>
                             complete(HttpEntity(ContentTypes.`application/octet-stream`, streamSource))
                           case None =>
                             complete((NotFound, s"Image not found for image id $imageId"))

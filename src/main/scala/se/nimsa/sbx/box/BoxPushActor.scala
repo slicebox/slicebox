@@ -24,15 +24,11 @@ import akka.http.scaladsl.model._
 import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.pattern.ask
 import akka.stream.ActorMaterializer
-import akka.util.{ByteString, Timeout}
-import se.nimsa.dcm4che.streams.DicomFlows.TagModification
+import akka.util.Timeout
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.box.BoxProtocol._
-import se.nimsa.sbx.dicom.DicomHierarchy.Image
-import se.nimsa.sbx.dicom.DicomUtil
 import se.nimsa.sbx.dicom.streams.DicomStreamLoadOps
 import se.nimsa.sbx.log.SbxLog
-import se.nimsa.sbx.metadata.MetaDataProtocol.GetImage
 import se.nimsa.sbx.storage.StorageService
 
 import scala.concurrent.Future
@@ -68,6 +64,7 @@ class BoxPushActor(box: Box,
   val pool = Http().superPool[String]()
 
   override def callAnonymizationService[R: ClassTag](message: Any) = anonymizationService.ask(message).mapTo[R]
+  override def callMetaDataService[R: ClassTag](message: Any) = metaDataService.ask(message).mapTo[R]
 
   def receive = LoggingReceive {
     case PollOutgoing =>
@@ -125,10 +122,8 @@ class BoxPushActor(box: Box,
   }
 
   def pushImagePipeline(transactionImage: OutgoingTransactionImage, outgoingTagValues: Seq[OutgoingTagValue]): Future[HttpResponse] =
-    metaDataService.ask(GetImage(transactionImage.image.imageId)).mapTo[Option[Image]].flatMap {
-      case Some(image) =>
-        val tagValues = outgoingTagValues.map(_.tagValue)
-        val source = anonymizedDicomData(image, tagValues, storage)
+    anonymizedDicomData(transactionImage.image.id, outgoingTagValues.map(_.tagValue), storage).flatMap {
+      case Some(source) =>
         val uri = s"${box.baseUrl}/image?transactionid=${transactionImage.transaction.id}&sequencenumber=${transactionImage.image.sequenceNumber}&totalimagecount=${transactionImage.transaction.totalImageCount}"
         sliceboxRequest(HttpMethods.POST, uri, HttpEntity(ContentTypes.`application/octet-stream`, source))
       case None =>
