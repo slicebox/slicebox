@@ -109,12 +109,6 @@ class StorageServiceActor(storage: StorageService,
           if (dicomData.attributes == null || dicomData.metaInformation == null)
             throw new RuntimeException(s"DICOM data corrupt for image ID ${image.id}")
           sender ! dicomData
-
-        case GetImageAttributes(image) =>
-          sender ! storage.readImageAttributes(image)
-
-        case GetImageInformation(image) =>
-          sender ! storage.readImageInformation(image)
       }
     }
 

@@ -22,14 +22,11 @@ import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
 import akka.stream.scaladsl.Compression
-import akka.util.ByteString
-import se.nimsa.dcm4che.streams.DicomFlows.TagModification
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.dicom.Contexts
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
-import se.nimsa.sbx.dicom.DicomUtil
 import se.nimsa.sbx.metadata.MetaDataProtocol.GetImage
 
 trait TransactionRoutes {
@@ -110,13 +107,10 @@ trait TransactionRoutes {
                     case Some(transactionImage) =>
                       val imageId = transactionImage.image.imageId
                       onSuccess(boxService.ask(GetOutgoingTagValues(transactionImage)).mapTo[Seq[OutgoingTagValue]]) { transactionTagValues =>
-                        val tagMods = transactionTagValues.map { ttv =>
-                          val tagBytes = DicomUtil.padToEvenLength(ByteString(ttv.tagValue.value.getBytes("US-ASCII")), ttv.tagValue.tag)
-                          TagModification(ttv.tagValue.tag, _ => tagBytes, insert = true)
-                        }
+                        val tagValues = transactionTagValues.map(_.tagValue)
                         onSuccess(metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]]) {
                           case Some(image) =>
-                            val streamSource = anonymizedData(image, tagMods, storage)
+                            val streamSource = anonymizedData(image, tagValues, storage)
                             complete(HttpEntity(ContentTypes.`application/octet-stream`, streamSource))
                           case None =>
                             complete((NotFound, s"Image not found for image id $imageId"))

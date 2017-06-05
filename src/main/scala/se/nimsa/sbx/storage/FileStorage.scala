@@ -24,10 +24,9 @@ import akka.stream.Materializer
 import akka.stream.scaladsl.{FileIO, Sink, Source}
 import akka.util.ByteString
 import akka.{Done, NotUsed}
+import se.nimsa.sbx.dicom.DicomData
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.DicomUtil._
-import se.nimsa.sbx.dicom.{DicomData, DicomUtil, ImageAttribute}
-import se.nimsa.sbx.storage.StorageProtocol.ImageInformation
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.control.NonFatal
@@ -66,12 +65,6 @@ class FileStorage(val path: Path) extends StorageService {
 
   override def readDicomData(image: Image, withPixelData: Boolean): DicomData =
     loadDicomData(filePath(image), withPixelData)
-
-  override def readImageAttributes(image: Image): List[ImageAttribute] =
-    DicomUtil.readImageAttributes(loadDicomData(filePath(image), withPixelData = false).attributes)
-
-  def readImageInformation(image: Image): ImageInformation =
-    super.readImageInformation(new BufferedInputStream(Files.newInputStream(filePath(image))))
 
   override def readPngImageData(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int)
                                (implicit system: ActorSystem, materializer: Materializer): Array[Byte] = {

@@ -19,10 +19,11 @@ package se.nimsa.sbx.app.routing
 import java.io.ByteArrayOutputStream
 import java.util.zip.{ZipEntry, ZipOutputStream}
 
+import akka.http.scaladsl.common.EntityStreamingSupport
+import akka.http.scaladsl.model.HttpEntity
 import akka.http.scaladsl.model.MediaTypes._
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.headers._
-import akka.http.scaladsl.model.{ContentTypes, HttpEntity}
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
@@ -44,6 +45,8 @@ import scala.util.{Failure, Success}
 trait ImageRoutes {
   this: SliceboxBase =>
 
+  implicit val jsonStreamingSupport = EntityStreamingSupport.json()
+
   def imageRoutes(apiUser: ApiUser): Route =
     pathPrefix("images") {
       pathEndOrSingleSlash {
@@ -59,7 +62,7 @@ trait ImageRoutes {
           case Some(image) =>
             pathEndOrSingleSlash {
               get {
-                complete(HttpEntity(ContentTypes.`application/octet-stream`, storage.fileSource(image)))
+                complete(HttpEntity(`application/octet-stream`, storage.fileSource(image)))
               } ~ delete {
                 complete(storageService.ask(DeleteDicomData(image)).flatMap(_ =>
                   metaDataService.ask(DeleteMetaData(image)).map(_ =>
@@ -67,15 +70,11 @@ trait ImageRoutes {
               }
             } ~ path("attributes") {
               get {
-                onSuccess(storageService.ask(GetImageAttributes(image)).mapTo[List[ImageAttribute]]) {
-                  complete(_)
-                }
+                complete(storage.readImageAttributes(image))
               }
             } ~ path("imageinformation") {
               get {
-                onSuccess(storageService.ask(GetImageInformation(image)).mapTo[ImageInformation]) {
-                  complete(_)
-                }
+                complete(storage.readImageInformation(image))
               }
             } ~ path("png") {
               parameters(
@@ -127,7 +126,7 @@ trait ImageRoutes {
                 case Some(imageIds) =>
                   val source: StreamSource[ByteString, _] = StreamSource.queue[ByteString](0, OverflowStrategy.fail)
                     .mapMaterializedValue(queue => new ImageZipper(queue).zipNext(imageIds))
-                  complete(HttpEntity(ContentTypes.`application/octet-stream`, source))
+                  complete(HttpEntity(`application/octet-stream`, source))
                 case None =>
                   complete(NotFound)
               }

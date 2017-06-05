@@ -5,36 +5,39 @@ import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{Source => StreamSource}
 import akka.util.{ByteString, Timeout}
-import org.dcm4che3.data.Attributes
+import org.dcm4che3.data.{Attributes, Tag}
 import org.dcm4che3.io.DicomStreamException
+import se.nimsa.dcm4che.streams.DicomFlows
 import se.nimsa.dcm4che.streams.DicomFlows.TagModification
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.app.GeneralProtocol.Source
 import se.nimsa.sbx.dicom.Contexts.Context
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.DicomPropertyValue.{PatientID, PatientName}
-import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, MetaDataAdded}
-import se.nimsa.sbx.storage.StorageProtocol.{DicomDataMoved, MoveDicomData}
+import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, DeleteMetaData, MetaDataAdded, MetaDataDeleted}
+import se.nimsa.sbx.storage.StorageProtocol.{DeleteDicomData, DicomDataDeleted, DicomDataMoved, MoveDicomData}
 import se.nimsa.sbx.storage.StorageService
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.reflect.ClassTag
+import DicomStreams._
+import se.nimsa.sbx.dicom.Contexts
 
 trait DicomStreamLoadOps {
 
   def callAnonymizationService[R: ClassTag](message: Any): Future[R]
 
-  private def anonymizationInsert(implicit ec: ExecutionContext) = (anonymizationKey: AnonymizationKey) =>
+  protected def anonymizationInsert(implicit ec: ExecutionContext) = (anonymizationKey: AnonymizationKey) =>
     callAnonymizationService[AnonymizationKeyAdded](AddAnonymizationKey(anonymizationKey))
       .map(_.anonymizationKey)
 
-  private def anonymizationQuery(implicit ec: ExecutionContext) = (patientName: PatientName, patientID: PatientID) =>
+  protected def anonymizationQuery(implicit ec: ExecutionContext) = (patientName: PatientName, patientID: PatientID) =>
     callAnonymizationService[AnonymizationKeys](GetAnonymizationKeysForPatient(patientName.value, patientID.value))
       .map(_.anonymizationKeys)
 
-  def anonymizedData(image: Image, tagMods: Seq[TagModification], storage: StorageService)
+  def anonymizedData(image: Image, tagValues: Seq[TagValue], storage: StorageService)
                     (implicit system: ActorSystem, mat: ActorMaterializer, ec: ExecutionContext, timeout: Timeout): StreamSource[ByteString, NotUsed] =
-    DicomStreams.anonymizedDicomDataSource(storage.fileSource(image), anonymizationQuery, anonymizationInsert, tagMods)
+    anonymizedDicomDataSource(storage.fileSource(image), anonymizationQuery, anonymizationInsert, tagValues)
 }
 
 trait DicomStreamOps extends DicomStreamLoadOps {
@@ -46,10 +49,10 @@ trait DicomStreamOps extends DicomStreamLoadOps {
   def callStorageService[R: ClassTag](message: Any): Future[R]
   def callMetaDataService[R: ClassTag](message: Any): Future[R]
 
-  def storeData(bytesSource: StreamSource[ByteString, _], source: Source, storage: StorageService, contexts: Seq[Context])
+  def storeData(bytesSource: StreamSource[ByteString, _], source: Source, storage: StorageService, contexts: Seq[Context], reverseAnonymization: Boolean = true)
                (implicit system: ActorSystem, mat: ActorMaterializer, ec: ExecutionContext, timeout: Timeout): Future[MetaDataAdded] = {
-    val tempPath = DicomStreams.createTempPath()
-    val sink = DicomStreams.dicomDataSink(storage.fileSink(tempPath), reverseAnonymizationQuery, contexts)
+    val tempPath = createTempPath()
+    val sink = dicomDataSink(storage.fileSink(tempPath), reverseAnonymizationQuery, contexts, reverseAnonymization)
     bytesSource.runWith(sink).flatMap {
       case (_, maybeDataset) =>
         val attributes: Attributes = maybeDataset.getOrElse(throw new DicomStreamException("DICOM data has no dataset"))
@@ -58,6 +61,24 @@ trait DicomStreamOps extends DicomStreamLoadOps {
             .map(_ => metaData)
         }
     }
+  }
+
+  def anonymizeData(image: Image, source: Source, storage: StorageService, tagValues: Seq[TagValue])
+                   (implicit system: ActorSystem, mat: ActorMaterializer, ec: ExecutionContext, timeout: Timeout): Future[MetaDataAdded] = {
+    val forcedSource = dicomDataSource(storage.fileSource(image))
+      .via(DicomFlows.modifyFlow(TagModification(Tag.PatientIdentityRemoved, _ => ByteString("NO"), insert = false)))
+      .via(DicomFlows.blacklistFilter { // FIXME: use seq variant, remember to include bulkdatafilter in dicom tags flow also
+        case Tag.DeidentificationMethod => true
+        case _ => false
+      })
+      .map(_.bytes)
+    val anonymizedSource = anonymizedDicomDataSource(forcedSource, anonymizationQuery, anonymizationInsert, tagValues)
+      .mapAsync(5)(bytes =>
+        callMetaDataService[MetaDataDeleted](DeleteMetaData(image)).flatMap(_ =>
+          callStorageService[DicomDataDeleted](DeleteDicomData(image))
+        ).map(_ => bytes)
+      )
+    storeData(anonymizedSource, source, storage, Contexts.extendedContexts, reverseAnonymization = false)
   }
 
 }

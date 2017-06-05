@@ -37,10 +37,6 @@ object StorageProtocol {
 
   case class GetDicomData(image: Image, withPixelData: Boolean) extends ImageRequest
 
-  case class GetImageAttributes(image: Image) extends ImageRequest
-
-  case class GetImageInformation(image: Image) extends ImageRequest
-
   case class CheckDicomData(dicomData: DicomData, useExtendedContexts: Boolean) extends ImageRequest
 
   case class AddDicomData(dicomData: DicomData, source: Source, image: Image) extends ImageRequest

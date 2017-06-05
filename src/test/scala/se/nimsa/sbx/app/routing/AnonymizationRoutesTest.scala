@@ -152,8 +152,8 @@ class AnonymizationRoutesTest extends {
         responseAs[FlatSeries]
       }
 
-    anonFlatSeries1.patient.patientName.value.startsWith("Anonymous") shouldBe true
-    anonFlatSeries2.patient.patientName.value.startsWith("Anonymous") shouldBe true
+    anonFlatSeries1.patient.patientName.value should not be "anon270"
+    anonFlatSeries2.patient.patientName.value should not be "John^Doe"
   }
 
   it should "return 404 NotFound when manually anonymizing an image that does not exist" in {
