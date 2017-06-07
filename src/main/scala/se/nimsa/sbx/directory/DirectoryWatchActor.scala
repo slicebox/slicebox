@@ -33,7 +33,7 @@ import se.nimsa.sbx.directory.DirectoryWatchProtocol._
 import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.storage.StorageService
 
-import scala.concurrent.duration.DurationInt
+import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.reflect.ClassTag
 import scala.util.control.NonFatal
 
@@ -42,14 +42,13 @@ class DirectoryWatchActor(watchedDirectory: WatchedDirectory,
                           metaDataServicePath: String = "../../MetaDataService",
                           storageServicePath: String = "../../StorageService",
                           anonymizationServicePath: String = "../../AnonymizationService")
-                         (implicit val timeout: Timeout) extends Actor with DicomStreamOps {
+                         (implicit val materializer: ActorMaterializer, timeout: Timeout) extends Actor with DicomStreamOps {
 
   val storageService = context.actorSelection(storageServicePath)
   val metaDataService = context.actorSelection(metaDataServicePath)
   val anonymizationService = context.actorSelection(anonymizationServicePath)
 
   implicit val system = context.system
-  implicit val materializer = ActorMaterializer()
   implicit val executor = context.dispatcher
 
   val sbxSource = Source(SourceType.DIRECTORY, watchedDirectory.name, watchedDirectory.id)
@@ -97,6 +96,7 @@ class DirectoryWatchActor(watchedDirectory: WatchedDirectory,
   override def callAnonymizationService[R: ClassTag](message: Any) = anonymizationService.ask(message).mapTo[R]
   override def callStorageService[R: ClassTag](message: Any) = storageService.ask(message).mapTo[R]
   override def callMetaDataService[R: ClassTag](message: Any) = metaDataService.ask(message).mapTo[R]
+  override def scheduleTask(delay: FiniteDuration)(task: => Unit) = system.scheduler.scheduleOnce(delay)(task)
 
   def receive = LoggingReceive {
     case _ =>
@@ -104,5 +104,5 @@ class DirectoryWatchActor(watchedDirectory: WatchedDirectory,
 }
 
 object DirectoryWatchActor {
-  def props(watchedDirectory: WatchedDirectory, storage: StorageService, timeout: Timeout): Props = Props(new DirectoryWatchActor(watchedDirectory, storage)(timeout))
+  def props(watchedDirectory: WatchedDirectory, storage: StorageService)(implicit materializer: ActorMaterializer, timeout: Timeout): Props = Props(new DirectoryWatchActor(watchedDirectory, storage))
 }

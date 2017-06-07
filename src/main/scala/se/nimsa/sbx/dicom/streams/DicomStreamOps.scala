@@ -1,7 +1,7 @@
 package se.nimsa.sbx.dicom.streams
 
 import akka.NotUsed
-import akka.actor.ActorSystem
+import akka.actor.{ActorSystem, Cancellable}
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{Source => StreamSource}
 import akka.util.{ByteString, Timeout}
@@ -21,6 +21,7 @@ import se.nimsa.sbx.storage.StorageProtocol.{DeleteDicomData, DicomDataDeleted, 
 import se.nimsa.sbx.storage.StorageService
 import se.nimsa.sbx.util.SbxExtensions._
 
+import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.concurrent.{ExecutionContext, Future}
 import scala.reflect.ClassTag
 
@@ -63,6 +64,8 @@ trait DicomStreamLoadOps {
 trait DicomStreamOps extends DicomStreamLoadOps {
 
   def callStorageService[R: ClassTag](message: Any): Future[R]
+  def callMetaDataService[R: ClassTag](message: Any): Future[R]
+  def scheduleTask(delay: FiniteDuration)(task: => Unit): Cancellable
 
   protected def reverseAnonymizationQuery(implicit ec: ExecutionContext) = (patientName: PatientName, patientID: PatientID) =>
     callAnonymizationService[AnonymizationKeys](GetReverseAnonymizationKeysForPatient(patientName.value, patientID.value))
@@ -89,6 +92,12 @@ trait DicomStreamOps extends DicomStreamLoadOps {
           callStorageService[DicomDataMoved](MoveDicomData(tempPath, s"${metaData.image.id}"))
             .map(_ => metaData)
         }
+    }.recover {
+      case t: Throwable =>
+        scheduleTask(30.seconds) {
+          storage.deleteFromStorage(tempPath) // delete temp file once file system has released handle
+        }
+        throw t
     }
   }
 

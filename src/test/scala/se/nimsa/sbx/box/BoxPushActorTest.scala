@@ -4,7 +4,7 @@ import akka.NotUsed
 import akka.actor.{Actor, ActorSystem, Props}
 import akka.http.scaladsl.model.StatusCodes.{InternalServerError, NoContent, ServiceUnavailable}
 import akka.http.scaladsl.model._
-import akka.stream.Materializer
+import akka.stream.{ActorMaterializer, Materializer}
 import akka.stream.scaladsl.Source
 import akka.testkit.{ImplicitSender, TestKit}
 import akka.util.{ByteString, Timeout}
@@ -29,6 +29,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
   implicit val ec = system.dispatcher
   implicit val timeout = Timeout(30.seconds)
+  implicit val materializer = ActorMaterializer()
 
   val dbConfig = TestUtil.createTestDb("boxpushactortest")
 
@@ -69,8 +70,8 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       Source.single(ByteString(1,2,3))
   }
 
-  val anonymizationService = system.actorOf(AnonymizationServiceActor.props(anonymizationDao, purgeEmptyAnonymizationKeys = false, timeout), name = "AnonymizationService")
-  val boxService = system.actorOf(BoxServiceActor.props(boxDao, "http://testhost:1234", storage, timeout), name = "BoxService")
+  val anonymizationService = system.actorOf(AnonymizationServiceActor.props(anonymizationDao, purgeEmptyAnonymizationKeys = false), name = "AnonymizationService")
+  val boxService = system.actorOf(BoxServiceActor.props(boxDao, "http://testhost:1234", storage), name = "BoxService")
 
   var reportTransactionAsFailed = false
 

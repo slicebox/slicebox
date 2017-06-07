@@ -160,5 +160,5 @@ class AnonymizationServiceActor(anonymizationDao: AnonymizationDAO, purgeEmptyAn
 }
 
 object AnonymizationServiceActor {
-  def props(anonymizationDao: AnonymizationDAO, purgeEmptyAnonymizationKeys: Boolean, timeout: Timeout): Props = Props(new AnonymizationServiceActor(anonymizationDao, purgeEmptyAnonymizationKeys)(timeout))
+  def props(anonymizationDao: AnonymizationDAO, purgeEmptyAnonymizationKeys: Boolean)(implicit timeout: Timeout): Props = Props(new AnonymizationServiceActor(anonymizationDao, purgeEmptyAnonymizationKeys))
 }

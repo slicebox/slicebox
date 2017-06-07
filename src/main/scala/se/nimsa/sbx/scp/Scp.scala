@@ -48,11 +48,11 @@ class Scp(val name: String,
       rsp.setInt(Tag.Status, VR.US, 0)
 
       val versionName = as.getRemoteImplVersionName
-      val tsuidBytes = DicomUtil.padToEvenLength(ByteString(pc.getTransferSyntax.getBytes("US-ASCII")), VR.UI)
+      val tsuidBytes = DicomUtil.padToEvenLength(ByteString(pc.getTransferSyntax), VR.UI)
       val cuidBytes = ByteString(rq.getBytes(Tag.AffectedSOPClassUID))
       val iuidBytes = ByteString(rq.getBytes(Tag.AffectedSOPInstanceUID))
-      val riuidBytes = DicomUtil.padToEvenLength(ByteString(as.getRemoteImplClassUID.getBytes("US-ASCII")), VR.UI)
-      val raetBytes = DicomUtil.padToEvenLength(ByteString(as.getRemoteAET.getBytes("US-ASCII")), VR.SH)
+      val riuidBytes = DicomUtil.padToEvenLength(ByteString(as.getRemoteImplClassUID), VR.UI)
+      val raetBytes = DicomUtil.padToEvenLength(ByteString(as.getRemoteAET), VR.SH)
 
       // val bigEndian = tsuid == UID.ExplicitVRBigEndianRetired
 
@@ -62,7 +62,7 @@ class Scp(val name: String,
       val fmiTransferSyntax = DicomAttribute(DicomHeader(Tag.TransferSyntaxUID, VR.UI, tsuidBytes.length, isFmi = true, bigEndian = false, explicitVR = true), Seq(DicomValueChunk(bigEndian = true, tsuidBytes, last = true)))
       val fmiImplementationUID = DicomAttribute(DicomHeader(Tag.ImplementationClassUID, VR.UI, riuidBytes.length, isFmi = true, bigEndian = false, explicitVR = true), Seq(DicomValueChunk(bigEndian = true, riuidBytes, last = true)))
       val fmiVersionName = if (versionName != null) {
-        val versionNameBytes = DicomUtil.padToEvenLength(ByteString(versionName.getBytes("US-ASCII")), VR.SH)
+        val versionNameBytes = DicomUtil.padToEvenLength(ByteString(versionName), VR.SH)
         DicomAttribute(DicomHeader(Tag.ImplementationVersionName, VR.SH, versionNameBytes.length, isFmi = true, bigEndian = false, explicitVR = true), Seq(DicomValueChunk(bigEndian = true, versionNameBytes, last = true)))
       } else
         DicomAttribute(DicomHeader(Tag.ImplementationVersionName, VR.SH, 0, isFmi = true, bigEndian = false, explicitVR = true, ByteString.empty), Seq(DicomValueChunk(bigEndian = true, ByteString.empty, last = true)))

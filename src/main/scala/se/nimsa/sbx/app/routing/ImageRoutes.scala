@@ -144,10 +144,9 @@ trait ImageRoutes {
                   metaDataService.ask(GetPatient(study.patientId)).mapTo[Option[Patient]].map { patientMaybe =>
                     patientMaybe.map { patient =>
                       bytes.fold(ByteString.empty)(_ ++ _).runWith(Sink.head).map { allBytes =>
-                        val dicomData = Jpeg2Dcm(allBytes.toArray, patient, study, optionalDescription)
-                        metaDataService.ask(AddMetaData(dicomData.attributes, source)).mapTo[MetaDataAdded].flatMap { metaData =>
-                          storageService.ask(AddDicomData(dicomData, source, metaData.image)).map { _ => metaData.image }
-                        }
+                        val scBytes = Jpeg2Dcm(allBytes.toArray, patient, study, optionalDescription)
+                        storeDicomData(StreamSource.single(ByteString(scBytes)), source, storage, Contexts.extendedContexts)
+                          .map(_.image)
                       }
                     }
                   }.unwrap

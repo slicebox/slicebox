@@ -20,6 +20,7 @@ import java.nio.file.{Files, Paths}
 
 import akka.actor.{Actor, PoisonPill, Props}
 import akka.event.{Logging, LoggingReceive}
+import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import se.nimsa.sbx.directory.DirectoryWatchProtocol._
 import se.nimsa.sbx.storage.StorageService
@@ -28,7 +29,7 @@ import se.nimsa.sbx.util.FutureUtil.await
 
 import scala.language.postfixOps
 
-class DirectoryWatchServiceActor(directoryWatchDao: DirectoryWatchDAO, storage: StorageService)(implicit timeout: Timeout) extends Actor with ExceptionCatching {
+class DirectoryWatchServiceActor(directoryWatchDao: DirectoryWatchDAO, storage: StorageService)(implicit materializer: ActorMaterializer, timeout: Timeout) extends Actor with ExceptionCatching {
   val log = Logging(context.system, this)
 
   setupWatches()
@@ -64,7 +65,7 @@ class DirectoryWatchServiceActor(directoryWatchDao: DirectoryWatchDAO, storage: 
                 val watchedDirectory = addDirectory(directory)
 
                 context.child(watchedDirectory.id.toString).getOrElse(
-                  context.actorOf(DirectoryWatchActor.props(watchedDirectory, storage, timeout), watchedDirectory.id.toString))
+                  context.actorOf(DirectoryWatchActor.props(watchedDirectory, storage), watchedDirectory.id.toString))
 
                 sender ! watchedDirectory
             }
@@ -90,7 +91,7 @@ class DirectoryWatchServiceActor(directoryWatchDao: DirectoryWatchDAO, storage: 
     watchedDirectories foreach (watchedDirectory => {
       val path = Paths.get(watchedDirectory.path)
       if (Files.isDirectory(path))
-        context.actorOf(DirectoryWatchActor.props(watchedDirectory, storage, timeout), watchedDirectory.id.toString)
+        context.actorOf(DirectoryWatchActor.props(watchedDirectory, storage), watchedDirectory.id.toString)
       else
         deleteDirectory(watchedDirectory.id)
     })
@@ -114,5 +115,5 @@ class DirectoryWatchServiceActor(directoryWatchDao: DirectoryWatchDAO, storage: 
 }
 
 object DirectoryWatchServiceActor {
-  def props(directoryWatchDao: DirectoryWatchDAO, storage: StorageService, timeout: Timeout): Props = Props(new DirectoryWatchServiceActor(directoryWatchDao, storage)(timeout))
+  def props(directoryWatchDao: DirectoryWatchDAO, storage: StorageService)(implicit materializer: ActorMaterializer, timeout: Timeout): Props = Props(new DirectoryWatchServiceActor(directoryWatchDao, storage))
 }

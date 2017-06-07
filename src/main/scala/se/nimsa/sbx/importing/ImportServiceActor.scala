@@ -92,5 +92,5 @@ class ImportServiceActor(importDao: ImportDAO)(implicit timeout: Timeout) extend
 }
 
 object ImportServiceActor {
-  def props(importDao: ImportDAO, timeout: Timeout): Props = Props(new ImportServiceActor(importDao)(timeout))
+  def props(importDao: ImportDAO)(implicit timeout: Timeout): Props = Props(new ImportServiceActor(importDao))
 }

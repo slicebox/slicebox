@@ -3,6 +3,7 @@ package se.nimsa.sbx.seriestype
 import akka.actor.ActorSelection.toScala
 import akka.actor.ActorSystem
 import akka.pattern.ask
+import akka.stream.ActorMaterializer
 import akka.testkit.{ImplicitSender, TestKit}
 import akka.util.Timeout
 import org.dcm4che3.data.{Keyword, Tag}
@@ -26,6 +27,7 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
 
   implicit val ec = system.dispatcher
   implicit val timeout = Timeout(30.seconds)
+  implicit val materializer = ActorMaterializer()
 
   val dbConfig = TestUtil.createTestDb("seriestypeupdateactortest")
   val dao = new MetaDataDAO(dbConfig)
@@ -43,8 +45,8 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
   }
 
   val storageService = system.actorOf(StorageServiceActor.props(storage), name = "StorageService")
-  val metaDataService = system.actorOf(MetaDataServiceActor.props(metaDataDao, propertiesDao, timeout), name = "MetaDataService")
-  val seriesTypeService = system.actorOf(SeriesTypeServiceActor.props(seriesTypeDao, storage, timeout), name = "SeriesTypeService")
+  val metaDataService = system.actorOf(MetaDataServiceActor.props(metaDataDao, propertiesDao), name = "MetaDataService")
+  val seriesTypeService = system.actorOf(SeriesTypeServiceActor.props(seriesTypeDao, storage), name = "SeriesTypeService")
   val seriesTypeUpdateService = system.actorSelection("user/SeriesTypeService/SeriesTypeUpdate")
 
   override def afterAll() = TestKit.shutdownActorSystem(system)

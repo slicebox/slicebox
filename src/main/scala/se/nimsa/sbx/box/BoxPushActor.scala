@@ -24,7 +24,8 @@ import akka.http.scaladsl.model._
 import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.pattern.ask
 import akka.stream.ActorMaterializer
-import akka.util.Timeout
+import akka.stream.scaladsl.Compression
+import akka.util.{ByteString, Timeout}
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.dicom.streams.DicomStreamLoadOps
@@ -42,7 +43,7 @@ class BoxPushActor(box: Box,
                    boxServicePath: String = "../../BoxService",
                    metaDataServicePath: String = "../../MetaDataService",
                    anonymizationServicePath: String = "../../AnonymizationService")
-                  (implicit val timeout: Timeout) extends Actor with DicomStreamLoadOps {
+                  (implicit val materializer: ActorMaterializer, timeout: Timeout) extends Actor with DicomStreamLoadOps {
 
   val log = Logging(context.system, this)
 
@@ -52,7 +53,6 @@ class BoxPushActor(box: Box,
 
   implicit val system = context.system
   implicit val executor = context.dispatcher
-  implicit val materializer = ActorMaterializer()
 
   val poller = system.scheduler.schedule(pollInterval, pollInterval) {
     self ! PollOutgoing
@@ -125,7 +125,7 @@ class BoxPushActor(box: Box,
     anonymizedDicomData(transactionImage.image.imageId, outgoingTagValues.map(_.tagValue), storage).flatMap {
       case Some(source) =>
         val uri = s"${box.baseUrl}/image?transactionid=${transactionImage.transaction.id}&sequencenumber=${transactionImage.image.sequenceNumber}&totalimagecount=${transactionImage.transaction.totalImageCount}"
-        sliceboxRequest(HttpMethods.POST, uri, HttpEntity(ContentTypes.`application/octet-stream`, source))
+        sliceboxRequest(HttpMethods.POST, uri, HttpEntity(ContentTypes.`application/octet-stream`, source.via(Compression.deflate)))
       case None =>
         Future.failed(new IllegalArgumentException("Image not found for image id " + transactionImage.image.imageId))
     }
@@ -199,6 +199,6 @@ class BoxPushActor(box: Box,
 }
 
 object BoxPushActor {
-  def props(box: Box, storageService: StorageService, timeout: Timeout): Props = Props(new BoxPushActor(box, storageService)(timeout))
+  def props(box: Box, storageService: StorageService)(implicit materializer: ActorMaterializer, timeout: Timeout): Props = Props(new BoxPushActor(box, storageService))
 
 }

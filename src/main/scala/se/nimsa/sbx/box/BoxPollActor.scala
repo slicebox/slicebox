@@ -47,7 +47,7 @@ class BoxPollActor(box: Box,
                    metaDataServicePath: String = "../../MetaDataService",
                    storageServicePath: String = "../../StorageService",
                    anonymizationServicePath: String = "../../AnonymizationService")
-                  (implicit val timeout: Timeout) extends Actor with DicomStreamOps with BoxJsonFormats with PlayJsonSupport {
+                  (implicit val materializer: ActorMaterializer, timeout: Timeout) extends Actor with DicomStreamOps with BoxJsonFormats with PlayJsonSupport {
 
   val log = Logging(context.system, this)
 
@@ -58,7 +58,6 @@ class BoxPollActor(box: Box,
 
   implicit val system = context.system
   implicit val executor = context.dispatcher
-  implicit val materializer = ActorMaterializer()
 
   val poller = system.scheduler.schedule(pollInterval, pollInterval) {
     self ! PollIncoming
@@ -70,6 +69,7 @@ class BoxPollActor(box: Box,
   override def callAnonymizationService[R: ClassTag](message: Any) = anonymizationService.ask(message).mapTo[R]
   override def callStorageService[R: ClassTag](message: Any) = storageService.ask(message).mapTo[R]
   override def callMetaDataService[R: ClassTag](message: Any) = metaDataService.ask(message).mapTo[R]
+  override def scheduleTask(delay: FiniteDuration)(task: => Unit) = system.scheduler.scheduleOnce(delay)(task)
 
   def receive = LoggingReceive {
     case PollIncoming =>
@@ -202,6 +202,6 @@ class BoxPollActor(box: Box,
 }
 
 object BoxPollActor {
-  def props(box: Box, storage: StorageService, timeout: Timeout): Props = Props(new BoxPollActor(box, storage)(timeout))
+  def props(box: Box, storage: StorageService)(implicit materializer: ActorMaterializer, timeout: Timeout): Props = Props(new BoxPollActor(box, storage))
 
 }

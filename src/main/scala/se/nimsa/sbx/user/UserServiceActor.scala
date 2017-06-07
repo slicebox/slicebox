@@ -164,7 +164,7 @@ class UserServiceActor(userDao: UserDAO, superUser: String, superPassword: Strin
 }
 
 object UserServiceActor {
-  def props(dao: UserDAO, superUser: String, superPassword: String, sessionTimeout: Long, timeout: Timeout): Props = Props(new UserServiceActor(dao, superUser, superPassword, sessionTimeout)(timeout))
+  def props(dao: UserDAO, superUser: String, superPassword: String, sessionTimeout: Long)(implicit timeout: Timeout): Props = Props(new UserServiceActor(dao, superUser, superPassword, sessionTimeout))
 
   def newSessionToken = UUID.randomUUID.toString
 

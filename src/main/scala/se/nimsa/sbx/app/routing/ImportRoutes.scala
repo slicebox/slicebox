@@ -118,11 +118,11 @@ trait ImportRoutes {
             }
             fileInfo match {
               case Some(fi) =>
-                SbxLog.error(s"Exception during import of ${fi.fileName}", failure.getMessage)
+                SbxLog.error(s"${failure.getClass.getSimpleName} during import of ${fi.fileName}", failure.getMessage)
                 importService.ask(UpdateSessionWithRejection(importSession))
                 complete((status, s"${fi.fileName}: ${failure.getMessage}"))
               case None =>
-                SbxLog.error("Exception during import", failure.getMessage)
+                SbxLog.error(s"${failure.getClass.getSimpleName} during import", failure.getMessage)
                 importService.ask(UpdateSessionWithRejection(importSession))
                 complete((status, failure.getMessage))
             }

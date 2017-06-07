@@ -108,7 +108,7 @@ trait TransactionRoutes {
                         val tagValues = transactionTagValues.map(_.tagValue)
                         onSuccess(anonymizedDicomData(imageId, tagValues, storage)) {
                           case Some(streamSource) =>
-                            complete(HttpEntity(ContentTypes.`application/octet-stream`, streamSource))
+                            complete(HttpEntity(ContentTypes.`application/octet-stream`, streamSource.via(Compression.deflate)))
                           case None =>
                             complete((NotFound, s"Image not found for image id $imageId"))
                         }
