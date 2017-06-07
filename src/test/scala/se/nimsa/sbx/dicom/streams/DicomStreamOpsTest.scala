@@ -21,7 +21,7 @@ import se.nimsa.sbx.util.TestUtil
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 
-class DicomStreamsTest extends TestKit(ActorSystem("AnonymizationFlowSpec")) with AsyncFlatSpecLike with Matchers {
+class DicomStreamOpsTest extends TestKit(ActorSystem("AnonymizationFlowSpec")) with AsyncFlatSpecLike with Matchers {
 
   import DicomTestData._
 
@@ -43,14 +43,14 @@ class DicomStreamsTest extends TestKit(ActorSystem("AnonymizationFlowSpec")) wit
     val bytes = preamble ++ fmiGroupLength(unsupportedMediaStorageSOPClassUID ++ tsuidExplicitLE) ++ unsupportedMediaStorageSOPClassUID ++ tsuidExplicitLE ++ patientNameJohnDoe
     val source = Source.single(bytes)
     recoverToSucceededIf[DicomStreamException] {
-      source.runWith(DicomStreams.dicomDataSink(storage.fileSink("name"), (_, _) => Future.successful(Seq.empty), Contexts.imageDataContexts))
+      source.runWith(DicomStreamOps.dicomDataSink(storage.fileSink("name"), (_, _) => Future.successful(Seq.empty), Contexts.imageDataContexts))
     }
   }
 
   it should "pass a supported context" in {
     val bytes = preamble ++ fmiGroupLength(supportedMediaStorageSOPClassUID ++ tsuidExplicitLE) ++ supportedMediaStorageSOPClassUID ++ tsuidExplicitLE ++ patientNameJohnDoe
     val source = Source.single(bytes)
-    source.runWith(DicomStreams.dicomDataSink(storage.fileSink("name"), (_, _) => Future.successful(Seq.empty), Contexts.imageDataContexts))
+    source.runWith(DicomStreamOps.dicomDataSink(storage.fileSink("name"), (_, _) => Future.successful(Seq.empty), Contexts.imageDataContexts))
       .map(_ => succeed)
   }
 
@@ -58,14 +58,14 @@ class DicomStreamsTest extends TestKit(ActorSystem("AnonymizationFlowSpec")) wit
     val bytes = preamble ++ fmiGroupLength(unknownMediaStorageSOPClassUID ++ tsuidExplicitLE) ++ unknownMediaStorageSOPClassUID ++ tsuidExplicitLE ++ patientNameJohnDoe
     val source = Source.single(bytes)
     recoverToSucceededIf[DicomStreamException] {
-      source.runWith(DicomStreams.dicomDataSink(storage.fileSink("name"), (_, _) => Future.successful(Seq.empty), Contexts.imageDataContexts))
+      source.runWith(DicomStreamOps.dicomDataSink(storage.fileSink("name"), (_, _) => Future.successful(Seq.empty), Contexts.imageDataContexts))
     }
   }
 
   it should "accept DICOM data with missing file meta information" in {
     val bytes = supportedSOPClassUID
     val source = Source.single(bytes)
-    source.runWith(DicomStreams.dicomDataSink(storage.fileSink("name"), (_, _) => Future.successful(Seq.empty), Contexts.imageDataContexts))
+    source.runWith(DicomStreamOps.dicomDataSink(storage.fileSink("name"), (_, _) => Future.successful(Seq.empty), Contexts.imageDataContexts))
       .map(_ => succeed)
   }
 
@@ -74,7 +74,7 @@ class DicomStreamsTest extends TestKit(ActorSystem("AnonymizationFlowSpec")) wit
     val anonKey = TestUtil.createAnonymizationKey(dicomData.attributes)
     val source = toSource(dicomData)
 
-    val anonSource = DicomStreams.anonymizedDicomDataSource(source, (_, _) => Future.successful(Seq(anonKey)), a => Future.successful(a), Seq.empty)
+    val anonSource = DicomStreamOps.anonymizedDicomDataSource(source, (_, _) => Future.successful(Seq(anonKey)), a => Future.successful(a), Seq.empty)
 
     anonSource.via(DicomPartFlow.partFlow).via(DicomFlows.attributeFlow).runWith(DicomAttributesSink.attributesSink).map {
       case (_, dsMaybe) =>
@@ -89,7 +89,7 @@ class DicomStreamsTest extends TestKit(ActorSystem("AnonymizationFlowSpec")) wit
     val t3 = TagValue(Tag.SeriesDescription, "Mapped Series Description")
     val bytes = preamble ++ fmiGroupLength(supportedMediaStorageSOPClassUID ++ tsuidExplicitLE) ++ supportedMediaStorageSOPClassUID ++ tsuidExplicitLE ++ patientNameJohnDoe
     val source = Source.single(bytes)
-    val anonSource = DicomStreams.anonymizedDicomDataSource(
+    val anonSource = DicomStreamOps.anonymizedDicomDataSource(
       source,
       (_, _) => Future.successful(Seq.empty),
       _ => Future.successful(TestUtil.createAnonymizationKey(new Attributes())),
@@ -110,7 +110,7 @@ class DicomStreamsTest extends TestKit(ActorSystem("AnonymizationFlowSpec")) wit
     val key = createAnonymizationKey(attributes, anonAttributes)
 
     val source = toSource(DicomData(attributes, null))
-    val anonSource = DicomStreams.anonymizedDicomDataSource(source, (_, _) => Future.successful(Seq(key)), _ => Future.successful(key), Seq.empty)
+    val anonSource = DicomStreamOps.anonymizedDicomDataSource(source, (_, _) => Future.successful(Seq(key)), _ => Future.successful(key), Seq.empty)
 
     anonSource.via(DicomPartFlow.partFlow).via(DicomFlows.attributeFlow).runWith(DicomAttributesSink.attributesSink).map {
       case (_, dsMaybe) =>
@@ -129,7 +129,7 @@ class DicomStreamsTest extends TestKit(ActorSystem("AnonymizationFlowSpec")) wit
     val key = createAnonymizationKey(attributes, anonAttributes)
 
     val metaData = DicomMetaPart(None, None, Some("pid"), Some("pn"), Some("NO"), Some("stuid"), Some("seuid"))
-    val query = DicomStreams.queryAnonymousAnonymizationKeys((_, _) => Future.successful(Seq(key)))
+    val query = DicomStreamOps.queryAnonymousAnonymizationKeys((_, _) => Future.successful(Seq(key)))
     query(metaData).map { parts =>
       parts should have length 2
       parts.head shouldBe a[DicomMetaPart]
@@ -148,7 +148,7 @@ class DicomStreamsTest extends TestKit(ActorSystem("AnonymizationFlowSpec")) wit
     val key = createAnonymizationKey(attributes, anonAttributes).copy(studyInstanceUID = "stuid2")
 
     val metaData = DicomMetaPart(None, None, Some("pid"), Some("pn"), Some("NO"), Some("stuid"), Some("seuid"))
-    val query = DicomStreams.queryAnonymousAnonymizationKeys((_, _) => Future.successful(Seq(key)))
+    val query = DicomStreamOps.queryAnonymousAnonymizationKeys((_, _) => Future.successful(Seq(key)))
     query(metaData).map { parts =>
       parts should have length 2
       parts.head shouldBe a[DicomMetaPart]
@@ -167,7 +167,7 @@ class DicomStreamsTest extends TestKit(ActorSystem("AnonymizationFlowSpec")) wit
     val key = createAnonymizationKey(attributes, anonAttributes)
 
     val metaData = DicomMetaPart(None, None, Some("apid"), Some("apn"), Some("YES"), Some("astuid"), Some("aseuid"))
-    val query = DicomStreams.queryProtectedAnonymizationKeys((_, _) => Future.successful(Seq(key)))
+    val query = DicomStreamOps.queryProtectedAnonymizationKeys((_, _) => Future.successful(Seq(key)))
     query(metaData).map { parts =>
       parts should have length 2
       parts.head shouldBe a[DicomMetaPart]
@@ -186,7 +186,7 @@ class DicomStreamsTest extends TestKit(ActorSystem("AnonymizationFlowSpec")) wit
     val key = createAnonymizationKey(attributes, anonAttributes).copy(anonStudyInstanceUID = "astuid2")
 
     val metaData = DicomMetaPart(None, None, Some("apid"), Some("apn"), Some("YES"), Some("astuid"), Some("aseuid"))
-    val query = DicomStreams.queryProtectedAnonymizationKeys((_, _) => Future.successful(Seq(key)))
+    val query = DicomStreamOps.queryProtectedAnonymizationKeys((_, _) => Future.successful(Seq(key)))
     query(metaData).map { parts =>
       parts should have length 2
       parts.head shouldBe a[DicomMetaPart]
@@ -205,7 +205,7 @@ class DicomStreamsTest extends TestKit(ActorSystem("AnonymizationFlowSpec")) wit
     val key = createAnonymizationKey(attributes, anonAttributes)
 
     val metaData = DicomMetaPart(None, None, Some("apid"), Some("apn"), Some("NO"), Some("astuid"), Some("aseuid"))
-    val query = DicomStreams.queryProtectedAnonymizationKeys((_, _) => Future.successful(Seq(key)))
+    val query = DicomStreamOps.queryProtectedAnonymizationKeys((_, _) => Future.successful(Seq(key)))
     query(metaData).map { parts =>
       parts should have length 2
       parts.head shouldBe a[DicomMetaPart]

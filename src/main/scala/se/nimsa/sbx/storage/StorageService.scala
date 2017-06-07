@@ -22,8 +22,8 @@ import java.io.{ByteArrayOutputStream, InputStream}
 import javax.imageio.ImageIO
 
 import akka.actor.ActorSystem
-import akka.stream.{ActorMaterializer, Materializer}
 import akka.stream.scaladsl.{Sink, Source, StreamConverters}
+import akka.stream.{ActorMaterializer, Materializer}
 import akka.util.ByteString
 import akka.{Done, NotUsed}
 import com.amazonaws.util.IOUtils
@@ -31,7 +31,7 @@ import org.dcm4che3.data.Tag
 import org.dcm4che3.imageio.plugins.dcm.DicomImageReadParam
 import se.nimsa.dcm4che.streams.{DicomAttributesSink, DicomFlows, DicomPartFlow}
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
-import se.nimsa.sbx.dicom.streams.DicomStreams
+import se.nimsa.sbx.dicom.streams.DicomStreamOps
 import se.nimsa.sbx.dicom.{DicomData, ImageAttribute}
 import se.nimsa.sbx.storage.StorageProtocol.ImageInformation
 
@@ -59,7 +59,7 @@ trait StorageService {
   def readDicomData(image: Image, withPixelData: Boolean): DicomData
 
   def readImageAttributes(image: Image)(implicit ec: ExecutionContext, system: ActorSystem, materializer: ActorMaterializer): Source[ImageAttribute, NotUsed] =
-    DicomStreams.imageAttributesSource(fileSource(image))
+    DicomStreamOps.imageAttributesSource(fileSource(image))
 
   private val imageInformationTags = Seq(Tag.InstanceNumber, Tag.ImageIndex, Tag.NumberOfFrames, Tag.SmallestImagePixelValue, Tag.LargestImagePixelValue).sorted
 
@@ -91,7 +91,7 @@ trait StorageService {
                       (implicit system: ActorSystem, materializer: Materializer): Array[Byte] = {
     // dcm4che does not support viewing of deflated data, cf. Github issue #42
     // As a workaround, do streaming inflate and mapping of transfer syntax
-    val inflatedSource = DicomStreams.inflatedSource(source)
+    val inflatedSource = DicomStreamOps.inflatedSource(source)
     val is = inflatedSource.runWith(StreamConverters.asInputStream())
     val iis = ImageIO.createImageInputStream(is)
     try {

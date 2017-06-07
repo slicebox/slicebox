@@ -264,7 +264,7 @@ object AnonymizationFlow {
     *
     * @return a `Flow` of `DicomParts` that will anonymize non-anonymized data but does nothing otherwise
     */
-  val maybeAnonFlow = DicomStreams.conditionalFlow(
+  val maybeAnonFlow = DicomStreamOps.conditionalFlow(
     {
       case p: DicomMetaPart => !p.isAnonymized
     }, anonFlow, Flow.fromFunction(identity))

@@ -76,7 +76,7 @@ object HarmonizeAnonymizationFlow {
       }
     }
 
-  val maybeHarmonizeAnonFlow = DicomStreams.conditionalFlow(
+  val maybeHarmonizeAnonFlow = DicomStreamOps.conditionalFlow(
     {
       case keys: AnonymizationKeysPart => keys.patientKey.isEmpty
     }, Flow.fromFunction(identity), harmonizeAnonFlow)
