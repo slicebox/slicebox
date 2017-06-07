@@ -17,7 +17,7 @@
 package se.nimsa.sbx.storage
 
 import java.io.{BufferedInputStream, InputStream}
-import java.nio.file.{Files, Path, StandardCopyOption}
+import java.nio.file.{Files, Path, Paths, StandardCopyOption}
 
 import akka.actor.ActorSystem
 import akka.stream.Materializer
@@ -57,9 +57,11 @@ class FileStorage(val path: Path) extends StorageService {
   private def filePath(filePath: String): Path =
     path.resolve(filePath)
 
-  override def move(sourceImageName: String, targetImageName: String): Unit = {
+  override def move(sourceImageName: String, targetImageName: String): Unit =
     Files.move(path.resolve(sourceImageName), path.resolve(targetImageName), StandardCopyOption.REPLACE_EXISTING)
-  }
+
+  override def deleteFromStorage(name: String): Unit =
+    Files.delete(filePath(name))
 
   override def deleteFromStorage(image: Image): Unit =
     Files.delete(filePath(image))

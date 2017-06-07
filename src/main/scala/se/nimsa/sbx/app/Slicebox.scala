@@ -43,7 +43,7 @@ import se.nimsa.sbx.user.{UserDAO, UserServiceActor}
 import slick.basic.DatabaseConfig
 import slick.jdbc.JdbcProfile
 
-import scala.concurrent.duration.DurationInt
+import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.concurrent.{Await, ExecutionContextExecutor}
 import scala.reflect.ClassTag
 import scala.util.{Failure, Success}
@@ -146,6 +146,7 @@ trait SliceboxBase extends SliceboxRoutes with DicomStreamOps with JsonFormats w
   override def callAnonymizationService[R: ClassTag](message: Any) = anonymizationService.ask(message).mapTo[R]
   override def callStorageService[R: ClassTag](message: Any) = storageService.ask(message).mapTo[R]
   override def callMetaDataService[R: ClassTag](message: Any) = metaDataService.ask(message).mapTo[R]
+  override def scheduleTask(delay: FiniteDuration)(task: => Unit) = system.scheduler.scheduleOnce(delay)(task)
 
 }
 
@@ -176,5 +177,4 @@ object Slicebox extends {
     case Failure(e) =>
       SbxLog.error("System", s"Could not bind to $host:$port, ${e.getMessage}")
   }
-
 }

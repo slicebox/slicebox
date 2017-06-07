@@ -72,13 +72,12 @@ angular.module('slicebox.import', ['ngRoute', 'ngFileUpload'])
             $scope.uiState.currentFileSet.progress = Math.round(100 * $scope.uiState.currentFileSet.index / $scope.uiState.currentFileSet.total);
             Upload.upload({
                 url: '/api/import/sessions/' + $scope.uiState.selectedSession.id + '/images',
-                file: files[0]
-            }).success(function (data, status, headers, config) {
-                //importedFiles.push({ name: config.file.name });
+                data: {file: files[0]}
+            }).success(function () {
                 files.shift();
                 importFirst(files);
-            }).error(function (message, status, headers, config) {
-                if (status >= 300) { // && status !== 400
+            }).error(function (message, status) {
+                if (status >= 300) {
                     sbxToast.showErrorMessage(message);
                 }
 

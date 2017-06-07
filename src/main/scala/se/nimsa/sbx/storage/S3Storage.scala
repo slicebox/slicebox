@@ -73,7 +73,9 @@ class S3Storage(val bucket: String, val s3Prefix: String, val region: String) ex
     s3Client.upload(s3Key, buffer)
   }
 
-  override def deleteFromStorage(image: Image): Unit = s3Client.delete(s3Id(image))
+  override def deleteFromStorage(name: String): Unit = s3Client.delete(s3Id(name))
+
+  override def deleteFromStorage(image: Image): Unit = deleteFromStorage(s3Id(image))
 
   override def readDicomData(image: Image, withPixelData: Boolean): DicomData = {
     val s3InputStream = s3Client.get(s3Id(image))

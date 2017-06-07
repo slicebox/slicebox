@@ -30,6 +30,7 @@
     <logger name="slick.jdbc.JdbcBackend.statement" level="WARN" />
     <logger name="slick.basic.BasicBackend.action" level="WARN" />
     <logger name="org.dcm4che3" level="WARN" />
+    <logger name="akka.stream.impl.io.FileSubscriber" level="OFF" />
 
     <root level="INFO">
         <appender-ref ref="CONSOLE"/>
