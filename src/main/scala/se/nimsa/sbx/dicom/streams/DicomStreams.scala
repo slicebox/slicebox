@@ -1,7 +1,7 @@
 package se.nimsa.sbx.dicom.streams
 
 import akka.actor.ActorSystem
-import akka.stream.scaladsl.{Broadcast, Compression, Flow, GraphDSL, Keep, Merge, Sink, Source}
+import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Keep, Merge, Sink, Source}
 import akka.stream.{ActorMaterializer, FlowShape, SinkShape}
 import akka.util.{ByteString, Timeout}
 import akka.{Done, NotUsed}
@@ -12,10 +12,10 @@ import se.nimsa.dcm4che.streams.DicomParts.{DicomAttributes, DicomPart}
 import se.nimsa.dcm4che.streams.{DicomAttributesSink, DicomFlows, DicomParsing, DicomPartFlow}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.AnonymizationKey
 import se.nimsa.sbx.anonymization.AnonymizationUtil.isEqual
-import se.nimsa.sbx.dicom.{Contexts, DicomUtil}
 import se.nimsa.sbx.dicom.Contexts.Context
 import se.nimsa.sbx.dicom.DicomPropertyValue.{PatientID, PatientName}
 import se.nimsa.sbx.dicom.DicomUtil.{attributesToPatient, attributesToSeries, attributesToStudy}
+import se.nimsa.sbx.dicom.{Contexts, DicomUtil}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -248,14 +248,13 @@ object DicomStreams {
       .via(collectAnonymizationKeyInfo) // DicomMetaPart :: AnonymizationKeyInfoPart :: DicomPart...
       .mapAsync(5)(maybeInsertAnonymizationKey(anonymizationInsert))
       .map(_.bytes)
-      .via(Compression.deflate)
 
   def inflatedSource(source: Source[ByteString, _]): Source[ByteString, _] = source
     .via(DicomPartFlow.partFlow)
     .via(DicomFlows.modifyFlow(
       TagModification(Tag.TransferSyntaxUID, valueBytes => {
         valueBytes.utf8String.trim match {
-          case UID.DeflatedExplicitVRLittleEndian => DicomUtil.padToEvenLength(ByteString(UID.ExplicitVRLittleEndian.getBytes("US-ASCII")), VR.UI)
+          case UID.DeflatedExplicitVRLittleEndian => DicomUtil.padToEvenLength(ByteString(UID.ExplicitVRLittleEndian), VR.UI)
           case _ => valueBytes
         }
       }, insert = false)))

@@ -24,6 +24,7 @@ import akka.http.scaladsl.model._
 import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.pattern.ask
 import akka.stream.ActorMaterializer
+import akka.stream.scaladsl.Compression
 import akka.util.{ByteString, Timeout}
 import se.nimsa.dcm4che.streams.DicomFlows.TagModification
 import se.nimsa.sbx.app.GeneralProtocol._
@@ -127,10 +128,10 @@ class BoxPushActor(box: Box,
     metaDataService.ask(GetImage(transactionImage.image.imageId)).mapTo[Option[Image]].flatMap {
       case Some(image) =>
         val tagMods = tagValues.map { ttv =>
-          val tagBytes = DicomUtil.padToEvenLength(ByteString(ttv.tagValue.value.getBytes("US-ASCII")), ttv.tagValue.tag)
+          val tagBytes = DicomUtil.padToEvenLength(ByteString(ttv.tagValue.value), ttv.tagValue.tag)
           TagModification(ttv.tagValue.tag, _ => tagBytes, insert = true)
         }
-        val source = anonymizedData(image, tagMods, storage)
+        val source = anonymizedData(image, tagMods, storage).via(Compression.deflate)
         val uri = s"${box.baseUrl}/image?transactionid=${transactionImage.transaction.id}&sequencenumber=${transactionImage.image.sequenceNumber}&totalimagecount=${transactionImage.transaction.totalImageCount}"
         sliceboxRequest(HttpMethods.POST, uri, HttpEntity(ContentTypes.`application/octet-stream`, source))
       case None =>

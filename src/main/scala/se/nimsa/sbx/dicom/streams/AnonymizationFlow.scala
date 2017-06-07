@@ -15,7 +15,7 @@ import scala.util.Random
 
 object AnonymizationFlow {
 
-  private def toAsciiBytes(s: String, vr: VR) = DicomUtil.padToEvenLength(ByteString(s.getBytes("US-ASCII")), vr)
+  private def toAsciiBytes(s: String, vr: VR) = DicomUtil.padToEvenLength(ByteString(s), vr)
   private def insert(tag: Int, mod: ByteString => ByteString) = TagModification(tag, mod, insert = true)
   private def modify(tag: Int, mod: ByteString => ByteString) = TagModification(tag, mod, insert = false)
   private def clear(tag: Int) = TagModification(tag, _ => ByteString.empty, insert = false)

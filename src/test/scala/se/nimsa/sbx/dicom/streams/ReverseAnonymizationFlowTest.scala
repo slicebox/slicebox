@@ -20,6 +20,8 @@ import scala.concurrent.duration.DurationInt
 
 class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymizationFlowSpec")) with FlatSpecLike with Matchers {
 
+  import DicomTestData._
+
   implicit val materializer = ActorMaterializer()
   implicit val ec = system.dispatcher
 
@@ -34,8 +36,6 @@ class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymiza
     val key = createAnonymizationKey(dicomData.attributes)
     AnonymizationKeysPart(Seq(key), Some(key), Some(key), Some(key))
   }
-
-  private def toAsciiBytes(s: String, vr: VR) = DicomUtil.padToEvenLength(ByteString(s.getBytes("US-ASCII")), vr)
 
   def anonSource(dicomData: DicomData) = {
     val key = anonKeyPart(dicomData).patientKey.get

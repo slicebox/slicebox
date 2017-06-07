@@ -31,7 +31,7 @@ object HarmonizeAnonymizationFlow {
          */
         def needHarmonizeAnon(tag: Int): Boolean = canDoHarmonizeAnon && harmonizeTags.contains(tag)
 
-        def canDoHarmonizeAnon: Boolean = maybeKeys.flatMap(_.patientKey).isDefined && maybeMeta.isDefined
+        def canDoHarmonizeAnon: Boolean = maybeKeys.flatMap(_.patientKey).isDefined
 
       {
         case meta: DicomMetaPart =>

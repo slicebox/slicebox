@@ -111,12 +111,12 @@ trait TransactionRoutes {
                       val imageId = transactionImage.image.imageId
                       onSuccess(boxService.ask(GetOutgoingTagValues(transactionImage)).mapTo[Seq[OutgoingTagValue]]) { transactionTagValues =>
                         val tagMods = transactionTagValues.map { ttv =>
-                          val tagBytes = DicomUtil.padToEvenLength(ByteString(ttv.tagValue.value.getBytes("US-ASCII")), ttv.tagValue.tag)
+                          val tagBytes = DicomUtil.padToEvenLength(ByteString(ttv.tagValue.value), ttv.tagValue.tag)
                           TagModification(ttv.tagValue.tag, _ => tagBytes, insert = true)
                         }
                         onSuccess(metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]]) {
                           case Some(image) =>
-                            val streamSource = anonymizedData(image, tagMods, storage)
+                            val streamSource = anonymizedData(image, tagMods, storage).via(Compression.deflate)
                             complete(HttpEntity(ContentTypes.`application/octet-stream`, streamSource))
                           case None =>
                             complete((NotFound, s"Image not found for image id $imageId"))
