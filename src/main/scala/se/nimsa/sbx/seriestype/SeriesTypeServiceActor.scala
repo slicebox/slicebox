@@ -18,6 +18,7 @@ package se.nimsa.sbx.seriestype
 
 import akka.actor.{Actor, Props}
 import akka.event.{Logging, LoggingReceive}
+import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import se.nimsa.sbx.dicom.DicomUtil
 import se.nimsa.sbx.metadata.MetaDataProtocol._
@@ -26,14 +27,14 @@ import se.nimsa.sbx.storage.StorageService
 import se.nimsa.sbx.util.ExceptionCatching
 import se.nimsa.sbx.util.FutureUtil.await
 
-class SeriesTypeServiceActor(seriesTypeDao: SeriesTypeDAO, storage: StorageService)(implicit timeout: Timeout) extends Actor with ExceptionCatching {
+class SeriesTypeServiceActor(seriesTypeDao: SeriesTypeDAO, storage: StorageService)(implicit materializer: ActorMaterializer, timeout: Timeout) extends Actor with ExceptionCatching {
 
   val log = Logging(context.system, this)
 
   implicit val system = context.system
   implicit val ec = context.dispatcher
 
-  val seriesTypeUpdateService = context.actorOf(SeriesTypeUpdateActor.props(storage, timeout), name = "SeriesTypeUpdate")
+  val seriesTypeUpdateService = context.actorOf(SeriesTypeUpdateActor.props(storage), name = "SeriesTypeUpdate")
 
   override def preStart {
     system.eventStream.subscribe(context.self, classOf[MetaDataDeleted])
@@ -190,5 +191,5 @@ class SeriesTypeServiceActor(seriesTypeDao: SeriesTypeDAO, storage: StorageServi
 }
 
 object SeriesTypeServiceActor {
-  def props(seriesTypeDao: SeriesTypeDAO, storage: StorageService, timeout: Timeout): Props = Props(new SeriesTypeServiceActor(seriesTypeDao, storage)(timeout))
+  def props(seriesTypeDao: SeriesTypeDAO, storage: StorageService)(implicit materializer: ActorMaterializer, timeout: Timeout): Props = Props(new SeriesTypeServiceActor(seriesTypeDao, storage))
 }

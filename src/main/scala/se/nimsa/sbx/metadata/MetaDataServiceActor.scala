@@ -149,5 +149,5 @@ class MetaDataServiceActor(metaDataDao: MetaDataDAO, propertiesDao: PropertiesDA
 }
 
 object MetaDataServiceActor {
-  def props(metaDataDao: MetaDataDAO, propertiesDao: PropertiesDAO, timeout: Timeout): Props = Props(new MetaDataServiceActor(metaDataDao, propertiesDao)(timeout))
+  def props(metaDataDao: MetaDataDAO, propertiesDao: PropertiesDAO)(implicit timeout: Timeout): Props = Props(new MetaDataServiceActor(metaDataDao, propertiesDao))
 }

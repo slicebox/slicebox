@@ -42,11 +42,10 @@ import se.nimsa.sbx.util.FutureUtil.await
 import scala.concurrent.Future
 import scala.language.postfixOps
 
-class ScuServiceActor(scuDao: ScuDAO, storage: StorageService)(implicit timeout: Timeout) extends Actor with ExceptionCatching {
+class ScuServiceActor(scuDao: ScuDAO, storage: StorageService)(implicit materializer: ActorMaterializer, timeout: Timeout) extends Actor with ExceptionCatching {
   val log = Logging(context.system, this)
 
   implicit val system = context.system
-  implicit val materializer = ActorMaterializer()
   implicit val ec = context.dispatcher
 
   val metaDataService = context.actorSelection("../MetaDataService")
@@ -161,5 +160,5 @@ class ScuServiceActor(scuDao: ScuDAO, storage: StorageService)(implicit timeout:
 }
 
 object ScuServiceActor {
-  def props(scuDao: ScuDAO, storage: StorageService, timeout: Timeout): Props = Props(new ScuServiceActor(scuDao, storage)(timeout))
+  def props(scuDao: ScuDAO, storage: StorageService)(implicit materializer: ActorMaterializer, timeout: Timeout): Props = Props(new ScuServiceActor(scuDao, storage))
 }

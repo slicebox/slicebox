@@ -20,6 +20,7 @@ import java.util.concurrent.Executors
 
 import akka.actor.{Actor, PoisonPill, Props}
 import akka.event.{Logging, LoggingReceive}
+import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import se.nimsa.sbx.scp.ScpProtocol._
 import se.nimsa.sbx.storage.StorageService
@@ -28,7 +29,7 @@ import se.nimsa.sbx.util.FutureUtil.await
 
 import scala.language.postfixOps
 
-class ScpServiceActor(scpDao: ScpDAO, storage: StorageService)(implicit timeout: Timeout) extends Actor with ExceptionCatching {
+class ScpServiceActor(scpDao: ScpDAO, storage: StorageService)(implicit materializer: ActorMaterializer, timeout: Timeout) extends Actor with ExceptionCatching {
   val log = Logging(context.system, this)
 
   val executor = Executors.newCachedThreadPool()
@@ -74,7 +75,7 @@ class ScpServiceActor(scpDao: ScpDAO, storage: StorageService)(implicit timeout:
                 val scpData = addScp(scp)
 
                 context.child(scpData.id.toString).getOrElse(
-                  context.actorOf(ScpActor.props(scpData, storage, executor, timeout), scpData.id.toString))
+                  context.actorOf(ScpActor.props(scpData, storage, executor), scpData.id.toString))
 
                 sender ! scpData
 
@@ -115,11 +116,11 @@ class ScpServiceActor(scpDao: ScpDAO, storage: StorageService)(implicit timeout:
 
   def setupScps() = {
     val scps = await(scpDao.listScpDatas(0, 10000000))
-    scps foreach (scpData => context.actorOf(ScpActor.props(scpData, storage, executor, timeout), scpData.id.toString))
+    scps foreach (scpData => context.actorOf(ScpActor.props(scpData, storage, executor), scpData.id.toString))
   }
 
 }
 
 object ScpServiceActor {
-  def props(scpDao: ScpDAO, storage: StorageService, timeout: Timeout): Props = Props(new ScpServiceActor(scpDao, storage)(timeout))
+  def props(scpDao: ScpDAO, storage: StorageService)(implicit materializer: ActorMaterializer, timeout: Timeout): Props = Props(new ScpServiceActor(scpDao, storage))
 }

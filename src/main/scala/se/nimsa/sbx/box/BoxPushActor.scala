@@ -46,7 +46,7 @@ class BoxPushActor(box: Box,
                    boxServicePath: String = "../../BoxService",
                    metaDataServicePath: String = "../../MetaDataService",
                    anonymizationServicePath: String = "../../AnonymizationService")
-                  (implicit val timeout: Timeout) extends Actor with DicomStreamLoadOps {
+                  (implicit val materializer: ActorMaterializer, timeout: Timeout) extends Actor with DicomStreamLoadOps {
 
   val log = Logging(context.system, this)
 
@@ -56,7 +56,6 @@ class BoxPushActor(box: Box,
 
   implicit val system = context.system
   implicit val executor = context.dispatcher
-  implicit val materializer = ActorMaterializer()
 
   val poller = system.scheduler.schedule(pollInterval, pollInterval) {
     self ! PollOutgoing
@@ -207,6 +206,6 @@ class BoxPushActor(box: Box,
 }
 
 object BoxPushActor {
-  def props(box: Box, storageService: StorageService, timeout: Timeout): Props = Props(new BoxPushActor(box, storageService)(timeout))
+  def props(box: Box, storageService: StorageService)(implicit materializer: ActorMaterializer, timeout: Timeout): Props = Props(new BoxPushActor(box, storageService))
 
 }

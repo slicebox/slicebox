@@ -33,12 +33,11 @@ import se.nimsa.sbx.storage.StorageService
 
 import scala.concurrent.Future
 
-class SeriesTypeUpdateActor(storage: StorageService)(implicit val timeout: Timeout) extends Actor {
+class SeriesTypeUpdateActor(storage: StorageService)(implicit val materializer: ActorMaterializer, timeout: Timeout) extends Actor {
 
   val log = Logging(context.system, this)
 
   implicit val system = context.system
-  implicit val materializer = ActorMaterializer()
   implicit val ec = context.dispatcher
 
   val storageService = context.actorSelection("../../StorageService")
@@ -226,5 +225,5 @@ class SeriesTypeUpdateActor(storage: StorageService)(implicit val timeout: Timeo
 }
 
 object SeriesTypeUpdateActor {
-  def props(storage: StorageService, timeout: Timeout): Props = Props(new SeriesTypeUpdateActor(storage)(timeout))
+  def props(storage: StorageService)(implicit materializer: ActorMaterializer, timeout: Timeout): Props = Props(new SeriesTypeUpdateActor(storage))
 }
