@@ -123,10 +123,7 @@ trait DicomStreamOps extends DicomStreamLoadOps {
       imageMaybe.map { image =>
         val forcedSource = dicomDataSource(storage.fileSource(image))
           .via(DicomFlows.modifyFlow(TagModification(Tag.PatientIdentityRemoved, _ => ByteString("NO"), insert = false)))
-          .via(DicomFlows.blacklistFilter { // FIXME: use seq variant, remember to include bulkdatafilter in dicom tags flow also
-            case Tag.DeidentificationMethod => true
-            case _ => false
-          })
+          .via(DicomFlows.blacklistFilter(Seq(Tag.DeidentificationMethod)))
           .map(_.bytes)
         val anonymizedSource = anonymizedDicomDataSource(forcedSource, anonymizationQuery, anonymizationInsert, tagValues)
           .mapAsync(5)(bytes =>
@@ -424,6 +421,7 @@ object DicomStreamOps {
                               (implicit ec: ExecutionContext, system: ActorSystem, materializer: ActorMaterializer): StreamSource[ImageAttribute, M] =
     source
       .via(new DicomPartFlow(stopTag = Some(Tag.PixelData)))
+      .via(bulkDataFilter)
       .via(collectAttributesFlow(encodingTags))
       .mapAsync(5)(attributesToMetaPart)
       .via(DicomFlows.attributeFlow)

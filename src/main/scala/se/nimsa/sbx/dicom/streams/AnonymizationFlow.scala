@@ -209,9 +209,9 @@ object AnonymizationFlow {
     * Remove, set empty or modify certain attributes
     */
   val anonFlow = Flow[DicomPart]
-    .via(DicomFlows.blacklistFilter(DicomParsing.isPrivateAttribute)) // remove private attributes
-    .via(DicomFlows.blacklistFilter(isOverlay)) // remove overlay data
-    .via(DicomFlows.blacklistFilter(removeTags.contains)) // remove tags from above list, if present
+    .via(DicomFlows.blacklistFilter(DicomParsing.isPrivateAttribute _)) // remove private attributes
+    .via(DicomFlows.blacklistFilter(isOverlay _)) // remove overlay data
+    .via(DicomFlows.blacklistFilter(removeTags.contains _)) // remove tags from above list, if present
     .via(DicomFlows.modifyFlow( // modify, clear and insert
     modify(Tag.AccessionNumber, bytes => if (bytes.nonEmpty) createAccessionNumber(bytes) else bytes),
     modify(Tag.ConcatenationUID, createUid),
