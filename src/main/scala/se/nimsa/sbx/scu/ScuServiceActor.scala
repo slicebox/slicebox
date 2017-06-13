@@ -23,7 +23,7 @@ import akka.NotUsed
 import akka.actor.{Actor, Props}
 import akka.event.{Logging, LoggingReceive}
 import akka.pattern.{ask, pipe}
-import akka.stream.ActorMaterializer
+import akka.stream.Materializer
 import akka.stream.scaladsl.Source
 import akka.util.Timeout
 import org.dcm4che3.net.{IncompatibleConnectionException, NoPresentationContextException}
@@ -41,7 +41,7 @@ import se.nimsa.sbx.util.FutureUtil.await
 
 import scala.concurrent.Future
 
-class ScuServiceActor(scuDao: ScuDAO, storage: StorageService)(implicit materializer: ActorMaterializer, timeout: Timeout) extends Actor with ExceptionCatching {
+class ScuServiceActor(scuDao: ScuDAO, storage: StorageService)(implicit materializer: Materializer, timeout: Timeout) extends Actor with ExceptionCatching {
   val log = Logging(context.system, this)
 
   implicit val system = context.system
@@ -159,5 +159,5 @@ class ScuServiceActor(scuDao: ScuDAO, storage: StorageService)(implicit material
 }
 
 object ScuServiceActor {
-  def props(scuDao: ScuDAO, storage: StorageService)(implicit materializer: ActorMaterializer, timeout: Timeout): Props = Props(new ScuServiceActor(scuDao, storage))
+  def props(scuDao: ScuDAO, storage: StorageService)(implicit materializer: Materializer, timeout: Timeout): Props = Props(new ScuServiceActor(scuDao, storage))
 }

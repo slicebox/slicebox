@@ -20,14 +20,14 @@ import java.nio.file.{Files, Paths}
 
 import akka.actor.{Actor, PoisonPill, Props}
 import akka.event.{Logging, LoggingReceive}
-import akka.stream.ActorMaterializer
+import akka.stream.Materializer
 import akka.util.Timeout
 import se.nimsa.sbx.directory.DirectoryWatchProtocol._
 import se.nimsa.sbx.storage.StorageService
 import se.nimsa.sbx.util.ExceptionCatching
 import se.nimsa.sbx.util.FutureUtil.await
 
-class DirectoryWatchServiceActor(directoryWatchDao: DirectoryWatchDAO, storage: StorageService)(implicit materializer: ActorMaterializer, timeout: Timeout) extends Actor with ExceptionCatching {
+class DirectoryWatchServiceActor(directoryWatchDao: DirectoryWatchDAO, storage: StorageService)(implicit materializer: Materializer, timeout: Timeout) extends Actor with ExceptionCatching {
   val log = Logging(context.system, this)
 
   setupWatches()
@@ -113,5 +113,5 @@ class DirectoryWatchServiceActor(directoryWatchDao: DirectoryWatchDAO, storage: 
 }
 
 object DirectoryWatchServiceActor {
-  def props(directoryWatchDao: DirectoryWatchDAO, storage: StorageService)(implicit materializer: ActorMaterializer, timeout: Timeout): Props = Props(new DirectoryWatchServiceActor(directoryWatchDao, storage))
+  def props(directoryWatchDao: DirectoryWatchDAO, storage: StorageService)(implicit materializer: Materializer, timeout: Timeout): Props = Props(new DirectoryWatchServiceActor(directoryWatchDao, storage))
 }

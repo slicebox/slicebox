@@ -21,14 +21,14 @@ import java.util.concurrent.{Executor, Executors}
 import akka.actor.{Actor, Props}
 import akka.event.{Logging, LoggingReceive}
 import akka.pattern.{ask, pipe}
-import akka.stream.ActorMaterializer
+import akka.stream.Materializer
 import akka.util.Timeout
 import org.dcm4che3.data.Attributes
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.ReverseAnonymization
 import se.nimsa.sbx.app.GeneralProtocol._
-import se.nimsa.sbx.dicom.{Contexts, DicomData}
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.streams.DicomStreamOps
+import se.nimsa.sbx.dicom.{Contexts, DicomData}
 import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, MetaDataAdded}
 import se.nimsa.sbx.scp.ScpProtocol._
@@ -44,7 +44,7 @@ class ScpActor(scpData: ScpData, storage: StorageService, executor: Executor,
                metaDataServicePath: String = "../../MetaDataService",
                storageServicePath: String = "../../StorageService",
                anonymizationServicePath: String = "../../AnonymizationService")
-              (implicit val materializer: ActorMaterializer, timeout: Timeout) extends Actor with DicomStreamOps {
+              (implicit val materializer: Materializer, timeout: Timeout) extends Actor with DicomStreamOps {
 
   val metaDataService = context.actorSelection(metaDataServicePath)
   val storageService = context.actorSelection(storageServicePath)
@@ -110,5 +110,5 @@ class ScpActor(scpData: ScpData, storage: StorageService, executor: Executor,
 }
 
 object ScpActor {
-  def props(scpData: ScpData, storage: StorageService, executor: Executor)(implicit materializer: ActorMaterializer, timeout: Timeout): Props = Props(new ScpActor(scpData, storage, executor))
+  def props(scpData: ScpData, storage: StorageService, executor: Executor)(implicit materializer: Materializer, timeout: Timeout): Props = Props(new ScpActor(scpData, storage, executor))
 }

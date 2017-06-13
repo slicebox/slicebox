@@ -21,21 +21,21 @@ import java.util.UUID
 import akka.actor.{Actor, PoisonPill, Props, Stash}
 import akka.event.{Logging, LoggingReceive}
 import akka.pattern.PipeToSupport
-import akka.stream.ActorMaterializer
+import akka.stream.Materializer
 import akka.util.Timeout
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.storage.StorageService
-import se.nimsa.sbx.util.SequentialPipeToSupport
 import se.nimsa.sbx.util.SbxExtensions._
+import se.nimsa.sbx.util.SequentialPipeToSupport
 
 import scala.collection.mutable
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 
-class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageService)(implicit val materializer: ActorMaterializer, timeout: Timeout) extends Actor with Stash with PipeToSupport with SequentialPipeToSupport {
+class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageService)(implicit val materializer: Materializer, timeout: Timeout) extends Actor with Stash with PipeToSupport with SequentialPipeToSupport {
 
   val log = Logging(context.system, this)
 
@@ -304,5 +304,5 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageServic
 }
 
 object BoxServiceActor {
-  def props(boxDao: BoxDAO, apiBaseURL: String, storage: StorageService)(implicit materializer: ActorMaterializer, timeout: Timeout): Props = Props(new BoxServiceActor(boxDao, apiBaseURL, storage))
+  def props(boxDao: BoxDAO, apiBaseURL: String, storage: StorageService)(implicit materializer: Materializer, timeout: Timeout): Props = Props(new BoxServiceActor(boxDao, apiBaseURL, storage))
 }

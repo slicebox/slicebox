@@ -19,7 +19,7 @@ package se.nimsa.sbx.seriestype
 import akka.actor.{Actor, Props}
 import akka.event.{Logging, LoggingReceive}
 import akka.pattern.ask
-import akka.stream.ActorMaterializer
+import akka.stream.Materializer
 import akka.util.Timeout
 import org.dcm4che3.data.Attributes
 import se.nimsa.dcm4che.streams.DicomFlows._
@@ -33,7 +33,7 @@ import se.nimsa.sbx.storage.StorageService
 
 import scala.concurrent.Future
 
-class SeriesTypeUpdateActor(storage: StorageService)(implicit val materializer: ActorMaterializer, timeout: Timeout) extends Actor {
+class SeriesTypeUpdateActor(storage: StorageService)(implicit val materializer: Materializer, timeout: Timeout) extends Actor {
 
   val log = Logging(context.system, this)
 
@@ -225,5 +225,5 @@ class SeriesTypeUpdateActor(storage: StorageService)(implicit val materializer: 
 }
 
 object SeriesTypeUpdateActor {
-  def props(storage: StorageService)(implicit materializer: ActorMaterializer, timeout: Timeout): Props = Props(new SeriesTypeUpdateActor(storage))
+  def props(storage: StorageService)(implicit materializer: Materializer, timeout: Timeout): Props = Props(new SeriesTypeUpdateActor(storage))
 }

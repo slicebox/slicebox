@@ -24,7 +24,7 @@ import akka.pattern.ask
 import akka.stream.alpakka.file.DirectoryChange
 import akka.stream.alpakka.file.scaladsl.{Directory, DirectoryChangesSource}
 import akka.stream.scaladsl.{FileIO, Keep, Sink, Source => StreamSource}
-import akka.stream.{ActorMaterializer, KillSwitches, UniqueKillSwitch}
+import akka.stream.{KillSwitches, Materializer, UniqueKillSwitch}
 import akka.util.Timeout
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.dicom.Contexts
@@ -42,7 +42,7 @@ class DirectoryWatchActor(watchedDirectory: WatchedDirectory,
                           metaDataServicePath: String = "../../MetaDataService",
                           storageServicePath: String = "../../StorageService",
                           anonymizationServicePath: String = "../../AnonymizationService")
-                         (implicit val materializer: ActorMaterializer, timeout: Timeout) extends Actor with DicomStreamOps {
+                         (implicit val materializer: Materializer, timeout: Timeout) extends Actor with DicomStreamOps {
 
   val storageService = context.actorSelection(storageServicePath)
   val metaDataService = context.actorSelection(metaDataServicePath)
@@ -104,5 +104,5 @@ class DirectoryWatchActor(watchedDirectory: WatchedDirectory,
 }
 
 object DirectoryWatchActor {
-  def props(watchedDirectory: WatchedDirectory, storage: StorageService)(implicit materializer: ActorMaterializer, timeout: Timeout): Props = Props(new DirectoryWatchActor(watchedDirectory, storage))
+  def props(watchedDirectory: WatchedDirectory, storage: StorageService)(implicit materializer: Materializer, timeout: Timeout): Props = Props(new DirectoryWatchActor(watchedDirectory, storage))
 }

@@ -2,7 +2,7 @@ package se.nimsa.sbx.dicom.streams
 
 import akka.actor.Cancellable
 import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Keep, Merge, Sink, Source => StreamSource}
-import akka.stream.{ActorMaterializer, FlowShape, Materializer, SinkShape}
+import akka.stream.{FlowShape, Materializer, SinkShape}
 import akka.util.ByteString
 import akka.{Done, NotUsed}
 import org.dcm4che3.data.{Attributes, Tag, UID, VR}
@@ -55,7 +55,7 @@ trait DicomStreamLoadOps {
     * @return a `Source` of anonymized DICOM byte chunks
     */
   def anonymizedDicomData(imageId: Long, tagValues: Seq[TagValue], storage: StorageService)
-                         (implicit mat: ActorMaterializer, ec: ExecutionContext): Future[Option[StreamSource[ByteString, NotUsed]]] =
+                         (implicit materializer: Materializer, ec: ExecutionContext): Future[Option[StreamSource[ByteString, NotUsed]]] =
     callMetaDataService[Option[Image]](GetImage(imageId)).map { imageMaybe =>
       imageMaybe.map { image =>
         anonymizedDicomDataSource(storage.fileSource(image), anonymizationQuery, anonymizationInsert, tagValues)
@@ -89,7 +89,7 @@ trait DicomStreamOps extends DicomStreamLoadOps {
     * @return the meta data info stored in the database
     */
   def storeDicomData(bytesSource: StreamSource[ByteString, _], source: Source, storage: StorageService, contexts: Seq[Context], reverseAnonymization: Boolean = true)
-                    (implicit mat: ActorMaterializer, ec: ExecutionContext): Future[MetaDataAdded] = {
+                    (implicit materializer: Materializer, ec: ExecutionContext): Future[MetaDataAdded] = {
     val tempPath = createTempPath()
     val sink = dicomDataSink(storage.fileSink(tempPath), reverseAnonymizationQuery, contexts, reverseAnonymization)
     bytesSource.runWith(sink).flatMap {
@@ -118,7 +118,7 @@ trait DicomStreamOps extends DicomStreamLoadOps {
     * @return the anonymized metadata stored in the system
     */
   def anonymizeData(imageId: Long, tagValues: Seq[TagValue], storage: StorageService)
-                   (implicit mat: ActorMaterializer, ec: ExecutionContext): Future[Option[MetaDataAdded]] =
+                   (implicit materializer: Materializer, ec: ExecutionContext): Future[Option[MetaDataAdded]] =
     callMetaDataService[Option[Image]](GetImage(imageId)).flatMap { imageMaybe =>
       imageMaybe.map { image =>
         val forcedSource = dicomDataSource(storage.fileSource(image))
@@ -223,7 +223,7 @@ object DicomStreamOps {
   }
 
   def dicomDataSink(storageSink: Sink[ByteString, Future[Done]], reverseAnonymizationQuery: (PatientName, PatientID) => Future[Seq[AnonymizationKey]], contexts: Seq[Context], reverseAnonymization: Boolean = true)
-                   (implicit ec: ExecutionContext, materializer: ActorMaterializer): Sink[ByteString, Future[(Option[Attributes], Option[Attributes])]] = {
+                   (implicit ec: ExecutionContext, materializer: Materializer): Sink[ByteString, Future[(Option[Attributes], Option[Attributes])]] = {
 
     val dbAttributesSink = DicomAttributesSink.attributesSink
 
@@ -256,7 +256,7 @@ object DicomStreamOps {
   }
 
   def attributesToAnonKeyProtectedInfo(dicomPart: DicomPart)
-                                      (implicit ec: ExecutionContext, materializer: ActorMaterializer): Future[DicomPart] = {
+                                      (implicit ec: ExecutionContext, materializer: Materializer): Future[DicomPart] = {
     dicomPart match {
       case da: DicomAttributes =>
         StreamSource.fromIterator(() => da.attributes.iterator).runWith(DicomAttributesSink.attributesSink).map {
@@ -276,7 +276,7 @@ object DicomStreamOps {
   }
 
   def attributesToAnonKeyAnonymousInfo(dicomPart: DicomPart)
-                                      (implicit ec: ExecutionContext, materializer: ActorMaterializer): Future[DicomPart] = {
+                                      (implicit ec: ExecutionContext, materializer: Materializer): Future[DicomPart] = {
     dicomPart match {
       case da: DicomAttributes =>
         StreamSource.fromIterator(() => da.attributes.iterator).runWith(DicomAttributesSink.attributesSink).map {
@@ -295,12 +295,12 @@ object DicomStreamOps {
     }
   }
 
-  def collectAnonymizationKeyProtectedInfo(implicit ec: ExecutionContext, materializer: ActorMaterializer) =
+  def collectAnonymizationKeyProtectedInfo(implicit ec: ExecutionContext, materializer: Materializer) =
     Flow[DicomPart]
       .via(collectAttributesFlow(anonymizationKeyTags))
       .mapAsync(5)(attributesToAnonKeyProtectedInfo)
 
-  def collectAnonymizationKeyAnonymousInfo(implicit ec: ExecutionContext, materializer: ActorMaterializer) =
+  def collectAnonymizationKeyAnonymousInfo(implicit ec: ExecutionContext, materializer: Materializer) =
     Flow[DicomPart]
       .via(collectAttributesFlow(anonymizationKeyTags))
       .mapAsync(5)(attributesToAnonKeyAnonymousInfo)
@@ -360,7 +360,7 @@ object DicomStreamOps {
                                 anonymizationQuery: (PatientName, PatientID) => Future[Seq[AnonymizationKey]],
                                 anonymizationInsert: AnonymizationKey => Future[AnonymizationKey],
                                 tagValues: Seq[TagValue])
-                               (implicit ec: ExecutionContext, materializer: ActorMaterializer): StreamSource[ByteString, NotUsed] =
+                               (implicit ec: ExecutionContext, materializer: Materializer): StreamSource[ByteString, NotUsed] =
     dicomDataSource(storageSource) // DicomPart...
       .via(collectAttributesFlow(metaTags2Collect)) // DicomAttributes :: DicomPart...
       .mapAsync(5)(attributesToMetaPart) // DicomMetaPart :: DicomPart...

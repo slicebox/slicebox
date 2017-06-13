@@ -24,7 +24,7 @@ import akka.http.scaladsl.model.StatusCodes.NotFound
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.pattern.ask
-import akka.stream.ActorMaterializer
+import akka.stream.Materializer
 import akka.stream.scaladsl.Compression
 import akka.util.Timeout
 import de.heikoseeberger.akkahttpplayjson.PlayJsonSupport
@@ -47,7 +47,7 @@ class BoxPollActor(box: Box,
                    metaDataServicePath: String = "../../MetaDataService",
                    storageServicePath: String = "../../StorageService",
                    anonymizationServicePath: String = "../../AnonymizationService")
-                  (implicit val materializer: ActorMaterializer, timeout: Timeout) extends Actor with DicomStreamOps with BoxJsonFormats with PlayJsonSupport {
+                  (implicit val materializer: Materializer, timeout: Timeout) extends Actor with DicomStreamOps with BoxJsonFormats with PlayJsonSupport {
 
   val log = Logging(context.system, this)
 
@@ -202,6 +202,6 @@ class BoxPollActor(box: Box,
 }
 
 object BoxPollActor {
-  def props(box: Box, storage: StorageService)(implicit materializer: ActorMaterializer, timeout: Timeout): Props = Props(new BoxPollActor(box, storage))
+  def props(box: Box, storage: StorageService)(implicit materializer: Materializer, timeout: Timeout): Props = Props(new BoxPollActor(box, storage))
 
 }
