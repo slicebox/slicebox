@@ -16,7 +16,7 @@ import org.scalatest.{FlatSpecLike, Matchers}
 import se.nimsa.dcm4che.streams.DicomFlows.collectAttributesFlow
 import se.nimsa.dcm4che.streams.DicomParts.{DicomPart, DicomValueChunk}
 import se.nimsa.dcm4che.streams.{DicomFlows, DicomPartFlow}
-import se.nimsa.sbx.dicom.streams.DicomStreams.{attributesToMetaPart, metaTags2Collect}
+import se.nimsa.sbx.dicom.streams.DicomStreamOps.{attributesToMetaPart, metaTags2Collect}
 import se.nimsa.sbx.util.TestUtil._
 
 import scala.concurrent.Await

@@ -22,15 +22,10 @@ import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
 import akka.stream.scaladsl.Compression
-import akka.util.ByteString
-import se.nimsa.dcm4che.streams.DicomFlows.TagModification
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.dicom.Contexts
-import se.nimsa.sbx.dicom.DicomHierarchy.Image
-import se.nimsa.sbx.dicom.DicomUtil
-import se.nimsa.sbx.metadata.MetaDataProtocol.GetImage
 
 trait TransactionRoutes {
   this: SliceboxBase =>
@@ -46,7 +41,7 @@ trait TransactionRoutes {
               post {
                 extractDataBytes { compressedBytes =>
                   val source = Source(SourceType.BOX, box.name, box.id)
-                  onSuccess(storeData(compressedBytes.via(Compression.inflate()), source, storage, Contexts.extendedContexts)) { metaData =>
+                  onSuccess(storeDicomData(compressedBytes.via(Compression.inflate()), source, storage, Contexts.extendedContexts)) { metaData =>
                     onSuccess(boxService.ask(UpdateIncoming(box, outgoingTransactionId, sequenceNumber, totalImageCount, metaData.image.id, metaData.imageAdded))) {
                       case IncomingUpdated(transaction) =>
                         transaction.status match {
@@ -110,14 +105,10 @@ trait TransactionRoutes {
                     case Some(transactionImage) =>
                       val imageId = transactionImage.image.imageId
                       onSuccess(boxService.ask(GetOutgoingTagValues(transactionImage)).mapTo[Seq[OutgoingTagValue]]) { transactionTagValues =>
-                        val tagMods = transactionTagValues.map { ttv =>
-                          val tagBytes = DicomUtil.padToEvenLength(ByteString(ttv.tagValue.value), ttv.tagValue.tag)
-                          TagModification(ttv.tagValue.tag, _ => tagBytes, insert = true)
-                        }
-                        onSuccess(metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]]) {
-                          case Some(image) =>
-                            val streamSource = anonymizedData(image, tagMods, storage).via(Compression.deflate)
-                            complete(HttpEntity(ContentTypes.`application/octet-stream`, streamSource))
+                        val tagValues = transactionTagValues.map(_.tagValue)
+                        onSuccess(anonymizedDicomData(imageId, tagValues, storage)) {
+                          case Some(streamSource) =>
+                            complete(HttpEntity(ContentTypes.`application/octet-stream`, streamSource.via(Compression.deflate)))
                           case None =>
                             complete((NotFound, s"Image not found for image id $imageId"))
                         }

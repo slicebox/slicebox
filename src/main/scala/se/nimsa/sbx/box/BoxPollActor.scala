@@ -140,7 +140,7 @@ class BoxPollActor(box: Box,
       val statusCode = response.status.intValue
       if (statusCode >= 200 && statusCode < 300) {
         val source = Source(SourceType.BOX, box.name, box.id)
-        storeData(response.entity.dataBytes.via(Compression.inflate()), source, storage, Contexts.extendedContexts).flatMap { metaData =>
+        storeDicomData(response.entity.dataBytes.via(Compression.inflate()), source, storage, Contexts.extendedContexts).flatMap { metaData =>
           boxService.ask(UpdateIncoming(box, transactionImage.transaction.id, transactionImage.image.sequenceNumber, transactionImage.transaction.totalImageCount, metaData.image.id, metaData.imageAdded)).flatMap {
             case IncomingUpdated(transaction) =>
               transaction.status match {

@@ -229,7 +229,7 @@ object DicomUtil {
     else
       bytes.length
 
-  private def getStrings(attrs: Attributes, tag: Int) = {
+  def getStrings(attrs: Attributes, tag: Int) = {
     val s = attrs.getStrings(tag)
     if (s == null || s.isEmpty) Array("") else s
   }

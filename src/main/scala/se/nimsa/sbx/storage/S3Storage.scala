@@ -18,16 +18,15 @@ package se.nimsa.sbx.storage
 
 import java.io.{ByteArrayOutputStream, InputStream}
 
-import akka.{Done, NotUsed}
 import akka.actor.ActorSystem
 import akka.stream.Materializer
 import akka.stream.alpakka.s3.scaladsl.S3Client
 import akka.stream.scaladsl.{Sink, Source}
 import akka.util.ByteString
+import akka.{Done, NotUsed}
+import se.nimsa.sbx.dicom.DicomData
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.DicomUtil._
-import se.nimsa.sbx.dicom.{DicomData, DicomUtil, ImageAttribute}
-import se.nimsa.sbx.storage.StorageProtocol.ImageInformation
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.control.NonFatal
@@ -80,16 +79,6 @@ class S3Storage(val bucket: String, val s3Prefix: String, val region: String) ex
   override def readDicomData(image: Image, withPixelData: Boolean): DicomData = {
     val s3InputStream = s3Client.get(s3Id(image))
     loadDicomData(s3InputStream, withPixelData)
-  }
-
-  override def readImageAttributes(image: Image): List[ImageAttribute] = {
-    val s3InputStream = s3Client.get(s3Id(image))
-    DicomUtil.readImageAttributes(loadDicomData(s3InputStream, withPixelData = false).attributes)
-  }
-
-  override def readImageInformation(image: Image): ImageInformation = {
-    val s3InputStream = s3Client.get(s3Id(image))
-    super.readImageInformation(s3InputStream)
   }
 
   override def readPngImageData(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int)

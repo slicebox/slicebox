@@ -26,14 +26,10 @@ import akka.pattern.ask
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Compression
 import akka.util.{ByteString, Timeout}
-import se.nimsa.dcm4che.streams.DicomFlows.TagModification
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.box.BoxProtocol._
-import se.nimsa.sbx.dicom.DicomHierarchy.Image
-import se.nimsa.sbx.dicom.DicomUtil
 import se.nimsa.sbx.dicom.streams.DicomStreamLoadOps
 import se.nimsa.sbx.log.SbxLog
-import se.nimsa.sbx.metadata.MetaDataProtocol.GetImage
 import se.nimsa.sbx.storage.StorageService
 
 import scala.concurrent.Future
@@ -68,6 +64,7 @@ class BoxPushActor(box: Box,
   val pool = Http().superPool[String]()
 
   override def callAnonymizationService[R: ClassTag](message: Any) = anonymizationService.ask(message).mapTo[R]
+  override def callMetaDataService[R: ClassTag](message: Any) = metaDataService.ask(message).mapTo[R]
 
   def receive = LoggingReceive {
     case PollOutgoing =>
@@ -124,16 +121,11 @@ class BoxPushActor(box: Box,
     }
   }
 
-  def pushImagePipeline(transactionImage: OutgoingTransactionImage, tagValues: Seq[OutgoingTagValue]): Future[HttpResponse] =
-    metaDataService.ask(GetImage(transactionImage.image.imageId)).mapTo[Option[Image]].flatMap {
-      case Some(image) =>
-        val tagMods = tagValues.map { ttv =>
-          val tagBytes = DicomUtil.padToEvenLength(ByteString(ttv.tagValue.value), ttv.tagValue.tag)
-          TagModification(ttv.tagValue.tag, _ => tagBytes, insert = true)
-        }
-        val source = anonymizedData(image, tagMods, storage).via(Compression.deflate)
+  def pushImagePipeline(transactionImage: OutgoingTransactionImage, outgoingTagValues: Seq[OutgoingTagValue]): Future[HttpResponse] =
+    anonymizedDicomData(transactionImage.image.imageId, outgoingTagValues.map(_.tagValue), storage).flatMap {
+      case Some(source) =>
         val uri = s"${box.baseUrl}/image?transactionid=${transactionImage.transaction.id}&sequencenumber=${transactionImage.image.sequenceNumber}&totalimagecount=${transactionImage.transaction.totalImageCount}"
-        sliceboxRequest(HttpMethods.POST, uri, HttpEntity(ContentTypes.`application/octet-stream`, source))
+        sliceboxRequest(HttpMethods.POST, uri, HttpEntity(ContentTypes.`application/octet-stream`, source.via(Compression.deflate)))
       case None =>
         Future.failed(new IllegalArgumentException("Image not found for image id " + transactionImage.image.imageId))
     }
