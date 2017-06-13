@@ -37,7 +37,6 @@ import se.nimsa.sbx.util.FutureUtil.await
 import se.nimsa.sbx.util.SbxExtensions._
 
 import scala.concurrent.Future
-import scala.language.postfixOps
 
 class ScuServiceActor(scuDao: ScuDAO)(implicit timeout: Timeout) extends Actor with ExceptionCatching {
   val log = Logging(context.system, this)

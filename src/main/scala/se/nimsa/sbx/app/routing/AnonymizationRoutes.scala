@@ -77,12 +77,12 @@ trait AnonymizationRoutes {
       } ~ pathPrefix("keys") {
         pathEndOrSingleSlash {
           get {
-            parameters(
+            parameters((
               'startindex.as[Long] ? 0,
               'count.as[Long] ? 20,
               'orderby.as[String].?,
               'orderascending.as[Boolean] ? true,
-              'filter.as[String].?) { (startIndex, count, orderBy, orderAscending, filter) =>
+              'filter.as[String].?)) { (startIndex, count, orderBy, orderAscending, filter) =>
               onSuccess(anonymizationService.ask(GetAnonymizationKeys(startIndex, count, orderBy, orderAscending, filter))) {
                 case AnonymizationKeys(anonymizationKeys) =>
                   complete(anonymizationKeys)

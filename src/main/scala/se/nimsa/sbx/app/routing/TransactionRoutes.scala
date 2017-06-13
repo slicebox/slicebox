@@ -44,7 +44,10 @@ trait TransactionRoutes {
           complete((Unauthorized, s"No box found for token $token"))
         case Some(box) =>
           path("image") {
-            parameters('transactionid.as[Long], 'sequencenumber.as[Long], 'totalimagecount.as[Long]) { (outgoingTransactionId, sequenceNumber, totalImageCount) =>
+            parameters((
+              'transactionid.as[Long],
+              'sequencenumber.as[Long],
+              'totalimagecount.as[Long])) { (outgoingTransactionId, sequenceNumber, totalImageCount) =>
               post {
                 entity(as[ByteString]) { compressedBytes =>
                   val bytes = decompress(compressedBytes.toArray)
@@ -73,7 +76,7 @@ trait TransactionRoutes {
               }
             }
           } ~ path("status") {
-            parameters('transactionid.as[Long]) { outgoingTransactionId =>
+            parameters(('transactionid.as[Long])) { outgoingTransactionId =>
               get {
                 onSuccess(boxService.ask(GetIncomingTransactionStatus(box, outgoingTransactionId)).mapTo[Option[TransactionStatus]]) {
                   case Some(status) => complete(HttpEntity(status.toString))
@@ -119,7 +122,7 @@ trait TransactionRoutes {
               }
             } ~ pathEndOrSingleSlash {
               get {
-                parameters('transactionid.as[Long], 'imageid.as[Long]) { (outgoingTransactionId, outgoingImageId) =>
+                parameters(('transactionid.as[Long], 'imageid.as[Long])) { (outgoingTransactionId, outgoingImageId) =>
                   onSuccess(boxService.ask(GetOutgoingTransactionImage(box, outgoingTransactionId, outgoingImageId)).mapTo[Option[OutgoingTransactionImage]]) {
                     case Some(transactionImage) =>
                       val imageId = transactionImage.image.imageId

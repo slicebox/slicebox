@@ -32,9 +32,9 @@ def scpRoutes(apiUser: ApiUser): Route =
     pathPrefix("scps") {
       pathEndOrSingleSlash {
         get {
-          parameters(
+          parameters((
             'startindex.as(nonNegativeFromStringUnmarshaller) ? 0,
-            'count.as(nonNegativeFromStringUnmarshaller) ? 20) { (startIndex, count) =>
+            'count.as(nonNegativeFromStringUnmarshaller) ? 20)) { (startIndex, count) =>
             onSuccess(scpService.ask(GetScps(startIndex, count))) {
               case Scps(scps) =>
                 complete(scps)

@@ -25,8 +25,6 @@ import se.nimsa.sbx.directory.DirectoryWatchProtocol._
 import se.nimsa.sbx.util.ExceptionCatching
 import se.nimsa.sbx.util.FutureUtil.await
 
-import scala.language.postfixOps
-
 class DirectoryWatchServiceActor(directoryWatchDao: DirectoryWatchDAO)(implicit timeout: Timeout) extends Actor with ExceptionCatching {
   val log = Logging(context.system, this)
 

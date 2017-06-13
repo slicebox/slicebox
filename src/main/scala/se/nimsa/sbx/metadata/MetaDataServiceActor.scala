@@ -27,7 +27,7 @@ import se.nimsa.sbx.util.SequentialPipeToSupport
 
 import scala.concurrent.Future
 
-class MetaDataServiceActor(metaDataDao: MetaDataDAO, propertiesDao: PropertiesDAO)(implicit timeout: Timeout) extends Actor with Stash with SequentialPipeToSupport {
+class MetaDataServiceActor(metaDataDao: MetaDataDAO, propertiesDao: PropertiesDAO) extends Actor with Stash with SequentialPipeToSupport {
 
   import context.system
 
@@ -149,5 +149,5 @@ class MetaDataServiceActor(metaDataDao: MetaDataDAO, propertiesDao: PropertiesDA
 }
 
 object MetaDataServiceActor {
-  def props(metaDataDao: MetaDataDAO, propertiesDao: PropertiesDAO, timeout: Timeout): Props = Props(new MetaDataServiceActor(metaDataDao, propertiesDao)(timeout))
+  def props(metaDataDao: MetaDataDAO, propertiesDao: PropertiesDAO): Props = Props(new MetaDataServiceActor(metaDataDao, propertiesDao))
 }

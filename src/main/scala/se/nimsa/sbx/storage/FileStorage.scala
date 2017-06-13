@@ -17,10 +17,9 @@
 package se.nimsa.sbx.storage
 
 import java.io.{BufferedInputStream, InputStream}
-import java.nio.file.{Files, Path, Paths}
+import java.nio.file.{Files, Path}
 import javax.imageio.ImageIO
 
-import org.dcm4che3.data.Attributes
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.DicomUtil._
 import se.nimsa.sbx.dicom.{DicomData, DicomUtil, ImageAttribute}

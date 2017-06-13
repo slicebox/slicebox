@@ -55,9 +55,9 @@ trait ImportRoutes {
       pathPrefix("sessions") {
         pathEndOrSingleSlash {
           get {
-            parameters(
+            parameters((
               'startindex.as(nonNegativeFromStringUnmarshaller) ? 0,
-              'count.as(nonNegativeFromStringUnmarshaller) ? 20) { (startIndex, count) =>
+              'count.as(nonNegativeFromStringUnmarshaller) ? 20)) { (startIndex, count) =>
               onSuccess(importService.ask(GetImportSessions(startIndex, count))) {
                 case ImportSessions(importSessions) =>
                   complete(importSessions)

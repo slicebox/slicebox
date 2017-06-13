@@ -82,11 +82,11 @@ trait ImageRoutes {
                 }
               }
             } ~ path("png") {
-              parameters(
+              parameters((
                 'framenumber.as[Int] ? 1,
                 'windowmin.as[Int] ? 0,
                 'windowmax.as[Int] ? 0,
-                'imageheight.as[Int] ? 0) { (frameNumber, min, max, height) =>
+                'imageheight.as[Int] ? 0)) { (frameNumber, min, max, height) =>
                 get {
                   onComplete(storageService.ask(GetPngDataArray(image, frameNumber, min, max, height))) {
                     case Success(PngDataArray(bytes)) => complete(HttpEntity(`image/png`, bytes))
@@ -139,7 +139,7 @@ trait ImageRoutes {
           }
         }
       } ~ path("jpeg") {
-        parameters('studyid.as[Long], 'description.?) { (studyId, optionalDescription) =>
+        parameters(('studyid.as[Long], 'description.?)) { (studyId, optionalDescription) =>
           post {
             extractDataBytes { bytes =>
               val source = Source(SourceType.USER, apiUser.user, apiUser.id)

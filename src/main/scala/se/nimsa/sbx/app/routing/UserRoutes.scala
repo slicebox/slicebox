@@ -29,7 +29,7 @@ trait UserRoutes { this: SliceboxBase =>
 
   val extractUserAgent: HttpHeader => Option[String] = {
     case a: `User-Agent` => Some(a.value)
-    case x               => None
+    case _               => None
   }
 
   val extractIP: Directive1[RemoteAddress] =
@@ -50,7 +50,7 @@ trait UserRoutes { this: SliceboxBase =>
       post {
         entity(as[UserPass]) { userPass =>
           onSuccess(userService.ask(Login(userPass, authKey))) {
-            case LoggedIn(user, session) =>
+            case LoggedIn(_, session) =>
               setCookie(HttpCookie(sessionField, value = session.token, path = Some("/api"), httpOnly = true)) {
                 complete(NoContent)
               }
@@ -77,9 +77,9 @@ trait UserRoutes { this: SliceboxBase =>
     pathPrefix("users") {
       pathEndOrSingleSlash {
         get {
-          parameters(
+          parameters((
             'startindex.as(nonNegativeFromStringUnmarshaller) ? 0,
-            'count.as(nonNegativeFromStringUnmarshaller) ? 20) { (startIndex, count) =>
+            'count.as(nonNegativeFromStringUnmarshaller) ? 20)) { (startIndex, count) =>
             onSuccess(userService.ask(GetUsers(startIndex, count))) {
               case Users(users) =>
                 complete(users)

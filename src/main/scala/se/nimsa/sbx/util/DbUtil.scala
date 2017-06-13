@@ -65,7 +65,7 @@ object DbUtil {
   }
 
   implicit class OptionActionOption[T, A <: Effect](val self: Option[DBIOAction[Option[T], NoStream, A]]) extends AnyVal {
-    def unwrap(implicit ec: ExecutionContext): DBIOAction[Option[T], NoStream, A] =
+    def unwrap: DBIOAction[Option[T], NoStream, A] =
       self.getOrElse(DBIO.successful(None))
   }
 

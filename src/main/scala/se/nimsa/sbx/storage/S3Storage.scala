@@ -17,7 +17,6 @@
 package se.nimsa.sbx.storage
 
 import java.io.{ByteArrayOutputStream, InputStream}
-import java.nio.file.{Files, Path}
 import javax.imageio.ImageIO
 
 import se.nimsa.sbx.dicom.DicomHierarchy.Image

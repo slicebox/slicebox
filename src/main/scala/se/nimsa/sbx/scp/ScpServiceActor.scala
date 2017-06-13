@@ -25,8 +25,6 @@ import se.nimsa.sbx.scp.ScpProtocol._
 import se.nimsa.sbx.util.ExceptionCatching
 import se.nimsa.sbx.util.FutureUtil.await
 
-import scala.language.postfixOps
-
 class ScpServiceActor(scpDao: ScpDAO)(implicit timeout: Timeout) extends Actor with ExceptionCatching {
   val log = Logging(context.system, this)
 

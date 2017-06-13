@@ -17,7 +17,6 @@
 package se.nimsa.sbx.log
 
 import se.nimsa.sbx.model.Entity
-import java.util.Date
 
 object LogProtocol {
 

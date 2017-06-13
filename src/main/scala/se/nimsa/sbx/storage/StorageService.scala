@@ -18,13 +18,12 @@ package se.nimsa.sbx.storage
 
 import java.awt.RenderingHints
 import java.awt.image.BufferedImage
-import java.io.{ByteArrayInputStream, ByteArrayOutputStream, IOException, InputStream}
-import java.nio.file.Path
+import java.io.{ByteArrayOutputStream, InputStream}
 import javax.imageio.ImageIO
 import javax.imageio.stream.ImageInputStream
 
 import com.amazonaws.util.IOUtils
-import org.dcm4che3.data.{BulkData, Fragments, Tag}
+import org.dcm4che3.data.Tag
 import org.dcm4che3.imageio.plugins.dcm.DicomImageReadParam
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.DicomUtil._

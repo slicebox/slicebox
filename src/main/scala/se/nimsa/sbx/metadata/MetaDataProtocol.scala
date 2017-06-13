@@ -17,10 +17,8 @@
 package se.nimsa.sbx.metadata
 
 import org.dcm4che3.data.Attributes
-import se.nimsa.sbx.app.GeneralProtocol.Source
-import se.nimsa.sbx.app.GeneralProtocol.SourceRef
+import se.nimsa.sbx.app.GeneralProtocol.{Source, SourceRef}
 import se.nimsa.sbx.dicom.DicomHierarchy._
-import se.nimsa.sbx.seriestype.SeriesTypeProtocol.SeriesIdSeriesType
 
 object MetaDataProtocol {
   

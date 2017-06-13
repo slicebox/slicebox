@@ -23,7 +23,6 @@ import akka.http.scaladsl.server.Route
 import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
 import se.nimsa.sbx.user.UserProtocol._
-import se.nimsa.sbx.metadata.MetaDataProtocol._
 
 trait SeriesTypeRoutes {
   this: SliceboxBase =>
@@ -32,9 +31,9 @@ trait SeriesTypeRoutes {
     pathPrefix("seriestypes") {
       pathEndOrSingleSlash {
         get {
-          parameters(
+          parameters((
             'startindex.as(nonNegativeFromStringUnmarshaller) ? 0,
-            'count.as(nonNegativeFromStringUnmarshaller) ? 20) { (startIndex, count) =>
+            'count.as(nonNegativeFromStringUnmarshaller) ? 20)) { (startIndex, count) =>
             onSuccess(seriesTypeService.ask(GetSeriesTypes(startIndex, count))) {
               case SeriesTypes(seriesTypes) =>
                 complete(seriesTypes)

@@ -20,8 +20,6 @@ import akka.actor.Actor
 import akka.actor.Status.Failure
 import se.nimsa.sbx.log.SbxLog
 
-import scala.annotation.tailrec
-
 trait ExceptionCatching { this: Actor =>
 
   def catchAndReport[A](op: => A): Option[A] =

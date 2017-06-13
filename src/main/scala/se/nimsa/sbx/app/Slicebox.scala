@@ -126,7 +126,7 @@ trait SliceboxBase extends SliceboxRoutes with JsonFormats with PlayJsonSupport 
     system.actorOf(UserServiceActor.props(userDao, superUser, superPassword, sessionTimeout, timeout), name = "UserService")
   }
   val logService = system.actorOf(LogServiceActor.props(logDao), name = "LogService")
-  val metaDataService = system.actorOf(MetaDataServiceActor.props(metaDataDao, propertiesDao, timeout), name = "MetaDataService")
+  val metaDataService = system.actorOf(MetaDataServiceActor.props(metaDataDao, propertiesDao), name = "MetaDataService")
   val storageService = system.actorOf(StorageServiceActor.props(storage), name = "StorageService")
   val anonymizationService = {
     val purgeEmptyAnonymizationKeys = sliceboxConfig.getBoolean("anonymization.purge-empty-keys")
