@@ -4,7 +4,7 @@ import akka.NotUsed
 import akka.actor.{Actor, ActorSystem, Props}
 import akka.http.scaladsl.model.StatusCodes.{InternalServerError, NoContent, ServiceUnavailable}
 import akka.http.scaladsl.model._
-import akka.stream.{ActorMaterializer, Materializer}
+import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Source
 import akka.testkit.{ImplicitSender, TestKit}
 import akka.util.{ByteString, Timeout}
@@ -66,7 +66,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
   }), name = "MetaDataService")
 
   val storage = new RuntimeStorage() {
-    override def fileSource(image: Image)(implicit actorSystem: ActorSystem, mat: Materializer): Source[ByteString, NotUsed] =
+    override def fileSource(image: Image): Source[ByteString, NotUsed] =
       Source.single(ByteString(1,2,3))
   }
 

@@ -6,7 +6,7 @@ scalacOptions := Seq("-encoding", "UTF-8", "-Xlint", "-deprecation", "-unchecked
 
 // define the project
 
-lazy val slicebox = (project in file(".")).enablePlugins(SbtWeb, JavaServerAppPackaging, GitBranchPrompt)
+lazy val slicebox = (project in file(".")).enablePlugins(SbtWeb, JavaServerAppPackaging)
 mainClass in Compile := Some("se.nimsa.sbx.app.Slicebox")
 
 // for sbt-resolver, (the re-start and re-stop commands)
@@ -78,7 +78,7 @@ libraryDependencies ++= {
   Seq(
     "com.typesafe.scala-logging" %% "scala-logging" % "3.5.0",
     "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
-    "com.typesafe.akka" %% "akka-stream" % akkaVersion,
+    "com.typesafe.akka" %% "akka-stream" % akkaVersion, // force newer version than default in akka-http
     "com.typesafe.akka" %% "akka-http" % akkaHttpVersion,
     "de.heikoseeberger" %% "akka-http-play-json" % "1.16.1",
     "ch.qos.logback" % "logback-classic" % "1.2.3",
@@ -95,13 +95,14 @@ libraryDependencies ++= {
     "org.dcm4che" % "dcm4che-imageio" % dcm4cheVersion,
     "org.dcm4che" % "dcm4che-net" % dcm4cheVersion,
     "com.typesafe.akka" %% "akka-testkit" % akkaVersion % "test",
+    "com.typesafe.akka" %% "akka-stream-testkit" % akkaVersion % "test",  // force newer version than default in akka-http
     "com.typesafe.akka" %% "akka-http-testkit" % akkaHttpVersion % "test",
     "org.webjars" % "angularjs" % "1.5.9",
     "org.webjars" % "angular-material" % "1.1.4",
     "org.webjars" % "angular-file-upload" % "11.0.0",
-    "se.nimsa" %% "dcm4che-streams" % "0.4-SNAPSHOT",
-    "com.lightbend.akka" %% "akka-stream-alpakka-s3" % "0.8",
-  "com.lightbend.akka" %% "akka-stream-alpakka-file" % "0.9"
+    "se.nimsa" %% "dcm4che-streams" % "0.4-SNAPSHOT" exclude("org.slf4j", "slf4j-simple"),
+    "com.lightbend.akka" %% "akka-stream-alpakka-s3" % "0.9",
+    "com.lightbend.akka" %% "akka-stream-alpakka-file" % "0.9"
   )
 }
 

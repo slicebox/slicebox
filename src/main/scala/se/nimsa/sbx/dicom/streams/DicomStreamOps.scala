@@ -1,8 +1,8 @@
 package se.nimsa.sbx.dicom.streams
 
-import akka.actor.{ActorSystem, Cancellable}
+import akka.actor.Cancellable
 import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Keep, Merge, Sink, Source => StreamSource}
-import akka.stream.{ActorMaterializer, FlowShape, SinkShape}
+import akka.stream.{ActorMaterializer, FlowShape, Materializer, SinkShape}
 import akka.util.ByteString
 import akka.{Done, NotUsed}
 import org.dcm4che3.data.{Attributes, Tag, UID, VR}
@@ -55,7 +55,7 @@ trait DicomStreamLoadOps {
     * @return a `Source` of anonymized DICOM byte chunks
     */
   def anonymizedDicomData(imageId: Long, tagValues: Seq[TagValue], storage: StorageService)
-                         (implicit system: ActorSystem, mat: ActorMaterializer, ec: ExecutionContext): Future[Option[StreamSource[ByteString, NotUsed]]] =
+                         (implicit mat: ActorMaterializer, ec: ExecutionContext): Future[Option[StreamSource[ByteString, NotUsed]]] =
     callMetaDataService[Option[Image]](GetImage(imageId)).map { imageMaybe =>
       imageMaybe.map { image =>
         anonymizedDicomDataSource(storage.fileSource(image), anonymizationQuery, anonymizationInsert, tagValues)
@@ -89,7 +89,7 @@ trait DicomStreamOps extends DicomStreamLoadOps {
     * @return the meta data info stored in the database
     */
   def storeDicomData(bytesSource: StreamSource[ByteString, _], source: Source, storage: StorageService, contexts: Seq[Context], reverseAnonymization: Boolean = true)
-                    (implicit system: ActorSystem, mat: ActorMaterializer, ec: ExecutionContext): Future[MetaDataAdded] = {
+                    (implicit mat: ActorMaterializer, ec: ExecutionContext): Future[MetaDataAdded] = {
     val tempPath = createTempPath()
     val sink = dicomDataSink(storage.fileSink(tempPath), reverseAnonymizationQuery, contexts, reverseAnonymization)
     bytesSource.runWith(sink).flatMap {
@@ -118,7 +118,7 @@ trait DicomStreamOps extends DicomStreamLoadOps {
     * @return the anonymized metadata stored in the system
     */
   def anonymizeData(imageId: Long, tagValues: Seq[TagValue], storage: StorageService)
-                   (implicit system: ActorSystem, mat: ActorMaterializer, ec: ExecutionContext): Future[Option[MetaDataAdded]] =
+                   (implicit mat: ActorMaterializer, ec: ExecutionContext): Future[Option[MetaDataAdded]] =
     callMetaDataService[Option[Image]](GetImage(imageId)).flatMap { imageMaybe =>
       imageMaybe.map { image =>
         val forcedSource = dicomDataSource(storage.fileSource(image))
@@ -168,7 +168,7 @@ object DicomStreamOps {
   def createTempPath() = s"tmp-${java.util.UUID.randomUUID().toString}"
 
   def attributesToMetaPart(dicomPart: DicomPart)
-                          (implicit ec: ExecutionContext, materializer: ActorMaterializer): Future[DicomPart] = {
+                          (implicit ec: ExecutionContext, materializer: Materializer): Future[DicomPart] = {
     dicomPart match {
       case da: DicomAttributes =>
         StreamSource.fromIterator(() => da.attributes.iterator).runWith(DicomAttributesSink.attributesSink).map {
@@ -418,7 +418,7 @@ object DicomStreamOps {
     })
 
   def imageAttributesSource[M](source: StreamSource[ByteString, M])
-                              (implicit ec: ExecutionContext, materializer: ActorMaterializer): StreamSource[ImageAttribute, M] =
+                              (implicit ec: ExecutionContext, materializer: Materializer): StreamSource[ImageAttribute, M] =
     source
       .via(new DicomPartFlow(stopTag = Some(Tag.PixelData)))
       .via(bulkDataFilter)

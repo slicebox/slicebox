@@ -19,7 +19,6 @@ package se.nimsa.sbx.storage
 import java.io.{BufferedInputStream, InputStream}
 import java.nio.file.{Files, Path, StandardCopyOption}
 
-import akka.actor.ActorSystem
 import akka.stream.Materializer
 import akka.stream.scaladsl.{FileIO, Sink, Source}
 import akka.util.ByteString
@@ -68,8 +67,7 @@ class FileStorage(val path: Path) extends StorageService {
   override def readDicomData(image: Image, withPixelData: Boolean): DicomData =
     loadDicomData(filePath(image), withPixelData)
 
-  override def readPngImageData(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int)
-                               (implicit system: ActorSystem, materializer: Materializer): Array[Byte] = {
+  override def readPngImageData(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int)(implicit materializer: Materializer): Array[Byte] = {
     val path = filePath(image)
     val source = FileIO.fromPath(path)
     super.readPngImageData(source, frameNumber, windowMin, windowMax, imageHeight)
@@ -90,10 +88,10 @@ class FileStorage(val path: Path) extends StorageService {
   }
 
 
-  override def fileSink(name: String)(implicit actorSystem: ActorSystem, mat: Materializer, ec: ExecutionContext):  Sink[ByteString, Future[Done]] =
+  override def fileSink(name: String)(implicit executionContext: ExecutionContext): Sink[ByteString, Future[Done]] =
     FileIO.toPath(filePath(name)).mapMaterializedValue(_.map(_ => Done))
 
-  override def fileSource(image: Image)(implicit actorSystem: ActorSystem, mat: Materializer): Source[ByteString, NotUsed] =
+  override def fileSource(image: Image): Source[ByteString, NotUsed] =
     FileIO.fromPath(filePath(image)).mapMaterializedValue(_ => NotUsed)
 
 }

@@ -21,9 +21,8 @@ import java.awt.image.BufferedImage
 import java.io.{ByteArrayOutputStream, InputStream}
 import javax.imageio.ImageIO
 
-import akka.actor.ActorSystem
+import akka.stream.Materializer
 import akka.stream.scaladsl.{Sink, Source, StreamConverters}
-import akka.stream.{ActorMaterializer, Materializer}
 import akka.util.ByteString
 import akka.{Done, NotUsed}
 import com.amazonaws.util.IOUtils
@@ -58,12 +57,12 @@ trait StorageService {
 
   def readDicomData(image: Image, withPixelData: Boolean): DicomData
 
-  def readImageAttributes(image: Image)(implicit ec: ExecutionContext, system: ActorSystem, materializer: ActorMaterializer): Source[ImageAttribute, NotUsed] =
+  def readImageAttributes(image: Image)(implicit materializer: Materializer, ec: ExecutionContext): Source[ImageAttribute, NotUsed] =
     DicomStreamOps.imageAttributesSource(fileSource(image))
 
   private val imageInformationTags = Seq(Tag.InstanceNumber, Tag.ImageIndex, Tag.NumberOfFrames, Tag.SmallestImagePixelValue, Tag.LargestImagePixelValue).sorted
 
-  def readImageInformation(image: Image)(implicit ec: ExecutionContext, actorSystem: ActorSystem, mat: Materializer): Future[ImageInformation] = {
+  def readImageInformation(image: Image)(implicit materializer: Materializer, ec: ExecutionContext): Future[ImageInformation] = {
     fileSource(image)
       .via(new DicomPartFlow(stopTag = Some(imageInformationTags.last + 1)))
       .via(DicomFlows.whitelistFilter(imageInformationTags.contains _))
@@ -84,11 +83,9 @@ trait StorageService {
       }
   }
 
-  def readPngImageData(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int)
-                      (implicit system: ActorSystem, materializer: Materializer): Array[Byte]
+  def readPngImageData(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int)(implicit materializer: Materializer): Array[Byte]
 
-  def readPngImageData(source: Source[ByteString, _], frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int)
-                      (implicit materializer: Materializer): Array[Byte] = {
+  def readPngImageData(source: Source[ByteString, _], frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int)(implicit materializer: Materializer): Array[Byte] = {
     // dcm4che does not support viewing of deflated data, cf. Github issue #42
     // As a workaround, do streaming inflate and mapping of transfer syntax
     val inflatedSource = DicomStreamOps.inflatedSource(source)
@@ -142,10 +139,10 @@ trait StorageService {
   }
 
   /** Sink for dicom files. */
-  def fileSink(name: String)(implicit actorSystem: ActorSystem, mat: Materializer, ec: ExecutionContext): Sink[ByteString, Future[Done]]
+  def fileSink(name: String)(implicit executionContext: ExecutionContext): Sink[ByteString, Future[Done]]
 
   /** Source for dicom files. */
-  def fileSource(image: Image)(implicit actorSystem: ActorSystem, mat: Materializer): Source[ByteString, NotUsed]
+  def fileSource(image: Image): Source[ByteString, NotUsed]
 
 }
 
