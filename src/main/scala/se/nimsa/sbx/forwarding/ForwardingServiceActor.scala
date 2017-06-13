@@ -270,5 +270,5 @@ class ForwardingServiceActor(forwardingDao: ForwardingDAO, pollInterval: FiniteD
 }
 
 object ForwardingServiceActor {
-  def props(forwardingDao: ForwardingDAO, timeout: Timeout): Props = Props(new ForwardingServiceActor(forwardingDao)(timeout))
+  def props(forwardingDao: ForwardingDAO)(implicit timeout: Timeout): Props = Props(new ForwardingServiceActor(forwardingDao))
 }

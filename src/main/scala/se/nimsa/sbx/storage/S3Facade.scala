@@ -18,6 +18,7 @@ package se.nimsa.sbx.storage
 
 import java.io.{ByteArrayInputStream, InputStream}
 
+import akka.stream.alpakka.s3.auth.BasicCredentials
 import com.amazonaws.{ClientConfiguration, Protocol}
 import com.amazonaws.auth.DefaultAWSCredentialsProviderChain
 import com.amazonaws.services.s3.AmazonS3ClientBuilder
@@ -28,13 +29,14 @@ import com.amazonaws.services.s3.model.{ObjectMetadata, PutObjectRequest}
   *
   * @param bucket bucket name
   */
-class S3Facade(val bucket: String) {
+class S3Facade(val bucket: String, val region: String) {
 
   // AWS credentials provider chain that looks for credentials in this order:
   // Environment Variables - AWS_ACCESS_KEY_ID and AWS_SECRET_KEY
   // Java System Properties - aws.accessKeyId and aws.secretKey
   // Instance profile credentials delivered through the Amazon EC2 metadata service
   val s3 = AmazonS3ClientBuilder.standard()
+    .withRegion(region)
     .withCredentials(new DefaultAWSCredentialsProviderChain())
     .withClientConfiguration(new ClientConfiguration().withProtocol(Protocol.HTTPS))
     .build()
@@ -42,6 +44,10 @@ class S3Facade(val bucket: String) {
 
   def delete(key: String): Unit = {
     s3.deleteObject(bucket, key)
+  }
+
+  def copy(sourceKey: String, targetKey: String): Unit = {
+    s3.copyObject(bucket, sourceKey, bucket, targetKey)
   }
 
   def exists(key: String): Boolean = {
@@ -69,4 +75,13 @@ class S3Facade(val bucket: String) {
     key
   }
 
+}
+
+object S3Facade {
+
+  def credentialsFromProviderChain() = {
+    val providerChain = new DefaultAWSCredentialsProviderChain()
+    val creds = providerChain.getCredentials
+    BasicCredentials(creds.getAWSAccessKeyId, creds.getAWSSecretKey)
+  }
 }

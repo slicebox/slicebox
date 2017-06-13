@@ -70,6 +70,14 @@ class AnonymizationServiceActor(anonymizationDao: AnonymizationDAO, purgeEmptyAn
             } else
               sender ! attributes
 
+          case GetAnonymizationKeysForPatient(name, id) =>
+            val keys = anonymizationKeysForPatient(name, id)
+            sender ! AnonymizationKeys(keys)
+
+          case GetReverseAnonymizationKeysForPatient(anonPatientName, anonPatientID) =>
+            val keys = anonymizationKeysForAnonPatient(anonPatientName, anonPatientID)
+            sender ! AnonymizationKeys(keys)
+
           case Anonymize(imageId, attributes, tagValues) =>
             if (isAnonymous(attributes) && tagValues.isEmpty)
               sender ! attributes
@@ -87,6 +95,9 @@ class AnonymizationServiceActor(anonymizationDao: AnonymizationDAO, purgeEmptyAn
 
               sender ! harmonizedAttributes
             }
+
+          case AddAnonymizationKey(anonymizationKey) =>
+            sender ! AnonymizationKeyAdded(addAnonymizationKey(anonymizationKey))
 
           case QueryAnonymizationKeys(query) =>
             sender ! queryAnonymizationKeys(query)
@@ -118,9 +129,17 @@ class AnonymizationServiceActor(anonymizationDao: AnonymizationDAO, purgeEmptyAn
     await(anonymizationDao.anonymizationKeysForAnonPatient(anonPatient.patientName.value, anonPatient.patientID.value))
   }
 
-  def anonymizationKeysForPatient(attributes: Attributes) = {
+  def anonymizationKeysForAnonPatient(anonPatientName: String, anonPatientID: String) = {
+    await(anonymizationDao.anonymizationKeysForAnonPatient(anonPatientName, anonPatientID))
+  }
+
+  def anonymizationKeysForPatient(attributes: Attributes): Seq[AnonymizationKey] = {
     val patient = attributesToPatient(attributes)
-    await(anonymizationDao.anonymizationKeysForPatient(patient.patientName.value, patient.patientID.value))
+    anonymizationKeysForPatient(patient.patientName.value, patient.patientID.value)
+  }
+
+  def anonymizationKeysForPatient(patientName: String, patientID: String): Seq[AnonymizationKey] = {
+    await(anonymizationDao.anonymizationKeysForPatient(patientName, patientID))
   }
 
   def removeImageFromAnonymizationKeyImages(imageId: Long) =
@@ -141,5 +160,5 @@ class AnonymizationServiceActor(anonymizationDao: AnonymizationDAO, purgeEmptyAn
 }
 
 object AnonymizationServiceActor {
-  def props(anonymizationDao: AnonymizationDAO, purgeEmptyAnonymizationKeys: Boolean, timeout: Timeout): Props = Props(new AnonymizationServiceActor(anonymizationDao, purgeEmptyAnonymizationKeys)(timeout))
+  def props(anonymizationDao: AnonymizationDAO, purgeEmptyAnonymizationKeys: Boolean)(implicit timeout: Timeout): Props = Props(new AnonymizationServiceActor(anonymizationDao, purgeEmptyAnonymizationKeys))
 }

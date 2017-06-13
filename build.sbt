@@ -59,11 +59,14 @@ licenses += ("Apache-2.0", new URL("https://www.apache.org/licenses/LICENSE-2.0.
 
 // repos
 
+
 resolvers ++= Seq(
-  "Typesafe Repository" at "http://repo.typesafe.com/typesafe/releases/",
-  "Sonatype snapshots" at "http://oss.sonatype.org/content/repositories/snapshots/",
+  Resolver.typesafeRepo("releases"),
+  Resolver.sonatypeRepo("snapshots"),
   "dcm4che Repository" at "http://www.dcm4che.org/maven2/",
   Resolver.bintrayRepo("hseeberger", "maven"))
+
+
 
 // deps
 
@@ -95,7 +98,10 @@ libraryDependencies ++= {
     "com.typesafe.akka" %% "akka-http-testkit" % akkaHttpVersion % "test",
     "org.webjars" % "angularjs" % "1.5.9",
     "org.webjars" % "angular-material" % "1.1.4",
-    "org.webjars" % "angular-file-upload" % "11.0.0"
+    "org.webjars" % "angular-file-upload" % "11.0.0",
+    "se.nimsa" %% "dcm4che-streams" % "0.4-SNAPSHOT",
+    "com.lightbend.akka" %% "akka-stream-alpakka-s3" % "0.8",
+  "com.lightbend.akka" %% "akka-stream-alpakka-file" % "0.9"
   )
 }
 

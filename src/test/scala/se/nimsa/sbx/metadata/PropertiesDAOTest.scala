@@ -10,7 +10,7 @@ import se.nimsa.sbx.util.FutureUtil.await
 import se.nimsa.sbx.util.TestUtil
 import se.nimsa.sbx.util.TestUtil._
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.DurationInt
 
 class PropertiesDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {

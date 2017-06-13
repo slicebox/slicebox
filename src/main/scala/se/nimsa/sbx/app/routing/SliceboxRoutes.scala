@@ -23,6 +23,7 @@ import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.AuthenticationFailedRejection.{CredentialsMissing, CredentialsRejected}
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.{AuthenticationFailedRejection, ExceptionHandler, RejectionHandler, Route}
+import org.dcm4che3.io.DicomStreamException
 import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.lang.{BadGatewayException, NotFoundException}
 import se.nimsa.sbx.user.Authenticator
@@ -52,6 +53,8 @@ trait SliceboxRoutes extends DirectoryRoutes
         complete((NotFound, e.getMessage))
       case e: FileNotFoundException =>
         complete((NotFound, "File not found: " + e.getMessage))
+      case e: DicomStreamException =>
+        complete((BadRequest, "Invalid DICOM data: " + e.getMessage))
       case e: NoSuchFileException =>
         complete((NotFound, "File not found: " + e.getMessage))
       case e: BadGatewayException =>

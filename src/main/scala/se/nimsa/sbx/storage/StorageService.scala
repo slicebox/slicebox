@@ -20,15 +20,22 @@ import java.awt.RenderingHints
 import java.awt.image.BufferedImage
 import java.io.{ByteArrayOutputStream, InputStream}
 import javax.imageio.ImageIO
-import javax.imageio.stream.ImageInputStream
 
+import akka.actor.ActorSystem
+import akka.stream.scaladsl.{Sink, Source, StreamConverters}
+import akka.stream.{ActorMaterializer, Materializer}
+import akka.util.ByteString
+import akka.{Done, NotUsed}
 import com.amazonaws.util.IOUtils
 import org.dcm4che3.data.Tag
 import org.dcm4che3.imageio.plugins.dcm.DicomImageReadParam
+import se.nimsa.dcm4che.streams.{DicomAttributesSink, DicomFlows, DicomPartFlow}
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
-import se.nimsa.sbx.dicom.DicomUtil._
+import se.nimsa.sbx.dicom.streams.DicomStreamOps
 import se.nimsa.sbx.dicom.{DicomData, ImageAttribute}
 import se.nimsa.sbx.storage.StorageProtocol.ImageInformation
+
+import scala.concurrent.{ExecutionContext, Future}
 
 /**
   * Created by michaelkober on 2016-04-25.
@@ -41,32 +48,52 @@ trait StorageService {
 
   def imageName(image: Image) = image.id.toString
 
-  def deleteFromStorage(images: Seq[Image]): Unit = images foreach (deleteFromStorage(_))
+  def deleteFromStorage(name: String): Unit
+
+  def deleteFromStorage(images: Seq[Image]): Unit = images foreach deleteFromStorage
 
   def deleteFromStorage(image: Image): Unit
 
+  def move(sourceImageName: String, targetImageName: String): Unit
+
   def readDicomData(image: Image, withPixelData: Boolean): DicomData
 
-  def readImageAttributes(image: Image): List[ImageAttribute]
+  def readImageAttributes(image: Image)(implicit ec: ExecutionContext, system: ActorSystem, materializer: ActorMaterializer): Source[ImageAttribute, NotUsed] =
+    DicomStreamOps.imageAttributesSource(fileSource(image))
 
-  def readImageInformation(image: Image): ImageInformation
+  private val imageInformationTags = Seq(Tag.InstanceNumber, Tag.ImageIndex, Tag.NumberOfFrames, Tag.SmallestImagePixelValue, Tag.LargestImagePixelValue).sorted
 
-  def readImageInformation(inputStream: InputStream): ImageInformation = {
-    val dicomData = loadDicomData(inputStream, withPixelData = false)
-    val attributes = dicomData.attributes
-    val instanceNumber = attributes.getInt(Tag.InstanceNumber, 1)
-    val imageIndex = attributes.getInt(Tag.ImageIndex, 1)
-    val frameIndex = if (instanceNumber > imageIndex) instanceNumber else imageIndex
-    ImageInformation(
-      attributes.getInt(Tag.NumberOfFrames, 1),
-      frameIndex,
-      attributes.getInt(Tag.SmallestImagePixelValue, 0),
-      attributes.getInt(Tag.LargestImagePixelValue, 0))
+  def readImageInformation(image: Image)(implicit ec: ExecutionContext, actorSystem: ActorSystem, mat: Materializer): Future[ImageInformation] = {
+    fileSource(image)
+      .via(new DicomPartFlow(stopTag = Some(imageInformationTags.last + 1)))
+      .via(DicomFlows.whitelistFilter(imageInformationTags.contains _))
+      .via(DicomFlows.attributeFlow)
+      .runWith(DicomAttributesSink.attributesSink)
+      .map {
+        case (_, maybeAttributes) =>
+          maybeAttributes.map { attributes =>
+            val instanceNumber = attributes.getInt(Tag.InstanceNumber, 1)
+            val imageIndex = attributes.getInt(Tag.ImageIndex, 1)
+            val frameIndex = if (instanceNumber > imageIndex) instanceNumber else imageIndex
+            ImageInformation(
+              attributes.getInt(Tag.NumberOfFrames, 1),
+              frameIndex,
+              attributes.getInt(Tag.SmallestImagePixelValue, 0),
+              attributes.getInt(Tag.LargestImagePixelValue, 0))
+          }.getOrElse(ImageInformation(0, 0, 0, 0))
+      }
   }
 
-  def readPngImageData(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int): Array[Byte]
+  def readPngImageData(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int)
+                      (implicit system: ActorSystem, materializer: Materializer): Array[Byte]
 
-  def readPngImageData(iis: ImageInputStream, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int): Array[Byte] = {
+  def readPngImageData(source: Source[ByteString, _], frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int)
+                      (implicit materializer: Materializer): Array[Byte] = {
+    // dcm4che does not support viewing of deflated data, cf. Github issue #42
+    // As a workaround, do streaming inflate and mapping of transfer syntax
+    val inflatedSource = DicomStreamOps.inflatedSource(source)
+    val is = inflatedSource.runWith(StreamConverters.asInputStream())
+    val iis = ImageIO.createImageInputStream(is)
     try {
       val imageReader = ImageIO.getImageReadersByFormatName("DICOM").next
       imageReader.setInput(iis)
@@ -114,4 +141,11 @@ trait StorageService {
       image
   }
 
+  /** Sink for dicom files. */
+  def fileSink(name: String)(implicit actorSystem: ActorSystem, mat: Materializer, ec: ExecutionContext): Sink[ByteString, Future[Done]]
+
+  /** Source for dicom files. */
+  def fileSource(image: Image)(implicit actorSystem: ActorSystem, mat: Materializer): Source[ByteString, NotUsed]
+
 }
+

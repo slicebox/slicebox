@@ -19,18 +19,18 @@ package se.nimsa.sbx.app.routing
 import java.io.ByteArrayOutputStream
 import java.util.zip.{ZipEntry, ZipOutputStream}
 
+import akka.NotUsed
+import akka.http.scaladsl.common.EntityStreamingSupport
+import akka.http.scaladsl.model.HttpEntity
 import akka.http.scaladsl.model.MediaTypes._
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.headers._
-import akka.http.scaladsl.model.{ContentTypes, HttpEntity}
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
-import akka.stream.scaladsl.{Sink, SourceQueueWithComplete, StreamConverters, Source => StreamSource}
+import akka.stream.scaladsl.{Sink, SourceQueueWithComplete, Source => StreamSource}
 import akka.stream.{OverflowStrategy, QueueOfferResult}
 import akka.util.ByteString
-import org.dcm4che3.data.Attributes
-import se.nimsa.sbx.anonymization.AnonymizationProtocol.ReverseAnonymization
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.dicom.DicomHierarchy.{FlatSeries, Image, Patient, Study}
@@ -45,6 +45,8 @@ import scala.util.{Failure, Success}
 
 trait ImageRoutes {
   this: SliceboxBase =>
+
+  implicit val jsonStreamingSupport = EntityStreamingSupport.json()
 
   def imageRoutes(apiUser: ApiUser): Route =
     pathPrefix("images") {
@@ -61,9 +63,7 @@ trait ImageRoutes {
           case Some(image) =>
             pathEndOrSingleSlash {
               get {
-                onSuccess(storageService.ask(GetImageData(image)).mapTo[DicomDataArray]) { imageData =>
-                  complete(HttpEntity(ByteString(imageData.data)))
-                }
+                complete(HttpEntity(`application/octet-stream`, storage.fileSource(image)))
               } ~ delete {
                 complete(storageService.ask(DeleteDicomData(image)).flatMap(_ =>
                   metaDataService.ask(DeleteMetaData(image)).map(_ =>
@@ -71,15 +71,11 @@ trait ImageRoutes {
               }
             } ~ path("attributes") {
               get {
-                onSuccess(storageService.ask(GetImageAttributes(image)).mapTo[List[ImageAttribute]]) {
-                  complete(_)
-                }
+                complete(storage.readImageAttributes(image))
               }
             } ~ path("imageinformation") {
               get {
-                onSuccess(storageService.ask(GetImageInformation(image)).mapTo[ImageInformation]) {
-                  complete(_)
-                }
+                complete(storage.readImageInformation(image))
               }
             } ~ path("png") {
               parameters((
@@ -88,8 +84,8 @@ trait ImageRoutes {
                 'windowmax.as[Int] ? 0,
                 'imageheight.as[Int] ? 0)) { (frameNumber, min, max, height) =>
                 get {
-                  onComplete(storageService.ask(GetPngDataArray(image, frameNumber, min, max, height))) {
-                    case Success(PngDataArray(bytes)) => complete(HttpEntity(`image/png`, bytes))
+                  onComplete(Future(storage.readPngImageData(image, frameNumber, min, max, height))) {
+                    case Success(bytes) => complete(HttpEntity(`image/png`, bytes))
                     case Failure(_) => complete(NoContent)
                     case _ => complete(InternalServerError)
                   }
@@ -131,7 +127,7 @@ trait ImageRoutes {
                 case Some(imageIds) =>
                   val source: StreamSource[ByteString, _] = StreamSource.queue[ByteString](0, OverflowStrategy.fail)
                     .mapMaterializedValue(queue => new ImageZipper(queue).zipNext(imageIds))
-                  complete(HttpEntity(ContentTypes.`application/octet-stream`, source))
+                  complete(HttpEntity(`application/octet-stream`, source))
                 case None =>
                   complete(NotFound)
               }
@@ -148,10 +144,9 @@ trait ImageRoutes {
                   metaDataService.ask(GetPatient(study.patientId)).mapTo[Option[Patient]].map { patientMaybe =>
                     patientMaybe.map { patient =>
                       bytes.fold(ByteString.empty)(_ ++ _).runWith(Sink.head).map { allBytes =>
-                        val dicomData = Jpeg2Dcm(allBytes.toArray, patient, study, optionalDescription)
-                        metaDataService.ask(AddMetaData(dicomData.attributes, source)).mapTo[MetaDataAdded].flatMap { metaData =>
-                          storageService.ask(AddDicomData(dicomData, source, metaData.image)).map { _ => metaData.image }
-                        }
+                        val scBytes = Jpeg2Dcm(allBytes.toArray, patient, study, optionalDescription)
+                        storeDicomData(StreamSource.single(ByteString(scBytes)), source, storage, Contexts.extendedContexts)
+                          .map(_.image)
                       }
                     }
                   }.unwrap
@@ -169,30 +164,14 @@ trait ImageRoutes {
       }
     }
 
-  private def addDicomDataRoute(bytes: StreamSource[ByteString, Any], apiUser: ApiUser) = {
-    val is = bytes.runWith(StreamConverters.asInputStream())
-    val dicomData = DicomUtil.loadDicomData(is, withPixelData = true)
+  private def addDicomDataRoute(bytes: StreamSource[ByteString, _], apiUser: ApiUser): Route = {
     val source = Source(SourceType.USER, apiUser.user, apiUser.id)
-    val futureImageAndOverwrite =
-      storageService.ask(CheckDicomData(dicomData, useExtendedContexts = true)).mapTo[Boolean].flatMap {
-        _ =>
-          anonymizationService.ask(ReverseAnonymization(dicomData.attributes)).mapTo[Attributes].flatMap {
-            reversedAttributes =>
-              metaDataService.ask(AddMetaData(reversedAttributes, source)).mapTo[MetaDataAdded].flatMap {
-                metaData =>
-                  storageService.ask(AddDicomData(dicomData.copy(attributes = reversedAttributes), source, metaData.image)).mapTo[DicomDataAdded].map {
-                    dicomDataAdded =>
-                      (metaData.image, dicomDataAdded.overwrite)
-                  }
-              }
-          }
-      }
-    onSuccess(futureImageAndOverwrite) {
-      case (image, overwrite) =>
-        if (overwrite)
-          complete((OK, image))
-        else
-          complete((Created, image))
+    val futureUpload = storeDicomData(bytes, source, storage, Contexts.extendedContexts)
+
+    onSuccess(futureUpload) { metaData =>
+      system.eventStream.publish(ImageAdded(metaData.image, source, !metaData.imageAdded))
+      val httpStatus = if (metaData.imageAdded) Created else OK
+      complete((httpStatus, metaData.image))
     }
   }
 
@@ -201,16 +180,14 @@ trait ImageRoutes {
     val byteStream = new ByteArrayOutputStream()
     val zipStream = new ZipOutputStream(byteStream)
 
-    private def getImageData(imageId: Long): Future[Option[(Image, FlatSeries, DicomDataArray)]] =
+    private def getImageData(imageId: Long): Future[Option[(Image, FlatSeries, StreamSource[ByteString, NotUsed])]] =
       metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]].flatMap { imageMaybe =>
         imageMaybe.map { image =>
           metaDataService.ask(GetSingleFlatSeries(image.seriesId)).mapTo[Option[FlatSeries]].map { flatSeriesMaybe =>
             flatSeriesMaybe.map { flatSeries =>
-              storageService.ask(GetImageData(image)).mapTo[DicomDataArray].map { imageData =>
-                (image, flatSeries, imageData)
-              }
+              (image, flatSeries, storage.fileSource(image))
             }
-          }.unwrap
+          }
         }.unwrap
       }
 
@@ -231,24 +208,25 @@ trait ImageRoutes {
         val imageId = imageIds.head
         getImageData(imageId).onComplete {
 
-          case Success(Some((image, flatSeries, imageData))) =>
+          case Success(Some((image, flatSeries, dicomDataSource))) =>
             val zipEntry = createZipEntry(image, flatSeries)
             zipStream.putNextEntry(zipEntry)
-            zipStream.write(imageData.data)
-            val zippedBytes = byteStream.toByteArray
-            byteStream.reset()
-            queue.offer(ByteString(zippedBytes)).onComplete {
+            dicomDataSource.map(_.toArray).runForeach(zipStream.write).andThen {
+              case Success(_) =>
+                val zippedBytes = byteStream.toByteArray
+                byteStream.reset()
+                queue.offer(ByteString(zippedBytes)).onComplete {
 
-              case Success(QueueOfferResult.Enqueued) =>
-                zipNext(imageIds.tail)
+                  case Success(QueueOfferResult.Enqueued) =>
+                    zipNext(imageIds.tail)
 
-              case Success(result) =>
-                queue.fail(new Exception(s"Unable to add image $imageId to export stream: $result"))
+                  case Success(result) =>
+                    queue.fail(new Exception(s"Unable to add image $imageId to export stream: $result"))
 
-              case Failure(error) =>
-                queue.fail(error)
+                  case Failure(error) =>
+                    queue.fail(error)
+                }
             }
-
           case Success(None) =>
             queue.fail(new Exception(s"Could not find image data for image id $imageId"))
 

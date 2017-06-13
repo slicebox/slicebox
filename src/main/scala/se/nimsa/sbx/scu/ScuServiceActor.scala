@@ -19,43 +19,44 @@ package se.nimsa.sbx.scu
 import java.io.IOException
 import java.net.{ConnectException, NoRouteToHostException, UnknownHostException}
 
+import akka.NotUsed
 import akka.actor.{Actor, Props}
 import akka.event.{Logging, LoggingReceive}
 import akka.pattern.{ask, pipe}
+import akka.stream.ActorMaterializer
+import akka.stream.scaladsl.Source
 import akka.util.Timeout
 import org.dcm4che3.net.{IncompatibleConnectionException, NoPresentationContextException}
+import se.nimsa.dcm4che.streams.DicomPartFlow
+import se.nimsa.dcm4che.streams.DicomParts.DicomPart
 import se.nimsa.sbx.app.GeneralProtocol._
-import se.nimsa.sbx.dicom.DicomData
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.lang.{BadGatewayException, NotFoundException}
 import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.metadata.MetaDataProtocol.GetImage
 import se.nimsa.sbx.scu.ScuProtocol._
-import se.nimsa.sbx.storage.StorageProtocol.GetDicomData
+import se.nimsa.sbx.storage.StorageService
 import se.nimsa.sbx.util.ExceptionCatching
 import se.nimsa.sbx.util.FutureUtil.await
-import se.nimsa.sbx.util.SbxExtensions._
 
 import scala.concurrent.Future
 
-class ScuServiceActor(scuDao: ScuDAO)(implicit timeout: Timeout) extends Actor with ExceptionCatching {
+class ScuServiceActor(scuDao: ScuDAO, storage: StorageService)(implicit materializer: ActorMaterializer, timeout: Timeout) extends Actor with ExceptionCatching {
   val log = Logging(context.system, this)
 
-  import context.system
-
+  implicit val system = context.system
   implicit val ec = context.dispatcher
 
   val metaDataService = context.actorSelection("../MetaDataService")
   val storageService = context.actorSelection("../StorageService")
 
   val dicomDataProvider = new DicomDataProvider {
-    override def getDicomData(imageId: Long, withPixelData: Boolean): Future[Option[DicomData]] = {
-      metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]].map { imageMaybe =>
-        imageMaybe.map { image =>
-          storageService.ask(GetDicomData(image, withPixelData)).mapTo[DicomData]
-        }
-      }.unwrap
-    }
+    override def getDicomData(imageId: Long, stopTag: Option[Int]): Future[Source[DicomPart, NotUsed]] =
+      metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]]
+        .map(imageMaybe =>
+          imageMaybe
+            .map(image => storage.fileSource(image).via(new DicomPartFlow(stopTag = stopTag)))
+            .getOrElse(Source.empty))
   }
 
   log.info("SCU service started")
@@ -158,5 +159,5 @@ class ScuServiceActor(scuDao: ScuDAO)(implicit timeout: Timeout) extends Actor w
 }
 
 object ScuServiceActor {
-  def props(scuDao: ScuDAO, timeout: Timeout): Props = Props(new ScuServiceActor(scuDao)(timeout))
+  def props(scuDao: ScuDAO, storage: StorageService)(implicit materializer: ActorMaterializer, timeout: Timeout): Props = Props(new ScuServiceActor(scuDao, storage))
 }

@@ -21,24 +21,30 @@ import java.util.concurrent.{Executor, Executors}
 import akka.actor.{Actor, Props}
 import akka.event.{Logging, LoggingReceive}
 import akka.pattern.{ask, pipe}
+import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import org.dcm4che3.data.Attributes
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.ReverseAnonymization
 import se.nimsa.sbx.app.GeneralProtocol._
-import se.nimsa.sbx.dicom.DicomData
+import se.nimsa.sbx.dicom.{Contexts, DicomData}
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
+import se.nimsa.sbx.dicom.streams.DicomStreamOps
 import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, MetaDataAdded}
 import se.nimsa.sbx.scp.ScpProtocol._
 import se.nimsa.sbx.storage.StorageProtocol.{AddDicomData, CheckDicomData, DicomDataAdded}
+import se.nimsa.sbx.storage.StorageService
 
 import scala.concurrent.Future
+import scala.concurrent.duration.FiniteDuration
+import scala.reflect.ClassTag
 import scala.util.{Failure, Success}
 
-class ScpActor(scpData: ScpData, executor: Executor, implicit val timeout: Timeout,
+class ScpActor(scpData: ScpData, storage: StorageService, executor: Executor,
                metaDataServicePath: String = "../../MetaDataService",
                storageServicePath: String = "../../StorageService",
-               anonymizationServicePath: String = "../../AnonymizationService") extends Actor {
+               anonymizationServicePath: String = "../../AnonymizationService")
+              (implicit val materializer: ActorMaterializer, timeout: Timeout) extends Actor with DicomStreamOps {
 
   val metaDataService = context.actorSelection(metaDataServicePath)
   val storageService = context.actorSelection(storageServicePath)
@@ -65,22 +71,14 @@ class ScpActor(scpData: ScpData, executor: Executor, implicit val timeout: Timeo
   }
 
   def receive = LoggingReceive {
-    case DicomDataReceivedByScp(dicomData) =>
+    case DicomDataReceivedByScp(bytesSource) =>
       log.debug("SCP", s"Dicom data received using SCP ${scpData.name}")
       val source = Source(SourceType.SCP, scpData.name, scpData.id)
-      val addDicomDataFuture =
-        checkDicomData(dicomData).flatMap { _ =>
-          reverseAnonymization(dicomData.attributes).flatMap { reversedAttributes =>
-            val reversedDicomData = DicomData(reversedAttributes, dicomData.metaInformation)
-            addMetadata(reversedAttributes, source).flatMap { image =>
-              addDicomData(reversedDicomData, source, image).map { _ =>
-              }
-            }
-          }
-        }
+      val addDicomDataFuture = storeDicomData(bytesSource, source, storage, Contexts.imageDataContexts)
 
       addDicomDataFuture.onComplete {
-        case Success(_) =>
+        case Success(metaData) =>
+          system.eventStream.publish(ImageAdded(metaData.image, source, !metaData.imageAdded))
         case Failure(e) =>
           SbxLog.error("Directory", s"Could not add file: ${e.getMessage}")
       }
@@ -105,8 +103,12 @@ class ScpActor(scpData: ScpData, executor: Executor, implicit val timeout: Timeo
   def reverseAnonymization(attributes: Attributes): Future[Attributes] =
     anonymizationService.ask(ReverseAnonymization(attributes)).mapTo[Attributes]
 
+  override def callAnonymizationService[R: ClassTag](message: Any) = anonymizationService.ask(message).mapTo[R]
+  override def callStorageService[R: ClassTag](message: Any) = storageService.ask(message).mapTo[R]
+  override def callMetaDataService[R: ClassTag](message: Any) = metaDataService.ask(message).mapTo[R]
+  override def scheduleTask(delay: FiniteDuration)(task: => Unit) = system.scheduler.scheduleOnce(delay)(task)
 }
 
 object ScpActor {
-  def props(scpData: ScpData, executor: Executor, timeout: Timeout): Props = Props(new ScpActor(scpData, executor, timeout))
+  def props(scpData: ScpData, storage: StorageService, executor: Executor)(implicit materializer: ActorMaterializer, timeout: Timeout): Props = Props(new ScpActor(scpData, storage, executor))
 }

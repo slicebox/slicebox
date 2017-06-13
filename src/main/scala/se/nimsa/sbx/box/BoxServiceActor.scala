@@ -21,11 +21,13 @@ import java.util.UUID
 import akka.actor.{Actor, PoisonPill, Props, Stash}
 import akka.event.{Logging, LoggingReceive}
 import akka.pattern.PipeToSupport
+import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.log.SbxLog
+import se.nimsa.sbx.storage.StorageService
 import se.nimsa.sbx.util.SequentialPipeToSupport
 import se.nimsa.sbx.util.SbxExtensions._
 
@@ -33,7 +35,7 @@ import scala.collection.mutable
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 
-class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String)(implicit val timeout: Timeout) extends Actor with Stash with PipeToSupport with SequentialPipeToSupport {
+class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageService)(implicit val materializer: ActorMaterializer, timeout: Timeout) extends Actor with Stash with PipeToSupport with SequentialPipeToSupport {
 
   val log = Logging(context.system, this)
 
@@ -252,13 +254,13 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String)(implicit val timeout: 
   def maybeStartPushActor(box: Box): Unit = {
     val actorName = pushActorName(box)
     if (context.child(actorName).isEmpty)
-      context.actorOf(BoxPushActor.props(box, timeout), actorName)
+      context.actorOf(BoxPushActor.props(box, storage), actorName)
   }
 
   def maybeStartPollActor(box: Box): Unit = {
     val actorName = pollActorName(box)
     if (context.child(actorName).isEmpty)
-      context.actorOf(BoxPollActor.props(box, timeout), actorName)
+      context.actorOf(BoxPollActor.props(box, storage), actorName)
   }
 
   def pushActorName(box: Box): String = BoxSendMethod.PUSH + "-" + box.id.toString
@@ -302,5 +304,5 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String)(implicit val timeout: 
 }
 
 object BoxServiceActor {
-  def props(boxDao: BoxDAO, apiBaseURL: String, timeout: Timeout): Props = Props(new BoxServiceActor(boxDao, apiBaseURL)(timeout))
+  def props(boxDao: BoxDAO, apiBaseURL: String, storage: StorageService)(implicit materializer: ActorMaterializer, timeout: Timeout): Props = Props(new BoxServiceActor(boxDao, apiBaseURL, storage))
 }

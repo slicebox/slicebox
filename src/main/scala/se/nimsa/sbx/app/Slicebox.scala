@@ -21,6 +21,7 @@ import java.util.concurrent.TimeUnit.MILLISECONDS
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
+import akka.pattern.ask
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import com.typesafe.config.{Config, ConfigFactory}
@@ -28,6 +29,7 @@ import de.heikoseeberger.akkahttpplayjson.PlayJsonSupport
 import se.nimsa.sbx.anonymization.{AnonymizationDAO, AnonymizationServiceActor}
 import se.nimsa.sbx.app.routing.SliceboxRoutes
 import se.nimsa.sbx.box.{BoxDAO, BoxServiceActor}
+import se.nimsa.sbx.dicom.streams.DicomStreamOps
 import se.nimsa.sbx.directory.{DirectoryWatchDAO, DirectoryWatchServiceActor}
 import se.nimsa.sbx.forwarding.{ForwardingDAO, ForwardingServiceActor}
 import se.nimsa.sbx.importing.{ImportDAO, ImportServiceActor}
@@ -41,11 +43,12 @@ import se.nimsa.sbx.user.{UserDAO, UserServiceActor}
 import slick.basic.DatabaseConfig
 import slick.jdbc.JdbcProfile
 
+import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.concurrent.{Await, ExecutionContextExecutor}
-import scala.concurrent.duration.DurationInt
+import scala.reflect.ClassTag
 import scala.util.{Failure, Success}
 
-trait SliceboxBase extends SliceboxRoutes with JsonFormats with PlayJsonSupport {
+trait SliceboxBase extends SliceboxRoutes with DicomStreamOps with JsonFormats with PlayJsonSupport {
 
   val appConfig: Config  = ConfigFactory.load()
   val sliceboxConfig = appConfig.getConfig("slicebox")
@@ -56,7 +59,7 @@ trait SliceboxBase extends SliceboxRoutes with JsonFormats with PlayJsonSupport 
 
   implicit def executor: ExecutionContextExecutor
 
-  implicit val timeout = {
+  implicit val timeout: Timeout = {
     val clientTimeout = appConfig.getDuration("akka.http.client.connecting-timeout", MILLISECONDS)
     val serverTimeout = appConfig.getDuration("akka.http.server.request-timeout", MILLISECONDS)
     Timeout(math.max(clientTimeout, serverTimeout) + 10, MILLISECONDS)
@@ -92,7 +95,7 @@ trait SliceboxBase extends SliceboxRoutes with JsonFormats with PlayJsonSupport 
     _ <- anonymizationDao.create()
   } yield Unit
   createDbTables.onComplete {
-    case Success(v) => SbxLog.default("System", "Database tables created. ")
+    case Success(_) => SbxLog.default("System", "Database tables created. ")
     case Failure(e) => SbxLog.error("System", s"Could not create tables. ${e.getMessage}")
   }
   Await.ready(createDbTables, 1.minute)
@@ -123,22 +126,27 @@ trait SliceboxBase extends SliceboxRoutes with JsonFormats with PlayJsonSupport 
 
   val userService = {
     val sessionTimeout = sliceboxConfig.getDuration("session-timeout", MILLISECONDS)
-    system.actorOf(UserServiceActor.props(userDao, superUser, superPassword, sessionTimeout, timeout), name = "UserService")
+    system.actorOf(UserServiceActor.props(userDao, superUser, superPassword, sessionTimeout), name = "UserService")
   }
   val logService = system.actorOf(LogServiceActor.props(logDao), name = "LogService")
   val metaDataService = system.actorOf(MetaDataServiceActor.props(metaDataDao, propertiesDao), name = "MetaDataService")
   val storageService = system.actorOf(StorageServiceActor.props(storage), name = "StorageService")
   val anonymizationService = {
     val purgeEmptyAnonymizationKeys = sliceboxConfig.getBoolean("anonymization.purge-empty-keys")
-    system.actorOf(AnonymizationServiceActor.props(anonymizationDao, purgeEmptyAnonymizationKeys, timeout), name = "AnonymizationService")
+    system.actorOf(AnonymizationServiceActor.props(anonymizationDao, purgeEmptyAnonymizationKeys), name = "AnonymizationService")
   }
-  val boxService = system.actorOf(BoxServiceActor.props(boxDao, apiBaseURL, timeout), name = "BoxService")
-  val scpService = system.actorOf(ScpServiceActor.props(scpDao, timeout), name = "ScpService")
-  val scuService = system.actorOf(ScuServiceActor.props(scuDao, timeout), name = "ScuService")
-  val directoryService = system.actorOf(DirectoryWatchServiceActor.props(directoryWatchDao, timeout), name = "DirectoryService")
-  val seriesTypeService = system.actorOf(SeriesTypeServiceActor.props(seriesTypeDao, timeout), name = "SeriesTypeService")
-  val forwardingService = system.actorOf(ForwardingServiceActor.props(forwardingDao, timeout), name = "ForwardingService")
-  val importService = system.actorOf(ImportServiceActor.props(importDao, timeout), name = "ImportService")
+  val boxService = system.actorOf(BoxServiceActor.props(boxDao, apiBaseURL, storage), name = "BoxService")
+  val scpService = system.actorOf(ScpServiceActor.props(scpDao, storage), name = "ScpService")
+  val scuService = system.actorOf(ScuServiceActor.props(scuDao, storage), name = "ScuService")
+  val directoryService = system.actorOf(DirectoryWatchServiceActor.props(directoryWatchDao, storage), name = "DirectoryService")
+  val seriesTypeService = system.actorOf(SeriesTypeServiceActor.props(seriesTypeDao, storage), name = "SeriesTypeService")
+  val forwardingService = system.actorOf(ForwardingServiceActor.props(forwardingDao), name = "ForwardingService")
+  val importService = system.actorOf(ImportServiceActor.props(importDao), name = "ImportService")
+
+  override def callAnonymizationService[R: ClassTag](message: Any) = anonymizationService.ask(message).mapTo[R]
+  override def callStorageService[R: ClassTag](message: Any) = storageService.ask(message).mapTo[R]
+  override def callMetaDataService[R: ClassTag](message: Any) = metaDataService.ask(message).mapTo[R]
+  override def scheduleTask(delay: FiniteDuration)(task: => Unit) = system.scheduler.scheduleOnce(delay)(task)
 
 }
 
@@ -152,7 +160,7 @@ object Slicebox extends {
 
   val storage =
     if (cfg.getString("dicom-storage.config.name") == "s3")
-      new S3Storage(cfg.getString("dicom-storage.config.bucket"), cfg.getString("dicom-storage.config.prefix"))
+      new S3Storage(cfg.getString("dicom-storage.config.bucket"), cfg.getString("dicom-storage.config.prefix"), cfg.getString("dicom-storage.config.region"))
     else
       new FileStorage(Paths.get(cfg.getString("dicom-storage.file-system.path")))
 } with SliceboxBase with App {
@@ -169,5 +177,4 @@ object Slicebox extends {
     case Failure(e) =>
       SbxLog.error("System", s"Could not bind to $host:$port, ${e.getMessage}")
   }
-
 }

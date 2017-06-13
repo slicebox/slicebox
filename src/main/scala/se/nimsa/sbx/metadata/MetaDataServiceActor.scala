@@ -19,7 +19,6 @@ package se.nimsa.sbx.metadata
 import akka.actor.{Actor, Props, Stash}
 import akka.event.{Logging, LoggingReceive}
 import akka.pattern.pipe
-import akka.util.Timeout
 import se.nimsa.sbx.dicom.DicomUtil._
 import se.nimsa.sbx.lang.NotFoundException
 import se.nimsa.sbx.metadata.MetaDataProtocol._

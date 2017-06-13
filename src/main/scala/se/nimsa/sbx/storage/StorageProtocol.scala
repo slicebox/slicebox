@@ -37,17 +37,13 @@ object StorageProtocol {
 
   case class GetDicomData(image: Image, withPixelData: Boolean) extends ImageRequest
 
-  case class GetImageAttributes(image: Image) extends ImageRequest
-
-  case class GetImageInformation(image: Image) extends ImageRequest
-
-  case class GetPngDataArray(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int) extends ImageRequest
-
   case class CheckDicomData(dicomData: DicomData, useExtendedContexts: Boolean) extends ImageRequest
 
   case class AddDicomData(dicomData: DicomData, source: Source, image: Image) extends ImageRequest
   
   case class DeleteDicomData(image: Image) extends ImageRequest
+
+  case class MoveDicomData(sourceImageName: String, targetImageName: String) extends ImageRequest
 
   case class CreateExportSet(imageIds: Seq[Long]) extends ImageRequest
 
@@ -56,11 +52,11 @@ object StorageProtocol {
 
   case class DicomDataArray(data: Array[Byte])
 
-  case class PngDataArray(data: Array[Byte])
-
   case class DicomDataAdded(image: Image, overwrite: Boolean)
 
   case class DicomDataDeleted(image: Image)
+
+  case class DicomDataMoved(sourceImageName: String, targetImageName: String)
 
   case class ExportSetId(id: Long)
 

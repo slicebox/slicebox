@@ -47,7 +47,7 @@ object Jpeg2Dcm {
 
   private val transferSyntax = UID.JPEGBaseline1
 
-  def apply(bytes: Array[Byte], patient: Patient, study: Study, optionalDescription: Option[String]): DicomData = {
+  def apply(bytes: Array[Byte], patient: Patient, study: Study, optionalDescription: Option[String]): Array[Byte] = {
 
     val jpgInput = new DataInputStream(new ByteArrayInputStream(bytes))
 
@@ -101,7 +101,7 @@ object Jpeg2Dcm {
         if ((jpgLen & 1) != 0)
           dos.write(0)
         dos.writeHeader(Tag.SequenceDelimitationItem, null, 0)
-        DicomUtil.loadDicomData(baos.toByteArray, withPixelData = true)
+        baos.toByteArray
       } finally {
         dos.close()
       }

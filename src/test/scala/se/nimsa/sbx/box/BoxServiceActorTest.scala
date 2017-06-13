@@ -1,6 +1,7 @@
 package se.nimsa.sbx.box
 
 import akka.actor.{ActorSystem, Props, actorRef2Scala}
+import akka.stream.ActorMaterializer
 import akka.testkit.{ImplicitSender, TestKit}
 import akka.util.Timeout
 import org.scalatest._
@@ -24,6 +25,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
 
   implicit val ec = system.dispatcher
   implicit val timeout = Timeout(30.seconds)
+  implicit val materializer = ActorMaterializer()
 
   val dbConfig = TestUtil.createTestDb("boxserviceactortest")
 
@@ -36,7 +38,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
   await(boxDao.create())
 
   val storageService = system.actorOf(Props(new StorageServiceActor(storage)), name = "StorageService")
-  val boxService = system.actorOf(Props(new BoxServiceActor(boxDao, "http://testhost:1234")), name = "BoxService")
+  val boxService = system.actorOf(Props(new BoxServiceActor(boxDao, "http://testhost:1234", storage)), name = "BoxService")
 
   override def afterEach() = {
     storage.clear()

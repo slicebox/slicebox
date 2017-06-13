@@ -18,31 +18,37 @@ package se.nimsa.sbx.scu
 
 import java.util.concurrent.Executors
 
+import akka.NotUsed
+import akka.actor.ActorSystem
+import akka.stream.ActorMaterializer
+import akka.stream.scaladsl.{Sink, Source}
 import com.typesafe.scalalogging.LazyLogging
 import org.dcm4che3.data.{Attributes, Tag, UID}
 import org.dcm4che3.imageio.codec.Decompressor
 import org.dcm4che3.net._
 import org.dcm4che3.net.pdu.{AAssociateRQ, PresentationContext}
 import org.dcm4che3.util.TagUtils
-import se.nimsa.sbx.dicom.DicomData
+import se.nimsa.dcm4che.streams.DicomParts.{DicomAttributes, DicomPart}
+import se.nimsa.dcm4che.streams.{DicomAttributesSink, DicomFlows}
+import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.scu.ScuProtocol.ScuData
 import se.nimsa.sbx.util.FutureUtil.traverseSequentially
-import se.nimsa.sbx.util.SbxExtensions._
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
 
 trait DicomDataProvider {
-  def getDicomData(imageId: Long, withPixelData: Boolean): Future[Option[DicomData]]
+  def getDicomData(imageId: Long, stopTag: Option[Int]): Future[Source[DicomPart, NotUsed]]
 }
 
 case class DicomDataInfo(iuid: String, cuid: String, ts: String, imageId: Long)
 
-class Scu(ae: ApplicationEntity, scuData: ScuData)(implicit ec: ExecutionContext) extends LazyLogging {
+class Scu(ae: ApplicationEntity, scuData: ScuData)
+         (implicit system: ActorSystem, mat: ActorMaterializer, ec: ExecutionContext) extends LazyLogging {
   val remote = new Connection()
   val rq = new AAssociateRQ()
 
   val priority: Int = 0
-  var as: Association = null
+  var as: Association = _
 
   rq.addPresentationContext(new PresentationContext(1, UID.VerificationSOPClass, UID.ImplicitVRLittleEndian))
   rq.setCalledAET(scuData.aeTitle)
@@ -65,58 +71,76 @@ class Scu(ae: ApplicationEntity, scuData: ScuData)(implicit ec: ExecutionContext
       }
   }
 
-  def addDicomData(imageId: Long, dicomData: DicomData): Option[DicomDataInfo] = {
-    val fmi = dicomData.metaInformation
+  def addDicomData(imageId: Long, dicomAttributes: DicomAttributes): Option[DicomDataInfo] = {
+    val attributes = dicomAttributes.attributes
 
-    val ts = fmi.getString(Tag.TransferSyntaxUID)
-    val cuid = fmi.getString(Tag.MediaStorageSOPClassUID)
-    val iuid = fmi.getString(Tag.MediaStorageSOPInstanceUID)
-    if (ts == null || cuid == null || iuid == null)
-      return None
+    val tsMaybe = attributes.find(_.header.tag == Tag.TransferSyntaxUID).map(a => a.valueBytes.utf8String.trim)
+    val cuidMaybe = attributes.find(_.header.tag == Tag.MediaStorageSOPClassUID).map(a => a.valueBytes.utf8String.trim)
+    val iuidMaybe = attributes.find(_.header.tag == Tag.MediaStorageSOPInstanceUID).map(a => a.valueBytes.utf8String.trim)
 
-    val dicomDataInfo = DicomDataInfo(iuid, cuid, ts, imageId)
+    val dicomDataInfoMaybe = for {
+      ts <- tsMaybe
+      cuid <- cuidMaybe
+      iuid <- iuidMaybe
+    } yield {
 
-    if (!rq.containsPresentationContextFor(cuid, ts)) {
-      if (!rq.containsPresentationContextFor(cuid)) {
-        if (!ts.equals(UID.ExplicitVRLittleEndian))
-          rq.addPresentationContext(new PresentationContext(rq.getNumberOfPresentationContexts * 2 + 1, cuid, UID.ExplicitVRLittleEndian))
-        if (!ts.equals(UID.ImplicitVRLittleEndian))
-          rq.addPresentationContext(new PresentationContext(rq.getNumberOfPresentationContexts * 2 + 1, cuid, UID.ImplicitVRLittleEndian))
+      if (!rq.containsPresentationContextFor(cuid, ts)) {
+        if (!rq.containsPresentationContextFor(cuid)) {
+          if (!ts.equals(UID.ExplicitVRLittleEndian))
+            rq.addPresentationContext(new PresentationContext(rq.getNumberOfPresentationContexts * 2 + 1, cuid, UID.ExplicitVRLittleEndian))
+          if (!ts.equals(UID.ImplicitVRLittleEndian))
+            rq.addPresentationContext(new PresentationContext(rq.getNumberOfPresentationContexts * 2 + 1, cuid, UID.ImplicitVRLittleEndian))
+        }
+        rq.addPresentationContext(new PresentationContext(rq.getNumberOfPresentationContexts * 2 + 1, cuid, ts))
       }
-      rq.addPresentationContext(new PresentationContext(rq.getNumberOfPresentationContexts * 2 + 1, cuid, ts))
+
+      DicomDataInfo(iuid, cuid, ts, imageId)
     }
 
-    Some(dicomDataInfo)
+    dicomDataInfoMaybe.orElse {
+      SbxLog.error("SCU", s"Image cannot be sent due to missing metainformation: transfer syntax = ${tsMaybe.getOrElse("")}, SOP class UID = ${cuidMaybe.getOrElse("")}, SOP instance UID = ${iuidMaybe.getOrElse("")}")
+      None
+    }
   }
 
-  def sendFiles(dicomDataInfos: Seq[DicomDataInfo], dicomDataProvider: DicomDataProvider): Future[Seq[Option[Long]]] = {
+  def sendFiles(dicomDataInfos: Seq[DicomDataInfo], dicomDataProvider: DicomDataProvider): Future[Seq[Long]] = {
 
     val futureSentFiles = traverseSequentially(dicomDataInfos) { dicomDataInfo =>
-      dicomDataProvider.getDicomData(dicomDataInfo.imageId, withPixelData = true).map { dicomDataMaybe =>
-        dicomDataMaybe.filter(_ => as.isReadyForDataTransfer).map { dicomData =>
-          send(dicomData, dicomDataInfo.cuid, dicomDataInfo.iuid, dicomDataInfo.ts, dicomDataInfo.imageId)
-        }
-      }.unwrap
-    }
+      dicomDataProvider.getDicomData(dicomDataInfo.imageId, None).map { source =>
+        if (as.isReadyForDataTransfer)
+          Some(send(source, dicomDataInfo.cuid, dicomDataInfo.iuid, dicomDataInfo.ts, dicomDataInfo.imageId))
+        else
+          None
+      }
+    }.flatMap(a => Future.sequence(a.flatten))
 
     futureSentFiles.andThen {
       case _ => as.waitForOutstandingRSP()
     }
   }
 
-  def send(dicomData: DicomData, cuid: String, iuid: String, filets: String, imageId: Long): Future[Long] = {
-    val ts = selectTransferSyntax(cuid, filets)
-    if (!ts.equals(filets)) {
-      Decompressor.decompress(dicomData.attributes, filets)
+  def send(source: Source[DicomPart, NotUsed], cuid: String, iuid: String, filets: String, imageId: Long): Future[Long] = {
+
+    val futureAttributes = source
+      .via(DicomFlows.attributeFlow)
+      .runWith(DicomAttributesSink.attributesSink)
+
+    futureAttributes.flatMap {
+      case (_, datasetMaybe) =>
+        val promise = Promise[Long]()
+        try {
+          val dataset = datasetMaybe.getOrElse(throw new IllegalArgumentException(s"Empty DICOM data for image id $imageId"))
+          val ts = selectTransferSyntax(cuid, filets)
+          if (!ts.equals(filets)) {
+            Decompressor.decompress(dataset, filets)
+          }
+          as.cstore(cuid, iuid, priority, new DataWriterAdapter(dataset), ts, rspHandlerFactory.createDimseRSPHandler(imageId, promise))
+        } catch {
+          case e: Exception =>
+            promise.failure(e)
+        }
+        promise.future
     }
-    val promise = Promise[Long]()
-    try
-      as.cstore(cuid, iuid, priority, new DataWriterAdapter(dicomData.attributes), ts, rspHandlerFactory.createDimseRSPHandler(imageId, promise))
-    catch {
-      case e: Exception =>
-        promise.failure(e)
-    }
-    promise.future
   }
 
   def selectTransferSyntax(cuid: String, filets: String): String = {
@@ -159,7 +183,8 @@ class Scu(ae: ApplicationEntity, scuData: ScuData)(implicit ec: ExecutionContext
 
 object Scu {
 
-  def sendFiles(scuData: ScuData, dicomDataProvider: DicomDataProvider, imageIds: Seq[Long])(implicit ec: ExecutionContext): Future[Seq[Option[Long]]] = {
+  def sendFiles(scuData: ScuData, dicomDataProvider: DicomDataProvider, imageIds: Seq[Long])
+               (implicit system: ActorSystem, materializer: ActorMaterializer, ec: ExecutionContext): Future[Seq[Long]] = {
     val device = new Device("slicebox-scu")
     val connection = new Connection()
     connection.setMaxOpsInvoked(0)
@@ -171,13 +196,18 @@ object Scu {
 
     val scu = new Scu(ae, scuData)
 
+    val tags = Set(Tag.MediaStorageSOPClassUID, Tag.MediaStorageSOPInstanceUID, Tag.TransferSyntaxUID)
+
     val futureDicomDataInfos = traverseSequentially(imageIds) { imageId =>
-      dicomDataProvider.getDicomData(imageId, withPixelData = false).map { dicomDataMaybe =>
-        dicomDataMaybe.flatMap { dicomData =>
-          scu.addDicomData(imageId, dicomData)
+      dicomDataProvider.getDicomData(imageId, Some(Tag.TransferSyntaxUID + 1)).flatMap { source =>
+        source.via(DicomFlows.collectAttributesFlow(tags)).runWith(Sink.head).map {
+          case attributes: DicomAttributes =>
+            Some(scu.addDicomData(imageId, attributes))
+          case _ =>
+            None
         }
       }
-    }.map(_.flatten)
+    }.map(_.flatten.flatten)
 
     futureDicomDataInfos.flatMap { dicomDataInfos =>
       val executorService = Executors.newSingleThreadExecutor()

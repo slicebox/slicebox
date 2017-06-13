@@ -21,8 +21,9 @@ import java.io._
 import java.nio.file.{Files, Path}
 import javax.imageio.ImageIO
 
+import akka.util.ByteString
 import org.dcm4che3.data.Attributes.Visitor
-import org.dcm4che3.data.{Attributes, Keyword, Tag, VR}
+import org.dcm4che3.data._
 import org.dcm4che3.imageio.plugins.dcm.DicomImageReadParam
 import org.dcm4che3.io.DicomInputStream.IncludeBulkData
 import org.dcm4che3.io.{DicomInputStream, DicomOutputStream}
@@ -52,7 +53,7 @@ object DicomUtil {
 
       // the transfer syntax uid given below is for the meta info block. The TS UID in the meta itself is used for the
       // remainder of the file
-      dos = new DicomOutputStream(outputStream, TransferSyntaxes.ExplicitVrLittleEndian.uid)
+      dos = new DicomOutputStream(outputStream, UID.ExplicitVRLittleEndian)
 
       dos.writeDataset(dicomData.metaInformation, dicomData.attributes)
     } finally {
@@ -163,7 +164,7 @@ object DicomUtil {
     val scUid = if (mScUid == null || mScUid.isEmpty) dScUid else mScUid
     if (tsUid == null || scUid == null)
       throw new IllegalArgumentException("DICOM attributes must contain meta information (transfer syntax UID and SOP class UID)")
-    if (!contexts.exists(context => context.sopClass.uid == scUid && context.transferSyntaxes.map(_.uid).contains(tsUid)))
+    if (!contexts.exists(context => context.sopClassUid == scUid && context.transferSyntaxeUids.contains(tsUid)))
       throw new IllegalArgumentException(s"The presentation context [SOPClassUID = $scUid, TransferSyntaxUID = $tsUid] is not supported")
   }
 
@@ -228,7 +229,7 @@ object DicomUtil {
     else
       bytes.length
 
-  private def getStrings(attrs: Attributes, tag: Int) = {
+  def getStrings(attrs: Attributes, tag: Int) = {
     val s = attrs.getStrings(tag)
     if (s == null || s.isEmpty) Array("") else s
   }
@@ -241,6 +242,13 @@ object DicomUtil {
   def nameForTag(tag: Int) = {
     val name = Keyword.valueOf(tag)
     if (name == null) "" else name
+  }
+
+  def padToEvenLength(bytes: ByteString, tag: Int): ByteString = padToEvenLength(bytes, StandardElementDictionary.INSTANCE.vrOf(tag))
+
+  def padToEvenLength(bytes: ByteString, vr: VR): ByteString = {
+    val padding = if ((bytes.length & 1) != 0) ByteString(vr.paddingByte()) else ByteString.empty
+    bytes ++ padding
   }
 
 }
