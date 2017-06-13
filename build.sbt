@@ -1,5 +1,3 @@
-import de.heikoseeberger.sbtheader.license.Apache2_0
-
 name := "slicebox"
 version := "1.3-SNAPSHOT"
 organization := "se.nimsa"
@@ -55,11 +53,10 @@ rpmRelease := {
 
 // for automatic license stub generation
 
-val licenceYear = "2017"
-val licencedTo = "Lars Edenbrandt"
-headers := Map(
-  "scala" -> Apache2_0(licenceYear, licencedTo),
-  "conf" -> Apache2_0(licenceYear, licencedTo, "#"))
+organizationName := "Lars Edenbrandt"
+startYear := Some(2014)
+licenses += ("Apache-2.0", new URL("https://www.apache.org/licenses/LICENSE-2.0.txt"))
+excludeFilter.in(unmanagedSources.in(headerCreate)) := HiddenFileFilter || "*.html" || "*.js" || "*.css"
 
 // repos
 
@@ -107,11 +104,6 @@ dependencyOverrides += "com.typesafe.akka" %% "akka-http" % "10.0.0" // akka-htt
 // run tests in separate JVMs
 
 fork in Test := true
-
-// eclipse IDE settings
-
-EclipseKeys.createSrc := EclipseCreateSrc.Default
-EclipseKeys.withSource := true
 
 // turn on cached resolution in SBT
 
