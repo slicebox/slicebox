@@ -1,7 +1,7 @@
 package se.nimsa.sbx.dicom.streams
 
 import akka.actor.Cancellable
-import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Keep, Merge, Sink, Source => StreamSource}
+import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Merge, Sink, Source => StreamSource}
 import akka.stream.{FlowShape, Materializer, SinkShape}
 import akka.util.ByteString
 import akka.{Done, NotUsed}
@@ -229,7 +229,9 @@ object DicomStreamOps {
 
     val validationContexts = Contexts.asNamePairs(contexts).map(ValidationContext.tupled)
 
-    Sink.fromGraph(GraphDSL.create(storageSink, dbAttributesSink)(Keep.right) { implicit builder =>
+    def runBothKeepRight[A, B] = (futureLeft: Future[A], futureRight: Future[B]) => futureLeft.flatMap(_ => futureRight)
+
+    Sink.fromGraph(GraphDSL.create(storageSink, dbAttributesSink)(runBothKeepRight) { implicit builder =>
       (dicomFileSink, dbAttributesSink) =>
         import GraphDSL.Implicits._
 
