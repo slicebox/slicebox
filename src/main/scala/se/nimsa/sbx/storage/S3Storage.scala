@@ -21,7 +21,6 @@ import java.io.{ByteArrayOutputStream, InputStream}
 import akka.actor.ActorSystem
 import akka.stream.Materializer
 import akka.stream.alpakka.s3.scaladsl.S3Client
-import akka.stream.alpakka.s3.{MemoryBufferType, S3Settings}
 import akka.stream.scaladsl.{Sink, Source}
 import akka.util.ByteString
 import akka.{Done, NotUsed}
@@ -41,16 +40,7 @@ import scala.util.control.NonFatal
   */
 class S3Storage(val bucket: String, val s3Prefix: String, val region: String)(implicit system: ActorSystem, materializer: Materializer) extends StorageService {
 
-  private val settings = new S3Settings(
-    bufferType = MemoryBufferType,
-    diskBufferPath = "",
-    proxy = None,
-    awsCredentials = S3Facade.credentialsFromProviderChain(),
-    s3Region = region,
-    pathStyleAccess = false
-  )
-
-  private val s3Client = new S3Client(settings)
+  private val s3Client = S3Client(S3Facade.credentialsFromProviderChain(), region)
   private val s3Facade = new S3Facade(bucket, region)
 
   private def s3Id(image: Image): String =
