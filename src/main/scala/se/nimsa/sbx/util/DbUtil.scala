@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Lars Edenbrandt
+ * Copyright 2014 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -65,7 +65,7 @@ object DbUtil {
   }
 
   implicit class OptionActionOption[T, A <: Effect](val self: Option[DBIOAction[Option[T], NoStream, A]]) extends AnyVal {
-    def unwrap(implicit ec: ExecutionContext): DBIOAction[Option[T], NoStream, A] =
+    def unwrap: DBIOAction[Option[T], NoStream, A] =
       self.getOrElse(DBIO.successful(None))
   }
 

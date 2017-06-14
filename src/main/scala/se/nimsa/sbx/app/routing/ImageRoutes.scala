@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Lars Edenbrandt
+ * Copyright 2014 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -78,11 +78,11 @@ trait ImageRoutes {
                 complete(storage.readImageInformation(image))
               }
             } ~ path("png") {
-              parameters(
+              parameters((
                 'framenumber.as[Int] ? 1,
                 'windowmin.as[Int] ? 0,
                 'windowmax.as[Int] ? 0,
-                'imageheight.as[Int] ? 0) { (frameNumber, min, max, height) =>
+                'imageheight.as[Int] ? 0)) { (frameNumber, min, max, height) =>
                 get {
                   onComplete(Future(storage.readPngImageData(image, frameNumber, min, max, height))) {
                     case Success(bytes) => complete(HttpEntity(`image/png`, bytes))
@@ -135,7 +135,7 @@ trait ImageRoutes {
           }
         }
       } ~ path("jpeg") {
-        parameters('studyid.as[Long], 'description.?) { (studyId, optionalDescription) =>
+        parameters(('studyid.as[Long], 'description.?)) { (studyId, optionalDescription) =>
           post {
             extractDataBytes { bytes =>
               val source = Source(SourceType.USER, apiUser.user, apiUser.id)

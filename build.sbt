@@ -1,14 +1,12 @@
-import de.heikoseeberger.sbtheader.license.Apache2_0
-
 name := "slicebox"
 version := "1.3-SNAPSHOT"
 organization := "se.nimsa"
-scalaVersion := "2.12.1"
+scalaVersion := "2.12.2"
 scalacOptions := Seq("-encoding", "UTF-8", "-Xlint", "-deprecation", "-unchecked", "-feature", "-target:jvm-1.8")
 
 // define the project
 
-lazy val slicebox = (project in file(".")).enablePlugins(SbtWeb, JavaServerAppPackaging, GitBranchPrompt)
+lazy val slicebox = (project in file(".")).enablePlugins(SbtWeb, JavaServerAppPackaging)
 mainClass in Compile := Some("se.nimsa.sbx.app.Slicebox")
 
 // for sbt-resolver, (the re-start and re-stop commands)
@@ -55,11 +53,9 @@ rpmRelease := {
 
 // for automatic license stub generation
 
-val licenceYear = "2017"
-val licencedTo = "Lars Edenbrandt"
-headers := Map(
-  "scala" -> Apache2_0(licenceYear, licencedTo),
-  "conf" -> Apache2_0(licenceYear, licencedTo, "#"))
+organizationName := "Lars Edenbrandt"
+startYear := Some(2014)
+licenses += ("Apache-2.0", new URL("https://www.apache.org/licenses/LICENSE-2.0.txt"))
 
 // repos
 
@@ -75,49 +71,44 @@ resolvers ++= Seq(
 // deps
 
 libraryDependencies ++= {
-  val akkaVersion = "2.4.17"
-  val akkaHttpVersion = "10.0.6"
+  val akkaVersion = "2.5.2"
+  val akkaHttpVersion = "10.0.7"
   val slickVersion = "3.2.0"
   val dcm4cheVersion = "3.3.8"
   Seq(
     "com.typesafe.scala-logging" %% "scala-logging" % "3.5.0",
     "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
+    "com.typesafe.akka" %% "akka-stream" % akkaVersion, // force newer version than default in akka-http
     "com.typesafe.akka" %% "akka-http" % akkaHttpVersion,
-    "de.heikoseeberger" %% "akka-http-play-json" % "1.15.0",
+    "de.heikoseeberger" %% "akka-http-play-json" % "1.16.1",
     "ch.qos.logback" % "logback-classic" % "1.2.3",
     "com.typesafe.slick" %% "slick" % slickVersion,
     "com.typesafe.slick" %% "slick-hikaricp" % slickVersion,
-    "com.h2database" % "h2" % "1.4.195",
+    "com.h2database" % "h2" % "1.4.196",
     "mysql" % "mysql-connector-java" % "6.0.6",
-    "com.zaxxer" % "HikariCP" % "2.6.1",
+    "com.zaxxer" % "HikariCP" % "2.6.2",
     "com.github.t3hnar" %% "scala-bcrypt" % "3.0",
-    "com.amazonaws" % "aws-java-sdk-s3" % "1.11.126",
+    "com.amazonaws" % "aws-java-sdk-s3" % "1.11.146",
     "org.scalatest" %% "scalatest" % "3.0.3" % "test",
     "org.dcm4che" % "dcm4che-core" % dcm4cheVersion,
     "org.dcm4che" % "dcm4che-image" % dcm4cheVersion,
     "org.dcm4che" % "dcm4che-imageio" % dcm4cheVersion,
     "org.dcm4che" % "dcm4che-net" % dcm4cheVersion,
     "com.typesafe.akka" %% "akka-testkit" % akkaVersion % "test",
+    "com.typesafe.akka" %% "akka-stream-testkit" % akkaVersion % "test",  // force newer version than default in akka-http
     "com.typesafe.akka" %% "akka-http-testkit" % akkaHttpVersion % "test",
     "org.webjars" % "angularjs" % "1.5.9",
     "org.webjars" % "angular-material" % "1.1.4",
     "org.webjars" % "angular-file-upload" % "11.0.0",
-    "se.nimsa" %% "dcm4che-streams" % "0.4-SNAPSHOT",
-    "com.lightbend.akka" %% "akka-stream-alpakka-s3" % "0.8",
-  "com.lightbend.akka" %% "akka-stream-alpakka-file" % "0.9"
+    "se.nimsa" %% "dcm4che-streams" % "0.4-SNAPSHOT" exclude("org.slf4j", "slf4j-simple"),
+    "com.lightbend.akka" %% "akka-stream-alpakka-s3" % "0.9",
+    "com.lightbend.akka" %% "akka-stream-alpakka-file" % "0.9"
   )
 }
-
-dependencyOverrides += "com.typesafe.akka" %% "akka-http" % "10.0.0" // akka-http-play-json wants akka-http 3.0.0-RC1
 
 // run tests in separate JVMs
 
 fork in Test := true
-
-// eclipse IDE settings
-
-EclipseKeys.createSrc := EclipseCreateSrc.Default
-EclipseKeys.withSource := true
 
 // turn on cached resolution in SBT
 

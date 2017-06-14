@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Lars Edenbrandt
+ * Copyright 2014 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,10 +17,8 @@
 package se.nimsa.sbx.metadata
 
 import org.dcm4che3.data.Attributes
-import se.nimsa.sbx.app.GeneralProtocol.Source
-import se.nimsa.sbx.app.GeneralProtocol.SourceRef
+import se.nimsa.sbx.app.GeneralProtocol.{Source, SourceRef}
 import se.nimsa.sbx.dicom.DicomHierarchy._
-import se.nimsa.sbx.seriestype.SeriesTypeProtocol.SeriesIdSeriesType
 
 object MetaDataProtocol {
   

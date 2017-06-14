@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Lars Edenbrandt
+ * Copyright 2014 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import java.util.concurrent.Executors
 
 import akka.NotUsed
 import akka.actor.ActorSystem
-import akka.stream.ActorMaterializer
+import akka.stream.Materializer
 import akka.stream.scaladsl.{Sink, Source}
 import com.typesafe.scalalogging.LazyLogging
 import org.dcm4che3.data.{Attributes, Tag, UID}
@@ -43,7 +43,7 @@ trait DicomDataProvider {
 case class DicomDataInfo(iuid: String, cuid: String, ts: String, imageId: Long)
 
 class Scu(ae: ApplicationEntity, scuData: ScuData)
-         (implicit system: ActorSystem, mat: ActorMaterializer, ec: ExecutionContext) extends LazyLogging {
+         (implicit system: ActorSystem, mat: Materializer, ec: ExecutionContext) extends LazyLogging {
   val remote = new Connection()
   val rq = new AAssociateRQ()
 
@@ -184,7 +184,7 @@ class Scu(ae: ApplicationEntity, scuData: ScuData)
 object Scu {
 
   def sendFiles(scuData: ScuData, dicomDataProvider: DicomDataProvider, imageIds: Seq[Long])
-               (implicit system: ActorSystem, materializer: ActorMaterializer, ec: ExecutionContext): Future[Seq[Long]] = {
+               (implicit system: ActorSystem, materializer: Materializer, ec: ExecutionContext): Future[Seq[Long]] = {
     val device = new Device("slicebox-scu")
     val connection = new Connection()
     connection.setMaxOpsInvoked(0)

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Lars Edenbrandt
+ * Copyright 2014 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,9 +23,9 @@ import akka.http.scaladsl.model.StatusCodes.NoContent
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.pattern.ask
-import akka.stream.ActorMaterializer
+import akka.stream.Materializer
 import akka.stream.scaladsl.Compression
-import akka.util.{ByteString, Timeout}
+import akka.util.Timeout
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.dicom.streams.DicomStreamLoadOps
@@ -43,7 +43,7 @@ class BoxPushActor(box: Box,
                    boxServicePath: String = "../../BoxService",
                    metaDataServicePath: String = "../../MetaDataService",
                    anonymizationServicePath: String = "../../AnonymizationService")
-                  (implicit val materializer: ActorMaterializer, timeout: Timeout) extends Actor with DicomStreamLoadOps {
+                  (implicit val materializer: Materializer, timeout: Timeout) extends Actor with DicomStreamLoadOps {
 
   val log = Logging(context.system, this)
 
@@ -199,6 +199,6 @@ class BoxPushActor(box: Box,
 }
 
 object BoxPushActor {
-  def props(box: Box, storageService: StorageService)(implicit materializer: ActorMaterializer, timeout: Timeout): Props = Props(new BoxPushActor(box, storageService))
+  def props(box: Box, storageService: StorageService)(implicit materializer: Materializer, timeout: Timeout): Props = Props(new BoxPushActor(box, storageService))
 
 }

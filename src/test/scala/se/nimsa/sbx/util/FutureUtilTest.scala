@@ -3,11 +3,11 @@ package se.nimsa.sbx.util
 import java.util.concurrent.Executors
 
 import akka.dispatch.ExecutionContexts
-import org.scalatest.{AsyncFlatSpec, FlatSpec, Matchers}
+import org.scalatest.{AsyncFlatSpec, Matchers}
 import se.nimsa.sbx.util.FutureUtil._
 
-import scala.concurrent.{Await, Future}
 import scala.concurrent.duration.DurationInt
+import scala.concurrent.{Await, Future}
 
 class FutureUtilTest extends AsyncFlatSpec with Matchers {
 

@@ -2,7 +2,6 @@ package se.nimsa.sbx.storage
 
 import java.io.{ByteArrayInputStream, InputStream}
 
-import akka.actor.ActorSystem
 import akka.stream.Materializer
 import akka.stream.scaladsl.{Sink, Source}
 import akka.util.ByteString
@@ -32,8 +31,7 @@ class RuntimeStorage extends StorageService {
   override def readDicomData(image: Image, withPixelData: Boolean): DicomData =
     loadDicomData(storage.getOrElse(imageName(image), null).toArray, withPixelData)
 
-  override def readPngImageData(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int)
-                               (implicit system: ActorSystem, materializer: Materializer): Array[Byte] = {
+  override def readPngImageData(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int)(implicit materializer: Materializer): Array[Byte] = {
     val source = Source.single(storage(imageName(image)))
     readPngImageData(source, frameNumber, windowMin, windowMax, imageHeight)
   }
@@ -54,7 +52,7 @@ class RuntimeStorage extends StorageService {
     }
   }
 
-  override def fileSink(name: String)(implicit actorSystem: ActorSystem, mat: Materializer, ec: ExecutionContext): Sink[ByteString, Future[Done]] =
+  override def fileSink(name: String)(implicit executionContext: ExecutionContext): Sink[ByteString, Future[Done]] =
     Sink.reduce[ByteString](_ ++ _)
       .mapMaterializedValue {
         _.map {
@@ -64,6 +62,6 @@ class RuntimeStorage extends StorageService {
         }
       }
 
-  override def fileSource(image: Image)(implicit actorSystem: ActorSystem, mat: Materializer): Source[ByteString, NotUsed] = Source.single(storage(imageName(image)))
+  override def fileSource(image: Image): Source[ByteString, NotUsed] = Source.single(storage(imageName(image)))
 
 }

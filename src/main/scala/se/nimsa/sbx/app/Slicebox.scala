@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Lars Edenbrandt
+ * Copyright 2014 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -160,7 +160,7 @@ object Slicebox extends {
 
   val storage =
     if (cfg.getString("dicom-storage.config.name") == "s3")
-      new S3Storage(cfg.getString("dicom-storage.config.bucket"), cfg.getString("dicom-storage.config.prefix"), cfg.getString("dicom-storage.config.region"))
+      new S3Storage(cfg.getString("dicom-storage.config.bucket"), cfg.getString("dicom-storage.config.prefix"), cfg.getString("dicom-storage.config.region"))(system, materializer)
     else
       new FileStorage(Paths.get(cfg.getString("dicom-storage.file-system.path")))
 } with SliceboxBase with App {

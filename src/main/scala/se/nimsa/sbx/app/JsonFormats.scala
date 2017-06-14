@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Lars Edenbrandt
+ * Copyright 2014 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,11 +27,9 @@ import se.nimsa.sbx.directory.DirectoryWatchProtocol._
 import se.nimsa.sbx.forwarding.ForwardingProtocol._
 import se.nimsa.sbx.importing.ImportProtocol._
 import se.nimsa.sbx.log.LogProtocol._
-import se.nimsa.sbx.metadata.MetaDataProtocol
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.scp.ScpProtocol._
 import se.nimsa.sbx.scu.ScuProtocol._
-import se.nimsa.sbx.seriestype.SeriesTypeProtocol
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
 import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.user.UserProtocol._

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Lars Edenbrandt
+ * Copyright 2014 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,11 +29,11 @@ trait LogRoutes { this: SliceboxBase =>
     pathPrefix("log") {
       pathEndOrSingleSlash {
         get {
-          parameters(
+          parameters((
             'startindex.as(nonNegativeFromStringUnmarshaller).?(0),
             'count.as(nonNegativeFromStringUnmarshaller).?(20),
             'subject.?,
-            'type.?) { (startIndex, count, subjectMaybe, typeMaybe) =>
+            'type.?)) { (startIndex, count, subjectMaybe, typeMaybe) =>
             val msg =
               subjectMaybe.flatMap(subject => typeMaybe.map(entryType => GetLogEntriesBySubjectAndType(subject, LogEntryType.withName(entryType), startIndex, count)))
                 .orElse(subjectMaybe.map(subject => GetLogEntriesBySubject(subject, startIndex, count)))

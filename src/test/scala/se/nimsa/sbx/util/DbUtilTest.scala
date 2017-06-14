@@ -1,9 +1,6 @@
 package se.nimsa.sbx.util
 
-import akka.util.Timeout
 import org.scalatest.{AsyncFlatSpec, Matchers}
-
-import scala.concurrent.duration.DurationInt
 
 class DbUtilTest extends AsyncFlatSpec with Matchers {
 
@@ -11,7 +8,6 @@ class DbUtilTest extends AsyncFlatSpec with Matchers {
   "The generic method for creating tables" should "create the specified tables" in {
     val dbConfig = TestUtil.createTestDb("dbutiltest")
     val db = dbConfig.db
-    implicit val timeout = Timeout(30.seconds)
 
     import dbConfig.profile.api._
 

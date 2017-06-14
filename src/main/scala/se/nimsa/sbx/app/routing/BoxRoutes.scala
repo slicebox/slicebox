@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Lars Edenbrandt
+ * Copyright 2014 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,18 +16,16 @@
 
 package se.nimsa.sbx.app.routing
 
+import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.server.Route
 import akka.pattern.ask
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.ImageTagValues
 import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
-import se.nimsa.sbx.metadata.MetaDataProtocol.{GetImage, Images}
-import se.nimsa.sbx.user.UserProtocol.ApiUser
-import se.nimsa.sbx.user.UserProtocol.UserRole
-import akka.http.scaladsl.model.StatusCodes._
-import akka.http.scaladsl.model.MediaTypes._
-import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.server.Route
+import se.nimsa.sbx.metadata.MetaDataProtocol.GetImage
+import se.nimsa.sbx.user.UserProtocol.{ApiUser, UserRole}
 
 import scala.concurrent.Future
 
@@ -38,9 +36,9 @@ trait BoxRoutes {
     pathPrefix("boxes") {
       pathEndOrSingleSlash {
         get {
-          parameters(
+          parameters((
             'startindex.as(nonNegativeFromStringUnmarshaller) ? 0,
-            'count.as(nonNegativeFromStringUnmarshaller) ? 20) { (startIndex, count) =>
+            'count.as(nonNegativeFromStringUnmarshaller) ? 20)) { (startIndex, count) =>
             onSuccess(boxService.ask(GetBoxes(startIndex, count))) {
               case Boxes(boxes) =>
                 complete(boxes)
@@ -97,9 +95,9 @@ trait BoxRoutes {
     pathPrefix("incoming") {
       pathEndOrSingleSlash {
         get {
-          parameters(
+          parameters((
             'startindex.as(nonNegativeFromStringUnmarshaller) ? 0,
-            'count.as(nonNegativeFromStringUnmarshaller) ? 20) { (startIndex, count) =>
+            'count.as(nonNegativeFromStringUnmarshaller) ? 20)) { (startIndex, count) =>
             onSuccess(boxService.ask(GetIncomingTransactions(startIndex, count))) {
               case IncomingTransactions(transactions) =>
                 complete(transactions)
@@ -132,9 +130,9 @@ trait BoxRoutes {
     pathPrefix("outgoing") {
       pathEndOrSingleSlash {
         get {
-          parameters(
+          parameters((
             'startindex.as(nonNegativeFromStringUnmarshaller) ? 0,
-            'count.as(nonNegativeFromStringUnmarshaller) ? 20) { (startIndex, count) =>
+            'count.as(nonNegativeFromStringUnmarshaller) ? 20)) { (startIndex, count) =>
             onSuccess(boxService.ask(GetOutgoingTransactions(startIndex, count))) {
               case OutgoingTransactions(transactions) =>
                 complete(transactions)

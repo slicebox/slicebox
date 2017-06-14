@@ -19,7 +19,7 @@ import scala.concurrent.Future
 
 class AnonymizationRoutesTest extends {
   val dbConfig = TestUtil.createTestDb("anonymizationroutestest")
-  val storage = new RuntimeStorage
+  val storage = new RuntimeStorage()
 } with FlatSpecLike with Matchers with RoutesTestBase {
 
   override def afterEach() {

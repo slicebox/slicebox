@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Lars Edenbrandt
+ * Copyright 2014 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -70,12 +70,12 @@ trait AnonymizationRoutes {
       } ~ pathPrefix("keys") {
         pathEndOrSingleSlash {
           get {
-            parameters(
+            parameters((
               'startindex.as[Long] ? 0,
               'count.as[Long] ? 20,
               'orderby.as[String].?,
               'orderascending.as[Boolean] ? true,
-              'filter.as[String].?) { (startIndex, count, orderBy, orderAscending, filter) =>
+              'filter.as[String].?)) { (startIndex, count, orderBy, orderAscending, filter) =>
               onSuccess(anonymizationService.ask(GetAnonymizationKeys(startIndex, count, orderBy, orderAscending, filter))) {
                 case AnonymizationKeys(anonymizationKeys) =>
                   complete(anonymizationKeys)
