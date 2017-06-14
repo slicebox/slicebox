@@ -23,11 +23,12 @@ import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.forwarding.ForwardingProtocol._
 import se.nimsa.sbx.log.SbxLog
+import se.nimsa.sbx.storage.StorageService
 import se.nimsa.sbx.util.FutureUtil.await
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
-class ForwardingServiceActor(forwardingDao: ForwardingDAO, pollInterval: FiniteDuration = 30.seconds)(implicit timeout: Timeout) extends Actor {
+class ForwardingServiceActor(forwardingDao: ForwardingDAO, storage: StorageService, pollInterval: FiniteDuration = 30.seconds)(implicit timeout: Timeout) extends Actor {
 
   import scala.collection.mutable
 
@@ -147,7 +148,7 @@ class ForwardingServiceActor(forwardingDao: ForwardingDAO, pollInterval: FiniteD
     val updatedTransaction = updateTransaction(transaction.copy(enroute = true, delivered = false))
     val images = getTransactionImagesForTransactionId(updatedTransaction.id)
 
-    val forwardingActor = context.actorOf(ForwardingActor.props(rule, updatedTransaction, images, timeout))
+    val forwardingActor = context.actorOf(ForwardingActor.props(rule, updatedTransaction, images, storage))
     transactionIdToForwardingActor(updatedTransaction.id) = forwardingActor
   }
 
@@ -270,5 +271,5 @@ class ForwardingServiceActor(forwardingDao: ForwardingDAO, pollInterval: FiniteD
 }
 
 object ForwardingServiceActor {
-  def props(forwardingDao: ForwardingDAO)(implicit timeout: Timeout): Props = Props(new ForwardingServiceActor(forwardingDao))
+  def props(forwardingDao: ForwardingDAO, storage: StorageService)(implicit timeout: Timeout): Props = Props(new ForwardingServiceActor(forwardingDao, storage))
 }

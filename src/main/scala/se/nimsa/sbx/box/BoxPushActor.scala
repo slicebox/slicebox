@@ -28,7 +28,7 @@ import akka.stream.scaladsl.Compression
 import akka.util.Timeout
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.box.BoxProtocol._
-import se.nimsa.sbx.dicom.streams.DicomStreamLoadOps
+import se.nimsa.sbx.dicom.streams.DicomStreamOps
 import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.storage.StorageService
 
@@ -43,7 +43,7 @@ class BoxPushActor(box: Box,
                    boxServicePath: String = "../../BoxService",
                    metaDataServicePath: String = "../../MetaDataService",
                    anonymizationServicePath: String = "../../AnonymizationService")
-                  (implicit val materializer: Materializer, timeout: Timeout) extends Actor with DicomStreamLoadOps {
+                  (implicit val materializer: Materializer, timeout: Timeout) extends Actor with DicomStreamOps {
 
   val log = Logging(context.system, this)
 
@@ -65,6 +65,7 @@ class BoxPushActor(box: Box,
 
   override def callAnonymizationService[R: ClassTag](message: Any) = anonymizationService.ask(message).mapTo[R]
   override def callMetaDataService[R: ClassTag](message: Any) = metaDataService.ask(message).mapTo[R]
+  override def scheduleTask(delay: FiniteDuration)(task: => Unit) = system.scheduler.scheduleOnce(delay)(task)
 
   def receive = LoggingReceive {
     case PollOutgoing =>

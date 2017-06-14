@@ -22,6 +22,7 @@ import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
+import se.nimsa.sbx.app.GeneralProtocol.{ImageAdded, ImageDeleted}
 import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.metadata.MetaDataProtocol._
@@ -37,8 +38,10 @@ trait AnonymizationRoutes {
       put {
         entity(as[Seq[TagValue]]) { tagValues =>
           onSuccess(anonymizeData(imageId, tagValues, storage)) {
-            case Some(metaDataAdded) =>
-              complete(metaDataAdded.image)
+            case Some(metaData) =>
+              system.eventStream.publish(ImageDeleted(imageId))
+              system.eventStream.publish(ImageAdded(metaData.image, metaData.source, !metaData.imageAdded))
+              complete(metaData.image)
             case None =>
               complete((NotFound, s"No image meta data found for image id $imageId"))
           }

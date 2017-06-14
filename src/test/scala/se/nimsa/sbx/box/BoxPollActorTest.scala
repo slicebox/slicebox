@@ -1,19 +1,20 @@
 package se.nimsa.sbx.box
 
+import akka.Done
 import akka.actor.{Actor, ActorSystem, Props}
 import akka.http.scaladsl.marshalling.Marshal
 import akka.http.scaladsl.model.ContentTypes._
 import akka.http.scaladsl.model.StatusCodes.{BadGateway, NoContent, NotFound, OK}
 import akka.http.scaladsl.model._
 import akka.stream.ActorMaterializer
+import akka.stream.scaladsl.Sink
 import akka.testkit.{ImplicitSender, TestKit}
-import akka.util.Timeout
+import akka.util.{ByteString, Timeout}
 import de.heikoseeberger.akkahttpplayjson.PlayJsonSupport
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
 import se.nimsa.sbx.anonymization.{AnonymizationDAO, AnonymizationServiceActor}
 import se.nimsa.sbx.app.JsonFormats
 import se.nimsa.sbx.box.BoxProtocol._
-import se.nimsa.sbx.box.MockupStorageActor.{ShowBadBehavior, ShowGoodBehavior}
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.metadata.MetaDataDAO
 import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, MetaDataAdded}
@@ -24,7 +25,7 @@ import se.nimsa.sbx.util.TestUtil
 
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.duration.DurationInt
-import scala.concurrent.{Await, Future}
+import scala.concurrent.{Await, ExecutionContext, Future}
 
 class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
   with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach with JsonFormats with PlayJsonSupport {
@@ -60,11 +61,18 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
         sender ! MetaDataAdded(null, null, null, Image(12, 22, null, null, null), patientAdded = false, studyAdded = false, seriesAdded = false, imageAdded = true, null)
     }
   }), name = "MetaDataService")
-  val storageService = system.actorOf(Props[MockupStorageActor], name = "StorageService")
-  val storage = new RuntimeStorage()
+  var storageFails = false
+  val storage = new RuntimeStorage() {
+    override def fileSink(name: String)(implicit executionContext: ExecutionContext): Sink[ByteString, Future[Done]] =
+      if (storageFails)
+        Sink.cancelled[ByteString].mapMaterializedValue(_ => Future.failed(new RuntimeException("Could not store data")))
+      else
+        super.fileSink(name)
+  }
+
   val anonymizationService = system.actorOf(AnonymizationServiceActor.props(anonymizationDao, purgeEmptyAnonymizationKeys = false), name = "AnonymizationService")
   val boxService = system.actorOf(BoxServiceActor.props(boxDao, "http://testhost:1234", storage), name = "BoxService")
-  val pollBoxActorRef = system.actorOf(Props(new BoxPollActor(remoteBox, storage, 1.hour, "../BoxService", "../MetaDataService", "../StorageService", "../AnonymizationService") {
+  val pollBoxActorRef = system.actorOf(Props(new BoxPollActor(remoteBox, storage, 1.hour, "../BoxService", "../MetaDataService", "../AnonymizationService") {
 
     override def sliceboxRequest(method: HttpMethod, uri: String, entity: MessageEntity): Future[HttpResponse] = {
       val request = HttpRequest(method = method, uri = uri, entity = entity)
@@ -78,7 +86,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
   }))
 
   override def beforeEach() {
-    storageService ! ShowGoodBehavior(3)
+    storageFails = false
 
     capturedRequests.clear()
 
@@ -294,7 +302,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
     }
 
     "should tell the box it is pulling images from that a transaction has failed when an image cannot be stored" in {
-      storageService ! ShowBadBehavior(new IllegalArgumentException("Pretending I cannot store dicom data."))
+      storageFails = true
 
       val outgoingTransactionId = 999
       val transaction = OutgoingTransaction(outgoingTransactionId, 987, "some box", 1, 2, 2, 2, TransactionStatus.WAITING)

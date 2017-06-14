@@ -13,7 +13,6 @@ import org.dcm4che3.io.{DicomOutputStream, DicomStreamException}
 import org.scalatest.{AsyncFlatSpecLike, Matchers}
 import se.nimsa.dcm4che.streams.{DicomAttributesSink, DicomFlows, DicomPartFlow}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.TagValue
-import se.nimsa.sbx.anonymization.AnonymizationUtil._
 import se.nimsa.sbx.dicom.{Contexts, DicomData}
 import se.nimsa.sbx.storage.RuntimeStorage
 import se.nimsa.sbx.util.TestUtil
@@ -106,8 +105,7 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("AnonymizationFlowSpec")) w
 
   "Harmonizing DICOM attributes when storing DICOM data" should "replace attributes according to existing anonymization keys" in {
     val attributes = createAttributes
-    val anonAttributes = createAnonymousAttributes
-    val key = createAnonymizationKey(attributes, anonAttributes)
+    val key = TestUtil.createAnonymizationKey(attributes, anonPatientName = "apn", anonPatientID = "apid", anonSeriesInstanceUID = "aseuid")
 
     val source = toSource(DicomData(attributes, null))
     val anonSource = DicomStreamOps.anonymizedDicomDataSource(source, (_, _) => Future.successful(Seq(key)), _ => Future.successful(key), Seq.empty)
@@ -125,8 +123,7 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("AnonymizationFlowSpec")) w
 
   "Querying for anonymization keys during anonymization" should "yield patient, study and series information when key and meta information match" in {
     val attributes = createAttributes
-    val anonAttributes = createAnonymousAttributes
-    val key = createAnonymizationKey(attributes, anonAttributes)
+    val key = TestUtil.createAnonymizationKey(attributes, anonPatientName = "apn", anonPatientID = "apid", anonSeriesInstanceUID = "aseuid")
 
     val metaData = DicomMetaPart(None, None, Some("pid"), Some("pn"), Some("NO"), Some("stuid"), Some("seuid"))
     val query = DicomStreamOps.queryAnonymousAnonymizationKeys((_, _) => Future.successful(Seq(key)))
@@ -144,8 +141,8 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("AnonymizationFlowSpec")) w
 
   it should "yield patient, but not study or series information when patient informtion match but study does not" in {
     val attributes = createAttributes
-    val anonAttributes = createAnonymousAttributes
-    val key = createAnonymizationKey(attributes, anonAttributes).copy(studyInstanceUID = "stuid2")
+    val key = TestUtil.createAnonymizationKey(attributes, anonPatientName = "apn", anonPatientID = "apid", anonSeriesInstanceUID = "aseuid")
+      .copy(studyInstanceUID = "stuid2")
 
     val metaData = DicomMetaPart(None, None, Some("pid"), Some("pn"), Some("NO"), Some("stuid"), Some("seuid"))
     val query = DicomStreamOps.queryAnonymousAnonymizationKeys((_, _) => Future.successful(Seq(key)))
@@ -163,8 +160,7 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("AnonymizationFlowSpec")) w
 
   "Querying for anonymization keys during reverse anonymization" should "yield patient, study and series information when key and meta information match" in {
     val attributes = createAttributes
-    val anonAttributes = createAnonymousAttributes
-    val key = createAnonymizationKey(attributes, anonAttributes)
+    val key = TestUtil.createAnonymizationKey(attributes, anonPatientName = "apn", anonPatientID = "apid", anonStudyInstanceUID = "astuid", anonSeriesInstanceUID = "aseuid")
 
     val metaData = DicomMetaPart(None, None, Some("apid"), Some("apn"), Some("YES"), Some("astuid"), Some("aseuid"))
     val query = DicomStreamOps.queryProtectedAnonymizationKeys((_, _) => Future.successful(Seq(key)))
@@ -182,8 +178,7 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("AnonymizationFlowSpec")) w
 
   it should "yield patient, but not study or series information when patient informtion match but study does not" in {
     val attributes = createAttributes
-    val anonAttributes = createAnonymousAttributes
-    val key = createAnonymizationKey(attributes, anonAttributes).copy(anonStudyInstanceUID = "astuid2")
+    val key = TestUtil.createAnonymizationKey(attributes, anonPatientName = "apn", anonPatientID = "apid", anonStudyInstanceUID = "astuid2", anonSeriesInstanceUID = "aseuid")
 
     val metaData = DicomMetaPart(None, None, Some("apid"), Some("apn"), Some("YES"), Some("astuid"), Some("aseuid"))
     val query = DicomStreamOps.queryProtectedAnonymizationKeys((_, _) => Future.successful(Seq(key)))
@@ -201,8 +196,7 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("AnonymizationFlowSpec")) w
 
   it should "create empty key info when data is not anonymized" in {
     val attributes = createAttributes
-    val anonAttributes = createAnonymousAttributes
-    val key = createAnonymizationKey(attributes, anonAttributes)
+    val key = TestUtil.createAnonymizationKey(attributes, anonPatientName = "apn", anonPatientID = "apid", anonStudyInstanceUID = "astuid2", anonSeriesInstanceUID = "aseuid")
 
     val metaData = DicomMetaPart(None, None, Some("apid"), Some("apn"), Some("NO"), Some("astuid"), Some("aseuid"))
     val query = DicomStreamOps.queryProtectedAnonymizationKeys((_, _) => Future.successful(Seq(key)))

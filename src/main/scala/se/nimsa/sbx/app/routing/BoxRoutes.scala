@@ -143,7 +143,7 @@ trait BoxRoutes {
         pathEndOrSingleSlash {
           delete {
             onSuccess(boxService.ask(RemoveOutgoingTransaction(outgoingTransactionId))) {
-              case OutgoingTransactionRemoved(outgoingEntryId) =>
+              case OutgoingTransactionRemoved(_) =>
                 complete(NoContent)
             }
           }

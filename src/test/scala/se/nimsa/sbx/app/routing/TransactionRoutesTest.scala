@@ -11,7 +11,6 @@ import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy.{Image, Patient}
 import se.nimsa.sbx.dicom.DicomProperty._
-import se.nimsa.sbx.dicom.DicomUtil
 import se.nimsa.sbx.storage.RuntimeStorage
 import se.nimsa.sbx.util.CompressionUtil._
 import se.nimsa.sbx.util.FutureUtil.await
@@ -148,7 +147,7 @@ class TransactionRoutesTest extends {
 
       contentType should be(ContentTypes.`application/octet-stream`)
 
-      val dicomData = DicomUtil.loadDicomData(decompress(responseAs[ByteString].toArray), withPixelData = true)
+      val dicomData = TestUtil.loadDicomData(decompress(responseAs[ByteString].toArray), withPixelData = true)
       dicomData should not be null
     }
   }
@@ -320,7 +319,7 @@ class TransactionRoutesTest extends {
       status should be(OK)
       responseAs[ByteString]
     }
-    val dicomData = DicomUtil.loadDicomData(decompress(compressedArray.toArray), withPixelData = false)
+    val dicomData = TestUtil.loadDicomData(decompress(compressedArray.toArray), withPixelData = false)
     dicomData.attributes.getString(PatientName.dicomTag) should be("TEST NAME") // mapped
     dicomData.attributes.getString(PatientID.dicomTag) should be("TEST ID") // mapped
     dicomData.attributes.getString(PatientBirthDate.dicomTag) should be("19601010") // mapped

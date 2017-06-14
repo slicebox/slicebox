@@ -4,8 +4,9 @@ import akka.actor.ActorSelection.toScala
 import akka.actor.ActorSystem
 import akka.pattern.ask
 import akka.stream.ActorMaterializer
+import akka.stream.scaladsl.{Source => StreamSource}
 import akka.testkit.{ImplicitSender, TestKit}
-import akka.util.Timeout
+import akka.util.{ByteString, Timeout}
 import org.dcm4che3.data.{Keyword, Tag}
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
 import se.nimsa.sbx.app.GeneralProtocol.{Source, SourceType}
@@ -178,10 +179,11 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
     Await.result(
       metaDataService.ask(AddMetaData(dicomData.attributes, source))
         .mapTo[MetaDataAdded]
-        .map { metaData =>
-          storage.storeDicomData(dicomData, metaData.image)
-          metaData
-        }.map(_.series), 30.seconds)
+        .flatMap { metaData =>
+          StreamSource.single(ByteString(TestUtil.toByteArray(dicomData)))
+            .runWith(storage.fileSink(metaData.image.id.toString))
+            .map(_ => metaData.series)
+        }, 30.seconds)
   }
 
   def addSeriesType(): SeriesType =

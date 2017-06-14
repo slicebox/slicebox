@@ -18,20 +18,19 @@ package se.nimsa.sbx.storage
 
 import java.awt.RenderingHints
 import java.awt.image.BufferedImage
-import java.io.{ByteArrayOutputStream, InputStream}
+import java.io.ByteArrayOutputStream
 import javax.imageio.ImageIO
 
 import akka.stream.Materializer
 import akka.stream.scaladsl.{Sink, Source, StreamConverters}
 import akka.util.ByteString
 import akka.{Done, NotUsed}
-import com.amazonaws.util.IOUtils
 import org.dcm4che3.data.Tag
 import org.dcm4che3.imageio.plugins.dcm.DicomImageReadParam
 import se.nimsa.dcm4che.streams.{DicomAttributesSink, DicomFlows, DicomPartFlow}
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
+import se.nimsa.sbx.dicom.ImageAttribute
 import se.nimsa.sbx.dicom.streams.DicomStreamOps
-import se.nimsa.sbx.dicom.{DicomData, ImageAttribute}
 import se.nimsa.sbx.storage.StorageProtocol.ImageInformation
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -41,28 +40,22 @@ import scala.concurrent.{ExecutionContext, Future}
   */
 trait StorageService {
 
-  val bufferSize = 524288
-
-  def storeDicomData(dicomData: DicomData, image: Image): Boolean
-
   def imageName(image: Image) = image.id.toString
 
   def deleteFromStorage(name: String): Unit
 
+  def deleteFromStorage(image: Image): Unit = deleteFromStorage(imageName(image))
+
   def deleteFromStorage(images: Seq[Image]): Unit = images foreach deleteFromStorage
 
-  def deleteFromStorage(image: Image): Unit
-
   def move(sourceImageName: String, targetImageName: String): Unit
-
-  def readDicomData(image: Image, withPixelData: Boolean): DicomData
 
   def readImageAttributes(image: Image)(implicit materializer: Materializer, ec: ExecutionContext): Source[ImageAttribute, NotUsed] =
     DicomStreamOps.imageAttributesSource(fileSource(image))
 
   private val imageInformationTags = Seq(Tag.InstanceNumber, Tag.ImageIndex, Tag.NumberOfFrames, Tag.SmallestImagePixelValue, Tag.LargestImagePixelValue).sorted
 
-  def readImageInformation(image: Image)(implicit materializer: Materializer, ec: ExecutionContext): Future[ImageInformation] = {
+  def readImageInformation(image: Image)(implicit materializer: Materializer, ec: ExecutionContext): Future[ImageInformation] =
     fileSource(image)
       .via(new DicomPartFlow(stopTag = Some(imageInformationTags.last + 1)))
       .via(DicomFlows.whitelistFilter(imageInformationTags.contains _))
@@ -81,11 +74,9 @@ trait StorageService {
               attributes.getInt(Tag.LargestImagePixelValue, 0))
           }.getOrElse(ImageInformation(0, 0, 0, 0))
       }
-  }
 
-  def readPngImageData(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int)(implicit materializer: Materializer): Array[Byte]
-
-  def readPngImageData(source: Source[ByteString, _], frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int)(implicit materializer: Materializer): Array[Byte] = {
+  def readPngImageData(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int)(implicit materializer: Materializer): Array[Byte] = {
+    val source = fileSource(image)
     // dcm4che does not support viewing of deflated data, cf. Github issue #42
     // As a workaround, do streaming inflate and mapping of transfer syntax
     val inflatedSource = DicomStreamOps.inflatedSource(source)
@@ -113,18 +104,7 @@ trait StorageService {
     }
   }
 
-  def imageAsInputStream(image: Image): InputStream
-
-  def imageAsByteArray(image: Image): Array[Byte] = {
-    val is = imageAsInputStream(image)
-    try {
-      IOUtils.toByteArray(is)
-    } finally {
-      IOUtils.closeQuietly(is, null)
-    }
-  }
-
-  def scaleImage(image: BufferedImage, imageHeight: Int): BufferedImage = {
+  private def scaleImage(image: BufferedImage, imageHeight: Int): BufferedImage = {
     val ratio = imageHeight / image.getHeight.asInstanceOf[Double]
     if (ratio != 0.0 && ratio != 1.0) {
       val imageWidth = (image.getWidth * ratio).asInstanceOf[Int]

@@ -10,7 +10,7 @@ import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.DicomPropertyValue._
 import se.nimsa.sbx.forwarding.ForwardingProtocol._
 import se.nimsa.sbx.metadata.MetaDataProtocol._
-import se.nimsa.sbx.storage.StorageProtocol._
+import se.nimsa.sbx.storage.RuntimeStorage
 import se.nimsa.sbx.util.FutureUtil.await
 import se.nimsa.sbx.util.TestUtil
 
@@ -30,6 +30,14 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
   val forwardingDao = new ForwardingDAO(dbConfig)
 
   await(forwardingDao.create())
+
+  var deletedImages = Seq.empty[Long]
+  val storage = new RuntimeStorage() {
+    override def deleteFromStorage(image: Image): Unit = {
+      deletedImages = deletedImages :+ image.id
+      super.deleteFromStorage(image)
+    }
+  }
 
   case class SetSource(source: Source)
 
@@ -54,26 +62,6 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     }
   }), name = "MetaDataService")
 
-  case object ResetDeletedImages
-
-  case object GetDeletedImages
-
-  val resetDeletedImagesReply = "Deleted Images reset"
-  val storageService = system.actorOf(Props(new Actor {
-    var deletedImages = Seq.empty[Long]
-
-    def receive = {
-      case DeleteDicomData(image) =>
-        deletedImages = deletedImages :+ image.id
-        sender ! DicomDataDeleted(image)
-      case ResetDeletedImages =>
-        deletedImages = Seq.empty[Long]
-        sender ! resetDeletedImagesReply
-      case GetDeletedImages =>
-        sender ! deletedImages
-    }
-  }), name = "StorageService")
-
   case object ResetSentImages
 
   case object GetSentImages
@@ -94,14 +82,16 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     }
   }), name = "BoxService")
 
-  val forwardingService = system.actorOf(Props(new ForwardingServiceActor(forwardingDao, 1000.hours)(Timeout(30.seconds))), name = "ForwardingService")
+  val forwardingService = system.actorOf(Props(new ForwardingServiceActor(forwardingDao, storage, 1000.hours)(Timeout(30.seconds))), name = "ForwardingService")
+
+  override def beforeEach(): Unit = {
+    deletedImages = Seq.empty[Long]
+  }
 
   override def afterEach() = {
     await(forwardingDao.clear())
     metaDataService ! SetSource(null)
     expectMsg(setSourceReply)
-    storageService ! ResetDeletedImages
-    expectMsg(resetDeletedImagesReply)
     boxService ! ResetSentImages
     expectMsg(resetSentImagesReply)
   }
@@ -331,8 +321,7 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     // wait for deletion of images to finish
     expectNoMsg
 
-    storageService ! GetDeletedImages
-    expectMsg(Seq(image.id))
+    deletedImages shouldBe Seq(image.id)
   }
 
   "remove transaction, transaction images but not stored images when a forwarding transaction is finalized for a rule with keepImages set to true" in {
@@ -368,8 +357,7 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
 
     await(forwardingDao.listForwardingTransactions) should be(empty)
     await(forwardingDao.listForwardingTransactionImages) should be(empty)
-    storageService ! GetDeletedImages
-    expectMsg(Seq.empty)
+    deletedImages shouldBe Seq.empty
   }
 
   "create a new transaction for a newly added image as soon as a transaction has been marked as enroute" in {

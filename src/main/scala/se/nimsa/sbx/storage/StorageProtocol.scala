@@ -16,10 +16,6 @@
 
 package se.nimsa.sbx.storage
 
-import se.nimsa.sbx.dicom.DicomHierarchy.Image
-import se.nimsa.sbx.app.GeneralProtocol._
-import se.nimsa.sbx.dicom.DicomData
-
 object StorageProtocol {
 
   // domain objects
@@ -30,33 +26,11 @@ object StorageProtocol {
     minimumPixelValue: Int,
     maximumPixelValue: Int)
 
-
   sealed trait ImageRequest
-
-  case class GetImageData(image: Image) extends ImageRequest
-
-  case class GetDicomData(image: Image, withPixelData: Boolean) extends ImageRequest
-
-  case class CheckDicomData(dicomData: DicomData, useExtendedContexts: Boolean) extends ImageRequest
-
-  case class AddDicomData(dicomData: DicomData, source: Source, image: Image) extends ImageRequest
-  
-  case class DeleteDicomData(image: Image) extends ImageRequest
-
-  case class MoveDicomData(sourceImageName: String, targetImageName: String) extends ImageRequest
 
   case class CreateExportSet(imageIds: Seq[Long]) extends ImageRequest
 
   case class GetExportSetImageIds(exportSetId: Long) extends ImageRequest
-
-
-  case class DicomDataArray(data: Array[Byte])
-
-  case class DicomDataAdded(image: Image, overwrite: Boolean)
-
-  case class DicomDataDeleted(image: Image)
-
-  case class DicomDataMoved(sourceImageName: String, targetImageName: String)
 
   case class ExportSetId(id: Long)
 

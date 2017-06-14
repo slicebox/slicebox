@@ -56,6 +56,7 @@ class AnonymizationDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Exe
       studyInstanceUID, anonStudyInstanceUID, studyDescription, studyID, accessionNumber,
       seriesInstanceUID, anonSeriesInstanceUID, seriesDescription, protocolName, frameOfReferenceUID, anonFrameOfReferenceUID) <> (AnonymizationKey.tupled, AnonymizationKey.unapply)
   }
+
   object AnonymizationKeyTable {
     val name = "AnonymizationKeys"
   }
@@ -69,6 +70,7 @@ class AnonymizationDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Exe
     def fkAnonymizationKey = foreignKey("fk_anonymization_key", anonymizationKeyId, anonymizationKeyQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
     def * = (id, anonymizationKeyId, imageId) <> (AnonymizationKeyImage.tupled, AnonymizationKeyImage.unapply)
   }
+
   object AnonymizationKeyImageTable {
     val name = "AnonymizationKeyImages"
   }
@@ -142,19 +144,19 @@ class AnonymizationDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Exe
 
   def anonymizationKeysForAnonPatient(anonPatientName: String, anonPatientID: String): Future[Seq[AnonymizationKey]] =
     db.run {
-    anonymizationKeyQuery
-      .filter(_.anonPatientName === anonPatientName)
-      .filter(_.anonPatientID === anonPatientID)
-      .result
-  }
+      anonymizationKeyQuery
+        .filter(_.anonPatientName === anonPatientName)
+        .filter(_.anonPatientID === anonPatientID)
+        .result
+    }
 
   def anonymizationKeysForPatient(patientName: String, patientID: String): Future[Seq[AnonymizationKey]] =
     db.run {
-    anonymizationKeyQuery
-      .filter(_.patientName === patientName)
-      .filter(_.patientID === patientID)
-      .result
-  }
+      anonymizationKeyQuery
+        .filter(_.patientName === patientName)
+        .filter(_.patientID === patientID)
+        .result
+    }
 
   def anonymizationKeyImagesForAnonymizationKeyIdAction(anonymizationKeyId: Long) =
     anonymizationKeyImageQuery.filter(_.anonymizationKeyId === anonymizationKeyId).result
@@ -164,11 +166,11 @@ class AnonymizationDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Exe
 
   def anonymizationKeyImageForAnonymizationKeyIdAndImageId(anonymizationKeyId: Long, imageId: Long): Future[Option[AnonymizationKeyImage]] =
     db.run {
-    anonymizationKeyImageQuery
-      .filter(_.anonymizationKeyId === anonymizationKeyId)
-      .filter(_.imageId === imageId)
-      .result.headOption
-  }
+      anonymizationKeyImageQuery
+        .filter(_.anonymizationKeyId === anonymizationKeyId)
+        .filter(_.imageId === imageId)
+        .result.headOption
+    }
 
   def anonymizationKeysForImageIdAction(imageId: Long) = {
     val join = for {
@@ -181,21 +183,23 @@ class AnonymizationDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Exe
   def anonymizationKeysForImageId(imageId: Long): Future[Seq[AnonymizationKey]] = db.run(anonymizationKeysForImageIdAction(imageId))
 
   def removeAnonymizationKeyImagesForImageId(imageId: Long, purgeEmptyAnonymizationKeys: Boolean) = db.run {
-    if (purgeEmptyAnonymizationKeys)
-      anonymizationKeysForImageIdAction(imageId).flatMap { keysForImage =>
-        deleteAnonymizationKeyImagesForImageIdAction(imageId).flatMap { _ =>
-          DBIO.sequence(keysForImage.map { key =>
-            anonymizationKeyImagesForAnonymizationKeyIdAction(key.id).flatMap { keyImages =>
-              if (keyImages.isEmpty)
-                removeAnonymizationKeyAction(key.id)
-              else
-                DBIO.successful({})
-            }
-          })
+    val action =
+      if (purgeEmptyAnonymizationKeys)
+        anonymizationKeysForImageIdAction(imageId).flatMap { keysForImage =>
+          deleteAnonymizationKeyImagesForImageIdAction(imageId).flatMap { _ =>
+            DBIO.sequence(keysForImage.map { key =>
+              anonymizationKeyImagesForAnonymizationKeyIdAction(key.id).flatMap { keyImages =>
+                if (keyImages.isEmpty)
+                  removeAnonymizationKeyAction(key.id)
+                else
+                  DBIO.successful({})
+              }
+            })
+          }
         }
-      }
-    else
-      deleteAnonymizationKeyImagesForImageIdAction(imageId)
+      else
+        deleteAnonymizationKeyImagesForImageIdAction(imageId)
+    action.transactionally
   }
 
   private def deleteAnonymizationKeyImagesForImageIdAction(imageId: Long) =
