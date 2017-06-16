@@ -40,11 +40,9 @@ import scala.util.control.NonFatal
 class DirectoryWatchActor(watchedDirectory: WatchedDirectory,
                           storage: StorageService,
                           metaDataServicePath: String = "../../MetaDataService",
-                          storageServicePath: String = "../../StorageService",
                           anonymizationServicePath: String = "../../AnonymizationService")
                          (implicit val materializer: Materializer, timeout: Timeout) extends Actor with DicomStreamOps {
 
-  val storageService = context.actorSelection(storageServicePath)
   val metaDataService = context.actorSelection(metaDataServicePath)
   val anonymizationService = context.actorSelection(anonymizationServicePath)
 
@@ -94,7 +92,6 @@ class DirectoryWatchActor(watchedDirectory: WatchedDirectory,
   }
 
   override def callAnonymizationService[R: ClassTag](message: Any) = anonymizationService.ask(message).mapTo[R]
-  override def callStorageService[R: ClassTag](message: Any) = storageService.ask(message).mapTo[R]
   override def callMetaDataService[R: ClassTag](message: Any) = metaDataService.ask(message).mapTo[R]
   override def scheduleTask(delay: FiniteDuration)(task: => Unit) = system.scheduler.scheduleOnce(delay)(task)
 

@@ -45,6 +45,7 @@ trait TransactionRoutes {
                 extractDataBytes { compressedBytes =>
                   val source = Source(SourceType.BOX, box.name, box.id)
                   onSuccess(storeDicomData(compressedBytes.via(Compression.inflate()), source, storage, Contexts.extendedContexts)) { metaData =>
+                    system.eventStream.publish(ImageAdded(metaData.image, source, !metaData.imageAdded))
                     onSuccess(boxService.ask(UpdateIncoming(box, outgoingTransactionId, sequenceNumber, totalImageCount, metaData.image.id, metaData.imageAdded))) {
                       case IncomingUpdated(transaction) =>
                         transaction.status match {
@@ -57,7 +58,7 @@ trait TransactionRoutes {
               }
             }
           } ~ path("status") {
-            parameters(('transactionid.as[Long])) { outgoingTransactionId =>
+            parameters('transactionid.as[Long]) { outgoingTransactionId =>
               get {
                 onSuccess(boxService.ask(GetIncomingTransactionStatus(box, outgoingTransactionId)).mapTo[Option[TransactionStatus]]) {
                   case Some(status) => complete(HttpEntity(status.toString))

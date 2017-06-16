@@ -16,9 +16,8 @@
 
 package se.nimsa.sbx.util
 
-import java.util.zip.Deflater
 import java.io.ByteArrayOutputStream
-import java.util.zip.Inflater
+import java.util.zip.{Deflater, Inflater}
 
 object CompressionUtil {
   

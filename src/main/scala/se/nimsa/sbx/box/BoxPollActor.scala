@@ -45,14 +45,12 @@ class BoxPollActor(box: Box,
                    pollInterval: FiniteDuration = 5.seconds,
                    boxServicePath: String = "../../BoxService",
                    metaDataServicePath: String = "../../MetaDataService",
-                   storageServicePath: String = "../../StorageService",
                    anonymizationServicePath: String = "../../AnonymizationService")
                   (implicit val materializer: Materializer, timeout: Timeout) extends Actor with DicomStreamOps with BoxJsonFormats with PlayJsonSupport {
 
   val log = Logging(context.system, this)
 
   val metaDataService = context.actorSelection(metaDataServicePath)
-  val storageService = context.actorSelection(storageServicePath)
   val anonymizationService = context.actorSelection(anonymizationServicePath)
   val boxService = context.actorSelection(boxServicePath)
 
@@ -67,7 +65,6 @@ class BoxPollActor(box: Box,
     poller.cancel()
 
   override def callAnonymizationService[R: ClassTag](message: Any) = anonymizationService.ask(message).mapTo[R]
-  override def callStorageService[R: ClassTag](message: Any) = storageService.ask(message).mapTo[R]
   override def callMetaDataService[R: ClassTag](message: Any) = metaDataService.ask(message).mapTo[R]
   override def scheduleTask(delay: FiniteDuration)(task: => Unit) = system.scheduler.scheduleOnce(delay)(task)
 

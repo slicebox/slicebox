@@ -16,20 +16,19 @@
 
 package se.nimsa.sbx.storage
 
-import java.io.{ByteArrayOutputStream, InputStream}
-
 import akka.actor.ActorSystem
 import akka.stream.Materializer
+import akka.stream.alpakka.s3.auth.BasicCredentials
 import akka.stream.alpakka.s3.scaladsl.S3Client
 import akka.stream.scaladsl.{Sink, Source}
 import akka.util.ByteString
 import akka.{Done, NotUsed}
-import se.nimsa.sbx.dicom.DicomData
+import com.amazonaws.{ClientConfiguration, Protocol}
+import com.amazonaws.auth.DefaultAWSCredentialsProviderChain
+import com.amazonaws.services.s3.AmazonS3ClientBuilder
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
-import se.nimsa.sbx.dicom.DicomUtil._
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.control.NonFatal
 
 /**
   * Service that stores DICOM files on AWS S3.
@@ -40,63 +39,36 @@ import scala.util.control.NonFatal
   */
 class S3Storage(val bucket: String, val s3Prefix: String, val region: String)(implicit system: ActorSystem, materializer: Materializer) extends StorageService {
 
-  private val s3Client = S3Client(S3Facade.credentialsFromProviderChain(), region)
-  private val s3Facade = new S3Facade(bucket, region)
+  // AWS credentials provider chain that looks for credentials in this order:
+  // Environment Variables - AWS_ACCESS_KEY_ID and AWS_SECRET_KEY
+  // Java System Properties - aws.accessKeyId and aws.secretKey
+  // Instance profile credentials delivered through the Amazon EC2 metadata service
+  val s3 = AmazonS3ClientBuilder.standard()
+    .withRegion(region)
+    .withCredentials(new DefaultAWSCredentialsProviderChain())
+    .withClientConfiguration(new ClientConfiguration().withProtocol(Protocol.HTTPS))
+    .build()
 
-  private def s3Id(image: Image): String =
-    s3Id(imageName(image))
+  private val s3Stream = S3Client(credentialsFromProviderChain(), region)
 
-  private def s3Id(imageName: String): String =
-    s3Prefix + "/" + imageName
+  private def credentialsFromProviderChain() = {
+    val providerChain = new DefaultAWSCredentialsProviderChain()
+    val creds = providerChain.getCredentials
+    BasicCredentials(creds.getAWSAccessKeyId, creds.getAWSSecretKey)
+  }
+
+  private def s3Id(imageName: String): String = s3Prefix + "/" + imageName
 
   override def move(sourceImageName: String, targetImageName: String) = {
-    s3Facade.copy(sourceImageName, s3Id(targetImageName))
-    s3Facade.delete(sourceImageName)
+    s3.copyObject(bucket, sourceImageName, bucket, s3Id(targetImageName))
+    s3.deleteObject(bucket, sourceImageName)
   }
 
-  override def storeDicomData(dicomData: DicomData, image: Image): Boolean = {
-    val storedId = s3Id(image)
-    val overwrite = s3Facade.exists(storedId)
-    try saveDicomDataToS3(dicomData, storedId) catch {
-      case NonFatal(e) =>
-        throw new IllegalArgumentException("Dicom data could not be stored", e)
-    }
-    overwrite
-  }
+  override def deleteFromStorage(name: String): Unit = s3.deleteObject(bucket, s3Id(name))
 
-  private def saveDicomDataToS3(dicomData: DicomData, s3Key: String): Unit = {
-    val os = new ByteArrayOutputStream()
-    try saveDicomData(dicomData, os) catch {
-      case NonFatal(e) =>
-        throw new IllegalArgumentException("Dicom data could not be stored", e)
-    }
-    val buffer = os.toByteArray
-    s3Facade.upload(s3Key, buffer)
-  }
+  override def fileSink(name: String)(implicit executionContext: ExecutionContext): Sink[ByteString, Future[Done]] =
+    s3Stream.multipartUpload(bucket, name).mapMaterializedValue(_.map(_ => Done))
 
-  override def deleteFromStorage(name: String): Unit = s3Facade.delete(s3Id(name))
+  override def fileSource(image: Image): Source[ByteString, NotUsed] = s3Stream.download(bucket, s3Id(imageName(image)))
 
-  override def deleteFromStorage(image: Image): Unit = deleteFromStorage(s3Id(image))
-
-  override def readDicomData(image: Image, withPixelData: Boolean): DicomData = {
-    val s3InputStream = s3Facade.get(s3Id(image))
-    loadDicomData(s3InputStream, withPixelData)
-  }
-
-  override def readPngImageData(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int)(implicit materializer: Materializer): Array[Byte] = {
-    super.readPngImageData(fileSource(image), frameNumber, windowMin, windowMax, imageHeight)
-  }
-
-  override def imageAsInputStream(image: Image): InputStream = {
-    val s3InputStream = s3Facade.get(s3Id(image))
-    s3InputStream
-  }
-
-  override def fileSink(name: String)(implicit executionContext: ExecutionContext): Sink[ByteString, Future[Done]] = {
-    s3Client.multipartUpload(bucket, name).mapMaterializedValue(_.map(_ => Done))
-  }
-
-  override def fileSource(image: Image): Source[ByteString, NotUsed] = {
-    s3Client.download(bucket, s3Id(image))
-  }
 }

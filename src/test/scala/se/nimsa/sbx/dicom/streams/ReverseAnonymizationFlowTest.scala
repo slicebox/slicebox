@@ -12,7 +12,8 @@ import org.scalatest.{FlatSpecLike, Matchers}
 import se.nimsa.dcm4che.streams.DicomFlows.TagModification
 import se.nimsa.dcm4che.streams.DicomParts.{DicomAttributes, DicomPart}
 import se.nimsa.dcm4che.streams.{DicomAttributesSink, DicomFlows, DicomParsing, DicomPartFlow}
-import se.nimsa.sbx.dicom.{DicomData, DicomUtil}
+import se.nimsa.sbx.dicom.DicomData
+import se.nimsa.sbx.util.TestUtil
 import se.nimsa.sbx.util.TestUtil._
 
 import scala.concurrent.Await
@@ -26,7 +27,7 @@ class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymiza
   implicit val ec = system.dispatcher
 
   def attributesSource(dicomData: DicomData): Source[DicomPart, NotUsed] = {
-    val bytes = ByteString(DicomUtil.toByteArray(dicomData))
+    val bytes = ByteString(TestUtil.toByteArray(dicomData))
     Source.single(bytes)
       .via(DicomPartFlow.partFlow)
       .via(DicomFlows.blacklistFilter(DicomParsing.isFileMetaInformation, keepPreamble = false))

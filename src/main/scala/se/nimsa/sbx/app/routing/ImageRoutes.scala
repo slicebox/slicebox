@@ -65,9 +65,11 @@ trait ImageRoutes {
               get {
                 complete(HttpEntity(`application/octet-stream`, storage.fileSource(image)))
               } ~ delete {
-                complete(storageService.ask(DeleteDicomData(image)).flatMap(_ =>
-                  metaDataService.ask(DeleteMetaData(image)).map(_ =>
-                    NoContent)))
+                complete(metaDataService.ask(DeleteMetaData(image)).map { _ =>
+                  system.eventStream.publish(ImageDeleted(image.id))
+                  storage.deleteFromStorage(image)
+                  NoContent
+                })
               }
             } ~ path("attributes") {
               get {
@@ -101,9 +103,10 @@ trait ImageRoutes {
             val futureDeleted = StreamSource(imageIds.toList).mapAsync(20) { imageId =>
               metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]].map { imageMaybe =>
                 imageMaybe.map { image =>
-                  storageService.ask(DeleteDicomData(image)).flatMap { _ =>
-                    metaDataService.ask(DeleteMetaData(image))
-                  }
+                    metaDataService.ask(DeleteMetaData(image)).map { _ =>
+                      system.eventStream.publish(ImageDeleted(image.id))
+                      storage.deleteFromStorage(image)
+                    }
                 }
               }.unwrap
             }.runWith(Sink.ignore)
@@ -146,7 +149,10 @@ trait ImageRoutes {
                       bytes.fold(ByteString.empty)(_ ++ _).runWith(Sink.head).map { allBytes =>
                         val scBytes = Jpeg2Dcm(allBytes.toArray, patient, study, optionalDescription)
                         storeDicomData(StreamSource.single(ByteString(scBytes)), source, storage, Contexts.extendedContexts)
-                          .map(_.image)
+                          .map { metaData =>
+                            system.eventStream.publish(ImageAdded(metaData.image, source, !metaData.imageAdded))
+                            metaData.image
+                          }
                       }
                     }
                   }.unwrap

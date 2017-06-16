@@ -35,17 +35,6 @@ object DicomTestData {
     attributes
   }
 
-  def createAnonymousAttributes = {
-    val attributes = new Attributes()
-    attributes.setString(Tag.PatientName, VR.PN, "apn")
-    attributes.setString(Tag.PatientID, VR.LO, "apid")
-    attributes.setString(Tag.StudyInstanceUID, VR.LO, "astuid")
-    attributes.setString(Tag.SeriesInstanceUID, VR.LO, "aseuid")
-    attributes.setString(Tag.FrameOfReferenceUID, VR.LO, "aforuid")
-    attributes.setString(Tag.PatientIdentityRemoved, VR.CS, "YES")
-    attributes
-  }
-
   def toAsciiBytes(s: String, vr: VR) = DicomUtil.padToEvenLength(ByteString(s), vr)
 
 }

@@ -140,11 +140,10 @@ trait SliceboxBase extends SliceboxRoutes with DicomStreamOps with JsonFormats w
   val scuService = system.actorOf(ScuServiceActor.props(scuDao, storage), name = "ScuService")
   val directoryService = system.actorOf(DirectoryWatchServiceActor.props(directoryWatchDao, storage), name = "DirectoryService")
   val seriesTypeService = system.actorOf(SeriesTypeServiceActor.props(seriesTypeDao, storage), name = "SeriesTypeService")
-  val forwardingService = system.actorOf(ForwardingServiceActor.props(forwardingDao), name = "ForwardingService")
+  val forwardingService = system.actorOf(ForwardingServiceActor.props(forwardingDao, storage), name = "ForwardingService")
   val importService = system.actorOf(ImportServiceActor.props(importDao), name = "ImportService")
 
   override def callAnonymizationService[R: ClassTag](message: Any) = anonymizationService.ask(message).mapTo[R]
-  override def callStorageService[R: ClassTag](message: Any) = storageService.ask(message).mapTo[R]
   override def callMetaDataService[R: ClassTag](message: Any) = metaDataService.ask(message).mapTo[R]
   override def scheduleTask(delay: FiniteDuration)(task: => Unit) = system.scheduler.scheduleOnce(delay)(task)
 

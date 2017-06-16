@@ -12,7 +12,7 @@ import akka.util.ByteString
 import org.dcm4che3.data.Tag
 import org.scalatest.{FlatSpecLike, Matchers}
 import se.nimsa.sbx.dicom.DicomHierarchy._
-import se.nimsa.sbx.dicom.{DicomUtil, ImageAttribute}
+import se.nimsa.sbx.dicom.ImageAttribute
 import se.nimsa.sbx.storage.RuntimeStorage
 import se.nimsa.sbx.storage.StorageProtocol.{ExportSetId, ImageInformation}
 import se.nimsa.sbx.util.FutureUtil.await
@@ -60,7 +60,7 @@ class ImageRoutesTest extends {
     GetAsUser(s"/api/images/${image.id}") ~> routes ~> check {
       status shouldBe OK
       contentType should be(ContentTypes.`application/octet-stream`)
-      val dicomData = DicomUtil.loadDicomData(responseAs[ByteString].toArray, withPixelData = true)
+      val dicomData = TestUtil.loadDicomData(responseAs[ByteString].toArray, withPixelData = true)
       dicomData should not be null
     }
   }
@@ -179,7 +179,7 @@ class ImageRoutesTest extends {
     GetAsUser(s"/api/images/${sc.id}") ~> routes ~> check {
       status shouldBe OK
       val dcmBytes = responseAs[ByteString]
-      val dcm = DicomUtil.loadDicomData(dcmBytes.toArray, withPixelData = false)
+      val dcm = TestUtil.loadDicomData(dcmBytes.toArray, withPixelData = false)
       dcm.attributes.getString(Tag.SeriesDescription) shouldBe description
     }
   }
@@ -275,7 +275,7 @@ class ImageRoutesTest extends {
     val image = PostAsUser("/api/images", HttpEntity(TestUtil.testImageByteArray)) ~> routes ~> check {
       responseAs[Image]
     }
-    val dicomData = DicomUtil.loadDicomData(TestUtil.testImageByteArray, withPixelData = false)
+    val dicomData = TestUtil.loadDicomData(TestUtil.testImageByteArray, withPixelData = false)
     GetAsUser(s"/api/images/${image.id}/imageinformation") ~> routes ~> check {
       status shouldBe OK
       val info = responseAs[ImageInformation]

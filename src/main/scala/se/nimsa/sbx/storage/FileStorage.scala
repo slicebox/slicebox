@@ -16,19 +16,14 @@
 
 package se.nimsa.sbx.storage
 
-import java.io.{BufferedInputStream, InputStream}
 import java.nio.file.{Files, Path, StandardCopyOption}
 
-import akka.stream.Materializer
 import akka.stream.scaladsl.{FileIO, Sink, Source}
 import akka.util.ByteString
 import akka.{Done, NotUsed}
-import se.nimsa.sbx.dicom.DicomData
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
-import se.nimsa.sbx.dicom.DicomUtil._
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.control.NonFatal
 
 /**
   * Service that stores DICOM files in local file system.
@@ -39,48 +34,18 @@ class FileStorage(val path: Path) extends StorageService {
 
   createStorageDirectoryIfNecessary()
 
-  override def storeDicomData(dicomData: DicomData, image: Image): Boolean = {
-    val storedPath = filePath(image)
-    val overwrite = Files.exists(storedPath)
-    try saveDicomData(dicomData, storedPath) catch {
-      case NonFatal(e) =>
-        throw new IllegalArgumentException("Dicom data could not be stored", e)
-    }
-    overwrite
-  }
-
-  private def filePath(image: Image): Path =
-    path.resolve(imageName(image))
-
-  private def filePath(filePath: String): Path =
-    path.resolve(filePath)
+  private def filePath(filePath: String): Path = path.resolve(filePath)
 
   override def move(sourceImageName: String, targetImageName: String): Unit =
     Files.move(path.resolve(sourceImageName), path.resolve(targetImageName), StandardCopyOption.REPLACE_EXISTING)
 
-  override def deleteFromStorage(name: String): Unit =
-    Files.delete(filePath(name))
-
-  override def deleteFromStorage(image: Image): Unit =
-    Files.delete(filePath(image))
-
-  override def readDicomData(image: Image, withPixelData: Boolean): DicomData =
-    loadDicomData(filePath(image), withPixelData)
-
-  override def readPngImageData(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int)(implicit materializer: Materializer): Array[Byte] = {
-    val path = filePath(image)
-    val source = FileIO.fromPath(path)
-    super.readPngImageData(source, frameNumber, windowMin, windowMax, imageHeight)
-  }
-
-  override def imageAsInputStream(image: Image): InputStream =
-    new BufferedInputStream(Files.newInputStream(filePath(image)))
+  override def deleteFromStorage(name: String): Unit = Files.delete(filePath(name))
 
   private def createStorageDirectoryIfNecessary(): Unit = {
     if (!Files.exists(path))
-      try {
+      try
         Files.createDirectories(path)
-      } catch {
+      catch {
         case e: Exception => throw new RuntimeException("Dicom-files directory could not be created: " + e.getMessage)
       }
     if (!Files.isDirectory(path))
@@ -91,7 +56,6 @@ class FileStorage(val path: Path) extends StorageService {
   override def fileSink(name: String)(implicit executionContext: ExecutionContext): Sink[ByteString, Future[Done]] =
     FileIO.toPath(filePath(name)).mapMaterializedValue(_.map(_ => Done))
 
-  override def fileSource(image: Image): Source[ByteString, NotUsed] =
-    FileIO.fromPath(filePath(image)).mapMaterializedValue(_ => NotUsed)
+  override def fileSource(image: Image): Source[ByteString, NotUsed] = FileIO.fromPath(filePath(imageName(image))).mapMaterializedValue(_ => NotUsed)
 
 }

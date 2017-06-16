@@ -1,7 +1,6 @@
 package se.nimsa.sbx.util
 
-import org.scalatest.FlatSpec
-import org.scalatest.Matchers
+import org.scalatest.{FlatSpec, Matchers}
 
 class CompressionUtilTest extends FlatSpec with Matchers {
 

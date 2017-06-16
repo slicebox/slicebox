@@ -12,7 +12,6 @@ import se.nimsa.dcm4che.streams.DicomPartFlow.partFlow
 import se.nimsa.dcm4che.streams.DicomParts._
 import se.nimsa.dcm4che.streams.{DicomAttributesSink, DicomFlows, DicomParsing, DicomPartFlow}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
-import se.nimsa.sbx.anonymization.AnonymizationUtil.isEqual
 import se.nimsa.sbx.app.GeneralProtocol.Source
 import se.nimsa.sbx.dicom.Contexts.Context
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
@@ -20,7 +19,6 @@ import se.nimsa.sbx.dicom.DicomPropertyValue.{PatientID, PatientName}
 import se.nimsa.sbx.dicom.DicomUtil.{attributesToPatient, attributesToSeries, attributesToStudy}
 import se.nimsa.sbx.dicom.{Contexts, DicomUtil, ImageAttribute}
 import se.nimsa.sbx.metadata.MetaDataProtocol._
-import se.nimsa.sbx.storage.StorageProtocol.{DeleteDicomData, DicomDataDeleted, DicomDataMoved, MoveDicomData}
 import se.nimsa.sbx.storage.StorageService
 import se.nimsa.sbx.util.SbxExtensions._
 
@@ -29,14 +27,15 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.reflect.ClassTag
 
 /**
-  * Stream operations for loading DICOM data from storage
+  * Stream operations for loading and saving DICOM data from and to storage
   */
-trait DicomStreamLoadOps {
+trait DicomStreamOps {
 
   import DicomStreamOps._
 
   def callAnonymizationService[R: ClassTag](message: Any): Future[R]
   def callMetaDataService[R: ClassTag](message: Any): Future[R]
+  def scheduleTask(delay: FiniteDuration)(task: => Unit): Cancellable
 
   protected def anonymizationInsert(implicit ec: ExecutionContext) = (anonymizationKey: AnonymizationKey) =>
     callAnonymizationService[AnonymizationKeyAdded](AddAnonymizationKey(anonymizationKey))
@@ -61,18 +60,6 @@ trait DicomStreamLoadOps {
         anonymizedDicomDataSource(storage.fileSource(image), anonymizationQuery, anonymizationInsert, tagValues)
       }
     }
-}
-
-/**
-  * Stream operations for loading and saving DICOM data from and to storage
-  */
-trait DicomStreamOps extends DicomStreamLoadOps {
-
-  import DicomStreamOps._
-
-  def callStorageService[R: ClassTag](message: Any): Future[R]
-  def callMetaDataService[R: ClassTag](message: Any): Future[R]
-  def scheduleTask(delay: FiniteDuration)(task: => Unit): Cancellable
 
   protected def reverseAnonymizationQuery(implicit ec: ExecutionContext) = (patientName: PatientName, patientID: PatientID) =>
     callAnonymizationService[AnonymizationKeys](GetReverseAnonymizationKeysForPatient(patientName.value, patientID.value))
@@ -95,9 +82,9 @@ trait DicomStreamOps extends DicomStreamLoadOps {
     bytesSource.runWith(sink).flatMap {
       case (_, maybeDataset) =>
         val attributes: Attributes = maybeDataset.getOrElse(throw new DicomStreamException("DICOM data has no dataset"))
-        callMetaDataService[MetaDataAdded](AddMetaData(attributes, source)).flatMap { metaData =>
-          callStorageService[DicomDataMoved](MoveDicomData(tempPath, s"${metaData.image.id}"))
-            .map(_ => metaData)
+        callMetaDataService[MetaDataAdded](AddMetaData(attributes, source)).map { metaDataAdded =>
+          storage.move(tempPath, s"${metaDataAdded.image.id}")
+          metaDataAdded
         }
     }.recover {
       case t: Throwable =>
@@ -127,9 +114,9 @@ trait DicomStreamOps extends DicomStreamLoadOps {
           .map(_.bytes)
         val anonymizedSource = anonymizedDicomDataSource(forcedSource, anonymizationQuery, anonymizationInsert, tagValues)
           .mapAsync(5)(bytes =>
-            callMetaDataService[MetaDataDeleted](DeleteMetaData(image)).flatMap(_ =>
-              callStorageService[DicomDataDeleted](DeleteDicomData(image))
-            ).map(_ => bytes)
+            callMetaDataService[MetaDataDeleted](DeleteMetaData(image))
+              .map(_ => storage.deleteFromStorage(image))
+              .map(_ => bytes)
           )
         callMetaDataService[Option[SeriesSource]](GetSourceForSeries(image.seriesId)).map { seriesSourceMaybe =>
           seriesSourceMaybe.map { seriesSource =>
@@ -474,4 +461,10 @@ object DicomStreamOps {
           case _ => Nil
         }
       }
+
+  def isEqual(key1: AnonymizationKey, key2: AnonymizationKey) =
+    key1.patientName == key2.patientName && key1.anonPatientName == key2.anonPatientName &&
+      key1.patientID == key2.patientID && key1.anonPatientID == key2.anonPatientID &&
+      key1.studyInstanceUID == key2.studyInstanceUID && key1.anonStudyInstanceUID == key2.anonStudyInstanceUID &&
+      key1.seriesInstanceUID == key2.seriesInstanceUID && key1.anonSeriesInstanceUID == key2.anonSeriesInstanceUID
 }

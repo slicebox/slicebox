@@ -1,6 +1,6 @@
 package se.nimsa.sbx.util
 
-import java.io.{File, IOException}
+import java.io._
 import java.nio.file._
 import java.nio.file.attribute.BasicFileAttributes
 import java.util.Date
@@ -11,14 +11,17 @@ import akka.http.scaladsl.model.{ContentTypes, HttpEntity, Multipart}
 import akka.stream.testkit.TestSubscriber
 import akka.util.ByteString
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
-import org.dcm4che3.data.{Attributes, Tag, VR}
+import org.dcm4che3.data.{Attributes, Tag, UID, VR}
+import org.dcm4che3.io.DicomInputStream.IncludeBulkData
+import org.dcm4che3.io.{DicomInputStream, DicomOutputStream}
+import org.dcm4che3.util.SafeClose
 import se.nimsa.dcm4che.streams.DicomParts._
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.AnonymizationKey
 import se.nimsa.sbx.app.GeneralProtocol._
+import se.nimsa.sbx.dicom.DicomData
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomPropertyValue._
 import se.nimsa.sbx.dicom.streams.DicomMetaPart
-import se.nimsa.sbx.dicom.{DicomData, DicomUtil}
 import se.nimsa.sbx.metadata.MetaDataProtocol.{SeriesSource, SeriesTag}
 import se.nimsa.sbx.metadata.{MetaDataDAO, PropertiesDAO}
 import se.nimsa.sbx.seriestype.SeriesTypeDAO
@@ -28,8 +31,76 @@ import slick.jdbc.JdbcProfile
 
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext
+import scala.util.control.NonFatal
 
 object TestUtil {
+
+  def saveDicomData(dicomData: DicomData, filePath: Path): Unit =
+    saveDicomData(dicomData, Files.newOutputStream(filePath))
+
+  def saveDicomData(dicomData: DicomData, outputStream: OutputStream): Unit = {
+    var dos: DicomOutputStream = null
+    try {
+      val transferSyntaxUID = dicomData.metaInformation.getString(Tag.TransferSyntaxUID)
+      if (transferSyntaxUID == null || transferSyntaxUID.isEmpty)
+        throw new IllegalArgumentException("DICOM meta information is missing transfer syntax UID")
+
+      // the transfer syntax uid given below is for the meta info block. The TS UID in the meta itself is used for the
+      // remainder of the file
+      dos = new DicomOutputStream(outputStream, UID.ExplicitVRLittleEndian)
+
+      dos.writeDataset(dicomData.metaInformation, dicomData.attributes)
+    } finally {
+      SafeClose.close(dos)
+    }
+  }
+
+  def loadDicomData(path: Path, withPixelData: Boolean): DicomData =
+    try
+      loadDicomData(new BufferedInputStream(Files.newInputStream(path)), withPixelData)
+    catch {
+      case NonFatal(_) => null
+    }
+
+  def loadDicomData(byteArray: Array[Byte], withPixelData: Boolean): DicomData =
+    try
+      loadDicomData(new BufferedInputStream(new ByteArrayInputStream(byteArray)), withPixelData)
+    catch {
+      case NonFatal(_) => null
+    }
+
+  def loadDicomData(inputStream: InputStream, withPixelData: Boolean): DicomData = {
+    var dis: DicomInputStream = null
+    try {
+      dis = new DicomInputStream(inputStream)
+      val fmi = if (dis.getFileMetaInformation == null) new Attributes() else dis.getFileMetaInformation
+      if (fmi.getString(Tag.TransferSyntaxUID) == null || fmi.getString(Tag.TransferSyntaxUID).isEmpty)
+        fmi.setString(Tag.TransferSyntaxUID, VR.UI, dis.getTransferSyntax)
+      val attributes =
+        if (withPixelData) {
+          dis.setIncludeBulkData(IncludeBulkData.YES)
+          dis.readDataset(-1, -1)
+        } else {
+          dis.setIncludeBulkData(IncludeBulkData.NO)
+          dis.readDataset(-1, Tag.PixelData)
+        }
+
+      DicomData(attributes, fmi)
+    } catch {
+      case NonFatal(_) => null
+    } finally {
+      SafeClose.close(dis)
+    }
+  }
+
+  def toByteArray(path: Path): Array[Byte] = toByteArray(loadDicomData(path, withPixelData = true))
+
+  def toByteArray(dicomData: DicomData): Array[Byte] = {
+    val bos = new ByteArrayOutputStream
+    saveDicomData(dicomData, bos)
+    bos.close()
+    bos.toByteArray
+  }
 
   def createTestDb(name: String) =
     DatabaseConfig.forConfig[JdbcProfile]("slicebox.database.in-memory", ConfigFactory.load().withValue(
@@ -113,8 +184,8 @@ object TestUtil {
   def testImageFile = new File(getClass.getResource("test.dcm").toURI)
   def testImageFormData = createMultipartFormWithFile(testImageFile)
   def testSecondaryCaptureFile = new File(getClass.getResource("sc.dcm").toURI)
-  def testImageDicomData(withPixelData: Boolean = true) = DicomUtil.loadDicomData(testImageFile.toPath, withPixelData)
-  def testImageByteArray = DicomUtil.toByteArray(testImageFile.toPath)
+  def testImageDicomData(withPixelData: Boolean = true) = loadDicomData(testImageFile.toPath, withPixelData)
+  def testImageByteArray = toByteArray(testImageFile.toPath)
 
   def jpegFile = new File(getClass.getResource("cat.jpg").toURI)
   def jpegByteArray = Files.readAllBytes(jpegFile.toPath)
@@ -263,7 +334,7 @@ object TestUtil {
     def expectMetaPart() = probe
       .request(1)
       .expectNextChainingPF {
-        case p: DicomMetaPart => true
+        case _: DicomMetaPart => true
       }
 
     def expectMetaPart(metaPart: DicomMetaPart) = probe

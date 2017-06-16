@@ -37,10 +37,64 @@ class MetaDataRoutesTest extends {
     // given
     await(insertMetaData(metaDataDao))
 
-    // then    
+    // then
     GetAsUser("/api/metadata/patients?orderby=patientID") ~> routes ~> check {
       status should be(OK)
       responseAs[List[Patient]] should have size 1
+    }
+  }
+
+  it should "return 200 OK when listing patients with advanced filtering" in {
+    GetAsUser("/api/metadata/patients?sources=user:22,scp:5&seriestypes=3,4,11&seriestags=22,3,1") ~> routes ~> check {
+      status should be(OK)
+      responseAs[List[Patient]] shouldBe empty
+    }
+  }
+
+  it should "return 200 OK when listing studies for a patient" in {
+    // given
+    val (dbPatient, (_, _), (_, _, _, _), (_, _, _, _, _, _, _, _)) = await(insertMetaData(metaDataDao))
+
+    // then
+    GetAsUser(s"/api/metadata/studies?patientid=${dbPatient.id}") ~> routes ~> check {
+      status should be(OK)
+      responseAs[List[Study]] should have size 2
+    }
+  }
+
+  it should "return 200 OK when listing studies for a patient with advanced filtering" in {
+    GetAsUser("/api/metadata/studies?patientid=3&sources=user:22,scp:5&seriestypes=3,4,11&seriestags=22,3,1") ~> routes ~> check {
+      status should be(OK)
+      responseAs[List[Study]] shouldBe empty
+    }
+  }
+
+  it should "return 200 OK when listing series for a study" in {
+    // given
+    val (_, (dbStudy1, _), (_, _, _, _), (_, _, _, _, _, _, _, _)) = await(insertMetaData(metaDataDao))
+
+    // then
+    GetAsUser(s"/api/metadata/series?studyid=${dbStudy1.id}") ~> routes ~> check {
+      status should be(OK)
+      responseAs[List[Series]] should have size 2
+    }
+  }
+
+  it should "return 200 OK when listing series for a study with advanced filtering" in {
+    GetAsUser("/api/metadata/series?studyid=3&sources=user:22,scp:5&seriestypes=3,4,11&seriestags=22,3,1") ~> routes ~> check {
+      status should be(OK)
+      responseAs[List[Series]] shouldBe empty
+    }
+  }
+
+  it should "return 200 OK when listing images for a series" in {
+    // given
+    val (_, (_, _), (dbSeries1, _, _, _), (_, _, _, _, _, _, _, _)) = await(insertMetaData(metaDataDao))
+
+    // then
+    GetAsUser(s"/api/metadata/images?seriesid=${dbSeries1.id}") ~> routes ~> check {
+      status should be(OK)
+      responseAs[List[Image]] should have size 2
     }
   }
 
@@ -127,6 +181,18 @@ class MetaDataRoutesTest extends {
 
       patients should have size 1
       patients.head.patientName.value should be("p1")
+    }
+  }
+
+  it should "return 200 OK and the source for the given source ID" in {
+    // given
+    val (_, (_, _), (dbSeries1, dbSeries2, dbSeries3, dbSeries4), (dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)) = await(insertMetaData(metaDataDao))
+    val ((dbSeriesSource1, _, _, _), (_, _, _, _)) = await(insertProperties(seriesTypeDao, propertiesDao, dbSeries1, dbSeries2, dbSeries3, dbSeries4, dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8))
+
+    //then
+    GetAsUser(s"/api/metadata/series/${dbSeries1.id}/source") ~> routes ~> check {
+      status shouldBe OK
+      responseAs[Source] shouldBe dbSeriesSource1.source
     }
   }
 

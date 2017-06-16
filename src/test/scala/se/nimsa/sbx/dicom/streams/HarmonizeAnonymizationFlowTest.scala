@@ -6,14 +6,13 @@ import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Source
 import akka.testkit.TestKit
 import akka.util.ByteString
-import org.dcm4che3.data.{Attributes, Tag, VR}
+import org.dcm4che3.data.{Attributes, Tag}
 import org.scalatest.{AsyncFlatSpecLike, Matchers}
-import se.nimsa.dcm4che.streams.DicomFlows.TagModification
 import se.nimsa.dcm4che.streams.DicomParts.DicomPart
 import se.nimsa.dcm4che.streams.{DicomAttributesSink, DicomFlows, DicomParsing, DicomPartFlow}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.AnonymizationKey
-import se.nimsa.sbx.anonymization.AnonymizationUtil.{createAnonymizationKey, isEqual}
-import se.nimsa.sbx.dicom.{DicomData, DicomUtil}
+import se.nimsa.sbx.dicom.DicomData
+import se.nimsa.sbx.util.TestUtil
 
 class HarmonizeAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymizationFlowSpec")) with AsyncFlatSpecLike with Matchers {
 
@@ -23,26 +22,13 @@ class HarmonizeAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymi
   implicit val ec = system.dispatcher
 
   def attributesSource(dicomData: DicomData): Source[DicomPart, NotUsed] = {
-    val bytes = ByteString(DicomUtil.toByteArray(dicomData))
+    val bytes = ByteString(TestUtil.toByteArray(dicomData))
     Source.single(bytes)
       .via(DicomPartFlow.partFlow)
       .via(DicomFlows.blacklistFilter(DicomParsing.isFileMetaInformation, keepPreamble = false))
   }
 
   def anonKeyPart(key: AnonymizationKey) = AnonymizationKeysPart(Seq(key), Some(key), Some(key), Some(key))
-
-  def anonSource(attributes: Attributes, anonAttributes: Attributes) = {
-    val key = createAnonymizationKey(attributes, anonAttributes)
-    attributesSource(DicomData(attributes, metaInformation))
-      .via(AnonymizationFlow.anonFlow)
-      .via(DicomFlows.modifyFlow(
-        TagModification(Tag.PatientName, _ => toAsciiBytes(key.anonPatientName, VR.PN), insert = false),
-        TagModification(Tag.PatientID, _ => toAsciiBytes(key.anonPatientID, VR.LO), insert = false),
-        TagModification(Tag.StudyInstanceUID, _ => toAsciiBytes(key.anonStudyInstanceUID, VR.UI), insert = false),
-        TagModification(Tag.SeriesInstanceUID, _ => toAsciiBytes(key.anonSeriesInstanceUID, VR.UI), insert = false),
-        TagModification(Tag.FrameOfReferenceUID, _ => toAsciiBytes(key.anonFrameOfReferenceUID, VR.UI), insert = false)
-      ))
-  }
 
   def harmonize(key: AnonymizationKey, attributes: Attributes) =
     Source.single(anonKeyPart(key))
@@ -53,20 +39,20 @@ class HarmonizeAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymi
 
   "The harmonize anonymization flow" should "not change attributes if anonymous info in key is equal to that in dataset" in {
     val attributes = createAttributes
-    val anonAttributes = createAnonymousAttributes
-    val key = createAnonymizationKey(attributes, anonAttributes)
+    val key = TestUtil.createAnonymizationKey(attributes)
     harmonize(key, attributes).map {
       case (_, dsMaybe) =>
         val harmonizedAttributes = dsMaybe.get
-        val identialKey = createAnonymizationKey(attributes, harmonizedAttributes)
-        isEqual(key, identialKey) shouldBe true
+        harmonizedAttributes.getString(Tag.PatientName) shouldBe key.anonPatientName
+        harmonizedAttributes.getString(Tag.PatientID) shouldBe key.anonPatientID
+        harmonizedAttributes.getString(Tag.StudyInstanceUID) shouldBe key.anonStudyInstanceUID
+        harmonizedAttributes.getString(Tag.SeriesInstanceUID) shouldBe key.anonSeriesInstanceUID
     }
   }
 
   it should "change change patient ID when attribute in key is different from that in dataset" in {
     val attributes = createAttributes
-    val anonAttributes = createAnonymousAttributes
-    val key = createAnonymizationKey(attributes, anonAttributes).copy(anonPatientID = "apid2")
+    val key = TestUtil.createAnonymizationKey(attributes).copy(anonPatientID = "apid2")
     harmonize(key, attributes).map {
       case (_, dsMaybe) =>
         val harmonizedAttributes = dsMaybe.get
@@ -76,8 +62,7 @@ class HarmonizeAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymi
 
   it should "change patient and study properties" in {
     val attributes = createAttributes
-    val anonAttributes = createAnonymousAttributes
-    val key = createAnonymizationKey(attributes, anonAttributes).copy(anonPatientID = "apid2", anonStudyInstanceUID = "astuid2")
+    val key = TestUtil.createAnonymizationKey(attributes).copy(anonPatientID = "apid2", anonStudyInstanceUID = "astuid2")
     harmonize(key, attributes).map {
       case (_, dsMaybe) =>
         val harmonizedAttributes = dsMaybe.get
