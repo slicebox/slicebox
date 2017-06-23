@@ -71,8 +71,8 @@ resolvers ++= Seq(
 // deps
 
 libraryDependencies ++= {
-  val akkaVersion = "2.5.2"
-  val akkaHttpVersion = "10.0.7"
+  val akkaVersion = "2.5.3"
+  val akkaHttpVersion = "10.0.8"
   val slickVersion = "3.2.0"
   val dcm4cheVersion = "3.3.8"
   Seq(
@@ -80,15 +80,15 @@ libraryDependencies ++= {
     "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
     "com.typesafe.akka" %% "akka-stream" % akkaVersion, // force newer version than default in akka-http
     "com.typesafe.akka" %% "akka-http" % akkaHttpVersion,
-    "de.heikoseeberger" %% "akka-http-play-json" % "1.16.1",
+    "de.heikoseeberger" %% "akka-http-play-json" % "1.17.0",
     "ch.qos.logback" % "logback-classic" % "1.2.3",
     "com.typesafe.slick" %% "slick" % slickVersion,
     "com.typesafe.slick" %% "slick-hikaricp" % slickVersion,
     "com.h2database" % "h2" % "1.4.196",
     "mysql" % "mysql-connector-java" % "6.0.6",
     "com.zaxxer" % "HikariCP" % "2.6.2",
-    "com.github.t3hnar" %% "scala-bcrypt" % "3.0",
-    "com.amazonaws" % "aws-java-sdk-s3" % "1.11.146",
+    "com.github.t3hnar" %% "scala-bcrypt" % "3.1",
+    "com.amazonaws" % "aws-java-sdk-s3" % "1.11.153",
     "org.scalatest" %% "scalatest" % "3.0.3" % "test",
     "org.dcm4che" % "dcm4che-core" % dcm4cheVersion,
     "org.dcm4che" % "dcm4che-image" % dcm4cheVersion,
