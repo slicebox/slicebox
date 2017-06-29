@@ -45,6 +45,7 @@ rpmVendor := maintainer.value
 rpmLicense := Some("Apache v2")
 packageArchitecture in Rpm := "noarch"
 rpmGroup := Some("Applications/Research")
+version in Rpm := version.value.replace("-SNAPSHOT", "")
 rpmRelease := {
   if (version.value.matches(".*-SNAPSHOT")) System.currentTimeMillis().toString else "1"
 }
