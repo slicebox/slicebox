@@ -41,7 +41,6 @@ bashScriptExtraDefines ++= Seq(
   """addJava "-Dlogback.configurationFile=${app_home}/../conf/logback.xml" """)
 
 // rpm specific
-
 rpmVendor := maintainer.value
 rpmLicense := Some("Apache v2")
 packageArchitecture in Rpm := "noarch"
