@@ -16,31 +16,31 @@
 
 package se.nimsa.sbx.scp
 
+import java.io.File
 import java.util.concurrent.{Executor, ScheduledExecutorService}
 
 import akka.actor.ActorRef
 import akka.pattern.ask
-import akka.stream.Materializer
 import akka.util.{ByteString, Timeout}
 import com.sun.xml.internal.messaging.saaj.util.ByteOutputStream
 import com.typesafe.scalalogging.LazyLogging
-import org.dcm4che3.data.{Attributes, Tag, VR}
+import org.dcm4che3.data.{Attributes, Tag, UID, VR}
 import org.dcm4che3.io.DicomOutputStream
 import org.dcm4che3.net._
 import org.dcm4che3.net.pdu.PresentationContext
 import org.dcm4che3.net.service.{BasicCEchoSCP, BasicCStoreSCP, DicomServiceRegistry}
+import org.dcm4che3.util.TagUtils
 import se.nimsa.sbx.dicom.Contexts
 import se.nimsa.sbx.scp.ScpProtocol.DicomDataReceivedByScp
 
-import scala.concurrent.{Await, ExecutionContext}
+import scala.concurrent.Await
 
 class Scp(val name: String,
           val aeTitle: String,
           val port: Int,
           executor: Executor,
           scheduledExecutor: ScheduledExecutorService,
-          notifyActor: ActorRef)
-         (implicit val ec: ExecutionContext, materializer: Materializer, timeout: Timeout) extends LazyLogging {
+          notifyActor: ActorRef)(implicit timeout: Timeout) extends LazyLogging {
 
   private val cstoreSCP = new BasicCStoreSCP("*") {
 
@@ -52,13 +52,14 @@ class Scp(val name: String,
       val tsuid = pc.getTransferSyntax
 
       val fmi = as.createFileMetaInformation(iuid, cuid, tsuid)
-      val dataset = data.readDataset(tsuid)
 
       val baos = new ByteOutputStream()
-      val dos = new DicomOutputStream(baos, tsuid)
-      dos.writeDataset(fmi, dataset)
+      val dos = new DicomOutputStream(baos, UID.ExplicitVRLittleEndian)
+      dos.writeFileMetaInformation(fmi)
+      data.copyTo(dos)
       dos.close()
-      val bytes = ByteString(baos.getBytes)
+
+      val bytes = ByteString(baos.getBytes.take(baos.size))
 
       /*
        * This is the interface between a synchronous callback and a async actor system. To avoid sending too many large
@@ -76,7 +77,7 @@ class Scp(val name: String,
   ae.setAssociationAcceptor(true)
   ae.addConnection(conn)
   Contexts.imageDataContexts.foreach(context =>
-    ae.addTransferCapability(new TransferCapability(null, context.sopClassUid, TransferCapability.Role.SCP, context.transferSyntaxeUids: _*)))
+    ae.addTransferCapability(new TransferCapability(null, context.sopClassUid, TransferCapability.Role.SCP, context.transferSyntaxUids: _*)))
 
   private val device = new Device("storescp")
   device.setExecutor(executor)
