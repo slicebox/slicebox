@@ -16,8 +16,6 @@
 
 package se.nimsa.sbx.scp
 
-import akka.NotUsed
-import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import se.nimsa.sbx.model.Entity
 
@@ -41,6 +39,6 @@ object ScpProtocol {
 
   case class ScpRemoved(scpDataId: Long)
 
-  case class DicomDataReceivedByScp(source: Source[ByteString, NotUsed])
+  case class DicomDataReceivedByScp(bytes: ByteString)
 
 }
