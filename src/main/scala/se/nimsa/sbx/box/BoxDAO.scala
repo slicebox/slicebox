@@ -395,19 +395,9 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
 
   def listIncomingTransactionsInProcess: Future[Seq[IncomingTransaction]] = db.run(listIncomingTransactionsInProcessAction)
 
-  def countOutgoingImagesForOutgoingTransactionId(outgoingTransactionId: Long): Future[Int] = db.run {
-    outgoingImageQuery.filter(_.outgoingTransactionId === outgoingTransactionId).length.result
-  }
-
   def listOutgoingImagesForOutgoingTransactionId(outgoingTransactionId: Long): Future[Seq[OutgoingImage]] = db.run {
     outgoingImageQuery.filter(_.outgoingTransactionId === outgoingTransactionId).result
   }
-
-  def countIncomingImagesForIncomingTransactionIdAction(incomingTransactionId: Long) =
-    incomingImageQuery.filter(_.incomingTransactionId === incomingTransactionId).length.result
-
-  def countIncomingImagesForIncomingTransactionId(incomingTransactionId: Long): Future[Int] =
-    db.run(countIncomingImagesForIncomingTransactionIdAction(incomingTransactionId))
 
   def listIncomingImagesForIncomingTransactionId(incomingTransactionId: Long): Future[Seq[IncomingImage]] = db.run {
     incomingImageQuery.filter(_.incomingTransactionId === incomingTransactionId).result
@@ -512,21 +502,14 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
             _.map(image => updateIncomingImageAction(image.copy(imageId = imageId)))
               .getOrElse(insertIncomingImageAction(IncomingImage(-1, incomingTransaction.id, imageId, sequenceNumber, overwrite)))
           }
-        }.map(_ => incomingTransaction)
-      }.flatMap { incomingTransaction =>
-        if (incomingTransaction.receivedImageCount == totalImageCount)
-          countIncomingImagesForIncomingTransactionIdAction(incomingTransaction.id).flatMap { nIncomingImages =>
-            val status =
-              if (nIncomingImages == totalImageCount)
-                TransactionStatus.FINISHED
-              else
-                TransactionStatus.FAILED
-            setIncomingTransactionStatusAction(incomingTransaction.id, status).map(_ => incomingTransaction.copy(status = status))
-          }
-        else
-          DBIO.successful(incomingTransaction)
+        }.flatMap { _ =>
+          if (incomingTransaction.receivedImageCount == totalImageCount)
+            setIncomingTransactionStatusAction(incomingTransaction.id, TransactionStatus.FINISHED)
+              .map(_ => incomingTransaction.copy(status = TransactionStatus.FINISHED))
+          else
+            DBIO.successful(incomingTransaction)
+        }
       }
-
     db.run(action.transactionally)
   }
 

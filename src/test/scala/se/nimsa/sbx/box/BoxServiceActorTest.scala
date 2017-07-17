@@ -181,7 +181,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
       await(boxDao.listIncomingImages) should have length 2
     }
 
-    "mark incoming transaction as failed when receiving the UpdateIncoming message for the last file of the transaction and the number of images in the transactions does not match the number of incoming images stored in the database" in {
+    "mark incoming transaction as processing until all files have been received" in {
 
       val box = Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, online = false)
 
@@ -194,9 +194,10 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
 
       expectMsgPF() {
         case IncomingUpdated(transaction) =>
-          transaction.receivedImageCount shouldBe 3
+          transaction.receivedImageCount shouldBe 2
+          transaction.addedImageCount shouldBe 2
           transaction.totalImageCount shouldBe totalImageCount
-          transaction.status shouldBe TransactionStatus.FAILED
+          transaction.status shouldBe TransactionStatus.PROCESSING
       }
     }
 

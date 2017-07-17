@@ -127,9 +127,7 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageServic
               case TransactionStatus.FINISHED =>
                 SbxLog.info("Box", s"Received $totalImageCount files from box ${box.name}")
               case TransactionStatus.FAILED =>
-                boxDao.countIncomingImagesForIncomingTransactionId(incomingTransactionWithStatus.id).foreach { nIncomingImages =>
-                  SbxLog.error("Box", s"Finished receiving $totalImageCount files from box ${box.name}, but only $nIncomingImages files can be found at this time.")
-                }
+                SbxLog.error("Box", s"Failed receiving $totalImageCount files from box ${box.name}")
               case _ =>
                 log.debug(s"Received pushed file and updated incoming transaction $incomingTransactionWithStatus")
             }
