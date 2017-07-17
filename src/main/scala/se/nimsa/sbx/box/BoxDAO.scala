@@ -499,9 +499,10 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
             insertIncomingTransactionAction(IncomingTransaction(-1, box.id, box.name, outgoingTransactionId, 0, 0, totalImageCount, System.currentTimeMillis, System.currentTimeMillis, TransactionStatus.WAITING))
           }
       }.flatMap { existingTransaction =>
+        val receivedImageCount = existingTransaction.receivedImageCount + 1
         val addedImageCount = if (overwrite) existingTransaction.addedImageCount else existingTransaction.addedImageCount + 1
         val incomingTransaction = existingTransaction.copy(
-          receivedImageCount = sequenceNumber,
+          receivedImageCount = receivedImageCount,
           addedImageCount = addedImageCount,
           totalImageCount = totalImageCount,
           updated = System.currentTimeMillis,
@@ -513,7 +514,7 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
           }
         }.map(_ => incomingTransaction)
       }.flatMap { incomingTransaction =>
-        if (sequenceNumber == totalImageCount)
+        if (incomingTransaction.receivedImageCount == totalImageCount)
           countIncomingImagesForIncomingTransactionIdAction(incomingTransaction.id).flatMap { nIncomingImages =>
             val status =
               if (nIncomingImages == totalImageCount)
