@@ -16,20 +16,21 @@
 
 package se.nimsa.sbx.scp
 
+import java.io.File
 import java.util.concurrent.{Executor, ScheduledExecutorService}
 
 import akka.actor.ActorRef
 import akka.pattern.ask
-import akka.stream.scaladsl.{StreamConverters, Source => StreamSource}
 import akka.util.{ByteString, Timeout}
+import com.sun.xml.internal.messaging.saaj.util.ByteOutputStream
 import com.typesafe.scalalogging.LazyLogging
-import org.dcm4che3.data.{Attributes, Tag, VR}
+import org.dcm4che3.data.{Attributes, Tag, UID, VR}
+import org.dcm4che3.io.DicomOutputStream
 import org.dcm4che3.net._
 import org.dcm4che3.net.pdu.PresentationContext
 import org.dcm4che3.net.service.{BasicCEchoSCP, BasicCStoreSCP, DicomServiceRegistry}
-import se.nimsa.dcm4che.streams.DicomParsing
-import se.nimsa.dcm4che.streams.DicomParts.{DicomAttribute, DicomHeader, DicomValueChunk}
-import se.nimsa.sbx.dicom.{Contexts, DicomUtil}
+import org.dcm4che3.util.TagUtils
+import se.nimsa.sbx.dicom.Contexts
 import se.nimsa.sbx.scp.ScpProtocol.DicomDataReceivedByScp
 
 import scala.concurrent.Await
@@ -39,47 +40,33 @@ class Scp(val name: String,
           val port: Int,
           executor: Executor,
           scheduledExecutor: ScheduledExecutorService,
-          notifyActor: ActorRef,
-          implicit val timeout: Timeout) extends LazyLogging {
+          notifyActor: ActorRef)(implicit timeout: Timeout) extends LazyLogging {
 
   private val cstoreSCP = new BasicCStoreSCP("*") {
 
     override protected def store(as: Association, pc: PresentationContext, rq: Attributes, data: PDVInputStream, rsp: Attributes): Unit = {
       rsp.setInt(Tag.Status, VR.US, 0)
 
-      val versionName = as.getRemoteImplVersionName
-      val tsuidBytes = DicomUtil.padToEvenLength(ByteString(pc.getTransferSyntax), VR.UI)
-      val cuidBytes = ByteString(rq.getBytes(Tag.AffectedSOPClassUID))
-      val iuidBytes = ByteString(rq.getBytes(Tag.AffectedSOPInstanceUID))
-      val riuidBytes = DicomUtil.padToEvenLength(ByteString(as.getRemoteImplClassUID), VR.UI)
-      val raetBytes = DicomUtil.padToEvenLength(ByteString(as.getRemoteAET), VR.SH)
+      val cuid = rq.getString(Tag.AffectedSOPClassUID)
+      val iuid = rq.getString(Tag.AffectedSOPInstanceUID)
+      val tsuid = pc.getTransferSyntax
 
-      // val bigEndian = tsuid == UID.ExplicitVRBigEndianRetired
+      val fmi = as.createFileMetaInformation(iuid, cuid, tsuid)
 
-      val fmiVersion = DicomAttribute(DicomHeader(Tag.FileMetaInformationVersion, VR.OB, 2, isFmi = true, bigEndian = false, explicitVR = true), Seq(DicomValueChunk(bigEndian = false, ByteString(1, 0), last = true)))
-      val fmiSopClass = DicomAttribute(DicomHeader(Tag.MediaStorageSOPClassUID, VR.UI, cuidBytes.length, isFmi = true, bigEndian = false, explicitVR = true), Seq(DicomValueChunk(bigEndian = true, cuidBytes, last = true)))
-      val fmiSopInstance = DicomAttribute(DicomHeader(Tag.MediaStorageSOPInstanceUID, VR.UI, iuidBytes.length, isFmi = true, bigEndian = false, explicitVR = true), Seq(DicomValueChunk(bigEndian = true, iuidBytes, last = true)))
-      val fmiTransferSyntax = DicomAttribute(DicomHeader(Tag.TransferSyntaxUID, VR.UI, tsuidBytes.length, isFmi = true, bigEndian = false, explicitVR = true), Seq(DicomValueChunk(bigEndian = true, tsuidBytes, last = true)))
-      val fmiImplementationUID = DicomAttribute(DicomHeader(Tag.ImplementationClassUID, VR.UI, riuidBytes.length, isFmi = true, bigEndian = false, explicitVR = true), Seq(DicomValueChunk(bigEndian = true, riuidBytes, last = true)))
-      val fmiVersionName = if (versionName != null) {
-        val versionNameBytes = DicomUtil.padToEvenLength(ByteString(versionName), VR.SH)
-        DicomAttribute(DicomHeader(Tag.ImplementationVersionName, VR.SH, versionNameBytes.length, isFmi = true, bigEndian = false, explicitVR = true), Seq(DicomValueChunk(bigEndian = true, versionNameBytes, last = true)))
-      } else
-        DicomAttribute(DicomHeader(Tag.ImplementationVersionName, VR.SH, 0, isFmi = true, bigEndian = false, explicitVR = true, ByteString.empty), Seq(DicomValueChunk(bigEndian = true, ByteString.empty, last = true)))
-      val fmiAeTitle = DicomAttribute(DicomHeader(Tag.SourceApplicationEntityTitle, VR.SH, raetBytes.length, isFmi = true, bigEndian = false, explicitVR = true), Seq(DicomValueChunk(bigEndian = true, raetBytes, last = true)))
+      val baos = new ByteOutputStream()
+      val dos = new DicomOutputStream(baos, UID.ExplicitVRLittleEndian)
+      dos.writeFileMetaInformation(fmi)
+      data.copyTo(dos)
+      dos.close()
 
-      val fmiBytes = fmiVersion.bytes ++ fmiSopClass.bytes ++ fmiSopInstance.bytes ++ fmiTransferSyntax.bytes ++ fmiImplementationUID.bytes ++ fmiVersionName.bytes ++ fmiAeTitle.bytes
-      val fmiLength = DicomAttribute(DicomHeader(Tag.FileMetaInformationGroupLength, VR.UL, 4, isFmi = true, bigEndian = false, explicitVR = true), Seq(DicomValueChunk(bigEndian = true, DicomParsing.intToBytesLE(fmiBytes.length), last = true)))
-      val preambleBytes = ByteString.fromArray(new Array[Byte](128)) ++ ByteString('D', 'I', 'C', 'M')
-
-      val source = StreamSource.single(preambleBytes ++ fmiLength.bytes ++ fmiBytes).concat(StreamConverters.fromInputStream(() => data))
+      val bytes = ByteString(baos.getBytes.take(baos.size))
 
       /*
        * This is the interface between a synchronous callback and a async actor system. To avoid sending too many large
        * messages to the notification actor, risking heap overflow, we block and wait here, ensuring one-at-a-time
        * processing of dicom data.
        */
-      Await.ready(notifyActor.ask(DicomDataReceivedByScp(source)), timeout.duration)
+      Await.ready(notifyActor.ask(DicomDataReceivedByScp(bytes)), timeout.duration)
     }
 
   }
@@ -90,7 +77,7 @@ class Scp(val name: String,
   ae.setAssociationAcceptor(true)
   ae.addConnection(conn)
   Contexts.imageDataContexts.foreach(context =>
-    ae.addTransferCapability(new TransferCapability(null, context.sopClassUid, TransferCapability.Role.SCP, context.transferSyntaxeUids: _*)))
+    ae.addTransferCapability(new TransferCapability(null, context.sopClassUid, TransferCapability.Role.SCP, context.transferSyntaxUids: _*)))
 
   private val device = new Device("storescp")
   device.setExecutor(executor)
