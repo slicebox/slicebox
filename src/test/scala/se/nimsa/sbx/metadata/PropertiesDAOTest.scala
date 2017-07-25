@@ -717,6 +717,51 @@ class PropertiesDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterA
     }
   }
 
+  it should "remove empty patients, studies and series when fully deleting images" in {
+    for {
+      (_, (_, _), (_, _, _, _), (i1, i2, i3, i4, i5, i6, i7, i8)) <- insertMetaDataAndProperties()
+      p1 <- metaDataDao.patients
+      t1 <- metaDataDao.studies
+      s1 <- metaDataDao.series
+      _ <- propertiesDao.deleteFully(Seq(i1.id, i2.id))
+      p2 <- metaDataDao.patients
+      t2 <- metaDataDao.studies
+      s2 <- metaDataDao.series
+      _ <- propertiesDao.deleteFully(Seq(i3.id, i4.id))
+      p3 <- metaDataDao.patients
+      t3 <- metaDataDao.studies
+      s3 <- metaDataDao.series
+      _ <- propertiesDao.deleteFully(Seq(i5.id, i6.id, i7.id))
+      p4 <- metaDataDao.patients
+      t4 <- metaDataDao.studies
+      s4 <- metaDataDao.series
+      _ <- propertiesDao.deleteFully(Seq(i8.id))
+      p5 <- metaDataDao.patients
+      t5 <- metaDataDao.studies
+      s5 <- metaDataDao.series
+    } yield {
+      p1 should have length 1
+      t1 should have length 2
+      s1 should have length 4
+
+      p2 should have length 1
+      t2 should have length 2
+      s2 should have length 3
+
+      p3 should have length 1
+      t3 should have length 1
+      s3 should have length 2
+
+      p4 should have length 1
+      t4 should have length 1
+      s4 should have length 1
+
+      p5 shouldBe empty
+      t5 shouldBe empty
+      s5 shouldBe empty
+    }
+  }
+
   it should "remove a series tag when the last occurrence of it has been removed" in {
     for {
       (_, (_, _), (dbSeries1, dbSeries2, dbSeries3, _), (_, _, _, _, _, _, _, _)) <- insertMetaDataAndProperties()
