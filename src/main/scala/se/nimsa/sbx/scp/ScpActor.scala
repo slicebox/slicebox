@@ -22,6 +22,7 @@ import akka.actor.{Actor, Props}
 import akka.event.{Logging, LoggingReceive}
 import akka.pattern.{ask, pipe}
 import akka.stream.Materializer
+import akka.stream.scaladsl.{Source => StreamSource}
 import akka.util.Timeout
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.dicom.Contexts
@@ -53,7 +54,7 @@ class ScpActor(scpData: ScpData, storage: StorageService, executor: Executor,
     thread
   }
 
-  val scp = new Scp(scpData.name, scpData.aeTitle, scpData.port, executor, scheduledExecutor, self, timeout)
+  val scp = new Scp(scpData.name, scpData.aeTitle, scpData.port, executor, scheduledExecutor, self)
   SbxLog.info("SCP", s"Started SCP ${scpData.name} with AE title ${scpData.aeTitle} on port ${scpData.port}")
 
   override def postStop() {
@@ -63,16 +64,17 @@ class ScpActor(scpData: ScpData, storage: StorageService, executor: Executor,
   }
 
   def receive = LoggingReceive {
-    case DicomDataReceivedByScp(bytesSource) =>
+    case DicomDataReceivedByScp(bytes) =>
       log.debug("SCP", s"Dicom data received using SCP ${scpData.name}")
+      val streamSource = StreamSource.single(bytes)
       val source = Source(SourceType.SCP, scpData.name, scpData.id)
-      val addDicomDataFuture = storeDicomData(bytesSource, source, storage, Contexts.imageDataContexts)
+      val addDicomDataFuture = storeDicomData(streamSource, source, storage, Contexts.imageDataContexts)
 
       addDicomDataFuture.onComplete {
         case Success(metaData) =>
           system.eventStream.publish(ImageAdded(metaData.image, source, !metaData.imageAdded))
         case Failure(e) =>
-          SbxLog.error("Directory", s"Could not add file: ${e.getMessage}")
+          SbxLog.error("SCP", s"Could not add file: ${e.getMessage}")
       }
 
       addDicomDataFuture.pipeTo(sender)

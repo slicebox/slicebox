@@ -23,7 +23,7 @@ import scala.collection.JavaConverters._
 
 object Contexts {
 
-  case class Context(sopClassUid: String, transferSyntaxeUids: Seq[String])
+  case class Context(sopClassUid: String, transferSyntaxUids: Seq[String])
 
   private lazy val standardTS = Seq(UID.ImplicitVRLittleEndian, UID.ExplicitVRLittleEndian, UID.ExplicitVRBigEndianRetired, UID.DeflatedExplicitVRLittleEndian, UID.JPEGBaseline1)
 
@@ -31,6 +31,6 @@ object Contexts {
 
   lazy val extendedContexts = imageDataContexts ++ ConfigFactory.load().getStringList("slicebox.accepted-sop-classes.extended").asScala.map(uid => Context(uid, standardTS))
 
-  def asNamePairs(contexts: Seq[Context]): Seq[(String, String)] = contexts.flatMap(context => context.transferSyntaxeUids.map((context.sopClassUid, _)))
+  def asNamePairs(contexts: Seq[Context]): Seq[(String, String)] = contexts.flatMap(context => context.transferSyntaxUids.map((context.sopClassUid, _)))
 
 }
