@@ -231,14 +231,32 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
   }
 
   /**
-    * First version of a bulk delete function. To be improved in streaming and series-centric milestones.
+    * Delete input images. If any series, studies and/or patients become empty as a result of this, delete them too.
+    * Also, delete series tags no longer used, if any.
     *
     * @param imageIds IDs of images to delete
-    * @return the ids of deleted series. This is a temporary solution before the new SeriesDeleted global event is introduced.
+    * @return the ids of deleted patients, studies, series and images
     */
   def deleteFully(imageIds: Seq[Long]): Future[(Seq[Long], Seq[Long], Seq[Long], Seq[Long])] = {
+    val action = DBIO.sequence {
+      imageIds
+        .grouped(1000) // micro-batch to keep size of queries under control
+        .map(subset => deleteFullyBatch(subset))
+    }
+    db.run(action.transactionally)
+      .map {
+        // put the subsets back together again
+        _.foldLeft((Seq.empty[Long], Seq.empty[Long], Seq.empty[Long], Seq.empty[Long])) { (total, ids) =>
+          (total._1 ++ ids._1, total._2 ++ ids._2, total._3 ++ ids._3, total._4 ++ ids._4)
+        }
+      }
+  }
+
+  private def deleteFullyBatch(imageIds: Seq[Long]) = {
+
     val images = imagesQuery.filter(_.id inSetBind imageIds) // batch this?
-    val action = images.map(_.id).result.flatMap { imageIds =>
+
+    images.map(_.id).result.flatMap { imageIds =>
 
       val uniqueSeriesIdsAction = images.map(_.seriesId).distinct.result
       val deleteImagesAction = images.delete
@@ -308,13 +326,11 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
             patientsQuery.filter(_.id inSetBind emptyPatientIds).delete
 
               // return deleted ids for each level
-              .map (_ => (emptyPatientIds, emptyStudyIds, emptySeriesIds, imageIds))
+              .map(_ => (emptyPatientIds, emptyStudyIds, emptySeriesIds, imageIds))
           }
         }
       }
     }
-
-    db.run(action.transactionally)
   }
 
   def flatSeries(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String], sourceRefs: Seq[SourceRef], seriesTypeIds: Seq[Long], seriesTagIds: Seq[Long]): Future[Seq[FlatSeries]] =
