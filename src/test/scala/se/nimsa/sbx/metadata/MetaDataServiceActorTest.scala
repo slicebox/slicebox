@@ -74,11 +74,11 @@ class MetaDataServiceActorTest(_system: ActorSystem) extends TestKit(_system) wi
         if (studyAdded) studyEvents += study
         if (seriesAdded) seriesEvents += series
         if (imageAdded) imageEvents += image
-      case MetaDataDeleted(patientMaybe, studyMaybe, seriesMaybe, imageMaybe) =>
-        patientMaybe.foreach(patient => patientEvents.find(_.id == patient.id).foreach(patientEvents -= _))
-        studyMaybe.foreach(study => studyEvents.find(_.id == study.id).foreach(studyEvents -= _))
-        seriesMaybe.foreach(series => seriesEvents.find(_.id == series.id).foreach(seriesEvents -= _))
-        imageMaybe.foreach(image => imageEvents.find(_.id == image.id).foreach(imageEvents -= _))
+      case MetaDataDeleted(patientIds, studyIds, seriesIds, imageIds) =>
+        patientEvents.filter(e => patientIds.contains(e.id)).foreach(patientEvents -= _)
+        studyEvents.filter(e => studyIds.contains(e.id)).foreach(studyEvents -= _)
+        seriesEvents.filter(e => seriesIds.contains(e.id)).foreach(seriesEvents -= _)
+        imageEvents.filter(e => imageIds.contains(e.id)).foreach(imageEvents -= _)
     }
 
   }))
@@ -193,7 +193,7 @@ class MetaDataServiceActorTest(_system: ActorSystem) extends TestKit(_system) wi
       seriesEvents should have length 4
       imageEvents should have length 5
 
-      metaDataActorRef ! DeleteMetaData(image5)
+      metaDataActorRef ! DeleteMetaData(Seq(image5.id))
       expectMsgType[MetaDataDeleted]
 
       Thread.sleep(500)
@@ -203,7 +203,7 @@ class MetaDataServiceActorTest(_system: ActorSystem) extends TestKit(_system) wi
       seriesEvents should have length 4
       imageEvents should have length 4
 
-      metaDataActorRef ! DeleteMetaData(image4)
+      metaDataActorRef ! DeleteMetaData(Seq(image4.id))
       expectMsgType[MetaDataDeleted]
 
       Thread.sleep(500)
@@ -213,7 +213,7 @@ class MetaDataServiceActorTest(_system: ActorSystem) extends TestKit(_system) wi
       seriesEvents should have length 3
       imageEvents should have length 3
 
-      metaDataActorRef ! DeleteMetaData(image3)
+      metaDataActorRef ! DeleteMetaData(Seq(image3.id))
       expectMsgType[MetaDataDeleted]
 
       Thread.sleep(500)
@@ -223,7 +223,7 @@ class MetaDataServiceActorTest(_system: ActorSystem) extends TestKit(_system) wi
       seriesEvents should have length 2
       imageEvents should have length 2
 
-      metaDataActorRef ! DeleteMetaData(image2)
+      metaDataActorRef ! DeleteMetaData(Seq(image2.id))
       expectMsgType[MetaDataDeleted]
 
       Thread.sleep(500)
@@ -233,7 +233,7 @@ class MetaDataServiceActorTest(_system: ActorSystem) extends TestKit(_system) wi
       seriesEvents should have length 1
       imageEvents should have length 1
 
-      metaDataActorRef ! DeleteMetaData(image1)
+      metaDataActorRef ! DeleteMetaData(Seq(image1.id))
       expectMsgType[MetaDataDeleted]
 
       Thread.sleep(500)

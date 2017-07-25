@@ -2,7 +2,7 @@ package se.nimsa.sbx.box
 
 import akka.NotUsed
 import akka.actor.{Actor, ActorSystem, Props}
-import akka.http.scaladsl.model.StatusCodes.{InternalServerError, NoContent, ServiceUnavailable}
+import akka.http.scaladsl.model.StatusCodes.{BadRequest, NoContent, ServiceUnavailable}
 import akka.http.scaladsl.model._
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Source
@@ -53,7 +53,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
   val okResponse = HttpResponse()
   val noResponse = HttpResponse(status = ServiceUnavailable)
-  val failResponse = HttpResponse(InternalServerError)
+  val failResponse = HttpResponse(status = BadRequest)
 
   val metaDataService = system.actorOf(Props(new Actor() {
     var imageFound = true
@@ -65,9 +65,10 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
     }
   }), name = "MetaDataService")
 
+  val invalidImageId = 666
+
   val storage = new RuntimeStorage() {
-    override def fileSource(image: Image): Source[ByteString, NotUsed] =
-      Source.single(ByteString(1,2,3))
+    override def fileSource(imageId: Long): Source[ByteString, NotUsed] = Source.single(ByteString(1, 2, 3))
   }
 
   val anonymizationService = system.actorOf(AnonymizationServiceActor.props(anonymizationDao, purgeEmptyAnonymizationKeys = false), name = "AnonymizationService")
@@ -164,7 +165,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
     "mark outgoing transaction as failed when file send fails" in {
 
-      val invalidImageId = 666
+      failedResponseSendIndices += 1
 
       val transaction = await(boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, testBox.id, testBox.name, 0, 1, 1000, 1000, TransactionStatus.WAITING)))
       await(boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, invalidImageId, 1, sent = false)))
@@ -182,11 +183,12 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
     "not mark wrong outgoing transaction as failed when transaction id is not unique" in {
 
-      val invalidImageId = 666
       val transaction1 = await(boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, testBox.id, testBox.name, 0, 1, 1000, 1000, TransactionStatus.WAITING)))
       await(boxDao.insertOutgoingImage(OutgoingImage(-1, transaction1.id, invalidImageId, 1, sent = false)))
       val transaction2 = await(boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, testBox.id, testBox.name, 0, 1, 1000, 1000, TransactionStatus.WAITING)))
       await(boxDao.insertOutgoingImage(OutgoingImage(-1, transaction2.id, dbImage1.id, 1, sent = false)))
+
+      failedResponseSendIndices += 1
 
       boxPushActorRef ! PollOutgoing
       expectNoMsg()
@@ -205,10 +207,10 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
     "process other transactions when file send fails" in {
 
-      val invalidImageId = 666
-
       val transaction1 = await(boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, testBox.id, testBox.name, 0, 1, 1000, 1000, TransactionStatus.WAITING)))
       await(boxDao.insertOutgoingImage(OutgoingImage(-1, transaction1.id, invalidImageId, 1, sent = false)))
+
+      failedResponseSendIndices += 1
 
       boxPushActorRef ! PollOutgoing
       expectNoMsg()
@@ -219,7 +221,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       boxPushActorRef ! PollOutgoing
       expectNoMsg()
 
-      capturedFileSendRequests.size should be(1)
+      capturedFileSendRequests.size should be(2)
       capturedStatusUpdateRequests should have length 1
 
       val outgoingTransactions = await(boxDao.listOutgoingTransactions(0, 10))

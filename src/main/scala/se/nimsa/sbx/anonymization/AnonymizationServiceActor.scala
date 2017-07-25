@@ -20,7 +20,7 @@ import akka.actor.{Actor, Props}
 import akka.event.{Logging, LoggingReceive}
 import akka.pattern.pipe
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
-import se.nimsa.sbx.app.GeneralProtocol.ImageDeleted
+import se.nimsa.sbx.app.GeneralProtocol.ImagesDeleted
 
 import scala.concurrent.ExecutionContext
 
@@ -29,15 +29,15 @@ class AnonymizationServiceActor(anonymizationDao: AnonymizationDAO, purgeEmptyAn
   val log = Logging(context.system, this)
 
   override def preStart {
-    context.system.eventStream.subscribe(context.self, classOf[ImageDeleted])
+    context.system.eventStream.subscribe(context.self, classOf[ImagesDeleted])
   }
 
   log.info("Anonymization service started")
 
   def receive = LoggingReceive {
 
-    case ImageDeleted(imageId) =>
-      anonymizationDao.removeAnonymizationKeyImagesForImageId(imageId, purgeEmptyAnonymizationKeys)
+    case ImagesDeleted(imageIds) =>
+      anonymizationDao.removeAnonymizationKeyImagesForImageId(imageIds, purgeEmptyAnonymizationKeys)
 
     case msg: AnonymizationRequest =>
 

@@ -122,7 +122,7 @@ class AnonymizationDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAft
       k1 <- dao.listAnonymizationKeys
       k2 <- dao.listAnonymizationKeyImages
 
-      _ <- dao.removeAnonymizationKeyImagesForImageId(imageId, purgeEmptyAnonymizationKeys = false)
+      _ <- dao.removeAnonymizationKeyImagesForImageId(Seq(imageId), purgeEmptyAnonymizationKeys = false)
 
       k3 <- dao.listAnonymizationKeys
       k4 <- dao.listAnonymizationKeyImages
@@ -143,7 +143,7 @@ class AnonymizationDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAft
       k1 <- dao.listAnonymizationKeys
       k2 <- dao.listAnonymizationKeyImages
 
-      _ <- dao.removeAnonymizationKeyImagesForImageId(imageId, purgeEmptyAnonymizationKeys = true)
+      _ <- dao.removeAnonymizationKeyImagesForImageId(Seq(imageId), purgeEmptyAnonymizationKeys = true)
 
       k3 <- dao.listAnonymizationKeys
       k4 <- dao.listAnonymizationKeyImages
@@ -170,7 +170,7 @@ class AnonymizationDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAft
       k1 <- dao.listAnonymizationKeys
       k2 <- dao.listAnonymizationKeyImages
 
-      _ <- dao.removeAnonymizationKeyImagesForImageId(imageId, purgeEmptyAnonymizationKeys = true)
+      _ <- dao.removeAnonymizationKeyImagesForImageId(Seq(imageId), purgeEmptyAnonymizationKeys = true)
 
       pk <- dao.anonymizationKeyForId(dbKey1.id)
       k3 <- dao.anonymizationKeyForId(dbKey2.id)

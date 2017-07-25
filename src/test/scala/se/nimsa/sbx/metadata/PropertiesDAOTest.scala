@@ -52,18 +52,6 @@ class PropertiesDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterA
     }
   }
 
-  it should "cascade delete linked series sources when a patient is deleted" in {
-    for {
-      (dbPatient1, (_, _), (_, _, _, _), (_, _, _, _, _, _, _, _)) <- insertMetaDataAndProperties()
-      ss1 <- propertiesDao.seriesSources
-      _ <- metaDataDao.deletePatient(dbPatient1.id)
-      ss2 <- propertiesDao.seriesSources
-    } yield {
-      ss1 should have length 4
-      ss2 shouldBe empty
-    }
-  }
-
   it should "not support adding a series source which links to a non-existing series" in {
     recoverToSucceededIf[JdbcSQLException] {
       propertiesDao.insertSeriesSource(SeriesSource(666, Source(SourceType.USER, "user", 1)))
@@ -753,15 +741,15 @@ class PropertiesDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterA
 
   it should "remove a series tag when deleting a series if the series tag attached to the series was the last of its kind" in {
     for {
-      (_, (_, _), (dbSeries1, dbSeries2, dbSeries3, dbSeries4), (_, _, _, _, _, _, _, _)) <- insertMetaDataAndProperties()
+      (_, (_, _), (_, _, _, _), (dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)) <- insertMetaDataAndProperties()
       st1 <- propertiesDao.listSeriesTags
-      _ <- propertiesDao.deleteFully(dbSeries4)
+      _ <- propertiesDao.deleteFully(Seq(dbImage7.id, dbImage8.id))
       st2 <- propertiesDao.listSeriesTags
-      _ <- propertiesDao.deleteFully(dbSeries1)
+      _ <- propertiesDao.deleteFully(Seq(dbImage1.id, dbImage2.id))
       st3 <- propertiesDao.listSeriesTags
-      _ <- propertiesDao.deleteFully(dbSeries2)
+      _ <- propertiesDao.deleteFully(Seq(dbImage3.id, dbImage4.id))
       st4 <- propertiesDao.listSeriesTags
-      _ <- propertiesDao.deleteFully(dbSeries3)
+      _ <- propertiesDao.deleteFully(Seq(dbImage5.id, dbImage6.id))
       st5 <- propertiesDao.listSeriesTags
     } yield {
       st1.size should be(2)

@@ -145,7 +145,7 @@ class BoxPollActor(box: Box,
                   throw new RuntimeException("Invalid transaction")
                 case _ =>
                   sendRemoteOutgoingFileCompleted(transactionImage).map { _ =>
-                    system.eventStream.publish(ImageAdded(metaData.image, source, !metaData.imageAdded))
+                    system.eventStream.publish(ImageAdded(metaData.image.id, source, !metaData.imageAdded))
                   }
               }
           }

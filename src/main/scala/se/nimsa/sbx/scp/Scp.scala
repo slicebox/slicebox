@@ -16,7 +16,6 @@
 
 package se.nimsa.sbx.scp
 
-import java.io.File
 import java.util.concurrent.{Executor, ScheduledExecutorService}
 
 import akka.actor.ActorRef
@@ -29,7 +28,6 @@ import org.dcm4che3.io.DicomOutputStream
 import org.dcm4che3.net._
 import org.dcm4che3.net.pdu.PresentationContext
 import org.dcm4che3.net.service.{BasicCEchoSCP, BasicCStoreSCP, DicomServiceRegistry}
-import org.dcm4che3.util.TagUtils
 import se.nimsa.sbx.dicom.Contexts
 import se.nimsa.sbx.scp.ScpProtocol.DicomDataReceivedByScp
 

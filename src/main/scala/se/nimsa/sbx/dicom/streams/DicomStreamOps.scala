@@ -54,12 +54,8 @@ trait DicomStreamOps {
     * @return a `Source` of anonymized DICOM byte chunks
     */
   def anonymizedDicomData(imageId: Long, tagValues: Seq[TagValue], storage: StorageService)
-                         (implicit materializer: Materializer, ec: ExecutionContext): Future[Option[StreamSource[ByteString, NotUsed]]] =
-    callMetaDataService[Option[Image]](GetImage(imageId)).map { imageMaybe =>
-      imageMaybe.map { image =>
-        anonymizedDicomDataSource(storage.fileSource(image), anonymizationQuery, anonymizationInsert, tagValues)
-      }
-    }
+                         (implicit materializer: Materializer, ec: ExecutionContext): StreamSource[ByteString, NotUsed] =
+    anonymizedDicomDataSource(storage.fileSource(imageId), anonymizationQuery, anonymizationInsert, tagValues)
 
   protected def reverseAnonymizationQuery(implicit ec: ExecutionContext) = (patientName: PatientName, patientID: PatientID) =>
     callAnonymizationService[AnonymizationKeys](GetReverseAnonymizationKeysForPatient(patientName.value, patientID.value))
@@ -89,7 +85,7 @@ trait DicomStreamOps {
     }.recover {
       case t: Throwable =>
         scheduleTask(30.seconds) {
-          storage.deleteFromStorage(tempPath) // delete temp file once file system has released handle
+          storage.deleteByName(Seq(tempPath)) // delete temp file once file system has released handle
         }
         throw t
     }
@@ -108,14 +104,14 @@ trait DicomStreamOps {
                    (implicit materializer: Materializer, ec: ExecutionContext): Future[Option[MetaDataAdded]] =
     callMetaDataService[Option[Image]](GetImage(imageId)).flatMap { imageMaybe =>
       imageMaybe.map { image =>
-        val forcedSource = dicomDataSource(storage.fileSource(image))
+        val forcedSource = dicomDataSource(storage.fileSource(imageId))
           .via(DicomFlows.modifyFlow(TagModification(Tag.PatientIdentityRemoved, _ => ByteString("NO"), insert = false)))
           .via(DicomFlows.blacklistFilter(Seq(Tag.DeidentificationMethod)))
           .map(_.bytes)
         val anonymizedSource = anonymizedDicomDataSource(forcedSource, anonymizationQuery, anonymizationInsert, tagValues)
           .mapAsync(5)(bytes =>
-            callMetaDataService[MetaDataDeleted](DeleteMetaData(image))
-              .map(_ => storage.deleteFromStorage(image))
+            callMetaDataService[MetaDataDeleted](DeleteMetaData(Seq(imageId)))
+              .map(_ => storage.deleteFromStorage(Seq(imageId)))
               .map(_ => bytes)
           )
         callMetaDataService[Option[SeriesSource]](GetSourceForSeries(image.seriesId)).map { seriesSourceMaybe =>

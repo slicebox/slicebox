@@ -18,15 +18,17 @@ package se.nimsa.sbx.storage
 
 import akka.actor.ActorSystem
 import akka.stream.Materializer
+import akka.stream.alpakka.s3.S3Exception
 import akka.stream.alpakka.s3.auth.BasicCredentials
 import akka.stream.alpakka.s3.scaladsl.S3Client
 import akka.stream.scaladsl.{Sink, Source}
 import akka.util.ByteString
 import akka.{Done, NotUsed}
-import com.amazonaws.{ClientConfiguration, Protocol}
 import com.amazonaws.auth.DefaultAWSCredentialsProviderChain
 import com.amazonaws.services.s3.AmazonS3ClientBuilder
-import se.nimsa.sbx.dicom.DicomHierarchy.Image
+import com.amazonaws.services.s3.model.DeleteObjectsRequest
+import com.amazonaws.{ClientConfiguration, Protocol}
+import se.nimsa.sbx.lang.NotFoundException
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -64,11 +66,19 @@ class S3Storage(val bucket: String, val s3Prefix: String, val region: String)(im
     s3.deleteObject(bucket, sourceImageName)
   }
 
-  override def deleteFromStorage(name: String): Unit = s3.deleteObject(bucket, s3Id(name))
+  override def deleteByName(names: Seq[String]): Unit =
+    if (names.length == 1)
+      s3.deleteObject(bucket, s3Id(names.head))
+    else
+      s3.deleteObjects(new DeleteObjectsRequest(bucket).withKeys(names.map(name => s3Id(name)): _*).withQuiet(true))
 
   override def fileSink(name: String)(implicit executionContext: ExecutionContext): Sink[ByteString, Future[Done]] =
     s3Stream.multipartUpload(bucket, name).mapMaterializedValue(_.map(_ => Done))
 
-  override def fileSource(image: Image): Source[ByteString, NotUsed] = s3Stream.download(bucket, s3Id(imageName(image)))
+  override def fileSource(imageId: Long): Source[ByteString, NotUsed] =
+    s3Stream.download(bucket, s3Id(imageName(imageId))).mapError {
+      // we do not have access to http status code here so not much we can do but map everything to NotFound
+      case e: S3Exception => new NotFoundException(s"Data could not be transferred for image id $imageId: ${e.getMessage}")
+    }
 
 }

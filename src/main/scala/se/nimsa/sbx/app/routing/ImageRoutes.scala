@@ -35,6 +35,7 @@ import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.dicom.DicomHierarchy.{FlatSeries, Image, Patient, Study}
 import se.nimsa.sbx.dicom._
+import se.nimsa.sbx.lang.NotFoundException
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.user.UserProtocol.ApiUser
@@ -59,58 +60,46 @@ trait ImageRoutes {
           }
         }
       } ~ pathPrefix(LongNumber) { imageId =>
-        onSuccess(metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]]) {
-          case Some(image) =>
-            pathEndOrSingleSlash {
-              get {
-                complete(HttpEntity(`application/octet-stream`, storage.fileSource(image)))
-              } ~ delete {
-                complete(metaDataService.ask(DeleteMetaData(image)).map { _ =>
-                  system.eventStream.publish(ImageDeleted(image.id))
-                  storage.deleteFromStorage(image)
-                  NoContent
-                })
-              }
-            } ~ path("attributes") {
-              get {
-                complete(storage.readImageAttributes(image))
-              }
-            } ~ path("imageinformation") {
-              get {
-                complete(storage.readImageInformation(image))
-              }
-            } ~ path("png") {
-              parameters((
-                'framenumber.as[Int] ? 1,
-                'windowmin.as[Int] ? 0,
-                'windowmax.as[Int] ? 0,
-                'imageheight.as[Int] ? 0)) { (frameNumber, min, max, height) =>
-                get {
-                  onComplete(Future(storage.readPngImageData(image, frameNumber, min, max, height))) {
-                    case Success(bytes) => complete(HttpEntity(`image/png`, bytes))
-                    case Failure(_) => complete(NoContent)
-                    case _ => complete(InternalServerError)
-                  }
-                }
+        pathEndOrSingleSlash {
+          get {
+            complete(HttpEntity(`application/octet-stream`, storage.fileSource(imageId)))
+          } ~ delete {
+            complete(metaDataService.ask(DeleteMetaData(Seq(imageId))).map { _ =>
+              system.eventStream.publish(ImagesDeleted(Seq(imageId)))
+              storage.deleteFromStorage(Seq(imageId))
+              NoContent
+            })
+          }
+        } ~ path("attributes") {
+          get {
+            complete(storage.readImageAttributes(imageId))
+          }
+        } ~ path("imageinformation") {
+          get {
+            complete(storage.readImageInformation(imageId))
+          }
+        } ~ path("png") {
+          parameters((
+            'framenumber.as[Int] ? 1,
+            'windowmin.as[Int] ? 0,
+            'windowmax.as[Int] ? 0,
+            'imageheight.as[Int] ? 0)) { (frameNumber, min, max, height) =>
+            get {
+              onComplete(Future(storage.readPngImageData(imageId, frameNumber, min, max, height))) {
+                case Success(bytes) => complete(HttpEntity(`image/png`, bytes))
+                case Failure(e) if e.isInstanceOf[NotFoundException] => complete(NotFound)
+                case Failure(_)  => complete(NoContent)
               }
             }
-          case None =>
-            complete((NotFound, s"No image meta data found for image id $imageId"))
+          }
         }
       } ~ path("delete") {
         post {
           entity(as[Seq[Long]]) { imageIds =>
-            val futureDeleted = StreamSource(imageIds.toList).mapAsync(20) { imageId =>
-              metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]].map { imageMaybe =>
-                imageMaybe.map { image =>
-                    metaDataService.ask(DeleteMetaData(image)).map { _ =>
-                      system.eventStream.publish(ImageDeleted(image.id))
-                      storage.deleteFromStorage(image)
-                    }
-                }
-              }.unwrap
-            }.runWith(Sink.ignore)
-            onSuccess(futureDeleted) { _ =>
+            val futureDeleted = metaDataService.ask(DeleteMetaData(imageIds)).map(_ =>
+              storage.deleteFromStorage(imageIds))
+            onSuccess(futureDeleted) {
+              system.eventStream.publish(ImagesDeleted(imageIds))
               complete(NoContent)
             }
           }
@@ -150,7 +139,7 @@ trait ImageRoutes {
                         val scBytes = Jpeg2Dcm(allBytes.toArray, patient, study, optionalDescription)
                         storeDicomData(StreamSource.single(ByteString(scBytes)), source, storage, Contexts.extendedContexts)
                           .map { metaData =>
-                            system.eventStream.publish(ImageAdded(metaData.image, source, !metaData.imageAdded))
+                            system.eventStream.publish(ImageAdded(metaData.image.id, source, !metaData.imageAdded))
                             metaData.image
                           }
                       }
@@ -175,7 +164,7 @@ trait ImageRoutes {
     val futureUpload = storeDicomData(bytes, source, storage, Contexts.extendedContexts)
 
     onSuccess(futureUpload) { metaData =>
-      system.eventStream.publish(ImageAdded(metaData.image, source, !metaData.imageAdded))
+      system.eventStream.publish(ImageAdded(metaData.image.id, source, !metaData.imageAdded))
       val httpStatus = if (metaData.imageAdded) Created else OK
       complete((httpStatus, metaData.image))
     }
@@ -191,7 +180,7 @@ trait ImageRoutes {
         imageMaybe.map { image =>
           metaDataService.ask(GetSingleFlatSeries(image.seriesId)).mapTo[Option[FlatSeries]].map { flatSeriesMaybe =>
             flatSeriesMaybe.map { flatSeries =>
-              (image, flatSeries, storage.fileSource(image))
+              (image, flatSeries, storage.fileSource(imageId))
             }
           }
         }.unwrap

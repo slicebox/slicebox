@@ -45,7 +45,7 @@ trait TransactionRoutes {
                 extractDataBytes { compressedBytes =>
                   val source = Source(SourceType.BOX, box.name, box.id)
                   onSuccess(storeDicomData(compressedBytes.via(Compression.inflate()), source, storage, Contexts.extendedContexts)) { metaData =>
-                    system.eventStream.publish(ImageAdded(metaData.image, source, !metaData.imageAdded))
+                    system.eventStream.publish(ImageAdded(metaData.image.id, source, !metaData.imageAdded))
                     onSuccess(boxService.ask(UpdateIncoming(box, outgoingTransactionId, sequenceNumber, totalImageCount, metaData.image.id, metaData.imageAdded))) {
                       case IncomingUpdated(transaction) =>
                         transaction.status match {
@@ -110,12 +110,8 @@ trait TransactionRoutes {
                       val imageId = transactionImage.image.imageId
                       onSuccess(boxService.ask(GetOutgoingTagValues(transactionImage)).mapTo[Seq[OutgoingTagValue]]) { transactionTagValues =>
                         val tagValues = transactionTagValues.map(_.tagValue)
-                        onSuccess(anonymizedDicomData(imageId, tagValues, storage)) {
-                          case Some(streamSource) =>
-                            complete(HttpEntity(ContentTypes.`application/octet-stream`, streamSource.via(Compression.deflate)))
-                          case None =>
-                            complete((NotFound, s"Image not found for image id $imageId"))
-                        }
+                        val streamSource = anonymizedDicomData(imageId, tagValues, storage)
+                        complete(HttpEntity(ContentTypes.`application/octet-stream`, streamSource.via(Compression.deflate)))
                       }
                     case None =>
                       complete((NotFound, s"No outgoing image found for transaction id $outgoingTransactionId and outgoing image id $outgoingImageId"))

@@ -54,7 +54,7 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageServic
   log.info("Box service started")
 
   override def preStart {
-    context.system.eventStream.subscribe(context.self, classOf[ImageDeleted])
+    context.system.eventStream.subscribe(context.self, classOf[ImagesDeleted])
   }
 
   override def postStop() =
@@ -66,8 +66,8 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageServic
       val now = System.currentTimeMillis()
       boxDao.updateStatusForBoxesAndTransactions(now, pollBoxesLastPollTimestamp.toMap, pollBoxOnlineStatusTimeoutMillis)
 
-    case ImageDeleted(imageId) =>
-      boxDao.removeOutgoingImagesForImageId(imageId) zip boxDao.removeIncomingImagesForImageId(imageId)
+    case ImagesDeleted(imageIds) =>
+      boxDao.removeOutgoingImagesForImageIds(imageIds) zip boxDao.removeIncomingImagesForImageIds(imageIds)
 
     case msg: BoxRequest =>
 

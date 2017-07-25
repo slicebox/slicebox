@@ -74,7 +74,7 @@ object MetaDataProtocol {
 
   case class AddMetaData(attributes: Attributes, source: Source)
   
-  case class DeleteMetaData(image: Image)
+  case class DeleteMetaData(imageIds: Seq[Long])
     
   sealed trait MetaDataQuery
 
@@ -131,7 +131,7 @@ object MetaDataProtocol {
 
   case class MetaDataAdded(patient: Patient, study: Study, series: Series, image: Image, patientAdded: Boolean, studyAdded: Boolean, seriesAdded: Boolean, imageAdded: Boolean, source: Source)
 
-  case class MetaDataDeleted(deletedPatient: Option[Patient], deletedStudy: Option[Study], deletedSeries: Option[Series], deletedImage: Option[Image])
+  case class MetaDataDeleted(patientIds: Seq[Long], studyIds: Seq[Long], seriesIds: Seq[Long], imageIds: Seq[Long])
   
   case class Patients(patients: Seq[Patient])
 

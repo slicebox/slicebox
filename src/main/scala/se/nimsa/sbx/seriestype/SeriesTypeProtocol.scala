@@ -103,7 +103,7 @@ object SeriesTypeProtocol {
 
   case class SeriesTypeAddedToSeries(seriesSeriesType: SeriesSeriesType)
   
-  case class SeriesTypesRemovedFromSeries(seriesId: Long)
+  case class SeriesTypesRemovedFromSeries(seriesIds: Seq[Long])
 
   case class SeriesTypeRemovedFromSeries(seriesId: Long, seriesTypeId: Long)
 

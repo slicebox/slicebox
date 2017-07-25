@@ -230,35 +230,91 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
       .flatMap(_ => cleanupSeriesTagAction(seriesTagId))
   }
 
-  def deleteImageFullyAction(image: Image) =
-    metaDataDao.deleteImageAction(image.id).flatMap { imagesDeleted =>
-      metaDataDao.seriesByIdAction(image.seriesId).flatMap { maybeParentSeries =>
-        imagesQuery.filter(_.seriesId === image.seriesId).take(1).result.flatMap { otherImages =>
-          maybeParentSeries
-            .filter(_ => otherImages.isEmpty)
-            .map(series => deleteSeriesFullyAction(series))
-            .getOrElse(DBIO.successful((None, None, None)))
-        }.map {
-          case (maybePatient, maybeStudy, maybeSeries) =>
-            val maybeImage = if (imagesDeleted == 0) None else Some(image)
-            (maybePatient, maybeStudy, maybeSeries, maybeImage)
+  /**
+    * First version of a bulk delete function. To be improved in streaming and series-centric milestones.
+    *
+    * @param imageIds IDs of images to delete
+    * @return the ids of deleted series. This is a temporary solution before the new SeriesDeleted global event is introduced.
+    */
+  def deleteFully(imageIds: Seq[Long]): Future[(Seq[Long], Seq[Long], Seq[Long], Seq[Long])] = {
+    val images = imagesQuery.filter(_.id inSetBind imageIds) // batch this?
+    val action = images.map(_.id).result.flatMap { imageIds =>
+
+      val uniqueSeriesIdsAction = images.map(_.seriesId).distinct.result
+      val deleteImagesAction = images.delete
+      // find empty series for images, then delete images
+      uniqueSeriesIdsAction.flatMap { uniqueSeriesIds =>
+        deleteImagesAction.flatMap { _ =>
+          DBIO.sequence(uniqueSeriesIds.map(seriesId =>
+            imagesQuery.filter(_.seriesId === seriesId).take(1).result.map {
+              case ims if ims.nonEmpty => None
+              case _ => Some(seriesId)
+            }
+          )).map(_.flatten)
+        }
+      }.flatMap { emptySeriesIds =>
+
+        // find series tags for removed series, then delete series series tags
+        val seriesSeriesTags = seriesSeriesTagQuery.filter(_.seriesId inSetBind emptySeriesIds)
+        val seriesTagIdsAction = seriesSeriesTags.map(_.seriesTagId).distinct.result
+        val deleteSeriesSeriesTagsAction = seriesSeriesTags.delete
+        seriesTagIdsAction.flatMap { seriesTagIds =>
+          deleteSeriesSeriesTagsAction.flatMap { _ =>
+            DBIO.sequence(seriesTagIds.map(seriesTagId =>
+              seriesSeriesTagQuery.filter(_.seriesTagId === seriesTagId).take(1).result.map {
+                case ims if ims.nonEmpty => None
+                case _ => Some(seriesTagId)
+              }
+            )).map(_.flatten)
+          }
+        }.flatMap { emptySeriesTagIds =>
+          // delete empty series tags
+          seriesTagQuery.filter(_.id inSetBind emptySeriesTagIds).delete
+            .map(_ => emptySeriesIds)
+        }
+      }.flatMap { emptySeriesIds =>
+
+        // find empty studies for series, then delete empty series
+        val series = seriesQuery.filter(_.id inSetBind emptySeriesIds)
+        val uniqueStudyIdsAction = series.map(_.studyId).distinct.result
+        val deleteSeriesAction = series.delete
+        uniqueStudyIdsAction.flatMap { uniqueStudyIds =>
+          deleteSeriesAction.flatMap { _ =>
+            DBIO.sequence(uniqueStudyIds.map(studyId =>
+              seriesQuery.filter(_.studyId === studyId).take(1).result.map {
+                case ims if ims.nonEmpty => None
+                case _ => Some(studyId)
+              }
+            )).map(_.flatten)
+          }
+        }.flatMap { emptyStudyIds =>
+
+          // find empty patients for studies, then delete empty studies
+          val studies = studiesQuery.filter(_.id inSetBind emptyStudyIds)
+          val uniquePatientIdsAction = studies.map(_.patientId).distinct.result
+          val deleteStudiesAction = studies.delete
+          uniquePatientIdsAction.flatMap { uniquePatientIds =>
+            deleteStudiesAction.flatMap { _ =>
+              DBIO.sequence(uniquePatientIds.map(patientId =>
+                studiesQuery.filter(_.patientId === patientId).take(1).result.map {
+                  case ims if ims.nonEmpty => None
+                  case _ => Some(patientId)
+                }
+              )).map(_.flatten)
+            }
+          }.flatMap { emptyPatientIds =>
+
+            // delete empty patients
+            patientsQuery.filter(_.id inSetBind emptyPatientIds).delete
+
+              // return deleted ids for each level
+              .map (_ => (emptyPatientIds, emptyStudyIds, emptySeriesIds, imageIds))
+          }
         }
       }
     }
 
-  def deleteSeriesFullyAction(series: Series) =
-    seriesTagsForSeriesAction(series.id).flatMap { seriesSeriesTags =>
-      metaDataDao.deleteSeriesFullyAction(series).flatMap { result =>
-        DBIO.sequence(seriesSeriesTags.map(seriesTag => cleanupSeriesTagAction(seriesTag.id)))
-          .map(_ => result)
-      }
-    }
-
-  def deleteFully(series: Series): Future[(Option[Patient], Option[Study], Option[Series])] =
-    db.run(deleteSeriesFullyAction(series).transactionally)
-
-  def deleteFully(image: Image): Future[(Option[Patient], Option[Study], Option[Series], Option[Image])] = db.run {
-    deleteImageFullyAction(image).transactionally
+    db.run(action.transactionally)
   }
 
   def flatSeries(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String], sourceRefs: Seq[SourceRef], seriesTypeIds: Seq[Long], seriesTagIds: Seq[Long]): Future[Seq[FlatSeries]] =

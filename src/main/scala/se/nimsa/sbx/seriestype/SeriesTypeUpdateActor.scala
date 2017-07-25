@@ -74,8 +74,13 @@ class SeriesTypeUpdateActor(storage: StorageService)(implicit val materializer: 
     case MarkSeriesAsProcessed(seriesId) =>
       seriesBeingUpdated -= seriesId
 
-    case ImageAdded(image, _, _) =>
-      self ! UpdateSeriesTypesForSeries(image.seriesId)
+    case ImageAdded(imageId, _, _) =>
+      val recipient = self
+      getImageForId(imageId).foreach { imageMaybe =>
+        imageMaybe.foreach { image =>
+          recipient ! UpdateSeriesTypesForSeries(image.seriesId)
+        }
+      }
 
     case PollSeriesTypesUpdateQueue => pollSeriesTypesUpdateQueue()
   }
@@ -116,7 +121,7 @@ class SeriesTypeUpdateActor(storage: StorageService)(implicit val materializer: 
 
               val tags = getInvolvedTags(seriesTypesInfo)
 
-              val futureAttributes = storage.fileSource(image)
+              val futureAttributes = storage.fileSource(image.id)
                 .via(new DicomPartFlow(stopTag = Some(tags.max + 1)))
                 .via(whitelistFilter(tags.contains _))
                 .via(attributeFlow)
@@ -202,6 +207,9 @@ class SeriesTypeUpdateActor(storage: StorageService)(implicit val materializer: 
 
   def getAllSeries: Future[Seq[Series]] =
     metaDataService.ask(GetAllSeries).mapTo[SeriesCollection].map(_.series)
+
+  def getImageForId(imageId: Long): Future[Option[Image]] =
+    metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]]
 
   def getImageForSeries(series: Series): Future[Option[Image]] =
     metaDataService.ask(GetImages(0, 1, series.id)).mapTo[Images]

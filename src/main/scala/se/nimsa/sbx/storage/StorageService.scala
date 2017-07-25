@@ -28,9 +28,9 @@ import akka.{Done, NotUsed}
 import org.dcm4che3.data.Tag
 import org.dcm4che3.imageio.plugins.dcm.DicomImageReadParam
 import se.nimsa.dcm4che.streams.{DicomAttributesSink, DicomFlows, DicomPartFlow}
-import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.ImageAttribute
 import se.nimsa.sbx.dicom.streams.DicomStreamOps
+import se.nimsa.sbx.lang.NotFoundException
 import se.nimsa.sbx.storage.StorageProtocol.ImageInformation
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -40,23 +40,21 @@ import scala.concurrent.{ExecutionContext, Future}
   */
 trait StorageService {
 
-  def imageName(image: Image) = image.id.toString
+  def imageName(imageId: Long) = imageId.toString
 
-  def deleteFromStorage(name: String): Unit
+  def deleteByName(name: Seq[String]): Unit
 
-  def deleteFromStorage(image: Image): Unit = deleteFromStorage(imageName(image))
-
-  def deleteFromStorage(images: Seq[Image]): Unit = images foreach deleteFromStorage
+  def deleteFromStorage(imageIds: Seq[Long]): Unit = deleteByName(imageIds.map(imageName))
 
   def move(sourceImageName: String, targetImageName: String): Unit
 
-  def readImageAttributes(image: Image)(implicit materializer: Materializer, ec: ExecutionContext): Source[ImageAttribute, NotUsed] =
-    DicomStreamOps.imageAttributesSource(fileSource(image))
+  def readImageAttributes(imageId: Long)(implicit materializer: Materializer, ec: ExecutionContext): Source[ImageAttribute, NotUsed] =
+    DicomStreamOps.imageAttributesSource(fileSource(imageId))
 
   private val imageInformationTags = Seq(Tag.InstanceNumber, Tag.ImageIndex, Tag.NumberOfFrames, Tag.SmallestImagePixelValue, Tag.LargestImagePixelValue).sorted
 
-  def readImageInformation(image: Image)(implicit materializer: Materializer, ec: ExecutionContext): Future[ImageInformation] =
-    fileSource(image)
+  def readImageInformation(imageId: Long)(implicit materializer: Materializer, ec: ExecutionContext): Future[ImageInformation] =
+    fileSource(imageId)
       .via(new DicomPartFlow(stopTag = Some(imageInformationTags.last + 1)))
       .via(DicomFlows.whitelistFilter(imageInformationTags.contains _))
       .via(DicomFlows.attributeFlow)
@@ -75,8 +73,8 @@ trait StorageService {
           }.getOrElse(ImageInformation(0, 0, 0, 0))
       }
 
-  def readPngImageData(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int)(implicit materializer: Materializer): Array[Byte] = {
-    val source = fileSource(image)
+  def readPngImageData(imageId: Long, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int)(implicit materializer: Materializer): Array[Byte] = {
+    val source = fileSource(imageId)
     // dcm4che does not support viewing of deflated data, cf. Github issue #42
     // As a workaround, do streaming inflate and mapping of transfer syntax
     val inflatedSource = DicomStreamOps.inflatedSource(source)
@@ -93,6 +91,7 @@ trait StorageService {
       val bi = try
         scaleImage(imageReader.read(frameNumber - 1, param), imageHeight)
       catch {
+        case e: NotFoundException => throw e
         case e: Exception => throw new IllegalArgumentException(e)
       }
       val baos = new ByteArrayOutputStream
@@ -121,8 +120,11 @@ trait StorageService {
   /** Sink for dicom files. */
   def fileSink(name: String)(implicit executionContext: ExecutionContext): Sink[ByteString, Future[Done]]
 
-  /** Source for dicom files. */
-  def fileSource(image: Image): Source[ByteString, NotUsed]
+  /**
+    * Source for dicom files.
+    * @throws NotFoundException if data cannot be found for imageId
+    * */
+  def fileSource(imageId: Long): Source[ByteString, NotUsed]
 
 }
 

@@ -31,7 +31,7 @@ import se.nimsa.sbx.user.Authenticator
 trait SliceboxRoutes extends DirectoryRoutes
   with ScpRoutes
   with ScuRoutes
-  with MetadataRoutes
+  with MetaDataRoutes
   with ImageRoutes
   with AnonymizationRoutes
   with BoxRoutes

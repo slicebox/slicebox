@@ -49,8 +49,8 @@ class MetaDataServiceActor(metaDataDao: MetaDataDAO, propertiesDao: PropertiesDA
       addFuture.foreach(context.system.eventStream.publish)
       addFuture.pipeSequentiallyTo(sender)
 
-    case DeleteMetaData(image) =>
-      val deleteFuture = propertiesDao.deleteFully(image).map(MetaDataDeleted.tupled)
+    case DeleteMetaData(imageIds) =>
+      val deleteFuture = propertiesDao.deleteFully(imageIds).map(MetaDataDeleted.tupled)
       deleteFuture.foreach(system.eventStream.publish)
       deleteFuture.pipeSequentiallyTo(sender)
 

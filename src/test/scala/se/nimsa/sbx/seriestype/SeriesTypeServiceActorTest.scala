@@ -6,7 +6,6 @@ import akka.stream.ActorMaterializer
 import akka.testkit.{ImplicitSender, TestKit}
 import akka.util.Timeout
 import org.scalatest._
-import se.nimsa.sbx.dicom.DicomHierarchy.Series
 import se.nimsa.sbx.metadata.MetaDataDAO
 import se.nimsa.sbx.metadata.MetaDataProtocol.MetaDataDeleted
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
@@ -266,7 +265,7 @@ class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
       val seriesId = 45
       await(seriesTypeDao.upsertSeriesSeriesType(SeriesSeriesType(seriesId, addedSeriesType.id)))
 
-      seriesTypeService ! MetaDataDeleted(None, None, Some(Series(seriesId, -1, null, null, null, null, null, null, null, null, null)), None)
+      seriesTypeService ! MetaDataDeleted(Seq.empty, Seq.empty, Seq(seriesId), Seq.empty)
       expectMsgType[SeriesTypesRemovedFromSeries]
 
       await(seriesTypeDao.listSeriesSeriesTypes) shouldBe empty

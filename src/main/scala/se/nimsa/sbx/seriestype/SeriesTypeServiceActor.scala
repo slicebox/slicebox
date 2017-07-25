@@ -44,11 +44,9 @@ class SeriesTypeServiceActor(seriesTypeDao: SeriesTypeDAO, storage: StorageServi
 
   def receive = LoggingReceive {
 
-    case MetaDataDeleted(_, _, seriesMaybe, _) =>
-      seriesMaybe.foreach { series =>
-        removeSeriesTypesFromSeries(series.id)
-        sender ! SeriesTypesRemovedFromSeries(series.id)
-      }
+    case MetaDataDeleted(_, _, seriesIds, _) =>
+        removeSeriesTypesFromSeries(seriesIds)
+        sender ! SeriesTypesRemovedFromSeries(seriesIds)
 
     case msg: SeriesTypeRequest =>
 
@@ -108,8 +106,8 @@ class SeriesTypeServiceActor(seriesTypeDao: SeriesTypeDAO, storage: StorageServi
             sender ! SeriesTypeAddedToSeries(seriesSeriesType)
 
           case RemoveSeriesTypesFromSeries(seriesId) =>
-            removeSeriesTypesFromSeries(seriesId)
-            sender ! SeriesTypesRemovedFromSeries(seriesId)
+            removeSeriesTypesFromSeries(Seq(seriesId))
+            sender ! SeriesTypesRemovedFromSeries(Seq(seriesId))
 
           case RemoveSeriesTypeFromSeries(seriesId, seriesTypeId) =>
             removeSeriesTypeFromSeries(seriesId, seriesTypeId)
@@ -179,8 +177,8 @@ class SeriesTypeServiceActor(seriesTypeDao: SeriesTypeDAO, storage: StorageServi
   def addSeriesTypeToSeries(seriesSeriesType: SeriesSeriesType) =
     await(seriesTypeDao.upsertSeriesSeriesType(seriesSeriesType))
 
-  def removeSeriesTypesFromSeries(seriesId: Long) =
-    await(seriesTypeDao.removeSeriesTypesForSeriesId(seriesId))
+  def removeSeriesTypesFromSeries(seriesIds: Seq[Long]) =
+    await(seriesTypeDao.removeSeriesTypesForSeriesIds(seriesIds))
 
   def removeSeriesTypeFromSeries(seriesId: Long, seriesTypeId: Long) =
     await(seriesTypeDao.removeSeriesTypeForSeriesId(seriesId, seriesTypeId))

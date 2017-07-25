@@ -70,7 +70,7 @@ class DirectoryWatchActor(watchedDirectory: WatchedDirectory,
       }
       .mapAsync(5) { path => // do import
         storeDicomData(FileIO.fromPath(path), sbxSource, storage, Contexts.imageDataContexts).map { metaData =>
-          system.eventStream.publish(ImageAdded(metaData.image, sbxSource, !metaData.imageAdded))
+          system.eventStream.publish(ImageAdded(metaData.image.id, sbxSource, !metaData.imageAdded))
         }.recover {
           case NonFatal(e) =>
             SbxLog.error("Directory", s"Could not add file ${Paths.get(watchedDirectory.path).relativize(path)}: ${e.getMessage}")

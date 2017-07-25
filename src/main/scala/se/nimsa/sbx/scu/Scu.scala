@@ -32,12 +32,11 @@ import se.nimsa.dcm4che.streams.DicomParts.{DicomAttributes, DicomPart}
 import se.nimsa.dcm4che.streams.{DicomAttributesSink, DicomFlows}
 import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.scu.ScuProtocol.ScuData
-import se.nimsa.sbx.util.FutureUtil.traverseSequentially
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
 
 trait DicomDataProvider {
-  def getDicomData(imageId: Long, stopTag: Option[Int]): Future[Source[DicomPart, NotUsed]]
+  def getDicomData(imageId: Long, stopTag: Option[Int]): Source[DicomPart, NotUsed]
 }
 
 case class DicomDataInfo(iuid: String, cuid: String, ts: String, imageId: Long)
@@ -105,14 +104,15 @@ class Scu(ae: ApplicationEntity, scuData: ScuData)
 
   def sendFiles(dicomDataInfos: Seq[DicomDataInfo], dicomDataProvider: DicomDataProvider): Future[Seq[Long]] = {
 
-    val futureSentFiles = traverseSequentially(dicomDataInfos) { dicomDataInfo =>
-      dicomDataProvider.getDicomData(dicomDataInfo.imageId, None).map { source =>
-        if (as.isReadyForDataTransfer)
+    val futureSentFiles = Future.sequence {
+      dicomDataInfos.flatMap { dicomDataInfo =>
+        if (as.isReadyForDataTransfer) {
+          val source = dicomDataProvider.getDicomData(dicomDataInfo.imageId, None)
           Some(send(source, dicomDataInfo.cuid, dicomDataInfo.iuid, dicomDataInfo.ts, dicomDataInfo.imageId))
-        else
+        } else
           None
       }
-    }.flatMap(a => Future.sequence(a.flatten))
+    }
 
     futureSentFiles.andThen {
       case _ => as.waitForOutstandingRSP()
@@ -198,16 +198,19 @@ object Scu {
 
     val tags = Set(Tag.MediaStorageSOPClassUID, Tag.MediaStorageSOPInstanceUID, Tag.TransferSyntaxUID)
 
-    val futureDicomDataInfos = traverseSequentially(imageIds) { imageId =>
-      dicomDataProvider.getDicomData(imageId, Some(Tag.TransferSyntaxUID + 1)).flatMap { source =>
-        source.via(DicomFlows.collectAttributesFlow(tags)).runWith(Sink.head).map {
-          case attributes: DicomAttributes =>
-            Some(scu.addDicomData(imageId, attributes))
-          case _ =>
-            None
-        }
+    val futureDicomDataInfos = Future.sequence {
+      imageIds.map { imageId =>
+        val source = dicomDataProvider.getDicomData(imageId, Some(Tag.TransferSyntaxUID + 1))
+        source.via(DicomFlows.collectAttributesFlow(tags))
+          .runWith(Sink.head)
+          .map {
+            case attributes: DicomAttributes =>
+              scu.addDicomData(imageId, attributes)
+            case _ =>
+              None
+          }
       }
-    }.map(_.flatten.flatten)
+    }.map(_.flatten)
 
     futureDicomDataInfos.flatMap { dicomDataInfos =>
       val executorService = Executors.newSingleThreadExecutor()

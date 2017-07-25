@@ -172,21 +172,19 @@ class AnonymizationDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Exe
         .result.headOption
     }
 
-  def anonymizationKeysForImageIdAction(imageId: Long) = {
+  def anonymizationKeysForImageIdsAction(imageIds: Seq[Long]) = {
     val join = for {
       key <- anonymizationKeyQuery
       image <- anonymizationKeyImageQuery if image.anonymizationKeyId === key.id
     } yield (key, image)
-    join.filter(_._2.imageId === imageId).map(_._1).result
+    join.filter(_._2.imageId inSetBind imageIds).map(_._1).result
   }
 
-  def anonymizationKeysForImageId(imageId: Long): Future[Seq[AnonymizationKey]] = db.run(anonymizationKeysForImageIdAction(imageId))
-
-  def removeAnonymizationKeyImagesForImageId(imageId: Long, purgeEmptyAnonymizationKeys: Boolean) = db.run {
+  def removeAnonymizationKeyImagesForImageId(imageIds: Seq[Long], purgeEmptyAnonymizationKeys: Boolean) = db.run {
     val action =
       if (purgeEmptyAnonymizationKeys)
-        anonymizationKeysForImageIdAction(imageId).flatMap { keysForImage =>
-          deleteAnonymizationKeyImagesForImageIdAction(imageId).flatMap { _ =>
+        anonymizationKeysForImageIdsAction(imageIds).flatMap { keysForImage =>
+          deleteAnonymizationKeyImagesForImageIdsAction(imageIds).flatMap { _ =>
             DBIO.sequence(keysForImage.map { key =>
               anonymizationKeyImagesForAnonymizationKeyIdAction(key.id).flatMap { keyImages =>
                 if (keyImages.isEmpty)
@@ -198,12 +196,12 @@ class AnonymizationDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Exe
           }
         }
       else
-        deleteAnonymizationKeyImagesForImageIdAction(imageId)
+        deleteAnonymizationKeyImagesForImageIdsAction(imageIds)
     action.transactionally
   }
 
-  private def deleteAnonymizationKeyImagesForImageIdAction(imageId: Long) =
-    anonymizationKeyImageQuery.filter(_.imageId === imageId).delete.map(_ => {})
+  private def deleteAnonymizationKeyImagesForImageIdsAction(imageIds: Seq[Long]) =
+    anonymizationKeyImageQuery.filter(_.imageId inSetBind imageIds).delete.map(_ => {})
 
   val anonymizationKeysGetResult = GetResult(r =>
     AnonymizationKey(r.nextLong, r.nextLong, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString))
