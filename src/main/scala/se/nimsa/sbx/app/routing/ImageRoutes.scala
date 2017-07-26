@@ -87,8 +87,8 @@ trait ImageRoutes {
             get {
               onComplete(Future(storage.readPngImageData(imageId, frameNumber, min, max, height))) {
                 case Success(bytes) => complete(HttpEntity(`image/png`, bytes))
-                case Failure(e) if e.isInstanceOf[NotFoundException] => complete(NotFound)
-                case Failure(_)  => complete(NoContent)
+                case Failure(_: NotFoundException) => complete(NotFound)
+                case Failure(_)  => complete(NotImplemented)
               }
             }
           }
