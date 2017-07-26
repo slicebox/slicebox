@@ -9,9 +9,9 @@ import akka.testkit.TestKit
 import akka.util.ByteString
 import org.dcm4che3.data.{Attributes, Tag, UID, VR}
 import org.scalatest.{FlatSpecLike, Matchers}
-import se.nimsa.dcm4che.streams.DicomFlows.TagModification
+import se.nimsa.dcm4che.streams.DicomModifyFlow.TagModification
 import se.nimsa.dcm4che.streams.DicomParts.{DicomAttributes, DicomPart}
-import se.nimsa.dcm4che.streams.{DicomAttributesSink, DicomFlows, DicomParsing, DicomPartFlow}
+import se.nimsa.dcm4che.streams._
 import se.nimsa.sbx.dicom.DicomData
 import se.nimsa.sbx.util.TestUtil
 import se.nimsa.sbx.util.TestUtil._
@@ -42,12 +42,12 @@ class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymiza
     val key = anonKeyPart(dicomData).patientKey.get
     attributesSource(dicomData)
       .via(AnonymizationFlow.anonFlow)
-      .via(DicomFlows.modifyFlow(
-        TagModification(Tag.PatientName, _ => toAsciiBytes(key.anonPatientName, VR.PN), insert = false),
-        TagModification(Tag.PatientID, _ => toAsciiBytes(key.anonPatientID, VR.LO), insert = false),
-        TagModification(Tag.StudyInstanceUID, _ => toAsciiBytes(key.anonStudyInstanceUID, VR.UI), insert = false),
-        TagModification(Tag.SeriesInstanceUID, _ => toAsciiBytes(key.anonSeriesInstanceUID, VR.UI), insert = false),
-        TagModification(Tag.FrameOfReferenceUID, _ => toAsciiBytes(key.anonFrameOfReferenceUID, VR.UI), insert = false)
+      .via(DicomModifyFlow.modifyFlow(
+        TagModification(TagPath.fromTag(Tag.PatientName), _ => toAsciiBytes(key.anonPatientName, VR.PN), insert = false),
+        TagModification(TagPath.fromTag(Tag.PatientID), _ => toAsciiBytes(key.anonPatientID, VR.LO), insert = false),
+        TagModification(TagPath.fromTag(Tag.StudyInstanceUID), _ => toAsciiBytes(key.anonStudyInstanceUID, VR.UI), insert = false),
+        TagModification(TagPath.fromTag(Tag.SeriesInstanceUID), _ => toAsciiBytes(key.anonSeriesInstanceUID, VR.UI), insert = false),
+        TagModification(TagPath.fromTag(Tag.FrameOfReferenceUID), _ => toAsciiBytes(key.anonFrameOfReferenceUID, VR.UI), insert = false)
       ))
   }
 
