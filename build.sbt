@@ -88,7 +88,7 @@ libraryDependencies ++= {
     "mysql" % "mysql-connector-java" % "6.0.6",
     "com.zaxxer" % "HikariCP" % "2.6.3",
     "com.github.t3hnar" %% "scala-bcrypt" % "3.1",
-    "com.amazonaws" % "aws-java-sdk-s3" % "1.11.167",
+    "com.amazonaws" % "aws-java-sdk-s3" % "1.11.168",
     "org.scalatest" %% "scalatest" % "3.0.3" % "test",
     "org.dcm4che" % "dcm4che-core" % dcm4cheVersion,
     "org.dcm4che" % "dcm4che-image" % dcm4cheVersion,
@@ -100,7 +100,7 @@ libraryDependencies ++= {
     "org.webjars" % "angularjs" % "1.5.9",
     "org.webjars" % "angular-material" % "1.1.4",
     "org.webjars" % "angular-file-upload" % "11.0.0",
-    "se.nimsa" %% "dcm4che-streams" % "0.4-SNAPSHOT" exclude("org.slf4j", "slf4j-simple"),
+    "se.nimsa" %% "dcm4che-streams" % "0.4" exclude("org.slf4j", "slf4j-simple"),
     "com.lightbend.akka" %% "akka-stream-alpakka-s3" % alpakkaVersion,
     "com.lightbend.akka" %% "akka-stream-alpakka-file" % alpakkaVersion
   )
