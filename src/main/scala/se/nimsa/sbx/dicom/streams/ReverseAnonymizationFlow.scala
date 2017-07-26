@@ -2,9 +2,9 @@ package se.nimsa.sbx.dicom.streams
 
 import akka.stream.scaladsl.Flow
 import org.dcm4che3.data.{SpecificCharacterSet, Tag}
-import se.nimsa.dcm4che.streams.DicomFlows
-import se.nimsa.dcm4che.streams.DicomFlows.TagModification
+import se.nimsa.dcm4che.streams.DicomModifyFlow.TagModification
 import se.nimsa.dcm4che.streams.DicomParts._
+import se.nimsa.dcm4che.streams.{DicomModifyFlow, TagPath}
 
 /**
   * A flow which performs reverse anonymization as soon as it has received an AnonymizationKeyPart (which means data is
@@ -28,8 +28,8 @@ object ReverseAnonymizationFlow {
     Tag.FrameOfReferenceUID)
 
   val reverseAnonFlow = Flow[DicomPart]
-    .via(DicomFlows.modifyFlow(
-      reverseTags.map(tag => TagModification(tag, identity, insert = true)): _*))
+    .via(DicomModifyFlow.modifyFlow(
+      reverseTags.map(tag => TagModification(TagPath.fromTag(tag), identity, insert = true)): _*))
     .statefulMapConcat {
 
       () =>

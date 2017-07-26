@@ -8,11 +8,12 @@ import akka.{Done, NotUsed}
 import org.dcm4che3.data.{Attributes, Tag, UID, VR}
 import org.dcm4che3.io.DicomStreamException
 import se.nimsa.dcm4che.streams.DicomFlows._
+import se.nimsa.dcm4che.streams.DicomModifyFlow.TagModification
 import se.nimsa.dcm4che.streams.DicomPartFlow.partFlow
 import se.nimsa.dcm4che.streams.DicomParts._
-import se.nimsa.dcm4che.streams.{DicomAttributesSink, DicomFlows, DicomParsing, DicomPartFlow}
+import se.nimsa.dcm4che.streams._
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
-import se.nimsa.sbx.app.GeneralProtocol.Source
+import se.nimsa.sbx.app.GeneralProtocol.{Source, SourceType}
 import se.nimsa.sbx.dicom.Contexts.Context
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.DicomPropertyValue.{PatientID, PatientName}
@@ -105,7 +106,7 @@ trait DicomStreamOps {
     callMetaDataService[Option[Image]](GetImage(imageId)).flatMap { imageMaybe =>
       imageMaybe.map { image =>
         val forcedSource = dicomDataSource(storage.fileSource(imageId))
-          .via(DicomFlows.modifyFlow(TagModification(Tag.PatientIdentityRemoved, _ => ByteString("NO"), insert = false)))
+          .via(DicomModifyFlow.modifyFlow(TagModification(TagPath.fromTag(Tag.PatientIdentityRemoved), _ => ByteString("NO"), insert = false)))
           .via(DicomFlows.blacklistFilter(Seq(Tag.DeidentificationMethod)))
           .map(_.bytes)
         val anonymizedSource = anonymizedDicomDataSource(forcedSource, anonymizationQuery, anonymizationInsert, tagValues)
@@ -122,6 +123,33 @@ trait DicomStreamOps {
       }.unwrap
     }.unwrap
 
+
+  def modifyData(imageId: Long, tagModifications: Seq[TagModification], storage: StorageService)
+                (implicit materializer: Materializer, ec: ExecutionContext) = {
+    val tempPath = createTempPath()
+    val sink = storage.fileSink(tempPath)
+
+    val futureSource =
+      callMetaDataService[Option[Image]](GetImage(imageId)).flatMap { imageMaybe =>
+        imageMaybe.map { image =>
+          callMetaDataService[Option[Source](GetSourceForSeries(image.seriesId))
+        }.unwrap
+      }.map(_.getOrElse(Source(SourceType.UNKNOWN, SourceType.UNKNOWN.toString, -1)))
+    futureSource.map { source =>
+      dicomDataSource(storage.fileSource(imageId))
+        .via(DicomModifyFlow.modifyFlow(tagModifications: _*))
+        .map(_.bytes)
+        .runWith(sink)
+        .flatMap { _ =>
+          callMetaDataService[MetaDataDeleted](DeleteMetaData(Seq(imageId))).flatMap { _ =>
+            storage.deleteFromStorage(Seq(imageId))
+            // TODO events
+            // TODO tags
+
+          }
+        }
+    }
+  }
 }
 
 object DicomStreamOps {
@@ -339,7 +367,7 @@ object DicomStreamOps {
       .via(DicomPartFlow.partFlow)
 
   def toTagModifications(tagValues: Seq[TagValue]) =
-    tagValues.map(tv => TagModification(tv.tag, _ => DicomUtil.padToEvenLength(ByteString(tv.value), tv.tag), insert = true))
+    tagValues.map(tv => TagModification(TagPath.fromTag(tv.tag), _ => DicomUtil.padToEvenLength(ByteString(tv.value), tv.tag), insert = true))
 
   def anonymizedDicomDataSource(storageSource: StreamSource[ByteString, NotUsed],
                                 anonymizationQuery: (PatientName, PatientID) => Future[Seq[AnonymizationKey]],
@@ -354,7 +382,7 @@ object DicomStreamOps {
       .via(collectAnonymizationKeyProtectedInfo) // AnonymizationKeyPart (protected) :: DicomMetaPart :: AnonymizationKeysPart :: DicomPart...
       .via(AnonymizationFlow.maybeAnonFlow)
       .via(HarmonizeAnonymizationFlow.harmonizeAnonFlow)
-      .via(DicomFlows.modifyFlow(toTagModifications(tagValues): _*))
+      .via(DicomModifyFlow.modifyFlow(toTagModifications(tagValues): _*))
       .via(collectAnonymizationKeyAnonymousInfo) // AnonymizationKeyPart (protected) :: AnonymizationKeyPart (anon) :: DicomMetaPart :: AnonymizationKeysPart :: DicomPart...
       .via(collectAnonymizationKeyInfo) // DicomMetaPart :: AnonymizationKeyInfoPart :: DicomPart...
       .mapAsync(5)(maybeInsertAnonymizationKey(anonymizationInsert))
@@ -362,8 +390,8 @@ object DicomStreamOps {
 
   def inflatedSource(source: StreamSource[ByteString, _]): StreamSource[ByteString, _] = source
     .via(DicomPartFlow.partFlow)
-    .via(DicomFlows.modifyFlow(
-      TagModification(Tag.TransferSyntaxUID, valueBytes => {
+    .via(DicomModifyFlow.modifyFlow(
+      TagModification(TagPath.fromTag(Tag.TransferSyntaxUID), valueBytes => {
         valueBytes.utf8String.trim match {
           case UID.DeflatedExplicitVRLittleEndian => DicomUtil.padToEvenLength(ByteString(UID.ExplicitVRLittleEndian), VR.UI)
           case _ => valueBytes

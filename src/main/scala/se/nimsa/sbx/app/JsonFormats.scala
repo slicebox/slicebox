@@ -16,7 +16,7 @@
 
 package se.nimsa.sbx.app
 
-import play.api.libs.json._
+import se.nimsa.dcm4che.streams.TagPath
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.box.BoxProtocol._
@@ -33,6 +33,10 @@ import se.nimsa.sbx.scu.ScuProtocol._
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
 import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.user.UserProtocol._
+import play.api.libs.json._
+import play.api.libs.json.Reads._
+import play.api.libs.functional.syntax._
+import se.nimsa.dcm4che.streams.TagPath.{TagPathSequence, TagPathTag}
 
 trait JsonFormats {
 
@@ -40,6 +44,36 @@ trait JsonFormats {
     case JsString(string) => JsSuccess(f(string))
     case _ => JsError("Enumeration expected")
   }, Writes[A](a => JsString(a.toString)))
+
+  private lazy val tagPathSequenceReads: Reads[TagPathSequence] = (
+    (__ \ "tag").read[Int] and
+      (__ \ "item").read[String] and
+      (__ \ "previous").lazyRead(Reads.optionWithNull[TagPathSequence](tagPathSequenceReads))
+    ) ((tag, itemString, previous) => {
+    val item = try Option(Integer.parseInt(itemString)) catch { case _: Throwable => None }
+    previous
+      .map(p => item.map(i => p.thenSequence(tag, i)).getOrElse(p.thenSequence(tag)))
+      .getOrElse(item.map(i => TagPath.fromSequence(tag, i)).getOrElse(TagPath.fromSequence(tag)))
+  })
+
+  private lazy val tagPathTagReads: Reads[TagPathTag] = (
+    (__ \ "tag").read[Int] and
+      (__ \ "previous").lazyRead(Reads.optionWithNull[TagPathSequence](tagPathSequenceReads))
+    ) ((tag, previous) => previous.map(p => p.thenTag(tag)).getOrElse(TagPath.fromTag(tag)))
+
+  private lazy val tagPathSequenceWrites: Writes[TagPathSequence] = (
+    (__ \ "tag").write[Int] and
+      (__ \ "item").write[String] and
+      (__ \ "previous").lazyWrite(Writes.optionWithNull[TagPathSequence](tagPathSequenceWrites))
+    ) (tagPath => (tagPath.tag, tagPath.item.map(_.toString).getOrElse("*"), tagPath.previous))
+
+  private lazy val tagPathTagWrites: Writes[TagPathTag] = (
+    (__ \ "tag").write[Int] and
+      (__ \ "previous").write(Writes.optionWithNull[TagPathSequence](tagPathSequenceWrites))
+    ) (tagPath => (tagPath.tag, tagPath.previous))
+
+  implicit lazy val tagPathSequenceFormat = Format(tagPathSequenceReads, tagPathSequenceWrites)
+  implicit lazy val tagPathTagFormat = Format(tagPathTagReads, tagPathTagWrites)
 
   implicit val unWatchDirectoryFormat: Format[UnWatchDirectory] = Json.format[UnWatchDirectory]
   implicit val watchedDirectoryFormat: Format[WatchedDirectory] = Json.format[WatchedDirectory]
