@@ -71,11 +71,12 @@ resolvers ++= Seq(
 
 libraryDependencies ++= {
   val akkaVersion = "2.5.3"
-  val akkaHttpVersion = "10.0.8"
-  val slickVersion = "3.2.0"
+  val akkaHttpVersion = "10.0.9"
+  val slickVersion = "3.2.1"
   val dcm4cheVersion = "3.3.8"
+  val alpakkaVersion = "0.11"
   Seq(
-    "com.typesafe.scala-logging" %% "scala-logging" % "3.5.0",
+    "com.typesafe.scala-logging" %% "scala-logging" % "3.7.2",
     "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
     "com.typesafe.akka" %% "akka-stream" % akkaVersion, // force newer version than default in akka-http
     "com.typesafe.akka" %% "akka-http" % akkaHttpVersion,
@@ -85,9 +86,9 @@ libraryDependencies ++= {
     "com.typesafe.slick" %% "slick-hikaricp" % slickVersion,
     "com.h2database" % "h2" % "1.4.196",
     "mysql" % "mysql-connector-java" % "6.0.6",
-    "com.zaxxer" % "HikariCP" % "2.6.2",
+    "com.zaxxer" % "HikariCP" % "2.6.3",
     "com.github.t3hnar" %% "scala-bcrypt" % "3.1",
-    "com.amazonaws" % "aws-java-sdk-s3" % "1.11.153",
+    "com.amazonaws" % "aws-java-sdk-s3" % "1.11.168",
     "org.scalatest" %% "scalatest" % "3.0.3" % "test",
     "org.dcm4che" % "dcm4che-core" % dcm4cheVersion,
     "org.dcm4che" % "dcm4che-image" % dcm4cheVersion,
@@ -99,9 +100,9 @@ libraryDependencies ++= {
     "org.webjars" % "angularjs" % "1.5.9",
     "org.webjars" % "angular-material" % "1.1.4",
     "org.webjars" % "angular-file-upload" % "11.0.0",
-    "se.nimsa" %% "dcm4che-streams" % "0.4-SNAPSHOT" exclude("org.slf4j", "slf4j-simple"),
-    "com.lightbend.akka" %% "akka-stream-alpakka-s3" % "0.9",
-    "com.lightbend.akka" %% "akka-stream-alpakka-file" % "0.9"
+    "se.nimsa" %% "dcm4che-streams" % "0.4" exclude("org.slf4j", "slf4j-simple"),
+    "com.lightbend.akka" %% "akka-stream-alpakka-s3" % alpakkaVersion,
+    "com.lightbend.akka" %% "akka-stream-alpakka-file" % alpakkaVersion
   )
 }
 

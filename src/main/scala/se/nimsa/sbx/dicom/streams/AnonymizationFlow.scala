@@ -6,9 +6,9 @@ import akka.stream.scaladsl.Flow
 import akka.util.ByteString
 import org.dcm4che3.data.{Tag, VR}
 import org.dcm4che3.util.UIDUtils
-import se.nimsa.dcm4che.streams.{DicomFlows, DicomParsing}
-import se.nimsa.dcm4che.streams.DicomFlows.TagModification
+import se.nimsa.dcm4che.streams.DicomModifyFlow.TagModification
 import se.nimsa.dcm4che.streams.DicomParts._
+import se.nimsa.dcm4che.streams.{DicomFlows, DicomModifyFlow, DicomParsing, TagPath}
 import se.nimsa.sbx.dicom.DicomUtil
 
 import scala.util.Random
@@ -16,9 +16,9 @@ import scala.util.Random
 object AnonymizationFlow {
 
   private def toAsciiBytes(s: String, vr: VR) = DicomUtil.padToEvenLength(ByteString(s), vr)
-  private def insert(tag: Int, mod: ByteString => ByteString) = TagModification(tag, mod, insert = true)
-  private def modify(tag: Int, mod: ByteString => ByteString) = TagModification(tag, mod, insert = false)
-  private def clear(tag: Int) = TagModification(tag, _ => ByteString.empty, insert = false)
+  private def insert(tag: Int, mod: ByteString => ByteString) = TagModification(TagPath.fromTag(tag), mod, insert = true)
+  private def modify(tag: Int, mod: ByteString => ByteString) = TagModification(TagPath.fromTag(tag), mod, insert = false)
+  private def clear(tag: Int) = TagModification(TagPath.fromTag(tag), _ => ByteString.empty, insert = false)
   private def createAccessionNumber(accessionNumberBytes: ByteString): ByteString = {
     val seed = UUID.nameUUIDFromBytes(accessionNumberBytes.toArray).getMostSignificantBits
     val rand = new Random(seed)
@@ -212,7 +212,7 @@ object AnonymizationFlow {
     .via(DicomFlows.blacklistFilter(DicomParsing.isPrivateAttribute _)) // remove private attributes
     .via(DicomFlows.blacklistFilter(isOverlay _)) // remove overlay data
     .via(DicomFlows.blacklistFilter(removeTags.contains _)) // remove tags from above list, if present
-    .via(DicomFlows.modifyFlow( // modify, clear and insert
+    .via(DicomModifyFlow.modifyFlow( // modify, clear and insert
     modify(Tag.AccessionNumber, bytes => if (bytes.nonEmpty) createAccessionNumber(bytes) else bytes),
     modify(Tag.ConcatenationUID, createUid),
     clear(Tag.ContentCreatorName),
