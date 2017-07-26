@@ -23,13 +23,11 @@ import akka.util.Timeout
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.ImageTagValues
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.box.BoxProtocol.{Box, SendToRemoteBox}
-import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.forwarding.ForwardingProtocol._
 import se.nimsa.sbx.log.SbxLog
-import se.nimsa.sbx.metadata.MetaDataProtocol.{DeleteMetaData, GetImage}
+import se.nimsa.sbx.metadata.MetaDataProtocol.DeleteMetaData
 import se.nimsa.sbx.scu.ScuProtocol.SendImagesToScp
 import se.nimsa.sbx.storage.StorageService
-import se.nimsa.sbx.util.SbxExtensions._
 
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
@@ -87,25 +85,20 @@ class ForwardingActor(rule: ForwardingRule, transaction: ForwardingTransaction, 
 
   def doDelete(): Future[Seq[Long]] = {
 
-    val futureDeletedImageIds = Future.sequence {
-      images.map(_.imageId).map { imageId =>
-        metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]].map { imageMaybe =>
-          imageMaybe.map { image =>
-            metaDataService.ask(DeleteMetaData(image))
-              .map { _ =>
-                system.eventStream.publish(ImageDeleted(image.id))
-                storage.deleteFromStorage(image)
-                image.id
-              }
-            }
-          }.unwrap
+    val futureDeletedImageIds = {
+      val imageIds = images.map(_.imageId)
+      metaDataService.ask(DeleteMetaData(imageIds))
+        .map { _ =>
+          storage.deleteFromStorage(imageIds)
+          system.eventStream.publish(ImagesDeleted(imageIds))
+          imageIds
         }
-      }.map(_.flatten)
+    }
 
     futureDeletedImageIds.onComplete {
-      case Success(_) =>
       case Failure(e) =>
         SbxLog.error("Forwarding", "Could not delete images after transfer: " + e.getMessage)
+      case _ =>
     }
 
     futureDeletedImageIds

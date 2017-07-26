@@ -16,8 +16,6 @@
 
 package se.nimsa.sbx.app
 
-import se.nimsa.sbx.dicom.DicomHierarchy.Image
-
 object GeneralProtocol {
   
   sealed trait SourceType {
@@ -75,9 +73,9 @@ object GeneralProtocol {
   
   case class Destination(destinationType: DestinationType, destinationName: String, destinationId: Long)
 
-  case class ImageAdded(image: Image, source: Source, overwrite: Boolean)
+  case class ImageAdded(imageId: Long, source: Source, overwrite: Boolean)
 
-  case class ImageDeleted(imageId: Long)
+  case class ImagesDeleted(imageIds: Seq[Long])
 
   case class ImagesSent(destination: Destination, imageIds: Seq[Long])
 

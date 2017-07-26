@@ -6,7 +6,7 @@ import akka.testkit.{ImplicitSender, TestKit}
 import akka.util.Timeout
 import org.scalatest._
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
-import se.nimsa.sbx.app.GeneralProtocol.ImageDeleted
+import se.nimsa.sbx.app.GeneralProtocol.ImagesDeleted
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomPropertyValue._
@@ -279,7 +279,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
       expectMsgType[IncomingUpdated]
 
       await(boxDao.listIncomingImages).size should be(2)
-      boxService ! ImageDeleted(4)
+      boxService ! ImagesDeleted(Seq(4))
       expectNoMsg
       await(boxDao.listIncomingImages).size should be(1)
     }
@@ -295,7 +295,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
       expectMsgType[ImagesAddedToOutgoing]
 
       await(boxDao.listOutgoingImages).size should be(3)
-      boxService ! ImageDeleted(i2.id)
+      boxService ! ImagesDeleted(Seq(i2.id))
       expectNoMsg
       await(boxDao.listOutgoingImages).size should be(2)
     }

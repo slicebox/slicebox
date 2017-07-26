@@ -247,8 +247,8 @@ class ForwardingDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
         .result
     }
 
-  def removeTransactionImagesForImageId(imageId: Long): Future[Unit] = db.run {
-    transactionImageQuery.filter(_.imageId === imageId).delete.map(_ => {})
+  def removeTransactionImagesForImageIds(imageIds: Seq[Long]): Future[Unit] = db.run {
+    transactionImageQuery.filter(_.imageId inSetBind imageIds).delete.map(_ => {})
   }
 
   def addImageToForwardingQueue(transactionId: Long, imageId: Long): Future[ForwardingTransactionImage] = {

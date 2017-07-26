@@ -107,7 +107,7 @@ trait ImportRoutes {
         onComplete(futureImport) {
           case Success(metaData) =>
             onSuccess(importService.ask(AddImageToSession(importSession.id, metaData.image, !metaData.imageAdded)).mapTo[ImageAddedToSession]) { _ =>
-              system.eventStream.publish(ImageAdded(metaData.image, source, !metaData.imageAdded))
+              system.eventStream.publish(ImageAdded(metaData.image.id, source, !metaData.imageAdded))
               val httpStatus = if (metaData.imageAdded) Created else OK
               complete((httpStatus, metaData.image))
             }

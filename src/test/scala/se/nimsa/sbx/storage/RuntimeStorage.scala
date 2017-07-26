@@ -3,7 +3,7 @@ package se.nimsa.sbx.storage
 import akka.stream.scaladsl.{Sink, Source}
 import akka.util.ByteString
 import akka.{Done, NotUsed}
-import se.nimsa.sbx.dicom.DicomHierarchy.Image
+import se.nimsa.sbx.lang.NotFoundException
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -13,7 +13,7 @@ class RuntimeStorage extends StorageService {
 
   val storage = mutable.Map.empty[String, ByteString]
 
-  override def deleteFromStorage(name: String): Unit = storage.remove(name)
+  override def deleteByName(names: Seq[String]): Unit = names.map(name => storage.remove(name))
 
   def clear() = storage.clear()
 
@@ -36,6 +36,7 @@ class RuntimeStorage extends StorageService {
         }
       }
 
-  override def fileSource(image: Image): Source[ByteString, NotUsed] = Source.single(storage(imageName(image)))
+  override def fileSource(imageId: Long): Source[ByteString, NotUsed] =
+    Source.single(storage.getOrElse(imageName(imageId), throw new NotFoundException(s"No data for image id $imageId")))
 
 }

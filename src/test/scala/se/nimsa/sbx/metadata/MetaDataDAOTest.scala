@@ -77,22 +77,6 @@ class MetaDataDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterAll
     }
   }
 
-  it should "cascade delete linked studies, series and images when a patient is deleted" in {
-    for {
-      dbPat <- dao.patientByNameAndID(pat1)
-      _ <- dao.deletePatient(dbPat.get.id)
-      images <- dao.images
-      series <- dao.series
-      studies <- dao.studies
-      patients <- dao.patients(0, 20, None, orderAscending = false, None)
-    } yield {
-      images.size should be(0)
-      series.size should be(0)
-      studies.size should be(0)
-      patients.size should be(0)
-    }
-  }
-
   it should "not support adding a study which links to a non-existing patient" in {
     recoverToSucceededIf[JdbcSQLException] {
       dao.insert(study1)
@@ -101,6 +85,7 @@ class MetaDataDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterAll
 
   it should "return the correct number of entities by each category" in {
     for {
+      _ <- dao.clear()
       dbPat <- dao.insert(pat1)
       dbStudy1 <- dao.insert(study1.copy(patientId = dbPat.id))
       dbStudy2 <- dao.insert(study2.copy(patientId = dbPat.id))
@@ -362,59 +347,6 @@ class MetaDataDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterAll
       }
 
       succeed
-    }
-  }
-
-  it should "remove empty patients when fully deleting a study" in {
-    for {
-      p1 <- dao.patients
-      s1 <- dao.studies.map(_.head)
-      _ <- dao.deleteFully(s1)
-      p2 <- dao.patients
-      s2 <- dao.studies.map(_.head)
-      _ <- dao.deleteFully(s2)
-      p3 <- dao.patients
-    } yield {
-      p1 should have length 1
-      p2 should have length 1
-      p3 shouldBe empty
-    }
-  }
-
-  it should "remove empty studies and patients when fully deleting a series" in {
-    for {
-      dbPat <- dao.insert(pat1)
-      dbStudy1 <- dao.insert(study1.copy(patientId = dbPat.id))
-      dbStudy2 <- dao.insert(study2.copy(patientId = dbPat.id))
-      dbSeries1 <- dao.insert(series1.copy(studyId = dbStudy1.id))
-      dbSeries2 <- dao.insert(series2.copy(studyId = dbStudy2.id))
-      dbSeries3 <- dao.insert(series3.copy(studyId = dbStudy1.id))
-      dbSeries4 <- dao.insert(series4.copy(studyId = dbStudy2.id))
-      p1 <- dao.patients
-      s1 <- dao.studies
-      _ <- dao.deleteFully(dbSeries1)
-      p2 <- dao.patients
-      s2 <- dao.studies
-      _ <- dao.deleteFully(dbSeries3)
-      p3 <- dao.patients
-      s3 <- dao.studies
-      _ <- dao.deleteFully(dbSeries2)
-      p4 <- dao.patients
-      s4 <- dao.studies
-      _ <- dao.deleteFully(dbSeries4)
-      p5 <- dao.patients
-      s5 <- dao.studies
-    } yield {
-      p1 should have length 1
-      s1 should have length 2
-      p2 should have length 1
-      s2 should have length 2
-      p3 should have length 1
-      s3 should have length 1
-      p4 should have length 1
-      s4 should have length 1
-      p5 should have length 0
-      s5 should have length 0
     }
   }
 

@@ -172,8 +172,8 @@ class SeriesTypeDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
     seriesSeriesTypes.filter(_.seriesId === seriesId).result
   }
 
-  def removeSeriesTypesForSeriesId(seriesId: Long): Future[Unit] = db.run {
-    seriesSeriesTypes.filter(_.seriesId === seriesId).delete
+  def removeSeriesTypesForSeriesIds(seriesIds: Seq[Long]): Future[Unit] = db.run {
+    seriesSeriesTypes.filter(_.seriesId inSetBind seriesIds).delete
   }.map(_ => Unit)
 
   def removeSeriesTypeForSeriesId(seriesId: Long, seriesTypeId: Long): Future[Unit] = db.run {

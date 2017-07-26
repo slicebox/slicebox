@@ -72,7 +72,7 @@ class ScpActor(scpData: ScpData, storage: StorageService, executor: Executor,
 
       addDicomDataFuture.onComplete {
         case Success(metaData) =>
-          system.eventStream.publish(ImageAdded(metaData.image, source, !metaData.imageAdded))
+          system.eventStream.publish(ImageAdded(metaData.image.id, source, !metaData.imageAdded))
         case Failure(e) =>
           SbxLog.error("SCP", s"Could not add file: ${e.getMessage}")
       }

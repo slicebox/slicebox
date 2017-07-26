@@ -22,7 +22,7 @@ import java.net.{ConnectException, NoRouteToHostException, UnknownHostException}
 import akka.NotUsed
 import akka.actor.{Actor, Props}
 import akka.event.{Logging, LoggingReceive}
-import akka.pattern.{ask, pipe}
+import akka.pattern.pipe
 import akka.stream.Materializer
 import akka.stream.scaladsl.Source
 import akka.util.Timeout
@@ -30,16 +30,12 @@ import org.dcm4che3.net.{IncompatibleConnectionException, NoPresentationContextE
 import se.nimsa.dcm4che.streams.DicomPartFlow
 import se.nimsa.dcm4che.streams.DicomParts.DicomPart
 import se.nimsa.sbx.app.GeneralProtocol._
-import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.lang.{BadGatewayException, NotFoundException}
 import se.nimsa.sbx.log.SbxLog
-import se.nimsa.sbx.metadata.MetaDataProtocol.GetImage
 import se.nimsa.sbx.scu.ScuProtocol._
 import se.nimsa.sbx.storage.StorageService
 import se.nimsa.sbx.util.ExceptionCatching
 import se.nimsa.sbx.util.FutureUtil.await
-
-import scala.concurrent.Future
 
 class ScuServiceActor(scuDao: ScuDAO, storage: StorageService)(implicit materializer: Materializer, timeout: Timeout) extends Actor with ExceptionCatching {
   val log = Logging(context.system, this)
@@ -47,16 +43,11 @@ class ScuServiceActor(scuDao: ScuDAO, storage: StorageService)(implicit material
   implicit val system = context.system
   implicit val ec = context.dispatcher
 
-  val metaDataService = context.actorSelection("../MetaDataService")
   val storageService = context.actorSelection("../StorageService")
 
   val dicomDataProvider = new DicomDataProvider {
-    override def getDicomData(imageId: Long, stopTag: Option[Int]): Future[Source[DicomPart, NotUsed]] =
-      metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]]
-        .map(imageMaybe =>
-          imageMaybe
-            .map(image => storage.fileSource(image).via(new DicomPartFlow(stopTag = stopTag)))
-            .getOrElse(Source.empty))
+    override def getDicomData(imageId: Long, stopTag: Option[Int]): Source[DicomPart, NotUsed] =
+      storage.fileSource(imageId).via(new DicomPartFlow(stopTag = stopTag))
   }
 
   log.info("SCU service started")

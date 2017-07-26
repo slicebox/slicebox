@@ -17,7 +17,6 @@
 package se.nimsa.sbx.forwarding
 
 import se.nimsa.sbx.app.GeneralProtocol._
-import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.model.Entity
 
 object ForwardingProtocol {
@@ -54,7 +53,7 @@ object ForwardingProtocol {
   case class UpdateTransaction(transaction: ForwardingTransaction)
 
 
-  case class ImageRegisteredForForwarding(image: Image, applicableRules: Seq[ForwardingRule])
+  case class ImageRegisteredForForwarding(imageId: Long, applicableRules: Seq[ForwardingRule])
   
   case class TransactionsEnroute(transactions: Seq[ForwardingTransaction])
   

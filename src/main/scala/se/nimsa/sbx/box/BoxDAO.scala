@@ -411,12 +411,12 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
     join.filter(_._1.id === outgoingTransactionId).map(_._2).result
   }
 
-  def removeOutgoingImagesForImageId(imageId: Long) = db.run {
-    outgoingImageQuery.filter(_.imageId === imageId).delete
+  def removeOutgoingImagesForImageIds(imageIds: Seq[Long]) = db.run {
+    outgoingImageQuery.filter(_.imageId inSetBind imageIds).delete
   }
 
-  def removeIncomingImagesForImageId(imageId: Long) = db.run {
-    incomingImageQuery.filter(_.imageId === imageId).delete
+  def removeIncomingImagesForImageIds(imageIds: Seq[Long]) = db.run {
+    incomingImageQuery.filter(_.imageId inSetBind imageIds).delete
   }
 
   def updateTransactionsStatusAction(now: Long, pollBoxOnlineStatusTimeoutMillis: Long) = {

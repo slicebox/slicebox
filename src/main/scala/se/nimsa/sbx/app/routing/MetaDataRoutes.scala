@@ -26,7 +26,7 @@ import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 
-trait MetadataRoutes {
+trait MetaDataRoutes {
   this: SliceboxBase =>
 
   def metaDataRoutes: Route =
