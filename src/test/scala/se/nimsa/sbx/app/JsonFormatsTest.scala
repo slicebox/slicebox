@@ -5,7 +5,7 @@ import play.api.libs.json.Json
 import se.nimsa.dcm4che.streams.TagPath
 import se.nimsa.dcm4che.streams.TagPath.TagPathTag
 
-class JsonFormatTest extends FlatSpec with Matchers with JsonFormats {
+class JsonFormatsTest extends FlatSpec with Matchers with JsonFormats {
 
   "The JSON representation of a tag path" should "be valid" in {
     val tagPath = TagPath.fromSequence(1, 1).thenSequence(2).thenTag(3)
@@ -18,8 +18,7 @@ class JsonFormatTest extends FlatSpec with Matchers with JsonFormats {
         |    "item" : "*",
         |    "previous" : {
         |      "tag" : 1,
-        |      "item" : "1",
-        |      "previous" : null
+        |      "item" : "1"
         |    }
         |  }
         |}""".stripMargin
@@ -33,8 +32,7 @@ class JsonFormatTest extends FlatSpec with Matchers with JsonFormats {
         |  "item" : "6",
         |  "previous" : {
         |    "tag" : 4,
-        |    "item" : "*",
-        |    "previous" : null
+        |    "item" : "*"
         |  }
         |}""".stripMargin
   }

@@ -132,7 +132,7 @@ trait DicomStreamOps {
     val futureSource =
       callMetaDataService[Option[Image]](GetImage(imageId)).flatMap { imageMaybe =>
         imageMaybe.map { image =>
-          callMetaDataService[Option[Source](GetSourceForSeries(image.seriesId))
+          callMetaDataService[Option[Source]](GetSourceForSeries(image.seriesId))
         }.unwrap
       }.map(_.getOrElse(Source(SourceType.UNKNOWN, SourceType.UNKNOWN.toString, -1)))
     futureSource.map { source =>
@@ -145,7 +145,7 @@ trait DicomStreamOps {
             storage.deleteFromStorage(Seq(imageId))
             // TODO events
             // TODO tags
-
+            null
           }
         }
     }

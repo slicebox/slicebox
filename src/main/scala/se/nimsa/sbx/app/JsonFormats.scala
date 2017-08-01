@@ -48,7 +48,7 @@ trait JsonFormats {
   private lazy val tagPathSequenceReads: Reads[TagPathSequence] = (
     (__ \ "tag").read[Int] and
       (__ \ "item").read[String] and
-      (__ \ "previous").lazyRead(Reads.optionWithNull[TagPathSequence](tagPathSequenceReads))
+      (__ \ "previous").lazyReadNullable[TagPathSequence](tagPathSequenceReads)
     ) ((tag, itemString, previous) => {
     val item = try Option(Integer.parseInt(itemString)) catch { case _: Throwable => None }
     previous
@@ -58,18 +58,18 @@ trait JsonFormats {
 
   private lazy val tagPathTagReads: Reads[TagPathTag] = (
     (__ \ "tag").read[Int] and
-      (__ \ "previous").lazyRead(Reads.optionWithNull[TagPathSequence](tagPathSequenceReads))
+      (__ \ "previous").lazyReadNullable[TagPathSequence](tagPathSequenceReads)
     ) ((tag, previous) => previous.map(p => p.thenTag(tag)).getOrElse(TagPath.fromTag(tag)))
 
   private lazy val tagPathSequenceWrites: Writes[TagPathSequence] = (
     (__ \ "tag").write[Int] and
       (__ \ "item").write[String] and
-      (__ \ "previous").lazyWrite(Writes.optionWithNull[TagPathSequence](tagPathSequenceWrites))
+      (__ \ "previous").lazyWriteNullable[TagPathSequence](tagPathSequenceWrites)
     ) (tagPath => (tagPath.tag, tagPath.item.map(_.toString).getOrElse("*"), tagPath.previous))
 
   private lazy val tagPathTagWrites: Writes[TagPathTag] = (
     (__ \ "tag").write[Int] and
-      (__ \ "previous").write(Writes.optionWithNull[TagPathSequence](tagPathSequenceWrites))
+      (__ \ "previous").writeNullable[TagPathSequence](tagPathSequenceWrites)
     ) (tagPath => (tagPath.tag, tagPath.previous))
 
   implicit lazy val tagPathSequenceFormat = Format(tagPathSequenceReads, tagPathSequenceWrites)
