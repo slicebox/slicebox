@@ -10,7 +10,7 @@ import akka.testkit.TestKit
 import akka.util.{ByteString, Timeout}
 import org.dcm4che3.data.{Attributes, Tag, UID}
 import org.dcm4che3.io.{DicomOutputStream, DicomStreamException}
-import org.scalatest.{AsyncFlatSpecLike, Matchers}
+import org.scalatest.{AsyncFlatSpecLike, BeforeAndAfterAll, Matchers}
 import se.nimsa.dcm4che.streams.{DicomAttributesSink, DicomFlows, DicomPartFlow}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.TagValue
 import se.nimsa.sbx.dicom.{Contexts, DicomData}
@@ -20,13 +20,15 @@ import se.nimsa.sbx.util.TestUtil
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 
-class DicomStreamOpsTest extends TestKit(ActorSystem("AnonymizationFlowSpec")) with AsyncFlatSpecLike with Matchers {
+class DicomStreamOpsTest extends TestKit(ActorSystem("AnonymizationFlowSpec")) with AsyncFlatSpecLike with Matchers with BeforeAndAfterAll {
 
   import DicomTestData._
 
   implicit val materializer = ActorMaterializer()
   implicit val ec = system.dispatcher
   implicit val timeout = Timeout(30.seconds)
+
+  override def afterAll = TestKit.shutdownActorSystem(system)
 
   val storage = new RuntimeStorage
 
@@ -211,4 +213,5 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("AnonymizationFlowSpec")) w
       keysPart.allKeys shouldBe empty
     }
   }
+
 }

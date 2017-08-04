@@ -8,7 +8,7 @@ import akka.stream.testkit.scaladsl.TestSink
 import akka.testkit.TestKit
 import akka.util.ByteString
 import org.dcm4che3.data.{Attributes, Tag, UID, VR}
-import org.scalatest.{FlatSpecLike, Matchers}
+import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 import se.nimsa.dcm4che.streams.DicomModifyFlow.TagModification
 import se.nimsa.dcm4che.streams.DicomParts.{DicomAttributes, DicomPart}
 import se.nimsa.dcm4che.streams._
@@ -19,12 +19,14 @@ import se.nimsa.sbx.util.TestUtil._
 import scala.concurrent.Await
 import scala.concurrent.duration.DurationInt
 
-class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymizationFlowSpec")) with FlatSpecLike with Matchers {
+class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymizationFlowSpec")) with FlatSpecLike with Matchers with BeforeAndAfterAll {
 
   import DicomTestData._
 
   implicit val materializer = ActorMaterializer()
   implicit val ec = system.dispatcher
+
+  override def afterAll = TestKit.shutdownActorSystem(system)
 
   def attributesSource(dicomData: DicomData): Source[DicomPart, NotUsed] = {
     val bytes = ByteString(TestUtil.toByteArray(dicomData))
