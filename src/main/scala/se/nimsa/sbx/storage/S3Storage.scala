@@ -80,10 +80,10 @@ class S3Storage(val bucket: String, val s3Prefix: String, val region: String)(im
   override def fileSink(name: String)(implicit executionContext: ExecutionContext): Sink[ByteString, Future[Done]] =
     S3Client(credentialsFromProviderChain(), region).multipartUpload(bucket, name).mapMaterializedValue(_.map(_ => Done))
 
-  override def fileSource(imageId: Long): Source[ByteString, NotUsed] =
-    S3Client(credentialsFromProviderChain(), region).download(bucket, s3Id(imageName(imageId))).mapError {
+  override def fileSource(name: String): Source[ByteString, NotUsed] =
+    S3Client(credentialsFromProviderChain(), region).download(bucket, s3Id(name)).mapError {
       // we do not have access to http status code here so not much we can do but map everything to NotFound
-      case e: S3Exception => new NotFoundException(s"Data could not be transferred for image id $imageId: ${e.getMessage}")
+      case e: S3Exception => new NotFoundException(s"Data could not be transferred for name $name: ${e.getMessage}")
     }
 
 }
