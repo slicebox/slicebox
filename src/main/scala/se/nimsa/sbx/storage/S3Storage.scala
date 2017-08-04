@@ -19,8 +19,7 @@ package se.nimsa.sbx.storage
 import akka.actor.ActorSystem
 import akka.stream.Materializer
 import akka.stream.alpakka.s3.S3Exception
-import akka.stream.alpakka.s3.auth.BasicCredentials
-import akka.stream.alpakka.s3.auth.{AWSSessionCredentials => AlpakkaSessionCredentials}
+import akka.stream.alpakka.s3.auth.{AWSSessionCredentials => AlpakkaSessionCredentials, BasicCredentials => AlpakkaBasicCredentials}
 import akka.stream.alpakka.s3.scaladsl.S3Client
 import akka.stream.scaladsl.{Sink, Source}
 import akka.util.ByteString
@@ -57,7 +56,7 @@ class S3Storage(val bucket: String, val s3Prefix: String, val region: String)(im
     val creds = providerChain.getCredentials
     creds match {
       case sc: AWSSessionCredentials => AlpakkaSessionCredentials(sc.getAWSAccessKeyId, sc.getAWSSecretKey, sc.getSessionToken)
-      case _ => BasicCredentials(creds.getAWSAccessKeyId, creds.getAWSSecretKey)
+      case _ => AlpakkaBasicCredentials(creds.getAWSAccessKeyId, creds.getAWSSecretKey)
     }
   }
 
