@@ -16,6 +16,9 @@
 
 package se.nimsa.sbx.app
 
+import java.util.Base64
+
+import akka.util.ByteString
 import se.nimsa.dcm4che.streams.TagPath
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.app.GeneralProtocol._
@@ -74,6 +77,17 @@ trait JsonFormats {
 
   implicit lazy val tagPathSequenceFormat = Format(tagPathSequenceReads, tagPathSequenceWrites)
   implicit lazy val tagPathTagFormat = Format(tagPathTagReads, tagPathTagWrites)
+
+  implicit val tagMappingFormat = Format[TagMapping](
+    (
+      (__ \ "tagPath").read[TagPathTag] and
+      (__ \ "value").read[String]) ((tagPath, valueString) => TagMapping(tagPath, ByteString(Base64.getDecoder.decode(valueString)))
+    ),
+    (
+      (__ \ "tagPath").write[TagPathTag] and
+      (__ \ "value").write[String]) (tagMapping => (tagMapping.tagPath, Base64.getEncoder.encodeToString(tagMapping.value.toArray))
+    )
+  )
 
   implicit val unWatchDirectoryFormat: Format[UnWatchDirectory] = Json.format[UnWatchDirectory]
   implicit val watchedDirectoryFormat: Format[WatchedDirectory] = Json.format[WatchedDirectory]
