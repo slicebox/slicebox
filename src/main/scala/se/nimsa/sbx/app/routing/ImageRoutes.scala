@@ -85,10 +85,10 @@ trait ImageRoutes {
             'windowmax.as[Int] ? 0,
             'imageheight.as[Int] ? 0)) { (frameNumber, min, max, height) =>
             get {
-              onComplete(Future(storage.readPngImageData(imageId, frameNumber, min, max, height))) {
+              onComplete(storage.readPngImageData(imageId, frameNumber, min, max, height)) {
                 case Success(bytes) => complete(HttpEntity(`image/png`, bytes))
                 case Failure(_: NotFoundException) => complete(NotFound)
-                case Failure(_)  => complete(NotImplemented)
+                case Failure(_) => complete(NotImplemented)
               }
             }
           }
