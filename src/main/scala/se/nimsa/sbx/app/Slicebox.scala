@@ -17,6 +17,7 @@
 package se.nimsa.sbx.app
 
 import java.nio.file.Paths
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit.MILLISECONDS
 
 import akka.actor.ActorSystem
@@ -44,7 +45,7 @@ import slick.basic.DatabaseConfig
 import slick.jdbc.JdbcProfile
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
-import scala.concurrent.{Await, ExecutionContextExecutor}
+import scala.concurrent.{Await, ExecutionContext, ExecutionContextExecutor}
 import scala.reflect.ClassTag
 import scala.util.{Failure, Success}
 
@@ -146,6 +147,9 @@ trait SliceboxBase extends SliceboxRoutes with DicomStreamOps with JsonFormats w
   override def callAnonymizationService[R: ClassTag](message: Any) = anonymizationService.ask(message).mapTo[R]
   override def callMetaDataService[R: ClassTag](message: Any) = metaDataService.ask(message).mapTo[R]
   override def scheduleTask(delay: FiniteDuration)(task: => Unit) = system.scheduler.scheduleOnce(delay)(task)
+
+  // special context for blocking IO
+  val blockingIoContext = ExecutionContext.fromExecutorService(Executors.newFixedThreadPool(4))
 
 }
 
