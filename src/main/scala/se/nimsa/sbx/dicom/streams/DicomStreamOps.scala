@@ -1,5 +1,7 @@
 package se.nimsa.sbx.dicom.streams
 
+import java.nio.file.FileAlreadyExistsException
+
 import akka.actor.Cancellable
 import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Merge, Sink, Source => StreamSource}
 import akka.stream.{FlowShape, Materializer, SinkShape}
@@ -80,7 +82,8 @@ trait DicomStreamOps {
       case (_, maybeDataset) =>
         val attributes: Attributes = maybeDataset.getOrElse(throw new DicomStreamException("DICOM data has no dataset"))
         callMetaDataService[MetaDataAdded](AddMetaData(attributes, source)).map { metaDataAdded =>
-          storage.move(tempPath, s"${metaDataAdded.image.id}")
+          if (metaDataAdded.imageAdded)
+            storage.move(tempPath, s"${metaDataAdded.image.id}")
           metaDataAdded
         }
     }.recover {
