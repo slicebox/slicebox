@@ -20,13 +20,14 @@ import akka.actor.ActorSystem
 import akka.stream.Materializer
 import akka.stream.alpakka.s3.S3Exception
 import akka.stream.alpakka.s3.auth.{AWSSessionCredentials => AlpakkaSessionCredentials, BasicCredentials => AlpakkaBasicCredentials}
+import akka.stream.alpakka.s3.impl.{S3Headers, ServerSideEncryption}
 import akka.stream.alpakka.s3.scaladsl.S3Client
 import akka.stream.scaladsl.{Sink, Source}
 import akka.util.ByteString
 import akka.{Done, NotUsed}
 import com.amazonaws.auth.{AWSSessionCredentials, DefaultAWSCredentialsProviderChain}
 import com.amazonaws.services.s3.AmazonS3ClientBuilder
-import com.amazonaws.services.s3.model.DeleteObjectsRequest
+import com.amazonaws.services.s3.model.{CopyObjectRequest, DeleteObjectsRequest, ObjectMetadata}
 import com.amazonaws.{ClientConfiguration, Protocol}
 import se.nimsa.sbx.lang.NotFoundException
 
@@ -63,7 +64,11 @@ class S3Storage(val bucket: String, val s3Prefix: String, val region: String)(im
   private def s3Id(imageName: String): String = s3Prefix + "/" + imageName
 
   override def move(sourceImageName: String, targetImageName: String) = {
-    s3.copyObject(bucket, sourceImageName, bucket, s3Id(targetImageName))
+    val request = new CopyObjectRequest(bucket, sourceImageName, bucket,  s3Id(targetImageName))
+    val metadata = new ObjectMetadata()
+    metadata.setSSEAlgorithm(ObjectMetadata.AES_256_SERVER_SIDE_ENCRYPTION)
+    request.setNewObjectMetadata(metadata)
+    s3.copyObject(request)
     s3.deleteObject(bucket, sourceImageName)
   }
 
@@ -78,7 +83,7 @@ class S3Storage(val bucket: String, val s3Prefix: String, val region: String)(im
     }
 
   override def fileSink(name: String)(implicit executionContext: ExecutionContext): Sink[ByteString, Future[Done]] =
-    S3Client(credentialsFromProviderChain(), region).multipartUpload(bucket, name).mapMaterializedValue(_.map(_ => Done))
+    S3Client(credentialsFromProviderChain(), region).multipartUploadWithHeaders(bucket, name, s3Headers = Some(S3Headers(ServerSideEncryption.AES256))).mapMaterializedValue(_.map(_ => Done))
 
   override def fileSource(imageId: Long): Source[ByteString, NotUsed] =
     S3Client(credentialsFromProviderChain(), region).download(bucket, s3Id(imageName(imageId))).mapError {
