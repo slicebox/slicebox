@@ -16,9 +16,10 @@
 
 package se.nimsa.sbx.app.routing
 
+import java.util.concurrent.TimeUnit
+
 import scala.concurrent.Await
 import scala.concurrent.duration.DurationInt
-
 import akka.actor.PoisonPill
 import akka.pattern.ask
 import akka.pattern.gracefulStop
@@ -48,6 +49,11 @@ trait GeneralRoutes {
               val stop =
                 gracefulStop(forwardingService, 5.seconds, PoisonPill) andThen { case _ => gracefulStop(importService, 5.seconds, PoisonPill) } andThen { case _ => gracefulStop(directoryService, 5.seconds, PoisonPill) } andThen { case _ => gracefulStop(scpService, 5.seconds, PoisonPill) } andThen { case _ => gracefulStop(scuService, 5.seconds, PoisonPill) } andThen { case _ => gracefulStop(seriesTypeService, 5.seconds, PoisonPill) } andThen { case _ => gracefulStop(logService, 5.seconds, PoisonPill) } andThen { case _ => gracefulStop(storageService, 5.seconds, PoisonPill) } andThen { case _ => gracefulStop(metaDataService, 5.seconds, PoisonPill) } andThen { case _ => gracefulStop(boxService, 5.seconds, PoisonPill) } andThen { case _ => gracefulStop(anonymizationService, 5.seconds, PoisonPill) } andThen { case _ => gracefulStop(userService, 5.seconds, PoisonPill) }
               Await.ready(stop, 5.seconds)
+
+              blockingIoContext.shutdown()
+              if (!blockingIoContext.awaitTermination(5, TimeUnit.SECONDS)) {
+                blockingIoContext.shutdownNow //try to drop tasks
+              }
 
               system.scheduler.scheduleOnce(1.second)(system.terminate())
               "Shutting down in 1 second..."

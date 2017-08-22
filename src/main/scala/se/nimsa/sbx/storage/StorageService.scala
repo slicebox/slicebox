@@ -19,7 +19,6 @@ package se.nimsa.sbx.storage
 import java.awt.RenderingHints
 import java.awt.image.BufferedImage
 import java.io.ByteArrayOutputStream
-import java.util.concurrent.Executors
 import javax.imageio.stream.ImageInputStream
 import javax.imageio.{ImageIO, ImageReader}
 
@@ -31,6 +30,7 @@ import com.typesafe.scalalogging.LazyLogging
 import org.dcm4che3.data.Tag
 import org.dcm4che3.imageio.plugins.dcm.DicomImageReadParam
 import se.nimsa.dcm4che.streams.{DicomAttributesSink, DicomFlows, DicomPartFlow}
+import se.nimsa.sbx.app.Slicebox
 import se.nimsa.sbx.dicom.ImageAttribute
 import se.nimsa.sbx.dicom.streams.DicomStreamOps
 import se.nimsa.sbx.lang.NotFoundException
@@ -95,8 +95,7 @@ trait StorageService extends LazyLogging {
     }
 
     // imageReader.read is blocking, needs to be run outside streams execution context
-    val blockingIoContext = ExecutionContext.fromExecutorService(Executors.newFixedThreadPool(2))
-    readAndScale(frameNumber, imageHeight, imageReader, param, iis)(blockingIoContext)
+    readAndScale(frameNumber, imageHeight, imageReader, param, iis)(Slicebox.blockingIoContext)
   }
 
   // used to wrap blocking read into future
