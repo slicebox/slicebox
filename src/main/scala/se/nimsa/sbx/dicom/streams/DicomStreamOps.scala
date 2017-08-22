@@ -1,7 +1,5 @@
 package se.nimsa.sbx.dicom.streams
 
-import java.nio.file.FileAlreadyExistsException
-
 import akka.actor.Cancellable
 import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Merge, Sink, Source => StreamSource}
 import akka.stream.{FlowShape, Materializer, SinkShape}
