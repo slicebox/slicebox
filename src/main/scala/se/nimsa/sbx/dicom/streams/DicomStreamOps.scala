@@ -82,8 +82,7 @@ trait DicomStreamOps {
       case (_, maybeDataset) =>
         val attributes: Attributes = maybeDataset.getOrElse(throw new DicomStreamException("DICOM data has no dataset"))
         callMetaDataService[MetaDataAdded](AddMetaData(attributes, source)).map { metaDataAdded =>
-          if (metaDataAdded.imageAdded)
-            storage.move(tempPath, s"${metaDataAdded.image.id}")
+          storage.move(tempPath, s"${metaDataAdded.image.id}")
           metaDataAdded
         }
     }.recover {
