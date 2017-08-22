@@ -19,15 +19,18 @@ package se.nimsa.sbx.storage
 import java.awt.RenderingHints
 import java.awt.image.BufferedImage
 import java.io.ByteArrayOutputStream
-import javax.imageio.ImageIO
+import javax.imageio.stream.ImageInputStream
+import javax.imageio.{ImageIO, ImageReader}
 
 import akka.stream.Materializer
 import akka.stream.scaladsl.{Sink, Source, StreamConverters}
 import akka.util.ByteString
 import akka.{Done, NotUsed}
+import com.typesafe.scalalogging.LazyLogging
 import org.dcm4che3.data.Tag
 import org.dcm4che3.imageio.plugins.dcm.DicomImageReadParam
 import se.nimsa.dcm4che.streams.{DicomAttributesSink, DicomFlows, DicomPartFlow}
+import se.nimsa.sbx.app.Slicebox
 import se.nimsa.sbx.dicom.ImageAttribute
 import se.nimsa.sbx.dicom.streams.DicomStreamOps
 import se.nimsa.sbx.lang.NotFoundException
@@ -35,10 +38,11 @@ import se.nimsa.sbx.storage.StorageProtocol.ImageInformation
 
 import scala.concurrent.{ExecutionContext, Future}
 
+
 /**
   * Created by michaelkober on 2016-04-25.
   */
-trait StorageService {
+trait StorageService extends LazyLogging {
 
   def imageName(imageId: Long) = imageId.toString
 
@@ -73,26 +77,37 @@ trait StorageService {
           }.getOrElse(ImageInformation(0, 0, 0, 0))
       }
 
-  def readPngImageData(imageId: Long, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int)(implicit materializer: Materializer): Array[Byte] = {
+  def readPngImageData(imageId: Long, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int)(implicit materializer: Materializer): Future[Array[Byte]] = {
     val source = fileSource(imageId)
     // dcm4che does not support viewing of deflated data, cf. Github issue #42
     // As a workaround, do streaming inflate and mapping of transfer syntax
     val inflatedSource = DicomStreamOps.inflatedSource(source)
     val is = inflatedSource.runWith(StreamConverters.asInputStream())
     val iis = ImageIO.createImageInputStream(is)
+
+
+    val imageReader = ImageIO.getImageReadersByFormatName("DICOM").next
+    imageReader.setInput(iis)
+    val param = imageReader.getDefaultReadParam.asInstanceOf[DicomImageReadParam]
+    if (windowMin < windowMax) {
+      param.setWindowCenter((windowMax - windowMin) / 2)
+      param.setWindowWidth(windowMax - windowMin)
+    }
+
+    // imageReader.read is blocking, needs to be run outside streams execution context
+    readAndScale(frameNumber, imageHeight, imageReader, param, iis)(Slicebox.blockingIoContext)
+  }
+
+  // used to wrap blocking read into future
+  private def readAndScale(frameNumber: Int, imageHeight: Int, imageReader: ImageReader, param: DicomImageReadParam, iis: ImageInputStream)(implicit ec: ExecutionContext) = Future {
     try {
-      val imageReader = ImageIO.getImageReadersByFormatName("DICOM").next
-      imageReader.setInput(iis)
-      val param = imageReader.getDefaultReadParam.asInstanceOf[DicomImageReadParam]
-      if (windowMin < windowMax) {
-        param.setWindowCenter((windowMax - windowMin) / 2)
-        param.setWindowWidth(windowMax - windowMin)
-      }
-      val bi = try
-        scaleImage(imageReader.read(frameNumber - 1, param), imageHeight)
-      catch {
+      val bi = try {
+        val image = imageReader.read(frameNumber - 1, param)
+        scaleImage(image, imageHeight)
+      } catch {
         case e: NotFoundException => throw e
-        case e: Exception => throw new IllegalArgumentException(e)
+        case e: Exception => logger.error("Exception:", e)
+          throw new IllegalArgumentException(e)
       }
       val baos = new ByteArrayOutputStream
       ImageIO.write(bi, "png", baos)
@@ -102,6 +117,7 @@ trait StorageService {
       iis.close()
     }
   }
+
 
   private def scaleImage(image: BufferedImage, imageHeight: Int): BufferedImage = {
     val ratio = imageHeight / image.getHeight.asInstanceOf[Double]
@@ -113,8 +129,10 @@ trait StorageService {
       g.drawImage(image, 0, 0, imageWidth, imageHeight, 0, 0, image.getWidth, image.getHeight, null)
       g.dispose()
       resized
-    } else
+    } else {
       image
+    }
+
   }
 
   /** Sink for dicom files. */
