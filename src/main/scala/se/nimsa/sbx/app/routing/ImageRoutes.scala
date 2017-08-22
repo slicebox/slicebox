@@ -89,7 +89,7 @@ trait ImageRoutes {
               onComplete(Future(storage.readPngImageData(imageId, frameNumber, min, max, height))) {
                 case Success(bytes) => complete(HttpEntity(`image/png`, bytes))
                 case Failure(_: NotFoundException) => complete(NotFound)
-                case Failure(_)  => complete(NotImplemented)
+                case Failure(_) => complete(NotImplemented)
               }
             }
           }
@@ -97,8 +97,11 @@ trait ImageRoutes {
           post {
             entity(as[Seq[TagMapping]]) { tagMappings =>
               val tagModifications = tagMappings.map(tm => TagModification(tm.tagPath, _ => tm.value, insert = true))
-              onSuccess(modifyData(imageId, tagModifications, storage)) { metaData =>
-                complete((Created, metaData.image))
+              onSuccess(modifyData(imageId, tagModifications, storage)) {
+                case (metaDataDeleted, metaDataAdded) =>
+                  system.eventStream.publish(ImagesDeleted(metaDataDeleted.imageIds))
+                  system.eventStream.publish(ImageAdded(metaDataAdded.image.id, metaDataAdded.source, !metaDataAdded.imageAdded))
+                  complete((Created, metaDataAdded.image))
               }
             }
           }

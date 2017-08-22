@@ -131,12 +131,16 @@ trait DicomStreamOps {
 
 
   def modifyData(imageId: Long, tagModifications: Seq[TagModification], storage: StorageService)
-                (implicit materializer: Materializer, ec: ExecutionContext) = {
+                (implicit materializer: Materializer, ec: ExecutionContext): Future[(MetaDataDeleted, MetaDataAdded)] = {
 
     val futureSource =
       callMetaDataService[Option[Image]](GetImage(imageId)).flatMap { imageMaybe =>
         imageMaybe.map { image =>
-          callMetaDataService[Option[Source]](GetSourceForSeries(image.seriesId))
+          callMetaDataService[Option[Source]](GetSourceForSeries(image.seriesId)).flatMap { sourceMaybe =>
+            callMetaDataService[SeriesTags](GetSeriesTagsForSeries(image.seriesId)).map { seriesTags =>
+              (sourceMaybe, seriesTags) // TODO bring series tags along and transfer them to new series
+            }
+          }
         }.unwrap
       }.map(_.getOrElse(Source(SourceType.UNKNOWN, SourceType.UNKNOWN.toString, -1)))
 
@@ -154,15 +158,12 @@ trait DicomStreamOps {
       futureModifiedTempFile.flatMap {
         case (_, maybeDataset) =>
 
-          val futureDeleted =
-            callMetaDataService[MetaDataDeleted](DeleteMetaData(Seq(imageId))).map { _ =>
-              storage.deleteFromStorage(Seq(imageId))
-            }
-
-          futureDeleted.flatMap { _ =>
-            // TODO events
+          callMetaDataService[MetaDataDeleted](DeleteMetaData(Seq(imageId))).flatMap { metaDataDeleted =>
+            storage.deleteFromStorage(Seq(imageId))
             // TODO tags
-            storeDicomData(maybeDataset, source, tempPath, storage)
+            storeDicomData(maybeDataset, source, tempPath, storage).map { metaDataAdded =>
+              (metaDataDeleted, metaDataAdded)
+            }
           }
 
       }

@@ -13,7 +13,7 @@ class RuntimeStorage extends StorageService {
 
   val storage = mutable.Map.empty[String, ByteString]
 
-  override def deleteByName(names: Seq[String]): Unit = names.map(name => storage.remove(name))
+  override def deleteByName(names: Seq[String]): Unit = names.foreach(name => storage.remove(name))
 
   def clear() = storage.clear()
 
