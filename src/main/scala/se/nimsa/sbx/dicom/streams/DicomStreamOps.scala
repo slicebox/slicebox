@@ -136,9 +136,9 @@ trait DicomStreamOps {
     val futureSourceAndTags =
       callMetaDataService[Option[Image]](GetImage(imageId)).map { imageMaybe =>
         imageMaybe.map { image =>
-          callMetaDataService[Option[Source]](GetSourceForSeries(image.seriesId)).flatMap { sourceMaybe =>
+          callMetaDataService[Option[SeriesSource]](GetSourceForSeries(image.seriesId)).flatMap { sourceMaybe =>
             callMetaDataService[SeriesTags](GetSeriesTagsForSeries(image.seriesId)).map { seriesTags =>
-              (sourceMaybe, seriesTags.seriesTags)
+              (sourceMaybe.map(_.source), seriesTags.seriesTags)
             }
           }
         }
@@ -154,31 +154,22 @@ trait DicomStreamOps {
         .map(_.bytes)
         .runWith(sink)
 
-    futureSourceAndTags.flatMap {
-      case (sourceMaybe, tags) =>
-        val source = sourceMaybe.getOrElse(Source(SourceType.UNKNOWN, SourceType.UNKNOWN.toString, -1))
-        futureModifiedTempFile.flatMap {
-          case (_, maybeDataset) =>
-
-            callMetaDataService[MetaDataDeleted](DeleteMetaData(Seq(imageId))).flatMap { metaDataDeleted =>
-              storage.deleteFromStorage(Seq(imageId))
-              storeDicomData(maybeDataset, source, tempPath, storage).flatMap { metaDataAdded =>
-                val seriesId = metaDataAdded.series.id
-                Future.sequence {
-                  tags.map { tag =>
-                    callMetaDataService[SeriesTagAddedToSeries](AddSeriesTagToSeries(tag, seriesId))
-                  }
-                }.map { _ =>
-                  (metaDataDeleted, metaDataAdded)
-                }
-              }
-            }
-
+    for {
+      (sourceMaybe, tags) <- futureSourceAndTags
+      source = sourceMaybe.getOrElse(Source(SourceType.UNKNOWN, SourceType.UNKNOWN.toString, -1))
+      (_, maybeDataset) <- futureModifiedTempFile
+      metaDataDeleted <- callMetaDataService[MetaDataDeleted](DeleteMetaData(Seq(imageId)))
+      _ = storage.deleteFromStorage(Seq(imageId))
+      metaDataAdded <- storeDicomData(maybeDataset, source, tempPath, storage)
+      seriesId = metaDataAdded.series.id
+      _ <- Future.sequence {
+        tags.map { tag =>
+          callMetaDataService[SeriesTagAddedToSeries](AddSeriesTagToSeries(tag, seriesId))
         }
-    }
+      }
+    } yield (metaDataDeleted, metaDataAdded)
 
   }
-
 
 }
 
@@ -204,7 +195,7 @@ object DicomStreamOps {
   def maybeDeflateFlow: Flow[DicomPart, DicomPart, NotUsed] = conditionalFlow(
     {
       case p: DicomMetaPart => p.transferSyntaxUid.isDefined && DicomParsing.isDeflated(p.transferSyntaxUid.get)
-    }, DicomFlows.deflateDatasetFlow, Flow.fromFunction(identity))
+    }, DicomFlows.deflateDatasetFlow, Flow.fromFunction(identity), routeADefault = false)
 
   def createTempPath() = s"tmp-${java.util.UUID.randomUUID().toString}"
 

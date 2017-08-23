@@ -94,9 +94,10 @@ trait ImageRoutes {
             }
           }
         } ~ path("modify") {
-          post {
+          put {
             entity(as[Seq[TagMapping]]) { tagMappings =>
-              val tagModifications = tagMappings.map(tm => TagModification(tm.tagPath, _ => tm.value, insert = true))
+              val tagModifications = tagMappings
+                .map(tm => TagModification(tm.tagPath, _ => DicomUtil.padToEvenLength(tm.value, tm.tagPath.tag), insert = true))
               onSuccess(modifyData(imageId, tagModifications, storage)) {
                 case (metaDataDeleted, metaDataAdded) =>
                   system.eventStream.publish(ImagesDeleted(metaDataDeleted.imageIds))
