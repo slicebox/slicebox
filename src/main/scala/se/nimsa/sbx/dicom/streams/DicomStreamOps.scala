@@ -133,16 +133,16 @@ trait DicomStreamOps {
   def modifyData(imageId: Long, tagModifications: Seq[TagModification], storage: StorageService)
                 (implicit materializer: Materializer, ec: ExecutionContext): Future[(MetaDataDeleted, MetaDataAdded)] = {
 
-    val futureSource =
-      callMetaDataService[Option[Image]](GetImage(imageId)).flatMap { imageMaybe =>
+    val futureSourceAndTags =
+      callMetaDataService[Option[Image]](GetImage(imageId)).map { imageMaybe =>
         imageMaybe.map { image =>
           callMetaDataService[Option[Source]](GetSourceForSeries(image.seriesId)).flatMap { sourceMaybe =>
             callMetaDataService[SeriesTags](GetSeriesTagsForSeries(image.seriesId)).map { seriesTags =>
-              (sourceMaybe, seriesTags) // TODO bring series tags along and transfer them to new series
+              (sourceMaybe, seriesTags.seriesTags)
             }
           }
-        }.unwrap
-      }.map(_.getOrElse(Source(SourceType.UNKNOWN, SourceType.UNKNOWN.toString, -1)))
+        }
+      }.unwrap.map(_.getOrElse((None, Seq.empty)))
 
     val tempPath = createTempPath()
     val sink = dicomDataSink(storage.fileSink(tempPath), reverseAnonymizationQuery, Contexts.extendedContexts, reverseAnonymization = false)
@@ -154,19 +154,27 @@ trait DicomStreamOps {
         .map(_.bytes)
         .runWith(sink)
 
-    futureSource.flatMap { source =>
-      futureModifiedTempFile.flatMap {
-        case (_, maybeDataset) =>
+    futureSourceAndTags.flatMap {
+      case (sourceMaybe, tags) =>
+        val source = sourceMaybe.getOrElse(Source(SourceType.UNKNOWN, SourceType.UNKNOWN.toString, -1))
+        futureModifiedTempFile.flatMap {
+          case (_, maybeDataset) =>
 
-          callMetaDataService[MetaDataDeleted](DeleteMetaData(Seq(imageId))).flatMap { metaDataDeleted =>
-            storage.deleteFromStorage(Seq(imageId))
-            // TODO tags
-            storeDicomData(maybeDataset, source, tempPath, storage).map { metaDataAdded =>
-              (metaDataDeleted, metaDataAdded)
+            callMetaDataService[MetaDataDeleted](DeleteMetaData(Seq(imageId))).flatMap { metaDataDeleted =>
+              storage.deleteFromStorage(Seq(imageId))
+              storeDicomData(maybeDataset, source, tempPath, storage).flatMap { metaDataAdded =>
+                val seriesId = metaDataAdded.series.id
+                Future.sequence {
+                  tags.map { tag =>
+                    callMetaDataService[SeriesTagAddedToSeries](AddSeriesTagToSeries(tag, seriesId))
+                  }
+                }.map { _ =>
+                  (metaDataDeleted, metaDataAdded)
+                }
+              }
             }
-          }
 
-      }
+        }
     }
 
   }
