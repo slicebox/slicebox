@@ -15,12 +15,12 @@ import se.nimsa.dcm4che.streams.DicomModifyFlow.TagModification
 import se.nimsa.dcm4che.streams.{DicomAttributesSink, DicomFlows, DicomPartFlow, TagPath}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.app.GeneralProtocol.{Source, SourceType}
-import se.nimsa.sbx.dicom.DicomHierarchy.{Image, Patient, Series, Study}
+import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.DicomPropertyValue._
+import se.nimsa.sbx.dicom.DicomUtil._
 import se.nimsa.sbx.dicom.{Contexts, DicomData}
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.storage.RuntimeStorage
-import se.nimsa.sbx.dicom.DicomUtil._
 import se.nimsa.sbx.util.TestUtil
 
 import scala.concurrent.Future
@@ -39,13 +39,12 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("AnonymizationFlowSpec")) w
 
 
   class DicomStreamOpsImpl extends DicomStreamOps {
-    val source = Source(SourceType.USER, "John", 1)
-    val seriesTag = SeriesTag(21, "tag1")
+    import scala.collection.mutable
+
     val anonKey = TestUtil.createAnonymizationKey(TestUtil.createDicomData().attributes)
-    val patient = Patient(1, PatientName("p1"), PatientID("s1"), PatientBirthDate("2000-01-01"), PatientSex("M"))
-    val study = Study(1, 1, StudyInstanceUID("stuid1"), StudyDescription("stdesc1"), StudyDate("19990101"), StudyID("stid1"), AccessionNumber("acc1"), PatientAge("12Y"))
-    val series = Series(1, 1, SeriesInstanceUID("seuid1"), SeriesDescription("sedesc1"), SeriesDate("19990101"), Modality("NM"), ProtocolName("prot1"), BodyPartExamined("bodypart1"), Manufacturer("manu1"), StationName("station1"), FrameOfReferenceUID("frid1"))
     val image = Image(1, 1, SOPInstanceUID("souid1"), ImageType("PRIMARY/RECON/TOMO"), InstanceNumber("1"))
+    val sources = mutable.Map.empty[Long, Source]
+    val seriesTags = mutable.Map.empty[Long, SeriesTag]
 
     override def callAnonymizationService[R: ClassTag](message: Any) = message match {
       case AddAnonymizationKey(anonymizationKey) => Future(AnonymizationKeyAdded(anonymizationKey).asInstanceOf[R])
@@ -54,12 +53,23 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("AnonymizationFlowSpec")) w
     }
 
     override def callMetaDataService[R: ClassTag](message: Any) = message match {
-      case AddMetaData(attributes, source1) => Future(MetaDataAdded(attributesToPatient(attributes).copy(id = someId), attributesToStudy(attributes).copy(id = someId), attributesToSeries(attributes).copy(id = someId), attributesToImage(attributes).copy(id = someId), patientAdded = true, studyAdded = true, seriesAdded = true, imageAdded = true, source1).asInstanceOf[R])
+      case AddMetaData(attributes, source) => Future {
+        val seriesId = someId
+        sources(seriesId) = source
+        MetaDataAdded(attributesToPatient(attributes).copy(id = someId), attributesToStudy(attributes).copy(id = someId), attributesToSeries(attributes).copy(id = seriesId), attributesToImage(attributes).copy(id = someId), patientAdded = true, studyAdded = true, seriesAdded = true, imageAdded = true, source).asInstanceOf[R]
+      }
       case DeleteMetaData(imageIds) => Future(MetaDataDeleted(Seq.empty, Seq.empty, Seq.empty, imageIds).asInstanceOf[R])
       case GetImage(imageId) => Future(Some(image.copy(id = imageId)).asInstanceOf[R])
-      case GetSourceForSeries(_) => Future(Some(source).asInstanceOf[R])
-      case GetSeriesTagsForSeries(_) => Future(SeriesTags(Seq(seriesTag)).asInstanceOf[R])
-      case AddSeriesTagToSeries(_, _) => Future(SeriesTagAddedToSeries(seriesTag).asInstanceOf[R])
+      case GetSourceForSeries(id) => Future {
+        sources.get(id).asInstanceOf[R]
+      }
+      case GetSeriesTagsForSeries(id) => Future {
+        SeriesTags(seriesTags.get(id).map(tag => Seq(tag)).getOrElse(Seq.empty)).asInstanceOf[R]
+      }
+      case AddSeriesTagToSeries(tag, id) => Future {
+        seriesTags(id) = tag
+        SeriesTagAddedToSeries(tag).asInstanceOf[R]
+      }
     }
 
     override def scheduleTask(delay: FiniteDuration)(task: => Unit) = system.scheduler.scheduleOnce(delay)(task)
@@ -309,6 +319,21 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("AnonymizationFlowSpec")) w
       dicomStreamOpsImpl.modifyData(metaDataAdded1.image.id, Seq(TagModification(TagPath.fromTag(Tag.PatientName), _ => ByteString(newName), insert = true)), storage).map {
         case (_, metaDataAdded2) =>
           metaDataAdded2.patient.patientName.value shouldBe newName
+      }
+    }
+  }
+
+  it should "transfer series source and tags to new, modified data" in {
+    val source = Source(SourceType.USER, "Jane", -1)
+    val testData = TestUtil.testImageDicomData()
+    val bytesSource = StreamSource.single(ByteString.fromArray(TestUtil.toByteArray(testData)))
+    dicomStreamOpsImpl.storeDicomData(bytesSource, source, storage, Contexts.imageDataContexts).flatMap { metaDataAdded1 =>
+      dicomStreamOpsImpl.modifyData(metaDataAdded1.image.id, Seq.empty, storage).map {
+        case (_, metaDataAdded2) =>
+          dicomStreamOpsImpl.sources.isDefinedAt(metaDataAdded1.series.id) shouldBe false
+          dicomStreamOpsImpl.sources.isDefinedAt(metaDataAdded2.series.id) shouldBe true
+          dicomStreamOpsImpl.seriesTags.isDefinedAt(metaDataAdded1.series.id) shouldBe false
+          dicomStreamOpsImpl.seriesTags.isDefinedAt(metaDataAdded2.series.id) shouldBe true
       }
     }
   }
