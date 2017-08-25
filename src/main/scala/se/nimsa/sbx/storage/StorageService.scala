@@ -142,7 +142,13 @@ trait StorageService extends LazyLogging {
     * Source for dicom files.
     * @throws NotFoundException if data cannot be found for imageId
     * */
-  def fileSource(imageId: Long): Source[ByteString, NotUsed]
+  def fileSource(imageId: Long): Source[ByteString, NotUsed] = fileSource(imageName(imageId))
+
+  /**
+    * Source for dicom files.
+    * @throws NotFoundException if data cannot be found for name
+    * */
+  def fileSource(name: String): Source[ByteString, NotUsed]
 
 }
 

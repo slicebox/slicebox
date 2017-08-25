@@ -13,7 +13,7 @@ class RuntimeStorage extends StorageService {
 
   val storage = mutable.Map.empty[String, ByteString]
 
-  override def deleteByName(names: Seq[String]): Unit = names.map(name => storage.remove(name))
+  override def deleteByName(names: Seq[String]): Unit = names.foreach(name => storage.remove(name))
 
   def clear() = storage.clear()
 
@@ -36,7 +36,7 @@ class RuntimeStorage extends StorageService {
         }
       }
 
-  override def fileSource(imageId: Long): Source[ByteString, NotUsed] =
-    Source.single(storage.getOrElse(imageName(imageId), throw new NotFoundException(s"No data for image id $imageId")))
+  override def fileSource(name: String): Source[ByteString, NotUsed] =
+    Source.single(storage.getOrElse(name, throw new NotFoundException(s"No data for name $name")))
 
 }

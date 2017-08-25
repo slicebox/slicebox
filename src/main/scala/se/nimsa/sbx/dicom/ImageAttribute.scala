@@ -16,6 +16,8 @@
 
 package se.nimsa.sbx.dicom
 
+import se.nimsa.dcm4che.streams.TagPath.TagPathTag
+
 case class ImageAttribute(
   tag: Int,
   group: Int,
@@ -25,6 +27,7 @@ case class ImageAttribute(
   multiplicity: Int,
   length: Int,
   depth: Int,
+  tagPathTag: TagPathTag,
   tagPath: List[Int],
   namePath: List[String],
   values: List[String])

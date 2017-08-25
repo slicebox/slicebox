@@ -12,7 +12,7 @@ import akka.testkit.TestKit
 import akka.util.ByteString
 import org.dcm4che3.data.{Attributes, Tag, UID, VR}
 import org.dcm4che3.io.DicomOutputStream
-import org.scalatest.{FlatSpecLike, Matchers}
+import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 import se.nimsa.dcm4che.streams.DicomFlows.collectAttributesFlow
 import se.nimsa.dcm4che.streams.DicomParts.{DicomPart, DicomValueChunk}
 import se.nimsa.dcm4che.streams.{DicomFlows, DicomPartFlow}
@@ -22,10 +22,12 @@ import se.nimsa.sbx.util.TestUtil._
 import scala.concurrent.Await
 import scala.concurrent.duration.DurationInt
 
-class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")) with FlatSpecLike with Matchers {
+class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")) with FlatSpecLike with Matchers with BeforeAndAfterAll {
 
   implicit val materializer = ActorMaterializer()
   implicit val ec = system.dispatcher
+
+  override def afterAll = TestKit.shutdownActorSystem(system)
 
   def toSource(attributes: Attributes): Source[DicomPart, NotUsed] = {
     val baos = new ByteArrayOutputStream()

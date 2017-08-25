@@ -2,9 +2,9 @@ package se.nimsa.sbx.dicom.streams
 
 import akka.stream.scaladsl.Flow
 import org.dcm4che3.data.{SpecificCharacterSet, Tag}
-import se.nimsa.dcm4che.streams.{DicomModifyFlow, TagPath}
 import se.nimsa.dcm4che.streams.DicomModifyFlow.TagModification
 import se.nimsa.dcm4che.streams.DicomParts._
+import se.nimsa.dcm4che.streams.{DicomModifyFlow, TagPath}
 
 /**
   * A flow which performs reverse anonymization as soon as it has received an AnonymizationKeyPart (which means data is
