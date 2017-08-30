@@ -8,8 +8,8 @@ import akka.{Done, NotUsed}
 import org.dcm4che3.data.{Attributes, Tag, UID, VR}
 import org.dcm4che3.io.DicomStreamException
 import se.nimsa.dcm4che.streams.DicomFlows._
-import se.nimsa.dcm4che.streams.DicomModifyFlow.TagModification
-import se.nimsa.dcm4che.streams.DicomPartFlow.partFlow
+import se.nimsa.dcm4che.streams.DicomModifyFlow._
+import se.nimsa.dcm4che.streams.DicomPartFlow._
 import se.nimsa.dcm4che.streams.DicomParts._
 import se.nimsa.dcm4che.streams.TagPath.TagPathSequence
 import se.nimsa.dcm4che.streams._
@@ -39,12 +39,12 @@ trait DicomStreamOps {
   def callMetaDataService[R: ClassTag](message: Any): Future[R]
   def scheduleTask(delay: FiniteDuration)(task: => Unit): Cancellable
 
-  protected def anonymizationInsert(implicit ec: ExecutionContext) = (anonymizationKey: AnonymizationKey) =>
-    callAnonymizationService[AnonymizationKeyAdded](AddAnonymizationKey(anonymizationKey))
+  protected def anonymizationInsert(implicit ec: ExecutionContext): (AnonymizationKey) => Future[AnonymizationKey] =
+    (anonymizationKey: AnonymizationKey) => callAnonymizationService[AnonymizationKeyAdded](AddAnonymizationKey(anonymizationKey))
       .map(_.anonymizationKey)
 
-  protected def anonymizationQuery(implicit ec: ExecutionContext) = (patientName: PatientName, patientID: PatientID) =>
-    callAnonymizationService[AnonymizationKeys](GetAnonymizationKeysForPatient(patientName.value, patientID.value))
+  protected def anonymizationQuery(implicit ec: ExecutionContext): (PatientName, PatientID) => Future[Seq[AnonymizationKey]] =
+    (patientName: PatientName, patientID: PatientID) => callAnonymizationService[AnonymizationKeys](GetAnonymizationKeysForPatient(patientName.value, patientID.value))
       .map(_.anonymizationKeys)
 
   /**
@@ -59,8 +59,8 @@ trait DicomStreamOps {
                          (implicit materializer: Materializer, ec: ExecutionContext): StreamSource[ByteString, NotUsed] =
     anonymizedDicomDataSource(storage.fileSource(imageId), anonymizationQuery, anonymizationInsert, tagValues)
 
-  protected def reverseAnonymizationQuery(implicit ec: ExecutionContext) = (patientName: PatientName, patientID: PatientID) =>
-    callAnonymizationService[AnonymizationKeys](GetReverseAnonymizationKeysForPatient(patientName.value, patientID.value))
+  protected def reverseAnonymizationQuery(implicit ec: ExecutionContext): (PatientName, PatientID) => Future[Seq[AnonymizationKey]] =
+    (patientName: PatientName, patientID: PatientID) => callAnonymizationService[AnonymizationKeys](GetReverseAnonymizationKeysForPatient(patientName.value, patientID.value))
       .map(_.anonymizationKeys)
 
   /**
@@ -112,14 +112,13 @@ trait DicomStreamOps {
       imageMaybe.map { image =>
         val forcedSource = storage.fileSource(imageId)
           .via(DicomPartFlow.partFlow)
-          .via(DicomModifyFlow.modifyFlow(TagModification(TagPath.fromTag(Tag.PatientIdentityRemoved), _ => ByteString("NO"), insert = false)))
-          .via(DicomFlows.blacklistFilter(Seq(Tag.DeidentificationMethod)))
+          .via(modifyFlow(TagModification(TagPath.fromTag(Tag.PatientIdentityRemoved), _ => ByteString("NO"), insert = false)))
+          .via(blacklistFilter(Seq(Tag.DeidentificationMethod)))
           .map(_.bytes)
         val anonymizedSource = anonymizedDicomDataSource(forcedSource, anonymizationQuery, anonymizationInsert, tagValues)
-          .mapAsync(5)(bytes =>
+          .mapMaterializedValue(_ =>
             callMetaDataService[MetaDataDeleted](DeleteMetaData(Seq(imageId)))
               .map(_ => storage.deleteFromStorage(Seq(imageId)))
-              .map(_ => bytes)
           )
         callMetaDataService[Option[SeriesSource]](GetSourceForSeries(image.seriesId)).map { seriesSourceMaybe =>
           seriesSourceMaybe.map { seriesSource =>
@@ -150,7 +149,9 @@ trait DicomStreamOps {
     val futureModifiedTempFile =
       storage.fileSource(imageId)
         .via(DicomPartFlow.partFlow)
-        .via(DicomModifyFlow.modifyFlow(tagModifications: _*))
+        .via(groupLengthDiscardFilter)
+        .via(modifyFlow(tagModifications: _*))
+        .via(fmiGroupLengthFlow)
         .map(_.bytes)
         .runWith(sink)
 
@@ -175,9 +176,13 @@ trait DicomStreamOps {
 
 object DicomStreamOps {
 
+  import AnonymizationFlow._
+  import HarmonizeAnonymizationFlow._
+  import ReverseAnonymizationFlow._
+
   val encodingTags = Set(Tag.TransferSyntaxUID, Tag.SpecificCharacterSet)
 
-  val tagsToStoreInDB = {
+  val tagsToStoreInDB: Set[Int] = {
     val patientTags = Seq(Tag.PatientName, Tag.PatientID, Tag.PatientSex, Tag.PatientBirthDate)
     val studyTags = Seq(Tag.StudyInstanceUID, Tag.StudyDescription, Tag.StudyID, Tag.StudyDate, Tag.AccessionNumber, Tag.PatientAge)
     val seriesTags = Seq(Tag.SeriesInstanceUID, Tag.SeriesDescription, Tag.SeriesDate, Tag.Modality, Tag.ProtocolName, Tag.BodyPartExamined, Tag.Manufacturer, Tag.StationName, Tag.FrameOfReferenceUID)
@@ -186,16 +191,16 @@ object DicomStreamOps {
     encodingTags ++ patientTags ++ studyTags ++ seriesTags ++ imageTags
   }
 
-  val metaTags2Collect = encodingTags ++ Set(Tag.PatientName, Tag.PatientID, Tag.PatientIdentityRemoved, Tag.StudyInstanceUID, Tag.SeriesInstanceUID)
+  val metaTags2Collect: Set[Int] = encodingTags ++ Set(Tag.PatientName, Tag.PatientID, Tag.PatientIdentityRemoved, Tag.StudyInstanceUID, Tag.SeriesInstanceUID)
 
-  val anonymizationKeyTags = encodingTags ++ Set(Tag.PatientName, Tag.PatientID, Tag.PatientBirthDate,
+  val anonymizationKeyTags: Set[Int] = encodingTags ++ Set(Tag.PatientName, Tag.PatientID, Tag.PatientBirthDate,
     Tag.StudyInstanceUID, Tag.StudyDescription, Tag.StudyID, Tag.AccessionNumber,
     Tag.SeriesInstanceUID, Tag.SeriesDescription, Tag.ProtocolName, Tag.FrameOfReferenceUID)
 
   def maybeDeflateFlow: Flow[DicomPart, DicomPart, NotUsed] = conditionalFlow(
     {
       case p: DicomMetaPart => p.transferSyntaxUid.isDefined && DicomParsing.isDeflated(p.transferSyntaxUid.get)
-    }, DicomFlows.deflateDatasetFlow, Flow.fromFunction(identity), routeADefault = false)
+    }, deflateDatasetFlow, Flow.fromFunction(identity), routeADefault = false)
 
   def createTempPath() = s"tmp-${java.util.UUID.randomUUID().toString}"
 
@@ -278,7 +283,7 @@ object DicomStreamOps {
               .mapAsync(5)(attributesToMetaPart)
               .mapAsync(5)(queryProtectedAnonymizationKeys(reverseAnonymizationQuery))
               .mapConcat(identity) // flatten stream of lists
-              .via(ReverseAnonymizationFlow.maybeReverseAnonFlow)
+              .via(maybeReverseAnonFlow)
           else
             baseFlow
         }
@@ -333,12 +338,12 @@ object DicomStreamOps {
     }
   }
 
-  def collectAnonymizationKeyProtectedInfo(implicit ec: ExecutionContext, materializer: Materializer) =
+  def collectAnonymizationKeyProtectedInfo(implicit ec: ExecutionContext, materializer: Materializer): Flow[DicomPart, DicomPart, NotUsed] =
     Flow[DicomPart]
       .via(collectAttributesFlow(anonymizationKeyTags))
       .mapAsync(5)(attributesToAnonKeyProtectedInfo)
 
-  def collectAnonymizationKeyAnonymousInfo(implicit ec: ExecutionContext, materializer: Materializer) =
+  def collectAnonymizationKeyAnonymousInfo(implicit ec: ExecutionContext, materializer: Materializer): Flow[DicomPart, DicomPart, NotUsed] =
     Flow[DicomPart]
       .via(collectAttributesFlow(anonymizationKeyTags))
       .mapAsync(5)(attributesToAnonKeyAnonymousInfo)
@@ -387,8 +392,8 @@ object DicomStreamOps {
       Future.successful(part)
   }
 
-  def toTagModifications(tagValues: Seq[TagValue]) =
-    tagValues.map(tv => TagModification(TagPath.fromTag(tv.tag), _ => DicomUtil.padToEvenLength(ByteString(tv.value), tv.tag), insert = true))
+  def toTagModifications(tagValues: Seq[TagValue]): Seq[TagModification] =
+    tagValues.map(tv => TagModification(TagPath.fromTag(tv.tag), _ => padToEvenLength(ByteString(tv.value), tv.tag), insert = true))
 
   def anonymizedDicomDataSource(storageSource: StreamSource[ByteString, NotUsed],
                                 anonymizationQuery: (PatientName, PatientID) => Future[Seq[AnonymizationKey]],
@@ -396,29 +401,32 @@ object DicomStreamOps {
                                 tagValues: Seq[TagValue])
                                (implicit ec: ExecutionContext, materializer: Materializer): StreamSource[ByteString, NotUsed] =
     storageSource
-      .via(DicomPartFlow.partFlow) // DicomPart...
+      .via(partFlow) // DicomPart...
+      .via(groupLengthDiscardFilter) // group lenghts may change, discard if any
       .via(collectAttributesFlow(metaTags2Collect)) // DicomAttributes :: DicomPart...
       .mapAsync(5)(attributesToMetaPart) // DicomMetaPart :: DicomPart...
       .mapAsync(5)(queryAnonymousAnonymizationKeys(anonymizationQuery))
       .mapConcat(identity) // DicomMetaPart :: AnonymizationKeysPart :: DicomPart...
       .via(collectAnonymizationKeyProtectedInfo) // AnonymizationKeyPart (protected) :: DicomMetaPart :: AnonymizationKeysPart :: DicomPart...
-      .via(AnonymizationFlow.maybeAnonFlow)
-      .via(HarmonizeAnonymizationFlow.harmonizeAnonFlow)
-      .via(DicomModifyFlow.modifyFlow(toTagModifications(tagValues): _*))
+      .via(maybeAnonFlow)
+      .via(harmonizeAnonFlow)
+      .via(modifyFlow(toTagModifications(tagValues): _*))
+      .via(fmiGroupLengthFlow) // update meta information group length
       .via(collectAnonymizationKeyAnonymousInfo) // AnonymizationKeyPart (protected) :: AnonymizationKeyPart (anon) :: DicomMetaPart :: AnonymizationKeysPart :: DicomPart...
       .via(collectAnonymizationKeyInfo) // DicomMetaPart :: AnonymizationKeyInfoPart :: DicomPart...
       .mapAsync(5)(maybeInsertAnonymizationKey(anonymizationInsert))
       .map(_.bytes)
 
   def inflatedSource(source: StreamSource[ByteString, _]): StreamSource[ByteString, _] = source
-    .via(DicomPartFlow.partFlow)
-    .via(DicomModifyFlow.modifyFlow(
+    .via(partFlow)
+    .via(modifyFlow(
       TagModification(TagPath.fromTag(Tag.TransferSyntaxUID), valueBytes => {
         valueBytes.utf8String.trim match {
-          case UID.DeflatedExplicitVRLittleEndian => DicomUtil.padToEvenLength(ByteString(UID.ExplicitVRLittleEndian), VR.UI)
+          case UID.DeflatedExplicitVRLittleEndian => padToEvenLength(ByteString(UID.ExplicitVRLittleEndian), VR.UI)
           case _ => valueBytes
         }
       }, insert = false)))
+    .via(fmiGroupLengthFlow)
     .map(_.bytes)
 
   def conditionalFlow(goA: PartialFunction[DicomPart, Boolean], flowA: Flow[DicomPart, DicomPart, _], flowB: Flow[DicomPart, DicomPart, _], routeADefault: Boolean = true): Flow[DicomPart, DicomPart, NotUsed] =
@@ -459,7 +467,7 @@ object DicomStreamOps {
       .via(bulkDataFilter)
       .via(collectAttributesFlow(encodingTags))
       .mapAsync(5)(attributesToMetaPart)
-      .via(DicomFlows.attributeFlow)
+      .via(attributeFlow)
       .statefulMapConcat {
         var meta: Option[DicomMetaPart] = None
         var namePath = List.empty[String]
@@ -488,8 +496,8 @@ object DicomStreamOps {
 
             ImageAttribute(
               tag,
-              DicomParsing.groupNumber(tag),
-              DicomParsing.elementNumber(tag),
+              groupNumber(tag),
+              elementNumber(tag),
               DicomUtil.nameForTag(tag),
               attribute.header.vr.name,
               multiplicity,
@@ -522,7 +530,7 @@ object DicomStreamOps {
         }
       }
 
-  def isEqual(key1: AnonymizationKey, key2: AnonymizationKey) =
+  def isEqual(key1: AnonymizationKey, key2: AnonymizationKey): Boolean =
     key1.patientName == key2.patientName && key1.anonPatientName == key2.anonPatientName &&
       key1.patientID == key2.patientID && key1.anonPatientID == key2.anonPatientID &&
       key1.studyInstanceUID == key2.studyInstanceUID && key1.anonStudyInstanceUID == key2.anonStudyInstanceUID &&

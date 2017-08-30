@@ -19,8 +19,7 @@ package se.nimsa.sbx.storage
 import java.awt.RenderingHints
 import java.awt.image.BufferedImage
 import java.io.ByteArrayOutputStream
-import javax.imageio.stream.ImageInputStream
-import javax.imageio.{ImageIO, ImageReader}
+import javax.imageio.ImageIO
 
 import akka.stream.Materializer
 import akka.stream.scaladsl.{Sink, Source, StreamConverters}
@@ -30,7 +29,6 @@ import com.typesafe.scalalogging.LazyLogging
 import org.dcm4che3.data.Tag
 import org.dcm4che3.imageio.plugins.dcm.DicomImageReadParam
 import se.nimsa.dcm4che.streams.{DicomAttributesSink, DicomFlows, DicomPartFlow}
-import se.nimsa.sbx.app.Slicebox
 import se.nimsa.sbx.dicom.ImageAttribute
 import se.nimsa.sbx.dicom.streams.DicomStreamOps
 import se.nimsa.sbx.lang.NotFoundException
@@ -44,7 +42,7 @@ import scala.concurrent.{ExecutionContext, Future}
   */
 trait StorageService extends LazyLogging {
 
-  def imageName(imageId: Long) = imageId.toString
+  def imageName(imageId: Long): String = imageId.toString
 
   def deleteByName(name: Seq[String]): Unit
 
@@ -77,14 +75,13 @@ trait StorageService extends LazyLogging {
           }.getOrElse(ImageInformation(0, 0, 0, 0))
       }
 
-  def readPngImageData(imageId: Long, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int)(implicit materializer: Materializer): Future[Array[Byte]] = {
+  def readPngImageData(imageId: Long, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int)(implicit materializer: Materializer, ec: ExecutionContext): Future[Array[Byte]] = Future {
     val source = fileSource(imageId)
     // dcm4che does not support viewing of deflated data, cf. Github issue #42
     // As a workaround, do streaming inflate and mapping of transfer syntax
     val inflatedSource = DicomStreamOps.inflatedSource(source)
     val is = inflatedSource.runWith(StreamConverters.asInputStream())
     val iis = ImageIO.createImageInputStream(is)
-
 
     val imageReader = ImageIO.getImageReadersByFormatName("DICOM").next
     imageReader.setInput(iis)
@@ -94,12 +91,6 @@ trait StorageService extends LazyLogging {
       param.setWindowWidth(windowMax - windowMin)
     }
 
-    // imageReader.read is blocking, needs to be run outside streams execution context
-    readAndScale(frameNumber, imageHeight, imageReader, param, iis)(Slicebox.blockingIoContext)
-  }
-
-  // used to wrap blocking read into future
-  private def readAndScale(frameNumber: Int, imageHeight: Int, imageReader: ImageReader, param: DicomImageReadParam, iis: ImageInputStream)(implicit ec: ExecutionContext) = Future {
     try {
       val bi = try {
         val image = imageReader.read(frameNumber - 1, param)
@@ -117,7 +108,6 @@ trait StorageService extends LazyLogging {
       iis.close()
     }
   }
-
 
   private def scaleImage(image: BufferedImage, imageHeight: Int): BufferedImage = {
     val ratio = imageHeight / image.getHeight.asInstanceOf[Double]
@@ -140,14 +130,16 @@ trait StorageService extends LazyLogging {
 
   /**
     * Source for dicom files.
+    *
     * @throws NotFoundException if data cannot be found for imageId
-    * */
+    **/
   def fileSource(imageId: Long): Source[ByteString, NotUsed] = fileSource(imageName(imageId))
 
   /**
     * Source for dicom files.
+    *
     * @throws NotFoundException if data cannot be found for name
-    * */
+    **/
   def fileSource(name: String): Source[ByteString, NotUsed]
 
 }

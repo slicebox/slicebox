@@ -226,7 +226,7 @@ object TestUtil {
 
     val metaInformation = new Attributes()
     metaInformation.setString(Tag.MediaStorageSOPClassUID, VR.UI, "1.2.840.10008.5.1.4.1.1.2")
-    metaInformation.setString(Tag.TransferSyntaxUID, VR.UI, "1.2.840.10008.5.1.4.1.1.2")
+    metaInformation.setString(Tag.TransferSyntaxUID, VR.UI, "1.2.840.10008.1.2.1")
 
     DicomData(attributes, metaInformation)
   }
@@ -240,15 +240,15 @@ object TestUtil {
     AnonymizationKey(-1, new Date().getTime,
       attributes.getString(Tag.PatientName), anonPatientName,
       attributes.getString(Tag.PatientID), anonPatientID,
-      attributes.getString(Tag.PatientBirthDate),
+      attributes.getString(Tag.PatientBirthDate, "1900-01-01"),
       attributes.getString(Tag.StudyInstanceUID), anonStudyInstanceUID,
       attributes.getString(Tag.StudyDescription),
-      attributes.getString(Tag.StudyID),
-      attributes.getString(Tag.AccessionNumber),
+      attributes.getString(Tag.StudyID, "Study ID"),
+      attributes.getString(Tag.AccessionNumber, "12345"),
       attributes.getString(Tag.SeriesInstanceUID), anonSeriesInstanceUID,
-      attributes.getString(Tag.SeriesDescription),
-      attributes.getString(Tag.ProtocolName),
-      attributes.getString(Tag.FrameOfReferenceUID), anonFrameOfReferenceUID)
+      attributes.getString(Tag.SeriesDescription, "Series Description"),
+      attributes.getString(Tag.ProtocolName, "Protocol Name"),
+      attributes.getString(Tag.FrameOfReferenceUID, "1.2.3.4.5"), anonFrameOfReferenceUID)
 
   def deleteFolderContents(path: Path) =
     Files.list(path).collect(Collectors.toList()).asScala.foreach { path =>

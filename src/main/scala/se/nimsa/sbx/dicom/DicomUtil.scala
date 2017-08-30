@@ -16,14 +16,13 @@
 
 package se.nimsa.sbx.dicom
 
-import akka.util.ByteString
 import org.dcm4che3.data._
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomPropertyValue._
 
 object DicomUtil {
 
-  def isAnonymous(attributes: Attributes) = attributes.getString(Tag.PatientIdentityRemoved, "NO") == "YES"
+  def isAnonymous(attributes: Attributes): Boolean = attributes.getString(Tag.PatientIdentityRemoved, "NO") == "YES"
 
   def cloneAttributes(attributes: Attributes): Attributes = new Attributes(attributes)
 
@@ -76,26 +75,19 @@ object DicomUtil {
     else
       values.tail.foldLeft(values.head)((result, part) => result + "/" + part)
 
-  def getStrings(attrs: Attributes, tag: Int) = {
+  def getStrings(attrs: Attributes, tag: Int): Array[String] = {
     val s = attrs.getStrings(tag)
     if (s == null || s.isEmpty) Array("") else s
   }
 
-  def concatenatedStringForTag(attrs: Attributes, tag: Int) = {
+  def concatenatedStringForTag(attrs: Attributes, tag: Int): String = {
     val array = getStrings(attrs, tag)
     array.mkString(",")
   }
 
-  def nameForTag(tag: Int) = {
+  def nameForTag(tag: Int): String = {
     val name = Keyword.valueOf(tag)
     if (name == null) "" else name
-  }
-
-  def padToEvenLength(bytes: ByteString, tag: Int): ByteString = padToEvenLength(bytes, StandardElementDictionary.INSTANCE.vrOf(tag))
-
-  def padToEvenLength(bytes: ByteString, vr: VR): ByteString = {
-    val padding = if ((bytes.length & 1) != 0) ByteString(vr.paddingByte()) else ByteString.empty
-    bytes ++ padding
   }
 
 }
