@@ -13,6 +13,7 @@ import org.dcm4che3.io.{DicomOutputStream, DicomStreamException}
 import org.scalatest.{AsyncFlatSpecLike, BeforeAndAfterAll, BeforeAndAfterEach, Matchers}
 import se.nimsa.dcm4che.streams.DicomFlows.attributeFlow
 import se.nimsa.dcm4che.streams.DicomModifyFlow.TagModification
+import se.nimsa.dcm4che.streams.DicomPartFlow.partFlow
 import se.nimsa.dcm4che.streams._
 import se.nimsa.sbx.anonymization.AnonymizationDAO
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
@@ -26,8 +27,8 @@ import se.nimsa.sbx.storage.RuntimeStorage
 import se.nimsa.sbx.util.FutureUtil.await
 import se.nimsa.sbx.util.{FutureUtil, TestUtil}
 
-import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
+import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.reflect.ClassTag
 
 class DicomStreamOpsTest extends TestKit(ActorSystem("AnonymizationFlowSpec")) with AsyncFlatSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {
@@ -153,7 +154,7 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("AnonymizationFlowSpec")) w
     val t2 = TagValue(Tag.PatientID, "Mapped Patient ID")
     val t3 = TagValue(Tag.SeriesDescription, "Mapped Series Description")
     val bytes = preamble ++ fmiGroupLength(supportedMediaStorageSOPClassUID ++ tsuidExplicitLE) ++ supportedMediaStorageSOPClassUID ++ tsuidExplicitLE ++ patientNameJohnDoe
-    val source = StreamSource.single(bytes)
+    val source = StreamSource.single(bytes).via(partFlow)
     val anonSource = DicomStreamOps.anonymizedDicomDataSource(
       source,
       (_, _) => Future.successful(Seq.empty),
@@ -173,7 +174,7 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("AnonymizationFlowSpec")) w
     val attributes = createAttributes
     val key = TestUtil.createAnonymizationKey(attributes, anonPatientName = "apn", anonPatientID = "apid", anonSeriesInstanceUID = "aseuid")
 
-    val source = toSource(DicomData(attributes, null))
+    val source = toSource(DicomData(attributes, null)).via(partFlow)
     val anonSource = DicomStreamOps.anonymizedDicomDataSource(source, (_, _) => Future.successful(Seq(key)), _ => Future.successful(key), Seq.empty)
 
     anonSource.via(DicomPartFlow.partFlow).via(DicomFlows.attributeFlow).runWith(DicomAttributesSink.attributesSink).map {
@@ -190,7 +191,7 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("AnonymizationFlowSpec")) w
   "The DICOM data source with anonymization" should "anonymize the patient ID and harmonize it according to an anonymization key" in {
     val dicomData = TestUtil.createDicomData()
     val anonKey = TestUtil.createAnonymizationKey(dicomData.attributes)
-    val source = toSource(dicomData)
+    val source = toSource(dicomData).via(partFlow)
 
     val anonSource = DicomStreamOps.anonymizedDicomDataSource(source, (_, _) => Future.successful(Seq(anonKey)), a => Future.successful(a), Seq.empty)
 
@@ -256,7 +257,7 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("AnonymizationFlowSpec")) w
       keysPart.patientKey shouldBe defined
       keysPart.studyKey shouldBe defined
       keysPart.seriesKey shouldBe defined
-      keysPart.allKeys should have length 1
+      keysPart.patientKeys should have length 1
     }
   }
 
@@ -275,7 +276,7 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("AnonymizationFlowSpec")) w
       keysPart.patientKey shouldBe defined
       keysPart.studyKey should not be defined
       keysPart.seriesKey should not be defined
-      keysPart.allKeys should have length 1
+      keysPart.patientKeys should have length 1
     }
   }
 
@@ -293,7 +294,7 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("AnonymizationFlowSpec")) w
       keysPart.patientKey shouldBe defined
       keysPart.studyKey shouldBe defined
       keysPart.seriesKey shouldBe defined
-      keysPart.allKeys should have length 1
+      keysPart.patientKeys should have length 1
     }
   }
 
@@ -311,7 +312,7 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("AnonymizationFlowSpec")) w
       keysPart.patientKey shouldBe defined
       keysPart.studyKey should not be defined
       keysPart.seriesKey should not be defined
-      keysPart.allKeys should have length 1
+      keysPart.patientKeys should have length 1
     }
   }
 
@@ -329,7 +330,7 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("AnonymizationFlowSpec")) w
       keysPart.patientKey should not be defined
       keysPart.studyKey should not be defined
       keysPart.seriesKey should not be defined
-      keysPart.allKeys shouldBe empty
+      keysPart.patientKeys shouldBe empty
     }
   }
 
