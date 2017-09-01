@@ -17,9 +17,9 @@ import scala.util.Random
 object AnonymizationFlow {
 
   private def toAsciiBytes(s: String, vr: VR) = padToEvenLength(ByteString(s), vr)
-  private def insert(tag: Int, mod: ByteString => ByteString) = TagModification(TagPath.fromTag(tag), mod, insert = true)
-  private def modify(tag: Int, mod: ByteString => ByteString) = TagModification(TagPath.fromTag(tag), mod, insert = false)
-  private def clear(tag: Int) = TagModification(TagPath.fromTag(tag), _ => ByteString.empty, insert = false)
+  private def insert(tag: Int, mod: ByteString => ByteString) = TagModification.endsWith(TagPath.fromTag(tag), mod, insert = true)
+  private def modify(tag: Int, mod: ByteString => ByteString) = TagModification.endsWith(TagPath.fromTag(tag), mod, insert = false)
+  private def clear(tag: Int) = TagModification.endsWith(TagPath.fromTag(tag), _ => ByteString.empty, insert = false)
   private def createAccessionNumber(accessionNumberBytes: ByteString): ByteString = {
     val seed = UUID.nameUUIDFromBytes(accessionNumberBytes.toArray).getMostSignificantBits
     val rand = new Random(seed)

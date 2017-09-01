@@ -214,11 +214,11 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("AnonymizationFlowSpec")) w
         .via(DicomPartFlow.partFlow)
         .via(DicomFlows.blacklistFilter(Seq(Tag.PixelData)))
         .via(DicomModifyFlow.modifyFlow(
-          TagModification(
+          TagModification.contains(
             TagPath.fromTag(Tag.MediaStorageSOPInstanceUID),
             uid => uid.dropRight(3) ++ ByteString(f"$sopInstanceUID%03d"),
             insert = true),
-          TagModification(
+          TagModification.contains(
             TagPath.fromTag(Tag.SOPInstanceUID),
             uid => uid.dropRight(3) ++ ByteString(f"$sopInstanceUID%03d"),
             insert = true)))
@@ -397,7 +397,7 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("AnonymizationFlowSpec")) w
     val bytesSource = StreamSource.single(ByteString.fromArray(TestUtil.toByteArray(testData)))
     for {
       metaDataAdded1 <- dicomStreamOpsImpl.storeDicomData(bytesSource, source, storage, Contexts.imageDataContexts)
-      (_, metaDataAdded2) <- dicomStreamOpsImpl.modifyData(metaDataAdded1.image.id, Seq(TagModification(TagPath.fromTag(Tag.PatientName), _ => ByteString(newName), insert = true)), storage)
+      (_, metaDataAdded2) <- dicomStreamOpsImpl.modifyData(metaDataAdded1.image.id, Seq(TagModification.endsWith(TagPath.fromTag(Tag.PatientName), _ => ByteString(newName), insert = true)), storage)
     } yield {
       metaDataAdded2.patient.patientName.value shouldBe newName
     }

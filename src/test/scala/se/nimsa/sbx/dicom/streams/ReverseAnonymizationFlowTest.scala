@@ -45,11 +45,11 @@ class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymiza
     attributesSource(dicomData)
       .via(AnonymizationFlow.anonFlow)
       .via(DicomModifyFlow.modifyFlow(
-        TagModification(TagPath.fromTag(Tag.PatientName), _ => toAsciiBytes(key.anonPatientName, VR.PN), insert = false),
-        TagModification(TagPath.fromTag(Tag.PatientID), _ => toAsciiBytes(key.anonPatientID, VR.LO), insert = false),
-        TagModification(TagPath.fromTag(Tag.StudyInstanceUID), _ => toAsciiBytes(key.anonStudyInstanceUID, VR.UI), insert = false),
-        TagModification(TagPath.fromTag(Tag.SeriesInstanceUID), _ => toAsciiBytes(key.anonSeriesInstanceUID, VR.UI), insert = false),
-        TagModification(TagPath.fromTag(Tag.FrameOfReferenceUID), _ => toAsciiBytes(key.anonFrameOfReferenceUID, VR.UI), insert = false)
+        TagModification.contains(TagPath.fromTag(Tag.PatientName), _ => toAsciiBytes(key.anonPatientName, VR.PN), insert = false),
+        TagModification.contains(TagPath.fromTag(Tag.PatientID), _ => toAsciiBytes(key.anonPatientID, VR.LO), insert = false),
+        TagModification.contains(TagPath.fromTag(Tag.StudyInstanceUID), _ => toAsciiBytes(key.anonStudyInstanceUID, VR.UI), insert = false),
+        TagModification.contains(TagPath.fromTag(Tag.SeriesInstanceUID), _ => toAsciiBytes(key.anonSeriesInstanceUID, VR.UI), insert = false),
+        TagModification.contains(TagPath.fromTag(Tag.FrameOfReferenceUID), _ => toAsciiBytes(key.anonFrameOfReferenceUID, VR.UI), insert = false)
       ))
   }
 

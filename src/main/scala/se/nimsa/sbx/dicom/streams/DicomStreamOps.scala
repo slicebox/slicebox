@@ -116,7 +116,7 @@ trait DicomStreamOps {
           seriesSourceMaybe.map { seriesSource =>
             val forcedSource = storage.fileSource(imageId)
               .via(DicomPartFlow.partFlow)
-              .via(modifyFlow(TagModification(TagPath.fromTag(Tag.PatientIdentityRemoved), _ => ByteString("NO"), insert = false)))
+              .via(modifyFlow(TagModification.contains(TagPath.fromTag(Tag.PatientIdentityRemoved), _ => ByteString("NO"), insert = false)))
               .via(blacklistFilter(Seq(Tag.DeidentificationMethod)))
             val anonymizedSource = anonymizedDicomDataSource(forcedSource, anonymizationQuery, anonymizationInsert, tagValues)
             storeDicomData(anonymizedSource, seriesSource.source, storage, Contexts.extendedContexts, reverseAnonymization = false).flatMap { metaDataAdded =>
@@ -396,7 +396,7 @@ object DicomStreamOps {
   }
 
   def toTagModifications(tagValues: Seq[TagValue]): Seq[TagModification] =
-  tagValues.map(tv => TagModification(TagPath.fromTag(tv.tag), _ => padToEvenLength(ByteString(tv.value), tv.tag), insert = true))
+  tagValues.map(tv => TagModification.endsWith(TagPath.fromTag(tv.tag), _ => padToEvenLength(ByteString(tv.value), tv.tag), insert = true))
 
   def anonymizedDicomDataSource(storageSource: StreamSource[DicomPart, NotUsed],
                                 anonymizationQuery: (PatientName, PatientID) => Future[Seq[AnonymizationKey]],
@@ -422,7 +422,7 @@ object DicomStreamOps {
   def inflatedSource(source: StreamSource[ByteString, _]): StreamSource[ByteString, _] = source
     .via(partFlow)
     .via(modifyFlow(
-      TagModification(TagPath.fromTag(Tag.TransferSyntaxUID), valueBytes => {
+      TagModification.contains(TagPath.fromTag(Tag.TransferSyntaxUID), valueBytes => {
         valueBytes.utf8String.trim match {
           case UID.DeflatedExplicitVRLittleEndian => padToEvenLength(ByteString(UID.ExplicitVRLittleEndian), VR.UI)
           case _ => valueBytes
