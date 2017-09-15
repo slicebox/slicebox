@@ -2,23 +2,24 @@ package se.nimsa.sbx.dicom.streams
 
 import java.util.UUID
 
+import akka.NotUsed
 import akka.stream.scaladsl.Flow
 import akka.util.ByteString
 import org.dcm4che3.data.{Tag, VR}
 import org.dcm4che3.util.UIDUtils
-import se.nimsa.dcm4che.streams.DicomModifyFlow.TagModification
+import se.nimsa.dcm4che.streams.DicomFlows._
+import se.nimsa.dcm4che.streams.DicomModifyFlow._
 import se.nimsa.dcm4che.streams.DicomParts._
-import se.nimsa.dcm4che.streams.{DicomFlows, DicomModifyFlow, DicomParsing, TagPath}
-import se.nimsa.sbx.dicom.DicomUtil
+import se.nimsa.dcm4che.streams._
 
 import scala.util.Random
 
 object AnonymizationFlow {
 
-  private def toAsciiBytes(s: String, vr: VR) = DicomUtil.padToEvenLength(ByteString(s), vr)
-  private def insert(tag: Int, mod: ByteString => ByteString) = TagModification(TagPath.fromTag(tag), mod, insert = true)
-  private def modify(tag: Int, mod: ByteString => ByteString) = TagModification(TagPath.fromTag(tag), mod, insert = false)
-  private def clear(tag: Int) = TagModification(TagPath.fromTag(tag), _ => ByteString.empty, insert = false)
+  private def toAsciiBytes(s: String, vr: VR) = padToEvenLength(ByteString(s), vr)
+  private def insert(tag: Int, mod: ByteString => ByteString) = TagModification.endsWith(TagPath.fromTag(tag), mod, insert = true)
+  private def modify(tag: Int, mod: ByteString => ByteString) = TagModification.endsWith(TagPath.fromTag(tag), mod, insert = false)
+  private def clear(tag: Int) = TagModification.endsWith(TagPath.fromTag(tag), _ => ByteString.empty, insert = false)
   private def createAccessionNumber(accessionNumberBytes: ByteString): ByteString = {
     val seed = UUID.nameUUIDFromBytes(accessionNumberBytes.toArray).getMostSignificantBits
     val rand = new Random(seed)
@@ -31,7 +32,7 @@ object AnonymizationFlow {
     else
       UIDUtils.createNameBasedUID(baseValue.toArray), VR.UI)
   private def isOverlay(tag: Int): Boolean = {
-    val group = DicomParsing.groupNumber(tag)
+    val group = groupNumber(tag)
     group >= 0x6000 && group < 0x6100
   }
 
@@ -208,11 +209,11 @@ object AnonymizationFlow {
     * Remove overlay data
     * Remove, set empty or modify certain attributes
     */
-  val anonFlow = Flow[DicomPart]
-    .via(DicomFlows.blacklistFilter(DicomParsing.isPrivateAttribute _)) // remove private attributes
-    .via(DicomFlows.blacklistFilter(isOverlay _)) // remove overlay data
-    .via(DicomFlows.blacklistFilter(removeTags.contains _)) // remove tags from above list, if present
-    .via(DicomModifyFlow.modifyFlow( // modify, clear and insert
+  val anonFlow: Flow[DicomPart, DicomPart, NotUsed] = Flow[DicomPart]
+    .via(blacklistFilter(DicomParsing.isPrivateAttribute _)) // remove private attributes
+    .via(blacklistFilter(isOverlay _)) // remove overlay data
+    .via(blacklistFilter(removeTags.contains _)) // remove tags from above list, if present
+    .via(modifyFlow( // modify, clear and insert
     modify(Tag.AccessionNumber, bytes => if (bytes.nonEmpty) createAccessionNumber(bytes) else bytes),
     modify(Tag.ConcatenationUID, createUid),
     clear(Tag.ContentCreatorName),
@@ -255,8 +256,7 @@ object AnonymizationFlow {
     modify(Tag.TemplateExtensionOrganizationUID, createUid),
     modify(Tag.TransactionUID, createUid),
     modify(Tag.UID, createUid),
-    clear(Tag.VerifyingObserverName)
-  ))
+    clear(Tag.VerifyingObserverName)))
 
   /**
     * Anonymize data if not already anonymized. Assumes first `DicomPart` is a `DicomMetaPart` that is used to determine
@@ -264,7 +264,7 @@ object AnonymizationFlow {
     *
     * @return a `Flow` of `DicomParts` that will anonymize non-anonymized data but does nothing otherwise
     */
-  val maybeAnonFlow = DicomStreamOps.conditionalFlow(
+  val maybeAnonFlow: Flow[DicomPart, DicomPart, NotUsed] = DicomStreamOps.conditionalFlow(
     {
       case p: DicomMetaPart => !p.isAnonymized
     }, anonFlow, Flow.fromFunction(identity))

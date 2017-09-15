@@ -18,7 +18,7 @@ package se.nimsa.sbx.box
 
 import java.util.UUID
 
-import akka.actor.{Actor, PoisonPill, Props, Stash}
+import akka.actor.{Actor, ActorSystem, Cancellable, PoisonPill, Props, Stash}
 import akka.event.{Logging, LoggingReceive}
 import akka.pattern.PipeToSupport
 import akka.stream.Materializer
@@ -29,10 +29,10 @@ import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.storage.StorageService
 import se.nimsa.sbx.util.SbxExtensions._
-import se.nimsa.sbx.util.SequentialPipeToSupport
+import se.nimsa.sbx.util.{FutureUtil, SequentialPipeToSupport}
 
 import scala.collection.mutable
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.concurrent.duration.DurationInt
 
 class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageService)(implicit val materializer: Materializer, timeout: Timeout) extends Actor with Stash with PipeToSupport with SequentialPipeToSupport {
@@ -42,22 +42,22 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageServic
   val pollBoxOnlineStatusTimeoutMillis: Long = 15000
   val pollBoxesLastPollTimestamp = mutable.Map.empty[Long, Long] // box id to timestamp
 
-  implicit val system = context.system
-  implicit val ec = context.dispatcher
+  implicit val system: ActorSystem = context.system
+  implicit val ec: ExecutionContextExecutor = context.dispatcher
 
   setupBoxes()
 
-  val pollBoxesOnlineStatusSchedule = context.system.scheduler.schedule(100.milliseconds, 7.seconds) {
-    self ! UpdateStatusForBoxesAndTransactions
-  }
+  val pollBoxesOnlineStatusSchedule: Cancellable =
+    context.system.scheduler.schedule(100.milliseconds, 7.seconds) {
+      self ! UpdateStatusForBoxesAndTransactions
+    }
 
   log.info("Box service started")
 
-  override def preStart {
+  override def preStart(): Unit =
     context.system.eventStream.subscribe(context.self, classOf[ImagesDeleted])
-  }
 
-  override def postStop() =
+  override def postStop(): Unit =
     pollBoxesOnlineStatusSchedule.cancel()
 
   def receive = LoggingReceive {
@@ -268,19 +268,15 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageServic
   def addImagesToOutgoing(boxId: Long, boxName: String, imageTagValuesSeq: Seq[ImageTagValues]): Future[Seq[OutgoingTagValue]] = {
     boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, boxId, boxName, 0, imageTagValuesSeq.length, System.currentTimeMillis, System.currentTimeMillis, TransactionStatus.WAITING))
       .flatMap { outgoingTransaction =>
-        Future.sequence {
-          imageTagValuesSeq.zipWithIndex.map {
-            case (imageTagValues, index) =>
-              val sequenceNumber = index + 1
-              boxDao.insertOutgoingImage(OutgoingImage(-1, outgoingTransaction.id, imageTagValues.imageId, sequenceNumber, sent = false))
-                .flatMap { outgoingImage =>
-                  Future.sequence {
-                    imageTagValues.tagValues.map { tagValue =>
-                      boxDao.insertOutgoingTagValue(OutgoingTagValue(-1, outgoingImage.id, tagValue))
-                    }
-                  }
+        FutureUtil.traverseSequentially(imageTagValuesSeq.zipWithIndex) {
+          case (imageTagValues, index) =>
+            val sequenceNumber = index + 1
+            boxDao.insertOutgoingImage(OutgoingImage(-1, outgoingTransaction.id, imageTagValues.imageId, sequenceNumber, sent = false))
+              .flatMap { outgoingImage =>
+                FutureUtil.traverseSequentially(imageTagValues.tagValues) { tagValue =>
+                  boxDao.insertOutgoingTagValue(OutgoingTagValue(-1, outgoingImage.id, tagValue))
                 }
-          }
+              }
         }
       }
       .map(_.flatten)

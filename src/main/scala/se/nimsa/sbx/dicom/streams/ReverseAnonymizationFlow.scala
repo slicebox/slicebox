@@ -29,7 +29,7 @@ object ReverseAnonymizationFlow {
 
   val reverseAnonFlow = Flow[DicomPart]
     .via(DicomModifyFlow.modifyFlow(
-      reverseTags.map(tag => TagModification(TagPath.fromTag(tag), identity, insert = true)): _*))
+      reverseTags.map(tag => TagModification.endsWith(TagPath.fromTag(tag), identity, insert = true)): _*))
     .statefulMapConcat {
 
       () =>
