@@ -14,28 +14,30 @@ import se.nimsa.sbx.anonymization.AnonymizationProtocol.AnonymizationKey
 import se.nimsa.sbx.dicom.DicomData
 import se.nimsa.sbx.util.TestUtil
 
+import scala.concurrent.{ExecutionContextExecutor, Future}
+
 class HarmonizeAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymizationFlowSpec")) with AsyncFlatSpecLike with Matchers with BeforeAndAfterAll {
 
   import DicomTestData._
 
-  implicit val materializer = ActorMaterializer()
-  implicit val ec = system.dispatcher
+  implicit val materializer: ActorMaterializer = ActorMaterializer()
+  implicit val ec: ExecutionContextExecutor = system.dispatcher
 
-  override def afterAll = TestKit.shutdownActorSystem(system)
+  override def afterAll: Unit = TestKit.shutdownActorSystem(system)
 
   def attributesSource(dicomData: DicomData): Source[DicomPart, NotUsed] = {
     val bytes = ByteString(TestUtil.toByteArray(dicomData))
     Source.single(bytes)
       .via(DicomPartFlow.partFlow)
-      .via(DicomFlows.blacklistFilter(DicomParsing.isFileMetaInformation, keepPreamble = false))
+      .via(DicomFlows.tagFilter(_ => false)(tagPath => !DicomParsing.isFileMetaInformation(tagPath.tag)))
   }
 
   def anonKeyPart(key: AnonymizationKey) = AnonymizationKeysPart(Seq(key), Some(key), Some(key), Some(key))
 
-  def harmonize(key: AnonymizationKey, attributes: Attributes) =
+  def harmonize(key: AnonymizationKey, attributes: Attributes): Future[(Option[Attributes], Option[Attributes])] =
     Source.single(anonKeyPart(key))
       .concat(attributesSource(DicomData(attributes, metaInformation)))
-      .via(HarmonizeAnonymizationFlow.harmonizeAnonFlow)
+      .via(HarmonizeAnonymizationFlow.harmonizeAnonFlow())
       .via(DicomFlows.attributeFlow)
       .runWith(DicomAttributesSink.attributesSink)
 

@@ -212,7 +212,7 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("AnonymizationFlowSpec")) w
     val storedImageIds = FutureUtil.traverseSequentially(sopInstanceUIDs) { sopInstanceUID =>
       val modifiedBytesSource = bytesSource
         .via(DicomPartFlow.partFlow)
-        .via(DicomFlows.blacklistFilter(Seq(Tag.PixelData)))
+        .via(DicomFlows.blacklistFilter(Set(TagPath.fromTag(Tag.PixelData))))
         .via(DicomModifyFlow.modifyFlow(
           TagModification.contains(
             TagPath.fromTag(Tag.MediaStorageSOPInstanceUID),

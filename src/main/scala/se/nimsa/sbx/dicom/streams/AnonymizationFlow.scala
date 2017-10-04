@@ -201,7 +201,8 @@ object AnonymizationFlow {
     Tag.VerifyingObserverIdentificationCodeSequence, // type Z
     Tag.VerifyingObserverSequence, // type D
     Tag.VerifyingOrganization,
-    Tag.VisitComments)
+    Tag.VisitComments
+  )
 
   /**
     * From standard PS3.15 Table E.1-1
@@ -209,10 +210,11 @@ object AnonymizationFlow {
     * Remove overlay data
     * Remove, set empty or modify certain attributes
     */
-  val anonFlow: Flow[DicomPart, DicomPart, NotUsed] = Flow[DicomPart]
-    .via(blacklistFilter(DicomParsing.isPrivateAttribute _)) // remove private attributes
-    .via(blacklistFilter(isOverlay _)) // remove overlay data
-    .via(blacklistFilter(removeTags.contains _)) // remove tags from above list, if present
+  def anonFlow(): Flow[DicomPart, DicomPart, NotUsed] = Flow[DicomPart]
+    .via(tagFilter(_ => true)(tagPath =>
+      !DicomParsing.isPrivateAttribute(tagPath.tag) &&
+        !isOverlay(tagPath.tag) &&
+        !removeTags.exists(tagPath.contains))) // remove private, overlay and PHI attributes
     .via(modifyFlow( // modify, clear and insert
     modify(Tag.AccessionNumber, bytes => if (bytes.nonEmpty) createAccessionNumber(bytes) else bytes),
     modify(Tag.ConcatenationUID, createUid),
@@ -264,10 +266,10 @@ object AnonymizationFlow {
     *
     * @return a `Flow` of `DicomParts` that will anonymize non-anonymized data but does nothing otherwise
     */
-  val maybeAnonFlow: Flow[DicomPart, DicomPart, NotUsed] = DicomStreamOps.conditionalFlow(
+  def maybeAnonFlow(): Flow[DicomPart, DicomPart, NotUsed] = DicomStreamOps.conditionalFlow(
     {
       case p: DicomMetaPart => !p.isAnonymized
-    }, anonFlow, Flow.fromFunction(identity))
+    }, anonFlow(), Flow.fromFunction(identity))
 
 }
 

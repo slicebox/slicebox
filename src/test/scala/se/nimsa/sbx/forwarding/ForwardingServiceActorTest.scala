@@ -142,7 +142,7 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
         imageId shouldBe image1.id
         applicableRules shouldBe empty
     }
-    expectNoMsg
+    expectNoMessage(3.seconds)
     await(forwardingDao.listForwardingRules(0, 1)) should be(empty)
     await(forwardingDao.listForwardingTransactions) should be(empty)
     await(forwardingDao.listForwardingTransactionImages) should be(empty)
@@ -319,7 +319,7 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     await(forwardingDao.listForwardingTransactionImages) should be(empty)
 
     // wait for deletion of images to finish
-    expectNoMsg
+    expectNoMessage(3.seconds)
 
     deletedImages shouldBe Seq(image.id)
   }

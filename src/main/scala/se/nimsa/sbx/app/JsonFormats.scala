@@ -39,7 +39,7 @@ import se.nimsa.sbx.user.UserProtocol._
 import play.api.libs.json._
 import play.api.libs.json.Reads._
 import play.api.libs.functional.syntax._
-import se.nimsa.dcm4che.streams.TagPath.{TagPathSequence, TagPathTag}
+import se.nimsa.dcm4che.streams.TagPath.{TagPathSequence, TagPathSequenceAny, TagPathSequenceItem, TagPathTag}
 
 trait JsonFormats {
 
@@ -53,7 +53,9 @@ trait JsonFormats {
       (__ \ "item").read[String] and
       (__ \ "previous").lazyReadNullable[TagPathSequence](tagPathSequenceReads)
     ) ((tag, itemString, previous) => {
-    val item = try Option(Integer.parseInt(itemString)) catch { case _: Throwable => None }
+    val item = try Option(Integer.parseInt(itemString)) catch {
+      case _: Throwable => None
+    }
     previous
       .map(p => item.map(i => p.thenSequence(tag, i)).getOrElse(p.thenSequence(tag)))
       .getOrElse(item.map(i => TagPath.fromSequence(tag, i)).getOrElse(TagPath.fromSequence(tag)))
@@ -64,28 +66,33 @@ trait JsonFormats {
       (__ \ "previous").lazyReadNullable[TagPathSequence](tagPathSequenceReads)
     ) ((tag, previous) => previous.map(p => p.thenTag(tag)).getOrElse(TagPath.fromTag(tag)))
 
+  private val sequenceToTuple: TagPathSequence => (Int, String, Option[TagPathSequence]) = {
+    case sequenceItem: TagPathSequenceItem => (sequenceItem.tag, sequenceItem.item.toString, sequenceItem.previous)
+    case sequenceAny: TagPathSequenceAny => (sequenceAny.tag, "*", sequenceAny.previous)
+  }
+
   private lazy val tagPathSequenceWrites: Writes[TagPathSequence] = (
     (__ \ "tag").write[Int] and
       (__ \ "item").write[String] and
       (__ \ "previous").lazyWriteNullable[TagPathSequence](tagPathSequenceWrites)
-    ) (tagPath => (tagPath.tag, tagPath.item.map(_.toString).getOrElse("*"), tagPath.previous))
+    ) (sequenceToTuple)
 
   private lazy val tagPathTagWrites: Writes[TagPathTag] = (
     (__ \ "tag").write[Int] and
       (__ \ "previous").writeNullable[TagPathSequence](tagPathSequenceWrites)
     ) (tagPath => (tagPath.tag, tagPath.previous))
 
-  implicit lazy val tagPathSequenceFormat = Format(tagPathSequenceReads, tagPathSequenceWrites)
-  implicit lazy val tagPathTagFormat = Format(tagPathTagReads, tagPathTagWrites)
+  implicit lazy val tagPathSequenceFormat: Format[TagPathSequence] = Format(tagPathSequenceReads, tagPathSequenceWrites)
+  implicit lazy val tagPathTagFormat: Format[TagPathTag] = Format(tagPathTagReads, tagPathTagWrites)
 
-  implicit val tagMappingFormat = Format[TagMapping](
+  implicit val tagMappingFormat: Format[TagMapping] = Format[TagMapping](
     (
       (__ \ "tagPath").read[TagPathTag] and
-      (__ \ "value").read[String]) ((tagPath, valueString) => TagMapping(tagPath, ByteString(Base64.getDecoder.decode(valueString)))
+        (__ \ "value").read[String]) ((tagPath, valueString) => TagMapping(tagPath, ByteString(Base64.getDecoder.decode(valueString)))
     ),
     (
       (__ \ "tagPath").write[TagPathTag] and
-      (__ \ "value").write[String]) (tagMapping => (tagMapping.tagPath, Base64.getEncoder.encodeToString(tagMapping.value.toArray))
+        (__ \ "value").write[String]) (tagMapping => (tagMapping.tagPath, Base64.getEncoder.encodeToString(tagMapping.value.toArray))
     )
   )
 

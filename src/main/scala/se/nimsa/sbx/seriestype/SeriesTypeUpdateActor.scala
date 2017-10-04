@@ -123,7 +123,7 @@ class SeriesTypeUpdateActor(storage: StorageService)(implicit val materializer: 
 
               val futureAttributes = storage.fileSource(image.id)
                 .via(new DicomPartFlow(stopTag = Some(tags.max + 1)))
-                .via(whitelistFilter(tags.contains _))
+                .via(tagFilter(_ => false)(tagPath => tags.contains(tagPath.tag)))
                 .via(attributeFlow)
                 .runWith(DicomAttributesSink.attributesSink)
 

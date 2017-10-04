@@ -19,15 +19,15 @@ import se.nimsa.dcm4che.streams.{DicomFlows, DicomPartFlow}
 import se.nimsa.sbx.dicom.streams.DicomStreamOps.{attributesToMetaPart, metaTags2Collect}
 import se.nimsa.sbx.util.TestUtil._
 
-import scala.concurrent.Await
+import scala.concurrent.{Await, ExecutionContextExecutor}
 import scala.concurrent.duration.DurationInt
 
 class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")) with FlatSpecLike with Matchers with BeforeAndAfterAll {
 
-  implicit val materializer = ActorMaterializer()
-  implicit val ec = system.dispatcher
+  implicit val materializer: ActorMaterializer = ActorMaterializer()
+  implicit val ec: ExecutionContextExecutor = system.dispatcher
 
-  override def afterAll = TestKit.shutdownActorSystem(system)
+  override def afterAll: Unit = TestKit.shutdownActorSystem(system)
 
   def toSource(attributes: Attributes): Source[DicomPart, NotUsed] = {
     val baos = new ByteArrayOutputStream()
@@ -40,15 +40,15 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
   }
 
   def toAnonSource(attributes: Attributes): Source[DicomPart, NotUsed] =
-    toSource(attributes).via(AnonymizationFlow.anonFlow)
+    toSource(attributes).via(AnonymizationFlow.anonFlow())
 
   def toMaybeAnonSource(attributes: Attributes): Source[DicomPart, NotUsed] =
     toSource(attributes)
       .via(collectAttributesFlow(metaTags2Collect))
       .mapAsync(5)(attributesToMetaPart)
-      .via(AnonymizationFlow.maybeAnonFlow)
+      .via(AnonymizationFlow.maybeAnonFlow())
 
-  def checkBasicAttributes(source: Source[DicomPart, NotUsed]) =
+  def checkBasicAttributes(source: Source[DicomPart, NotUsed]): PartProbe =
     source.runWith(TestSink.probe[DicomPart])
       .expectHeaderAndValueChunkPairs(
         Tag.SOPInstanceUID,
@@ -103,11 +103,7 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
       .expectHeader(Tag.SOPInstanceUID)
       .expectValueChunk()
       .expectHeader(Tag.AccessionNumber)
-      .request(1)
-      .expectNextChainingPF {
-        case v: DicomValueChunk =>
-          v.bytes shouldBe empty
-      }
+      .expectHeader(Tag.PatientName)
   }
 
   it should "create an new UID from and existing UID" in {
@@ -172,12 +168,12 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
   it should "always create the same new UID from some fixed existing UID" in {
     val attributes = new Attributes()
     attributes.setString(Tag.SOPInstanceUID, VR.UI, "1.2.3.4.5.6.7.8.9")
-    val source = toAnonSource(attributes)
-      .via(DicomFlows.whitelistFilter(_ == Tag.SOPInstanceUID))
+    def source() = toAnonSource(attributes)
+      .via(DicomFlows.tagFilter(_ => false)(tagPath => tagPath.tag == Tag.SOPInstanceUID))
       .via(DicomFlows.attributeFlow)
 
-    val f1 = source.runWith(Sink.head)
-    val f2 = source.runWith(Sink.head)
+    val f1 = source().runWith(Sink.head)
+    val f2 = source().runWith(Sink.head)
     val (sop1, sop2) = Await.result(f1.zip(f2), 5.seconds)
 
     sop1.bytes shouldBe sop2.bytes
@@ -213,14 +209,14 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
     val attributes = new Attributes()
     attributes.setString(Tag.PatientID, VR.LO, "John^Doe")
     val source1 = toAnonSource(attributes)
-    val source2 = source1.via(AnonymizationFlow.anonFlow)
+    val source2 = source1.via(AnonymizationFlow.anonFlow())
 
     val f1 = source1
-      .via(DicomFlows.whitelistFilter(_ == Tag.PatientID))
+      .via(DicomFlows.tagFilter(_ => false)(tagPath => tagPath.tag == Tag.PatientID))
       .map(_.bytes)
       .runWith(Sink.fold(ByteString.empty)(_ ++ _))
     val f2 = source2
-      .via(DicomFlows.whitelistFilter(_ == Tag.PatientID))
+      .via(DicomFlows.tagFilter(_ => false)(tagPath => tagPath.tag == Tag.PatientID))
       .map(_.bytes)
       .runWith(Sink.fold(ByteString.empty)(_ ++ _))
     val (ds1, ds2) = Await.result(f1.zip(f2), 5.seconds)
@@ -228,10 +224,10 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
     ds1 should not be ds2
   }
 
-  "The conditional anonimization flow" should "anonymize data which has not been anonymized" in {
+  "The conditional anonymization flow" should "anonymize data which has not been anonymized" in {
     val attributes = new Attributes()
     attributes.setString(Tag.PatientID, VR.LO, "John^Doe")
-    val source = toMaybeAnonSource(attributes).via(DicomFlows.whitelistFilter(_ == Tag.PatientID))
+    val source = toMaybeAnonSource(attributes).via(DicomFlows.tagFilter(_ => false)(tagPath => tagPath.tag == Tag.PatientID))
 
     source.runWith(TestSink.probe[DicomPart])
       .expectHeader(Tag.PatientID)
@@ -247,7 +243,7 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
     val attributes = new Attributes()
     attributes.setString(Tag.PatientID, VR.LO, "John^Doe")
     attributes.setString(Tag.PatientIdentityRemoved, VR.CS, "YES")
-    val source = toMaybeAnonSource(attributes).via(DicomFlows.whitelistFilter(_ == Tag.PatientID))
+    val source = toMaybeAnonSource(attributes).via(DicomFlows.tagFilter(_ => false)(tagPath => tagPath.tag == Tag.PatientID))
 
     source.runWith(TestSink.probe[DicomPart])
       .expectHeader(Tag.PatientID)
@@ -263,7 +259,7 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
     val attributes = new Attributes()
     attributes.setString(Tag.PatientID, VR.LO, "John^Doe")
     attributes.setString(Tag.PatientIdentityRemoved, VR.CS, "YES")
-    val source = toSource(attributes).via(AnonymizationFlow.maybeAnonFlow).via(DicomFlows.whitelistFilter(_ == Tag.PatientID))
+    val source = toSource(attributes).via(AnonymizationFlow.maybeAnonFlow()).via(DicomFlows.tagFilter(_ => false)(tagPath => tagPath.tag == Tag.PatientID))
 
     source.runWith(TestSink.probe[DicomPart])
       .expectHeader(Tag.PatientID)

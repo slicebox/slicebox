@@ -69,7 +69,7 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
       val series = addTestDicomData()
 
       seriesTypeUpdateService ! UpdateSeriesTypesForSeries(series.id)
-      expectNoMsg
+      expectNoMessage(3.seconds)
 
       waitForSeriesTypesUpdateCompletion()
 
@@ -87,7 +87,7 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
       val series = addTestDicomData()
 
       seriesTypeUpdateService ! UpdateSeriesTypesForSeries(series.id)
-      expectNoMsg
+      expectNoMessage(3.seconds)
 
       waitForSeriesTypesUpdateCompletion()
 
@@ -105,7 +105,7 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
       await(seriesTypeDao.upsertSeriesSeriesType(SeriesSeriesType(series.id, seriesType.id)))
 
       seriesTypeUpdateService ! UpdateSeriesTypesForSeries(series.id)
-      expectNoMsg
+      expectNoMessage(3.seconds)
 
       waitForSeriesTypesUpdateCompletion()
 
@@ -120,9 +120,9 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
       addMatchingRuleToSeriesType(seriesType)
 
       seriesTypeUpdateService ! UpdateSeriesTypesForSeries(series1.id)
-      expectNoMsg
+      expectNoMessage(3.seconds)
       seriesTypeUpdateService ! UpdateSeriesTypesForSeries(series2.id)
-      expectNoMsg
+      expectNoMessage(3.seconds)
       waitForSeriesTypesUpdateCompletion()
 
       seriesSeriesTypesForSeries(series1).size should be(1)
@@ -138,7 +138,7 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
       val series = addTestDicomData(patientName = "xyz", patientSex = "M")
 
       seriesTypeUpdateService ! UpdateSeriesTypesForSeries(series.id)
-      expectNoMsg
+      expectNoMessage(3.seconds)
 
       waitForSeriesTypesUpdateCompletion()
 
@@ -154,7 +154,7 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
       val series = addTestDicomData(patientName = "xyz")
 
       seriesTypeUpdateService ! UpdateSeriesTypesForSeries(series.id)
-      expectNoMsg
+      expectNoMessage(3.seconds)
 
       waitForSeriesTypesUpdateCompletion()
 

@@ -58,7 +58,7 @@ trait StorageService extends LazyLogging {
   def readImageInformation(imageId: Long)(implicit materializer: Materializer, ec: ExecutionContext): Future[ImageInformation] =
     fileSource(imageId)
       .via(new DicomPartFlow(stopTag = Some(imageInformationTags.last + 1)))
-      .via(DicomFlows.whitelistFilter(imageInformationTags.contains _))
+      .via(DicomFlows.tagFilter(_ => true)(tagPath => imageInformationTags.contains(tagPath.tag)))
       .via(DicomFlows.attributeFlow)
       .runWith(DicomAttributesSink.attributesSink)
       .map {

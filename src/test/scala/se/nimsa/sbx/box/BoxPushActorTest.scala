@@ -127,7 +127,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
       boxPushActorRef ! PollOutgoing
 
-      expectNoMsg()
+      expectNoMessage(3.seconds)
 
       capturedFileSendRequests should have length 1
       capturedStatusUpdateRequests shouldBe empty
@@ -141,7 +141,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       val image2 = await(boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage2.id, 1, sent = false)))
 
       boxPushActorRef ! PollOutgoing
-      expectNoMsg()
+      expectNoMessage(3.seconds)
 
       capturedFileSendRequests.size should be(2)
       capturedStatusUpdateRequests shouldBe empty
@@ -158,7 +158,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
       boxPushActorRef ! PollOutgoing
 
-      expectNoMsg() // both images will be sent
+      expectNoMessage(3.seconds) // both images will be sent
 
       await(boxDao.listOutgoingTransactions(0, 1)).head.status shouldBe TransactionStatus.FINISHED
     }
@@ -172,7 +172,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
       boxPushActorRef ! PollOutgoing
 
-      expectNoMsg()
+      expectNoMessage(3.seconds)
 
       val outgoingTransactions = await(boxDao.listOutgoingTransactions(0, 10))
       outgoingTransactions.size should be(1)
@@ -191,7 +191,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       failedResponseSendIndices += 1
 
       boxPushActorRef ! PollOutgoing
-      expectNoMsg()
+      expectNoMessage(3.seconds)
 
       val outgoingTransactions = await(boxDao.listOutgoingTransactions(0, 10))
       outgoingTransactions.size should be(2)
@@ -213,13 +213,13 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       failedResponseSendIndices += 1
 
       boxPushActorRef ! PollOutgoing
-      expectNoMsg()
+      expectNoMessage(3.seconds)
 
       val transaction2 = await(boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, testBox.id, testBox.name, 0, 1, 1000, 1000, TransactionStatus.WAITING)))
       await(boxDao.insertOutgoingImage(OutgoingImage(-1, transaction2.id, dbImage2.id, 1, sent = false)))
 
       boxPushActorRef ! PollOutgoing
-      expectNoMsg()
+      expectNoMessage(3.seconds)
 
       capturedFileSendRequests.size should be(2)
       capturedStatusUpdateRequests should have length 1
@@ -243,7 +243,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       noResponseSendIndices ++= Seq(2, 3)
 
       boxPushActorRef ! PollOutgoing
-      expectNoMsg()
+      expectNoMessage(3.seconds)
 
       await(boxDao.listOutgoingImagesForOutgoingTransactionId(transaction.id)).count(_.sent == false) should be(2)
 
@@ -251,7 +251,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       noResponseSendIndices.clear()
 
       boxPushActorRef ! PollOutgoing
-      expectNoMsg()
+      expectNoMessage(3.seconds)
 
       await(boxDao.listOutgoingImagesForOutgoingTransactionId(transaction.id)).count(_.sent == false) should be(0)
 
@@ -268,7 +268,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
       boxPushActorRef ! PollOutgoing
 
-      expectNoMsg() // both images will be sent
+      expectNoMessage(3.seconds) // both images will be sent
 
       await(boxDao.listOutgoingTransactions(0, 1)).head.status shouldBe TransactionStatus.FAILED
 
