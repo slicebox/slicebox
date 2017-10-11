@@ -59,8 +59,6 @@ trait DicomStreamOps {
                          (implicit materializer: Materializer, ec: ExecutionContext): StreamSource[ByteString, NotUsed] = {
     val source = storage.fileSource(imageId)
       .via(partFlow)
-      .via(groupLengthDiscardFilter) // group lengths may change, discard if any
-      .via(sequenceLengthFilter) // undefined length seqs and items only
     anonymizedDicomDataSource(source, anonymizationQuery, anonymizationInsert, tagValues)
   }
 
@@ -119,8 +117,6 @@ trait DicomStreamOps {
           seriesSourceMaybe.map { seriesSource =>
             val forcedSource = storage.fileSource(imageId)
               .via(DicomPartFlow.partFlow)
-              .via(groupLengthDiscardFilter) // group lengths may change, discard if any
-              .via(sequenceLengthFilter) // undefined length seqs and items only
               .via(modifyFlow(TagModification.contains(TagPath.fromTag(Tag.PatientIdentityRemoved), _ => ByteString("NO"), insert = false)))
               .via(blacklistFilter(Set(TagPath.fromTag(Tag.DeidentificationMethod))))
             val anonymizedSource = anonymizedDicomDataSource(forcedSource, anonymizationQuery, anonymizationInsert, tagValues)
@@ -157,7 +153,7 @@ trait DicomStreamOps {
       storage.fileSource(imageId)
         .via(DicomPartFlow.partFlow)
         .via(groupLengthDiscardFilter)
-        .via(sequenceLengthFilter)
+        .via(forceIndeterminateLengthSequences())
         .via(modifyFlow(tagModifications: _*))
         .via(fmiGroupLengthFlow)
         .map(_.bytes)
@@ -286,8 +282,6 @@ object DicomStreamOps {
         val flow = builder.add {
           if (reverseAnonymization)
             baseFlow
-              .via(groupLengthDiscardFilter)
-              .via(sequenceLengthFilter)
               .via(collectAttributesFlow(metaTags2Collect))
               .mapAsync(1)(attributesToMetaPart)
               .mapAsync(1)(queryProtectedAnonymizationKeys(reverseAnonymizationQuery))

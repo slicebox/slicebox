@@ -16,6 +16,8 @@ import scala.util.Random
 
 object AnonymizationFlow {
 
+  import DicomParsing.isPrivateAttribute
+
   private def toAsciiBytes(s: String, vr: VR) = padToEvenLength(ByteString(s), vr)
   private def insert(tag: Int, mod: ByteString => ByteString) = TagModification.endsWith(TagPath.fromTag(tag), mod, insert = true)
   private def modify(tag: Int, mod: ByteString => ByteString) = TagModification.endsWith(TagPath.fromTag(tag), mod, insert = false)
@@ -211,10 +213,11 @@ object AnonymizationFlow {
     * Remove, set empty or modify certain attributes
     */
   def anonFlow(): Flow[DicomPart, DicomPart, NotUsed] = Flow[DicomPart]
+    .via(groupLengthDiscardFilter)
+    .via(forceIndeterminateLengthSequences())
     .via(tagFilter(_ => true)(tagPath =>
-      !DicomParsing.isPrivateAttribute(tagPath.tag) &&
-        !isOverlay(tagPath.tag) &&
-        !removeTags.exists(tagPath.contains))) // remove private, overlay and PHI attributes
+      !tagPath.toList.map(_.tag).exists(tag =>
+        isPrivateAttribute(tag) || isOverlay(tag) || removeTags.contains(tag)))) // remove private, overlay and PHI attributes
     .via(modifyFlow( // modify, clear and insert
     modify(Tag.AccessionNumber, bytes => if (bytes.nonEmpty) createAccessionNumber(bytes) else bytes),
     modify(Tag.ConcatenationUID, createUid),

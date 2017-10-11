@@ -3,6 +3,7 @@ package se.nimsa.sbx.dicom.streams
 import akka.NotUsed
 import akka.stream.scaladsl.Flow
 import org.dcm4che3.data.{SpecificCharacterSet, Tag}
+import se.nimsa.dcm4che.streams.DicomFlows.forceIndeterminateLengthSequences
 import se.nimsa.dcm4che.streams.DicomModifyFlow.TagModification
 import se.nimsa.dcm4che.streams.DicomParts._
 import se.nimsa.dcm4che.streams._
@@ -12,6 +13,8 @@ import se.nimsa.dcm4che.streams._
   * anonymized)
   */
 object ReverseAnonymizationFlow {
+
+  import DicomFlows.groupLengthDiscardFilter
 
   private val reverseTags = Seq(
     Tag.PatientName,
@@ -29,9 +32,11 @@ object ReverseAnonymizationFlow {
     Tag.FrameOfReferenceUID)
 
   def reverseAnonFlow(): Flow[DicomPart, DicomPart, NotUsed] = Flow[DicomPart]
+    .via(groupLengthDiscardFilter)
+    .via(forceIndeterminateLengthSequences())
     .via(DicomModifyFlow.modifyFlow(
       reverseTags.map(tag => TagModification.endsWith(TagPath.fromTag(tag), identity, insert = true)): _*))
-    .via(DicomFlowFactory.create(new DicomFlow with JustEmit with GuaranteedValueEvent {
+    .via(DicomFlowFactory.create(new IdentityFlow with GuaranteedValueEvent {
       var maybeMeta: Option[DicomMetaPart] = None
       var maybeKeys: Option[AnonymizationKeysPart] = None
       var currentAttribute: Option[DicomAttribute] = None

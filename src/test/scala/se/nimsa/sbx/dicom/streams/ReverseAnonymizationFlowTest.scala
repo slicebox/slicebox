@@ -85,9 +85,7 @@ class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymiza
     val dicomData = DicomData(attributes, fmi)
     val source = attributesSource(dicomData)
       .via(ReverseAnonymizationFlow.reverseAnonFlow())
-      .via(DicomFlowFactory.create(new DicomFlow with JustEmit with GuaranteedValueEvent {
-        override def onValueChunk(part: DicomParts.DicomValueChunk): List[DicomPart] = part :: Nil
-      }))
+      .via(DicomFlows.guaranteedValueFlow)
 
     source.runWith(TestSink.probe[DicomPart])
       .expectHeaderAndValueChunkPairs(

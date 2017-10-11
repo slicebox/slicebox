@@ -53,12 +53,12 @@ trait StorageService extends LazyLogging {
   def readImageAttributes(imageId: Long)(implicit materializer: Materializer, ec: ExecutionContext): Source[ImageAttribute, NotUsed] =
     DicomStreamOps.imageAttributesSource(fileSource(imageId))
 
-  private val imageInformationTags = Seq(Tag.InstanceNumber, Tag.ImageIndex, Tag.NumberOfFrames, Tag.SmallestImagePixelValue, Tag.LargestImagePixelValue).sorted
+  private val imageInformationTags = Set(Tag.InstanceNumber, Tag.ImageIndex, Tag.NumberOfFrames, Tag.SmallestImagePixelValue, Tag.LargestImagePixelValue)
 
   def readImageInformation(imageId: Long)(implicit materializer: Materializer, ec: ExecutionContext): Future[ImageInformation] =
     fileSource(imageId)
-      .via(new DicomPartFlow(stopTag = Some(imageInformationTags.last + 1)))
-      .via(DicomFlows.tagFilter(_ => true)(tagPath => imageInformationTags.contains(tagPath.tag)))
+      .via(new DicomPartFlow(stopTag = Some(imageInformationTags.max + 1)))
+      .via(DicomFlows.whitelistFilter(imageInformationTags))
       .via(DicomFlows.attributeFlow)
       .runWith(DicomAttributesSink.attributesSink)
       .map {

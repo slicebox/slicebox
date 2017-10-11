@@ -3,13 +3,16 @@ package se.nimsa.sbx.dicom.streams
 import akka.NotUsed
 import akka.stream.scaladsl.Flow
 import org.dcm4che3.data.{SpecificCharacterSet, Tag}
-import se.nimsa.dcm4che.streams.{DicomFlow, DicomFlowFactory, GuaranteedValueEvent, JustEmit}
+import se.nimsa.dcm4che.streams.DicomFlows.forceIndeterminateLengthSequences
 import se.nimsa.dcm4che.streams.DicomParts._
+import se.nimsa.dcm4che.streams._
 
 /**
   * A flow which harmonizes anonymization so that random attributes correspond between patients, studies and series
   */
 object HarmonizeAnonymizationFlow {
+
+  import DicomFlows.groupLengthDiscardFilter
 
   private val harmonizeTags = Seq(
     Tag.PatientName,
@@ -18,8 +21,10 @@ object HarmonizeAnonymizationFlow {
     Tag.SeriesInstanceUID,
     Tag.FrameOfReferenceUID)
 
-  def harmonizeAnonFlow(): Flow[DicomPart, DicomPart, NotUsed] =
-    DicomFlowFactory.create(new DicomFlow with JustEmit with GuaranteedValueEvent {
+  def harmonizeAnonFlow(): Flow[DicomPart, DicomPart, NotUsed] = Flow[DicomPart]
+    .via(groupLengthDiscardFilter)
+    .via(forceIndeterminateLengthSequences())
+    .via(DicomFlowFactory.create(new IdentityFlow with GuaranteedValueEvent {
 
       def maybeHarmonize(attribute: DicomAttribute, keys: AnonymizationKeysPart, cs: SpecificCharacterSet): List[DicomPart with Product with Serializable] = {
         val updatedAttribute = attribute.header.tag match {
@@ -53,7 +58,7 @@ object HarmonizeAnonymizationFlow {
 
         case keys: AnonymizationKeysPart =>
           maybeKeys = Some(keys)
-          super.onPart(keys).filterNot(_ == keys)
+          super.onPart(keys)
       }
 
       override def onHeader(header: DicomHeader): List[DicomPart] =
@@ -80,7 +85,7 @@ object HarmonizeAnonymizationFlow {
             super.onValueChunk(valueChunk).filterNot(_ == valueChunk)
         } else
           super.onValueChunk(valueChunk)
-    })
+    }))
 
   def maybeHarmonizeAnonFlow(): Flow[DicomPart, DicomPart, NotUsed] = DicomStreamOps.conditionalFlow(
     {
