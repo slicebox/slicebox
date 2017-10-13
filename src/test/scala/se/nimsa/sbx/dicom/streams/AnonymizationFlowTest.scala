@@ -167,9 +167,9 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
 
   it should "always create the same new UID from some fixed existing UID" in {
     val attributes = new Attributes()
-    attributes.setString(Tag.SOPInstanceUID, VR.UI, "1.2.3.4.5.6.7.8.9")
+    attributes.setString(Tag.TargetUID, VR.UI, "1.2.3.4.5.6.7.8.9")
     def source() = toAnonSource(attributes)
-      .via(DicomFlows.tagFilter(_ => false)(tagPath => tagPath.tag == Tag.SOPInstanceUID))
+      .via(DicomFlows.tagFilter(_ => false)(tagPath => tagPath.tag == Tag.TargetUID))
       .via(DicomFlows.attributeFlow)
 
     val f1 = source().runWith(Sink.head)
