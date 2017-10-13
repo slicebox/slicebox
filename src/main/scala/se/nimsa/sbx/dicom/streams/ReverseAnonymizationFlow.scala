@@ -3,7 +3,7 @@ package se.nimsa.sbx.dicom.streams
 import akka.NotUsed
 import akka.stream.scaladsl.Flow
 import org.dcm4che3.data.{SpecificCharacterSet, Tag}
-import se.nimsa.dcm4che.streams.DicomFlows.forceIndeterminateLengthSequences
+import se.nimsa.dcm4che.streams.DicomFlows.toUndefinedLengthSequences
 import se.nimsa.dcm4che.streams.DicomModifyFlow.TagModification
 import se.nimsa.dcm4che.streams.DicomParts._
 import se.nimsa.dcm4che.streams._
@@ -31,12 +31,12 @@ object ReverseAnonymizationFlow {
     Tag.ProtocolName,
     Tag.FrameOfReferenceUID)
 
-  def reverseAnonFlow(): Flow[DicomPart, DicomPart, NotUsed] = Flow[DicomPart]
+  val reverseAnonFlow: Flow[DicomPart, DicomPart, NotUsed] = Flow[DicomPart]
     .via(groupLengthDiscardFilter)
-    .via(forceIndeterminateLengthSequences())
+    .via(toUndefinedLengthSequences)
     .via(DicomModifyFlow.modifyFlow(
       reverseTags.map(tag => TagModification.endsWith(TagPath.fromTag(tag), identity, insert = true)): _*))
-    .via(DicomFlowFactory.create(new IdentityFlow with GuaranteedValueEvent {
+    .via(DicomFlowFactory.create(new IdentityFlow with GuaranteedValueEvent with StartEvent {
       var maybeMeta: Option[DicomMetaPart] = None
       var maybeKeys: Option[AnonymizationKeysPart] = None
       var currentAttribute: Option[DicomAttribute] = None
@@ -105,12 +105,18 @@ object ReverseAnonymizationFlow {
         } else
           super.onValueChunk(chunk)
 
+      override def onStart(): List[DicomPart] = {
+        maybeMeta = None
+        maybeKeys = None
+        currentAttribute = None
+        super.onStart()
+      }
     }))
 
-  def maybeReverseAnonFlow(): Flow[DicomPart, DicomPart, NotUsed] = DicomStreamOps.conditionalFlow(
+  def maybeReverseAnonFlow: Flow[DicomPart, DicomPart, NotUsed] = DicomStreamOps.conditionalFlow(
     {
       case keys: AnonymizationKeysPart => keys.patientKey.isEmpty
-    }, Flow.fromFunction(identity), reverseAnonFlow())
+    }, Flow.fromFunction(identity), reverseAnonFlow)
 
 }
 

@@ -19,16 +19,13 @@ package se.nimsa.sbx.scu
 import java.io.IOException
 import java.net.{ConnectException, NoRouteToHostException, UnknownHostException}
 
-import akka.NotUsed
-import akka.actor.{Actor, Props}
+import akka.actor.{Actor, ActorSelection, ActorSystem, Props}
 import akka.event.{Logging, LoggingReceive}
 import akka.pattern.pipe
 import akka.stream.Materializer
-import akka.stream.scaladsl.Source
 import akka.util.Timeout
 import org.dcm4che3.net.{IncompatibleConnectionException, NoPresentationContextException}
-import se.nimsa.dcm4che.streams.DicomPartFlow
-import se.nimsa.dcm4che.streams.DicomParts.DicomPart
+import se.nimsa.dcm4che.streams.DicomParseFlow
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.lang.{BadGatewayException, NotFoundException}
 import se.nimsa.sbx.log.SbxLog
@@ -37,18 +34,18 @@ import se.nimsa.sbx.storage.StorageService
 import se.nimsa.sbx.util.ExceptionCatching
 import se.nimsa.sbx.util.FutureUtil.await
 
+import scala.concurrent.ExecutionContextExecutor
+
 class ScuServiceActor(scuDao: ScuDAO, storage: StorageService)(implicit materializer: Materializer, timeout: Timeout) extends Actor with ExceptionCatching {
   val log = Logging(context.system, this)
 
-  implicit val system = context.system
-  implicit val ec = context.dispatcher
+  implicit val system: ActorSystem = context.system
+  implicit val ec: ExecutionContextExecutor = context.dispatcher
 
-  val storageService = context.actorSelection("../StorageService")
+  val storageService: ActorSelection = context.actorSelection("../StorageService")
 
-  val dicomDataProvider = new DicomDataProvider {
-    override def getDicomData(imageId: Long, stopTag: Option[Int]): Source[DicomPart, NotUsed] =
-      storage.fileSource(imageId).via(new DicomPartFlow(stopTag = stopTag))
-  }
+  val dicomDataProvider: DicomDataProvider =
+    (imageId: Long, stopTag: Option[Int]) => storage.fileSource(imageId).via(new DicomParseFlow(stopTag = stopTag))
 
   log.info("SCU service started")
 
@@ -129,22 +126,22 @@ class ScuServiceActor(scuDao: ScuDAO, storage: StorageService)(implicit material
 
   }
 
-  def addScu(scuData: ScuData) =
+  def addScu(scuData: ScuData): ScuData =
     await(scuDao.insert(scuData))
 
-  def scuForId(id: Long) =
+  def scuForId(id: Long): Option[ScuData] =
     await(scuDao.scuDataForId(id))
 
-  def scuForName(name: String) =
+  def scuForName(name: String): Option[ScuData] =
     await(scuDao.scuDataForName(name))
 
-  def scuForHostAndPort(host: String, port: Int) =
+  def scuForHostAndPort(host: String, port: Int): Option[ScuData] =
     await(scuDao.scuDataForHostAndPort(host, port))
 
-  def deleteScuWithId(id: Long) =
+  def deleteScuWithId(id: Long): Int =
     await(scuDao.deleteScuDataWithId(id))
 
-  def getScus(startIndex: Long, count: Long) =
+  def getScus(startIndex: Long, count: Long): Seq[ScuData] =
     await(scuDao.listScuDatas(startIndex, count))
 
 }

@@ -15,7 +15,7 @@ import org.dcm4che3.io.DicomOutputStream
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 import se.nimsa.dcm4che.streams.DicomFlows.collectAttributesFlow
 import se.nimsa.dcm4che.streams.DicomParts.{DicomPart, DicomValueChunk}
-import se.nimsa.dcm4che.streams.{DicomFlows, DicomPartFlow}
+import se.nimsa.dcm4che.streams.{DicomFlows, DicomParseFlow}
 import se.nimsa.sbx.dicom.streams.DicomStreamOps.{attributesToMetaPart, metaTags2Collect}
 import se.nimsa.sbx.util.TestUtil._
 
@@ -36,17 +36,17 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
     dos.close()
 
     Source.single(ByteString(baos.toByteArray))
-      .via(DicomPartFlow.partFlow)
+      .via(DicomParseFlow.parseFlow)
   }
 
   def toAnonSource(attributes: Attributes): Source[DicomPart, NotUsed] =
-    toSource(attributes).via(AnonymizationFlow.anonFlow())
+    toSource(attributes).via(AnonymizationFlow.anonFlow)
 
   def toMaybeAnonSource(attributes: Attributes): Source[DicomPart, NotUsed] =
     toSource(attributes)
       .via(collectAttributesFlow(metaTags2Collect))
       .mapAsync(5)(attributesToMetaPart)
-      .via(AnonymizationFlow.maybeAnonFlow())
+      .via(AnonymizationFlow.maybeAnonFlow)
 
   def checkBasicAttributes(source: Source[DicomPart, NotUsed]): PartProbe =
     source.runWith(TestSink.probe[DicomPart])
@@ -209,7 +209,7 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
     val attributes = new Attributes()
     attributes.setString(Tag.PatientID, VR.LO, "John^Doe")
     val source1 = toAnonSource(attributes)
-    val source2 = source1.via(AnonymizationFlow.anonFlow())
+    val source2 = source1.via(AnonymizationFlow.anonFlow)
 
     val f1 = source1
       .via(DicomFlows.tagFilter(_ => false)(tagPath => tagPath.tag == Tag.PatientID))
@@ -259,7 +259,7 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
     val attributes = new Attributes()
     attributes.setString(Tag.PatientID, VR.LO, "John^Doe")
     attributes.setString(Tag.PatientIdentityRemoved, VR.CS, "YES")
-    val source = toSource(attributes).via(AnonymizationFlow.maybeAnonFlow()).via(DicomFlows.tagFilter(_ => false)(tagPath => tagPath.tag == Tag.PatientID))
+    val source = toSource(attributes).via(AnonymizationFlow.maybeAnonFlow).via(DicomFlows.tagFilter(_ => false)(tagPath => tagPath.tag == Tag.PatientID))
 
     source.runWith(TestSink.probe[DicomPart])
       .expectHeader(Tag.PatientID)

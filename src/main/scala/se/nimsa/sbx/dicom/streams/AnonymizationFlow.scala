@@ -212,9 +212,9 @@ object AnonymizationFlow {
     * Remove overlay data
     * Remove, set empty or modify certain attributes
     */
-  def anonFlow(): Flow[DicomPart, DicomPart, NotUsed] = Flow[DicomPart]
+  def anonFlow: Flow[DicomPart, DicomPart, NotUsed] = Flow[DicomPart]
     .via(groupLengthDiscardFilter)
-    .via(forceIndeterminateLengthSequences())
+    .via(toUndefinedLengthSequences)
     .via(tagFilter(_ => true)(tagPath =>
       !tagPath.toList.map(_.tag).exists(tag =>
         isPrivateAttribute(tag) || isOverlay(tag) || removeTags.contains(tag)))) // remove private, overlay and PHI attributes
@@ -230,7 +230,7 @@ object AnonymizationFlow {
     modify(Tag.DoseReferenceUID, createUid),
     modify(Tag.FiducialUID, createUid),
     clear(Tag.FillerOrderNumberImagingServiceRequest),
-    modify(Tag.FrameOfReferenceUID, _ => createUid(null)),
+    modify(Tag.FrameOfReferenceUID, createUid),
     modify(Tag.InstanceCreatorUID, createUid),
     modify(Tag.IrradiationEventUID, createUid),
     modify(Tag.LargePaletteColorLookupTableUID, createUid),
@@ -269,10 +269,10 @@ object AnonymizationFlow {
     *
     * @return a `Flow` of `DicomParts` that will anonymize non-anonymized data but does nothing otherwise
     */
-  def maybeAnonFlow(): Flow[DicomPart, DicomPart, NotUsed] = DicomStreamOps.conditionalFlow(
+  def maybeAnonFlow: Flow[DicomPart, DicomPart, NotUsed] = DicomStreamOps.conditionalFlow(
     {
       case p: DicomMetaPart => !p.isAnonymized
-    }, anonFlow(), Flow.fromFunction(identity))
+    }, anonFlow, Flow.fromFunction(identity))
 
 }
 

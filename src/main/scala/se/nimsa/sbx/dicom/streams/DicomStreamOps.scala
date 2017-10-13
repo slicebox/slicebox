@@ -9,7 +9,7 @@ import org.dcm4che3.data.{Attributes, Tag, UID, VR}
 import org.dcm4che3.io.DicomStreamException
 import se.nimsa.dcm4che.streams.DicomFlows._
 import se.nimsa.dcm4che.streams.DicomModifyFlow._
-import se.nimsa.dcm4che.streams.DicomPartFlow._
+import se.nimsa.dcm4che.streams.DicomParseFlow._
 import se.nimsa.dcm4che.streams.DicomParts._
 import se.nimsa.dcm4che.streams.TagPath.TagPathSequence
 import se.nimsa.dcm4che.streams._
@@ -58,7 +58,7 @@ trait DicomStreamOps {
   def anonymizedDicomData(imageId: Long, tagValues: Seq[TagValue], storage: StorageService)
                          (implicit materializer: Materializer, ec: ExecutionContext): StreamSource[ByteString, NotUsed] = {
     val source = storage.fileSource(imageId)
-      .via(partFlow)
+      .via(parseFlow)
     anonymizedDicomDataSource(source, anonymizationQuery, anonymizationInsert, tagValues)
   }
 
@@ -116,7 +116,7 @@ trait DicomStreamOps {
         callMetaDataService[Option[SeriesSource]](GetSourceForSeries(image.seriesId)).map { seriesSourceMaybe =>
           seriesSourceMaybe.map { seriesSource =>
             val forcedSource = storage.fileSource(imageId)
-              .via(DicomPartFlow.partFlow)
+              .via(parseFlow)
               .via(modifyFlow(TagModification.contains(TagPath.fromTag(Tag.PatientIdentityRemoved), _ => ByteString("NO"), insert = false)))
               .via(blacklistFilter(Set(TagPath.fromTag(Tag.DeidentificationMethod))))
             val anonymizedSource = anonymizedDicomDataSource(forcedSource, anonymizationQuery, anonymizationInsert, tagValues)
@@ -151,9 +151,9 @@ trait DicomStreamOps {
 
     val futureModifiedTempFile =
       storage.fileSource(imageId)
-        .via(DicomPartFlow.partFlow)
+        .via(parseFlow)
         .via(groupLengthDiscardFilter)
-        .via(forceIndeterminateLengthSequences())
+        .via(toUndefinedLengthSequences)
         .via(modifyFlow(tagModifications: _*))
         .via(fmiGroupLengthFlow)
         .map(_.bytes)
@@ -277,7 +277,7 @@ object DicomStreamOps {
         import GraphDSL.Implicits._
 
         val baseFlow = validateFlowWithContext(validationContexts)
-          .via(partFlow)
+          .via(parseFlow)
 
         val flow = builder.add {
           if (reverseAnonymization)
@@ -286,7 +286,7 @@ object DicomStreamOps {
               .mapAsync(1)(attributesToMetaPart)
               .mapAsync(1)(queryProtectedAnonymizationKeys(reverseAnonymizationQuery))
               .mapConcat(identity) // flatten stream of lists
-              .via(maybeReverseAnonFlow())
+              .via(maybeReverseAnonFlow)
           else
             baseFlow
         }
@@ -410,8 +410,8 @@ object DicomStreamOps {
       .mapAsync(1)(queryAnonymousAnonymizationKeys(anonymizationQuery))
       .mapConcat(identity) // DicomMetaPart :: AnonymizationKeysPart :: DicomPart...
       .via(collectAnonymizationKeyProtectedInfo) // AnonymizationKeyPart (protected) :: DicomMetaPart :: AnonymizationKeysPart :: DicomPart...
-      .via(maybeAnonFlow())
-      .via(maybeHarmonizeAnonFlow())
+      .via(maybeAnonFlow)
+      .via(maybeHarmonizeAnonFlow)
       .via(modifyFlow(toTagModifications(tagValues): _*))
       .via(fmiGroupLengthFlow) // update meta information group length
       .via(collectAnonymizationKeyAnonymousInfo) // AnonymizationKeyPart (anon) :: AnonymizationKeyPart (protected) :: DicomMetaPart :: AnonymizationKeysPart :: DicomPart...
@@ -420,7 +420,7 @@ object DicomStreamOps {
       .map(_.bytes)
 
   def inflatedSource(source: StreamSource[ByteString, _]): StreamSource[ByteString, _] = source
-    .via(partFlow)
+    .via(parseFlow)
     .via(modifyFlow(
       TagModification.contains(TagPath.fromTag(Tag.TransferSyntaxUID), valueBytes => {
         valueBytes.utf8String.trim match {
@@ -465,7 +465,7 @@ object DicomStreamOps {
   def imageAttributesSource[M](source: StreamSource[ByteString, M])
                               (implicit ec: ExecutionContext, materializer: Materializer): StreamSource[ImageAttribute, M] =
     source
-      .via(new DicomPartFlow(stopTag = Some(Tag.PixelData)))
+      .via(new DicomParseFlow(stopTag = Some(Tag.PixelData)))
       .via(bulkDataFilter)
       .via(collectAttributesFlow(encodingTags))
       .mapAsync(1)(attributesToMetaPart)

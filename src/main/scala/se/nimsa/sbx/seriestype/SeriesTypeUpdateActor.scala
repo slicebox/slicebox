@@ -16,14 +16,14 @@
 
 package se.nimsa.sbx.seriestype
 
-import akka.actor.{Actor, Props}
+import akka.actor.{Actor, ActorRef, ActorSelection, ActorSystem, Props}
 import akka.event.{Logging, LoggingReceive}
 import akka.pattern.ask
 import akka.stream.Materializer
 import akka.util.Timeout
 import org.dcm4che3.data.Attributes
 import se.nimsa.dcm4che.streams.DicomFlows._
-import se.nimsa.dcm4che.streams.{DicomAttributesSink, DicomPartFlow}
+import se.nimsa.dcm4che.streams.{DicomAttributesSink, DicomParseFlow}
 import se.nimsa.sbx.app.GeneralProtocol.ImageAdded
 import se.nimsa.sbx.dicom.DicomHierarchy.{Image, Series}
 import se.nimsa.sbx.dicom.DicomUtil
@@ -31,18 +31,18 @@ import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
 import se.nimsa.sbx.storage.StorageService
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContextExecutor, Future}
 
 class SeriesTypeUpdateActor(storage: StorageService)(implicit val materializer: Materializer, timeout: Timeout) extends Actor {
 
   val log = Logging(context.system, this)
 
-  implicit val system = context.system
-  implicit val ec = context.dispatcher
+  implicit val system: ActorSystem = context.system
+  implicit val ec: ExecutionContextExecutor = context.dispatcher
 
-  val storageService = context.actorSelection("../../StorageService")
-  val metaDataService = context.actorSelection("../../MetaDataService")
-  val seriesTypeService = context.parent
+  val storageService: ActorSelection = context.actorSelection("../../StorageService")
+  val metaDataService: ActorSelection = context.actorSelection("../../MetaDataService")
+  val seriesTypeService: ActorRef = context.parent
 
   val seriesToUpdate = scala.collection.mutable.Set.empty[Long]
   val seriesBeingUpdated = scala.collection.mutable.Set.empty[Long]
@@ -85,10 +85,10 @@ class SeriesTypeUpdateActor(storage: StorageService)(implicit val materializer: 
     case PollSeriesTypesUpdateQueue => pollSeriesTypesUpdateQueue()
   }
 
-  def addToUpdateQueueIfNotPresent(seriesId: Long) =
+  def addToUpdateQueueIfNotPresent(seriesId: Long): Boolean =
     seriesToUpdate.add(seriesId)
 
-  def pollSeriesTypesUpdateQueue() =
+  def pollSeriesTypesUpdateQueue(): Unit =
     if (seriesToUpdate.nonEmpty)
       nextSeriesNotBeingUpdated().foreach { seriesId =>
         val marked = markSeriesAsBeingUpdated(seriesId)
@@ -101,9 +101,9 @@ class SeriesTypeUpdateActor(storage: StorageService)(implicit val materializer: 
             }
       }
 
-  def nextSeriesNotBeingUpdated() = seriesToUpdate.find(!seriesBeingUpdated.contains(_))
+  def nextSeriesNotBeingUpdated(): Option[Long] = seriesToUpdate.find(!seriesBeingUpdated.contains(_))
 
-  def markSeriesAsBeingUpdated(seriesId: Long) =
+  def markSeriesAsBeingUpdated(seriesId: Long): Boolean =
     if (seriesToUpdate.remove(seriesId))
       seriesBeingUpdated.add(seriesId)
     else
@@ -122,7 +122,7 @@ class SeriesTypeUpdateActor(storage: StorageService)(implicit val materializer: 
               val tags = getInvolvedTags(seriesTypesInfo)
 
               val futureAttributes = storage.fileSource(image.id)
-                .via(new DicomPartFlow(stopTag = Some(tags.max + 1)))
+                .via(new DicomParseFlow(stopTag = Some(tags.max + 1)))
                 .via(tagFilter(_ => false)(tagPath => tags.contains(tagPath.tag)))
                 .via(attributeFlow)
                 .runWith(DicomAttributesSink.attributesSink)

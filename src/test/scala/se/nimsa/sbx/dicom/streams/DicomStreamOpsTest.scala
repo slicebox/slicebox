@@ -13,7 +13,7 @@ import org.dcm4che3.io.{DicomOutputStream, DicomStreamException}
 import org.scalatest.{AsyncFlatSpecLike, BeforeAndAfterAll, BeforeAndAfterEach, Matchers}
 import se.nimsa.dcm4che.streams.DicomFlows.attributeFlow
 import se.nimsa.dcm4che.streams.DicomModifyFlow.TagModification
-import se.nimsa.dcm4che.streams.DicomPartFlow.partFlow
+import se.nimsa.dcm4che.streams.DicomParseFlow.parseFlow
 import se.nimsa.dcm4che.streams._
 import se.nimsa.sbx.anonymization.AnonymizationDAO
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
@@ -154,14 +154,14 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("AnonymizationFlowSpec")) w
     val t2 = TagValue(Tag.PatientID, "Mapped Patient ID")
     val t3 = TagValue(Tag.SeriesDescription, "Mapped Series Description")
     val bytes = preamble ++ fmiGroupLength(supportedMediaStorageSOPClassUID ++ tsuidExplicitLE) ++ supportedMediaStorageSOPClassUID ++ tsuidExplicitLE ++ patientNameJohnDoe
-    val source = StreamSource.single(bytes).via(partFlow)
+    val source = StreamSource.single(bytes).via(parseFlow)
     val anonSource = DicomStreamOps.anonymizedDicomDataSource(
       source,
       (_, _) => Future.successful(Seq.empty),
       _ => Future.successful(TestUtil.createAnonymizationKey(new Attributes())),
       Seq(t1, t2, t3))
 
-    anonSource.via(DicomPartFlow.partFlow).via(DicomFlows.attributeFlow).runWith(DicomAttributesSink.attributesSink).map {
+    anonSource.via(parseFlow).via(DicomFlows.attributeFlow).runWith(DicomAttributesSink.attributesSink).map {
       case (_, dsMaybe) =>
         val ds = dsMaybe.get
         ds.getString(Tag.PatientName) should be("Mapped Patient Name")
@@ -174,10 +174,10 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("AnonymizationFlowSpec")) w
     val attributes = createAttributes
     val key = TestUtil.createAnonymizationKey(attributes, anonPatientName = "apn", anonPatientID = "apid", anonSeriesInstanceUID = "aseuid")
 
-    val source = toSource(DicomData(attributes, null)).via(partFlow)
+    val source = toSource(DicomData(attributes, null)).via(parseFlow)
     val anonSource = DicomStreamOps.anonymizedDicomDataSource(source, (_, _) => Future.successful(Seq(key)), _ => Future.successful(key), Seq.empty)
 
-    anonSource.via(DicomPartFlow.partFlow).via(DicomFlows.attributeFlow).runWith(DicomAttributesSink.attributesSink).map {
+    anonSource.via(parseFlow).via(DicomFlows.attributeFlow).runWith(DicomAttributesSink.attributesSink).map {
       case (_, dsMaybe) =>
         val ds = dsMaybe.get
         ds.getString(Tag.PatientName) should be("apn")
@@ -191,11 +191,11 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("AnonymizationFlowSpec")) w
   "The DICOM data source with anonymization" should "anonymize the patient ID and harmonize it according to an anonymization key" in {
     val dicomData = TestUtil.createDicomData()
     val anonKey = TestUtil.createAnonymizationKey(dicomData.attributes)
-    val source = toSource(dicomData).via(partFlow)
+    val source = toSource(dicomData).via(parseFlow)
 
     val anonSource = DicomStreamOps.anonymizedDicomDataSource(source, (_, _) => Future.successful(Seq(anonKey)), a => Future.successful(a), Seq.empty)
 
-    anonSource.via(DicomPartFlow.partFlow).via(DicomFlows.attributeFlow).runWith(DicomAttributesSink.attributesSink).map {
+    anonSource.via(parseFlow).via(DicomFlows.attributeFlow).runWith(DicomAttributesSink.attributesSink).map {
       case (_, dsMaybe) =>
         val ds = dsMaybe.get
         ds.getString(Tag.PatientID) shouldBe anonKey.anonPatientID
@@ -211,7 +211,7 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("AnonymizationFlowSpec")) w
     val sopInstanceUIDs = 1 to 100
     val storedImageIds = FutureUtil.traverseSequentially(sopInstanceUIDs) { sopInstanceUID =>
       val modifiedBytesSource = bytesSource
-        .via(DicomPartFlow.partFlow)
+        .via(parseFlow)
         .via(DicomFlows.blacklistFilter(Set(TagPath.fromTag(Tag.PixelData))))
         .via(DicomModifyFlow.modifyFlow(
           TagModification.contains(
@@ -231,7 +231,7 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("AnonymizationFlowSpec")) w
     val anonymousPatientIds = storedImageIds.flatMap { imageIds =>
       FutureUtil.traverseSequentially(imageIds) { imageId =>
         dicomStreamOpsImpl.anonymizedDicomData(imageId, Seq.empty, storage)
-          .via(DicomPartFlow.partFlow)
+          .via(parseFlow)
           .via(attributeFlow)
           .runWith(DicomAttributesSink.attributesSink)
           .map(_._2)

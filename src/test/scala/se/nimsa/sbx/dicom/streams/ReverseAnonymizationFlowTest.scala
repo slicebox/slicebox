@@ -10,14 +10,15 @@ import akka.util.ByteString
 import org.dcm4che3.data.{Attributes, Tag, UID, VR}
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 import se.nimsa.dcm4che.streams.DicomModifyFlow.TagModification
+import se.nimsa.dcm4che.streams.DicomParseFlow.parseFlow
 import se.nimsa.dcm4che.streams.DicomParts.{DicomAttributes, DicomPart}
 import se.nimsa.dcm4che.streams._
 import se.nimsa.sbx.dicom.DicomData
 import se.nimsa.sbx.util.TestUtil
 import se.nimsa.sbx.util.TestUtil._
 
-import scala.concurrent.{Await, ExecutionContextExecutor}
 import scala.concurrent.duration.DurationInt
+import scala.concurrent.{Await, ExecutionContextExecutor}
 
 class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymizationFlowSpec")) with FlatSpecLike with Matchers with BeforeAndAfterAll {
 
@@ -31,7 +32,7 @@ class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymiza
   def attributesSource(dicomData: DicomData): Source[DicomPart, NotUsed] = {
     val bytes = ByteString(TestUtil.toByteArray(dicomData))
     Source.single(bytes)
-      .via(DicomPartFlow.partFlow)
+      .via(parseFlow)
       .via(DicomFlows.tagFilter(_ => false)(tagPath => !DicomParsing.isFileMetaInformation(tagPath.tag)))
   }
 
@@ -43,7 +44,7 @@ class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymiza
   def anonSource(dicomData: DicomData): Source[DicomPart, NotUsed] = {
     val key = anonKeyPart(dicomData).patientKey.get
     attributesSource(dicomData)
-      .via(AnonymizationFlow.anonFlow())
+      .via(AnonymizationFlow.anonFlow)
       .via(DicomModifyFlow.modifyFlow(
         TagModification.contains(TagPath.fromTag(Tag.PatientName), _ => toAsciiBytes(key.anonPatientName, VR.PN), insert = false),
         TagModification.contains(TagPath.fromTag(Tag.PatientID), _ => toAsciiBytes(key.anonPatientID, VR.LO), insert = false),
@@ -58,7 +59,7 @@ class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymiza
 
     val source = Source.single(anonKeyPart(dicomData))
       .concat(anonSource(dicomData))
-      .via(ReverseAnonymizationFlow.reverseAnonFlow())
+      .via(ReverseAnonymizationFlow.reverseAnonFlow)
       .via(DicomFlows.attributeFlow)
 
     val (_, dsMaybe) = Await.result(source.runWith(DicomAttributesSink.attributesSink), 10.seconds)
@@ -84,7 +85,7 @@ class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymiza
     fmi.setString(Tag.TransferSyntaxUID, VR.UI, UID.ExplicitVRLittleEndian)
     val dicomData = DicomData(attributes, fmi)
     val source = attributesSource(dicomData)
-      .via(ReverseAnonymizationFlow.reverseAnonFlow())
+      .via(ReverseAnonymizationFlow.reverseAnonFlow)
       .via(DicomFlows.guaranteedValueFlow)
 
     source.runWith(TestSink.probe[DicomPart])
@@ -111,7 +112,7 @@ class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymiza
 
   "The conditional reverse anonymization flow" should "not perform reverse anonymization when stream is empty" in {
     val source = Source.empty
-      .via(ReverseAnonymizationFlow.maybeReverseAnonFlow())
+      .via(ReverseAnonymizationFlow.maybeReverseAnonFlow)
 
     source.runWith(TestSink.probe[DicomPart])
       .expectDicomComplete()
@@ -121,7 +122,7 @@ class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymiza
     val dicomData = createDicomData()
 
     val source = anonSource(dicomData)
-      .via(ReverseAnonymizationFlow.reverseAnonFlow())
+      .via(ReverseAnonymizationFlow.reverseAnonFlow)
       .via(DicomFlows.collectAttributesFlow(Set(Tag.PatientName)))
       .filter(_.isInstanceOf[DicomAttributes])
       .mapAsync(5) {
@@ -139,7 +140,7 @@ class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymiza
 
     val source = Source.single(anonKeyPart(dicomData))
       .concat(anonSource(dicomData))
-      .via(ReverseAnonymizationFlow.reverseAnonFlow())
+      .via(ReverseAnonymizationFlow.reverseAnonFlow)
       .via(DicomFlows.collectAttributesFlow(Set(Tag.PatientName)))
       .filter(_.isInstanceOf[DicomAttributes])
       .mapAsync(5) {
