@@ -319,7 +319,7 @@ trait MetaDataRoutes {
       })
     } catch {
       case e: Exception =>
-        throw new IllegalArgumentException("Sources parameter must be formatted as a comma separated list of sourceType:sourceId elements, e.g. BOX:23,BOX:12,USER:2")
+        throw new IllegalArgumentException("Sources parameter must be formatted as a comma separated list of sourceType:sourceId elements, e.g. box:23,box:12,user:2")
     }
   }
 

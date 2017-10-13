@@ -212,56 +212,60 @@ object AnonymizationFlow {
     * Remove overlay data
     * Remove, set empty or modify certain attributes
     */
-  def anonFlow: Flow[DicomPart, DicomPart, NotUsed] = Flow[DicomPart]
-    .via(groupLengthDiscardFilter)
-    .via(toUndefinedLengthSequences)
-    .via(tagFilter(_ => true)(tagPath =>
-      !tagPath.toList.map(_.tag).exists(tag =>
-        isPrivateAttribute(tag) || isOverlay(tag) || removeTags.contains(tag)))) // remove private, overlay and PHI attributes
-    .via(modifyFlow( // modify, clear and insert
-    modify(Tag.AccessionNumber, bytes => if (bytes.nonEmpty) createAccessionNumber(bytes) else bytes),
-    modify(Tag.ConcatenationUID, createUid),
-    clear(Tag.ContentCreatorName),
-    modify(Tag.ContextGroupExtensionCreatorUID, createUid),
-    clear(Tag.ContrastBolusAgent),
-    modify(Tag.CreatorVersionUID, createUid),
-    insert(Tag.DeidentificationMethod, _ => toAsciiBytes("Retain Longitudinal Full Dates Option", VR.LO)),
-    modify(Tag.DimensionOrganizationUID, createUid),
-    modify(Tag.DoseReferenceUID, createUid),
-    modify(Tag.FiducialUID, createUid),
-    clear(Tag.FillerOrderNumberImagingServiceRequest),
-    modify(Tag.FrameOfReferenceUID, createUid),
-    modify(Tag.InstanceCreatorUID, createUid),
-    modify(Tag.IrradiationEventUID, createUid),
-    modify(Tag.LargePaletteColorLookupTableUID, createUid),
-    modify(Tag.MediaStorageSOPInstanceUID, createUid),
-    modify(Tag.ObservationSubjectUIDTrial, createUid),
-    modify(Tag.ObservationUID, createUid),
-    modify(Tag.PaletteColorLookupTableUID, createUid),
-    insert(Tag.PatientIdentityRemoved, _ => toAsciiBytes("YES", VR.CS)),
-    insert(Tag.PatientID, _ => createUid(null)),
-    insert(Tag.PatientName, _ => createUid(null)),
-    clear(Tag.PlacerOrderNumberImagingServiceRequest),
-    modify(Tag.ReferencedFrameOfReferenceUID, createUid),
-    modify(Tag.ReferencedGeneralPurposeScheduledProcedureStepTransactionUID, createUid),
-    modify(Tag.ReferencedObservationUIDTrial, createUid),
-    modify(Tag.ReferencedSOPInstanceUID, createUid),
-    modify(Tag.ReferencedSOPInstanceUIDInFile, createUid),
-    clear(Tag.ReferringPhysicianName),
-    modify(Tag.RelatedFrameOfReferenceUID, createUid),
-    modify(Tag.RequestedSOPInstanceUID, createUid),
-    insert(Tag.SeriesInstanceUID, _ => createUid(null)),
-    insert(Tag.SOPInstanceUID, createUid),
-    modify(Tag.StorageMediaFileSetUID, createUid),
-    clear(Tag.StudyID),
-    insert(Tag.StudyInstanceUID, _ => createUid(null)),
-    modify(Tag.SynchronizationFrameOfReferenceUID, createUid),
-    modify(Tag.TargetUID, createUid),
-    modify(Tag.TemplateExtensionCreatorUID, createUid),
-    modify(Tag.TemplateExtensionOrganizationUID, createUid),
-    modify(Tag.TransactionUID, createUid),
-    modify(Tag.UID, createUid),
-    clear(Tag.VerifyingObserverName)))
+  def anonFlow: Flow[DicomPart, DicomPart, NotUsed] = {
+    val sopInstanceUID = createUid(null)
+
+    Flow[DicomPart]
+      .via(groupLengthDiscardFilter)
+      .via(toUndefinedLengthSequences)
+      .via(tagFilter(_ => true)(tagPath =>
+        !tagPath.toList.map(_.tag).exists(tag =>
+          isPrivateAttribute(tag) || isOverlay(tag) || removeTags.contains(tag)))) // remove private, overlay and PHI attributes
+      .via(modifyFlow( // modify, clear and insert
+      modify(Tag.AccessionNumber, bytes => if (bytes.nonEmpty) createAccessionNumber(bytes) else bytes),
+      modify(Tag.ConcatenationUID, createUid),
+      clear(Tag.ContentCreatorName),
+      modify(Tag.ContextGroupExtensionCreatorUID, createUid),
+      clear(Tag.ContrastBolusAgent),
+      modify(Tag.CreatorVersionUID, createUid),
+      insert(Tag.DeidentificationMethod, _ => toAsciiBytes("Retain Longitudinal Full Dates Option", VR.LO)),
+      modify(Tag.DimensionOrganizationUID, createUid),
+      modify(Tag.DoseReferenceUID, createUid),
+      modify(Tag.FiducialUID, createUid),
+      clear(Tag.FillerOrderNumberImagingServiceRequest),
+      modify(Tag.FrameOfReferenceUID, createUid),
+      modify(Tag.InstanceCreatorUID, createUid),
+      modify(Tag.IrradiationEventUID, createUid),
+      modify(Tag.LargePaletteColorLookupTableUID, createUid),
+      modify(Tag.MediaStorageSOPInstanceUID, _ => sopInstanceUID),
+      modify(Tag.ObservationSubjectUIDTrial, createUid),
+      modify(Tag.ObservationUID, createUid),
+      modify(Tag.PaletteColorLookupTableUID, createUid),
+      insert(Tag.PatientIdentityRemoved, _ => toAsciiBytes("YES", VR.CS)),
+      insert(Tag.PatientID, _ => createUid(null)),
+      insert(Tag.PatientName, _ => createUid(null)),
+      clear(Tag.PlacerOrderNumberImagingServiceRequest),
+      modify(Tag.ReferencedFrameOfReferenceUID, createUid),
+      modify(Tag.ReferencedGeneralPurposeScheduledProcedureStepTransactionUID, createUid),
+      modify(Tag.ReferencedObservationUIDTrial, createUid),
+      modify(Tag.ReferencedSOPInstanceUID, createUid),
+      modify(Tag.ReferencedSOPInstanceUIDInFile, createUid),
+      clear(Tag.ReferringPhysicianName),
+      modify(Tag.RelatedFrameOfReferenceUID, createUid),
+      modify(Tag.RequestedSOPInstanceUID, createUid),
+      insert(Tag.SeriesInstanceUID, _ => createUid(null)),
+      insert(Tag.SOPInstanceUID, _ => sopInstanceUID),
+      modify(Tag.StorageMediaFileSetUID, createUid),
+      clear(Tag.StudyID),
+      insert(Tag.StudyInstanceUID, _ => createUid(null)),
+      modify(Tag.SynchronizationFrameOfReferenceUID, createUid),
+      modify(Tag.TargetUID, createUid),
+      modify(Tag.TemplateExtensionCreatorUID, createUid),
+      modify(Tag.TemplateExtensionOrganizationUID, createUid),
+      modify(Tag.TransactionUID, createUid),
+      modify(Tag.UID, createUid),
+      clear(Tag.VerifyingObserverName)))
+  }
 
   /**
     * Anonymize data if not already anonymized. Assumes first `DicomPart` is a `DicomMetaPart` that is used to determine
