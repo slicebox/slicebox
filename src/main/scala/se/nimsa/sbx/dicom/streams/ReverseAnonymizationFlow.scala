@@ -31,7 +31,7 @@ object ReverseAnonymizationFlow {
     Tag.ProtocolName,
     Tag.FrameOfReferenceUID)
 
-  val reverseAnonFlow: Flow[DicomPart, DicomPart, NotUsed] = Flow[DicomPart]
+  def reverseAnonFlow: Flow[DicomPart, DicomPart, NotUsed] = Flow[DicomPart]
     .via(groupLengthDiscardFilter)
     .via(toUndefinedLengthSequences)
     .via(DicomModifyFlow.modifyFlow(
