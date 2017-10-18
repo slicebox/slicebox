@@ -62,7 +62,15 @@ trait AnonymizationRoutes {
             complete {
               FutureUtil.traverseSequentially(imageTagValuesSeq) { imageTagValues =>
                 anonymizeData(imageTagValues.imageId, imageTagValues.tagValues, storage)
-              }.map(_.flatMap(_.map(_.image)))
+              }.map { metaDataMaybes =>
+                system.eventStream.publish(ImagesDeleted(imageTagValuesSeq.map(_.imageId)))
+                metaDataMaybes.flatMap { metaDataMaybe =>
+                  metaDataMaybe.map { metaData =>
+                    system.eventStream.publish(ImageAdded(metaData.image.id, metaData.source, !metaData.imageAdded))
+                    metaData.image
+                  }
+                }
+              }
             }
           }
         }

@@ -280,7 +280,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
 
       await(boxDao.listIncomingImages).size should be(2)
       boxService ! ImagesDeleted(Seq(4))
-      expectNoMsg
+      expectNoMessage(3.seconds)
       await(boxDao.listIncomingImages).size should be(1)
     }
 
@@ -296,7 +296,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
 
       await(boxDao.listOutgoingImages).size should be(3)
       boxService ! ImagesDeleted(Seq(i2.id))
-      expectNoMsg
+      expectNoMessage(3.seconds)
       await(boxDao.listOutgoingImages).size should be(2)
     }
 

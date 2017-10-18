@@ -16,6 +16,7 @@ import org.dcm4che3.io.DicomInputStream.IncludeBulkData
 import org.dcm4che3.io.{DicomInputStream, DicomOutputStream}
 import org.dcm4che3.util.SafeClose
 import se.nimsa.dcm4che.streams.DicomParts._
+import se.nimsa.dcm4che.streams.tagToString
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.AnonymizationKey
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.dicom.DicomData
@@ -280,70 +281,172 @@ object TestUtil {
         }
     })
 
-  implicit class DicomPartProbe(probe: TestSubscriber.Probe[DicomPart]) {
-    def expectPreamble() = probe
+  type PartProbe = TestSubscriber.Probe[DicomPart]
+
+  implicit class DicomPartProbe(probe: PartProbe) {
+    def expectPreamble(): PartProbe = probe
       .request(1)
       .expectNextChainingPF {
         case _: DicomPreamble => true
+        case p => throw new RuntimeException(s"Expected DicomPreamble, got $p")
       }
 
-    def expectValueChunk() = probe
+    def expectValueChunk(): PartProbe = probe
       .request(1)
       .expectNextChainingPF {
         case _: DicomValueChunk => true
+        case p => throw new RuntimeException(s"Expected DicomValueChunk, got $p")
       }
 
-    def expectValueChunk(bytes: ByteString) = probe
+    def expectValueChunk(length: Int): PartProbe = probe
+      .request(1)
+      .expectNextChainingPF {
+        case chunk: DicomValueChunk if chunk.bytes.length == length => true
+        case p => throw new RuntimeException(s"Expected DicomValueChunk with length = $length, got $p")
+      }
+
+    def expectValueChunk(bytes: ByteString): PartProbe = probe
       .request(1)
       .expectNextChainingPF {
         case chunk: DicomValueChunk if chunk.bytes == bytes => true
+        case p => throw new RuntimeException(s"Expected DicomValueChunk with bytes = $bytes, got $p")
       }
 
-    def expectHeader(tag: Int) = probe
+    def expectItem(index: Int): PartProbe = probe
+      .request(1)
+      .expectNextChainingPF {
+        case item: DicomItem if item.index == index => true
+        case p => throw new RuntimeException(s"Expected DicomItem with index = $index, got $p")
+      }
+
+    def expectItem(index: Int, length: Int): PartProbe = probe
+      .request(1)
+      .expectNextChainingPF {
+        case item: DicomItem if item.index == index && item.length == length => true
+        case p => throw new RuntimeException(s"Expected DicomItem with index = $index and length $length, got $p")
+      }
+
+    def expectItemDelimitation(): PartProbe = probe
+      .request(1)
+      .expectNextChainingPF {
+        case _: DicomSequenceItemDelimitation => true
+        case p => throw new RuntimeException(s"Expected DicomSequenceItemDelimitation, got $p")
+      }
+
+    def expectFragments(): PartProbe = probe
+      .request(1)
+      .expectNextChainingPF {
+        case _: DicomFragments => true
+        case p => throw new RuntimeException(s"Expected DicomFragments, got $p")
+      }
+
+    def expectFragment(length: Int): PartProbe = probe
+      .request(1)
+      .expectNextChainingPF {
+        case item: DicomFragment if item.bytes.length == length => true
+        case p => throw new RuntimeException(s"Expected DicomFragment with length $length, got $p")
+      }
+
+    def expectFragmentsDelimitation(): PartProbe = probe
+      .request(1)
+      .expectNextChainingPF {
+        case _: DicomFragmentsDelimitation => true
+        case p => throw new RuntimeException(s"Expected DicomFragmentsDelimitation, got $p")
+      }
+
+    def expectHeader(tag: Int): PartProbe = probe
       .request(1)
       .expectNextChainingPF {
         case h: DicomHeader if h.tag == tag => true
+        case p => throw new RuntimeException(s"Expected DicomHeader with tag = ${tagToString(tag)}, got $p")
       }
 
-    def expectHeader(tag: Int, vr: VR, length: Int) = probe
+    def expectHeader(tag: Int, vr: VR, length: Long): PartProbe = probe
       .request(1)
       .expectNextChainingPF {
         case h: DicomHeader if h.tag == tag && h.vr == vr && h.length == length => true
+        case p => throw new RuntimeException(s"Expected DicomHeader with tag = ${tagToString(tag)}, VR = $vr and length = $length, got $p")
       }
 
-    def expectDeflatedChunk() = probe
+    def expectSequence(tag: Int): PartProbe = probe
+      .request(1)
+      .expectNextChainingPF {
+        case h: DicomSequence if h.tag == tag => true
+        case p => throw new RuntimeException(s"Expected DicomSequence with tag = ${tagToString(tag)}, got $p")
+      }
+
+    def expectSequence(tag: Int, length: Int): PartProbe = probe
+      .request(1)
+      .expectNextChainingPF {
+        case h: DicomSequence if h.tag == tag && h.length == length => true
+        case p => throw new RuntimeException(s"Expected DicomSequence with tag = ${tagToString(tag)} and length = $length, got $p")
+      }
+
+    def expectSequenceDelimitation(): PartProbe = probe
+      .request(1)
+      .expectNextChainingPF {
+        case _: DicomSequenceDelimitation => true
+        case p => throw new RuntimeException(s"Expected DicomSequenceDelimitation, got $p")
+      }
+
+    def expectUnknownPart(): PartProbe = probe
+      .request(1)
+      .expectNextChainingPF {
+        case _: DicomUnknownPart => true
+        case p => throw new RuntimeException(s"Expected UnkownPart, got $p")
+      }
+
+    def expectDeflatedChunk(): PartProbe = probe
       .request(1)
       .expectNextChainingPF {
         case _: DicomDeflatedChunk => true
+        case p => throw new RuntimeException(s"Expected DicomDeflatedChunk, got $p")
       }
 
-    def expectAttribute(tag: Int) = probe
+    def expectAttribute(tag: Int, length: Int): PartProbe = probe
       .request(1)
       .expectNextChainingPF {
-        case a: DicomAttribute if a.header.tag == tag => true
+        case a: DicomAttribute if a.header.tag == tag && a.valueBytes.length == length => true
+        case p => throw new RuntimeException(s"Expected DicomAttribute with tag = ${tagToString(tag)} and length = $length, got $p")
       }
 
-    def expectDicomComplete() = probe
+    def expectFragmentData(length: Int): PartProbe = probe
+      .request(1)
+      .expectNextChainingPF {
+        case fragment: DicomFragment if fragment.bytes.length == length => true
+        case p => throw new RuntimeException(s"Expected DicomFragment with length = $length, got $p")
+      }
+
+    def expectDicomComplete(): PartProbe = probe
       .request(1)
       .expectComplete()
 
-    def expectDicomError() = probe
+    def expectDicomError(): Throwable = probe
       .request(1)
       .expectError()
 
-    def expectMetaPart() = probe
+    def expectAttributesPart(attributesPart: DicomAttributes): PartProbe = probe
+      .request(1)
+      .expectNextChainingPF {
+        case p: DicomAttributes if p == attributesPart => true
+        case p => throw new RuntimeException(s"Expected DicomAttributes with part = $attributesPart, got $p")
+      }
+
+    def expectMetaPart(): PartProbe = probe
       .request(1)
       .expectNextChainingPF {
         case _: DicomMetaPart => true
+        case p => throw new RuntimeException(s"Expected DicomMetaPart, got $p")
       }
 
-    def expectMetaPart(metaPart: DicomMetaPart) = probe
+    def expectMetaPart(metaPart: DicomMetaPart): PartProbe = probe
       .request(1)
       .expectNextChainingPF {
         case p: DicomMetaPart if p == metaPart => true
+        case p => throw new RuntimeException(s"Expected DicomMetaPart $metaPart, got $p")
       }
 
-    def expectHeaderAndValueChunkPairs(tags: Int*) =
+    def expectHeaderAndValueChunkPairs(tags: Int*): PartProbe =
       tags.foldLeft(probe)((probe, tag) => probe.expectHeader(tag).expectValueChunk())
   }
 }

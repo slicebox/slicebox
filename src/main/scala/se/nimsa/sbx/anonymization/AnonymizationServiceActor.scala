@@ -16,15 +16,17 @@
 
 package se.nimsa.sbx.anonymization
 
-import akka.actor.{Actor, Props}
+import akka.actor.{Actor, Props, Stash}
 import akka.event.{Logging, LoggingReceive}
 import akka.pattern.pipe
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.app.GeneralProtocol.ImagesDeleted
+import se.nimsa.sbx.util.SequentialPipeToSupport
 
 import scala.concurrent.ExecutionContext
 
-class AnonymizationServiceActor(anonymizationDao: AnonymizationDAO, purgeEmptyAnonymizationKeys: Boolean)(implicit ec: ExecutionContext) extends Actor {
+class AnonymizationServiceActor(anonymizationDao: AnonymizationDAO, purgeEmptyAnonymizationKeys: Boolean)
+                               (implicit ec: ExecutionContext) extends Actor with Stash with SequentialPipeToSupport {
 
   val log = Logging(context.system, this)
 
@@ -42,8 +44,15 @@ class AnonymizationServiceActor(anonymizationDao: AnonymizationDAO, purgeEmptyAn
     case msg: AnonymizationRequest =>
 
       msg match {
+        case AddAnonymizationKey(anonymizationKey) =>
+          anonymizationDao.insertAnonymizationKey(anonymizationKey)
+            .map(AnonymizationKeyAdded)
+            .pipeSequentiallyTo(sender)
+
         case RemoveAnonymizationKey(anonymizationKeyId) =>
-          pipe(anonymizationDao.removeAnonymizationKey(anonymizationKeyId).map(_ => AnonymizationKeyRemoved(anonymizationKeyId))).to(sender)
+          anonymizationDao.removeAnonymizationKey(anonymizationKeyId)
+            .map(_ => AnonymizationKeyRemoved(anonymizationKeyId))
+            .pipeSequentiallyTo(sender)
 
         case GetAnonymizationKeys(startIndex, count, orderBy, orderAscending, filter) =>
           pipe(anonymizationDao.anonymizationKeys(startIndex, count, orderBy, orderAscending, filter).map(AnonymizationKeys)).to(sender)
@@ -59,9 +68,6 @@ class AnonymizationServiceActor(anonymizationDao: AnonymizationDAO, purgeEmptyAn
 
         case GetReverseAnonymizationKeysForPatient(anonPatientName, anonPatientID) =>
           pipe(anonymizationDao.anonymizationKeysForAnonPatient(anonPatientName, anonPatientID).map(AnonymizationKeys)).to(sender)
-
-        case AddAnonymizationKey(anonymizationKey) =>
-          pipe(anonymizationDao.insertAnonymizationKey(anonymizationKey).map(AnonymizationKeyAdded)).to(sender)
 
         case QueryAnonymizationKeys(query) =>
           val order = query.order.map(_.orderBy)

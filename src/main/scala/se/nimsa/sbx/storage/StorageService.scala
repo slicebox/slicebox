@@ -28,7 +28,7 @@ import akka.{Done, NotUsed}
 import com.typesafe.scalalogging.LazyLogging
 import org.dcm4che3.data.Tag
 import org.dcm4che3.imageio.plugins.dcm.DicomImageReadParam
-import se.nimsa.dcm4che.streams.{DicomAttributesSink, DicomFlows, DicomPartFlow}
+import se.nimsa.dcm4che.streams.{DicomAttributesSink, DicomFlows, DicomParseFlow}
 import se.nimsa.sbx.dicom.ImageAttribute
 import se.nimsa.sbx.dicom.streams.DicomStreamOps
 import se.nimsa.sbx.lang.NotFoundException
@@ -53,12 +53,12 @@ trait StorageService extends LazyLogging {
   def readImageAttributes(imageId: Long)(implicit materializer: Materializer, ec: ExecutionContext): Source[ImageAttribute, NotUsed] =
     DicomStreamOps.imageAttributesSource(fileSource(imageId))
 
-  private val imageInformationTags = Seq(Tag.InstanceNumber, Tag.ImageIndex, Tag.NumberOfFrames, Tag.SmallestImagePixelValue, Tag.LargestImagePixelValue).sorted
+  private val imageInformationTags = Set(Tag.InstanceNumber, Tag.ImageIndex, Tag.NumberOfFrames, Tag.SmallestImagePixelValue, Tag.LargestImagePixelValue)
 
   def readImageInformation(imageId: Long)(implicit materializer: Materializer, ec: ExecutionContext): Future[ImageInformation] =
     fileSource(imageId)
-      .via(new DicomPartFlow(stopTag = Some(imageInformationTags.last + 1)))
-      .via(DicomFlows.whitelistFilter(imageInformationTags.contains _))
+      .via(new DicomParseFlow(stopTag = Some(imageInformationTags.max + 1)))
+      .via(DicomFlows.whitelistFilter(imageInformationTags))
       .via(DicomFlows.attributeFlow)
       .runWith(DicomAttributesSink.attributesSink)
       .map {

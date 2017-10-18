@@ -10,37 +10,38 @@ import akka.util.ByteString
 import org.dcm4che3.data.{Attributes, Tag, UID, VR}
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 import se.nimsa.dcm4che.streams.DicomModifyFlow.TagModification
+import se.nimsa.dcm4che.streams.DicomParseFlow.parseFlow
 import se.nimsa.dcm4che.streams.DicomParts.{DicomAttributes, DicomPart}
 import se.nimsa.dcm4che.streams._
 import se.nimsa.sbx.dicom.DicomData
 import se.nimsa.sbx.util.TestUtil
 import se.nimsa.sbx.util.TestUtil._
 
-import scala.concurrent.Await
 import scala.concurrent.duration.DurationInt
+import scala.concurrent.{Await, ExecutionContextExecutor}
 
 class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymizationFlowSpec")) with FlatSpecLike with Matchers with BeforeAndAfterAll {
 
   import DicomTestData._
 
-  implicit val materializer = ActorMaterializer()
-  implicit val ec = system.dispatcher
+  implicit val materializer: ActorMaterializer = ActorMaterializer()
+  implicit val ec: ExecutionContextExecutor = system.dispatcher
 
-  override def afterAll = TestKit.shutdownActorSystem(system)
+  override def afterAll: Unit = TestKit.shutdownActorSystem(system)
 
   def attributesSource(dicomData: DicomData): Source[DicomPart, NotUsed] = {
     val bytes = ByteString(TestUtil.toByteArray(dicomData))
     Source.single(bytes)
-      .via(DicomPartFlow.partFlow)
-      .via(DicomFlows.blacklistFilter(DicomParsing.isFileMetaInformation, keepPreamble = false))
+      .via(parseFlow)
+      .via(DicomFlows.tagFilter(_ => false)(tagPath => !DicomParsing.isFileMetaInformation(tagPath.tag)))
   }
 
-  def anonKeyPart(dicomData: DicomData) = {
+  def anonKeyPart(dicomData: DicomData): AnonymizationKeysPart = {
     val key = createAnonymizationKey(dicomData.attributes)
     AnonymizationKeysPart(Seq(key), Some(key), Some(key), Some(key))
   }
 
-  def anonSource(dicomData: DicomData) = {
+  def anonSource(dicomData: DicomData): Source[DicomPart, NotUsed] = {
     val key = anonKeyPart(dicomData).patientKey.get
     attributesSource(dicomData)
       .via(AnonymizationFlow.anonFlow)
@@ -85,6 +86,7 @@ class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymiza
     val dicomData = DicomData(attributes, fmi)
     val source = attributesSource(dicomData)
       .via(ReverseAnonymizationFlow.reverseAnonFlow)
+      .via(DicomFlows.guaranteedValueFlow)
 
     source.runWith(TestSink.probe[DicomPart])
       .expectHeaderAndValueChunkPairs(
