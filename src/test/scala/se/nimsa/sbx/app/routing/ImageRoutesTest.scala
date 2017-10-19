@@ -11,10 +11,13 @@ import akka.http.scaladsl.server.Route
 import akka.util.ByteString
 import org.dcm4che3.data.Tag
 import org.scalatest.{FlatSpecLike, Matchers}
+import se.nimsa.dcm4che.streams.TagPath
+import se.nimsa.sbx.app.GeneralProtocol.Source
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.ImageAttribute
+import se.nimsa.sbx.metadata.MetaDataProtocol.SeriesTag
 import se.nimsa.sbx.storage.RuntimeStorage
-import se.nimsa.sbx.storage.StorageProtocol.{ExportSetId, ImageInformation}
+import se.nimsa.sbx.storage.StorageProtocol.{ExportSetId, ImageInformation, TagMapping}
 import se.nimsa.sbx.util.FutureUtil.await
 import se.nimsa.sbx.util.TestUtil
 
@@ -78,7 +81,7 @@ class ImageRoutesTest extends {
   }
 
   it should "return 400 BadRequest when adding an invalid image" in {
-    PostAsUser("/api/images", HttpEntity(ByteString(1,2,3,4))) ~> routes ~> check {
+    PostAsUser("/api/images", HttpEntity(ByteString(1, 2, 3, 4))) ~> routes ~> check {
       status should be(BadRequest)
     }
   }
@@ -322,4 +325,83 @@ class ImageRoutesTest extends {
     stream.close()
     true
   }
+
+  it should "modify and replace old data and transfer source and series tags when modifying an image" in {
+    // create test data and verify original values
+    val testData = TestUtil.testImageDicomData()
+    testData.attributes.getString(Tag.PatientAge) shouldBe "011Y"
+    testData.attributes.getString(Tag.RescaleSlope) shouldBe null
+    testData.attributes
+      .getNestedDataset(Tag.EnergyWindowInformationSequence)
+      .getNestedDataset(Tag.EnergyWindowRangeSequence, 1)
+      .getString(Tag.EnergyWindowUpperLimit) shouldBe "147"
+
+    // upload original data
+    val testDataArray = TestUtil.toByteArray(testData)
+    val image = PostAsUser("/api/images", HttpEntity(testDataArray)) ~> routes ~> check {
+      responseAs[Image]
+    }
+
+    // get original source
+    val originalSource = GetAsUser(s"/api/metadata/series/${image.seriesId}/source") ~> routes ~> check {
+      responseAs[Source]
+    }
+
+    // add tags to uploaded series
+    val tag1 = PostAsUser(s"/api/metadata/series/${image.seriesId}/seriestags", SeriesTag(-1, "Tag1")) ~> routes ~> check {
+      responseAs[SeriesTag]
+    }
+    val tag2 = PostAsUser(s"/api/metadata/series/${image.seriesId}/seriestags", SeriesTag(-1, "Tag2")) ~> routes ~> check {
+      responseAs[SeriesTag]
+    }
+
+    // define modifications
+    val tagMappings = Seq(
+      TagMapping(TagPath
+        .fromTag(Tag.PatientAge), ByteString("123Y")), // standard replacement
+      TagMapping(TagPath
+        .fromTag(Tag.RescaleSlope), ByteString("2.5")), // insert new attribute
+      TagMapping(TagPath
+        .fromSequence(Tag.EnergyWindowInformationSequence)
+        .thenSequence(Tag.EnergyWindowRangeSequence, 2)
+        .thenTag(Tag.EnergyWindowUpperLimit), ByteString("999")) // modify item in sequence
+    )
+
+    // modify
+    val modifiedImage = PutAsUser(s"/api/images/${image.id}/modify", tagMappings) ~> routes ~> check {
+      status shouldBe Created
+      responseAs[Image]
+    }
+
+    // verify that original data is deleted
+    GetAsUser(s"/api/images/${image.id}") ~> routes ~> check {
+      status shouldBe NotFound
+    }
+
+    // get modified data
+    val modifiedData = GetAsUser(s"/api/images/${modifiedImage.id}") ~> routes ~> check {
+      status shouldBe OK
+      val bytes = responseAs[ByteString]
+      TestUtil.loadDicomData(bytes.toArray, withPixelData = true)
+    }
+
+    // verify that modifications have taken effect
+    modifiedData.attributes.getString(Tag.PatientAge) shouldBe "123Y"
+    modifiedData.attributes.getString(Tag.RescaleSlope) shouldBe "2.5"
+    modifiedData.attributes
+      .getNestedDataset(Tag.EnergyWindowInformationSequence)
+      .getNestedDataset(Tag.EnergyWindowRangeSequence, 1)
+      .getString(Tag.EnergyWindowUpperLimit) shouldBe "999"
+
+    // verify that original source has been transferred to modified data
+    GetAsUser(s"/api/metadata/series/${modifiedImage.seriesId}/source") ~> routes ~> check {
+      responseAs[Source] shouldBe originalSource
+    }
+
+    // verify that series tags have been transferred to modified data
+    GetAsUser(s"/api/metadata/series/${modifiedImage.seriesId}/seriestags") ~> routes ~> check {
+      responseAs[List[SeriesTag]].map(_.name) shouldBe List(tag1, tag2).map(_.name)
+    }
+  }
+
 }

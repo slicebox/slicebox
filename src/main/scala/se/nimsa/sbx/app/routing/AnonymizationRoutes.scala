@@ -27,6 +27,7 @@ import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.user.UserProtocol.ApiUser
+import se.nimsa.sbx.util.FutureUtil
 
 import scala.concurrent.Future
 
@@ -59,10 +60,17 @@ trait AnonymizationRoutes {
         post {
           entity(as[Seq[ImageTagValues]]) { imageTagValuesSeq =>
             complete {
-              Future.sequence {
-                imageTagValuesSeq.map(imageTagValues =>
-                  anonymizeData(imageTagValues.imageId, imageTagValues.tagValues, storage))
-              }.map(_.flatMap(_.map(_.image)))
+              FutureUtil.traverseSequentially(imageTagValuesSeq) { imageTagValues =>
+                anonymizeData(imageTagValues.imageId, imageTagValues.tagValues, storage)
+              }.map { metaDataMaybes =>
+                system.eventStream.publish(ImagesDeleted(imageTagValuesSeq.map(_.imageId)))
+                metaDataMaybes.flatMap { metaDataMaybe =>
+                  metaDataMaybe.map { metaData =>
+                    system.eventStream.publish(ImageAdded(metaData.image.id, metaData.source, !metaData.imageAdded))
+                    metaData.image
+                  }
+                }
+              }
             }
           }
         }

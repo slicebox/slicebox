@@ -46,7 +46,8 @@ trait TransactionRoutes {
                   val source = Source(SourceType.BOX, box.name, box.id)
                   onSuccess(storeDicomData(compressedBytes.via(Compression.inflate()), source, storage, Contexts.extendedContexts)) { metaData =>
                     system.eventStream.publish(ImageAdded(metaData.image.id, source, !metaData.imageAdded))
-                    onSuccess(boxService.ask(UpdateIncoming(box, outgoingTransactionId, sequenceNumber, totalImageCount, metaData.image.id, metaData.imageAdded))) {
+                    val overwrite = !metaData.imageAdded
+                    onSuccess(boxService.ask(UpdateIncoming(box, outgoingTransactionId, sequenceNumber, totalImageCount, metaData.image.id, overwrite))) {
                       case IncomingUpdated(transaction) =>
                         transaction.status match {
                           case TransactionStatus.FAILED => complete(InternalServerError)

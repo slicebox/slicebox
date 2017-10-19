@@ -64,11 +64,11 @@ class FileStorage(val path: Path) extends StorageService {
   override def fileSink(name: String)(implicit executionContext: ExecutionContext): Sink[ByteString, Future[Done]] =
     FileIO.toPath(filePath(name)).mapMaterializedValue(_.map(_ => Done))
 
-  override def fileSource(imageId: Long): Source[ByteString, NotUsed] =
-    FileIO.fromPath(filePath(imageName(imageId)))
+  override def fileSource(name: String): Source[ByteString, NotUsed] =
+    FileIO.fromPath(filePath(name))
       .mapMaterializedValue(_ => NotUsed)
       .mapError {
-        case e: FileNotFoundException => new NotFoundException(s"File not found for image id $imageId")
+        case _: FileNotFoundException => new NotFoundException(s"File not found for name $name")
       }
 
 }

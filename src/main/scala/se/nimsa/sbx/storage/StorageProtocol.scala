@@ -16,6 +16,9 @@
 
 package se.nimsa.sbx.storage
 
+import akka.util.ByteString
+import se.nimsa.dcm4che.streams.TagPath.TagPathTag
+
 object StorageProtocol {
 
   // domain objects
@@ -25,6 +28,8 @@ object StorageProtocol {
     frameIndex: Int,
     minimumPixelValue: Int,
     maximumPixelValue: Int)
+
+  case class TagMapping(tagPath: TagPathTag, value: ByteString)
 
   sealed trait ImageRequest
 

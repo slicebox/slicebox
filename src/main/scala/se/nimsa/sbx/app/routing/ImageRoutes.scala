@@ -20,7 +20,7 @@ import java.io.ByteArrayOutputStream
 import java.util.zip.{ZipEntry, ZipOutputStream}
 
 import akka.NotUsed
-import akka.http.scaladsl.common.EntityStreamingSupport
+import akka.http.scaladsl.common.{EntityStreamingSupport, JsonEntityStreamingSupport}
 import akka.http.scaladsl.model.HttpEntity
 import akka.http.scaladsl.model.MediaTypes._
 import akka.http.scaladsl.model.StatusCodes._
@@ -31,6 +31,8 @@ import akka.pattern.ask
 import akka.stream.scaladsl.{Sink, SourceQueueWithComplete, Source => StreamSource}
 import akka.stream.{OverflowStrategy, QueueOfferResult}
 import akka.util.ByteString
+import se.nimsa.dcm4che.streams.DicomModifyFlow.TagModification
+import se.nimsa.dcm4che.streams.padToEvenLength
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.dicom.DicomHierarchy.{FlatSeries, Image, Patient, Study}
@@ -47,7 +49,7 @@ import scala.util.{Failure, Success}
 trait ImageRoutes {
   this: SliceboxBase =>
 
-  implicit val jsonStreamingSupport = EntityStreamingSupport.json()
+  implicit val jsonStreamingSupport: JsonEntityStreamingSupport = EntityStreamingSupport.json()
 
   def imageRoutes(apiUser: ApiUser): Route =
     pathPrefix("images") {
@@ -85,10 +87,24 @@ trait ImageRoutes {
             'windowmax.as[Int] ? 0,
             'imageheight.as[Int] ? 0)) { (frameNumber, min, max, height) =>
             get {
-              onComplete(storage.readPngImageData(imageId, frameNumber, min, max, height)) {
+              // use dedicated thread pool for blocking IO here
+              onComplete(storage.readPngImageData(imageId, frameNumber, min, max, height)(materializer, blockingIoContext)) {
                 case Success(bytes) => complete(HttpEntity(`image/png`, bytes))
                 case Failure(_: NotFoundException) => complete(NotFound)
                 case Failure(_) => complete(NotImplemented)
+              }
+            }
+          }
+        } ~ path("modify") {
+          put {
+            entity(as[Seq[TagMapping]]) { tagMappings =>
+              val tagModifications = tagMappings
+                .map(tm => TagModification.contains(tm.tagPath, _ => padToEvenLength(tm.value, tm.tagPath.tag), insert = true))
+              onSuccess(modifyData(imageId, tagModifications, storage)) {
+                case (metaDataDeleted, metaDataAdded) =>
+                  system.eventStream.publish(ImagesDeleted(metaDataDeleted.imageIds))
+                  system.eventStream.publish(ImageAdded(metaDataAdded.image.id, metaDataAdded.source, !metaDataAdded.imageAdded))
+                  complete((Created, metaDataAdded.image))
               }
             }
           }
@@ -164,7 +180,8 @@ trait ImageRoutes {
     val futureUpload = storeDicomData(bytes, source, storage, Contexts.extendedContexts)
 
     onSuccess(futureUpload) { metaData =>
-      system.eventStream.publish(ImageAdded(metaData.image.id, source, !metaData.imageAdded))
+      val overwrite = !metaData.imageAdded
+      system.eventStream.publish(ImageAdded(metaData.image.id, source, overwrite))
       val httpStatus = if (metaData.imageAdded) Created else OK
       complete((httpStatus, metaData.image))
     }

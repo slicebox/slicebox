@@ -7,30 +7,35 @@ import akka.stream.scaladsl.Source
 import akka.testkit.TestKit
 import akka.util.ByteString
 import org.dcm4che3.data.{Attributes, Tag}
-import org.scalatest.{AsyncFlatSpecLike, Matchers}
+import org.scalatest.{AsyncFlatSpecLike, BeforeAndAfterAll, Matchers}
+import se.nimsa.dcm4che.streams.DicomParseFlow.parseFlow
 import se.nimsa.dcm4che.streams.DicomParts.DicomPart
-import se.nimsa.dcm4che.streams.{DicomAttributesSink, DicomFlows, DicomParsing, DicomPartFlow}
+import se.nimsa.dcm4che.streams.{DicomAttributesSink, DicomFlows, DicomParsing}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.AnonymizationKey
 import se.nimsa.sbx.dicom.DicomData
 import se.nimsa.sbx.util.TestUtil
 
-class HarmonizeAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymizationFlowSpec")) with AsyncFlatSpecLike with Matchers {
+import scala.concurrent.{ExecutionContextExecutor, Future}
+
+class HarmonizeAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymizationFlowSpec")) with AsyncFlatSpecLike with Matchers with BeforeAndAfterAll {
 
   import DicomTestData._
 
-  implicit val materializer = ActorMaterializer()
-  implicit val ec = system.dispatcher
+  implicit val materializer: ActorMaterializer = ActorMaterializer()
+  implicit val ec: ExecutionContextExecutor = system.dispatcher
+
+  override def afterAll: Unit = TestKit.shutdownActorSystem(system)
 
   def attributesSource(dicomData: DicomData): Source[DicomPart, NotUsed] = {
     val bytes = ByteString(TestUtil.toByteArray(dicomData))
     Source.single(bytes)
-      .via(DicomPartFlow.partFlow)
-      .via(DicomFlows.blacklistFilter(DicomParsing.isFileMetaInformation, keepPreamble = false))
+      .via(parseFlow)
+      .via(DicomFlows.tagFilter(_ => false)(tagPath => !DicomParsing.isFileMetaInformation(tagPath.tag)))
   }
 
   def anonKeyPart(key: AnonymizationKey) = AnonymizationKeysPart(Seq(key), Some(key), Some(key), Some(key))
 
-  def harmonize(key: AnonymizationKey, attributes: Attributes) =
+  def harmonize(key: AnonymizationKey, attributes: Attributes): Future[(Option[Attributes], Option[Attributes])] =
     Source.single(anonKeyPart(key))
       .concat(attributesSource(DicomData(attributes, metaInformation)))
       .via(HarmonizeAnonymizationFlow.harmonizeAnonFlow)

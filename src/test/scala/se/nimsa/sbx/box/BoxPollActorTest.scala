@@ -105,7 +105,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
       pollBoxActorRef ! PollIncoming
 
-      expectNoMsg
+      expectNoMessage(3.seconds)
 
       capturedRequests.size should be(1)
       capturedRequests(0).uri.toString() should be(s"$remoteBoxBaseUrl/outgoing/poll")
@@ -123,7 +123,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
       pollBoxActorRef ! PollIncoming
 
-      expectNoMsg
+      expectNoMessage(3.seconds)
 
       capturedRequests(1).uri.toString() should be(s"$remoteBoxBaseUrl/outgoing?transactionid=$outgoingTransactionId&imageid=$outgoingImageId")
     }
@@ -145,7 +145,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
       pollBoxActorRef ! PollIncoming
 
-      expectNoMsg
+      expectNoMessage(3.seconds)
 
       // Check that incoming transaction has been created
       val incomingTransactions = await(boxDao.listIncomingTransactions(0, 10))
@@ -167,11 +167,11 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
     "go back to polling state when poll request returns 404" in {
       mockHttpResponses += notFoundResponse
       pollBoxActorRef ! PollIncoming
-      expectNoMsg
+      expectNoMessage(3.seconds)
 
       mockHttpResponses += notFoundResponse
       pollBoxActorRef ! PollIncoming
-      expectNoMsg
+      expectNoMessage(3.seconds)
 
       capturedRequests.size should be(2)
       capturedRequests(0).uri.toString() should be(s"$remoteBoxBaseUrl/outgoing/poll")
@@ -203,7 +203,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
       pollBoxActorRef ! PollIncoming
 
-      expectNoMsg
+      expectNoMessage(3.seconds)
 
       val incomingTransactions = await(boxDao.listIncomingTransactions(0, 10))
       incomingTransactions should have length 1
@@ -230,15 +230,15 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
       // poll box, outgoing transaction will be found and an attempt to fetch the file will fail
       pollBoxActorRef ! PollIncoming
-      expectNoMsg
+      expectNoMessage(3.seconds)
 
       // poll box again, fetching the file will fail again
       pollBoxActorRef ! PollIncoming
-      expectNoMsg
+      expectNoMessage(3.seconds)
 
       // poll box again, fetching the file will succeed, done message will be sent
       pollBoxActorRef ! PollIncoming
-      expectNoMsg
+      expectNoMessage(3.seconds)
 
       // Check that requests are sent as expected
       capturedRequests.size should be(8)
@@ -262,7 +262,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
       // poll box, reading the file will fail, failed message will be sent
       pollBoxActorRef ! PollIncoming
-      expectNoMsg
+      expectNoMessage(3.seconds)
 
       // Check that requests are sent as expected
       capturedRequests.size should be(3)
@@ -287,7 +287,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
       // poll box, storing the file will fail, failed message will be sent
       pollBoxActorRef ! PollIncoming
-      expectNoMsg
+      expectNoMessage(3.seconds)
 
       // Check that requests are sent as expected
       capturedRequests.size should be(3)
