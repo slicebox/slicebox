@@ -42,9 +42,9 @@ class FileStorage(val path: Path) extends StorageService {
       Files.move(path.resolve(sourceImageName), path.resolve(targetImageName), StandardCopyOption.REPLACE_EXISTING)
     catch {
       case e: FileAlreadyExistsException =>
-        // replacing a file in a concurrent setting sometimes fails on Windows. In such cases, delete and move again
-        Files.delete(path.resolve(targetImageName))
-        Files.move(path.resolve(sourceImageName), path.resolve(targetImageName))
+        // replacing a file in a concurrent setting sometimes fails on Windows. In such cases, wait then move again
+        Thread.sleep(500)
+        Files.move(path.resolve(sourceImageName), path.resolve(targetImageName), StandardCopyOption.REPLACE_EXISTING)
     }
 
   override def deleteByName(names: Seq[String]): Unit = names.foreach(name => Files.delete(filePath(name)))
