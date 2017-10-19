@@ -6,7 +6,7 @@ scalacOptions := Seq("-encoding", "UTF-8", "-Xlint", "-deprecation", "-unchecked
 
 // define the project
 
-lazy val slicebox = (project in file(".")).enablePlugins(SbtWeb, JavaServerAppPackaging)
+lazy val slicebox = (project in file(".")).enablePlugins(SbtWeb, JavaServerAppPackaging, SystemVPlugin)
 mainClass in Compile := Some("se.nimsa.sbx.app.Slicebox")
 
 // for sbt-resolver, (the re-start and re-stop commands)
@@ -45,7 +45,6 @@ rpmVendor := maintainer.value
 rpmLicense := Some("Apache v2")
 packageArchitecture in Rpm := "noarch"
 rpmGroup := Some("Applications/Research")
-version in Rpm := version.value.replace("-SNAPSHOT", "")
 rpmRelease := {
   if (version.value.matches(".*-SNAPSHOT")) System.currentTimeMillis().toString else "1"
 }
