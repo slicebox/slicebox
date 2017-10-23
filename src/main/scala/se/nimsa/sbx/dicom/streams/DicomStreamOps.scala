@@ -278,12 +278,12 @@ object DicomStreamOps {
 
         val baseFlow = validateFlowWithContext(validationContexts)
           .via(parseFlow)
+          .via(collectAttributesFlow(metaTags2Collect))
+          .mapAsync(1)(attributesToMetaPart) // needed for e.g. maybe deflate flow
 
         val flow = builder.add {
           if (reverseAnonymization)
             baseFlow
-              .via(collectAttributesFlow(metaTags2Collect))
-              .mapAsync(1)(attributesToMetaPart)
               .mapAsync(1)(queryProtectedAnonymizationKeys(reverseAnonymizationQuery))
               .mapConcat(identity) // flatten stream of lists
               .via(maybeReverseAnonFlow)
@@ -358,6 +358,7 @@ object DicomStreamOps {
           var maybeKeys: Option[AnonymizationKeysPart] = None
           var maybeProtectedKey: Option[AnonymizationKeyPart] = None
           var maybeAnonymousKey: Option[AnonymizationKeyPart] = None
+
           def maybeEmit() = maybeKeys
             .flatMap(keys => maybeProtectedKey
               .flatMap(protectedKey => maybeAnonymousKey
@@ -417,6 +418,7 @@ object DicomStreamOps {
       .via(collectAnonymizationKeyAnonymousInfo) // AnonymizationKeyPart (anon) :: AnonymizationKeyPart (protected) :: DicomMetaPart :: AnonymizationKeysPart :: DicomPart...
       .via(collectAnonymizationKeyInfo) // DicomMetaPart :: AnonymizationKeyInfoPart :: DicomPart...
       .mapAsync(1)(maybeInsertAnonymizationKey(anonymizationInsert))
+      .via(maybeDeflateFlow)
       .map(_.bytes)
 
   def inflatedSource(source: StreamSource[ByteString, _]): StreamSource[ByteString, _] = source
