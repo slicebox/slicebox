@@ -19,13 +19,12 @@ package se.nimsa.sbx.storage
 import akka.actor.ActorSystem
 import akka.stream.Materializer
 import akka.stream.alpakka.s3.S3Exception
-import akka.stream.alpakka.s3.auth.{AWSSessionCredentials => AlpakkaSessionCredentials, BasicCredentials => AlpakkaBasicCredentials}
 import akka.stream.alpakka.s3.impl.{S3Headers, ServerSideEncryption}
 import akka.stream.alpakka.s3.scaladsl.S3Client
 import akka.stream.scaladsl.{Sink, Source}
 import akka.util.ByteString
 import akka.{Done, NotUsed}
-import com.amazonaws.auth.{AWSSessionCredentials, DefaultAWSCredentialsProviderChain}
+import com.amazonaws.auth.DefaultAWSCredentialsProviderChain
 import com.amazonaws.services.s3.AmazonS3ClientBuilder
 import com.amazonaws.services.s3.model.{CopyObjectRequest, DeleteObjectsRequest, ObjectMetadata}
 import com.amazonaws.{ClientConfiguration, Protocol}
@@ -52,15 +51,6 @@ class S3Storage(val bucket: String, val s3Prefix: String, val region: String)(im
     .withClientConfiguration(new ClientConfiguration().withProtocol(Protocol.HTTPS))
     .build()
 
-  private def credentialsFromProviderChain() = {
-    val providerChain = new DefaultAWSCredentialsProviderChain()
-    val creds = providerChain.getCredentials
-    creds match {
-      case sc: AWSSessionCredentials => AlpakkaSessionCredentials(sc.getAWSAccessKeyId, sc.getAWSSecretKey, sc.getSessionToken)
-      case _ => AlpakkaBasicCredentials(creds.getAWSAccessKeyId, creds.getAWSSecretKey)
-    }
-  }
-
   private def s3Id(imageName: String): String = s3Prefix + "/" + imageName
 
   override def move(sourceImageName: String, targetImageName: String) = {
@@ -83,10 +73,10 @@ class S3Storage(val bucket: String, val s3Prefix: String, val region: String)(im
     }
 
   override def fileSink(name: String)(implicit executionContext: ExecutionContext): Sink[ByteString, Future[Done]] =
-    S3Client(credentialsFromProviderChain(), region).multipartUploadWithHeaders(bucket, name, s3Headers = Some(S3Headers(ServerSideEncryption.AES256))).mapMaterializedValue(_.map(_ => Done))
+    S3Client(new DefaultAWSCredentialsProviderChain(), region).multipartUploadWithHeaders(bucket, name, s3Headers = Some(S3Headers(ServerSideEncryption.AES256))).mapMaterializedValue(_.map(_ => Done))
 
   override def fileSource(name: String): Source[ByteString, NotUsed] =
-    S3Client(credentialsFromProviderChain(), region).download(bucket, s3Id(name)).mapError {
+    S3Client(new DefaultAWSCredentialsProviderChain(), region).download(bucket, s3Id(name)).mapError {
       // we do not have access to http status code here so not much we can do but map everything to NotFound
       case e: S3Exception => new NotFoundException(s"Data could not be transferred for name $name: ${e.getMessage}")
     }
