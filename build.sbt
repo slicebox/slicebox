@@ -99,7 +99,7 @@ libraryDependencies ++= {
     "org.webjars" % "angularjs" % "1.5.9",
     "org.webjars" % "angular-material" % "1.1.4",
     "org.webjars" % "angular-file-upload" % "11.0.0",
-    "se.nimsa" %% "dcm4che-streams" % "0.5" exclude("org.slf4j", "slf4j-simple"),
+    "se.nimsa" %% "dcm4che-streams" % "0.6-SNAPSHOT" exclude("org.slf4j", "slf4j-simple"),
     "com.lightbend.akka" %% "akka-stream-alpakka-s3" % alpakkaVersion,
     "com.lightbend.akka" %% "akka-stream-alpakka-file" % alpakkaVersion
   )
