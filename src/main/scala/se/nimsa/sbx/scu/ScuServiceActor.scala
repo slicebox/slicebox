@@ -116,8 +116,10 @@ class ScuServiceActor(scuDao: ScuDAO, storage: StorageService)(implicit material
                       case _: NoRouteToHostException =>
                         throw new BadGatewayException(s"No route found to host ${scu.aeTitle}@${scu.host}:${scu.port}")
                       case e: NoPresentationContextException =>
-                        throw new BadGatewayException(s"${scu.aeTitle}@${scu.host}:${scu.port}: ${e.getMessage}")
+                        throw new BadGatewayException(s"No presentation context when sending to ${scu.aeTitle}@${scu.host}:${scu.port}: ${e.getMessage}")
                     }
+                  case e: RuntimeException =>
+                    throw new BadGatewayException(s"Unable to send images to ${scu.aeTitle}@${scu.host}:${scu.port}: ${e.getMessage}")
                 }
                 .pipeTo(sender)
             }).orElse(throw new NotFoundException(s"SCU with id $scuId not found"))
