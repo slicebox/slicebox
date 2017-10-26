@@ -16,14 +16,14 @@
 
 package se.nimsa.sbx.directory
 
-import java.nio.file.{FileSystems, Files, Paths}
+import java.nio.file.{FileSystem, FileSystems, Files, Paths}
 
-import akka.actor.{Actor, Props}
+import akka.actor.{Actor, ActorSelection, ActorSystem, Cancellable, Props}
 import akka.event.LoggingReceive
 import akka.pattern.ask
 import akka.stream.alpakka.file.DirectoryChange
 import akka.stream.alpakka.file.scaladsl.{Directory, DirectoryChangesSource}
-import akka.stream.scaladsl.{FileIO, Keep, Sink, Source => StreamSource}
+import akka.stream.scaladsl.{FileIO, Keep, RunnableGraph, Sink, Source => StreamSource}
 import akka.stream.{KillSwitches, Materializer, UniqueKillSwitch}
 import akka.util.Timeout
 import se.nimsa.sbx.app.GeneralProtocol._
@@ -33,6 +33,7 @@ import se.nimsa.sbx.directory.DirectoryWatchProtocol._
 import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.storage.StorageService
 
+import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.reflect.ClassTag
 import scala.util.control.NonFatal
@@ -43,17 +44,17 @@ class DirectoryWatchActor(watchedDirectory: WatchedDirectory,
                           anonymizationServicePath: String = "../../AnonymizationService")
                          (implicit val materializer: Materializer, timeout: Timeout) extends Actor with DicomStreamOps {
 
-  val metaDataService = context.actorSelection(metaDataServicePath)
-  val anonymizationService = context.actorSelection(anonymizationServicePath)
+  val metaDataService: ActorSelection = context.actorSelection(metaDataServicePath)
+  val anonymizationService: ActorSelection = context.actorSelection(anonymizationServicePath)
 
-  implicit val system = context.system
-  implicit val executor = context.dispatcher
+  implicit val system: ActorSystem = context.system
+  implicit val executor: ExecutionContext = context.dispatcher
 
   val sbxSource = Source(SourceType.DIRECTORY, watchedDirectory.name, watchedDirectory.id)
 
-  val fs = FileSystems.getDefault
+  val fs: FileSystem = FileSystems.getDefault
 
-  val source =
+  val source: RunnableGraph[UniqueKillSwitch] =
     Directory.walk(fs.getPath(watchedDirectory.path)).map(path => (path, DirectoryChange.Creation)) // recurse on startup
       .concat(DirectoryChangesSource(fs.getPath(watchedDirectory.path), pollInterval = 5.seconds, maxBufferSize = 100000)) // watch
       .filter {
@@ -91,9 +92,9 @@ class DirectoryWatchActor(watchedDirectory: WatchedDirectory,
     killSwitch.shutdown() // tear down watch process
   }
 
-  override def callAnonymizationService[R: ClassTag](message: Any) = anonymizationService.ask(message).mapTo[R]
-  override def callMetaDataService[R: ClassTag](message: Any) = metaDataService.ask(message).mapTo[R]
-  override def scheduleTask(delay: FiniteDuration)(task: => Unit) = system.scheduler.scheduleOnce(delay)(task)
+  override def callAnonymizationService[R: ClassTag](message: Any): Future[R] = anonymizationService.ask(message).mapTo[R]
+  override def callMetaDataService[R: ClassTag](message: Any): Future[R] = metaDataService.ask(message).mapTo[R]
+  override def scheduleTask(delay: FiniteDuration)(task: => Unit): Cancellable = system.scheduler.scheduleOnce(delay)(task)
 
   def receive = LoggingReceive {
     case _ =>
