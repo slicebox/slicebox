@@ -105,6 +105,8 @@ trait JsonFormats {
   implicit val remoteBoxFormat: Format[RemoteBox] = Json.format[RemoteBox]
   implicit val remoteBoxConnectionDataFormat: Format[RemoteBoxConnectionData] = Json.format[RemoteBoxConnectionData]
 
+  implicit val systemInformationFormat: Format[SystemInformation] = Json.format[SystemInformation]
+
   implicit val sourceTypeFormat: Format[SourceType] = enumFormat(SourceType.withName)
 
   implicit val destinationTypeFormat: Format[DestinationType] = enumFormat(DestinationType.withName)

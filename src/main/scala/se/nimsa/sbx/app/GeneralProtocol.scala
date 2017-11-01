@@ -17,7 +17,9 @@
 package se.nimsa.sbx.app
 
 object GeneralProtocol {
-  
+
+  case class SystemInformation(version: String)
+
   sealed trait SourceType {
     override def toString: String = this match {
       case SourceType.SCP => "scp"
