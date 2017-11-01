@@ -55,11 +55,11 @@ class DirectoryWatchActor(watchedDirectory: WatchedDirectory,
   val fs: FileSystem = FileSystems.getDefault
 
   val source: RunnableGraph[UniqueKillSwitch] =
-    Directory.walk(fs.getPath(watchedDirectory.path)).map(path => (path, DirectoryChange.Creation)) // recurse on startup
-      .concat(DirectoryChangesSource(fs.getPath(watchedDirectory.path), pollInterval = 5.seconds, maxBufferSize = 100000)) // watch
+    Directory.walk(fs.getPath(watchedDirectory.path)).map(path => (path, DirectoryChange.Creation))
+      .concat(DirectoryChangesSource(fs.getPath(watchedDirectory.path), pollInterval = 5.seconds, maxBufferSize = 100000))
       .filter {
-      case (_, change) => change == DirectoryChange.Creation || change == DirectoryChange.Modification
-    }
+        case (_, change) => change == DirectoryChange.Creation || change == DirectoryChange.Modification
+      }
       .map(_._1)
       .flatMapConcat { path =>
         if (Files.isDirectory(path))
