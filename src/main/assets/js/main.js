@@ -94,7 +94,7 @@ angular.module('slicebox', [
 .controller('SliceboxCtrl', function($scope, $http, $location, $mdSidenav, userService, openConfirmActionModal, openMessageModal) {
 
     $scope.uiState = {};
-    
+
     userService.updateCurrentUser();
 
     $scope.logout = function() {

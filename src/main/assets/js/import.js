@@ -25,13 +25,16 @@ angular.module('slicebox.import', ['ngRoute', 'ngFileUpload'])
             }
         ];
 
-    $scope.uiState.selectedSession = null;
-    $scope.uiState.currentFileSet = {
-        processing: false,
-        index: 0,
-        total: 0,
-        progress: 0
-    };
+    if (!$scope.uiState.sessionTableState) {
+        $scope.uiState.sessionTableState = {};
+        $scope.uiState.selectedSession = null;
+        $scope.uiState.currentFileSet = {
+            processing: false,
+            index: 0,
+            total: 0,
+            progress: 0
+        };
+    }
 
     $scope.callbacks = {};
 

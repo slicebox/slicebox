@@ -88,7 +88,7 @@ angular.module('slicebox.home', ['ngRoute'])
             {
                 name: 'Send to SCP',
                 action: confirmSendSeriesToScp
-            },   
+            },
             {
                 name: 'Delete',
                 action: confirmDeleteSeries
@@ -120,7 +120,7 @@ angular.module('slicebox.home', ['ngRoute'])
             {
                 name: 'Send to SCP',
                 action: confirmSendSeriesToScp
-            },   
+            },
             {
                 name: 'Delete',
                 action: confirmDeleteSeries
@@ -154,54 +154,58 @@ angular.module('slicebox.home', ['ngRoute'])
 
     $scope.callbacks = {};
 
-    $scope.uiState = {};
-    $scope.uiState.selectedPatient = null;
-    $scope.uiState.selectedStudy = null;
-    $scope.uiState.selectedSeries = null;
-    $scope.uiState.loadPngImagesInProgress = false;
-    $scope.uiState.seriesDetails = {
-        leftColumnSelectedTabIndex: 0,
-        rightColumnSelectedTabIndex: 0,
-        selectedSeriesSource: "",
-        selectedSeriesSeriesTypes: [],
-        selectedSeriesSeriesTags: [],
-        pngImageUrls: [],
-        imageHeight: 0,
-        images: 1,
-        isWindowManual: false,
-        windowMin: 0,
-        windowMax: 100,
-        tagState: {
-            searchText: ""
-        },
-        typeState: {
-            searchText: ""
-        }
-    };
-    $scope.uiState.advancedFiltering = {
-        sourcesPromise: $q.when([]),
-        seriesTypesPromise: $q.when([]),
-        seriesTagsPromise: $q.when([]),
-        selectedSources: [],
-        selectedSeriesTypes: [],
-        selectedSeriesTags: []
-    };
+    if (!$scope.uiState.patientTableState) {
+        $scope.uiState.patientTableState = {};
+        $scope.uiState.studyTableState = {};
+        $scope.uiState.seriesTableState = {};
+        $scope.uiState.flatTableState = {};
+        $scope.uiState.attributesTableState = {};
 
-    $scope.uiState.advancedFiltering.sourcesPromise = $http.get('/api/sources').then(function(sourcesData) {
-        return sourcesData.data.map(function (source) {
-            source.selected = false;
-            return source;
-        }); 
-    });
-
-    $scope.uiState.advancedFiltering.seriesTypesPromise = $http.get('/api/seriestypes').then(function (seriesTypesData) {
-        return seriesTypesData.data.map(function (seriesType) {
-            seriesType.selected = false;
-            return seriesType;
+        $scope.uiState.selectedPatient = null;
+        $scope.uiState.selectedStudy = null;
+        $scope.uiState.selectedSeries = null;
+        $scope.uiState.loadPngImagesInProgress = false;
+        $scope.uiState.seriesDetails = {
+            leftColumnSelectedTabIndex: 0,
+            rightColumnSelectedTabIndex: 0,
+            selectedSeriesSource: "",
+            selectedSeriesSeriesTypes: [],
+            selectedSeriesSeriesTags: [],
+            pngImageUrls: [],
+            imageHeight: 0,
+            images: 1,
+            isWindowManual: false,
+            windowMin: 0,
+            windowMax: 100,
+            tagState: {
+                searchText: ""
+            },
+            typeState: {
+                searchText: ""
+            }
+        };
+        $scope.uiState.advancedFiltering = {
+            sourcesPromise: $q.when([]),
+            seriesTypesPromise: $q.when([]),
+            seriesTagsPromise: $q.when([]),
+            selectedSources: [],
+            selectedSeriesTypes: [],
+            selectedSeriesTags: []
+        };
+        $scope.uiState.advancedFiltering.sourcesPromise = $http.get('/api/sources').then(function (sourcesData) {
+            return sourcesData.data.map(function (source) {
+                source.selected = false;
+                return source;
+            });
         });
-    });
-
-    updateSeriesTagsPromise();
+        $scope.uiState.advancedFiltering.seriesTypesPromise = $http.get('/api/seriestypes').then(function (seriesTypesData) {
+            return seriesTypesData.data.map(function (seriesType) {
+                seriesType.selected = false;
+                return seriesType;
+            });
+        });
+        updateSeriesTagsPromise();
+    }
 
     // Scope functions
 
@@ -230,7 +234,7 @@ angular.module('slicebox.home', ['ngRoute'])
     $scope.findSeriesTags = function(searchText) {
         var lcSearchText = angular.lowercase(searchText);
         var selectedTagNames = $scope.uiState.seriesDetails.selectedSeriesSeriesTags.map(function (seriesTag) { return seriesTag.name; });
-        return searchText ? $scope.uiState.advancedFiltering.seriesTagsPromise.then(function (seriesTags) { 
+        return searchText ? $scope.uiState.advancedFiltering.seriesTagsPromise.then(function (seriesTags) {
             return seriesTags.filter(function (seriesTag) {
                 var lcName = angular.lowercase(seriesTag.name);
                 return lcName.indexOf(lcSearchText) === 0;
@@ -264,7 +268,7 @@ angular.module('slicebox.home', ['ngRoute'])
     };
 
     $scope.nameForSource = function(source) {
-        return source.sourceName + " (" + source.sourceType + ")";        
+        return source.sourceName + " (" + source.sourceType + ")";
     };
 
     $scope.loadPatients = function(startIndex, count, orderByProperty, orderByDirection, filter) {
@@ -275,7 +279,7 @@ angular.module('slicebox.home', ['ngRoute'])
             if (orderByProperty) {
                 var orderByPropertyName = orderByProperty === "id" ? orderByProperty : orderByProperty.substring(0, orderByProperty.indexOf('['));
                 loadPatientsUrl = loadPatientsUrl + '&orderby=' + orderByPropertyName;
-                
+
                 if (orderByDirection === 'ASCENDING') {
                     loadPatientsUrl = loadPatientsUrl + '&orderascending=true';
                 } else {
@@ -301,6 +305,7 @@ angular.module('slicebox.home', ['ngRoute'])
 
     $scope.patientSelected = function(patient) {
         if ($scope.uiState.selectedPatient !== patient) {
+            $scope.uiState.studyTableState = {};
             $scope.uiState.selectedPatient = patient;
             $scope.studySelected(null, true);
         }
@@ -331,6 +336,7 @@ angular.module('slicebox.home', ['ngRoute'])
 
     $scope.studySelected = function(study, reset) {
         if ($scope.uiState.selectedStudy !== study) {
+            $scope.uiState.seriesTableState = {};
             $scope.uiState.selectedStudy = study;
             $scope.seriesSelected(null, true);
         }
@@ -364,7 +370,7 @@ angular.module('slicebox.home', ['ngRoute'])
         if (orderByProperty) {
             var orderByPropertyName = orderByProperty == "id" ? orderByProperty : orderByProperty.substring(orderByProperty.indexOf('.') + 1, orderByProperty.indexOf('['));
             loadFlatSeriesUrl = loadFlatSeriesUrl + '&orderby=' + orderByPropertyName;
-            
+
             if (orderByDirection === 'ASCENDING') {
                 loadFlatSeriesUrl = loadFlatSeriesUrl + '&orderascending=true';
             } else {
@@ -397,10 +403,10 @@ angular.module('slicebox.home', ['ngRoute'])
             $scope.uiState.seriesDetails.pngImageUrls = [];
             $scope.uiState.seriesDetails.tagState.searchText = "";
 
-            if ($scope.callbacks.imageAttributesTable) { 
-                $scope.callbacks.imageAttributesTable.reset(); 
+            if ($scope.callbacks.imageAttributesTable) {
+                $scope.callbacks.imageAttributesTable.reset();
             }
-            if ($scope.callbacks.datasetsTable) { 
+            if ($scope.callbacks.datasetsTable) {
                 $scope.callbacks.datasetsTable.reset();
             }
 
@@ -437,7 +443,7 @@ angular.module('slicebox.home', ['ngRoute'])
         var imagesPromise = $http.get('/api/metadata/images?count=1&seriesid=' + $scope.uiState.selectedSeries.id);
 
         imagesPromise.error(function(reason) {
-            sbxToast.showErrorMessage('Failed to load images for series: ' + error);            
+            sbxToast.showErrorMessage('Failed to load images for series: ' + error);
         });
 
         var attributesPromise = imagesPromise.then(function(images) {
@@ -448,7 +454,7 @@ angular.module('slicebox.home', ['ngRoute'])
                             orderByDirection = 'ASCENDING';
                         }
                         return data.data.sort(function compare(a,b) {
-                          return orderByDirection === 'ASCENDING' ? 
+                          return orderByDirection === 'ASCENDING' ?
                             a[orderByProperty] < b[orderByProperty] ? -1 : a[orderByProperty] > b[orderByProperty] ? 1 : 0 :
                             a[orderByProperty] > b[orderByProperty] ? -1 : a[orderByProperty] < b[orderByProperty] ? 1 : 0;
                         });
@@ -499,7 +505,7 @@ angular.module('slicebox.home', ['ngRoute'])
             $scope.uiState.advancedFiltering.selectedSeriesTypes = selections.selectedSeriesTypes;
             $scope.uiState.advancedFiltering.selectedSeriesTags = selections.selectedSeriesTags;
 
-            $scope.patientSelected(null);        
+            $scope.patientSelected(null);
             $scope.callbacks.patientsTable.reset();
             if ($scope.callbacks.flatSeriesTable) {
                 $scope.callbacks.flatSeriesTable.reset();
@@ -512,11 +518,11 @@ angular.module('slicebox.home', ['ngRoute'])
         var dialogPromise = $mdDialog.show({
             templateUrl: '/assets/partials/imageSettingsModalContent.html',
             controller: 'ImageSettingsModalCtrl',
-            locals: { 
-                imageHeight: $scope.uiState.seriesDetails.imageHeight, 
-                images: $scope.uiState.seriesDetails.images, 
-                isWindowManual: $scope.uiState.seriesDetails.isWindowManual, 
-                windowMin: $scope.uiState.seriesDetails.windowMin, 
+            locals: {
+                imageHeight: $scope.uiState.seriesDetails.imageHeight,
+                images: $scope.uiState.seriesDetails.images,
+                isWindowManual: $scope.uiState.seriesDetails.isWindowManual,
+                windowMin: $scope.uiState.seriesDetails.windowMin,
                 windowMax: $scope.uiState.seriesDetails.windowMax },
             scope: $scope.$new()
         });
@@ -551,33 +557,33 @@ angular.module('slicebox.home', ['ngRoute'])
 
                                 var url = '/api/images/' + image.id + '/png' + '?framenumber=' + (j + 1);
                                 if ($scope.uiState.seriesDetails.isWindowManual) {
-                                    url = url + 
-                                        '&windowmin=' + $scope.uiState.seriesDetails.windowMin + 
+                                    url = url +
+                                        '&windowmin=' + $scope.uiState.seriesDetails.windowMin +
                                         '&windowmax=' + $scope.uiState.seriesDetails.windowMax;
                                 }
                                 if (!isNaN(parseInt($scope.uiState.seriesDetails.imageHeight))) {
-                                    url = url + 
+                                    url = url +
                                         '&imageheight=' + $scope.uiState.seriesDetails.imageHeight;
                                 }
                                 var frameIndex = Math.max(0, info.frameIndex - 1)*Math.max(1, info.numberOfFrames) + (j + 1);
                                 $scope.uiState.seriesDetails.pngImageUrls.push({ url: url, frameIndex: frameIndex });
-                                generateMore = $scope.uiState.seriesDetails.pngImageUrls.length < $scope.uiState.seriesDetails.images && 
+                                generateMore = $scope.uiState.seriesDetails.pngImageUrls.length < $scope.uiState.seriesDetails.images &&
                                                 !(imageIndex === images.length - 1 && j == info.numberOfFrames - 1);
                             }
                             if (!generateMore) {
                                 $scope.uiState.loadPngImagesInProgress = false;
                             }
                         }).error(function(error) {
-                            sbxToast.showErrorMessage('Failed to load image information: ' + error);            
-                            $scope.uiState.loadPngImagesInProgress = false;                                      
+                            sbxToast.showErrorMessage('Failed to load image information: ' + error);
+                            $scope.uiState.loadPngImagesInProgress = false;
                         });
 
                     }
 
                 });
             }).error(function(reason) {
-                sbxToast.showErrorMessage('Failed to load images for series: ' + reason);          
-                $scope.uiState.loadPngImagesInProgress = false;              
+                sbxToast.showErrorMessage('Failed to load images for series: ' + reason);
+                $scope.uiState.loadPngImagesInProgress = false;
             });
 
         }
@@ -587,49 +593,49 @@ angular.module('slicebox.home', ['ngRoute'])
 
     function urlWithAdvancedFiltering(url) {
         return sbxMetaData.urlWithAdvancedFiltering(
-            url, 
-            $scope.uiState.advancedFiltering.selectedSources, 
-            $scope.uiState.advancedFiltering.selectedSeriesTypes, 
-            $scope.uiState.advancedFiltering.selectedSeriesTags);        
+            url,
+            $scope.uiState.advancedFiltering.selectedSources,
+            $scope.uiState.advancedFiltering.selectedSeriesTypes,
+            $scope.uiState.advancedFiltering.selectedSeriesTags);
     }
 
     function studiesForPatients(patients) {
         return sbxMetaData.studiesForPatients(
             patients,
-            $scope.uiState.advancedFiltering.selectedSources, 
-            $scope.uiState.advancedFiltering.selectedSeriesTypes, 
+            $scope.uiState.advancedFiltering.selectedSources,
+            $scope.uiState.advancedFiltering.selectedSeriesTypes,
             $scope.uiState.advancedFiltering.selectedSeriesTags);
     }
 
     function seriesForPatients(patients) {
         return sbxMetaData.seriesForPatients(
             patients,
-            $scope.uiState.advancedFiltering.selectedSources, 
-            $scope.uiState.advancedFiltering.selectedSeriesTypes, 
+            $scope.uiState.advancedFiltering.selectedSources,
+            $scope.uiState.advancedFiltering.selectedSeriesTypes,
             $scope.uiState.advancedFiltering.selectedSeriesTags);
     }
 
     function imagesForPatients(patients) {
         return sbxMetaData.imagesForPatients(
             patients,
-            $scope.uiState.advancedFiltering.selectedSources, 
-            $scope.uiState.advancedFiltering.selectedSeriesTypes, 
+            $scope.uiState.advancedFiltering.selectedSources,
+            $scope.uiState.advancedFiltering.selectedSeriesTypes,
             $scope.uiState.advancedFiltering.selectedSeriesTags);
     }
 
     function seriesForStudies(studies) {
         return sbxMetaData.seriesForStudies(
             studies,
-            $scope.uiState.advancedFiltering.selectedSources, 
-            $scope.uiState.advancedFiltering.selectedSeriesTypes, 
+            $scope.uiState.advancedFiltering.selectedSources,
+            $scope.uiState.advancedFiltering.selectedSeriesTypes,
             $scope.uiState.advancedFiltering.selectedSeriesTags);
     }
 
     function imagesForStudies(studies) {
         return sbxMetaData.imagesForStudies(
             studies,
-            $scope.uiState.advancedFiltering.selectedSources, 
-            $scope.uiState.advancedFiltering.selectedSeriesTypes, 
+            $scope.uiState.advancedFiltering.selectedSources,
+            $scope.uiState.advancedFiltering.selectedSeriesTypes,
             $scope.uiState.advancedFiltering.selectedSeriesTags);
     }
 
@@ -639,7 +645,7 @@ angular.module('slicebox.home', ['ngRoute'])
 
     function updateSeriesTagsPromise() {
         $scope.uiState.advancedFiltering.seriesTagsPromise = $scope.uiState.advancedFiltering.seriesTagsPromise.then(function (oldTags) {
-            return $http.get('/api/metadata/seriestags').then(function (newTagsData) {        
+            return $http.get('/api/metadata/seriestags').then(function (newTagsData) {
                 var newTags = newTagsData.data;
                 // copy selected attribute from existing tags
                 newTags.forEach(function (newTag) {
@@ -649,7 +655,7 @@ angular.module('slicebox.home', ['ngRoute'])
                             newTag.selected = oldTag.selected;
                         }
                     });
-                }); 
+                });
                 return newTags;
             });
         });
@@ -682,7 +688,7 @@ angular.module('slicebox.home', ['ngRoute'])
                     receiversUrl: receiversUrl,
                     receiverSelectedCallback: receiverSelectedCallback
                 }
-            });        
+            });
     }
 
     function confirmSendPatients(patients) {
@@ -754,7 +760,7 @@ angular.module('slicebox.home', ['ngRoute'])
             var imageIds = images.map(function (image) { return image.id; });
             var f = openBulkDeleteEntitiesModalFunction('/api/images/delete', 'images');
             f(imageIds).finally(function() {
-                $scope.patientSelected(null);        
+                $scope.patientSelected(null);
                 $scope.callbacks.patientsTable.reset();
                 updateSeriesTagsPromise();
             });
@@ -766,7 +772,7 @@ angular.module('slicebox.home', ['ngRoute'])
             var imageIds = images.map(function (image) { return image.id; });
             var f = openBulkDeleteEntitiesModalFunction('/api/images/delete', 'images');
             f(imageIds).finally(function() {
-                $scope.studySelected(null);        
+                $scope.studySelected(null);
                 $scope.callbacks.studiesTable.reset();
                 updateSeriesTagsPromise();
             });
@@ -779,11 +785,11 @@ angular.module('slicebox.home', ['ngRoute'])
             var f = openBulkDeleteEntitiesModalFunction('/api/images/delete', 'images');
             f(imageIds).finally(function() {
                 if ($scope.callbacks.flatSeriesTable) {
-                    $scope.flatSeriesSelected(null);     
+                    $scope.flatSeriesSelected(null);
                     $scope.callbacks.flatSeriesTable.reset();
-                } 
+                }
                 if ($scope.callbacks.seriesTable) {
-                    $scope.seriesSelected(null);        
+                    $scope.seriesSelected(null);
                     $scope.callbacks.seriesTable.reset();
                 }
                 updateSeriesTagsPromise();
@@ -805,7 +811,7 @@ angular.module('slicebox.home', ['ngRoute'])
 
             return anonymizeImages(imageIdsAndPatientsPromise);
         });
-    } 
+    }
 
     function confirmAnonymizeSeries(series) {
         openConfirmActionModal('Anonymize', 'Force anonymization of ' + series.length + ' series? Patient information will be lost.', 'Ok', function() {
@@ -828,11 +834,11 @@ angular.module('slicebox.home', ['ngRoute'])
             var promise = $http.post('/api/anonymization/anonymize', imageTagValuesSeq);
 
             promise.finally(function () {
-                $scope.patientSelected(null);        
+                $scope.patientSelected(null);
                 $scope.callbacks.patientsTable.reset();
                 if ($scope.callbacks.flatSeriesTable) {
                     $scope.callbacks.flatSeriesTable.reset();
-                }                
+                }
                 updateSeriesTagsPromise();
             });
 
@@ -880,7 +886,7 @@ angular.module('slicebox.home', ['ngRoute'])
                 return images.map(function (image) {
                     return { imageId: image.id, patient: fs.patient };
                 });
-            });        
+            });
         });
 
         return sbxMisc.flattenPromises(imageIdAndPatientsPromises);
@@ -913,7 +919,7 @@ angular.module('slicebox.home', ['ngRoute'])
                     actionStringPastTense: actionStringPastTense,
                     actionString: actionString
                 }
-            });            
+            });
         });
     }
 
@@ -929,7 +935,7 @@ angular.module('slicebox.home', ['ngRoute'])
             var images = imagesForStudies(studies);
             return exportImages(images);
         });
-    } 
+    }
 
     function confirmExportSeries(series) {
         openConfirmActionModal('Export', 'This will export ' + series.length + ' series as a zip archive. Proceed?', 'Ok', function() {
@@ -950,12 +956,12 @@ angular.module('slicebox.home', ['ngRoute'])
     }
 
     function summaryForPatients(patients) {
-        studiesForPatients(patients).then(function (st) { 
-            seriesForStudies(st).then(function (se) { 
+        studiesForPatients(patients).then(function (st) {
+            seriesForStudies(st).then(function (se) {
                 summaryStringForSeries(se).then(function (summaryString) {
-                    var summary = 
+                    var summary =
                         '<ul>' +
-                            '<li>' + patients.length + ' patients</li>' + 
+                            '<li>' + patients.length + ' patients</li>' +
                             '<li>' + st.length + ' studies</li>' + summaryString +
                         '</ul>';
                     openMessageModal('Patients Summary', summary);
@@ -965,9 +971,9 @@ angular.module('slicebox.home', ['ngRoute'])
     }
 
     function summaryForStudies(studies) {
-        seriesForStudies(studies).then(function (se) { 
+        seriesForStudies(studies).then(function (se) {
             summaryStringForSeries(se).then(function (summaryString) {
-                var summary = 
+                var summary =
                     '<ul>' +
                         '<li>' + studies.length + ' studies</li>' + summaryString +
                     '</ul>';
@@ -998,8 +1004,8 @@ angular.module('slicebox.home', ['ngRoute'])
             var modalitiesString = JSON.stringify(modalities).replace(/\"/g,'');
             modalitiesString = modalitiesString.substring(1, modalitiesString.length - 1);
 
-            return '<li>' + series.length + ' series</li>' + 
-                   '<li>' + im.length + ' images</li>' + 
+            return '<li>' + series.length + ' series</li>' +
+                   '<li>' + im.length + ' images</li>' +
                    '<li>Modalities (# series): ' + modalitiesString + '</li>';
         });
     }
@@ -1075,7 +1081,7 @@ angular.module('slicebox.home', ['ngRoute'])
 
     $scope.updateAnonymousPatientNames = function() {
         $scope.anonymizedPatientNames = $scope.patients.map(function(patient, index) {
-            return $scope.namePrefix + " " + zeroPad($scope.numberingStart + index, $scope.numberingLength);                
+            return $scope.namePrefix + " " + zeroPad($scope.numberingStart + index, $scope.numberingLength);
         });
     };
 
@@ -1097,7 +1103,7 @@ angular.module('slicebox.home', ['ngRoute'])
             if (anonName && anonName.length > 0) {
                 imageTagValuesSeq.push( { imageId: imageId, tagValues: [ { tag: 0x00100010, value: anonName } ] } );
             } else {
-                imageTagValuesSeq.push( { imageId: imageId, tagValues: [ ] } );                
+                imageTagValuesSeq.push( { imageId: imageId, tagValues: [ ] } );
             }
         }
 
@@ -1124,7 +1130,7 @@ angular.module('slicebox.home', ['ngRoute'])
     }
 
     $scope.updateAnonymousPatientNames();
-    
+
 })
 
 .controller('AddSeriesTypeRuleFromTagValuesModalCtrl', function($scope, $mdDialog, $http, $q, sbxToast, tagValues) {
@@ -1139,7 +1145,7 @@ angular.module('slicebox.home', ['ngRoute'])
 
         loadSeriesTypesPromise.success(function(seriesTypes) {
             $scope.seriesTypes = seriesTypes;
-        });      
+        });
 
         return loadSeriesTypesPromise;
     };
