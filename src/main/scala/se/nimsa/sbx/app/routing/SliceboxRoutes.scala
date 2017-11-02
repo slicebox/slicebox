@@ -19,6 +19,7 @@ package se.nimsa.sbx.app.routing
 import java.io.FileNotFoundException
 import java.nio.file.NoSuchFileException
 
+import akka.http.scaladsl.model.EntityStreamException
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.AuthenticationFailedRejection.{CredentialsMissing, CredentialsRejected}
 import akka.http.scaladsl.server.Directives._
@@ -54,6 +55,8 @@ trait SliceboxRoutes extends DirectoryRoutes
       case e: FileNotFoundException =>
         complete((NotFound, "File not found: " + e.getMessage))
       case e: DicomStreamException =>
+        complete((BadRequest, "Invalid DICOM data: " + e.getMessage))
+      case e: EntityStreamException =>
         complete((BadRequest, "Invalid DICOM data: " + e.getMessage))
       case e: NoSuchFileException =>
         complete((NotFound, "File not found: " + e.getMessage))
