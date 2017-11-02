@@ -20,7 +20,8 @@ angular.module('slicebox', [
     'slicebox.adminWatchDirectories',
     'slicebox.adminBoxes',
     'slicebox.adminUsers',
-    'slicebox.adminSeriesTypes'
+    'slicebox.adminSeriesTypes',
+    'slicebox.adminSystem'
 ])
 
 .config(function($locationProvider, $routeProvider, $mdThemingProvider, $filterProvider, $httpProvider) {
@@ -91,7 +92,7 @@ angular.module('slicebox', [
     });
 })
 
-.controller('SliceboxCtrl', function($scope, $http, $location, $mdSidenav, userService, openConfirmActionModal, openMessageModal) {
+.controller('SliceboxCtrl', function($scope, $http, $location, $mdSidenav, userService) {
 
     $scope.uiState = {};
     
@@ -123,14 +124,6 @@ angular.module('slicebox', [
 
     $scope.currentPathStartsWith = function(path) { 
         return $location.path().indexOf(path) === 0;
-    };
-
-    $scope.shutdown = function() {
-        openConfirmActionModal('System', 'This command will wait for ongoing requests to finish and then stop the Slicebox service. Proceed?', 'Ok', function() {
-            return $http.post('/api/system/stop').then(function() {
-                openMessageModal('System', 'The Slicebox service has been stopped.');
-            });
-        });
     };
 
 });

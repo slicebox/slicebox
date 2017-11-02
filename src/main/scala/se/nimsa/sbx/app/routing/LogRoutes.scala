@@ -23,7 +23,8 @@ import akka.http.scaladsl.server.Route
 import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.log.LogProtocol._
 
-trait LogRoutes { this: SliceboxBase =>
+trait LogRoutes {
+  this: SliceboxBase =>
 
   def logRoutes: Route =
     pathPrefix("log") {
@@ -44,13 +45,17 @@ trait LogRoutes { this: SliceboxBase =>
                 complete(logEntries)
             }
           }
-        } 
+        } ~ delete {
+          onSuccess(logService.ask(ClearLog)) { _ =>
+            complete(NoContent)
+          }
+        }
       } ~ path(LongNumber) { logId =>
         delete {
-            onSuccess(logService.ask(RemoveLogEntry(logId))) {
-              case LogEntryRemoved(_) =>
-                complete(NoContent)
-            }          
+          onSuccess(logService.ask(RemoveLogEntry(logId))) {
+            case LogEntryRemoved(_) =>
+              complete(NoContent)
+          }
         }
       }
     }

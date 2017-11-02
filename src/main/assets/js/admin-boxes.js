@@ -11,7 +11,7 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
   });
 })
 
-.controller('AdminBoxesCtrl', function($scope, $http, $interval, $mdDialog, sbxToast, openDeleteEntitiesModalFunction, openMessageModal) {
+.controller('AdminBoxesCtrl', function($scope, $http, $interval, $mdDialog, sbxToast, openDeleteEntitiesModalFunction) {
     // Initialization
     $scope.objectActions =
         [

@@ -115,7 +115,7 @@
 								<md-button ng-class="{ active: isCurrentPath('/admin/seriestypes')}" ng-click="closeLeftNav()" href="/admin/seriestypes">Apps</md-button>
 							</li>
 							<li>
-								<md-button href="" ng-click="shutdown()">Shutdown</md-button>
+								<md-button ng-class="{ active: isCurrentPath('/admin/system')}" ng-click="closeLeftNav()" href="/admin/system">System</md-button>
 							</li>
 						</ul>
 					</li>
@@ -152,5 +152,6 @@
 	<script type="text/javascript" src="/assets/js/admin-forwarding.js"></script>
 	<script type="text/javascript" src="/assets/js/admin-users.js"></script>
 	<script type="text/javascript" src="/assets/js/admin-series-types.js"></script>
+	<script type="text/javascript" src="/assets/js/admin-system.js"></script>
 </body>
 </html>
