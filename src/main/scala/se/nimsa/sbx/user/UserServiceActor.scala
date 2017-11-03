@@ -172,7 +172,7 @@ class UserServiceActor(userDao: UserDAO, superUser: String, superPassword: Strin
 
   def listUsers(startIndex: Long, count: Long): Future[Seq[ApiUser]] = userDao.listUsers(startIndex, count)
 
-  private def md5Hash(text: String): String = MessageDigest.getInstance("MD5")
+  def md5Hash(text: String): String = MessageDigest.getInstance("MD5")
     .digest(text.getBytes("utf-8"))
     .map(0xFF & _)
     .map("%02x".format(_))
