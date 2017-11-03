@@ -44,8 +44,8 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
 
   class PatientsTable(tag: Tag) extends Table[Patient](tag, PatientsTable.name) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
-    def patientName = column[String](DicomProperty.PatientName.name, O.Length(512))
-    def patientID = column[String](DicomProperty.PatientID.name, O.Length(255))
+    def patientName = column[String](DicomProperty.PatientName.name, O.Length(180))
+    def patientID = column[String](DicomProperty.PatientID.name, O.Length(128))
     def patientBirthDate = column[String](DicomProperty.PatientBirthDate.name)
     def patientSex = column[String](DicomProperty.PatientSex.name)
     def idxUniquePatient = index("idx_unique_patient", (patientName, patientID), unique = true)
@@ -68,7 +68,7 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
   class StudiesTable(tag: Tag) extends Table[Study](tag, StudiesTable.name) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def patientId = column[Long]("patientId")
-    def studyInstanceUID = column[String](DicomProperty.StudyInstanceUID.name, O.Length(255))
+    def studyInstanceUID = column[String](DicomProperty.StudyInstanceUID.name, O.Length(128))
     def studyDescription = column[String](DicomProperty.StudyDescription.name)
     def studyDate = column[String](DicomProperty.StudyDate.name)
     def studyID = column[String](DicomProperty.StudyID.name)
@@ -96,7 +96,7 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
   class SeriesTable(tag: Tag) extends Table[Series](tag, SeriesTable.name) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def studyId = column[Long]("studyId")
-    def seriesInstanceUID = column[String](DicomProperty.SeriesInstanceUID.name, O.Length(255))
+    def seriesInstanceUID = column[String](DicomProperty.SeriesInstanceUID.name, O.Length(128))
     def seriesDescription = column[String](DicomProperty.SeriesDescription.name)
     def seriesDate = column[String](DicomProperty.SeriesDate.name)
     def modality = column[String](DicomProperty.Modality.name)
@@ -127,7 +127,7 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
   class ImagesTable(tag: Tag) extends Table[Image](tag, ImagesTable.name) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def seriesId = column[Long]("seriesId")
-    def sopInstanceUID = column[String](DicomProperty.SOPInstanceUID.name, O.Length(255))
+    def sopInstanceUID = column[String](DicomProperty.SOPInstanceUID.name, O.Length(128))
     def imageType = column[String](DicomProperty.ImageType.name)
     def instanceNumber = column[String](DicomProperty.InstanceNumber.name)
     def idxUniqueImage = index("idx_unique_image", (seriesId, sopInstanceUID), unique = true)
@@ -191,7 +191,8 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
   // *** Inserts ***
 
   def insertPatientAction(patient: Patient) =
-    (patientsQuery returning patientsQuery.map(_.id) += patient)
+    (patientsQuery returning patientsQuery.map(_.id) += patient
+      .copy(patientName = patient.patientName.copy(value = patient.patientName.value.take(180))))
       .map(generatedId => patient.copy(id = generatedId))
 
   def insert(patient: Patient): Future[Patient] = db.run(insertPatientAction(patient))
@@ -475,7 +476,7 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
 
   def patientByNameAndIDAction(patient: Patient) =
     patientsQuery
-      .filter(_.patientName === patient.patientName.value)
+      .filter(_.patientName === patient.patientName.value.take(180))
       .filter(_.patientID === patient.patientID.value)
       .result.headOption
 
@@ -538,9 +539,18 @@ object MetaDataDAO {
     if (whereParts.exists(_.isDefined)) " where" else ""
 
   def orderByPart(orderBy: Option[String], orderAscending: Boolean) =
-    orderBy.map(orderByValue =>
-      s""" order by "$orderByValue" ${if (orderAscending) "asc" else "desc"}""")
-      .getOrElse("")
+    orderBy.map { orderByValue =>
+
+      /*
+      MySQL is case insensitive for most collations. When joining tables for listing flat series,
+      we end up with columns `patientId` (foreign key in Series table) and patientID (DICOM
+      attribute in Patients table) and we must distinguish between these. This fix makes sure the
+      attribute is chosen over the foreign key and resolves the ambiguity.
+       */
+      val ob = if (orderByValue == "patientID") s""""Patients"."$orderByValue"""" else s""""$orderByValue""""
+
+      s""" order by $ob ${if (orderAscending) "asc" else "desc"}"""
+    }.getOrElse("")
 
   def pagePart(startIndex: Long, count: Long) = s""" limit $count offset $startIndex"""
 

@@ -23,8 +23,7 @@ import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.seriestype.SeriesTypeDAO
 import se.nimsa.sbx.util.DbUtil._
 import slick.basic.DatabaseConfig
-import slick.jdbc.JdbcProfile
-import slick.jdbc.GetResult
+import slick.jdbc.{GetResult, JdbcProfile}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -69,7 +68,7 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
 
   class SeriesTagTable(tag: Tag) extends Table[SeriesTag](tag, SeriesTagTable.name) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
-    def name = column[String]("name", O.Length(255))
+    def name = column[String]("name", O.Length(180))
     def idxUniqueName = index("idx_unique_series_tag_name", name, unique = true)
     def * = (id, name) <> (toSeriesTag.tupled, fromSeriesTag)
   }

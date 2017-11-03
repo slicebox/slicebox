@@ -34,31 +34,35 @@ class UserDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCon
 
   class UserTable(tag: Tag) extends Table[ApiUser](tag, UserTable.name) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
-    def user = column[String]("user", O.Length(255))
+    def user = column[String]("user", O.Length(180))
     def role = column[String]("role")
     def password = column[String]("password")
     def idxUniqueUser = index("idx_unique_user", user, unique = true)
-    def * = (id, user, role, password) <>(toUser.tupled, fromUser)
+    def * = (id, user, role, password) <> (toUser.tupled, fromUser)
   }
+
   object UserTable {
     val name = "User"
   }
+
   val users = TableQuery[UserTable]
 
   class SessionTable(tag: Tag) extends Table[ApiSession](tag, SessionTable.name) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def userId = column[Long]("userid")
-    def token = column[String]("token", O.Length(255))
-    def ip = column[String]("ip", O.Length(255))
-    def userAgent = column[String]("useragent", O.Length(512))
+    def token = column[String]("token", O.Length(64))
+    def ip = column[String]("ip", O.Length(64))
+    def userAgent = column[String]("useragent", O.Length(32))
     def updated = column[Long]("updated")
     def fkUser = foreignKey("fk_user", userId, users)(_.id, onDelete = ForeignKeyAction.Cascade)
     def idxUniqueSession = index("idx_unique_session", (token, ip, userAgent), unique = true)
-    def * = (id, userId, token, ip, userAgent, updated) <>(ApiSession.tupled, ApiSession.unapply)
+    def * = (id, userId, token, ip, userAgent, updated) <> (ApiSession.tupled, ApiSession.unapply)
   }
+
   object SessionTable {
     val name = "ApiSession"
   }
+
   val sessions = TableQuery[SessionTable]
 
   def create() = createTables(dbConf, (UserTable.name, users), (SessionTable.name, sessions))
@@ -138,7 +142,7 @@ class UserDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCon
     sessions.filter(_.id === apiSession.id).update(apiSession)
   }
 
-  def deleteSessionByUserIdIpAndUserAgent(userId: Long, ip: String, userAgent: String): Future[Int]  = db.run {
+  def deleteSessionByUserIdIpAndUserAgent(userId: Long, ip: String, userAgent: String): Future[Int] = db.run {
     sessions
       .filter(_.userId === userId)
       .filter(_.ip === ip)
@@ -146,7 +150,8 @@ class UserDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCon
       .delete
   }
 
-  def deleteSessionById(sessionId: Long): Future[Int]  = db.run {
+  def deleteSessionById(sessionId: Long): Future[Int] = db.run {
     sessions.filter(_.id === sessionId).delete
   }
+
 }
