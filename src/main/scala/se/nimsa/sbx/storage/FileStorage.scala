@@ -17,7 +17,7 @@
 package se.nimsa.sbx.storage
 
 import java.io.FileNotFoundException
-import java.nio.file.{Files, Path, StandardCopyOption}
+import java.nio.file.{FileAlreadyExistsException, Files, Path, StandardCopyOption}
 
 import akka.stream.scaladsl.{FileIO, Sink, Source}
 import akka.util.ByteString
@@ -38,7 +38,14 @@ class FileStorage(val path: Path) extends StorageService {
   private def filePath(filePath: String): Path = path.resolve(filePath)
 
   override def move(sourceImageName: String, targetImageName: String): Unit =
-    Files.move(path.resolve(sourceImageName), path.resolve(targetImageName), StandardCopyOption.REPLACE_EXISTING)
+    try
+      Files.move(path.resolve(sourceImageName), path.resolve(targetImageName), StandardCopyOption.REPLACE_EXISTING)
+    catch {
+      case e: FileAlreadyExistsException =>
+        // replacing a file in a concurrent setting sometimes fails on Windows. In such cases, wait then move again
+        Thread.sleep(500)
+        Files.move(path.resolve(sourceImageName), path.resolve(targetImageName), StandardCopyOption.REPLACE_EXISTING)
+    }
 
   override def deleteByName(names: Seq[String]): Unit = names.foreach(name => Files.delete(filePath(name)))
 
