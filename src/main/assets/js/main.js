@@ -97,6 +97,10 @@ angular.module('slicebox', [
     
     userService.updateCurrentUser();
 
+    $http.get('/api/system/information').then(function (info) {
+        $scope.uiState.systemInformation = info.data;
+    });
+
     $scope.logout = function() {
         userService.logout().finally(function() {
             userService.updateCurrentUser().finally(function () {

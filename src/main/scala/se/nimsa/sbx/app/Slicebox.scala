@@ -28,6 +28,7 @@ import akka.util.Timeout
 import com.typesafe.config.{Config, ConfigFactory}
 import de.heikoseeberger.akkahttpplayjson.PlayJsonSupport
 import se.nimsa.sbx.anonymization.{AnonymizationDAO, AnonymizationServiceActor}
+import se.nimsa.sbx.app.GeneralProtocol.SystemInformation
 import se.nimsa.sbx.app.routing.SliceboxRoutes
 import se.nimsa.sbx.box.{BoxDAO, BoxServiceActor}
 import se.nimsa.sbx.dicom.streams.DicomStreamOps
@@ -50,6 +51,8 @@ import scala.reflect.ClassTag
 import scala.util.{Failure, Success}
 
 trait SliceboxBase extends SliceboxRoutes with DicomStreamOps with JsonFormats with PlayJsonSupport {
+
+  val systemInformation: SystemInformation = SystemInformation("1.3-SNAPSHOT")
 
   val appConfig: Config  = ConfigFactory.load()
   val sliceboxConfig = appConfig.getConfig("slicebox")

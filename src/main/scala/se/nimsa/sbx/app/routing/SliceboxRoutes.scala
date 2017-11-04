@@ -93,7 +93,7 @@ trait SliceboxRoutes extends DirectoryRoutes
                 forwardingRoutes(apiUser) ~
                 importRoutes(apiUser)
             }
-        } ~ transactionRoutes ~ healthCheckRoute
+        } ~ transactionRoutes ~ publicSystemRoutes
       }
     } ~
       pathPrefixTest(!"api") {

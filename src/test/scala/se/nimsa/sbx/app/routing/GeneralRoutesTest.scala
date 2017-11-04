@@ -49,6 +49,13 @@ class GeneralRoutesTest extends {
     }
   }
 
+  it should "return 200 OK and system information" in {
+    Get("/api/system/information") ~> routes ~> check {
+      status shouldBe OK
+      responseAs[SystemInformation].version should not be empty
+    }
+  }
+
   it should "return 403 Forbidden when trying to stop the service as a user" in {
     PostAsUser("/api/system/stop") ~> Route.seal(routes) ~> check {
       status shouldBe Forbidden

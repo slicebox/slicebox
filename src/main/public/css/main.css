@@ -12,6 +12,12 @@
 	font-weight: 300;
 }
 
+.slicebox .toolbar-version-text {
+	font-weight: 300;
+	font-size: 60%;
+	margin-right: 12px;
+}
+
 .slicebox .toolbar-logo-image {
 	width: 35px;
 	height: 35px;

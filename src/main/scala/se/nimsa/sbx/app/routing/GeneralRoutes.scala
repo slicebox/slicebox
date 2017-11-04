@@ -97,9 +97,12 @@ trait GeneralRoutes {
       }
     }
 
-  def healthCheckRoute: Route =
-    path("system" / "health") {
-      complete(OK)
+  def publicSystemRoutes: Route =
+    pathPrefix("system") {
+      path("health") {
+        complete(OK)
+      } ~ path("information") {
+        complete(systemInformation)
+      }
     }
-
 }
