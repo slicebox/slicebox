@@ -52,6 +52,7 @@ object LogProtocol {
   case class GetLogEntriesBySubject(subject: String, startIndex: Long, count: Long)
   case class GetLogEntriesByType(entryType: LogEntryType, startIndex: Long, count: Long)
   case class GetLogEntriesBySubjectAndType(subject: String, entryType: LogEntryType, startIndex: Long, count: Long)
+  case object ClearLog
 
   case class RemoveLogEntry(logId: Long)
   

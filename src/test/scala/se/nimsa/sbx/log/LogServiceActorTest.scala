@@ -2,7 +2,7 @@ package se.nimsa.sbx.log
 
 import java.util.Date
 
-import akka.actor.ActorSystem
+import akka.actor.{ActorRef, ActorSystem}
 import akka.testkit.{ImplicitSender, TestKit}
 import akka.util.Timeout
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
@@ -10,6 +10,7 @@ import se.nimsa.sbx.log.LogProtocol._
 import se.nimsa.sbx.util.FutureUtil.await
 import se.nimsa.sbx.util.TestUtil
 
+import scala.concurrent.ExecutionContextExecutor
 import scala.concurrent.duration.DurationInt
 
 class LogServiceActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
@@ -17,8 +18,8 @@ class LogServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
 
   def this() = this(ActorSystem("LogServiceActorTestSystem"))
 
-  implicit val ec = system.dispatcher
-  implicit val timeout = Timeout(30.seconds)
+  implicit val ec: ExecutionContextExecutor = system.dispatcher
+  implicit val timeout: Timeout = Timeout(30.seconds)
 
   val dbConfig = TestUtil.createTestDb("logserviceactortest")
   val db = dbConfig.db
@@ -27,9 +28,9 @@ class LogServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
 
   await(logDao.create())
 
-  val logServiceActorRef = _system.actorOf(LogServiceActor.props(logDao))
+  val logServiceActorRef: ActorRef = _system.actorOf(LogServiceActor.props(logDao))
 
-  override def beforeEach() = {
+  override def beforeEach(): Unit = {
     logServiceActorRef ! AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Category1", "Message1"))
     expectMsgType[LogEntryAdded]
     logServiceActorRef ! AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Category1", "Message2"))
@@ -44,9 +45,9 @@ class LogServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
     expectMsgType[LogEntryAdded]
   }
 
-  override def afterEach() = await(logDao.clear())
+  override def afterEach(): Unit = await(logDao.clear())
 
-  override def afterAll = TestKit.shutdownActorSystem(_system)
+  override def afterAll: Unit = TestKit.shutdownActorSystem(_system)
 
   "A LogServiceActor" should {
 
@@ -96,6 +97,16 @@ class LogServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
         case LogEntries(logEntries) if logEntries.size == 1 &&
           logEntries.head.subject == "Category2" &&
           logEntries.head.entryType == LogEntryType.DEFAULT => true
+      }
+    }
+
+    "support clearing the log" in {
+      logServiceActorRef ! ClearLog
+      expectMsg(6)
+
+      logServiceActorRef ! GetLogEntries(0, 1000)
+      expectMsgPF() {
+        case LogEntries(logEntries) if logEntries.isEmpty => true
       }
     }
 

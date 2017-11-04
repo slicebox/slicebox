@@ -21,16 +21,18 @@ import akka.event.{Logging, LoggingReceive}
 import akka.pattern.pipe
 import se.nimsa.sbx.log.LogProtocol._
 
+import scala.concurrent.ExecutionContextExecutor
+
 class LogServiceActor(logDao: LogDAO) extends Actor {
   val log = Logging(context.system, this)
 
-  implicit val ec = context.dispatcher
+  implicit val ec: ExecutionContextExecutor = context.dispatcher
 
-  override def preStart {
+  override def preStart: Unit = {
     context.system.eventStream.subscribe(self, classOf[AddLogEntry])
   }
 
-  override def postStop {
+  override def postStop: Unit = {
     context.system.eventStream.unsubscribe(self)
   }
 
@@ -54,6 +56,9 @@ class LogServiceActor(logDao: LogDAO) extends Actor {
 
     case RemoveLogEntry(id) =>
       pipe(logDao.removeLogEntry(id).map(_ => LogEntryRemoved(id))).to(sender)
+
+    case ClearLog =>
+      pipe(logDao.clear()).to(sender)
   }
 
 }
