@@ -11,7 +11,7 @@ angular.module('slicebox.utils', ['ngSanitize'])
         },
 
         flattenPromises: function(arrayOfPromisesOfArrays) {
-            return $q.all(arrayOfPromisesOfArrays).then(this.flatten); 
+            return $q.all(arrayOfPromisesOfArrays).then(this.flatten);
         }
     };
 })
@@ -78,7 +78,7 @@ angular.module('slicebox.utils', ['ngSanitize'])
                     return seriesData.data;
                 });
             });
-            return sbxMisc.flattenPromises(promises);            
+            return sbxMisc.flattenPromises(promises);
         },
 
         studiesForPatients: function(patients, sources, seriesTypes, seriesTags) {
@@ -184,7 +184,7 @@ angular.module('slicebox.utils', ['ngSanitize'])
         });
 
         return deleteAllPromises;
-    }    
+    }
 
 })
 
@@ -206,7 +206,7 @@ angular.module('slicebox.utils', ['ngSanitize'])
         }, function(response) {
             sbxToast.showErrorMessage(response.data);
         });
-    }    
+    }
 
 })
 
@@ -252,7 +252,7 @@ angular.module('slicebox.utils', ['ngSanitize'])
         });
 
         return actionPromise;
-    };    
+    };
 
     $scope.cancelButtonClicked = function () {
         $mdDialog.cancel();
@@ -298,7 +298,7 @@ angular.module('slicebox.utils', ['ngSanitize'])
     };
 
     var allTagsPromise = $http.get('/api/metadata/seriestags').then(function (seriesTagsData) { return seriesTagsData.data; });
-    
+
     var tagIdToTagPromise = allTagsPromise.then(function (allTags) {
         return allTags.reduce(function(map, tag) {
             map[tag.id] = tag;
@@ -314,8 +314,8 @@ angular.module('slicebox.utils', ['ngSanitize'])
 
     var existingTagIdsPromise = idTagsPromise.then(function (idTags) {
         return sbxMisc.unique(sbxMisc.flatten(idTags.map(function (idTag) {
-            return idTag.tags.map(function (tag) { 
-                return tag.id; 
+            return idTag.tags.map(function (tag) {
+                return tag.id;
             });
         })));
     });
@@ -323,10 +323,10 @@ angular.module('slicebox.utils', ['ngSanitize'])
     var tagIdToSeriesIdsPromise = existingTagIdsPromise.then(function (tagIds) {
         return idTagsPromise.then(function (idTags) {
             return tagIds.reduce(function (map, tagId) {
-                var seriesIdsForTagId = idTags.filter(function (idTag) { 
-                    return idTag.tags.map(function (tag) { return tag.id; }).indexOf(tagId) >= 0; 
-                }).map(function (idTag) { 
-                    return idTag.seriesId; 
+                var seriesIdsForTagId = idTags.filter(function (idTag) {
+                    return idTag.tags.map(function (tag) { return tag.id; }).indexOf(tagId) >= 0;
+                }).map(function (idTag) {
+                    return idTag.seriesId;
                 });
                 map[tagId] = seriesIdsForTagId;
                 return map;
@@ -353,7 +353,7 @@ angular.module('slicebox.utils', ['ngSanitize'])
     $scope.findSeriesTags = function(searchText) {
         var lcSearchText = angular.lowercase(searchText);
         var seriesTagNames = $scope.uiState.seriesTags.map(function (seriesTag) { return seriesTag.name; });
-        return searchText ? allTagsPromise.then(function (seriesTags) { 
+        return searchText ? allTagsPromise.then(function (seriesTags) {
             return seriesTags.filter(function (seriesTag) {
                 var lcName = angular.lowercase(seriesTag.name);
                 return lcName.indexOf(lcSearchText) === 0;
@@ -422,7 +422,7 @@ angular.module('slicebox.utils', ['ngSanitize'])
     };
 
     function getAddedTags(tags, originalTags) {
-        return tags.filter(function (tag) { 
+        return tags.filter(function (tag) {
             for (var i = 0; i < originalTags.length; i++) {
                 var originalTag = originalTags[i];
                 if (originalTag.name === tag.name && originalTag.nSeries === tag.nSeries) {
@@ -434,7 +434,7 @@ angular.module('slicebox.utils', ['ngSanitize'])
     }
 
     function getRemovedTags(tags, originalTags) {
-        return originalTags.filter(function (originalTag) { 
+        return originalTags.filter(function (originalTag) {
             return tags.map(function (tag) { return tag.name; }).indexOf(originalTag.name) < 0;
         });
     }
@@ -458,10 +458,10 @@ angular.module('slicebox.utils', ['ngSanitize'])
     service.login = function (username, password) {
         return $http.post('/api/users/login', { user: username, pass: password });
     };
-    
+
     service.logout = function() {
         return $http.post('/api/users/logout');
     };
 
-    return service;  
+    return service;
 });

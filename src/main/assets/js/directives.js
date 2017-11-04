@@ -82,7 +82,8 @@ angular.module('slicebox.directives', [])
             rowCSSClassesCallback: '&rowCssClasses',
             rowObjectActionsCallback: '&rowObjectActions',
             emptyMessage: '@',
-            refreshButton: '='
+            refreshButton: '=',
+            gridState: '='
         },
         controller: function($scope, $element, $attrs) {
             $scope.columnDefinitions = [];
@@ -105,17 +106,29 @@ angular.module('slicebox.directives', [])
                 }
             };
 
-            $scope.currentPage = 0;
-            $scope.currentPageSize = pageSizeAsNumber();
-            $scope.selectedObject = null;
-            $scope.orderByProperty = null;
-            $scope.orderByDirection = null;
-            $scope.objectActionSelection = [];
-            $scope.uiState = {
-                selectAllChecked: false,
-                emptyMessage: 'Empty',
-                filter: ''
-            };
+            if ($scope.gridState && !angular.equals($scope.gridState, {})) {
+                $scope.uiState = angular.copy($scope.gridState);
+                $scope.objectList = $scope.gridState.objectList;
+            } else {
+                $scope.uiState = {
+                    currentPage: 0,
+                    morePageExist: false,
+                    currentPageSize: pageSizeAsNumber(),
+                    selectedObject: null,
+                    orderByProperty: null,
+                    orderByDirection: null,
+                    objectActionSelection: [],
+                    selectAllChecked: false,
+                    emptyMessage: 'Empty',
+                    filter: ''
+                };
+            }
+            $scope.$on('$destroy', function () {
+                if ($scope.gridState) {
+                    angular.copy($scope.uiState, $scope.gridState);
+                    $scope.gridState.objectList = $scope.objectList;
+                }
+            });
 
             if (angular.isDefined($attrs.callbacks)) {
                 $scope.callbacks = {
@@ -131,15 +144,23 @@ angular.module('slicebox.directives', [])
                 $scope.uiState.emptyMessage = $scope.emptyMessage;
             }
 
-            $scope.$watchCollection('columnDefinitions', function() {
+            $scope.$watchCollection('columnDefinitions', function () {
                 doOnColumnsChanged();
-            });            
+            });
 
-            $scope.$watchCollection('objectActionSelection', function() {
+            $scope.$watchCollection('uiState.objectActionSelection', function () {
                 updateSelectAllObjectActionChecked();
             });
 
-            loadPageData();
+            $scope.$watch('uiState.currentPageSize', function (newValue, oldValue) {
+                if (newValue !== oldValue) {
+                    loadPageData();
+                }
+            });
+
+            if (!$scope.objectList) {
+                loadPageData();
+            }
 
             // Scope functions
             $scope.tableBodyStyle = function() {
@@ -161,7 +182,7 @@ angular.module('slicebox.directives', [])
             };
 
             $scope.rowCSSClasses = function(rowObject) {
-                var rowObjectSelected = rowObject === $scope.selectedObject;
+                var rowObjectSelected = $scope.uiState.selectedObject && rowObject.id === $scope.uiState.selectedObject.id;
 
                 if (angular.isDefined($attrs.rowCssClasses)) {
                     return $scope.rowCSSClassesCallback({rowObject: rowObject, selected: rowObjectSelected});
@@ -183,25 +204,25 @@ angular.module('slicebox.directives', [])
             };
 
             $scope.loadNextPage = function() {
-                if ($scope.objectList.length < $scope.currentPageSize) {
+                if ($scope.objectList.length < $scope.uiState.currentPageSize) {
                     return;
                 }
 
-                $scope.currentPage += 1;
+                $scope.uiState.currentPage += 1;
                 loadPageData();
             };
 
             $scope.loadPreviousPage = function() {
-                if ($scope.currentPage === 0) {
+                if ($scope.uiState.currentPage === 0) {
                     return;
                 }
 
-                $scope.currentPage -= 1;
+                $scope.uiState.currentPage -= 1;
                 loadPageData();
             };
 
             $scope.rowClicked = function(rowObject) {
-                if ($scope.selectedObject === rowObject) {
+                if ($scope.uiState.selectedObject === rowObject) {
                     selectObject(null);
                 } else {
                     selectObject(rowObject);
@@ -235,29 +256,29 @@ angular.module('slicebox.directives', [])
                     return;
                 }
 
-                if ($scope.orderByProperty === columnDefinition.property) {
-                    if ($scope.orderByDirection === 'ASCENDING') {
-                        $scope.orderByDirection = 'DESCENDING';
+                if ($scope.uiState.orderByProperty === columnDefinition.property) {
+                    if ($scope.uiState.orderByDirection === 'ASCENDING') {
+                        $scope.uiState.orderByDirection = 'DESCENDING';
                     } else {
-                        $scope.orderByDirection = 'ASCENDING';
+                        $scope.uiState.orderByDirection = 'ASCENDING';
                     }
                 } else {
-                    $scope.orderByProperty = columnDefinition.property;
-                    $scope.orderByDirection = 'ASCENDING';
+                    $scope.uiState.orderByProperty = columnDefinition.property;
+                    $scope.uiState.orderByDirection = 'ASCENDING';
                 }
 
                 loadPageData();
             };
 
             $scope.selectAllChanged = function() {
-                for (var i = 0; i < $scope.objectActionSelection.length; i++) {
-                    $scope.objectActionSelection[i] = $scope.uiState.selectAllChecked;
+                for (var i = 0; i < $scope.uiState.objectActionSelection.length; i++) {
+                    $scope.uiState.objectActionSelection[i] = $scope.uiState.selectAllChecked;
                 }
             };
 
             $scope.objectActionsEnabled = function() {
-                for (var i = 0; i < $scope.objectActionSelection.length; i++) {
-                    if ($scope.objectActionSelection[i] === true) {
+                for (var i = 0; i < $scope.uiState.objectActionSelection.length; i++) {
+                    if ($scope.uiState.objectActionSelection[i] === true) {
                         return true;
                     }
                 }
@@ -281,11 +302,6 @@ angular.module('slicebox.directives', [])
                 performObjectAction(objectAction);
             };
 
-            $scope.pageSizeChanged = function() {
-                $scope.currentPageSize = pageSizeAsNumber();
-                loadPageData();
-            };
-
             $scope.refresh = function() {
                 loadPageData();
             };
@@ -306,7 +322,7 @@ angular.module('slicebox.directives', [])
             }
 
             function loadPageData() {
-                if ($scope.currentPageSize <= 0) {
+                if ($scope.uiState.currentPageSize <= 0) {
                     return $q.when([]);
                 }
 
@@ -314,15 +330,15 @@ angular.module('slicebox.directives', [])
 
                 var deferred = $q.defer();
 
-                var startIndex = $scope.currentPage * $scope.currentPageSize;
+                var startIndex = $scope.uiState.currentPage * $scope.uiState.currentPageSize;
 
                 // Load one more object than pageSize to be able to check if more data is available
-                var count = $scope.currentPageSize + 1;
+                var count = $scope.uiState.currentPageSize + 1;
                 var loadPageFunctionParameters = {
                     startIndex: startIndex,
                     count: count,
-                    orderByProperty: $scope.orderByProperty,
-                    orderByDirection: $scope.orderByDirection
+                    orderByProperty: $scope.uiState.orderByProperty,
+                    orderByDirection: $scope.uiState.orderByDirection
                 };
 
                 if ($scope.uiState.filter && $scope.uiState.filter.length > 0) {
@@ -362,12 +378,12 @@ angular.module('slicebox.directives', [])
             function handleLoadedPageData(pageData, selectedObjectsBeforeLoadPage) {
                 $scope.objectList = convertPageData(pageData);
 
-                if ($scope.objectList.length > $scope.currentPageSize) {
+                if ($scope.objectList.length > $scope.uiState.currentPageSize) {
                     // Remove the extra object from the end of the list
                     $scope.objectList.splice(-1, 1);
-                    $scope.morePagesExists = true;
+                    $scope.uiState.morePagesExists = true;
                 } else {
-                    $scope.morePagesExists = false;
+                    $scope.uiState.morePagesExists = false;
                 }
 
                 validateAndUpdateSelectedObject();
@@ -455,20 +471,20 @@ angular.module('slicebox.directives', [])
             }
 
             function validateAndUpdateSelectedObject() {
-                if (!$scope.selectedObject) {
+                if (!$scope.uiState.selectedObject) {
                     return;
                 }
 
-                var newSelectedObject = findObjectInArray($scope.selectedObject, $scope.objectList);
+                var newSelectedObject = findObjectInArray($scope.uiState.selectedObject, $scope.objectList);
                 if (newSelectedObject) {
-                    $scope.selectedObject = newSelectedObject;
+                    $scope.uiState.selectedObject = newSelectedObject;
                 } else {
                     selectObject(null);
                 }
             }
 
             function validateAndUpdateObjectActionSelection(selectedObjectsBeforeLoadPage) {
-                $scope.objectActionSelection = new Array($scope.objectList.length);
+                $scope.uiState.objectActionSelection = new Array($scope.objectList.length);
 
                 if (selectedObjectsBeforeLoadPage.length === 0) {
                     return;
@@ -479,17 +495,17 @@ angular.module('slicebox.directives', [])
                     if (newSelectedObject) {
                         var index = $scope.objectList.indexOf(newSelectedObject);
                         if (index >= 0) {
-                            $scope.objectActionSelection[index] = true;
+                            $scope.uiState.objectActionSelection[index] = true;
                         }
                     }
                 });
             }
 
             function updateSelectAllObjectActionChecked() {
-                var allSelected = ($scope.objectActionSelection.length > 0);
+                var allSelected = ($scope.uiState.objectActionSelection.length > 0);
 
-                for (var i = 0; i < $scope.objectActionSelection.length; i++) {
-                    if (!$scope.objectActionSelection[i]) {
+                for (var i = 0; i < $scope.uiState.objectActionSelection.length; i++) {
+                    if (!$scope.uiState.objectActionSelection[i]) {
                         allSelected = false;
                     }
                 }
@@ -502,21 +518,23 @@ angular.module('slicebox.directives', [])
             }
 
             function selectObject(object) {
-                if ($scope.selectedObject === object) {
+                if ($scope.uiState.selectedObject === object) {
                     return;
                 }
 
                 $scope.objectSelectedCallback({object: object});
 
-                $scope.selectedObject = object;
+                $scope.uiState.selectedObject = object;
             }
 
             function selectedActionObjects() {
                 var selectedObjects = [];
 
-                for (var i = 0; i < $scope.objectActionSelection.length; i++) {
-                    if ($scope.objectActionSelection[i]) {
-                        selectedObjects.push($scope.objectList[i]);
+                for (var i = 0; i < $scope.uiState.objectActionSelection.length; i++) {
+                    if ($scope.uiState.objectActionSelection[i]) {
+                        if ($scope.objectList && $scope.objectList.length > i) {
+                            selectedObjects.push($scope.objectList[i]);
+                        }
                     }
                 }
 
@@ -580,12 +598,12 @@ angular.module('slicebox.directives', [])
             }
 
             function reset() {
-                $scope.currentPage = 0;
+                $scope.uiState.currentPage = 0;
                 return loadPageData();
             }
 
             function clearSelection() {
-                $scope.selectedObject = null;
+                $scope.uiState.selectedObject = null;
             }
 
             function performObjectAction(objectAction) {

@@ -12,7 +12,11 @@ angular.module('slicebox.transactions', ['ngRoute'])
 })
 
 .controller('TransactionsCtrl', function($scope) {
-    $scope.uiState = {};
+    if (!$scope.uiState.incomingTableState) {
+        $scope.uiState.incomingTableState = {};
+        $scope.uiState.outgoingTableState = {};
+        $scope.uiState.boxLogTableState = {};
+    }
 })
 
 .controller('IncomingCtrl', function($scope, $http, $interval, openDeleteEntitiesModalFunction, openTagSeriesModalFunction) {

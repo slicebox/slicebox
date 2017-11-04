@@ -13,7 +13,8 @@
                             object-actions="objectActions"
                             sorting="false"
                             callbacks="callbacks.incomingTable"
-                            empty-message="There are no incoming transactions">
+                            empty-message="There are no incoming transactions"
+                            grid-state="uiState.incomingTableState">
 
                             <sbx-grid-column property="updated" title="Updated" filter="date: yyyy-MM-dd HH:mm">
                             </sbx-grid-column>
@@ -56,7 +57,8 @@
                             object-actions="objectActions"
                             sorting="false"
                             callbacks="callbacks.outgoingTable"
-                            empty-message="There are no outgoing transactions">
+                            empty-message="There are no outgoing transactions"
+                            grid-state="uiState.outgoingTableState">
 
                             <sbx-grid-column property="updated" title="Updated" filter="date: yyyy-MM-dd HH:mm">
                             </sbx-grid-column>
@@ -99,7 +101,8 @@
                         object-actions="actions"
                         sorting="false"
                         callbacks="callbacks.logTable"
-                        empty-message="Event log is empty">
+                        empty-message="Event log is empty"
+                        grid-state="uiState.boxLogTableState">
 
                         <sbx-grid-column property="created" title="Created" filter="date: yyyy-MM-dd HH:mm">
                         </sbx-grid-column>
