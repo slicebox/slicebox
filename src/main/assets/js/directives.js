@@ -182,7 +182,7 @@ angular.module('slicebox.directives', [])
             };
 
             $scope.rowCSSClasses = function(rowObject) {
-                var rowObjectSelected = rowObject === $scope.uiState.selectedObject;
+                var rowObjectSelected = $scope.uiState.selectedObject && rowObject.id === $scope.uiState.selectedObject.id;
 
                 if (angular.isDefined($attrs.rowCssClasses)) {
                     return $scope.rowCSSClassesCallback({rowObject: rowObject, selected: rowObjectSelected});

@@ -289,9 +289,10 @@
                         <md-card-content>
                             <md-content class="md-padding" style="height: 600px">
                                 <sbx-grid
-                                    load-page="loadImageAttributes(0, 1000000000, orderByProperty, orderByDirection)"
+                                    load-page="loadImageAttributes(0, 1000000000, orderByProperty, orderByDirection, filter)"
                                     page-size="1000000000"
                                     sorting="true"
+                                    filter="true"
                                     object-actions="imageAttributesActions"
                                     callbacks="callbacks.imageAttributesTable"
                                     empty-message="No image attributes found"

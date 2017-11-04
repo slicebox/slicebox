@@ -305,11 +305,14 @@ angular.module('slicebox.home', ['ngRoute'])
 
     $scope.patientSelected = function(patient) {
         if ($scope.uiState.selectedPatient !== patient) {
+            $scope.uiState.flatTableState = {}
             $scope.uiState.studyTableState = {};
             $scope.uiState.selectedPatient = patient;
             $scope.studySelected(null, true);
         }
-        $scope.callbacks.patientsTable.reloadPage();
+        if ($scope.callbacks.patientsTable) {
+            $scope.callbacks.patientsTable.reloadPage();
+        }
     };
 
     $scope.loadStudies = function(startIndex, count, orderByProperty, orderByDirection) {
@@ -368,7 +371,7 @@ angular.module('slicebox.home', ['ngRoute'])
     $scope.loadFlatSeries = function(startIndex, count, orderByProperty, orderByDirection, filter) {
         var loadFlatSeriesUrl = '/api/metadata/flatseries?startindex=' + startIndex + '&count=' + count;
         if (orderByProperty) {
-            var orderByPropertyName = orderByProperty == "id" ? orderByProperty : orderByProperty.substring(orderByProperty.indexOf('.') + 1, orderByProperty.indexOf('['));
+            var orderByPropertyName = orderByProperty === "id" ? orderByProperty : orderByProperty.substring(orderByProperty.indexOf('.') + 1, orderByProperty.indexOf('['));
             loadFlatSeriesUrl = loadFlatSeriesUrl + '&orderby=' + orderByPropertyName;
 
             if (orderByDirection === 'ASCENDING') {
@@ -427,15 +430,18 @@ angular.module('slicebox.home', ['ngRoute'])
     $scope.flatSeriesSelected = function(flatSeries) {
 
         if (flatSeries !== null) {
-            $scope.patientSelected(flatSeries.patient);
-            $scope.studySelected(flatSeries.study);
+            $scope.uiState.selectedPatient = null;
+            $scope.uiState.selectedStudy = null;
+            $scope.uiState.patientTableState = {};
+            $scope.uiState.studyTableState = {};
+            $scope.uiState.seriesTableState = {};
             $scope.seriesSelected(flatSeries.series);
         } else {
             $scope.seriesSelected(null);
         }
     };
 
-    $scope.loadImageAttributes = function(startIndex, count, orderByProperty, orderByDirection) {
+    $scope.loadImageAttributes = function(startIndex, count, orderByProperty, orderByDirection, filter) {
         if ($scope.uiState.selectedSeries === null) {
             return [];
         }
@@ -449,6 +455,17 @@ angular.module('slicebox.home', ['ngRoute'])
         var attributesPromise = imagesPromise.then(function(images) {
             if (images.data.length > 0) {
                 return $http.get('/api/images/' + images.data[0].id + '/attributes').then(function(data) {
+                    if (filter) {
+                        var filterLc = filter.toLowerCase();
+                        data.data = data.data.filter(function (attribute) {
+                            var nameCondition = attribute.name.toLowerCase().indexOf(filterLc) >= 0;
+                            var tagCondition = toHexString(attribute.tag).indexOf(filterLc) >= 0;
+                            var valuesCondition = attribute.values.reduce(function (c, value) {
+                                return c | value.toLowerCase().indexOf(filterLc) >= 0;
+                            }, false);
+                            return nameCondition || tagCondition || valuesCondition;
+                        })
+                    }
                     if (orderByProperty) {
                         if (!orderByDirection) {
                             orderByDirection = 'ASCENDING';
@@ -590,6 +607,14 @@ angular.module('slicebox.home', ['ngRoute'])
     };
 
     // Private functions
+
+    function toHexString(intValue) {
+        var returnValue = intValue.toString(16);
+        while (returnValue.length < 8) {
+            returnValue = '0' + returnValue;
+        }
+        return returnValue.toUpperCase();
+    }
 
     function urlWithAdvancedFiltering(url) {
         return sbxMetaData.urlWithAdvancedFiltering(
