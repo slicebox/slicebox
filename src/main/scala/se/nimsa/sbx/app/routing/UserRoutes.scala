@@ -29,7 +29,7 @@ trait UserRoutes { this: SliceboxBase =>
 
   val extractUserAgent: HttpHeader => Option[String] = {
     case a: `User-Agent` => Some(a.value)
-    case _               => None
+    case _ => None
   }
 
   val extractIP: Directive1[RemoteAddress] =
@@ -40,10 +40,13 @@ trait UserRoutes { this: SliceboxBase =>
     } | provide(RemoteAddress.Unknown)
 
   def extractAuthKey: Directive1[AuthKey] =
-    (optionalCookie(sessionField) & extractIP & optionalHeaderValue(extractUserAgent)).tmap {
-      case (optionalCookie, ip, optionalUserAgent) =>
-        AuthKey(optionalCookie.map(_.value), ip.toOption.map(_.getHostAddress), optionalUserAgent)
-    }
+    if (sessionsIncludeIpAndUserAgent)
+      (optionalCookie(sessionField) & extractIP & optionalHeaderValue(extractUserAgent)).tmap {
+        case (cookie, ip, optionalUserAgent) =>
+          AuthKey(cookie.map(_.value), ip.toOption.map(_.getHostAddress), optionalUserAgent)
+      }
+    else
+      optionalCookie(sessionField).map(cookie => AuthKey(cookie.map(_.value), Some(""), Some("")))
 
   def loginRoute(authKey: AuthKey): Route =
     path("users" / "login") {
@@ -67,7 +70,7 @@ trait UserRoutes { this: SliceboxBase =>
         onSuccess(userService.ask(GetAndRefreshUserByAuthKey(authKey)).mapTo[Option[ApiUser]]) { optionalUser =>
           optionalUser.map(user => UserInfo(user.id, user.user, user.role)) match {
             case Some(userInfo) => complete(userInfo)
-            case None           => complete(NotFound)
+            case None => complete(NotFound)
           }
         }
       }

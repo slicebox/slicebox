@@ -125,6 +125,7 @@ trait SliceboxBase extends SliceboxRoutes with DicomStreamOps with JsonFormats w
 
   val superUser = sliceboxConfig.getString("superuser.user")
   val superPassword = sliceboxConfig.getString("superuser.password")
+  val sessionsIncludeIpAndUserAgent: Boolean = sliceboxConfig.getBoolean("user-sessions-include-ip-and-useragent")
 
   def storage: StorageService
 
