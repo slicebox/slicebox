@@ -35,10 +35,10 @@ class ForwardingDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
 
   class ForwardingRuleTable(tag: Tag) extends Table[ForwardingRule](tag, ForwardingRuleTable.name) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
-    def sourceType = column[String]("sourcetype", O.Length(255))
+    def sourceType = column[String]("sourcetype", O.Length(64))
     def sourceName = column[String]("sourcename")
     def sourceId = column[Long]("sourceid")
-    def destinationType = column[String]("destinationtype", O.Length(255))
+    def destinationType = column[String]("destinationtype", O.Length(64))
     def destinationName = column[String]("destinationname")
     def destinationId = column[Long]("destinationid")
     def keepImages = column[Boolean]("keepimages")
