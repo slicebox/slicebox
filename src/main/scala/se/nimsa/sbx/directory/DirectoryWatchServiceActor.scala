@@ -83,7 +83,7 @@ class DirectoryWatchServiceActor(directoryWatchDao: DirectoryWatchDAO, storage: 
 
   }
 
-  def setupWatches() = {
+  def setupWatches(): Unit = {
     val watchedDirectories = await(directoryWatchDao.listWatchedDirectories(0, 1000000))
 
     watchedDirectories foreach (watchedDirectory => {
@@ -98,16 +98,16 @@ class DirectoryWatchServiceActor(directoryWatchDao: DirectoryWatchDAO, storage: 
   def addDirectory(directory: WatchedDirectory): WatchedDirectory =
     await(directoryWatchDao.insert(directory))
 
-  def deleteDirectory(id: Long) =
+  def deleteDirectory(id: Long): Unit =
     await(directoryWatchDao.deleteWatchedDirectoryWithId(id))
 
-  def watchedDirectoryForId(watchedDirectoryId: Long) =
+  def watchedDirectoryForId(watchedDirectoryId: Long): Option[WatchedDirectory] =
     await(directoryWatchDao.watchedDirectoryForId(watchedDirectoryId))
 
-  def watchedDirectoryForPath(path: String) =
+  def watchedDirectoryForPath(path: String): Option[WatchedDirectory] =
     await(directoryWatchDao.watchedDirectoryForPath(path))
 
-  def getWatchedDirectories(startIndex: Long, count: Long) =
+  def getWatchedDirectories(startIndex: Long, count: Long): Seq[WatchedDirectory] =
     await(directoryWatchDao.listWatchedDirectories(startIndex, count))
 
 }
