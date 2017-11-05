@@ -21,7 +21,7 @@ import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.server.directives.FileInfo
 import akka.pattern.ask
-import akka.stream.scaladsl.{Source => StreamSource}
+import akka.stream.scaladsl.{Sink, Source => StreamSource}
 import akka.util.ByteString
 import org.dcm4che3.io.DicomStreamException
 import se.nimsa.sbx.app.GeneralProtocol._
@@ -42,10 +42,12 @@ trait ImportRoutes {
   def importRoutes(apiUser: ApiUser): Route =
     path("import" / "sessions" / LongNumber / "images") { id =>
       post {
-        fileUpload("file") {
-          case (fileInfo, bytes) => addImageToImportSessionRoute(Some(fileInfo), bytes, id)
-        } ~ extractDataBytes { bytes =>
-          addImageToImportSessionRoute(None, bytes, id)
+        withoutSizeLimit {
+          fileUpload("file") {
+            case (fileInfo, bytes) => addImageToImportSessionRoute(Some(fileInfo), bytes, id)
+          } ~ extractDataBytes { bytes =>
+            addImageToImportSessionRoute(None, bytes, id)
+          }
         }
       }
     } ~ pathPrefix("import") {

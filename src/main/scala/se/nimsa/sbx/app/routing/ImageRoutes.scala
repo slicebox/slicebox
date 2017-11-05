@@ -55,10 +55,12 @@ trait ImageRoutes {
     pathPrefix("images") {
       pathEndOrSingleSlash {
         post {
-          fileUpload("file") {
-            case (_, bytes) => addDicomDataRoute(bytes, apiUser)
-          } ~ extractDataBytes { bytes =>
-            addDicomDataRoute(bytes, apiUser)
+          withoutSizeLimit {
+            fileUpload("file") {
+              case (_, bytes) => addDicomDataRoute(bytes, apiUser)
+            } ~ extractDataBytes { bytes =>
+              addDicomDataRoute(bytes, apiUser)
+            }
           }
         }
       } ~ pathPrefix(LongNumber) { imageId =>
