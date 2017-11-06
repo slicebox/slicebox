@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Lars Edenbrandt
+ * Copyright 2014 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,6 @@
 package se.nimsa.sbx.log
 
 import se.nimsa.sbx.model.Entity
-import java.util.Date
 
 object LogProtocol {
 
@@ -53,6 +52,7 @@ object LogProtocol {
   case class GetLogEntriesBySubject(subject: String, startIndex: Long, count: Long)
   case class GetLogEntriesByType(entryType: LogEntryType, startIndex: Long, count: Long)
   case class GetLogEntriesBySubjectAndType(subject: String, entryType: LogEntryType, startIndex: Long, count: Long)
+  case object ClearLog
 
   case class RemoveLogEntry(logId: Long)
   

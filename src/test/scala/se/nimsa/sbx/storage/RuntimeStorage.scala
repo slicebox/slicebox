@@ -1,43 +1,42 @@
 package se.nimsa.sbx.storage
 
-import java.io.{ByteArrayInputStream, InputStream}
-import javax.imageio.ImageIO
+import akka.stream.scaladsl.{Sink, Source}
+import akka.util.ByteString
+import akka.{Done, NotUsed}
+import se.nimsa.sbx.lang.NotFoundException
 
-import se.nimsa.sbx.dicom.DicomHierarchy.Image
-import se.nimsa.sbx.dicom.DicomUtil._
-import se.nimsa.sbx.dicom.{DicomData, DicomUtil, ImageAttribute}
-import se.nimsa.sbx.storage.StorageProtocol.ImageInformation
+import scala.concurrent.{ExecutionContext, Future}
 
 class RuntimeStorage extends StorageService {
 
   import scala.collection.mutable
 
-  val storage = mutable.Map.empty[String, Array[Byte]]
+  val storage = mutable.Map.empty[String, ByteString]
 
-  override def storeDicomData(dicomData: DicomData, image: Image): Boolean = {
-    val overwrite = storage.contains(imageName(image))
-    storage.put(imageName(image), toByteArray(dicomData))
-    overwrite
-  }
+  override def deleteByName(names: Seq[String]): Unit = names.foreach(name => storage.remove(name))
 
-  override def deleteFromStorage(image: Image): Unit =
-    storage.remove(imageName(image))
+  def clear() = storage.clear()
 
-  override def readDicomData(image: Image, withPixelData: Boolean): DicomData =
-    loadDicomData(storage.get(imageName(image)).getOrElse(null), withPixelData)
+  override def move(sourceImageName: String, targetImageName: String) =
+    storage.get(sourceImageName).map { sourceBytes =>
+      storage.remove(sourceImageName)
+      storage(targetImageName) = sourceBytes
+      Unit
+    }.getOrElse {
+      throw new RuntimeException(s"Dicom data not found for key $sourceImageName")
+    }
 
-  override def readImageAttributes(image: Image): List[ImageAttribute] =
-    DicomUtil.readImageAttributes(loadDicomData(storage.get(imageName(image)).getOrElse(null), withPixelData = false).attributes)
+  override def fileSink(name: String)(implicit executionContext: ExecutionContext): Sink[ByteString, Future[Done]] =
+    Sink.reduce[ByteString](_ ++ _)
+      .mapMaterializedValue {
+        _.map {
+          bytes =>
+            storage(name) = bytes
+            Done
+        }
+      }
 
-  override def readImageInformation(image: Image): ImageInformation =
-    super.readImageInformation(imageAsInputStream(image))
+  override def fileSource(name: String): Source[ByteString, NotUsed] =
+    Source.single(storage.getOrElse(name, throw new NotFoundException(s"No data for name $name")))
 
-  override def readPngImageData(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int): Array[Byte] =
-    super.readPngImageData(ImageIO.createImageInputStream(imageAsInputStream(image)), frameNumber, windowMin, windowMax, imageHeight)
-
-  override def imageAsInputStream(image: Image): InputStream =
-    new ByteArrayInputStream(storage(imageName(image)))
-
-  def clear() =
-    storage.clear()
 }

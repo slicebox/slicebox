@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Lars Edenbrandt
+ * Copyright 2014 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,44 +18,46 @@ package se.nimsa.sbx.box
 
 import java.util.UUID
 
-import akka.actor.{Actor, PoisonPill, Props, Stash}
+import akka.actor.{Actor, ActorSystem, Cancellable, PoisonPill, Props, Stash}
 import akka.event.{Logging, LoggingReceive}
 import akka.pattern.PipeToSupport
+import akka.stream.Materializer
 import akka.util.Timeout
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.log.SbxLog
-import se.nimsa.sbx.util.SequentialPipeToSupport
+import se.nimsa.sbx.storage.StorageService
 import se.nimsa.sbx.util.SbxExtensions._
+import se.nimsa.sbx.util.{FutureUtil, SequentialPipeToSupport}
 
 import scala.collection.mutable
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.concurrent.duration.DurationInt
 
-class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String)(implicit val timeout: Timeout) extends Actor with Stash with PipeToSupport with SequentialPipeToSupport {
+class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageService)(implicit val materializer: Materializer, timeout: Timeout) extends Actor with Stash with PipeToSupport with SequentialPipeToSupport {
 
   val log = Logging(context.system, this)
 
   val pollBoxOnlineStatusTimeoutMillis: Long = 15000
   val pollBoxesLastPollTimestamp = mutable.Map.empty[Long, Long] // box id to timestamp
 
-  implicit val system = context.system
-  implicit val ec = context.dispatcher
+  implicit val system: ActorSystem = context.system
+  implicit val ec: ExecutionContextExecutor = context.dispatcher
 
   setupBoxes()
 
-  val pollBoxesOnlineStatusSchedule = context.system.scheduler.schedule(100.milliseconds, 7.seconds) {
-    self ! UpdateStatusForBoxesAndTransactions
-  }
+  val pollBoxesOnlineStatusSchedule: Cancellable =
+    context.system.scheduler.schedule(100.milliseconds, 7.seconds) {
+      self ! UpdateStatusForBoxesAndTransactions
+    }
 
   log.info("Box service started")
 
-  override def preStart {
-    context.system.eventStream.subscribe(context.self, classOf[ImageDeleted])
-  }
+  override def preStart(): Unit =
+    context.system.eventStream.subscribe(context.self, classOf[ImagesDeleted])
 
-  override def postStop() =
+  override def postStop(): Unit =
     pollBoxesOnlineStatusSchedule.cancel()
 
   def receive = LoggingReceive {
@@ -64,8 +66,8 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String)(implicit val timeout: 
       val now = System.currentTimeMillis()
       boxDao.updateStatusForBoxesAndTransactions(now, pollBoxesLastPollTimestamp.toMap, pollBoxOnlineStatusTimeoutMillis)
 
-    case ImageDeleted(imageId) =>
-      boxDao.removeOutgoingImagesForImageId(imageId) zip boxDao.removeIncomingImagesForImageId(imageId)
+    case ImagesDeleted(imageIds) =>
+      boxDao.removeOutgoingImagesForImageIds(imageIds) zip boxDao.removeIncomingImagesForImageIds(imageIds)
 
     case msg: BoxRequest =>
 
@@ -125,9 +127,7 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String)(implicit val timeout: 
               case TransactionStatus.FINISHED =>
                 SbxLog.info("Box", s"Received $totalImageCount files from box ${box.name}")
               case TransactionStatus.FAILED =>
-                boxDao.countIncomingImagesForIncomingTransactionId(incomingTransactionWithStatus.id).foreach { nIncomingImages =>
-                  SbxLog.error("Box", s"Finished receiving $totalImageCount files from box ${box.name}, but only $nIncomingImages files can be found at this time.")
-                }
+                SbxLog.error("Box", s"Failed receiving $totalImageCount files from box ${box.name}")
               case _ =>
                 log.debug(s"Received pushed file and updated incoming transaction $incomingTransactionWithStatus")
             }
@@ -252,13 +252,13 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String)(implicit val timeout: 
   def maybeStartPushActor(box: Box): Unit = {
     val actorName = pushActorName(box)
     if (context.child(actorName).isEmpty)
-      context.actorOf(BoxPushActor.props(box, timeout), actorName)
+      context.actorOf(BoxPushActor.props(box, storage), actorName)
   }
 
   def maybeStartPollActor(box: Box): Unit = {
     val actorName = pollActorName(box)
     if (context.child(actorName).isEmpty)
-      context.actorOf(BoxPollActor.props(box, timeout), actorName)
+      context.actorOf(BoxPollActor.props(box, storage), actorName)
   }
 
   def pushActorName(box: Box): String = BoxSendMethod.PUSH + "-" + box.id.toString
@@ -268,19 +268,15 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String)(implicit val timeout: 
   def addImagesToOutgoing(boxId: Long, boxName: String, imageTagValuesSeq: Seq[ImageTagValues]): Future[Seq[OutgoingTagValue]] = {
     boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, boxId, boxName, 0, imageTagValuesSeq.length, System.currentTimeMillis, System.currentTimeMillis, TransactionStatus.WAITING))
       .flatMap { outgoingTransaction =>
-        Future.sequence {
-          imageTagValuesSeq.zipWithIndex.map {
-            case (imageTagValues, index) =>
-              val sequenceNumber = index + 1
-              boxDao.insertOutgoingImage(OutgoingImage(-1, outgoingTransaction.id, imageTagValues.imageId, sequenceNumber, sent = false))
-                .flatMap { outgoingImage =>
-                  Future.sequence {
-                    imageTagValues.tagValues.map { tagValue =>
-                      boxDao.insertOutgoingTagValue(OutgoingTagValue(-1, outgoingImage.id, tagValue))
-                    }
-                  }
+        FutureUtil.traverseSequentially(imageTagValuesSeq.zipWithIndex) {
+          case (imageTagValues, index) =>
+            val sequenceNumber = index + 1
+            boxDao.insertOutgoingImage(OutgoingImage(-1, outgoingTransaction.id, imageTagValues.imageId, sequenceNumber, sent = false))
+              .flatMap { outgoingImage =>
+                FutureUtil.traverseSequentially(imageTagValues.tagValues) { tagValue =>
+                  boxDao.insertOutgoingTagValue(OutgoingTagValue(-1, outgoingImage.id, tagValue))
                 }
-          }
+              }
         }
       }
       .map(_.flatten)
@@ -302,5 +298,5 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String)(implicit val timeout: 
 }
 
 object BoxServiceActor {
-  def props(boxDao: BoxDAO, apiBaseURL: String, timeout: Timeout): Props = Props(new BoxServiceActor(boxDao, apiBaseURL)(timeout))
+  def props(boxDao: BoxDAO, apiBaseURL: String, storage: StorageService)(implicit materializer: Materializer, timeout: Timeout): Props = Props(new BoxServiceActor(boxDao, apiBaseURL, storage))
 }

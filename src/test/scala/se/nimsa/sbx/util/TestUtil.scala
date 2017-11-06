@@ -1,6 +1,6 @@
 package se.nimsa.sbx.util
 
-import java.io.{File, IOException}
+import java.io._
 import java.nio.file._
 import java.nio.file.attribute.BasicFileAttributes
 import java.util.Date
@@ -8,13 +8,21 @@ import java.util.stream.Collectors
 
 import akka.http.scaladsl.model.Multipart.FormData.BodyPart
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, Multipart}
+import akka.stream.testkit.TestSubscriber
+import akka.util.ByteString
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
-import org.dcm4che3.data.{Attributes, Tag, VR}
+import org.dcm4che3.data.{Attributes, Tag, UID, VR}
+import org.dcm4che3.io.DicomInputStream.IncludeBulkData
+import org.dcm4che3.io.{DicomInputStream, DicomOutputStream}
+import org.dcm4che3.util.SafeClose
+import se.nimsa.dcm4che.streams.DicomParts._
+import se.nimsa.dcm4che.streams.tagToString
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.AnonymizationKey
 import se.nimsa.sbx.app.GeneralProtocol._
+import se.nimsa.sbx.dicom.DicomData
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomPropertyValue._
-import se.nimsa.sbx.dicom.{DicomData, DicomUtil}
+import se.nimsa.sbx.dicom.streams.DicomMetaPart
 import se.nimsa.sbx.metadata.MetaDataProtocol.{SeriesSource, SeriesTag}
 import se.nimsa.sbx.metadata.{MetaDataDAO, PropertiesDAO}
 import se.nimsa.sbx.seriestype.SeriesTypeDAO
@@ -24,8 +32,76 @@ import slick.jdbc.JdbcProfile
 
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext
+import scala.util.control.NonFatal
 
 object TestUtil {
+
+  def saveDicomData(dicomData: DicomData, filePath: Path): Unit =
+    saveDicomData(dicomData, Files.newOutputStream(filePath))
+
+  def saveDicomData(dicomData: DicomData, outputStream: OutputStream): Unit = {
+    var dos: DicomOutputStream = null
+    try {
+      val transferSyntaxUID = dicomData.metaInformation.getString(Tag.TransferSyntaxUID)
+      if (transferSyntaxUID == null || transferSyntaxUID.isEmpty)
+        throw new IllegalArgumentException("DICOM meta information is missing transfer syntax UID")
+
+      // the transfer syntax uid given below is for the meta info block. The TS UID in the meta itself is used for the
+      // remainder of the file
+      dos = new DicomOutputStream(outputStream, UID.ExplicitVRLittleEndian)
+
+      dos.writeDataset(dicomData.metaInformation, dicomData.attributes)
+    } finally {
+      SafeClose.close(dos)
+    }
+  }
+
+  def loadDicomData(path: Path, withPixelData: Boolean): DicomData =
+    try
+      loadDicomData(new BufferedInputStream(Files.newInputStream(path)), withPixelData)
+    catch {
+      case NonFatal(_) => null
+    }
+
+  def loadDicomData(byteArray: Array[Byte], withPixelData: Boolean): DicomData =
+    try
+      loadDicomData(new BufferedInputStream(new ByteArrayInputStream(byteArray)), withPixelData)
+    catch {
+      case NonFatal(_) => null
+    }
+
+  def loadDicomData(inputStream: InputStream, withPixelData: Boolean): DicomData = {
+    var dis: DicomInputStream = null
+    try {
+      dis = new DicomInputStream(inputStream)
+      val fmi = if (dis.getFileMetaInformation == null) new Attributes() else dis.getFileMetaInformation
+      if (fmi.getString(Tag.TransferSyntaxUID) == null || fmi.getString(Tag.TransferSyntaxUID).isEmpty)
+        fmi.setString(Tag.TransferSyntaxUID, VR.UI, dis.getTransferSyntax)
+      val attributes =
+        if (withPixelData) {
+          dis.setIncludeBulkData(IncludeBulkData.YES)
+          dis.readDataset(-1, -1)
+        } else {
+          dis.setIncludeBulkData(IncludeBulkData.NO)
+          dis.readDataset(-1, Tag.PixelData)
+        }
+
+      DicomData(attributes, fmi)
+    } catch {
+      case NonFatal(_) => null
+    } finally {
+      SafeClose.close(dis)
+    }
+  }
+
+  def toByteArray(path: Path): Array[Byte] = toByteArray(loadDicomData(path, withPixelData = true))
+
+  def toByteArray(dicomData: DicomData): Array[Byte] = {
+    val bos = new ByteArrayOutputStream
+    saveDicomData(dicomData, bos)
+    bos.close()
+    bos.toByteArray
+  }
 
   def createTestDb(name: String) =
     DatabaseConfig.forConfig[JdbcProfile]("slicebox.database.in-memory", ConfigFactory.load().withValue(
@@ -109,8 +185,8 @@ object TestUtil {
   def testImageFile = new File(getClass.getResource("test.dcm").toURI)
   def testImageFormData = createMultipartFormWithFile(testImageFile)
   def testSecondaryCaptureFile = new File(getClass.getResource("sc.dcm").toURI)
-  def testImageDicomData(withPixelData: Boolean = true) = DicomUtil.loadDicomData(testImageFile.toPath, withPixelData)
-  def testImageByteArray = DicomUtil.toByteArray(testImageFile.toPath)
+  def testImageDicomData(withPixelData: Boolean = true) = loadDicomData(testImageFile.toPath, withPixelData)
+  def testImageByteArray = toByteArray(testImageFile.toPath)
 
   def jpegFile = new File(getClass.getResource("cat.jpg").toURI)
   def jpegByteArray = Files.readAllBytes(jpegFile.toPath)
@@ -151,7 +227,7 @@ object TestUtil {
 
     val metaInformation = new Attributes()
     metaInformation.setString(Tag.MediaStorageSOPClassUID, VR.UI, "1.2.840.10008.5.1.4.1.1.2")
-    metaInformation.setString(Tag.TransferSyntaxUID, VR.UI, "1.2.840.10008.5.1.4.1.1.2")
+    metaInformation.setString(Tag.TransferSyntaxUID, VR.UI, "1.2.840.10008.1.2.1")
 
     DicomData(attributes, metaInformation)
   }
@@ -165,15 +241,15 @@ object TestUtil {
     AnonymizationKey(-1, new Date().getTime,
       attributes.getString(Tag.PatientName), anonPatientName,
       attributes.getString(Tag.PatientID), anonPatientID,
-      attributes.getString(Tag.PatientBirthDate),
+      attributes.getString(Tag.PatientBirthDate, "1900-01-01"),
       attributes.getString(Tag.StudyInstanceUID), anonStudyInstanceUID,
       attributes.getString(Tag.StudyDescription),
-      attributes.getString(Tag.StudyID),
-      attributes.getString(Tag.AccessionNumber),
+      attributes.getString(Tag.StudyID, "Study ID"),
+      attributes.getString(Tag.AccessionNumber, "12345"),
       attributes.getString(Tag.SeriesInstanceUID), anonSeriesInstanceUID,
-      attributes.getString(Tag.SeriesDescription),
-      attributes.getString(Tag.ProtocolName),
-      attributes.getString(Tag.FrameOfReferenceUID), anonFrameOfReferenceUID)
+      attributes.getString(Tag.SeriesDescription, "Series Description"),
+      attributes.getString(Tag.ProtocolName, "Protocol Name"),
+      attributes.getString(Tag.FrameOfReferenceUID, "1.2.3.4.5"), anonFrameOfReferenceUID)
 
   def deleteFolderContents(path: Path) =
     Files.list(path).collect(Collectors.toList()).asScala.foreach { path =>
@@ -205,4 +281,172 @@ object TestUtil {
         }
     })
 
+  type PartProbe = TestSubscriber.Probe[DicomPart]
+
+  implicit class DicomPartProbe(probe: PartProbe) {
+    def expectPreamble(): PartProbe = probe
+      .request(1)
+      .expectNextChainingPF {
+        case _: DicomPreamble => true
+        case p => throw new RuntimeException(s"Expected DicomPreamble, got $p")
+      }
+
+    def expectValueChunk(): PartProbe = probe
+      .request(1)
+      .expectNextChainingPF {
+        case _: DicomValueChunk => true
+        case p => throw new RuntimeException(s"Expected DicomValueChunk, got $p")
+      }
+
+    def expectValueChunk(length: Int): PartProbe = probe
+      .request(1)
+      .expectNextChainingPF {
+        case chunk: DicomValueChunk if chunk.bytes.length == length => true
+        case p => throw new RuntimeException(s"Expected DicomValueChunk with length = $length, got $p")
+      }
+
+    def expectValueChunk(bytes: ByteString): PartProbe = probe
+      .request(1)
+      .expectNextChainingPF {
+        case chunk: DicomValueChunk if chunk.bytes == bytes => true
+        case p => throw new RuntimeException(s"Expected DicomValueChunk with bytes = $bytes, got $p")
+      }
+
+    def expectItem(index: Int): PartProbe = probe
+      .request(1)
+      .expectNextChainingPF {
+        case item: DicomItem if item.index == index => true
+        case p => throw new RuntimeException(s"Expected DicomItem with index = $index, got $p")
+      }
+
+    def expectItem(index: Int, length: Int): PartProbe = probe
+      .request(1)
+      .expectNextChainingPF {
+        case item: DicomItem if item.index == index && item.length == length => true
+        case p => throw new RuntimeException(s"Expected DicomItem with index = $index and length $length, got $p")
+      }
+
+    def expectItemDelimitation(): PartProbe = probe
+      .request(1)
+      .expectNextChainingPF {
+        case _: DicomSequenceItemDelimitation => true
+        case p => throw new RuntimeException(s"Expected DicomSequenceItemDelimitation, got $p")
+      }
+
+    def expectFragments(): PartProbe = probe
+      .request(1)
+      .expectNextChainingPF {
+        case _: DicomFragments => true
+        case p => throw new RuntimeException(s"Expected DicomFragments, got $p")
+      }
+
+    def expectFragment(length: Int): PartProbe = probe
+      .request(1)
+      .expectNextChainingPF {
+        case item: DicomFragment if item.bytes.length == length => true
+        case p => throw new RuntimeException(s"Expected DicomFragment with length $length, got $p")
+      }
+
+    def expectFragmentsDelimitation(): PartProbe = probe
+      .request(1)
+      .expectNextChainingPF {
+        case _: DicomFragmentsDelimitation => true
+        case p => throw new RuntimeException(s"Expected DicomFragmentsDelimitation, got $p")
+      }
+
+    def expectHeader(tag: Int): PartProbe = probe
+      .request(1)
+      .expectNextChainingPF {
+        case h: DicomHeader if h.tag == tag => true
+        case p => throw new RuntimeException(s"Expected DicomHeader with tag = ${tagToString(tag)}, got $p")
+      }
+
+    def expectHeader(tag: Int, vr: VR, length: Long): PartProbe = probe
+      .request(1)
+      .expectNextChainingPF {
+        case h: DicomHeader if h.tag == tag && h.vr == vr && h.length == length => true
+        case p => throw new RuntimeException(s"Expected DicomHeader with tag = ${tagToString(tag)}, VR = $vr and length = $length, got $p")
+      }
+
+    def expectSequence(tag: Int): PartProbe = probe
+      .request(1)
+      .expectNextChainingPF {
+        case h: DicomSequence if h.tag == tag => true
+        case p => throw new RuntimeException(s"Expected DicomSequence with tag = ${tagToString(tag)}, got $p")
+      }
+
+    def expectSequence(tag: Int, length: Int): PartProbe = probe
+      .request(1)
+      .expectNextChainingPF {
+        case h: DicomSequence if h.tag == tag && h.length == length => true
+        case p => throw new RuntimeException(s"Expected DicomSequence with tag = ${tagToString(tag)} and length = $length, got $p")
+      }
+
+    def expectSequenceDelimitation(): PartProbe = probe
+      .request(1)
+      .expectNextChainingPF {
+        case _: DicomSequenceDelimitation => true
+        case p => throw new RuntimeException(s"Expected DicomSequenceDelimitation, got $p")
+      }
+
+    def expectUnknownPart(): PartProbe = probe
+      .request(1)
+      .expectNextChainingPF {
+        case _: DicomUnknownPart => true
+        case p => throw new RuntimeException(s"Expected UnkownPart, got $p")
+      }
+
+    def expectDeflatedChunk(): PartProbe = probe
+      .request(1)
+      .expectNextChainingPF {
+        case _: DicomDeflatedChunk => true
+        case p => throw new RuntimeException(s"Expected DicomDeflatedChunk, got $p")
+      }
+
+    def expectAttribute(tag: Int, length: Int): PartProbe = probe
+      .request(1)
+      .expectNextChainingPF {
+        case a: DicomAttribute if a.header.tag == tag && a.valueBytes.length == length => true
+        case p => throw new RuntimeException(s"Expected DicomAttribute with tag = ${tagToString(tag)} and length = $length, got $p")
+      }
+
+    def expectFragmentData(length: Int): PartProbe = probe
+      .request(1)
+      .expectNextChainingPF {
+        case fragment: DicomFragment if fragment.bytes.length == length => true
+        case p => throw new RuntimeException(s"Expected DicomFragment with length = $length, got $p")
+      }
+
+    def expectDicomComplete(): PartProbe = probe
+      .request(1)
+      .expectComplete()
+
+    def expectDicomError(): Throwable = probe
+      .request(1)
+      .expectError()
+
+    def expectAttributesPart(attributesPart: DicomAttributes): PartProbe = probe
+      .request(1)
+      .expectNextChainingPF {
+        case p: DicomAttributes if p == attributesPart => true
+        case p => throw new RuntimeException(s"Expected DicomAttributes with part = $attributesPart, got $p")
+      }
+
+    def expectMetaPart(): PartProbe = probe
+      .request(1)
+      .expectNextChainingPF {
+        case _: DicomMetaPart => true
+        case p => throw new RuntimeException(s"Expected DicomMetaPart, got $p")
+      }
+
+    def expectMetaPart(metaPart: DicomMetaPart): PartProbe = probe
+      .request(1)
+      .expectNextChainingPF {
+        case p: DicomMetaPart if p == metaPart => true
+        case p => throw new RuntimeException(s"Expected DicomMetaPart $metaPart, got $p")
+      }
+
+    def expectHeaderAndValueChunkPairs(tags: Int*): PartProbe =
+      tags.foldLeft(probe)((probe, tag) => probe.expectHeader(tag).expectValueChunk())
+  }
 }

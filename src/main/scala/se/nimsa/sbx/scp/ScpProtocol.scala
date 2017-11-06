@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Lars Edenbrandt
+ * Copyright 2014 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 
 package se.nimsa.sbx.scp
 
-import se.nimsa.sbx.dicom.DicomData
+import akka.util.ByteString
 import se.nimsa.sbx.model.Entity
 
 object ScpProtocol {
@@ -39,6 +39,6 @@ object ScpProtocol {
 
   case class ScpRemoved(scpDataId: Long)
 
-  case class DicomDataReceivedByScp(dicomData: DicomData)
+  case class DicomDataReceivedByScp(bytes: ByteString)
 
 }

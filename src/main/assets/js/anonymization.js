@@ -29,6 +29,10 @@ angular.module('slicebox.anonymization', ['ngRoute'])
             }            
         ];
 
+    if (!$scope.uiState.anonymizationTableState) {
+        $scope.uiState.anonymizationTableState = {};
+    }
+
     $scope.callbacks = {};
 
     // Scope functions

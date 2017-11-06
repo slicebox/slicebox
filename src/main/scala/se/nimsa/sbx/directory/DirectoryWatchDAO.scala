@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Lars Edenbrandt
+ * Copyright 2014 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,11 +42,11 @@ class DirectoryWatchDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Ex
 
   val watchedDirectoriesQuery = TableQuery[DirectoryWatchDataTable]
 
-  def create() = createTables(dbConf, (DirectoryWatchDataTable.name, watchedDirectoriesQuery))
+  def create(): Future[Unit] = createTables(dbConf, (DirectoryWatchDataTable.name, watchedDirectoriesQuery))
 
-  def drop() = db.run(watchedDirectoriesQuery.schema.drop)
+  def drop(): Future[Unit] = db.run(watchedDirectoriesQuery.schema.drop)
 
-  def clear() = db.run(watchedDirectoriesQuery.delete)
+  def clear(): Future[Int] = db.run(watchedDirectoriesQuery.delete)
 
   def insert(watchedDirectory: WatchedDirectory): Future[WatchedDirectory] = db.run {
     (watchedDirectoriesQuery returning watchedDirectoriesQuery.map(_.id) += watchedDirectory)

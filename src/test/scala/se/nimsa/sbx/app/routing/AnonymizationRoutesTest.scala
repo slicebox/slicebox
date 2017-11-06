@@ -9,7 +9,6 @@ import org.scalatest.{FlatSpecLike, Matchers}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomProperty.PatientName
-import se.nimsa.sbx.dicom.DicomUtil
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.storage.RuntimeStorage
 import se.nimsa.sbx.util.FutureUtil.await
@@ -19,7 +18,7 @@ import scala.concurrent.Future
 
 class AnonymizationRoutesTest extends {
   val dbConfig = TestUtil.createTestDb("anonymizationroutestest")
-  val storage = new RuntimeStorage
+  val storage = new RuntimeStorage()
 } with FlatSpecLike with Matchers with RoutesTestBase {
 
   override def afterEach() {
@@ -98,7 +97,7 @@ class AnonymizationRoutesTest extends {
     val anonAttributes =
       PostAsUser(s"/api/images/${image.id}/anonymized", tagValues) ~> routes ~> check {
         status should be(OK)
-        DicomUtil.loadDicomData(responseAs[ByteString].toArray, withPixelData = true).attributes
+        TestUtil.loadDicomData(responseAs[ByteString].toArray, withPixelData = true).attributes
       }
 
     anonAttributes.getString(Tag.PatientName) shouldBe anonPatientName
@@ -111,13 +110,13 @@ class AnonymizationRoutesTest extends {
     dd2.attributes.setString(Tag.PatientName, VR.PN, "John^Doe")
 
     val image1 =
-      PostAsUser("/api/images", HttpEntity(DicomUtil.toByteArray(dd1))) ~> routes ~> check {
+      PostAsUser("/api/images", HttpEntity(TestUtil.toByteArray(dd1))) ~> routes ~> check {
         status should be(Created)
         responseAs[Image]
       }
 
     val image2 =
-      PostAsUser("/api/images", HttpEntity(DicomUtil.toByteArray(dd2))) ~> routes ~> check {
+      PostAsUser("/api/images", HttpEntity(TestUtil.toByteArray(dd2))) ~> routes ~> check {
         status should be(Created)
         responseAs[Image]
       }
@@ -152,8 +151,8 @@ class AnonymizationRoutesTest extends {
         responseAs[FlatSeries]
       }
 
-    anonFlatSeries1.patient.patientName.value.startsWith("Anonymous") shouldBe true
-    anonFlatSeries2.patient.patientName.value.startsWith("Anonymous") shouldBe true
+    anonFlatSeries1.patient.patientName.value should not be "anon270"
+    anonFlatSeries2.patient.patientName.value should not be "John^Doe"
   }
 
   it should "return 404 NotFound when manually anonymizing an image that does not exist" in {

@@ -35,7 +35,8 @@
                                 object-selected="patientSelected(object)"
                                 callbacks="callbacks.patientsTable"
                                 refresh-button="true"
-                                empty-message="No patients found">
+                                empty-message="No patients found"
+                                grid-state="uiState.patientTableState">
 
                                 <sbx-grid-column property="id" title="Id">
                                 </sbx-grid-column>
@@ -71,7 +72,8 @@
                                 object-selected="studySelected(object)"
                                 callbacks="callbacks.studiesTable"
                                 refresh-button="true"
-                                empty-message="No studies found">
+                                empty-message="No studies found"
+                                grid-state="uiState.studyTableState">
 
                                 <sbx-grid-column property="id" title="Id">
                                 </sbx-grid-column>
@@ -107,7 +109,8 @@
                                 object-selected="seriesSelected(object)"
                                 callbacks="callbacks.seriesTable"
                                 refresh-button="true"
-                                empty-message="No series found">
+                                empty-message="No series found"
+                                grid-state="uiState.seriesTableState">
 
                                 <sbx-grid-column property="id" title="Id">
                                 </sbx-grid-column>
@@ -163,7 +166,8 @@
                                 object-selected="flatSeriesSelected(object)"
                                 callbacks="callbacks.flatSeriesTable"
                                 refresh-button="true"
-                                empty-message="No series found">
+                                empty-message="No series found"
+                                grid-state="uiState.flatTableState">
 
                                 <sbx-grid-column property="id" title="Id">
                                 </sbx-grid-column>
@@ -285,12 +289,14 @@
                         <md-card-content>
                             <md-content class="md-padding" style="height: 600px">
                                 <sbx-grid
-                                    load-page="loadImageAttributes(0, 1000000000, orderByProperty, orderByDirection)"
+                                    load-page="loadImageAttributes(0, 1000000000, orderByProperty, orderByDirection, filter)"
                                     page-size="1000000000"
                                     sorting="true"
+                                    filter="true"
                                     object-actions="imageAttributesActions"
                                     callbacks="callbacks.imageAttributesTable"
-                                    empty-message="No image attributes found">
+                                    empty-message="No image attributes found"
+                                    grid-state="uiState.attributesTableState">
 
                                     <sbx-grid-column property="tag" title="Tag" filter="hexvalue: 8">
                                     </sbx-grid-column>

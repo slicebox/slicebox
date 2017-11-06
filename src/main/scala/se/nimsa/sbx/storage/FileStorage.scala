@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Lars Edenbrandt
+ * Copyright 2014 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,17 +16,15 @@
 
 package se.nimsa.sbx.storage
 
-import java.io.{BufferedInputStream, InputStream}
-import java.nio.file.{Files, Path, Paths}
-import javax.imageio.ImageIO
+import java.io.FileNotFoundException
+import java.nio.file.{FileAlreadyExistsException, Files, Path, StandardCopyOption}
 
-import org.dcm4che3.data.Attributes
-import se.nimsa.sbx.dicom.DicomHierarchy.Image
-import se.nimsa.sbx.dicom.DicomUtil._
-import se.nimsa.sbx.dicom.{DicomData, DicomUtil, ImageAttribute}
-import se.nimsa.sbx.storage.StorageProtocol.ImageInformation
+import akka.stream.scaladsl.{FileIO, Sink, Source}
+import akka.util.ByteString
+import akka.{Done, NotUsed}
+import se.nimsa.sbx.lang.NotFoundException
 
-import scala.util.control.NonFatal
+import scala.concurrent.{ExecutionContext, Future}
 
 /**
   * Service that stores DICOM files in local file system.
@@ -37,48 +35,40 @@ class FileStorage(val path: Path) extends StorageService {
 
   createStorageDirectoryIfNecessary()
 
-  override def storeDicomData(dicomData: DicomData, image: Image): Boolean = {
-    val storedPath = filePath(image)
-    val overwrite = Files.exists(storedPath)
-    try saveDicomData(dicomData, storedPath) catch {
-      case NonFatal(e) =>
-        throw new IllegalArgumentException("Dicom data could not be stored", e)
+  private def filePath(filePath: String): Path = path.resolve(filePath)
+
+  override def move(sourceImageName: String, targetImageName: String): Unit =
+    try
+      Files.move(path.resolve(sourceImageName), path.resolve(targetImageName), StandardCopyOption.REPLACE_EXISTING)
+    catch {
+      case e: FileAlreadyExistsException =>
+        // replacing a file in a concurrent setting sometimes fails on Windows. In such cases, wait then move again
+        Thread.sleep(500)
+        Files.move(path.resolve(sourceImageName), path.resolve(targetImageName), StandardCopyOption.REPLACE_EXISTING)
     }
-    overwrite
-  }
 
-  private def filePath(image: Image): Path =
-    path.resolve(imageName(image))
-
-  override def deleteFromStorage(image: Image): Unit =
-    Files.delete(filePath(image))
-
-  override def readDicomData(image: Image, withPixelData: Boolean): DicomData =
-    loadDicomData(filePath(image), withPixelData)
-
-  override def readImageAttributes(image: Image): List[ImageAttribute] =
-    DicomUtil.readImageAttributes(loadDicomData(filePath(image), withPixelData = false).attributes)
-
-  def readImageInformation(image: Image): ImageInformation =
-    super.readImageInformation(new BufferedInputStream(Files.newInputStream(filePath(image))))
-
-  override def readPngImageData(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int): Array[Byte] = {
-    val file = filePath(image).toFile
-    val iis = ImageIO.createImageInputStream(file)
-    super.readPngImageData(iis, frameNumber, windowMin, windowMax, imageHeight)
-  }
-
-  override def imageAsInputStream(image: Image): InputStream =
-    new BufferedInputStream(Files.newInputStream(filePath(image)))
+  override def deleteByName(names: Seq[String]): Unit = names.foreach(name => Files.delete(filePath(name)))
 
   private def createStorageDirectoryIfNecessary(): Unit = {
     if (!Files.exists(path))
-      try {
+      try
         Files.createDirectories(path)
-      } catch {
+      catch {
         case e: Exception => throw new RuntimeException("Dicom-files directory could not be created: " + e.getMessage)
       }
     if (!Files.isDirectory(path))
       throw new IllegalArgumentException("Dicom-files directory is not a directory.")
   }
+
+
+  override def fileSink(name: String)(implicit executionContext: ExecutionContext): Sink[ByteString, Future[Done]] =
+    FileIO.toPath(filePath(name)).mapMaterializedValue(_.map(_ => Done))
+
+  override def fileSource(name: String): Source[ByteString, NotUsed] =
+    FileIO.fromPath(filePath(name))
+      .mapMaterializedValue(_ => NotUsed)
+      .mapError {
+        case _: FileNotFoundException => new NotFoundException(s"File not found for name $name")
+      }
+
 }

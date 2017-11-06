@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Lars Edenbrandt
+ * Copyright 2014 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,10 @@
 
 package se.nimsa.sbx.app
 
-import play.api.libs.json._
+import java.util.Base64
+
+import akka.util.ByteString
+import se.nimsa.dcm4che.streams.TagPath
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.box.BoxProtocol._
@@ -27,14 +30,16 @@ import se.nimsa.sbx.directory.DirectoryWatchProtocol._
 import se.nimsa.sbx.forwarding.ForwardingProtocol._
 import se.nimsa.sbx.importing.ImportProtocol._
 import se.nimsa.sbx.log.LogProtocol._
-import se.nimsa.sbx.metadata.MetaDataProtocol
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.scp.ScpProtocol._
 import se.nimsa.sbx.scu.ScuProtocol._
-import se.nimsa.sbx.seriestype.SeriesTypeProtocol
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
 import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.user.UserProtocol._
+import play.api.libs.json._
+import play.api.libs.json.Reads._
+import play.api.libs.functional.syntax._
+import se.nimsa.dcm4che.streams.TagPath.{TagPathSequence, TagPathSequenceAny, TagPathSequenceItem, TagPathTag}
 
 trait JsonFormats {
 
@@ -42,6 +47,54 @@ trait JsonFormats {
     case JsString(string) => JsSuccess(f(string))
     case _ => JsError("Enumeration expected")
   }, Writes[A](a => JsString(a.toString)))
+
+  private lazy val tagPathSequenceReads: Reads[TagPathSequence] = (
+    (__ \ "tag").read[Int] and
+      (__ \ "item").read[String] and
+      (__ \ "previous").lazyReadNullable[TagPathSequence](tagPathSequenceReads)
+    ) ((tag, itemString, previous) => {
+    val item = try Option(Integer.parseInt(itemString)) catch {
+      case _: Throwable => None
+    }
+    previous
+      .map(p => item.map(i => p.thenSequence(tag, i)).getOrElse(p.thenSequence(tag)))
+      .getOrElse(item.map(i => TagPath.fromSequence(tag, i)).getOrElse(TagPath.fromSequence(tag)))
+  })
+
+  private lazy val tagPathTagReads: Reads[TagPathTag] = (
+    (__ \ "tag").read[Int] and
+      (__ \ "previous").lazyReadNullable[TagPathSequence](tagPathSequenceReads)
+    ) ((tag, previous) => previous.map(p => p.thenTag(tag)).getOrElse(TagPath.fromTag(tag)))
+
+  private val sequenceToTuple: TagPathSequence => (Int, String, Option[TagPathSequence]) = {
+    case sequenceItem: TagPathSequenceItem => (sequenceItem.tag, sequenceItem.item.toString, sequenceItem.previous)
+    case sequenceAny: TagPathSequenceAny => (sequenceAny.tag, "*", sequenceAny.previous)
+  }
+
+  private lazy val tagPathSequenceWrites: Writes[TagPathSequence] = (
+    (__ \ "tag").write[Int] and
+      (__ \ "item").write[String] and
+      (__ \ "previous").lazyWriteNullable[TagPathSequence](tagPathSequenceWrites)
+    ) (sequenceToTuple)
+
+  private lazy val tagPathTagWrites: Writes[TagPathTag] = (
+    (__ \ "tag").write[Int] and
+      (__ \ "previous").writeNullable[TagPathSequence](tagPathSequenceWrites)
+    ) (tagPath => (tagPath.tag, tagPath.previous))
+
+  implicit lazy val tagPathSequenceFormat: Format[TagPathSequence] = Format(tagPathSequenceReads, tagPathSequenceWrites)
+  implicit lazy val tagPathTagFormat: Format[TagPathTag] = Format(tagPathTagReads, tagPathTagWrites)
+
+  implicit val tagMappingFormat: Format[TagMapping] = Format[TagMapping](
+    (
+      (__ \ "tagPath").read[TagPathTag] and
+        (__ \ "value").read[String]) ((tagPath, valueString) => TagMapping(tagPath, ByteString(Base64.getDecoder.decode(valueString)))
+    ),
+    (
+      (__ \ "tagPath").write[TagPathTag] and
+        (__ \ "value").write[String]) (tagMapping => (tagMapping.tagPath, Base64.getEncoder.encodeToString(tagMapping.value.toArray))
+    )
+  )
 
   implicit val unWatchDirectoryFormat: Format[UnWatchDirectory] = Json.format[UnWatchDirectory]
   implicit val watchedDirectoryFormat: Format[WatchedDirectory] = Json.format[WatchedDirectory]
@@ -51,6 +104,8 @@ trait JsonFormats {
 
   implicit val remoteBoxFormat: Format[RemoteBox] = Json.format[RemoteBox]
   implicit val remoteBoxConnectionDataFormat: Format[RemoteBoxConnectionData] = Json.format[RemoteBoxConnectionData]
+
+  implicit val systemInformationFormat: Format[SystemInformation] = Json.format[SystemInformation]
 
   implicit val sourceTypeFormat: Format[SourceType] = enumFormat(SourceType.withName)
 

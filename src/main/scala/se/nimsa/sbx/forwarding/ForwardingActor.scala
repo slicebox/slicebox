@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Lars Edenbrandt
+ * Copyright 2014 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,24 +23,21 @@ import akka.util.Timeout
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.ImageTagValues
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.box.BoxProtocol.{Box, SendToRemoteBox}
-import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.forwarding.ForwardingProtocol._
 import se.nimsa.sbx.log.SbxLog
-import se.nimsa.sbx.metadata.MetaDataProtocol.{DeleteMetaData, GetImage}
+import se.nimsa.sbx.metadata.MetaDataProtocol.DeleteMetaData
 import se.nimsa.sbx.scu.ScuProtocol.SendImagesToScp
-import se.nimsa.sbx.storage.StorageProtocol.DeleteDicomData
-import se.nimsa.sbx.util.SbxExtensions._
+import se.nimsa.sbx.storage.StorageService
 
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
-class ForwardingActor(rule: ForwardingRule, transaction: ForwardingTransaction, images: Seq[ForwardingTransactionImage], implicit val timeout: Timeout) extends Actor {
+class ForwardingActor(rule: ForwardingRule, transaction: ForwardingTransaction, images: Seq[ForwardingTransactionImage], storage: StorageService)(implicit val timeout: Timeout) extends Actor {
 
   implicit val system = context.system
   implicit val ec = context.dispatcher
 
   val metaDataService = context.actorSelection("../../MetaDataService")
-  val storageService = context.actorSelection("../../StorageService")
   val boxService = context.actorSelection("../../BoxService")
   val scuService = context.actorSelection("../../ScuService")
 
@@ -88,24 +85,20 @@ class ForwardingActor(rule: ForwardingRule, transaction: ForwardingTransaction, 
 
   def doDelete(): Future[Seq[Long]] = {
 
-    val futureDeletedImageIds = Future.sequence {
-      images.map(_.imageId).map { imageId =>
-        metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]].map { imageMaybe =>
-          imageMaybe.map { image =>
-            metaDataService.ask(DeleteMetaData(image)).flatMap { _ =>
-              storageService.ask(DeleteDicomData(image)).map { _ =>
-                imageId
-              }
-            }
-          }
-        }.unwrap
-      }
-    }.map(_.flatten)
+    val futureDeletedImageIds = {
+      val imageIds = images.map(_.imageId)
+      metaDataService.ask(DeleteMetaData(imageIds))
+        .map { _ =>
+          storage.deleteFromStorage(imageIds)
+          system.eventStream.publish(ImagesDeleted(imageIds))
+          imageIds
+        }
+    }
 
     futureDeletedImageIds.onComplete {
-      case Success(_) =>
       case Failure(e) =>
         SbxLog.error("Forwarding", "Could not delete images after transfer: " + e.getMessage)
+      case _ =>
     }
 
     futureDeletedImageIds
@@ -114,5 +107,5 @@ class ForwardingActor(rule: ForwardingRule, transaction: ForwardingTransaction, 
 }
 
 object ForwardingActor {
-  def props(rule: ForwardingRule, transaction: ForwardingTransaction, images: Seq[ForwardingTransactionImage], timeout: Timeout): Props = Props(new ForwardingActor(rule, transaction, images, timeout))
+  def props(rule: ForwardingRule, transaction: ForwardingTransaction, images: Seq[ForwardingTransactionImage], storage: StorageService)(implicit timeout: Timeout): Props = Props(new ForwardingActor(rule, transaction, images, storage))
 }

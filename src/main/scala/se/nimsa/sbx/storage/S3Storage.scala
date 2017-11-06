@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Lars Edenbrandt
+ * Copyright 2014 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,76 +16,69 @@
 
 package se.nimsa.sbx.storage
 
-import java.io.{ByteArrayOutputStream, InputStream}
-import java.nio.file.{Files, Path}
-import javax.imageio.ImageIO
+import akka.actor.ActorSystem
+import akka.stream.Materializer
+import akka.stream.alpakka.s3.S3Exception
+import akka.stream.alpakka.s3.impl.{S3Headers, ServerSideEncryption}
+import akka.stream.alpakka.s3.scaladsl.S3Client
+import akka.stream.scaladsl.{Sink, Source}
+import akka.util.ByteString
+import akka.{Done, NotUsed}
+import com.amazonaws.auth.DefaultAWSCredentialsProviderChain
+import com.amazonaws.services.s3.AmazonS3ClientBuilder
+import com.amazonaws.services.s3.model.{CopyObjectRequest, DeleteObjectsRequest, ObjectMetadata}
+import com.amazonaws.{ClientConfiguration, Protocol}
+import se.nimsa.sbx.lang.NotFoundException
 
-import se.nimsa.sbx.dicom.DicomHierarchy.Image
-import se.nimsa.sbx.dicom.DicomUtil._
-import se.nimsa.sbx.dicom.{DicomData, DicomUtil, ImageAttribute}
-import se.nimsa.sbx.storage.StorageProtocol.ImageInformation
-
-import scala.util.control.NonFatal
+import scala.concurrent.{ExecutionContext, Future}
 
 /**
   * Service that stores DICOM files on AWS S3.
+  *
   * @param s3Prefix prefix for keys
-  * @param bucket S3 bucket
+  * @param bucket   S3 bucket
+  * @param region   aws region of the bucket
   */
-class S3Storage(val bucket: String, val s3Prefix: String) extends StorageService {
+class S3Storage(val bucket: String, val s3Prefix: String, val region: String)(implicit system: ActorSystem, materializer: Materializer) extends StorageService {
 
-  val s3Client = new S3Facade(bucket)
+  // AWS credentials provider chain that looks for credentials in this order:
+  // Environment Variables - AWS_ACCESS_KEY_ID and AWS_SECRET_KEY
+  // Java System Properties - aws.accessKeyId and aws.secretKey
+  // Instance profile credentials delivered through the Amazon EC2 metadata service
+  private val s3 = AmazonS3ClientBuilder.standard()
+    .withRegion(region)
+    .withCredentials(new DefaultAWSCredentialsProviderChain())
+    .withClientConfiguration(new ClientConfiguration().withProtocol(Protocol.HTTPS))
+    .build()
 
-  private def s3Id(image: Image) =
-    s3Prefix + "/" + imageName(image)
+  private def s3Id(imageName: String): String = s3Prefix + "/" + imageName
 
+  override def move(sourceImageName: String, targetImageName: String) = {
+    val request = new CopyObjectRequest(bucket, sourceImageName, bucket,  s3Id(targetImageName))
+    val metadata = new ObjectMetadata()
+    metadata.setSSEAlgorithm(ObjectMetadata.AES_256_SERVER_SIDE_ENCRYPTION)
+    request.setNewObjectMetadata(metadata)
+    s3.copyObject(request)
+    s3.deleteObject(bucket, sourceImageName)
+  }
 
-  override def storeDicomData(dicomData: DicomData, image: Image): Boolean = {
-    val storedId = s3Id(image)
-    val overwrite = s3Client.exists(storedId)
-    try saveDicomDataToS3(dicomData, storedId) catch {
-      case NonFatal(e) =>
-        throw new IllegalArgumentException("Dicom data could not be stored", e)
+  override def deleteByName(names: Seq[String]): Unit =
+    if (names.length == 1)
+      s3.deleteObject(bucket, s3Id(names.head))
+    else {
+      // micro-batch this since S3 accepts up to 1000 deletes at a timej
+      names.grouped(1000).map { subset =>
+        s3.deleteObjects(new DeleteObjectsRequest(bucket).withKeys(subset.map(name => s3Id(name)): _*).withQuiet(true))
+      }
     }
-    overwrite
-  }
 
-  private def saveDicomDataToS3(dicomData: DicomData, s3Key: String): Unit = {
-    val os = new ByteArrayOutputStream()
-    try saveDicomData(dicomData, os) catch {
-      case NonFatal(e) =>
-        throw new IllegalArgumentException("Dicom data could not be stored", e)
+  override def fileSink(name: String)(implicit executionContext: ExecutionContext): Sink[ByteString, Future[Done]] =
+    S3Client(new DefaultAWSCredentialsProviderChain(), region).multipartUploadWithHeaders(bucket, name, s3Headers = Some(S3Headers(ServerSideEncryption.AES256))).mapMaterializedValue(_.map(_ => Done))
+
+  override def fileSource(name: String): Source[ByteString, NotUsed] =
+    S3Client(new DefaultAWSCredentialsProviderChain(), region).download(bucket, s3Id(name)).mapError {
+      // we do not have access to http status code here so not much we can do but map everything to NotFound
+      case e: S3Exception => new NotFoundException(s"Data could not be transferred for name $name: ${e.getMessage}")
     }
-    val buffer = os.toByteArray
-    s3Client.upload(s3Key, buffer)
-  }
-
-  override def deleteFromStorage(image: Image): Unit = s3Client.delete(s3Id(image))
-
-  override def readDicomData(image: Image, withPixelData: Boolean): DicomData = {
-    val s3InputStream = s3Client.get(s3Id(image))
-    loadDicomData(s3InputStream, withPixelData)
-  }
-
-  override def readImageAttributes(image: Image): List[ImageAttribute] = {
-    val s3InputStream = s3Client.get(s3Id(image))
-    DicomUtil.readImageAttributes(loadDicomData(s3InputStream, withPixelData = false).attributes)
-  }
-
-  override def readImageInformation(image: Image): ImageInformation = {
-    val s3InputStream = s3Client.get(s3Id(image))
-    super.readImageInformation(s3InputStream)
-  }
-
-  override def readPngImageData(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int): Array[Byte] = {
-    val s3InputStream = s3Client.get(s3Id(image))
-    val iis = ImageIO.createImageInputStream(s3InputStream)
-    super.readPngImageData(iis, frameNumber, windowMin, windowMax, imageHeight)
-  }
-
-  override def imageAsInputStream(image: Image): InputStream = {
-    val s3InputStream = s3Client.get(s3Id(image))
-    s3InputStream
-  }
 
 }

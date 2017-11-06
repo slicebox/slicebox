@@ -1,11 +1,12 @@
 package se.nimsa.sbx.box
 
 import akka.actor.{ActorSystem, Props, actorRef2Scala}
+import akka.stream.ActorMaterializer
 import akka.testkit.{ImplicitSender, TestKit}
 import akka.util.Timeout
 import org.scalatest._
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
-import se.nimsa.sbx.app.GeneralProtocol.ImageDeleted
+import se.nimsa.sbx.app.GeneralProtocol.ImagesDeleted
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomPropertyValue._
@@ -24,6 +25,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
 
   implicit val ec = system.dispatcher
   implicit val timeout = Timeout(30.seconds)
+  implicit val materializer = ActorMaterializer()
 
   val dbConfig = TestUtil.createTestDb("boxserviceactortest")
 
@@ -36,7 +38,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
   await(boxDao.create())
 
   val storageService = system.actorOf(Props(new StorageServiceActor(storage)), name = "StorageService")
-  val boxService = system.actorOf(Props(new BoxServiceActor(boxDao, "http://testhost:1234")), name = "BoxService")
+  val boxService = system.actorOf(Props(new BoxServiceActor(boxDao, "http://testhost:1234", storage)), name = "BoxService")
 
   override def afterEach() = {
     storage.clear()
@@ -179,7 +181,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
       await(boxDao.listIncomingImages) should have length 2
     }
 
-    "mark incoming transaction as failed when receiving the UpdateIncoming message for the last file of the transaction and the number of images in the transactions does not match the number of incoming images stored in the database" in {
+    "mark incoming transaction as processing until all files have been received" in {
 
       val box = Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, online = false)
 
@@ -192,9 +194,10 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
 
       expectMsgPF() {
         case IncomingUpdated(transaction) =>
-          transaction.receivedImageCount shouldBe 3
+          transaction.receivedImageCount shouldBe 2
+          transaction.addedImageCount shouldBe 2
           transaction.totalImageCount shouldBe totalImageCount
-          transaction.status shouldBe TransactionStatus.FAILED
+          transaction.status shouldBe TransactionStatus.PROCESSING
       }
     }
 
@@ -276,8 +279,8 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
       expectMsgType[IncomingUpdated]
 
       await(boxDao.listIncomingImages).size should be(2)
-      boxService ! ImageDeleted(4)
-      expectNoMsg
+      boxService ! ImagesDeleted(Seq(4))
+      expectNoMessage(3.seconds)
       await(boxDao.listIncomingImages).size should be(1)
     }
 
@@ -292,8 +295,8 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
       expectMsgType[ImagesAddedToOutgoing]
 
       await(boxDao.listOutgoingImages).size should be(3)
-      boxService ! ImageDeleted(i2.id)
-      expectNoMsg
+      boxService ! ImagesDeleted(Seq(i2.id))
+      expectNoMessage(3.seconds)
       await(boxDao.listOutgoingImages).size should be(2)
     }
 

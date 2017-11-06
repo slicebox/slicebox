@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Lars Edenbrandt
+ * Copyright 2014 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -92,5 +92,5 @@ class ImportServiceActor(importDao: ImportDAO)(implicit timeout: Timeout) extend
 }
 
 object ImportServiceActor {
-  def props(importDao: ImportDAO, timeout: Timeout): Props = Props(new ImportServiceActor(importDao)(timeout))
+  def props(importDao: ImportDAO)(implicit timeout: Timeout): Props = Props(new ImportServiceActor(importDao))
 }

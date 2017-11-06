@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Lars Edenbrandt
+ * Copyright 2014 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 
 package se.nimsa.sbx.user
 
+import java.security.MessageDigest
 import java.util.UUID
 
 import akka.actor.{Actor, Props, actorRef2Scala}
@@ -111,25 +112,34 @@ class UserServiceActor(userDao: UserDAO, superUser: String, superPassword: Strin
 
   def userByName(name: String): Future[Option[ApiUser]] = userDao.userByName(name)
 
-  def createOrUpdateSession(user: ApiUser, ip: String, userAgent: String): Future[ApiSession] =
-    userDao.userSessionByUserIdIpAndUserAgent(user.id, ip, userAgent)
+  def createOrUpdateSession(user: ApiUser, ip: String, userAgent: String): Future[ApiSession] = {
+    val userAgentHash = md5Hash(userAgent)
+
+    userDao.userSessionByUserIdIpAndUserAgent(user.id, ip, userAgentHash)
       .flatMap(_.map(apiSession => {
         val updatedSession = apiSession.copy(updated = currentTime)
         userDao.updateSession(updatedSession).map(_ => updatedSession)
       }).getOrElse(
-        userDao.insertSession(ApiSession(-1, user.id, newSessionToken, ip, userAgent, currentTime))))
+        userDao.insertSession(ApiSession(-1, user.id, newSessionToken, ip, userAgentHash, currentTime))))
+  }
 
   def deleteSession(user: ApiUser, authKey: AuthKey): Future[Option[Unit]] =
-    authKey.ip.flatMap(ip =>
-      authKey.userAgent.map(userAgent =>
-        userDao.deleteSessionByUserIdIpAndUserAgent(user.id, ip, userAgent)
-          .map(n => if (n == 0) None else Some({})))).unwrap
+    authKey.ip.flatMap { ip =>
+      authKey.userAgent.map { userAgent =>
+        val userAgentHash = md5Hash(userAgent)
+
+        userDao.deleteSessionByUserIdIpAndUserAgent(user.id, ip, userAgentHash)
+          .map(n => if (n == 0) None else Some({}))
+      }
+    }.unwrap
 
   def getAndRefreshUser(authKey: AuthKey): Future[Option[ApiUser]] = {
     authKey.token.flatMap(token =>
       authKey.ip.flatMap(ip =>
-        authKey.userAgent.map(userAgent =>
-          userDao.userSessionByTokenIpAndUserAgent(token, ip, userAgent))))
+        authKey.userAgent.map { userAgent =>
+          val userAgentHash = md5Hash(userAgent)
+          userDao.userSessionByTokenIpAndUserAgent(token, ip, userAgentHash)
+        }))
       .unwrap
       .map(_.filter {
         case (_, apiSession) =>
@@ -161,10 +171,16 @@ class UserServiceActor(userDao: UserDAO, superUser: String, superPassword: Strin
     ))
 
   def listUsers(startIndex: Long, count: Long): Future[Seq[ApiUser]] = userDao.listUsers(startIndex, count)
+
+  def md5Hash(text: String): String = MessageDigest.getInstance("MD5")
+    .digest(text.getBytes("utf-8"))
+    .map(0xFF & _)
+    .map("%02x".format(_))
+    .foldLeft("")(_ + _)
 }
 
 object UserServiceActor {
-  def props(dao: UserDAO, superUser: String, superPassword: String, sessionTimeout: Long, timeout: Timeout): Props = Props(new UserServiceActor(dao, superUser, superPassword, sessionTimeout)(timeout))
+  def props(dao: UserDAO, superUser: String, superPassword: String, sessionTimeout: Long)(implicit timeout: Timeout): Props = Props(new UserServiceActor(dao, superUser, superPassword, sessionTimeout))
 
   def newSessionToken = UUID.randomUUID.toString
 

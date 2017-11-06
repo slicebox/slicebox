@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Lars Edenbrandt
+ * Copyright 2014 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,25 +18,18 @@ package se.nimsa.sbx.scp
 
 import java.util.concurrent.{Executor, ScheduledExecutorService}
 
-import org.dcm4che3.data.Attributes
-import org.dcm4che3.data.Tag
-import org.dcm4che3.data.VR
-import org.dcm4che3.net.ApplicationEntity
-import org.dcm4che3.net.Association
-import org.dcm4che3.net.Connection
-import org.dcm4che3.net.Device
-import org.dcm4che3.net.PDVInputStream
-import org.dcm4che3.net.TransferCapability
-import org.dcm4che3.net.pdu.PresentationContext
-import org.dcm4che3.net.service.BasicCEchoSCP
-import org.dcm4che3.net.service.BasicCStoreSCP
-import org.dcm4che3.net.service.DicomServiceRegistry
-import com.typesafe.scalalogging.LazyLogging
 import akka.actor.ActorRef
 import akka.pattern.ask
-import se.nimsa.sbx.dicom.{Contexts, DicomData}
-import ScpProtocol.DicomDataReceivedByScp
-import akka.util.Timeout
+import akka.util.{ByteString, Timeout}
+import com.sun.xml.internal.messaging.saaj.util.ByteOutputStream
+import com.typesafe.scalalogging.LazyLogging
+import org.dcm4che3.data.{Attributes, Tag, UID, VR}
+import org.dcm4che3.io.DicomOutputStream
+import org.dcm4che3.net._
+import org.dcm4che3.net.pdu.PresentationContext
+import org.dcm4che3.net.service.{BasicCEchoSCP, BasicCStoreSCP, DicomServiceRegistry}
+import se.nimsa.sbx.dicom.Contexts
+import se.nimsa.sbx.scp.ScpProtocol.DicomDataReceivedByScp
 
 import scala.concurrent.Await
 
@@ -45,8 +38,7 @@ class Scp(val name: String,
           val port: Int,
           executor: Executor,
           scheduledExecutor: ScheduledExecutorService,
-          notifyActor: ActorRef,
-          implicit val timeout: Timeout) extends LazyLogging {
+          notifyActor: ActorRef)(implicit timeout: Timeout) extends LazyLogging {
 
   private val cstoreSCP = new BasicCStoreSCP("*") {
 
@@ -57,17 +49,22 @@ class Scp(val name: String,
       val iuid = rq.getString(Tag.AffectedSOPInstanceUID)
       val tsuid = pc.getTransferSyntax
 
-      val metaInformation = as.createFileMetaInformation(iuid, cuid, tsuid)
-      val attributes = data.readDataset(tsuid)
+      val fmi = as.createFileMetaInformation(iuid, cuid, tsuid)
 
-      val dicomData = DicomData(attributes, metaInformation)
+      val baos = new ByteOutputStream()
+      val dos = new DicomOutputStream(baos, UID.ExplicitVRLittleEndian)
+      dos.writeFileMetaInformation(fmi)
+      data.copyTo(dos)
+      dos.close()
+
+      val bytes = ByteString(baos.getBytes.take(baos.size))
 
       /*
        * This is the interface between a synchronous callback and a async actor system. To avoid sending too many large
        * messages to the notification actor, risking heap overflow, we block and wait here, ensuring one-at-a-time
        * processing of dicom data.
        */
-      Await.ready(notifyActor.ask(DicomDataReceivedByScp(dicomData)), timeout.duration)
+      Await.ready(notifyActor.ask(DicomDataReceivedByScp(bytes)), timeout.duration)
     }
 
   }
@@ -78,7 +75,7 @@ class Scp(val name: String,
   ae.setAssociationAcceptor(true)
   ae.addConnection(conn)
   Contexts.imageDataContexts.foreach(context =>
-    ae.addTransferCapability(new TransferCapability(null, context.sopClass.uid, TransferCapability.Role.SCP, context.transferSyntaxes.map(_.uid): _*)))
+    ae.addTransferCapability(new TransferCapability(null, context.sopClassUid, TransferCapability.Role.SCP, context.transferSyntaxUids: _*)))
 
   private val device = new Device("storescp")
   device.setExecutor(executor)

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Lars Edenbrandt
+ * Copyright 2014 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,11 +16,11 @@
 
 package se.nimsa.sbx.seriestype
 
-import SeriesTypeProtocol._
+import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
 import se.nimsa.sbx.util.DbUtil.createTables
 import slick.basic.DatabaseConfig
 import slick.jdbc.JdbcProfile
-import slick.driver.H2Driver
+
 import scala.concurrent.{ExecutionContext, Future}
 
 class SeriesTypeDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionContext) {
@@ -31,7 +31,7 @@ class SeriesTypeDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
 
   class SeriesTypeTable(tag: Tag) extends Table[SeriesType](tag, SeriesTypeTable.name) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
-    def name = column[String]("name", O.Length(255))
+    def name = column[String]("name", O.Length(180))
     def idxUniqueName = index("idx_unique_series_type_name", name, unique = true)
     def * = (id, name) <> (SeriesType.tupled, SeriesType.unapply)
   }
@@ -172,8 +172,8 @@ class SeriesTypeDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
     seriesSeriesTypes.filter(_.seriesId === seriesId).result
   }
 
-  def removeSeriesTypesForSeriesId(seriesId: Long): Future[Unit] = db.run {
-    seriesSeriesTypes.filter(_.seriesId === seriesId).delete
+  def removeSeriesTypesForSeriesIds(seriesIds: Seq[Long]): Future[Unit] = db.run {
+    seriesSeriesTypes.filter(_.seriesId inSetBind seriesIds).delete
   }.map(_ => Unit)
 
   def removeSeriesTypeForSeriesId(seriesId: Long, seriesTypeId: Long): Future[Unit] = db.run {

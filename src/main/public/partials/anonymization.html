@@ -14,7 +14,8 @@
                             object-actions="actions"
                             callbacks="callbacks.anonymizationKeyTable"
                             refresh-button="true"
-                            empty-message="No anonymization keys">
+                            empty-message="No anonymization keys"
+                            grid-state="uiState.anonymizationTableState">
 
                             <sbx-grid-column property="created" title="Created" filter="date: yyyy-MM-dd HH:mm"></sbx-grid-column>
                             <sbx-grid-column property="patientName" title="Patient Name"><sbx-grid-cell>{{rowObject.patientName | prettyPatientName}}</sbx-grid-cell></sbx-grid-column>

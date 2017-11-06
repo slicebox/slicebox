@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Lars Edenbrandt
+ * Copyright 2014 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,7 +40,7 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
 
   class BoxTable(tag: Tag) extends Table[Box](tag, BoxTable.name) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
-    def name = column[String]("name", O.Length(255))
+    def name = column[String]("name", O.Length(180))
     def token = column[String]("token")
     def baseUrl = column[String]("baseurl")
     def sendMethod = column[BoxSendMethod]("sendmethod")
@@ -395,19 +395,9 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
 
   def listIncomingTransactionsInProcess: Future[Seq[IncomingTransaction]] = db.run(listIncomingTransactionsInProcessAction)
 
-  def countOutgoingImagesForOutgoingTransactionId(outgoingTransactionId: Long): Future[Int] = db.run {
-    outgoingImageQuery.filter(_.outgoingTransactionId === outgoingTransactionId).length.result
-  }
-
   def listOutgoingImagesForOutgoingTransactionId(outgoingTransactionId: Long): Future[Seq[OutgoingImage]] = db.run {
     outgoingImageQuery.filter(_.outgoingTransactionId === outgoingTransactionId).result
   }
-
-  def countIncomingImagesForIncomingTransactionIdAction(incomingTransactionId: Long) =
-    incomingImageQuery.filter(_.incomingTransactionId === incomingTransactionId).length.result
-
-  def countIncomingImagesForIncomingTransactionId(incomingTransactionId: Long): Future[Int] =
-    db.run(countIncomingImagesForIncomingTransactionIdAction(incomingTransactionId))
 
   def listIncomingImagesForIncomingTransactionId(incomingTransactionId: Long): Future[Seq[IncomingImage]] = db.run {
     incomingImageQuery.filter(_.incomingTransactionId === incomingTransactionId).result
@@ -421,12 +411,12 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
     join.filter(_._1.id === outgoingTransactionId).map(_._2).result
   }
 
-  def removeOutgoingImagesForImageId(imageId: Long) = db.run {
-    outgoingImageQuery.filter(_.imageId === imageId).delete
+  def removeOutgoingImagesForImageIds(imageIds: Seq[Long]) = db.run {
+    outgoingImageQuery.filter(_.imageId inSetBind imageIds).delete
   }
 
-  def removeIncomingImagesForImageId(imageId: Long) = db.run {
-    incomingImageQuery.filter(_.imageId === imageId).delete
+  def removeIncomingImagesForImageIds(imageIds: Seq[Long]) = db.run {
+    incomingImageQuery.filter(_.imageId inSetBind imageIds).delete
   }
 
   def updateTransactionsStatusAction(now: Long, pollBoxOnlineStatusTimeoutMillis: Long) = {
@@ -499,9 +489,10 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
             insertIncomingTransactionAction(IncomingTransaction(-1, box.id, box.name, outgoingTransactionId, 0, 0, totalImageCount, System.currentTimeMillis, System.currentTimeMillis, TransactionStatus.WAITING))
           }
       }.flatMap { existingTransaction =>
+        val receivedImageCount = existingTransaction.receivedImageCount + 1
         val addedImageCount = if (overwrite) existingTransaction.addedImageCount else existingTransaction.addedImageCount + 1
         val incomingTransaction = existingTransaction.copy(
-          receivedImageCount = sequenceNumber,
+          receivedImageCount = receivedImageCount,
           addedImageCount = addedImageCount,
           totalImageCount = totalImageCount,
           updated = System.currentTimeMillis,
@@ -511,21 +502,14 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
             _.map(image => updateIncomingImageAction(image.copy(imageId = imageId)))
               .getOrElse(insertIncomingImageAction(IncomingImage(-1, incomingTransaction.id, imageId, sequenceNumber, overwrite)))
           }
-        }.map(_ => incomingTransaction)
-      }.flatMap { incomingTransaction =>
-        if (sequenceNumber == totalImageCount)
-          countIncomingImagesForIncomingTransactionIdAction(incomingTransaction.id).flatMap { nIncomingImages =>
-            val status =
-              if (nIncomingImages == totalImageCount)
-                TransactionStatus.FINISHED
-              else
-                TransactionStatus.FAILED
-            setIncomingTransactionStatusAction(incomingTransaction.id, status).map(_ => incomingTransaction.copy(status = status))
-          }
-        else
-          DBIO.successful(incomingTransaction)
+        }.flatMap { _ =>
+          if (incomingTransaction.receivedImageCount == totalImageCount)
+            setIncomingTransactionStatusAction(incomingTransaction.id, TransactionStatus.FINISHED)
+              .map(_ => incomingTransaction.copy(status = TransactionStatus.FINISHED))
+          else
+            DBIO.successful(incomingTransaction)
+        }
       }
-
     db.run(action.transactionally)
   }
 

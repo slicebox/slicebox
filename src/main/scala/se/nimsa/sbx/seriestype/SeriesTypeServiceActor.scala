@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Lars Edenbrandt
+ * Copyright 2014 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,21 +18,23 @@ package se.nimsa.sbx.seriestype
 
 import akka.actor.{Actor, Props}
 import akka.event.{Logging, LoggingReceive}
+import akka.stream.Materializer
 import akka.util.Timeout
 import se.nimsa.sbx.dicom.DicomUtil
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
+import se.nimsa.sbx.storage.StorageService
 import se.nimsa.sbx.util.ExceptionCatching
 import se.nimsa.sbx.util.FutureUtil.await
 
-class SeriesTypeServiceActor(seriesTypeDao: SeriesTypeDAO)(implicit timeout: Timeout) extends Actor with ExceptionCatching {
+class SeriesTypeServiceActor(seriesTypeDao: SeriesTypeDAO, storage: StorageService)(implicit materializer: Materializer, timeout: Timeout) extends Actor with ExceptionCatching {
 
   val log = Logging(context.system, this)
 
   implicit val system = context.system
   implicit val ec = context.dispatcher
 
-  val seriesTypeUpdateService = context.actorOf(SeriesTypeUpdateActor.props(timeout), name = "SeriesTypeUpdate")
+  val seriesTypeUpdateService = context.actorOf(SeriesTypeUpdateActor.props(storage), name = "SeriesTypeUpdate")
 
   override def preStart {
     system.eventStream.subscribe(context.self, classOf[MetaDataDeleted])
@@ -42,11 +44,9 @@ class SeriesTypeServiceActor(seriesTypeDao: SeriesTypeDAO)(implicit timeout: Tim
 
   def receive = LoggingReceive {
 
-    case MetaDataDeleted(_, _, seriesMaybe, _) =>
-      seriesMaybe.foreach { series =>
-        removeSeriesTypesFromSeries(series.id)
-        sender ! SeriesTypesRemovedFromSeries(series.id)
-      }
+    case MetaDataDeleted(_, _, seriesIds, _) =>
+        removeSeriesTypesFromSeries(seriesIds)
+        sender ! SeriesTypesRemovedFromSeries(seriesIds)
 
     case msg: SeriesTypeRequest =>
 
@@ -106,8 +106,8 @@ class SeriesTypeServiceActor(seriesTypeDao: SeriesTypeDAO)(implicit timeout: Tim
             sender ! SeriesTypeAddedToSeries(seriesSeriesType)
 
           case RemoveSeriesTypesFromSeries(seriesId) =>
-            removeSeriesTypesFromSeries(seriesId)
-            sender ! SeriesTypesRemovedFromSeries(seriesId)
+            removeSeriesTypesFromSeries(Seq(seriesId))
+            sender ! SeriesTypesRemovedFromSeries(Seq(seriesId))
 
           case RemoveSeriesTypeFromSeries(seriesId, seriesTypeId) =>
             removeSeriesTypeFromSeries(seriesId, seriesTypeId)
@@ -177,8 +177,8 @@ class SeriesTypeServiceActor(seriesTypeDao: SeriesTypeDAO)(implicit timeout: Tim
   def addSeriesTypeToSeries(seriesSeriesType: SeriesSeriesType) =
     await(seriesTypeDao.upsertSeriesSeriesType(seriesSeriesType))
 
-  def removeSeriesTypesFromSeries(seriesId: Long) =
-    await(seriesTypeDao.removeSeriesTypesForSeriesId(seriesId))
+  def removeSeriesTypesFromSeries(seriesIds: Seq[Long]) =
+    await(seriesTypeDao.removeSeriesTypesForSeriesIds(seriesIds))
 
   def removeSeriesTypeFromSeries(seriesId: Long, seriesTypeId: Long) =
     await(seriesTypeDao.removeSeriesTypeForSeriesId(seriesId, seriesTypeId))
@@ -189,5 +189,5 @@ class SeriesTypeServiceActor(seriesTypeDao: SeriesTypeDAO)(implicit timeout: Tim
 }
 
 object SeriesTypeServiceActor {
-  def props(seriesTypeDao: SeriesTypeDAO, timeout: Timeout): Props = Props(new SeriesTypeServiceActor(seriesTypeDao)(timeout))
+  def props(seriesTypeDao: SeriesTypeDAO, storage: StorageService)(implicit materializer: Materializer, timeout: Timeout): Props = Props(new SeriesTypeServiceActor(seriesTypeDao, storage))
 }

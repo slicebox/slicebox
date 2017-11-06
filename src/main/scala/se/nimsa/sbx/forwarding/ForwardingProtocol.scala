@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Lars Edenbrandt
+ * Copyright 2014 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,6 @@
 package se.nimsa.sbx.forwarding
 
 import se.nimsa.sbx.app.GeneralProtocol._
-import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.model.Entity
 
 object ForwardingProtocol {
@@ -54,7 +53,7 @@ object ForwardingProtocol {
   case class UpdateTransaction(transaction: ForwardingTransaction)
 
 
-  case class ImageRegisteredForForwarding(image: Image, applicableRules: Seq[ForwardingRule])
+  case class ImageRegisteredForForwarding(imageId: Long, applicableRules: Seq[ForwardingRule])
   
   case class TransactionsEnroute(transactions: Seq[ForwardingTransaction])
   

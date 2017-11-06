@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Lars Edenbrandt
+ * Copyright 2014 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,14 +20,14 @@ import akka.actor.{Actor, ActorRef, Props}
 import akka.event.{Logging, LoggingReceive}
 import akka.util.Timeout
 import se.nimsa.sbx.app.GeneralProtocol._
-import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.forwarding.ForwardingProtocol._
 import se.nimsa.sbx.log.SbxLog
+import se.nimsa.sbx.storage.StorageService
 import se.nimsa.sbx.util.FutureUtil.await
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
-class ForwardingServiceActor(forwardingDao: ForwardingDAO, pollInterval: FiniteDuration = 30.seconds)(implicit timeout: Timeout) extends Actor {
+class ForwardingServiceActor(forwardingDao: ForwardingDAO, storage: StorageService, pollInterval: FiniteDuration = 30.seconds)(implicit timeout: Timeout) extends Actor {
 
   import scala.collection.mutable
 
@@ -40,7 +40,7 @@ class ForwardingServiceActor(forwardingDao: ForwardingDAO, pollInterval: FiniteD
 
   override def preStart {
     context.system.eventStream.subscribe(context.self, classOf[ImageAdded])
-    context.system.eventStream.subscribe(context.self, classOf[ImageDeleted])
+    context.system.eventStream.subscribe(context.self, classOf[ImagesDeleted])
     context.system.eventStream.subscribe(context.self, classOf[ImagesSent])
   }
 
@@ -65,12 +65,12 @@ class ForwardingServiceActor(forwardingDao: ForwardingDAO, pollInterval: FiniteD
 
     // EVENTS
 
-    case ImageAdded(image, source, _) =>
-      val applicableRules = maybeAddImageToForwardingQueue(image, source, sender)
-      sender ! ImageRegisteredForForwarding(image, applicableRules)
+    case ImageAdded(imageId, source, _) =>
+      val applicableRules = maybeAddImageToForwardingQueue(imageId, source, sender)
+      sender ! ImageRegisteredForForwarding(imageId, applicableRules)
 
-    case ImageDeleted(imageId) =>
-      removeImageFromTransactions(imageId)
+    case ImagesDeleted(imageIds) =>
+      removeImageFromTransactions(imageIds)
 
     case ImagesSent(destination, imageIds) =>
       val transactionMaybe = markTransactionAsDelivered(destination, imageIds)
@@ -117,7 +117,7 @@ class ForwardingServiceActor(forwardingDao: ForwardingDAO, pollInterval: FiniteD
       transactionMaybe
     })
 
-  def maybeAddImageToForwardingQueue(image: Image, source: Source, origin: ActorRef): Seq[ForwardingRule] = {
+  def maybeAddImageToForwardingQueue(imageId: Long, source: Source, origin: ActorRef): Seq[ForwardingRule] = {
     // look for rules with this source
     val rules = getForwardingRulesForSourceTypeAndId(source.sourceType, source.sourceId)
 
@@ -126,7 +126,7 @@ class ForwardingServiceActor(forwardingDao: ForwardingDAO, pollInterval: FiniteD
       val transaction = createOrUpdateForwardingTransaction(rule)
 
       // add to queue
-      addImageToForwardingQueue(transaction, image)
+      addImageToForwardingQueue(transaction, imageId)
     }
 
     rules
@@ -147,7 +147,7 @@ class ForwardingServiceActor(forwardingDao: ForwardingDAO, pollInterval: FiniteD
     val updatedTransaction = updateTransaction(transaction.copy(enroute = true, delivered = false))
     val images = getTransactionImagesForTransactionId(updatedTransaction.id)
 
-    val forwardingActor = context.actorOf(ForwardingActor.props(rule, updatedTransaction, images, timeout))
+    val forwardingActor = context.actorOf(ForwardingActor.props(rule, updatedTransaction, images, storage))
     transactionIdToForwardingActor(updatedTransaction.id) = forwardingActor
   }
 
@@ -232,9 +232,9 @@ class ForwardingServiceActor(forwardingDao: ForwardingDAO, pollInterval: FiniteD
   def createOrUpdateForwardingTransaction(forwardingRule: ForwardingRule): ForwardingTransaction =
     await(forwardingDao.createOrUpdateForwardingTransaction(forwardingRule))
 
-  def addImageToForwardingQueue(forwardingTransaction: ForwardingTransaction, image: Image) =
+  def addImageToForwardingQueue(forwardingTransaction: ForwardingTransaction, imageId: Long) =
     // dicom data may be added multiple times (with overwrite), check if it has been added before
-    await(forwardingDao.addImageToForwardingQueue(forwardingTransaction.id, image.id))
+    await(forwardingDao.addImageToForwardingQueue(forwardingTransaction.id, imageId))
 
   def getFreshExpiredTransactions: Seq[ForwardingTransaction] = {
     val timeLimit = System.currentTimeMillis - pollInterval.toMillis
@@ -264,11 +264,11 @@ class ForwardingServiceActor(forwardingDao: ForwardingDAO, pollInterval: FiniteD
   def getUndeliveredTransactionsForSource(source: Source): Seq[ForwardingTransaction] =
     await(forwardingDao.getUndeliveredTransactionsForSourceTypeAndId(source.sourceType, source.sourceId))
 
-  def removeImageFromTransactions(imageId: Long): Unit =
-    await(forwardingDao.removeTransactionImagesForImageId(imageId))
+  def removeImageFromTransactions(imageIds: Seq[Long]): Unit =
+    await(forwardingDao.removeTransactionImagesForImageIds(imageIds))
 
 }
 
 object ForwardingServiceActor {
-  def props(forwardingDao: ForwardingDAO, timeout: Timeout): Props = Props(new ForwardingServiceActor(forwardingDao)(timeout))
+  def props(forwardingDao: ForwardingDAO, storage: StorageService)(implicit timeout: Timeout): Props = Props(new ForwardingServiceActor(forwardingDao, storage))
 }

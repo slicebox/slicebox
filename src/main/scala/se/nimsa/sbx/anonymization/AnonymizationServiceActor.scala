@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Lars Edenbrandt
+ * Copyright 2014 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,130 +16,68 @@
 
 package se.nimsa.sbx.anonymization
 
-import akka.actor.{Actor, Props}
+import akka.actor.{Actor, Props, Stash}
 import akka.event.{Logging, LoggingReceive}
-import akka.util.Timeout
-import org.dcm4che3.data.Attributes
+import akka.pattern.pipe
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
-import se.nimsa.sbx.anonymization.AnonymizationUtil._
-import se.nimsa.sbx.app.GeneralProtocol.ImageDeleted
-import se.nimsa.sbx.dicom.DicomUtil._
-import se.nimsa.sbx.util.ExceptionCatching
-import se.nimsa.sbx.util.FutureUtil.await
+import se.nimsa.sbx.app.GeneralProtocol.ImagesDeleted
+import se.nimsa.sbx.util.SequentialPipeToSupport
 
-class AnonymizationServiceActor(anonymizationDao: AnonymizationDAO, purgeEmptyAnonymizationKeys: Boolean)(implicit timeout: Timeout) extends Actor with ExceptionCatching {
+import scala.concurrent.ExecutionContext
+
+class AnonymizationServiceActor(anonymizationDao: AnonymizationDAO, purgeEmptyAnonymizationKeys: Boolean)
+                               (implicit ec: ExecutionContext) extends Actor with Stash with SequentialPipeToSupport {
 
   val log = Logging(context.system, this)
 
   override def preStart {
-    context.system.eventStream.subscribe(context.self, classOf[ImageDeleted])
+    context.system.eventStream.subscribe(context.self, classOf[ImagesDeleted])
   }
 
   log.info("Anonymization service started")
 
   def receive = LoggingReceive {
 
-    case ImageDeleted(imageId) =>
-      removeImageFromAnonymizationKeyImages(imageId)
+    case ImagesDeleted(imageIds) =>
+      anonymizationDao.removeAnonymizationKeyImagesForImageId(imageIds, purgeEmptyAnonymizationKeys)
 
     case msg: AnonymizationRequest =>
 
-      catchAndReport {
+      msg match {
+        case AddAnonymizationKey(anonymizationKey) =>
+          anonymizationDao.insertAnonymizationKey(anonymizationKey)
+            .map(AnonymizationKeyAdded)
+            .pipeSequentiallyTo(sender)
 
-        msg match {
-          case RemoveAnonymizationKey(anonymizationKeyId) =>
-            removeAnonymizationKey(anonymizationKeyId)
-            sender ! AnonymizationKeyRemoved(anonymizationKeyId)
+        case RemoveAnonymizationKey(anonymizationKeyId) =>
+          anonymizationDao.removeAnonymizationKey(anonymizationKeyId)
+            .map(_ => AnonymizationKeyRemoved(anonymizationKeyId))
+            .pipeSequentiallyTo(sender)
 
-          case GetAnonymizationKeys(startIndex, count, orderBy, orderAscending, filter) =>
-            sender ! AnonymizationKeys(listAnonymizationKeys(startIndex, count, orderBy, orderAscending, filter))
+        case GetAnonymizationKeys(startIndex, count, orderBy, orderAscending, filter) =>
+          pipe(anonymizationDao.anonymizationKeys(startIndex, count, orderBy, orderAscending, filter).map(AnonymizationKeys)).to(sender)
 
-          case GetAnonymizationKey(anonymizationKeyId) =>
-            sender ! getAnonymizationKeyForId(anonymizationKeyId)
+        case GetAnonymizationKey(anonymizationKeyId) =>
+          pipe(anonymizationDao.anonymizationKeyForId(anonymizationKeyId)).to(sender)
 
-          case GetImageIdsForAnonymizationKey(anonymizationKeyId) =>
-            val imageIds = getAnonymizationKeyImagesByAnonymizationKeyId(anonymizationKeyId).map(_.imageId)
-            sender ! imageIds
+        case GetImageIdsForAnonymizationKey(anonymizationKeyId) =>
+          pipe(anonymizationDao.anonymizationKeyImagesForAnonymizationKeyId(anonymizationKeyId).map(_.map(_.imageId))).to(sender)
 
+        case GetAnonymizationKeysForPatient(patientName, patientID) =>
+          pipe(anonymizationDao.anonymizationKeysForPatient(patientName, patientID).map(AnonymizationKeys)).to(sender)
 
-          case ReverseAnonymization(attributes) =>
-            if (isAnonymous(attributes)) {
-              val clonedAttributes = cloneAttributes(attributes)
-              reverseAnonymization(anonymizationKeysForAnonPatient(clonedAttributes), clonedAttributes)
-              sender ! clonedAttributes
-            } else
-              sender ! attributes
+        case GetReverseAnonymizationKeysForPatient(anonPatientName, anonPatientID) =>
+          pipe(anonymizationDao.anonymizationKeysForAnonPatient(anonPatientName, anonPatientID).map(AnonymizationKeys)).to(sender)
 
-          case Anonymize(imageId, attributes, tagValues) =>
-            if (isAnonymous(attributes) && tagValues.isEmpty)
-              sender ! attributes
-            else {
-              val anonymizationKeys = anonymizationKeysForPatient(attributes)
-              val anonAttributes = anonymizeAttributes(attributes)
-              val harmonizedAttributes = harmonizeAnonymization(anonymizationKeys, attributes, anonAttributes)
-              applyTagValues(harmonizedAttributes, tagValues)
-
-              val anonymizationKey = createAnonymizationKey(attributes, harmonizedAttributes)
-              val dbAnonymizationKey = anonymizationKeys.find(isEqual(_, anonymizationKey))
-                .getOrElse(addAnonymizationKey(anonymizationKey))
-
-              maybeAddAnonymizationKeyImage(dbAnonymizationKey.id, imageId)
-
-              sender ! harmonizedAttributes
-            }
-
-          case QueryAnonymizationKeys(query) =>
-            sender ! queryAnonymizationKeys(query)
-        }
-
+        case QueryAnonymizationKeys(query) =>
+          val order = query.order.map(_.orderBy)
+          val orderAscending = query.order.forall(_.orderAscending)
+          pipe(anonymizationDao.queryAnonymizationKeys(query.startIndex, query.count, order, orderAscending, query.queryProperties)).to(sender)
       }
-  }
-
-  def addAnonymizationKey(anonymizationKey: AnonymizationKey): AnonymizationKey =
-    await(anonymizationDao.insertAnonymizationKey(anonymizationKey))
-
-  def maybeAddAnonymizationKeyImage(anonymizationKeyId: Long, imageId: Long): AnonymizationKeyImage =
-    await(anonymizationDao.anonymizationKeyImageForAnonymizationKeyIdAndImageId(anonymizationKeyId, imageId))
-      .getOrElse(
-        await(anonymizationDao.insertAnonymizationKeyImage(
-          AnonymizationKeyImage(-1, anonymizationKeyId, imageId))))
-
-  def removeAnonymizationKey(anonymizationKeyId: Long) =
-    await(anonymizationDao.removeAnonymizationKey(anonymizationKeyId))
-
-  def listAnonymizationKeys(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String]) =
-    await(anonymizationDao.anonymizationKeys(startIndex, count, orderBy, orderAscending, filter))
-
-  def getAnonymizationKeys(anonymizationKeyId: Long): Option[AnonymizationKey] =
-    await(anonymizationDao.anonymizationKeyForId(anonymizationKeyId))
-
-  def anonymizationKeysForAnonPatient(attributes: Attributes) = {
-    val anonPatient = attributesToPatient(attributes)
-    await(anonymizationDao.anonymizationKeysForAnonPatient(anonPatient.patientName.value, anonPatient.patientID.value))
-  }
-
-  def anonymizationKeysForPatient(attributes: Attributes) = {
-    val patient = attributesToPatient(attributes)
-    await(anonymizationDao.anonymizationKeysForPatient(patient.patientName.value, patient.patientID.value))
-  }
-
-  def removeImageFromAnonymizationKeyImages(imageId: Long) =
-    await(anonymizationDao.removeAnonymizationKeyImagesForImageId(imageId, purgeEmptyAnonymizationKeys))
-
-  def getAnonymizationKeyImagesByAnonymizationKeyId(anonymizationKeyId: Long) =
-    await(anonymizationDao.anonymizationKeyImagesForAnonymizationKeyId(anonymizationKeyId))
-
-  def getAnonymizationKeyForId(id: Long): Option[AnonymizationKey] =
-    await(anonymizationDao.anonymizationKeyForId(id))
-
-  def queryAnonymizationKeys(query: AnonymizationKeyQuery): Seq[AnonymizationKey] = {
-    val order = query.order.map(_.orderBy)
-    val orderAscending = query.order.forall(_.orderAscending)
-    await(anonymizationDao.queryAnonymizationKeys(query.startIndex, query.count, order, orderAscending, query.queryProperties))
   }
 
 }
 
 object AnonymizationServiceActor {
-  def props(anonymizationDao: AnonymizationDAO, purgeEmptyAnonymizationKeys: Boolean, timeout: Timeout): Props = Props(new AnonymizationServiceActor(anonymizationDao, purgeEmptyAnonymizationKeys)(timeout))
+  def props(anonymizationDao: AnonymizationDAO, purgeEmptyAnonymizationKeys: Boolean)(implicit ec: ExecutionContext): Props = Props(new AnonymizationServiceActor(anonymizationDao, purgeEmptyAnonymizationKeys))
 }

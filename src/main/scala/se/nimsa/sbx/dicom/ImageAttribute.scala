@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Lars Edenbrandt
+ * Copyright 2014 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,8 @@
 
 package se.nimsa.sbx.dicom
 
+import se.nimsa.dcm4che.streams.TagPath.TagPathTag
+
 case class ImageAttribute(
   tag: Int,
   group: Int,
@@ -25,6 +27,7 @@ case class ImageAttribute(
   multiplicity: Int,
   length: Int,
   depth: Int,
+  tagPathTag: TagPathTag,
   tagPath: List[Int],
   namePath: List[String],
   values: List[String])

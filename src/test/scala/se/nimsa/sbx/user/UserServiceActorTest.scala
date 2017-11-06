@@ -50,13 +50,16 @@ class UserServiceActorTest(_system: ActorSystem) extends TestKit(_system) with I
     }
 
     "refresh a non-expired session defined by a token, ip and user agent" in {
+      val userAgent = "user agent"
+      val userAgentHash = userActor.md5Hash(userAgent)
+
       val user = await(dao.insert(ApiUser(-1, "user", UserRole.USER).withPassword("pass")))
       val sessionTime = System.currentTimeMillis - 1000
-      await(dao.insertSession(ApiSession(-1, user.id, "token", "ip", "user agent", sessionTime)))
+      await(dao.insertSession(ApiSession(-1, user.id, "token", "ip", userAgentHash, sessionTime)))
 
-      await(userActor.getAndRefreshUser(AuthKey(Some("token"), Some("ip"), Some("user agent"))))
+      await(userActor.getAndRefreshUser(AuthKey(Some("token"), Some("ip"), Some(userAgent))))
 
-      val optionalSession = await(dao.userSessionByTokenIpAndUserAgent("token", "ip", "user agent"))
+      val optionalSession = await(dao.userSessionByTokenIpAndUserAgent("token", "ip", userAgentHash))
       optionalSession.isDefined shouldBe true
       optionalSession.get._2.updated shouldBe >(sessionTime)
     }
@@ -89,12 +92,14 @@ class UserServiceActorTest(_system: ActorSystem) extends TestKit(_system) with I
     }
 
     "remove a session based on user id, IP and user agent when logging out" in {
+      val userAgent = "user agent"
+
       val user = await(dao.insert(ApiUser(-1, "user", UserRole.USER).withPassword("pass")))
-      val session1 = await(userActor.createOrUpdateSession(user, "ip", "userAgent"))
+      val session1 = await(userActor.createOrUpdateSession(user, "ip", userAgent))
       await(dao.listSessions) should have length 1
-      await(userActor.deleteSession(user, AuthKey(Some(session1.token), Some("Other IP"), Some(session1.userAgent))))
+      await(userActor.deleteSession(user, AuthKey(Some(session1.token), Some("Other IP"), Some(userAgent))))
       await(dao.listSessions) should have length 1
-      await(userActor.deleteSession(user, AuthKey(Some(session1.token), Some(session1.ip), Some(session1.userAgent))))
+      await(userActor.deleteSession(user, AuthKey(Some(session1.token), Some(session1.ip), Some(userAgent))))
       await(dao.listSessions) should have length 0
     }
 

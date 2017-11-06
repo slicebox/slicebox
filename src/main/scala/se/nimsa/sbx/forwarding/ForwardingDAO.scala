@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Lars Edenbrandt
+ * Copyright 2014 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,10 +35,10 @@ class ForwardingDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
 
   class ForwardingRuleTable(tag: Tag) extends Table[ForwardingRule](tag, ForwardingRuleTable.name) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
-    def sourceType = column[String]("sourcetype", O.Length(255))
+    def sourceType = column[String]("sourcetype", O.Length(64))
     def sourceName = column[String]("sourcename")
     def sourceId = column[Long]("sourceid")
-    def destinationType = column[String]("destinationtype", O.Length(255))
+    def destinationType = column[String]("destinationtype", O.Length(64))
     def destinationName = column[String]("destinationname")
     def destinationId = column[Long]("destinationid")
     def keepImages = column[Boolean]("keepimages")
@@ -247,8 +247,8 @@ class ForwardingDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
         .result
     }
 
-  def removeTransactionImagesForImageId(imageId: Long): Future[Unit] = db.run {
-    transactionImageQuery.filter(_.imageId === imageId).delete.map(_ => {})
+  def removeTransactionImagesForImageIds(imageIds: Seq[Long]): Future[Unit] = db.run {
+    transactionImageQuery.filter(_.imageId inSetBind imageIds).delete.map(_ => {})
   }
 
   def addImageToForwardingQueue(transactionId: Long, imageId: Long): Future[ForwardingTransactionImage] = {

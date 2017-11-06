@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Lars Edenbrandt
+ * Copyright 2014 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,14 +20,14 @@ import java.nio.file.{Files, Paths}
 
 import akka.actor.{Actor, PoisonPill, Props}
 import akka.event.{Logging, LoggingReceive}
+import akka.stream.Materializer
 import akka.util.Timeout
 import se.nimsa.sbx.directory.DirectoryWatchProtocol._
+import se.nimsa.sbx.storage.StorageService
 import se.nimsa.sbx.util.ExceptionCatching
 import se.nimsa.sbx.util.FutureUtil.await
 
-import scala.language.postfixOps
-
-class DirectoryWatchServiceActor(directoryWatchDao: DirectoryWatchDAO)(implicit timeout: Timeout) extends Actor with ExceptionCatching {
+class DirectoryWatchServiceActor(directoryWatchDao: DirectoryWatchDAO, storage: StorageService)(implicit materializer: Materializer, timeout: Timeout) extends Actor with ExceptionCatching {
   val log = Logging(context.system, this)
 
   setupWatches()
@@ -63,7 +63,7 @@ class DirectoryWatchServiceActor(directoryWatchDao: DirectoryWatchDAO)(implicit 
                 val watchedDirectory = addDirectory(directory)
 
                 context.child(watchedDirectory.id.toString).getOrElse(
-                  context.actorOf(DirectoryWatchActor.props(watchedDirectory, timeout), watchedDirectory.id.toString))
+                  context.actorOf(DirectoryWatchActor.props(watchedDirectory, storage), watchedDirectory.id.toString))
 
                 sender ! watchedDirectory
             }
@@ -83,13 +83,13 @@ class DirectoryWatchServiceActor(directoryWatchDao: DirectoryWatchDAO)(implicit 
 
   }
 
-  def setupWatches() = {
+  def setupWatches(): Unit = {
     val watchedDirectories = await(directoryWatchDao.listWatchedDirectories(0, 1000000))
 
     watchedDirectories foreach (watchedDirectory => {
       val path = Paths.get(watchedDirectory.path)
       if (Files.isDirectory(path))
-        context.actorOf(DirectoryWatchActor.props(watchedDirectory, timeout), watchedDirectory.id.toString)
+        context.actorOf(DirectoryWatchActor.props(watchedDirectory, storage), watchedDirectory.id.toString)
       else
         deleteDirectory(watchedDirectory.id)
     })
@@ -98,20 +98,20 @@ class DirectoryWatchServiceActor(directoryWatchDao: DirectoryWatchDAO)(implicit 
   def addDirectory(directory: WatchedDirectory): WatchedDirectory =
     await(directoryWatchDao.insert(directory))
 
-  def deleteDirectory(id: Long) =
+  def deleteDirectory(id: Long): Unit =
     await(directoryWatchDao.deleteWatchedDirectoryWithId(id))
 
-  def watchedDirectoryForId(watchedDirectoryId: Long) =
+  def watchedDirectoryForId(watchedDirectoryId: Long): Option[WatchedDirectory] =
     await(directoryWatchDao.watchedDirectoryForId(watchedDirectoryId))
 
-  def watchedDirectoryForPath(path: String) =
+  def watchedDirectoryForPath(path: String): Option[WatchedDirectory] =
     await(directoryWatchDao.watchedDirectoryForPath(path))
 
-  def getWatchedDirectories(startIndex: Long, count: Long) =
+  def getWatchedDirectories(startIndex: Long, count: Long): Seq[WatchedDirectory] =
     await(directoryWatchDao.listWatchedDirectories(startIndex, count))
 
 }
 
 object DirectoryWatchServiceActor {
-  def props(directoryWatchDao: DirectoryWatchDAO, timeout: Timeout): Props = Props(new DirectoryWatchServiceActor(directoryWatchDao)(timeout))
+  def props(directoryWatchDao: DirectoryWatchDAO, storage: StorageService)(implicit materializer: Materializer, timeout: Timeout): Props = Props(new DirectoryWatchServiceActor(directoryWatchDao, storage))
 }

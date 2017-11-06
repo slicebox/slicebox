@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Lars Edenbrandt
+ * Copyright 2014 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -103,7 +103,7 @@ object SeriesTypeProtocol {
 
   case class SeriesTypeAddedToSeries(seriesSeriesType: SeriesSeriesType)
   
-  case class SeriesTypesRemovedFromSeries(seriesId: Long)
+  case class SeriesTypesRemovedFromSeries(seriesIds: Seq[Long])
 
   case class SeriesTypeRemovedFromSeries(seriesId: Long, seriesTypeId: Long)
 

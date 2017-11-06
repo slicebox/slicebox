@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Lars Edenbrandt
+ * Copyright 2014 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,6 @@ package se.nimsa.sbx.metadata
 import akka.actor.{Actor, Props, Stash}
 import akka.event.{Logging, LoggingReceive}
 import akka.pattern.pipe
-import akka.util.Timeout
 import se.nimsa.sbx.dicom.DicomUtil._
 import se.nimsa.sbx.lang.NotFoundException
 import se.nimsa.sbx.metadata.MetaDataProtocol._
@@ -27,7 +26,7 @@ import se.nimsa.sbx.util.SequentialPipeToSupport
 
 import scala.concurrent.Future
 
-class MetaDataServiceActor(metaDataDao: MetaDataDAO, propertiesDao: PropertiesDAO)(implicit timeout: Timeout) extends Actor with Stash with SequentialPipeToSupport {
+class MetaDataServiceActor(metaDataDao: MetaDataDAO, propertiesDao: PropertiesDAO) extends Actor with Stash with SequentialPipeToSupport {
 
   import context.system
 
@@ -50,8 +49,8 @@ class MetaDataServiceActor(metaDataDao: MetaDataDAO, propertiesDao: PropertiesDA
       addFuture.foreach(context.system.eventStream.publish)
       addFuture.pipeSequentiallyTo(sender)
 
-    case DeleteMetaData(image) =>
-      val deleteFuture = propertiesDao.deleteFully(image).map(MetaDataDeleted.tupled)
+    case DeleteMetaData(imageIds) =>
+      val deleteFuture = propertiesDao.deleteFully(imageIds).map(MetaDataDeleted.tupled)
       deleteFuture.foreach(system.eventStream.publish)
       deleteFuture.pipeSequentiallyTo(sender)
 
@@ -149,5 +148,5 @@ class MetaDataServiceActor(metaDataDao: MetaDataDAO, propertiesDao: PropertiesDA
 }
 
 object MetaDataServiceActor {
-  def props(metaDataDao: MetaDataDAO, propertiesDao: PropertiesDAO, timeout: Timeout): Props = Props(new MetaDataServiceActor(metaDataDao, propertiesDao)(timeout))
+  def props(metaDataDao: MetaDataDAO, propertiesDao: PropertiesDAO): Props = Props(new MetaDataServiceActor(metaDataDao, propertiesDao))
 }

@@ -2,14 +2,14 @@ package se.nimsa.sbx.seriestype
 
 import akka.actor.ActorSystem
 import akka.actor.Status.Failure
+import akka.stream.ActorMaterializer
 import akka.testkit.{ImplicitSender, TestKit}
 import akka.util.Timeout
-import akka.util.Timeout.durationToTimeout
 import org.scalatest._
-import se.nimsa.sbx.dicom.DicomHierarchy.Series
 import se.nimsa.sbx.metadata.MetaDataDAO
 import se.nimsa.sbx.metadata.MetaDataProtocol.MetaDataDeleted
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
+import se.nimsa.sbx.storage.RuntimeStorage
 import se.nimsa.sbx.util.FutureUtil.await
 import se.nimsa.sbx.util.TestUtil
 
@@ -22,13 +22,16 @@ class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
 
   implicit val ec = system.dispatcher
   implicit val timeout = Timeout(30.seconds)
+  implicit val materializer = ActorMaterializer()
 
   val dbConfig = TestUtil.createTestDb("seriestypeserviceactortest")
   val dao = new MetaDataDAO(dbConfig)
 
   val seriesTypeDao = new SeriesTypeDAO(dbConfig)
 
-  val seriesTypeService = system.actorOf(SeriesTypeServiceActor.props(seriesTypeDao, 1.minute), name = "SeriesTypeService")
+  val storage = new RuntimeStorage()
+
+  val seriesTypeService = system.actorOf(SeriesTypeServiceActor.props(seriesTypeDao, storage), name = "SeriesTypeService")
 
   override def beforeAll() = await(seriesTypeDao.create())
 
@@ -262,7 +265,7 @@ class SeriesTypeServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
       val seriesId = 45
       await(seriesTypeDao.upsertSeriesSeriesType(SeriesSeriesType(seriesId, addedSeriesType.id)))
 
-      seriesTypeService ! MetaDataDeleted(None, None, Some(Series(seriesId, -1, null, null, null, null, null, null, null, null, null)), None)
+      seriesTypeService ! MetaDataDeleted(Seq.empty, Seq.empty, Seq(seriesId), Seq.empty)
       expectMsgType[SeriesTypesRemovedFromSeries]
 
       await(seriesTypeDao.listSeriesSeriesTypes) shouldBe empty

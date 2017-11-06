@@ -10,7 +10,7 @@ import se.nimsa.sbx.util.FutureUtil.await
 import se.nimsa.sbx.util.TestUtil
 import se.nimsa.sbx.util.TestUtil._
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.DurationInt
 
 class PropertiesDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {
@@ -49,18 +49,6 @@ class PropertiesDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterA
       ss should be(empty)
       st should be(empty)
       sst should be(empty)
-    }
-  }
-
-  it should "cascade delete linked series sources when a patient is deleted" in {
-    for {
-      (dbPatient1, (_, _), (_, _, _, _), (_, _, _, _, _, _, _, _)) <- insertMetaDataAndProperties()
-      ss1 <- propertiesDao.seriesSources
-      _ <- metaDataDao.deletePatient(dbPatient1.id)
-      ss2 <- propertiesDao.seriesSources
-    } yield {
-      ss1 should have length 4
-      ss2 shouldBe empty
     }
   }
 
@@ -729,6 +717,51 @@ class PropertiesDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterA
     }
   }
 
+  it should "remove empty patients, studies and series when fully deleting images" in {
+    for {
+      (_, (_, _), (_, _, _, _), (i1, i2, i3, i4, i5, i6, i7, i8)) <- insertMetaDataAndProperties()
+      p1 <- metaDataDao.patients
+      t1 <- metaDataDao.studies
+      s1 <- metaDataDao.series
+      _ <- propertiesDao.deleteFully(Seq(i1.id, i2.id))
+      p2 <- metaDataDao.patients
+      t2 <- metaDataDao.studies
+      s2 <- metaDataDao.series
+      _ <- propertiesDao.deleteFully(Seq(i3.id, i4.id))
+      p3 <- metaDataDao.patients
+      t3 <- metaDataDao.studies
+      s3 <- metaDataDao.series
+      _ <- propertiesDao.deleteFully(Seq(i5.id, i6.id, i7.id))
+      p4 <- metaDataDao.patients
+      t4 <- metaDataDao.studies
+      s4 <- metaDataDao.series
+      _ <- propertiesDao.deleteFully(Seq(i8.id))
+      p5 <- metaDataDao.patients
+      t5 <- metaDataDao.studies
+      s5 <- metaDataDao.series
+    } yield {
+      p1 should have length 1
+      t1 should have length 2
+      s1 should have length 4
+
+      p2 should have length 1
+      t2 should have length 2
+      s2 should have length 3
+
+      p3 should have length 1
+      t3 should have length 1
+      s3 should have length 2
+
+      p4 should have length 1
+      t4 should have length 1
+      s4 should have length 1
+
+      p5 shouldBe empty
+      t5 shouldBe empty
+      s5 shouldBe empty
+    }
+  }
+
   it should "remove a series tag when the last occurrence of it has been removed" in {
     for {
       (_, (_, _), (dbSeries1, dbSeries2, dbSeries3, _), (_, _, _, _, _, _, _, _)) <- insertMetaDataAndProperties()
@@ -753,15 +786,15 @@ class PropertiesDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterA
 
   it should "remove a series tag when deleting a series if the series tag attached to the series was the last of its kind" in {
     for {
-      (_, (_, _), (dbSeries1, dbSeries2, dbSeries3, dbSeries4), (_, _, _, _, _, _, _, _)) <- insertMetaDataAndProperties()
+      (_, (_, _), (_, _, _, _), (dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)) <- insertMetaDataAndProperties()
       st1 <- propertiesDao.listSeriesTags
-      _ <- propertiesDao.deleteFully(dbSeries4)
+      _ <- propertiesDao.deleteFully(Seq(dbImage7.id, dbImage8.id))
       st2 <- propertiesDao.listSeriesTags
-      _ <- propertiesDao.deleteFully(dbSeries1)
+      _ <- propertiesDao.deleteFully(Seq(dbImage1.id, dbImage2.id))
       st3 <- propertiesDao.listSeriesTags
-      _ <- propertiesDao.deleteFully(dbSeries2)
+      _ <- propertiesDao.deleteFully(Seq(dbImage3.id, dbImage4.id))
       st4 <- propertiesDao.listSeriesTags
-      _ <- propertiesDao.deleteFully(dbSeries3)
+      _ <- propertiesDao.deleteFully(Seq(dbImage5.id, dbImage6.id))
       st5 <- propertiesDao.listSeriesTags
     } yield {
       st1.size should be(2)
