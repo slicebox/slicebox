@@ -276,7 +276,7 @@ object DicomStreamOps {
       (storageSink, attributesSink) =>
         import GraphDSL.Implicits._
 
-        val baseFlow = validateFlowWithContext(validationContexts)
+        val baseFlow = validateFlowWithContext(validationContexts, drainIncoming = true)
           .via(parseFlow)
           .via(collectAttributesFlow(metaTags2Collect))
           .mapAsync(1)(attributesToMetaPart) // needed for e.g. maybe deflate flow
