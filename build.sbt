@@ -1,7 +1,7 @@
 name := "slicebox"
 version := "1.3-SNAPSHOT"
 organization := "se.nimsa"
-scalaVersion := "2.12.3"
+scalaVersion := "2.12.4"
 scalacOptions := Seq("-encoding", "UTF-8", "-Xlint", "-deprecation", "-unchecked", "-feature", "-target:jvm-1.8")
 
 // define the project
@@ -73,13 +73,13 @@ libraryDependencies ++= {
   val akkaHttpVersion = "10.0.10"
   val slickVersion = "3.2.1"
   val dcm4cheVersion = "3.3.8"
-  val alpakkaVersion = "0.13"
+  val alpakkaVersion = "0.14"
   Seq(
     "com.typesafe.scala-logging" %% "scala-logging" % "3.7.2",
     "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
     "com.typesafe.akka" %% "akka-stream" % akkaVersion, // force newer version than default in akka-http
     "com.typesafe.akka" %% "akka-http" % akkaHttpVersion,
-    "de.heikoseeberger" %% "akka-http-play-json" % "1.18.0",
+    "de.heikoseeberger" %% "akka-http-play-json" % "1.18.1",
     "ch.qos.logback" % "logback-classic" % "1.2.3",
     "com.typesafe.slick" %% "slick" % slickVersion,
     "com.typesafe.slick" %% "slick-hikaricp" % slickVersion,
@@ -87,7 +87,7 @@ libraryDependencies ++= {
     "mysql" % "mysql-connector-java" % "6.0.6",
     "com.zaxxer" % "HikariCP" % "2.7.2",
     "com.github.t3hnar" %% "scala-bcrypt" % "3.1",
-    "com.amazonaws" % "aws-java-sdk-s3" % "1.11.207",
+    "com.amazonaws" % "aws-java-sdk-s3" % "1.11.224",
     "org.scalatest" %% "scalatest" % "3.0.4" % "test",
     "org.dcm4che" % "dcm4che-core" % dcm4cheVersion,
     "org.dcm4che" % "dcm4che-image" % dcm4cheVersion,
@@ -99,7 +99,7 @@ libraryDependencies ++= {
     "org.webjars" % "angularjs" % "1.5.9",
     "org.webjars" % "angular-material" % "1.1.4",
     "org.webjars" % "angular-file-upload" % "11.0.0",
-    "se.nimsa" %% "dcm4che-streams" % "0.6-SNAPSHOT" exclude("org.slf4j", "slf4j-simple"),
+    "se.nimsa" %% "dcm4che-streams" % "0.6" exclude("org.slf4j", "slf4j-simple"),
     "com.lightbend.akka" %% "akka-stream-alpakka-s3" % alpakkaVersion,
     "com.lightbend.akka" %% "akka-stream-alpakka-file" % alpakkaVersion
   )
