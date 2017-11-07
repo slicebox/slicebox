@@ -305,7 +305,7 @@ angular.module('slicebox.home', ['ngRoute'])
 
     $scope.patientSelected = function(patient) {
         if ($scope.uiState.selectedPatient !== patient) {
-            $scope.uiState.flatTableState = {}
+            $scope.uiState.flatTableState = {};
             $scope.uiState.studyTableState = {};
             $scope.uiState.selectedPatient = patient;
             $scope.studySelected(null, true);
@@ -464,7 +464,7 @@ angular.module('slicebox.home', ['ngRoute'])
                                 return c | value.toLowerCase().indexOf(filterLc) >= 0;
                             }, false);
                             return nameCondition || tagCondition || valuesCondition;
-                        })
+                        });
                     }
                     if (orderByProperty) {
                         if (!orderByDirection) {

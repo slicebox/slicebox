@@ -4,11 +4,11 @@ resolvers += Classpaths.typesafeReleases
 
 addSbtPlugin("com.typesafe.sbt" % "sbt-web" % "1.4.3")
 
-// addSbtPlugin("com.typesafe.sbt" % "sbt-jshint" % "1.0.5")
+addSbtPlugin("com.typesafe.sbt" % "sbt-jshint" % "1.0.6")
 
-addSbtPlugin("io.spray" % "sbt-revolver" % "0.9.0")
+addSbtPlugin("io.spray" % "sbt-revolver" % "0.9.1")
 
-addSbtPlugin("com.typesafe.sbt" % "sbt-native-packager" % "1.2.2")
+addSbtPlugin("com.typesafe.sbt" % "sbt-native-packager" % "1.3.2")
 
 addSbtPlugin("de.heikoseeberger" % "sbt-header" % "3.0.2")
 
