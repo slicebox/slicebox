@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Lars Edenbrandt
+ * Copyright 2014 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,9 +16,8 @@
 
 package se.nimsa.sbx.storage
 
-import se.nimsa.sbx.dicom.DicomHierarchy.Image
-import se.nimsa.sbx.app.GeneralProtocol._
-import se.nimsa.sbx.dicom.DicomData
+import akka.util.ByteString
+import se.nimsa.dcm4che.streams.TagPath.TagPathTag
 
 object StorageProtocol {
 
@@ -30,37 +29,13 @@ object StorageProtocol {
     minimumPixelValue: Int,
     maximumPixelValue: Int)
 
+  case class TagMapping(tagPath: TagPathTag, value: ByteString)
 
   sealed trait ImageRequest
-
-  case class GetImageData(image: Image) extends ImageRequest
-
-  case class GetDicomData(image: Image, withPixelData: Boolean) extends ImageRequest
-
-  case class GetImageAttributes(image: Image) extends ImageRequest
-
-  case class GetImageInformation(image: Image) extends ImageRequest
-
-  case class GetPngDataArray(image: Image, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int) extends ImageRequest
-
-  case class CheckDicomData(dicomData: DicomData, useExtendedContexts: Boolean) extends ImageRequest
-
-  case class AddDicomData(dicomData: DicomData, source: Source, image: Image) extends ImageRequest
-  
-  case class DeleteDicomData(image: Image) extends ImageRequest
 
   case class CreateExportSet(imageIds: Seq[Long]) extends ImageRequest
 
   case class GetExportSetImageIds(exportSetId: Long) extends ImageRequest
-
-
-  case class DicomDataArray(data: Array[Byte])
-
-  case class PngDataArray(data: Array[Byte])
-
-  case class DicomDataAdded(image: Image, overwrite: Boolean)
-
-  case class DicomDataDeleted(image: Image)
 
   case class ExportSetId(id: Long)
 

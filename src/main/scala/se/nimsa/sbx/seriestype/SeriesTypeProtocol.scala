@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Lars Edenbrandt
+ * Copyright 2014 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import se.nimsa.sbx.dicom.DicomHierarchy.Series
 object SeriesTypeProtocol {
 
   import se.nimsa.sbx.model.Entity
-  
+
   case class SeriesType(id: Long, name: String) extends Entity
   
   case class SeriesTypes(seriesTypes: Seq[SeriesType])
@@ -29,6 +29,12 @@ object SeriesTypeProtocol {
   case class SeriesTypeRule(id: Long, seriesTypeId: Long) extends Entity
   
   case class SeriesSeriesType(seriesId: Long, seriesTypeId: Long)
+
+  case class SeriesIdSeriesTypesResult(seriesIdSeriesTypes: Seq[SeriesIdSeriesType])
+
+  case class SeriesIdSeriesType(seriesId: Long, seriesType: SeriesType)
+
+  case class IdsQuery(ids: Seq[Long])
 
   case class SeriesTypeRuleAttribute(
       id: Long,
@@ -42,8 +48,7 @@ object SeriesTypeProtocol {
   case class SeriesTypeRules(seriesTypeRules: Seq[SeriesTypeRule])
   
   case class SeriesTypeRuleAttributes(seriesTypeRuleAttributes: Seq[SeriesTypeRuleAttribute])
-  
-  
+
   sealed trait SeriesTypeRequest
   
   case class GetSeriesTypes(startIndex: Long, count: Long) extends SeriesTypeRequest
@@ -94,11 +99,14 @@ object SeriesTypeProtocol {
 
   case class GetSeriesTypesForSeries(seriesId: Long) extends SeriesTypeRequest
 
+  case class GetSeriesTypesForListOfSeries(idsQuery: IdsQuery) extends SeriesTypeRequest
+
   case class SeriesTypeAddedToSeries(seriesSeriesType: SeriesSeriesType)
   
-  case class SeriesTypesRemovedFromSeries(seriesId: Long)
+  case class SeriesTypesRemovedFromSeries(seriesIds: Seq[Long])
 
   case class SeriesTypeRemovedFromSeries(seriesId: Long, seriesTypeId: Long)
+
 
 
 

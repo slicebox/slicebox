@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Lars Edenbrandt
+ * Copyright 2014 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,9 +32,9 @@ def scpRoutes(apiUser: ApiUser): Route =
     pathPrefix("scps") {
       pathEndOrSingleSlash {
         get {
-          parameters(
+          parameters((
             'startindex.as(nonNegativeFromStringUnmarshaller) ? 0,
-            'count.as(nonNegativeFromStringUnmarshaller) ? 20) { (startIndex, count) =>
+            'count.as(nonNegativeFromStringUnmarshaller) ? 20)) { (startIndex, count) =>
             onSuccess(scpService.ask(GetScps(startIndex, count))) {
               case Scps(scps) =>
                 complete(scps)

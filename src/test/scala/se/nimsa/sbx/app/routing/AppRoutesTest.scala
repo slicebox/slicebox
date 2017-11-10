@@ -11,7 +11,7 @@ import se.nimsa.sbx.storage.RuntimeStorage
 import se.nimsa.sbx.util.TestUtil
 
 class AppRoutesTest extends {
-  val dbProps = TestUtil.createTestDb("approutestest")
+  val dbConfig = TestUtil.createTestDb("approutestest")
   val storage = new RuntimeStorage
 } with FlatSpecLike with Matchers with RoutesTestBase {
 

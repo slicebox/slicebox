@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Lars Edenbrandt
+ * Copyright 2014 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,48 +16,61 @@
 
 package se.nimsa.sbx.directory
 
-import scala.slick.driver.JdbcProfile
-import java.nio.file.Path
-import java.nio.file.Paths
-import scala.slick.jdbc.meta.MTable
-import DirectoryWatchProtocol._
+import se.nimsa.sbx.directory.DirectoryWatchProtocol._
+import se.nimsa.sbx.util.DbUtil.createTables
+import slick.basic.DatabaseConfig
+import slick.jdbc.JdbcProfile
 
-class DirectoryWatchDAO(val driver: JdbcProfile) {
-  import driver.simple._
+import scala.concurrent.{ExecutionContext, Future}
 
-  class DirectoryWatchDataTable(tag: Tag) extends Table[WatchedDirectory](tag, "DirectoryWatchData") {
+class DirectoryWatchDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionContext) {
+
+  import dbConf.profile.api._
+
+  val db = dbConf.db
+
+  class DirectoryWatchDataTable(tag: Tag) extends Table[WatchedDirectory](tag, DirectoryWatchDataTable.name) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def name = column[String]("name")
     def path = column[String]("path")
     def * = (id, name, path) <> (WatchedDirectory.tupled, WatchedDirectory.unapply)
   }
 
+  object DirectoryWatchDataTable {
+    val name = "DirectoryWatchData"
+  }
+
   val watchedDirectoriesQuery = TableQuery[DirectoryWatchDataTable]
 
-  def create(implicit session: Session) =
-    if (MTable.getTables("DirectoryWatchData").list.isEmpty) watchedDirectoriesQuery.ddl.create
-  
-  def insert(watchedDirectory: WatchedDirectory)(implicit session: Session): WatchedDirectory = {
-    val generatedId = (watchedDirectoriesQuery returning watchedDirectoriesQuery.map(_.id)) += watchedDirectory
-    watchedDirectory.copy(id = generatedId)
+  def create(): Future[Unit] = createTables(dbConf, (DirectoryWatchDataTable.name, watchedDirectoriesQuery))
+
+  def drop(): Future[Unit] = db.run(watchedDirectoriesQuery.schema.drop)
+
+  def clear(): Future[Int] = db.run(watchedDirectoriesQuery.delete)
+
+  def insert(watchedDirectory: WatchedDirectory): Future[WatchedDirectory] = db.run {
+    (watchedDirectoriesQuery returning watchedDirectoriesQuery.map(_.id) += watchedDirectory)
+      .map(generatedId => watchedDirectory.copy(id = generatedId))
   }
 
-  def deleteWatchedDirectoryWithId(watchedDirectoryId: Long)(implicit session: Session): Int = {
+  def deleteWatchedDirectoryWithId(watchedDirectoryId: Long): Future[Unit] = db.run {
     watchedDirectoriesQuery
-      .filter(_.id === watchedDirectoryId)
-      .delete
+      .filter(_.id === watchedDirectoryId).delete.map(_ => {})
   }
-  
-  def listWatchedDirectories(startIndex: Long, count: Long)(implicit session: Session): List[WatchedDirectory] =
+
+  def listWatchedDirectories(startIndex: Long, count: Long): Future[Seq[WatchedDirectory]] = db.run {
     watchedDirectoriesQuery
       .drop(startIndex)
       .take(count)
-      .list
-    
-  def watchedDirectoryForId(id: Long)(implicit session: Session): Option[WatchedDirectory] =
-    watchedDirectoriesQuery.filter(_.id === id).firstOption
-    
-  def watchedDirectoryForPath(path: String)(implicit session: Session): Option[WatchedDirectory] =
-    watchedDirectoriesQuery.filter(_.path === path).firstOption
-    
+      .result
+  }
+
+  def watchedDirectoryForId(id: Long): Future[Option[WatchedDirectory]] = db.run {
+    watchedDirectoriesQuery.filter(_.id === id).result.headOption
+  }
+
+  def watchedDirectoryForPath(path: String): Future[Option[WatchedDirectory]] = db.run {
+    watchedDirectoriesQuery.filter(_.path === path).result.headOption
+  }
+
 }

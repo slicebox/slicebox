@@ -9,10 +9,11 @@ import se.nimsa.sbx.scu.ScuProtocol.ScuData
 import se.nimsa.sbx.scp.ScpProtocol.ScpData
 import se.nimsa.sbx.app.GeneralProtocol._
 import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.server.Route
 import se.nimsa.sbx.storage.RuntimeStorage
 
 class GeneralRoutesTest extends {
-  val dbProps = TestUtil.createTestDb("generalroutestest")
+  val dbConfig = TestUtil.createTestDb("generalroutestest")
   val storage = new RuntimeStorage
 } with FlatSpecLike with Matchers with RoutesTestBase {
 
@@ -47,4 +48,24 @@ class GeneralRoutesTest extends {
       status shouldBe OK
     }
   }
+
+  it should "return 200 OK and system information" in {
+    Get("/api/system/information") ~> routes ~> check {
+      status shouldBe OK
+      responseAs[SystemInformation].version should not be empty
+    }
+  }
+
+  it should "return 403 Forbidden when trying to stop the service as a user" in {
+    PostAsUser("/api/system/stop") ~> Route.seal(routes) ~> check {
+      status shouldBe Forbidden
+    }
+  }
+
+  it should "return 200 OK when stopping the service" in {
+    PostAsAdmin("/api/system/stop") ~> routes ~> check {
+      status shouldBe OK
+    }
+  }
+
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Lars Edenbrandt
+ * Copyright 2014 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,26 +16,24 @@
 
 package se.nimsa.sbx.app.routing
 
-
-import scala.concurrent.Future
-import akka.pattern.ask
-import org.dcm4che3.data.Attributes
-import se.nimsa.sbx.anonymization.AnonymizationProtocol.ReverseAnonymization
-import se.nimsa.sbx.app.GeneralProtocol._
-import se.nimsa.sbx.app.SliceboxBase
-import se.nimsa.sbx.dicom.DicomUtil
-import se.nimsa.sbx.storage.StorageProtocol._
-import se.nimsa.sbx.user.UserProtocol.ApiUser
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
-import akka.stream.scaladsl.StreamConverters
-import akka.stream.scaladsl.{Source => StreamSource}
+import akka.http.scaladsl.server.directives.FileInfo
+import akka.pattern.ask
+import akka.stream.scaladsl.{Sink, Source => StreamSource}
 import akka.util.ByteString
-import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, GetImage, MetaDataAdded}
+import org.dcm4che3.io.DicomStreamException
+import se.nimsa.sbx.app.GeneralProtocol._
+import se.nimsa.sbx.app.SliceboxBase
+import se.nimsa.sbx.dicom.Contexts
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.importing.ImportProtocol._
+import se.nimsa.sbx.log.SbxLog
+import se.nimsa.sbx.metadata.MetaDataProtocol.GetImage
+import se.nimsa.sbx.user.UserProtocol.ApiUser
 
+import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
 trait ImportRoutes {
@@ -44,10 +42,12 @@ trait ImportRoutes {
   def importRoutes(apiUser: ApiUser): Route =
     path("import" / "sessions" / LongNumber / "images") { id =>
       post {
-        fileUpload("file") {
-          case (_, bytes) => addImageToImportSessionRoute(bytes, id)
-        } ~ extractDataBytes { bytes =>
-          addImageToImportSessionRoute(bytes, id)
+        withoutSizeLimit {
+          fileUpload("file") {
+            case (fileInfo, bytes) => addImageToImportSessionRoute(Some(fileInfo), bytes, id)
+          } ~ extractDataBytes { bytes =>
+            addImageToImportSessionRoute(None, bytes, id)
+          }
         }
       }
     } ~ pathPrefix("import") {
@@ -55,9 +55,9 @@ trait ImportRoutes {
       pathPrefix("sessions") {
         pathEndOrSingleSlash {
           get {
-            parameters(
+            parameters((
               'startindex.as(nonNegativeFromStringUnmarshaller) ? 0,
-              'count.as(nonNegativeFromStringUnmarshaller) ? 20) { (startIndex, count) =>
+              'count.as(nonNegativeFromStringUnmarshaller) ? 20)) { (startIndex, count) =>
               onSuccess(importService.ask(GetImportSessions(startIndex, count))) {
                 case ImportSessions(importSessions) =>
                   complete(importSessions)
@@ -98,39 +98,40 @@ trait ImportRoutes {
 
     }
 
-  def addImageToImportSessionRoute(bytes: StreamSource[ByteString, Any], importSessionId: Long): Route = {
-    val is = bytes.runWith(StreamConverters.asInputStream())
-    val dicomData = DicomUtil.loadDicomData(is, withPixelData = true)
+  def addImageToImportSessionRoute(fileInfo: Option[FileInfo], bytes: StreamSource[ByteString, Any], importSessionId: Long): Route = {
+
     onSuccess(importService.ask(GetImportSession(importSessionId)).mapTo[Option[ImportSession]]) {
       case Some(importSession) =>
 
         val source = Source(SourceType.IMPORT, importSession.name, importSessionId)
+        val futureImport = storeDicomData(bytes, source, storage, Contexts.imageDataContexts)
 
-        onComplete(storageService.ask(CheckDicomData(dicomData, useExtendedContexts = false)).mapTo[Boolean]) {
-
-          case Success(status) =>
-            onSuccess(anonymizationService.ask(ReverseAnonymization(dicomData.attributes)).mapTo[Attributes]) { reversedAttributes =>
-              onSuccess(metaDataService.ask(AddMetaData(reversedAttributes, source)).mapTo[MetaDataAdded]) { metaData =>
-                onSuccess(storageService.ask(AddDicomData(dicomData.copy(attributes = reversedAttributes), source, metaData.image)).mapTo[DicomDataAdded]) { dicomDataAdded =>
-                  onSuccess(importService.ask(AddImageToSession(importSession.id, dicomDataAdded.image, dicomDataAdded.overwrite)).mapTo[ImageAddedToSession]) { importSessionImage =>
-                    if (dicomDataAdded.overwrite)
-                      complete((OK, dicomDataAdded.image))
-                    else
-                      complete((Created, dicomDataAdded.image))
-                  }
-                }
-              }
+        onComplete(futureImport) {
+          case Success(metaData) =>
+            onSuccess(importService.ask(AddImageToSession(importSession.id, metaData.image, !metaData.imageAdded)).mapTo[ImageAddedToSession]) { _ =>
+              val overwrite = !metaData.imageAdded
+              system.eventStream.publish(ImageAdded(metaData.image.id, source, overwrite))
+              val httpStatus = if (metaData.imageAdded) Created else OK
+              complete((httpStatus, metaData.image))
             }
-
-          case Failure(e) =>
-            importService.ask(UpdateSessionWithRejection(importSession))
-            complete((BadRequest, e.getMessage))
-
+          case Failure(failure) =>
+            val status = failure match {
+              case _: DicomStreamException => BadRequest
+              case _ => InternalServerError
+            }
+            fileInfo match {
+              case Some(fi) =>
+                SbxLog.error(s"${failure.getClass.getSimpleName} during import of ${fi.fileName}", failure.getMessage)
+                importService.ask(UpdateSessionWithRejection(importSession))
+                complete((status, s"${fi.fileName}: ${failure.getMessage}"))
+              case None =>
+                SbxLog.error(s"${failure.getClass.getSimpleName} during import", failure.getMessage)
+                importService.ask(UpdateSessionWithRejection(importSession))
+                complete((status, failure.getMessage))
+            }
         }
-
       case None =>
         complete(NotFound)
     }
   }
-
 }

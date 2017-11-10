@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Lars Edenbrandt
+ * Copyright 2014 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,15 +19,15 @@ package se.nimsa.sbx.forwarding
 import akka.actor.{Actor, ActorRef, Props}
 import akka.event.{Logging, LoggingReceive}
 import akka.util.Timeout
-import se.nimsa.sbx.app.DbProps
 import se.nimsa.sbx.app.GeneralProtocol._
-import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.forwarding.ForwardingProtocol._
 import se.nimsa.sbx.log.SbxLog
+import se.nimsa.sbx.storage.StorageService
+import se.nimsa.sbx.util.FutureUtil.await
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
-class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30.seconds)(implicit timeout: Timeout) extends Actor {
+class ForwardingServiceActor(forwardingDao: ForwardingDAO, storage: StorageService, pollInterval: FiniteDuration = 30.seconds)(implicit timeout: Timeout) extends Actor {
 
   import scala.collection.mutable
 
@@ -36,14 +36,11 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
   implicit val system = context.system
   implicit val ec = context.dispatcher
 
-  val db = dbProps.db
-  val forwardingDao = new ForwardingDAO(dbProps.driver)
-
   val transactionIdToForwardingActor = mutable.Map.empty[Long, ActorRef]
 
   override def preStart {
     context.system.eventStream.subscribe(context.self, classOf[ImageAdded])
-    context.system.eventStream.subscribe(context.self, classOf[ImageDeleted])
+    context.system.eventStream.subscribe(context.self, classOf[ImagesDeleted])
     context.system.eventStream.subscribe(context.self, classOf[ImagesSent])
   }
 
@@ -68,12 +65,12 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
 
     // EVENTS
 
-    case ImageAdded(image, source, overwrite) =>
-      val applicableRules = maybeAddImageToForwardingQueue(image, source, sender)
-      sender ! ImageRegisteredForForwarding(image, applicableRules)
+    case ImageAdded(imageId, source, _) =>
+      val applicableRules = maybeAddImageToForwardingQueue(imageId, source, sender)
+      sender ! ImageRegisteredForForwarding(imageId, applicableRules)
 
-    case ImageDeleted(imageId) =>
-      removeImageFromTransactions(imageId)
+    case ImagesDeleted(imageIds) =>
+      removeImageFromTransactions(imageIds)
 
     case ImagesSent(destination, imageIds) =>
       val transactionMaybe = markTransactionAsDelivered(destination, imageIds)
@@ -120,7 +117,7 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
       transactionMaybe
     })
 
-  def maybeAddImageToForwardingQueue(image: Image, source: Source, origin: ActorRef): List[ForwardingRule] = {
+  def maybeAddImageToForwardingQueue(imageId: Long, source: Source, origin: ActorRef): Seq[ForwardingRule] = {
     // look for rules with this source
     val rules = getForwardingRulesForSourceTypeAndId(source.sourceType, source.sourceId)
 
@@ -129,13 +126,13 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
       val transaction = createOrUpdateForwardingTransaction(rule)
 
       // add to queue
-      addImageToForwardingQueue(transaction, image)
+      addImageToForwardingQueue(transaction, imageId)
     }
 
     rules
   }
 
-  def maybeSendImages(): List[ForwardingTransaction] = {
+  def maybeSendImages(): Seq[ForwardingTransaction] = {
     val rulesAndTransactions = transactionsToRulesAndTransactions(getFreshExpiredTransactions)
 
     rulesAndTransactions.foreach {
@@ -150,11 +147,11 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
     val updatedTransaction = updateTransaction(transaction.copy(enroute = true, delivered = false))
     val images = getTransactionImagesForTransactionId(updatedTransaction.id)
 
-    val forwardingActor = context.actorOf(ForwardingActor.props(rule, updatedTransaction, images, timeout))
+    val forwardingActor = context.actorOf(ForwardingActor.props(rule, updatedTransaction, images, storage))
     transactionIdToForwardingActor(updatedTransaction.id) = forwardingActor
   }
 
-  def finalizeSentTransactions(): List[ForwardingProtocol.ForwardingTransaction] = {
+  def finalizeSentTransactions(): Seq[ForwardingTransaction] = {
     /*
      * This is tricky since we allow many rules with the same source, but different choices for keep images.
      * - It is safe to remove delivered transactions with keepImages=true
@@ -166,12 +163,12 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
     val transactionsAndRules = transactionsToRulesAndTransactions(getDeliveredTransactions)
 
     val toRemoveButNotDeleteTransactions = transactionsAndRules.filter {
-      case (rule, transaction) =>
+      case (rule, _) =>
         rule.keepImages
     }.map(_._2)
 
     val toRemoveAndDeleteTransactions = transactionsAndRules.filter {
-      case (rule, transaction) =>
+      case (rule, _) =>
         !rule.keepImages && getUndeliveredTransactionsForSource(rule.source).isEmpty
     }.map(_._2)
 
@@ -201,7 +198,7 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
     transactionsToRemove
   }
 
-  def transactionsToRulesAndTransactions(transactions: List[ForwardingTransaction]) =
+  def transactionsToRulesAndTransactions(transactions: Seq[ForwardingTransaction]) =
     transactions
       .map(transaction => (getForwardingRuleForId(transaction.forwardingRuleId), transaction))
       .filter(_._1.isDefined)
@@ -213,97 +210,65 @@ class ForwardingServiceActor(dbProps: DbProps, pollInterval: FiniteDuration = 30
   // Database function
 
   def getForwardingRulesFromDb(startIndex: Long, count: Long) =
-    db.withSession { implicit session =>
-      forwardingDao.listForwardingRules(startIndex, count)
-    }
+    await(forwardingDao.listForwardingRules(startIndex, count))
 
   def addForwardingRuleToDb(forwardingRule: ForwardingRule): ForwardingRule =
-    db.withSession { implicit session =>
-      forwardingDao.getForwardingRuleForSourceIdAndTypeAndDestinationIdAndType(
-        forwardingRule.source.sourceId,
-        forwardingRule.source.sourceType,
-        forwardingRule.destination.destinationId,
-        forwardingRule.destination.destinationType)
-        .getOrElse(forwardingDao.insertForwardingRule(forwardingRule))
-    }
+    await(forwardingDao.getForwardingRuleForSourceIdAndTypeAndDestinationIdAndType(
+      forwardingRule.source.sourceId,
+      forwardingRule.source.sourceType,
+      forwardingRule.destination.destinationId,
+      forwardingRule.destination.destinationType))
+      .getOrElse(await(forwardingDao.insertForwardingRule(forwardingRule)))
 
   def removeForwardingRuleFromDb(forwardingRuleId: Long): Unit =
-    db.withSession { implicit session =>
-      forwardingDao.removeForwardingRule(forwardingRuleId)
-    }
+    await(forwardingDao.removeForwardingRule(forwardingRuleId))
 
   def hasForwardingRules: Boolean =
-    db.withSession { implicit session =>
-      forwardingDao.getNumberOfForwardingRules > 0
-    }
+    await(forwardingDao.getNumberOfForwardingRules) > 0
 
-  def getForwardingRulesForSourceTypeAndId(sourceType: SourceType, sourceId: Long): List[ForwardingRule] =
-    db.withSession { implicit session =>
-      forwardingDao.getForwardingRulesForSourceTypeAndId(sourceType, sourceId)
-    }
+  def getForwardingRulesForSourceTypeAndId(sourceType: SourceType, sourceId: Long): Seq[ForwardingRule] =
+    await(forwardingDao.getForwardingRulesForSourceTypeAndId(sourceType, sourceId))
 
   def createOrUpdateForwardingTransaction(forwardingRule: ForwardingRule): ForwardingTransaction =
-    db.withSession { implicit session =>
-      forwardingDao.createOrUpdateForwardingTransaction(forwardingRule)
-    }
+    await(forwardingDao.createOrUpdateForwardingTransaction(forwardingRule))
 
-  def addImageToForwardingQueue(forwardingTransaction: ForwardingTransaction, image: Image) =
-    db.withTransaction { implicit session =>
-      // dicom data may be added multiple times (with overwrite), check if it has been added before
-      forwardingDao.getTransactionImageForTransactionIdAndImageId(forwardingTransaction.id, image.id)
-        .getOrElse(
-          forwardingDao.insertForwardingTransactionImage(ForwardingTransactionImage(-1, forwardingTransaction.id, image.id)))
-    }
+  def addImageToForwardingQueue(forwardingTransaction: ForwardingTransaction, imageId: Long) =
+    // dicom data may be added multiple times (with overwrite), check if it has been added before
+    await(forwardingDao.addImageToForwardingQueue(forwardingTransaction.id, imageId))
 
-  def getFreshExpiredTransactions: List[ForwardingTransaction] =
-    db.withSession { implicit session =>
-      val timeLimit = System.currentTimeMillis - pollInterval.toMillis
-      forwardingDao.listFreshExpiredTransactions(timeLimit)
-    }
+  def getFreshExpiredTransactions: Seq[ForwardingTransaction] = {
+    val timeLimit = System.currentTimeMillis - pollInterval.toMillis
+    await(forwardingDao.listFreshExpiredTransactions(timeLimit))
+  }
 
   def getForwardingRuleForId(forwardingRuleId: Long): Option[ForwardingRule] =
-    db.withSession { implicit session =>
-      forwardingDao.getForwardingRuleForId(forwardingRuleId)
-    }
+    await(forwardingDao.getForwardingRuleForId(forwardingRuleId))
 
-  def getTransactionImagesForTransactionId(transactionId: Long): List[ForwardingTransactionImage] =
-    db.withSession { implicit session =>
-      forwardingDao.getTransactionImagesForTransactionId(transactionId)
-    }
+  def getTransactionImagesForTransactionId(transactionId: Long): Seq[ForwardingTransactionImage] =
+    await(forwardingDao.getTransactionImagesForTransactionId(transactionId))
 
   def getTransactionForDestinationAndImageId(destination: Destination, imageId: Long): Option[ForwardingTransaction] =
-    db.withSession { implicit session =>
-      forwardingDao.getTransactionForDestinationAndImageId(destination, imageId)
-    }
+    await(forwardingDao.getTransactionForDestinationAndImageId(destination, imageId))
 
-  def updateTransaction(transaction: ForwardingTransaction): ForwardingTransaction =
-    db.withSession { implicit session =>
-      forwardingDao.updateForwardingTransaction(transaction)
-      transaction
-    }
+  def updateTransaction(transaction: ForwardingTransaction): ForwardingTransaction = {
+    await(forwardingDao.updateForwardingTransaction(transaction))
+    transaction
+  }
 
   def removeTransactionForId(transactionId: Long): Unit =
-    db.withSession { implicit session =>
-      forwardingDao.removeTransactionForId(transactionId)
-    }
+    await(forwardingDao.removeTransactionForId(transactionId))
 
-  def getDeliveredTransactions: List[ForwardingTransaction] =
-    db.withSession { implicit session =>
-      forwardingDao.getDeliveredTransactions
-    }
+  def getDeliveredTransactions: Seq[ForwardingTransaction] =
+    await(forwardingDao.getDeliveredTransactions)
 
-  def getUndeliveredTransactionsForSource(source: Source): List[ForwardingTransaction] =
-    db.withSession { implicit session =>
-      forwardingDao.getUndeliveredTransactionsForSourceTypeAndId(source.sourceType, source.sourceId)
-    }
+  def getUndeliveredTransactionsForSource(source: Source): Seq[ForwardingTransaction] =
+    await(forwardingDao.getUndeliveredTransactionsForSourceTypeAndId(source.sourceType, source.sourceId))
 
-  def removeImageFromTransactions(imageId: Long): Unit =
-    db.withSession { implicit session =>
-      forwardingDao.removeTransactionImagesForImageId(imageId)
-    }
+  def removeImageFromTransactions(imageIds: Seq[Long]): Unit =
+    await(forwardingDao.removeTransactionImagesForImageIds(imageIds))
 
 }
 
 object ForwardingServiceActor {
-  def props(dbProps: DbProps, timeout: Timeout): Props = Props(new ForwardingServiceActor(dbProps)(timeout))
+  def props(forwardingDao: ForwardingDAO, storage: StorageService)(implicit timeout: Timeout): Props = Props(new ForwardingServiceActor(forwardingDao, storage))
 }

@@ -1,26 +1,19 @@
 package se.nimsa.sbx.app.routing
 
+import akka.http.scaladsl.model.StatusCodes._
 import org.scalatest.{FlatSpecLike, Matchers}
 import se.nimsa.sbx.app.GeneralProtocol.{Destination, DestinationType, Source, SourceType}
-import se.nimsa.sbx.forwarding.ForwardingDAO
 import se.nimsa.sbx.forwarding.ForwardingProtocol.ForwardingRule
-import akka.http.scaladsl.model.StatusCodes._
 import se.nimsa.sbx.storage.RuntimeStorage
+import se.nimsa.sbx.util.FutureUtil.await
 import se.nimsa.sbx.util.TestUtil
 
 class ForwardingRoutesTest extends {
-  val dbProps = TestUtil.createTestDb("forwardingroutestest")
+  val dbConfig = TestUtil.createTestDb("forwardingroutestest")
   val storage = new RuntimeStorage
 } with FlatSpecLike with Matchers with RoutesTestBase {
 
-  val db = dbProps.db
-  val dao = new ForwardingDAO(dbProps.driver)
-
-  override def afterEach() {
-    db.withSession { implicit session =>
-      dao.clear
-    }
-  }
+  override def afterEach() = await(forwardingDao.clear())
 
   val rule = ForwardingRule(-1, Source(SourceType.BOX, "remote box", 12), Destination(DestinationType.SCU, "my PACS", 17), keepImages = true)
 

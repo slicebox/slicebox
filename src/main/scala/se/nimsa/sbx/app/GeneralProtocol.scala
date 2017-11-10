@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Lars Edenbrandt
+ * Copyright 2014 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,10 +16,10 @@
 
 package se.nimsa.sbx.app
 
-import se.nimsa.sbx.dicom.DicomHierarchy.Image
-
 object GeneralProtocol {
-  
+
+  case class SystemInformation(version: String)
+
   sealed trait SourceType {
     override def toString: String = this match {
       case SourceType.SCP => "scp"
@@ -75,9 +75,9 @@ object GeneralProtocol {
   
   case class Destination(destinationType: DestinationType, destinationName: String, destinationId: Long)
 
-  case class ImageAdded(image: Image, source: Source, overwrite: Boolean)
+  case class ImageAdded(imageId: Long, source: Source, overwrite: Boolean)
 
-  case class ImageDeleted(imageId: Long)
+  case class ImagesDeleted(imageIds: Seq[Long])
 
   case class ImagesSent(destination: Destination, imageIds: Seq[Long])
 

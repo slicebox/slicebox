@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Lars Edenbrandt
+ * Copyright 2014 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,10 +19,12 @@ package se.nimsa.sbx.app.routing
 import java.io.FileNotFoundException
 import java.nio.file.NoSuchFileException
 
+import akka.http.scaladsl.model.EntityStreamException
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.AuthenticationFailedRejection.{CredentialsMissing, CredentialsRejected}
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.{AuthenticationFailedRejection, ExceptionHandler, RejectionHandler, Route}
+import org.dcm4che3.io.DicomStreamException
 import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.lang.{BadGatewayException, NotFoundException}
 import se.nimsa.sbx.user.Authenticator
@@ -30,7 +32,7 @@ import se.nimsa.sbx.user.Authenticator
 trait SliceboxRoutes extends DirectoryRoutes
   with ScpRoutes
   with ScuRoutes
-  with MetadataRoutes
+  with MetaDataRoutes
   with ImageRoutes
   with AnonymizationRoutes
   with BoxRoutes
@@ -52,6 +54,10 @@ trait SliceboxRoutes extends DirectoryRoutes
         complete((NotFound, e.getMessage))
       case e: FileNotFoundException =>
         complete((NotFound, "File not found: " + e.getMessage))
+      case e: DicomStreamException =>
+        complete((BadRequest, "Invalid DICOM data: " + e.getMessage))
+      case e: EntityStreamException =>
+        complete((BadRequest, "Invalid DICOM data: " + e.getMessage))
       case e: NoSuchFileException =>
         complete((NotFound, "File not found: " + e.getMessage))
       case e: BadGatewayException =>
@@ -90,7 +96,7 @@ trait SliceboxRoutes extends DirectoryRoutes
                 forwardingRoutes(apiUser) ~
                 importRoutes(apiUser)
             }
-        } ~ transactionRoutes ~ healthCheckRoute
+        } ~ transactionRoutes ~ publicSystemRoutes
       }
     } ~
       pathPrefixTest(!"api") {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Lars Edenbrandt
+ * Copyright 2014 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,55 +16,70 @@
 
 package se.nimsa.sbx.scp
 
-import scala.slick.driver.JdbcProfile
-import scala.slick.jdbc.meta.MTable
-import ScpProtocol.ScpData
+import se.nimsa.sbx.scp.ScpProtocol.ScpData
+import se.nimsa.sbx.util.DbUtil._
+import slick.basic.DatabaseConfig
+import slick.jdbc.JdbcProfile
 
-class ScpDAO(val driver: JdbcProfile) {
+import scala.concurrent.{ExecutionContext, Future}
 
-  import driver.simple._
+class ScpDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionContext) {
 
-  class ScpDataTable(tag: Tag) extends Table[ScpData](tag, "ScpData") {
+  import dbConf.profile.api._
+
+  val db = dbConf.db
+
+  class ScpDataTable(tag: Tag) extends Table[ScpData](tag, ScpDataTable.name) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
-
     def name = column[String]("name")
-
     def aeTitle = column[String]("aeTitle")
-
     def port = column[Int]("port")
-
-    def * = (id, name, aeTitle, port) <>(ScpData.tupled, ScpData.unapply)
+    def * = (id, name, aeTitle, port) <> (ScpData.tupled, ScpData.unapply)
   }
 
-  val scpDataQuery = TableQuery[ScpDataTable]
-
-  def create(implicit session: Session) =
-    if (MTable.getTables("ScpData").list.isEmpty) scpDataQuery.ddl.create
-
-
-  def insert(scpData: ScpData)(implicit session: Session): ScpData = {
-    val generatedId = (scpDataQuery returning scpDataQuery.map(_.id)) += scpData
-    scpData.copy(id = generatedId)
+  object ScpDataTable {
+    val name = "ScpData"
   }
 
-  def deleteScpDataWithId(scpDataId: Long)(implicit session: Session): Int = {
-    scpDataQuery
+  val scpDatas = TableQuery[ScpDataTable]
+
+  def create() = createTables(dbConf, (ScpDataTable.name, scpDatas))
+
+  def drop() = db.run {
+    scpDatas.schema.drop
+  }
+
+  def clear() = db.run {
+    scpDatas.delete
+  }
+
+
+  def insert(scpData: ScpData): Future[ScpData] = db.run {
+    scpDatas returning scpDatas.map(_.id) += scpData
+  }.map(generatedId => scpData.copy(id = generatedId))
+
+  def deleteScpDataWithId(scpDataId: Long): Future[Int] = db.run {
+    scpDatas
       .filter(_.id === scpDataId)
       .delete
   }
 
-  def scpDataForId(id: Long)(implicit session: Session): Option[ScpData] =
-    scpDataQuery.filter(_.id === id).firstOption
+  def scpDataForId(id: Long): Future[Option[ScpData]] = db.run {
+    scpDatas.filter(_.id === id).result.headOption
+  }
 
-  def scpDataForName(name: String)(implicit session: Session): Option[ScpData] =
-    scpDataQuery.filter(_.name === name).firstOption
+  def scpDataForName(name: String): Future[Option[ScpData]] = db.run {
+    scpDatas.filter(_.name === name).result.headOption
+  }
 
-  def scpDataForPort(port: Int)(implicit session: Session): Option[ScpData] =
-    scpDataQuery.filter(_.port === port).firstOption
+  def scpDataForPort(port: Int): Future[Option[ScpData]] = db.run {
+    scpDatas.filter(_.port === port).result.headOption
+  }
 
-  def listScpDatas(startIndex: Long, count: Long)(implicit session: Session): List[ScpData] =
-    scpDataQuery
+  def listScpDatas(startIndex: Long, count: Long): Future[Seq[ScpData]] = db.run {
+    scpDatas
       .drop(startIndex)
       .take(count)
-      .list
+      .result
+  }
 }

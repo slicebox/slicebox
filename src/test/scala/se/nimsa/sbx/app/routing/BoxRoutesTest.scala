@@ -6,28 +6,26 @@ import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server._
 import org.scalatest.{FlatSpecLike, Matchers}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
-import se.nimsa.sbx.box.BoxDAO
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
-import se.nimsa.sbx.metadata.MetaDataDAO
 import se.nimsa.sbx.storage.RuntimeStorage
+import se.nimsa.sbx.util.FutureUtil.await
 import se.nimsa.sbx.util.TestUtil
 
+import scala.concurrent.Future
+
 class BoxRoutesTest extends {
-  val dbProps = TestUtil.createTestDb("boxroutestest")
+  val dbConfig = TestUtil.createTestDb("boxroutestest")
   val storage = new RuntimeStorage
 } with FlatSpecLike with Matchers with RoutesTestBase {
 
-  val db = dbProps.db
-  val boxDao = new BoxDAO(dbProps.driver)
-  val metaDataDao = new MetaDataDAO(dbProps.driver)
-
-  override def afterEach() {
-    db.withSession { implicit session =>
-      metaDataDao.clear
-      boxDao.clear
-    }
-  }
+  override def afterEach() =
+    await(Future.sequence(Seq(
+      metaDataDao.clear(),
+      seriesTypeDao.clear(),
+      propertiesDao.clear(),
+      boxDao.clear()
+    )))
 
   def addPollBox(name: String) =
     PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData(name)) ~> routes ~> check {
@@ -180,10 +178,8 @@ class BoxRoutesTest extends {
   }
 
   it should "support listing incoming entries" in {
-      db.withSession { implicit session =>
-        boxDao.insertIncomingTransaction(IncomingTransaction(-1, 1, "some box", 1, 3, 3, 4, System.currentTimeMillis(), System.currentTimeMillis(), TransactionStatus.WAITING))
-        boxDao.insertIncomingTransaction(IncomingTransaction(-1, 1, "some box", 2, 3, 3, 5, System.currentTimeMillis(), System.currentTimeMillis(), TransactionStatus.WAITING))
-      }
+    await(boxDao.insertIncomingTransaction(IncomingTransaction(-1, 1, "some box", 1, 3, 3, 4, System.currentTimeMillis(), System.currentTimeMillis(), TransactionStatus.WAITING)))
+    await(boxDao.insertIncomingTransaction(IncomingTransaction(-1, 1, "some box", 2, 3, 3, 5, System.currentTimeMillis(), System.currentTimeMillis(), TransactionStatus.WAITING)))
 
     GetAsUser("/api/boxes/incoming") ~> routes ~> check {
       responseAs[List[IncomingTransaction]].size should be(2)
@@ -191,10 +187,7 @@ class BoxRoutesTest extends {
   }
 
   it should "support removing incoming entries" in {
-    val entry =
-      db.withSession { implicit session =>
-        boxDao.insertIncomingTransaction(IncomingTransaction(-1, 1, "some box", 2, 3, 3, 4, System.currentTimeMillis(), System.currentTimeMillis(), TransactionStatus.WAITING))
-      }
+    val entry = await(boxDao.insertIncomingTransaction(IncomingTransaction(-1, 1, "some box", 2, 3, 3, 4, System.currentTimeMillis(), System.currentTimeMillis(), TransactionStatus.WAITING)))
 
     DeleteAsUser(s"/api/boxes/incoming/${entry.id}") ~> routes ~> check {
       status should be(NoContent)
@@ -206,32 +199,28 @@ class BoxRoutesTest extends {
   }
 
   it should "support removing outgoing entries" in {
-    db.withSession { implicit session =>
-      val entry = boxDao.insertOutgoingTransaction(OutgoingTransaction(1, 1, "some box", 0, 1, 1000, 1000, TransactionStatus.WAITING))
-      boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, 1, 1, sent = false))
+    val entry = await(boxDao.insertOutgoingTransaction(OutgoingTransaction(1, 1, "some box", 0, 1, 1000, 1000, TransactionStatus.WAITING)))
+    await(boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, 1, 1, sent = false)))
 
-      DeleteAsUser(s"/api/boxes/outgoing/${entry.id}") ~> routes ~> check {
-        status should be(NoContent)
-      }
-
-      GetAsUser("/api/boxes/outgoing") ~> routes ~> check {
-        responseAs[List[OutgoingTransaction]].size should be(0)
-      }
-      
-      boxDao.listOutgoingImages shouldBe empty
+    DeleteAsUser(s"/api/boxes/outgoing/${entry.id}") ~> routes ~> check {
+      status should be(NoContent)
     }
+
+    GetAsUser("/api/boxes/outgoing") ~> routes ~> check {
+      responseAs[List[OutgoingTransaction]].size should be(0)
+    }
+
+    await(boxDao.listOutgoingImages) shouldBe empty
   }
 
   it should "support listing images corresponding to an incoming entry" in {
-    val entry =
-      db.withSession { implicit session =>
-        val (_, (_, _), (_, _, _, _), (dbImage1, dbImage2, _, _, _, _, _, _)) =
-          TestUtil.insertMetaData(metaDataDao)
-        val entry = boxDao.insertIncomingTransaction(IncomingTransaction(-1, 1, "some box", 2, 3, 3, 4, System.currentTimeMillis(), System.currentTimeMillis(), TransactionStatus.WAITING))
-        boxDao.insertIncomingImage(IncomingImage(-1, entry.id, dbImage1.id, 1, overwrite = false))
-        boxDao.insertIncomingImage(IncomingImage(-1, entry.id, dbImage2.id, 2, overwrite = false))
-        entry
-      }
+    val entry = {
+      val (_, (_, _), (_, _, _, _), (dbImage1, dbImage2, _, _, _, _, _, _)) = await(TestUtil.insertMetaData(metaDataDao))
+      val entry = await(boxDao.insertIncomingTransaction(IncomingTransaction(-1, 1, "some box", 2, 3, 3, 4, System.currentTimeMillis(), System.currentTimeMillis(), TransactionStatus.WAITING)))
+      await(boxDao.insertIncomingImage(IncomingImage(-1, entry.id, dbImage1.id, 1, overwrite = false)))
+      await(boxDao.insertIncomingImage(IncomingImage(-1, entry.id, dbImage2.id, 2, overwrite = false)))
+      entry
+    }
 
     GetAsUser(s"/api/boxes/incoming/${entry.id}/images") ~> routes ~> check {
       status should be(OK)
@@ -240,16 +229,14 @@ class BoxRoutesTest extends {
   }
 
   it should "only list images corresponding to an incoming entry that exists" in {
-    val entry =
-      db.withSession { implicit session =>
-        val (_, (_, _), (_, _, _, _), (dbImage1, dbImage2, _, _, _, _, _, _)) =
-          TestUtil.insertMetaData(metaDataDao)
-        val entry = boxDao.insertIncomingTransaction(IncomingTransaction(-1, 1, "some box", 2, 3, 3, 4, System.currentTimeMillis(), System.currentTimeMillis(), TransactionStatus.WAITING))
-        boxDao.insertIncomingImage(IncomingImage(-1, entry.id, dbImage1.id, 1, overwrite = false))
-        boxDao.insertIncomingImage(IncomingImage(-1, entry.id, dbImage2.id, 2, overwrite = false))
-        boxDao.insertIncomingImage(IncomingImage(-1, entry.id, 666, 3, overwrite = false))
-        entry
-      }
+    val entry = {
+      val (_, (_, _), (_, _, _, _), (dbImage1, dbImage2, _, _, _, _, _, _)) = await(TestUtil.insertMetaData(metaDataDao))
+      val entry = await(boxDao.insertIncomingTransaction(IncomingTransaction(-1, 1, "some box", 2, 3, 3, 4, System.currentTimeMillis(), System.currentTimeMillis(), TransactionStatus.WAITING)))
+      await(boxDao.insertIncomingImage(IncomingImage(-1, entry.id, dbImage1.id, 1, overwrite = false)))
+      await(boxDao.insertIncomingImage(IncomingImage(-1, entry.id, dbImage2.id, 2, overwrite = false)))
+      await(boxDao.insertIncomingImage(IncomingImage(-1, entry.id, 666, 3, overwrite = false)))
+      entry
+    }
 
     GetAsUser(s"/api/boxes/incoming/${entry.id}/images") ~> routes ~> check {
       status should be(OK)
@@ -258,15 +245,13 @@ class BoxRoutesTest extends {
   }
 
   it should "support listing images corresponding to an outgoing entry" in {
-    val entry =
-      db.withSession { implicit session =>
-        val (_, (_, _), (_, _, _, _), (dbImage1, dbImage2, _, _, _, _, _, _)) =
-          TestUtil.insertMetaData(metaDataDao)
-        val entry = boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, 1, "some box", 3, 4, System.currentTimeMillis(), System.currentTimeMillis(), TransactionStatus.WAITING))
-        boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, dbImage1.id, 1, sent = false))
-        boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, dbImage2.id, 2, sent = false))
-        entry
-      }
+    val entry = {
+      val (_, (_, _), (_, _, _, _), (dbImage1, dbImage2, _, _, _, _, _, _)) = await(TestUtil.insertMetaData(metaDataDao))
+      val entry = await(boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, 1, "some box", 3, 4, System.currentTimeMillis(), System.currentTimeMillis(), TransactionStatus.WAITING)))
+      await(boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, dbImage1.id, 1, sent = false)))
+      await(boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, dbImage2.id, 2, sent = false)))
+      entry
+    }
 
     GetAsUser(s"/api/boxes/outgoing/${entry.id}/images") ~> routes ~> check {
       status should be(OK)
@@ -275,16 +260,14 @@ class BoxRoutesTest extends {
   }
 
   it should "only list images corresponding to an outgoing entry that exists" in {
-    val entry =
-      db.withSession { implicit session =>
-        val (_, (_, _), (_, _, _, _), (dbImage1, dbImage2, _, _, _, _, _, _)) =
-          TestUtil.insertMetaData(metaDataDao)
-        val entry = boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, 1, "some box", 3, 4, System.currentTimeMillis(), System.currentTimeMillis(), TransactionStatus.WAITING))
-        boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, dbImage1.id, 1, sent = false))
-        boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, dbImage2.id, 2, sent = false))
-        boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, 666, 3, sent = false))
-        entry
-      }
+    val entry = {
+      val (_, (_, _), (_, _, _, _), (dbImage1, dbImage2, _, _, _, _, _, _)) = await(TestUtil.insertMetaData(metaDataDao))
+      val entry = await(boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, 1, "some box", 3, 4, System.currentTimeMillis(), System.currentTimeMillis(), TransactionStatus.WAITING)))
+      await(boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, dbImage1.id, 1, sent = false)))
+      await(boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, dbImage2.id, 2, sent = false)))
+      await(boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, 666, 3, sent = false)))
+      entry
+    }
 
     GetAsUser(s"/api/boxes/outgoing/${entry.id}/images") ~> routes ~> check {
       status should be(OK)
@@ -299,12 +282,8 @@ class BoxRoutesTest extends {
         responseAs[Image]
       }
 
-    val (entry, imageTransaction) =
-      db.withSession { implicit session =>
-        val entry = boxDao.insertIncomingTransaction(IncomingTransaction(-1, 1, "some box", 2, 3, 3, 4, System.currentTimeMillis(), System.currentTimeMillis(), TransactionStatus.WAITING))
-        val imageTransaction = boxDao.insertIncomingImage(IncomingImage(-1, entry.id, image.id, 1, overwrite = false))
-        (entry, imageTransaction)
-      }
+    val entry = await(boxDao.insertIncomingTransaction(IncomingTransaction(-1, 1, "some box", 2, 3, 3, 4, System.currentTimeMillis(), System.currentTimeMillis(), TransactionStatus.WAITING)))
+    val imageTransaction = await(boxDao.insertIncomingImage(IncomingImage(-1, entry.id, image.id, 1, overwrite = false)))
 
     GetAsUser(s"/api/boxes/incoming/${entry.id}/images") ~> routes ~> check {
       status shouldBe OK
@@ -330,12 +309,8 @@ class BoxRoutesTest extends {
         responseAs[Image]
       }
 
-    val (entry, imageTransaction) =
-      db.withSession { implicit session =>
-        val entry = boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, 1, "some box", 3, 4, System.currentTimeMillis(), System.currentTimeMillis(), TransactionStatus.WAITING))
-        val imageTransaction = boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, image.id, 1, sent = false))
-        (entry, imageTransaction)
-      }
+    val entry = await(boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, 1, "some box", 3, 4, System.currentTimeMillis(), System.currentTimeMillis(), TransactionStatus.WAITING)))
+    val imageTransaction = await(boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, image.id, 1, sent = false)))
 
     GetAsUser(s"/api/boxes/outgoing/${entry.id}/images") ~> routes ~> check {
       status shouldBe OK

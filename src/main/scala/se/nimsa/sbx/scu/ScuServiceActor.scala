@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Lars Edenbrandt
+ * Copyright 2014 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,50 +16,36 @@
 
 package se.nimsa.sbx.scu
 
+import java.io.IOException
 import java.net.{ConnectException, NoRouteToHostException, UnknownHostException}
 
-import akka.actor.{Actor, Props}
+import akka.actor.{Actor, ActorSelection, ActorSystem, Props}
 import akka.event.{Logging, LoggingReceive}
-import akka.pattern.{ask, pipe}
+import akka.pattern.pipe
+import akka.stream.Materializer
 import akka.util.Timeout
-import org.dcm4che3.net.NoPresentationContextException
-import se.nimsa.sbx.app.DbProps
+import org.dcm4che3.net.{IncompatibleConnectionException, NoPresentationContextException}
+import se.nimsa.dcm4che.streams.DicomParseFlow
 import se.nimsa.sbx.app.GeneralProtocol._
-import se.nimsa.sbx.dicom.DicomData
-import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.lang.{BadGatewayException, NotFoundException}
 import se.nimsa.sbx.log.SbxLog
-import se.nimsa.sbx.metadata.MetaDataProtocol.GetImage
 import se.nimsa.sbx.scu.ScuProtocol._
-import se.nimsa.sbx.storage.StorageProtocol.GetDicomData
+import se.nimsa.sbx.storage.StorageService
 import se.nimsa.sbx.util.ExceptionCatching
-import se.nimsa.sbx.util.SbxExtensions._
+import se.nimsa.sbx.util.FutureUtil.await
 
-import scala.concurrent.Future
-import scala.language.postfixOps
+import scala.concurrent.ExecutionContextExecutor
 
-class ScuServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extends Actor with ExceptionCatching {
+class ScuServiceActor(scuDao: ScuDAO, storage: StorageService)(implicit materializer: Materializer, timeout: Timeout) extends Actor with ExceptionCatching {
   val log = Logging(context.system, this)
 
-  val db = dbProps.db
-  val dao = new ScuDAO(dbProps.driver)
+  implicit val system: ActorSystem = context.system
+  implicit val ec: ExecutionContextExecutor = context.dispatcher
 
-  import context.system
+  val storageService: ActorSelection = context.actorSelection("../StorageService")
 
-  implicit val ec = context.dispatcher
-
-  val metaDataService = context.actorSelection("../MetaDataService")
-  val storageService = context.actorSelection("../StorageService")
-
-  val dicomDataProvider = new DicomDataProvider {
-    override def getDicomData(imageId: Long, withPixelData: Boolean): Future[Option[DicomData]] = {
-      metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]].map { imageMaybe =>
-        imageMaybe.map { image =>
-          storageService.ask(GetDicomData(image, withPixelData)).mapTo[DicomData]
-        }
-      }.unwrap
-    }
-  }
+  val dicomDataProvider: DicomDataProvider =
+    (imageId: Long, stopTag: Option[Int]) => storage.fileSource(imageId).via(new DicomParseFlow(stopTag = stopTag))
 
   log.info("SCU service started")
 
@@ -100,7 +86,7 @@ class ScuServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extends Actor
             }
 
           case RemoveScu(scuDataId) =>
-            scuForId(scuDataId).foreach(scuData => deleteScuWithId(scuDataId))
+            scuForId(scuDataId).foreach(_ => deleteScuWithId(scuDataId))
             sender ! ScuRemoved(scuDataId)
 
           case GetScus(startIndex, count) =>
@@ -119,14 +105,21 @@ class ScuServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extends Actor
                   ImagesSentToScp(scuId, imageIds)
                 })
                 .recover {
-                  case e: UnknownHostException =>
-                    throw new BadGatewayException(s"Unable to reach host ${scu.aeTitle}@${scu.host}:${scu.port}")
-                  case e: ConnectException =>
-                    throw new BadGatewayException(s"Connection refused on host ${scu.aeTitle}@${scu.host}:${scu.port}")
-                  case e: NoRouteToHostException =>
-                    throw new BadGatewayException(s"No route found to host ${scu.aeTitle}@${scu.host}:${scu.port}")
-                  case e: NoPresentationContextException =>
-                    throw new BadGatewayException(s"${scu.aeTitle}@${scu.host}:${scu.port}: ${e.getMessage}")
+                  case _: UnknownHostException =>
+                    throw new BadGatewayException(s"Unknown host ${scu.aeTitle}@${scu.host}:${scu.port}")
+                  case _: IncompatibleConnectionException =>
+                    throw new BadGatewayException(s"Incompatible connection to ${scu.aeTitle}@${scu.host}:${scu.port}")
+                  case e: IOException if e.getCause != null =>
+                    e.getCause match {
+                      case _: ConnectException =>
+                        throw new BadGatewayException(s"Connection refused on host ${scu.aeTitle}@${scu.host}:${scu.port}")
+                      case _: NoRouteToHostException =>
+                        throw new BadGatewayException(s"No route found to host ${scu.aeTitle}@${scu.host}:${scu.port}")
+                      case e: NoPresentationContextException =>
+                        throw new BadGatewayException(s"No presentation context when sending to ${scu.aeTitle}@${scu.host}:${scu.port}: ${e.getMessage}")
+                    }
+                  case e: RuntimeException =>
+                    throw new BadGatewayException(s"Unable to send images to ${scu.aeTitle}@${scu.host}:${scu.port}: ${e.getMessage}")
                 }
                 .pipeTo(sender)
             }).orElse(throw new NotFoundException(s"SCU with id $scuId not found"))
@@ -135,38 +128,26 @@ class ScuServiceActor(dbProps: DbProps)(implicit timeout: Timeout) extends Actor
 
   }
 
-  def addScu(scuData: ScuData) =
-    db.withSession { implicit session =>
-      dao.insert(scuData)
-    }
+  def addScu(scuData: ScuData): ScuData =
+    await(scuDao.insert(scuData))
 
-  def scuForId(id: Long) =
-    db.withSession { implicit session =>
-      dao.scuDataForId(id)
-    }
+  def scuForId(id: Long): Option[ScuData] =
+    await(scuDao.scuDataForId(id))
 
-  def scuForName(name: String) =
-    db.withSession { implicit session =>
-      dao.scuDataForName(name)
-    }
+  def scuForName(name: String): Option[ScuData] =
+    await(scuDao.scuDataForName(name))
 
-  def scuForHostAndPort(host: String, port: Int) =
-    db.withSession { implicit session =>
-      dao.scuDataForHostAndPort(host, port)
-    }
+  def scuForHostAndPort(host: String, port: Int): Option[ScuData] =
+    await(scuDao.scuDataForHostAndPort(host, port))
 
-  def deleteScuWithId(id: Long) =
-    db.withSession { implicit session =>
-      dao.deleteScuDataWithId(id)
-    }
+  def deleteScuWithId(id: Long): Int =
+    await(scuDao.deleteScuDataWithId(id))
 
-  def getScus(startIndex: Long, count: Long) =
-    db.withSession { implicit session =>
-      dao.listScuDatas(startIndex, count)
-    }
+  def getScus(startIndex: Long, count: Long): Seq[ScuData] =
+    await(scuDao.listScuDatas(startIndex, count))
 
 }
 
 object ScuServiceActor {
-  def props(dbProps: DbProps, timeout: Timeout): Props = Props(new ScuServiceActor(dbProps)(timeout))
+  def props(scuDao: ScuDAO, storage: StorageService)(implicit materializer: Materializer, timeout: Timeout): Props = Props(new ScuServiceActor(scuDao, storage))
 }

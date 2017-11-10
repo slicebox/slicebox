@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Lars Edenbrandt
+ * Copyright 2014 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,9 +16,8 @@
 
 package se.nimsa.sbx.util
 
-import java.util.zip.Deflater
 import java.io.ByteArrayOutputStream
-import java.util.zip.Inflater
+import java.util.zip.{Deflater, Inflater}
 
 object CompressionUtil {
   

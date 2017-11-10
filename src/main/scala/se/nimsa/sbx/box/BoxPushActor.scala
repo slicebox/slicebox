@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Lars Edenbrandt
+ * Copyright 2014 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,43 +23,36 @@ import akka.http.scaladsl.model.StatusCodes.NoContent
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.pattern.ask
-import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.{Sink, Source => StreamSource}
+import akka.stream.Materializer
+import akka.stream.scaladsl.Compression
 import akka.util.Timeout
-import org.dcm4che3.data.Attributes
-import se.nimsa.sbx.anonymization.AnonymizationProtocol.Anonymize
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.box.BoxProtocol._
-import se.nimsa.sbx.dicom.DicomData
-import se.nimsa.sbx.dicom.DicomHierarchy.Image
-import se.nimsa.sbx.dicom.DicomUtil.toByteArray
+import se.nimsa.sbx.dicom.streams.DicomStreamOps
 import se.nimsa.sbx.log.SbxLog
-import se.nimsa.sbx.metadata.MetaDataProtocol.GetImage
-import se.nimsa.sbx.storage.StorageProtocol.GetDicomData
-import se.nimsa.sbx.util.CompressionUtil.compress
+import se.nimsa.sbx.storage.StorageService
 
 import scala.concurrent.Future
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
+import scala.reflect.ClassTag
 import scala.util.{Failure, Success}
 
 class BoxPushActor(box: Box,
-                   implicit val timeout: Timeout,
+                   storage: StorageService,
                    pollInterval: FiniteDuration = 5.seconds,
                    boxServicePath: String = "../../BoxService",
                    metaDataServicePath: String = "../../MetaDataService",
-                   storageServicePath: String = "../../StorageService",
-                   anonymizationServicePath: String = "../../AnonymizationService") extends Actor {
+                   anonymizationServicePath: String = "../../AnonymizationService")
+                  (implicit val materializer: Materializer, timeout: Timeout) extends Actor with DicomStreamOps {
 
   val log = Logging(context.system, this)
 
   val metaDataService = context.actorSelection(metaDataServicePath)
-  val storageService = context.actorSelection(storageServicePath)
   val anonymizationService = context.actorSelection(anonymizationServicePath)
   val boxService = context.actorSelection(boxServicePath)
 
   implicit val system = context.system
-  implicit val ec = context.dispatcher
-  implicit val materializer = ActorMaterializer()
+  implicit val executor = context.dispatcher
 
   val poller = system.scheduler.schedule(pollInterval, pollInterval) {
     self ! PollOutgoing
@@ -70,6 +63,10 @@ class BoxPushActor(box: Box,
 
   val pool = Http().superPool[String]()
 
+  override def callAnonymizationService[R: ClassTag](message: Any) = anonymizationService.ask(message).mapTo[R]
+  override def callMetaDataService[R: ClassTag](message: Any) = metaDataService.ask(message).mapTo[R]
+  override def scheduleTask(delay: FiniteDuration)(task: => Unit) = system.scheduler.scheduleOnce(delay)(task)
+
   def receive = LoggingReceive {
     case PollOutgoing =>
       context.become(inTransferState)
@@ -78,7 +75,7 @@ class BoxPushActor(box: Box,
           self ! TransferFinished
           self ! PollOutgoing
         case Failure(e) => e match {
-          case e@(EmptyTransactionException | RemoteBoxUnavailableException) =>
+          case _@(EmptyTransactionException | RemoteBoxUnavailableException) =>
             self ! TransferFinished
           case e: Exception =>
             SbxLog.error("Box", s"Failed to send file to box ${box.name}: ${e.getMessage}")
@@ -106,39 +103,29 @@ class BoxPushActor(box: Box,
   def sendFile(transactionImage: OutgoingTransactionImage, tagValues: Seq[OutgoingTagValue]): Future[Unit] = {
     log.debug(s"Pushing transaction image $transactionImage with tag values $tagValues")
 
-    pushImagePipeline(transactionImage, tagValues).flatMap(response => {
-      val statusCode = response.status.intValue
-      if (statusCode >= 200 && statusCode < 300)
+    pushImagePipeline(transactionImage, tagValues).transformWith {
+      case Success(response) if response.status.intValue >= 200 && response.status.intValue < 300 =>
         handleFileSentForOutgoingTransaction(transactionImage)
-      else {
+      case Success(response) =>
         Unmarshal(response).to[String].flatMap { errorMessage =>
-          handleFileSendFailedForOutgoingTransaction(transactionImage, statusCode, new Exception(s"File send failed with status code $statusCode: $errorMessage"))
+          handleFileSendFailedForOutgoingTransaction(transactionImage, response.status.intValue, new Exception(s"File send failed with status code ${response.status.intValue}: $errorMessage"))
         }
+      case Failure(e) => e match {
+        case exception: RemoteTransactionFailedException =>
+          handleFileSendFailedForOutgoingTransaction(transactionImage, 502, exception)
+        case exception: IllegalArgumentException =>
+          handleFileSendFailedForOutgoingTransaction(transactionImage, 400, exception)
+        case exception: Exception =>
+          handleFileSendFailedForOutgoingTransaction(transactionImage, 503, exception)
       }
-    }).recoverWith {
-      case exception: RemoteTransactionFailedException =>
-        handleFileSendFailedForOutgoingTransaction(transactionImage, 502, exception)
-      case exception: IllegalArgumentException =>
-        handleFileSendFailedForOutgoingTransaction(transactionImage, 400, exception)
-      case exception: Exception =>
-        handleFileSendFailedForOutgoingTransaction(transactionImage, 503, exception)
     }
   }
 
-  def pushImagePipeline(transactionImage: OutgoingTransactionImage, tagValues: Seq[OutgoingTagValue]): Future[HttpResponse] =
-    metaDataService.ask(GetImage(transactionImage.image.imageId)).mapTo[Option[Image]].flatMap {
-      case Some(image) =>
-        storageService.ask(GetDicomData(image, withPixelData = true)).mapTo[DicomData].flatMap { dicomData =>
-          anonymizationService.ask(Anonymize(transactionImage.image.imageId, dicomData.attributes, tagValues.map(_.tagValue))).mapTo[Attributes].flatMap { anonymizedAttributes =>
-            val compressedBytes = compress(toByteArray(dicomData.copy(attributes = anonymizedAttributes)))
-            val uri = s"${box.baseUrl}/image?transactionid=${transactionImage.transaction.id}&sequencenumber=${transactionImage.image.sequenceNumber}&totalimagecount=${transactionImage.transaction.totalImageCount}"
-            val connectionId = s"${transactionImage.transaction.id},${transactionImage.image.sequenceNumber}"
-            sliceboxRequest(HttpMethods.POST, uri, HttpEntity(compressedBytes), connectionId)
-          }
-        }
-      case None =>
-        Future.failed(new IllegalArgumentException("Image not found for image id " + transactionImage.image.imageId))
-    }
+  def pushImagePipeline(transactionImage: OutgoingTransactionImage, outgoingTagValues: Seq[OutgoingTagValue]): Future[HttpResponse] = {
+    val source = anonymizedDicomData(transactionImage.image.imageId, outgoingTagValues.map(_.tagValue), storage)
+    val uri = s"${box.baseUrl}/image?transactionid=${transactionImage.transaction.id}&sequencenumber=${transactionImage.image.sequenceNumber}&totalimagecount=${transactionImage.transaction.totalImageCount}"
+    sliceboxRequest(HttpMethods.POST, uri, HttpEntity(ContentTypes.`application/octet-stream`, source.via(Compression.deflate)))
+  }
 
   def handleFileSentForOutgoingTransaction(transactionImage: OutgoingTransactionImage): Future[Unit] = {
     log.debug(s"File sent for outgoing transaction $transactionImage")
@@ -169,14 +156,13 @@ class BoxPushActor(box: Box,
         // other error in communication. Report the transaction as failed here and on remote
         boxService.ask(SetOutgoingTransactionStatus(transactionImage.transaction, TransactionStatus.FAILED)).flatMap { _ =>
           val uri = s"${box.baseUrl}/status?transactionid=${transactionImage.transaction.id}"
-          val connectionId = transactionImage.transaction.id.toString
-          sliceboxRequest(HttpMethods.PUT, uri, HttpEntity(TransactionStatus.FAILED.toString), connectionId)
+          sliceboxRequest(HttpMethods.PUT, uri, HttpEntity(TransactionStatus.FAILED.toString))
             .recover {
-              case e: Exception =>
+              case _: Exception =>
                 SbxLog.warn("Box", "Unable to set remote transaction status.")
                 HttpResponse(status = NoContent)
             }
-            .map { response =>
+            .map { _ =>
               throw exception
             }
         }
@@ -186,39 +172,32 @@ class BoxPushActor(box: Box,
   def handleTransactionFinished(outgoingTransaction: OutgoingTransaction): Future[Unit] =
     boxService.ask(GetOutgoingImageIdsForTransaction(outgoingTransaction)).mapTo[Seq[Long]].flatMap { imageIds =>
       val uri = s"${box.baseUrl}/status?transactionid=${outgoingTransaction.id}"
-      val connectionId = outgoingTransaction.id.toString
-      sliceboxRequest(HttpMethods.GET, uri, HttpEntity.Empty, connectionId)
+      sliceboxRequest(HttpMethods.GET, uri, HttpEntity.Empty)
         .recover {
-        case _ =>
-          SbxLog.warn("Box", "Unable to get remote status of finished transaction, assuming all is well.")
-          HttpResponse(entity = HttpEntity(TransactionStatus.FINISHED.toString))
-      }.flatMap { response =>
-        Unmarshal(response).to[String].map { statusString =>
+          case _ =>
+            SbxLog.warn("Box", "Unable to get remote status of finished transaction, assuming all is well.")
+            HttpResponse(entity = HttpEntity(TransactionStatus.FINISHED.toString))
+        }.flatMap { response =>
+        Unmarshal(response).to[String].flatMap { statusString =>
           val status = TransactionStatus.withName(statusString)
           status match {
             case TransactionStatus.FINISHED =>
               SbxLog.info("Box", s"Finished sending ${outgoingTransaction.totalImageCount} images to box ${box.name}")
               context.system.eventStream.publish(ImagesSent(Destination(DestinationType.BOX, box.name, box.id), imageIds))
+              Future.successful(Unit)
             case _ =>
-              throw new RemoteTransactionFailedException()
+              boxService.ask(SetOutgoingTransactionStatus(outgoingTransaction, TransactionStatus.FAILED))
+                .map(_ => Unit)
           }
         }
       }
     }
 
-  private def sliceboxRequest(method: HttpMethod, uri: String, entity: RequestEntity, connectionId: String): Future[HttpResponse] =
-    StreamSource
-      .single(HttpRequest(method = method, uri = uri, entity = entity) -> connectionId)
-      .via(pool)
-      .runWith(Sink.head)
-      .map {
-        case (Success(response), _) => response
-        case (Failure(error), _) => throw error
-      }
-
+  protected def sliceboxRequest(method: HttpMethod, uri: String, entity: RequestEntity): Future[HttpResponse] =
+    Http().singleRequest(HttpRequest(method = method, uri = uri, entity = entity))
 }
 
 object BoxPushActor {
-  def props(box: Box, timeout: Timeout): Props = Props(new BoxPushActor(box, timeout))
+  def props(box: Box, storageService: StorageService)(implicit materializer: Materializer, timeout: Timeout): Props = Props(new BoxPushActor(box, storageService))
 
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Lars Edenbrandt
+ * Copyright 2014 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,23 +16,23 @@
 
 package se.nimsa.sbx.user
 
-import UserProtocol._
-import akka.actor.Actor
-import akka.actor.Props
-import akka.event.Logging
-import akka.event.LoggingReceive
-import se.nimsa.sbx.util.ExceptionCatching
-import scala.concurrent.duration.DurationInt
+import java.security.MessageDigest
 import java.util.UUID
-import akka.actor.actorRef2Scala
-import se.nimsa.sbx.app.DbProps
-import UserServiceActor._
 
-class UserServiceActor(dbProps: DbProps, superUser: String, superPassword: String, sessionTimeout: Long) extends Actor with ExceptionCatching {
+import akka.actor.{Actor, Props, actorRef2Scala}
+import akka.event.{Logging, LoggingReceive}
+import akka.pattern.pipe
+import akka.util.Timeout
+import se.nimsa.sbx.user.UserProtocol._
+import se.nimsa.sbx.user.UserServiceActor._
+import se.nimsa.sbx.util.FutureUtil.await
+import se.nimsa.sbx.util.SbxExtensions._
+
+import scala.concurrent.Future
+import scala.concurrent.duration.DurationInt
+
+class UserServiceActor(userDao: UserDAO, superUser: String, superPassword: String, sessionTimeout: Long)(implicit timeout: Timeout) extends Actor {
   val log = Logging(context.system, this)
-
-  val db = dbProps.db
-  val dao = new UserDAO(dbProps.driver)
 
   addSuperUser()
 
@@ -48,138 +48,139 @@ class UserServiceActor(dbProps: DbProps, superUser: String, superPassword: Strin
   def receive = LoggingReceive {
 
     case msg: UserRequest =>
-      catchAndReport {
+      msg match {
 
-        msg match {
-
-          case Login(userPass, authKey) =>
-            userByName(userPass.user) match {
+        case Login(userPass, authKey) =>
+          pipe(
+            userByName(userPass.user).flatMap {
               case Some(user) if user.passwordMatches(userPass.pass) =>
-                val result = authKey.ip.flatMap(ip =>
-                  authKey.userAgent.map(userAgent => {
-                    val session = createOrUpdateSession(user, ip, userAgent)
-                    LoggedIn(user, session)
-                  }))
-                  .getOrElse(LoginFailed)
-                sender ! result
+                authKey.ip.flatMap(ip =>
+                  authKey.userAgent.map { userAgent =>
+                    createOrUpdateSession(user, ip, userAgent)
+                      .map(session => LoggedIn(user, session))
+                  }).getOrElse(Future.successful(LoginFailed))
               case _ =>
-                sender ! LoginFailed
+                Future.successful(LoginFailed)
             }
+          ).to(sender)
 
-          case Logout(apiUser, authKey) =>
-            deleteSession(apiUser, authKey)
-            sender ! LoggedOut
+        case Logout(apiUser, authKey) =>
+          pipe(deleteSession(apiUser, authKey).map(_ => LoggedOut)).to(sender)
 
-          case AddUser(apiUser) =>
+        case AddUser(apiUser) =>
+          pipe(
             if (apiUser.role == UserRole.SUPERUSER)
-              throw new IllegalArgumentException("Superusers may not be added")
-            sender ! UserAdded(getOrCreateUser(apiUser))
+              Future.failed(new IllegalArgumentException("Superusers may not be added"))
+            else
+              userDao
+                .insert(apiUser)
+                .recoverWith {
+                  case e: Exception =>
+                    userDao.userByName(apiUser.user).map {
+                      case Some(user) => user
+                      case None => throw e
+                    }
+                }
+                .map(UserAdded)
+          ).to(sender)
 
-          case GetUserByName(user) =>
-            sender ! userByName(user)
+        case GetUserByName(user) =>
+          pipe(userByName(user)).to(sender)
 
-          case GetAndRefreshUserByAuthKey(authKey) =>
-            val optionalUser = getAndRefreshUser(authKey)
-            sender ! optionalUser
+        case GetAndRefreshUserByAuthKey(authKey) =>
+          pipe(getAndRefreshUser(authKey)).to(sender)
 
-          case GetUsers(startIndex, count) =>
-            val users = listUsers(startIndex, count)
-            sender ! Users(users)
+        case GetUsers(startIndex, count) =>
+          pipe(listUsers(startIndex, count).map(Users)).to(sender)
 
-          case DeleteUser(userId) =>
-            deleteUser(userId)
-            sender ! UserDeleted(userId)
+        case DeleteUser(userId) =>
+          pipe(deleteUser(userId).map(_ => UserDeleted(userId))).to(sender)
 
-        }
       }
 
     case RemoveExpiredSessions => removeExpiredSessions()
 
   }
 
-  def addSuperUser(): Unit =
-    db.withSession { implicit session =>
-      val superUsers = dao.listUsers(0, 1000000).filter(_.role == UserRole.SUPERUSER)
-      if (superUsers.isEmpty || superUsers.head.user != superUser || !superUsers.head.passwordMatches(superPassword)) {
-        superUsers.foreach(superUser => dao.deleteUserByUserId(superUser.id))
-        dao.insert(ApiUser(-1, superUser, UserRole.SUPERUSER).withPassword(superPassword))
+  def addSuperUser(): Unit = {
+    val superUsers = await(userDao.listUsers(0, 1000000)).filter(_.role == UserRole.SUPERUSER)
+    if (superUsers.isEmpty || superUsers.head.user != superUser || !superUsers.head.passwordMatches(superPassword)) {
+      superUsers.foreach(superUser => userDao.deleteUserByUserId(superUser.id))
+      await(userDao.insert(ApiUser(-1, superUser, UserRole.SUPERUSER).withPassword(superPassword)))
+    }
+  }
+
+  def userByName(name: String): Future[Option[ApiUser]] = userDao.userByName(name)
+
+  def createOrUpdateSession(user: ApiUser, ip: String, userAgent: String): Future[ApiSession] = {
+    val userAgentHash = md5Hash(userAgent)
+
+    userDao.userSessionByUserIdIpAndUserAgent(user.id, ip, userAgentHash)
+      .flatMap(_.map(apiSession => {
+        val updatedSession = apiSession.copy(updated = currentTime)
+        userDao.updateSession(updatedSession).map(_ => updatedSession)
+      }).getOrElse(
+        userDao.insertSession(ApiSession(-1, user.id, newSessionToken, ip, userAgentHash, currentTime))))
+  }
+
+  def deleteSession(user: ApiUser, authKey: AuthKey): Future[Option[Unit]] =
+    authKey.ip.flatMap { ip =>
+      authKey.userAgent.map { userAgent =>
+        val userAgentHash = md5Hash(userAgent)
+
+        userDao.deleteSessionByUserIdIpAndUserAgent(user.id, ip, userAgentHash)
+          .map(n => if (n == 0) None else Some({}))
       }
-    }
+    }.unwrap
 
-  def userByName(name: String): Option[ApiUser] =
-    db.withSession { implicit session =>
-      dao.userByName(name)
-    }
-
-  def createOrUpdateSession(user: ApiUser, ip: String, userAgent: String): ApiSession =
-    db.withSession { implicit session =>
-      dao.userSessionByUserIdIpAndUserAgent(user.id, ip, userAgent)
-        .map(apiSession => {
-          val updatedSession = apiSession.copy(updated = currentTime)
-          dao.updateSession(updatedSession)
-          updatedSession
-        })
-        .getOrElse(
-          dao.insertSession(ApiSession(-1, user.id, newSessionToken, ip, userAgent, currentTime)))
-    }
-
-  def deleteSession(user: ApiUser, authKey: AuthKey): Option[Int] =
-    db.withSession { implicit session =>
+  def getAndRefreshUser(authKey: AuthKey): Future[Option[ApiUser]] = {
+    authKey.token.flatMap(token =>
       authKey.ip.flatMap(ip =>
-        authKey.userAgent.map(userAgent =>
-          dao.deleteSessionByUserIdIpAndUserAgent(user.id, ip, userAgent)))
-    }
+        authKey.userAgent.map { userAgent =>
+          val userAgentHash = md5Hash(userAgent)
+          userDao.userSessionByTokenIpAndUserAgent(token, ip, userAgentHash)
+        }))
+      .unwrap
+      .map(_.filter {
+        case (_, apiSession) =>
+          apiSession.updated > (currentTime - sessionTimeout)
+      })
+      .map(_.map {
+        case (apiUser, apiSession) =>
+          userDao.updateSession(apiSession.copy(updated = currentTime)).map(_ => apiUser)
+      })
+      .unwrap
+  }
 
-  def getAndRefreshUser(authKey: AuthKey): Option[ApiUser] =
-    db.withSession { implicit session =>
-      val validUserAndSession =
-        authKey.token.flatMap(token =>
-          authKey.ip.flatMap(ip =>
-            authKey.userAgent.flatMap(userAgent =>
-              dao.userSessionByTokenIpAndUserAgent(token, ip, userAgent))))
-          .filter {
-            case (user, apiSession) =>
-              apiSession.updated > (currentTime - sessionTimeout)
-          }
-
-      validUserAndSession.foreach {
-        case (user, apiSession) =>
-          dao.updateSession(apiSession.copy(updated = currentTime))
+  def deleteUser(userId: Long): Future[Unit] = {
+    userDao.userById(userId)
+      .map {
+        case Some(user) if user.role == UserRole.SUPERUSER =>
+          throw new IllegalArgumentException("Superuser may not be deleted")
+        case _ =>
       }
+      .flatMap(_ => userDao.deleteUserByUserId(userId))
+      .map(_ => {})
+  }
 
-      validUserAndSession.map(_._1)
-    }
-
-  def getOrCreateUser(user: ApiUser): ApiUser =
-    db.withSession { implicit session =>
-      dao.userByName(user.user).getOrElse(dao.insert(user))
-    }
-
-  def deleteUser(userId: Long): Unit =
-    db.withSession { implicit session =>
-      dao.userById(userId)
-        .filter(_.role == UserRole.SUPERUSER)
-        .foreach(superuser => throw new IllegalArgumentException("Superuser may not be deleted"))
-
-      dao.deleteUserByUserId(userId)
-      sender ! UserDeleted(userId)
-    }
-
-  def removeExpiredSessions(): Unit =
-    db.withSession { implicit session =>
-      dao.listSessions
+  def removeExpiredSessions(): Future[Seq[Int]] =
+    userDao.listSessions.flatMap(sessions => Future.sequence(
+      sessions
         .filter(_.updated < currentTime - sessionTimeout)
-        .foreach(expiredSession => dao.deleteSessionById(expiredSession.id))
-    }
+        .map(expiredSession => userDao.deleteSessionById(expiredSession.id))
+    ))
 
-  def listUsers(startIndex: Long, count: Long): List[ApiUser] =
-    db.withSession { implicit session =>
-      dao.listUsers(startIndex, count)
-    }
+  def listUsers(startIndex: Long, count: Long): Future[Seq[ApiUser]] = userDao.listUsers(startIndex, count)
+
+  def md5Hash(text: String): String = MessageDigest.getInstance("MD5")
+    .digest(text.getBytes("utf-8"))
+    .map(0xFF & _)
+    .map("%02x".format(_))
+    .foldLeft("")(_ + _)
 }
 
 object UserServiceActor {
-  def props(dbProps: DbProps, superUser: String, superPassword: String, sessionTimeout: Long): Props = Props(new UserServiceActor(dbProps, superUser, superPassword, sessionTimeout))
+  def props(dao: UserDAO, superUser: String, superPassword: String, sessionTimeout: Long)(implicit timeout: Timeout): Props = Props(new UserServiceActor(dao, superUser, superPassword, sessionTimeout))
 
   def newSessionToken = UUID.randomUUID.toString
 

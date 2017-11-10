@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Lars Edenbrandt
+ * Copyright 2014 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,9 +14,8 @@
  * limitations under the License.
  */
 
-package se.nimsa.sbx.app
+package se.nimsa.sbx.dicom
 
-import scala.slick.jdbc.JdbcBackend.Database
-import scala.slick.driver.JdbcProfile
+import org.dcm4che3.data.Attributes
 
-case class DbProps(db: Database, driver: JdbcProfile)
+case class DicomData(attributes: Attributes, metaInformation: Attributes)

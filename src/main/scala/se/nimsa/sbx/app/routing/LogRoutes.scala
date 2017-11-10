@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Lars Edenbrandt
+ * Copyright 2014 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,17 +23,18 @@ import akka.http.scaladsl.server.Route
 import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.log.LogProtocol._
 
-trait LogRoutes { this: SliceboxBase =>
+trait LogRoutes {
+  this: SliceboxBase =>
 
   def logRoutes: Route =
     pathPrefix("log") {
       pathEndOrSingleSlash {
         get {
-          parameters(
+          parameters((
             'startindex.as(nonNegativeFromStringUnmarshaller).?(0),
             'count.as(nonNegativeFromStringUnmarshaller).?(20),
             'subject.?,
-            'type.?) { (startIndex, count, subjectMaybe, typeMaybe) =>
+            'type.?)) { (startIndex, count, subjectMaybe, typeMaybe) =>
             val msg =
               subjectMaybe.flatMap(subject => typeMaybe.map(entryType => GetLogEntriesBySubjectAndType(subject, LogEntryType.withName(entryType), startIndex, count)))
                 .orElse(subjectMaybe.map(subject => GetLogEntriesBySubject(subject, startIndex, count)))
@@ -44,13 +45,17 @@ trait LogRoutes { this: SliceboxBase =>
                 complete(logEntries)
             }
           }
-        } 
+        } ~ delete {
+          onSuccess(logService.ask(ClearLog)) { _ =>
+            complete(NoContent)
+          }
+        }
       } ~ path(LongNumber) { logId =>
         delete {
-            onSuccess(logService.ask(RemoveLogEntry(logId))) {
-              case LogEntryRemoved(_) =>
-                complete(NoContent)
-            }          
+          onSuccess(logService.ask(RemoveLogEntry(logId))) {
+            case LogEntryRemoved(_) =>
+              complete(NoContent)
+          }
         }
       }
     }

@@ -1,50 +1,57 @@
 package se.nimsa.sbx.log
 
-import akka.testkit.TestKit
-import akka.testkit.ImplicitSender
-import org.scalatest.BeforeAndAfterAll
-import akka.actor.ActorSystem
-import org.scalatest.Matchers
-import org.scalatest.WordSpecLike
-import scala.slick.driver.H2Driver
-import se.nimsa.sbx.app.DbProps
-import scala.slick.jdbc.JdbcBackend.Database
-import akka.actor.Props
-import se.nimsa.sbx.log.LogProtocol._
 import java.util.Date
 
+import akka.actor.{ActorRef, ActorSystem}
+import akka.testkit.{ImplicitSender, TestKit}
+import akka.util.Timeout
+import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
+import se.nimsa.sbx.log.LogProtocol._
+import se.nimsa.sbx.util.FutureUtil.await
+import se.nimsa.sbx.util.TestUtil
+
+import scala.concurrent.ExecutionContextExecutor
+import scala.concurrent.duration.DurationInt
+
 class LogServiceActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
-  with WordSpecLike with Matchers with BeforeAndAfterAll {
+  with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {
 
   def this() = this(ActorSystem("LogServiceActorTestSystem"))
 
-  val db = Database.forURL("jdbc:h2:mem:logserviceactortest;DB_CLOSE_DELAY=-1", driver = "org.h2.Driver")
-  val dbProps = DbProps(db, H2Driver)
+  implicit val ec: ExecutionContextExecutor = system.dispatcher
+  implicit val timeout: Timeout = Timeout(30.seconds)
 
-  val logDao = new LogDAO(H2Driver)
+  val dbConfig = TestUtil.createTestDb("logserviceactortest")
+  val db = dbConfig.db
 
-  db.withSession { implicit session =>
-    logDao.create
+  val logDao = new LogDAO(dbConfig)
+
+  await(logDao.create())
+
+  val logServiceActorRef: ActorRef = _system.actorOf(LogServiceActor.props(logDao))
+
+  override def beforeEach(): Unit = {
+    logServiceActorRef ! AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Category1", "Message1"))
+    expectMsgType[LogEntryAdded]
+    logServiceActorRef ! AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Category1", "Message2"))
+    expectMsgType[LogEntryAdded]
+    logServiceActorRef ! AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.WARN, "Category1", "Message3"))
+    expectMsgType[LogEntryAdded]
+    logServiceActorRef ! AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.WARN, "Category2", "Message4"))
+    expectMsgType[LogEntryAdded]
+    logServiceActorRef ! AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.DEFAULT, "Category2", "Message5"))
+    expectMsgType[LogEntryAdded]
+    logServiceActorRef ! AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.ERROR, "Category2", "Message6"))
+    expectMsgType[LogEntryAdded]
   }
-  
-  val logServiceActorRef = _system.actorOf(LogServiceActor.props(dbProps))
 
-  override def afterAll = {
-    TestKit.shutdownActorSystem(_system)
-  }
+  override def afterEach(): Unit = await(logDao.clear())
+
+  override def afterAll: Unit = TestKit.shutdownActorSystem(_system)
 
   "A LogServiceActor" should {
 
     "add log messages pushed to the event stream" in {
-      logServiceActorRef ! AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Category1", "Message1"))
-      logServiceActorRef ! AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.INFO, "Category1", "Message2"))
-      logServiceActorRef ! AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.WARN, "Category1", "Message3"))
-      logServiceActorRef ! AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.WARN, "Category2", "Message4"))
-      logServiceActorRef ! AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.DEFAULT, "Category2", "Message5"))
-      logServiceActorRef ! AddLogEntry(LogEntry(-1, new Date().getTime, LogEntryType.ERROR, "Category2", "Message6"))
-
-      expectNoMsg
-      
       logServiceActorRef ! GetLogEntries(0, 1000)
 
       expectMsgPF() {
@@ -53,9 +60,12 @@ class LogServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
     }
 
     "support removing a log message" in {
-      logServiceActorRef ! RemoveLogEntry(3)
+      logServiceActorRef ! GetLogEntries(0, 1000)
+      val someEntry = expectMsgType[LogEntries].logEntries.head
 
-      expectMsg(LogEntryRemoved(3))
+      logServiceActorRef ! RemoveLogEntry(someEntry.id)
+
+      expectMsg(LogEntryRemoved(someEntry.id))
 
       logServiceActorRef ! GetLogEntries(0, 1000)
 
@@ -85,8 +95,18 @@ class LogServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
 
       expectMsgPF() {
         case LogEntries(logEntries) if logEntries.size == 1 &&
-          logEntries(0).subject == "Category2" &&
-          logEntries(0).entryType == LogEntryType.DEFAULT => true
+          logEntries.head.subject == "Category2" &&
+          logEntries.head.entryType == LogEntryType.DEFAULT => true
+      }
+    }
+
+    "support clearing the log" in {
+      logServiceActorRef ! ClearLog
+      expectMsg(6)
+
+      logServiceActorRef ! GetLogEntries(0, 1000)
+      expectMsgPF() {
+        case LogEntries(logEntries) if logEntries.isEmpty => true
       }
     }
 

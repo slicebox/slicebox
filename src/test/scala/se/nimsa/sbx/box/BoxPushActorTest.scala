@@ -1,47 +1,50 @@
 package se.nimsa.sbx.box
 
+import akka.NotUsed
 import akka.actor.{Actor, ActorSystem, Props}
-import akka.http.scaladsl.model.StatusCodes.{InternalServerError, NoContent, ServiceUnavailable}
+import akka.http.scaladsl.model.StatusCodes.{BadRequest, NoContent, ServiceUnavailable}
 import akka.http.scaladsl.model._
-import akka.stream.scaladsl.Flow
+import akka.stream.ActorMaterializer
+import akka.stream.scaladsl.Source
 import akka.testkit.{ImplicitSender, TestKit}
+import akka.util.{ByteString, Timeout}
 import org.scalatest._
-import se.nimsa.sbx.anonymization.AnonymizationServiceActor
-import se.nimsa.sbx.app.DbProps
+import se.nimsa.sbx.anonymization.{AnonymizationDAO, AnonymizationServiceActor}
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.metadata.MetaDataDAO
 import se.nimsa.sbx.metadata.MetaDataProtocol.GetImage
+import se.nimsa.sbx.storage.RuntimeStorage
+import se.nimsa.sbx.util.FutureUtil.await
 import se.nimsa.sbx.util.TestUtil
 
 import scala.collection.mutable.ArrayBuffer
+import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
-import scala.slick.driver.H2Driver
-import scala.slick.jdbc.JdbcBackend.Database
-import scala.util.{Success, Try}
 
 class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
   with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {
 
   def this() = this(ActorSystem("BoxPushActorTestSystem"))
 
-  val db = Database.forURL("jdbc:h2:mem:boxpushactortest;DB_CLOSE_DELAY=-1", driver = "org.h2.Driver")
-  val dbProps = DbProps(db, H2Driver)
+  implicit val ec = system.dispatcher
+  implicit val timeout = Timeout(30.seconds)
+  implicit val materializer = ActorMaterializer()
 
-  val boxDao = new BoxDAO(dbProps.driver)
-  val metaDataDao = new MetaDataDAO(dbProps.driver)
+  val dbConfig = TestUtil.createTestDb("boxpushactortest")
 
-  db.withSession { implicit session =>
-    boxDao.create
-    metaDataDao.create
-  }
+  val boxDao = new BoxDAO(dbConfig)
+  val metaDataDao = new MetaDataDAO(dbConfig)
+  val anonymizationDao = new AnonymizationDAO(dbConfig)
+
+  await(metaDataDao.create())
+  await(anonymizationDao.create())
+  await(boxDao.create())
 
   val testBox = Box(1, "Test Box", "abc123", "testbox.com", BoxSendMethod.PUSH, online = false)
 
   val (dbPatient1, (dbStudy1, dbStudy2), (dbSeries1, dbSeries2, dbSeries3, dbSeries4), (dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)) =
-    db.withSession { implicit session =>
-      TestUtil.insertMetaData(metaDataDao)
-    }
+    await(TestUtil.insertMetaData(metaDataDao))
 
   val capturedFileSendRequests = ArrayBuffer.empty[HttpRequest]
   val capturedStatusUpdateRequests = ArrayBuffer.empty[HttpRequest]
@@ -50,7 +53,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
 
   val okResponse = HttpResponse()
   val noResponse = HttpResponse(status = ServiceUnavailable)
-  val failResponse = HttpResponse(InternalServerError)
+  val failResponse = HttpResponse(status = BadRequest)
 
   val metaDataService = system.actorOf(Props(new Actor() {
     var imageFound = true
@@ -61,34 +64,42 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
         sender ! None
     }
   }), name = "MetaDataService")
-  val storageService = system.actorOf(Props[MockupStorageActor], name = "StorageService")
-  val anonymizationService = system.actorOf(AnonymizationServiceActor.props(dbProps, purgeEmptyAnonymizationKeys = false), name = "AnonymizationService")
-  val boxService = system.actorOf(BoxServiceActor.props(dbProps, "http://testhost:1234", 1.minute), name = "BoxService")
+
+  val invalidImageId = 666
+
+  val storage = new RuntimeStorage() {
+    override def fileSource(imageId: Long): Source[ByteString, NotUsed] = Source.single(ByteString(1, 2, 3))
+  }
+
+  val anonymizationService = system.actorOf(AnonymizationServiceActor.props(anonymizationDao, purgeEmptyAnonymizationKeys = false), name = "AnonymizationService")
+  val boxService = system.actorOf(BoxServiceActor.props(boxDao, "http://testhost:1234", storage), name = "BoxService")
 
   var reportTransactionAsFailed = false
 
-  val boxPushActorRef = system.actorOf(Props(new BoxPushActor(testBox, 1000.hours, 1000.hours, "../BoxService", "../MetaDataService", "../StorageService", "../AnonymizationService") {
+  val boxPushActorRef = system.actorOf(Props(new BoxPushActor(testBox, storage, 1000.hours, "../BoxService", "../MetaDataService", "../AnonymizationService") {
 
-    override val pool = Flow.fromFunction[(HttpRequest, String), (Try[HttpResponse], String)] {
-      case (request, id) =>
-        request.method match {
-          case HttpMethods.POST =>
-            capturedFileSendRequests += request
-            if (failedResponseSendIndices.contains(capturedFileSendRequests.size))
-              (Success(failResponse), id)
-            else if (noResponseSendIndices.contains(capturedFileSendRequests.size))
-              (Success(noResponse), id)
-            else
-              (Success(okResponse), id)
-          case HttpMethods.GET =>
-            if (reportTransactionAsFailed)
-              (Success(HttpResponse(entity = HttpEntity(TransactionStatus.FAILED.toString))), id)
-            else
-              (Success(HttpResponse(entity = HttpEntity(TransactionStatus.FINISHED.toString))), id)
-          case HttpMethods.PUT =>
-            capturedStatusUpdateRequests += request
-            (Success(HttpResponse(status = NoContent)), id)
-        }
+    override def sliceboxRequest(method: HttpMethod, uri: String, entity: MessageEntity): Future[HttpResponse] = {
+      val request = HttpRequest(method = method, uri = uri, entity = entity)
+      request.method match {
+        case HttpMethods.POST =>
+          capturedFileSendRequests += request
+          if (failedResponseSendIndices.contains(capturedFileSendRequests.size))
+            Future.successful(failResponse)
+          else if (noResponseSendIndices.contains(capturedFileSendRequests.size))
+            Future.successful(noResponse)
+          else
+            Future.successful(okResponse)
+        case HttpMethods.GET =>
+          if (reportTransactionAsFailed)
+            Future.successful(HttpResponse(entity = HttpEntity(TransactionStatus.FAILED.toString)))
+          else
+            Future.successful(HttpResponse(entity = HttpEntity(TransactionStatus.FINISHED.toString)))
+        case HttpMethods.PUT =>
+          capturedStatusUpdateRequests += request
+          Future.successful(HttpResponse(status = NoContent))
+        case _ =>
+          Future.failed(new IllegalArgumentException("Unsupported method"))
+      }
     }
 
   }), name = "PushBox")
@@ -104,25 +115,19 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
     noResponseSendIndices.clear()
     reportTransactionAsFailed = false
 
-    db.withSession { implicit session =>
-      boxDao.clear
-    }
+    await(boxDao.clear())
   }
 
   "A BoxPushActor" should {
 
     "post file to correct URL" in {
 
-      val (transaction, image) =
-        db.withSession { implicit session =>
-          val transaction = boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, testBox.id, testBox.name, 0, 1, 1000, 1000, TransactionStatus.WAITING))
-          val image = boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage1.id, 1, sent = false))
-          (transaction, image)
-        }
+      val transaction = await(boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, testBox.id, testBox.name, 0, 1, 1000, 1000, TransactionStatus.WAITING)))
+      val image = await(boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage1.id, 1, sent = false)))
 
       boxPushActorRef ! PollOutgoing
 
-      expectNoMsg()
+      expectNoMessage(3.seconds)
 
       capturedFileSendRequests should have length 1
       capturedStatusUpdateRequests shouldBe empty
@@ -130,161 +135,144 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
     }
 
     "post file in correct order" in {
-      db.withSession { implicit session =>
+      // Insert outgoing images out of order
+      val transaction = await(boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, testBox.id, testBox.name, 0, 2, 1000, 1000, TransactionStatus.WAITING)))
+      val image1 = await(boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage1.id, 2, sent = false)))
+      val image2 = await(boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage2.id, 1, sent = false)))
 
-        // Insert outgoing images out of order
-        val transaction = boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, testBox.id, testBox.name, 0, 2, 1000, 1000, TransactionStatus.WAITING))
-        val image1 = boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage1.id, 2, sent = false))
-        val image2 = boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage2.id, 1, sent = false))
+      boxPushActorRef ! PollOutgoing
+      expectNoMessage(3.seconds)
 
-        boxPushActorRef ! PollOutgoing
-        expectNoMsg()
-
-        capturedFileSendRequests.size should be(2)
-        capturedStatusUpdateRequests shouldBe empty
-        capturedFileSendRequests(0).uri.toString() should be(s"${testBox.baseUrl}/image?transactionid=${transaction.id}&sequencenumber=${image2.sequenceNumber}&totalimagecount=${transaction.totalImageCount}")
-        capturedFileSendRequests(1).uri.toString() should be(s"${testBox.baseUrl}/image?transactionid=${transaction.id}&sequencenumber=${image1.sequenceNumber}&totalimagecount=${transaction.totalImageCount}")
-      }
+      capturedFileSendRequests.size should be(2)
+      capturedStatusUpdateRequests shouldBe empty
+      capturedFileSendRequests(0).uri.toString() should be(s"${testBox.baseUrl}/image?transactionid=${transaction.id}&sequencenumber=${image2.sequenceNumber}&totalimagecount=${transaction.totalImageCount}")
+      capturedFileSendRequests(1).uri.toString() should be(s"${testBox.baseUrl}/image?transactionid=${transaction.id}&sequencenumber=${image1.sequenceNumber}&totalimagecount=${transaction.totalImageCount}")
     }
 
     "mark outgoing transaction as finished when all files have been sent" in {
-      db.withSession { implicit session =>
+      val transaction = await(boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, testBox.id, testBox.name, 0, 2, 1000, 1000, TransactionStatus.WAITING)))
+      await(boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage1.id, 1, sent = false)))
+      await(boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage2.id, 2, sent = false)))
 
-        val transaction = boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, testBox.id, testBox.name, 0, 2, 1000, 1000, TransactionStatus.WAITING))
-        boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage1.id, 1, sent = false))
-        boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage2.id, 2, sent = false))
+      await(boxDao.listOutgoingTransactions(0, 1)).head.status shouldBe TransactionStatus.WAITING
 
-        boxDao.listOutgoingTransactions(0, 1).head.status shouldBe TransactionStatus.WAITING
+      boxPushActorRef ! PollOutgoing
 
-        boxPushActorRef ! PollOutgoing
+      expectNoMessage(3.seconds) // both images will be sent
 
-        expectNoMsg() // both images will be sent
-
-        boxDao.listOutgoingTransactions(0, 1).head.status shouldBe TransactionStatus.FINISHED
-      }
+      await(boxDao.listOutgoingTransactions(0, 1)).head.status shouldBe TransactionStatus.FINISHED
     }
 
     "mark outgoing transaction as failed when file send fails" in {
 
-      db.withSession { implicit session =>
-        val invalidImageId = 666
+      failedResponseSendIndices += 1
 
-        val transaction = boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, testBox.id, testBox.name, 0, 1, 1000, 1000, TransactionStatus.WAITING))
-        boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, invalidImageId, 1, sent = false))
+      val transaction = await(boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, testBox.id, testBox.name, 0, 1, 1000, 1000, TransactionStatus.WAITING)))
+      await(boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, invalidImageId, 1, sent = false)))
 
-        boxPushActorRef ! PollOutgoing
+      boxPushActorRef ! PollOutgoing
 
-        expectNoMsg()
+      expectNoMessage(3.seconds)
 
-        val outgoingTransactions = boxDao.listOutgoingTransactions(0, 10)
-        outgoingTransactions.size should be(1)
-        outgoingTransactions.foreach(_.status shouldBe TransactionStatus.FAILED)
+      val outgoingTransactions = await(boxDao.listOutgoingTransactions(0, 10))
+      outgoingTransactions.size should be(1)
+      outgoingTransactions.foreach(_.status shouldBe TransactionStatus.FAILED)
 
-        capturedStatusUpdateRequests should have length 1
-      }
+      capturedStatusUpdateRequests should have length 1
     }
 
     "not mark wrong outgoing transaction as failed when transaction id is not unique" in {
 
-      db.withSession { implicit session =>
-        val invalidImageId = 666
-        val transaction1 = boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, testBox.id, testBox.name, 0, 1, 1000, 1000, TransactionStatus.WAITING))
-        boxDao.insertOutgoingImage(OutgoingImage(-1, transaction1.id, invalidImageId, 1, sent = false))
-        val transaction2 = boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, testBox.id, testBox.name, 0, 1, 1000, 1000, TransactionStatus.WAITING))
-        boxDao.insertOutgoingImage(OutgoingImage(-1, transaction2.id, dbImage1.id, 1, sent = false))
+      val transaction1 = await(boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, testBox.id, testBox.name, 0, 1, 1000, 1000, TransactionStatus.WAITING)))
+      await(boxDao.insertOutgoingImage(OutgoingImage(-1, transaction1.id, invalidImageId, 1, sent = false)))
+      val transaction2 = await(boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, testBox.id, testBox.name, 0, 1, 1000, 1000, TransactionStatus.WAITING)))
+      await(boxDao.insertOutgoingImage(OutgoingImage(-1, transaction2.id, dbImage1.id, 1, sent = false)))
 
-        boxPushActorRef ! PollOutgoing
-        expectNoMsg()
+      failedResponseSendIndices += 1
 
-        val outgoingTransactions = boxDao.listOutgoingTransactions(0, 10)
-        outgoingTransactions.size should be(2)
-        outgoingTransactions.foreach { transaction =>
-          if (transaction.id == transaction1.id)
-            transaction.status shouldBe TransactionStatus.FAILED
-          else
-            transaction.status shouldBe TransactionStatus.WAITING
-        }
+      boxPushActorRef ! PollOutgoing
+      expectNoMessage(3.seconds)
 
-        capturedStatusUpdateRequests should have length 1
+      val outgoingTransactions = await(boxDao.listOutgoingTransactions(0, 10))
+      outgoingTransactions.size should be(2)
+      outgoingTransactions.foreach { transaction =>
+        if (transaction.id == transaction1.id)
+          transaction.status shouldBe TransactionStatus.FAILED
+        else
+          transaction.status shouldBe TransactionStatus.WAITING
       }
+
+      capturedStatusUpdateRequests should have length 1
     }
 
     "process other transactions when file send fails" in {
 
-      db.withSession { implicit session =>
-        val invalidImageId = 666
+      val transaction1 = await(boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, testBox.id, testBox.name, 0, 1, 1000, 1000, TransactionStatus.WAITING)))
+      await(boxDao.insertOutgoingImage(OutgoingImage(-1, transaction1.id, invalidImageId, 1, sent = false)))
 
-        val transaction1 = boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, testBox.id, testBox.name, 0, 1, 1000, 1000, TransactionStatus.WAITING))
-        boxDao.insertOutgoingImage(OutgoingImage(-1, transaction1.id, invalidImageId, 1, sent = false))
+      failedResponseSendIndices += 1
 
-        boxPushActorRef ! PollOutgoing
-        expectNoMsg()
+      boxPushActorRef ! PollOutgoing
+      expectNoMessage(3.seconds)
 
-        val transaction2 = boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, testBox.id, testBox.name, 0, 1, 1000, 1000, TransactionStatus.WAITING))
-        boxDao.insertOutgoingImage(OutgoingImage(-1, transaction2.id, dbImage2.id, 1, sent = false))
+      val transaction2 = await(boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, testBox.id, testBox.name, 0, 1, 1000, 1000, TransactionStatus.WAITING)))
+      await(boxDao.insertOutgoingImage(OutgoingImage(-1, transaction2.id, dbImage2.id, 1, sent = false)))
 
-        boxPushActorRef ! PollOutgoing
-        expectNoMsg()
+      boxPushActorRef ! PollOutgoing
+      expectNoMessage(3.seconds)
 
-        capturedFileSendRequests.size should be(1)
-        capturedStatusUpdateRequests should have length 1
+      capturedFileSendRequests.size should be(2)
+      capturedStatusUpdateRequests should have length 1
 
-        val outgoingTransactions = boxDao.listOutgoingTransactions(0, 10)
-        outgoingTransactions.size should be(2)
-        outgoingTransactions.foreach(transaction =>
-          if (transaction.id == transaction1.id) {
-            transaction.status shouldBe TransactionStatus.FAILED
-          } else {
-            transaction.status shouldBe TransactionStatus.FINISHED
-          })
-      }
+      val outgoingTransactions = await(boxDao.listOutgoingTransactions(0, 10))
+      outgoingTransactions.size should be(2)
+      outgoingTransactions.foreach(transaction =>
+        if (transaction.id == transaction1.id) {
+          transaction.status shouldBe TransactionStatus.FAILED
+        } else {
+          transaction.status shouldBe TransactionStatus.FINISHED
+        })
     }
 
     "pause outgoing processing when remote server is not working, and resume once remote server is back up" in {
+      val transaction = await(boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, testBox.id, testBox.name, 0, 3, 1000, 1000, TransactionStatus.WAITING)))
+      await(boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage1.id, 1, sent = false)))
+      await(boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage2.id, 2, sent = false)))
+      await(boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage3.id, 3, sent = false)))
 
-      db.withSession { implicit session =>
-        val transaction = boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, testBox.id, testBox.name, 0, 3, 1000, 1000, TransactionStatus.WAITING))
-        boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage1.id, 1, sent = false))
-        boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage2.id, 2, sent = false))
-        boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage3.id, 3, sent = false))
+      noResponseSendIndices ++= Seq(2, 3)
 
-        noResponseSendIndices ++= Seq(2, 3)
+      boxPushActorRef ! PollOutgoing
+      expectNoMessage(3.seconds)
 
-        boxPushActorRef ! PollOutgoing
-        expectNoMsg()
+      await(boxDao.listOutgoingImagesForOutgoingTransactionId(transaction.id)).count(_.sent == false) should be(2)
 
-        boxDao.listOutgoingImagesForOutgoingTransactionId(transaction.id).count(_.sent == false) should be(2)
+      // server back up
+      noResponseSendIndices.clear()
 
-        // server back up
-        noResponseSendIndices.clear()
+      boxPushActorRef ! PollOutgoing
+      expectNoMessage(3.seconds)
 
-        boxPushActorRef ! PollOutgoing
-        expectNoMsg()
+      await(boxDao.listOutgoingImagesForOutgoingTransactionId(transaction.id)).count(_.sent == false) should be(0)
 
-        boxDao.listOutgoingImagesForOutgoingTransactionId(transaction.id).count(_.sent == false) should be(0)
-
-        capturedStatusUpdateRequests shouldBe empty
-      }
+      capturedStatusUpdateRequests shouldBe empty
     }
 
     "mark transaction as failed if remote box reports it as failed after transaction has finished" in {
       reportTransactionAsFailed = true
-      db.withSession { implicit session =>
+      val transaction = await(boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, testBox.id, testBox.name, 0, 2, 1000, 1000, TransactionStatus.WAITING)))
+      await(boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage1.id, 1, sent = false)))
+      await(boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage2.id, 2, sent = false)))
 
-        val transaction = boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, testBox.id, testBox.name, 0, 2, 1000, 1000, TransactionStatus.WAITING))
-        boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage1.id, 1, sent = false))
-        boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage2.id, 2, sent = false))
+      await(boxDao.listOutgoingTransactions(0, 1)).head.status shouldBe TransactionStatus.WAITING
 
-        boxDao.listOutgoingTransactions(0, 1).head.status shouldBe TransactionStatus.WAITING
+      boxPushActorRef ! PollOutgoing
 
-        boxPushActorRef ! PollOutgoing
+      expectNoMessage(3.seconds) // both images will be sent
 
-        expectNoMsg() // both images will be sent
+      await(boxDao.listOutgoingTransactions(0, 1)).head.status shouldBe TransactionStatus.FAILED
 
-        boxDao.listOutgoingTransactions(0, 1).head.status shouldBe TransactionStatus.FAILED
-
-        capturedStatusUpdateRequests shouldBe empty
-      }
+      capturedStatusUpdateRequests shouldBe empty
     }
   }
 }

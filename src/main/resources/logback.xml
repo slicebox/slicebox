@@ -10,14 +10,11 @@
 
     <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <file>logs/slicebox.log</file>
-        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
             <fileNamePattern>logs/slicebox_%d{yyyy-MM-dd}.%i.log</fileNamePattern>
- 
-            <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
-                <maxFileSize>5MB</maxFileSize>
-            </timeBasedFileNamingAndTriggeringPolicy>
-
-            <maxHistory>30</maxHistory>
+            <maxFileSize>100MB</maxFileSize>
+            <maxHistory>60</maxHistory>
+            <totalSizeCap>20GB</totalSizeCap>
         </rollingPolicy>
  
         <encoder>
@@ -27,11 +24,13 @@
     </appender>
 
     <logger name="akka" level="WARN" />
-	<logger name="scala.slick" level="WARN" />
+    <logger name="slick" level="WARN" />
     <logger name="com.zaxxer.hikari" level="WARN" />
     <logger name="com.typesafe.sslconfig" level="WARN" />
-	<!-- <logger name="scala.slick.jdbc.JdbcBackend.statement" level="DEBUG" /> -->
-	<logger name="org.dcm4che3" level="WARN" />
+    <logger name="slick.jdbc.JdbcBackend.statement" level="WARN" />
+    <logger name="slick.basic.BasicBackend.action" level="WARN" />
+    <logger name="org.dcm4che3" level="WARN" />
+    <logger name="akka.stream.impl.io.FileSubscriber" level="OFF" />
 
     <root level="INFO">
         <appender-ref ref="CONSOLE"/>

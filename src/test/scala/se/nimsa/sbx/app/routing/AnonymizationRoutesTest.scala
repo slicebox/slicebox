@@ -6,30 +6,28 @@ import akka.http.scaladsl.server._
 import akka.util.ByteString
 import org.dcm4che3.data.{Tag, VR}
 import org.scalatest.{FlatSpecLike, Matchers}
-import se.nimsa.sbx.anonymization.AnonymizationDAO
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomProperty.PatientName
-import se.nimsa.sbx.dicom.DicomUtil
-import se.nimsa.sbx.metadata.MetaDataDAO
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.storage.RuntimeStorage
+import se.nimsa.sbx.util.FutureUtil.await
 import se.nimsa.sbx.util.TestUtil
 
+import scala.concurrent.Future
+
 class AnonymizationRoutesTest extends {
-  val dbProps = TestUtil.createTestDb("anonymizationroutestest")
-  val storage = new RuntimeStorage
+  val dbConfig = TestUtil.createTestDb("anonymizationroutestest")
+  val storage = new RuntimeStorage()
 } with FlatSpecLike with Matchers with RoutesTestBase {
 
-  val db = dbProps.db
-  val dao = new AnonymizationDAO(dbProps.driver)
-  val metaDataDao = new MetaDataDAO(dbProps.driver)
-
   override def afterEach() {
-    db.withSession { implicit session =>
-      dao.clear
-      metaDataDao.clear
-    }
+    await(Future.sequence(Seq(
+      metaDataDao.clear(),
+      seriesTypeDao.clear(),
+      propertiesDao.clear(),
+      anonymizationDao.clear()
+    )))
     storage.asInstanceOf[RuntimeStorage].clear()
   }
 
@@ -99,7 +97,7 @@ class AnonymizationRoutesTest extends {
     val anonAttributes =
       PostAsUser(s"/api/images/${image.id}/anonymized", tagValues) ~> routes ~> check {
         status should be(OK)
-        DicomUtil.loadDicomData(responseAs[ByteString].toArray, withPixelData = true).attributes
+        TestUtil.loadDicomData(responseAs[ByteString].toArray, withPixelData = true).attributes
       }
 
     anonAttributes.getString(Tag.PatientName) shouldBe anonPatientName
@@ -107,18 +105,18 @@ class AnonymizationRoutesTest extends {
   }
 
   it should "return 200 OK and the image IDs of the new anonymized images when bulk anonymizing a sequence of images" in {
-    val dd1 = TestUtil.testImageDicomData(true)
-    val dd2 = TestUtil.testImageDicomData(true)
+    val dd1 = TestUtil.testImageDicomData()
+    val dd2 = TestUtil.testImageDicomData()
     dd2.attributes.setString(Tag.PatientName, VR.PN, "John^Doe")
 
     val image1 =
-      PostAsUser("/api/images", HttpEntity(DicomUtil.toByteArray(dd1))) ~> routes ~> check {
+      PostAsUser("/api/images", HttpEntity(TestUtil.toByteArray(dd1))) ~> routes ~> check {
         status should be(Created)
         responseAs[Image]
       }
 
     val image2 =
-      PostAsUser("/api/images", HttpEntity(DicomUtil.toByteArray(dd2))) ~> routes ~> check {
+      PostAsUser("/api/images", HttpEntity(TestUtil.toByteArray(dd2))) ~> routes ~> check {
         status should be(Created)
         responseAs[Image]
       }
@@ -153,8 +151,8 @@ class AnonymizationRoutesTest extends {
         responseAs[FlatSeries]
       }
 
-    anonFlatSeries1.patient.patientName.value.startsWith("Anonymous") shouldBe true
-    anonFlatSeries2.patient.patientName.value.startsWith("Anonymous") shouldBe true
+    anonFlatSeries1.patient.patientName.value should not be "anon270"
+    anonFlatSeries2.patient.patientName.value should not be "John^Doe"
   }
 
   it should "return 404 NotFound when manually anonymizing an image that does not exist" in {
@@ -164,28 +162,24 @@ class AnonymizationRoutesTest extends {
   }
 
   it should "provide a list of anonymization keys" in {
-    db.withSession { implicit session =>
-      val dicomData = TestUtil.createDicomData()
-      val key1 = TestUtil.createAnonymizationKey(dicomData.attributes)
-      val key2 = key1.copy(patientName = "pat name 2", anonPatientName = "anon pat name 2")
-      val insertedKey1 = dao.insertAnonymizationKey(key1)
-      val insertedKey2 = dao.insertAnonymizationKey(key2)
-      GetAsUser("/api/anonymization/keys") ~> routes ~> check {
-        status should be(OK)
-        responseAs[List[AnonymizationKey]] should be(List(insertedKey1, insertedKey2))
-      }
+    val dicomData = TestUtil.createDicomData()
+    val key1 = TestUtil.createAnonymizationKey(dicomData.attributes)
+    val key2 = key1.copy(patientName = "pat name 2", anonPatientName = "anon pat name 2")
+    val insertedKey1 = await(anonymizationDao.insertAnonymizationKey(key1))
+    val insertedKey2 = await(anonymizationDao.insertAnonymizationKey(key2))
+    GetAsUser("/api/anonymization/keys") ~> routes ~> check {
+      status should be(OK)
+      responseAs[List[AnonymizationKey]] should be(List(insertedKey1, insertedKey2))
     }
   }
 
   it should "return 200 OK and the requested anonymization key" in {
-    db.withSession { implicit session =>
-      val dicomData = TestUtil.createDicomData()
-      val key1 = TestUtil.createAnonymizationKey(dicomData.attributes)
-      val insertedKey1 = dao.insertAnonymizationKey(key1)
-      GetAsUser(s"/api/anonymization/keys/${insertedKey1.id}") ~> routes ~> check {
-        status shouldBe OK
-        responseAs[AnonymizationKey] shouldBe insertedKey1
-      }
+    val dicomData = TestUtil.createDicomData()
+    val key1 = TestUtil.createAnonymizationKey(dicomData.attributes)
+    val insertedKey1 = await(anonymizationDao.insertAnonymizationKey(key1))
+    GetAsUser(s"/api/anonymization/keys/${insertedKey1.id}") ~> routes ~> check {
+      status shouldBe OK
+      responseAs[AnonymizationKey] shouldBe insertedKey1
     }
   }
 
@@ -196,18 +190,16 @@ class AnonymizationRoutesTest extends {
   }
 
   it should "provide a list of sorted anonymization keys supporting startindex and count" in {
-    db.withSession { implicit session =>
-      val dicomData = TestUtil.createDicomData(patientName = "B")
-      val key1 = TestUtil.createAnonymizationKey(dicomData.attributes, anonPatientName = "anon B")
-      val key2 = key1.copy(patientName = "A", anonPatientName = "anon A")
-      dao.insertAnonymizationKey(key1)
-      val insertedKey2 = dao.insertAnonymizationKey(key2)
-      GetAsUser("/api/anonymization/keys?startindex=0&count=1&orderby=patientName&orderascending=true") ~> routes ~> check {
-        status should be(OK)
-        val keys = responseAs[List[AnonymizationKey]]
-        keys.length should be(1)
-        keys.head should be(insertedKey2)
-      }
+    val dicomData = TestUtil.createDicomData(patientName = "B")
+    val key1 = TestUtil.createAnonymizationKey(dicomData.attributes, anonPatientName = "anon B")
+    val key2 = key1.copy(patientName = "A", anonPatientName = "anon A")
+    await(anonymizationDao.insertAnonymizationKey(key1))
+    val insertedKey2 = await(anonymizationDao.insertAnonymizationKey(key2))
+    GetAsUser("/api/anonymization/keys?startindex=0&count=1&orderby=patientName&orderascending=true") ~> routes ~> check {
+      status should be(OK)
+      val keys = responseAs[List[AnonymizationKey]]
+      keys.length should be(1)
+      keys.head should be(insertedKey2)
     }
   }
 
@@ -218,40 +210,36 @@ class AnonymizationRoutesTest extends {
   }
 
   it should "return 200 OK and a list of images corresponding to the anonymization key with the supplied ID" in {
-    db.withSession { implicit session =>
-      val (dbPatient1, (_, _), (_, _, _, _), (dbImage1, dbImage2, _, _, _, _, _, _)) = TestUtil.insertMetaData(metaDataDao)
-      val key1 = AnonymizationKey(-1, 1234, dbPatient1.patientName.value, "anonPN", dbPatient1.patientID.value, "anonPID", "", "", "", "", "", "", "", "", "", "", "", "")
-      val insertedKey1 = dao.insertAnonymizationKey(key1)
-      val akImage1 = AnonymizationKeyImage(-1, insertedKey1.id, dbImage1.id)
-      val akImage2 = AnonymizationKeyImage(-1, insertedKey1.id, dbImage2.id)
-      dao.insertAnonymizationKeyImage(akImage1)
-      dao.insertAnonymizationKeyImage(akImage2)
-      val akImages =
-        GetAsUser(s"/api/anonymization/keys/${insertedKey1.id}/images") ~> routes ~> check {
-          status shouldBe OK
-          responseAs[Seq[Image]]
-        }
-      akImages should have length 2
-      akImages shouldBe Seq(dbImage1, dbImage2)
-    }
+    val (dbPatient1, (_, _), (_, _, _, _), (dbImage1, dbImage2, _, _, _, _, _, _)) = await(TestUtil.insertMetaData(metaDataDao))
+    val key1 = AnonymizationKey(-1, 1234, dbPatient1.patientName.value, "anonPN", dbPatient1.patientID.value, "anonPID", "", "", "", "", "", "", "", "", "", "", "", "")
+    val insertedKey1 = await(anonymizationDao.insertAnonymizationKey(key1))
+    val akImage1 = AnonymizationKeyImage(-1, insertedKey1.id, dbImage1.id)
+    val akImage2 = AnonymizationKeyImage(-1, insertedKey1.id, dbImage2.id)
+    await(anonymizationDao.insertAnonymizationKeyImage(akImage1))
+    await(anonymizationDao.insertAnonymizationKeyImage(akImage2))
+    val akImages =
+      GetAsUser(s"/api/anonymization/keys/${insertedKey1.id}/images") ~> routes ~> check {
+        status shouldBe OK
+        responseAs[Seq[Image]]
+      }
+    akImages should have length 2
+    akImages shouldBe Seq(dbImage1, dbImage2)
   }
 
   it should "return 200 OK and a list of anonymization keys when querying" in {
-    db.withSession { implicit session =>
-      val (dbPatient1, (_, _), (_, _, _, _), (_, _, _, _, _, _, _, _)) = TestUtil.insertMetaData(metaDataDao)
-      val key1 = AnonymizationKey(-1, 1234, dbPatient1.patientName.value, "anonPN", dbPatient1.patientID.value, "anonPID", "", "", "", "", "", "", "", "", "", "", "", "")
-      val insertedKey1 = dao.insertAnonymizationKey(key1)
+    val (dbPatient1, (_, _), (_, _, _, _), (_, _, _, _, _, _, _, _)) = await(TestUtil.insertMetaData(metaDataDao))
+    val key1 = AnonymizationKey(-1, 1234, dbPatient1.patientName.value, "anonPN", dbPatient1.patientID.value, "anonPID", "", "", "", "", "", "", "", "", "", "", "", "")
+    val insertedKey1 = await(anonymizationDao.insertAnonymizationKey(key1))
 
-      val query = AnonymizationKeyQuery(0, 10, None, Seq(QueryProperty("anonPatientName", QueryOperator.EQUALS, insertedKey1.anonPatientName)))
-      val keys =
-        PostAsUser("/api/anonymization/keys/query", query) ~> routes ~> check {
-          status shouldBe OK
-          responseAs[List[AnonymizationKey]]
-        }
+    val query = AnonymizationKeyQuery(0, 10, None, Seq(QueryProperty("anonPatientName", QueryOperator.EQUALS, insertedKey1.anonPatientName)))
+    val keys =
+      PostAsUser("/api/anonymization/keys/query", query) ~> routes ~> check {
+        status shouldBe OK
+        responseAs[List[AnonymizationKey]]
+      }
 
-      keys should have length 1
-      keys.head shouldBe insertedKey1
-    }
+    keys should have length 1
+    keys.head shouldBe insertedKey1
   }
 
   it should "remove related anonymization image record when an image is deleted" in {
@@ -261,12 +249,8 @@ class AnonymizationRoutesTest extends {
         responseAs[Image]
       }
 
-    val key =
-      db.withSession { implicit session =>
-        val key = dao.insertAnonymizationKey(AnonymizationKey(-1, 1234, "pn", "anonPN", "pid", "anonPID", "", "", "", "", "", "", "", "", "", "", "", ""))
-        dao.insertAnonymizationKeyImage(AnonymizationKeyImage(-1, key.id, image.id))
-        key
-      }
+    val key = await(anonymizationDao.insertAnonymizationKey(AnonymizationKey(-1, 1234, "pn", "anonPN", "pid", "anonPID", "", "", "", "", "", "", "", "", "", "", "", "")))
+    await(anonymizationDao.insertAnonymizationKeyImage(AnonymizationKeyImage(-1, key.id, image.id)))
 
     GetAsUser(s"/api/anonymization/keys/${key.id}/images") ~> routes ~> check {
       status shouldBe OK

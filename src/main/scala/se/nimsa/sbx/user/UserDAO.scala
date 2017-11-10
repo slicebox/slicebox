@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Lars Edenbrandt
+ * Copyright 2014 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,135 +16,142 @@
 
 package se.nimsa.sbx.user
 
-import scala.slick.driver.JdbcProfile
-import scala.slick.jdbc.meta.MTable
-import UserProtocol._
+import se.nimsa.sbx.user.UserProtocol._
+import se.nimsa.sbx.util.DbUtil._
+import slick.basic.DatabaseConfig
+import slick.jdbc.JdbcProfile
 
-class UserDAO(val driver: JdbcProfile) {
+import scala.concurrent.{ExecutionContext, Future}
 
-  import driver.simple._
+class UserDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionContext) {
+
+  import dbConf.profile.api._
+
+  val db = dbConf.db
 
   val toUser = (id: Long, user: String, role: String, password: String) => ApiUser(id, user, UserRole.withName(role), Some(password))
   val fromUser = (user: ApiUser) => Option((user.id, user.user, user.role.toString(), user.hashedPassword.get))
 
-  class UserTable(tag: Tag) extends Table[ApiUser](tag, "User") {
+  class UserTable(tag: Tag) extends Table[ApiUser](tag, UserTable.name) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
-
-    def user = column[String]("user")
-
+    def user = column[String]("user", O.Length(180))
     def role = column[String]("role")
-
     def password = column[String]("password")
-
     def idxUniqueUser = index("idx_unique_user", user, unique = true)
-
-    def * = (id, user, role, password) <>(toUser.tupled, fromUser)
+    def * = (id, user, role, password) <> (toUser.tupled, fromUser)
   }
 
-  val userQuery = TableQuery[UserTable]
+  object UserTable {
+    val name = "User"
+  }
 
-  class SessionTable(tag: Tag) extends Table[ApiSession](tag, "ApiSession") {
+  val users = TableQuery[UserTable]
+
+  class SessionTable(tag: Tag) extends Table[ApiSession](tag, SessionTable.name) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
-
     def userId = column[Long]("userid")
-
-    def token = column[String]("token")
-
-    def ip = column[String]("ip")
-
-    def userAgent = column[String]("useragent")
-
+    def token = column[String]("token", O.Length(64))
+    def ip = column[String]("ip", O.Length(64))
+    def userAgent = column[String]("useragent", O.Length(32))
     def updated = column[Long]("updated")
-
-    def fkUser = foreignKey("fk_user", userId, userQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
-
+    def fkUser = foreignKey("fk_user", userId, users)(_.id, onDelete = ForeignKeyAction.Cascade)
     def idxUniqueSession = index("idx_unique_session", (token, ip, userAgent), unique = true)
-
-    def * = (id, userId, token, ip, userAgent, updated) <>(ApiSession.tupled, ApiSession.unapply)
+    def * = (id, userId, token, ip, userAgent, updated) <> (ApiSession.tupled, ApiSession.unapply)
   }
 
-  val sessionQuery = TableQuery[SessionTable]
-
-  def create(implicit session: Session) = {
-    if (MTable.getTables("User").list.isEmpty) userQuery.ddl.create
-    if (MTable.getTables("ApiSession").list.isEmpty) sessionQuery.ddl.create
+  object SessionTable {
+    val name = "ApiSession"
   }
 
-  def drop(implicit session: Session): Unit =
-    (userQuery.ddl ++ sessionQuery.ddl).drop
+  val sessions = TableQuery[SessionTable]
 
-  def clear(implicit session: Session): Unit = {
-    userQuery.delete
-    sessionQuery.delete
+  def create() = createTables(dbConf, (UserTable.name, users), (SessionTable.name, sessions))
+
+  def drop() = db.run {
+    (users.schema ++ sessions.schema).drop
   }
 
-  def insert(user: ApiUser)(implicit session: Session): ApiUser = {
-    val generatedId = (userQuery returning userQuery.map(_.id)) += user
-    user.copy(id = generatedId)
+  def clear() = db.run {
+    DBIO.seq(users.delete, sessions.delete)
   }
 
-  def userById(userId: Long)(implicit session: Session): Option[ApiUser] =
-    userQuery.filter(_.id === userId).firstOption
+  def insert(user: ApiUser): Future[ApiUser] = db.run {
+    users returning users.map(_.id) += user
+  }.map(generatedId => user.copy(id = generatedId))
 
-  def userByName(user: String)(implicit session: Session): Option[ApiUser] =
-    userQuery.filter(_.user === user).firstOption
+  def userById(userId: Long): Future[Option[ApiUser]] = db.run {
+    users.filter(_.id === userId).result.headOption
+  }
 
-  def userSessionsByToken(token: String)(implicit session: Session): List[(ApiUser, ApiSession)] =
+  def userByName(user: String): Future[Option[ApiUser]] = db.run {
+    users.filter(_.user === user).result.headOption
+  }
+
+  def userSessionsByToken(token: String): Future[Seq[(ApiUser, ApiSession)]] = db.run {
     (for {
-      users <- userQuery
-      sessions <- sessionQuery if sessions.userId === users.id
+      users <- users
+      sessions <- sessions if sessions.userId === users.id
     } yield (users, sessions))
       .filter(_._2.token === token)
-      .list
+      .result
+  }
 
-  def userSessionByTokenIpAndUserAgent(token: String, ip: String, userAgent: String)(implicit session: Session): Option[(ApiUser, ApiSession)] =
+  def userSessionByTokenIpAndUserAgent(token: String, ip: String, userAgent: String): Future[Option[(ApiUser, ApiSession)]] = db.run {
     (for {
-      users <- userQuery
-      sessions <- sessionQuery if sessions.userId === users.id
+      users <- users
+      sessions <- sessions if sessions.userId === users.id
     } yield (users, sessions))
       .filter(_._2.token === token)
       .filter(_._2.ip === ip)
       .filter(_._2.userAgent === userAgent)
-      .firstOption
+      .result.headOption
+  }
 
-  def deleteUserByUserId(userId: Long)(implicit session: Session): Unit =
-    userQuery.filter(_.id === userId).delete
+  def deleteUserByUserId(userId: Long): Future[Int] = db.run {
+    users.filter(_.id === userId).delete
+  }
 
-  def listUsers(startIndex: Long, count: Long)(implicit session: Session): List[ApiUser] =
-    userQuery
+  def listUsers(startIndex: Long, count: Long): Future[Seq[ApiUser]] = db.run {
+    users
       .drop(startIndex)
       .take(count)
-      .list
+      .result
+  }
 
-  def listSessions(implicit session: Session): List[ApiSession] =
-    sessionQuery.list
+  def listSessions: Future[Seq[ApiSession]] = db.run {
+    sessions.result
+  }
 
-  def userSessionByUserIdIpAndUserAgent(userId: Long, ip: String, userAgent: String)(implicit session: Session): Option[ApiSession] =
+  def userSessionByUserIdIpAndUserAgent(userId: Long, ip: String, userAgent: String): Future[Option[ApiSession]] = db.run {
     (for {
-      users <- userQuery
-      sessions <- sessionQuery if sessions.userId === users.id
+      users <- users
+      sessions <- sessions if sessions.userId === users.id
     } yield (users, sessions))
       .filter(_._1.id === userId)
       .filter(_._2.ip === ip)
       .filter(_._2.userAgent === userAgent)
       .map(_._2)
-      .firstOption
-
-  def insertSession(apiSession: ApiSession)(implicit session: Session) = {
-    val generatedId = (sessionQuery returning sessionQuery.map(_.id)) += apiSession
-    apiSession.copy(id = generatedId)
+      .result.headOption
   }
 
-  def updateSession(apiSession: ApiSession)(implicit session: Session) =
-    sessionQuery.filter(_.id === apiSession.id).update(apiSession)
+  def insertSession(apiSession: ApiSession) = db.run {
+    sessions returning sessions.map(_.id) += apiSession
+  }.map(generatedId => apiSession.copy(id = generatedId))
 
-  def deleteSessionByUserIdIpAndUserAgent(userId: Long, ip: String, userAgent: String)(implicit session: Session) =
-    sessionQuery
+  def updateSession(apiSession: ApiSession) = db.run {
+    sessions.filter(_.id === apiSession.id).update(apiSession)
+  }
+
+  def deleteSessionByUserIdIpAndUserAgent(userId: Long, ip: String, userAgent: String): Future[Int] = db.run {
+    sessions
       .filter(_.userId === userId)
       .filter(_.ip === ip)
       .filter(_.userAgent === userAgent)
       .delete
+  }
 
-  def deleteSessionById(sessionId: Long)(implicit session: Session) =
-    sessionQuery.filter(_.id === sessionId).delete
+  def deleteSessionById(sessionId: Long): Future[Int] = db.run {
+    sessions.filter(_.id === sessionId).delete
+  }
+
 }

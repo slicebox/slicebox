@@ -4,11 +4,11 @@
 Service | Status | Description
 ------- | ------ | -----------
 Bintray           | [![Download](https://api.bintray.com/packages/slicebox/slicebox/installers/images/download.svg) ](https://bintray.com/slicebox/slicebox/installers/_latestVersion) | Latest Version on Bintray
-Travis            | [![Build Status](https://travis-ci.org/slicebox/slicebox.svg?branch=master)](https://travis-ci.org/slicebox/slicebox.svg?branch=master) | [Tests](https://travis-ci.org/slicebox/slicebox/)
-Coveralls         | [![Coverage Status](https://coveralls.io/repos/github/slicebox/slicebox/badge.svg?branch=master)](https://coveralls.io/github/slicebox/slicebox?branch=master) | Code coverage
+Travis            | [![Build Status](https://travis-ci.org/slicebox/slicebox.svg?branch=develop)](https://travis-ci.org/slicebox/slicebox.svg?branch=develop) | [Tests](https://travis-ci.org/slicebox/slicebox/)
+Coveralls         | [![Coverage Status](https://coveralls.io/repos/github/slicebox/slicebox/badge.svg?branch=develop)](https://coveralls.io/github/slicebox/slicebox?branch=develop) | Code coverage
 Gitter            | [![Join the chat at https://gitter.im/slicebox/slicebox](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/slicebox/slicebox?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge) | Chatroom
 Documentation     | - | [Wiki](https://github.com/slicebox/slicebox/wiki)
-API Documentation | - | [REST API](http://slicebox.github.io/slicebox)
+API Documentation | - | [REST API](http://slicebox.github.io/slicebox-api)
 
 Slicebox is a microservice for safe sharing and easy access to medical images. The goal of the project is to facilitate research and collaboration between hospitals and universities. The service makes it easy to send images from the hosptial's PACS (image archive) to collaborators on the outside. Anonymization is handled automatically, releaving the hospital staff of the burden of making sure patient information does not leave the hospital network.
 
@@ -41,7 +41,7 @@ The user manual with information on installing, configuring and using slicebox i
 API
 ---
 
-A full specification of the Slicebox API is available at [slicebox.github.io/slicebox](http://slicebox.github.io/slicebox), displayed using [Swagger UI](http://swagger.io).
+A full specification of the Slicebox API is available at [slicebox.github.io/slicebox-api](http://slicebox.github.io/slicebox-api).
 
 Versioning
 ----------

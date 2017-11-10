@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Lars Edenbrandt
+ * Copyright 2014 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,18 +16,23 @@
 
 package se.nimsa.sbx.log
 
-import scala.slick.driver.JdbcProfile
-import scala.slick.jdbc.meta.MTable
-import LogProtocol._
-import java.util.Date
+import se.nimsa.sbx.log.LogProtocol._
+import se.nimsa.sbx.util.DbUtil.createTables
+import slick.basic.DatabaseConfig
+import slick.jdbc.JdbcProfile
 
-class LogDAO(val driver: JdbcProfile) {
-  import driver.simple._
+import scala.concurrent.{ExecutionContext, Future}
+
+class LogDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionContext){
+
+  import dbConf.profile.api._
+
+  val db = dbConf.db
 
   val toLogEntry = (id: Long, created: Long, entryType: String, subject: String, message: String) => LogEntry(id, created, LogEntryType.withName(entryType), subject, message)
   val fromLogEntry = (logEntry: LogEntry) => Option((logEntry.id, logEntry.created, logEntry.entryType.toString(), logEntry.subject, logEntry.message))
 
-  class LogTable(tag: Tag) extends Table[LogEntry](tag, "Log") {
+  class LogTable(tag: Tag) extends Table[LogEntry](tag, LogTable.name) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def created = column[Long]("created")
     def entryType = column[String]("type")
@@ -36,55 +41,61 @@ class LogDAO(val driver: JdbcProfile) {
     def * = (id, created, entryType, subject, message) <> (toLogEntry.tupled, fromLogEntry)
   }
 
-  val logQuery = TableQuery[LogTable]
-
-  def create(implicit session: Session): Unit =
-    if (MTable.getTables("Log").list.isEmpty) logQuery.ddl.create
-
-  def drop(implicit session: Session): Unit =
-    logQuery.ddl.drop
-    
-  def clear(implicit session: Session): Unit =
-    logQuery.delete
-
-  def insertLogEntry(logEntry: LogEntry)(implicit session: Session): LogEntry = {
-    val generatedId = (logQuery returning logQuery.map(_.id)) += logEntry
-    logEntry.copy(id = generatedId)
+  object LogTable {
+    val name = "Log"
   }
 
-  def removeLogEntry(logId: Long)(implicit session: Session): Unit =
-    logQuery.filter(_.id === logId).delete
+  val logQuery = TableQuery[LogTable]
 
-  def listLogEntries(startIndex: Long, count: Long)(implicit session: Session): List[LogEntry] =
+  def create() = createTables(dbConf, (LogTable.name, logQuery))
+
+  def drop() = db.run(logQuery.schema.drop)
+
+  def clear() = db.run(logQuery.delete)
+
+  def insertLogEntry(logEntry: LogEntry): Future[LogEntry] = db.run {
+    (logQuery returning logQuery.map(_.id) += logEntry)
+      .map(generatedId => logEntry.copy(id = generatedId))
+  }
+
+  def removeLogEntry(logId: Long): Future[Unit] = db.run {
+    logQuery.filter(_.id === logId).delete.map(_ => {})
+  }
+
+  def listLogEntries(startIndex: Long, count: Long): Future[Seq[LogEntry]] = db.run {
     logQuery
       .sortBy(_.created.desc)
       .drop(startIndex)
       .take(count)
-      .list
+      .result
+  }
 
-  def logEntriesBySubject(subject: String, startIndex: Long, count: Long)(implicit session: Session): List[LogEntry] =
+  def logEntriesBySubject(subject: String, startIndex: Long, count: Long): Future[Seq[LogEntry]] = db.run {
     logQuery
       .filter(_.subject === subject)
       .sortBy(_.created.desc)
       .drop(startIndex)
       .take(count)
-      .list
+      .result
+  }
 
-  def logEntriesByType(entryType: LogEntryType, startIndex: Long, count: Long)(implicit session: Session): List[LogEntry] =
+  def logEntriesByType(entryType: LogEntryType, startIndex: Long, count: Long): Future[Seq[LogEntry]] = db.run {
     logQuery
       .filter(_.entryType === entryType.toString)
       .sortBy(_.created.desc)
       .drop(startIndex)
       .take(count)
-      .list
+      .result
+  }
 
-  def logEntriesBySubjectAndType(subject: String, entryType: LogEntryType, startIndex: Long, count: Long)(implicit session: Session): List[LogEntry] =
+  def logEntriesBySubjectAndType(subject: String, entryType: LogEntryType, startIndex: Long, count: Long): Future[Seq[LogEntry]] = db.run {
     logQuery
       .filter(_.subject === subject)
       .filter(_.entryType === entryType.toString)
       .sortBy(_.created.desc)
       .drop(startIndex)
       .take(count)
-      .list
+      .result
+  }
 
 }

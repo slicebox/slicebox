@@ -29,6 +29,10 @@ angular.module('slicebox.anonymization', ['ngRoute'])
             }            
         ];
 
+    if (!$scope.uiState.anonymizationTableState) {
+        $scope.uiState.anonymizationTableState = {};
+    }
+
     $scope.callbacks = {};
 
     // Scope functions
@@ -59,11 +63,11 @@ angular.module('slicebox.anonymization', ['ngRoute'])
 
     $scope.exportToCsv = function(keys) {
         var csv = 
-            "Id;Created;Patient Birth Date;Patient Name;Anonymous Patient Name;Patient ID;Anonymous Patient ID;" + 
+            "Id;Created;Patient Name;Patient ID;Anonymous Patient Name;Anonymous Patient ID;Patient Birth Date;" +
             "Study Instance UID;Anonymous Study Instance UID;Study Description;Study ID;Accession Number;" + 
             "Series Instance UID;Anonymous Series Instance UID;Series Description;Protocol Name;Frame Of Reference UID;Anonymous Frame Of Reference UID\n" +
             keys.map(function (key) {
-                return key.id + ";" + key.created + ";" + key.patientBirthDate + ";" + key.patientName + ";" + key.anonPatientName + ";" + key.patientID + ";" + key.anonPatientID + ";" + 
+                return key.id + ";" + key.created + ";" + key.patientName + ";" + key.patientID + ";" + key.anonPatientName + ";" + key.anonPatientID + ";" + key.patientBirthDate + ";" +
                     key.studyInstanceUID + ";" + key.anonStudyInstanceUID + ";" + key.studyDescription + ";" + key.studyID + ";" + key.accessionNumber + ";" +
                     key.seriesInstanceUID + ";" + key.anonSeriesInstanceUID + ";" + key.seriesDescription + ";" + key.protocolName + ";" + key.frameOfReferenceUID + ";" + key.anonFrameOfReferenceUID;
             }).join("\n");

@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Lars Edenbrandt
+ * Copyright 2014 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,17 +23,17 @@ import akka.http.scaladsl.server.Route
 import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
 import se.nimsa.sbx.user.UserProtocol._
-import se.nimsa.sbx.metadata.MetaDataProtocol._
 
-trait SeriesTypeRoutes { this: SliceboxBase =>
+trait SeriesTypeRoutes {
+  this: SliceboxBase =>
 
   def seriesTypeRoutes(apiUser: ApiUser): Route =
     pathPrefix("seriestypes") {
       pathEndOrSingleSlash {
         get {
-          parameters(
+          parameters((
             'startindex.as(nonNegativeFromStringUnmarshaller) ? 0,
-            'count.as(nonNegativeFromStringUnmarshaller) ? 20) { (startIndex, count) =>
+            'count.as(nonNegativeFromStringUnmarshaller) ? 20)) { (startIndex, count) =>
             onSuccess(seriesTypeService.ask(GetSeriesTypes(startIndex, count))) {
               case SeriesTypes(seriesTypes) =>
                 complete(seriesTypes)
@@ -138,7 +138,17 @@ trait SeriesTypeRoutes { this: SliceboxBase =>
             }
           }
         }
-
+      } ~ pathPrefix("series") {
+        path("query") {
+          post {
+            entity(as[IdsQuery]) { query =>
+              onSuccess(seriesTypeService.ask(GetSeriesTypesForListOfSeries(query))) {
+                case result: SeriesIdSeriesTypesResult =>
+                  complete(result)
+              }
+            }
+          }
+        }
       }
     }
 }

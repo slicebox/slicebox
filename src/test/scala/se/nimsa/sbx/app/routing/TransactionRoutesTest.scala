@@ -2,40 +2,29 @@ package se.nimsa.sbx.app.routing
 
 import java.util.UUID
 
-import akka.http.scaladsl.model.{ContentTypes, HttpEntity}
 import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.model.{ContentTypes, HttpEntity}
 import akka.http.scaladsl.server._
-import akka.http.scaladsl.unmarshalling.PredefinedFromEntityUnmarshallers
 import akka.util.ByteString
 import org.scalatest.{FlatSpecLike, Matchers}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
-import se.nimsa.sbx.box.BoxDAO
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy.{Image, Patient}
 import se.nimsa.sbx.dicom.DicomProperty._
-import se.nimsa.sbx.dicom.DicomUtil
 import se.nimsa.sbx.storage.RuntimeStorage
 import se.nimsa.sbx.util.CompressionUtil._
+import se.nimsa.sbx.util.FutureUtil.await
 import se.nimsa.sbx.util.TestUtil
 
 import scala.concurrent.Await
-import scala.concurrent.duration.Duration
 import scala.concurrent.duration.DurationInt
-import scala.reflect.ClassTag
 
 class TransactionRoutesTest extends {
-  val dbProps = TestUtil.createTestDb("transactionroutestest")
+  val dbConfig = TestUtil.createTestDb("transactionroutestest")
   val storage = new RuntimeStorage
 } with FlatSpecLike with Matchers with RoutesTestBase {
 
-  val db = dbProps.db
-  val boxDao = new BoxDAO(dbProps.driver)
-
-  override def afterEach() {
-    db.withSession { implicit session =>
-      boxDao.clear
-    }
-  }
+  override def afterEach() = await(boxDao.clear())
 
   def addPollBox(name: String) =
     PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData(name)) ~> routes ~> check {
@@ -56,10 +45,10 @@ class TransactionRoutesTest extends {
 
     // first, add a box on the poll (university) side
     val uniBox =
-    PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData("hosp")) ~> routes ~> check {
-      status should be(Created)
-      responseAs[Box]
-    }
+      PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData("hosp")) ~> routes ~> check {
+        status should be(Created)
+        responseAs[Box]
+      }
 
     // then, push an image from the hospital to the uni box we just set up
     val compressedBytes = compress(TestUtil.testImageByteArray)
@@ -77,9 +66,9 @@ class TransactionRoutesTest extends {
 
     // first, add a box on the poll (university) side
     val uniBox =
-    PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData("hosp")) ~> routes ~> check {
-      responseAs[Box]
-    }
+      PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData("hosp")) ~> routes ~> check {
+        responseAs[Box]
+      }
 
     // then, push an image from the hospital to the uni box we just set up
     val compressedBytes = compress(TestUtil.testImageByteArray)
@@ -92,9 +81,7 @@ class TransactionRoutesTest extends {
       status should be(NoContent)
     }
 
-    db.withSession { implicit session =>
-      boxDao.listIncomingImages should have length 1
-    }
+    await(boxDao.listIncomingImages) should have length 1
   }
 
   it should "return unauthorized when polling outgoing with unvalid token" in {
@@ -149,10 +136,10 @@ class TransactionRoutesTest extends {
 
     // poll outgoing
     val transactionImage =
-    Get(s"/api/transactions/${uniBox.token}/outgoing/poll") ~> routes ~> check {
-      status should be(OK)
-      responseAs[OutgoingTransactionImage]
-    }
+      Get(s"/api/transactions/${uniBox.token}/outgoing/poll") ~> routes ~> check {
+        status should be(OK)
+        responseAs[OutgoingTransactionImage]
+      }
 
     // get image
     Get(s"/api/transactions/${uniBox.token}/outgoing?transactionid=${transactionImage.transaction.id}&imageid=${transactionImage.image.id}") ~> routes ~> check {
@@ -160,7 +147,7 @@ class TransactionRoutesTest extends {
 
       contentType should be(ContentTypes.`application/octet-stream`)
 
-      val dicomData = DicomUtil.loadDicomData(decompress(responseAs[ByteString].toArray), withPixelData = true)
+      val dicomData = TestUtil.loadDicomData(decompress(responseAs[ByteString].toArray), withPixelData = true)
       dicomData should not be null
     }
   }
@@ -179,10 +166,10 @@ class TransactionRoutesTest extends {
 
     // poll outgoing
     val transactionImage =
-    Get(s"/api/transactions/${uniBox.token}/outgoing/poll") ~> routes ~> check {
-      status should be(OK)
-      responseAs[OutgoingTransactionImage]
-    }
+      Get(s"/api/transactions/${uniBox.token}/outgoing/poll") ~> routes ~> check {
+        status should be(OK)
+        responseAs[OutgoingTransactionImage]
+      }
 
     // check that outgoing image is not marked as sent at this stage
     transactionImage.image.sent shouldBe false
@@ -197,19 +184,15 @@ class TransactionRoutesTest extends {
       status should be(NotFound)
     }
 
-    db.withSession { implicit session =>
-      boxDao.listOutgoingImages.head.sent shouldBe true
-    }
+    await(boxDao.listOutgoingImages).head.sent shouldBe true
 
     GetAsUser(s"/api/boxes/outgoing/${transactionImage.transaction.id}/images") ~> routes ~> check {
       status shouldBe OK
       responseAs[List[Image]] should have length 1
     }
 
-    db.withSession { implicit session =>
-      boxDao.listOutgoingImages should have length 1
-      boxDao.listOutgoingImages.head.sent shouldBe true
-    }
+    await(boxDao.listOutgoingImages) should have length 1
+    await(boxDao.listOutgoingImages).head.sent shouldBe true
   }
 
   it should "mark correct transaction as failed when failed message is received" in {
@@ -226,10 +209,10 @@ class TransactionRoutesTest extends {
 
     // poll outgoing
     val transactionImage =
-    Get(s"/api/transactions/${uniBox.token}/outgoing/poll") ~> routes ~> check {
-      status should be(OK)
-      responseAs[OutgoingTransactionImage]
-    }
+      Get(s"/api/transactions/${uniBox.token}/outgoing/poll") ~> routes ~> check {
+        status should be(OK)
+        responseAs[OutgoingTransactionImage]
+      }
 
     // send failed
     Post(s"/api/transactions/${uniBox.token}/outgoing/failed", FailedOutgoingTransactionImage(transactionImage, "error message")) ~> routes ~> check {
@@ -255,9 +238,7 @@ class TransactionRoutesTest extends {
 
     val transId = 12345
 
-    db.withSession { implicit session =>
-      boxDao.insertIncomingTransaction(IncomingTransaction(-1, uniBox.id, uniBox.name, transId, 45, 45, 48, 0, 0, TransactionStatus.FAILED))
-    }
+    await(boxDao.insertIncomingTransaction(IncomingTransaction(-1, uniBox.id, uniBox.name, transId, 45, 45, 48, 0, 0, TransactionStatus.FAILED)))
 
     Get(s"/api/transactions/${uniBox.token}/status?transactionid=$transId") ~> routes ~> check {
       status shouldBe OK
@@ -280,9 +261,7 @@ class TransactionRoutesTest extends {
 
     val transId = 12345
 
-    db.withSession { implicit session =>
-      boxDao.insertIncomingTransaction(IncomingTransaction(-1, uniBox.id, uniBox.name, transId, 45, 45, 48, 0, 0, TransactionStatus.PROCESSING))
-    }
+    await(boxDao.insertIncomingTransaction(IncomingTransaction(-1, uniBox.id, uniBox.name, transId, 45, 45, 48, 0, 0, TransactionStatus.PROCESSING)))
 
     Put(s"/api/transactions/${uniBox.token}/status?transactionid=$transId", TransactionStatus.FAILED.toString) ~> routes ~> check {
       status shouldBe NoContent
@@ -328,10 +307,10 @@ class TransactionRoutesTest extends {
 
     // poll outgoing
     val transactionImage =
-    Get(s"/api/transactions/${uniBox.token}/outgoing/poll") ~> routes ~> check {
-      status should be(OK)
-      responseAs[OutgoingTransactionImage]
-    }
+      Get(s"/api/transactions/${uniBox.token}/outgoing/poll") ~> routes ~> check {
+        status should be(OK)
+        responseAs[OutgoingTransactionImage]
+      }
 
     // get image
     val transactionId = transactionImage.transaction.id
@@ -340,7 +319,7 @@ class TransactionRoutesTest extends {
       status should be(OK)
       responseAs[ByteString]
     }
-    val dicomData = DicomUtil.loadDicomData(decompress(compressedArray.toArray), withPixelData = false)
+    val dicomData = TestUtil.loadDicomData(decompress(compressedArray.toArray), withPixelData = false)
     dicomData.attributes.getString(PatientName.dicomTag) should be("TEST NAME") // mapped
     dicomData.attributes.getString(PatientID.dicomTag) should be("TEST ID") // mapped
     dicomData.attributes.getString(PatientBirthDate.dicomTag) should be("19601010") // mapped

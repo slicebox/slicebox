@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Lars Edenbrandt
+ * Copyright 2014 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,10 +16,8 @@
 
 package se.nimsa.sbx.anonymization
 
+import se.nimsa.sbx.metadata.MetaDataProtocol.{QueryOrder, QueryProperty}
 import se.nimsa.sbx.model.Entity
-import org.dcm4che3.data.Attributes
-import se.nimsa.sbx.metadata.MetaDataProtocol.QueryOrder
-import se.nimsa.sbx.metadata.MetaDataProtocol.QueryProperty
 
 object AnonymizationProtocol {
 
@@ -60,9 +58,9 @@ object AnonymizationProtocol {
       
   trait AnonymizationRequest
 
-  case class ReverseAnonymization(attributes: Attributes) extends AnonymizationRequest
+  case class GetAnonymizationKeysForPatient(patientName: String, patientId: String) extends AnonymizationRequest
 
-  case class Anonymize(imageId: Long, attributes: Attributes, tagValues: Seq[TagValue]) extends AnonymizationRequest
+  case class GetReverseAnonymizationKeysForPatient(anonPatientName: String, anonPatientID: String) extends AnonymizationRequest
 
   case class GetAnonymizationKeys(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String]) extends AnonymizationRequest
 
@@ -73,6 +71,10 @@ object AnonymizationProtocol {
   case class QueryAnonymizationKeys(query: AnonymizationKeyQuery) extends AnonymizationRequest
   
   case class RemoveAnonymizationKey(anonymizationKeyId: Long) extends AnonymizationRequest
+
+  case class AddAnonymizationKey(anonymizationKey: AnonymizationKey) extends AnonymizationRequest
+
+  case class AnonymizationKeyAdded(anonymizationKey: AnonymizationKey)
 
   case class AnonymizationKeyRemoved(anonymizationKeyId: Long)
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Lars Edenbrandt
+ * Copyright 2014 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,9 +25,8 @@ import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
-import akka.http.scaladsl.unmarshalling.{PredefinedFromStringUnmarshallers, Unmarshaller}
 
-trait MetadataRoutes {
+trait MetaDataRoutes {
   this: SliceboxBase =>
 
   def metaDataRoutes: Route =
@@ -42,7 +41,7 @@ trait MetadataRoutes {
       } ~ pathPrefix("patients") {
         pathEndOrSingleSlash {
           get {
-            parameters(
+            parameters((
               'startindex.as(nonNegativeFromStringUnmarshaller) ? 0,
               'count.as(nonNegativeFromStringUnmarshaller) ? 20,
               'orderby.as[String].?,
@@ -50,7 +49,7 @@ trait MetadataRoutes {
               'filter.as[String].?,
               'sources.as[String].?,
               'seriestypes.as[String].?,
-              'seriestags.as[String].?) { (startIndex, count, orderBy, orderAscending, filter, sourcesString, seriesTypesString, seriesTagsString) =>
+              'seriestags.as[String].?)) { (startIndex, count, orderBy, orderAscending, filter, sourcesString, seriesTypesString, seriesTagsString) =>
               val sources = sourcesString.map(parseSourcesString).getOrElse(Array.empty)
               val seriesTypes = seriesTypesString.map(parseIdsString).getOrElse(Array.empty)
               val seriesTags = seriesTagsString.map(parseIdsString).getOrElse(Array.empty)
@@ -77,10 +76,10 @@ trait MetadataRoutes {
               }
             }
           } ~ path("images") {
-            parameters(
+            parameters((
               'sources.as[String].?,
               'seriestypes.as[String].?,
-              'seriestags.as[String].?) { (sourcesString, seriesTypesString, seriesTagsString) =>
+              'seriestags.as[String].?)) { (sourcesString, seriesTypesString, seriesTagsString) =>
               val sources = sourcesString.map(parseSourcesString(_)).getOrElse(Array.empty)
               val seriesTypes = seriesTypesString.map(parseIdsString(_)).getOrElse(Array.empty)
               val seriesTags = seriesTagsString.map(parseIdsString(_)).getOrElse(Array.empty)
@@ -94,13 +93,13 @@ trait MetadataRoutes {
       } ~ pathPrefix("studies") {
         pathEndOrSingleSlash {
           get {
-            parameters(
+            parameters((
               'startindex.as(nonNegativeFromStringUnmarshaller) ? 0,
               'count.as(nonNegativeFromStringUnmarshaller) ? 20,
               'patientid.as[Long],
               'sources.as[String].?,
               'seriestypes.as[String].?,
-              'seriestags.as[String].?) { (startIndex, count, patientId, sourcesString, seriesTypesString, seriesTagsString) =>
+              'seriestags.as[String].?)) { (startIndex, count, patientId, sourcesString, seriesTypesString, seriesTagsString) =>
               val sources = sourcesString.map(parseSourcesString(_)).getOrElse(Array.empty)
               val seriesTypes = seriesTypesString.map(parseIdsString(_)).getOrElse(Array.empty)
               val seriesTags = seriesTagsString.map(parseIdsString(_)).getOrElse(Array.empty)
@@ -127,10 +126,10 @@ trait MetadataRoutes {
               }
             }
           } ~ path("images") {
-            parameters(
+            parameters((
               'sources.as[String].?,
               'seriestypes.as[String].?,
-              'seriestags.as[String].?) { (sourcesString, seriesTypesString, seriesTagsString) =>
+              'seriestags.as[String].?)) { (sourcesString, seriesTypesString, seriesTagsString) =>
               val sources = sourcesString.map(parseSourcesString(_)).getOrElse(Array.empty)
               val seriesTypes = seriesTypesString.map(parseIdsString(_)).getOrElse(Array.empty)
               val seriesTags = seriesTagsString.map(parseIdsString(_)).getOrElse(Array.empty)
@@ -144,13 +143,13 @@ trait MetadataRoutes {
       } ~ pathPrefix("series") {
         pathEndOrSingleSlash {
           get {
-            parameters(
+            parameters((
               'startindex.as(nonNegativeFromStringUnmarshaller) ? 0,
               'count.as(nonNegativeFromStringUnmarshaller) ? 20,
               'studyid.as[Long],
               'sources.as[String].?,
               'seriestypes.as[String].?,
-              'seriestags.as[String].?) { (startIndex, count, studyId, sourcesString, seriesTypesString, seriesTagsString) =>
+              'seriestags.as[String].?)) { (startIndex, count, studyId, sourcesString, seriesTypesString, seriesTagsString) =>
               val sources = sourcesString.map(parseSourcesString(_)).getOrElse(Array.empty)
               val seriesTypes = seriesTypesString.map(parseIdsString(_)).getOrElse(Array.empty)
               val seriesTags = seriesTagsString.map(parseIdsString(_)).getOrElse(Array.empty)
@@ -246,10 +245,10 @@ trait MetadataRoutes {
       } ~ pathPrefix("images") {
         pathEndOrSingleSlash {
           get {
-            parameters(
+            parameters((
               'startindex.as(nonNegativeFromStringUnmarshaller) ? 0,
               'count.as(nonNegativeFromStringUnmarshaller) ? 20,
-              'seriesid.as[Long]) { (startIndex, count, seriesId) =>
+              'seriesid.as[Long])) { (startIndex, count, seriesId) =>
               onSuccess(metaDataService.ask(GetImages(startIndex, count, seriesId))) {
                 case Images(images) =>
                   complete(images)
@@ -275,7 +274,7 @@ trait MetadataRoutes {
       } ~ pathPrefix("flatseries") {
         pathEndOrSingleSlash {
           get {
-            parameters(
+            parameters((
               'startindex.as(nonNegativeFromStringUnmarshaller) ? 0,
               'count.as(nonNegativeFromStringUnmarshaller) ? 20,
               'orderby.as[String].?,
@@ -283,7 +282,7 @@ trait MetadataRoutes {
               'filter.as[String].?,
               'sources.as[String].?,
               'seriestypes.as[String].?,
-              'seriestags.as[String].?) { (startIndex, count, orderBy, orderAscending, filter, sourcesString, seriesTypesString, seriesTagsString) =>
+              'seriestags.as[String].?)) { (startIndex, count, orderBy, orderAscending, filter, sourcesString, seriesTypesString, seriesTagsString) =>
               val sources = sourcesString.map(parseSourcesString(_)).getOrElse(Array.empty)
               val seriesTypes = seriesTypesString.map(parseIdsString(_)).getOrElse(Array.empty)
               val seriesTags = seriesTagsString.map(parseIdsString(_)).getOrElse(Array.empty)
@@ -320,7 +319,7 @@ trait MetadataRoutes {
       })
     } catch {
       case e: Exception =>
-        throw new IllegalArgumentException("Sources parameter must be formatted as a comma separated list of sourceType:sourceId elements, e.g. BOX:23,BOX:12,USER:2")
+        throw new IllegalArgumentException("Sources parameter must be formatted as a comma separated list of sourceType:sourceId elements, e.g. box:23,box:12,user:2")
     }
   }
 

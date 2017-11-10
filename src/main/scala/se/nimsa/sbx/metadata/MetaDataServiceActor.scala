@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Lars Edenbrandt
+ * Copyright 2014 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,255 +16,137 @@
 
 package se.nimsa.sbx.metadata
 
-import akka.actor.{Actor, Props}
+import akka.actor.{Actor, Props, Stash}
 import akka.event.{Logging, LoggingReceive}
-import se.nimsa.sbx.app.DbProps
-import se.nimsa.sbx.app.GeneralProtocol.Source
-import se.nimsa.sbx.dicom.DicomHierarchy._
+import akka.pattern.pipe
 import se.nimsa.sbx.dicom.DicomUtil._
 import se.nimsa.sbx.lang.NotFoundException
-import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.metadata.MetaDataProtocol._
-import se.nimsa.sbx.util.ExceptionCatching
+import se.nimsa.sbx.util.SequentialPipeToSupport
 
-class MetaDataServiceActor(dbProps: DbProps) extends Actor with ExceptionCatching {
+import scala.concurrent.Future
+
+class MetaDataServiceActor(metaDataDao: MetaDataDAO, propertiesDao: PropertiesDAO) extends Actor with Stash with SequentialPipeToSupport {
 
   import context.system
 
-  val log = Logging(context.system, this)
+  implicit val executor = system.dispatcher
 
-  val db = dbProps.db
-  val dao = new MetaDataDAO(dbProps.driver)
-  val propertiesDao = new PropertiesDAO(dbProps.driver)
+  val log = Logging(context.system, this)
 
   log.info("Meta data service started")
 
   def receive = LoggingReceive {
 
     case AddMetaData(attributes, source) =>
-      catchAndReport {
-        val metaData = addMetaData(
-          attributesToPatient(attributes),
-          attributesToStudy(attributes),
-          attributesToSeries(attributes),
-          attributesToImage(attributes),
-          source)
-        log.debug(s"Added metadata $metaData")
-        context.system.eventStream.publish(metaData)
-        sender ! metaData
-      }
+      val addFuture = propertiesDao.addMetaData(
+        attributesToPatient(attributes),
+        attributesToStudy(attributes),
+        attributesToSeries(attributes),
+        attributesToImage(attributes),
+        source)
+      addFuture.map(metaData => s"Added metadata $metaData").foreach(log.debug)
+      addFuture.foreach(context.system.eventStream.publish)
+      addFuture.pipeSequentiallyTo(sender)
 
-    case DeleteMetaData(imageId) =>
-      catchAndReport {
-        val (deletedPatient, deletedStudy, deletedSeries, deletedImage) =
-          db.withSession { implicit session =>
-            dao.imageById(imageId).map(propertiesDao.deleteFully).getOrElse((None, None, None, None))
-          }
+    case DeleteMetaData(imageIds) =>
+      val deleteFuture = propertiesDao.deleteFully(imageIds).map(MetaDataDeleted.tupled)
+      deleteFuture.foreach(system.eventStream.publish)
+      deleteFuture.pipeSequentiallyTo(sender)
 
-        val metaDataDeleted = MetaDataDeleted(deletedPatient, deletedStudy, deletedSeries, deletedImage)
-        system.eventStream.publish(metaDataDeleted)
-
-        sender ! metaDataDeleted
-      }
-
-    case msg: PropertiesRequest => catchAndReport {
+    case msg: PropertiesRequest =>
       msg match {
 
         case GetSeriesTags =>
-          sender ! SeriesTags(getSeriesTags)
+          pipe(propertiesDao.listSeriesTags.map(SeriesTags)).to(sender)
 
         case GetSourceForSeries(seriesId) =>
-          db.withSession { implicit session =>
-            sender ! propertiesDao.seriesSourceById(seriesId)
-          }
+          pipe(propertiesDao.seriesSourceById(seriesId)).to(sender)
 
         case GetSeriesTagsForSeries(seriesId) =>
-          val seriesTags = getSeriesTagsForSeries(seriesId)
-          sender ! SeriesTags(seriesTags)
+          pipe(propertiesDao.seriesTagsForSeries(seriesId).map(SeriesTags)).to(sender)
 
         case AddSeriesTagToSeries(seriesTag, seriesId) =>
-          db.withSession { implicit session =>
-            dao.seriesById(seriesId).getOrElse {
-              throw new NotFoundException("Series not found")
-            }
-            val dbSeriesTag = propertiesDao.addAndInsertSeriesTagForSeriesId(seriesTag, seriesId)
-            sender ! SeriesTagAddedToSeries(dbSeriesTag)
-          }
+          propertiesDao.addSeriesTagToSeries(seriesTag, seriesId).map(_.getOrElse {
+            throw new NotFoundException("Series not found")
+          }).map(SeriesTagAddedToSeries)
+            .pipeSequentiallyTo(sender)
 
         case RemoveSeriesTagFromSeries(seriesTagId, seriesId) =>
-          db.withSession { implicit session =>
-            propertiesDao.removeAndCleanupSeriesTagForSeriesId(seriesTagId, seriesId)
-            sender ! SeriesTagRemovedFromSeries(seriesId)
-          }
+          propertiesDao.removeAndCleanupSeriesTagForSeriesId(seriesTagId, seriesId)
+            .map(_ => SeriesTagRemovedFromSeries(seriesId))
+            .pipeSequentiallyTo(sender)
       }
-    }
 
-    case msg: MetaDataQuery => catchAndReport {
+    case msg: MetaDataQuery =>
       msg match {
         case GetPatients(startIndex, count, orderBy, orderAscending, filter, sourceIds, seriesTypeIds, seriesTagIds) =>
-          db.withSession { implicit session =>
-            sender ! Patients(propertiesDao.patients(startIndex, count, orderBy, orderAscending, filter, sourceIds, seriesTypeIds, seriesTagIds))
-          }
+          pipe(propertiesDao.patients(startIndex, count, orderBy, orderAscending, filter, sourceIds, seriesTypeIds, seriesTagIds).map(Patients)).to(sender)
 
         case GetStudies(startIndex, count, patientId, sourceRefs, seriesTypeIds, seriesTagIds) =>
-          db.withSession { implicit session =>
-            sender ! Studies(propertiesDao.studiesForPatient(startIndex, count, patientId, sourceRefs, seriesTypeIds, seriesTagIds))
-          }
+          pipe(propertiesDao.studiesForPatient(startIndex, count, patientId, sourceRefs, seriesTypeIds, seriesTagIds).map(Studies)).to(sender)
 
         case GetSeries(startIndex, count, studyId, sourceRefs, seriesTypeIds, seriesTagIds) =>
-          db.withSession { implicit session =>
-            sender ! SeriesCollection(propertiesDao.seriesForStudy(startIndex, count, studyId, sourceRefs, seriesTypeIds, seriesTagIds))
-          }
+          pipe(propertiesDao.seriesForStudy(startIndex, count, studyId, sourceRefs, seriesTypeIds, seriesTagIds).map(SeriesCollection)).to(sender)
 
         case GetImages(startIndex, count, seriesId) =>
-          db.withSession { implicit session =>
-            sender ! Images(dao.imagesForSeries(startIndex, count, seriesId))
-          }
+          pipe(metaDataDao.imagesForSeries(startIndex, count, seriesId).map(Images)).to(sender)
 
         case GetFlatSeries(startIndex, count, orderBy, orderAscending, filter, sourceRefs, seriesTypeIds, seriesTagIds) =>
-          db.withSession { implicit session =>
-            sender ! FlatSeriesCollection(propertiesDao.flatSeries(startIndex, count, orderBy, orderAscending, filter, sourceRefs, seriesTypeIds, seriesTagIds))
-          }
+          pipe(propertiesDao.flatSeries(startIndex, count, orderBy, orderAscending, filter, sourceRefs, seriesTypeIds, seriesTagIds).map(FlatSeriesCollection)).to(sender)
 
         case GetPatient(patientId) =>
-          db.withSession { implicit session =>
-            sender ! dao.patientById(patientId)
-          }
+          pipe(metaDataDao.patientById(patientId)).to(sender).to(sender)
 
         case GetStudy(studyId) =>
-          db.withSession { implicit session =>
-            sender ! dao.studyById(studyId)
-          }
+          pipe(metaDataDao.studyById(studyId)).to(sender)
 
         case GetSingleSeries(seriesId) =>
-          db.withSession { implicit session =>
-            sender ! dao.seriesById(seriesId)
-          }
+          pipe(metaDataDao.seriesById(seriesId)).to(sender)
 
         case GetAllSeries =>
-          db.withSession { implicit session =>
-            sender ! SeriesCollection(dao.series)
-          }
+          pipe(metaDataDao.series.map(SeriesCollection)).to(sender)
 
         case GetImage(imageId) =>
-          db.withSession { implicit session =>
-            sender ! dao.imageById(imageId)
-          }
+          pipe(metaDataDao.imageById(imageId)).to(sender)
 
         case GetSingleFlatSeries(seriesId) =>
-          db.withSession { implicit session =>
-            sender ! dao.flatSeriesById(seriesId)
-          }
+          pipe(metaDataDao.flatSeriesById(seriesId)).to(sender)
 
         case QueryPatients(query) =>
-          db.withSession { implicit session =>
-            sender ! Patients(propertiesDao.queryPatients(query.startIndex, query.count, query.order, query.queryProperties, query.filters))
-          }
+          pipe(propertiesDao.queryPatients(query.startIndex, query.count, query.order, query.queryProperties, query.filters).map(Patients)).to(sender)
 
         case QueryStudies(query) =>
-          db.withSession { implicit session =>
-            sender ! Studies(propertiesDao.queryStudies(query.startIndex, query.count, query.order, query.queryProperties, query.filters))
-          }
+          pipe(propertiesDao.queryStudies(query.startIndex, query.count, query.order, query.queryProperties, query.filters).map(Studies)).to(sender)
 
         case QuerySeries(query) =>
-          db.withSession { implicit session =>
-            sender ! SeriesCollection(propertiesDao.querySeries(query.startIndex, query.count, query.order, query.queryProperties, query.filters))
-          }
+          pipe(propertiesDao.querySeries(query.startIndex, query.count, query.order, query.queryProperties, query.filters).map(SeriesCollection)).to(sender)
 
         case QueryImages(query) =>
-          db.withSession { implicit session =>
-            sender ! Images(propertiesDao.queryImages(query.startIndex, query.count, query.order, query.queryProperties, query.filters))
-          }
+          pipe(propertiesDao.queryImages(query.startIndex, query.count, query.order, query.queryProperties, query.filters).map(Images)).to(sender)
 
         case QueryFlatSeries(query) =>
-          db.withSession { implicit session =>
-            sender ! FlatSeriesCollection(propertiesDao.queryFlatSeries(query.startIndex, query.count, query.order, query.queryProperties, query.filters))
-          }
+          pipe(propertiesDao.queryFlatSeries(query.startIndex, query.count, query.order, query.queryProperties, query.filters).map(FlatSeriesCollection)).to(sender)
 
         case GetImagesForStudy(studyId, sourceRefs, seriesTypeIds, seriesTagIds) =>
-          db.withSession { implicit session =>
-            sender ! Images(propertiesDao.seriesForStudy(0, 100000000, studyId, sourceRefs, seriesTypeIds, seriesTagIds)
-              .flatMap(series => dao.imagesForSeries(0, 100000000, series.id)))
-          }
+          val imagesFuture = propertiesDao.seriesForStudy(0, 100000000, studyId, sourceRefs, seriesTypeIds, seriesTagIds)
+            .flatMap(series => Future.sequence(series.map(s => metaDataDao.imagesForSeries(0, 100000000, s.id))))
+            .map(_.flatten)
+          pipe(imagesFuture.map(Images)).to(sender)
 
         case GetImagesForPatient(patientId, sourceRefs, seriesTypeIds, seriesTagIds) =>
-          db.withSession { implicit session =>
-            sender ! Images(propertiesDao.studiesForPatient(0, 100000000, patientId, sourceRefs, seriesTypeIds, seriesTagIds)
-              .flatMap(study => propertiesDao.seriesForStudy(0, 100000000, study.id, sourceRefs, seriesTypeIds, seriesTagIds)
-                .flatMap(series => dao.imagesForSeries(0, 100000000, series.id))))
-          }
-
+          val imagesFuture = propertiesDao.studiesForPatient(0, 100000000, patientId, sourceRefs, seriesTypeIds, seriesTagIds)
+            .flatMap(studies => Future.sequence(studies.map(study => propertiesDao.seriesForStudy(0, 100000000, study.id, sourceRefs, seriesTypeIds, seriesTagIds)
+              .flatMap(series => Future.sequence(series.map(s => metaDataDao.imagesForSeries(0, 100000000, s.id)))
+                .map(_.flatten))))
+              .map(_.flatten))
+          pipe(imagesFuture.map(Images)).to(sender)
       }
-    }
 
   }
 
-  def getSeriesTags =
-    db.withSession { implicit session =>
-      propertiesDao.listSeriesTags
-    }
-
-  def getSeriesTagsForSeries(seriesId: Long) =
-    db.withSession { implicit session =>
-      propertiesDao.seriesTagsForSeries(seriesId)
-    }
-
-  def addMetaData(patient: Patient, study: Study, series: Series, image: Image, source: Source): MetaDataAdded = {
-    var patientAdded = false
-    var studyAdded = false
-    var seriesAdded = false
-    var imageAdded = false
-
-    val (dbPatient, dbStudy, dbSeries, dbImage, dbSeriesSource) =
-      db.withTransaction { implicit session =>
-
-        val seriesSource = SeriesSource(-1, source)
-
-        val dbPatient = dao.patientByNameAndID(patient).map { dbp =>
-          val updatePatient = patient.copy(id = dbp.id)
-          dao.updatePatient(updatePatient)
-          updatePatient
-        }.getOrElse {
-          patientAdded = true
-          dao.insert(patient)
-        }
-        val dbStudy = dao.studyByUidAndPatient(study, dbPatient).map { dbs =>
-          val updateStudy = study.copy(id = dbs.id, patientId = dbs.patientId)
-          dao.updateStudy(updateStudy)
-          updateStudy
-        }.getOrElse {
-          studyAdded = true
-          dao.insert(study.copy(patientId = dbPatient.id))
-        }
-        val dbSeries = dao.seriesByUidAndStudy(series, dbStudy).map { dbs =>
-          val updateSeries = series.copy(id = dbs.id, studyId = dbs.studyId)
-          dao.updateSeries(updateSeries)
-          updateSeries
-        }.getOrElse {
-          seriesAdded = true
-          dao.insert(series.copy(studyId = dbStudy.id))
-        }
-        val dbImage = dao.imageByUidAndSeries(image, dbSeries).map { dbi =>
-          val updateImage = image.copy(id = dbi.id, seriesId = dbi.seriesId)
-          dao.updateImage(updateImage)
-          updateImage
-        }.getOrElse {
-          imageAdded = true
-          dao.insert(image.copy(seriesId = dbSeries.id))
-        }
-        val dbSeriesSource = propertiesDao.seriesSourceById(dbSeries.id).map { dbss =>
-          val updateSeriesSource = seriesSource.copy(id = dbss.id)
-          propertiesDao.updateSeriesSource(updateSeriesSource)
-          updateSeriesSource
-        }.getOrElse(propertiesDao.insertSeriesSource(seriesSource.copy(id = dbSeries.id)))
-        
-        (dbPatient, dbStudy, dbSeries, dbImage, dbSeriesSource)
-      }
-
-    MetaDataAdded(dbPatient, dbStudy, dbSeries, dbImage, patientAdded, studyAdded, seriesAdded, imageAdded, dbSeriesSource.source)
-  }
 }
 
 object MetaDataServiceActor {
-  def props(dbProps: DbProps): Props = Props(new MetaDataServiceActor(dbProps))
+  def props(metaDataDao: MetaDataDAO, propertiesDao: PropertiesDAO): Props = Props(new MetaDataServiceActor(metaDataDao, propertiesDao))
 }

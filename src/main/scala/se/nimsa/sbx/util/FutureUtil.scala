@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Lars Edenbrandt
+ * Copyright 2014 Lars Edenbrandt
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,16 +16,21 @@
 
 package se.nimsa.sbx.util
 
+import akka.util.Timeout
+
 import scala.language.higherKinds
 import scala.collection.generic.CanBuildFrom
-import scala.concurrent.Future
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{Await, ExecutionContext, Future}
 
-object FutureUtil {
+object  FutureUtil {
 
   def traverseSequentially[A, B, M[X] <: TraversableOnce[X]](in: M[A])(fn: A => Future[B])(implicit cbf: CanBuildFrom[M[A], B, M[B]], executor: ExecutionContext): Future[M[B]] =
     in.foldLeft(Future.successful(cbf(in))) { (fr, a) =>
       fr.flatMap(r => fn(a).map(b => r += b))
     }.map(_.result())
 
+  /**
+    * Temporary helper method while properly integrating the async approach of Slick 3
+    */
+  def await[T](future: Future[T])(implicit timeout: Timeout): T = Await.result(future, timeout.duration)
 }

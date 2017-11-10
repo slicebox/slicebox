@@ -10,7 +10,7 @@ import akka.http.scaladsl.model.StatusCodes._
 import se.nimsa.sbx.storage.RuntimeStorage
 
 class DirectoryRoutesTest extends {
-  val dbProps = TestUtil.createTestDb("directoryroutestest")
+  val dbConfig = TestUtil.createTestDb("directoryroutestest")
   val storage = new RuntimeStorage
 } with FlatSpecLike with Matchers with RoutesTestBase {
 
