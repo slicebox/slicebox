@@ -304,12 +304,12 @@ angular.module('slicebox.home', ['ngRoute'])
     };
 
     $scope.patientSelected = function(patient) {
-        if ($scope.uiState.selectedPatient !== patient) {
-            $scope.uiState.flatTableState = {};
-            $scope.uiState.studyTableState = {};
-            $scope.uiState.selectedPatient = patient;
-            $scope.studySelected(null, true);
-        }
+        $scope.uiState.flatTableState = {};
+        $scope.uiState.studyTableState = {};
+        $scope.uiState.seriesTableState = {};
+        $scope.uiState.attributesTableState = {};
+        $scope.uiState.selectedPatient = patient;
+        $scope.studySelected(null, true);
         if ($scope.callbacks.patientsTable) {
             $scope.callbacks.patientsTable.reloadPage();
         }
@@ -338,11 +338,10 @@ angular.module('slicebox.home', ['ngRoute'])
     };
 
     $scope.studySelected = function(study, reset) {
-        if ($scope.uiState.selectedStudy !== study) {
-            $scope.uiState.seriesTableState = {};
-            $scope.uiState.selectedStudy = study;
-            $scope.seriesSelected(null, true);
-        }
+        $scope.uiState.seriesTableState = {};
+        $scope.uiState.attributesTableState = {};
+        $scope.uiState.selectedStudy = study;
+        $scope.seriesSelected(null, true);
         if (reset && $scope.callbacks.studiesTable) {
             $scope.callbacks.studiesTable.reset();
         } else if ($scope.callbacks.studiesTable) {
@@ -397,31 +396,28 @@ angular.module('slicebox.home', ['ngRoute'])
     };
 
     $scope.seriesSelected = function(series, reset) {
-        if ($scope.uiState.selectedSeries !== series) {
-            $scope.uiState.selectedSeries = series;
+        $scope.uiState.selectedSeries = series;
 
-            $scope.uiState.seriesDetails.selectedSeriesSource = "";
-            $scope.uiState.seriesDetails.selectedSeriesSeriesTypes = [];
-            $scope.uiState.seriesDetails.selectedSeriesSeriesTags = [];
-            $scope.uiState.seriesDetails.pngImageUrls = [];
-            $scope.uiState.seriesDetails.tagState.searchText = "";
+        $scope.uiState.seriesDetails.selectedSeriesSource = "";
+        $scope.uiState.seriesDetails.selectedSeriesSeriesTypes = [];
+        $scope.uiState.seriesDetails.selectedSeriesSeriesTags = [];
+        $scope.uiState.seriesDetails.pngImageUrls = [];
+        $scope.uiState.seriesDetails.tagState.searchText = "";
 
-            if ($scope.callbacks.imageAttributesTable) {
-                $scope.callbacks.imageAttributesTable.reset();
-            }
-            if ($scope.callbacks.datasetsTable) {
-                $scope.callbacks.datasetsTable.reset();
-            }
+        $scope.updatePNGImageUrls();
 
-            $scope.updatePNGImageUrls();
-
-            if (series !== null) {
-                updateSelectedSeriesSource(series);
-                updateSelectedSeriesSeriesTypes(series);
-                updateSelectedSeriesSeriesTags(series);
-            }
+        if (series !== null) {
+            updateSelectedSeriesSource(series);
+            updateSelectedSeriesSeriesTypes(series);
+            updateSelectedSeriesSeriesTags(series);
         }
 
+        if ($scope.callbacks.datasetsTable) {
+            $scope.callbacks.datasetsTable.reset();
+        }
+        if ($scope.callbacks.imageAttributesTable) {
+            $scope.callbacks.imageAttributesTable.reset();
+        }
         if (reset && $scope.callbacks.seriesTable) {
             $scope.callbacks.seriesTable.reset();
         }
