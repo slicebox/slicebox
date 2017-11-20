@@ -6,7 +6,7 @@ scalacOptions := Seq("-encoding", "UTF-8", "-Xlint", "-deprecation", "-unchecked
 
 // define the project
 
-lazy val slicebox = (project in file(".")).enablePlugins(SbtWeb, JavaServerAppPackaging, SystemVPlugin)
+lazy val slicebox = (project in file(".")).enablePlugins(SbtWeb, JavaServerAppPackaging, SystemVPlugin, DockerPlugin, AshScriptPlugin)
 mainClass in Compile := Some("se.nimsa.sbx.app.Slicebox")
 
 // for sbt-resolver, (the re-start and re-stop commands)
@@ -117,3 +117,6 @@ updateOptions := updateOptions.value.withCachedResolution(true)
 
 WebKeys.packagePrefix in Assets := "public/"
 (managedClasspath in Runtime) += (packageBin in Assets).value
+
+// docker base image
+dockerBaseImage := "openjdk:8-jre-alpine"
