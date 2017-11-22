@@ -6,6 +6,7 @@ import org.dcm4che3.data.{SpecificCharacterSet, Tag}
 import se.nimsa.dcm4che.streams.DicomFlows.toUndefinedLengthSequences
 import se.nimsa.dcm4che.streams.DicomParts._
 import se.nimsa.dcm4che.streams._
+import se.nimsa.sbx.dicom.streams.DicomStreamOps.{DicomInfoPart, PartialAnonymizationKeyPart}
 
 /**
   * A flow which harmonizes anonymization so that random attributes correspond between patients, studies and series
@@ -21,21 +22,31 @@ object HarmonizeAnonymizationFlow {
     Tag.SeriesInstanceUID,
     Tag.FrameOfReferenceUID)
 
-  val harmonizeAnonFlow: Flow[DicomPart, DicomPart, NotUsed] = Flow[DicomPart]
+  def harmonizeAnonFlow: Flow[DicomPart, DicomPart, NotUsed] = Flow[DicomPart]
     .via(groupLengthDiscardFilter)
     .via(toUndefinedLengthSequences)
     .via(DicomFlowFactory.create(new IdentityFlow with GuaranteedValueEvent with StartEvent {
-      var maybeMeta: Option[DicomMetaPart] = None
-      var maybeKeys: Option[AnonymizationKeysPart] = None
+      var maybeInfo: Option[DicomInfoPart] = None
+      var maybeKey: Option[PartialAnonymizationKeyPart] = None
       var currentAttribute: Option[DicomAttribute] = None
 
-      def maybeHarmonize(attribute: DicomAttribute, keys: AnonymizationKeysPart, cs: SpecificCharacterSet): List[DicomPart with Product with Serializable] = {
+      def maybeHarmonize(attribute: DicomAttribute, keyPart: PartialAnonymizationKeyPart, cs: SpecificCharacterSet): List[DicomPart] = {
         val updatedAttribute = attribute.header.tag match {
-          case Tag.PatientName => keys.patientKey.map(key => attribute.withUpdatedValue(key.anonPatientName, cs)).getOrElse(attribute)
-          case Tag.PatientID => keys.patientKey.map(key => attribute.withUpdatedValue(key.anonPatientID, cs)).getOrElse(attribute)
-          case Tag.StudyInstanceUID => keys.studyKey.map(key => attribute.withUpdatedValue(key.anonStudyInstanceUID)).getOrElse(attribute) // ASCII
-          case Tag.SeriesInstanceUID => keys.seriesKey.map(key => attribute.withUpdatedValue(key.anonSeriesInstanceUID)).getOrElse(attribute) // ASCII
-          case Tag.FrameOfReferenceUID => keys.seriesKey.map(key => attribute.withUpdatedValue(key.anonFrameOfReferenceUID)).getOrElse(attribute) // ASCII
+          case Tag.PatientName => keyPart.keyMaybe
+            .map(key => attribute.withUpdatedValue(key.anonPatientName, cs))
+            .getOrElse(attribute)
+          case Tag.PatientID => keyPart.keyMaybe
+            .map(key => attribute.withUpdatedValue(key.anonPatientID, cs))
+            .getOrElse(attribute)
+          case Tag.StudyInstanceUID => keyPart.keyMaybe
+            .map(key => attribute.withUpdatedValue(key.anonStudyInstanceUID))
+            .getOrElse(attribute) // ASCII
+          case Tag.SeriesInstanceUID => keyPart.keyMaybe
+            .map(key => attribute.withUpdatedValue(key.anonSeriesInstanceUID))
+            .getOrElse(attribute) // ASCII
+          case Tag.FrameOfReferenceUID => keyPart.keyMaybe
+            .map(key => attribute.withUpdatedValue(key.anonFrameOfReferenceUID))
+            .getOrElse(attribute) // ASCII
           case _ => attribute
         }
         updatedAttribute.header :: updatedAttribute.valueChunks.toList
@@ -45,22 +56,22 @@ object HarmonizeAnonymizationFlow {
        * - anomymization keys have been received in stream
        * - tag specifies attribute that needs to be harmonized
        */
-      def needHarmonizeAnon(tag: Int, maybeKeys: Option[AnonymizationKeysPart]): Boolean = canDoHarmonizeAnon(maybeKeys) && harmonizeTags.contains(tag)
+      def needHarmonizeAnon(tag: Int, keyPart: Option[PartialAnonymizationKeyPart]): Boolean = canDoHarmonizeAnon(keyPart) && harmonizeTags.contains(tag)
 
-      def canDoHarmonizeAnon(maybeKeys: Option[AnonymizationKeysPart]): Boolean = maybeKeys.flatMap(_.patientKey).isDefined
+      def canDoHarmonizeAnon(keyPartMaybe: Option[PartialAnonymizationKeyPart]): Boolean = keyPartMaybe.flatMap(_.keyMaybe).isDefined
 
       override def onPart(part: DicomPart): List[DicomPart] = part match {
-        case meta: DicomMetaPart =>
-          maybeMeta = Some(meta)
+        case info: DicomInfoPart =>
+          maybeInfo = Some(info)
           super.onPart(part)
 
-        case keys: AnonymizationKeysPart =>
-          maybeKeys = Some(keys)
-          super.onPart(keys)
+        case keyPart: PartialAnonymizationKeyPart =>
+          maybeKey = Some(keyPart)
+          super.onPart(keyPart)
       }
 
       override def onHeader(header: DicomHeader): List[DicomPart] =
-        if (needHarmonizeAnon(header.tag, maybeKeys)) {
+        if (needHarmonizeAnon(header.tag, maybeKey)) {
           currentAttribute = Some(DicomAttribute(header, Seq.empty))
           super.onHeader(header).filterNot(_ == header)
         } else {
@@ -69,24 +80,24 @@ object HarmonizeAnonymizationFlow {
         }
 
       override def onValueChunk(valueChunk: DicomValueChunk): List[DicomPart] =
-        if (currentAttribute.isDefined && canDoHarmonizeAnon(maybeKeys)) {
+        if (currentAttribute.isDefined && canDoHarmonizeAnon(maybeKey)) {
           currentAttribute = currentAttribute.map(attribute => attribute.copy(valueChunks = attribute.valueChunks :+ valueChunk))
 
           if (valueChunk.last) {
             val attribute = currentAttribute.get
-            val keys = maybeKeys.get
-            val cs = maybeMeta.flatMap(_.specificCharacterSet).getOrElse(SpecificCharacterSet.ASCII)
+            val key = maybeKey.get
+            val cs = maybeInfo.flatMap(_.specificCharacterSet).getOrElse(SpecificCharacterSet.ASCII)
 
             currentAttribute = None
-            maybeHarmonize(attribute, keys, cs)
+            maybeHarmonize(attribute, key, cs)
           } else
             super.onValueChunk(valueChunk).filterNot(_ == valueChunk)
         } else
           super.onValueChunk(valueChunk)
 
       override def onStart(): List[DicomPart] = {
-        maybeMeta = None
-        maybeKeys = None
+        maybeInfo = None
+        maybeKey = None
         currentAttribute = None
         super.onStart()
       }
@@ -94,7 +105,7 @@ object HarmonizeAnonymizationFlow {
 
   def maybeHarmonizeAnonFlow: Flow[DicomPart, DicomPart, NotUsed] = DicomStreamOps.conditionalFlow(
     {
-      case keys: AnonymizationKeysPart => keys.patientKey.isEmpty
+      case keyPart: PartialAnonymizationKeyPart => keyPart.keyMaybe.isEmpty
     }, Flow.fromFunction(identity), harmonizeAnonFlow)
 
 }

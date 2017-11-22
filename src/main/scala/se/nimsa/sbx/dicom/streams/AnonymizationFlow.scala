@@ -1,42 +1,24 @@
 package se.nimsa.sbx.dicom.streams
 
-import java.util.UUID
-
 import akka.NotUsed
 import akka.stream.scaladsl.Flow
 import akka.util.ByteString
 import org.dcm4che3.data.{Tag, VR}
-import org.dcm4che3.util.UIDUtils
 import se.nimsa.dcm4che.streams.DicomFlows._
 import se.nimsa.dcm4che.streams.DicomModifyFlow._
 import se.nimsa.dcm4che.streams.DicomParts._
 import se.nimsa.dcm4che.streams._
-
-import scala.util.Random
+import se.nimsa.sbx.anonymization.AnonymizationUtil._
+import se.nimsa.sbx.dicom.DicomUtil._
 
 object AnonymizationFlow {
 
   import DicomParsing.isPrivateAttribute
+  import DicomStreamOps.DicomInfoPart
 
-  private def toAsciiBytes(s: String, vr: VR) = padToEvenLength(ByteString(s), vr)
   private def insert(tag: Int, mod: ByteString => ByteString) = TagModification.endsWith(TagPath.fromTag(tag), mod, insert = true)
   private def modify(tag: Int, mod: ByteString => ByteString) = TagModification.endsWith(TagPath.fromTag(tag), mod, insert = false)
   private def clear(tag: Int) = TagModification.endsWith(TagPath.fromTag(tag), _ => ByteString.empty, insert = false)
-  private def createAccessionNumber(accessionNumberBytes: ByteString): ByteString = {
-    val seed = UUID.nameUUIDFromBytes(accessionNumberBytes.toArray).getMostSignificantBits
-    val rand = new Random(seed)
-    val newNumber = (1 to 16).foldLeft("")((s, _) => s + rand.nextInt(10).toString)
-    toAsciiBytes(newNumber, VR.SH)
-  }
-  private def createUid(baseValue: ByteString): ByteString = toAsciiBytes(
-    if (baseValue == null || baseValue.isEmpty)
-      UIDUtils.createUID()
-    else
-      UIDUtils.createNameBasedUID(baseValue.toArray), VR.UI)
-  private def isOverlay(tag: Int): Boolean = {
-    val group = groupNumber(tag)
-    group >= 0x6000 && group < 0x6100
-  }
 
   private val removeTags = Set(
     Tag.AcquisitionComments,
@@ -213,7 +195,7 @@ object AnonymizationFlow {
     * Remove, set empty or modify certain attributes
     */
   def anonFlow: Flow[DicomPart, DicomPart, NotUsed] = {
-    val sopInstanceUID = createUid(null)
+    val sopInstanceUID = createUid(ByteString.empty)
 
     Flow[DicomPart]
       .via(groupLengthDiscardFilter)
@@ -275,7 +257,7 @@ object AnonymizationFlow {
     */
   def maybeAnonFlow: Flow[DicomPart, DicomPart, NotUsed] = DicomStreamOps.conditionalFlow(
     {
-      case p: DicomMetaPart => !p.isAnonymized
+      case p: DicomInfoPart => !p.isAnonymized
     }, anonFlow, Flow.fromFunction(identity))
 
 }

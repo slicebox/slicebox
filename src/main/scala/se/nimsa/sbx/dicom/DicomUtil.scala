@@ -16,7 +16,9 @@
 
 package se.nimsa.sbx.dicom
 
+import akka.util.ByteString
 import org.dcm4che3.data._
+import se.nimsa.dcm4che.streams.{groupNumber, padToEvenLength}
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomPropertyValue._
 
@@ -88,6 +90,13 @@ object DicomUtil {
   def nameForTag(tag: Int): String = {
     val name = Keyword.valueOf(tag)
     if (name == null) "" else name
+  }
+
+  def toAsciiBytes(s: String, vr: VR): ByteString = padToEvenLength(ByteString(s), vr)
+
+  def isOverlay(tag: Int): Boolean = {
+    val group = groupNumber(tag)
+    group >= 0x6000 && group < 0x6100
   }
 
 }
