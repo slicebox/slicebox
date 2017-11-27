@@ -61,7 +61,7 @@ trait AnonymizationRoutes {
           entity(as[Seq[ImageTagValues]]) { imageTagValuesSeq =>
             complete {
               Source.fromIterator(() => imageTagValuesSeq.iterator)
-                .mapAsync(8) { imageTagValues =>
+                .mapAsyncUnordered(8) { imageTagValues =>
                   anonymizeData(imageTagValues.imageId, imageTagValues.tagValues, storage)
                 }
                 .runWith(Sink.seq)
