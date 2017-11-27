@@ -55,8 +55,16 @@ object AnonymizationProtocol {
       id: Long,
       anonymizationKeyId: Long,
       imageId: Long) extends Entity
-      
+
   trait AnonymizationRequest
+
+  case class GetOrCreateAnonymizationKey(patientName: Option[String], patientId: Option[String],
+                                         patientSex: Option[String], patientBirthDate: Option[String],
+                                         patientAge: Option[String], studyInstanceUID: Option[String],
+                                         studyDescription: Option[String], studyID: Option[String],
+                                         accessionNumber: Option[String], seriesInstanceUID: Option[String],
+                                         seriesDescription: Option[String], protocolName: Option[String],
+                                         frameOfReferenceUID: Option[String], tagValues: Seq[TagValue]) extends AnonymizationRequest
 
   case class GetAnonymizationKeysForPatient(patientName: String, patientId: String) extends AnonymizationRequest
 
@@ -79,5 +87,4 @@ object AnonymizationProtocol {
   case class AnonymizationKeyRemoved(anonymizationKeyId: Long)
 
   case class AnonymizationKeys(anonymizationKeys: Seq[AnonymizationKey])
-
 }

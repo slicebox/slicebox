@@ -14,6 +14,7 @@ import se.nimsa.dcm4che.streams.DicomParseFlow.parseFlow
 import se.nimsa.dcm4che.streams.DicomParts.{DicomAttributes, DicomPart}
 import se.nimsa.dcm4che.streams._
 import se.nimsa.sbx.dicom.DicomData
+import se.nimsa.sbx.dicom.streams.DicomStreamOps.PartialAnonymizationKeyPart
 import se.nimsa.sbx.util.TestUtil
 import se.nimsa.sbx.util.TestUtil._
 
@@ -36,13 +37,13 @@ class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymiza
       .via(DicomFlows.tagFilter(_ => false)(tagPath => !DicomParsing.isFileMetaInformation(tagPath.tag)))
   }
 
-  def anonKeyPart(dicomData: DicomData): AnonymizationKeysPart = {
+  def anonKeyPart(dicomData: DicomData): PartialAnonymizationKeyPart = {
     val key = createAnonymizationKey(dicomData.attributes)
-    AnonymizationKeysPart(Seq(key), Some(key), Some(key), Some(key))
+    PartialAnonymizationKeyPart(Some(key), hasPatientInfo = true, hasStudyInfo = true, hasSeriesInfo = true)
   }
 
   def anonSource(dicomData: DicomData): Source[DicomPart, NotUsed] = {
-    val key = anonKeyPart(dicomData).patientKey.get
+    val key = anonKeyPart(dicomData).keyMaybe.get
     attributesSource(dicomData)
       .via(AnonymizationFlow.anonFlow)
       .via(DicomModifyFlow.modifyFlow(

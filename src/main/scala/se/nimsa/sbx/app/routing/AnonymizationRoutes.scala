@@ -21,13 +21,13 @@ import akka.http.scaladsl.model.{ContentTypes, HttpEntity}
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
+import akka.stream.scaladsl.{Sink, Source}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.app.GeneralProtocol.{ImageAdded, ImagesDeleted}
 import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.user.UserProtocol.ApiUser
-import se.nimsa.sbx.util.FutureUtil
 
 import scala.concurrent.Future
 
@@ -60,17 +60,20 @@ trait AnonymizationRoutes {
         post {
           entity(as[Seq[ImageTagValues]]) { imageTagValuesSeq =>
             complete {
-              FutureUtil.traverseSequentially(imageTagValuesSeq) { imageTagValues =>
-                anonymizeData(imageTagValues.imageId, imageTagValues.tagValues, storage)
-              }.map { metaDataMaybes =>
-                system.eventStream.publish(ImagesDeleted(imageTagValuesSeq.map(_.imageId)))
-                metaDataMaybes.flatMap { metaDataMaybe =>
-                  metaDataMaybe.map { metaData =>
-                    system.eventStream.publish(ImageAdded(metaData.image.id, metaData.source, !metaData.imageAdded))
-                    metaData.image
+              Source.fromIterator(() => imageTagValuesSeq.iterator)
+                .mapAsyncUnordered(8) { imageTagValues =>
+                  anonymizeData(imageTagValues.imageId, imageTagValues.tagValues, storage)
+                }
+                .runWith(Sink.seq)
+                .map { metaDataMaybes =>
+                  system.eventStream.publish(ImagesDeleted(imageTagValuesSeq.map(_.imageId)))
+                  metaDataMaybes.flatMap { metaDataMaybe =>
+                    metaDataMaybe.map { metaData =>
+                      system.eventStream.publish(ImageAdded(metaData.image.id, metaData.source, !metaData.imageAdded))
+                      metaData.image
+                    }
                   }
                 }
-              }
             }
           }
         }

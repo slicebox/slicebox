@@ -22,7 +22,7 @@ import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.dicom.DicomData
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomPropertyValue._
-import se.nimsa.sbx.dicom.streams.DicomMetaPart
+import se.nimsa.sbx.dicom.streams.DicomStreamOps.DicomInfoPart
 import se.nimsa.sbx.metadata.MetaDataProtocol.{SeriesSource, SeriesTag}
 import se.nimsa.sbx.metadata.{MetaDataDAO, PropertiesDAO}
 import se.nimsa.sbx.seriestype.SeriesTypeDAO
@@ -435,14 +435,14 @@ object TestUtil {
     def expectMetaPart(): PartProbe = probe
       .request(1)
       .expectNextChainingPF {
-        case _: DicomMetaPart => true
+        case _: DicomInfoPart => true
         case p => throw new RuntimeException(s"Expected DicomMetaPart, got $p")
       }
 
-    def expectMetaPart(metaPart: DicomMetaPart): PartProbe = probe
+    def expectMetaPart(metaPart: DicomInfoPart): PartProbe = probe
       .request(1)
       .expectNextChainingPF {
-        case p: DicomMetaPart if p == metaPart => true
+        case p: DicomInfoPart if p == metaPart => true
         case p => throw new RuntimeException(s"Expected DicomMetaPart $metaPart, got $p")
       }
 

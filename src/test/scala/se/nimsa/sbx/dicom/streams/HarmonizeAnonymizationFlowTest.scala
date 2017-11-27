@@ -13,6 +13,7 @@ import se.nimsa.dcm4che.streams.DicomParts.DicomPart
 import se.nimsa.dcm4che.streams.{DicomAttributesSink, DicomFlows, DicomParsing}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.AnonymizationKey
 import se.nimsa.sbx.dicom.DicomData
+import se.nimsa.sbx.dicom.streams.DicomStreamOps.PartialAnonymizationKeyPart
 import se.nimsa.sbx.util.TestUtil
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -33,7 +34,7 @@ class HarmonizeAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymi
       .via(DicomFlows.tagFilter(_ => false)(tagPath => !DicomParsing.isFileMetaInformation(tagPath.tag)))
   }
 
-  def anonKeyPart(key: AnonymizationKey) = AnonymizationKeysPart(Seq(key), Some(key), Some(key), Some(key))
+  def anonKeyPart(key: AnonymizationKey) = PartialAnonymizationKeyPart(Some(key), hasPatientInfo = true, hasStudyInfo = true, hasSeriesInfo = true)
 
   def harmonize(key: AnonymizationKey, attributes: Attributes): Future[(Option[Attributes], Option[Attributes])] =
     Source.single(anonKeyPart(key))

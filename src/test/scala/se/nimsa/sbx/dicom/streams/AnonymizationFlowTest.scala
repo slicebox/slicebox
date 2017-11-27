@@ -16,7 +16,7 @@ import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 import se.nimsa.dcm4che.streams.DicomFlows.collectAttributesFlow
 import se.nimsa.dcm4che.streams.DicomParts.{DicomPart, DicomValueChunk}
 import se.nimsa.dcm4che.streams.{DicomFlows, DicomParseFlow}
-import se.nimsa.sbx.dicom.streams.DicomStreamOps.{attributesToMetaPart, metaTags2Collect}
+import se.nimsa.sbx.dicom.streams.DicomStreamOps.{attributesToInfoPart, basicInfoTags}
 import se.nimsa.sbx.util.TestUtil._
 
 import scala.concurrent.{Await, ExecutionContextExecutor}
@@ -44,8 +44,8 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
 
   def toMaybeAnonSource(attributes: Attributes): Source[DicomPart, NotUsed] =
     toSource(attributes)
-      .via(collectAttributesFlow(metaTags2Collect))
-      .mapAsync(5)(attributesToMetaPart)
+      .via(collectAttributesFlow(basicInfoTags))
+      .mapAsync(5)(attributesToInfoPart)
       .via(AnonymizationFlow.maybeAnonFlow)
 
   def checkBasicAttributes(source: Source[DicomPart, NotUsed]): PartProbe =
