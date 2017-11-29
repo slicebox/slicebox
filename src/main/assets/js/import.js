@@ -59,42 +59,49 @@ angular.module('slicebox.import', ['ngRoute', 'ngFileUpload'])
         $scope.uiState.selectedSession = importSession;
     };
 
-    function importFirst(files) {
-        if (files && files.length) {
+    $scope.import = function(filesAndDirectories) {
+        var files = filesAndDirectories.filter(function (fileOrDirectory) {
+            return fileOrDirectory.type !== 'directory';
+        });
+
+        $scope.uiState.currentFileSet.processing = true;
+        $scope.uiState.currentFileSet.index = 0;
+        $scope.uiState.currentFileSet.total = files.length;
+        $scope.uiState.currentFileSet.progress = 0;
+
+        var prepareNext = function() {
+            files.shift();
+            if (files.length) {
+                next();
+            } else if ($scope.uiState.currentFileSet.processing) {
+                $scope.uiState.currentFileSet.processing = false;
+                $scope.callbacks.importSessionsTable.reloadPage();
+            }
+        };
+
+        var next = function() {
             $scope.uiState.currentFileSet.index++;
             $scope.uiState.currentFileSet.progress = Math.round(100 * $scope.uiState.currentFileSet.index / $scope.uiState.currentFileSet.total);
+
             Upload.upload({
                 url: '/api/import/sessions/' + $scope.uiState.selectedSession.id + '/images',
                 data: {file: files[0]}
             }).success(function () {
-                files.shift();
-                importFirst(files);
+                prepareNext();
             }).error(function (message, status) {
                 if (status >= 300 && status !== 400) {
                     sbxToast.showErrorMessage(message);
                 }
-
-                files.shift();
-                importFirst(files);
+                prepareNext();
             });
-        } else {
-            $scope.uiState.currentFileSet.processing = false;
-            $scope.callbacks.importSessionsTable.reloadPage();
-        }
-    }
+        };
 
-    $scope.import = function(files) {
-        var filesPrune = [];
-        for (var i = 0; i < files.length; i++) {
-            if (files[i].type !== 'directory') {
-                filesPrune.push(files[i]);
-            }
+        // start nConcurrent uploads
+        var nConcurrent = Math.min(6, files.length);
+        for (var i = 0; i < nConcurrent; i++) {
+            next();
+            files.shift();
         }
-        $scope.uiState.currentFileSet.processing = true;
-        $scope.uiState.currentFileSet.index = 0;
-        $scope.uiState.currentFileSet.total = filesPrune.length;
-        $scope.uiState.currentFileSet.progress = 0;
-        importFirst(filesPrune);
     };
 
 })
