@@ -11,7 +11,7 @@ angular.module('slicebox.adminForwarding', ['ngRoute'])
   });
 })
 
-.controller('AdminForwardingCtrl', function($scope, $http, $interval, $mdDialog, openAddEntityModal, openDeleteEntitiesModalFunction) {
+.controller('AdminForwardingCtrl', function($scope, $http, $mdDialog, openAddEntityModal, openDeleteEntitiesModalFunction) {
     // Initialization
     $scope.objectActions =
         [
