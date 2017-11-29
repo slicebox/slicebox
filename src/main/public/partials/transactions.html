@@ -10,6 +10,7 @@
                         <sbx-grid
                             load-page="loadIncomingPage(startIndex, count, orderByProperty, orderByDirection)"
                             page-size="20"
+                            refresh-button="true"
                             object-actions="objectActions"
                             sorting="false"
                             callbacks="callbacks.incomingTable"
@@ -54,6 +55,7 @@
                         <sbx-grid
                             load-page="loadOutgoingPage(startIndex, count, orderByProperty, orderByDirection)"
                             page-size="20"
+                            refresh-button="true"
                             object-actions="objectActions"
                             sorting="false"
                             callbacks="callbacks.outgoingTable"
@@ -97,6 +99,7 @@
                     <sbx-grid
                         load-page="loadLogPage(startIndex, count)"
                         page-size="20"
+                        refresh-button="true"
                         page-sizes="[10, 20, 50, 100]"
                         object-actions="actions"
                         sorting="false"
