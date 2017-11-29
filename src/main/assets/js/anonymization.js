@@ -11,7 +11,7 @@ angular.module('slicebox.anonymization', ['ngRoute'])
   });
 })
 
-.controller('AnonymizationCtrl', function($scope, $http, $interval, openMessageModal, openDeleteEntitiesModalFunction, openTagSeriesModalFunction, sbxToast) {
+.controller('AnonymizationCtrl', function($scope, $http, openMessageModal, openDeleteEntitiesModalFunction, openTagSeriesModalFunction, sbxToast) {
     // Initialization
     $scope.actions =
         [

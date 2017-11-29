@@ -1,5 +1,5 @@
 <div layout="column" layout-margin>
-    <div class="admin-series-types">	
+    <div class="admin-series-types">
 
 	    <div layout="row" layout-margin>
 	        <div flex>
@@ -10,6 +10,7 @@
 	                        <sbx-grid
 	                            load-page="loadSeriesTypesPage(startIndex, count, orderByProperty, orderByDirection)"
 	                            page-size="20"
+								refresh-button="true"
 	                            sorting="false"
 	                            object-actions="objectActions"
 	                            callbacks="callbacks.seriesTypesTable"
@@ -97,7 +98,7 @@
 				                            </sbx-grid-column>		                            
 				                        </sbx-grid>
 				                    </span>
-		                    		
+
 		                    		<div layout="row" class="button-row">
 					                    <md-button md-no-ink class="md-primary" type="button" ng-click="addRuleAttributeButtonClicked(rule, $index)">
 					                        Add Attribute

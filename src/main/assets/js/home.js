@@ -192,20 +192,21 @@ angular.module('slicebox.home', ['ngRoute'])
             selectedSeriesTypes: [],
             selectedSeriesTags: []
         };
-        $scope.uiState.advancedFiltering.sourcesPromise = $http.get('/api/sources').then(function (sourcesData) {
-            return sourcesData.data.map(function (source) {
-                source.selected = false;
-                return source;
-            });
-        });
-        $scope.uiState.advancedFiltering.seriesTypesPromise = $http.get('/api/seriestypes').then(function (seriesTypesData) {
-            return seriesTypesData.data.map(function (seriesType) {
-                seriesType.selected = false;
-                return seriesType;
-            });
-        });
-        updateSeriesTagsPromise();
     }
+
+    $scope.uiState.advancedFiltering.sourcesPromise = $http.get('/api/sources').then(function (sourcesData) {
+        return sourcesData.data.map(function (source) {
+            source.selected = false;
+            return source;
+        });
+    });
+    $scope.uiState.advancedFiltering.seriesTypesPromise = $http.get('/api/seriestypes').then(function (seriesTypesData) {
+        return seriesTypesData.data.map(function (seriesType) {
+            seriesType.selected = false;
+            return seriesType;
+        });
+    });
+    updateSeriesTagsPromise();
 
     // Scope functions
 

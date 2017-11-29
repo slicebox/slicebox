@@ -19,7 +19,7 @@ angular.module('slicebox.transactions', ['ngRoute'])
     }
 })
 
-.controller('IncomingCtrl', function($scope, $http, $interval, openDeleteEntitiesModalFunction, openTagSeriesModalFunction) {
+.controller('IncomingCtrl', function($scope, $http, openDeleteEntitiesModalFunction, openTagSeriesModalFunction) {
     // Initialization
     $scope.objectActions =
         [
@@ -35,23 +35,13 @@ angular.module('slicebox.transactions', ['ngRoute'])
 
     $scope.callbacks = {};
 
-    var timer = $interval(function() {
-        if (angular.isDefined($scope.callbacks.incomingTable)) {
-            $scope.callbacks.incomingTable.reloadPage();
-        }
-    }, 5000);
-
-    $scope.$on('$destroy', function() {
-        $interval.cancel(timer);
-    });
-  
     $scope.loadIncomingPage = function(startIndex, count, orderByProperty, orderByDirection) {
         return $http.get('/api/boxes/incoming?startindex=' + startIndex + '&count=' + count);
     };
 
 })
 
-.controller('OutgoingCtrl', function($scope, $http, $interval, openDeleteEntitiesModalFunction, openTagSeriesModalFunction) {
+.controller('OutgoingCtrl', function($scope, $http, openDeleteEntitiesModalFunction, openTagSeriesModalFunction) {
     // Initialization
     $scope.objectActions =
         [
@@ -67,16 +57,6 @@ angular.module('slicebox.transactions', ['ngRoute'])
 
     $scope.callbacks = {};
 
-    var timer = $interval(function() {
-        if (angular.isDefined($scope.callbacks.outgoingTable)) {
-            $scope.callbacks.outgoingTable.reloadPage();
-        }
-    }, 5000);
-
-    $scope.$on('$destroy', function() {
-        $interval.cancel(timer);
-    });
-  
     // Scope functions
     $scope.loadOutgoingPage = function(startIndex, count, orderByProperty, orderByDirection) {
         return $http.get('/api/boxes/outgoing?startindex=' + startIndex + '&count=' + count);
@@ -84,7 +64,7 @@ angular.module('slicebox.transactions', ['ngRoute'])
 
 })
 
-.controller('BoxLogCtrl', function($scope, $http, $interval, openDeleteEntitiesModalFunction) {
+.controller('BoxLogCtrl', function($scope, $http, openDeleteEntitiesModalFunction) {
     // Initialization
     $scope.actions =
         [
@@ -96,16 +76,6 @@ angular.module('slicebox.transactions', ['ngRoute'])
 
     $scope.callbacks = {};
 
-    var timer = $interval(function() {
-        if (angular.isDefined($scope.callbacks.logTable)) {
-            $scope.callbacks.logTable.reloadPage();
-        }
-    }, 5000);
-
-    $scope.$on('$destroy', function() {
-        $interval.cancel(timer);
-    });
-  
     // Scope functions
     $scope.loadLogPage = function(startIndex, count) {
         return $http.get('/api/log?startindex=' + startIndex + '&count=' + count + '&subject=Box');
