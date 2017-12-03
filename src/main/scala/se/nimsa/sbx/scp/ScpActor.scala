@@ -68,7 +68,7 @@ class ScpActor(scpData: ScpData, storage: StorageService, executor: Executor,
       log.debug("SCP", s"Dicom data received using SCP ${scpData.name}")
       val streamSource = StreamSource.single(bytes)
       val source = Source(SourceType.SCP, scpData.name, scpData.id)
-      val addDicomDataFuture = storeDicomData(streamSource, source, storage, Contexts.imageDataContexts)
+      val addDicomDataFuture = storeDicomData(streamSource, source, storage, Contexts.imageDataContexts, reverseAnonymization = true)
 
       addDicomDataFuture.onComplete {
         case Success(metaData) =>

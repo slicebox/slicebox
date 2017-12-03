@@ -70,7 +70,7 @@ class DirectoryWatchActor(watchedDirectory: WatchedDirectory,
           StreamSource.empty // other (symlinks etc): ignore
       }
       .mapAsync(5) { path => // do import
-        storeDicomData(FileIO.fromPath(path), sbxSource, storage, Contexts.imageDataContexts).map { metaData =>
+        storeDicomData(FileIO.fromPath(path), sbxSource, storage, Contexts.imageDataContexts, reverseAnonymization = true).map { metaData =>
           system.eventStream.publish(ImageAdded(metaData.image.id, sbxSource, !metaData.imageAdded))
         }.recover {
           case NonFatal(e) =>

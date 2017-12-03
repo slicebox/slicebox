@@ -123,6 +123,7 @@ class BoxPushActor(box: Box,
 
   def pushImagePipeline(transactionImage: OutgoingTransactionImage, outgoingTagValues: Seq[OutgoingTagValue]): Future[HttpResponse] = {
     val source = anonymizedDicomData(transactionImage.image.imageId, outgoingTagValues.map(_.tagValue), storage)
+      .batchWeighted(storage.streamChunkSize, _.length, identity)(_ ++ _)
     val uri = s"${box.baseUrl}/image?transactionid=${transactionImage.transaction.id}&sequencenumber=${transactionImage.image.sequenceNumber}&totalimagecount=${transactionImage.transaction.totalImageCount}"
     sliceboxRequest(HttpMethods.POST, uri, HttpEntity(ContentTypes.`application/octet-stream`, source.via(Compression.deflate)))
   }

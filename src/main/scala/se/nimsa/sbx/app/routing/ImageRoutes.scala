@@ -76,11 +76,11 @@ trait ImageRoutes {
           }
         } ~ path("attributes") {
           get {
-            complete(storage.readImageAttributes(imageId))
+            complete(readImageAttributes(imageId, storage))
           }
         } ~ path("imageinformation") {
           get {
-            complete(storage.readImageInformation(imageId))
+            complete(readImageInformation(imageId, storage))
           }
         } ~ path("png") {
           parameters((
@@ -90,7 +90,7 @@ trait ImageRoutes {
             'imageheight.as[Int] ? 0)) { (frameNumber, min, max, height) =>
             get {
               // use dedicated thread pool for blocking IO here
-              onComplete(storage.readPngImageData(imageId, frameNumber, min, max, height)(materializer, blockingIoContext)) {
+              onComplete(readPngImageData(imageId, frameNumber, min, max, height, storage)(materializer, blockingIoContext)) {
                 case Success(bytes) => complete(HttpEntity(`image/png`, bytes))
                 case Failure(_: NotFoundException) => complete(NotFound)
                 case Failure(_) => complete(NotImplemented)
@@ -155,7 +155,7 @@ trait ImageRoutes {
                     patientMaybe.map { patient =>
                       bytes.fold(ByteString.empty)(_ ++ _).runWith(Sink.head).map { allBytes =>
                         val scBytes = Jpeg2Dcm(allBytes.toArray, patient, study, optionalDescription)
-                        storeDicomData(StreamSource.single(ByteString(scBytes)), source, storage, Contexts.extendedContexts)
+                        storeDicomData(StreamSource.single(ByteString(scBytes)), source, storage, Contexts.extendedContexts, reverseAnonymization = true)
                           .map { metaData =>
                             system.eventStream.publish(ImageAdded(metaData.image.id, source, !metaData.imageAdded))
                             metaData.image
@@ -179,7 +179,7 @@ trait ImageRoutes {
 
   private def addDicomDataRoute(bytes: StreamSource[ByteString, _], apiUser: ApiUser): Route = {
     val source = Source(SourceType.USER, apiUser.user, apiUser.id)
-    val futureUpload = storeDicomData(bytes, source, storage, Contexts.extendedContexts)
+    val futureUpload = storeDicomData(bytes, source, storage, Contexts.extendedContexts, reverseAnonymization = true)
 
     onSuccess(futureUpload) { metaData =>
       val overwrite = !metaData.imageAdded

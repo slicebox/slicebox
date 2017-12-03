@@ -165,11 +165,17 @@ object Slicebox extends {
 
   val dbConfig = DatabaseConfig.forConfig[JdbcProfile]("slicebox.database.config")
 
+  val chunkSize: Int = cfg.getMemorySize("stream.chunk-size").toBytes.toInt
+
   val storage =
     if (cfg.getString("dicom-storage.config.name") == "s3")
-      new S3Storage(cfg.getString("dicom-storage.config.bucket"), cfg.getString("dicom-storage.config.prefix"), cfg.getString("dicom-storage.config.region"))(system, materializer)
+      new S3Storage(cfg.getString("dicom-storage.config.bucket"), cfg.getString("dicom-storage.config.prefix"), cfg.getString("dicom-storage.config.region"))(system, materializer) {
+        override val streamChunkSize: Int = chunkSize
+      }
     else
-      new FileStorage(Paths.get(cfg.getString("dicom-storage.file-system.path")))
+      new FileStorage(Paths.get(cfg.getString("dicom-storage.file-system.path"))) {
+        override val streamChunkSize: Int = chunkSize
+      }
 } with SliceboxBase with App {
 
   val bindFuture = if (useSsl) {

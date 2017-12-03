@@ -22,7 +22,7 @@ import org.dcm4che3.data.{SpecificCharacterSet, Tag}
 import se.nimsa.dcm4che.streams.DicomFlows.toUndefinedLengthSequences
 import se.nimsa.dcm4che.streams.DicomParts._
 import se.nimsa.dcm4che.streams._
-import se.nimsa.sbx.dicom.streams.DicomStreamOps.{DicomInfoPart, PartialAnonymizationKeyPart}
+import se.nimsa.sbx.dicom.streams.DicomStreamUtil._
 
 /**
   * A flow which harmonizes anonymization so that random attributes correspond between patients, studies and series
@@ -119,7 +119,7 @@ object HarmonizeAnonymizationFlow {
       }
     }))
 
-  def maybeHarmonizeAnonFlow: Flow[DicomPart, DicomPart, NotUsed] = DicomStreamOps.conditionalFlow(
+  def maybeHarmonizeAnonFlow: Flow[DicomPart, DicomPart, NotUsed] = conditionalFlow(
     {
       case keyPart: PartialAnonymizationKeyPart => keyPart.keyMaybe.isEmpty
     }, Flow.fromFunction(identity), harmonizeAnonFlow)

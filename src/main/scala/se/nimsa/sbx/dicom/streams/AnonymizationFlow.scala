@@ -26,11 +26,11 @@ import se.nimsa.dcm4che.streams.DicomParts._
 import se.nimsa.dcm4che.streams._
 import se.nimsa.sbx.anonymization.AnonymizationUtil._
 import se.nimsa.sbx.dicom.DicomUtil._
+import se.nimsa.sbx.dicom.streams.DicomStreamUtil._
 
 object AnonymizationFlow {
 
   import DicomParsing.isPrivateAttribute
-  import DicomStreamOps.DicomInfoPart
 
   private def insert(tag: Int, mod: ByteString => ByteString) = TagModification.endsWith(TagPath.fromTag(tag), mod, insert = true)
   private def modify(tag: Int, mod: ByteString => ByteString) = TagModification.endsWith(TagPath.fromTag(tag), mod, insert = false)
@@ -271,7 +271,7 @@ object AnonymizationFlow {
     *
     * @return a `Flow` of `DicomParts` that will anonymize non-anonymized data but does nothing otherwise
     */
-  def maybeAnonFlow: Flow[DicomPart, DicomPart, NotUsed] = DicomStreamOps.conditionalFlow(
+  def maybeAnonFlow: Flow[DicomPart, DicomPart, NotUsed] = conditionalFlow(
     {
       case p: DicomInfoPart => !p.isAnonymized
     }, anonFlow, Flow.fromFunction(identity))
