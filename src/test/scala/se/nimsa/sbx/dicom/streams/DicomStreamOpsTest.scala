@@ -18,7 +18,7 @@ import se.nimsa.dcm4che.streams._
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.anonymization.{AnonymizationDAO, AnonymizationServiceActor}
 import se.nimsa.sbx.app.GeneralProtocol.{Source, SourceType}
-import se.nimsa.sbx.dicom.streams.DicomStreamUtil._
+import se.nimsa.sbx.dicom.streams.DicomStreamUtil.{DicomInfoPart, PartialAnonymizationKeyPart}
 import se.nimsa.sbx.dicom.{Contexts, DicomData}
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.metadata.{MetaDataDAO, MetaDataServiceActor, PropertiesDAO}
@@ -30,7 +30,7 @@ import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.reflect.ClassTag
 
-class DicomStreamOpsTest extends TestKit(ActorSystem("AnonymizationFlowSpec")) with AsyncFlatSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {
+class DicomStreamOpsTest extends TestKit(ActorSystem("DicomStreamOpsSpec")) with AsyncFlatSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {
 
   import DicomTestData._
 
