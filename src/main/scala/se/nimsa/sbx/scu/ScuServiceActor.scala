@@ -25,7 +25,6 @@ import akka.pattern.pipe
 import akka.stream.Materializer
 import akka.util.Timeout
 import org.dcm4che3.net.{IncompatibleConnectionException, NoPresentationContextException}
-import se.nimsa.dcm4che.streams.DicomParseFlow
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.lang.{BadGatewayException, NotFoundException}
 import se.nimsa.sbx.log.SbxLog
@@ -44,8 +43,7 @@ class ScuServiceActor(scuDao: ScuDAO, storage: StorageService)(implicit material
 
   val storageService: ActorSelection = context.actorSelection("../StorageService")
 
-  val dicomDataProvider: DicomDataProvider =
-    (imageId: Long, stopTag: Option[Int]) => storage.fileSource(imageId).via(new DicomParseFlow(stopTag = stopTag))
+  val dicomDataProvider: DicomDataProvider = (imageId: Long, stopTag: Option[Int]) => storage.dataSource(imageId, stopTag)
 
   log.info("SCU service started")
 

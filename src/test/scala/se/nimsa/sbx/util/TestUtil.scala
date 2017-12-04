@@ -22,7 +22,7 @@ import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.dicom.DicomData
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomPropertyValue._
-import se.nimsa.sbx.dicom.streams.DicomStreamOps.DicomInfoPart
+import se.nimsa.sbx.dicom.streams.DicomStreamUtil._
 import se.nimsa.sbx.metadata.MetaDataProtocol.{SeriesSource, SeriesTag}
 import se.nimsa.sbx.metadata.{MetaDataDAO, PropertiesDAO}
 import se.nimsa.sbx.seriestype.SeriesTypeDAO

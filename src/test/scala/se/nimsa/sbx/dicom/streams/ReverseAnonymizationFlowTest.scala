@@ -10,11 +10,11 @@ import akka.util.ByteString
 import org.dcm4che3.data.{Attributes, Tag, UID, VR}
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 import se.nimsa.dcm4che.streams.DicomModifyFlow.TagModification
-import se.nimsa.dcm4che.streams.DicomParseFlow.parseFlow
 import se.nimsa.dcm4che.streams.DicomParts.{DicomAttributes, DicomPart}
 import se.nimsa.dcm4che.streams._
 import se.nimsa.sbx.dicom.DicomData
-import se.nimsa.sbx.dicom.streams.DicomStreamOps.PartialAnonymizationKeyPart
+import se.nimsa.sbx.dicom.streams.DicomStreamUtil._
+import se.nimsa.sbx.storage.{RuntimeStorage, StorageService}
 import se.nimsa.sbx.util.TestUtil
 import se.nimsa.sbx.util.TestUtil._
 
@@ -30,10 +30,12 @@ class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymiza
 
   override def afterAll: Unit = TestKit.shutdownActorSystem(system)
 
+  val storage: StorageService = new RuntimeStorage
+
   def attributesSource(dicomData: DicomData): Source[DicomPart, NotUsed] = {
     val bytes = ByteString(TestUtil.toByteArray(dicomData))
     Source.single(bytes)
-      .via(parseFlow)
+      .via(storage.parseFlow(None))
       .via(DicomFlows.tagFilter(_ => false)(tagPath => !DicomParsing.isFileMetaInformation(tagPath.tag)))
   }
 

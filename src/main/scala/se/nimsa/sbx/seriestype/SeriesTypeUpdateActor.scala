@@ -22,8 +22,8 @@ import akka.pattern.ask
 import akka.stream.Materializer
 import akka.util.Timeout
 import org.dcm4che3.data.Attributes
+import se.nimsa.dcm4che.streams.DicomAttributesSink
 import se.nimsa.dcm4che.streams.DicomFlows._
-import se.nimsa.dcm4che.streams.{DicomAttributesSink, DicomParseFlow}
 import se.nimsa.sbx.app.GeneralProtocol.ImageAdded
 import se.nimsa.sbx.dicom.DicomHierarchy.{Image, Series}
 import se.nimsa.sbx.dicom.DicomUtil
@@ -121,8 +121,7 @@ class SeriesTypeUpdateActor(storage: StorageService)(implicit val materializer: 
 
               val tags = getInvolvedTags(seriesTypesInfo)
 
-              val futureAttributes = storage.fileSource(image.id)
-                .via(new DicomParseFlow(stopTag = Some(tags.max + 1)))
+              val futureAttributes = storage.dataSource(image.id, Some(tags.max + 1))
                 .via(tagFilter(_ => false)(tagPath => tags.contains(tagPath.tag)))
                 .via(attributeFlow)
                 .runWith(DicomAttributesSink.attributesSink)

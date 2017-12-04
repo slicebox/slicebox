@@ -104,7 +104,7 @@ trait ImportRoutes {
       case Some(importSession) =>
 
         val source = Source(SourceType.IMPORT, importSession.name, importSessionId)
-        val futureImport = storeDicomData(bytes, source, storage, Contexts.imageDataContexts)
+        val futureImport = storeDicomData(bytes, source, storage, Contexts.imageDataContexts, reverseAnonymization = true)
 
         onComplete(futureImport) {
           case Success(metaData) =>

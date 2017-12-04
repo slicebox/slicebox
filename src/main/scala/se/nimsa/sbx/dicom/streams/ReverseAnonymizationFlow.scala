@@ -23,6 +23,7 @@ import se.nimsa.dcm4che.streams.DicomFlows.toUndefinedLengthSequences
 import se.nimsa.dcm4che.streams.DicomModifyFlow.TagModification
 import se.nimsa.dcm4che.streams.DicomParts._
 import se.nimsa.dcm4che.streams._
+import se.nimsa.sbx.dicom.streams.DicomStreamUtil._
 
 /**
   * A flow which performs reverse anonymization as soon as it has received an AnonymizationKeyPart (which means data is
@@ -31,7 +32,6 @@ import se.nimsa.dcm4che.streams._
 object ReverseAnonymizationFlow {
 
   import DicomFlows.groupLengthDiscardFilter
-  import DicomStreamOps._
 
   private val reverseTags = Seq(
     Tag.PatientName,
@@ -141,7 +141,7 @@ object ReverseAnonymizationFlow {
       }
     }))
 
-  def maybeReverseAnonFlow: Flow[DicomPart, DicomPart, NotUsed] = DicomStreamOps.conditionalFlow(
+  def maybeReverseAnonFlow: Flow[DicomPart, DicomPart, NotUsed] = conditionalFlow(
     {
       case keyPart: PartialAnonymizationKeyPart => keyPart.keyMaybe.isEmpty
     }, Flow.fromFunction(identity), reverseAnonFlow)

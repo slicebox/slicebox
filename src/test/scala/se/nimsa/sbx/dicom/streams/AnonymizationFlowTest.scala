@@ -13,14 +13,15 @@ import akka.util.ByteString
 import org.dcm4che3.data.{Attributes, Tag, UID, VR}
 import org.dcm4che3.io.DicomOutputStream
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
+import se.nimsa.dcm4che.streams.DicomFlows
 import se.nimsa.dcm4che.streams.DicomFlows.collectAttributesFlow
 import se.nimsa.dcm4che.streams.DicomParts.{DicomPart, DicomValueChunk}
-import se.nimsa.dcm4che.streams.{DicomFlows, DicomParseFlow}
-import se.nimsa.sbx.dicom.streams.DicomStreamOps.{attributesToInfoPart, basicInfoTags}
+import se.nimsa.sbx.dicom.streams.DicomStreamUtil._
+import se.nimsa.sbx.storage.{RuntimeStorage, StorageService}
 import se.nimsa.sbx.util.TestUtil._
 
-import scala.concurrent.{Await, ExecutionContextExecutor}
 import scala.concurrent.duration.DurationInt
+import scala.concurrent.{Await, ExecutionContextExecutor}
 
 class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")) with FlatSpecLike with Matchers with BeforeAndAfterAll {
 
@@ -29,6 +30,8 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
 
   override def afterAll: Unit = TestKit.shutdownActorSystem(system)
 
+  val storage: StorageService = new RuntimeStorage
+
   def toSource(attributes: Attributes): Source[DicomPart, NotUsed] = {
     val baos = new ByteArrayOutputStream()
     val dos = new DicomOutputStream(baos, UID.ExplicitVRLittleEndian)
@@ -36,7 +39,7 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
     dos.close()
 
     Source.single(ByteString(baos.toByteArray))
-      .via(DicomParseFlow.parseFlow)
+      .via(storage.parseFlow(None))
   }
 
   def toAnonSource(attributes: Attributes): Source[DicomPart, NotUsed] =

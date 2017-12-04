@@ -44,7 +44,7 @@ trait TransactionRoutes {
               post {
                 extractDataBytes { compressedBytes =>
                   val source = Source(SourceType.BOX, box.name, box.id)
-                  onSuccess(storeDicomData(compressedBytes.via(Compression.inflate()), source, storage, Contexts.extendedContexts)) { metaData =>
+                  onSuccess(storeDicomData(compressedBytes.via(Compression.inflate()), source, storage, Contexts.extendedContexts, reverseAnonymization = true)) { metaData =>
                     system.eventStream.publish(ImageAdded(metaData.image.id, source, !metaData.imageAdded))
                     val overwrite = !metaData.imageAdded
                     onSuccess(boxService.ask(UpdateIncoming(box, outgoingTransactionId, sequenceNumber, totalImageCount, metaData.image.id, overwrite))) {
@@ -112,6 +112,7 @@ trait TransactionRoutes {
                       onSuccess(boxService.ask(GetOutgoingTagValues(transactionImage)).mapTo[Seq[OutgoingTagValue]]) { transactionTagValues =>
                         val tagValues = transactionTagValues.map(_.tagValue)
                         val streamSource = anonymizedDicomData(imageId, tagValues, storage)
+                          .batchWeighted(storage.streamChunkSize, _.length, identity)(_ ++ _)
                         complete(HttpEntity(ContentTypes.`application/octet-stream`, streamSource.via(Compression.deflate)))
                       }
                     case None =>
