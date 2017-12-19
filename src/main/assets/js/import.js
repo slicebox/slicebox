@@ -38,6 +38,16 @@ angular.module('slicebox.import', ['ngRoute', 'ngFileUpload'])
 
     $scope.callbacks = {};
 
+    var timer = $interval(function() {
+        if ($scope.uiState.currentFileSet.processing) {
+            $scope.callbacks.importSessionsTable.reloadPage();
+        }
+    }, 10000);
+
+    $scope.$on('$destroy', function() {
+        $interval.cancel(timer);
+    });
+
     $scope.loadImportSessions = function(startIndex, count) {
         var sessionsPromise = $http.get('/api/import/sessions?startindex=' + startIndex + '&count=' + count);
         return sessionsPromise;
