@@ -11,7 +11,7 @@ angular.module('slicebox.import', ['ngRoute', 'ngFileUpload'])
   });
 })
 
-.controller('ImportCtrl', function($scope, $http, Upload, $q, sbxToast, openAddEntityModal, openDeleteEntitiesModalFunction, openTagSeriesModalFunction) {
+.controller('ImportCtrl', function($scope, $http, $interval, Upload, $q, sbxToast, openAddEntityModal, openDeleteEntitiesModalFunction, openTagSeriesModalFunction) {
 
     $scope.sessionActions =
         [
