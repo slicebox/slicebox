@@ -87,7 +87,7 @@ libraryDependencies ++= {
     "mysql" % "mysql-connector-java" % "6.0.6",
     "com.zaxxer" % "HikariCP" % "2.7.4",
     "com.github.t3hnar" %% "scala-bcrypt" % "3.1",
-    "com.amazonaws" % "aws-java-sdk-s3" % "1.11.251",
+    "com.amazonaws" % "aws-java-sdk-s3" % "1.11.252",
     "org.scalatest" %% "scalatest" % "3.0.4" % "test",
     "org.dcm4che" % "dcm4che-core" % dcm4cheVersion,
     "org.dcm4che" % "dcm4che-image" % dcm4cheVersion,
