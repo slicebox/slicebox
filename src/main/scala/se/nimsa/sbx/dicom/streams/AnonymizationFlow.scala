@@ -266,15 +266,15 @@ object AnonymizationFlow {
   }
 
   /**
-    * Anonymize data if not already anonymized. Assumes first `DicomPart` is a `DicomMetaPart` that is used to determine
-    * if data has been anonymized or not.
+    * Anonymize data if not already anonymized. Assumes first `DicomPart` is a `PartialAnonymizationKeyPart` that is
+    * used to determine if data has been anonymized or not.
     *
     * @return a `Flow` of `DicomParts` that will anonymize non-anonymized data but does nothing otherwise
     */
   def maybeAnonFlow: Flow[DicomPart, DicomPart, NotUsed] = conditionalFlow(
     {
-      case p: DicomInfoPart => !p.isAnonymized
-    }, anonFlow, Flow.fromFunction(identity))
+      case keyPart: PartialAnonymizationKeyPart => keyPart.keyMaybe.isEmpty
+    }, Flow.fromFunction(identity), anonFlow)
 
 }
 
