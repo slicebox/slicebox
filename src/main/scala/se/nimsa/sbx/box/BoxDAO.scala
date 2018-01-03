@@ -21,7 +21,7 @@ import se.nimsa.sbx.box.BoxProtocol.BoxSendMethod._
 import se.nimsa.sbx.box.BoxProtocol.TransactionStatus._
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.util.DbUtil.createTables
-import slick.basic.DatabaseConfig
+import slick.basic.{DatabaseConfig, DatabasePublisher}
 import slick.jdbc.JdbcProfile
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -356,6 +356,13 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
     boxQuery.drop(startIndex).take(count).result
   }
 
+  def listPendingOutgoingTransactions(): Future[Seq[OutgoingTransaction]] = db.run {
+    outgoingTransactionQuery
+      .filterNot(_.status === (FAILED: TransactionStatus))
+      .filterNot(_.status === (FINISHED: TransactionStatus))
+      .result
+  }
+
   def listOutgoingTransactions(startIndex: Long, count: Long): Future[Seq[OutgoingTransaction]] = db.run {
     outgoingTransactionQuery
       .sortBy(_.updated.desc)
@@ -397,6 +404,14 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
 
   def listOutgoingImagesForOutgoingTransactionId(outgoingTransactionId: Long): Future[Seq[OutgoingImage]] = db.run {
     outgoingImageQuery.filter(_.outgoingTransactionId === outgoingTransactionId).result
+  }
+
+  def streamPendingOutgoingImagesForOutgoingTransactionId(outgoingTransactionId: Long): DatabasePublisher[OutgoingImage] = db.stream {
+    outgoingImageQuery
+      .filter(_.outgoingTransactionId === outgoingTransactionId)
+      .filter(_.sent === false)
+      .sortBy(_.sequenceNumber.asc) // remove?
+      .result
   }
 
   def listIncomingImagesForIncomingTransactionId(incomingTransactionId: Long): Future[Seq[IncomingImage]] = db.run {
@@ -489,8 +504,8 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
             insertIncomingTransactionAction(IncomingTransaction(-1, box.id, box.name, outgoingTransactionId, 0, 0, totalImageCount, System.currentTimeMillis, System.currentTimeMillis, TransactionStatus.WAITING))
           }
       }.flatMap { existingTransaction =>
-        val receivedImageCount = existingTransaction.receivedImageCount + 1
-        val addedImageCount = if (overwrite) existingTransaction.addedImageCount else existingTransaction.addedImageCount + 1
+        val receivedImageCount = math.min(totalImageCount, existingTransaction.receivedImageCount + 1)
+        val addedImageCount = if (overwrite) existingTransaction.addedImageCount else math.min(totalImageCount, existingTransaction.addedImageCount + 1)
         val incomingTransaction = existingTransaction.copy(
           receivedImageCount = receivedImageCount,
           addedImageCount = addedImageCount,

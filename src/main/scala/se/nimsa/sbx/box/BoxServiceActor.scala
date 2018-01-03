@@ -18,10 +18,10 @@ package se.nimsa.sbx.box
 
 import java.util.UUID
 
-import akka.actor.{Actor, ActorSystem, Cancellable, PoisonPill, Props, Stash}
+import akka.actor.{Actor, ActorRef, ActorSystem, Cancellable, PoisonPill, Props, Stash}
 import akka.event.{Logging, LoggingReceive}
 import akka.pattern.PipeToSupport
-import akka.stream.Materializer
+import akka.stream.{Materializer, scaladsl}
 import akka.util.Timeout
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.app.GeneralProtocol._
@@ -35,7 +35,7 @@ import scala.collection.mutable
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.concurrent.duration.DurationInt
 
-class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageService)(implicit val materializer: Materializer, timeout: Timeout) extends Actor with Stash with PipeToSupport with SequentialPipeToSupport {
+class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageService, parallelism: Int)(implicit val materializer: Materializer, timeout: Timeout) extends Actor with Stash with PipeToSupport with SequentialPipeToSupport {
 
   val log = Logging(context.system, this)
 
@@ -44,6 +44,8 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageServic
 
   implicit val system: ActorSystem = context.system
   implicit val ec: ExecutionContextExecutor = context.dispatcher
+
+  val pushActor: ActorRef = context.actorOf(BoxPushActor.props(storage, parallelism), BoxSendMethod.PUSH.toString)
 
   setupBoxes()
 
@@ -94,15 +96,12 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageServic
               val token = baseUrlToToken(remoteBox.baseUrl)
               boxDao.insertBox(Box(-1, remoteBox.name, token, remoteBox.baseUrl, BoxSendMethod.PUSH, online = false))
           }.map { box =>
-            maybeStartPushActor(box)
             maybeStartPollActor(box)
             RemoteBoxAdded(box)
           }.pipeSequentiallyTo(sender)
 
         case RemoveBox(boxId) =>
           boxDao.boxById(boxId).map(_.foreach(box => {
-            context.child(pushActorName(box))
-              .foreach(_ ! PoisonPill)
             context.child(pollActorName(box))
               .foreach(_ ! PoisonPill)
           }))
@@ -147,7 +146,10 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageServic
         case SendToRemoteBox(box, imageTagValuesSeq) =>
           SbxLog.info("Box", s"Sending ${imageTagValuesSeq.length} images to box ${box.name}")
           addImagesToOutgoing(box.id, box.name, imageTagValuesSeq)
-            .map(_ => ImagesAddedToOutgoing(box.id, imageTagValuesSeq.map(_.imageId)))
+            .map { transaction =>
+              pushActor ! PushTransaction(box, transaction)
+              ImagesAddedToOutgoing(box.id, imageTagValuesSeq.map(_.imageId))
+            }
             .pipeSequentiallyTo(sender)
 
         case GetOutgoingTransactionImage(box, outgoingTransactionId, outgoingImageId) =>
@@ -161,17 +163,22 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageServic
         case GetNextOutgoingTransactionImage(boxId) =>
           boxDao.nextOutgoingTransactionImageForBoxId(boxId).pipeTo(sender)
 
+        case GetOutgoingImagesForTransaction(transaction) =>
+          sender ! scaladsl.Source
+            .fromPublisher(boxDao.streamPendingOutgoingImagesForOutgoingTransactionId(transaction.id))
+            .map(image => OutgoingTransactionImage(transaction, image))
+
         case GetOutgoingImageIdsForTransaction(transaction) =>
           boxDao.outgoingImagesByOutgoingTransactionId(transaction.id).map(_.map(_.imageId)).pipeTo(sender)
 
         case MarkOutgoingImageAsSent(box, transactionImage) =>
-          updateOutgoingTransaction(transactionImage).flatMap { updatedTransaction =>
-            boxDao.outgoingImagesByOutgoingTransactionId(updatedTransaction.id).map(_.map(_.imageId)).map { imageIds =>
-              if (updatedTransaction.sentImageCount == updatedTransaction.totalImageCount) {
+          updateOutgoingTransaction(transactionImage).flatMap { updatedTransactionImage =>
+            if (updatedTransactionImage.transaction.sentImageCount == updatedTransactionImage.transaction.totalImageCount) {
+              boxDao.outgoingImagesByOutgoingTransactionId(updatedTransactionImage.transaction.id).map(_.map(_.imageId)).map { imageIds =>
                 context.system.eventStream.publish(ImagesSent(Destination(DestinationType.BOX, box.name, box.id), imageIds))
-                SbxLog.info("Box", s"Finished sending ${updatedTransaction.totalImageCount} images to box ${box.name}")
+                SbxLog.info("Box", s"Finished sending ${updatedTransactionImage.transaction.totalImageCount} images to box ${box.name}")
               }
-            }
+            } else Future.successful(Unit)
           }.map(_ => OutgoingImageMarkedAsSent).pipeSequentiallyTo(sender)
 
         case MarkOutgoingTransactionAsFailed(_, failedTransactionImage) =>
@@ -197,6 +204,7 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageServic
           boxDao.listOutgoingImagesForOutgoingTransactionId(outgoingTransactionId).map(_.map(_.imageId)).pipeTo(sender)
 
         case RemoveOutgoingTransaction(outgoingTransactionId) =>
+          pushActor ! RemoveTransaction(outgoingTransactionId)
           boxDao.removeOutgoingTransaction(outgoingTransactionId).map(_ => OutgoingTransactionRemoved(outgoingTransactionId))
             .pipeSequentiallyTo(sender)
 
@@ -238,21 +246,25 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageServic
       case e: Exception => throw new IllegalArgumentException("Malformed box base url: " + url, e)
     }
 
-  def setupBoxes(): Future[Unit] =
-    boxDao.listBoxes(0, 10000000).map(_ foreach (box =>
-      box.sendMethod match {
-        case BoxSendMethod.PUSH =>
-          maybeStartPushActor(box)
-          maybeStartPollActor(box)
-        case BoxSendMethod.POLL =>
-          pollBoxesLastPollTimestamp(box.id) = 0
-        case _ =>
-      }))
-
-  def maybeStartPushActor(box: Box): Unit = {
-    val actorName = pushActorName(box)
-    if (context.child(actorName).isEmpty)
-      context.actorOf(BoxPushActor.props(box, storage), actorName)
+  def setupBoxes(): Future[Unit] = {
+    boxDao.listBoxes(0, 10000000).map { boxes =>
+      boxes.foreach { box =>
+        box.sendMethod match {
+          case BoxSendMethod.PUSH =>
+            maybeStartPollActor(box)
+          case BoxSendMethod.POLL =>
+            pollBoxesLastPollTimestamp(box.id) = 0
+          case _ =>
+        }
+      }
+      boxDao.listPendingOutgoingTransactions().foreach { transactions =>
+        transactions.foreach { transaction =>
+          boxes.find(_.id == transaction.boxId).foreach { box =>
+            pushActor ! PushTransaction(box, transaction)
+          }
+        }
+      }
+    }
   }
 
   def maybeStartPollActor(box: Box): Unit = {
@@ -261,11 +273,9 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageServic
       context.actorOf(BoxPollActor.props(box, storage), actorName)
   }
 
-  def pushActorName(box: Box): String = BoxSendMethod.PUSH + "-" + box.id.toString
-
   def pollActorName(box: Box): String = BoxSendMethod.POLL + "-" + box.id.toString
 
-  def addImagesToOutgoing(boxId: Long, boxName: String, imageTagValuesSeq: Seq[ImageTagValues]): Future[Seq[OutgoingTagValue]] = {
+  def addImagesToOutgoing(boxId: Long, boxName: String, imageTagValuesSeq: Seq[ImageTagValues]): Future[OutgoingTransaction] = {
     boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, boxId, boxName, 0, imageTagValuesSeq.length, System.currentTimeMillis, System.currentTimeMillis, TransactionStatus.WAITING))
       .flatMap { outgoingTransaction =>
         FutureUtil.traverseSequentially(imageTagValuesSeq.zipWithIndex) {
@@ -277,12 +287,11 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageServic
                   boxDao.insertOutgoingTagValue(OutgoingTagValue(-1, outgoingImage.id, tagValue))
                 }
               }
-        }
+        }.map(_ => outgoingTransaction)
       }
-      .map(_.flatten)
   }
 
-  def updateOutgoingTransaction(transactionImage: OutgoingTransactionImage): Future[OutgoingTransaction] = {
+  def updateOutgoingTransaction(transactionImage: OutgoingTransactionImage): Future[OutgoingTransactionImage] = {
     val updatedTransactionImage = transactionImage.image.copy(sent = true)
     val updatedTransaction = transactionImage.transaction.copy(
       sentImageCount = transactionImage.image.sequenceNumber,
@@ -291,12 +300,12 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageServic
 
     boxDao.updateOutgoingTransaction(updatedTransaction, updatedTransactionImage).map { _ =>
       log.debug(s"Marked outgoing transaction image $updatedTransactionImage as sent")
-      updatedTransaction
+      OutgoingTransactionImage(updatedTransaction, updatedTransactionImage)
     }
   }
 
 }
 
 object BoxServiceActor {
-  def props(boxDao: BoxDAO, apiBaseURL: String, storage: StorageService)(implicit materializer: Materializer, timeout: Timeout): Props = Props(new BoxServiceActor(boxDao, apiBaseURL, storage))
+  def props(boxDao: BoxDAO, apiBaseURL: String, storage: StorageService, parallelism: Int)(implicit materializer: Materializer, timeout: Timeout): Props = Props(new BoxServiceActor(boxDao, apiBaseURL, storage, parallelism))
 }

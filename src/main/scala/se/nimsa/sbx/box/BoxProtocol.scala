@@ -138,6 +138,8 @@ object BoxProtocol {
 
   case class GetNextOutgoingTransactionImage(boxId: Long) extends BoxRequest
 
+  case class GetOutgoingImagesForTransaction(transaction: OutgoingTransaction) extends BoxRequest
+
   case class GetOutgoingImageIdsForTransaction(transaction: OutgoingTransaction) extends BoxRequest
 
   case class SetOutgoingTransactionStatus(transaction: OutgoingTransaction, status: TransactionStatus) extends BoxRequest
@@ -197,4 +199,7 @@ object BoxProtocol {
 
   case object PollIncoming
 
+  case class PushTransaction(box: Box, transaction: OutgoingTransaction)
+
+  case class RemoveTransaction(outgoingTransactionId: Long)
 }
