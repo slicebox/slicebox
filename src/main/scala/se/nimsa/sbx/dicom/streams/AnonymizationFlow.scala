@@ -210,9 +210,7 @@ object AnonymizationFlow {
     * Remove overlay data
     * Remove, set empty or modify certain attributes
     */
-  def anonFlow: Flow[DicomPart, DicomPart, NotUsed] = {
-    val sopInstanceUID = createUid(ByteString.empty)
-
+  def anonFlow: Flow[DicomPart, DicomPart, NotUsed] =
     Flow[DicomPart]
       .via(groupLengthDiscardFilter)
       .via(toUndefinedLengthSequences)
@@ -235,7 +233,7 @@ object AnonymizationFlow {
       modify(Tag.InstanceCreatorUID, createUid),
       modify(Tag.IrradiationEventUID, createUid),
       modify(Tag.LargePaletteColorLookupTableUID, createUid),
-      modify(Tag.MediaStorageSOPInstanceUID, _ => sopInstanceUID),
+      modify(Tag.MediaStorageSOPInstanceUID, createUid),
       modify(Tag.ObservationSubjectUIDTrial, createUid),
       modify(Tag.ObservationUID, createUid),
       modify(Tag.PaletteColorLookupTableUID, createUid),
@@ -252,7 +250,7 @@ object AnonymizationFlow {
       modify(Tag.RelatedFrameOfReferenceUID, createUid),
       modify(Tag.RequestedSOPInstanceUID, createUid),
       insert(Tag.SeriesInstanceUID, _ => createUid(null)),
-      insert(Tag.SOPInstanceUID, _ => sopInstanceUID),
+      insert(Tag.SOPInstanceUID, createUid),
       modify(Tag.StorageMediaFileSetUID, createUid),
       clear(Tag.StudyID),
       insert(Tag.StudyInstanceUID, _ => createUid(null)),
@@ -263,7 +261,6 @@ object AnonymizationFlow {
       modify(Tag.TransactionUID, createUid),
       modify(Tag.UID, createUid),
       clear(Tag.VerifyingObserverName)))
-  }
 
   /**
     * Anonymize data if not already anonymized. Assumes first `DicomPart` is a `PartialAnonymizationKeyPart` that is

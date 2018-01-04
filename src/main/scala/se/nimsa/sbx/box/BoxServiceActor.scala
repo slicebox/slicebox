@@ -294,7 +294,7 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageServic
   def updateOutgoingTransaction(transactionImage: OutgoingTransactionImage): Future[OutgoingTransactionImage] = {
     val updatedTransactionImage = transactionImage.image.copy(sent = true)
     val updatedTransaction = transactionImage.transaction.copy(
-      sentImageCount = transactionImage.image.sequenceNumber,
+      sentImageCount = math.max(transactionImage.transaction.sentImageCount, transactionImage.image.sequenceNumber),
       updated = System.currentTimeMillis,
       status = TransactionStatus.PROCESSING)
 
