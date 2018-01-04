@@ -52,7 +52,7 @@ import scala.util.{Failure, Success}
 
 trait SliceboxBase extends SliceboxRoutes with DicomStreamOps with JsonFormats with PlayJsonSupport {
 
-  val systemInformation: SystemInformation = SystemInformation("1.4-SNAPSHOT")
+  val systemInformation: SystemInformation = SystemInformation("1.3.2")
 
   val appConfig: Config  = ConfigFactory.load()
   val sliceboxConfig = appConfig.getConfig("slicebox")

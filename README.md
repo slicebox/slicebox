@@ -4,8 +4,8 @@
 Service | Status | Description
 ------- | ------ | -----------
 Bintray           | [![Download](https://api.bintray.com/packages/slicebox/slicebox/installers/images/download.svg) ](https://bintray.com/slicebox/slicebox/installers/_latestVersion) | Latest Version on Bintray
-Travis            | [![Build Status](https://travis-ci.org/slicebox/slicebox.svg?branch=develop)](https://travis-ci.org/slicebox/slicebox.svg?branch=develop) | [Tests](https://travis-ci.org/slicebox/slicebox/)
-Coveralls         | [![Coverage Status](https://coveralls.io/repos/github/slicebox/slicebox/badge.svg?branch=develop)](https://coveralls.io/github/slicebox/slicebox?branch=develop) | Code coverage
+Travis            | [![Build Status](https://travis-ci.org/slicebox/slicebox.svg?branch=master)](https://travis-ci.org/slicebox/slicebox.svg?branch=master) | [Tests](https://travis-ci.org/slicebox/slicebox/)
+Coveralls         | [![Coverage Status](https://coveralls.io/repos/github/slicebox/slicebox/badge.svg?branch=master)](https://coveralls.io/github/slicebox/slicebox?branch=master) | Code coverage
 Gitter            | [![Join the chat at https://gitter.im/slicebox/slicebox](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/slicebox/slicebox?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge) | Chatroom
 Documentation     | - | [Wiki](https://github.com/slicebox/slicebox/wiki)
 API Documentation | - | [REST API](http://slicebox.github.io/slicebox-api)
