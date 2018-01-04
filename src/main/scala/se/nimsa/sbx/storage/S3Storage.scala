@@ -16,17 +16,18 @@
 
 package se.nimsa.sbx.storage
 
+import java.io.ByteArrayInputStream
+
 import akka.actor.ActorSystem
 import akka.stream.Materializer
 import akka.stream.alpakka.s3.S3Exception
-import akka.stream.alpakka.s3.impl.{S3Headers, ServerSideEncryption}
 import akka.stream.alpakka.s3.scaladsl.S3Client
 import akka.stream.scaladsl.{Sink, Source}
 import akka.util.ByteString
 import akka.{Done, NotUsed}
 import com.amazonaws.auth.DefaultAWSCredentialsProviderChain
 import com.amazonaws.services.s3.AmazonS3ClientBuilder
-import com.amazonaws.services.s3.model.{CopyObjectRequest, DeleteObjectsRequest, ObjectMetadata}
+import com.amazonaws.services.s3.model.{CopyObjectRequest, DeleteObjectsRequest, ObjectMetadata, PutObjectRequest}
 import com.amazonaws.{ClientConfiguration, Protocol}
 import se.nimsa.sbx.lang.NotFoundException
 
@@ -53,8 +54,8 @@ class S3Storage(val bucket: String, val s3Prefix: String, val region: String)(im
 
   private def s3Id(imageName: String): String = s3Prefix + "/" + imageName
 
-  override def move(sourceImageName: String, targetImageName: String) = {
-    val request = new CopyObjectRequest(bucket, sourceImageName, bucket,  s3Id(targetImageName))
+  override def move(sourceImageName: String, targetImageName: String): Unit = {
+    val request = new CopyObjectRequest(bucket, sourceImageName, bucket, s3Id(targetImageName))
     val metadata = new ObjectMetadata()
     metadata.setSSEAlgorithm(ObjectMetadata.AES_256_SERVER_SIDE_ENCRYPTION)
     request.setNewObjectMetadata(metadata)
@@ -63,17 +64,27 @@ class S3Storage(val bucket: String, val s3Prefix: String, val region: String)(im
   }
 
   override def deleteByName(names: Seq[String]): Unit =
-    if (names.length == 1)
+    if (names.lengthCompare(1) == 0)
       s3.deleteObject(bucket, s3Id(names.head))
     else {
-      // micro-batch this since S3 accepts up to 1000 deletes at a timej
+      // micro-batch this since S3 accepts up to 1000 deletes at a time
       names.grouped(1000).map { subset =>
         s3.deleteObjects(new DeleteObjectsRequest(bucket).withKeys(subset.map(name => s3Id(name)): _*).withQuiet(true))
       }
     }
 
   override def fileSink(name: String)(implicit executionContext: ExecutionContext): Sink[ByteString, Future[Done]] =
-    S3Client(new DefaultAWSCredentialsProviderChain(), region).multipartUploadWithHeaders(bucket, name, s3Headers = Some(S3Headers(ServerSideEncryption.AES256))).mapMaterializedValue(_.map(_ => Done))
+    Sink
+      .fold[ByteString, ByteString](ByteString.empty)(_ ++ _)
+      .mapMaterializedValue(_.map { bytes =>
+        val metadata: ObjectMetadata = new ObjectMetadata
+        metadata.setSSEAlgorithm(ObjectMetadata.AES_256_SERVER_SIDE_ENCRYPTION)
+        metadata.setContentLength(bytes.length)
+        metadata.setContentType("application/octet-stream")
+        val putObjectRequest: PutObjectRequest = new PutObjectRequest(bucket, name, new ByteArrayInputStream(bytes.toArray), metadata)
+        s3.putObject(putObjectRequest)
+        Done
+      })
 
   override def fileSource(name: String): Source[ByteString, NotUsed] =
     S3Client(new DefaultAWSCredentialsProviderChain(), region).download(bucket, s3Id(name)).mapError {

@@ -158,9 +158,7 @@ angular.module('slicebox.directives', [])
                 }
             });
 
-            if (!$scope.objectList) {
-                loadPageData();
-            }
+            loadPageData();
 
             // Scope functions
             $scope.tableBodyStyle = function() {
