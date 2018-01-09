@@ -517,13 +517,7 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
             _.map(image => updateIncomingImageAction(image.copy(imageId = imageId)))
               .getOrElse(insertIncomingImageAction(IncomingImage(-1, incomingTransaction.id, imageId, sequenceNumber, overwrite)))
           }
-        }.flatMap { _ =>
-          if (incomingTransaction.receivedImageCount == totalImageCount)
-            setIncomingTransactionStatusAction(incomingTransaction.id, TransactionStatus.FINISHED)
-              .map(_ => incomingTransaction.copy(status = TransactionStatus.FINISHED))
-          else
-            DBIO.successful(incomingTransaction)
-        }
+        }.map(_ => incomingTransaction)
       }
     db.run(action.transactionally)
   }

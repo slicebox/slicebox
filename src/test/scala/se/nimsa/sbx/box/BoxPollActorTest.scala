@@ -71,7 +71,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
   }
 
   val anonymizationService = system.actorOf(AnonymizationServiceActor.props(anonymizationDao, purgeEmptyAnonymizationKeys = false), name = "AnonymizationService")
-  val boxService = system.actorOf(BoxServiceActor.props(boxDao, "http://testhost:1234", storage), name = "BoxService")
+  val boxService = system.actorOf(BoxServiceActor.props(boxDao, "http://testhost:1234", storage, 10), name = "BoxService")
   val pollBoxActorRef = system.actorOf(Props(new BoxPollActor(remoteBox, storage, 1.hour, "../BoxService", "../MetaDataService", "../AnonymizationService") {
 
     override def sliceboxRequest(method: HttpMethod, uri: String, entity: MessageEntity): Future[HttpResponse] = {

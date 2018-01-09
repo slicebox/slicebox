@@ -16,8 +16,10 @@
 
 package se.nimsa.sbx.box
 
+import java.util.concurrent.Executors
+
 import akka.NotUsed
-import akka.actor.{Actor, ActorSelection, ActorSystem, Cancellable, Props}
+import akka.actor.{Actor, ActorSelection, ActorSystem, Cancellable, Props, Scheduler}
 import akka.event.{Logging, LoggingReceive}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model._
@@ -31,7 +33,7 @@ import se.nimsa.sbx.storage.StorageService
 
 import scala.collection.mutable
 import scala.concurrent.duration.FiniteDuration
-import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.reflect.ClassTag
 
 class BoxPushActor(storage: StorageService,
@@ -52,7 +54,13 @@ class BoxPushActor(storage: StorageService,
   val transactionKillSwitches = mutable.Map.empty[Long, KillSwitch]
 
   override implicit val system: ActorSystem = context.system
-  override implicit val ec: ExecutionContextExecutor = context.dispatcher
+  override implicit val scheduler: Scheduler = system.scheduler
+
+  override implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(Executors.newWorkStealingPool())
+
+  override def postStop(): Unit = {
+    ec.shutdownNow()
+  }
 
   def receive = LoggingReceive {
     case PushTransaction(box, transaction) =>
@@ -75,12 +83,10 @@ class BoxPushActor(storage: StorageService,
     boxService.ask(GetOutgoingImagesForTransaction(transaction)).mapTo[Source[OutgoingTransactionImage, NotUsed]]
   override def outgoingTagValuesForImage(transactionImage: OutgoingTransactionImage): Future[Seq[OutgoingTagValue]] =
     boxService.ask(GetOutgoingTagValues(transactionImage)).mapTo[Seq[OutgoingTagValue]]
-  override def updateOutgoingTransaction(transactionImage: OutgoingTransactionImage): Future[OutgoingTransactionImage] =
-    boxService.ask(UpdateOutgoingTransaction(transactionImage)).mapTo[OutgoingTransactionImage]
+  override def updateOutgoingTransaction(transactionImage: OutgoingTransactionImage, sentImageCount: Long): Future[OutgoingTransactionImage] =
+    boxService.ask(UpdateOutgoingTransaction(transactionImage, sentImageCount)).mapTo[OutgoingTransactionImage]
   override def setOutgoingTransactionStatus(transaction: OutgoingTransaction, status: TransactionStatus): Future[Unit] =
     boxService.ask(SetOutgoingTransactionStatus(transaction, status)).map(_ => Unit)
-  override def getOutgoingImageIdsForTransaction(transaction: OutgoingTransaction): Future[Seq[Long]] =
-    boxService.ask(GetOutgoingImageIdsForTransaction(transaction)).mapTo[Seq[Long]]
   override def anonymizedDicomData(transactionImage: OutgoingTransactionImage, tagValues: Seq[OutgoingTagValue]): Source[ByteString, NotUsed] =
     anonymizedDicomData(transactionImage.image.imageId, tagValues.map(_.tagValue), storage)
 }

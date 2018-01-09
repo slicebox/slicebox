@@ -7,11 +7,11 @@ import org.scalatest.{AsyncFlatSpec, Matchers}
 import se.nimsa.sbx.util.FutureUtil._
 
 import scala.concurrent.duration.DurationInt
-import scala.concurrent.{Await, Future}
+import scala.concurrent.{Await, ExecutionContextExecutor, Future}
 
 class FutureUtilTest extends AsyncFlatSpec with Matchers {
 
-  implicit val ec = ExecutionContexts.fromExecutor(Executors.newFixedThreadPool(8))
+  implicit val ec: ExecutionContextExecutor = ExecutionContexts.fromExecutor(Executors.newFixedThreadPool(8))
 
   "traversing a collection with Future.traverse" should "complete futures in parallel" in {
 

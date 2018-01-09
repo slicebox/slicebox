@@ -1,93 +1,83 @@
 package se.nimsa.sbx.box
 
-import akka.actor.ActorSystem
+import akka.actor.{ActorSystem, Scheduler}
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.stream._
-import akka.stream.scaladsl.{Compression, Flow, GraphDSL, Keep, MergePreferred, RestartFlow, Sink, Source, SourceQueueWithComplete}
+import akka.stream.scaladsl.{Compression, Keep, Sink, Source}
 import akka.util.ByteString
 import akka.{Done, NotUsed}
 import se.nimsa.sbx.app.GeneralProtocol.{Destination, DestinationType, ImagesSent}
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.log.SbxLog
+import se.nimsa.sbx.util.FutureUtil.retry
 
-import scala.concurrent.duration.DurationInt
-import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.concurrent.duration.{DurationInt, FiniteDuration}
+import scala.concurrent.{ExecutionContext, Future}
 
 trait BoxPushOps {
 
   implicit val system: ActorSystem
-  implicit val ec: ExecutionContextExecutor
   implicit val materializer: Materializer
+  implicit val ec: ExecutionContext
+  implicit val scheduler: Scheduler
 
   val parallelism: Int
 
+  val minBackoff: FiniteDuration = 1.second
+  val maxBackoff: FiniteDuration = 15.seconds
+
   def pendingOutgoingImagesForTransaction(transaction: OutgoingTransaction): Future[Source[OutgoingTransactionImage, NotUsed]]
   def outgoingTagValuesForImage(transactionImage: OutgoingTransactionImage): Future[Seq[OutgoingTagValue]]
-  def updateOutgoingTransaction(transactionImage: OutgoingTransactionImage): Future[OutgoingTransactionImage]
+  def updateOutgoingTransaction(transactionImage: OutgoingTransactionImage, sentImageCount: Long): Future[OutgoingTransactionImage]
   def setOutgoingTransactionStatus(transaction: OutgoingTransaction, status: TransactionStatus): Future[Unit]
-  def getOutgoingImageIdsForTransaction(transaction: OutgoingTransaction): Future[Seq[Long]]
   def anonymizedDicomData(transactionImage: OutgoingTransactionImage, tagValues: Seq[OutgoingTagValue]): Source[ByteString, NotUsed]
   def sliceboxRequest(method: HttpMethod, uri: String, entity: RequestEntity): Future[HttpResponse]
 
-  def pushTransaction(box: Box, transaction: OutgoingTransaction): (Future[Done], KillSwitch) = {
-    val (recycleQueue, recycleSource) = createQueue[OutgoingTransactionImage](10 * parallelism)
-
-    val (killSwitch, futureResult) = Source.fromFutureSource(pendingOutgoingImagesForTransaction(transaction))
-      .via(mergePreferred(Source.fromFutureSource(recycleSource)))
-
-      .via(RestartFlow.withBackoff(1.second, 15.seconds, 0.2) { () =>
-
-        Flow[OutgoingTransactionImage]
-          .mapAsync(parallelism) { transactionImage =>
-            outgoingTagValuesForImage(transactionImage)
-              .flatMap { tagValues =>
-                pushImage(box, transactionImage, tagValues)
-                  .flatMap { httpResponse =>
-                    httpResponse.status.intValue() match {
-                      case status if status >= 200 && status < 300 =>
-                        handleFileSentForOutgoingTransaction(box, transactionImage)
-                      case status =>
-                        Unmarshal(httpResponse).to[String].flatMap { errorMessage =>
-                          SbxLog.warn("Box", s"Failed pushing image ${transactionImage.image.imageId}, got status code $status and message $errorMessage. Retrying later.")
-                          val exception = new RuntimeException(errorMessage)
-                          handleFileSendFailedForOutgoingTransaction(transactionImage, exception)
-                            .map { _ =>
-                              recycleQueue.offer(transactionImage)
-                              throw exception
-                              transactionImage
-                            }
-                        }
-                    }
+  def pushTransaction(box: Box, transaction: OutgoingTransaction): (Future[Done], KillSwitch) =
+    Source
+      .fromFutureSource(pendingOutgoingImagesForTransaction(transaction))
+      .mapAsyncUnordered(parallelism) { transactionImage =>
+        retry(minBackoff, maxBackoff, 0.2) {
+          outgoingTagValuesForImage(transactionImage)
+            .flatMap { tagValues =>
+              pushImage(box, transactionImage, tagValues)
+                .flatMap { httpResponse =>
+                  httpResponse.status.intValue() match {
+                    case status if status >= 200 && status < 300 =>
+                      Future.successful(transactionImage)
+                    case status =>
+                      Unmarshal(httpResponse).to[String].flatMap { errorMessage =>
+                        SbxLog.warn("Box", s"Failed pushing image ${transactionImage.image.imageId}, got status code $status and message $errorMessage. Retrying later.")
+                        val exception = new RuntimeException(errorMessage)
+                        handleFileSendFailedForOutgoingTransaction(transactionImage, exception)
+                          .map(_ => throw exception)
+                      }
                   }
-                  .recoverWith {
-                    case exception: Exception =>
-                      handleFileSendFailedForOutgoingTransaction(transactionImage, exception)
-                        .map { _ =>
-                          recycleQueue.offer(transactionImage)
-                          throw exception
-                        }
-                  }
-              }
-          }
-
-      })
-      .map { updatedTransactionImage =>
-        if (updatedTransactionImage.transaction.sentImageCount == updatedTransactionImage.transaction.totalImageCount)
-          recycleQueue.complete()
-        updatedTransactionImage
+                }
+                .recoverWith {
+                  case exception: Exception =>
+                    handleFileSendFailedForOutgoingTransaction(transactionImage, exception)
+                      .map(_ => throw exception)
+                }
+            }
+        }
       }
+      .zipWithIndex
+      .mapAsync(1) {
+        case (transactionImage, index) => handleFileSentForOutgoingTransaction(transactionImage, index + 1)
+      }
+      .map(_.image.imageId)
       .viaMat(KillSwitches.single)(Keep.right)
-      .toMat(Sink.ignore)(Keep.both)
+      .toMat(Sink.seq)(Keep.both)
       .mapMaterializedValue {
-        case (switch, futureDone) =>
-          val doneWithCleanup = futureDone.flatMap(_ => handleTransactionFinished(box, transaction).map(_ => Done))
-          (switch, doneWithCleanup)
+        case (switch, futureImageIds) =>
+          val futureDone = futureImageIds
+            .flatMap(imageIds => handleTransactionFinished(box, transaction, imageIds))
+            .map(_ => Done)
+          (futureDone, switch)
       }
       .run()
-
-    (futureResult, killSwitch)
-  }
 
   def pushImage(box: Box, transactionImage: OutgoingTransactionImage, tagValues: Seq[OutgoingTagValue]): Future[HttpResponse] = {
     val source = anonymizedDicomData(transactionImage, tagValues)
@@ -96,46 +86,25 @@ trait BoxPushOps {
     sliceboxRequest(HttpMethods.POST, uri, HttpEntity(ContentTypes.`application/octet-stream`, source))
   }
 
-  def handleFileSentForOutgoingTransaction(box: Box, transactionImage: OutgoingTransactionImage): Future[OutgoingTransactionImage] =
-    updateOutgoingTransaction(transactionImage)
+  def handleFileSentForOutgoingTransaction(transactionImage: OutgoingTransactionImage, sentImageCount: Long): Future[OutgoingTransactionImage] =
+    updateOutgoingTransaction(transactionImage, sentImageCount)
 
   def handleFileSendFailedForOutgoingTransaction(transactionImage: OutgoingTransactionImage, exception: Exception): Future[OutgoingTransactionImage] =
     setOutgoingTransactionStatus(transactionImage.transaction, TransactionStatus.WAITING).map(_ => transactionImage)
 
-  def handleTransactionFinished(box: Box, transaction: OutgoingTransaction): Future[Unit] =
-    getOutgoingImageIdsForTransaction(transaction)
-      .flatMap { imageIds =>
-        setOutgoingTransactionStatus(transaction, TransactionStatus.FINISHED)
-          .flatMap { _ =>
-            val uri = s"${box.baseUrl}/status?transactionid=${transaction.id}"
-            sliceboxRequest(HttpMethods.PUT, uri, HttpEntity(TransactionStatus.FINISHED.toString))
-              .recover {
-                case _: Exception =>
-                  SbxLog.warn("Box", s"Unable to set remote status of transaction ${transaction.id} to FINISHED.")
-              }
-              .map { _ =>
-                SbxLog.info("Box", s"Finished sending ${transaction.totalImageCount} images to box ${box.name}")
-                system.eventStream.publish(ImagesSent(Destination(DestinationType.BOX, box.name, box.id), imageIds))
-              }
+  def handleTransactionFinished(box: Box, transaction: OutgoingTransaction, imageIds: Seq[Long]): Future[Unit] =
+    setOutgoingTransactionStatus(transaction, TransactionStatus.FINISHED)
+      .flatMap { _ =>
+        val uri = s"${box.baseUrl}/status?transactionid=${transaction.id}"
+        sliceboxRequest(HttpMethods.PUT, uri, HttpEntity(TransactionStatus.FINISHED.toString))
+          .recover {
+            case _: Exception =>
+              SbxLog.warn("Box", s"Unable to set remote status of transaction ${transaction.id} to FINISHED.")
+          }
+          .map { _ =>
+            SbxLog.info("Box", s"Finished sending ${transaction.totalImageCount} images to box ${box.name}")
+            system.eventStream.publish(ImagesSent(Destination(DestinationType.BOX, box.name, box.id), imageIds))
           }
       }
-
-  def createQueue[A](bufferSize: Int): (SourceQueueWithComplete[A], Future[Source[A, NotUsed]]) =
-    Source
-      .queue[A](bufferSize, OverflowStrategy.backpressure)
-      .prefixAndTail(0)
-      .map(_._2)
-      .toMat(Sink.head)(Keep.both)
-      .run()
-
-  def mergePreferred[A, M](g: Graph[SourceShape[A], M]): Graph[FlowShape[A, A], M] =
-    GraphDSL.create(g) { implicit b =>
-      r =>
-        import akka.stream.scaladsl.GraphDSL.Implicits._
-
-        val merge = b.add(MergePreferred[A](1))
-        r ~> merge.preferred
-        FlowShape(merge.in(0), merge.out)
-    }
 
 }
