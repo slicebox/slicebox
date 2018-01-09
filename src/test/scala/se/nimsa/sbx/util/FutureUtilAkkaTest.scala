@@ -87,6 +87,25 @@ class FutureUtilAkkaTest(_system: ActorSystem) extends TestKit(_system) with Imp
     }
   }
 
+  it should "return the result of the first successful attempt" in {
+    var i = 0
+    val n = 10
+
+    val f = retry(10.millis, 20.millis, 0.2){
+      case _: Throwable => true
+    } {
+      i += 1
+      if (i < n)
+        Future.failed(new IllegalArgumentException("oups"))
+      else
+        Future.successful(i)
+    }
+
+    f.map { result =>
+      result shouldBe n
+    }
+  }
+
   "Creating 3 backoff delays with minimum delay 100 milliseconds" should "produce the delays 100, 200 and 400 milliseconds" in {
     backoffDelays(3, 100.millis) shouldBe Seq(100.millis, 200.millis, 400.millis)
   }
