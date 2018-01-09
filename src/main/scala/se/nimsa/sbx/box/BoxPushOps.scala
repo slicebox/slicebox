@@ -23,6 +23,7 @@ trait BoxPushOps {
   implicit val scheduler: Scheduler
 
   val parallelism: Int
+  val streamChunkSize: Long
 
   val minBackoff: FiniteDuration = 1.second
   val maxBackoff: FiniteDuration = 15.seconds
@@ -42,6 +43,11 @@ trait BoxPushOps {
           outgoingTagValuesForImage(transactionImage)
             .flatMap { tagValues =>
               pushImage(box, transactionImage, tagValues)
+                .recoverWith {
+                  case exception: Exception =>
+                    handleFileSendFailedForOutgoingTransaction(transactionImage, exception)
+                      .map(_ => throw exception)
+                }
                 .flatMap { httpResponse =>
                   httpResponse.status.intValue() match {
                     case status if status >= 200 && status < 300 =>
@@ -55,17 +61,12 @@ trait BoxPushOps {
                       }
                   }
                 }
-                .recoverWith {
-                  case exception: Exception =>
-                    handleFileSendFailedForOutgoingTransaction(transactionImage, exception)
-                      .map(_ => throw exception)
-                }
             }
         }
       }
       .zipWithIndex
       .mapAsync(1) {
-        case (transactionImage, index) => handleFileSentForOutgoingTransaction(transactionImage, index + 1)
+        case (transactionImage, index) => handleFileSentForOutgoingTransaction(transactionImage, index + 1 + transaction.sentImageCount)
       }
       .map(_.image.imageId)
       .viaMat(KillSwitches.single)(Keep.right)
@@ -81,6 +82,7 @@ trait BoxPushOps {
 
   def pushImage(box: Box, transactionImage: OutgoingTransactionImage, tagValues: Seq[OutgoingTagValue]): Future[HttpResponse] = {
     val source = anonymizedDicomData(transactionImage, tagValues)
+      .batchWeighted(streamChunkSize, _.length, identity)(_ ++ _)
       .via(Compression.deflate)
     val uri = s"${box.baseUrl}/image?transactionid=${transactionImage.transaction.id}&sequencenumber=${transactionImage.image.sequenceNumber}&totalimagecount=${transactionImage.transaction.totalImageCount}"
     sliceboxRequest(HttpMethods.POST, uri, HttpEntity(ContentTypes.`application/octet-stream`, source))

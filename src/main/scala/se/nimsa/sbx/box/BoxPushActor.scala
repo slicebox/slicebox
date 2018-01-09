@@ -52,8 +52,10 @@ class BoxPushActor(storage: StorageService,
   val transactionKillSwitches = mutable.Map.empty[Long, KillSwitch]
 
   override implicit val system: ActorSystem = context.system
-  override implicit val ec: ExecutionContext = system.dispatcher
+  override implicit val ec: ExecutionContext = context.dispatcher
   override implicit val scheduler: Scheduler = system.scheduler
+
+  override val streamChunkSize: Long = storage.streamChunkSize
 
   def receive = LoggingReceive {
     case PushTransaction(box, transaction) =>
