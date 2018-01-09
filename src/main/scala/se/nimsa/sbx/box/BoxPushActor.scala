@@ -16,8 +16,6 @@
 
 package se.nimsa.sbx.box
 
-import java.util.concurrent.Executors
-
 import akka.NotUsed
 import akka.actor.{Actor, ActorSelection, ActorSystem, Cancellable, Props, Scheduler}
 import akka.event.{Logging, LoggingReceive}
@@ -33,7 +31,7 @@ import se.nimsa.sbx.storage.StorageService
 
 import scala.collection.mutable
 import scala.concurrent.duration.FiniteDuration
-import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
+import scala.concurrent.{ExecutionContext, Future}
 import scala.reflect.ClassTag
 
 class BoxPushActor(storage: StorageService,
@@ -54,13 +52,8 @@ class BoxPushActor(storage: StorageService,
   val transactionKillSwitches = mutable.Map.empty[Long, KillSwitch]
 
   override implicit val system: ActorSystem = context.system
+  override implicit val ec: ExecutionContext = system.dispatcher
   override implicit val scheduler: Scheduler = system.scheduler
-
-  override implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(Executors.newWorkStealingPool())
-
-  override def postStop(): Unit = {
-    ec.shutdownNow()
-  }
 
   def receive = LoggingReceive {
     case PushTransaction(box, transaction) =>

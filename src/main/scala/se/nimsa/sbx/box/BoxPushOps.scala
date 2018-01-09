@@ -38,7 +38,7 @@ trait BoxPushOps {
     Source
       .fromFutureSource(pendingOutgoingImagesForTransaction(transaction))
       .mapAsyncUnordered(parallelism) { transactionImage =>
-        retry(minBackoff, maxBackoff, 0.2) {
+        retry(minBackoff, maxBackoff, 0.2) { case _: Throwable => true } {
           outgoingTagValuesForImage(transactionImage)
             .flatMap { tagValues =>
               pushImage(box, transactionImage, tagValues)
