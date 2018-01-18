@@ -94,6 +94,10 @@ object BoxProtocol {
   case class OutgoingTagValue(id: Long, outgoingImageId: Long, tagValue: TagValue) extends Entity
 
   case class OutgoingTransactionImage(transaction: OutgoingTransaction, image: OutgoingImage) {
+    /**
+      * Update transaction and image when image has been sent: Mark outgoing image as sent. Update sent image count and
+      * updated timestamp, and set status to PROCESSING in transaction.
+      */
     def update(sentImageCount: Long): OutgoingTransactionImage = {
       val updatedImage = image.copy(sent = true)
       val updatedTransaction = transaction.copy(
