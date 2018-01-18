@@ -123,8 +123,6 @@ trait SliceboxBase extends SliceboxRoutes with DicomStreamOps with JsonFormats w
       s"http$ssl://$publicHost:$publicPort/api"
   }
 
-  val boxParallelism = sliceboxConfig.getInt("stream.parallelism")
-
   val superUser = sliceboxConfig.getString("superuser.user")
   val superPassword = sliceboxConfig.getString("superuser.password")
   val sessionsIncludeIpAndUserAgent: Boolean = sliceboxConfig.getBoolean("user-sessions-include-ip-and-useragent")
@@ -142,7 +140,7 @@ trait SliceboxBase extends SliceboxRoutes with DicomStreamOps with JsonFormats w
     val purgeEmptyAnonymizationKeys = sliceboxConfig.getBoolean("anonymization.purge-empty-keys")
     system.actorOf(AnonymizationServiceActor.props(anonymizationDao, purgeEmptyAnonymizationKeys), name = "AnonymizationService")
   }
-  val boxService = system.actorOf(BoxServiceActor.props(boxDao, apiBaseURL, storage, boxParallelism), name = "BoxService")
+  val boxService = system.actorOf(BoxServiceActor.props(boxDao, apiBaseURL, storage), name = "BoxService")
   val scpService = system.actorOf(ScpServiceActor.props(scpDao, storage), name = "ScpService")
   val scuService = system.actorOf(ScuServiceActor.props(scuDao, storage), name = "ScuService")
   val directoryService = system.actorOf(DirectoryWatchServiceActor.props(directoryWatchDao, storage), name = "DirectoryService")

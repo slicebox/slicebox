@@ -356,10 +356,10 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
     boxQuery.drop(startIndex).take(count).result
   }
 
-  def listPendingOutgoingTransactions(): Future[Seq[OutgoingTransaction]] = db.run {
+  def listPendingOutgoingTransactionsForBox(boxId: Long): Future[Seq[OutgoingTransaction]] = db.run {
     outgoingTransactionQuery
-      .filterNot(_.status === (FAILED: TransactionStatus))
-      .filterNot(_.status === (FINISHED: TransactionStatus))
+      .filter(_.boxId === boxId)
+      .filter(_.status === (WAITING: TransactionStatus))
       .result
   }
 

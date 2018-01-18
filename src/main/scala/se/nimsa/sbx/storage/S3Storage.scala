@@ -87,9 +87,12 @@ class S3Storage(val bucket: String, val s3Prefix: String, val region: String)(im
       })
 
   override def fileSource(name: String): Source[ByteString, NotUsed] =
-    S3Client(new DefaultAWSCredentialsProviderChain(), region).download(bucket, s3Id(name)).mapError {
-      // we do not have access to http status code here so not much we can do but map everything to NotFound
-      case e: S3Exception => new NotFoundException(s"Data could not be transferred for name $name: ${e.getMessage}")
-    }
+    S3Client(new DefaultAWSCredentialsProviderChain(), region)
+      .download(bucket, s3Id(name))
+      .mapMaterializedValue(_ => NotUsed)
+      .mapError {
+        // we do not have access to http status code here so not much we can do but map everything to NotFound
+        case e: S3Exception => new NotFoundException(s"Data could not be transferred for name $name: ${e.getMessage}")
+      }
 
 }

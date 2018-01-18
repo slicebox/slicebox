@@ -38,7 +38,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
   await(boxDao.create())
 
   val storageService: ActorRef = system.actorOf(Props(new StorageServiceActor(storage)), name = "StorageService")
-  val boxService: ActorRef = system.actorOf(Props(new BoxServiceActor(boxDao, "http://testhost:1234", storage, 10)), name = "BoxService")
+  val boxService: ActorRef = system.actorOf(Props(new BoxServiceActor(boxDao, "http://testhost:1234", storage)), name = "BoxService")
 
   override def afterEach(): Unit = {
     storage.clear()
@@ -154,31 +154,20 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
       await(boxDao.listIncomingImages) should have length 1
     }
 
-    "mark incoming transaction as finished when receiving the UpdateIncoming message for the last file of the transaction" in {
+    "update incoming transaction status" in {
 
       val box = Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, online = false)
 
-      val totalImageCount = 2
-      boxService ! UpdateIncoming(box, 32, sequenceNumber = 1, totalImageCount, 33, overwrite = false)
+      val transactionId = 32
+      boxService ! UpdateIncoming(box, transactionId, sequenceNumber = 1, totalImageCount = 55, 33, overwrite = false)
+      expectMsgType[IncomingUpdated]
 
-      expectMsgPF() {
-        case IncomingUpdated(transaction) =>
-          transaction.receivedImageCount shouldBe 1
-          transaction.totalImageCount shouldBe totalImageCount
-          transaction.status shouldBe TransactionStatus.PROCESSING
-      }
+      boxService ! SetIncomingTransactionStatus(box.id, transactionId, TransactionStatus.FINISHED)
+      expectMsg(Some(IncomingTransactionStatusUpdated))
 
-      boxService ! UpdateIncoming(box, 32, sequenceNumber = 2, totalImageCount, 33, overwrite = false)
-
-      expectMsgPF() {
-        case IncomingUpdated(transaction) =>
-          transaction.receivedImageCount shouldBe 2
-          transaction.totalImageCount shouldBe totalImageCount
-          transaction.status shouldBe TransactionStatus.FINISHED
-      }
-
-      await(boxDao.listIncomingTransactions(0, 10)) should have length 1
-      await(boxDao.listIncomingImages) should have length 2
+      val transactions = await(boxDao.listIncomingTransactions(0, 10))
+      transactions should have length 1
+      transactions.head.status shouldBe TransactionStatus.FINISHED
     }
 
     "mark incoming transaction as processing until all files have been received" in {
