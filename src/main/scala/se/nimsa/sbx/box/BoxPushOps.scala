@@ -172,11 +172,8 @@ trait BoxPushOps {
     */
   protected def completeFlow[T](flow: Flow[T, T, _], decider: T => Boolean): Flow[T, T, NotUsed] =
     Flow.fromGraph(GraphDSL.create() { implicit builder =>
-      val toOptionFlow = builder.add(Flow[T].map(Option.apply))
-      val fromOptionFlow = Flow[Option[T]].mapConcat {
-        case Some(t) => t :: Nil
-        case _ => Nil
-      }
+      val toSomeFlow = builder.add(Flow[T].map(Some.apply))
+      val fromOptionFlow = Flow[Option[T]].collect { case Some(t) => t }
 
       val concatFinished = builder.add(Concat[Option[T]](2))
       val broadcast = builder.add(Broadcast[T](2))
@@ -184,10 +181,10 @@ trait BoxPushOps {
       val shouldCompleteFlow = Flow[T].filter(decider)
       val toOnceNoneFlow = Flow[T].take(1).map(_ => None)
 
-      toOptionFlow ~> concatFinished ~> fromOptionFlow ~> flow                 ~> broadcast
-                      concatFinished <~ toOnceNoneFlow <~ shouldCompleteFlow   <~ broadcast.out(1)
+      toSomeFlow ~> concatFinished ~> fromOptionFlow ~> flow                 ~> broadcast
+                    concatFinished <~ toOnceNoneFlow <~ shouldCompleteFlow   <~ broadcast.out(1)
 
-      FlowShape(toOptionFlow.in, broadcast.out(0))
+      FlowShape(toSomeFlow.in, broadcast.out(0))
     })
 
   /**
