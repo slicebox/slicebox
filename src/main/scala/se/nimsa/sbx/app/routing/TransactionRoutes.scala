@@ -42,17 +42,19 @@ trait TransactionRoutes {
               'sequencenumber.as[Long],
               'totalimagecount.as[Long])) { (outgoingTransactionId, sequenceNumber, totalImageCount) =>
               post {
-                extractDataBytes { compressedBytes =>
-                  val source = Source(SourceType.BOX, box.name, box.id)
-                  onSuccess(storeDicomData(compressedBytes.via(Compression.inflate()), source, storage, Contexts.extendedContexts, reverseAnonymization = true)) { metaData =>
-                    system.eventStream.publish(ImageAdded(metaData.image.id, source, !metaData.imageAdded))
-                    val overwrite = !metaData.imageAdded
-                    onSuccess(boxService.ask(UpdateIncoming(box, outgoingTransactionId, sequenceNumber, totalImageCount, metaData.image.id, overwrite))) {
-                      case IncomingUpdated(transaction) =>
-                        transaction.status match {
-                          case TransactionStatus.FAILED => complete(InternalServerError)
-                          case _ => complete(NoContent)
-                        }
+                withoutSizeLimit {
+                  extractDataBytes { compressedBytes =>
+                    val source = Source(SourceType.BOX, box.name, box.id)
+                    onSuccess(storeDicomData(compressedBytes.via(Compression.inflate()), source, storage, Contexts.extendedContexts, reverseAnonymization = true)) { metaData =>
+                      system.eventStream.publish(ImageAdded(metaData.image.id, source, !metaData.imageAdded))
+                      val overwrite = !metaData.imageAdded
+                      onSuccess(boxService.ask(UpdateIncoming(box, outgoingTransactionId, sequenceNumber, totalImageCount, metaData.image.id, overwrite))) {
+                        case IncomingUpdated(transaction) =>
+                          transaction.status match {
+                            case TransactionStatus.FAILED => complete(InternalServerError)
+                            case _ => complete(NoContent)
+                          }
+                      }
                     }
                   }
                 }

@@ -1,278 +1,137 @@
 package se.nimsa.sbx.box
 
-import akka.NotUsed
-import akka.actor.{Actor, ActorSystem, Props}
-import akka.http.scaladsl.model.StatusCodes.{BadRequest, NoContent, ServiceUnavailable}
-import akka.http.scaladsl.model._
-import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.Source
+import java.util.concurrent.Executors
+
+import akka.Done
+import akka.actor.{Actor, ActorRef, ActorSystem, Props}
+import akka.pattern.ask
+import akka.stream.{ActorMaterializer, KillSwitch}
 import akka.testkit.{ImplicitSender, TestKit}
-import akka.util.{ByteString, Timeout}
+import akka.util.Timeout
 import org.scalatest._
-import se.nimsa.sbx.anonymization.{AnonymizationDAO, AnonymizationServiceActor}
 import se.nimsa.sbx.box.BoxProtocol._
-import se.nimsa.sbx.dicom.DicomHierarchy.Image
-import se.nimsa.sbx.metadata.MetaDataDAO
-import se.nimsa.sbx.metadata.MetaDataProtocol.GetImage
 import se.nimsa.sbx.storage.RuntimeStorage
 import se.nimsa.sbx.util.FutureUtil.await
-import se.nimsa.sbx.util.TestUtil
 
-import scala.collection.mutable.ArrayBuffer
-import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 
 class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
   with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {
 
   def this() = this(ActorSystem("BoxPushActorTestSystem"))
 
-  implicit val ec = system.dispatcher
-  implicit val timeout = Timeout(30.seconds)
-  implicit val materializer = ActorMaterializer()
+  implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(Executors.newWorkStealingPool())
+  implicit val timeout: Timeout = Timeout(30.seconds)
+  implicit val materializer: ActorMaterializer = ActorMaterializer()
 
-  val dbConfig = TestUtil.createTestDb("boxpushactortest")
+  val testBox = Box(1, "Test Box", "abc123", "testbox.com", BoxSendMethod.PUSH, online = true)
+  val storage = new RuntimeStorage()
 
-  val boxDao = new BoxDAO(dbConfig)
-  val metaDataDao = new MetaDataDAO(dbConfig)
-  val anonymizationDao = new AnonymizationDAO(dbConfig)
+  var nPolls = 0
+  var nPushed = 0
 
-  await(metaDataDao.create())
-  await(anonymizationDao.create())
-  await(boxDao.create())
-
-  val testBox = Box(1, "Test Box", "abc123", "testbox.com", BoxSendMethod.PUSH, online = false)
-
-  val (dbPatient1, (dbStudy1, dbStudy2), (dbSeries1, dbSeries2, dbSeries3, dbSeries4), (dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)) =
-    await(TestUtil.insertMetaData(metaDataDao))
-
-  val capturedFileSendRequests = ArrayBuffer.empty[HttpRequest]
-  val capturedStatusUpdateRequests = ArrayBuffer.empty[HttpRequest]
-  val failedResponseSendIndices = ArrayBuffer.empty[Int]
-  val noResponseSendIndices = ArrayBuffer.empty[Int]
-
-  val okResponse = HttpResponse()
-  val noResponse = HttpResponse(status = ServiceUnavailable)
-  val failResponse = HttpResponse(status = BadRequest)
-
-  val metaDataService = system.actorOf(Props(new Actor() {
-    var imageFound = true
-    def receive = {
-      case GetImage(imageId) if imageId < 4 =>
-        sender ! Some(Image(imageId, 2, null, null, null))
-      case GetImage(_) =>
-        sender ! None
+  val boxService: ActorRef = system.actorOf(Props(new Actor() {
+    def receive: Receive = {
+      case GetOutgoingTransactionsForBox(_) =>
+        nPolls += 1
+        sender ! Seq(OutgoingTransaction(1, testBox.id, testBox.name, 0, 10, 1000, 1000, TransactionStatus.WAITING))
     }
-  }), name = "MetaDataService")
+  }), name = "BoxService")
 
-  val invalidImageId = 666
+  val metaService: ActorRef = system.actorOf(Props(new Actor() {
+    override def receive: Receive = { case _ => }
+  }), name = "MetaService")
 
-  val storage = new RuntimeStorage() {
-    override def fileSource(imageId: Long): Source[ByteString, NotUsed] = Source.single(ByteString(1, 2, 3))
-  }
+  val anonService: ActorRef = system.actorOf(Props(new Actor() {
+    override def receive: Receive = { case _ => }
+  }), name = "AnonService")
 
-  val anonymizationService = system.actorOf(AnonymizationServiceActor.props(anonymizationDao, purgeEmptyAnonymizationKeys = false), name = "AnonymizationService")
-  val boxService = system.actorOf(BoxServiceActor.props(boxDao, "http://testhost:1234", storage), name = "BoxService")
-
-  var reportTransactionAsFailed = false
-
-  val boxPushActorRef = system.actorOf(Props(new BoxPushActor(testBox, storage, 1000.hours, "../BoxService", "../MetaDataService", "../AnonymizationService") {
-
-    override def sliceboxRequest(method: HttpMethod, uri: String, entity: MessageEntity): Future[HttpResponse] = {
-      val request = HttpRequest(method = method, uri = uri, entity = entity)
-      request.method match {
-        case HttpMethods.POST =>
-          capturedFileSendRequests += request
-          if (failedResponseSendIndices.contains(capturedFileSendRequests.size))
-            Future.successful(failResponse)
-          else if (noResponseSendIndices.contains(capturedFileSendRequests.size))
-            Future.successful(noResponse)
-          else
-            Future.successful(okResponse)
-        case HttpMethods.GET =>
-          if (reportTransactionAsFailed)
-            Future.successful(HttpResponse(entity = HttpEntity(TransactionStatus.FAILED.toString)))
-          else
-            Future.successful(HttpResponse(entity = HttpEntity(TransactionStatus.FINISHED.toString)))
-        case HttpMethods.PUT =>
-          capturedStatusUpdateRequests += request
-          Future.successful(HttpResponse(status = NoContent))
-        case _ =>
-          Future.failed(new IllegalArgumentException("Unsupported method"))
-      }
+  case object Clear
+  case object GetNumberOfKillSwitches
+  val pushActor: ActorRef = system.actorOf(Props(new BoxPushActor(testBox, storage, 200.milliseconds, "../BoxService", "../MetaService", "../AnonService") {
+    override def receive: Receive = {
+      case Clear =>
+        transactionKillSwitches.clear()
+        sender ! Unit
+      case GetNumberOfKillSwitches =>
+        sender ! transactionKillSwitches.size
+      case m => super.receive(m)
     }
-
+    override def pushTransaction(transaction: BoxProtocol.OutgoingTransaction): (Future[Done], KillSwitch) = {
+      nPushed += 1
+      super.pushTransaction(transaction)
+    }
   }), name = "PushBox")
 
-  override def afterAll {
+  override def beforeEach(): Unit = {
+    nPolls = 0
+    nPushed = 0
+    await(pushActor.ask(Clear))
+  }
+
+  override def afterAll(): Unit = {
     TestKit.shutdownActorSystem(system)
   }
 
-  override def beforeEach() {
-    capturedFileSendRequests.clear()
-    capturedStatusUpdateRequests.clear()
-    failedResponseSendIndices.clear()
-    noResponseSendIndices.clear()
-    reportTransactionAsFailed = false
-
-    await(boxDao.clear())
-  }
-
   "A BoxPushActor" should {
-
-    "post file to correct URL" in {
-
-      val transaction = await(boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, testBox.id, testBox.name, 0, 1, 1000, 1000, TransactionStatus.WAITING)))
-      val image = await(boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage1.id, 1, sent = false)))
-
-      boxPushActorRef ! PollOutgoing
-
-      expectNoMessage(3.seconds)
-
-      capturedFileSendRequests should have length 1
-      capturedStatusUpdateRequests shouldBe empty
-      capturedFileSendRequests(0).uri.toString() should be(s"${testBox.baseUrl}/image?transactionid=${transaction.id}&sequencenumber=${image.sequenceNumber}&totalimagecount=${transaction.totalImageCount}")
+    "poll the database for new outgoing transactions to push" in {
+      pushActor ! PollOutgoing
+      expectNoMessage(1.second)
+      nPolls shouldBe 1
     }
 
-    "post file in correct order" in {
-      // Insert outgoing images out of order
-      val transaction = await(boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, testBox.id, testBox.name, 0, 2, 1000, 1000, TransactionStatus.WAITING)))
-      val image1 = await(boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage1.id, 2, sent = false)))
-      val image2 = await(boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage2.id, 1, sent = false)))
-
-      boxPushActorRef ! PollOutgoing
-      expectNoMessage(3.seconds)
-
-      capturedFileSendRequests.size should be(2)
-      capturedStatusUpdateRequests shouldBe empty
-      capturedFileSendRequests(0).uri.toString() should be(s"${testBox.baseUrl}/image?transactionid=${transaction.id}&sequencenumber=${image2.sequenceNumber}&totalimagecount=${transaction.totalImageCount}")
-      capturedFileSendRequests(1).uri.toString() should be(s"${testBox.baseUrl}/image?transactionid=${transaction.id}&sequencenumber=${image1.sequenceNumber}&totalimagecount=${transaction.totalImageCount}")
+    "push pending transactions" in {
+      pushActor ! PollOutgoing
+      expectNoMessage(1.second)
+      nPushed shouldBe 1
     }
 
-    "mark outgoing transaction as finished when all files have been sent" in {
-      val transaction = await(boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, testBox.id, testBox.name, 0, 2, 1000, 1000, TransactionStatus.WAITING)))
-      await(boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage1.id, 1, sent = false)))
-      await(boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage2.id, 2, sent = false)))
-
-      await(boxDao.listOutgoingTransactions(0, 1)).head.status shouldBe TransactionStatus.WAITING
-
-      boxPushActorRef ! PollOutgoing
-
-      expectNoMessage(3.seconds) // both images will be sent
-
-      await(boxDao.listOutgoingTransactions(0, 1)).head.status shouldBe TransactionStatus.FINISHED
+    "add a kill switch for each started transaction and remove it when transaction finishes" in {
+      pushActor ! PollOutgoing
+      expectNoMessage(1.second)
+      await(pushActor.ask(GetNumberOfKillSwitches).mapTo[Int]) shouldBe 1
+      pushActor ! RemoveTransaction(1)
+      expectNoMessage(1.second)
+      await(pushActor.ask(GetNumberOfKillSwitches).mapTo[Int]) shouldBe 0
     }
 
-    "mark outgoing transaction as failed when file send fails" in {
-
-      failedResponseSendIndices += 1
-
-      val transaction = await(boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, testBox.id, testBox.name, 0, 1, 1000, 1000, TransactionStatus.WAITING)))
-      await(boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, invalidImageId, 1, sent = false)))
-
-      boxPushActorRef ! PollOutgoing
-
-      expectNoMessage(3.seconds)
-
-      val outgoingTransactions = await(boxDao.listOutgoingTransactions(0, 10))
-      outgoingTransactions.size should be(1)
-      outgoingTransactions.foreach(_.status shouldBe TransactionStatus.FAILED)
-
-      capturedStatusUpdateRequests should have length 1
-    }
-
-    "not mark wrong outgoing transaction as failed when transaction id is not unique" in {
-
-      val transaction1 = await(boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, testBox.id, testBox.name, 0, 1, 1000, 1000, TransactionStatus.WAITING)))
-      await(boxDao.insertOutgoingImage(OutgoingImage(-1, transaction1.id, invalidImageId, 1, sent = false)))
-      val transaction2 = await(boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, testBox.id, testBox.name, 0, 1, 1000, 1000, TransactionStatus.WAITING)))
-      await(boxDao.insertOutgoingImage(OutgoingImage(-1, transaction2.id, dbImage1.id, 1, sent = false)))
-
-      failedResponseSendIndices += 1
-
-      boxPushActorRef ! PollOutgoing
-      expectNoMessage(3.seconds)
-
-      val outgoingTransactions = await(boxDao.listOutgoingTransactions(0, 10))
-      outgoingTransactions.size should be(2)
-      outgoingTransactions.foreach { transaction =>
-        if (transaction.id == transaction1.id)
-          transaction.status shouldBe TransactionStatus.FAILED
-        else
-          transaction.status shouldBe TransactionStatus.WAITING
+    "should parse box urls into protocol, host and port" in {
+      val pattern = BoxPushActor.pattern
+      "http://example.com:8080/path" match {
+        case pattern(pr, ho, po) =>
+          pr shouldBe "http"
+          ho shouldBe "example.com"
+          po shouldBe "8080"
       }
 
-      capturedStatusUpdateRequests should have length 1
-    }
+      "https://1.2.3.4:8080/path" match {
+        case pattern(pr, ho, po) =>
+          pr shouldBe "https"
+          ho shouldBe "1.2.3.4"
+          po shouldBe "8080"
+      }
 
-    "process other transactions when file send fails" in {
+      "localhost" match {
+        case pattern(pr, ho, po) =>
+          pr shouldBe null
+          ho shouldBe "localhost"
+          po shouldBe null
+      }
 
-      val transaction1 = await(boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, testBox.id, testBox.name, 0, 1, 1000, 1000, TransactionStatus.WAITING)))
-      await(boxDao.insertOutgoingImage(OutgoingImage(-1, transaction1.id, invalidImageId, 1, sent = false)))
+      "ftp://localhost:1234" match {
+        case pattern(pr, ho, po) =>
+          pr shouldBe "ftp"
+          ho shouldBe "localhost"
+          po shouldBe "1234"
+      }
 
-      failedResponseSendIndices += 1
-
-      boxPushActorRef ! PollOutgoing
-      expectNoMessage(3.seconds)
-
-      val transaction2 = await(boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, testBox.id, testBox.name, 0, 1, 1000, 1000, TransactionStatus.WAITING)))
-      await(boxDao.insertOutgoingImage(OutgoingImage(-1, transaction2.id, dbImage2.id, 1, sent = false)))
-
-      boxPushActorRef ! PollOutgoing
-      expectNoMessage(3.seconds)
-
-      capturedFileSendRequests.size should be(2)
-      capturedStatusUpdateRequests should have length 1
-
-      val outgoingTransactions = await(boxDao.listOutgoingTransactions(0, 10))
-      outgoingTransactions.size should be(2)
-      outgoingTransactions.foreach(transaction =>
-        if (transaction.id == transaction1.id) {
-          transaction.status shouldBe TransactionStatus.FAILED
-        } else {
-          transaction.status shouldBe TransactionStatus.FINISHED
-        })
-    }
-
-    "pause outgoing processing when remote server is not working, and resume once remote server is back up" in {
-      val transaction = await(boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, testBox.id, testBox.name, 0, 3, 1000, 1000, TransactionStatus.WAITING)))
-      await(boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage1.id, 1, sent = false)))
-      await(boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage2.id, 2, sent = false)))
-      await(boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage3.id, 3, sent = false)))
-
-      noResponseSendIndices ++= Seq(2, 3)
-
-      boxPushActorRef ! PollOutgoing
-      expectNoMessage(3.seconds)
-
-      await(boxDao.listOutgoingImagesForOutgoingTransactionId(transaction.id)).count(_.sent == false) should be(2)
-
-      // server back up
-      noResponseSendIndices.clear()
-
-      boxPushActorRef ! PollOutgoing
-      expectNoMessage(3.seconds)
-
-      await(boxDao.listOutgoingImagesForOutgoingTransactionId(transaction.id)).count(_.sent == false) should be(0)
-
-      capturedStatusUpdateRequests shouldBe empty
-    }
-
-    "mark transaction as failed if remote box reports it as failed after transaction has finished" in {
-      reportTransactionAsFailed = true
-      val transaction = await(boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, testBox.id, testBox.name, 0, 2, 1000, 1000, TransactionStatus.WAITING)))
-      await(boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage1.id, 1, sent = false)))
-      await(boxDao.insertOutgoingImage(OutgoingImage(-1, transaction.id, dbImage2.id, 2, sent = false)))
-
-      await(boxDao.listOutgoingTransactions(0, 1)).head.status shouldBe TransactionStatus.WAITING
-
-      boxPushActorRef ! PollOutgoing
-
-      expectNoMessage(3.seconds) // both images will be sent
-
-      await(boxDao.listOutgoingTransactions(0, 1)).head.status shouldBe TransactionStatus.FAILED
-
-      capturedStatusUpdateRequests shouldBe empty
+      "a/b/http://8080/abc:56://" match {
+        case pattern(pr, ho, po) =>
+          pr shouldBe null
+          ho shouldBe "a"
+          po shouldBe null
+      }
     }
   }
 }

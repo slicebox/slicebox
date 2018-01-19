@@ -16,189 +16,127 @@
 
 package se.nimsa.sbx.box
 
-import akka.actor.{Actor, Props}
+import akka.NotUsed
+import akka.actor.{Actor, ActorSelection, ActorSystem, Cancellable, Props, Scheduler}
 import akka.event.{Logging, LoggingReceive}
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.StatusCodes.NoContent
 import akka.http.scaladsl.model._
-import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.pattern.ask
-import akka.stream.Materializer
-import akka.stream.scaladsl.Compression
-import akka.util.Timeout
-import se.nimsa.sbx.app.GeneralProtocol._
+import akka.stream.scaladsl.{Flow, Source}
+import akka.stream.{KillSwitch, Materializer}
+import akka.util.{ByteString, Timeout}
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.dicom.streams.DicomStreamOps
 import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.storage.StorageService
 
-import scala.concurrent.Future
+import scala.collection.mutable
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
+import scala.concurrent.{ExecutionContext, Future}
 import scala.reflect.ClassTag
-import scala.util.{Failure, Success}
+import scala.util.Try
+import scala.util.matching.Regex
 
-class BoxPushActor(box: Box,
+class BoxPushActor(override val box: Box,
                    storage: StorageService,
-                   pollInterval: FiniteDuration = 5.seconds,
+                   pollInterval: FiniteDuration = 15.seconds,
                    boxServicePath: String = "../../BoxService",
                    metaDataServicePath: String = "../../MetaDataService",
                    anonymizationServicePath: String = "../../AnonymizationService")
-                  (implicit val materializer: Materializer, timeout: Timeout) extends Actor with DicomStreamOps {
+                  (implicit val materializer: Materializer, timeout: Timeout) extends Actor with DicomStreamOps with BoxPushOps {
+  import BoxPushActor._
 
   val log = Logging(context.system, this)
 
-  val metaDataService = context.actorSelection(metaDataServicePath)
-  val anonymizationService = context.actorSelection(anonymizationServicePath)
-  val boxService = context.actorSelection(boxServicePath)
+  val metaDataService: ActorSelection = context.actorSelection(metaDataServicePath)
+  val anonymizationService: ActorSelection = context.actorSelection(anonymizationServicePath)
+  val boxService: ActorSelection = context.actorSelection(boxServicePath)
 
-  implicit val system = context.system
-  implicit val executor = context.dispatcher
+  val transactionKillSwitches = mutable.Map.empty[Long, KillSwitch]
 
-  val poller = system.scheduler.schedule(pollInterval, pollInterval) {
+  override implicit val system: ActorSystem = context.system
+  override implicit val ec: ExecutionContext = context.dispatcher
+  override implicit val scheduler: Scheduler = system.scheduler
+
+  override protected val streamChunkSize: Long = storage.streamChunkSize
+
+  val http = Http(system)
+
+  override protected val pool: Flow[(HttpRequest, OutgoingTransactionImage), (Try[HttpResponse], OutgoingTransactionImage), Http.HostConnectionPool] =
+    box.baseUrl match {
+      case pattern(protocolPart, host, portPart) =>
+        val protocol = Option(protocolPart).getOrElse("http")
+        val port = Option(portPart) match {
+          case None if protocol == "https" => 443
+          case None => 80
+          case Some(portString) => portString.toInt
+        }
+        if (port == 443)
+          http.cachedHostConnectionPoolHttps[OutgoingTransactionImage](host, port)
+        else
+          http.cachedHostConnectionPool[OutgoingTransactionImage](host, port)
+    }
+
+  val poller: Cancellable = system.scheduler.schedule(pollInterval, pollInterval) {
     self ! PollOutgoing
   }
 
-  override def postStop() =
+  override def postStop(): Unit =
+    transactionKillSwitches.values.foreach(_.shutdown())
     poller.cancel()
-
-  val pool = Http().superPool[String]()
-
-  override def callAnonymizationService[R: ClassTag](message: Any) = anonymizationService.ask(message).mapTo[R]
-  override def callMetaDataService[R: ClassTag](message: Any) = metaDataService.ask(message).mapTo[R]
-  override def scheduleTask(delay: FiniteDuration)(task: => Unit) = system.scheduler.scheduleOnce(delay)(task)
 
   def receive = LoggingReceive {
     case PollOutgoing =>
-      context.become(inTransferState)
-      processNextOutgoingTransaction().onComplete {
-        case Success(_) =>
-          self ! TransferFinished
-          self ! PollOutgoing
-        case Failure(e) => e match {
-          case _@(EmptyTransactionException | RemoteBoxUnavailableException) =>
-            self ! TransferFinished
-          case e: Exception =>
-            SbxLog.error("Box", s"Failed to send file to box ${box.name}: ${e.getMessage}")
-            self ! TransferFinished
-        }
+      boxService.ask(GetOutgoingTransactionsForBox(box))
+        .mapTo[Seq[OutgoingTransaction]]
+        .map(outgoingTransactions =>
+          outgoingTransactions
+            .filter(transaction => !isPushingTransaction(transaction))
+            .foreach(transaction => self ! PushTransaction(transaction)))
+
+    case PushTransaction(transaction) =>
+      if (!transactionKillSwitches.contains(transaction.id)) {
+        val (_, killSwitch) = pushTransaction(transaction)
+        transactionKillSwitches(transaction.id) = killSwitch
       }
+
+    case RemoveTransaction(transactionId) =>
+      transactionKillSwitches.get(transactionId).foreach(_.shutdown())
+      transactionKillSwitches.remove(transactionId)
   }
 
-  def inTransferState: Receive = {
-    case TransferFinished => context.unbecome()
-  }
+  protected def isPushingTransaction(transaction: OutgoingTransaction): Boolean =
+    transactionKillSwitches.contains(transaction.id)
 
-  def processNextOutgoingTransaction(): Future[Unit] = {
-    boxService.ask(GetNextOutgoingTransactionImage(box.id)).mapTo[Option[OutgoingTransactionImage]].flatMap {
-      case Some(transactionImage) => sendFileForOutgoingTransactionImage(transactionImage)
-      case None => Future.failed(EmptyTransactionException)
-    }
-  }
-
-  def sendFileForOutgoingTransactionImage(transactionImage: OutgoingTransactionImage): Future[Unit] =
+  override def callAnonymizationService[R: ClassTag](message: Any): Future[R] =
+    anonymizationService.ask(message).mapTo[R]
+  override def callMetaDataService[R: ClassTag](message: Any): Future[R] =
+    metaDataService.ask(message).mapTo[R]
+  override def scheduleTask(delay: FiniteDuration)(task: => Unit): Cancellable =
+    system.scheduler.scheduleOnce(delay)(task)
+  override protected def pendingOutgoingImagesForTransaction(transaction: OutgoingTransaction): Future[Source[OutgoingTransactionImage, NotUsed]] =
+    boxService.ask(GetOutgoingImagesForTransaction(transaction)).mapTo[Source[OutgoingTransactionImage, NotUsed]]
+  override protected def outgoingTagValuesForImage(transactionImage: OutgoingTransactionImage): Future[Seq[OutgoingTagValue]] =
     boxService.ask(GetOutgoingTagValues(transactionImage)).mapTo[Seq[OutgoingTagValue]]
-      .flatMap(transactionTagValues =>
-        sendFile(transactionImage, transactionTagValues))
-
-  def sendFile(transactionImage: OutgoingTransactionImage, tagValues: Seq[OutgoingTagValue]): Future[Unit] = {
-    log.debug(s"Pushing transaction image $transactionImage with tag values $tagValues")
-
-    pushImagePipeline(transactionImage, tagValues).transformWith {
-      case Success(response) if response.status.intValue >= 200 && response.status.intValue < 300 =>
-        handleFileSentForOutgoingTransaction(transactionImage)
-      case Success(response) =>
-        Unmarshal(response).to[String].flatMap { errorMessage =>
-          handleFileSendFailedForOutgoingTransaction(transactionImage, response.status.intValue, new Exception(s"File send failed with status code ${response.status.intValue}: $errorMessage"))
-        }
-      case Failure(e) => e match {
-        case exception: RemoteTransactionFailedException =>
-          handleFileSendFailedForOutgoingTransaction(transactionImage, 502, exception)
-        case exception: IllegalArgumentException =>
-          handleFileSendFailedForOutgoingTransaction(transactionImage, 400, exception)
-        case exception: Exception =>
-          handleFileSendFailedForOutgoingTransaction(transactionImage, 503, exception)
+  override protected def updateOutgoingTransaction(transactionImage: OutgoingTransactionImage, sentImageCount: Long): Future[OutgoingTransactionImage] =
+    boxService.ask(UpdateOutgoingTransaction(transactionImage, sentImageCount)).mapTo[OutgoingTransactionImage]
+  override protected def setOutgoingTransactionStatus(transaction: OutgoingTransaction, status: TransactionStatus): Future[Unit] =
+    boxService.ask(SetOutgoingTransactionStatus(transaction, status)).map(_ => Unit)
+  override protected def setRemoteIncomingTransactionStatus(transaction: OutgoingTransaction, status: TransactionStatus): Future[Unit] =
+    http.singleRequest(HttpRequest(
+      method = HttpMethods.PUT,
+      uri = s"${box.baseUrl}/status?transactionid=${transaction.id}",
+      entity = HttpEntity(status.toString)))
+      .recover {
+        case _: Exception =>
+          SbxLog.warn("Box", s"Unable to set remote status of transaction ${transaction.id} to FINISHED.")
       }
-    }
-  }
-
-  def pushImagePipeline(transactionImage: OutgoingTransactionImage, outgoingTagValues: Seq[OutgoingTagValue]): Future[HttpResponse] = {
-    val source = anonymizedDicomData(transactionImage.image.imageId, outgoingTagValues.map(_.tagValue), storage)
-      .batchWeighted(storage.streamChunkSize, _.length, identity)(_ ++ _)
-    val uri = s"${box.baseUrl}/image?transactionid=${transactionImage.transaction.id}&sequencenumber=${transactionImage.image.sequenceNumber}&totalimagecount=${transactionImage.transaction.totalImageCount}"
-    sliceboxRequest(HttpMethods.POST, uri, HttpEntity(ContentTypes.`application/octet-stream`, source.via(Compression.deflate)))
-  }
-
-  def handleFileSentForOutgoingTransaction(transactionImage: OutgoingTransactionImage): Future[Unit] = {
-    log.debug(s"File sent for outgoing transaction $transactionImage")
-
-    boxService.ask(UpdateOutgoingTransaction(transactionImage)).mapTo[OutgoingTransaction].flatMap { updatedTransaction =>
-      if (updatedTransaction.sentImageCount == updatedTransaction.totalImageCount)
-        handleTransactionFinished(updatedTransaction)
-      else
-        Future.successful({})
-    }
-
-  }
-
-  def handleFileSendFailedForOutgoingTransaction(transactionImage: OutgoingTransactionImage, statusCode: Int, exception: Exception): Future[Unit] = {
-    log.debug(s"Failed to send file to box ${box.name}: ${exception.getMessage}")
-    statusCode match {
-      case 503 =>
-        // service unavailable, remote box is most likely down
-        boxService.ask(SetOutgoingTransactionStatus(transactionImage.transaction, TransactionStatus.WAITING)).map {
-          throw RemoteBoxUnavailableException
-        }
-      case 502 =>
-        // remote box reported transaction failed. Report it here also
-        boxService.ask(SetOutgoingTransactionStatus(transactionImage.transaction, TransactionStatus.FAILED)).map { _ =>
-          throw exception
-        }
-      case _ =>
-        // other error in communication. Report the transaction as failed here and on remote
-        boxService.ask(SetOutgoingTransactionStatus(transactionImage.transaction, TransactionStatus.FAILED)).flatMap { _ =>
-          val uri = s"${box.baseUrl}/status?transactionid=${transactionImage.transaction.id}"
-          sliceboxRequest(HttpMethods.PUT, uri, HttpEntity(TransactionStatus.FAILED.toString))
-            .recover {
-              case _: Exception =>
-                SbxLog.warn("Box", "Unable to set remote transaction status.")
-                HttpResponse(status = NoContent)
-            }
-            .map { _ =>
-              throw exception
-            }
-        }
-    }
-  }
-
-  def handleTransactionFinished(outgoingTransaction: OutgoingTransaction): Future[Unit] =
-    boxService.ask(GetOutgoingImageIdsForTransaction(outgoingTransaction)).mapTo[Seq[Long]].flatMap { imageIds =>
-      val uri = s"${box.baseUrl}/status?transactionid=${outgoingTransaction.id}"
-      sliceboxRequest(HttpMethods.GET, uri, HttpEntity.Empty)
-        .recover {
-          case _ =>
-            SbxLog.warn("Box", "Unable to get remote status of finished transaction, assuming all is well.")
-            HttpResponse(entity = HttpEntity(TransactionStatus.FINISHED.toString))
-        }.flatMap { response =>
-        Unmarshal(response).to[String].flatMap { statusString =>
-          val status = TransactionStatus.withName(statusString)
-          status match {
-            case TransactionStatus.FINISHED =>
-              SbxLog.info("Box", s"Finished sending ${outgoingTransaction.totalImageCount} images to box ${box.name}")
-              context.system.eventStream.publish(ImagesSent(Destination(DestinationType.BOX, box.name, box.id), imageIds))
-              Future.successful(Unit)
-            case _ =>
-              boxService.ask(SetOutgoingTransactionStatus(outgoingTransaction, TransactionStatus.FAILED))
-                .map(_ => Unit)
-          }
-        }
-      }
-    }
-
-  protected def sliceboxRequest(method: HttpMethod, uri: String, entity: RequestEntity): Future[HttpResponse] =
-    Http().singleRequest(HttpRequest(method = method, uri = uri, entity = entity))
+      .map(_ => Unit)
+  override protected def anonymizedDicomData(transactionImage: OutgoingTransactionImage, tagValues: Seq[OutgoingTagValue]): Source[ByteString, NotUsed] =
+    anonymizedDicomData(transactionImage.image.imageId, tagValues.map(_.tagValue), storage)
 }
 
 object BoxPushActor {
-  def props(box: Box, storageService: StorageService)(implicit materializer: Materializer, timeout: Timeout): Props = Props(new BoxPushActor(box, storageService))
-
+  def props(box: Box, storage: StorageService)(implicit materializer: Materializer, timeout: Timeout): Props = Props(new BoxPushActor(box, storage))
+  val pattern: Regex = """(?:([A-Za-z]*)://)?([^\:|/]+)?:?([0-9]+)?.*""".r
 }

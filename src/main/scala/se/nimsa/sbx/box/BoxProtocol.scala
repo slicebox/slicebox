@@ -93,7 +93,20 @@ object BoxProtocol {
 
   case class OutgoingTagValue(id: Long, outgoingImageId: Long, tagValue: TagValue) extends Entity
 
-  case class OutgoingTransactionImage(transaction: OutgoingTransaction, image: OutgoingImage)
+  case class OutgoingTransactionImage(transaction: OutgoingTransaction, image: OutgoingImage) {
+    /**
+      * Update transaction and image when image has been sent: Mark outgoing image as sent. Update sent image count and
+      * updated timestamp, and set status to PROCESSING in transaction.
+      */
+    def update(sentImageCount: Long): OutgoingTransactionImage = {
+      val updatedImage = image.copy(sent = true)
+      val updatedTransaction = transaction.copy(
+        sentImageCount = sentImageCount,
+        updated = System.currentTimeMillis,
+        status = TransactionStatus.PROCESSING)
+      OutgoingTransactionImage(updatedTransaction, updatedImage)
+    }
+  }
 
   case class IncomingTransaction(id: Long, boxId: Long, boxName: String, outgoingTransactionId: Long, receivedImageCount: Long, addedImageCount: Long, totalImageCount: Long, created: Long, updated: Long, status: TransactionStatus) extends Entity
 
@@ -120,7 +133,7 @@ object BoxProtocol {
 
   case class PollOutgoing(box: Box) extends BoxRequest
 
-  case class UpdateOutgoingTransaction(transactionImage: OutgoingTransactionImage) extends BoxRequest
+  case class UpdateOutgoingTransaction(transactionImage: OutgoingTransactionImage, sentImageCount: Long) extends BoxRequest
 
   case class SendToRemoteBox(box: Box, imageTagValuesSeq: Seq[ImageTagValues]) extends BoxRequest
 
@@ -138,7 +151,9 @@ object BoxProtocol {
 
   case class GetNextOutgoingTransactionImage(boxId: Long) extends BoxRequest
 
-  case class GetOutgoingImageIdsForTransaction(transaction: OutgoingTransaction) extends BoxRequest
+  case class GetOutgoingImagesForTransaction(transaction: OutgoingTransaction) extends BoxRequest
+
+  case class GetOutgoingTransactionsForBox(box: Box) extends BoxRequest
 
   case class SetOutgoingTransactionStatus(transaction: OutgoingTransaction, status: TransactionStatus) extends BoxRequest
 
@@ -197,4 +212,7 @@ object BoxProtocol {
 
   case object PollIncoming
 
+  case class PushTransaction(transaction: OutgoingTransaction)
+
+  case class RemoveTransaction(outgoingTransactionId: Long)
 }

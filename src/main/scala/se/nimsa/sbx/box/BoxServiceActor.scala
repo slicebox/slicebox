@@ -21,7 +21,7 @@ import java.util.UUID
 import akka.actor.{Actor, ActorSystem, Cancellable, PoisonPill, Props, Stash}
 import akka.event.{Logging, LoggingReceive}
 import akka.pattern.PipeToSupport
-import akka.stream.Materializer
+import akka.stream.{Materializer, scaladsl}
 import akka.util.Timeout
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.app.GeneralProtocol._
@@ -32,8 +32,8 @@ import se.nimsa.sbx.util.SbxExtensions._
 import se.nimsa.sbx.util.{FutureUtil, SequentialPipeToSupport}
 
 import scala.collection.mutable
-import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.concurrent.duration.DurationInt
+import scala.concurrent.{ExecutionContextExecutor, Future}
 
 class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageService)(implicit val materializer: Materializer, timeout: Timeout) extends Actor with Stash with PipeToSupport with SequentialPipeToSupport {
 
@@ -161,18 +161,25 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageServic
         case GetNextOutgoingTransactionImage(boxId) =>
           boxDao.nextOutgoingTransactionImageForBoxId(boxId).pipeTo(sender)
 
-        case GetOutgoingImageIdsForTransaction(transaction) =>
-          boxDao.outgoingImagesByOutgoingTransactionId(transaction.id).map(_.map(_.imageId)).pipeTo(sender)
+        case GetOutgoingImagesForTransaction(transaction) =>
+          sender ! scaladsl.Source
+            .fromPublisher(boxDao.streamPendingOutgoingImagesForOutgoingTransactionId(transaction.id))
+            .map(image => OutgoingTransactionImage(transaction, image))
+
+        case GetOutgoingTransactionsForBox(box) =>
+          boxDao.listPendingOutgoingTransactionsForBox(box.id).pipeTo(sender)
 
         case MarkOutgoingImageAsSent(box, transactionImage) =>
-          updateOutgoingTransaction(transactionImage).flatMap { updatedTransaction =>
-            boxDao.outgoingImagesByOutgoingTransactionId(updatedTransaction.id).map(_.map(_.imageId)).map { imageIds =>
-              if (updatedTransaction.sentImageCount == updatedTransaction.totalImageCount) {
-                context.system.eventStream.publish(ImagesSent(Destination(DestinationType.BOX, box.name, box.id), imageIds))
-                SbxLog.info("Box", s"Finished sending ${updatedTransaction.totalImageCount} images to box ${box.name}")
-              }
-            }
-          }.map(_ => OutgoingImageMarkedAsSent).pipeSequentiallyTo(sender)
+          updateOutgoingTransaction(transactionImage, transactionImage.transaction.sentImageCount + 1)
+            .flatMap { updatedTransactionImage =>
+              if (updatedTransactionImage.transaction.sentImageCount == updatedTransactionImage.transaction.totalImageCount) {
+                boxDao.outgoingImagesByOutgoingTransactionId(updatedTransactionImage.transaction.id).map(_.map(_.imageId))
+                  .map { imageIds =>
+                    context.system.eventStream.publish(ImagesSent(Destination(DestinationType.BOX, box.name, box.id), imageIds))
+                    SbxLog.info("Box", s"Finished sending ${updatedTransactionImage.transaction.totalImageCount} images to box ${box.name}")
+                  }
+              } else Future.successful(Unit)
+            }.map(_ => OutgoingImageMarkedAsSent).pipeSequentiallyTo(sender)
 
         case MarkOutgoingTransactionAsFailed(_, failedTransactionImage) =>
           SbxLog.error("Box", failedTransactionImage.message)
@@ -208,8 +215,8 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageServic
           boxDao.tagValuesByOutgoingTransactionImage(transactionImage.transaction.id, transactionImage.image.id)
             .pipeTo(sender)
 
-        case UpdateOutgoingTransaction(transactionImage) =>
-          updateOutgoingTransaction(transactionImage).pipeSequentiallyTo(sender)
+        case UpdateOutgoingTransaction(transactionImage, sentImageCount) =>
+          updateOutgoingTransaction(transactionImage, sentImageCount).pipeSequentiallyTo(sender)
 
         case SetOutgoingTransactionStatus(transaction, status) =>
           boxDao.setOutgoingTransactionStatus(transaction.id, status).map(_ => OutgoingTransactionStatusUpdated)
@@ -265,7 +272,7 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageServic
 
   def pollActorName(box: Box): String = BoxSendMethod.POLL + "-" + box.id.toString
 
-  def addImagesToOutgoing(boxId: Long, boxName: String, imageTagValuesSeq: Seq[ImageTagValues]): Future[Seq[OutgoingTagValue]] = {
+  def addImagesToOutgoing(boxId: Long, boxName: String, imageTagValuesSeq: Seq[ImageTagValues]): Future[OutgoingTransaction] = {
     boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, boxId, boxName, 0, imageTagValuesSeq.length, System.currentTimeMillis, System.currentTimeMillis, TransactionStatus.WAITING))
       .flatMap { outgoingTransaction =>
         FutureUtil.traverseSequentially(imageTagValuesSeq.zipWithIndex) {
@@ -277,21 +284,16 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageServic
                   boxDao.insertOutgoingTagValue(OutgoingTagValue(-1, outgoingImage.id, tagValue))
                 }
               }
-        }
+        }.map(_ => outgoingTransaction)
       }
-      .map(_.flatten)
   }
 
-  def updateOutgoingTransaction(transactionImage: OutgoingTransactionImage): Future[OutgoingTransaction] = {
-    val updatedTransactionImage = transactionImage.image.copy(sent = true)
-    val updatedTransaction = transactionImage.transaction.copy(
-      sentImageCount = transactionImage.image.sequenceNumber,
-      updated = System.currentTimeMillis,
-      status = TransactionStatus.PROCESSING)
+  def updateOutgoingTransaction(transactionImage: OutgoingTransactionImage, sentImageCount: Long): Future[OutgoingTransactionImage] = {
+    val updatedTransactionImage = transactionImage.update(sentImageCount)
 
-    boxDao.updateOutgoingTransaction(updatedTransaction, updatedTransactionImage).map { _ =>
-      log.debug(s"Marked outgoing transaction image $updatedTransactionImage as sent")
-      updatedTransaction
+    boxDao.updateOutgoingTransaction(updatedTransactionImage.transaction, updatedTransactionImage.image).map { _ =>
+      log.debug(s"Marked outgoing transaction and image $updatedTransactionImage as sent")
+      updatedTransactionImage
     }
   }
 

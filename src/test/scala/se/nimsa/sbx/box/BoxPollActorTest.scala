@@ -178,38 +178,6 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       capturedRequests(1).uri.toString() should be(s"$remoteBoxBaseUrl/outgoing/poll")
     }
 
-    "mark incoming transaction as finished when all files have been received" in {
-      val outgoingTransactionId = 999
-      val transaction = OutgoingTransaction(outgoingTransactionId, 987, "some box", 0, 2, 112233, 112233, TransactionStatus.WAITING)
-      val image1 = OutgoingImage(1, outgoingTransactionId, 1, 1, sent = false)
-      val image2 = OutgoingImage(2, outgoingTransactionId, 2, 2, sent = false)
-      val transactionImage1 = OutgoingTransactionImage(transaction.copy(sentImageCount = 1), image1)
-      val transactionImage2 = OutgoingTransactionImage(transaction.copy(sentImageCount = 2), image2)
-
-      val bytes = compress(TestUtil.testImageByteArray)
-
-      // insert mock responses for fetching two images
-      val entity1 = Await.result(Marshal(transactionImage1).to[MessageEntity], 30.seconds)
-      mockHttpResponses += HttpResponse(status = OK, entity = entity1)
-
-      mockHttpResponses += HttpResponse(status = OK, entity = HttpEntity(`application/octet-stream`, bytes))
-      mockHttpResponses += HttpResponse(NoContent)
-      // done reply
-      val entity2 = Await.result(Marshal(transactionImage2).to[MessageEntity], 30.seconds)
-      mockHttpResponses += HttpResponse(status = OK, entity = entity2)
-
-      mockHttpResponses += HttpResponse(status = OK, entity = HttpEntity(`application/octet-stream`, bytes))
-      mockHttpResponses += HttpResponse(NoContent) // done reply
-
-      pollBoxActorRef ! PollIncoming
-
-      expectNoMessage(3.seconds)
-
-      val incomingTransactions = await(boxDao.listIncomingTransactions(0, 10))
-      incomingTransactions should have length 1
-      incomingTransactions.head.status shouldBe TransactionStatus.FINISHED
-    }
-
     "keep trying to fetch remote file until fetching succeeds" in {
       val outgoingTransactionId = 999
       val transaction = OutgoingTransaction(outgoingTransactionId, 987, "some box", 1, 2, 2, 2, TransactionStatus.WAITING)

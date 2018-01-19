@@ -52,6 +52,7 @@ trait AnonymizationRoutes {
       post {
         entity(as[Seq[TagValue]]) { tagValues =>
           val source = anonymizedDicomData(imageId, tagValues, storage)
+            .batchWeighted(storage.streamChunkSize, _.length, identity)(_ ++ _)
           complete(HttpEntity(ContentTypes.`application/octet-stream`, source))
         }
       }

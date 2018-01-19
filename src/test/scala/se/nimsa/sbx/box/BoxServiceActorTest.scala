@@ -1,6 +1,6 @@
 package se.nimsa.sbx.box
 
-import akka.actor.{ActorSystem, Props, actorRef2Scala}
+import akka.actor.{ActorRef, ActorSystem, Props, actorRef2Scala}
 import akka.stream.ActorMaterializer
 import akka.testkit.{ImplicitSender, TestKit}
 import akka.util.Timeout
@@ -15,7 +15,7 @@ import se.nimsa.sbx.storage.{RuntimeStorage, StorageServiceActor}
 import se.nimsa.sbx.util.FutureUtil.await
 import se.nimsa.sbx.util.TestUtil
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.concurrent.duration.DurationInt
 
 class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
@@ -23,9 +23,9 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
 
   def this() = this(ActorSystem("BoxServiceActorTestSystem"))
 
-  implicit val ec = system.dispatcher
-  implicit val timeout = Timeout(30.seconds)
-  implicit val materializer = ActorMaterializer()
+  implicit val ec: ExecutionContextExecutor = system.dispatcher
+  implicit val timeout: Timeout = Timeout(30.seconds)
+  implicit val materializer: ActorMaterializer = ActorMaterializer()
 
   val dbConfig = TestUtil.createTestDb("boxserviceactortest")
 
@@ -37,10 +37,10 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
   await(metaDataDao.create())
   await(boxDao.create())
 
-  val storageService = system.actorOf(Props(new StorageServiceActor(storage)), name = "StorageService")
-  val boxService = system.actorOf(Props(new BoxServiceActor(boxDao, "http://testhost:1234", storage)), name = "BoxService")
+  val storageService: ActorRef = system.actorOf(Props(new StorageServiceActor(storage)), name = "StorageService")
+  val boxService: ActorRef = system.actorOf(Props(new BoxServiceActor(boxDao, "http://testhost:1234", storage)), name = "BoxService")
 
-  override def afterEach() = {
+  override def afterEach(): Unit = {
     storage.clear()
     await(Future.sequence(Seq(
       metaDataDao.clear(),
@@ -48,7 +48,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
     )))
   }
 
-  override def afterAll = TestKit.shutdownActorSystem(system)
+  override def afterAll: Unit = TestKit.shutdownActorSystem(system)
 
   "A BoxServiceActor" should {
 
@@ -154,31 +154,20 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
       await(boxDao.listIncomingImages) should have length 1
     }
 
-    "mark incoming transaction as finished when receiving the UpdateIncoming message for the last file of the transaction" in {
+    "update incoming transaction status" in {
 
       val box = Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, online = false)
 
-      val totalImageCount = 2
-      boxService ! UpdateIncoming(box, 32, sequenceNumber = 1, totalImageCount, 33, overwrite = false)
+      val transactionId = 32
+      boxService ! UpdateIncoming(box, transactionId, sequenceNumber = 1, totalImageCount = 55, 33, overwrite = false)
+      expectMsgType[IncomingUpdated]
 
-      expectMsgPF() {
-        case IncomingUpdated(transaction) =>
-          transaction.receivedImageCount shouldBe 1
-          transaction.totalImageCount shouldBe totalImageCount
-          transaction.status shouldBe TransactionStatus.PROCESSING
-      }
+      boxService ! SetIncomingTransactionStatus(box.id, transactionId, TransactionStatus.FINISHED)
+      expectMsg(Some(IncomingTransactionStatusUpdated))
 
-      boxService ! UpdateIncoming(box, 32, sequenceNumber = 2, totalImageCount, 33, overwrite = false)
-
-      expectMsgPF() {
-        case IncomingUpdated(transaction) =>
-          transaction.receivedImageCount shouldBe 2
-          transaction.totalImageCount shouldBe totalImageCount
-          transaction.status shouldBe TransactionStatus.FINISHED
-      }
-
-      await(boxDao.listIncomingTransactions(0, 10)) should have length 1
-      await(boxDao.listIncomingImages) should have length 2
+      val transactions = await(boxDao.listIncomingTransactions(0, 10))
+      transactions should have length 1
+      transactions.head.status shouldBe TransactionStatus.FINISHED
     }
 
     "mark incoming transaction as processing until all files have been received" in {
@@ -301,7 +290,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
     }
 
   }
-  def insertMetadata() = for {
+  def insertMetadata(): Future[(Patient, Study, Series, Image, Image, Image)] = for {
     p1 <- metaDataDao.insert(Patient(-1, PatientName("p1"), PatientID("s1"), PatientBirthDate("2000-01-01"), PatientSex("M")))
     s1 <- metaDataDao.insert(Study(-1, p1.id, StudyInstanceUID("stuid1"), StudyDescription("stdesc1"), StudyDate("19990101"), StudyID("stid1"), AccessionNumber("acc1"), PatientAge("12Y")))
     r1 <- metaDataDao.insert(Series(-1, s1.id, SeriesInstanceUID("seuid1"), SeriesDescription("sedesc1"), SeriesDate("19990101"), Modality("NM"), ProtocolName("prot1"), BodyPartExamined("bodypart1"), Manufacturer("manu1"), StationName("station1"), FrameOfReferenceUID("frid1")))
