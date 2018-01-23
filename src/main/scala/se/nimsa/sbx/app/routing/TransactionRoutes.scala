@@ -83,10 +83,16 @@ trait TransactionRoutes {
             }
           } ~ pathPrefix("outgoing") {
             path("poll") {
-              get {
-                onSuccess(boxService.ask(PollOutgoing(box)).mapTo[Option[OutgoingTransactionImage]]) {
-                  case Some(outgoingTransactionImage) => complete(outgoingTransactionImage)
-                  case None => complete(NotFound)
+              parameter("n".as[Long].?(1L)) { n =>
+                get {
+                  onSuccess(boxService.ask(PollOutgoing(box, n)).mapTo[Seq[OutgoingTransactionImage]]) { transactionImages =>
+                    if (transactionImages.isEmpty)
+                      complete(NotFound)
+                    else if (transactionImages.lengthCompare(1) == 0)
+                      complete(transactionImages.head)
+                    else
+                      complete(transactionImages)
+                  }
                 }
               }
             } ~ path("done") {

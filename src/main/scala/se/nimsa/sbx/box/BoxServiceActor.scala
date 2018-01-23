@@ -123,26 +123,19 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageServic
           val futureIncomingTransactionWithStatus = boxDao.updateIncoming(box, outgoingTransactionId, sequenceNumber, totalImageCount, imageId, overwrite)
 
           futureIncomingTransactionWithStatus.foreach { incomingTransactionWithStatus =>
-            incomingTransactionWithStatus.status match {
-              case TransactionStatus.FINISHED =>
-                SbxLog.info("Box", s"Received $totalImageCount files from box ${box.name}")
-              case TransactionStatus.FAILED =>
-                SbxLog.error("Box", s"Failed receiving $totalImageCount files from box ${box.name}")
-              case _ =>
-                log.debug(s"Received pushed file and updated incoming transaction $incomingTransactionWithStatus")
-            }
+            log.debug(s"Received pushed file and updated incoming transaction $incomingTransactionWithStatus")
           }
 
           futureIncomingTransactionWithStatus.map(IncomingUpdated).pipeSequentiallyTo(sender)
 
-        case PollOutgoing(box) =>
+        case PollOutgoing(box, n) =>
           pollBoxesLastPollTimestamp(box.id) = System.currentTimeMillis
-          val futureOutgoingTransaction = boxDao.nextOutgoingTransactionImageForBoxId(box.id)
+          val futureOutgoingTransactionImages = boxDao.nextOutgoingTransactionImagesForBoxId(box.id, n)
 
-          futureOutgoingTransaction.foreach(outgoingTransaction =>
-            log.debug(s"Received poll request, responding with outgoing transaction $outgoingTransaction"))
+          futureOutgoingTransactionImages.foreach(outgoingTransactionImages =>
+            log.debug(s"Received poll request, responding with outgoing transaction images $outgoingTransactionImages"))
 
-          futureOutgoingTransaction.pipeTo(sender)
+          futureOutgoingTransactionImages.pipeTo(sender)
 
         case SendToRemoteBox(box, imageTagValuesSeq) =>
           SbxLog.info("Box", s"Sending ${imageTagValuesSeq.length} images to box ${box.name}")
@@ -158,9 +151,6 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageServic
 
           futureOutgoingTransactionImage.pipeTo(sender)
 
-        case GetNextOutgoingTransactionImage(boxId) =>
-          boxDao.nextOutgoingTransactionImageForBoxId(boxId).pipeTo(sender)
-
         case GetOutgoingImagesForTransaction(transaction) =>
           sender ! scaladsl.Source
             .fromPublisher(boxDao.streamPendingOutgoingImagesForOutgoingTransactionId(transaction.id))
@@ -170,7 +160,7 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageServic
           boxDao.listPendingOutgoingTransactionsForBox(box.id).pipeTo(sender)
 
         case MarkOutgoingImageAsSent(box, transactionImage) =>
-          updateOutgoingTransaction(transactionImage, transactionImage.transaction.sentImageCount + 1)
+          updateOutgoingTransaction(transactionImage, transactionImage.transaction.sentImageCount)
             .flatMap { updatedTransactionImage =>
               if (updatedTransactionImage.transaction.sentImageCount == updatedTransactionImage.transaction.totalImageCount) {
                 boxDao.outgoingImagesByOutgoingTransactionId(updatedTransactionImage.transaction.id).map(_.map(_.imageId))

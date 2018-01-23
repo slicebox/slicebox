@@ -55,10 +55,9 @@ class BoxPushOpsTest extends TestKit(ActorSystem("BoxPushOpsSpec")) with AsyncFl
       Future(transactionImage.update(sentImageCount))
     override protected def setOutgoingTransactionStatus(transaction: BoxProtocol.OutgoingTransaction, status: BoxProtocol.TransactionStatus): Future[Unit] =
       Future(Unit)
-    override protected def setRemoteIncomingTransactionStatus(transaction: OutgoingTransaction, status: TransactionStatus): Future[Unit] =
-      Future(Unit)
     override protected def anonymizedDicomData(transactionImage: BoxProtocol.OutgoingTransactionImage, tagValues: Seq[BoxProtocol.OutgoingTagValue]): Source[ByteString, NotUsed] =
       Source.single(ByteString(1, 2, 3))
+    override protected def singleRequest(request: HttpRequest): Future[HttpResponse] = Future(okResponse)
   }
 
   "Sending images via PUSH" should "post file to correct URL" in {

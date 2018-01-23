@@ -1,6 +1,5 @@
 package se.nimsa.sbx.box
 
-import akka.actor.{ActorSystem, Scheduler}
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.stream._
@@ -11,34 +10,20 @@ import se.nimsa.sbx.app.GeneralProtocol.{Destination, DestinationType, ImagesSen
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.log.SbxLog
 
-import scala.concurrent.duration.{DurationInt, FiniteDuration}
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
 
-trait BoxPushOps {
+trait BoxPushOps extends BoxStreamBase {
 
   import GraphDSL.Implicits._
 
-  type ResponseImage = (Try[HttpResponse], OutgoingTransactionImage)
-
-  val box: Box
-
-  implicit val system: ActorSystem
-  implicit val materializer: Materializer
-  implicit val ec: ExecutionContext
-  implicit val scheduler: Scheduler
-
-  protected val streamChunkSize: Long
-
-  protected val retryInterval: FiniteDuration = 15.seconds
-
-  protected def pool: Flow[(HttpRequest, OutgoingTransactionImage), (Try[HttpResponse], OutgoingTransactionImage), _]
   protected def pendingOutgoingImagesForTransaction(transaction: OutgoingTransaction): Future[Source[OutgoingTransactionImage, NotUsed]]
   protected def outgoingTagValuesForImage(transactionImage: OutgoingTransactionImage): Future[Seq[OutgoingTagValue]]
   protected def updateOutgoingTransaction(transactionImage: OutgoingTransactionImage, sentImageCount: Long): Future[OutgoingTransactionImage]
   protected def setOutgoingTransactionStatus(transaction: OutgoingTransaction, status: TransactionStatus): Future[Unit]
-  protected def setRemoteIncomingTransactionStatus(transaction: OutgoingTransaction, status: TransactionStatus): Future[Unit]
   protected def anonymizedDicomData(transactionImage: OutgoingTransactionImage, tagValues: Seq[OutgoingTagValue]): Source[ByteString, NotUsed]
+
+  lazy val pushPool: Flow[(HttpRequest, OutgoingTransactionImage), (Try[HttpResponse], OutgoingTransactionImage), _] = pool[OutgoingTransactionImage]
 
   /**
     * Push the images of the input transaction to the remote box.
@@ -60,6 +45,7 @@ trait BoxPushOps {
           (futureDone, switch)
       }
       .run()
+  //TODO if pushing box is shut down and transfer is resumed later, all imageIDs will not be collected. Emit all ids in transaction as before
 
   /**
     * Push images to a remote with retry, and add graph nodes which make sure the flow does not complete until all
@@ -164,28 +150,7 @@ trait BoxPushOps {
         outgoingTagValuesForImage(transactionImage)
           .map(tagValues => createRequest(box, transactionImage, tagValues))
       }
-      .via(pool)
-
-  /**
-    * When applying this function to the input flow, the resulting flow does not complete until the upstream completes
-    * AND the decider function has returned true at least once.
-    */
-  protected def completeFlow[T](flow: Flow[T, T, _], decider: T => Boolean): Flow[T, T, NotUsed] =
-    Flow.fromGraph(GraphDSL.create() { implicit builder =>
-      val toSomeFlow = builder.add(Flow[T].map(Some.apply))
-      val fromOptionFlow = Flow[Option[T]].collect { case Some(t) => t }
-
-      val concatFinished = builder.add(Concat[Option[T]](2))
-      val broadcast = builder.add(Broadcast[T](2))
-
-      val shouldCompleteFlow = Flow[T].filter(decider)
-      val toOnceNoneFlow = Flow[T].take(1).map(_ => None)
-
-      toSomeFlow ~> concatFinished ~> fromOptionFlow ~> flow                 ~> broadcast
-                    concatFinished <~ toOnceNoneFlow <~ shouldCompleteFlow   <~ broadcast.out(1)
-
-      FlowShape(toSomeFlow.in, broadcast.out(0))
-    })
+      .via(pushPool)
 
   /**
     * Create a PUSH request for a `OutgoingTransactionImage`, possibly with Tag-Value mappings
@@ -214,4 +179,12 @@ trait BoxPushOps {
         SbxLog.info("Box", s"Finished sending ${transaction.totalImageCount} images to box ${box.name}")
         system.eventStream.publish(ImagesSent(Destination(DestinationType.BOX, box.name, box.id), imageIds))
       }
+
+  protected def setRemoteIncomingTransactionStatus(transaction: OutgoingTransaction, status: TransactionStatus): Future[Unit] =
+    singleRequest(HttpRequest(method = HttpMethods.PUT, uri = s"${box.baseUrl}/status?transactionid=${transaction.id}", entity = HttpEntity(status.toString)))
+      .recover {
+        case _: Exception =>
+          SbxLog.warn("Box", s"Unable to set remote status of transaction ${transaction.id} to FINISHED.")
+      }
+      .map(_ => Unit)
 }
