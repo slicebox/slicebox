@@ -65,7 +65,7 @@ class BoxPushOpsTest extends TestKit(ActorSystem("BoxPushOpsSpec")) with AsyncFl
     var capturedTransactionImage: OutgoingTransactionImage = null
     val impl = new BoxPushOpsImpl() {
       override def createRequest(box: Box, transactionImage: OutgoingTransactionImage, tagValues: Seq[OutgoingTagValue]): (HttpRequest, OutgoingTransactionImage) = {
-        val request = super.createRequest(box, transactionImage, tagValues)
+        val request = super.createPushRequest(box, transactionImage, tagValues)
         capturedUri = request._1.uri.toString
         capturedTransactionImage = transactionImage
         request

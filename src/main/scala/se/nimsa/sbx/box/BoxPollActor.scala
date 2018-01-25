@@ -18,7 +18,6 @@ package se.nimsa.sbx.box
 
 import akka.actor.{Actor, ActorSelection, ActorSystem, Cancellable, Props}
 import akka.event.{Logging, LoggingReceive}
-import akka.http.scaladsl.Http
 import akka.pattern.ask
 import akka.stream._
 import akka.util.{ByteString, Timeout}
@@ -50,9 +49,7 @@ class BoxPollActor(override val box: Box,
   override implicit val system: ActorSystem = context.system
   override implicit val ec: ExecutionContext = context.dispatcher
 
-  override val http = Http(system)
-
-  val switch: KillSwitch = puller.run()
+  val switch: KillSwitch = pollAndTransfer(() => pullBatch()).run()
 
   override def postStop(): Unit =
     switch.shutdown()
@@ -61,10 +58,10 @@ class BoxPollActor(override val box: Box,
   override def callMetaDataService[R: ClassTag](message: Any): Future[R] = metaDataService.ask(message).mapTo[R]
   override def scheduleTask(delay: FiniteDuration)(task: => Unit): Cancellable = system.scheduler.scheduleOnce(delay)(task)
 
-  override protected def storeDicomData(bytesSource: scaladsl.Source[ByteString, _], source: Source): Future[MetaDataProtocol.MetaDataAdded] =
+  override def storeDicomData(bytesSource: scaladsl.Source[ByteString, _], source: Source): Future[MetaDataProtocol.MetaDataAdded] =
     storeDicomData(bytesSource, source, storage, Contexts.extendedContexts, reverseAnonymization = true)
 
-  override protected def updateIncomingTransaction(transactionImage: OutgoingTransactionImage, imageId: Long, overwrite: Boolean): Future[IncomingUpdated] =
+  override def updateIncomingTransaction(transactionImage: OutgoingTransactionImage, imageId: Long, overwrite: Boolean): Future[IncomingUpdated] =
     boxService.ask(UpdateIncoming(box, transactionImage.transaction.id, transactionImage.image.sequenceNumber, transactionImage.transaction.totalImageCount, imageId, overwrite)).mapTo[IncomingUpdated]
 
   def receive = LoggingReceive {

@@ -21,7 +21,7 @@ import java.util.UUID
 import akka.actor.{Actor, ActorSystem, Cancellable, PoisonPill, Props, Stash}
 import akka.event.{Logging, LoggingReceive}
 import akka.pattern.PipeToSupport
-import akka.stream.{Materializer, scaladsl}
+import akka.stream.Materializer
 import akka.util.Timeout
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.app.GeneralProtocol._
@@ -151,18 +151,13 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageServic
 
           futureOutgoingTransactionImage.pipeTo(sender)
 
-        case GetOutgoingImagesForTransaction(transaction) =>
-          sender ! scaladsl.Source
-            .fromPublisher(boxDao.streamPendingOutgoingImagesForOutgoingTransactionId(transaction.id))
-            .map(image => OutgoingTransactionImage(transaction, image))
-
         case GetOutgoingTransactionsForBox(box) =>
           boxDao.listPendingOutgoingTransactionsForBox(box.id).pipeTo(sender)
 
         case MarkOutgoingImageAsSent(box, transactionImage) =>
           updateOutgoingTransaction(transactionImage, transactionImage.transaction.sentImageCount)
             .flatMap { updatedTransactionImage =>
-              if (updatedTransactionImage.transaction.sentImageCount == updatedTransactionImage.transaction.totalImageCount) {
+              if (updatedTransactionImage.transaction.sentImageCount >= updatedTransactionImage.transaction.totalImageCount) {
                 boxDao.outgoingImagesByOutgoingTransactionId(updatedTransactionImage.transaction.id).map(_.map(_.imageId))
                   .map { imageIds =>
                     context.system.eventStream.publish(ImagesSent(Destination(DestinationType.BOX, box.name, box.id), imageIds))

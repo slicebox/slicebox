@@ -149,8 +149,6 @@ object BoxProtocol {
 
   case class GetOutgoingTransactions(startIndex: Long, count: Long) extends BoxRequest
 
-  case class GetOutgoingImagesForTransaction(transaction: OutgoingTransaction) extends BoxRequest
-
   case class GetOutgoingTransactionsForBox(box: Box) extends BoxRequest
 
   case class SetOutgoingTransactionStatus(transaction: OutgoingTransaction, status: TransactionStatus) extends BoxRequest
