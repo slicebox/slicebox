@@ -125,7 +125,7 @@ class BoxPollOpsTest extends TestKit(ActorSystem("BoxPollOpsSpec")) with AsyncFl
     val impl = new BoxPollOpsImpl(10) {
       override def pool[T]: Flow[(HttpRequest, T), (Try[HttpResponse], T), _] =
         Flow.fromFunction((requestT: (HttpRequest, T)) =>
-          (Try(notFoundResponse), requestT._2))
+          (Try(errorResponse), requestT._2))
     }
     recoverToSucceededIf[TransactionException] {
       impl.pullBatch()
