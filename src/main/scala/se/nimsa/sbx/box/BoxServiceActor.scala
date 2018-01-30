@@ -155,7 +155,7 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageServic
           boxDao.listPendingOutgoingTransactionsForBox(box.id).pipeTo(sender)
 
         case MarkOutgoingImageAsSent(box, transactionImage) =>
-          updateOutgoingTransaction(transactionImage, transactionImage.transaction.sentImageCount)
+          updateOutgoingTransactionOnImageSent(transactionImage, transactionImage.transaction.sentImageCount)
             .flatMap { updatedTransactionImage =>
               if (updatedTransactionImage.transaction.sentImageCount >= updatedTransactionImage.transaction.totalImageCount) {
                 boxDao.outgoingImagesByOutgoingTransactionId(updatedTransactionImage.transaction.id).map(_.map(_.imageId))
@@ -163,6 +163,9 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageServic
                     context.system.eventStream.publish(ImagesSent(Destination(DestinationType.BOX, box.name, box.id), imageIds))
                     SbxLog.info("Box", s"Finished sending ${updatedTransactionImage.transaction.totalImageCount} images to box ${box.name}")
                   }
+                  .flatMap(_ => boxDao.updateOutgoingTransaction(
+                    transactionImage.transaction.copy(status = TransactionStatus.FINISHED),
+                    transactionImage.image))
               } else Future.successful(Unit)
             }.map(_ => OutgoingImageMarkedAsSent).pipeSequentiallyTo(sender)
 
@@ -201,7 +204,7 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageServic
             .pipeTo(sender)
 
         case UpdateOutgoingTransaction(transactionImage, sentImageCount) =>
-          updateOutgoingTransaction(transactionImage, sentImageCount).pipeSequentiallyTo(sender)
+          updateOutgoingTransactionOnImageSent(transactionImage, sentImageCount).pipeSequentiallyTo(sender)
 
         case SetOutgoingTransactionStatus(transaction, status) =>
           boxDao.setOutgoingTransactionStatus(transaction.id, status).map(_ => OutgoingTransactionStatusUpdated)
@@ -215,6 +218,7 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageServic
 
         case UpdateBoxOnlineStatus(boxId, online) =>
           boxDao.updateBoxOnlineStatus(boxId, online)
+            .pipeSequentiallyTo(sender)
       }
 
   }
@@ -273,7 +277,7 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageServic
       }
   }
 
-  def updateOutgoingTransaction(transactionImage: OutgoingTransactionImage, sentImageCount: Long): Future[OutgoingTransactionImage] = {
+  def updateOutgoingTransactionOnImageSent(transactionImage: OutgoingTransactionImage, sentImageCount: Long): Future[OutgoingTransactionImage] = {
     val updatedTransactionImage = transactionImage.update(sentImageCount)
 
     boxDao.updateOutgoingTransaction(updatedTransactionImage.transaction, updatedTransactionImage.image).map { _ =>

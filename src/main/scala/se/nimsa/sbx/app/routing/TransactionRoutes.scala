@@ -121,7 +121,8 @@ trait TransactionRoutes {
                         val tagValues = transactionTagValues.map(_.tagValue)
                         val streamSource = anonymizedDicomData(imageId, tagValues, storage)
                           .batchWeighted(storage.streamChunkSize, _.length, identity)(_ ++ _)
-                        complete(HttpEntity(ContentTypes.`application/octet-stream`, streamSource.via(Compression.deflate)))
+                          .via(Compression.deflate)
+                        complete(HttpEntity(ContentTypes.`application/octet-stream`, streamSource))
                       }
                     case None =>
                       complete((NotFound, s"No outgoing image found for transaction id $outgoingTransactionId and outgoing image id $outgoingImageId"))

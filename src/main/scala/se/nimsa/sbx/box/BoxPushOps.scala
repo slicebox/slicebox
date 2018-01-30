@@ -10,9 +10,9 @@ import se.nimsa.sbx.box.BoxProtocol._
 import scala.collection.immutable.Seq
 import scala.concurrent.Future
 
-trait BoxPushOps extends BoxStreamBase {
+trait BoxPushOps extends BoxStreamOps {
 
-  import BoxStreamBase._
+  override val transferType: String = "push"
 
   def poll(n: Int): Future[Seq[OutgoingTransactionImage]]
   def outgoingTagValuesForImage(transactionImage: OutgoingTransactionImage): Future[Seq[OutgoingTagValue]]
@@ -28,7 +28,7 @@ trait BoxPushOps extends BoxStreamBase {
       .via(pushPool)
       .map(checkResponse).map(_._2)
       .statefulMapConcat(indexInTransaction)
-      .mapAsyncUnordered(parallelism)(updateTransaction)
+      .mapAsyncUnordered(parallelism)(updateOutgoingTransaction)
       .toMat(Sink.seq)(Keep.right)
   }
 
@@ -40,13 +40,11 @@ trait BoxPushOps extends BoxStreamBase {
 
   def createPushRequest(box: Box, transactionImage: OutgoingTransactionImage, tagValues: Seq[OutgoingTagValue]): (HttpRequest, OutgoingTransactionImage) = {
     val source = anonymizedDicomData(transactionImage, tagValues)
-      .batchWeighted(streamChunkSize, _.length, identity)(_ ++ _)
-      .via(Compression.deflate)
     val uri = s"${box.baseUrl}/image?transactionid=${transactionImage.transaction.id}&sequencenumber=${transactionImage.image.sequenceNumber}&totalimagecount=${transactionImage.transaction.totalImageCount}"
     HttpRequest(method = HttpMethods.POST, uri = uri, entity = HttpEntity(ContentTypes.`application/octet-stream`, source)) -> transactionImage
   }
 
-  def updateTransaction(imageIndex: (OutgoingTransactionImage, Long)): Future[OutgoingTransactionImage] =
+  def updateOutgoingTransaction(imageIndex: (OutgoingTransactionImage, Long)): Future[OutgoingTransactionImage] =
     imageIndex match {
       case (transactionImage, index) => updateOutgoingTransaction(transactionImage, index)
     }

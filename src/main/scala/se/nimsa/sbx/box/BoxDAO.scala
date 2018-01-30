@@ -474,19 +474,7 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
         }
       }
 
-    val inToFinishedAction =
-      listOpenIncomingTransactionsAction.flatMap { transactions =>
-        DBIO.sequence {
-          transactions.map { transaction =>
-            if (transaction.receivedImageCount >= transaction.totalImageCount)
-              setIncomingTransactionStatusAction(transaction.id, TransactionStatus.FINISHED)
-            else
-              DBIO.successful(Unit)
-          }
-        }
-      }
-
-    DBIO.seq(inToWaitingAction, outToWaitingAction, inToFinishedAction).map(_ => {})
+    DBIO.seq(inToWaitingAction, outToWaitingAction).map(_ => {})
   }
 
   def updatePollBoxesOnlineStatusAction(now: Long, pollBoxesLastPollTimestamp: Map[Long, Long], pollBoxOnlineStatusTimeoutMillis: Long): DBIOAction[Seq[Unit], NoStream, Effect.Write] = {
@@ -508,17 +496,7 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
     }
 
   def updateOutgoingTransaction(updatedTransaction: OutgoingTransaction, updatedImage: OutgoingImage): Future[Unit] = {
-    val action =
-      updateOutgoingTransactionAction(updatedTransaction).flatMap { _ =>
-          updateOutgoingImageAction(updatedImage).flatMap { _ =>
-              if (updatedTransaction.sentImageCount == updatedTransaction.totalImageCount)
-                setOutgoingTransactionStatusAction(updatedTransaction.id, TransactionStatus.FINISHED)
-                  .map(_ => {})
-              else
-                DBIO.successful({})
-          }
-      }
-
+    val action = updateOutgoingTransactionAction(updatedTransaction).flatMap(_ => updateOutgoingImageAction(updatedImage))
     db.run(action.transactionally)
   }
 

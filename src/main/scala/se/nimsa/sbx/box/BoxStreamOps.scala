@@ -7,7 +7,6 @@ import akka.stream._
 import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, MergePreferred, RunnableGraph, Sink}
 import se.nimsa.sbx.box.BoxProtocol.{Box, OutgoingTransactionImage}
 import se.nimsa.sbx.log.SbxLog
-import se.nimsa.sbx.storage.StorageService
 
 import scala.collection.immutable.Seq
 import scala.collection.mutable
@@ -16,15 +15,15 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.matching.Regex
 import scala.util.{Failure, Success, Try}
 
-trait BoxStreamBase {
+trait BoxStreamOps {
 
-  import BoxStreamBase._
+  import BoxStreamOps._
 
   type RequestImage = (HttpRequest, OutgoingTransactionImage)
   type ResponseImage = (Try[HttpResponse], OutgoingTransactionImage)
 
   val box: Box
-  val storage: StorageService
+  val transferType: String
 
   implicit val system: ActorSystem
   implicit val materializer: Materializer
@@ -32,24 +31,9 @@ trait BoxStreamBase {
 
   lazy val http = Http(system)
 
-  val streamChunkSize: Long = storage.streamChunkSize
-
   val retryInterval: FiniteDuration = 15.seconds
-
-  def pool[T]: Flow[(HttpRequest, T), (Try[HttpResponse], T), _] =
-    box.baseUrl match {
-      case pattern(protocolPart, host, portPart) =>
-        val protocol = Option(protocolPart).getOrElse("http")
-        val port = Option(portPart) match {
-          case None if protocol == "https" => 443
-          case None => 80
-          case Some(portString) => portString.toInt
-        }
-        if (port == 443)
-          http.cachedHostConnectionPoolHttps[T](host, port)
-        else
-          http.cachedHostConnectionPool[T](host, port)
-    }
+  val batchSize = 200
+  val parallelism = 8
 
   def pollAndTransfer[Mat](transferBatch: () => Future[Seq[OutgoingTransactionImage]]): RunnableGraph[KillSwitch] = {
     RunnableGraph.fromGraph(GraphDSL.create(KillSwitches.single[Tick]) {
@@ -67,7 +51,7 @@ trait BoxStreamBase {
           val tryBatch = (_: Tick) => transferBatch().map(Success.apply).recover { case t: Throwable => Failure(t) }
           val batchFlow = Flow[Tick].mapAsync(1)(tryBatch)
 
-          val onlineAndFetching = Flow[Try[Seq[OutgoingTransactionImage]]]
+          val onlineAndTransferring = Flow[Try[Seq[OutgoingTransactionImage]]]
             .collect {
               case Success(images) if images.nonEmpty => tick
             }
@@ -94,21 +78,36 @@ trait BoxStreamBase {
             .map { failure =>
               failure.exception match {
                 case e: TransactionFailedException =>
-                  SbxLog.warn("Box", s"Failed transferring image ${e.transactionImage.image.imageId}: ${e.getMessage}, cause: ${e.getCause.getMessage}. Retrying later.")
+                  SbxLog.warn("Box", s"Connection to ${box.name} ($transferType) failed for image ${e.transactionImage.image.imageId}: ${e.getMessage}, cause: ${e.getCause.getMessage}. Retrying later.")
                 case t: Throwable =>
-                  SbxLog.warn("Box", s"Failed transferring image: ${t.getMessage}. Retrying later.")
+                  SbxLog.warn("Box", s"Connection to ${box.name} ($transferType) failed: ${t.getMessage}. Retrying later.")
               }
               failure
             }
 
           ticker ~> merge.in(0)
-                    merge           ~> switch ~> batchFlow ~> bcast
-                    merge.preferred <~ onlineAndFetching   <~ bcast
-                                                              bcast ~> failedBatchPath ~> Sink.ignore
+                    merge           ~> switch ~> batchFlow   ~> bcast
+                    merge.preferred <~ onlineAndTransferring <~ bcast
+                                                                bcast ~> failedBatchPath ~> Sink.ignore
 
           ClosedShape
     })
   }
+
+  def pool[T]: Flow[(HttpRequest, T), (Try[HttpResponse], T), _] =
+    box.baseUrl match {
+      case pattern(protocolPart, host, portPart) =>
+        val protocol = Option(protocolPart).getOrElse("http")
+        val port = Option(portPart) match {
+          case None if protocol == "https" => 443
+          case None => 80
+          case Some(portString) => portString.toInt
+        }
+        if (port == 443)
+          http.cachedHostConnectionPoolHttps[T](host, port)
+        else
+          http.cachedHostConnectionPool[T](host, port)
+    }
 
   def checkResponse(responseImage: ResponseImage): (HttpResponse, OutgoingTransactionImage) = {
     responseImage match {
@@ -117,13 +116,13 @@ trait BoxStreamBase {
           case status if status >= 200 && status < 300 => (response, transactionImage)
           case status if status == 400 =>
             response.discardEntityBytes()
-            SbxLog.warn("Box", s"Ignoring rejected image: ${transactionImage.image.imageId}, box: ${transactionImage.transaction.boxName}")
+            SbxLog.warn("Box", s"${box.name} ($transferType): Ignoring rejected image ${transactionImage.image.imageId}")
             (response, transactionImage)
           case _ =>
             response.discardEntityBytes()
-            throw new TransactionFailedException(transactionImage, s"Failed transferring image: ${transactionImage.image.imageId}, box: ${box.name}", null)
+            throw new TransactionFailedException(transactionImage, s"Connection to ${box.name} ($transferType) failed for image ${transactionImage.image.imageId}", null)
         }
-      case (Failure(exception), transactionImage) => throw new TransactionFailedException(transactionImage, s"Failed getting outgoing transaction image with id ${transactionImage.image.id} from ${box.name}", exception)
+      case (Failure(exception), transactionImage) => throw new TransactionFailedException(transactionImage, s"Connection to ${box.name} ($transferType) failed for image ${transactionImage.image.id}", exception)
     }
   }
 
@@ -141,7 +140,7 @@ trait BoxStreamBase {
   def singleRequest(request: HttpRequest): Future[HttpResponse] = http.singleRequest(request)
 }
 
-object BoxStreamBase {
+object BoxStreamOps {
 
   class TransactionRejectedException(val transactionImage: OutgoingTransactionImage, message: String, cause: Throwable) extends Exception(message, cause)
   class TransactionFailedException(val transactionImage: OutgoingTransactionImage, message: String, cause: Throwable) extends Exception(message, cause)
@@ -151,9 +150,4 @@ object BoxStreamBase {
   val tick = Tick()
 
   val pattern: Regex = """(?:([A-Za-z]*)://)?([^\:|/]+)?:?([0-9]+)?.*""".r
-
-  val batchSize = 200
-
-  val parallelism = 8
-
 }

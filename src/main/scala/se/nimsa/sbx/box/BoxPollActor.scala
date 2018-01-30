@@ -20,6 +20,7 @@ import akka.actor.{Actor, ActorSelection, ActorSystem, Cancellable, Props}
 import akka.event.{Logging, LoggingReceive}
 import akka.pattern.ask
 import akka.stream._
+import akka.stream.scaladsl.Compression
 import akka.util.{ByteString, Timeout}
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.box.BoxProtocol._
@@ -33,7 +34,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.reflect.ClassTag
 
 class BoxPollActor(override val box: Box,
-                   override val storage: StorageService,
+                   val storage: StorageService,
                    override val retryInterval: FiniteDuration = 15.seconds,
                    boxServicePath: String = "../../BoxService",
                    metaDataServicePath: String = "../../MetaDataService",
@@ -59,15 +60,16 @@ class BoxPollActor(override val box: Box,
   override def scheduleTask(delay: FiniteDuration)(task: => Unit): Cancellable = system.scheduler.scheduleOnce(delay)(task)
 
   override def storeDicomData(bytesSource: scaladsl.Source[ByteString, _], source: Source): Future[MetaDataProtocol.MetaDataAdded] =
-    storeDicomData(bytesSource, source, storage, Contexts.extendedContexts, reverseAnonymization = true)
+    storeDicomData(bytesSource.via(Compression.inflate()), source, storage, Contexts.extendedContexts, reverseAnonymization = true)
 
   override def updateIncomingTransaction(transactionImage: OutgoingTransactionImage, imageId: Long, overwrite: Boolean): Future[IncomingUpdated] =
     boxService.ask(UpdateIncoming(box, transactionImage.transaction.id, transactionImage.image.sequenceNumber, transactionImage.transaction.totalImageCount, imageId, overwrite)).mapTo[IncomingUpdated]
 
+  override def updateBoxOnlineStatus(online: Boolean): Future[Unit] = boxService.ask(UpdateBoxOnlineStatus(box.id, online)).mapTo[Unit]
+
   def receive = LoggingReceive {
     case _ =>
   }
-
 }
 
 object BoxPollActor {

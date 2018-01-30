@@ -19,9 +19,8 @@ package se.nimsa.sbx.box
 import akka.NotUsed
 import akka.actor.{Actor, ActorSelection, ActorSystem, Cancellable, Props}
 import akka.event.{Logging, LoggingReceive}
-import akka.http.scaladsl.model.{HttpEntity, HttpMethods, HttpRequest}
 import akka.pattern.ask
-import akka.stream.scaladsl.Source
+import akka.stream.scaladsl.{Compression, Source}
 import akka.stream.{KillSwitch, Materializer}
 import akka.util.{ByteString, Timeout}
 import se.nimsa.sbx.app.GeneralProtocol.{Destination, DestinationType, ImagesSent}
@@ -36,7 +35,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.reflect.ClassTag
 
 class BoxPushActor(override val box: Box,
-                   override val storage: StorageService,
+                   val storage: StorageService,
                    override val retryInterval: FiniteDuration = 15.seconds,
                    boxServicePath: String = "../../BoxService",
                    metaDataServicePath: String = "../../MetaDataService",
@@ -72,25 +71,23 @@ class BoxPushActor(override val box: Box,
     boxService.ask(PollOutgoing(box, n)).mapTo[Seq[OutgoingTransactionImage]]
   override def outgoingTagValuesForImage(transactionImage: OutgoingTransactionImage): Future[Seq[OutgoingTagValue]] =
     boxService.ask(GetOutgoingTagValues(transactionImage)).mapTo[Seq[OutgoingTagValue]]
+  override def anonymizedDicomData(transactionImage: OutgoingTransactionImage, tagValues: Seq[OutgoingTagValue]): Source[ByteString, NotUsed] =
+    anonymizedDicomData(transactionImage.image.imageId, tagValues.map(_.tagValue), storage)
+      .batchWeighted(storage.streamChunkSize, _.length, identity)(_ ++ _)
+      .via(Compression.deflate)
   override def updateOutgoingTransaction(transactionImage: OutgoingTransactionImage, sentImageCount: Long): Future[OutgoingTransactionImage] =
     boxService.ask(UpdateOutgoingTransaction(transactionImage, sentImageCount)).mapTo[OutgoingTransactionImage]
       .flatMap { updatedTransactionImage =>
         if (updatedTransactionImage.transaction.sentImageCount >= updatedTransactionImage.transaction.totalImageCount)
           getImageIdsForOutgoingTransaction(transactionImage.transaction).flatMap { imageIds =>
-            handleTransactionFinished(updatedTransactionImage.transaction, imageIds)
+            finalizeOutgoingTransaction(updatedTransactionImage.transaction, imageIds)
           }.map(_ => updatedTransactionImage)
         else
           Future.successful(updatedTransactionImage)
       }
-  override def anonymizedDicomData(transactionImage: OutgoingTransactionImage, tagValues: Seq[OutgoingTagValue]): Source[ByteString, NotUsed] =
-    anonymizedDicomData(transactionImage.image.imageId, tagValues.map(_.tagValue), storage)
 
-  def handleTransactionFinished(transaction: OutgoingTransaction, imageIds: Seq[Long]): Future[Unit] =
+  def finalizeOutgoingTransaction(transaction: OutgoingTransaction, imageIds: Seq[Long]): Future[Unit] =
     setOutgoingTransactionStatus(transaction, TransactionStatus.FINISHED)
-      .flatMap { _ =>
-        setRemoteIncomingTransactionStatus(transaction, TransactionStatus.FINISHED)
-          .recover { case _: Exception => Unit } // just setting status, ignore if not successful
-      }
       .map { _ =>
         SbxLog.info("Box", s"Finished sending ${transaction.totalImageCount} images to box ${box.name}")
         system.eventStream.publish(ImagesSent(Destination(DestinationType.BOX, box.name, box.id), imageIds))
@@ -98,14 +95,6 @@ class BoxPushActor(override val box: Box,
 
   def setOutgoingTransactionStatus(transaction: OutgoingTransaction, status: TransactionStatus): Future[Unit] =
     boxService.ask(SetOutgoingTransactionStatus(transaction, status)).map(_ => Unit)
-
-  def setRemoteIncomingTransactionStatus(transaction: OutgoingTransaction, status: TransactionStatus): Future[Unit] =
-    singleRequest(HttpRequest(method = HttpMethods.PUT, uri = s"${box.baseUrl}/status?transactionid=${transaction.id}", entity = HttpEntity(status.toString)))
-      .recover {
-        case _: Exception =>
-          SbxLog.warn("Box", s"Unable to set remote status of transaction ${transaction.id} to FINISHED.")
-      }
-      .map(_ => Unit)
 
   def getImageIdsForOutgoingTransaction(transaction: OutgoingTransaction): Future[Seq[Long]] =
     boxService.ask(GetImageIdsForOutgoingTransaction(transaction.id)).mapTo[Seq[Long]]

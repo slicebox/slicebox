@@ -182,7 +182,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
       boxService ! UpdateIncoming(box, 32, sequenceNumber = 1, totalImageCount, 33, overwrite = false)
       expectMsgType[IncomingUpdated]
 
-      boxService ! UpdateIncoming(box, 32, sequenceNumber = 3, totalImageCount, 33, overwrite = false)
+      boxService ! UpdateIncoming(box, 32, sequenceNumber = 2, totalImageCount, 33, overwrite = false)
 
       expectMsgPF() {
         case IncomingUpdated(transaction) =>
