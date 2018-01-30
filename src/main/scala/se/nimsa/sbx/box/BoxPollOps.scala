@@ -47,7 +47,10 @@ trait BoxPollOps extends BoxStreamOps with BoxJsonFormats with PlayJsonSupport {
       .toMat(Sink.seq)(Keep.right)
   }
 
-  def pullBatch(): Future[Seq[OutgoingTransactionImage]] = scaladsl.Source.fromFuture(poll(batchSize)).runWith(pullSink)
+  def pullBatch(): Future[Seq[OutgoingTransactionImage]] =
+    scaladsl.Source
+      .fromFuture(pollAndUpdateBoxStatus(batchSize))
+      .runWith(pullSink)
 
   def poll(n: Int): Future[Seq[OutgoingTransactionImage]] =
     singleRequest(pollRequest(n))
@@ -62,6 +65,9 @@ trait BoxPollOps extends BoxStreamOps with BoxJsonFormats with PlayJsonSupport {
               case _: Throwable => Unmarshal(response).to[Seq[OutgoingTransactionImage]]
             }
       }
+
+  def pollAndUpdateBoxStatus(n: Int): Future[Seq[OutgoingTransactionImage]] =
+    poll(n).recoverWith { case t: Throwable => boxStatusToOffline.map(_ => throw t) }
 
   def boxStatusToOnline(transactionImages: Seq[OutgoingTransactionImage]): Future[Seq[OutgoingTransactionImage]] =
     updateBoxOnlineStatus(online = true).map(_ => transactionImages)
@@ -79,6 +85,8 @@ trait BoxPollOps extends BoxStreamOps with BoxJsonFormats with PlayJsonSupport {
       out :: Nil
     }
   }
+
+  def boxStatusToOffline: Future[Unit] = updateBoxOnlineStatus(online = false)
 
   def storeData(responseImage: (HttpResponse, OutgoingTransactionImage)): Future[OutgoingTransactionImage] =
     responseImage match {

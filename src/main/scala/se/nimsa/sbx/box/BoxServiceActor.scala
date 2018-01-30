@@ -129,7 +129,7 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageServic
           futureIncomingTransactionWithStatus.map(IncomingUpdated).pipeSequentiallyTo(sender)
 
         case PollOutgoing(box, n) =>
-          pollBoxesLastPollTimestamp(box.id) = System.currentTimeMillis
+          if (box.sendMethod == BoxSendMethod.POLL) pollBoxesLastPollTimestamp(box.id) = System.currentTimeMillis
           val futureOutgoingTransactionImages = boxDao.nextOutgoingTransactionImagesForBoxId(box.id, n)
 
           futureOutgoingTransactionImages.foreach(outgoingTransactionImages =>
@@ -155,6 +155,7 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageServic
           boxDao.listPendingOutgoingTransactionsForBox(box.id).pipeTo(sender)
 
         case MarkOutgoingImageAsSent(box, transactionImage) =>
+          if (box.sendMethod == BoxSendMethod.POLL) pollBoxesLastPollTimestamp(box.id) = System.currentTimeMillis
           updateOutgoingTransactionOnImageSent(transactionImage, transactionImage.transaction.sentImageCount)
             .flatMap { updatedTransactionImage =>
               if (updatedTransactionImage.transaction.sentImageCount >= updatedTransactionImage.transaction.totalImageCount) {

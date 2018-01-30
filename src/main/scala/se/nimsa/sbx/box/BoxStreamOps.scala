@@ -77,8 +77,8 @@ trait BoxStreamOps {
             }
             .map { failure =>
               failure.exception match {
-                case e: TransactionFailedException =>
-                  SbxLog.warn("Box", s"Connection to ${box.name} ($transferType) failed for image ${e.transactionImage.image.imageId}: ${e.getMessage}, cause: ${e.getCause.getMessage}. Retrying later.")
+                case e: TransactionException =>
+                  SbxLog.warn("Box", s"Connection to ${box.name} ($transferType) failed for image ${e.transactionImage.image.imageId}: ${e.getMessage}, cause: ${if (e.getCause != null) e.getCause.getMessage else "none"}. Retrying later.")
                 case t: Throwable =>
                   SbxLog.warn("Box", s"Connection to ${box.name} ($transferType) failed: ${t.getMessage}. Retrying later.")
               }
@@ -118,11 +118,15 @@ trait BoxStreamOps {
             response.discardEntityBytes()
             SbxLog.warn("Box", s"${box.name} ($transferType): Ignoring rejected image ${transactionImage.image.imageId}")
             (response, transactionImage)
+          case status if status == 404 =>
+            response.discardEntityBytes()
+            SbxLog.warn("Box", s"${box.name} ($transferType): Ignoring removed image ${transactionImage.image.imageId}")
+            (response, transactionImage)
           case _ =>
             response.discardEntityBytes()
-            throw new TransactionFailedException(transactionImage, s"Connection to ${box.name} ($transferType) failed for image ${transactionImage.image.imageId}", null)
+            throw new TransactionException(transactionImage, s"Connection to ${box.name} ($transferType) failed for image ${transactionImage.image.imageId}", null)
         }
-      case (Failure(exception), transactionImage) => throw new TransactionFailedException(transactionImage, s"Connection to ${box.name} ($transferType) failed for image ${transactionImage.image.id}", exception)
+      case (Failure(exception), transactionImage) => throw new TransactionException(transactionImage, s"Connection to ${box.name} ($transferType) failed for image ${transactionImage.image.id}", exception)
     }
   }
 
@@ -142,8 +146,7 @@ trait BoxStreamOps {
 
 object BoxStreamOps {
 
-  class TransactionRejectedException(val transactionImage: OutgoingTransactionImage, message: String, cause: Throwable) extends Exception(message, cause)
-  class TransactionFailedException(val transactionImage: OutgoingTransactionImage, message: String, cause: Throwable) extends Exception(message, cause)
+  class TransactionException(val transactionImage: OutgoingTransactionImage, message: String, cause: Throwable) extends Exception(message, cause)
 
   case class Tick()
 

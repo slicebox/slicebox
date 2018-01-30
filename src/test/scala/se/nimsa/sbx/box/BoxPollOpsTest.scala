@@ -15,7 +15,7 @@ import org.scalatest.{AsyncFlatSpecLike, BeforeAndAfterAll, Matchers}
 import se.nimsa.sbx.app.GeneralProtocol
 import se.nimsa.sbx.app.GeneralProtocol.SourceType
 import se.nimsa.sbx.box.BoxProtocol._
-import se.nimsa.sbx.box.BoxStreamOps.TransactionFailedException
+import se.nimsa.sbx.box.BoxStreamOps.TransactionException
 import se.nimsa.sbx.dicom.DicomHierarchy.{Image, Patient, Series, Study}
 import se.nimsa.sbx.dicom.DicomPropertyValue._
 import se.nimsa.sbx.metadata.MetaDataProtocol
@@ -127,7 +127,7 @@ class BoxPollOpsTest extends TestKit(ActorSystem("BoxPollOpsSpec")) with AsyncFl
         Flow.fromFunction((requestT: (HttpRequest, T)) =>
           (Try(notFoundResponse), requestT._2))
     }
-    recoverToSucceededIf[TransactionFailedException] {
+    recoverToSucceededIf[TransactionException] {
       impl.pullBatch()
     }
   }
