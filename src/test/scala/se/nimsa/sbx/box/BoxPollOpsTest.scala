@@ -53,6 +53,8 @@ class BoxPollOpsTest extends TestKit(ActorSystem("BoxPollOpsSpec")) with AsyncFl
     override implicit val ec: ExecutionContextExecutor = BoxPollOpsTest.this.ec
     override implicit val materializer: Materializer = BoxPollOpsTest.this.materializer
     override val retryInterval: FiniteDuration = 50.milliseconds
+    override val batchSize: Int = 200
+    override val parallelism: Int = 8
     override def pool[T]: Flow[(HttpRequest, T), (Try[HttpResponse], T), _] =
       Flow.fromFunction((requestT: (HttpRequest, T)) => (Try(HttpResponse(entity = ByteString(1, 2, 3, 4))), requestT._2))
     override def singleRequest(request: HttpRequest): Future[HttpResponse] =

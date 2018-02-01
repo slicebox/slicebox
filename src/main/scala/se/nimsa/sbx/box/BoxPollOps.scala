@@ -15,10 +15,13 @@ import se.nimsa.sbx.box.BoxProtocol.{IncomingUpdated, OutgoingTransactionImage}
 import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.metadata.MetaDataProtocol.MetaDataAdded
 
+import scala.concurrent.duration.DurationInt
 import scala.collection.immutable.Seq
 import scala.concurrent.Future
 
 trait BoxPollOps extends BoxStreamOps with BoxJsonFormats with PlayJsonSupport {
+
+  import BoxStreamOps._
 
   implicit lazy val scheduler: Scheduler = system.scheduler
 
@@ -31,15 +34,25 @@ trait BoxPollOps extends BoxStreamOps with BoxJsonFormats with PlayJsonSupport {
   lazy val pullSink: Sink[Seq[OutgoingTransactionImage], Future[Seq[OutgoingTransactionImage]]] = {
     val pullPool = pool[OutgoingTransactionImage]
 
+    val statusToOnlineSink1 = Flow[Seq[OutgoingTransactionImage]]
+      .buffer(1, OverflowStrategy.dropNew)
+      .mapAsyncUnordered(parallelism)(boxStatusToOnline)
+      .to(Sink.ignore)
+
+    val statusToOnlineSink2 = Flow[OutgoingTransactionImage]
+      .buffer(1, OverflowStrategy.dropNew)
+      .throttle(1, 5.seconds, 1, ThrottleMode.shaping)
+      .mapAsyncUnordered(parallelism)(boxStatusToOnline)
+      .to(Sink.ignore)
+
     Flow[Seq[OutgoingTransactionImage]]
-      .mapAsync(1)(boxStatusToOnline)
+      .alsoTo(statusToOnlineSink1)
       .mapConcat(identity)
       .map(createGetRequest)
       .via(pullPool)
       .map(checkResponse)
       .mapAsyncUnordered(parallelism)(storeData)
-      .statefulMapConcat(boxStatusToOnline)
-      .mapAsyncUnordered(parallelism)(identity)
+      .alsoTo(statusToOnlineSink2)
       .statefulMapConcat(indexInTransaction)
       .mapAsyncUnordered(parallelism)(createDoneRequest)
       .via(pullPool)
@@ -72,19 +85,7 @@ trait BoxPollOps extends BoxStreamOps with BoxJsonFormats with PlayJsonSupport {
   def boxStatusToOnline(transactionImages: Seq[OutgoingTransactionImage]): Future[Seq[OutgoingTransactionImage]] =
     updateBoxOnlineStatus(online = true).map(_ => transactionImages)
 
-  def boxStatusToOnline: () => OutgoingTransactionImage => List[Future[OutgoingTransactionImage]] = () => {
-    var lastUpdate: Long = 0
-
-    (transactionImage: OutgoingTransactionImage) => {
-      val now = System.currentTimeMillis
-      val out = if ((now - lastUpdate) > (retryInterval.toMillis / 3)) {
-        lastUpdate = now
-        updateBoxOnlineStatus(online = true).map(_ => transactionImage)
-      } else
-        Future.successful(transactionImage)
-      out :: Nil
-    }
-  }
+  def boxStatusToOnline(transactionImage: OutgoingTransactionImage): Future[Unit] = updateBoxOnlineStatus(online = true)
 
   def boxStatusToOffline: Future[Unit] = updateBoxOnlineStatus(online = false)
 

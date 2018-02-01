@@ -12,6 +12,8 @@ import scala.concurrent.Future
 
 trait BoxPushOps extends BoxStreamOps {
 
+  import BoxStreamOps._
+
   override val transferType: String = "push"
 
   def poll(n: Int): Future[Seq[OutgoingTransactionImage]]

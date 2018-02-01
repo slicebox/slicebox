@@ -36,6 +36,8 @@ import scala.reflect.ClassTag
 class BoxPollActor(override val box: Box,
                    val storage: StorageService,
                    override val retryInterval: FiniteDuration = 15.seconds,
+                   override val batchSize: Int = 200,
+                   override val parallelism: Int = 8,
                    boxServicePath: String = "../../BoxService",
                    metaDataServicePath: String = "../../MetaDataService",
                    anonymizationServicePath: String = "../../AnonymizationService")

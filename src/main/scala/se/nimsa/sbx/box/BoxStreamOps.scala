@@ -10,7 +10,7 @@ import se.nimsa.sbx.log.SbxLog
 
 import scala.collection.immutable.Seq
 import scala.collection.mutable
-import scala.concurrent.duration.{DurationInt, FiniteDuration}
+import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.matching.Regex
 import scala.util.{Failure, Success, Try}
@@ -19,21 +19,17 @@ trait BoxStreamOps {
 
   import BoxStreamOps._
 
-  type RequestImage = (HttpRequest, OutgoingTransactionImage)
-  type ResponseImage = (Try[HttpResponse], OutgoingTransactionImage)
-
   val box: Box
   val transferType: String
+  val retryInterval: FiniteDuration
+  val batchSize: Int
+  val parallelism: Int
 
   implicit val system: ActorSystem
   implicit val materializer: Materializer
   implicit val ec: ExecutionContext
 
   lazy val http = Http(system)
-
-  val retryInterval: FiniteDuration = 15.seconds
-  val batchSize = 200
-  val parallelism = 8
 
   def pollAndTransfer[Mat](transferBatch: () => Future[Seq[OutgoingTransactionImage]]): RunnableGraph[KillSwitch] = {
     RunnableGraph.fromGraph(GraphDSL.create(KillSwitches.single[Tick]) {
@@ -130,7 +126,23 @@ trait BoxStreamOps {
     }
   }
 
-  def indexInTransaction: () => OutgoingTransactionImage => List[(OutgoingTransactionImage, Long)] = () => {
+  def singleRequest(request: HttpRequest): Future[HttpResponse] = http.singleRequest(request)
+}
+
+object BoxStreamOps {
+
+  type RequestImage = (HttpRequest, OutgoingTransactionImage)
+  type ResponseImage = (Try[HttpResponse], OutgoingTransactionImage)
+
+  class TransactionException(val transactionImage: OutgoingTransactionImage, message: String, cause: Throwable) extends Exception(message, cause)
+
+  case class Tick()
+
+  val tick = Tick()
+
+  val pattern: Regex = """(?:([A-Za-z]*)://)?([^\:|/]+)?:?([0-9]+)?.*""".r
+
+  val indexInTransaction: () => OutgoingTransactionImage => List[(OutgoingTransactionImage, Long)] = () => {
     val indices = mutable.Map.empty[Long, Long]
 
     (transactionImage: OutgoingTransactionImage) => {
@@ -140,17 +152,4 @@ trait BoxStreamOps {
       (transactionImage, index) :: Nil
     }
   }
-
-  def singleRequest(request: HttpRequest): Future[HttpResponse] = http.singleRequest(request)
-}
-
-object BoxStreamOps {
-
-  class TransactionException(val transactionImage: OutgoingTransactionImage, message: String, cause: Throwable) extends Exception(message, cause)
-
-  case class Tick()
-
-  val tick = Tick()
-
-  val pattern: Regex = """(?:([A-Za-z]*)://)?([^\:|/]+)?:?([0-9]+)?.*""".r
 }

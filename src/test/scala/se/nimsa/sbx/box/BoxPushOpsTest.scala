@@ -41,6 +41,8 @@ class BoxPushOpsTest extends TestKit(ActorSystem("BoxPushOpsSpec")) with AsyncFl
     override implicit val ec: ExecutionContextExecutor = BoxPushOpsTest.this.ec
     override implicit val materializer: Materializer = BoxPushOpsTest.this.materializer
     override val retryInterval: FiniteDuration = 50.milliseconds
+    override val batchSize: Int = 200
+    override val parallelism: Int = 8
     override def pool[T]: Flow[(HttpRequest, T), (Try[HttpResponse], T), _] =
       Flow.fromFunction((requestT: (HttpRequest, T)) => (Try(okResponse), requestT._2))
     override def poll(n: Int): Future[Seq[OutgoingTransactionImage]] =
@@ -76,31 +78,6 @@ class BoxPushOpsTest extends TestKit(ActorSystem("BoxPushOpsSpec")) with AsyncFl
     }
   }
 
-  /*
-  it should "deflate data before sending" in {
-    val data = ByteString((1 to 10000).map(_.toByte): _*)
-    var outgoingData = data
-    val impl = new BoxPushOpsImpl() {
-      override def anonymizedDicomData(transactionImage: OutgoingTransactionImage, tagValues: Seq[OutgoingTagValue]): Source[ByteString, NotUsed] =
-        Source.single(data)
-      override def pool[T]: Flow[(HttpRequest, T), (Try[HttpResponse], T), _] =
-        Flow[(HttpRequest, T)]
-          .mapAsync(1) { requestImage =>
-            requestImage._1.entity.dataBytes.runWith(Sink.fold(ByteString.empty)(_ ++ _)).map { d =>
-              outgoingData = d
-              requestImage
-            }
-          }
-          .via(super.pool)
-    }
-
-    impl.pushBatch().map { _ =>
-      outgoingData should not be data
-      outgoingData.length should be < data.length
-    }
-  }
-  */
-
   it should "update outgoing transaction as images are sent" in {
     var updatedTransaction: OutgoingTransaction = null
 
@@ -117,23 +94,6 @@ class BoxPushOpsTest extends TestKit(ActorSystem("BoxPushOpsSpec")) with AsyncFl
       updatedTransaction should not be null
     }
   }
-
-  /*
-  it should "mark outgoing transaction as finished when all images have been sent" in {
-    var transactionFinished = false
-
-    val impl = new BoxPushOpsImpl() {
-      override def setOutgoingTransactionStatus(transaction: OutgoingTransaction, status: TransactionStatus): Future[Unit] = {
-        transactionFinished = status == TransactionStatus.FINISHED
-        super.setOutgoingTransactionStatus(transaction, status)
-      }
-    }
-
-    impl.pushBatch().map { _ =>
-      transactionFinished shouldBe true
-    }
-  }
-  */
 
   it should "process many files" in {
     val n = 10000
@@ -152,36 +112,6 @@ class BoxPushOpsTest extends TestKit(ActorSystem("BoxPushOpsSpec")) with AsyncFl
     }
   }
 
-  /*
-  it should "finalize transaction when finished" in {
-    val n = 10
-    val nFilesPushed = new AtomicInteger()
-    val nRemoteStatusRequests = new AtomicInteger()
-    var nFilesPushedWhenFinished = 0
-
-    val impl = new BoxPushOpsImpl() {
-      override def setRemoteIncomingTransactionStatus(transaction: OutgoingTransaction, status: TransactionStatus): Future[Unit] = {
-        nRemoteStatusRequests.incrementAndGet()
-        super.setRemoteIncomingTransactionStatus(transaction, status)
-      }
-      override def handleFileSentForOutgoingTransaction(transactionImage: OutgoingTransactionImage, sentImageCount: Long): Future[OutgoingTransactionImage] = {
-        nFilesPushed.incrementAndGet()
-        super.handleFileSentForOutgoingTransaction(transactionImage, sentImageCount)
-      }
-      override def handleTransactionFinished(box: Box, transaction: OutgoingTransaction, imageIds: Seq[Long]): Future[Unit] = {
-        nFilesPushedWhenFinished = nFilesPushed.intValue()
-        super.handleTransactionFinished(box, transaction, imageIds)
-      }
-    }
-
-    impl.pushBatch().map { _ =>
-      nRemoteStatusRequests.intValue() shouldBe 1
-      nFilesPushedWhenFinished.intValue() shouldBe n
-      nFilesPushed.intValue() shouldBe nFilesPushedWhenFinished.intValue()
-    }
-  }
-  */
-
   it should "update sent image count in order" in {
     val n = 10
     val sentImageCounts = new CopyOnWriteArrayList[Long]()
@@ -197,36 +127,6 @@ class BoxPushOpsTest extends TestKit(ActorSystem("BoxPushOpsSpec")) with AsyncFl
       sentImageCounts.toArray.toSeq.map(_.asInstanceOf[Long]) shouldBe (1 to 10)
     }
   }
-
-  /*
-  it should "retry sending files on failure" in {
-    val n = 100
-    val failureProbability = 0.1
-
-    var sentImageIds = Seq.empty[Long]
-
-    val impl = new BoxPushOpsImpl() {
-      override val pool: Flow[(HttpRequest, OutgoingTransactionImage), (Try[HttpResponse], OutgoingTransactionImage), _] =
-        Flow.fromFunction((requestImage: (HttpRequest, OutgoingTransactionImage)) => {
-          if (math.random() < failureProbability)
-            if (math.random() < 0.5)
-              (Failure(new RuntimeException("Some exception")), requestImage._2)
-            else
-              (Try(errorResponse), requestImage._2)
-          else
-            (Try(okResponse), requestImage._2)
-        })
-      override def handleTransactionFinished(box: Box, transaction: OutgoingTransaction, imageIds: Seq[Long]): Future[Unit] = {
-        sentImageIds = imageIds
-        super.handleTransactionFinished(box, transaction, imageIds)
-      }
-    }
-
-    impl.pushBatch().map { _ =>
-      sentImageIds.toSet shouldBe (1001L to (1000L + n)).toSet
-    }
-  }
-  */
 
   it should "keep pushing files when one or more files are rejected on remote (HTTP status 400)" in {
     val n = 10
@@ -250,41 +150,4 @@ class BoxPushOpsTest extends TestKit(ActorSystem("BoxPushOpsSpec")) with AsyncFl
       nFilesPushed.intValue() shouldBe n
     }
   }
-
-  /*
-  it should "not fail if setting remote status fails" in {
-    val impl = new BoxPushOpsImpl() {
-      override protected def setRemoteIncomingTransactionStatus(transaction: OutgoingTransaction, status: TransactionStatus): Future[Unit] = {
-        Future.failed(new RuntimeException("Connection refused"))
-      }
-    }
-
-    impl.pushBatch().map { _ =>
-      succeed
-    }
-  }
-
-  it should "stop sending images if pipeline is shut down prematurely" in {
-    val n = 1000
-    val shutdownIndex = n / 2
-    val nFilesPushed = new AtomicInteger()
-    var killSwitch: KillSwitch = null
-
-    val impl = new BoxPushOpsImpl() {
-      override protected def handleFileSentForOutgoingTransaction(transactionImage: OutgoingTransactionImage, sentImageCount: Long): Future[OutgoingTransactionImage] = {
-        nFilesPushed.incrementAndGet()
-        if (nFilesPushed.intValue() == shutdownIndex)
-          killSwitch.shutdown()
-        super.handleFileSentForOutgoingTransaction(transactionImage, sentImageCount)
-      }
-    }
-
-    val futureResult = impl.pushBatch()
-    killSwitch = switch
-
-    futureResult.map { _ =>
-      nFilesPushed.intValue() should be < n
-    }
-  }
-  */
 }
