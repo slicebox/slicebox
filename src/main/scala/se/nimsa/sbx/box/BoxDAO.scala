@@ -21,7 +21,7 @@ import se.nimsa.sbx.box.BoxProtocol.BoxSendMethod._
 import se.nimsa.sbx.box.BoxProtocol.TransactionStatus._
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.util.DbUtil.createTables
-import slick.basic.{DatabaseConfig, DatabasePublisher}
+import slick.basic.DatabaseConfig
 import slick.jdbc.JdbcProfile
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -243,24 +243,14 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
   def updateIncomingTransactionAction(transaction: IncomingTransaction): DBIOAction[Unit, NoStream, Effect.Write] =
     incomingTransactionQuery.filter(_.id === transaction.id).update(transaction).map(_ => {})
 
-  def updateIncomingTransaction(transaction: IncomingTransaction): Future[Unit] =
-    db.run(updateIncomingTransactionAction(transaction))
-
   def updateOutgoingTransactionAction(transaction: OutgoingTransaction): DBIOAction[Unit, NoStream, Effect.Write] =
     outgoingTransactionQuery.filter(_.id === transaction.id).update(transaction).map(_ => {})
-
-  def updateOutgoingTransaction(transaction: OutgoingTransaction): Future[Unit] =
-    db.run(updateOutgoingTransactionAction(transaction))
 
   def updateOutgoingImageAction(image: OutgoingImage): DBIOAction[Unit, NoStream, Effect.Write] =
     outgoingImageQuery.filter(_.id === image.id).update(image).map(_ => {})
 
-  def updateOutgoingImage(image: OutgoingImage): Future[Unit] = db.run(updateOutgoingImageAction(image))
-
   def updateIncomingImageAction(image: IncomingImage): DBIOAction[Unit, NoStream, Effect.Write] =
     incomingImageQuery.filter(_.id === image.id).update(image).map(_ => {})
-
-  def updateIncomingImage(image: IncomingImage): Future[Unit] = db.run(updateIncomingImageAction(image))
 
   def nextOutgoingTransactionImagesForBoxId(boxId: Long, n: Long): Future[Seq[OutgoingTransactionImage]] = db.run {
     val join = for {
@@ -326,15 +316,6 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
       .filter(_.sequenceNumber === sequenceNumber)
       .result.headOption
 
-  def incomingImageByIncomingTransactionIdAndSequenceNumber(incomingTransactionId: Long, sequenceNumber: Long): Future[Option[IncomingImage]] =
-    db.run(incomingImageByIncomingTransactionIdAndSequenceNumberAction(incomingTransactionId, sequenceNumber))
-
-  def outgoingTransactionById(outgoingTransactionId: Long): Future[Option[OutgoingTransaction]] = db.run {
-    outgoingTransactionQuery
-      .filter(_.id === outgoingTransactionId)
-      .result.headOption
-  }
-
   def removeIncomingTransaction(incomingTransactionId: Long): Future[Unit] = db.run {
     incomingTransactionQuery.filter(_.id === incomingTransactionId).delete
       .map(_ => {})
@@ -347,11 +328,6 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
 
   def removeOutgoingTransaction(outgoingTransactionId: Long): Future[Unit] = db.run {
     outgoingTransactionQuery.filter(_.id === outgoingTransactionId).delete
-      .map(_ => {})
-  }
-
-  def removeOutgoingTransactions(outgoingTransactionIds: Seq[Long]): Future[Unit] = db.run {
-    outgoingTransactionQuery.filter(_.id inSet outgoingTransactionIds).delete
       .map(_ => {})
   }
 
@@ -396,37 +372,13 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
       .filter(_.status === (PROCESSING: TransactionStatus))
       .result
 
-  val listOpenOutgoingTransactionsAction: DBIOAction[Seq[OutgoingTransaction], NoStream, Effect.Read] =
-    outgoingTransactionQuery
-      .filterNot(_.status === (FINISHED: TransactionStatus))
-      .filterNot(_.status === (FAILED: TransactionStatus))
-      .result
-
-  val listOutgoingTransactionsInProcess: Future[Seq[OutgoingTransaction]] = db.run(listOutgoingTransactionsInProcessAction)
-
   val listIncomingTransactionsInProcessAction: DBIOAction[Seq[IncomingTransaction], NoStream, Effect.Read] =
     incomingTransactionQuery
       .filter(_.status === (PROCESSING: TransactionStatus))
       .result
 
-  val listOpenIncomingTransactionsAction: DBIOAction[Seq[IncomingTransaction], NoStream, Effect.Read] =
-    incomingTransactionQuery
-      .filterNot(_.status === (FINISHED: TransactionStatus))
-      .filterNot(_.status === (FAILED: TransactionStatus))
-      .result
-
-  def listIncomingTransactionsInProcess: Future[Seq[IncomingTransaction]] = db.run(listIncomingTransactionsInProcessAction)
-
   def listOutgoingImagesForOutgoingTransactionId(outgoingTransactionId: Long): Future[Seq[OutgoingImage]] = db.run {
     outgoingImageQuery.filter(_.outgoingTransactionId === outgoingTransactionId).result
-  }
-
-  def streamPendingOutgoingImagesForOutgoingTransactionId(outgoingTransactionId: Long): DatabasePublisher[OutgoingImage] = db.stream {
-    outgoingImageQuery
-      .filter(_.outgoingTransactionId === outgoingTransactionId)
-      .filter(_.sent === false)
-      .sortBy(_.sequenceNumber.asc) // remove?
-      .result
   }
 
   def listIncomingImagesForIncomingTransactionId(incomingTransactionId: Long): Future[Seq[IncomingImage]] = db.run {
