@@ -72,10 +72,13 @@ trait BoxPollOps extends BoxStreamOps with BoxJsonFormats with PlayJsonSupport {
           response.discardEntityBytes()
           Future.successful(Seq.empty)
         case response =>
-          Unmarshal(response).to[OutgoingTransactionImage]
-            .map(transactionImage => Seq(transactionImage))
-            .recoverWith {
-              case _: Throwable => Unmarshal(response).to[Seq[OutgoingTransactionImage]]
+          response.entity.toStrict(20.seconds)
+            .flatMap { strictEntity =>
+              Unmarshal(strictEntity).to[OutgoingTransactionImage]
+                .map(transactionImage => Seq(transactionImage))
+                .recoverWith {
+                  case _: Throwable => Unmarshal(strictEntity).to[Seq[OutgoingTransactionImage]]
+                }
             }
       }
 
