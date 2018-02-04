@@ -165,8 +165,8 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageServic
                     SbxLog.info("Box", s"Finished sending ${updatedTransactionImage.transaction.totalImageCount} images to box ${box.name}")
                   }
                   .flatMap(_ => boxDao.updateOutgoingTransaction(
-                    transactionImage.transaction.copy(status = TransactionStatus.FINISHED),
-                    transactionImage.image))
+                    updatedTransactionImage.transaction.copy(status = TransactionStatus.FINISHED),
+                    updatedTransactionImage.image))
               } else Future.successful(Unit)
             }.map(_ => OutgoingImageMarkedAsSent).pipeSequentiallyTo(sender)
 
