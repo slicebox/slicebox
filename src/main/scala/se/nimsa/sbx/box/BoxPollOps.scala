@@ -96,15 +96,21 @@ trait BoxPollOps extends BoxStreamOps with BoxJsonFormats with PlayJsonSupport {
     responseImage match {
       case (response, transactionImage) =>
         val source = Source(SourceType.BOX, box.name, box.id)
-        storeDicomData(response.entity.dataBytes, source)
-          .flatMap(metaData => updateTransaction(transactionImage, metaData))
-          .recover {
-            case _: DicomStreamException =>
-              response.discardEntityBytes()
-              // assume exception is due to unsupported presentation context
-              SbxLog.warn("Box", s"Ignoring rejected image: ${transactionImage.image.imageId}, box: ${transactionImage.transaction.boxName}")
-              transactionImage
-          }
+        response.entity match {
+          case HttpEntity.Strict(_, data) if data.isEmpty =>
+            // checkResponse returns empty entity for some error codes, do not try to store
+            Future.successful(transactionImage)
+          case entity =>
+            storeDicomData(entity.dataBytes, source)
+              .flatMap(metaData => updateTransaction(transactionImage, metaData))
+              .recover {
+                case _: DicomStreamException =>
+                  // exception likely due to unsupported presentation context
+                  response.discardEntityBytes()
+                  SbxLog.warn("Box", s"Ignoring rejected image: ${transactionImage.image.imageId}, box: ${transactionImage.transaction.boxName}")
+                  transactionImage
+              }
+        }
     }
 
   def updateTransaction(transactionImage: OutgoingTransactionImage, metaData: MetaDataAdded): Future[OutgoingTransactionImage] = {
