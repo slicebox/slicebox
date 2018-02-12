@@ -142,6 +142,32 @@ class BoxPollOpsTest extends TestKit(ActorSystem("BoxPollOpsSpec")) with AsyncFl
     impl.pullBatch().map(_ => succeed)
   }
 
+  it should "ignore files that have been removed on server" in {
+    val impl = new BoxPollOpsImpl(10) {
+      override def pool[T]: Flow[(HttpRequest, T), (Try[HttpResponse], T), _] =
+        Flow.fromFunction((requestT: (HttpRequest, T)) => {
+          if (requestT._1.uri.path.toString.endsWith("outgoing") && requestT._2.asInstanceOf[OutgoingTransactionImage].image.sequenceNumber == 5)
+            (Try(HttpResponse(status = StatusCodes.NotFound)), requestT._2)
+          else
+            (Try(HttpResponse(entity = ByteString(1, 2, 3, 4))), requestT._2)
+        })
+    }
+    impl.pullBatch().map(_ => succeed)
+  }
+
+  it should "ignore bad requests when fetching files" in {
+    val impl = new BoxPollOpsImpl(10) {
+      override def pool[T]: Flow[(HttpRequest, T), (Try[HttpResponse], T), _] =
+        Flow.fromFunction((requestT: (HttpRequest, T)) => {
+          if (requestT._1.uri.path.toString.endsWith("outgoing") && requestT._2.asInstanceOf[OutgoingTransactionImage].image.sequenceNumber == 5)
+            (Try(HttpResponse(status = StatusCodes.BadRequest)), requestT._2)
+          else
+            (Try(HttpResponse(entity = ByteString(1, 2, 3, 4))), requestT._2)
+        })
+    }
+    impl.pullBatch().map(_ => succeed)
+  }
+
   it should "call correct URL when fetching file data" in {
     var capturedUri = ""
     var capturedTi: OutgoingTransactionImage = null

@@ -100,6 +100,7 @@ trait BoxPollOps extends BoxStreamOps with BoxJsonFormats with PlayJsonSupport {
           .flatMap(metaData => updateTransaction(transactionImage, metaData))
           .recover {
             case _: DicomStreamException =>
+              response.discardEntityBytes()
               // assume exception is due to unsupported presentation context
               SbxLog.warn("Box", s"Ignoring rejected image: ${transactionImage.image.imageId}, box: ${transactionImage.transaction.boxName}")
               transactionImage

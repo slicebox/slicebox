@@ -2,7 +2,7 @@ package se.nimsa.sbx.box
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
+import akka.http.scaladsl.model.{HttpEntity, HttpRequest, HttpResponse}
 import akka.stream._
 import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, MergePreferred, RunnableGraph, Sink}
 import se.nimsa.sbx.box.BoxProtocol.{Box, OutgoingTransactionImage}
@@ -113,11 +113,11 @@ trait BoxStreamOps {
           case status if status == 400 =>
             response.discardEntityBytes()
             SbxLog.warn("Box", s"${box.name} ($transferType): Ignoring rejected image ${transactionImage.image.imageId}")
-            (response, transactionImage)
+            (response.copy(entity = HttpEntity.Empty), transactionImage)
           case status if status == 404 =>
             response.discardEntityBytes()
             SbxLog.warn("Box", s"${box.name} ($transferType): Ignoring removed image ${transactionImage.image.imageId}")
-            (response, transactionImage)
+            (response.copy(entity = HttpEntity.Empty), transactionImage)
           case _ =>
             response.discardEntityBytes()
             throw new TransactionException(transactionImage, s"Connection to ${box.name} ($transferType) failed for image ${transactionImage.image.imageId}", null)

@@ -120,8 +120,8 @@ trait TransactionRoutes {
                       onSuccess(boxService.ask(GetOutgoingTagValues(transactionImage)).mapTo[Seq[OutgoingTagValue]]) { transactionTagValues =>
                         val tagValues = transactionTagValues.map(_.tagValue)
                         val streamSource = anonymizedDicomData(imageId, tagValues, storage)
-                          .batchWeighted(storage.streamChunkSize, _.length, identity)(_ ++ _)
                           .via(Compression.deflate)
+                          .batchWeighted(storage.streamChunkSize, _.length, identity)(_ ++ _)
                         complete(HttpEntity(ContentTypes.`application/octet-stream`, streamSource))
                       }
                     case None =>
