@@ -29,7 +29,7 @@ import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.storage.StorageService
 import se.nimsa.sbx.util.SbxExtensions._
-import se.nimsa.sbx.util.{FutureUtil, SequentialPipeToSupport}
+import se.nimsa.sbx.util.SequentialPipeToSupport
 
 import scala.collection.mutable
 import scala.concurrent.duration.DurationInt
@@ -265,15 +265,21 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageServic
   def addImagesToOutgoing(boxId: Long, boxName: String, imageTagValuesSeq: Seq[ImageTagValues]): Future[OutgoingTransaction] = {
     boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, boxId, boxName, 0, imageTagValuesSeq.length, System.currentTimeMillis, System.currentTimeMillis, TransactionStatus.WAITING))
       .flatMap { outgoingTransaction =>
-        FutureUtil.traverseSequentially(imageTagValuesSeq.zipWithIndex) {
-          case (imageTagValues, index) =>
-            val sequenceNumber = index + 1
-            boxDao.insertOutgoingImage(OutgoingImage(-1, outgoingTransaction.id, imageTagValues.imageId, sequenceNumber, sent = false))
-              .flatMap { outgoingImage =>
-                FutureUtil.traverseSequentially(imageTagValues.tagValues) { tagValue =>
-                  boxDao.insertOutgoingTagValue(OutgoingTagValue(-1, outgoingImage.id, tagValue))
-                }
-              }
+        Future.sequence {
+          imageTagValuesSeq.zipWithIndex
+            .map {
+              case (imageTagValues, index) =>
+                val sequenceNumber = index + 1
+                boxDao.insertOutgoingImage(OutgoingImage(-1, outgoingTransaction.id, imageTagValues.imageId, sequenceNumber, sent = false))
+                  .flatMap { outgoingImage =>
+                    Future.sequence {
+                      imageTagValues.tagValues
+                        .map { tagValue =>
+                          boxDao.insertOutgoingTagValue(OutgoingTagValue(-1, outgoingImage.id, tagValue))
+                        }
+                    }
+                  }
+            }
         }.map(_ => outgoingTransaction)
       }
   }
