@@ -83,10 +83,16 @@ trait TransactionRoutes {
             }
           } ~ pathPrefix("outgoing") {
             path("poll") {
-              get {
-                onSuccess(boxService.ask(PollOutgoing(box)).mapTo[Option[OutgoingTransactionImage]]) {
-                  case Some(outgoingTransactionImage) => complete(outgoingTransactionImage)
-                  case None => complete(NotFound)
+              parameter("n".as[Long].?(1L)) { n =>
+                get {
+                  onSuccess(boxService.ask(PollOutgoing(box, n)).mapTo[Seq[OutgoingTransactionImage]]) { transactionImages =>
+                    if (transactionImages.isEmpty)
+                      complete(NotFound)
+                    else if (transactionImages.lengthCompare(1) == 0)
+                      complete(transactionImages.head)
+                    else
+                      complete(transactionImages)
+                  }
                 }
               }
             } ~ path("done") {
@@ -114,8 +120,9 @@ trait TransactionRoutes {
                       onSuccess(boxService.ask(GetOutgoingTagValues(transactionImage)).mapTo[Seq[OutgoingTagValue]]) { transactionTagValues =>
                         val tagValues = transactionTagValues.map(_.tagValue)
                         val streamSource = anonymizedDicomData(imageId, tagValues, storage)
+                          .via(Compression.deflate)
                           .batchWeighted(storage.streamChunkSize, _.length, identity)(_ ++ _)
-                        complete(HttpEntity(ContentTypes.`application/octet-stream`, streamSource.via(Compression.deflate)))
+                        complete(HttpEntity(ContentTypes.`application/octet-stream`, streamSource))
                       }
                     case None =>
                       complete((NotFound, s"No outgoing image found for transaction id $outgoingTransactionId and outgoing image id $outgoingImageId"))

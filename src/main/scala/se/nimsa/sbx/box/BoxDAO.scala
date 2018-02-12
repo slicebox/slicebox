@@ -21,7 +21,7 @@ import se.nimsa.sbx.box.BoxProtocol.BoxSendMethod._
 import se.nimsa.sbx.box.BoxProtocol.TransactionStatus._
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.util.DbUtil.createTables
-import slick.basic.{DatabaseConfig, DatabasePublisher}
+import slick.basic.DatabaseConfig
 import slick.jdbc.JdbcProfile
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -32,10 +32,10 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
 
   val db = dbConf.db
 
-  implicit val statusColumnType =
+  implicit val statusColumnType: BaseColumnType[TransactionStatus] =
     MappedColumnType.base[TransactionStatus, String](ts => ts.toString, TransactionStatus.withName)
 
-  implicit val sendMethodColumnType =
+  implicit val sendMethodColumnType: BaseColumnType[BoxSendMethod] =
     MappedColumnType.base[BoxSendMethod, String](bsm => bsm.toString, BoxSendMethod.withName)
 
   class BoxTable(tag: Tag) extends Table[Box](tag, BoxTable.name) {
@@ -90,8 +90,10 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
 
   val outgoingImageQuery = TableQuery[OutgoingImageTable]
 
-  val toOutgoingTagValue = (id: Long, outgoingImageId: Long, tag: Int, value: String) => OutgoingTagValue(id, outgoingImageId, TagValue(tag, value))
-  val fromOutgoingTagValue = (tagValue: OutgoingTagValue) => Option((tagValue.id, tagValue.outgoingImageId, tagValue.tagValue.tag, tagValue.tagValue.value))
+  val toOutgoingTagValue: (Long, Long, Int, String) => OutgoingTagValue =
+    (id: Long, outgoingImageId: Long, tag: Int, value: String) => OutgoingTagValue(id, outgoingImageId, TagValue(tag, value))
+  val fromOutgoingTagValue: OutgoingTagValue => Option[(Long, Long, Int, String)] =
+    (tagValue: OutgoingTagValue) => Option((tagValue.id, tagValue.outgoingImageId, tagValue.tagValue.tag, tagValue.tagValue.value))
 
   class OutgoingTagValueTable(tag: Tag) extends Table[OutgoingTagValue](tag, OutgoingTagValueTable.name) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
@@ -145,7 +147,7 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
 
   val incomingImageQuery = TableQuery[IncomingImageTable]
 
-  def create() = createTables(dbConf,
+  def create(): Future[Unit] = createTables(dbConf,
     (BoxTable.name, boxQuery),
     (OutgoingTransactionTable.name, outgoingTransactionQuery),
     (OutgoingImageTable.name, outgoingImageQuery),
@@ -153,11 +155,11 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
     (IncomingTransactionTable.name, incomingTransactionQuery),
     (IncomingImageTable.name, incomingImageQuery))
 
-  def drop() = db.run {
+  def drop(): Future[Unit] = db.run {
     (boxQuery.schema ++ outgoingTransactionQuery.schema ++ incomingTransactionQuery.schema ++ outgoingImageQuery.schema ++ outgoingTagValueQuery.schema ++ incomingImageQuery.schema).drop
   }
 
-  def clear() = db.run {
+  def clear(): Future[Unit] = db.run {
     DBIO.seq(
       boxQuery.delete,
       outgoingTransactionQuery.delete, // cascade deletes images and tag values
@@ -196,7 +198,7 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
       .map(generatedId => transaction.copy(id = generatedId))
   }
 
-  def insertIncomingTransactionAction(transaction: IncomingTransaction) =
+  def insertIncomingTransactionAction(transaction: IncomingTransaction): DBIOAction[IncomingTransaction, NoStream, Effect.Write] =
     (incomingTransactionQuery returning incomingTransactionQuery.map(_.id) += transaction)
       .map(generatedId => transaction.copy(id = generatedId))
 
@@ -208,7 +210,7 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
       .map(generatedId => outgoingImage.copy(id = generatedId))
   }
 
-  def insertIncomingImageAction(incomingImage: IncomingImage) =
+  def insertIncomingImageAction(incomingImage: IncomingImage): DBIOAction[IncomingImage, NoStream, Effect.Write] =
     (incomingImageQuery returning incomingImageQuery.map(_.id) += incomingImage)
       .map(generatedId => incomingImage.copy(id = generatedId))
 
@@ -229,7 +231,7 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
       .result.headOption
   }
 
-  def updateBoxOnlineStatusAction(boxId: Long, online: Boolean) =
+  def updateBoxOnlineStatusAction(boxId: Long, online: Boolean): DBIOAction[Unit, NoStream, Effect.Write] =
     boxQuery
       .filter(_.id === boxId)
       .map(_.online)
@@ -238,29 +240,19 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
 
   def updateBoxOnlineStatus(boxId: Long, online: Boolean): Future[Unit] = db.run(updateBoxOnlineStatusAction(boxId, online))
 
-  def updateIncomingTransactionAction(transaction: IncomingTransaction) =
+  def updateIncomingTransactionAction(transaction: IncomingTransaction): DBIOAction[Unit, NoStream, Effect.Write] =
     incomingTransactionQuery.filter(_.id === transaction.id).update(transaction).map(_ => {})
 
-  def updateIncomingTransaction(transaction: IncomingTransaction): Future[Unit] =
-    db.run(updateIncomingTransactionAction(transaction))
-
-  def updateOutgoingTransactionAction(transaction: OutgoingTransaction) =
+  def updateOutgoingTransactionAction(transaction: OutgoingTransaction): DBIOAction[Unit, NoStream, Effect.Write] =
     outgoingTransactionQuery.filter(_.id === transaction.id).update(transaction).map(_ => {})
 
-  def updateOutgoingTransaction(transaction: OutgoingTransaction): Future[Unit] =
-    db.run(updateOutgoingTransactionAction(transaction))
-
-  def updateOutgoingImageAction(image: OutgoingImage) =
+  def updateOutgoingImageAction(image: OutgoingImage): DBIOAction[Unit, NoStream, Effect.Write] =
     outgoingImageQuery.filter(_.id === image.id).update(image).map(_ => {})
 
-  def updateOutgoingImage(image: OutgoingImage): Future[Unit] = db.run(updateOutgoingImageAction(image))
-
-  def updateIncomingImageAction(image: IncomingImage) =
+  def updateIncomingImageAction(image: IncomingImage): DBIOAction[Unit, NoStream, Effect.Write] =
     incomingImageQuery.filter(_.id === image.id).update(image).map(_ => {})
 
-  def updateIncomingImage(image: IncomingImage): Future[Unit] = db.run(updateIncomingImageAction(image))
-
-  def nextOutgoingTransactionImageForBoxId(boxId: Long): Future[Option[OutgoingTransactionImage]] = db.run {
+  def nextOutgoingTransactionImagesForBoxId(boxId: Long, n: Long): Future[Seq[OutgoingTransactionImage]] = db.run {
     val join = for {
       transaction <- outgoingTransactionQuery
       image <- outgoingImageQuery if transaction.id === image.outgoingTransactionId
@@ -268,10 +260,10 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
     join
       .filter(_._1.boxId === boxId)
       .filterNot(_._1.status === (FAILED: TransactionStatus))
-      .filterNot(_._1.status === (FINISHED: TransactionStatus))
       .filter(_._2.sent === false)
       .sortBy(t => (t._1.created.asc, t._2.sequenceNumber.asc))
-      .result.headOption
+      .take(n)
+      .result
       .map(_.map(OutgoingTransactionImage.tupled))
   }
 
@@ -288,7 +280,7 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
       .map(_.map(OutgoingTransactionImage.tupled))
   }
 
-  def setOutgoingTransactionStatusAction(outgoingTransactionId: Long, status: TransactionStatus) =
+  def setOutgoingTransactionStatusAction(outgoingTransactionId: Long, status: TransactionStatus): DBIOAction[Unit, NoStream, Effect.Write] =
     outgoingTransactionQuery
       .filter(_.id === outgoingTransactionId)
       .map(_.status)
@@ -298,7 +290,7 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
   def setOutgoingTransactionStatus(outgoingTransactionId: Long, status: TransactionStatus): Future[Unit] =
     db.run(setOutgoingTransactionStatusAction(outgoingTransactionId, status))
 
-  def setIncomingTransactionStatusAction(incomingTransactionId: Long, status: TransactionStatus) =
+  def setIncomingTransactionStatusAction(incomingTransactionId: Long, status: TransactionStatus): DBIOAction[Unit, NoStream, Effect.Write] =
     incomingTransactionQuery
       .filter(_.id === incomingTransactionId)
       .map(_.status)
@@ -308,7 +300,7 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
   def setIncomingTransactionStatus(incomingTransactionId: Long, status: TransactionStatus): Future[Unit] =
     db.run(setIncomingTransactionStatusAction(incomingTransactionId, status))
 
-  def incomingTransactionByOutgoingTransactionIdAction(boxId: Long, outgoingTransactionId: Long) =
+  def incomingTransactionByOutgoingTransactionIdAction(boxId: Long, outgoingTransactionId: Long): DBIOAction[Option[IncomingTransaction], NoStream, Effect.Read] =
     incomingTransactionQuery
       .filter(_.boxId === boxId)
       .filter(_.outgoingTransactionId === outgoingTransactionId)
@@ -317,20 +309,11 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
   def incomingTransactionByOutgoingTransactionId(boxId: Long, outgoingTransactionId: Long): Future[Option[IncomingTransaction]] =
     db.run(incomingTransactionByOutgoingTransactionIdAction(boxId, outgoingTransactionId))
 
-  def incomingImageByIncomingTransactionIdAndSequenceNumberAction(incomingTransactionId: Long, sequenceNumber: Long) =
+  def incomingImageByIncomingTransactionIdAndSequenceNumberAction(incomingTransactionId: Long, sequenceNumber: Long): DBIOAction[Option[IncomingImage], NoStream, Effect.Read] =
     incomingImageQuery
       .filter(_.incomingTransactionId === incomingTransactionId)
       .filter(_.sequenceNumber === sequenceNumber)
       .result.headOption
-
-  def incomingImageByIncomingTransactionIdAndSequenceNumber(incomingTransactionId: Long, sequenceNumber: Long): Future[Option[IncomingImage]] =
-    db.run(incomingImageByIncomingTransactionIdAndSequenceNumberAction(incomingTransactionId, sequenceNumber))
-
-  def outgoingTransactionById(outgoingTransactionId: Long): Future[Option[OutgoingTransaction]] = db.run {
-    outgoingTransactionQuery
-      .filter(_.id === outgoingTransactionId)
-      .result.headOption
-  }
 
   def removeIncomingTransaction(incomingTransactionId: Long): Future[Unit] = db.run {
     incomingTransactionQuery.filter(_.id === incomingTransactionId).delete
@@ -344,11 +327,6 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
 
   def removeOutgoingTransaction(outgoingTransactionId: Long): Future[Unit] = db.run {
     outgoingTransactionQuery.filter(_.id === outgoingTransactionId).delete
-      .map(_ => {})
-  }
-
-  def removeOutgoingTransactions(outgoingTransactionIds: Seq[Long]): Future[Unit] = db.run {
-    outgoingTransactionQuery.filter(_.id inSet outgoingTransactionIds).delete
       .map(_ => {})
   }
 
@@ -388,30 +366,18 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
       .result
   }
 
-  def listOutgoingTransactionsInProcessAction =
+  def listOutgoingTransactionsInProcessAction: DBIOAction[Seq[OutgoingTransaction], NoStream, Effect.Read] =
     outgoingTransactionQuery
       .filter(_.status === (PROCESSING: TransactionStatus))
       .result
 
-  def listOutgoingTransactionsInProcess: Future[Seq[OutgoingTransaction]] = db.run(listOutgoingTransactionsInProcessAction)
-
-  def listIncomingTransactionsInProcessAction =
+  val listIncomingTransactionsInProcessAction: DBIOAction[Seq[IncomingTransaction], NoStream, Effect.Read] =
     incomingTransactionQuery
       .filter(_.status === (PROCESSING: TransactionStatus))
       .result
 
-  def listIncomingTransactionsInProcess: Future[Seq[IncomingTransaction]] = db.run(listIncomingTransactionsInProcessAction)
-
   def listOutgoingImagesForOutgoingTransactionId(outgoingTransactionId: Long): Future[Seq[OutgoingImage]] = db.run {
     outgoingImageQuery.filter(_.outgoingTransactionId === outgoingTransactionId).result
-  }
-
-  def streamPendingOutgoingImagesForOutgoingTransactionId(outgoingTransactionId: Long): DatabasePublisher[OutgoingImage] = db.stream {
-    outgoingImageQuery
-      .filter(_.outgoingTransactionId === outgoingTransactionId)
-      .filter(_.sent === false)
-      .sortBy(_.sequenceNumber.asc) // remove?
-      .result
   }
 
   def listIncomingImagesForIncomingTransactionId(incomingTransactionId: Long): Future[Seq[IncomingImage]] = db.run {
@@ -426,16 +392,16 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
     join.filter(_._1.id === outgoingTransactionId).map(_._2).result
   }
 
-  def removeOutgoingImagesForImageIds(imageIds: Seq[Long]) = db.run {
+  def removeOutgoingImagesForImageIds(imageIds: Seq[Long]): Future[Int] = db.run {
     outgoingImageQuery.filter(_.imageId inSetBind imageIds).delete
   }
 
-  def removeIncomingImagesForImageIds(imageIds: Seq[Long]) = db.run {
+  def removeIncomingImagesForImageIds(imageIds: Seq[Long]): Future[Int] = db.run {
     incomingImageQuery.filter(_.imageId inSetBind imageIds).delete
   }
 
-  def updateTransactionsStatusAction(now: Long, pollBoxOnlineStatusTimeoutMillis: Long) = {
-    val inAction =
+  def updateTransactionsStatusAction(now: Long, pollBoxOnlineStatusTimeoutMillis: Long): DBIOAction[Unit, NoStream, Effect.Read with Effect.Write] = {
+    val inToWaitingAction =
       listIncomingTransactionsInProcessAction.flatMap { transactions =>
         DBIO.sequence {
           transactions.map { transaction =>
@@ -447,7 +413,7 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
         }
       }
 
-    val outAction =
+    val outToWaitingAction =
       listOutgoingTransactionsInProcessAction.flatMap { transactions =>
         DBIO.sequence {
           transactions.map { transaction =>
@@ -459,16 +425,16 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
         }
       }
 
-    DBIO.seq(inAction, outAction).map(_ => {})
+    DBIO.seq(inToWaitingAction, outToWaitingAction).map(_ => {})
   }
 
-  def updatePollBoxesOnlineStatusAction(now: Long, pollBoxesLastPollTimestamp: Map[Long, Long], pollBoxOnlineStatusTimeoutMillis: Long) = {
+  def updatePollBoxesOnlineStatusAction(now: Long, pollBoxesLastPollTimestamp: Map[Long, Long], pollBoxOnlineStatusTimeoutMillis: Long): DBIOAction[Seq[Unit], NoStream, Effect.Write] = {
     DBIO.sequence {
       pollBoxesLastPollTimestamp.map {
         case (boxId, lastPollTime) =>
           val online = (now - lastPollTime) < pollBoxOnlineStatusTimeoutMillis
           updateBoxOnlineStatusAction(boxId, online)
-      }
+      }.toSeq
     }
   }
 
@@ -481,17 +447,7 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
     }
 
   def updateOutgoingTransaction(updatedTransaction: OutgoingTransaction, updatedImage: OutgoingImage): Future[Unit] = {
-    val action =
-      updateOutgoingTransactionAction(updatedTransaction).flatMap { _ =>
-        updateOutgoingImageAction(updatedImage).flatMap { _ =>
-          if (updatedTransaction.sentImageCount == updatedTransaction.totalImageCount)
-            setOutgoingTransactionStatusAction(updatedTransaction.id, TransactionStatus.FINISHED)
-              .map(_ => {})
-          else
-            DBIO.successful({})
-        }
-      }
-
+    val action = updateOutgoingTransactionAction(updatedTransaction).flatMap(_ => updateOutgoingImageAction(updatedImage))
     db.run(action.transactionally)
   }
 
@@ -504,20 +460,26 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
             insertIncomingTransactionAction(IncomingTransaction(-1, box.id, box.name, outgoingTransactionId, 0, 0, totalImageCount, System.currentTimeMillis, System.currentTimeMillis, TransactionStatus.WAITING))
           }
       }.flatMap { existingTransaction =>
-        val receivedImageCount = math.min(totalImageCount, existingTransaction.receivedImageCount + 1)
-        val addedImageCount = if (overwrite) existingTransaction.addedImageCount else math.min(totalImageCount, existingTransaction.addedImageCount + 1)
-        val incomingTransaction = existingTransaction.copy(
-          receivedImageCount = receivedImageCount,
-          addedImageCount = addedImageCount,
-          totalImageCount = totalImageCount,
-          updated = System.currentTimeMillis,
-          status = TransactionStatus.PROCESSING)
-        updateIncomingTransactionAction(incomingTransaction).flatMap { _ =>
-          incomingImageByIncomingTransactionIdAndSequenceNumberAction(incomingTransaction.id, sequenceNumber).flatMap {
-            _.map(image => updateIncomingImageAction(image.copy(imageId = imageId)))
-              .getOrElse(insertIncomingImageAction(IncomingImage(-1, incomingTransaction.id, imageId, sequenceNumber, overwrite)))
+          val receivedImageCount = math.min(totalImageCount, existingTransaction.receivedImageCount + 1)
+          val addedImageCount = if (overwrite) existingTransaction.addedImageCount else math.min(totalImageCount, existingTransaction.addedImageCount + 1)
+          val incomingTransaction = existingTransaction.copy(
+            receivedImageCount = receivedImageCount,
+            addedImageCount = addedImageCount,
+            totalImageCount = totalImageCount,
+            updated = System.currentTimeMillis,
+            status = TransactionStatus.PROCESSING)
+          updateIncomingTransactionAction(incomingTransaction).flatMap { _ =>
+              incomingImageByIncomingTransactionIdAndSequenceNumberAction(incomingTransaction.id, sequenceNumber).flatMap {
+                _.map(image => updateIncomingImageAction(image.copy(imageId = imageId)))
+                  .getOrElse(insertIncomingImageAction(IncomingImage(-1, incomingTransaction.id, imageId, sequenceNumber, overwrite)))
+              }
+          }.flatMap { _ =>
+            if (incomingTransaction.receivedImageCount >= totalImageCount)
+              setIncomingTransactionStatusAction(incomingTransaction.id, TransactionStatus.FINISHED)
+                .map(_ => incomingTransaction.copy(status = TransactionStatus.FINISHED))
+            else
+              DBIO.successful(incomingTransaction)
           }
-        }.map(_ => incomingTransaction)
       }
     db.run(action.transactionally)
   }

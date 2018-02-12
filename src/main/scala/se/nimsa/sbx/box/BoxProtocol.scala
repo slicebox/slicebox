@@ -131,7 +131,7 @@ object BoxProtocol {
 
   case class UpdateIncoming(box: Box, transactionId: Long, sequenceNumber: Long, totalImageCount: Long, imageId: Long, overwrite: Boolean) extends BoxRequest
 
-  case class PollOutgoing(box: Box) extends BoxRequest
+  case class PollOutgoing(box: Box, n: Long) extends BoxRequest
 
   case class UpdateOutgoingTransaction(transactionImage: OutgoingTransactionImage, sentImageCount: Long) extends BoxRequest
 
@@ -148,10 +148,6 @@ object BoxProtocol {
   case class GetIncomingTransactions(startIndex: Long, count: Long) extends BoxRequest
 
   case class GetOutgoingTransactions(startIndex: Long, count: Long) extends BoxRequest
-
-  case class GetNextOutgoingTransactionImage(boxId: Long) extends BoxRequest
-
-  case class GetOutgoingImagesForTransaction(transaction: OutgoingTransaction) extends BoxRequest
 
   case class GetOutgoingTransactionsForBox(box: Box) extends BoxRequest
 
@@ -213,6 +209,4 @@ object BoxProtocol {
   case object PollIncoming
 
   case class PushTransaction(transaction: OutgoingTransaction)
-
-  case class RemoveTransaction(outgoingTransactionId: Long)
 }

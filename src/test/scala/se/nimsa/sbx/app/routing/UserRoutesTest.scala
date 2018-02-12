@@ -28,7 +28,7 @@ class UserRoutesTest extends {
     await(userDao.insert(ApiUser(-1, superUser, UserRole.SUPERUSER).withPassword(superPassword)))
   }
 
-  "The system" should "return the new user when a new user is added" in {
+  "User routes" should "return the new user when a new user is added" in {
     PostAsAdmin("/api/users", user) ~> routes ~> check {
       responseAs[ApiUser].user should be(user.user)
     }

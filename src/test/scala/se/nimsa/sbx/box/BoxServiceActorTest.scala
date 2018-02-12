@@ -102,9 +102,9 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
 
       await(boxDao.listOutgoingTransactions(0, 1)) shouldBe empty
 
-      boxService ! PollOutgoing(box)
+      boxService ! PollOutgoing(box, 1)
 
-      expectMsg(None)
+      expectMsg(Seq.empty)
     }
 
     "return first outgoing transaction image from the least recent outgoing transaction when receiving poll message" in {
@@ -120,18 +120,21 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
       await(boxDao.insertOutgoingImage(OutgoingImage(-1, transaction2.id, imageId, 2, sent = false)))
       await(boxDao.insertOutgoingImage(OutgoingImage(-1, transaction2.id, imageId, 1, sent = false)))
 
-      boxService ! PollOutgoing(box)
+      boxService ! PollOutgoing(box, 1)
 
       expectMsgPF() {
-        case Some(OutgoingTransactionImage(dbTransaction, image)) =>
-          dbTransaction.boxId should be(box.id)
-          dbTransaction.boxName should be("some box")
-          dbTransaction.sentImageCount should be(0)
-          dbTransaction.totalImageCount should be(1)
-          image.imageId should be(imageId)
-          image.sequenceNumber should be(4)
-          image.sent should be(false)
-          image.outgoingTransactionId should be(transaction1.id)
+        case transactionImages: Seq[_] => transactionImages.headOption match {
+          case Some(OutgoingTransactionImage(dbTransaction, image)) =>
+            dbTransaction.boxId should be(box.id)
+            dbTransaction.boxName should be("some box")
+            dbTransaction.sentImageCount should be(0)
+            dbTransaction.totalImageCount should be(1)
+            image.imageId should be(imageId)
+            image.sequenceNumber should be(4)
+            image.sent should be(false)
+            image.outgoingTransactionId should be(transaction1.id)
+          case _ => fail
+        }
       }
     }
 
@@ -179,7 +182,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
       boxService ! UpdateIncoming(box, 32, sequenceNumber = 1, totalImageCount, 33, overwrite = false)
       expectMsgType[IncomingUpdated]
 
-      boxService ! UpdateIncoming(box, 32, sequenceNumber = 3, totalImageCount, 33, overwrite = false)
+      boxService ! UpdateIncoming(box, 32, sequenceNumber = 2, totalImageCount, 33, overwrite = false)
 
       expectMsgPF() {
         case IncomingUpdated(transaction) =>
