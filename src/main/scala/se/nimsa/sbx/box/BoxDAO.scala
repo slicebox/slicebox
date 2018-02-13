@@ -472,26 +472,29 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
       }
   }
 
-  def updateIncoming(box: Box, outgoingTransactionId: Long, sequenceNumber: Long, totalImageCount: Long, added: Boolean): Future[IncomingTransaction] =
-    db.run(updateIncomingAction(box, outgoingTransactionId, sequenceNumber, totalImageCount, added))
+  def maybeFinalizeIncomingAction(incomingTransaction: IncomingTransaction): DBIOAction[IncomingTransaction, NoStream, Effect.Write] =
+    if (incomingTransaction.receivedImageCount >= incomingTransaction.totalImageCount)
+      setIncomingTransactionStatusAction(incomingTransaction.id, TransactionStatus.FINISHED)
+        .map(_ => incomingTransaction.copy(status = TransactionStatus.FINISHED))
+    else
+      DBIO.successful(incomingTransaction)
+
+  def updateIncoming(box: Box, outgoingTransactionId: Long, sequenceNumber: Long, totalImageCount: Long, added: Boolean): Future[IncomingTransaction] = {
+    val action =
+      updateIncomingAction(box, outgoingTransactionId, sequenceNumber, totalImageCount, added)
+        .flatMap(incomingTransaction => maybeFinalizeIncomingAction(incomingTransaction))
+    db.run(action.transactionally)
+  }
 
   def updateIncoming(box: Box, outgoingTransactionId: Long, sequenceNumber: Long, totalImageCount: Long, imageId: Long, overwrite: Boolean): Future[IncomingTransaction] = {
     val action =
       updateIncomingAction(box, outgoingTransactionId, sequenceNumber, totalImageCount, !overwrite)
-        .flatMap { incomingTransaction =>
+        .flatMap(incomingTransaction =>
           incomingImageByIncomingTransactionIdAndSequenceNumberAction(incomingTransaction.id, sequenceNumber)
-            .flatMap {
-              _.map(image => updateIncomingImageAction(image.copy(imageId = imageId)))
-                .getOrElse(insertIncomingImageAction(IncomingImage(-1, incomingTransaction.id, imageId, sequenceNumber, overwrite)))
-            }
-            .flatMap { _ =>
-              if (incomingTransaction.receivedImageCount >= totalImageCount)
-                setIncomingTransactionStatusAction(incomingTransaction.id, TransactionStatus.FINISHED)
-                  .map(_ => incomingTransaction.copy(status = TransactionStatus.FINISHED))
-              else
-                DBIO.successful(incomingTransaction)
-            }
-        }
+            .flatMap(imageMaybe => imageMaybe
+              .map(image => updateIncomingImageAction(image.copy(imageId = imageId)))
+              .getOrElse(insertIncomingImageAction(IncomingImage(-1, incomingTransaction.id, imageId, sequenceNumber, overwrite))))
+            .flatMap(_ => maybeFinalizeIncomingAction(incomingTransaction)))
     db.run(action.transactionally)
   }
 }
