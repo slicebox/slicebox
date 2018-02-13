@@ -19,6 +19,7 @@ package se.nimsa.sbx.box
 import akka.NotUsed
 import akka.actor.{Actor, ActorSelection, ActorSystem, Cancellable, Props}
 import akka.event.{Logging, LoggingReceive}
+import akka.http.scaladsl.model._
 import akka.pattern.ask
 import akka.stream.scaladsl.{Compression, Source}
 import akka.stream.{KillSwitch, Materializer}
@@ -81,22 +82,31 @@ class BoxPushActor(override val box: Box,
     boxService.ask(UpdateOutgoingTransaction(transactionImage, sentImageCount)).mapTo[OutgoingTransactionImage]
       .flatMap { updatedTransactionImage =>
         if (updatedTransactionImage.transaction.sentImageCount >= updatedTransactionImage.transaction.totalImageCount)
-          getImageIdsForOutgoingTransaction(transactionImage.transaction).flatMap { imageIds =>
-            finalizeOutgoingTransaction(updatedTransactionImage.transaction, imageIds)
-          }.map(_ => updatedTransactionImage)
+          finalizeOutgoingTransaction(updatedTransactionImage.transaction).map(_ => updatedTransactionImage)
         else
           Future.successful(updatedTransactionImage)
       }
 
-  def finalizeOutgoingTransaction(transaction: OutgoingTransaction, imageIds: Seq[Long]): Future[Unit] =
-    setOutgoingTransactionStatus(transaction, TransactionStatus.FINISHED)
-      .map { _ =>
-        SbxLog.info("Box", s"Finished sending ${transaction.totalImageCount} images to box ${box.name}")
-        system.eventStream.publish(ImagesSent(Destination(DestinationType.BOX, box.name, box.id), imageIds))
+  def finalizeOutgoingTransaction(transaction: OutgoingTransaction): Future[Unit] =
+    getImageIdsForOutgoingTransaction(transaction)
+      .flatMap { imageIds =>
+        setOutgoingTransactionStatus(transaction, TransactionStatus.FINISHED)
+          .flatMap { _ =>
+            setRemoteOutgoingTransactionStatus(transaction, TransactionStatus.FINISHED)
+              .map { _ =>
+                SbxLog.info("Box", s"Finished sending ${transaction.totalImageCount} images to box ${box.name}")
+                system.eventStream.publish(ImagesSent(Destination(DestinationType.BOX, box.name, box.id), imageIds))
+              }
+          }
       }
 
   def setOutgoingTransactionStatus(transaction: OutgoingTransaction, status: TransactionStatus): Future[Unit] =
     boxService.ask(SetOutgoingTransactionStatus(transaction, status)).map(_ => Unit)
+
+  def setRemoteOutgoingTransactionStatus(transaction: OutgoingTransaction, status: TransactionStatus): Future[Unit] =
+    singleRequest(HttpRequest(method = HttpMethods.PUT, uri = s"${box.baseUrl}/status?transactionid=${transaction.id}", entity = HttpEntity(s""""${status.toString}"""").withContentType(ContentTypes.`application/json`)))
+      .recover { case _: Exception => SbxLog.warn("Box", s"Unable to set remote status of transaction ${transaction.id} to FINISHED.") }
+      .map(_ => Unit)
 
   def getImageIdsForOutgoingTransaction(transaction: OutgoingTransaction): Future[Seq[Long]] =
     boxService.ask(GetImageIdsForOutgoingTransaction(transaction.id)).mapTo[Seq[Long]]

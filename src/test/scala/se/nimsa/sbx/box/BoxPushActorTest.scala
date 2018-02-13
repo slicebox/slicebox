@@ -80,12 +80,11 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
             transaction = transactionImage.transaction.copy(sentImageCount = transactionImage.image.sequenceNumber),
             image = transactionImage.image.copy(sent = true))
           if (updatedTransactionImage.transaction.sentImageCount >= updatedTransactionImage.transaction.totalImageCount)
-            finalizeOutgoingTransaction(updatedTransactionImage.transaction, Seq.empty)
-              .map(_ => updatedTransactionImage)(ec)
+            finalizeOutgoingTransaction(updatedTransactionImage.transaction).map(_ => updatedTransactionImage)(ec)
           else
             Future(updatedTransactionImage)(ec)
         }
-        override def finalizeOutgoingTransaction(transaction: OutgoingTransaction, imageIds: Seq[Long]): Future[Unit] = {
+        override def finalizeOutgoingTransaction(transaction: OutgoingTransaction): Future[Unit] = {
           finalized = true
           Future({})(ec)
         }

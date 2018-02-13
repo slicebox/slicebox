@@ -56,7 +56,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
               Future(Seq.empty)(ec)
           override def pool[T]: Flow[(HttpRequest, T), (Try[HttpResponse], T), _] =
             Flow.fromFunction((rt: (HttpRequest, T)) => (Success(HttpResponse()), rt._2))
-          override def updateIncomingTransaction(transactionImage: OutgoingTransactionImage, imageId: Long, overwrite: Boolean): Future[IncomingUpdated] = {
+          override def updateIncoming(transactionImage: OutgoingTransactionImage, imageId: Long, overwrite: Boolean): Future[IncomingUpdated] = {
             nUpdated.getAndIncrement()
             Future(IncomingUpdated(IncomingTransaction(
               -1, box.id, box.name, transactionImage.transaction.id,

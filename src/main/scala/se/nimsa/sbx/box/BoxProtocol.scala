@@ -129,6 +129,8 @@ object BoxProtocol {
 
   case class GetBoxByToken(token: String) extends BoxRequest
 
+  case class UpdateIncomingTransaction(box: Box, transactionId: Long, sequenceNumber: Long, totalImageCount: Long, added: Boolean) extends BoxRequest
+
   case class UpdateIncoming(box: Box, transactionId: Long, sequenceNumber: Long, totalImageCount: Long, imageId: Long, overwrite: Boolean) extends BoxRequest
 
   case class PollOutgoing(box: Box, n: Long) extends BoxRequest
