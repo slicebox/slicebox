@@ -119,16 +119,11 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageServic
         case GetBoxByToken(token) =>
           boxDao.pollBoxByToken(token).pipeTo(sender)
 
-        case UpdateIncomingTransaction(box, outgoingTransactionId, sequenceNumber, totalImageCount, added) =>
-          boxDao.updateIncoming(box, outgoingTransactionId, sequenceNumber, totalImageCount, added)
-            .map(IncomingUpdated)
-            .pipeSequentiallyTo(sender)
-
-        case UpdateIncoming(box, outgoingTransactionId, sequenceNumber, totalImageCount, imageId, overwrite) =>
-          val futureIncomingTransactionWithStatus = boxDao.updateIncoming(box, outgoingTransactionId, sequenceNumber, totalImageCount, imageId, overwrite)
+        case UpdateIncoming(box, outgoingTransactionId, sequenceNumber, totalImageCount, imageIdMaybe, added) =>
+          val futureIncomingTransactionWithStatus = boxDao.updateIncoming(box, outgoingTransactionId, sequenceNumber, totalImageCount, imageIdMaybe, added)
 
           futureIncomingTransactionWithStatus.foreach { incomingTransactionWithStatus =>
-            log.debug(s"Received pushed file and updated incoming transaction $incomingTransactionWithStatus")
+            log.debug(s"Updated incoming transaction $incomingTransactionWithStatus")
           }
 
           futureIncomingTransactionWithStatus.map(IncomingUpdated).pipeSequentiallyTo(sender)

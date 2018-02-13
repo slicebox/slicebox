@@ -55,7 +55,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
     "create incoming transaction for first file in transaction" in {
       val box = await(boxDao.insertBox(Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, online = false)))
 
-      boxService ! UpdateIncoming(box, 123, 1, 2, 2, overwrite = false)
+      boxService ! UpdateIncoming(box, 123, 1, 2, Some(2), added = true)
 
       expectMsgType[IncomingUpdated]
 
@@ -76,10 +76,10 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
     "update incoming transaction for next file in transaction" in {
       val box = await(boxDao.insertBox(Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, online = false)))
 
-      boxService ! UpdateIncoming(box, 123, 1, 3, 4, overwrite = false)
+      boxService ! UpdateIncoming(box, 123, 1, 3, Some(4), added = true)
       expectMsgType[IncomingUpdated]
 
-      boxService ! UpdateIncoming(box, 123, 2, 3, 5, overwrite = false)
+      boxService ! UpdateIncoming(box, 123, 2, 3, Some(5), added = true)
       expectMsgType[IncomingUpdated]
 
       val incomingTransactions = await(boxDao.listIncomingTransactions(0, 10))
@@ -144,7 +144,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
 
       val sequenceNumber = 1
       val totalImageCount = 55
-      boxService ! UpdateIncoming(box, 32, sequenceNumber, totalImageCount, 33, overwrite = false)
+      boxService ! UpdateIncoming(box, 32, sequenceNumber, totalImageCount, Some(33), added = true)
 
       expectMsgPF() {
         case IncomingUpdated(transaction) =>
@@ -162,7 +162,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
       val box = Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, online = false)
 
       val transactionId = 32
-      boxService ! UpdateIncoming(box, transactionId, sequenceNumber = 1, totalImageCount = 55, 33, overwrite = false)
+      boxService ! UpdateIncoming(box, transactionId, sequenceNumber = 1, totalImageCount = 55, Some(33), added = true)
       expectMsgType[IncomingUpdated]
 
       boxService ! SetIncomingTransactionStatus(box.id, transactionId, TransactionStatus.FINISHED)
@@ -179,10 +179,10 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
 
       val totalImageCount = 3
 
-      boxService ! UpdateIncoming(box, 32, sequenceNumber = 1, totalImageCount, 33, overwrite = false)
+      boxService ! UpdateIncoming(box, 32, sequenceNumber = 1, totalImageCount, Some(33), added = true)
       expectMsgType[IncomingUpdated]
 
-      boxService ! UpdateIncoming(box, 32, sequenceNumber = 2, totalImageCount, 33, overwrite = false)
+      boxService ! UpdateIncoming(box, 32, sequenceNumber = 2, totalImageCount, Some(33), added = true)
 
       expectMsgPF() {
         case IncomingUpdated(transaction) =>
@@ -240,10 +240,10 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
     "remove incoming images when the related incoming transaction is removed" in {
       val box = await(boxDao.insertBox(Box(-1, "some remote box", "abc", "https://someurl.com", BoxSendMethod.POLL, online = false)))
 
-      boxService ! UpdateIncoming(box, 123, 1, 3, 4, overwrite = false)
+      boxService ! UpdateIncoming(box, 123, 1, 3, Some(4), added = true)
       expectMsgType[IncomingUpdated]
 
-      boxService ! UpdateIncoming(box, 123, 2, 3, 5, overwrite = false)
+      boxService ! UpdateIncoming(box, 123, 2, 3, Some(5), added = true)
       expectMsgType[IncomingUpdated]
 
       val incomingTransactions = await(boxDao.listIncomingTransactions(0, 10))
@@ -264,10 +264,10 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
       val box = await(boxDao.insertBox(Box(-1, "some remote box", "abc", "https://someurl.com", BoxSendMethod.POLL, online = false)))
 
       // insert incoming images (2)
-      boxService ! UpdateIncoming(box, 123, 1, 3, 4, overwrite = false)
+      boxService ! UpdateIncoming(box, 123, 1, 3, Some(4), added = true)
       expectMsgType[IncomingUpdated]
 
-      boxService ! UpdateIncoming(box, 123, 2, 3, 5, overwrite = false)
+      boxService ! UpdateIncoming(box, 123, 2, 3, Some(5), added = true)
       expectMsgType[IncomingUpdated]
 
       await(boxDao.listIncomingImages).size should be(2)

@@ -479,21 +479,17 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
     else
       DBIO.successful(incomingTransaction)
 
-  def updateIncoming(box: Box, outgoingTransactionId: Long, sequenceNumber: Long, totalImageCount: Long, added: Boolean): Future[IncomingTransaction] = {
+  def updateIncoming(box: Box, outgoingTransactionId: Long, sequenceNumber: Long, totalImageCount: Long, imageIdMaybe: Option[Long], added: Boolean): Future[IncomingTransaction] = {
     val action =
       updateIncomingAction(box, outgoingTransactionId, sequenceNumber, totalImageCount, added)
-        .flatMap(incomingTransaction => maybeFinalizeIncomingAction(incomingTransaction))
-    db.run(action.transactionally)
-  }
-
-  def updateIncoming(box: Box, outgoingTransactionId: Long, sequenceNumber: Long, totalImageCount: Long, imageId: Long, overwrite: Boolean): Future[IncomingTransaction] = {
-    val action =
-      updateIncomingAction(box, outgoingTransactionId, sequenceNumber, totalImageCount, !overwrite)
         .flatMap(incomingTransaction =>
-          incomingImageByIncomingTransactionIdAndSequenceNumberAction(incomingTransaction.id, sequenceNumber)
-            .flatMap(imageMaybe => imageMaybe
-              .map(image => updateIncomingImageAction(image.copy(imageId = imageId)))
-              .getOrElse(insertIncomingImageAction(IncomingImage(-1, incomingTransaction.id, imageId, sequenceNumber, overwrite))))
+          imageIdMaybe
+            .map(imageId =>
+              incomingImageByIncomingTransactionIdAndSequenceNumberAction(incomingTransaction.id, sequenceNumber)
+                .flatMap(imageMaybe => imageMaybe
+                  .map(image => updateIncomingImageAction(image.copy(imageId = imageId)))
+                  .getOrElse(insertIncomingImageAction(IncomingImage(-1, incomingTransaction.id, imageId, sequenceNumber, !added)))))
+            .getOrElse(DBIO.successful(incomingTransaction))
             .flatMap(_ => maybeFinalizeIncomingAction(incomingTransaction)))
     db.run(action.transactionally)
   }

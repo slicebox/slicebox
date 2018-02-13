@@ -64,11 +64,8 @@ class BoxPollActor(override val box: Box,
   override def storeDicomData(bytesSource: scaladsl.Source[ByteString, _], source: Source): Future[MetaDataProtocol.MetaDataAdded] =
     storeDicomData(bytesSource.via(Compression.inflate()), source, storage, Contexts.extendedContexts, reverseAnonymization = true)
 
-  override def updateIncoming(transactionImage: OutgoingTransactionImage, added: Boolean): Future[IncomingUpdated] =
-    boxService.ask(UpdateIncomingTransaction(box, transactionImage.transaction.id, transactionImage.image.sequenceNumber, transactionImage.transaction.totalImageCount, added)).mapTo[IncomingUpdated]
-
-  override def updateIncoming(transactionImage: OutgoingTransactionImage, imageId: Long, overwrite: Boolean): Future[IncomingUpdated] =
-    boxService.ask(UpdateIncoming(box, transactionImage.transaction.id, transactionImage.image.sequenceNumber, transactionImage.transaction.totalImageCount, imageId, overwrite)).mapTo[IncomingUpdated]
+  override def updateIncoming(transactionImage: OutgoingTransactionImage, imageIdMaybe: Option[Long], added: Boolean): Future[IncomingUpdated] =
+    boxService.ask(UpdateIncoming(box, transactionImage.transaction.id, transactionImage.image.sequenceNumber, transactionImage.transaction.totalImageCount, imageIdMaybe, added)).mapTo[IncomingUpdated]
 
   override def updateBoxOnlineStatus(online: Boolean): Future[Unit] = boxService.ask(UpdateBoxOnlineStatus(box.id, online)).mapTo[Unit]
 

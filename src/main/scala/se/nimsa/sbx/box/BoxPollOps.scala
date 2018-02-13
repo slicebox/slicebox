@@ -28,8 +28,7 @@ trait BoxPollOps extends BoxStreamOps with BoxJsonFormats with PlayJsonSupport {
   override val transferType: String = "poll"
 
   def storeDicomData(bytesSource: scaladsl.Source[ByteString, _], source: Source): Future[MetaDataAdded]
-  def updateIncoming(transactionImage: OutgoingTransactionImage, added: Boolean): Future[IncomingUpdated]
-  def updateIncoming(transactionImage: OutgoingTransactionImage, imageId: Long, overwrite: Boolean): Future[IncomingUpdated]
+  def updateIncoming(transactionImage: OutgoingTransactionImage, imageIdMaybe: Option[Long], added: Boolean): Future[IncomingUpdated]
   def updateBoxOnlineStatus(online: Boolean): Future[Unit]
 
   lazy val pullSink: Sink[Seq[OutgoingTransactionImage], Future[Seq[OutgoingTransactionImage]]] = {
@@ -115,16 +114,15 @@ trait BoxPollOps extends BoxStreamOps with BoxJsonFormats with PlayJsonSupport {
     }
 
   def updateTransaction(transactionImage: OutgoingTransactionImage, metaData: MetaDataAdded): Future[OutgoingTransactionImage] = {
-    val overwrite = !metaData.imageAdded
-    updateIncoming(transactionImage, metaData.image.id, overwrite)
+    updateIncoming(transactionImage, Some(metaData.image.id), metaData.imageAdded)
       .map { _ =>
-        system.eventStream.publish(ImageAdded(metaData.image.id, metaData.source, overwrite))
+        system.eventStream.publish(ImageAdded(metaData.image.id, metaData.source, !metaData.imageAdded))
         transactionImage
       }
   }
 
   def updateTransaction(transactionImage: OutgoingTransactionImage): Future[OutgoingTransactionImage] =
-    updateIncoming(transactionImage, added = false).map(_ => transactionImage)
+    updateIncoming(transactionImage, None, added = false).map(_ => transactionImage)
 
   def pollRequest(n: Int): HttpRequest = {
     val uri = s"${box.baseUrl}/outgoing/poll?n=$n"

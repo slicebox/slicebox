@@ -72,9 +72,7 @@ class BoxPollOpsTest extends TestKit(ActorSystem("BoxPollOpsSpec")) with AsyncFl
         Series(3, 4, SeriesInstanceUID("5.6.7.8"), SeriesDescription(""), SeriesDate(""), Modality("CT"), ProtocolName(""), BodyPartExamined(""), Manufacturer(""), StationName(""), FrameOfReferenceUID("2.4.6.8")),
         Image(2, 3, SOPInstanceUID("4.3.2.1"), ImageType(""), InstanceNumber("1")),
         patientAdded = true, studyAdded = true, seriesAdded = true, imageAdded = true, GeneralProtocol.Source(SourceType.BOX, box.name, box.id)))
-    override def updateIncoming(transactionImage: OutgoingTransactionImage, imageId: Long, overwrite: Boolean): Future[IncomingUpdated] =
-      Future.successful(IncomingUpdated(IncomingTransaction(-1, box.id, box.name, transactionImage.transaction.id, transactionImage.transaction.sentImageCount, transactionImage.transaction.sentImageCount, transactionImage.transaction.totalImageCount, 1000, 1000, TransactionStatus.PROCESSING)))
-    override def updateIncoming(transactionImage: OutgoingTransactionImage, added: Boolean): Future[IncomingUpdated] =
+    override def updateIncoming(transactionImage: OutgoingTransactionImage, imageIdMaybe: Option[Long], added: Boolean): Future[IncomingUpdated] =
       Future.successful(IncomingUpdated(IncomingTransaction(-1, box.id, box.name, transactionImage.transaction.id, transactionImage.transaction.sentImageCount, transactionImage.transaction.sentImageCount, transactionImage.transaction.totalImageCount, 1000, 1000, TransactionStatus.PROCESSING)))
     override def updateBoxOnlineStatus(online: Boolean): Future[Unit] = Future(Unit)
   }
@@ -204,9 +202,9 @@ class BoxPollOpsTest extends TestKit(ActorSystem("BoxPollOpsSpec")) with AsyncFl
     val n = 10
     val nUpdated = new AtomicInteger()
     val impl = new BoxPollOpsImpl(n) {
-      override def updateIncoming(transactionImage: OutgoingTransactionImage, imageId: Long, overwrite: Boolean): Future[IncomingUpdated] = {
+      override def updateIncoming(transactionImage: OutgoingTransactionImage, imageIdMaybe: Option[Long], added: Boolean): Future[IncomingUpdated] = {
         nUpdated.getAndIncrement()
-        super.updateIncoming(transactionImage, imageId, overwrite)
+        super.updateIncoming(transactionImage, imageIdMaybe, added)
       }
     }
     impl.pullBatch().map { _ =>
