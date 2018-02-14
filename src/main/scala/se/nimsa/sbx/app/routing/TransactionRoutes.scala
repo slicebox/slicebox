@@ -26,6 +26,7 @@ import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.dicom.Contexts
+import se.nimsa.sbx.log.SbxLog
 
 import scala.util.{Failure, Success}
 
@@ -54,6 +55,7 @@ trait TransactionRoutes {
                           _ => complete(NoContent)
                         }
                       case Failure(_) =>
+                        SbxLog.warn("Box", s"Ignoring rejected image from ${box.name} in transaction $outgoingTransactionId")
                         onSuccess(boxService.ask(UpdateIncoming(box, outgoingTransactionId, sequenceNumber, totalImageCount, None, added = false))) {
                           _ => complete(NoContent)
                         }
