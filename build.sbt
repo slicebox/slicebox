@@ -70,7 +70,7 @@ resolvers ++= Seq(
 
 libraryDependencies ++= {
   val akkaVersion = "2.5.9"
-  val akkaHttpVersion = "10.1.0-RC1"
+  val akkaHttpVersion = "10.1.0-RC2"
   val slickVersion = "3.2.1"
   val dcm4cheVersion = "3.3.8"
   val alpakkaVersion = "0.16"
