@@ -17,7 +17,6 @@
 package se.nimsa.sbx.dicom
 
 import com.typesafe.config.ConfigFactory
-import org.dcm4che3.data.UID
 
 import scala.collection.JavaConverters._
 
@@ -25,11 +24,11 @@ object Contexts {
 
   case class Context(sopClassUid: String, transferSyntaxUids: Seq[String])
 
-  private lazy val standardTS = Seq(UID.ImplicitVRLittleEndian, UID.ExplicitVRLittleEndian, UID.ExplicitVRBigEndianRetired, UID.DeflatedExplicitVRLittleEndian, UID.JPEGBaseline1)
+  private lazy val standardTS: Seq[String] = ConfigFactory.load().getStringList("slicebox.accepted-transfer-syntaxes").asScala
 
-  lazy val imageDataContexts = ConfigFactory.load().getStringList("slicebox.accepted-sop-classes.image-data").asScala.map(uid => Context(uid, standardTS))
+  lazy val imageDataContexts: Seq[Context] = ConfigFactory.load().getStringList("slicebox.accepted-sop-classes.image-data").asScala.map(uid => Context(uid, standardTS))
 
-  lazy val extendedContexts = imageDataContexts ++ ConfigFactory.load().getStringList("slicebox.accepted-sop-classes.extended").asScala.map(uid => Context(uid, standardTS))
+  lazy val extendedContexts: Seq[Context] = imageDataContexts ++ ConfigFactory.load().getStringList("slicebox.accepted-sop-classes.extended").asScala.map(uid => Context(uid, standardTS))
 
   def asNamePairs(contexts: Seq[Context]): Seq[(String, String)] = contexts.flatMap(context => context.transferSyntaxUids.map((context.sopClassUid, _)))
 
