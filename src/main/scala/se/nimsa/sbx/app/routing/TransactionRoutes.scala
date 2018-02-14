@@ -16,7 +16,7 @@
 
 package se.nimsa.sbx.app.routing
 
-import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.model.StatusCodes.{BadRequest, NoContent, NotFound, Unauthorized}
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity}
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
@@ -26,6 +26,9 @@ import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.dicom.Contexts
+import se.nimsa.sbx.log.SbxLog
+
+import scala.util.{Failure, Success}
 
 trait TransactionRoutes {
   this: SliceboxBase =>
@@ -45,16 +48,17 @@ trait TransactionRoutes {
                 withoutSizeLimit {
                   extractDataBytes { compressedBytes =>
                     val source = Source(SourceType.BOX, box.name, box.id)
-                    onSuccess(storeDicomData(compressedBytes.via(Compression.inflate()), source, storage, Contexts.extendedContexts, reverseAnonymization = true)) { metaData =>
-                      system.eventStream.publish(ImageAdded(metaData.image.id, source, !metaData.imageAdded))
-                      val overwrite = !metaData.imageAdded
-                      onSuccess(boxService.ask(UpdateIncoming(box, outgoingTransactionId, sequenceNumber, totalImageCount, metaData.image.id, overwrite))) {
-                        case IncomingUpdated(transaction) =>
-                          transaction.status match {
-                            case TransactionStatus.FAILED => complete(InternalServerError)
-                            case _ => complete(NoContent)
-                          }
-                      }
+                    onComplete(storeDicomData(compressedBytes.via(Compression.inflate()), source, storage, Contexts.extendedContexts, reverseAnonymization = true)) {
+                      case Success(metaData) =>
+                        system.eventStream.publish(ImageAdded(metaData.image.id, source, !metaData.imageAdded))
+                        onSuccess(boxService.ask(UpdateIncoming(box, outgoingTransactionId, sequenceNumber, totalImageCount, Some(metaData.image.id), metaData.imageAdded))) {
+                          _ => complete(NoContent)
+                        }
+                      case Failure(_) =>
+                        SbxLog.warn("Box", s"Ignoring rejected image from ${box.name} in transaction $outgoingTransactionId")
+                        onSuccess(boxService.ask(UpdateIncoming(box, outgoingTransactionId, sequenceNumber, totalImageCount, None, added = false))) {
+                          _ => complete(NoContent)
+                        }
                     }
                   }
                 }

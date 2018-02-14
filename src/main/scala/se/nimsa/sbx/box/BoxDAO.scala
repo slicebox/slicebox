@@ -451,37 +451,47 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
     db.run(action.transactionally)
   }
 
-  def updateIncoming(box: Box, outgoingTransactionId: Long, sequenceNumber: Long, totalImageCount: Long, imageId: Long, overwrite: Boolean): Future[IncomingTransaction] = {
-    val action =
-      incomingTransactionByOutgoingTransactionIdAction(box.id, outgoingTransactionId).flatMap {
-        _
+  def updateIncomingAction(box: Box, outgoingTransactionId: Long, sequenceNumber: Long, totalImageCount: Long, added: Boolean): DBIOAction[IncomingTransaction, NoStream, Effect.Read with Effect.Write with Effect.Write] = {
+    incomingTransactionByOutgoingTransactionIdAction(box.id, outgoingTransactionId)
+      .flatMap { incomingTransactionMaybe =>
+        incomingTransactionMaybe
           .map(DBIO.successful)
-          .getOrElse {
-            insertIncomingTransactionAction(IncomingTransaction(-1, box.id, box.name, outgoingTransactionId, 0, 0, totalImageCount, System.currentTimeMillis, System.currentTimeMillis, TransactionStatus.WAITING))
-          }
-      }.flatMap { existingTransaction =>
-          val receivedImageCount = math.min(totalImageCount, existingTransaction.receivedImageCount + 1)
-          val addedImageCount = if (overwrite) existingTransaction.addedImageCount else math.min(totalImageCount, existingTransaction.addedImageCount + 1)
-          val incomingTransaction = existingTransaction.copy(
-            receivedImageCount = receivedImageCount,
-            addedImageCount = addedImageCount,
-            totalImageCount = totalImageCount,
-            updated = System.currentTimeMillis,
-            status = TransactionStatus.PROCESSING)
-          updateIncomingTransactionAction(incomingTransaction).flatMap { _ =>
-              incomingImageByIncomingTransactionIdAndSequenceNumberAction(incomingTransaction.id, sequenceNumber).flatMap {
-                _.map(image => updateIncomingImageAction(image.copy(imageId = imageId)))
-                  .getOrElse(insertIncomingImageAction(IncomingImage(-1, incomingTransaction.id, imageId, sequenceNumber, overwrite)))
-              }
-          }.flatMap { _ =>
-            if (incomingTransaction.receivedImageCount >= totalImageCount)
-              setIncomingTransactionStatusAction(incomingTransaction.id, TransactionStatus.FINISHED)
-                .map(_ => incomingTransaction.copy(status = TransactionStatus.FINISHED))
-            else
-              DBIO.successful(incomingTransaction)
-          }
+          .getOrElse(insertIncomingTransactionAction(IncomingTransaction(-1, box.id, box.name, outgoingTransactionId, 0, 0, totalImageCount, System.currentTimeMillis, System.currentTimeMillis, TransactionStatus.WAITING)))
       }
-    db.run(action.transactionally)
+      .flatMap { existingTransaction =>
+        val receivedImageCount = math.min(totalImageCount, existingTransaction.receivedImageCount + 1)
+        val addedImageCount = if (added) math.min(totalImageCount, existingTransaction.addedImageCount + 1) else existingTransaction.addedImageCount
+        val incomingTransaction = existingTransaction.copy(
+          receivedImageCount = receivedImageCount,
+          addedImageCount = addedImageCount,
+          totalImageCount = totalImageCount,
+          updated = System.currentTimeMillis,
+          status = TransactionStatus.PROCESSING)
+        updateIncomingTransactionAction(incomingTransaction)
+          .map(_ => incomingTransaction)
+      }
   }
 
+  def maybeFinalizeIncomingAction(incomingTransaction: IncomingTransaction): DBIOAction[IncomingTransaction, NoStream, Effect.Write] =
+    if (incomingTransaction.receivedImageCount >= incomingTransaction.totalImageCount)
+      setIncomingTransactionStatusAction(incomingTransaction.id, TransactionStatus.FINISHED)
+        .map(_ => incomingTransaction.copy(status = TransactionStatus.FINISHED))
+    else
+      DBIO.successful(incomingTransaction)
+
+  def updateIncoming(box: Box, outgoingTransactionId: Long, sequenceNumber: Long, totalImageCount: Long, imageIdMaybe: Option[Long], added: Boolean): Future[IncomingTransaction] = {
+    val action =
+      updateIncomingAction(box, outgoingTransactionId, sequenceNumber, totalImageCount, added)
+        .flatMap(incomingTransaction =>
+          imageIdMaybe
+            .map(imageId =>
+              incomingImageByIncomingTransactionIdAndSequenceNumberAction(incomingTransaction.id, sequenceNumber)
+                .flatMap(imageMaybe => imageMaybe
+                  .map(image => updateIncomingImageAction(image.copy(imageId = imageId)))
+                  .getOrElse(insertIncomingImageAction(IncomingImage(-1, incomingTransaction.id, imageId, sequenceNumber, !added)))))
+            .getOrElse(DBIO.successful(incomingTransaction))
+            .flatMap(_ => maybeFinalizeIncomingAction(incomingTransaction)))
+    db.run(action.transactionally)
+  }
 }
+

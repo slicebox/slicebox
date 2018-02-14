@@ -15,9 +15,9 @@ import se.nimsa.sbx.box.BoxProtocol.{IncomingUpdated, OutgoingTransactionImage}
 import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.metadata.MetaDataProtocol.MetaDataAdded
 
-import scala.concurrent.duration.DurationInt
 import scala.collection.immutable.Seq
 import scala.concurrent.Future
+import scala.concurrent.duration.DurationInt
 
 trait BoxPollOps extends BoxStreamOps with BoxJsonFormats with PlayJsonSupport {
 
@@ -28,7 +28,7 @@ trait BoxPollOps extends BoxStreamOps with BoxJsonFormats with PlayJsonSupport {
   override val transferType: String = "poll"
 
   def storeDicomData(bytesSource: scaladsl.Source[ByteString, _], source: Source): Future[MetaDataAdded]
-  def updateIncomingTransaction(transactionImage: OutgoingTransactionImage, imageId: Long, overwrite: Boolean): Future[IncomingUpdated]
+  def updateIncoming(transactionImage: OutgoingTransactionImage, imageIdMaybe: Option[Long], added: Boolean): Future[IncomingUpdated]
   def updateBoxOnlineStatus(online: Boolean): Future[Unit]
 
   lazy val pullSink: Sink[Seq[OutgoingTransactionImage], Future[Seq[OutgoingTransactionImage]]] = {
@@ -103,24 +103,26 @@ trait BoxPollOps extends BoxStreamOps with BoxJsonFormats with PlayJsonSupport {
           case entity =>
             storeDicomData(entity.dataBytes, source)
               .flatMap(metaData => updateTransaction(transactionImage, metaData))
-              .recover {
+              .recoverWith {
                 case _: DicomStreamException =>
                   // exception likely due to unsupported presentation context
                   response.discardEntityBytes()
                   SbxLog.warn("Box", s"Ignoring rejected image: ${transactionImage.image.imageId}, box: ${transactionImage.transaction.boxName}")
-                  transactionImage
+                  updateTransaction(transactionImage)
               }
         }
     }
 
   def updateTransaction(transactionImage: OutgoingTransactionImage, metaData: MetaDataAdded): Future[OutgoingTransactionImage] = {
-    val overwrite = !metaData.imageAdded
-    updateIncomingTransaction(transactionImage, metaData.image.id, overwrite)
+    updateIncoming(transactionImage, Some(metaData.image.id), metaData.imageAdded)
       .map { _ =>
-        system.eventStream.publish(ImageAdded(metaData.image.id, metaData.source, overwrite))
+        system.eventStream.publish(ImageAdded(metaData.image.id, metaData.source, !metaData.imageAdded))
         transactionImage
       }
   }
+
+  def updateTransaction(transactionImage: OutgoingTransactionImage): Future[OutgoingTransactionImage] =
+    updateIncoming(transactionImage, None, added = false).map(_ => transactionImage)
 
   def pollRequest(n: Int): HttpRequest = {
     val uri = s"${box.baseUrl}/outgoing/poll?n=$n"
