@@ -38,7 +38,7 @@
                     </sbx-grid-cell>
                 </sbx-grid-column>
 
-                <sbx-grid-column property="anon" title="Anonymized Name (leave blank for default)">
+                <sbx-grid-column property="anon" title="Anonymized Name">
                     <sbx-grid-cell>
                         <input type="text" ng-model="anonymizedPatientNames[patients.indexOf(rowObject)]" />
                     </sbx-grid-cell>
@@ -52,7 +52,7 @@
 
     <md-dialog-actions layout="row">
         <span flex></span>
-        <md-button ng-click="clearButtonClicked()">Clear</md-button>
+        <md-button class="md-warn" ng-click="keepButtonClicked()">Keep Names</md-button>
         <md-button ng-click="cancelButtonClicked()">Cancel</md-button>
         <sbx-button button-class="md-primary" button-title="Ok" action="actionButtonClicked()"></sbx-button>
     </md-dialog-actions>

@@ -1107,8 +1107,8 @@ angular.module('slicebox.home', ['ngRoute'])
         });
     };
 
-    $scope.clearButtonClicked = function() {
-        $scope.anonymizedPatientNames = $scope.patients.map(function() { return ""; });
+    $scope.keepButtonClicked = function() {
+        $scope.anonymizedPatientNames = $scope.patients.map(function(patient) { return patient.patientName.value; });
     };
 
     $scope.cancelButtonClicked = function() {
