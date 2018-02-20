@@ -156,7 +156,7 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageServic
 
         case MarkOutgoingImageAsSent(box, transactionImage) =>
           if (box.sendMethod == BoxSendMethod.POLL) pollBoxesLastPollTimestamp(box.id) = System.currentTimeMillis
-          updateOutgoingTransactionOnImageSent(transactionImage, transactionImage.transaction.sentImageCount)
+          updateOutgoingTransactionOnImageSent(transactionImage, math.min(transactionImage.transaction.totalImageCount, transactionImage.transaction.sentImageCount + 1))
             .flatMap { updatedTransactionImage =>
               if (updatedTransactionImage.transaction.sentImageCount >= updatedTransactionImage.transaction.totalImageCount) {
                 boxDao.outgoingImagesByOutgoingTransactionId(updatedTransactionImage.transaction.id).map(_.map(_.imageId))
@@ -213,7 +213,8 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageServic
 
         case SetIncomingTransactionStatus(boxId, transactionId, status) =>
           boxDao.incomingTransactionByOutgoingTransactionId(boxId, transactionId)
-            .map(_.map(incomingTransaction => boxDao.setIncomingTransactionStatus(incomingTransaction.id, status).map(_ => IncomingTransactionStatusUpdated)))
+            .map(_.map(incomingTransaction => boxDao.updateIncomingTransaction(incomingTransaction.copy(status = status, receivedImageCount = incomingTransaction.totalImageCount))
+              .map(_ => IncomingTransactionStatusUpdated)))
             .unwrap
             .pipeSequentiallyTo(sender)
 
