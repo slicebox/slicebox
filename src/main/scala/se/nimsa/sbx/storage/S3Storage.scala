@@ -52,6 +52,8 @@ class S3Storage(val bucket: String, val s3Prefix: String, val region: String)(im
     .withClientConfiguration(new ClientConfiguration().withProtocol(Protocol.HTTPS))
     .build()
 
+  private val alpakkaS3 = S3Client(new DefaultAWSCredentialsProviderChain(), region)
+
   private def s3Id(imageName: String): String = s3Prefix + "/" + imageName
 
   override def move(sourceImageName: String, targetImageName: String): Unit = {
@@ -87,12 +89,12 @@ class S3Storage(val bucket: String, val s3Prefix: String, val region: String)(im
       })
 
   override def fileSource(name: String): Source[ByteString, NotUsed] =
-    S3Client(new DefaultAWSCredentialsProviderChain(), region)
-      .download(bucket, s3Id(name))
-      .mapMaterializedValue(_ => NotUsed)
-      .mapError {
-        // we do not have access to http status code here so not much we can do but map everything to NotFound
-        case e: S3Exception => new NotFoundException(s"Data could not be transferred for name $name: ${e.getMessage}")
-      }
+    alpakkaS3
+    .download(bucket, s3Id(name))
+    .mapMaterializedValue(_ => NotUsed)
+    .mapError {
+      // we do not have access to http status code here so not much we can do but map everything to NotFound
+      case e: S3Exception => new NotFoundException(s"Data could not be transferred for name $name: ${e.getMessage}")
+    }
 
 }
