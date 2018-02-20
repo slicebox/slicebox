@@ -48,6 +48,17 @@ Versioning
 
 This project uses [semantic versioning](http://semver.org). Versions are organized as MAJOR.MINOR.PATCH. Between minor versions, we only add functionality in a backwards compatible manner. This means that you can safely upgrade from e.g. version 1.2 to version 1.3. Patch versions are mainly used for bug fixes. Between major version, e.g. going from 1.6 to 2.0, we intrduce one or several breaking changes. Upgrading in this case will be more complex and it may be necessary to dump existing files and databases. Versions prior to 1.0 are pre-production releases and are not required to be backwards compatible. 
 
+Development
+-----------
+
+Slicebox uses the YourKit profiler for optimizing code and finding performance bottlenecks. YourKit supports open source 
+projects with its full-featured Java Profiler. YourKit, LLC is the creator of 
+<a href="https://www.yourkit.com/java/profiler/">YourKit Java Profiler</a> and 
+<a href="https://www.yourkit.com/.net/profiler/">YourKit .NET Profiler</a>, innovative and intelligent tools for 
+profiling Java and .NET applications.
+
+![YourKit logo](https://www.yourkit.com/images/yklogo.png)
+
 License
 -------
 
