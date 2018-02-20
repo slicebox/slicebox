@@ -16,7 +16,7 @@
 
 package se.nimsa.sbx.box
 
-import se.nimsa.sbx.anonymization.AnonymizationProtocol.TagValue
+import se.nimsa.sbx.anonymization.AnonymizationProtocol.{ImageTagValues, TagValue}
 import se.nimsa.sbx.box.BoxProtocol.BoxSendMethod._
 import se.nimsa.sbx.box.BoxProtocol.TransactionStatus._
 import se.nimsa.sbx.box.BoxProtocol._
@@ -170,10 +170,11 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
     outgoingTagValueQuery.result
   }
 
-  def insertOutgoingTagValue(tagValue: OutgoingTagValue): Future[OutgoingTagValue] = db.run {
+  def insertOutgoingTagValueAction(tagValue: OutgoingTagValue): DBIOAction[OutgoingTagValue, NoStream, Effect.Write] =
     (outgoingTagValueQuery returning outgoingTagValueQuery.map(_.id) += tagValue)
       .map(generatedId => tagValue.copy(id = generatedId))
-  }
+
+  def insertOutgoingTagValue(tagValue: OutgoingTagValue): Future[OutgoingTagValue] = db.run(insertOutgoingTagValueAction(tagValue))
 
   def tagValuesByOutgoingTransactionImage(outgoingTransactionId: Long, outgoingImageId: Long): Future[Seq[OutgoingTagValue]] = db.run {
     val join = for {
@@ -193,10 +194,12 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
       .map(generatedId => box.copy(id = generatedId))
   }
 
-  def insertOutgoingTransaction(transaction: OutgoingTransaction): Future[OutgoingTransaction] = db.run {
+  def insertOutgoingTransactionAction(transaction: OutgoingTransaction): DBIOAction[OutgoingTransaction, NoStream, Effect.Write] =
     (outgoingTransactionQuery returning outgoingTransactionQuery.map(_.id) += transaction)
       .map(generatedId => transaction.copy(id = generatedId))
-  }
+
+  def insertOutgoingTransaction(transaction: OutgoingTransaction): Future[OutgoingTransaction] =
+    db.run(insertOutgoingTransactionAction(transaction))
 
   def insertIncomingTransactionAction(transaction: IncomingTransaction): DBIOAction[IncomingTransaction, NoStream, Effect.Write] =
     (incomingTransactionQuery returning incomingTransactionQuery.map(_.id) += transaction)
@@ -205,10 +208,11 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
   def insertIncomingTransaction(transaction: IncomingTransaction): Future[IncomingTransaction] =
     db.run(insertIncomingTransactionAction(transaction))
 
-  def insertOutgoingImage(outgoingImage: OutgoingImage): Future[OutgoingImage] = db.run {
+  def insertOutgoingImageAction(outgoingImage: OutgoingImage): DBIOAction[OutgoingImage, NoStream, Effect.Write] =
     (outgoingImageQuery returning outgoingImageQuery.map(_.id) += outgoingImage)
       .map(generatedId => outgoingImage.copy(id = generatedId))
-  }
+
+  def insertOutgoingImage(outgoingImage: OutgoingImage): Future[OutgoingImage] = db.run(insertOutgoingImageAction(outgoingImage))
 
   def insertIncomingImageAction(incomingImage: IncomingImage): DBIOAction[IncomingImage, NoStream, Effect.Write] =
     (incomingImageQuery returning incomingImageQuery.map(_.id) += incomingImage)
@@ -493,5 +497,30 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
             .flatMap(_ => maybeFinalizeIncomingAction(incomingTransaction)))
     db.run(action.transactionally)
   }
+
+  def addImagesToOutgoing(boxId: Long, boxName: String, imageTagValuesSeq: Seq[ImageTagValues]): Future[OutgoingTransaction] = {
+    val action =
+      insertOutgoingTransactionAction(OutgoingTransaction(-1, boxId, boxName, 0, imageTagValuesSeq.length, System.currentTimeMillis, System.currentTimeMillis, TransactionStatus.WAITING))
+        .flatMap { outgoingTransaction =>
+          DBIO.sequence {
+            imageTagValuesSeq.zipWithIndex
+              .map {
+                case (imageTagValues, index) =>
+                  val sequenceNumber = index + 1
+                  insertOutgoingImageAction(OutgoingImage(-1, outgoingTransaction.id, imageTagValues.imageId, sequenceNumber, sent = false))
+                    .flatMap { outgoingImage =>
+                      DBIO.sequence {
+                        imageTagValues.tagValues
+                          .map { tagValue =>
+                            insertOutgoingTagValueAction(OutgoingTagValue(-1, outgoingImage.id, tagValue))
+                          }
+                      }
+                    }
+              }
+          }.map(_ => outgoingTransaction)
+        }
+    db.run(action.transactionally)
+  }
+
 }
 
