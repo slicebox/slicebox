@@ -77,7 +77,7 @@ trait TransactionRoutes {
                   status match {
                     case TransactionStatus.UNKNOWN => complete((BadRequest, s"Invalid status format: $statusString"))
                     case _ =>
-                      onSuccess(boxService.ask(SetIncomingTransactionStatus(box.id, outgoingTransactionId, status)).mapTo[Option[Unit]]) {
+                      onSuccess(boxService.ask(SetIncomingTransactionStatus(box, outgoingTransactionId, status)).mapTo[Option[Unit]]) {
                         case Some(_) => complete(NoContent)
                         case None => complete(NotFound)
                       }

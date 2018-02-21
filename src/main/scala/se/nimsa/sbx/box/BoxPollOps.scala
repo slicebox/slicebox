@@ -11,7 +11,7 @@ import akka.util.ByteString
 import de.heikoseeberger.akkahttpplayjson.PlayJsonSupport
 import org.dcm4che3.io.DicomStreamException
 import se.nimsa.sbx.app.GeneralProtocol._
-import se.nimsa.sbx.box.BoxProtocol.{IncomingUpdated, OutgoingTransactionImage}
+import se.nimsa.sbx.box.BoxProtocol.{IncomingUpdated, OutgoingTransactionImage, TransactionStatus}
 import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.metadata.MetaDataProtocol.MetaDataAdded
 
@@ -53,10 +53,10 @@ trait BoxPollOps extends BoxStreamOps with BoxJsonFormats with PlayJsonSupport {
       .map(checkResponse)
       .mapAsyncUnordered(parallelism)(storeData)
       .alsoTo(statusToOnlineSink2)
-      .statefulMapConcat(indexInTransaction)
       .mapAsyncUnordered(parallelism)(createDoneRequest)
       .via(pullPool)
       .map(checkResponse).map(_._2)
+      .mapAsync(1)(maybeFinalizeOutgoingTransaction)
       .toMat(Sink.seq)(Keep.right)
   }
 
@@ -115,9 +115,9 @@ trait BoxPollOps extends BoxStreamOps with BoxJsonFormats with PlayJsonSupport {
 
   def updateTransaction(transactionImage: OutgoingTransactionImage, metaData: MetaDataAdded): Future[OutgoingTransactionImage] = {
     updateIncoming(transactionImage, Some(metaData.image.id), metaData.imageAdded)
-      .map { _ =>
+      .map { incomingUpdated =>
         system.eventStream.publish(ImageAdded(metaData.image.id, metaData.source, !metaData.imageAdded))
-        transactionImage
+        transactionImage.copy(transaction = transactionImage.transaction.copy(sentImageCount = incomingUpdated.transaction.receivedImageCount))
       }
   }
 
@@ -134,13 +134,17 @@ trait BoxPollOps extends BoxStreamOps with BoxJsonFormats with PlayJsonSupport {
     HttpRequest(method = HttpMethods.GET, uri = uri, entity = HttpEntity.Empty) -> transactionImage
   }
 
-  def createDoneRequest(imageIndex: (OutgoingTransactionImage, Long)): Future[RequestImage] =
-    imageIndex match {
-      case (transactionImage, index) =>
-        val updatedTransactionImage = transactionImage.update(index)
-        Marshal(updatedTransactionImage).to[MessageEntity].map { entity =>
-          val uri = s"${box.baseUrl}/outgoing/done"
-          HttpRequest(method = HttpMethods.POST, uri = uri, entity = entity) -> updatedTransactionImage
-        }
+  def createDoneRequest(transactionImage: OutgoingTransactionImage): Future[RequestImage] = {
+    Marshal(transactionImage).to[MessageEntity].map { entity =>
+      val uri = s"${box.baseUrl}/outgoing/done"
+      HttpRequest(method = HttpMethods.POST, uri = uri, entity = entity) -> transactionImage
     }
+  }
+
+  def maybeFinalizeOutgoingTransaction(transactionImage: OutgoingTransactionImage): Future[OutgoingTransactionImage] =
+        if (transactionImage.transaction.sentImageCount >= transactionImage.transaction.totalImageCount)
+          setRemoteOutgoingTransactionStatus(transactionImage.transaction, TransactionStatus.FINISHED)
+            .map(_ => transactionImage)
+        else
+          Future.successful(transactionImage)
 }
