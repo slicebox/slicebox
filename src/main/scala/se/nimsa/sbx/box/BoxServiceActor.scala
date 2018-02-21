@@ -23,7 +23,6 @@ import akka.event.{Logging, LoggingReceive}
 import akka.pattern.PipeToSupport
 import akka.stream.Materializer
 import akka.util.Timeout
-import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.log.SbxLog
@@ -139,7 +138,7 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageServic
 
         case SendToRemoteBox(box, imageTagValuesSeq) =>
           SbxLog.info("Box", s"Sending ${imageTagValuesSeq.length} images to box ${box.name}")
-          addImagesToOutgoing(box.id, box.name, imageTagValuesSeq)
+          boxDao.addImagesToOutgoing(box.id, box.name, imageTagValuesSeq)
             .map(_ => ImagesAddedToOutgoing(box.id, imageTagValuesSeq.map(_.imageId)))
             .pipeSequentiallyTo(sender)
 
@@ -262,28 +261,6 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageServic
   def pushActorName(box: Box): String = BoxSendMethod.PUSH + "-" + box.id.toString
 
   def pollActorName(box: Box): String = BoxSendMethod.POLL + "-" + box.id.toString
-
-  def addImagesToOutgoing(boxId: Long, boxName: String, imageTagValuesSeq: Seq[ImageTagValues]): Future[OutgoingTransaction] = {
-    boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, boxId, boxName, 0, imageTagValuesSeq.length, System.currentTimeMillis, System.currentTimeMillis, TransactionStatus.WAITING))
-      .flatMap { outgoingTransaction =>
-        Future.sequence {
-          imageTagValuesSeq.zipWithIndex
-            .map {
-              case (imageTagValues, index) =>
-                val sequenceNumber = index + 1
-                boxDao.insertOutgoingImage(OutgoingImage(-1, outgoingTransaction.id, imageTagValues.imageId, sequenceNumber, sent = false))
-                  .flatMap { outgoingImage =>
-                    Future.sequence {
-                      imageTagValues.tagValues
-                        .map { tagValue =>
-                          boxDao.insertOutgoingTagValue(OutgoingTagValue(-1, outgoingImage.id, tagValue))
-                        }
-                    }
-                  }
-            }
-        }.map(_ => outgoingTransaction)
-      }
-  }
 
   def updateOutgoingTransactionOnImageSent(transactionImage: OutgoingTransactionImage, sentImageCount: Long): Future[OutgoingTransactionImage] = {
     val updatedTransactionImage = transactionImage.update(sentImageCount)
