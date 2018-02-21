@@ -165,7 +165,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
       boxService ! UpdateIncoming(box, transactionId, sequenceNumber = 1, totalImageCount = 55, Some(33), added = true)
       expectMsgType[IncomingUpdated]
 
-      boxService ! SetIncomingTransactionStatus(box.id, transactionId, TransactionStatus.FINISHED)
+      boxService ! SetIncomingTransactionStatus(box, transactionId, TransactionStatus.FINISHED)
       expectMsg(Some(IncomingTransactionStatusUpdated))
 
       val transactions = await(boxDao.listIncomingTransactions(0, 10))

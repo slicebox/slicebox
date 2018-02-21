@@ -155,19 +155,16 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageServic
 
         case MarkOutgoingImageAsSent(box, transactionImage) =>
           if (box.sendMethod == BoxSendMethod.POLL) pollBoxesLastPollTimestamp(box.id) = System.currentTimeMillis
-          updateOutgoingTransactionOnImageSent(transactionImage, math.min(transactionImage.transaction.totalImageCount, transactionImage.transaction.sentImageCount + 1))
-            .flatMap { updatedTransactionImage =>
-              if (updatedTransactionImage.transaction.sentImageCount >= updatedTransactionImage.transaction.totalImageCount) {
-                boxDao.outgoingImagesByOutgoingTransactionId(updatedTransactionImage.transaction.id).map(_.map(_.imageId))
-                  .map { imageIds =>
-                    context.system.eventStream.publish(ImagesSent(Destination(DestinationType.BOX, box.name, box.id), imageIds))
-                    SbxLog.info("Box", s"Finished sending ${updatedTransactionImage.transaction.totalImageCount} images to box ${box.name}")
-                  }
-                  .flatMap(_ => boxDao.updateOutgoingTransaction(
-                    updatedTransactionImage.transaction.copy(status = TransactionStatus.FINISHED),
-                    updatedTransactionImage.image))
-              } else Future.successful(Unit)
-            }.map(_ => OutgoingImageMarkedAsSent).pipeSequentiallyTo(sender)
+          boxDao.outgoingTransactionImageByOutgoingTransactionIdAndOutgoingImageId(box.id, transactionImage.transaction.id, transactionImage.image.id)
+            .map { dbTransactionImageMaybe =>
+              dbTransactionImageMaybe
+                .map { dbTransactionImage =>
+                  updateOutgoingTransactionOnImageSent(dbTransactionImage, math.min(dbTransactionImage.transaction.totalImageCount, dbTransactionImage.transaction.sentImageCount + 1))
+                    .flatMap(updatedTransactionImage => maybeFinalizeOutgoingTransaction(box, updatedTransactionImage.transaction))
+                }
+            }
+            .unwrap
+            .map(_ => OutgoingImageMarkedAsSent).pipeSequentiallyTo(sender)
 
         case MarkOutgoingTransactionAsFailed(_, failedTransactionImage) =>
           SbxLog.error("Box", failedTransactionImage.message)
@@ -210,11 +207,16 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageServic
           boxDao.setOutgoingTransactionStatus(transaction.id, status).map(_ => OutgoingTransactionStatusUpdated)
             .pipeSequentiallyTo(sender)
 
-        case SetIncomingTransactionStatus(boxId, transactionId, status) =>
-          boxDao.incomingTransactionByOutgoingTransactionId(boxId, transactionId)
+        case SetIncomingTransactionStatus(box, transactionId, status) =>
+          boxDao.incomingTransactionByOutgoingTransactionId(box.id, transactionId)
             .map(_.map { incomingTransaction =>
               if (status == TransactionStatus.FINISHED)
                 boxDao.updateIncomingTransaction(incomingTransaction.copy(status = status, receivedImageCount = incomingTransaction.totalImageCount))
+                  .flatMap { _ =>
+                    boxDao.outgoingTransactionByTransactionId(box.id, transactionId)
+                      .map(_.map(outgoingTransaction => maybeFinalizeOutgoingTransaction(box, outgoingTransaction)))
+                      .unwrap
+                  }
                   .map(_ => IncomingTransactionStatusUpdated)
               else
                 boxDao.updateIncomingTransaction(incomingTransaction.copy(status = status))
@@ -268,10 +270,22 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageServic
 
   def pollActorName(box: Box): String = BoxSendMethod.POLL + "-" + box.id.toString
 
+  def maybeFinalizeOutgoingTransaction(box: Box, transaction: OutgoingTransaction): Future[Unit] = {
+    if (transaction.sentImageCount >= transaction.totalImageCount && transaction.status != TransactionStatus.FINISHED) {
+      boxDao.outgoingImagesByOutgoingTransactionId(transaction.id).map(_.map(_.imageId))
+        .map { imageIds =>
+          context.system.eventStream.publish(ImagesSent(Destination(DestinationType.BOX, box.name, box.id), imageIds))
+          SbxLog.info("Box", s"Finished sending ${transaction.totalImageCount} images to box ${box.name}")
+        }
+        .flatMap(_ => boxDao.updateOutgoingTransaction(transaction.copy(status = TransactionStatus.FINISHED)))
+        .map(_ => Unit)
+    } else Future.successful(Unit)
+  }
+
   def updateOutgoingTransactionOnImageSent(transactionImage: OutgoingTransactionImage, sentImageCount: Long): Future[OutgoingTransactionImage] = {
     val updatedTransactionImage = transactionImage.update(sentImageCount)
 
-    boxDao.updateOutgoingTransaction(updatedTransactionImage.transaction, updatedTransactionImage.image).map { _ =>
+    boxDao.updateOutgoingTransactionImage(updatedTransactionImage.transaction, updatedTransactionImage.image).map { _ =>
       log.debug(s"Marked outgoing transaction and image $updatedTransactionImage as sent")
       updatedTransactionImage
     }

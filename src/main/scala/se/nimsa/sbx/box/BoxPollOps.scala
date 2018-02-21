@@ -56,7 +56,6 @@ trait BoxPollOps extends BoxStreamOps with BoxJsonFormats with PlayJsonSupport {
       .mapAsyncUnordered(parallelism)(createDoneRequest)
       .via(pullPool)
       .map(checkResponse).map(_._2)
-      .statefulMapConcat(indexInTransaction)
       .mapAsync(1)(maybeFinalizeOutgoingTransaction)
       .toMat(Sink.seq)(Keep.right)
   }
@@ -116,9 +115,9 @@ trait BoxPollOps extends BoxStreamOps with BoxJsonFormats with PlayJsonSupport {
 
   def updateTransaction(transactionImage: OutgoingTransactionImage, metaData: MetaDataAdded): Future[OutgoingTransactionImage] = {
     updateIncoming(transactionImage, Some(metaData.image.id), metaData.imageAdded)
-      .map { _ =>
+      .map { incomingUpdated =>
         system.eventStream.publish(ImageAdded(metaData.image.id, metaData.source, !metaData.imageAdded))
-        transactionImage
+        transactionImage.copy(transaction = transactionImage.transaction.copy(sentImageCount = incomingUpdated.transaction.receivedImageCount))
       }
   }
 
@@ -142,13 +141,10 @@ trait BoxPollOps extends BoxStreamOps with BoxJsonFormats with PlayJsonSupport {
     }
   }
 
-  def maybeFinalizeOutgoingTransaction(imageIndex: (OutgoingTransactionImage, Long)): Future[OutgoingTransactionImage] =
-    imageIndex match {
-      case (transactionImage, index) =>
-        if (index >= transactionImage.transaction.totalImageCount)
+  def maybeFinalizeOutgoingTransaction(transactionImage: OutgoingTransactionImage): Future[OutgoingTransactionImage] =
+        if (transactionImage.transaction.sentImageCount >= transactionImage.transaction.totalImageCount)
           setRemoteOutgoingTransactionStatus(transactionImage.transaction, TransactionStatus.FINISHED)
             .map(_ => transactionImage)
         else
           Future.successful(transactionImage)
-    }
 }
