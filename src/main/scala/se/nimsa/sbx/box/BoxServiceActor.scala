@@ -212,8 +212,14 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageServic
 
         case SetIncomingTransactionStatus(boxId, transactionId, status) =>
           boxDao.incomingTransactionByOutgoingTransactionId(boxId, transactionId)
-            .map(_.map(incomingTransaction => boxDao.updateIncomingTransaction(incomingTransaction.copy(status = status, receivedImageCount = incomingTransaction.totalImageCount))
-              .map(_ => IncomingTransactionStatusUpdated)))
+            .map(_.map { incomingTransaction =>
+              if (status == TransactionStatus.FINISHED)
+                boxDao.updateIncomingTransaction(incomingTransaction.copy(status = status, receivedImageCount = incomingTransaction.totalImageCount))
+                  .map(_ => IncomingTransactionStatusUpdated)
+              else
+                boxDao.updateIncomingTransaction(incomingTransaction.copy(status = status))
+                  .map(_ => IncomingTransactionStatusUpdated)
+            })
             .unwrap
             .pipeSequentiallyTo(sender)
 
