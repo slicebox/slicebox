@@ -195,17 +195,25 @@ angular.module('slicebox.home', ['ngRoute'])
     }
 
     $scope.uiState.advancedFiltering.sourcesPromise = $http.get('/api/sources').then(function (sourcesData) {
-        return sourcesData.data.map(function (source) {
-            source.selected = false;
-            return source;
-        });
-    });
+        if (sourcesData.status === 200) {
+            return sourcesData.data.map(function (source) {
+                source.selected = false;
+                return source;
+            });
+        } else {
+            return [];
+        }
+    }, function () { return []; });
     $scope.uiState.advancedFiltering.seriesTypesPromise = $http.get('/api/seriestypes').then(function (seriesTypesData) {
-        return seriesTypesData.data.map(function (seriesType) {
-            seriesType.selected = false;
-            return seriesType;
-        });
-    });
+        if (seriesTypesData.status === 200) {
+            return seriesTypesData.data.map(function (seriesType) {
+                seriesType.selected = false;
+                return seriesType;
+            });
+        } else {
+            return [];
+        }
+    }, function () { return []; });
     updateSeriesTagsPromise();
 
     // Scope functions
@@ -668,18 +676,22 @@ angular.module('slicebox.home', ['ngRoute'])
     function updateSeriesTagsPromise() {
         $scope.uiState.advancedFiltering.seriesTagsPromise = $scope.uiState.advancedFiltering.seriesTagsPromise.then(function (oldTags) {
             return $http.get('/api/metadata/seriestags').then(function (newTagsData) {
-                var newTags = newTagsData.data;
-                // copy selected attribute from existing tags
-                newTags.forEach(function (newTag) {
-                    newTag.selected = false;
-                    oldTags.forEach(function (oldTag) {
-                        if (newTag.name === oldTag.name) {
-                            newTag.selected = oldTag.selected;
-                        }
+                if (newTagsData.status === 200) {
+                    var newTags = newTagsData.data;
+                    // copy selected attribute from existing tags
+                    newTags.forEach(function (newTag) {
+                        newTag.selected = false;
+                        oldTags.forEach(function (oldTag) {
+                            if (newTag.name === oldTag.name) {
+                                newTag.selected = oldTag.selected;
+                            }
+                        });
                     });
-                });
-                return newTags;
-            });
+                    return newTags;
+                } else {
+                    return [];
+                }
+            }, function () { return []; });
         });
     }
 
