@@ -61,7 +61,7 @@ licenses += ("Apache-2.0", new URL("https://www.apache.org/licenses/LICENSE-2.0.
 resolvers ++= Seq(
   Resolver.typesafeRepo("releases"),
   Resolver.sonatypeRepo("snapshots"),
-  "dcm4che Repository" at "http://www.dcm4che.org/maven2/",
+  "dcm4che Repository" at "https://www.dcm4che.org/maven2/",
   Resolver.bintrayRepo("hseeberger", "maven"))
 
 
