@@ -54,8 +54,8 @@ trait TransactionRoutes {
                         onSuccess(boxService.ask(UpdateIncoming(box, outgoingTransactionId, sequenceNumber, totalImageCount, Some(metaData.image.id), metaData.imageAdded))) {
                           _ => complete(NoContent)
                         }
-                      case Failure(_) =>
-                        SbxLog.warn("Box", s"Ignoring rejected image from ${box.name} in transaction $outgoingTransactionId")
+                      case Failure(e) =>
+                        SbxLog.warn("Box", s"Ignoring rejected image from ${box.name} in transaction $outgoingTransactionId: ${e.getMessage}")
                         onSuccess(boxService.ask(UpdateIncoming(box, outgoingTransactionId, sequenceNumber, totalImageCount, None, added = false))) {
                           _ => complete(NoContent)
                         }
