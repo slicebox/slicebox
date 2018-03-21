@@ -16,6 +16,8 @@
 
 package se.nimsa.sbx.seriestype
 
+import java.sql.SQLIntegrityConstraintViolationException
+
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
 import se.nimsa.sbx.util.DbUtil.createTables
 import slick.basic.DatabaseConfig
@@ -165,8 +167,11 @@ class SeriesTypeDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
   }.map(_ => Unit)
 
   def upsertSeriesSeriesType(seriesSeriesType: SeriesSeriesType): Future[SeriesSeriesType] = db.run {
-    seriesSeriesTypes.insertOrUpdate(seriesSeriesType)
-  }.map(_ => seriesSeriesType)
+    seriesSeriesTypes += seriesSeriesType
+  }.map(_ => seriesSeriesType).recover {
+    case _: SQLIntegrityConstraintViolationException => seriesSeriesType //Duplicate key -> series already tagged with series type
+    case e => throw e
+  }
 
   def listSeriesSeriesTypesForSeriesId(seriesId: Long): Future[Seq[SeriesSeriesType]] = db.run {
     seriesSeriesTypes.filter(_.seriesId === seriesId).result
