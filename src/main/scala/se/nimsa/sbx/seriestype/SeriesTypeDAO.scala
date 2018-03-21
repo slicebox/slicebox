@@ -16,7 +16,7 @@
 
 package se.nimsa.sbx.seriestype
 
-import java.sql.SQLIntegrityConstraintViolationException
+import java.sql.SQLException
 
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
 import se.nimsa.sbx.util.DbUtil.createTables
@@ -169,7 +169,7 @@ class SeriesTypeDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
   def upsertSeriesSeriesType(seriesSeriesType: SeriesSeriesType): Future[SeriesSeriesType] = db.run {
     seriesSeriesTypes += seriesSeriesType
   }.map(_ => seriesSeriesType).recover {
-    case _: SQLIntegrityConstraintViolationException => seriesSeriesType //Duplicate key -> series already tagged with series type
+    case _: SQLException => seriesSeriesType //Duplicate key -> series already tagged with series type
     case e => throw e
   }
 
