@@ -90,9 +90,12 @@ class BoxPushActor(override val box: Box,
     getImageIdsForOutgoingTransaction(transaction)
       .flatMap { imageIds =>
         setOutgoingTransactionStatus(transaction, TransactionStatus.FINISHED)
-          .map { _ =>
-            SbxLog.info("Box", s"Finished sending ${transaction.totalImageCount} images to box ${box.name}")
-            system.eventStream.publish(ImagesSent(Destination(DestinationType.BOX, box.name, box.id), imageIds))
+          .flatMap { _ =>
+            setRemoteOutgoingTransactionStatus(transaction, TransactionStatus.FINISHED)
+              .map { _ =>
+                SbxLog.info("Box", s"Finished sending ${transaction.totalImageCount} images to box ${box.name}")
+                system.eventStream.publish(ImagesSent(Destination(DestinationType.BOX, box.name, box.id), imageIds))
+              }
           }
       }
 
