@@ -161,7 +161,7 @@ object BoxProtocol {
 
   case class GetIncomingTransactionStatus(box: Box, transactionId: Long) extends BoxRequest
 
-  case class SetIncomingTransactionStatus(boxId: Long, transactionId: Long, status: TransactionStatus) extends BoxRequest
+  case class SetIncomingTransactionStatus(box: Box, transactionId: Long, status: TransactionStatus) extends BoxRequest
 
   case class RemoveIncomingTransaction(incomingTransactionId: Long) extends BoxRequest
 

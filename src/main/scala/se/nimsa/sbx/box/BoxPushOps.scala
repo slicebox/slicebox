@@ -30,7 +30,7 @@ trait BoxPushOps extends BoxStreamOps {
       .via(pushPool)
       .map(checkResponse).map(_._2)
       .statefulMapConcat(indexInTransaction)
-      .mapAsyncUnordered(parallelism)(updateOutgoingTransaction)
+      .mapAsync(1)(updateOutgoingTransaction)
       .toMat(Sink.seq)(Keep.right)
   }
 

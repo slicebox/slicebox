@@ -2,10 +2,10 @@ package se.nimsa.sbx.box
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.{HttpEntity, HttpRequest, HttpResponse}
+import akka.http.scaladsl.model._
 import akka.stream._
 import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, MergePreferred, RunnableGraph, Sink}
-import se.nimsa.sbx.box.BoxProtocol.{Box, OutgoingTransactionImage}
+import se.nimsa.sbx.box.BoxProtocol.{Box, OutgoingTransaction, OutgoingTransactionImage, TransactionStatus}
 import se.nimsa.sbx.log.SbxLog
 
 import scala.collection.immutable.Seq
@@ -125,6 +125,11 @@ trait BoxStreamOps {
       case (Failure(exception), transactionImage) => throw new TransactionException(transactionImage, s"Connection to ${box.name} ($transferType) failed for image ${transactionImage.image.id}", exception)
     }
   }
+
+  def setRemoteOutgoingTransactionStatus(transaction: OutgoingTransaction, status: TransactionStatus): Future[Unit] =
+    singleRequest(HttpRequest(method = HttpMethods.PUT, uri = s"${box.baseUrl}/status?transactionid=${transaction.id}", entity = HttpEntity(s""""${status.toString}"""").withContentType(ContentTypes.`application/json`)))
+      .recover { case _: Exception => SbxLog.warn("Box", s"Unable to set remote status of transaction ${transaction.id} to $status.") }
+      .map(_ => Unit)
 
   def singleRequest(request: HttpRequest): Future[HttpResponse] = http.singleRequest(request)
 }
