@@ -1,7 +1,7 @@
 name := "slicebox"
 version := "1.5-SNAPSHOT"
 organization := "se.nimsa"
-scalaVersion := "2.12.4"
+scalaVersion := "2.12.5"
 scalacOptions := Seq("-encoding", "UTF-8", "-Xlint", "-deprecation", "-unchecked", "-feature", "-target:jvm-1.8")
 
 // define the project
@@ -99,7 +99,7 @@ libraryDependencies ++= {
     "org.webjars" % "angularjs" % "1.5.11",
     "org.webjars" % "angular-material" % "1.1.5",
     "org.webjars" % "angular-file-upload" % "11.0.0",
-    "se.nimsa" %% "dcm4che-streams" % "0.6" exclude("org.slf4j", "slf4j-simple"),
+    "se.nimsa" %% "dcm4che-streams" % "0.7-SNAPSHOT" exclude("org.slf4j", "slf4j-simple"),
     "com.lightbend.akka" %% "akka-stream-alpakka-s3" % alpakkaVersion,
     "com.lightbend.akka" %% "akka-stream-alpakka-file" % alpakkaVersion
   )

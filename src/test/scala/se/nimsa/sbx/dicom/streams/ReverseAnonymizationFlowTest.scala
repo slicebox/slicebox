@@ -7,11 +7,13 @@ import akka.stream.scaladsl.{Sink, Source}
 import akka.stream.testkit.scaladsl.TestSink
 import akka.testkit.TestKit
 import akka.util.ByteString
-import org.dcm4che3.data.{Attributes, Tag, UID, VR}
+import org.dcm4che3.data.Attributes
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
-import se.nimsa.dcm4che.streams.DicomModifyFlow.TagModification
-import se.nimsa.dcm4che.streams.DicomParts.{DicomAttributes, DicomPart}
 import se.nimsa.dcm4che.streams._
+import se.nimsa.dicom.streams.DicomModifyFlow.TagModification
+import se.nimsa.dicom.streams.DicomParts.{DicomAttributes, DicomPart}
+import se.nimsa.dicom.streams.{DicomFlows, DicomModifyFlow, DicomParsing}
+import se.nimsa.dicom.{Tag, TagPath, UID, VR}
 import se.nimsa.sbx.dicom.DicomData
 import se.nimsa.sbx.dicom.streams.DicomStreamUtil._
 import se.nimsa.sbx.storage.{RuntimeStorage, StorageService}
@@ -103,6 +105,7 @@ class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymiza
           Tag.StudyInstanceUID,
           Tag.StudyDescription,
           Tag.StudyID,
+          Tag.SpecificCharacterSet, // inserted by utf8 flow
           Tag.AccessionNumber,
           Tag.SeriesInstanceUID,
           Tag.SeriesDescription,
@@ -126,10 +129,11 @@ class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymiza
 
     val source = anonSource(dicomData)
       .via(ReverseAnonymizationFlow.reverseAnonFlow)
-      .via(DicomFlows.collectAttributesFlow(Set(Tag.PatientName)))
+      .via(DicomFlows.collectAttributesFlow(Set(Tag.PatientName), "anon"))
       .filter(_.isInstanceOf[DicomAttributes])
       .mapAsync(5) {
-        case as: DicomAttributes => Source(as.attributes.toList).runWith(DicomAttributesSink.attributesSink)
+        case as: DicomAttributes if as.tag == "anon" =>
+          Source(as.attributes.toList).runWith(DicomAttributesSink.attributesSink)
       }
 
     val (_, dsMaybe) = Await.result(source.runWith(Sink.head), 10.seconds)
@@ -144,10 +148,11 @@ class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymiza
     val source = Source.single(anonKeyPart(dicomData))
       .concat(anonSource(dicomData))
       .via(ReverseAnonymizationFlow.reverseAnonFlow)
-      .via(DicomFlows.collectAttributesFlow(Set(Tag.PatientName)))
+      .via(DicomFlows.collectAttributesFlow(Set(Tag.PatientName), "reverse"))
       .filter(_.isInstanceOf[DicomAttributes])
       .mapAsync(5) {
-        case as: DicomAttributes => Source(as.attributes.toList).runWith(DicomAttributesSink.attributesSink)
+        case as: DicomAttributes if as.tag == "reverse" =>
+          Source(as.attributes.toList).runWith(DicomAttributesSink.attributesSink)
       }
 
     val (_, dsMaybe) = Await.result(source.runWith(Sink.head), 10.seconds)

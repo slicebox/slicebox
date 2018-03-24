@@ -2,8 +2,8 @@ package se.nimsa.sbx.util
 
 import java.nio.file.Files
 
-import org.dcm4che3.data.Tag
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
+import se.nimsa.dicom.Tag
 import se.nimsa.sbx.dicom.DicomData
 
 class TestUtilTest extends FlatSpec with Matchers with BeforeAndAfterAll {

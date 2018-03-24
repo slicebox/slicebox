@@ -3,8 +3,10 @@ package se.nimsa.sbx.metadata
 import akka.actor.{Actor, ActorSystem, Props}
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit}
 import akka.util.Timeout
-import org.dcm4che3.data.{Attributes, Tag, VR}
+import org.dcm4che3.data.Attributes
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
+import se.nimsa.dcm4che.streams.toCheVR
+import se.nimsa.dicom.{Tag, VR}
 import se.nimsa.sbx.app.GeneralProtocol.{Source, SourceType}
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.metadata.MetaDataProtocol._

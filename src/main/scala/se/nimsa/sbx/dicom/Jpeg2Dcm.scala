@@ -19,10 +19,12 @@ package se.nimsa.sbx.dicom
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream, DataInputStream}
 import java.util.Date
 
-import org.dcm4che3.data.{Attributes, Tag, UID, VR}
+import org.dcm4che3.data.Attributes
 import org.dcm4che3.io.DicomOutputStream
 import org.dcm4che3.util.UIDUtils
+import se.nimsa.dicom.{Tag, UID, VR}
 import se.nimsa.sbx.dicom.DicomHierarchy.{Patient, Study}
+import se.nimsa.dcm4che.streams.toCheVR
 
 /**
  * Scala port and minor adaptation of the Jpg2Dcm tool which is part of the Dcm4Che toolkit.
@@ -45,7 +47,7 @@ object Jpeg2Dcm {
 
   private val charset = "ISO_IR 100"
 
-  private val transferSyntax = UID.JPEGBaseline1
+  private val transferSyntax = UID.JPEGBaselineProcess1
 
   def apply(bytes: Array[Byte], patient: Patient, study: Study, optionalDescription: Option[String]): Array[Byte] = {
 

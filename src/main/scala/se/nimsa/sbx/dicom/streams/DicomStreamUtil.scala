@@ -20,9 +20,10 @@ import akka.NotUsed
 import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Merge, Source}
 import akka.stream.{FlowShape, Materializer}
 import akka.util.ByteString
-import org.dcm4che3.data.{SpecificCharacterSet, Tag}
+import org.dcm4che3.data.SpecificCharacterSet
 import se.nimsa.dcm4che.streams.DicomAttributesSink
-import se.nimsa.dcm4che.streams.DicomParts.{DicomAttributes, DicomPart}
+import se.nimsa.dicom.Tag
+import se.nimsa.dicom.streams.DicomParts.{DicomAttributes, DicomPart}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.AnonymizationKey
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -74,10 +75,10 @@ object DicomStreamUtil {
     def isAnonymized: Boolean = identityRemoved.exists(_.toUpperCase == "YES")
   }
 
-  def attributesToInfoPart(dicomPart: DicomPart)
+  def attributesToInfoPart(dicomPart: DicomPart, tag: String)
                           (implicit ec: ExecutionContext, materializer: Materializer): Future[DicomPart] = {
     dicomPart match {
-      case da: DicomAttributes =>
+      case da: DicomAttributes if da.tag == tag =>
         Source.fromIterator(() => da.attributes.iterator).runWith(DicomAttributesSink.attributesSink).map {
           case (fmiMaybe, dsMaybe) =>
             DicomInfoPart(

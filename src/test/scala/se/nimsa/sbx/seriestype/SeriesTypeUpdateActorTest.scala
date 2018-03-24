@@ -7,8 +7,9 @@ import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{Source => StreamSource}
 import akka.testkit.{ImplicitSender, TestKit}
 import akka.util.{ByteString, Timeout}
-import org.dcm4che3.data.{Keyword, Tag}
+import org.dcm4che3.data.Keyword
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
+import se.nimsa.dicom.Tag
 import se.nimsa.sbx.app.GeneralProtocol.{Source, SourceType}
 import se.nimsa.sbx.dicom.DicomHierarchy.Series
 import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, MetaDataAdded}

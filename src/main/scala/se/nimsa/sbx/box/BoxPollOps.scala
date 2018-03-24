@@ -9,7 +9,7 @@ import akka.stream._
 import akka.stream.scaladsl.{Flow, Keep, Sink}
 import akka.util.ByteString
 import de.heikoseeberger.akkahttpplayjson.PlayJsonSupport
-import org.dcm4che3.io.DicomStreamException
+import se.nimsa.dicom.streams.DicomStreamException
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.box.BoxProtocol.{IncomingUpdated, OutgoingTransactionImage, TransactionStatus}
 import se.nimsa.sbx.log.SbxLog

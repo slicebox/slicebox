@@ -17,8 +17,9 @@
 package se.nimsa.sbx.dicom
 
 import akka.util.ByteString
-import org.dcm4che3.data._
-import se.nimsa.dcm4che.streams.{groupNumber, padToEvenLength}
+import org.dcm4che3.data.{Attributes, Keyword}
+import se.nimsa.dicom.VR.VR
+import se.nimsa.dicom.{Tag, groupNumber, padToEvenLength}
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomPropertyValue._
 

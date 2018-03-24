@@ -10,12 +10,14 @@ import akka.stream.scaladsl.{Sink, Source}
 import akka.stream.testkit.scaladsl.TestSink
 import akka.testkit.TestKit
 import akka.util.ByteString
-import org.dcm4che3.data.{Attributes, Tag, UID, VR}
+import org.dcm4che3.data.Attributes
 import org.dcm4che3.io.DicomOutputStream
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
-import se.nimsa.dcm4che.streams.DicomFlows
-import se.nimsa.dcm4che.streams.DicomFlows.collectAttributesFlow
-import se.nimsa.dcm4che.streams.DicomParts.{DicomPart, DicomValueChunk}
+import se.nimsa.dcm4che.streams.toCheVR
+import se.nimsa.dicom.streams.DicomFlows
+import se.nimsa.dicom.streams.DicomFlows.collectAttributesFlow
+import se.nimsa.dicom.streams.DicomParts.{DicomPart, DicomValueChunk}
+import se.nimsa.dicom.{Tag, UID, VR}
 import se.nimsa.sbx.dicom.streams.DicomStreamUtil._
 import se.nimsa.sbx.storage.{RuntimeStorage, StorageService}
 import se.nimsa.sbx.util.TestUtil._
@@ -47,13 +49,14 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
 
   def toMaybeAnonSource(attributes: Attributes): Source[DicomPart, NotUsed] =
     toSource(attributes)
-      .via(collectAttributesFlow(basicInfoTags))
-      .mapAsync(5)(attributesToInfoPart)
+      .via(collectAttributesFlow(basicInfoTags, "anon"))
+      .mapAsync(5)(attributesToInfoPart(_, "anon"))
       .via(AnonymizationFlow.maybeAnonFlow)
 
   def checkBasicAttributes(source: Source[DicomPart, NotUsed]): PartProbe =
     source.runWith(TestSink.probe[DicomPart])
       .expectHeaderAndValueChunkPairs(
+        Tag.SpecificCharacterSet,
         Tag.SOPInstanceUID,
         Tag.Modality,
         Tag.PatientName,
@@ -70,6 +73,8 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
     val source = toAnonSource(attributes)
 
     source.runWith(TestSink.probe[DicomPart])
+      .expectHeader(Tag.SpecificCharacterSet)
+      .expectValueChunk()
       .expectHeader(Tag.SOPInstanceUID)
       .expectValueChunk()
       .expectHeader(Tag.AccessionNumber)
@@ -103,6 +108,8 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
     val source = toAnonSource(attributes)
 
     source.runWith(TestSink.probe[DicomPart])
+      .expectHeader(Tag.SpecificCharacterSet)
+      .expectValueChunk()
       .expectHeader(Tag.SOPInstanceUID)
       .expectValueChunk()
       .expectHeader(Tag.AccessionNumber)
@@ -116,6 +123,7 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
 
     source.runWith(TestSink.probe[DicomPart])
       .expectHeaderAndValueChunkPairs(
+        Tag.SpecificCharacterSet,
         Tag.SOPInstanceUID,
         Tag.PatientName,
         Tag.PatientID,
@@ -148,6 +156,7 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
     def check(source: Source[DicomPart, NotUsed]) =
       source.runWith(TestSink.probe[DicomPart])
         .expectHeaderAndValueChunkPairs(
+          Tag.SpecificCharacterSet,
           Tag.SOPInstanceUID,
           Tag.Modality,
           Tag.PatientName,
@@ -171,6 +180,7 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
   it should "always create the same new UID from some fixed existing UID" in {
     val attributes = new Attributes()
     attributes.setString(Tag.TargetUID, VR.UI, "1.2.3.4.5.6.7.8.9")
+
     def source() = toAnonSource(attributes)
       .via(DicomFlows.tagFilter(_ => false)(tagPath => tagPath.tag == Tag.TargetUID))
       .via(DicomFlows.attributeFlow)

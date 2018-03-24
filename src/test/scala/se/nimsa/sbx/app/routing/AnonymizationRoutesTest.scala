@@ -4,8 +4,9 @@ import akka.http.scaladsl.model.HttpEntity
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server._
 import akka.util.ByteString
-import org.dcm4che3.data.{Tag, VR}
 import org.scalatest.{FlatSpecLike, Matchers}
+import se.nimsa.dcm4che.streams.toCheVR
+import se.nimsa.dicom.{Tag, VR}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomProperty.PatientName

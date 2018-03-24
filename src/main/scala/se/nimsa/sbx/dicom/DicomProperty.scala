@@ -16,7 +16,7 @@
 
 package se.nimsa.sbx.dicom
 
-import org.dcm4che3.data.Tag
+import se.nimsa.dicom.Tag
 
 case class DicomProperty(name: String, dicomTag: Int)
 

@@ -1,8 +1,10 @@
 package se.nimsa.sbx.dicom.streams
 
 import akka.util.ByteString
-import org.dcm4che3.data.{Attributes, Tag, UID, VR}
-import se.nimsa.dcm4che.streams._
+import org.dcm4che3.data.Attributes
+import se.nimsa.dicom._
+import se.nimsa.dcm4che.streams.toCheVR
+import se.nimsa.dicom.VR.VR
 
 object DicomTestData {
 

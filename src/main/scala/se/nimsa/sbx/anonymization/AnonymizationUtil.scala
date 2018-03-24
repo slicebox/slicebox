@@ -19,8 +19,8 @@ package se.nimsa.sbx.anonymization
 import java.util.UUID
 
 import akka.util.ByteString
-import org.dcm4che3.data.VR
 import org.dcm4che3.util.UIDUtils
+import se.nimsa.dicom.VR
 import se.nimsa.sbx.dicom.DicomUtil.toAsciiBytes
 
 import scala.util.Random

@@ -23,13 +23,15 @@ import akka.actor.ActorSystem
 import akka.stream.Materializer
 import akka.stream.scaladsl.{Sink, Source}
 import com.typesafe.scalalogging.LazyLogging
-import org.dcm4che3.data.{Attributes, Tag, UID}
+import org.dcm4che3.data.Attributes
 import org.dcm4che3.imageio.codec.Decompressor
 import org.dcm4che3.net._
 import org.dcm4che3.net.pdu.{AAssociateRQ, PresentationContext}
 import org.dcm4che3.util.TagUtils
-import se.nimsa.dcm4che.streams.DicomParts.{DicomAttributes, DicomPart}
-import se.nimsa.dcm4che.streams.{DicomAttributesSink, DicomFlows}
+import se.nimsa.dcm4che.streams.DicomAttributesSink
+import se.nimsa.dicom.{Tag, UID}
+import se.nimsa.dicom.streams.DicomFlows
+import se.nimsa.dicom.streams.DicomParts.{DicomAttributes, DicomPart}
 import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.scu.ScuProtocol.ScuData
 import se.nimsa.sbx.util.FutureUtil
@@ -197,10 +199,10 @@ object Scu {
 
     val futureDicomDataInfos = FutureUtil.traverseSequentially(imageIds) { imageId =>
       val source = dicomDataProvider.getDicomData(imageId, Some(Tag.TransferSyntaxUID + 1))
-      source.via(DicomFlows.collectAttributesFlow(tags))
+      source.via(DicomFlows.collectAttributesFlow(tags, "scu"))
         .runWith(Sink.head)
         .map {
-          case attributes: DicomAttributes =>
+          case attributes: DicomAttributes if attributes.tag == "scu" =>
             scu.addDicomData(imageId, attributes)
           case _ =>
             None

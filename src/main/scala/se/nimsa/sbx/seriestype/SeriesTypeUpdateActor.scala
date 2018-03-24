@@ -23,7 +23,7 @@ import akka.stream.Materializer
 import akka.util.Timeout
 import org.dcm4che3.data.Attributes
 import se.nimsa.dcm4che.streams.DicomAttributesSink
-import se.nimsa.dcm4che.streams.DicomFlows._
+import se.nimsa.dicom.streams.DicomFlows._
 import se.nimsa.sbx.app.GeneralProtocol.ImageAdded
 import se.nimsa.sbx.dicom.DicomHierarchy.{Image, Series}
 import se.nimsa.sbx.dicom.DicomUtil

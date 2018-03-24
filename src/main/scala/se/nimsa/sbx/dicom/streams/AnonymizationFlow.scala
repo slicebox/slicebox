@@ -19,18 +19,18 @@ package se.nimsa.sbx.dicom.streams
 import akka.NotUsed
 import akka.stream.scaladsl.Flow
 import akka.util.ByteString
-import org.dcm4che3.data.{Tag, VR}
-import se.nimsa.dcm4che.streams.DicomFlows._
-import se.nimsa.dcm4che.streams.DicomModifyFlow._
-import se.nimsa.dcm4che.streams.DicomParts._
-import se.nimsa.dcm4che.streams._
+import se.nimsa.dicom.{Tag, TagPath}
+import se.nimsa.dicom.VR
+import se.nimsa.dicom.streams.DicomFlows._
+import se.nimsa.dicom.streams.DicomModifyFlow.{TagModification, _}
+import se.nimsa.dicom.streams.DicomParsing.isPrivateAttribute
+import se.nimsa.dicom.streams.DicomParts.DicomPart
 import se.nimsa.sbx.anonymization.AnonymizationUtil._
 import se.nimsa.sbx.dicom.DicomUtil._
 import se.nimsa.sbx.dicom.streams.DicomStreamUtil._
 
 object AnonymizationFlow {
 
-  import DicomParsing.isPrivateAttribute
 
   private def insert(tag: Int, mod: ByteString => ByteString) = TagModification.endsWith(TagPath.fromTag(tag), mod, insert = true)
   private def modify(tag: Int, mod: ByteString => ByteString) = TagModification.endsWith(TagPath.fromTag(tag), mod, insert = false)
@@ -214,6 +214,7 @@ object AnonymizationFlow {
     Flow[DicomPart]
       .via(groupLengthDiscardFilter)
       .via(toUndefinedLengthSequences)
+      .via(toUtf8Flow)
       .via(tagFilter(_ => true)(tagPath =>
         !tagPath.toList.map(_.tag).exists(tag =>
           isPrivateAttribute(tag) || isOverlay(tag) || removeTags.contains(tag)))) // remove private, overlay and PHI attributes

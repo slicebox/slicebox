@@ -20,8 +20,8 @@ import akka.stream.scaladsl.{Sink, Source}
 import akka.util.ByteString
 import akka.{Done, NotUsed}
 import com.typesafe.scalalogging.LazyLogging
-import se.nimsa.dcm4che.streams.DicomParseFlow
-import se.nimsa.dcm4che.streams.DicomParts._
+import se.nimsa.dicom.streams.DicomParseFlow
+import se.nimsa.dicom.streams.DicomParts.DicomPart
 
 import scala.concurrent.{ExecutionContext, Future}
 

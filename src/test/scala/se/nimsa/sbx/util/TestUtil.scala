@@ -11,12 +11,14 @@ import akka.http.scaladsl.model.{ContentTypes, HttpEntity, Multipart}
 import akka.stream.testkit.TestSubscriber
 import akka.util.ByteString
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
-import org.dcm4che3.data.{Attributes, Tag, UID, VR}
+import org.dcm4che3.data.Attributes
 import org.dcm4che3.io.DicomInputStream.IncludeBulkData
 import org.dcm4che3.io.{DicomInputStream, DicomOutputStream}
 import org.dcm4che3.util.SafeClose
-import se.nimsa.dcm4che.streams.DicomParts._
-import se.nimsa.dcm4che.streams.tagToString
+import se.nimsa.dcm4che.streams.toCheVR
+import se.nimsa.dicom.VR.VR
+import se.nimsa.dicom.streams.DicomParts._
+import se.nimsa.dicom.{Tag, UID, VR, tagToString}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.AnonymizationKey
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.dicom.DicomData

@@ -23,11 +23,13 @@ import akka.pattern.ask
 import akka.util.{ByteString, Timeout}
 import com.sun.xml.internal.messaging.saaj.util.ByteOutputStream
 import com.typesafe.scalalogging.LazyLogging
-import org.dcm4che3.data.{Attributes, Tag, UID, VR}
+import org.dcm4che3.data.Attributes
 import org.dcm4che3.io.DicomOutputStream
 import org.dcm4che3.net._
 import org.dcm4che3.net.pdu.PresentationContext
 import org.dcm4che3.net.service.{BasicCEchoSCP, BasicCStoreSCP, DicomServiceRegistry}
+import se.nimsa.dcm4che.streams.toCheVR
+import se.nimsa.dicom.{Tag, UID, VR}
 import se.nimsa.sbx.dicom.Contexts
 import se.nimsa.sbx.scp.ScpProtocol.DicomDataReceivedByScp
 

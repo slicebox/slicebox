@@ -9,12 +9,14 @@ import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{Source => StreamSource}
 import akka.testkit.TestKit
 import akka.util.{ByteString, Timeout}
-import org.dcm4che3.data.{Attributes, Tag, UID, VR}
-import org.dcm4che3.io.{DicomOutputStream, DicomStreamException}
+import org.dcm4che3.data.Attributes
+import org.dcm4che3.io.DicomOutputStream
 import org.scalatest.{AsyncFlatSpecLike, BeforeAndAfterAll, BeforeAndAfterEach, Matchers}
-import se.nimsa.dcm4che.streams.DicomFlows.attributeFlow
-import se.nimsa.dcm4che.streams.DicomModifyFlow.TagModification
-import se.nimsa.dcm4che.streams._
+import se.nimsa.dcm4che.streams.{DicomAttributesSink, toCheVR}
+import se.nimsa.dicom._
+import se.nimsa.dicom.streams.DicomFlows.attributeFlow
+import se.nimsa.dicom.streams.DicomModifyFlow.{TagModification, modifyFlow}
+import se.nimsa.dicom.streams.{DicomFlows, DicomStreamException}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.anonymization.{AnonymizationDAO, AnonymizationServiceActor}
 import se.nimsa.sbx.app.GeneralProtocol.{Source, SourceType}
@@ -183,7 +185,7 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("DicomStreamOpsSpec")) with
         val modifiedBytesSource = bytesSource
           .via(storage.parseFlow(None))
           .via(DicomFlows.blacklistFilter(Set(TagPath.fromTag(Tag.PixelData))))
-          .via(DicomModifyFlow.modifyFlow(
+          .via(modifyFlow(
             TagModification.contains(
               TagPath.fromTag(Tag.MediaStorageSOPInstanceUID),
               uid => uid.dropRight(3) ++ ByteString(f"$sopInstanceUID%03d"),

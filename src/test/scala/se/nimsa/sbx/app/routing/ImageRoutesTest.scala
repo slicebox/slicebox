@@ -2,16 +2,15 @@ package se.nimsa.sbx.app.routing
 
 import java.io.ByteArrayInputStream
 import java.util.zip.ZipInputStream
-import javax.imageio.ImageIO
 
+import javax.imageio.ImageIO
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.Uri.Query
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, Uri}
 import akka.http.scaladsl.server.Route
 import akka.util.ByteString
-import org.dcm4che3.data.Tag
 import org.scalatest.{FlatSpecLike, Matchers}
-import se.nimsa.dcm4che.streams.TagPath
+import se.nimsa.dicom.{Tag, TagPath}
 import se.nimsa.sbx.app.GeneralProtocol.Source
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.ImageAttribute

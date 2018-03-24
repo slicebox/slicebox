@@ -19,7 +19,11 @@ package se.nimsa.sbx.app
 import java.util.Base64
 
 import akka.util.ByteString
-import se.nimsa.dcm4che.streams.TagPath
+import play.api.libs.functional.syntax._
+import play.api.libs.json.Reads._
+import play.api.libs.json._
+import se.nimsa.dicom.TagPath
+import se.nimsa.dicom.TagPath.{TagPathSequence, TagPathSequenceAny, TagPathSequenceItem, TagPathTag}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.box.BoxProtocol._
@@ -36,10 +40,6 @@ import se.nimsa.sbx.scu.ScuProtocol._
 import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
 import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.user.UserProtocol._
-import play.api.libs.json._
-import play.api.libs.json.Reads._
-import play.api.libs.functional.syntax._
-import se.nimsa.dcm4che.streams.TagPath.{TagPathSequence, TagPathSequenceAny, TagPathSequenceItem, TagPathTag}
 
 trait JsonFormats {
 

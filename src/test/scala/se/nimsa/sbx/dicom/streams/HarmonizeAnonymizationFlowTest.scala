@@ -6,10 +6,12 @@ import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Source
 import akka.testkit.TestKit
 import akka.util.ByteString
-import org.dcm4che3.data.{Attributes, Tag}
+import org.dcm4che3.data.Attributes
 import org.scalatest.{AsyncFlatSpecLike, BeforeAndAfterAll, Matchers}
-import se.nimsa.dcm4che.streams.DicomParts.DicomPart
-import se.nimsa.dcm4che.streams.{DicomAttributesSink, DicomFlows, DicomParsing}
+import se.nimsa.dcm4che.streams.DicomAttributesSink
+import se.nimsa.dicom.Tag
+import se.nimsa.dicom.streams.DicomParts.DicomPart
+import se.nimsa.dicom.streams.{DicomFlows, DicomParsing}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.AnonymizationKey
 import se.nimsa.sbx.dicom.DicomData
 import se.nimsa.sbx.dicom.streams.DicomStreamUtil._

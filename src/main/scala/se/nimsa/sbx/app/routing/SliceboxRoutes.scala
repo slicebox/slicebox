@@ -24,7 +24,7 @@ import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.AuthenticationFailedRejection.{CredentialsMissing, CredentialsRejected}
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.{AuthenticationFailedRejection, ExceptionHandler, RejectionHandler, Route}
-import org.dcm4che3.io.DicomStreamException
+import se.nimsa.dicom.streams.DicomStreamException
 import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.lang.{BadGatewayException, NotFoundException}
 import se.nimsa.sbx.user.Authenticator

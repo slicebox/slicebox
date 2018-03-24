@@ -30,7 +30,7 @@ class BoxStreamOpsTest(_system: ActorSystem) extends TestKit(_system) with Impli
     TestKit.shutdownActorSystem(system)
   }
 
-  val box: BoxProtocol.Box = Box(1, "Test Box", "abc123", "testbox.com", BoxSendMethod.PUSH, online = false)
+  val box: BoxProtocol.Box = Box(1, "Test Box", "abc123", "testbox2.com", BoxSendMethod.PUSH, online = false)
   val transaction: OutgoingTransaction = OutgoingTransaction(1, box.id, box.name, 0, 1, 1000, 1000, TransactionStatus.WAITING)
 
   class BoxStreamOpsImpl extends BoxStreamOps {
@@ -102,7 +102,7 @@ class BoxStreamOpsTest(_system: ActorSystem) extends TestKit(_system) with Impli
     }
     val impl = new BoxStreamOpsImpl()
     val switch = impl.pollAndTransfer(transferBatch).run()
-    akka.pattern.after(1.second, system.scheduler) {
+    akka.pattern.after(2.seconds, system.scheduler) {
       Future {
         switch.shutdown()
         capturedImages.length shouldBe 300
