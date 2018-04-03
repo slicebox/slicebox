@@ -146,9 +146,22 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
 
   def seriesTagForName(name: String): Future[Option[SeriesTag]] = db.run(seriesTagForNameAction(name))
 
-  def updateSeriesTag(seriesTag: SeriesTag): Future[Unit] = db.run {
+  def seriesTagForIdAction(id: Long) = seriesTagQuery.filter(_.id === id).result.headOption
+
+  def seriesTagForId(id: Long): Future[Option[SeriesTag]] = db.run(seriesTagForIdAction(id))
+
+  def updateSeriesTag(seriesTag: SeriesTag): Future[Option[SeriesTag]] = db.run {
     seriesTagQuery.filter(_.id === seriesTag.id).update(seriesTag)
-  }.map(_ => Unit)
+  }.map { updateCount =>
+    if (updateCount > 0) {
+      Some(seriesTag)
+    } else {
+      None
+    }
+  }
+
+  // FIXME
+  def deleteSeriesTag(tagId: Long) = ???
 
   def listSeriesSources: Future[Seq[SeriesSource]] = db.run {
     seriesSourceQuery.result

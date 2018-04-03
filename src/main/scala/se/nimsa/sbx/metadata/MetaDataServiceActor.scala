@@ -60,6 +60,18 @@ class MetaDataServiceActor(metaDataDao: MetaDataDAO, propertiesDao: PropertiesDA
         case GetSeriesTags =>
           pipe(propertiesDao.listSeriesTags.map(SeriesTags)).to(sender)
 
+        case GetSeriesTag(tagId) =>
+          pipe(propertiesDao.seriesTagForId(tagId)).to(sender)
+
+        case UpdateSeriesTag(tag) =>
+          pipe(propertiesDao.updateSeriesTag(tag)).to(sender)
+
+        case CreateSeriesTag(tag) =>
+          pipe(propertiesDao.insertSeriesTag(tag)).to(sender)
+
+        case DeleteSeriesTag(tagId) =>
+          pipe(propertiesDao.deleteSeriesTag(tagId)).to(sender)
+
         case GetSourceForSeries(seriesId) =>
           pipe(propertiesDao.seriesSourceById(seriesId)).to(sender)
 
