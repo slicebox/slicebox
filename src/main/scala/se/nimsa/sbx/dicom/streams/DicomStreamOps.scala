@@ -26,10 +26,10 @@ import akka.stream.{Materializer, SinkShape}
 import akka.util.ByteString
 import akka.{Done, NotUsed}
 import javax.imageio.ImageIO
-import org.dcm4che3.data.Attributes
+import org.dcm4che3.data.{Attributes, Keyword}
 import org.dcm4che3.imageio.plugins.dcm.DicomImageReadParam
 import se.nimsa.dcm4che.streams._
-import se.nimsa.dicom.TagPath.TagPathSequence
+import se.nimsa.dicom.TagPath.TagPathTag
 import se.nimsa.dicom._
 import se.nimsa.dicom.streams.DicomFlows._
 import se.nimsa.dicom.streams.DicomModifyFlow._
@@ -188,14 +188,11 @@ trait DicomStreamOps {
       .mapAsync(1)(attributesToInfoPart(_, "imageattributes"))
       .via(attributeFlow)
       .statefulMapConcat {
-        var info: Option[DicomInfoPart] = None
-        var namePath = List.empty[String]
-        var tagPath = List.empty[Int]
-        var tagPathSequence: Option[TagPathSequence] = None
+        var characterSets: Option[CharacterSets] = None
 
         () => {
           case mp: DicomInfoPart =>
-            info = Some(mp)
+            characterSets = mp.specificCharacterSet.map(cs => CharacterSets(cs.))
             Nil
           case attribute: DicomAttribute =>
             val tag = attribute.header.tag
@@ -204,14 +201,15 @@ trait DicomStreamOps {
               case VR.OW | VR.OF | VR.OB =>
                 List(s"< Binary data ($length bytes) >")
               case _ =>
-                val attrs = new Attributes(attribute.bigEndian, 9)
-                info.flatMap(_.specificCharacterSet).foreach(cs => attrs.setSpecificCharacterSet(cs.toCodes: _*))
-                attrs.setBytes(tag, attribute.header.vr, attribute.valueBytes.toArray)
-                DicomUtil.getStrings(attrs, tag).toList
+                Value.toStrings(attribute.header.vr, CharacterSets.defaultOnly, attribute.valueBytes).toList
             }
             val multiplicity = values.length
-            val depth = tagPath.size
-            val tagPathTag = tagPathSequence.map(_.thenTag(attribute.header.tag)).getOrElse(TagPath.fromTag(attribute.header.tag))
+            val tagPath = attribute.tagPath.toList.map(_.tag)
+            val tagPathTag = attribute.tagPath match {
+              case tpt: TagPathTag => tpt
+              case _ =>
+            }
+            val depth = attribute.tagPath
 
             ImageAttribute(
               tag,
@@ -222,29 +220,10 @@ trait DicomStreamOps {
               multiplicity,
               length,
               depth,
-              tagPathTag,
+              attribute.tagPath,
               tagPath,
-              namePath,
+              tagPath.map(Keyword.valueOf),
               values) :: Nil
-          case sq: DicomSequence =>
-            namePath = namePath :+ DicomUtil.nameForTag(sq.tag)
-            tagPath = tagPath :+ sq.tag
-            tagPathSequence = tagPathSequence.map(_.thenSequence(sq.tag)).orElse(Some(TagPath.fromSequence(sq.tag)))
-            Nil
-          case _: DicomSequenceDelimitation =>
-            namePath = namePath.dropRight(1)
-            tagPath = tagPath.dropRight(1)
-            tagPathSequence = tagPathSequence.flatMap(_.previous)
-            Nil
-          case fragments: DicomFragments =>
-            tagPathSequence = tagPathSequence.map(_.thenSequence(fragments.tag)).orElse(Some(TagPath.fromSequence(fragments.tag)))
-            Nil
-          case _: DicomFragmentsDelimitation =>
-            tagPathSequence = tagPathSequence.flatMap(_.previous)
-            Nil
-          case item: DicomItem =>
-            tagPathSequence = tagPathSequence.flatMap(s => s.previous.map(_.thenSequence(s.tag, item.index)).orElse(Some(TagPath.fromSequence(s.tag, item.index))))
-            Nil
           case _ => Nil
         }
       }
@@ -254,7 +233,7 @@ trait DicomStreamOps {
       .dataSource(imageId, Some(imageInformationTags.max + 1))
       .via(whitelistFilter(imageInformationTags))
       .via(attributeFlow)
-      .runWith(DicomAttributesSink.attributesSink)
+      .runWith(DicomAttributesSink.attribuesSink)
       .map {
         case (_, maybeAttributes) =>
           maybeAttributes.map { attributes =>

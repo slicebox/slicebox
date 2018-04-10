@@ -79,6 +79,7 @@ object DicomStreamUtil {
                           (implicit ec: ExecutionContext, materializer: Materializer): Future[DicomPart] = {
     dicomPart match {
       case da: DicomAttributes if da.tag == tag =>
+
         Source.fromIterator(() => da.attributes.iterator).runWith(DicomAttributesSink.attributesSink).map {
           case (fmiMaybe, dsMaybe) =>
             DicomInfoPart(
