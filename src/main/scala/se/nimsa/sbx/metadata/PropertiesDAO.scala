@@ -160,9 +160,6 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
     }
   }
 
-  // FIXME
-  def deleteSeriesTag(tagId: Long) = ???
-
   def listSeriesSources: Future[Seq[SeriesSource]] = db.run {
     seriesSourceQuery.result
   }
@@ -171,9 +168,9 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
     seriesTagQuery.result
   }
 
-  def removeSeriesTagAction(seriesTagId: Long) = seriesTagQuery.filter(_.id === seriesTagId).delete.map(_ => {})
+  def deleteSeriesTagAction(tagId: Long) = seriesTagQuery.filter(_.id === tagId).delete.map(_ => {})
 
-  def removeSeriesTag(seriesTagId: Long): Future[Unit] = db.run(removeSeriesTagAction(seriesTagId))
+  def deleteSeriesTag(tagId: Long): Future[Unit] = db.run(deleteSeriesTagAction(tagId))
 
   def insertSeriesSeriesTagAction(seriesSeriesTag: SeriesSeriesTag) =
     (seriesSeriesTagQuery += seriesSeriesTag).map(_ => seriesSeriesTag)
@@ -227,19 +224,9 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
   def addAndInsertSeriesTagForSeriesId(seriesTag: SeriesTag, seriesId: Long): Future[SeriesTag] =
     db.run(addAndInsertSeriesTagForSeriesIdAction(seriesTag, seriesId).transactionally)
 
-  def cleanupSeriesTagAction(seriesTagId: Long) =
-    listSeriesSeriesTagsForSeriesTagIdAction(seriesTagId).flatMap { otherSeriesWithSameTag =>
-      if (otherSeriesWithSameTag.isEmpty)
-        removeSeriesTagAction(seriesTagId)
-      else
-        DBIO.successful({})
-    }
 
-  def cleanupSeriesTag(seriesTagId: Long) = db.run(cleanupSeriesTagAction(seriesTagId))
-
-  def removeAndCleanupSeriesTagForSeriesId(seriesTagId: Long, seriesId: Long): Future[Unit] = db.run {
+  def removeSeriesTagForSeriesId(seriesTagId: Long, seriesId: Long): Future[Unit] = db.run {
     removeSeriesSeriesTagAction(seriesTagId, seriesId)
-      .flatMap(_ => cleanupSeriesTagAction(seriesTagId))
   }
 
   /**
@@ -264,6 +251,7 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
       }
   }
 
+  // FIXME
   private def deleteFullyBatch(imageIds: Seq[Long]) = {
 
     val images = imagesQuery.filter(_.id inSetBind imageIds) // batch this?
@@ -281,26 +269,6 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
               case _ => Some(seriesId)
             }
           )).map(_.flatten)
-        }
-      }.flatMap { emptySeriesIds =>
-
-        // find series tags for removed series, then delete series series tags
-        val seriesSeriesTags = seriesSeriesTagQuery.filter(_.seriesId inSetBind emptySeriesIds)
-        val seriesTagIdsAction = seriesSeriesTags.map(_.seriesTagId).distinct.result
-        val deleteSeriesSeriesTagsAction = seriesSeriesTags.delete
-        seriesTagIdsAction.flatMap { seriesTagIds =>
-          deleteSeriesSeriesTagsAction.flatMap { _ =>
-            DBIO.sequence(seriesTagIds.map(seriesTagId =>
-              seriesSeriesTagQuery.filter(_.seriesTagId === seriesTagId).take(1).result.map {
-                case ims if ims.nonEmpty => None
-                case _ => Some(seriesTagId)
-              }
-            )).map(_.flatten)
-          }
-        }.flatMap { emptySeriesTagIds =>
-          // delete empty series tags
-          seriesTagQuery.filter(_.id inSetBind emptySeriesTagIds).delete
-            .map(_ => emptySeriesIds)
         }
       }.flatMap { emptySeriesIds =>
 

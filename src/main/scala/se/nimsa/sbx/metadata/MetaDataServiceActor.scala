@@ -85,7 +85,7 @@ class MetaDataServiceActor(metaDataDao: MetaDataDAO, propertiesDao: PropertiesDA
             .pipeSequentiallyTo(sender)
 
         case RemoveSeriesTagFromSeries(seriesTagId, seriesId) =>
-          propertiesDao.removeAndCleanupSeriesTagForSeriesId(seriesTagId, seriesId)
+          propertiesDao.removeSeriesTagForSeriesId(seriesTagId, seriesId)
             .map(_ => SeriesTagRemovedFromSeries(seriesId))
             .pipeSequentiallyTo(sender)
       }

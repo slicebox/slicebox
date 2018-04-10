@@ -86,8 +86,7 @@ trait SeriesTagsRoutes {
                 }
               }
             } ~ delete {
-              // FIXME
-              onSuccess(metaDataService.ask(DeleteSeriesTag(tagId))) {
+             onSuccess(metaDataService.ask(DeleteSeriesTag(tagId))) {
                 case SeriesTags(seriesTags) =>
                   complete(NoContent)
               }
