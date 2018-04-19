@@ -25,7 +25,7 @@ case class ImageAttribute(
   name: String,
   vr: String,
   multiplicity: Int,
-  length: Int,
+  length: Long,
   depth: Int,
   tagPathTag: TagPathTag,
   tagPath: List[Int],

@@ -26,21 +26,22 @@ import akka.stream.{Materializer, SinkShape}
 import akka.util.ByteString
 import akka.{Done, NotUsed}
 import javax.imageio.ImageIO
-import org.dcm4che3.data.{Attributes, Keyword}
 import org.dcm4che3.imageio.plugins.dcm.DicomImageReadParam
-import se.nimsa.dcm4che.streams._
 import se.nimsa.dicom.TagPath.TagPathTag
-import se.nimsa.dicom._
+import se.nimsa.dicom.streams.CollectFlow._
 import se.nimsa.dicom.streams.DicomFlows._
-import se.nimsa.dicom.streams.DicomModifyFlow._
 import se.nimsa.dicom.streams.DicomParts._
-import se.nimsa.dicom.streams.{DicomParseFlow, DicomParsing, DicomStreamException}
+import se.nimsa.dicom.streams.ElementFolds._
+import se.nimsa.dicom.streams.Elements.Element
+import se.nimsa.dicom.streams.ModifyFlow._
+import se.nimsa.dicom.streams.{DicomParsing, Elements, ParseFlow}
+import se.nimsa.dicom.{Keyword, _}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.app.GeneralProtocol.{Source, SourceType}
 import se.nimsa.sbx.dicom.Contexts.Context
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.DicomPropertyValue.{PatientID, PatientName}
-import se.nimsa.sbx.dicom.{Contexts, DicomUtil, ImageAttribute}
+import se.nimsa.sbx.dicom.{Contexts, ImageAttribute}
 import se.nimsa.sbx.lang.NotFoundException
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.storage.StorageProtocol.ImageInformation
@@ -72,8 +73,7 @@ trait DicomStreamOps {
     * @param tagValues forced values of attributes as pairs of tag number and string value encoded in UTF-8 (ASCII) format
     * @return a `Source` of anonymized DICOM byte chunks
     */
-  protected def anonymizedDicomData(imageId: Long, tagValues: Seq[TagValue], storage: StorageService)
-                                   (implicit materializer: Materializer, ec: ExecutionContext): StreamSource[ByteString, NotUsed] = {
+  protected def anonymizedDicomData(imageId: Long, tagValues: Seq[TagValue], storage: StorageService)(implicit ec: ExecutionContext): StreamSource[ByteString, NotUsed] = {
     val source = storage.dataSource(imageId, None)
     anonymizedDicomDataSource(source, getOrCreateAnonKey(tagValues), tagValues)
   }
@@ -92,15 +92,15 @@ trait DicomStreamOps {
                               (implicit materializer: Materializer, ec: ExecutionContext): Future[MetaDataAdded] = {
     val tempPath = createTempPath()
     val sink = dicomDataSink(storage.fileSink(tempPath), storage.parseFlow(None), reverseAnonymizationKeysForPatient, contexts, reverseAnonymization)
-    bytesSource.runWith(sink).flatMap {
-      case (_, maybeDataset) => storeDicomData(maybeDataset, source, tempPath, storage)
-    }.recover {
-      case t: Throwable =>
-        scheduleTask(30.seconds) {
-          storage.deleteByName(Seq(tempPath)) // delete temp file once file system has released handle
-        }
-        throw t
-    }
+    bytesSource.runWith(sink)
+      .flatMap(elements => storeDicomData(elements, source, tempPath, storage))
+      .recover {
+        case t: Throwable =>
+          scheduleTask(30.seconds) {
+            storage.deleteByName(Seq(tempPath)) // delete temp file once file system has released handle
+          }
+          throw t
+      }
   }
 
   /**
@@ -166,10 +166,10 @@ trait DicomStreamOps {
     for {
       (sourceMaybe, tags) <- futureSourceAndTags
       source = sourceMaybe.getOrElse(Source(SourceType.UNKNOWN, SourceType.UNKNOWN.toString, -1))
-      (_, maybeDataset) <- futureModifiedTempFile
+      elements <- futureModifiedTempFile
       metaDataDeleted <- callMetaDataService[MetaDataDeleted](DeleteMetaData(Seq(imageId)))
       _ = storage.deleteFromStorage(Seq(imageId))
-      metaDataAdded <- storeDicomData(maybeDataset, source, tempPath, storage)
+      metaDataAdded <- storeDicomData(elements, source, tempPath, storage)
       seriesId = metaDataAdded.series.id
       _ <- Future.sequence {
         tags.map { tag =>
@@ -180,49 +180,46 @@ trait DicomStreamOps {
 
   }
 
-  protected def readImageAttributes(imageId: Long, storage: StorageService)(implicit materializer: Materializer, ec: ExecutionContext): StreamSource[ImageAttribute, NotUsed] =
+  protected def readImageAttributes(imageId: Long, storage: StorageService): StreamSource[ImageAttribute, NotUsed] =
     storage
       .dataSource(imageId, Some(Tag.PixelData))
       .via(bulkDataFilter)
-      .via(collectAttributesFlow(encodingTags, "imageattributes"))
-      .mapAsync(1)(attributesToInfoPart(_, "imageattributes"))
-      .via(attributeFlow)
+      .via(elementsFlow)
       .statefulMapConcat {
-        var characterSets: Option[CharacterSets] = None
+        var characterSets = CharacterSets.defaultOnly
 
         () => {
-          case mp: DicomInfoPart =>
-            characterSets = mp.specificCharacterSet.map(cs => CharacterSets(cs.))
-            Nil
-          case attribute: DicomAttribute =>
-            val tag = attribute.header.tag
-            val length = attribute.valueBytes.length
-            val values = attribute.header.vr match {
-              case VR.OW | VR.OF | VR.OB =>
-                List(s"< Binary data ($length bytes) >")
-              case _ =>
-                Value.toStrings(attribute.header.vr, CharacterSets.defaultOnly, attribute.valueBytes).toList
+          case element: Element =>
+            if (element.tagPath == TagPath.fromTag(Tag.SpecificCharacterSet))
+              characterSets = CharacterSets(element.value)
+
+            val values = element.vr match {
+              case VR.OW | VR.OF | VR.OB => List(s"< Binary data (${element.length} bytes) >")
+              case _ => element.value.toStrings(element.vr, characterSets).toList
             }
+
+            val tagPathTag: TagPathTag = element.tagPath match {
+              case t: TagPathTag => t
+              case t => t.previous.map(_.thenTag(t.tag)).getOrElse(TagPath.fromTag(t.tag))
+            }
+
+            val tag = tagPathTag.tag
             val multiplicity = values.length
-            val tagPath = attribute.tagPath.toList.map(_.tag)
-            val tagPathTag = attribute.tagPath match {
-              case tpt: TagPathTag => tpt
-              case _ =>
-            }
-            val depth = attribute.tagPath
+            val tagPathList = element.tagPath.toList.map(_.tag)
+            val depth = tagPathTag.depth
 
             ImageAttribute(
               tag,
               groupNumber(tag),
               elementNumber(tag),
-              DicomUtil.nameForTag(tag),
-              attribute.header.vr.name,
+              Keyword.valueOf(tag),
+              element.vr.toString,
               multiplicity,
-              length,
+              element.length,
               depth,
-              attribute.tagPath,
-              tagPath,
-              tagPath.map(Keyword.valueOf),
+              tagPathTag,
+              tagPathList,
+              tagPathList.map(Keyword.valueOf),
               values) :: Nil
           case _ => Nil
         }
@@ -232,20 +229,18 @@ trait DicomStreamOps {
     storage
       .dataSource(imageId, Some(imageInformationTags.max + 1))
       .via(whitelistFilter(imageInformationTags))
-      .via(attributeFlow)
-      .runWith(DicomAttributesSink.attribuesSink)
-      .map {
-        case (_, maybeAttributes) =>
-          maybeAttributes.map { attributes =>
-            val instanceNumber = attributes.getInt(Tag.InstanceNumber, 1)
-            val imageIndex = attributes.getInt(Tag.ImageIndex, 1)
-            val frameIndex = if (instanceNumber > imageIndex) instanceNumber else imageIndex
-            ImageInformation(
-              attributes.getInt(Tag.NumberOfFrames, 1),
-              frameIndex,
-              attributes.getInt(Tag.SmallestImagePixelValue, 0),
-              attributes.getInt(Tag.LargestImagePixelValue, 0))
-          }.getOrElse(ImageInformation(0, 0, 0, 0))
+      .via(elementsFlow)
+      .runWith(elementsSink)
+      .map { elements =>
+        val instanceNumber = elements(Tag.InstanceNumber).flatMap(_.value.toInt).getOrElse(1)
+        val imageIndex = elements(Tag.ImageIndex).flatMap(_.value.toInt).getOrElse(1)
+        val frameIndex = if (instanceNumber > imageIndex) instanceNumber else imageIndex
+        ImageInformation(
+          elements(Tag.NumberOfFrames).flatMap(_.value.toInt).getOrElse(1),
+          frameIndex,
+          elements(Tag.SmallestImagePixelValue).flatMap(_.value.toInt).getOrElse(0),
+          elements(Tag.LargestImagePixelValue).flatMap(_.value.toInt).getOrElse(0)
+        )
       }
 
   protected def readPngImageData(imageId: Long, frameNumber: Int, windowMin: Int, windowMax: Int, imageHeight: Int, storage: StorageService)(implicit materializer: Materializer, ec: ExecutionContext): Future[Array[Byte]] = Future {
@@ -306,14 +301,12 @@ trait DicomStreamOps {
 
   }
 
-  private[streams] def storeDicomData(maybeDataset: Option[Attributes], source: Source, tempPath: String, storage: StorageService)
-                                     (implicit ec: ExecutionContext): Future[MetaDataAdded] = {
-    val attributes: Attributes = maybeDataset.getOrElse(throw new DicomStreamException("DICOM data has no dataset"))
-    callMetaDataService[MetaDataAdded](AddMetaData(attributes, source)).map { metaDataAdded =>
+  private[streams] def storeDicomData(elements: Elements, source: Source, tempPath: String, storage: StorageService)
+                                     (implicit ec: ExecutionContext): Future[MetaDataAdded] =
+    callMetaDataService[MetaDataAdded](AddMetaData(elements, source)).map { metaDataAdded =>
       storage.move(tempPath, storage.imageName(metaDataAdded.image.id))
       metaDataAdded
     }
-  }
 
   private[streams] def maybeDeflateFlow: Flow[DicomPart, DicomPart, NotUsed] = conditionalFlow(
     {
@@ -341,23 +334,21 @@ trait DicomStreamOps {
       Future.successful(part :: Nil)
   }
 
-  private[streams] def dicomDataSink(storageSink: Sink[ByteString, Future[Done]], parseFlow: DicomParseFlow, reverseAnonymizationKeysForPatient: (PatientName, PatientID) => Future[Seq[AnonymizationKey]], contexts: Seq[Context], reverseAnonymization: Boolean)
-                                    (implicit ec: ExecutionContext, materializer: Materializer): Sink[ByteString, Future[(Option[Attributes], Option[Attributes])]] = {
-
-    val attributesSink = DicomAttributesSink.attributesSink
+  private[streams] def dicomDataSink(storageSink: Sink[ByteString, Future[Done]], parseFlow: ParseFlow, reverseAnonymizationKeysForPatient: (PatientName, PatientID) => Future[Seq[AnonymizationKey]], contexts: Seq[Context], reverseAnonymization: Boolean)
+                                    (implicit ec: ExecutionContext): Sink[ByteString, Future[Elements]] = {
 
     val validationContexts = Contexts.asNamePairs(contexts).map(ValidationContext.tupled)
 
     def runBothKeepRight[A, B] = (futureLeft: Future[A], futureRight: Future[B]) => futureLeft.flatMap(_ => futureRight)
 
-    Sink.fromGraph(GraphDSL.create(storageSink, attributesSink)(runBothKeepRight) { implicit builder =>
-      (storageSink, attributesSink) =>
+    Sink.fromGraph(GraphDSL.create(storageSink, elementsSink)(runBothKeepRight) { implicit builder =>
+      (storageSink, elementsSink) =>
         import GraphDSL.Implicits._
 
         val baseFlow = validateFlowWithContext(validationContexts, drainIncoming = true)
           .via(parseFlow)
-          .via(collectAttributesFlow(basicInfoTags, "basictags"))
-          .mapAsync(1)(attributesToInfoPart(_, "basictags")) // needed for e.g. maybe deflate flow
+          .via(collectFlow(basicInfoTags, "basictags"))
+          .map(attributesToInfoPart(_, "basictags")) // needed for e.g. maybe deflate flow
 
         val flow = builder.add {
           if (reverseAnonymization)
@@ -373,7 +364,7 @@ trait DicomStreamOps {
 
         flow ~> bcast.in
         bcast.out(0) ~> maybeDeflateFlow.map(_.bytes) ~> storageSink
-        bcast.out(1) ~> whitelistFilter(tagsToStoreInDB) ~> attributeFlow ~> attributesSink
+        bcast.out(1) ~> whitelistFilter(tagsToStoreInDB) ~> elementsFlow ~> elementsSink
 
         SinkShape(flow.in)
     })
@@ -393,11 +384,10 @@ trait DicomStreamOps {
 
   private[streams] def anonymizedDicomDataSource(storageSource: StreamSource[DicomPart, NotUsed],
                                                  getOrCreateAnonKey: DicomInfoPart => Future[AnonymizationKey],
-                                                 tagValues: Seq[TagValue])
-                                                (implicit ec: ExecutionContext, materializer: Materializer): StreamSource[ByteString, NotUsed] =
+                                                 tagValues: Seq[TagValue])(implicit ec: ExecutionContext): StreamSource[ByteString, NotUsed] =
     storageSource // DicomPart...
-      .via(collectAttributesFlow(extendedInfoTags, "extendedtags")) // DicomAttributes :: DicomPart...
-      .mapAsync(1)(attributesToInfoPart(_, "extendedtags")) // DicomInfoPart :: DicomPart...
+      .via(collectFlow(extendedInfoTags, "extendedtags")) // DicomAttributes :: DicomPart...
+      .map(attributesToInfoPart(_, "extendedtags")) // DicomInfoPart :: DicomPart...
       .mapAsync(1)(getOrCreateAnonKeyPart(getOrCreateAnonKey)) // PartialAnonymizationKeyPart :: DicomPart...
       .via(maybeAnonFlow) // PartialAnonymizationKeyPart needed here to determine if data needs anonymization
       .via(maybeHarmonizeAnonFlow) // PartialAnonymizationKeyPart needed here to determine if data needs harmonizing

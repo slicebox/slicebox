@@ -19,12 +19,14 @@ package se.nimsa.sbx.scu
 import java.io.IOException
 import java.net.{ConnectException, NoRouteToHostException, UnknownHostException}
 
+import akka.NotUsed
 import akka.actor.{Actor, ActorSelection, ActorSystem, Props}
 import akka.event.{Logging, LoggingReceive}
 import akka.pattern.pipe
-import akka.stream.Materializer
-import akka.util.Timeout
+import akka.stream.{Materializer, scaladsl}
+import akka.util.{ByteString, Timeout}
 import org.dcm4che3.net.{IncompatibleConnectionException, NoPresentationContextException}
+import se.nimsa.dicom.streams.DicomParts
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.lang.{BadGatewayException, NotFoundException}
 import se.nimsa.sbx.log.SbxLog
@@ -43,7 +45,10 @@ class ScuServiceActor(scuDao: ScuDAO, storage: StorageService)(implicit material
 
   val storageService: ActorSelection = context.actorSelection("../StorageService")
 
-  val dicomDataProvider: DicomDataProvider = (imageId: Long, stopTag: Option[Int]) => storage.dataSource(imageId, stopTag)
+  val dicomDataProvider: DicomDataProvider = new DicomDataProvider {
+    override def getDicomData(imageId: Long, stopTag: Option[Int]): scaladsl.Source[DicomParts.DicomPart, NotUsed] = storage.dataSource(imageId, stopTag)
+    override def getDicomBytes(imageId: Long): scaladsl.Source[ByteString, NotUsed] = storage.fileSource(imageId)
+  }
 
   log.info("SCU service started")
 

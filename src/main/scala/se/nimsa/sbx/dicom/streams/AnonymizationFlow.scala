@@ -19,12 +19,11 @@ package se.nimsa.sbx.dicom.streams
 import akka.NotUsed
 import akka.stream.scaladsl.Flow
 import akka.util.ByteString
-import se.nimsa.dicom.{Tag, TagPath}
-import se.nimsa.dicom.VR
 import se.nimsa.dicom.streams.DicomFlows._
-import se.nimsa.dicom.streams.DicomModifyFlow.{TagModification, _}
-import se.nimsa.dicom.streams.DicomParsing.isPrivateAttribute
+import se.nimsa.dicom.streams.DicomParsing.isPrivate
 import se.nimsa.dicom.streams.DicomParts.DicomPart
+import se.nimsa.dicom.streams.ModifyFlow.{TagModification, modifyFlow}
+import se.nimsa.dicom.{Tag, TagPath, VR}
 import se.nimsa.sbx.anonymization.AnonymizationUtil._
 import se.nimsa.sbx.dicom.DicomUtil._
 import se.nimsa.sbx.dicom.streams.DicomStreamUtil._
@@ -217,7 +216,7 @@ object AnonymizationFlow {
       .via(toUtf8Flow)
       .via(tagFilter(_ => true)(tagPath =>
         !tagPath.toList.map(_.tag).exists(tag =>
-          isPrivateAttribute(tag) || isOverlay(tag) || removeTags.contains(tag)))) // remove private, overlay and PHI attributes
+          isPrivate(tag) || isOverlay(tag) || removeTags.contains(tag)))) // remove private, overlay and PHI attributes
       .via(modifyFlow( // modify, clear and insert
       modify(Tag.AccessionNumber, bytes => if (bytes.nonEmpty) createAccessionNumber(bytes) else bytes),
       modify(Tag.ConcatenationUID, createUid),

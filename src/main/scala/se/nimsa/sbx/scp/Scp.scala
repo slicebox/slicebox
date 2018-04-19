@@ -28,7 +28,7 @@ import org.dcm4che3.io.DicomOutputStream
 import org.dcm4che3.net._
 import org.dcm4che3.net.pdu.PresentationContext
 import org.dcm4che3.net.service.{BasicCEchoSCP, BasicCStoreSCP, DicomServiceRegistry}
-import se.nimsa.dcm4che.streams.toCheVR
+import se.nimsa.sbx.dicom.DicomUtil.toCheVR
 import se.nimsa.dicom.{Tag, UID, VR}
 import se.nimsa.sbx.dicom.Contexts
 import se.nimsa.sbx.scp.ScpProtocol.DicomDataReceivedByScp

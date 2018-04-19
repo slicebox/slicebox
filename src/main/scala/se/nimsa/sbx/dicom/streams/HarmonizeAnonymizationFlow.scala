@@ -19,10 +19,11 @@ package se.nimsa.sbx.dicom.streams
 import akka.NotUsed
 import akka.stream.scaladsl.Flow
 import akka.util.ByteString
-import se.nimsa.dicom.{Tag, TagPath}
-import se.nimsa.dicom.streams.{DicomFlowFactory, GuaranteedValueEvent, IdentityFlow, StartEvent}
-import se.nimsa.dicom.streams.DicomParts.{DicomAttribute, DicomHeader, DicomPart, DicomValueChunk}
+import se.nimsa.dicom.Tag
+import se.nimsa.dicom.streams.CollectFlow.CollectedElement
 import se.nimsa.dicom.streams.DicomFlows._
+import se.nimsa.dicom.streams.DicomParts.{DicomHeader, DicomPart, DicomValueChunk}
+import se.nimsa.dicom.streams.{DicomFlowFactory, GuaranteedValueEvent, IdentityFlow, StartEvent}
 import se.nimsa.sbx.dicom.streams.DicomStreamUtil._
 
 /**
@@ -41,11 +42,11 @@ object HarmonizeAnonymizationFlow {
     .via(groupLengthDiscardFilter)
     .via(toUndefinedLengthSequences)
     .via(toUtf8Flow)
-    .via(DicomFlowFactory.create(new IdentityFlow with GuaranteedValueEvent with StartEvent {
+    .via(DicomFlowFactory.create(new IdentityFlow with GuaranteedValueEvent[DicomPart] with StartEvent[DicomPart] {
       var maybeKey: Option[PartialAnonymizationKeyPart] = None
-      var currentAttribute: Option[DicomAttribute] = None
+      var currentAttribute: Option[CollectedElement] = None
 
-      def maybeHarmonize(attribute: DicomAttribute, keyPart: PartialAnonymizationKeyPart): List[DicomPart] = {
+      def maybeHarmonize(attribute: CollectedElement, keyPart: PartialAnonymizationKeyPart): List[DicomPart] = {
         val updatedAttribute = attribute.header.tag match {
           case Tag.PatientName => keyPart.keyMaybe
             .map(key => attribute.withUpdatedValue(ByteString(key.anonPatientName)))
@@ -84,7 +85,7 @@ object HarmonizeAnonymizationFlow {
 
       override def onHeader(header: DicomHeader): List[DicomPart] =
         if (needHarmonizeAnon(header.tag, maybeKey)) {
-          currentAttribute = Some(DicomAttribute(header, TagPath.fromTag(header.tag), Seq.empty))
+          currentAttribute = Some(CollectedElement(header, Seq.empty))
           super.onHeader(header).filterNot(_ == header)
         } else {
           currentAttribute = None

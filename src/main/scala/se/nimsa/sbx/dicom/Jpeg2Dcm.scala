@@ -24,7 +24,7 @@ import org.dcm4che3.io.DicomOutputStream
 import org.dcm4che3.util.UIDUtils
 import se.nimsa.dicom.{Tag, UID, VR}
 import se.nimsa.sbx.dicom.DicomHierarchy.{Patient, Study}
-import se.nimsa.dcm4che.streams.toCheVR
+import se.nimsa.sbx.dicom.DicomUtil.toCheVR
 
 /**
  * Scala port and minor adaptation of the Jpg2Dcm tool which is part of the Dcm4Che toolkit.

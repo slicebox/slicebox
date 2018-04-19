@@ -19,11 +19,12 @@ package se.nimsa.sbx.dicom.streams
 import akka.NotUsed
 import akka.stream.scaladsl.Flow
 import akka.util.ByteString
-import se.nimsa.dicom.{Tag, TagPath}
+import se.nimsa.dicom.streams.CollectFlow.CollectedElement
 import se.nimsa.dicom.streams.DicomFlows._
-import se.nimsa.dicom.streams.DicomModifyFlow.TagModification
-import se.nimsa.dicom.streams.DicomParts.{DicomAttribute, DicomHeader, DicomPart, DicomValueChunk}
+import se.nimsa.dicom.streams.ModifyFlow.{TagModification, modifyFlow}
+import se.nimsa.dicom.streams.DicomParts.{DicomHeader, DicomPart, DicomValueChunk}
 import se.nimsa.dicom.streams._
+import se.nimsa.dicom.{Tag, TagPath}
 import se.nimsa.sbx.dicom.streams.DicomStreamUtil._
 
 /**
@@ -51,13 +52,13 @@ object ReverseAnonymizationFlow {
     .via(groupLengthDiscardFilter)
     .via(toUndefinedLengthSequences)
     .via(toUtf8Flow)
-    .via(DicomModifyFlow.modifyFlow(
+    .via(modifyFlow(
       reverseTags.map(tag => TagModification.endsWith(TagPath.fromTag(tag), identity, insert = true)): _*))
-    .via(DicomFlowFactory.create(new IdentityFlow with GuaranteedValueEvent with StartEvent {
+    .via(DicomFlowFactory.create(new IdentityFlow with GuaranteedValueEvent[DicomPart] with StartEvent[DicomPart] {
       var maybeKey: Option[PartialAnonymizationKeyPart] = None
-      var currentAttribute: Option[DicomAttribute] = None
+      var currentAttribute: Option[CollectedElement] = None
 
-      def maybeReverse(attribute: DicomAttribute, keyPart: PartialAnonymizationKeyPart): List[DicomPart with Product with Serializable] = {
+      def maybeReverse(attribute: CollectedElement, keyPart: PartialAnonymizationKeyPart): List[DicomPart with Product with Serializable] = {
         val updatedAttribute = attribute.header.tag match {
           case Tag.PatientName => keyPart.keyMaybe.filter(_ => keyPart.hasPatientInfo).map(key =>
             attribute.withUpdatedValue(ByteString(key.patientName))).getOrElse(attribute)
@@ -106,7 +107,7 @@ object ReverseAnonymizationFlow {
 
       override def onHeader(header: DicomHeader): List[DicomPart] =
         if (needReverseAnon(header.tag, maybeKey) && canDoReverseAnon(maybeKey)) {
-          currentAttribute = Some(DicomAttribute(header, TagPath.fromTag(header.tag), Seq.empty))
+          currentAttribute = Some(CollectedElement(header, Seq.empty))
           super.onHeader(header).filterNot(_ == header)
         } else {
           currentAttribute = None

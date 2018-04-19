@@ -31,7 +31,7 @@ import akka.pattern.ask
 import akka.stream.scaladsl.{Sink, SourceQueueWithComplete, Source => StreamSource}
 import akka.stream.{OverflowStrategy, QueueOfferResult}
 import akka.util.ByteString
-import se.nimsa.dicom.streams.DicomModifyFlow.TagModification
+import se.nimsa.dicom.streams.ModifyFlow.TagModification
 import se.nimsa.dicom.padToEvenLength
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.app.SliceboxBase

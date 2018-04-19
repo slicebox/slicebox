@@ -17,16 +17,14 @@
 package se.nimsa.sbx.dicom.streams
 
 import akka.NotUsed
-import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Merge, Source}
-import akka.stream.{FlowShape, Materializer}
+import akka.stream.FlowShape
+import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Merge}
 import akka.util.ByteString
-import org.dcm4che3.data.SpecificCharacterSet
-import se.nimsa.dcm4che.streams.DicomAttributesSink
-import se.nimsa.dicom.Tag
-import se.nimsa.dicom.streams.DicomParts.{DicomAttributes, DicomPart}
+import se.nimsa.dicom.Value.ByteStringExtension
+import se.nimsa.dicom.streams.CollectFlow.CollectedElements
+import se.nimsa.dicom.streams.DicomParts.DicomPart
+import se.nimsa.dicom.{CharacterSets, Tag, VR}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.AnonymizationKey
-
-import scala.concurrent.{ExecutionContext, Future}
 
 object DicomStreamUtil {
 
@@ -54,8 +52,8 @@ object DicomStreamUtil {
     def bigEndian: Boolean = false
   }
 
-  case class DicomInfoPart(transferSyntaxUid: Option[String],
-                           specificCharacterSet: Option[SpecificCharacterSet],
+  case class DicomInfoPart(characterSets: CharacterSets,
+                           transferSyntaxUid: Option[String],
                            patientID: Option[String],
                            patientName: Option[String],
                            patientSex: Option[String],
@@ -75,32 +73,28 @@ object DicomStreamUtil {
     def isAnonymized: Boolean = identityRemoved.exists(_.toUpperCase == "YES")
   }
 
-  def attributesToInfoPart(dicomPart: DicomPart, tag: String)
-                          (implicit ec: ExecutionContext, materializer: Materializer): Future[DicomPart] = {
+  def attributesToInfoPart(dicomPart: DicomPart, tag: String): DicomPart = {
     dicomPart match {
-      case da: DicomAttributes if da.tag == tag =>
-
-        Source.fromIterator(() => da.attributes.iterator).runWith(DicomAttributesSink.attributesSink).map {
-          case (fmiMaybe, dsMaybe) =>
+      case da: CollectedElements if da.tag == tag =>
             DicomInfoPart(
-              fmiMaybe.flatMap(fmi => Option(fmi.getString(Tag.TransferSyntaxUID))),
-              dsMaybe.flatMap(ds => Option(ds.getSpecificCharacterSet)),
-              dsMaybe.flatMap(ds => Option(ds.getString(Tag.PatientID))),
-              dsMaybe.flatMap(ds => Option(ds.getString(Tag.PatientName))),
-              dsMaybe.flatMap(ds => Option(ds.getString(Tag.PatientSex))),
-              dsMaybe.flatMap(ds => Option(ds.getString(Tag.PatientBirthDate))),
-              dsMaybe.flatMap(ds => Option(ds.getString(Tag.PatientAge))),
-              dsMaybe.flatMap(ds => Option(ds.getString(Tag.PatientIdentityRemoved))),
-              dsMaybe.flatMap(ds => Option(ds.getString(Tag.StudyInstanceUID))),
-              dsMaybe.flatMap(ds => Option(ds.getString(Tag.StudyDescription))),
-              dsMaybe.flatMap(ds => Option(ds.getString(Tag.StudyID))),
-              dsMaybe.flatMap(ds => Option(ds.getString(Tag.AccessionNumber))),
-              dsMaybe.flatMap(ds => Option(ds.getString(Tag.SeriesInstanceUID))),
-              dsMaybe.flatMap(ds => Option(ds.getString(Tag.SeriesDescription))),
-              dsMaybe.flatMap(ds => Option(ds.getString(Tag.ProtocolName))),
-              dsMaybe.flatMap(ds => Option(ds.getString(Tag.FrameOfReferenceUID))))
-        }
-      case part: DicomPart => Future.successful(part)
+              da.characterSets,
+              da.elements.find(_.tag == Tag.TransferSyntaxUID).map(_.bytes.toValue.toSingleString(VR.UI, da.characterSets)),
+              da.elements.find(_.tag == Tag.PatientID).map(_.bytes.toValue.toSingleString(VR.LO, da.characterSets)),
+              da.elements.find(_.tag == Tag.PatientName).map(_.bytes.toValue.toSingleString(VR.PN, da.characterSets)),
+              da.elements.find(_.tag == Tag.PatientSex).map(_.bytes.toValue.toSingleString(VR.CS, da.characterSets)),
+              da.elements.find(_.tag == Tag.PatientBirthDate).map(_.bytes.toValue.toSingleString(VR.DA, da.characterSets)),
+              da.elements.find(_.tag == Tag.PatientAge).map(_.bytes.toValue.toSingleString(VR.AS, da.characterSets)),
+              da.elements.find(_.tag == Tag.PatientIdentityRemoved).map(_.bytes.toValue.toSingleString(VR.CS, da.characterSets)),
+              da.elements.find(_.tag == Tag.StudyInstanceUID).map(_.bytes.toValue.toSingleString(VR.UI, da.characterSets)),
+              da.elements.find(_.tag == Tag.StudyDescription).map(_.bytes.toValue.toSingleString(VR.LO, da.characterSets)),
+              da.elements.find(_.tag == Tag.StudyID).map(_.bytes.toValue.toSingleString(VR.SH, da.characterSets)),
+              da.elements.find(_.tag == Tag.AccessionNumber).map(_.bytes.toValue.toSingleString(VR.SH, da.characterSets)),
+              da.elements.find(_.tag == Tag.SeriesInstanceUID).map(_.bytes.toValue.toSingleString(VR.UI, da.characterSets)),
+              da.elements.find(_.tag == Tag.SeriesDescription).map(_.bytes.toValue.toSingleString(VR.LO, da.characterSets)),
+              da.elements.find(_.tag == Tag.ProtocolName).map(_.bytes.toValue.toSingleString(VR.LO, da.characterSets)),
+              da.elements.find(_.tag == Tag.FrameOfReferenceUID).map(_.bytes.toValue.toSingleString(VR.UI, da.characterSets))
+            )
+      case part: DicomPart => part
     }
   }
 

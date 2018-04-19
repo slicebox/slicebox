@@ -13,11 +13,11 @@ import akka.util.ByteString
 import org.dcm4che3.data.Attributes
 import org.dcm4che3.io.DicomOutputStream
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
-import se.nimsa.dcm4che.streams.toCheVR
+import se.nimsa.dicom.streams.CollectFlow.collectFlow
 import se.nimsa.dicom.streams.DicomFlows
-import se.nimsa.dicom.streams.DicomFlows.collectAttributesFlow
 import se.nimsa.dicom.streams.DicomParts.{DicomPart, DicomValueChunk}
 import se.nimsa.dicom.{Tag, UID, VR}
+import se.nimsa.sbx.dicom.DicomUtil.toCheVR
 import se.nimsa.sbx.dicom.streams.DicomStreamUtil._
 import se.nimsa.sbx.storage.{RuntimeStorage, StorageService}
 import se.nimsa.sbx.util.TestUtil._
@@ -49,8 +49,8 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
 
   def toMaybeAnonSource(attributes: Attributes): Source[DicomPart, NotUsed] =
     toSource(attributes)
-      .via(collectAttributesFlow(basicInfoTags, "anon"))
-      .mapAsync(5)(attributesToInfoPart(_, "anon"))
+      .via(collectFlow(basicInfoTags, "anon"))
+      .map(attributesToInfoPart(_, "anon"))
       .via(AnonymizationFlow.maybeAnonFlow)
 
   def checkBasicAttributes(source: Source[DicomPart, NotUsed]): PartProbe =

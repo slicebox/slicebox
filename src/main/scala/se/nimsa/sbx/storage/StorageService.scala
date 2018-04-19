@@ -20,8 +20,8 @@ import akka.stream.scaladsl.{Sink, Source}
 import akka.util.ByteString
 import akka.{Done, NotUsed}
 import com.typesafe.scalalogging.LazyLogging
-import se.nimsa.dicom.streams.DicomParseFlow
 import se.nimsa.dicom.streams.DicomParts.DicomPart
+import se.nimsa.dicom.streams.ParseFlow
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -56,7 +56,7 @@ trait StorageService extends LazyLogging {
     *
     * @param stopTag optional stop tag (exclusive)
     */
-  def parseFlow(stopTag: Option[Int]) = new DicomParseFlow(streamChunkSize, stopTag)
+  def parseFlow(stopTag: Option[Int]) = new ParseFlow(streamChunkSize, stopTag)
 
   /**
     * Source for dicom data
