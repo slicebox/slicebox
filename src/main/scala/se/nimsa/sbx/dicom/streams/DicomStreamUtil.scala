@@ -20,32 +20,31 @@ import akka.NotUsed
 import akka.stream.FlowShape
 import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Merge}
 import akka.util.ByteString
-import se.nimsa.dicom.Value.ByteStringExtension
+import se.nimsa.dicom.DicomParts.DicomPart
+import se.nimsa.dicom._
 import se.nimsa.dicom.streams.CollectFlow.CollectedElements
-import se.nimsa.dicom.streams.DicomParts.DicomPart
-import se.nimsa.dicom.{CharacterSets, Tag, VR}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.AnonymizationKey
 
 object DicomStreamUtil {
 
-  val encodingTags = Set(Tag.TransferSyntaxUID, Tag.SpecificCharacterSet)
+  val encodingTags: Set[TagPath] = Set(Tag.TransferSyntaxUID, Tag.SpecificCharacterSet).map(TagPath.fromTag)
 
-  val tagsToStoreInDB: Set[Int] = {
-    val patientTags = Seq(Tag.PatientName, Tag.PatientID, Tag.PatientSex, Tag.PatientBirthDate)
-    val studyTags = Seq(Tag.StudyInstanceUID, Tag.StudyDescription, Tag.StudyID, Tag.StudyDate, Tag.AccessionNumber, Tag.PatientAge)
-    val seriesTags = Seq(Tag.SeriesInstanceUID, Tag.SeriesDescription, Tag.SeriesDate, Tag.Modality, Tag.ProtocolName, Tag.BodyPartExamined, Tag.Manufacturer, Tag.StationName, Tag.FrameOfReferenceUID)
-    val imageTags = Seq(Tag.SOPInstanceUID, Tag.ImageType, Tag.InstanceNumber)
+  val tagsToStoreInDB: Set[TagPath] = {
+    val patientTags = Seq(Tag.PatientName, Tag.PatientID, Tag.PatientSex, Tag.PatientBirthDate).map(TagPath.fromTag)
+    val studyTags = Seq(Tag.StudyInstanceUID, Tag.StudyDescription, Tag.StudyID, Tag.StudyDate, Tag.AccessionNumber, Tag.PatientAge).map(TagPath.fromTag)
+    val seriesTags = Seq(Tag.SeriesInstanceUID, Tag.SeriesDescription, Tag.SeriesDate, Tag.Modality, Tag.ProtocolName, Tag.BodyPartExamined, Tag.Manufacturer, Tag.StationName, Tag.FrameOfReferenceUID).map(TagPath.fromTag)
+    val imageTags = Seq(Tag.SOPInstanceUID, Tag.ImageType, Tag.InstanceNumber).map(TagPath.fromTag)
 
     encodingTags ++ patientTags ++ studyTags ++ seriesTags ++ imageTags
   }
 
-  val basicInfoTags: Set[Int] = encodingTags ++ Set(Tag.PatientName, Tag.PatientID, Tag.PatientIdentityRemoved,
-    Tag.StudyInstanceUID, Tag.SeriesInstanceUID)
+  val basicInfoTags: Set[TagPath] = encodingTags ++ Set(Tag.PatientName, Tag.PatientID, Tag.PatientIdentityRemoved,
+    Tag.StudyInstanceUID, Tag.SeriesInstanceUID).map(TagPath.fromTag)
 
-  val extendedInfoTags: Set[Int] = basicInfoTags ++ Set(Tag.PatientSex, Tag.PatientBirthDate, Tag.PatientAge, Tag.StudyDescription, Tag.StudyID,
-    Tag.AccessionNumber, Tag.SeriesDescription, Tag.ProtocolName, Tag.FrameOfReferenceUID)
+  val extendedInfoTags: Set[TagPath] = basicInfoTags ++ Set(Tag.PatientSex, Tag.PatientBirthDate, Tag.PatientAge, Tag.StudyDescription, Tag.StudyID,
+    Tag.AccessionNumber, Tag.SeriesDescription, Tag.ProtocolName, Tag.FrameOfReferenceUID).map(TagPath.fromTag)
 
-  val imageInformationTags = Set(Tag.InstanceNumber, Tag.ImageIndex, Tag.NumberOfFrames, Tag.SmallestImagePixelValue, Tag.LargestImagePixelValue)
+  val imageInformationTags: Set[TagPath] = Set(Tag.InstanceNumber, Tag.ImageIndex, Tag.NumberOfFrames, Tag.SmallestImagePixelValue, Tag.LargestImagePixelValue).map(TagPath.fromTag)
 
   case class PartialAnonymizationKeyPart(keyMaybe: Option[AnonymizationKey], hasPatientInfo: Boolean, hasStudyInfo: Boolean, hasSeriesInfo: Boolean) extends DicomPart {
     def bytes: ByteString = ByteString.empty
@@ -76,23 +75,25 @@ object DicomStreamUtil {
   def attributesToInfoPart(dicomPart: DicomPart, tag: String): DicomPart = {
     dicomPart match {
       case da: CollectedElements if da.tag == tag =>
+        def toString(e: Element): String = e.toSingleString(da.characterSets)
+
             DicomInfoPart(
               da.characterSets,
-              da.elements.find(_.tag == Tag.TransferSyntaxUID).map(_.bytes.toValue.toSingleString(VR.UI, da.characterSets)),
-              da.elements.find(_.tag == Tag.PatientID).map(_.bytes.toValue.toSingleString(VR.LO, da.characterSets)),
-              da.elements.find(_.tag == Tag.PatientName).map(_.bytes.toValue.toSingleString(VR.PN, da.characterSets)),
-              da.elements.find(_.tag == Tag.PatientSex).map(_.bytes.toValue.toSingleString(VR.CS, da.characterSets)),
-              da.elements.find(_.tag == Tag.PatientBirthDate).map(_.bytes.toValue.toSingleString(VR.DA, da.characterSets)),
-              da.elements.find(_.tag == Tag.PatientAge).map(_.bytes.toValue.toSingleString(VR.AS, da.characterSets)),
-              da.elements.find(_.tag == Tag.PatientIdentityRemoved).map(_.bytes.toValue.toSingleString(VR.CS, da.characterSets)),
-              da.elements.find(_.tag == Tag.StudyInstanceUID).map(_.bytes.toValue.toSingleString(VR.UI, da.characterSets)),
-              da.elements.find(_.tag == Tag.StudyDescription).map(_.bytes.toValue.toSingleString(VR.LO, da.characterSets)),
-              da.elements.find(_.tag == Tag.StudyID).map(_.bytes.toValue.toSingleString(VR.SH, da.characterSets)),
-              da.elements.find(_.tag == Tag.AccessionNumber).map(_.bytes.toValue.toSingleString(VR.SH, da.characterSets)),
-              da.elements.find(_.tag == Tag.SeriesInstanceUID).map(_.bytes.toValue.toSingleString(VR.UI, da.characterSets)),
-              da.elements.find(_.tag == Tag.SeriesDescription).map(_.bytes.toValue.toSingleString(VR.LO, da.characterSets)),
-              da.elements.find(_.tag == Tag.ProtocolName).map(_.bytes.toValue.toSingleString(VR.LO, da.characterSets)),
-              da.elements.find(_.tag == Tag.FrameOfReferenceUID).map(_.bytes.toValue.toSingleString(VR.UI, da.characterSets))
+              da.elements.find(_.header.tag == Tag.TransferSyntaxUID).map(toString),
+              da.elements.find(_.header.tag == Tag.PatientID).map(toString),
+              da.elements.find(_.header.tag == Tag.PatientName).map(toString),
+              da.elements.find(_.header.tag == Tag.PatientSex).map(toString),
+              da.elements.find(_.header.tag == Tag.PatientBirthDate).map(toString),
+              da.elements.find(_.header.tag == Tag.PatientAge).map(toString),
+              da.elements.find(_.header.tag == Tag.PatientIdentityRemoved).map(toString),
+              da.elements.find(_.header.tag == Tag.StudyInstanceUID).map(toString),
+              da.elements.find(_.header.tag == Tag.StudyDescription).map(toString),
+              da.elements.find(_.header.tag == Tag.StudyID).map(toString),
+              da.elements.find(_.header.tag == Tag.AccessionNumber).map(toString),
+              da.elements.find(_.header.tag == Tag.SeriesInstanceUID).map(toString),
+              da.elements.find(_.header.tag == Tag.SeriesDescription).map(toString),
+              da.elements.find(_.header.tag == Tag.ProtocolName).map(toString),
+              da.elements.find(_.header.tag == Tag.FrameOfReferenceUID).map(toString)
             )
       case part: DicomPart => part
     }

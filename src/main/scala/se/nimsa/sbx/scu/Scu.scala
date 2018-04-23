@@ -32,8 +32,8 @@ import org.dcm4che3.net.pdu.{AAssociateRQ, PresentationContext}
 import org.dcm4che3.util.TagUtils
 import se.nimsa.dicom.streams.CollectFlow
 import se.nimsa.dicom.streams.CollectFlow.CollectedElements
-import se.nimsa.dicom.streams.DicomParts.DicomPart
-import se.nimsa.dicom.{Tag, UID}
+import se.nimsa.dicom.DicomParts.DicomPart
+import se.nimsa.dicom.{Tag, TagPath, UID}
 import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.scu.ScuProtocol.ScuData
 import se.nimsa.sbx.util.FutureUtil
@@ -76,9 +76,9 @@ class Scu(ae: ApplicationEntity, scuData: ScuData)
   def addDicomData(imageId: Long, dicomAttributes: CollectedElements): Option[DicomDataInfo] = {
     val attributes = dicomAttributes.elements
 
-    val tsMaybe = attributes.find(_.header.tag == Tag.TransferSyntaxUID).map(a => a.valueBytes.utf8String.trim)
-    val cuidMaybe = attributes.find(_.header.tag == Tag.MediaStorageSOPClassUID).map(a => a.valueBytes.utf8String.trim)
-    val iuidMaybe = attributes.find(_.header.tag == Tag.MediaStorageSOPInstanceUID).map(a => a.valueBytes.utf8String.trim)
+    val tsMaybe = attributes.find(_.header.tag == Tag.TransferSyntaxUID).map(a => a.value.utf8String.trim)
+    val cuidMaybe = attributes.find(_.header.tag == Tag.MediaStorageSOPClassUID).map(a => a.value.utf8String.trim)
+    val iuidMaybe = attributes.find(_.header.tag == Tag.MediaStorageSOPInstanceUID).map(a => a.value.utf8String.trim)
 
     val dicomDataInfoMaybe = for {
       ts <- tsMaybe
@@ -193,7 +193,7 @@ object Scu {
 
     val scu = new Scu(ae, scuData)
 
-    val tags = Set(Tag.MediaStorageSOPClassUID, Tag.MediaStorageSOPInstanceUID, Tag.TransferSyntaxUID)
+    val tags: Set[TagPath] = Set(Tag.MediaStorageSOPClassUID, Tag.MediaStorageSOPInstanceUID, Tag.TransferSyntaxUID).map(TagPath.fromTag)
 
     val futureDicomDataInfos = FutureUtil.traverseSequentially(imageIds) { imageId =>
       val source = dicomDataProvider.getDicomData(imageId, Some(Tag.TransferSyntaxUID + 1))

@@ -24,7 +24,7 @@ import akka.util.Timeout
 import se.nimsa.dicom.TagPath
 import se.nimsa.dicom.streams.DicomFlows._
 import se.nimsa.dicom.streams.ElementFolds._
-import se.nimsa.dicom.streams.Elements
+import se.nimsa.dicom.Elements
 import se.nimsa.sbx.app.GeneralProtocol.ImageAdded
 import se.nimsa.sbx.dicom.DicomHierarchy.{Image, Series}
 import se.nimsa.sbx.dicom.DicomUtil

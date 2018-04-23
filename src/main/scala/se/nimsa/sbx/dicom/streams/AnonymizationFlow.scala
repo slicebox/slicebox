@@ -20,8 +20,8 @@ import akka.NotUsed
 import akka.stream.scaladsl.Flow
 import akka.util.ByteString
 import se.nimsa.dicom.streams.DicomFlows._
-import se.nimsa.dicom.streams.DicomParsing.isPrivate
-import se.nimsa.dicom.streams.DicomParts.DicomPart
+import se.nimsa.dicom.DicomParsing.isPrivate
+import se.nimsa.dicom.DicomParts.DicomPart
 import se.nimsa.dicom.streams.ModifyFlow.{TagModification, modifyFlow}
 import se.nimsa.dicom.{Tag, TagPath, VR}
 import se.nimsa.sbx.anonymization.AnonymizationUtil._

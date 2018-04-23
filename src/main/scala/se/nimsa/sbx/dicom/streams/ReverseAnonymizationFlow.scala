@@ -19,10 +19,10 @@ package se.nimsa.sbx.dicom.streams
 import akka.NotUsed
 import akka.stream.scaladsl.Flow
 import akka.util.ByteString
-import se.nimsa.dicom.streams.CollectFlow.CollectedElement
+import se.nimsa.dicom.Element
 import se.nimsa.dicom.streams.DicomFlows._
 import se.nimsa.dicom.streams.ModifyFlow.{TagModification, modifyFlow}
-import se.nimsa.dicom.streams.DicomParts.{DicomHeader, DicomPart, DicomValueChunk}
+import se.nimsa.dicom.DicomParts.{DicomHeader, DicomPart, DicomValueChunk}
 import se.nimsa.dicom.streams._
 import se.nimsa.dicom.{Tag, TagPath}
 import se.nimsa.sbx.dicom.streams.DicomStreamUtil._
@@ -56,9 +56,9 @@ object ReverseAnonymizationFlow {
       reverseTags.map(tag => TagModification.endsWith(TagPath.fromTag(tag), identity, insert = true)): _*))
     .via(DicomFlowFactory.create(new IdentityFlow with GuaranteedValueEvent[DicomPart] with StartEvent[DicomPart] {
       var maybeKey: Option[PartialAnonymizationKeyPart] = None
-      var currentAttribute: Option[CollectedElement] = None
+      var currentAttribute: Option[Element] = None
 
-      def maybeReverse(attribute: CollectedElement, keyPart: PartialAnonymizationKeyPart): List[DicomPart with Product with Serializable] = {
+      def maybeReverse(attribute: Element, keyPart: PartialAnonymizationKeyPart): List[DicomPart with Product with Serializable] = {
         val updatedAttribute = attribute.header.tag match {
           case Tag.PatientName => keyPart.keyMaybe.filter(_ => keyPart.hasPatientInfo).map(key =>
             attribute.withUpdatedValue(ByteString(key.patientName))).getOrElse(attribute)
@@ -86,7 +86,7 @@ object ReverseAnonymizationFlow {
             attribute.withUpdatedValue(ByteString(key.frameOfReferenceUID))).getOrElse(attribute)
           case _ => attribute
         }
-        updatedAttribute.header :: updatedAttribute.valueChunks.toList
+        updatedAttribute.header :: DicomValueChunk(updatedAttribute.bigEndian, updatedAttribute.value, last = true) :: Nil
       }
 
       /*
@@ -107,7 +107,7 @@ object ReverseAnonymizationFlow {
 
       override def onHeader(header: DicomHeader): List[DicomPart] =
         if (needReverseAnon(header.tag, maybeKey) && canDoReverseAnon(maybeKey)) {
-          currentAttribute = Some(CollectedElement(header, Seq.empty))
+          currentAttribute = Some(Element(TagPath.fromTag(header.tag), header.bigEndian, header.vr, header.explicitVR, header.length, ByteString.empty))
           super.onHeader(header).filterNot(_ == header)
         } else {
           currentAttribute = None
@@ -116,7 +116,7 @@ object ReverseAnonymizationFlow {
 
       override def onValueChunk(chunk: DicomValueChunk): List[DicomPart] =
         if (currentAttribute.isDefined && canDoReverseAnon(maybeKey)) {
-          currentAttribute = currentAttribute.map(attribute => attribute.copy(valueChunks = attribute.valueChunks :+ chunk))
+          currentAttribute = currentAttribute.map(attribute => attribute.copy(value = attribute.value ++ chunk.bytes))
 
           if (chunk.last) {
             val attribute = currentAttribute.get

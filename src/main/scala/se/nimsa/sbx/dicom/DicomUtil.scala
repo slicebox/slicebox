@@ -20,7 +20,7 @@ import akka.util.ByteString
 import org.dcm4che3.data.{Attributes, Keyword, VR => CheVR}
 import se.nimsa.dicom.VR.VR
 import se.nimsa.dicom._
-import se.nimsa.dicom.streams.Elements
+import se.nimsa.dicom.Elements
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomPropertyValue._
 
@@ -70,11 +70,11 @@ object DicomUtil {
       -1,
       -1,
       SOPInstanceUID(valueOrEmpty(attributes, DicomProperty.SOPInstanceUID.dicomTag)),
-      ImageType(readMultiple(attributes(DicomProperty.ImageType.dicomTag).map(_.value.toStrings).getOrElse(Seq.empty))),
+      ImageType(readMultiple(attributes(DicomProperty.ImageType.dicomTag).map(_.toStrings()).getOrElse(Seq.empty))),
       InstanceNumber(valueOrEmpty(attributes, DicomProperty.InstanceNumber.dicomTag)))
 
   private def valueOrEmpty(attributes: Elements, tag: Int) =
-    attributes(tag).map(e => e.value.toSingleString(e.vr, attributes.characterSets)).getOrElse("")
+    attributes(tag).map(_.toSingleString()).getOrElse("")
 
   def readMultiple(values: Seq[String]): String =
     if (values == null || values.length == 0)
@@ -83,7 +83,7 @@ object DicomUtil {
       values.tail.foldLeft(values.head)((result, part) => result + "/" + part)
 
   def getStrings(attrs: Elements, tag: Int): Seq[String] =
-    attrs(tag).map(a => a.value.toStrings).getOrElse(Seq(""))
+    attrs(tag).map(a => a.toStrings()).getOrElse(Seq(""))
 
   def concatenatedStringForTag(attrs: Elements, tag: Int): String = {
     val array = getStrings(attrs, tag)

@@ -30,12 +30,12 @@ import org.dcm4che3.imageio.plugins.dcm.DicomImageReadParam
 import se.nimsa.dicom.TagPath.TagPathTag
 import se.nimsa.dicom.streams.CollectFlow._
 import se.nimsa.dicom.streams.DicomFlows._
-import se.nimsa.dicom.streams.DicomParts._
+import se.nimsa.dicom.DicomParts._
 import se.nimsa.dicom.streams.ElementFolds._
-import se.nimsa.dicom.streams.Elements.Element
 import se.nimsa.dicom.streams.ModifyFlow._
-import se.nimsa.dicom.streams.{DicomParsing, Elements, ParseFlow}
-import se.nimsa.dicom.{Keyword, _}
+import se.nimsa.dicom.streams.{DicomStreamException, ParseFlow}
+import se.nimsa.dicom.{DicomParsing, Elements}
+import se.nimsa.dicom.{Element, Keyword, _}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.app.GeneralProtocol.{Source, SourceType}
 import se.nimsa.sbx.dicom.Contexts.Context
@@ -99,7 +99,7 @@ trait DicomStreamOps {
           scheduleTask(30.seconds) {
             storage.deleteByName(Seq(tempPath)) // delete temp file once file system has released handle
           }
-          throw t
+          if (!t.isInstanceOf[DicomStreamException]) throw new DicomStreamException(t.getMessage) else throw t
       }
   }
 
@@ -194,8 +194,8 @@ trait DicomStreamOps {
               characterSets = CharacterSets(element.value)
 
             val values = element.vr match {
-              case VR.OW | VR.OF | VR.OB => List(s"< Binary data (${element.length} bytes) >")
-              case _ => element.value.toStrings(element.vr, characterSets).toList
+              case VR.OW | VR.OF | VR.OB | VR.OD if element.length > 20 => List(s"< Binary data (${element.length} bytes) >")
+              case _ => element.toStrings(characterSets).toList
             }
 
             val tagPathTag: TagPathTag = element.tagPath match {
@@ -227,19 +227,19 @@ trait DicomStreamOps {
 
   protected def readImageInformation(imageId: Long, storage: StorageService)(implicit materializer: Materializer, ec: ExecutionContext): Future[ImageInformation] =
     storage
-      .dataSource(imageId, Some(imageInformationTags.max + 1))
+      .dataSource(imageId, Some(Tag.LargestImagePixelValue + 1))
       .via(whitelistFilter(imageInformationTags))
       .via(elementsFlow)
       .runWith(elementsSink)
       .map { elements =>
-        val instanceNumber = elements(Tag.InstanceNumber).flatMap(_.value.toInt).getOrElse(1)
-        val imageIndex = elements(Tag.ImageIndex).flatMap(_.value.toInt).getOrElse(1)
+        val instanceNumber = elements(Tag.InstanceNumber).flatMap(_.toInt).getOrElse(1)
+        val imageIndex = elements(Tag.ImageIndex).flatMap(_.toInt).getOrElse(1)
         val frameIndex = if (instanceNumber > imageIndex) instanceNumber else imageIndex
         ImageInformation(
-          elements(Tag.NumberOfFrames).flatMap(_.value.toInt).getOrElse(1),
-          frameIndex,
-          elements(Tag.SmallestImagePixelValue).flatMap(_.value.toInt).getOrElse(0),
-          elements(Tag.LargestImagePixelValue).flatMap(_.value.toInt).getOrElse(0)
+          elements(Tag.NumberOfFrames).flatMap(_.toInt).getOrElse(1),
+          frameIndex.toInt,
+          elements(Tag.SmallestImagePixelValue).flatMap(_.toInt).getOrElse(0),
+          elements(Tag.LargestImagePixelValue).flatMap(_.toInt).getOrElse(0)
         )
       }
 
