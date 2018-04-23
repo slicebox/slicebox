@@ -85,7 +85,7 @@ libraryDependencies ++= {
     "com.typesafe.slick" %% "slick-hikaricp" % slickVersion,
     "com.h2database" % "h2" % "1.4.197",
     "mysql" % "mysql-connector-java" % "6.0.6",
-    "com.zaxxer" % "HikariCP" % "3.0.0",
+    "com.zaxxer" % "HikariCP" % "2.7.8",
     "com.github.t3hnar" %% "scala-bcrypt" % "3.1",
     "com.amazonaws" % "aws-java-sdk-s3" % "1.11.312",
     "org.scalatest" %% "scalatest" % "3.0.5" % "test",

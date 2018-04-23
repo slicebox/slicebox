@@ -16,11 +16,13 @@
 
 package se.nimsa.sbx.app.routing
 
+import akka.http.scaladsl.model.EntityStreamException
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.server.directives.FileInfo
 import akka.pattern.ask
+import akka.stream.AbruptIOTerminationException
 import akka.stream.scaladsl.{Source => StreamSource}
 import akka.util.ByteString
 import org.dcm4che3.io.DicomStreamException
@@ -121,7 +123,7 @@ trait ImportRoutes {
             }
             fileInfo match {
               case Some(fi) =>
-                SbxLog.error("Import", s"${failure.getClass.getSimpleName} during import of ${fi.fileName}: failure.getMessage")
+                SbxLog.error("Import", s"${failure.getClass.getSimpleName} during import of ${fi.fileName}: ${failure.getMessage}")
                 importService.ask(UpdateSessionWithRejection(importSession))
                 complete((status, s"${fi.fileName}: ${failure.getMessage}"))
               case None =>
