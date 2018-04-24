@@ -27,15 +27,14 @@ import akka.util.ByteString
 import akka.{Done, NotUsed}
 import javax.imageio.ImageIO
 import org.dcm4che3.imageio.plugins.dcm.DicomImageReadParam
+import se.nimsa.dicom.DicomParts._
 import se.nimsa.dicom.TagPath.TagPathTag
 import se.nimsa.dicom.streams.CollectFlow._
 import se.nimsa.dicom.streams.DicomFlows._
-import se.nimsa.dicom.DicomParts._
 import se.nimsa.dicom.streams.ElementFolds._
 import se.nimsa.dicom.streams.ModifyFlow._
 import se.nimsa.dicom.streams.{DicomStreamException, ParseFlow}
-import se.nimsa.dicom.{DicomParsing, Elements}
-import se.nimsa.dicom.{Element, Keyword, _}
+import se.nimsa.dicom.{DicomParsing, Elements, Keyword, _}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.app.GeneralProtocol.{Source, SourceType}
 import se.nimsa.sbx.dicom.Contexts.Context
@@ -189,8 +188,10 @@ trait DicomStreamOps {
         var characterSets = CharacterSets.defaultOnly
 
         () => {
-          case element: Element =>
-            if (element.tagPath == TagPath.fromTag(Tag.SpecificCharacterSet))
+          case tpElement: TpElement =>
+            val tagPath = tpElement.tagPath
+            val element = tpElement.element
+            if (tagPath == TagPath.fromTag(Tag.SpecificCharacterSet))
               characterSets = CharacterSets(element.value)
 
             val values = element.vr match {
@@ -198,14 +199,14 @@ trait DicomStreamOps {
               case _ => element.toStrings(characterSets).toList
             }
 
-            val tagPathTag: TagPathTag = element.tagPath match {
+            val tagPathTag: TagPathTag = tagPath match {
               case t: TagPathTag => t
               case t => t.previous.map(_.thenTag(t.tag)).getOrElse(TagPath.fromTag(t.tag))
             }
 
             val tag = tagPathTag.tag
             val multiplicity = values.length
-            val tagPathList = element.tagPath.toList.map(_.tag)
+            val tagPathList = tagPath.toList.map(_.tag)
             val depth = tagPathTag.depth
 
             ImageAttribute(

@@ -20,9 +20,8 @@ import akka.NotUsed
 import akka.stream.FlowShape
 import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Merge}
 import akka.util.ByteString
-import se.nimsa.dicom.DicomParts.DicomPart
+import se.nimsa.dicom.DicomParts.{DicomPart, ElementsPart}
 import se.nimsa.dicom._
-import se.nimsa.dicom.streams.CollectFlow.CollectedElements
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.AnonymizationKey
 
 object DicomStreamUtil {
@@ -72,28 +71,28 @@ object DicomStreamUtil {
     def isAnonymized: Boolean = identityRemoved.exists(_.toUpperCase == "YES")
   }
 
-  def attributesToInfoPart(dicomPart: DicomPart, tag: String): DicomPart = {
+  def attributesToInfoPart(dicomPart: DicomPart, label: String): DicomPart = {
     dicomPart match {
-      case da: CollectedElements if da.tag == tag =>
-        def toString(e: Element): String = e.toSingleString(da.characterSets)
+      case ep: ElementsPart if ep.label == label =>
+        def toString(e: Element): String = e.toSingleString(ep.characterSets)
 
             DicomInfoPart(
-              da.characterSets,
-              da.elements.find(_.header.tag == Tag.TransferSyntaxUID).map(toString),
-              da.elements.find(_.header.tag == Tag.PatientID).map(toString),
-              da.elements.find(_.header.tag == Tag.PatientName).map(toString),
-              da.elements.find(_.header.tag == Tag.PatientSex).map(toString),
-              da.elements.find(_.header.tag == Tag.PatientBirthDate).map(toString),
-              da.elements.find(_.header.tag == Tag.PatientAge).map(toString),
-              da.elements.find(_.header.tag == Tag.PatientIdentityRemoved).map(toString),
-              da.elements.find(_.header.tag == Tag.StudyInstanceUID).map(toString),
-              da.elements.find(_.header.tag == Tag.StudyDescription).map(toString),
-              da.elements.find(_.header.tag == Tag.StudyID).map(toString),
-              da.elements.find(_.header.tag == Tag.AccessionNumber).map(toString),
-              da.elements.find(_.header.tag == Tag.SeriesInstanceUID).map(toString),
-              da.elements.find(_.header.tag == Tag.SeriesDescription).map(toString),
-              da.elements.find(_.header.tag == Tag.ProtocolName).map(toString),
-              da.elements.find(_.header.tag == Tag.FrameOfReferenceUID).map(toString)
+              ep.characterSets,
+              ep.elements.find(_.header.tag == Tag.TransferSyntaxUID).map(toString),
+              ep.elements.find(_.header.tag == Tag.PatientID).map(toString),
+              ep.elements.find(_.header.tag == Tag.PatientName).map(toString),
+              ep.elements.find(_.header.tag == Tag.PatientSex).map(toString),
+              ep.elements.find(_.header.tag == Tag.PatientBirthDate).map(toString),
+              ep.elements.find(_.header.tag == Tag.PatientAge).map(toString),
+              ep.elements.find(_.header.tag == Tag.PatientIdentityRemoved).map(toString),
+              ep.elements.find(_.header.tag == Tag.StudyInstanceUID).map(toString),
+              ep.elements.find(_.header.tag == Tag.StudyDescription).map(toString),
+              ep.elements.find(_.header.tag == Tag.StudyID).map(toString),
+              ep.elements.find(_.header.tag == Tag.AccessionNumber).map(toString),
+              ep.elements.find(_.header.tag == Tag.SeriesInstanceUID).map(toString),
+              ep.elements.find(_.header.tag == Tag.SeriesDescription).map(toString),
+              ep.elements.find(_.header.tag == Tag.ProtocolName).map(toString),
+              ep.elements.find(_.header.tag == Tag.FrameOfReferenceUID).map(toString)
             )
       case part: DicomPart => part
     }

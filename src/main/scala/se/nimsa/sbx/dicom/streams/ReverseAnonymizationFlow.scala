@@ -107,7 +107,7 @@ object ReverseAnonymizationFlow {
 
       override def onHeader(header: DicomHeader): List[DicomPart] =
         if (needReverseAnon(header.tag, maybeKey) && canDoReverseAnon(maybeKey)) {
-          currentAttribute = Some(Element(TagPath.fromTag(header.tag), header.bigEndian, header.vr, header.explicitVR, header.length, ByteString.empty))
+          currentAttribute = Some(Element(header.tag, header.bigEndian, header.vr, header.explicitVR, header.length, ByteString.empty))
           super.onHeader(header).filterNot(_ == header)
         } else {
           currentAttribute = None

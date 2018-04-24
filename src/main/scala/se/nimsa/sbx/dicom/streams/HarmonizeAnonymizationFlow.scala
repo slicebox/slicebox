@@ -19,10 +19,9 @@ package se.nimsa.sbx.dicom.streams
 import akka.NotUsed
 import akka.stream.scaladsl.Flow
 import akka.util.ByteString
-import se.nimsa.dicom.{Tag, TagPath}
-import se.nimsa.dicom.Element
-import se.nimsa.dicom.streams.DicomFlows._
 import se.nimsa.dicom.DicomParts.{DicomHeader, DicomPart, DicomValueChunk}
+import se.nimsa.dicom.{Element, Tag}
+import se.nimsa.dicom.streams.DicomFlows._
 import se.nimsa.dicom.streams.{DicomFlowFactory, GuaranteedValueEvent, IdentityFlow, StartEvent}
 import se.nimsa.sbx.dicom.streams.DicomStreamUtil._
 
@@ -85,7 +84,7 @@ object HarmonizeAnonymizationFlow {
 
       override def onHeader(header: DicomHeader): List[DicomPart] =
         if (needHarmonizeAnon(header.tag, maybeKey)) {
-          currentAttribute = Some(Element(TagPath.fromTag(header.tag), header.bigEndian, header.vr, header.explicitVR, header.length, ByteString.empty))
+          currentAttribute = Some(Element(header.tag, header.bigEndian, header.vr, header.explicitVR, header.length, ByteString.empty))
           super.onHeader(header).filterNot(_ == header)
         } else {
           currentAttribute = None
