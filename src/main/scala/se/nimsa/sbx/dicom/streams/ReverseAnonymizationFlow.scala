@@ -58,33 +58,33 @@ object ReverseAnonymizationFlow {
       var maybeKey: Option[PartialAnonymizationKeyPart] = None
       var currentAttribute: Option[Element] = None
 
-      def maybeReverse(attribute: Element, keyPart: PartialAnonymizationKeyPart): List[DicomPart with Product with Serializable] = {
-        val updatedAttribute = attribute.header.tag match {
+      def maybeReverse(element: Element, keyPart: PartialAnonymizationKeyPart): List[DicomPart with Product with Serializable] = {
+        val updatedAttribute = element.header.tag match {
           case Tag.PatientName => keyPart.keyMaybe.filter(_ => keyPart.hasPatientInfo).map(key =>
-            attribute.withUpdatedValue(ByteString(key.patientName))).getOrElse(attribute)
+            element.withUpdatedValue(ByteString(key.patientName))).getOrElse(element)
           case Tag.PatientID => keyPart.keyMaybe.filter(_ => keyPart.hasPatientInfo).map(key =>
-            attribute.withUpdatedValue(ByteString(key.patientID))).getOrElse(attribute)
+            element.withUpdatedValue(ByteString(key.patientID))).getOrElse(element)
           case Tag.PatientBirthDate => keyPart.keyMaybe.filter(_ => keyPart.hasPatientInfo).map(key =>
-            attribute.withUpdatedValue(ByteString(key.patientBirthDate))).getOrElse(attribute)
-          case Tag.PatientIdentityRemoved => attribute.withUpdatedValue(ByteString("NO"))
-          case Tag.DeidentificationMethod => attribute.withUpdatedValue(ByteString.empty)
+            element.withUpdatedValue(ByteString(key.patientBirthDate))).getOrElse(element)
+          case Tag.PatientIdentityRemoved => element.withUpdatedValue(ByteString("NO"))
+          case Tag.DeidentificationMethod => element.withUpdatedValue(ByteString.empty)
           case Tag.StudyInstanceUID => keyPart.keyMaybe.filter(_ => keyPart.hasStudyInfo).map(key =>
-            attribute.withUpdatedValue(ByteString(key.studyInstanceUID))).getOrElse(attribute)
+            element.withUpdatedValue(ByteString(key.studyInstanceUID))).getOrElse(element)
           case Tag.StudyDescription => keyPart.keyMaybe.filter(_ => keyPart.hasStudyInfo).map(key =>
-            attribute.withUpdatedValue(ByteString(key.studyDescription))).getOrElse(attribute)
+            element.withUpdatedValue(ByteString(key.studyDescription))).getOrElse(element)
           case Tag.StudyID => keyPart.keyMaybe.filter(_ => keyPart.hasStudyInfo).map(key =>
-            attribute.withUpdatedValue(ByteString(key.studyID))).getOrElse(attribute)
+            element.withUpdatedValue(ByteString(key.studyID))).getOrElse(element)
           case Tag.AccessionNumber => keyPart.keyMaybe.filter(_ => keyPart.hasStudyInfo).map(key =>
-            attribute.withUpdatedValue(ByteString(key.accessionNumber))).getOrElse(attribute)
+            element.withUpdatedValue(ByteString(key.accessionNumber))).getOrElse(element)
           case Tag.SeriesInstanceUID => keyPart.keyMaybe.filter(_ => keyPart.hasSeriesInfo).map(key =>
-            attribute.withUpdatedValue(ByteString(key.seriesInstanceUID))).getOrElse(attribute)
+            element.withUpdatedValue(ByteString(key.seriesInstanceUID))).getOrElse(element)
           case Tag.SeriesDescription => keyPart.keyMaybe.filter(_ => keyPart.hasSeriesInfo).map(key =>
-            attribute.withUpdatedValue(ByteString(key.seriesDescription))).getOrElse(attribute)
+            element.withUpdatedValue(ByteString(key.seriesDescription))).getOrElse(element)
           case Tag.ProtocolName => keyPart.keyMaybe.filter(_ => keyPart.hasSeriesInfo).map(key =>
-            attribute.withUpdatedValue(ByteString(key.protocolName))).getOrElse(attribute)
+            element.withUpdatedValue(ByteString(key.protocolName))).getOrElse(element)
           case Tag.FrameOfReferenceUID => keyPart.keyMaybe.filter(_ => keyPart.hasSeriesInfo).map(key =>
-            attribute.withUpdatedValue(ByteString(key.frameOfReferenceUID))).getOrElse(attribute)
-          case _ => attribute
+            element.withUpdatedValue(ByteString(key.frameOfReferenceUID))).getOrElse(element)
+          case _ => element
         }
         updatedAttribute.header :: DicomValueChunk(updatedAttribute.bigEndian, updatedAttribute.value, last = true) :: Nil
       }

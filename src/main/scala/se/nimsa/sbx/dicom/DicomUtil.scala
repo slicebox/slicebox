@@ -17,7 +17,7 @@
 package se.nimsa.sbx.dicom
 
 import akka.util.ByteString
-import org.dcm4che3.data.{Attributes, Keyword, VR => CheVR}
+import org.dcm4che3.data.{Keyword, VR => CheVR}
 import se.nimsa.dicom.VR.VR
 import se.nimsa.dicom._
 import se.nimsa.dicom.Elements
@@ -28,9 +28,7 @@ import scala.language.implicitConversions
 
 object DicomUtil {
 
-  def isAnonymous(attributes: Attributes): Boolean = attributes.getString(Tag.PatientIdentityRemoved, "NO") == "YES"
-
-  def cloneAttributes(attributes: Attributes): Attributes = new Attributes(attributes)
+  def isAnonymous(elements: Elements): Boolean = elements(Tag.PatientIdentityRemoved).map(_.toSingleString()).getOrElse("NO") == "YES"
 
   def attributesToPatient(attributes: Elements): Patient =
     Patient(

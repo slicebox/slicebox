@@ -5,8 +5,8 @@ import java.util.concurrent.atomic.AtomicInteger
 import akka.NotUsed
 import akka.actor.{ActorSystem, PoisonPill, Props}
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
+import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{Flow, Sink, Source}
-import akka.stream.{ActorMaterializer, Materializer}
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit}
 import akka.util.{ByteString, Timeout}
 import org.scalatest._
@@ -40,7 +40,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
     val transactionImage = OutgoingTransactionImage(transaction, OutgoingImage(4, transaction.id, 1004, 4, sent = false))
     val pushActorRef: TestActorRef[BoxPushActor] = TestActorRef[BoxPushActor](
       Props(new BoxPushActor(box, storage, 200.milliseconds, 200, 8, "../BoxService", "../MetaService", "../AnonService") {
-        override protected def anonymizedDicomData(imageId: Long, tagValues: scala.collection.Seq[TagValue], storage: StorageService)(implicit materializer: Materializer, ec: ExecutionContext): Source[ByteString, NotUsed] = Source.single(data)
+        override protected def anonymizedDicomData(imageId: Long, tagValues: scala.collection.Seq[TagValue], storage: StorageService)(implicit ec: ExecutionContext): Source[ByteString, NotUsed] = Source.single(data)
       }), name = "PushBox")
     val pushActor: BoxPushActor = pushActorRef.underlyingActor
 
@@ -59,7 +59,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
     var finalized = false
     val pushActorRef = system.actorOf(Props(
       new BoxPushActor(box, storage, 200.milliseconds, n, 8, "../BoxService", "../MetaService", "../AnonService") {
-        override protected def anonymizedDicomData(imageId: Long, tagValues: scala.collection.Seq[TagValue], storage: StorageService)(implicit materializer: Materializer, ec: ExecutionContext): Source[ByteString, NotUsed] =
+        override protected def anonymizedDicomData(imageId: Long, tagValues: scala.collection.Seq[TagValue], storage: StorageService)(implicit ec: ExecutionContext): Source[ByteString, NotUsed] =
           Source.single(ByteString(1, 2, 3, 4))
         override def poll(n: Int): Future[Seq[OutgoingTransactionImage]] =
           if (firstBatch) {

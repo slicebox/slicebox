@@ -5,15 +5,11 @@ import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Source
 import akka.testkit.TestKit
-import akka.util.ByteString
-import org.dcm4che3.data.Attributes
 import org.scalatest.{AsyncFlatSpecLike, BeforeAndAfterAll, Matchers}
-import se.nimsa.dcm4che.streams.DicomAttributesSink
-import se.nimsa.dicom.Tag
-import se.nimsa.dicom.streams.DicomParts.DicomPart
-import se.nimsa.dicom.streams.{DicomFlows, DicomParsing}
+import se.nimsa.dicom.DicomParts.DicomPart
+import se.nimsa.dicom.streams.{DicomFlows, ElementFolds}
+import se.nimsa.dicom.{DicomParsing, Elements, Tag}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.AnonymizationKey
-import se.nimsa.sbx.dicom.DicomData
 import se.nimsa.sbx.dicom.streams.DicomStreamUtil._
 import se.nimsa.sbx.storage.{RuntimeStorage, StorageService}
 import se.nimsa.sbx.util.TestUtil
@@ -31,8 +27,8 @@ class HarmonizeAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymi
 
   val storage: StorageService = new RuntimeStorage
 
-  def attributesSource(dicomData: DicomData): Source[DicomPart, NotUsed] = {
-    val bytes = ByteString(TestUtil.toByteArray(dicomData))
+  def elementsSource(elements: Elements): Source[DicomPart, NotUsed] = {
+    val bytes = TestUtil.toBytes(elements)
     Source.single(bytes)
       .via(storage.parseFlow(None))
       .via(DicomFlows.tagFilter(_ => false)(tagPath => !DicomParsing.isFileMetaInformation(tagPath.tag)))
@@ -40,44 +36,38 @@ class HarmonizeAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymi
 
   def anonKeyPart(key: AnonymizationKey) = PartialAnonymizationKeyPart(Some(key), hasPatientInfo = true, hasStudyInfo = true, hasSeriesInfo = true)
 
-  def harmonize(key: AnonymizationKey, attributes: Attributes): Future[(Option[Attributes], Option[Attributes])] =
+  def harmonize(key: AnonymizationKey, elements: Elements): Future[Elements] =
     Source.single(anonKeyPart(key))
-      .concat(attributesSource(DicomData(attributes, metaInformation)))
+      .concat(elementsSource(elements))
       .via(HarmonizeAnonymizationFlow.harmonizeAnonFlow)
-      .via(DicomFlows.attributeFlow)
-      .runWith(DicomAttributesSink.attributesSink)
+      .via(ElementFolds.elementsFlow)
+      .runWith(ElementFolds.elementsSink)
 
   "The harmonize anonymization flow" should "not change attributes if anonymous info in key is equal to that in dataset" in {
-    val attributes = createAttributes
-    val key = TestUtil.createAnonymizationKey(attributes)
-    harmonize(key, attributes).map {
-      case (_, dsMaybe) =>
-        val harmonizedAttributes = dsMaybe.get
-        harmonizedAttributes.getString(Tag.PatientName) shouldBe key.anonPatientName
-        harmonizedAttributes.getString(Tag.PatientID) shouldBe key.anonPatientID
-        harmonizedAttributes.getString(Tag.StudyInstanceUID) shouldBe key.anonStudyInstanceUID
-        harmonizedAttributes.getString(Tag.SeriesInstanceUID) shouldBe key.anonSeriesInstanceUID
+    val elements = testElements
+    val key = TestUtil.createAnonymizationKey(elements)
+    harmonize(key, elements).map { harmonizedAttributes =>
+        harmonizedAttributes(Tag.PatientName).get.toSingleString() shouldBe key.anonPatientName
+        harmonizedAttributes(Tag.PatientID).get.toSingleString() shouldBe key.anonPatientID
+        harmonizedAttributes(Tag.StudyInstanceUID).get.toSingleString() shouldBe key.anonStudyInstanceUID
+        harmonizedAttributes(Tag.SeriesInstanceUID).get.toSingleString() shouldBe key.anonSeriesInstanceUID
     }
   }
 
   it should "change change patient ID when attribute in key is different from that in dataset" in {
-    val attributes = createAttributes
-    val key = TestUtil.createAnonymizationKey(attributes).copy(anonPatientID = "apid2")
-    harmonize(key, attributes).map {
-      case (_, dsMaybe) =>
-        val harmonizedAttributes = dsMaybe.get
-        harmonizedAttributes.getString(Tag.PatientID) shouldBe "apid2"
+    val elements = testElements
+    val key = TestUtil.createAnonymizationKey(elements).copy(anonPatientID = "apid2")
+    harmonize(key, elements).map { harmonizedAttributes =>
+        harmonizedAttributes(Tag.PatientID).get.toSingleString() shouldBe "apid2"
     }
   }
 
   it should "change patient and study properties" in {
-    val attributes = createAttributes
+    val attributes = testElements
     val key = TestUtil.createAnonymizationKey(attributes).copy(anonPatientID = "apid2", anonStudyInstanceUID = "astuid2")
-    harmonize(key, attributes).map {
-      case (_, dsMaybe) =>
-        val harmonizedAttributes = dsMaybe.get
-        harmonizedAttributes.getString(Tag.PatientID) shouldBe "apid2"
-        harmonizedAttributes.getString(Tag.StudyInstanceUID) shouldBe "astuid2"
+    harmonize(key, attributes).map { harmonizedAttributes =>
+        harmonizedAttributes(Tag.PatientID).get.toSingleString() shouldBe "apid2"
+        harmonizedAttributes(Tag.StudyInstanceUID).get.toSingleString() shouldBe "astuid2"
     }
   }
 

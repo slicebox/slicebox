@@ -1,9 +1,7 @@
 package se.nimsa.sbx.dicom.streams
 
 import akka.util.ByteString
-import org.dcm4che3.data.Attributes
 import se.nimsa.dicom._
-import se.nimsa.dcm4che.streams.toCheVR
 import se.nimsa.dicom.VR.VR
 
 object DicomTestData {
@@ -18,23 +16,19 @@ object DicomTestData {
   val supportedSOPClassUID: ByteString = ByteString(8, 0, 22, 0, 85, 73, 26, 0) ++ ByteString.fromArray("1.2.840.10008.5.1.4.1.1.20".toCharArray.map(_.toByte))
   val unsupportedSOPClassUID: ByteString = ByteString(8, 0, 22, 0, 85, 73, 26, 0) ++ ByteString.fromArray("1.2.840.10008.5.1.4.1.1.7".toCharArray.map(_.toByte)) ++ ByteString(0)
 
-  val metaInformation: Attributes = {
-    val meta = new Attributes()
-    meta.setString(Tag.TransferSyntaxUID, VR.UI, UID.ExplicitVRLittleEndian)
-    meta
-  }
+  val metaInformation: Elements =
+    Elements.empty
+      .update(Tag.TransferSyntaxUID, Element.explicitLE(Tag.TransferSyntaxUID, VR.UI, ByteString(UID.ExplicitVRLittleEndian)))
 
-  def createAttributes: Attributes = {
-    val attributes = new Attributes()
-    attributes.setString(Tag.PatientName, VR.PN, "pn")
-    attributes.setString(Tag.PatientID, VR.LO, "pid")
-    attributes.setString(Tag.StudyInstanceUID, VR.LO, "stuid")
-    attributes.setString(Tag.SeriesInstanceUID, VR.LO, "seuid")
-    attributes.setString(Tag.FrameOfReferenceUID, VR.LO, "foruid")
-    attributes.setString(Tag.Allergies, VR.LO, "allergies")
-    attributes.setString(Tag.PatientIdentityRemoved, VR.CS, "NO")
-    attributes
-  }
+  val testElements: Elements =
+    Elements.empty
+      .update(Tag.PatientName, Element.explicitLE(Tag.PatientName, VR.PN, ByteString("pn")))
+      .update(Tag.PatientID, Element.explicitLE(Tag.PatientID, VR.LO, ByteString("pid")))
+      .update(Tag.StudyInstanceUID, Element.explicitLE(Tag.StudyInstanceUID, VR.UI, ByteString("stuid")))
+      .update(Tag.SeriesInstanceUID, Element.explicitLE(Tag.SeriesInstanceUID, VR.UI, ByteString("seuid")))
+      .update(Tag.FrameOfReferenceUID, Element.explicitLE(Tag.FrameOfReferenceUID, VR.UI, ByteString("foruid")))
+      .update(Tag.Allergies, Element.explicitLE(Tag.Allergies, VR.LO, ByteString("allergies")))
+      .update(Tag.PatientIdentityRemoved, Element.explicitLE(Tag.PatientIdentityRemoved, VR.CS, ByteString("NO")))
 
   def toAsciiBytes(s: String, vr: VR): ByteString = padToEvenLength(ByteString(s), vr)
 
