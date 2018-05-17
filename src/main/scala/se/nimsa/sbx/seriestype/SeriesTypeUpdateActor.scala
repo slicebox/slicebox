@@ -189,7 +189,7 @@ class SeriesTypeUpdateActor(storage: StorageService)(implicit val materializer: 
     val attrs = attribute.tagPath.map(pathString => {
       try {
         val pathTags = pathString.split(",").map(_.toInt)
-        pathTags.foldLeft(dataset)((nested, tag) => nested(TagPath.fromSequence(tag)))
+        pathTags.foldLeft(dataset)((nested, tag) => nested.sequence(TagPath.fromSequence(tag)))
       } catch {
         case _: Exception =>
           dataset

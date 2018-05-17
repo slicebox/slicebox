@@ -10,7 +10,7 @@ Gitter            | [![Join the chat at https://gitter.im/slicebox/slicebox](htt
 Documentation     | - | [Wiki](https://github.com/slicebox/slicebox/wiki)
 API Documentation | - | [REST API](http://slicebox.github.io/slicebox-api)
 
-Slicebox is a microservice for safe sharing and easy access to medical images. The goal of the project is to facilitate research and collaboration between hospitals and universities. The service makes it easy to send images from the hosptial's PACS (image archive) to collaborators on the outside. Anonymization is handled automatically, releaving the hospital staff of the burden of making sure patient information does not leave the hospital network.
+Slicebox is a microservice for safe sharing and easy access to medical images. The goal of the project is to facilitate research and collaboration between hospitals and universities. The service makes it easy to send images from the hosptial's PACS (image archive) to collaborators on the outside. Anonymization is handled automatically, relieving the hospital staff of the burden of making sure patient information does not leave the hospital network.
 
 Features
 --------

@@ -278,6 +278,7 @@ class ImageRoutesTest extends {
       responseAs[Image]
     }
     val dicomData = TestUtil.loadDicomData(TestUtil.testImageBytes, withPixelData = false)
+    println(dicomData)
     GetAsUser(s"/api/images/${image.id}/imageinformation") ~> routes ~> check {
       status shouldBe OK
       val info = responseAs[ImageInformation]
@@ -330,10 +331,13 @@ class ImageRoutesTest extends {
     val testData = TestUtil.testImageDicomData()
     testData(Tag.PatientAge).get.toSingleString() shouldBe "011Y"
     testData(Tag.RescaleSlope) shouldBe empty
+
     testData
-      .apply(TagPath.fromSequence(Tag.EnergyWindowInformationSequence))
-      .apply(TagPath.fromSequence(Tag.EnergyWindowRangeSequence, 1))
-      .apply(Tag.EnergyWindowUpperLimit).get.toSingleString() shouldBe "147"
+      .sequence(TagPath.fromSequence(Tag.EnergyWindowInformationSequence))
+      .sequence(TagPath.fromSequence(Tag.EnergyWindowRangeSequence, 2))
+      .apply(Tag.EnergyWindowUpperLimit)
+      .get
+      .toSingleString() shouldBe "147"
 
     // upload original data
     val testDataArray = TestUtil.toBytes(testData)
@@ -387,10 +391,17 @@ class ImageRoutesTest extends {
     // verify that modifications have taken effect
     modifiedData(Tag.PatientAge).get.toSingleString() shouldBe "123Y"
     modifiedData(Tag.RescaleSlope).flatMap(_.toDouble).get shouldBe 2.5
+
+    println(modifiedData)
+    println()
+    println(modifiedData
+      .sequence(TagPath.fromSequence(Tag.EnergyWindowInformationSequence))
+      .sequence(TagPath.fromSequence(Tag.EnergyWindowRangeSequence, 2)))
+
     modifiedData
-      .apply(TagPath.fromSequence(Tag.EnergyWindowInformationSequence))
-      .apply(TagPath.fromSequence(Tag.EnergyWindowRangeSequence, 1))
-      .apply(Tag.EnergyWindowUpperLimit).flatMap(_.toInt).get shouldBe 999
+      .sequence(TagPath.fromSequence(Tag.EnergyWindowInformationSequence))
+      .sequence(TagPath.fromSequence(Tag.EnergyWindowRangeSequence, 2))
+      .apply(Tag.EnergyWindowUpperLimit).map(_.value.utf8String).get shouldBe "999"
 
     // verify that original source has been transferred to modified data
     GetAsUser(s"/api/metadata/series/${modifiedImage.seriesId}/source") ~> routes ~> check {

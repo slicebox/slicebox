@@ -201,7 +201,7 @@ trait DicomStreamOps {
 
             val tagPathTag: TagPathTag = tagPath match {
               case t: TagPathTag => t
-              case t => t.previous.map(_.thenTag(t.tag)).getOrElse(TagPath.fromTag(t.tag))
+              case t => t.previous.thenTag(t.tag)
             }
 
             val tag = tagPathTag.tag
