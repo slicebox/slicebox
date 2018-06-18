@@ -1,7 +1,7 @@
 name := "slicebox"
 version := "1.5-SNAPSHOT"
 organization := "se.nimsa"
-scalaVersion := "2.12.5"
+scalaVersion := "2.12.6"
 scalacOptions := Seq("-encoding", "UTF-8", "-Xlint", "-deprecation", "-unchecked", "-feature", "-target:jvm-1.8")
 
 // define the project
@@ -69,24 +69,24 @@ updateOptions := updateOptions.value.withGigahorse(false) // temporary workaroun
 // deps
 
 libraryDependencies ++= {
-  val akkaVersion = "2.5.11"
-  val akkaHttpVersion = "10.1.1"
+  val akkaVersion = "2.5.13"
+  val akkaHttpVersion = "10.1.3"
   val slickVersion = "3.2.3"
   val dcm4cheVersion = "3.3.8"
-  val alpakkaVersion = "0.18"
+  val alpakkaVersion = "0.19"
   Seq(
-    "com.typesafe.scala-logging" %% "scala-logging" % "3.8.0",
+    "com.typesafe.scala-logging" %% "scala-logging" % "3.9.0",
     "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
     "com.typesafe.akka" %% "akka-stream" % akkaVersion, // force newer version than default in akka-http
     "com.typesafe.akka" %% "akka-http" % akkaHttpVersion,
-    "de.heikoseeberger" %% "akka-http-play-json" % "1.20.1",
+    "de.heikoseeberger" %% "akka-http-play-json" % "1.21.0",
     "ch.qos.logback" % "logback-classic" % "1.2.3",
     "com.typesafe.slick" %% "slick" % slickVersion,
     "com.typesafe.slick" %% "slick-hikaricp" % slickVersion,
     "com.h2database" % "h2" % "1.4.197",
     "mysql" % "mysql-connector-java" % "6.0.6",
     "com.github.t3hnar" %% "scala-bcrypt" % "3.1",
-    "com.amazonaws" % "aws-java-sdk-s3" % "1.11.312",
+    "com.amazonaws" % "aws-java-sdk-s3" % "1.11.349",
     "org.scalatest" %% "scalatest" % "3.0.5" % "test",
     "org.dcm4che" % "dcm4che-core" % dcm4cheVersion,
     "org.dcm4che" % "dcm4che-image" % dcm4cheVersion,
