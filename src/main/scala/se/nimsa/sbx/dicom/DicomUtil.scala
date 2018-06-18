@@ -17,10 +17,9 @@
 package se.nimsa.sbx.dicom
 
 import akka.util.ByteString
-import org.dcm4che3.data.{Keyword, VR => CheVR}
-import se.nimsa.dicom.VR.VR
-import se.nimsa.dicom._
-import se.nimsa.dicom.Elements
+import org.dcm4che3.data.{VR => CheVR}
+import se.nimsa.dicom.data.VR.VR
+import se.nimsa.dicom.data.{Tag, VR, Keyword, Elements, padToEvenLength, groupNumber}
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomPropertyValue._
 
@@ -28,7 +27,7 @@ import scala.language.implicitConversions
 
 object DicomUtil {
 
-  def isAnonymous(elements: Elements): Boolean = elements(Tag.PatientIdentityRemoved).map(_.toSingleString()).getOrElse("NO") == "YES"
+  def isAnonymous(elements: Elements): Boolean = elements.getString(Tag.PatientIdentityRemoved).getOrElse("NO") == "YES"
 
   def attributesToPatient(attributes: Elements): Patient =
     Patient(
@@ -68,20 +67,22 @@ object DicomUtil {
       -1,
       -1,
       SOPInstanceUID(valueOrEmpty(attributes, DicomProperty.SOPInstanceUID.dicomTag)),
-      ImageType(readMultiple(attributes(DicomProperty.ImageType.dicomTag).map(_.toStrings()).getOrElse(Seq.empty))),
+      ImageType(readMultiple(attributes.getStrings(DicomProperty.ImageType.dicomTag))),
       InstanceNumber(valueOrEmpty(attributes, DicomProperty.InstanceNumber.dicomTag)))
 
   private def valueOrEmpty(attributes: Elements, tag: Int) =
-    attributes(tag).map(_.toSingleString()).getOrElse("")
+    attributes.getString(tag).getOrElse("")
 
   def readMultiple(values: Seq[String]): String =
-    if (values == null || values.length == 0)
+    if (values == null || values.isEmpty)
       ""
     else
-      values.tail.foldLeft(values.head)((result, part) => result + "/" + part)
+      values.tail.foldLeft(values.head)((result, part) => result + "\\" + part)
 
-  def getStrings(attrs: Elements, tag: Int): Seq[String] =
-    attrs(tag).map(a => a.toStrings()).getOrElse(Seq(""))
+  def getStrings(attrs: Elements, tag: Int): Seq[String] = {
+    val strings = attrs.getStrings(tag)
+    if (strings.isEmpty) Seq("") else strings
+  }
 
   def concatenatedStringForTag(attrs: Elements, tag: Int): String = {
     val array = getStrings(attrs, tag)

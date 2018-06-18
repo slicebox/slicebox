@@ -21,10 +21,10 @@ import akka.event.{Logging, LoggingReceive}
 import akka.pattern.ask
 import akka.stream.Materializer
 import akka.util.Timeout
-import se.nimsa.dicom.TagPath
+import se.nimsa.dicom.data.Elements
 import se.nimsa.dicom.streams.DicomFlows._
-import se.nimsa.dicom.streams.ElementFolds._
-import se.nimsa.dicom.Elements
+import se.nimsa.dicom.streams.ElementFlows._
+import se.nimsa.dicom.streams.ElementSink.elementSink
 import se.nimsa.sbx.app.GeneralProtocol.ImageAdded
 import se.nimsa.sbx.dicom.DicomHierarchy.{Image, Series}
 import se.nimsa.sbx.dicom.DicomUtil
@@ -124,8 +124,8 @@ class SeriesTypeUpdateActor(storage: StorageService)(implicit val materializer: 
 
               val futureAttributes = storage.dataSource(image.id, Some(tags.max + 1))
                 .via(tagFilter(_ => false)(tagPath => tags.contains(tagPath.tag)))
-                .via(elementsFlow)
-                .runWith(elementsSink)
+                .via(elementFlow)
+                .runWith(elementSink)
 
               val updateSeriesTypes = futureAttributes
                 .flatMap(attributes => updateSeriesTypesForDicomData(series, seriesTypesInfo, attributes))
@@ -185,16 +185,16 @@ class SeriesTypeUpdateActor(storage: StorageService)(implicit val materializer: 
       }
     }
 
-  def evaluateRuleAttribute(attribute: SeriesTypeRuleAttribute, dataset: Elements): Boolean = {
+  def evaluateRuleAttribute(attribute: SeriesTypeRuleAttribute, elements: Elements): Boolean = {
     val attrs = attribute.tagPath.map(pathString => {
       try {
         val pathTags = pathString.split(",").map(_.toInt)
-        pathTags.foldLeft(dataset)((nested, tag) => nested.sequence(TagPath.fromSequence(tag)))
+        pathTags.foldLeft(elements)((nested, tag) => nested.getNested(tag, 1).get) // TODO support tag paths and items other than 1
       } catch {
         case _: Exception =>
-          dataset
+          elements
       }
-    }).getOrElse(dataset)
+    }).getOrElse(elements)
     DicomUtil.concatenatedStringForTag(attrs, attribute.tag) == attribute.values
   }
 

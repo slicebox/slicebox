@@ -8,16 +8,16 @@ import akka.stream.testkit.scaladsl.TestSink
 import akka.testkit.TestKit
 import akka.util.ByteString
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
-import se.nimsa.dicom.DicomParts.{DicomPart, DicomValueChunk}
-import se.nimsa.dicom._
+import se.nimsa.dicom.data.DicomParts.{DicomPart, ValueChunk}
+import se.nimsa.dicom.data._
 import se.nimsa.dicom.streams.CollectFlow.collectFlow
-import se.nimsa.dicom.streams.{DicomFlows, ElementFolds}
+import se.nimsa.dicom.streams.{DicomFlows, ElementFlows}
 import se.nimsa.sbx.dicom.streams.DicomStreamUtil._
 import se.nimsa.sbx.storage.{RuntimeStorage, StorageService}
 import se.nimsa.sbx.util.TestUtil._
 
 import scala.concurrent.duration.DurationInt
-import scala.concurrent.{Await, ExecutionContextExecutor}
+import scala.concurrent.{Await, ExecutionContextExecutor, Future}
 
 class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")) with FlatSpecLike with Matchers with BeforeAndAfterAll {
 
@@ -28,8 +28,7 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
 
   val storage: StorageService = new RuntimeStorage
 
-  def toSource(elements: Elements): Source[DicomPart, NotUsed] =
-    Source.single(elements.bytes).via(storage.parseFlow(None))
+  def toSource(elements: Elements): Source[DicomPart, NotUsed] = Source(elements.toParts)
 
   def toAnonSource(elements: Elements): Source[DicomPart, NotUsed] =
     toSource(elements).via(AnonymizationFlow.anonFlow)
@@ -38,6 +37,7 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
     toSource(elements)
       .via(collectFlow(basicInfoTags, "anon"))
       .map(attributesToInfoPart(_, "anon"))
+      .mapAsync(1)(getOrCreateAnonKeyPart(_ => Future.successful(createAnonymizationKey(elements))))
       .via(AnonymizationFlow.maybeAnonFlow)
 
   def checkBasicAttributes(source: Source[DicomPart, NotUsed]): PartProbe =
@@ -55,8 +55,8 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
       .expectDicomComplete()
 
   "The anonymization flow" should "replace an existing accession number with a named based UID" in {
-    val elements = Elements.empty
-        .update(Tag.AccessionNumber, Element.explicitLE(Tag.AccessionNumber, VR.SH, ByteString("ACC001")))
+    val elements = Elements.empty()
+        .setString(Tag.AccessionNumber, "ACC001")
     val source = toAnonSource(elements)
 
     source.runWith(TestSink.probe[DicomPart])
@@ -67,9 +67,9 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
       .expectHeader(Tag.AccessionNumber)
       .request(1)
       .expectNextChainingPF {
-        case v: DicomValueChunk =>
+        case v: ValueChunk =>
           v.bytes should not be empty
-          v.bytes should not equal elements(Tag.AccessionNumber).get.value
+          v.bytes should not equal elements.getBytes(Tag.AccessionNumber).get
       }
       .expectHeaderAndValueChunkPairs(
         Tag.PatientName,
@@ -83,15 +83,15 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
   }
 
   it should "add basic hierarchy attributes also when not present" in {
-    val elements = Elements.empty
-      .update(Tag.Modality, Element.explicitLE(Tag.Modality, VR.CS, ByteString("NM")))
+    val elements = Elements.empty()
+      .setString(Tag.Modality, "NM")
     val source = toAnonSource(elements)
     checkBasicAttributes(source)
   }
 
   it should "leave an empty accession number empty" in {
-    val elements = Elements.empty
-      .update(Tag.AccessionNumber, Element.explicitLE(Tag.AccessionNumber, VR.SH, ByteString("")))
+    val elements = Elements.empty()
+      .setString(Tag.AccessionNumber, "")
     val source = toAnonSource(elements)
 
     source.runWith(TestSink.probe[DicomPart])
@@ -104,8 +104,8 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
   }
 
   it should "create an new UID from and existing UID" in {
-    val elements = Elements.empty
-      .update(Tag.StudyInstanceUID, Element.explicitLE(Tag.StudyInstanceUID, VR.UI, ByteString("1.2.3.4.5.6.7.8.9")))
+    val elements = Elements.empty()
+      .setString(Tag.StudyInstanceUID, "1.2.3.4.5.6.7.8.9")
     val source = toAnonSource(elements)
 
     source.runWith(TestSink.probe[DicomPart])
@@ -119,7 +119,7 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
       .expectHeader(Tag.StudyInstanceUID)
       .request(1)
       .expectNextChainingPF {
-        case v: DicomValueChunk if v.bytes.utf8String.trim != elements(Tag.StudyInstanceUID).get.toSingleString() => true
+        case v: ValueChunk if v.bytes.utf8String.trim != elements.getString(Tag.StudyInstanceUID).get => true
       }
       .expectHeader(Tag.SeriesInstanceUID)
       .expectValueChunk()
@@ -127,14 +127,14 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
   }
 
   it should "create a UID for UID tags which define DICOM hierarchy, regardless of whether value exists, is empty or has a previous value" in {
-    val elements1 = Elements.empty
-      .update(Tag.Modality, Element.explicitLE(Tag.Modality, VR.CS, ByteString("NM")))
-    val elements2 = Elements.empty
-      .update(Tag.Modality, Element.explicitLE(Tag.Modality, VR.CS, ByteString("NM")))
-      .update(Tag.StudyInstanceUID, Element.explicitLE(Tag.StudyInstanceUID, VR.UI, ByteString("")))
-    val elements3 = Elements.empty
-      .update(Tag.Modality, Element.explicitLE(Tag.Modality, VR.CS, ByteString("NM")))
-      .update(Tag.StudyInstanceUID, Element.explicitLE(Tag.StudyInstanceUID, VR.UI, ByteString("1.2.3.4.5.6.7.8.9")))
+    val elements1 = Elements.empty()
+      .setString(Tag.Modality, "NM")
+    val elements2 = Elements.empty()
+      .setString(Tag.Modality, "NM")
+      .setString(Tag.StudyInstanceUID, "")
+    val elements3 = Elements.empty()
+      .setString(Tag.Modality, "NM")
+      .setString(Tag.StudyInstanceUID, "1.2.3.4.5.6.7.8.9")
 
     val source1 = toAnonSource(elements1)
     val source2 = toAnonSource(elements2)
@@ -153,7 +153,7 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
         .expectHeader(Tag.StudyInstanceUID)
         .request(1)
         .expectNextChainingPF {
-          case v: DicomValueChunk if v.bytes.nonEmpty => true
+          case v: ValueChunk if v.bytes.nonEmpty => true
         }
         .expectHeader(Tag.SeriesInstanceUID)
         .expectValueChunk()
@@ -165,49 +165,49 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
   }
 
   it should "always create the same new UID from some fixed existing UID" in {
-    val elements = Elements.empty
-      .update(Tag.TargetUID, Element.explicitLE(Tag.TargetUID, VR.UI, ByteString("1.2.3.4.5.6.7.8.9")))
+    val elements = Elements.empty()
+      .setString(Tag.TargetUID, "1.2.3.4.5.6.7.8.9")
 
     def source() = toAnonSource(elements)
       .via(DicomFlows.tagFilter(_ => false)(tagPath => tagPath.tag == Tag.TargetUID))
-      .via(ElementFolds.elementsFlow)
+      .via(ElementFlows.elementFlow)
 
     val f1 = source().runWith(Sink.head)
     val f2 = source().runWith(Sink.head)
     val (sop1, sop2) = Await.result(f1.zip(f2), 5.seconds)
 
-    sop1.element.value shouldBe sop2.element.value
+    sop1 shouldBe sop2
   }
 
   it should "remove private tags" in {
-    val elements = Elements.empty
-      .update(Tag.Modality, Element.explicitLE(Tag.Modality, VR.CS, ByteString("NM")))
-      .update(Tag.SOPInstanceUID, Element.explicitLE(Tag.SOPInstanceUID, VR.UI, ByteString("1.2.3.4.5.6.7.8")))
-      .update(0x80030010, Element.explicitLE(0x80030010, VR.LO, ByteString("Private tag value")))
+    val elements = Elements.empty()
+      .setString(Tag.Modality, "NM")
+      .setString(Tag.SOPInstanceUID, "1.2.3.4.5.6.7.8")
+      .setString(0x80030010, "Private tag value")
     val source = toAnonSource(elements)
     checkBasicAttributes(source)
   }
 
   it should "remove overlay data" in {
-    val elements = Elements.empty
-      .update(Tag.Modality, Element.explicitLE(Tag.Modality, VR.CS, ByteString("NM")))
-      .update(Tag.SOPInstanceUID, Element.explicitLE(Tag.SOPInstanceUID, VR.UI, ByteString("1.2.3.4.5.6.7.8")))
-      .update(0x60020010, Element.explicitLE(0x60020010, VR.PN, ByteString("34")))
+    val elements = Elements.empty()
+      .setString(Tag.Modality, "NM")
+      .setString(Tag.SOPInstanceUID, "1.2.3.4.5.6.7.8")
+      .setString(0x60020010, "34")
     val source = toAnonSource(elements)
     checkBasicAttributes(source)
   }
 
   it should "remove birth date" in {
-    val elements = Elements.empty
-      .update(Tag.Modality, Element.explicitLE(Tag.Modality, VR.CS, ByteString("NM")))
-      .update(Tag.PatientBirthDate, Element.explicitLE(Tag.PatientBirthDate, VR.DA, ByteString("20040325")))
+    val elements = Elements.empty()
+      .setString(Tag.Modality, "NM")
+      .setString(Tag.PatientBirthDate, "20040325")
     val source = toAnonSource(elements)
     checkBasicAttributes(source)
   }
 
   it should "anonymize already anonymized data" in {
-    val elements = Elements.empty
-      .update(Tag.PatientID, Element.explicitLE(Tag.PatientID, VR.LO, ByteString("12345678")))
+    val elements = Elements.empty()
+      .setString(Tag.PatientID, "12345678")
     val source1 = toAnonSource(elements)
     val source2 = source1.via(AnonymizationFlow.anonFlow)
 
@@ -225,48 +225,49 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
   }
 
   "The conditional anonymization flow" should "anonymize data which has not been anonymized" in {
-    val elements = Elements.empty
-      .update(Tag.PatientID, Element.explicitLE(Tag.PatientID, VR.LO, ByteString("12345678")))
-    val source = toMaybeAnonSource(elements).via(DicomFlows.tagFilter(_ => false)(tagPath => tagPath.tag == Tag.PatientID))
+    val elements = Elements.empty()
+      .setString(Tag.PatientID, "12345678")
+    val source = toMaybeAnonSource(elements)
+      .via(DicomFlows.tagFilter(_ => false)(tagPath => tagPath.tag == Tag.PatientID))
 
     source.runWith(TestSink.probe[DicomPart])
       .expectHeader(Tag.PatientID)
       .request(1)
       .expectNextChainingPF {
-        case v: DicomValueChunk =>
-          v.bytes should not be elements(Tag.PatientID).get.value
+        case v: ValueChunk =>
+          v.bytes should not be elements.getBytes(Tag.PatientID).get
       }
       .expectDicomComplete()
   }
 
   it should "not anonymize already anonymized data" in {
-    val elements = Elements.empty
-      .update(Tag.PatientID, Element.explicitLE(Tag.PatientID, VR.LO, ByteString("12345678")))
-      .update(Tag.PatientIdentityRemoved, Element.explicitLE(Tag.PatientIdentityRemoved, VR.CS, ByteString("YES")))
+    val elements = Elements.empty()
+      .setString(Tag.PatientID, "12345678")
+      .setString(Tag.PatientIdentityRemoved, "YES")
     val source = toMaybeAnonSource(elements).via(DicomFlows.tagFilter(_ => false)(tagPath => tagPath.tag == Tag.PatientID))
 
     source.runWith(TestSink.probe[DicomPart])
       .expectHeader(Tag.PatientID)
       .request(1)
       .expectNextChainingPF {
-        case v: DicomValueChunk =>
-          v.bytes shouldBe elements(Tag.PatientID).get.value
+        case v: ValueChunk =>
+          v.bytes shouldBe elements.getBytes(Tag.PatientID).get
       }
       .expectDicomComplete()
   }
 
   it should "anonymize if PatientIdentityRemoved=YES but DicomInfoPart is missing" in {
-    val elements = Elements.empty
-      .update(Tag.PatientID, Element.explicitLE(Tag.PatientID, VR.LO, ByteString("12345678")))
-      .update(Tag.PatientIdentityRemoved, Element.explicitLE(Tag.PatientIdentityRemoved, VR.CS, ByteString("YES")))
+    val elements = Elements.empty()
+      .setString(Tag.PatientID, "12345678")
+      .setString(Tag.PatientIdentityRemoved, "YES")
     val source = toSource(elements).via(AnonymizationFlow.maybeAnonFlow).via(DicomFlows.tagFilter(_ => false)(tagPath => tagPath.tag == Tag.PatientID))
 
     source.runWith(TestSink.probe[DicomPart])
       .expectHeader(Tag.PatientID)
       .request(1)
       .expectNextChainingPF {
-        case v: DicomValueChunk =>
-          v.bytes should not be elements(Tag.PatientID).get.value
+        case v: ValueChunk =>
+          v.bytes should not be elements.getBytes(Tag.PatientID).get
       }
       .expectDicomComplete()
   }

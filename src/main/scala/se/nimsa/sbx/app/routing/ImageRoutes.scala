@@ -32,7 +32,7 @@ import akka.stream.scaladsl.{Sink, SourceQueueWithComplete, Source => StreamSour
 import akka.stream.{OverflowStrategy, QueueOfferResult}
 import akka.util.ByteString
 import se.nimsa.dicom.streams.ModifyFlow.TagModification
-import se.nimsa.dicom.padToEvenLength
+import se.nimsa.dicom.data.padToEvenLength
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.dicom.DicomHierarchy.{FlatSeries, Image, Patient, Study}

@@ -1,8 +1,8 @@
 package se.nimsa.sbx.dicom.streams
 
 import akka.util.ByteString
-import se.nimsa.dicom._
-import se.nimsa.dicom.VR.VR
+import se.nimsa.dicom.data._
+import se.nimsa.dicom.data.VR.VR
 
 object DicomTestData {
 
@@ -17,18 +17,18 @@ object DicomTestData {
   val unsupportedSOPClassUID: ByteString = ByteString(8, 0, 22, 0, 85, 73, 26, 0) ++ ByteString.fromArray("1.2.840.10008.5.1.4.1.1.7".toCharArray.map(_.toByte)) ++ ByteString(0)
 
   val metaInformation: Elements =
-    Elements.empty
-      .update(Tag.TransferSyntaxUID, Element.explicitLE(Tag.TransferSyntaxUID, VR.UI, ByteString(UID.ExplicitVRLittleEndian)))
+    Elements.empty()
+      .setString(Tag.TransferSyntaxUID, UID.ExplicitVRLittleEndian)
 
   val testElements: Elements =
-    Elements.empty
-      .update(Tag.PatientName, Element.explicitLE(Tag.PatientName, VR.PN, ByteString("pn")))
-      .update(Tag.PatientID, Element.explicitLE(Tag.PatientID, VR.LO, ByteString("pid")))
-      .update(Tag.StudyInstanceUID, Element.explicitLE(Tag.StudyInstanceUID, VR.UI, ByteString("stuid")))
-      .update(Tag.SeriesInstanceUID, Element.explicitLE(Tag.SeriesInstanceUID, VR.UI, ByteString("seuid")))
-      .update(Tag.FrameOfReferenceUID, Element.explicitLE(Tag.FrameOfReferenceUID, VR.UI, ByteString("foruid")))
-      .update(Tag.Allergies, Element.explicitLE(Tag.Allergies, VR.LO, ByteString("allergies")))
-      .update(Tag.PatientIdentityRemoved, Element.explicitLE(Tag.PatientIdentityRemoved, VR.CS, ByteString("NO")))
+    Elements.empty()
+      .setString(Tag.PatientName, "pn")
+      .setString(Tag.PatientID, "pid")
+      .setString(Tag.StudyInstanceUID, "stuid")
+      .setString(Tag.SeriesInstanceUID, "seuid")
+      .setString(Tag.FrameOfReferenceUID, "foruid")
+      .setString(Tag.Allergies, "allergies")
+      .setString(Tag.PatientIdentityRemoved, "NO")
 
   def toAsciiBytes(s: String, vr: VR): ByteString = padToEvenLength(ByteString(s), vr)
 

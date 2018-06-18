@@ -12,10 +12,12 @@ import akka.stream.scaladsl.{FileIO, Flow, Keep, Sink, Source => StreamSource}
 import akka.stream.testkit.TestSubscriber
 import akka.util.ByteString
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
-import se.nimsa.dicom.DicomParts._
-import se.nimsa.dicom.VR.VR
-import se.nimsa.dicom._
-import se.nimsa.dicom.streams.{ElementFolds, ParseFlow}
+import se.nimsa.dicom.data.DicomParts._
+import se.nimsa.dicom.data.{Elements, Tag, tagToString}
+import se.nimsa.dicom.data.VR.VR
+import se.nimsa.dicom.streams.ElementFlows.elementFlow
+import se.nimsa.dicom.streams.ElementSink.elementSink
+import se.nimsa.dicom.streams.ParseFlow
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.AnonymizationKey
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy._
@@ -33,21 +35,21 @@ import scala.concurrent.{Await, ExecutionContext, Future}
 
 object TestUtil {
 
-  private def parseSink(withPixelData: Boolean): Sink[ByteString, Future[Elements]] =
+  private def parseSink(withPixelData: Boolean)(implicit ec: ExecutionContext): Sink[ByteString, Future[Elements]] =
     Flow[ByteString]
-      .via(new ParseFlow(stopTag = if (withPixelData) Some(Tag.PixelData) else None))
-      .via(ElementFolds.elementsFlow)
-      .toMat(ElementFolds.elementsSink)(Keep.right)
+      .via(new ParseFlow(stopTag = if (withPixelData) None else Some(Tag.PixelData)))
+      .via(elementFlow)
+      .toMat(elementSink)(Keep.right)
 
-  def loadDicomData(path: Path, withPixelData: Boolean)(implicit materializer: Materializer): Elements =
+  def loadDicomData(path: Path, withPixelData: Boolean)(implicit ec: ExecutionContext, materializer: Materializer): Elements =
     Await.result(FileIO.fromPath(path).runWith(parseSink(withPixelData)), 5.seconds)
 
-  def loadDicomData(bytes: ByteString, withPixelData: Boolean)(implicit materializer: Materializer): Elements =
+  def loadDicomData(bytes: ByteString, withPixelData: Boolean)(implicit ec: ExecutionContext, materializer: Materializer): Elements =
     Await.result(StreamSource.single(bytes).runWith(parseSink(withPixelData)), 5.seconds)
 
-  def toBytes(path: Path)(implicit materializer: Materializer): ByteString = toBytes(loadDicomData(path, withPixelData = true))
+  def toBytes(path: Path)(implicit ec: ExecutionContext, materializer: Materializer): ByteString = toBytes(loadDicomData(path, withPixelData = true))
 
-  def toBytes(elements: Elements): ByteString = elements.bytes
+  def toBytes(elements: Elements): ByteString = elements.toBytes
 
   def createTestDb(name: String): DatabaseConfig[JdbcProfile] =
     DatabaseConfig.forConfig[JdbcProfile]("slicebox.database.in-memory", ConfigFactory.load().withValue(
@@ -134,9 +136,9 @@ object TestUtil {
 
   def testSecondaryCaptureFile = new File(getClass.getResource("sc.dcm").toURI)
 
-  def testImageDicomData(withPixelData: Boolean = true)(implicit materializer: Materializer): Elements = loadDicomData(testImageFile.toPath, withPixelData)
+  def testImageDicomData(withPixelData: Boolean = true)(implicit ec: ExecutionContext, materializer: Materializer): Elements = loadDicomData(testImageFile.toPath, withPixelData)
 
-  def testImageBytes(implicit materializer: Materializer): ByteString = toBytes(testImageFile.toPath)
+  def testImageBytes(implicit ec: ExecutionContext, materializer: Materializer): ByteString = toBytes(testImageFile.toPath)
 
   def jpegFile = new File(getClass.getResource("cat.jpg").toURI)
 
@@ -160,24 +162,24 @@ object TestUtil {
                      frameOfReferenceUID: String = "frame of reference uid",
                      sopInstanceUID: String = "sop instance uid"): Elements = {
 
-    Elements.empty
-      .update(TagPath.fromTag(Tag.MediaStorageSOPClassUID), Element.explicitLE(Tag.MediaStorageSOPClassUID, VR.UI, ByteString("1.2.840.10008.5.1.4.1.1.2")))
-      .update(TagPath.fromTag(Tag.TransferSyntaxUID), Element.explicitLE(Tag.TransferSyntaxUID, VR.UI, ByteString("1.2.840.10008.1.2.1")))
-      .update(TagPath.fromTag(Tag.PatientName), Element.explicitLE(Tag.PatientName, VR.PN, ByteString(patientName)))
-      .update(TagPath.fromTag(Tag.PatientID), Element.explicitLE(Tag.PatientID, VR.LO, ByteString(patientID)))
-      .update(TagPath.fromTag(Tag.PatientBirthDate), Element.explicitLE(Tag.PatientBirthDate, VR.DA, ByteString(patientBirthDate)))
-      .update(TagPath.fromTag(Tag.PatientSex), Element.explicitLE(Tag.PatientSex, VR.CS, ByteString(patientSex)))
-      .update(TagPath.fromTag(Tag.StudyInstanceUID), Element.explicitLE(Tag.StudyInstanceUID, VR.UI, ByteString(studyInstanceUID)))
-      .update(TagPath.fromTag(Tag.StudyDescription), Element.explicitLE(Tag.StudyDescription, VR.LO, ByteString(studyDescription)))
-      .update(TagPath.fromTag(Tag.StudyID), Element.explicitLE(Tag.StudyID, VR.LO, ByteString(studyID)))
-      .update(TagPath.fromTag(Tag.AccessionNumber), Element.explicitLE(Tag.AccessionNumber, VR.SH, ByteString(accessionNumber)))
-      .update(TagPath.fromTag(Tag.SeriesInstanceUID), Element.explicitLE(Tag.SeriesInstanceUID, VR.UI, ByteString(seriesInstanceUID)))
-      .update(TagPath.fromTag(Tag.SeriesDescription), Element.explicitLE(Tag.SeriesDescription, VR.LO, ByteString(seriesDescription)))
-      .update(TagPath.fromTag(Tag.StationName), Element.explicitLE(Tag.StationName, VR.LO, ByteString(stationName)))
-      .update(TagPath.fromTag(Tag.Manufacturer), Element.explicitLE(Tag.Manufacturer, VR.LO, ByteString(manufacturer)))
-      .update(TagPath.fromTag(Tag.ProtocolName), Element.explicitLE(Tag.ProtocolName, VR.LO, ByteString(protocolName)))
-      .update(TagPath.fromTag(Tag.FrameOfReferenceUID), Element.explicitLE(Tag.FrameOfReferenceUID, VR.UI, ByteString(frameOfReferenceUID)))
-      .update(TagPath.fromTag(Tag.SOPInstanceUID), Element.explicitLE(Tag.SOPInstanceUID, VR.UI, ByteString(sopInstanceUID)))
+    Elements.empty()
+      .setString(Tag.MediaStorageSOPClassUID, "1.2.840.10008.5.1.4.1.1.2")
+      .setString(Tag.TransferSyntaxUID, "1.2.840.10008.1.2.1")
+      .setString(Tag.PatientName, patientName)
+      .setString(Tag.PatientID, patientID)
+      .setString(Tag.PatientBirthDate, patientBirthDate)
+      .setString(Tag.PatientSex, patientSex)
+      .setString(Tag.StudyInstanceUID, studyInstanceUID)
+      .setString(Tag.StudyDescription, studyDescription)
+      .setString(Tag.StudyID, studyID)
+      .setString(Tag.AccessionNumber, accessionNumber)
+      .setString(Tag.SeriesInstanceUID, seriesInstanceUID)
+      .setString(Tag.SeriesDescription, seriesDescription)
+      .setString(Tag.StationName, stationName)
+      .setString(Tag.Manufacturer, manufacturer)
+      .setString(Tag.ProtocolName, protocolName)
+      .setString(Tag.FrameOfReferenceUID, frameOfReferenceUID)
+      .setString(Tag.SOPInstanceUID, sopInstanceUID)
   }
 
   def createAnonymizationKey(elements: Elements,
@@ -187,17 +189,17 @@ object TestUtil {
                              anonSeriesInstanceUID: String = "anon series instance UID",
                              anonFrameOfReferenceUID: String = "anon frame of reference UID") =
     AnonymizationKey(-1, new Date().getTime,
-      elements(Tag.PatientName).map(_.toSingleString()).getOrElse(""), anonPatientName,
-      elements(Tag.PatientID).map(_.toSingleString()).getOrElse(""), anonPatientID,
-      elements(Tag.PatientBirthDate).map(_.toSingleString()).getOrElse("1900-01-01"),
-      elements(Tag.StudyInstanceUID).map(_.toSingleString()).getOrElse(""), anonStudyInstanceUID,
-      elements(Tag.StudyDescription).map(_.toSingleString()).getOrElse(""),
-      elements(Tag.StudyID).map(_.toSingleString()).getOrElse("Study ID"),
-      elements(Tag.AccessionNumber).map(_.toSingleString()).getOrElse("12345"),
-      elements(Tag.SeriesInstanceUID).map(_.toSingleString()).getOrElse(""), anonSeriesInstanceUID,
-      elements(Tag.SeriesDescription).map(_.toSingleString()).getOrElse("Series Description"),
-      elements(Tag.ProtocolName).map(_.toSingleString()).getOrElse("Protocol Name"),
-      elements(Tag.FrameOfReferenceUID).map(_.toSingleString()).getOrElse("1.2.3.4.5"), anonFrameOfReferenceUID)
+      elements.getString(Tag.PatientName).getOrElse(""), anonPatientName,
+      elements.getString(Tag.PatientID).getOrElse(""), anonPatientID,
+      elements.getString(Tag.PatientBirthDate).getOrElse("1900-01-01"),
+      elements.getString(Tag.StudyInstanceUID).getOrElse(""), anonStudyInstanceUID,
+      elements.getString(Tag.StudyDescription).getOrElse(""),
+      elements.getString(Tag.StudyID).getOrElse("Study ID"),
+      elements.getString(Tag.AccessionNumber).getOrElse("12345"),
+      elements.getString(Tag.SeriesInstanceUID).getOrElse(""), anonSeriesInstanceUID,
+      elements.getString(Tag.SeriesDescription).getOrElse("Series Description"),
+      elements.getString(Tag.ProtocolName).getOrElse("Protocol Name"),
+      elements.getString(Tag.FrameOfReferenceUID).getOrElse("1.2.3.4.5"), anonFrameOfReferenceUID)
 
   def deleteFolder(path: Path): Path =
     Files.walkFileTree(path, new SimpleFileVisitor[Path]() {
@@ -228,112 +230,105 @@ object TestUtil {
     def expectPreamble(): PartProbe = probe
       .request(1)
       .expectNextChainingPF {
-        case _: DicomPreamble => true
+        case _: PreamblePart => true
         case p => throw new RuntimeException(s"Expected DicomPreamble, got $p")
       }
 
     def expectValueChunk(): PartProbe = probe
       .request(1)
       .expectNextChainingPF {
-        case _: DicomValueChunk => true
+        case _: ValueChunk => true
         case p => throw new RuntimeException(s"Expected DicomValueChunk, got $p")
       }
 
     def expectValueChunk(length: Int): PartProbe = probe
       .request(1)
       .expectNextChainingPF {
-        case chunk: DicomValueChunk if chunk.bytes.length == length => true
+        case chunk: ValueChunk if chunk.bytes.length == length => true
         case p => throw new RuntimeException(s"Expected DicomValueChunk with length = $length, got $p")
       }
 
     def expectValueChunk(bytes: ByteString): PartProbe = probe
       .request(1)
       .expectNextChainingPF {
-        case chunk: DicomValueChunk if chunk.bytes == bytes => true
+        case chunk: ValueChunk if chunk.bytes == bytes => true
         case p => throw new RuntimeException(s"Expected DicomValueChunk with bytes = $bytes, got $p")
       }
 
     def expectItem(index: Int): PartProbe = probe
       .request(1)
       .expectNextChainingPF {
-        case item: DicomItem if item.index == index => true
+        case item: ItemPart if item.index == index => true
         case p => throw new RuntimeException(s"Expected DicomItem with index = $index, got $p")
       }
 
     def expectItem(index: Int, length: Int): PartProbe = probe
       .request(1)
       .expectNextChainingPF {
-        case item: DicomItem if item.index == index && item.length == length => true
+        case item: ItemPart if item.index == index && item.length == length => true
         case p => throw new RuntimeException(s"Expected DicomItem with index = $index and length $length, got $p")
       }
 
     def expectItemDelimitation(): PartProbe = probe
       .request(1)
       .expectNextChainingPF {
-        case _: DicomSequenceItemDelimitation => true
+        case _: ItemDelimitationPart => true
         case p => throw new RuntimeException(s"Expected DicomSequenceItemDelimitation, got $p")
       }
 
     def expectFragments(): PartProbe = probe
       .request(1)
       .expectNextChainingPF {
-        case _: DicomFragments => true
+        case _: FragmentsPart => true
         case p => throw new RuntimeException(s"Expected DicomFragments, got $p")
-      }
-
-    def expectFragmentsDelimitation(): PartProbe = probe
-      .request(1)
-      .expectNextChainingPF {
-        case _: DicomFragmentsDelimitation => true
-        case p => throw new RuntimeException(s"Expected DicomFragmentsDelimitation, got $p")
       }
 
     def expectHeader(tag: Int): PartProbe = probe
       .request(1)
       .expectNextChainingPF {
-        case h: DicomHeader if h.tag == tag => true
+        case h: HeaderPart if h.tag == tag => true
         case p => throw new RuntimeException(s"Expected DicomHeader with tag = ${tagToString(tag)}, got $p")
       }
 
     def expectHeader(tag: Int, vr: VR, length: Long): PartProbe = probe
       .request(1)
       .expectNextChainingPF {
-        case h: DicomHeader if h.tag == tag && h.vr == vr && h.length == length => true
+        case h: HeaderPart if h.tag == tag && h.vr == vr && h.length == length => true
         case p => throw new RuntimeException(s"Expected DicomHeader with tag = ${tagToString(tag)}, VR = $vr and length = $length, got $p")
       }
 
     def expectSequence(tag: Int): PartProbe = probe
       .request(1)
       .expectNextChainingPF {
-        case h: DicomSequence if h.tag == tag => true
+        case h: SequencePart if h.tag == tag => true
         case p => throw new RuntimeException(s"Expected DicomSequence with tag = ${tagToString(tag)}, got $p")
       }
 
     def expectSequence(tag: Int, length: Int): PartProbe = probe
       .request(1)
       .expectNextChainingPF {
-        case h: DicomSequence if h.tag == tag && h.length == length => true
+        case h: SequencePart if h.tag == tag && h.length == length => true
         case p => throw new RuntimeException(s"Expected DicomSequence with tag = ${tagToString(tag)} and length = $length, got $p")
       }
 
     def expectSequenceDelimitation(): PartProbe = probe
       .request(1)
       .expectNextChainingPF {
-        case _: DicomSequenceDelimitation => true
+        case _: SequenceDelimitationPart => true
         case p => throw new RuntimeException(s"Expected DicomSequenceDelimitation, got $p")
       }
 
     def expectUnknownPart(): PartProbe = probe
       .request(1)
       .expectNextChainingPF {
-        case _: DicomUnknownPart => true
+        case _: UnknownPart => true
         case p => throw new RuntimeException(s"Expected UnkownPart, got $p")
       }
 
     def expectDeflatedChunk(): PartProbe = probe
       .request(1)
       .expectNextChainingPF {
-        case _: DicomDeflatedChunk => true
+        case _: DeflatedChunk => true
         case p => throw new RuntimeException(s"Expected DicomDeflatedChunk, got $p")
       }
 

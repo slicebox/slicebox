@@ -8,10 +8,11 @@ import akka.stream.testkit.scaladsl.TestSink
 import akka.testkit.TestKit
 import akka.util.ByteString
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
-import se.nimsa.dicom.DicomParts.DicomPart
-import se.nimsa.dicom._
+import se.nimsa.dicom.data.DicomParts.{DicomPart, HeaderPart, ValueChunk}
+import se.nimsa.dicom.data.Elements.ValueElement
+import se.nimsa.dicom.data._
 import se.nimsa.dicom.streams.ModifyFlow.TagModification
-import se.nimsa.dicom.streams.{DicomFlows, ElementFolds, ModifyFlow}
+import se.nimsa.dicom.streams.{DicomFlows, ElementFlows, ElementSink, ModifyFlow}
 import se.nimsa.sbx.dicom.streams.DicomStreamUtil._
 import se.nimsa.sbx.storage.{RuntimeStorage, StorageService}
 import se.nimsa.sbx.util.TestUtil._
@@ -31,7 +32,7 @@ class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymiza
   val storage: StorageService = new RuntimeStorage
 
   def elementsSource(elements: Elements): Source[DicomPart, NotUsed] =
-    Source.single(elements.bytes)
+    Source.single(elements.toBytes)
       .via(storage.parseFlow(None))
       .via(DicomFlows.tagFilter(_ => false)(tagPath => !DicomParsing.isFileMetaInformation(tagPath.tag)))
 
@@ -59,9 +60,9 @@ class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymiza
     val source = Source.single(anonKeyPart(elements))
       .concat(anonSource(elements))
       .via(ReverseAnonymizationFlow.reverseAnonFlow)
-      .via(ElementFolds.elementsFlow)
+      .via(ElementFlows.elementFlow)
 
-    val reversedElements = Await.result(source.runWith(ElementFolds.elementsSink), 10.seconds)
+    val reversedElements = Await.result(source.runWith(ElementSink.elementSink), 10.seconds)
 
     reversedElements(Tag.PatientName) shouldBe elements(Tag.PatientName)
     reversedElements(Tag.PatientID) shouldBe elements(Tag.PatientID)
@@ -77,12 +78,15 @@ class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymiza
   }
 
   it should "insert anonymization key attributes into dataset even if they originally were not present" in {
-    val elements = Elements.empty
-      .update(Tag.TransferSyntaxUID, Element.explicitLE(Tag.TransferSyntaxUID, VR.UI, ByteString(UID.ExplicitVRLittleEndian)))
-      .update(Tag.Modality, Element.explicitLE(Tag.Modality, VR.CS, ByteString("NM")))
+    val elements = Elements.empty()
+      .setString(Tag.TransferSyntaxUID, UID.ExplicitVRLittleEndian)
+      .setString(Tag.Modality, "NM")
     val source = elementsSource(elements)
       .via(ReverseAnonymizationFlow.reverseAnonFlow)
-      .via(DicomFlows.guaranteedValueFlow)
+      .mapConcat {
+        case p: HeaderPart if p.length == 0 => p :: ValueChunk(bigEndian = false, ByteString.empty, last = true) :: Nil
+        case p => p :: Nil
+      }
 
     source.runWith(TestSink.probe[DicomPart])
       .expectHeaderAndValueChunkPairs(
@@ -120,13 +124,16 @@ class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymiza
 
     val source = anonSource(elements)
       .via(ReverseAnonymizationFlow.reverseAnonFlow)
-      .via(ElementFolds.elementsFlow)
-      .filter(_.element.tag == Tag.PatientName)
+      .via(ElementFlows.elementFlow)
+      .mapConcat {
+        case e: ValueElement if e.tag == Tag.PatientName => e :: Nil
+        case _ => Nil
+      }
       .take(1)
 
-    val tpElement = Await.result(source.runWith(Sink.head), 10.seconds)
+    val element = Await.result(source.runWith(Sink.head), 10.seconds)
 
-    tpElement.element should not be elements(Tag.PatientName)
+    element.value.toSingleString(VR.PN) should not be elements.getString(Tag.PatientName).get
   }
 
   it should "perform reverse anonymization when anonymization key is present in stream" in {
@@ -135,12 +142,15 @@ class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymiza
     val source = Source.single(anonKeyPart(dicomData))
       .concat(anonSource(dicomData))
       .via(ReverseAnonymizationFlow.reverseAnonFlow)
-      .via(ElementFolds.elementsFlow)
-      .filter(_.element.tag == Tag.PatientName)
+      .via(ElementFlows.elementFlow)
+      .mapConcat {
+        case e: ValueElement if e.tag == Tag.PatientName => e :: Nil
+        case _ => Nil
+      }
 
-    val tpElement = Await.result(source.runWith(Sink.head), 10.seconds)
+    val element = Await.result(source.runWith(Sink.head), 10.seconds)
 
-   tpElement.element shouldBe dicomData(Tag.PatientName).get
+    element.value.toString(VR.PN).get shouldBe dicomData.getString(Tag.PatientName).get
   }
 
 }

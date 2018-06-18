@@ -6,9 +6,11 @@ import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Source
 import akka.testkit.TestKit
 import org.scalatest.{AsyncFlatSpecLike, BeforeAndAfterAll, Matchers}
-import se.nimsa.dicom.DicomParts.DicomPart
-import se.nimsa.dicom.streams.{DicomFlows, ElementFolds}
-import se.nimsa.dicom.{DicomParsing, Elements, Tag}
+import se.nimsa.dicom.data.DicomParts.DicomPart
+import se.nimsa.dicom.data.{DicomParsing, Elements, Tag}
+import se.nimsa.dicom.streams.DicomFlows
+import se.nimsa.dicom.streams.ElementFlows.elementFlow
+import se.nimsa.dicom.streams.ElementSink.elementSink
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.AnonymizationKey
 import se.nimsa.sbx.dicom.streams.DicomStreamUtil._
 import se.nimsa.sbx.storage.{RuntimeStorage, StorageService}
@@ -40,17 +42,17 @@ class HarmonizeAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymi
     Source.single(anonKeyPart(key))
       .concat(elementsSource(elements))
       .via(HarmonizeAnonymizationFlow.harmonizeAnonFlow)
-      .via(ElementFolds.elementsFlow)
-      .runWith(ElementFolds.elementsSink)
+      .via(elementFlow)
+      .runWith(elementSink)
 
   "The harmonize anonymization flow" should "not change attributes if anonymous info in key is equal to that in dataset" in {
     val elements = testElements
     val key = TestUtil.createAnonymizationKey(elements)
     harmonize(key, elements).map { harmonizedAttributes =>
-        harmonizedAttributes(Tag.PatientName).get.toSingleString() shouldBe key.anonPatientName
-        harmonizedAttributes(Tag.PatientID).get.toSingleString() shouldBe key.anonPatientID
-        harmonizedAttributes(Tag.StudyInstanceUID).get.toSingleString() shouldBe key.anonStudyInstanceUID
-        harmonizedAttributes(Tag.SeriesInstanceUID).get.toSingleString() shouldBe key.anonSeriesInstanceUID
+        harmonizedAttributes.getString(Tag.PatientName).get shouldBe key.anonPatientName
+        harmonizedAttributes.getString(Tag.PatientID).get shouldBe key.anonPatientID
+        harmonizedAttributes.getString(Tag.StudyInstanceUID).get shouldBe key.anonStudyInstanceUID
+        harmonizedAttributes.getString(Tag.SeriesInstanceUID).get shouldBe key.anonSeriesInstanceUID
     }
   }
 
@@ -58,7 +60,7 @@ class HarmonizeAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymi
     val elements = testElements
     val key = TestUtil.createAnonymizationKey(elements).copy(anonPatientID = "apid2")
     harmonize(key, elements).map { harmonizedAttributes =>
-        harmonizedAttributes(Tag.PatientID).get.toSingleString() shouldBe "apid2"
+        harmonizedAttributes.getString(Tag.PatientID).get shouldBe "apid2"
     }
   }
 
@@ -66,8 +68,8 @@ class HarmonizeAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymi
     val attributes = testElements
     val key = TestUtil.createAnonymizationKey(attributes).copy(anonPatientID = "apid2", anonStudyInstanceUID = "astuid2")
     harmonize(key, attributes).map { harmonizedAttributes =>
-        harmonizedAttributes(Tag.PatientID).get.toSingleString() shouldBe "apid2"
-        harmonizedAttributes(Tag.StudyInstanceUID).get.toSingleString() shouldBe "astuid2"
+        harmonizedAttributes.getString(Tag.PatientID).get shouldBe "apid2"
+        harmonizedAttributes.getString(Tag.StudyInstanceUID).get shouldBe "astuid2"
     }
   }
 

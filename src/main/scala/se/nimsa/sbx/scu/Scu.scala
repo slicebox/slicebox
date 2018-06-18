@@ -31,8 +31,8 @@ import org.dcm4che3.net._
 import org.dcm4che3.net.pdu.{AAssociateRQ, PresentationContext}
 import org.dcm4che3.util.TagUtils
 import se.nimsa.dicom.streams.CollectFlow
-import se.nimsa.dicom.DicomParts.{DicomPart, ElementsPart}
-import se.nimsa.dicom.{Tag, TagPath, UID}
+import se.nimsa.dicom.data.DicomParts.{DicomPart, ElementsPart}
+import se.nimsa.dicom.data.{Tag, TagPath, UID}
 import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.scu.ScuProtocol.ScuData
 import se.nimsa.sbx.util.FutureUtil
@@ -75,9 +75,9 @@ class Scu(ae: ApplicationEntity, scuData: ScuData)
   def addDicomData(imageId: Long, ep: ElementsPart): Option[DicomDataInfo] = {
     val elements = ep.elements
 
-    val tsMaybe = elements.find(_.header.tag == Tag.TransferSyntaxUID).map(a => a.value.utf8String.trim)
-    val cuidMaybe = elements.find(_.header.tag == Tag.MediaStorageSOPClassUID).map(a => a.value.utf8String.trim)
-    val iuidMaybe = elements.find(_.header.tag == Tag.MediaStorageSOPInstanceUID).map(a => a.value.utf8String.trim)
+    val tsMaybe = elements.getString(Tag.TransferSyntaxUID)
+    val cuidMaybe = elements.getString(Tag.MediaStorageSOPClassUID)
+    val iuidMaybe = elements.getString(Tag.MediaStorageSOPInstanceUID)
 
     val dicomDataInfoMaybe = for {
       ts <- tsMaybe

@@ -16,13 +16,17 @@
 
 package se.nimsa.sbx.dicom.streams
 
+import java.time.ZoneOffset
+
 import akka.NotUsed
 import akka.stream.FlowShape
 import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Merge}
 import akka.util.ByteString
-import se.nimsa.dicom.DicomParts.{DicomPart, ElementsPart}
-import se.nimsa.dicom._
+import se.nimsa.dicom.data.DicomParts.{DicomPart, ElementsPart}
+import se.nimsa.dicom.data._
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.AnonymizationKey
+
+import scala.concurrent.{ExecutionContext, Future}
 
 object DicomStreamUtil {
 
@@ -51,6 +55,7 @@ object DicomStreamUtil {
   }
 
   case class DicomInfoPart(characterSets: CharacterSets,
+                           zoneOffset: ZoneOffset,
                            transferSyntaxUid: Option[String],
                            patientID: Option[String],
                            patientName: Option[String],
@@ -74,28 +79,36 @@ object DicomStreamUtil {
   def attributesToInfoPart(dicomPart: DicomPart, label: String): DicomPart = {
     dicomPart match {
       case ep: ElementsPart if ep.label == label =>
-        def toString(e: Element): String = e.toSingleString(ep.characterSets)
-
-            DicomInfoPart(
-              ep.characterSets,
-              ep.elements.find(_.header.tag == Tag.TransferSyntaxUID).map(toString),
-              ep.elements.find(_.header.tag == Tag.PatientID).map(toString),
-              ep.elements.find(_.header.tag == Tag.PatientName).map(toString),
-              ep.elements.find(_.header.tag == Tag.PatientSex).map(toString),
-              ep.elements.find(_.header.tag == Tag.PatientBirthDate).map(toString),
-              ep.elements.find(_.header.tag == Tag.PatientAge).map(toString),
-              ep.elements.find(_.header.tag == Tag.PatientIdentityRemoved).map(toString),
-              ep.elements.find(_.header.tag == Tag.StudyInstanceUID).map(toString),
-              ep.elements.find(_.header.tag == Tag.StudyDescription).map(toString),
-              ep.elements.find(_.header.tag == Tag.StudyID).map(toString),
-              ep.elements.find(_.header.tag == Tag.AccessionNumber).map(toString),
-              ep.elements.find(_.header.tag == Tag.SeriesInstanceUID).map(toString),
-              ep.elements.find(_.header.tag == Tag.SeriesDescription).map(toString),
-              ep.elements.find(_.header.tag == Tag.ProtocolName).map(toString),
-              ep.elements.find(_.header.tag == Tag.FrameOfReferenceUID).map(toString)
-            )
+        DicomInfoPart(
+          ep.elements.characterSets,
+          ep.elements.zoneOffset,
+          ep.elements.getString(Tag.TransferSyntaxUID),
+          ep.elements.getString(Tag.PatientID),
+          ep.elements.getString(Tag.PatientName),
+          ep.elements.getString(Tag.PatientSex),
+          ep.elements.getString(Tag.PatientBirthDate),
+          ep.elements.getString(Tag.PatientAge),
+          ep.elements.getString(Tag.PatientIdentityRemoved),
+          ep.elements.getString(Tag.StudyInstanceUID),
+          ep.elements.getString(Tag.StudyDescription),
+          ep.elements.getString(Tag.StudyID),
+          ep.elements.getString(Tag.AccessionNumber),
+          ep.elements.getString(Tag.SeriesInstanceUID),
+          ep.elements.getString(Tag.SeriesDescription),
+          ep.elements.getString(Tag.ProtocolName),
+          ep.elements.getString(Tag.FrameOfReferenceUID)
+        )
       case part: DicomPart => part
     }
+  }
+
+  def getOrCreateAnonKeyPart(getOrCreateAnonKey: DicomInfoPart => Future[AnonymizationKey])
+                                             (implicit ec: ExecutionContext): DicomPart => Future[DicomPart] = {
+    case info: DicomInfoPart if info.isAnonymized =>
+      Future.successful(PartialAnonymizationKeyPart(None, hasPatientInfo = false, hasStudyInfo = false, hasSeriesInfo = false))
+    case info: DicomInfoPart =>
+      getOrCreateAnonKey(info).map(key => PartialAnonymizationKeyPart(Some(key), hasPatientInfo = true, hasStudyInfo = true, hasSeriesInfo = true))
+    case part: DicomPart => Future.successful(part)
   }
 
   def conditionalFlow(goA: PartialFunction[DicomPart, Boolean], flowA: Flow[DicomPart, DicomPart, _], flowB: Flow[DicomPart, DicomPart, _], routeADefault: Boolean = true): Flow[DicomPart, DicomPart, NotUsed] =

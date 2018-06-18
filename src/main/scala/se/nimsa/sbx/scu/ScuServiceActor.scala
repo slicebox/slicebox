@@ -26,7 +26,7 @@ import akka.pattern.pipe
 import akka.stream.{Materializer, scaladsl}
 import akka.util.{ByteString, Timeout}
 import org.dcm4che3.net.{IncompatibleConnectionException, NoPresentationContextException}
-import se.nimsa.dicom.DicomParts
+import se.nimsa.dicom.data.DicomParts
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.lang.{BadGatewayException, NotFoundException}
 import se.nimsa.sbx.log.SbxLog

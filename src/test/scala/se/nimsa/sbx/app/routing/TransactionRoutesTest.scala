@@ -320,10 +320,10 @@ class TransactionRoutesTest extends {
       responseAs[ByteString]
     }
     val elements = TestUtil.loadDicomData(decompress(compressedArray), withPixelData = false)
-    elements(PatientName.dicomTag).get.toSingleString() should be("TEST NAME") // mapped
-    elements(PatientID.dicomTag).get.toSingleString() should be("TEST ID") // mapped
-    elements(PatientBirthDate.dicomTag).get.toSingleString() should be("19601010") // mapped
-    elements(PatientSex.dicomTag).get.toSingleString() should be(patient.patientSex.value) // not mapped
+    elements.getString(PatientName.dicomTag).get should be("TEST NAME") // mapped
+    elements.getString(PatientID.dicomTag).get should be("TEST ID") // mapped
+    elements.getString(PatientBirthDate.dicomTag).get should be("19601010") // mapped
+    elements.getString(PatientSex.dicomTag).get should be(patient.patientSex.value) // not mapped
 
     // send done
     Post(s"/api/transactions/${uniBox.token}/outgoing/done", transactionImage) ~> routes ~> check {

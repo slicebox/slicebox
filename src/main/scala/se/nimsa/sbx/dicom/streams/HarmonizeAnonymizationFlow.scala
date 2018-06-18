@@ -19,8 +19,9 @@ package se.nimsa.sbx.dicom.streams
 import akka.NotUsed
 import akka.stream.scaladsl.Flow
 import akka.util.ByteString
-import se.nimsa.dicom.DicomParts.{DicomHeader, DicomPart, DicomValueChunk}
-import se.nimsa.dicom.{Element, Tag}
+import se.nimsa.dicom.data.DicomParts.{DicomPart, HeaderPart, ValueChunk}
+import se.nimsa.dicom.data.Elements.ValueElement
+import se.nimsa.dicom.data.{Tag, Value}
 import se.nimsa.dicom.streams.DicomFlows._
 import se.nimsa.dicom.streams.{DicomFlowFactory, GuaranteedValueEvent, IdentityFlow, StartEvent}
 import se.nimsa.sbx.dicom.streams.DicomStreamUtil._
@@ -43,28 +44,28 @@ object HarmonizeAnonymizationFlow {
     .via(toUtf8Flow)
     .via(DicomFlowFactory.create(new IdentityFlow with GuaranteedValueEvent[DicomPart] with StartEvent[DicomPart] {
       var maybeKey: Option[PartialAnonymizationKeyPart] = None
-      var currentAttribute: Option[Element] = None
+      var currentAttribute: Option[ValueElement] = None
 
-      def maybeHarmonize(attribute: Element, keyPart: PartialAnonymizationKeyPart): List[DicomPart] = {
-        val updatedAttribute = attribute.header.tag match {
+      def maybeHarmonize(element: ValueElement, keyPart: PartialAnonymizationKeyPart): List[DicomPart] = {
+        val updatedAttribute = element.tag match {
           case Tag.PatientName => keyPart.keyMaybe
-            .map(key => attribute.withUpdatedValue(ByteString(key.anonPatientName)))
-            .getOrElse(attribute)
+            .map(key => element.setValue(Value(ByteString(key.anonPatientName))))
+            .getOrElse(element)
           case Tag.PatientID => keyPart.keyMaybe
-            .map(key => attribute.withUpdatedValue(ByteString(key.anonPatientID)))
-            .getOrElse(attribute)
+            .map(key => element.setValue(Value(ByteString(key.anonPatientID))))
+            .getOrElse(element)
           case Tag.StudyInstanceUID => keyPart.keyMaybe
-            .map(key => attribute.withUpdatedValue(ByteString(key.anonStudyInstanceUID)))
-            .getOrElse(attribute)
+            .map(key => element.setValue(Value(ByteString(key.anonStudyInstanceUID))))
+            .getOrElse(element)
           case Tag.SeriesInstanceUID => keyPart.keyMaybe
-            .map(key => attribute.withUpdatedValue(ByteString(key.anonSeriesInstanceUID)))
-            .getOrElse(attribute)
+            .map(key => element.setValue(Value(ByteString(key.anonSeriesInstanceUID))))
+            .getOrElse(element)
           case Tag.FrameOfReferenceUID => keyPart.keyMaybe
-            .map(key => attribute.withUpdatedValue(ByteString(key.anonFrameOfReferenceUID)))
-            .getOrElse(attribute)
-          case _ => attribute
+            .map(key => element.setValue(Value(ByteString(key.anonFrameOfReferenceUID))))
+            .getOrElse(element)
+          case _ => element
         }
-        updatedAttribute.header :: DicomValueChunk(updatedAttribute.bigEndian, updatedAttribute.value, last = true) :: Nil
+        updatedAttribute.toParts
       }
       /*
        * do harmonize anon if:
@@ -82,16 +83,16 @@ object HarmonizeAnonymizationFlow {
         case p => super.onPart(p)
       }
 
-      override def onHeader(header: DicomHeader): List[DicomPart] =
+      override def onHeader(header: HeaderPart): List[DicomPart] =
         if (needHarmonizeAnon(header.tag, maybeKey)) {
-          currentAttribute = Some(Element(header.tag, header.bigEndian, header.vr, header.explicitVR, header.length, ByteString.empty))
+          currentAttribute = Some(ValueElement.empty(header.tag, header.vr, header.bigEndian, header.explicitVR))
           super.onHeader(header).filterNot(_ == header)
         } else {
           currentAttribute = None
           super.onHeader(header)
         }
 
-      override def onValueChunk(chunk: DicomValueChunk): List[DicomPart] =
+      override def onValueChunk(chunk: ValueChunk): List[DicomPart] =
         if (currentAttribute.isDefined && canDoHarmonizeAnon(maybeKey)) {
           currentAttribute = currentAttribute.map(attribute => attribute.copy(value = attribute.value ++ chunk.bytes))
 

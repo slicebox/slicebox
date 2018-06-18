@@ -17,7 +17,7 @@
 package se.nimsa.sbx.storage
 
 import akka.util.ByteString
-import se.nimsa.dicom.TagPath.TagPathTag
+import se.nimsa.dicom.data.TagPath.TagPathTag
 
 object StorageProtocol {
 

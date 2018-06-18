@@ -5,7 +5,7 @@ import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server._
 import akka.util.ByteString
 import org.scalatest.{FlatSpecLike, Matchers}
-import se.nimsa.dicom.{Element, Tag, VR}
+import se.nimsa.dicom.data.Tag
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomProperty.PatientName
@@ -100,14 +100,13 @@ class AnonymizationRoutesTest extends {
         TestUtil.loadDicomData(responseAs[ByteString], withPixelData = true)
       }
 
-    anonAttributes(Tag.PatientName).get.toSingleString() shouldBe anonPatientName
-    anonAttributes(Tag.PatientID).get.toSingleString() should not be flatSeries.patient.patientName.value
+    anonAttributes.getString(Tag.PatientName).get shouldBe anonPatientName
+    anonAttributes.getString(Tag.PatientID).get should not be flatSeries.patient.patientName.value
   }
 
   it should "return 200 OK and the image IDs of the new anonymized images when bulk anonymizing a sequence of images" in {
     val dd1 = TestUtil.testImageDicomData()
-    val dd2 = TestUtil.testImageDicomData()
-      .update(Tag.PatientName, Element.explicitLE(Tag.PatientName, VR.PN, ByteString("John^Doe")))
+    val dd2 = TestUtil.testImageDicomData().setString(Tag.PatientName, "John^Doe")
 
     val image1 =
       PostAsUser("/api/images", HttpEntity(TestUtil.toBytes(dd1))) ~> routes ~> check {

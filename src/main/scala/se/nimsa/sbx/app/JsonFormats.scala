@@ -22,8 +22,8 @@ import akka.util.ByteString
 import play.api.libs.functional.syntax._
 import play.api.libs.json.Reads._
 import play.api.libs.json._
-import se.nimsa.dicom.TagPath
-import se.nimsa.dicom.TagPath._
+import se.nimsa.dicom.data.TagPath
+import se.nimsa.dicom.data.TagPath._
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.box.BoxProtocol._

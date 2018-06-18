@@ -22,7 +22,7 @@ import java.util.Date
 import org.dcm4che3.data.Attributes
 import org.dcm4che3.io.DicomOutputStream
 import org.dcm4che3.util.UIDUtils
-import se.nimsa.dicom.{Tag, UID, VR}
+import se.nimsa.dicom.data.{Tag, UID, VR}
 import se.nimsa.sbx.dicom.DicomHierarchy.{Patient, Study}
 import se.nimsa.sbx.dicom.DicomUtil.toCheVR
 

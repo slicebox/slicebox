@@ -10,7 +10,7 @@ import akka.http.scaladsl.model.{ContentTypes, HttpEntity, Uri}
 import akka.http.scaladsl.server.Route
 import akka.util.ByteString
 import org.scalatest.{FlatSpecLike, Matchers}
-import se.nimsa.dicom.{Tag, TagPath}
+import se.nimsa.dicom.data.{Tag, TagPath}
 import se.nimsa.sbx.app.GeneralProtocol.Source
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.ImageAttribute
@@ -182,7 +182,7 @@ class ImageRoutesTest extends {
       status shouldBe OK
       val dcmBytes = responseAs[ByteString]
       val dcm = TestUtil.loadDicomData(dcmBytes, withPixelData = false)
-      dcm(Tag.SeriesDescription).get.toSingleString() shouldBe description
+      dcm.getString(Tag.SeriesDescription).get shouldBe description
     }
   }
 
@@ -278,13 +278,12 @@ class ImageRoutesTest extends {
       responseAs[Image]
     }
     val dicomData = TestUtil.loadDicomData(TestUtil.testImageBytes, withPixelData = false)
-    println(dicomData)
     GetAsUser(s"/api/images/${image.id}/imageinformation") ~> routes ~> check {
       status shouldBe OK
       val info = responseAs[ImageInformation]
-      info.minimumPixelValue shouldBe dicomData(Tag.SmallestImagePixelValue).flatMap(_.toInt).getOrElse(0)
-      info.maximumPixelValue shouldBe dicomData(Tag.LargestImagePixelValue).flatMap(_.toInt).getOrElse(0)
-      info.numberOfFrames shouldBe dicomData(Tag.NumberOfFrames).flatMap(_.toInt).getOrElse(1)
+      info.minimumPixelValue shouldBe dicomData.getInt(Tag.SmallestImagePixelValue).getOrElse(0)
+      info.maximumPixelValue shouldBe dicomData.getInt(Tag.LargestImagePixelValue).getOrElse(0)
+      info.numberOfFrames shouldBe dicomData.getInt(Tag.NumberOfFrames).getOrElse(1)
     }
   }
 
@@ -329,15 +328,14 @@ class ImageRoutesTest extends {
   it should "modify and replace old data and transfer source and series tags when modifying an image" in {
     // create test data and verify original values
     val testData = TestUtil.testImageDicomData()
-    testData(Tag.PatientAge).get.toSingleString() shouldBe "011Y"
-    testData(Tag.RescaleSlope) shouldBe empty
+    testData.getString(Tag.PatientAge).get shouldBe "011Y"
+    testData.getString(Tag.RescaleSlope) shouldBe empty
 
     testData
-      .sequence(TagPath.fromSequence(Tag.EnergyWindowInformationSequence))
-      .sequence(TagPath.fromSequence(Tag.EnergyWindowRangeSequence, 2))
-      .apply(Tag.EnergyWindowUpperLimit)
+      .getNested(TagPath.fromSequence(Tag.EnergyWindowInformationSequence, 1).thenSequence(Tag.EnergyWindowRangeSequence, 2))
       .get
-      .toSingleString() shouldBe "147"
+      .getString(Tag.EnergyWindowUpperLimit)
+      .get shouldBe "147"
 
     // upload original data
     val testDataArray = TestUtil.toBytes(testData)
@@ -389,19 +387,14 @@ class ImageRoutesTest extends {
     }
 
     // verify that modifications have taken effect
-    modifiedData(Tag.PatientAge).get.toSingleString() shouldBe "123Y"
-    modifiedData(Tag.RescaleSlope).flatMap(_.toDouble).get shouldBe 2.5
-
-    println(modifiedData)
-    println()
-    println(modifiedData
-      .sequence(TagPath.fromSequence(Tag.EnergyWindowInformationSequence))
-      .sequence(TagPath.fromSequence(Tag.EnergyWindowRangeSequence, 2)))
+    modifiedData.getString(Tag.PatientAge).get shouldBe "123Y"
+    modifiedData.getDouble(Tag.RescaleSlope).get shouldBe 2.5
 
     modifiedData
-      .sequence(TagPath.fromSequence(Tag.EnergyWindowInformationSequence))
-      .sequence(TagPath.fromSequence(Tag.EnergyWindowRangeSequence, 2))
-      .apply(Tag.EnergyWindowUpperLimit).map(_.value.utf8String).get shouldBe "999"
+      .getNested(TagPath.fromSequence(Tag.EnergyWindowInformationSequence, 1).thenSequence(Tag.EnergyWindowRangeSequence, 2))
+      .get
+      .getString(Tag.EnergyWindowUpperLimit)
+      .get shouldBe "999"
 
     // verify that original source has been transferred to modified data
     GetAsUser(s"/api/metadata/series/${modifiedImage.seriesId}/source") ~> routes ~> check {

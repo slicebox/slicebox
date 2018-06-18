@@ -20,7 +20,7 @@ import java.util.UUID
 
 import akka.util.ByteString
 import org.dcm4che3.util.UIDUtils
-import se.nimsa.dicom.VR
+import se.nimsa.dicom.data.VR
 import se.nimsa.sbx.dicom.DicomUtil.toAsciiBytes
 
 import scala.util.Random

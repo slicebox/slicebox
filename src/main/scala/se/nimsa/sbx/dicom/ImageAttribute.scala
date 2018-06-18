@@ -16,7 +16,7 @@
 
 package se.nimsa.sbx.dicom
 
-import se.nimsa.dicom.TagPath.TagPathTag
+import se.nimsa.dicom.data.TagPath.TagPathTag
 
 case class ImageAttribute(
   tag: Int,

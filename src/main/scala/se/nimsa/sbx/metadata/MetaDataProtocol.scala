@@ -16,7 +16,7 @@
 
 package se.nimsa.sbx.metadata
 
-import se.nimsa.dicom.Elements
+import se.nimsa.dicom.data.Elements
 import se.nimsa.sbx.app.GeneralProtocol.{Source, SourceRef}
 import se.nimsa.sbx.dicom.DicomHierarchy._
 

@@ -27,14 +27,16 @@ import akka.util.ByteString
 import akka.{Done, NotUsed}
 import javax.imageio.ImageIO
 import org.dcm4che3.imageio.plugins.dcm.DicomImageReadParam
-import se.nimsa.dicom.DicomParts._
-import se.nimsa.dicom.TagPath.TagPathTag
+import se.nimsa.dicom.data.DicomParts._
+import se.nimsa.dicom.data.Elements._
+import se.nimsa.dicom.data.TagPath.TagPathTag
+import se.nimsa.dicom.data.{DicomParsing, Elements, Keyword, _}
 import se.nimsa.dicom.streams.CollectFlow._
 import se.nimsa.dicom.streams.DicomFlows._
-import se.nimsa.dicom.streams.ElementFolds._
+import se.nimsa.dicom.streams.ElementFlows._
+import se.nimsa.dicom.streams.ElementSink.elementSink
 import se.nimsa.dicom.streams.ModifyFlow._
 import se.nimsa.dicom.streams.{DicomStreamException, ParseFlow}
-import se.nimsa.dicom.{DicomParsing, Elements, Keyword, _}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.app.GeneralProtocol.{Source, SourceType}
 import se.nimsa.sbx.dicom.Contexts.Context
@@ -183,31 +185,29 @@ trait DicomStreamOps {
     storage
       .dataSource(imageId, Some(Tag.PixelData))
       .via(bulkDataFilter)
-      .via(elementsFlow)
+      .via(elementFlow)
+      .via(tagPathFlow)
       .statefulMapConcat {
         var characterSets = CharacterSets.defaultOnly
 
         () => {
-          case tpElement: TpElement =>
-            val tagPath = tpElement.tagPath
-            val element = tpElement.element
-            if (tagPath == TagPath.fromTag(Tag.SpecificCharacterSet))
-              characterSets = CharacterSets(element.value)
+          case (tagPath: TagPath, element: ValueElement) =>
+            if (element.tag == Tag.SpecificCharacterSet)
+              characterSets = CharacterSets(element)
 
+            val tag = element.tag
+            val length = element.length
             val values = element.vr match {
-              case VR.OW | VR.OF | VR.OB | VR.OD if element.length > 20 => List(s"< Binary data (${element.length} bytes) >")
-              case _ => element.toStrings(characterSets).toList
+              case VR.OW | VR.OF | VR.OB | VR.OD if length > 20 => List(s"< Binary data ($length bytes) >")
+              case _ => element.value.toStrings(element.vr, element.bigEndian, characterSets).toList
             }
-
-            val tagPathTag: TagPathTag = tagPath match {
-              case t: TagPathTag => t
-              case t => t.previous.thenTag(t.tag)
-            }
-
-            val tag = tagPathTag.tag
             val multiplicity = values.length
-            val tagPathList = tagPath.toList.map(_.tag)
-            val depth = tagPathTag.depth
+            val tagPathTag = tagPath match {
+              case tp: TagPathTag => tp
+              case tp => tp.previous.thenTag(tp.tag) // should not happen
+            }
+            val tagPathTags = tagPath.toList.map(_.tag)
+            val namePath = tagPathTags.map(Keyword.valueOf)
 
             ImageAttribute(
               tag,
@@ -216,11 +216,11 @@ trait DicomStreamOps {
               Keyword.valueOf(tag),
               element.vr.toString,
               multiplicity,
-              element.length,
-              depth,
+              length,
+              tagPath.depth,
               tagPathTag,
-              tagPathList,
-              tagPathList.map(Keyword.valueOf),
+              tagPathTags,
+              namePath,
               values) :: Nil
           case _ => Nil
         }
@@ -230,17 +230,17 @@ trait DicomStreamOps {
     storage
       .dataSource(imageId, Some(Tag.LargestImagePixelValue + 1))
       .via(whitelistFilter(imageInformationTags))
-      .via(elementsFlow)
-      .runWith(elementsSink)
+      .via(elementFlow)
+      .runWith(elementSink)
       .map { elements =>
-        val instanceNumber = elements(Tag.InstanceNumber).flatMap(_.toInt).getOrElse(1)
-        val imageIndex = elements(Tag.ImageIndex).flatMap(_.toInt).getOrElse(1)
+        val instanceNumber = elements.getInt(Tag.InstanceNumber).getOrElse(1)
+        val imageIndex = elements.getInt(Tag.ImageIndex).getOrElse(1)
         val frameIndex = if (instanceNumber > imageIndex) instanceNumber else imageIndex
         ImageInformation(
-          elements(Tag.NumberOfFrames).flatMap(_.toInt).getOrElse(1),
+          elements.getInt(Tag.NumberOfFrames).getOrElse(1),
           frameIndex.toInt,
-          elements(Tag.SmallestImagePixelValue).flatMap(_.toInt).getOrElse(0),
-          elements(Tag.LargestImagePixelValue).flatMap(_.toInt).getOrElse(0)
+          elements.getInt(Tag.SmallestImagePixelValue).getOrElse(0),
+          elements.getInt(Tag.LargestImagePixelValue).getOrElse(0)
         )
       }
 
@@ -342,8 +342,8 @@ trait DicomStreamOps {
 
     def runBothKeepRight[A, B] = (futureLeft: Future[A], futureRight: Future[B]) => futureLeft.flatMap(_ => futureRight)
 
-    Sink.fromGraph(GraphDSL.create(storageSink, elementsSink)(runBothKeepRight) { implicit builder =>
-      (storageSink, elementsSink) =>
+    Sink.fromGraph(GraphDSL.create(storageSink, elementSink)(runBothKeepRight) { implicit builder =>
+      (storageSink, elementSink) =>
         import GraphDSL.Implicits._
 
         val baseFlow = validateFlowWithContext(validationContexts, drainIncoming = true)
@@ -365,19 +365,10 @@ trait DicomStreamOps {
 
         flow ~> bcast.in
         bcast.out(0) ~> maybeDeflateFlow.map(_.bytes) ~> storageSink
-        bcast.out(1) ~> whitelistFilter(tagsToStoreInDB) ~> elementsFlow ~> elementsSink
+        bcast.out(1) ~> whitelistFilter(tagsToStoreInDB) ~> elementFlow ~> elementSink
 
         SinkShape(flow.in)
     })
-  }
-
-  private[streams] def getOrCreateAnonKeyPart(getOrCreateAnonKey: DicomInfoPart => Future[AnonymizationKey])
-                                             (implicit ec: ExecutionContext): DicomPart => Future[DicomPart] = {
-    case info: DicomInfoPart if info.isAnonymized =>
-      Future.successful(PartialAnonymizationKeyPart(None, hasPatientInfo = false, hasStudyInfo = false, hasSeriesInfo = false))
-    case info: DicomInfoPart =>
-      getOrCreateAnonKey(info).map(key => PartialAnonymizationKeyPart(Some(key), hasPatientInfo = true, hasStudyInfo = true, hasSeriesInfo = true))
-    case part: DicomPart => Future.successful(part)
   }
 
   private[streams] def toTagModifications(tagValues: Seq[TagValue]): Seq[TagModification] =

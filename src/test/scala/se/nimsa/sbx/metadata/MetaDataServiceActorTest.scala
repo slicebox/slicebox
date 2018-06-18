@@ -3,9 +3,10 @@ package se.nimsa.sbx.metadata
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import akka.stream.ActorMaterializer
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit}
-import akka.util.{ByteString, Timeout}
+import akka.util.Timeout
+import org.dcm4che3.data.Tag
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
-import se.nimsa.dicom.{Element, Elements, Tag, VR}
+import se.nimsa.dicom.data.Elements
 import se.nimsa.sbx.app.GeneralProtocol.{Source, SourceType}
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.metadata.MetaDataProtocol._
@@ -121,7 +122,7 @@ class MetaDataServiceActorTest extends TestKit(ActorSystem("MetaDataTestSystem")
 
       // changing series level
 
-      val elements2 = elements(Tag.SeriesInstanceUID) = Element.explicitLE(Tag.SeriesInstanceUID, VR.UI, ByteString("seuid2"))
+      val elements2 = elements.setString(Tag.SeriesInstanceUID, "seuid2")
       metaDataActorRef ! AddMetaData(elements2, source)
       expectMsgType[MetaDataAdded]
 
@@ -134,7 +135,7 @@ class MetaDataServiceActorTest extends TestKit(ActorSystem("MetaDataTestSystem")
 
       // changing patient level
 
-      val elements3 = elements(Tag.PatientName) = Element.explicitLE(Tag.PatientName, VR.PN, ByteString("pat2"))
+      val elements3 = elements.setString(Tag.PatientName, "pat2")
       metaDataActorRef ! AddMetaData(elements3, source)
       expectMsgType[MetaDataAdded]
 
@@ -164,19 +165,19 @@ class MetaDataServiceActorTest extends TestKit(ActorSystem("MetaDataTestSystem")
       metaDataActorRef ! AddMetaData(elements, source)
       val image1 = expectMsgPF() { case MetaDataAdded(_, _, _, im, _, _, _, _, _) => im }
 
-      val elements2 = elements(Tag.PatientName) = Element.explicitLE(Tag.PatientName, VR.PN, ByteString("pat2"))
+      val elements2 = elements.setString(Tag.PatientName, "pat2")
       metaDataActorRef ! AddMetaData(elements2, source)
       val image2 = expectMsgPF() { case MetaDataAdded(_, _, _, im, _, _, _, _, _) => im }
 
-      val elements3 = elements(Tag.StudyInstanceUID) = Element.explicitLE(Tag.StudyInstanceUID, VR.UI, ByteString("stuid2"))
+      val elements3 = elements.setString(Tag.StudyInstanceUID, "stuid2")
       metaDataActorRef ! AddMetaData(elements3, source)
       val image3 = expectMsgPF() { case MetaDataAdded(_, _, _, im, _, _, _, _, _) => im }
 
-      val elements4 = elements(Tag.SeriesInstanceUID) = Element.explicitLE(Tag.SeriesInstanceUID, VR.UI, ByteString("seuid2"))
+      val elements4 = elements.setString(Tag.SeriesInstanceUID, "seuid2")
       metaDataActorRef ! AddMetaData(elements4, source)
       val image4 = expectMsgPF() { case MetaDataAdded(_, _, _, im, _, _, _, _, _) => im }
 
-      val elements5 = elements(Tag.SOPInstanceUID) = Element.explicitLE(Tag.SOPInstanceUID, VR.UI, ByteString("sopuid2"))
+      val elements5 = elements.setString(Tag.SOPInstanceUID, "sopuid2")
       metaDataActorRef ! AddMetaData(elements5, source)
       val image5 = expectMsgPF() { case MetaDataAdded(_, _, _, im, _, _, _, _, _) => im }
 
@@ -245,10 +246,10 @@ class MetaDataServiceActorTest extends TestKit(ActorSystem("MetaDataTestSystem")
       expectMsgType[MetaDataAdded]
 
       val elements2 = elements
-        .update(Tag.SOPInstanceUID, Element.explicitLE(Tag.PatientBirthDate, VR.DA, ByteString("new date")))
-        .update(Tag.StudyID, Element.explicitLE(Tag.StudyID, VR.LO, ByteString("new id")))
-        .update(Tag.Modality, Element.explicitLE(Tag.Modality, VR.CS, ByteString("new modality")))
-        .update(Tag.InstanceNumber, Element.explicitLE(Tag.InstanceNumber, VR.SS, ByteString("666")))
+        .setString(Tag.PatientBirthDate, "new date")
+        .setString(Tag.StudyID, "new id")
+        .setString(Tag.Modality, "new modality")
+        .setString(Tag.InstanceNumber, "666")
 
       metaDataActorRef ! AddMetaData(elements2, source)
       expectMsgType[MetaDataAdded]
@@ -272,7 +273,7 @@ class MetaDataServiceActorTest extends TestKit(ActorSystem("MetaDataTestSystem")
       expectMsgType[MetaDataAdded]
 
       val elements2 = elements
-        .update(Tag.SeriesInstanceUID, Element.explicitLE(Tag.SeriesInstanceUID, VR.UI, ByteString("new ui")))
+        .setString(Tag.SeriesInstanceUID, "new ui")
 
       metaDataActorRef ! AddMetaData(elements2, source2)
       expectMsgType[MetaDataAdded]
