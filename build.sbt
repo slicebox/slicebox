@@ -1,3 +1,4 @@
+
 name := "slicebox"
 version := "1.5-SNAPSHOT"
 organization := "se.nimsa"
@@ -6,8 +7,12 @@ scalacOptions := Seq("-encoding", "UTF-8", "-Xlint", "-deprecation", "-unchecked
 
 // define the project
 
-lazy val slicebox = (project in file(".")).enablePlugins(SbtWeb, JavaServerAppPackaging, SystemVPlugin, DockerPlugin, AshScriptPlugin)
+lazy val slicebox = (project in file(".")).enablePlugins(SbtWeb, JavaServerAppPackaging, SystemVPlugin, DockerPlugin, AshScriptPlugin, BuildInfoPlugin)
+
 mainClass in Compile := Some("se.nimsa.sbx.app.Slicebox")
+
+buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion)
+buildInfoPackage := "se.nimsa.sbx.app"
 
 // for sbt-resolver, (the re-start and re-stop commands)
 

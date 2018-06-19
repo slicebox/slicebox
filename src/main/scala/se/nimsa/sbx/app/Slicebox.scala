@@ -20,7 +20,7 @@ import java.nio.file.Paths
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit.MILLISECONDS
 
-import akka.actor.ActorSystem
+import akka.actor.{ActorRef, ActorSystem, Cancellable}
 import akka.http.scaladsl.Http
 import akka.pattern.ask
 import akka.stream.ActorMaterializer
@@ -46,16 +46,16 @@ import slick.basic.DatabaseConfig
 import slick.jdbc.JdbcProfile
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
-import scala.concurrent.{Await, ExecutionContext, ExecutionContextExecutor}
+import scala.concurrent._
 import scala.reflect.ClassTag
 import scala.util.{Failure, Success}
 
 trait SliceboxBase extends SliceboxRoutes with DicomStreamOps with JsonFormats with PlayJsonSupport {
 
-  val systemInformation: SystemInformation = SystemInformation("1.5-SNAPSHOT")
+  val systemInformation: SystemInformation = SystemInformation(BuildInfo.version)
 
   val appConfig: Config  = ConfigFactory.load()
-  val sliceboxConfig = appConfig.getConfig("slicebox")
+  val sliceboxConfig: Config = appConfig.getConfig("slicebox")
 
   implicit def system: ActorSystem
 
@@ -84,7 +84,7 @@ trait SliceboxBase extends SliceboxRoutes with DicomStreamOps with JsonFormats w
   val importDao = new ImportDAO(dbConfig)
   val anonymizationDao = new AnonymizationDAO(dbConfig)
 
-  val createDbTables = for {
+  val createDbTables: Future[Unit] = for {
     _ <- logDao.create()
     _ <- seriesTypeDao.create()
     _ <- forwardingDao.create()
@@ -104,14 +104,14 @@ trait SliceboxBase extends SliceboxRoutes with DicomStreamOps with JsonFormats w
   }
   Await.ready(createDbTables, 1.minute)
 
-  val host = sliceboxConfig.getString("host")
-  val port = sliceboxConfig.getInt("port")
-  val publicHost = sliceboxConfig.getString("public.host")
-  val publicPort = sliceboxConfig.getInt("public.port")
+  val host: String = sliceboxConfig.getString("host")
+  val port: Int = sliceboxConfig.getInt("port")
+  val publicHost: String = sliceboxConfig.getString("public.host")
+  val publicPort: Int = sliceboxConfig.getInt("public.port")
 
-  val useSsl = sliceboxConfig.getString("ssl.ssl-encryption") == "on"
+  val useSsl: Boolean = sliceboxConfig.getString("ssl.ssl-encryption") == "on"
 
-  val apiBaseURL = {
+  val apiBaseURL: String = {
     val withReverseProxy = (host != publicHost) || (port != publicPort)
     val withSsl = withReverseProxy && sliceboxConfig.getBoolean("public.with-ssl") || useSsl
 
@@ -123,44 +123,44 @@ trait SliceboxBase extends SliceboxRoutes with DicomStreamOps with JsonFormats w
       s"http$ssl://$publicHost:$publicPort/api"
   }
 
-  val superUser = sliceboxConfig.getString("superuser.user")
-  val superPassword = sliceboxConfig.getString("superuser.password")
+  val superUser: String = sliceboxConfig.getString("superuser.user")
+  val superPassword: String = sliceboxConfig.getString("superuser.password")
   val sessionsIncludeIpAndUserAgent: Boolean = sliceboxConfig.getBoolean("user-sessions-include-ip-and-useragent")
 
   def storage: StorageService
 
-  val userService = {
+  val userService: ActorRef = {
     val sessionTimeout = sliceboxConfig.getDuration("session-timeout", MILLISECONDS)
     system.actorOf(UserServiceActor.props(userDao, superUser, superPassword, sessionTimeout), name = "UserService")
   }
-  val logService = system.actorOf(LogServiceActor.props(logDao), name = "LogService")
-  val metaDataService = system.actorOf(MetaDataServiceActor.props(metaDataDao, propertiesDao), name = "MetaDataService")
-  val storageService = system.actorOf(StorageServiceActor.props(storage), name = "StorageService")
-  val anonymizationService = {
+  val logService: ActorRef = system.actorOf(LogServiceActor.props(logDao), name = "LogService")
+  val metaDataService: ActorRef = system.actorOf(MetaDataServiceActor.props(metaDataDao, propertiesDao), name = "MetaDataService")
+  val storageService: ActorRef = system.actorOf(StorageServiceActor.props(storage), name = "StorageService")
+  val anonymizationService: ActorRef = {
     val purgeEmptyAnonymizationKeys = sliceboxConfig.getBoolean("anonymization.purge-empty-keys")
     system.actorOf(AnonymizationServiceActor.props(anonymizationDao, purgeEmptyAnonymizationKeys), name = "AnonymizationService")
   }
-  val boxService = system.actorOf(BoxServiceActor.props(boxDao, apiBaseURL, storage), name = "BoxService")
-  val scpService = system.actorOf(ScpServiceActor.props(scpDao, storage), name = "ScpService")
-  val scuService = system.actorOf(ScuServiceActor.props(scuDao, storage), name = "ScuService")
-  val directoryService = system.actorOf(DirectoryWatchServiceActor.props(directoryWatchDao, storage), name = "DirectoryService")
-  val seriesTypeService = system.actorOf(SeriesTypeServiceActor.props(seriesTypeDao, storage), name = "SeriesTypeService")
-  val forwardingService = system.actorOf(ForwardingServiceActor.props(forwardingDao, storage), name = "ForwardingService")
-  val importService = system.actorOf(ImportServiceActor.props(importDao), name = "ImportService")
+  val boxService: ActorRef = system.actorOf(BoxServiceActor.props(boxDao, apiBaseURL, storage), name = "BoxService")
+  val scpService: ActorRef = system.actorOf(ScpServiceActor.props(scpDao, storage), name = "ScpService")
+  val scuService: ActorRef = system.actorOf(ScuServiceActor.props(scuDao, storage), name = "ScuService")
+  val directoryService: ActorRef = system.actorOf(DirectoryWatchServiceActor.props(directoryWatchDao, storage), name = "DirectoryService")
+  val seriesTypeService: ActorRef = system.actorOf(SeriesTypeServiceActor.props(seriesTypeDao, storage), name = "SeriesTypeService")
+  val forwardingService: ActorRef = system.actorOf(ForwardingServiceActor.props(forwardingDao, storage), name = "ForwardingService")
+  val importService: ActorRef = system.actorOf(ImportServiceActor.props(importDao), name = "ImportService")
 
-  override def callAnonymizationService[R: ClassTag](message: Any) = anonymizationService.ask(message).mapTo[R]
-  override def callMetaDataService[R: ClassTag](message: Any) = metaDataService.ask(message).mapTo[R]
-  override def scheduleTask(delay: FiniteDuration)(task: => Unit) = system.scheduler.scheduleOnce(delay)(task)
+  override def callAnonymizationService[R: ClassTag](message: Any): Future[R] = anonymizationService.ask(message).mapTo[R]
+  override def callMetaDataService[R: ClassTag](message: Any): Future[R] = metaDataService.ask(message).mapTo[R]
+  override def scheduleTask(delay: FiniteDuration)(task: => Unit): Cancellable = system.scheduler.scheduleOnce(delay)(task)
 
   // special context for blocking IO
-  val blockingIoContext = ExecutionContext.fromExecutorService(Executors.newFixedThreadPool(4))
+  val blockingIoContext: ExecutionContextExecutorService = ExecutionContext.fromExecutorService(Executors.newFixedThreadPool(4))
 
 }
 
 object Slicebox extends {
-  implicit val system = ActorSystem("slicebox")
-  implicit val materializer = ActorMaterializer()
-  implicit val executor = system.dispatcher
+  implicit val system: ActorSystem = ActorSystem("slicebox")
+  implicit val materializer: ActorMaterializer = ActorMaterializer()
+  implicit val executor: ExecutionContextExecutor = system.dispatcher
   val cfg = ConfigFactory.load().getConfig("slicebox")
 
   val dbConfig = DatabaseConfig.forConfig[JdbcProfile]("slicebox.database.config")

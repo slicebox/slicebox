@@ -16,21 +16,19 @@
 
 package se.nimsa.sbx.dicom
 
-import java.io.{ByteArrayInputStream, ByteArrayOutputStream, DataInputStream}
-import java.util.Date
+import java.io.{ByteArrayInputStream, DataInputStream}
+import java.time.LocalDate
 
-import org.dcm4che3.data.Attributes
-import org.dcm4che3.io.DicomOutputStream
-import org.dcm4che3.util.UIDUtils
-import se.nimsa.dicom.data.{Tag, UID, VR}
+import akka.util.ByteString
+import se.nimsa.dicom.data.Elements._
+import se.nimsa.dicom.data._
 import se.nimsa.sbx.dicom.DicomHierarchy.{Patient, Study}
-import se.nimsa.sbx.dicom.DicomUtil.toCheVR
 
 /**
- * Scala port and minor adaptation of the Jpg2Dcm tool which is part of the Dcm4Che toolkit.
- * See https://github.com/dcm4che/dcm4che/, specifically
- * https://github.com/dcm4che/dcm4che/blob/master/dcm4che-tool/dcm4che-tool-jpg2dcm/src/main/java/org/dcm4che3/tool/jpg2dcm/Jpg2Dcm.java
- */
+  * Scala and dicom-streams port of the Jpg2Dcm tool which is part of the dcm4che toolkit.
+  * See https://github.com/dcm4che/dcm4che/, specifically
+  * https://github.com/dcm4che/dcm4che/blob/master/dcm4che-tool/dcm4che-tool-jpg2dcm/src/main/java/org/dcm4che3/tool/jpg2dcm/Jpg2Dcm.java
+  */
 object Jpeg2Dcm {
 
   private val FF = 0xff
@@ -49,70 +47,68 @@ object Jpeg2Dcm {
 
   private val transferSyntax = UID.JPEGBaselineProcess1
 
-  def apply(bytes: Array[Byte], patient: Patient, study: Study, optionalDescription: Option[String]): Array[Byte] = {
+  def apply(bytes: ByteString, patient: Patient, study: Study, optionalDescription: Option[String]): ByteString = {
 
-    val jpgInput = new DataInputStream(new ByteArrayInputStream(bytes))
+    val jpgInput = new DataInputStream(new ByteArrayInputStream(bytes.toArray))
 
-    try {
+    var attrs = Elements.empty()
+      .setString(Tag.SOPClassUID, UID.SecondaryCaptureImageStorage)
+      .setString(Tag.PatientName, patient.patientName.value)
+      .setString(Tag.PatientID, patient.patientID.value)
+      .setString(Tag.PatientSex, patient.patientSex.value)
+      .setString(Tag.PatientBirthDate, patient.patientBirthDate.value)
+      .setString(Tag.AccessionNumber, study.accessionNumber.value)
+      .setString(Tag.PatientAge, study.patientAge.value)
+      .setString(Tag.StudyDate, study.studyDate.value)
+      .setString(Tag.StudyDescription, study.studyDescription.value)
+      .setString(Tag.StudyID, study.studyID.value)
+      .setString(Tag.StudyInstanceUID, study.studyInstanceUID.value)
+      .setString(Tag.SpecificCharacterSet, charset)
+      .setString(Tag.SeriesDescription, optionalDescription.getOrElse(""))
 
-      val attrs = new Attributes()
-      attrs.setString(Tag.SOPClassUID, VR.UI, UID.SecondaryCaptureImageStorage)
-      attrs.setString(Tag.PatientName, VR.PN, patient.patientName.value)
-      attrs.setString(Tag.PatientID, VR.LO, patient.patientID.value)
-      attrs.setString(Tag.PatientSex, VR.CS, patient.patientSex.value)
-      attrs.setString(Tag.PatientBirthDate, VR.DA, patient.patientBirthDate.value)
-      attrs.setString(Tag.AccessionNumber, VR.SH, study.accessionNumber.value)
-      attrs.setString(Tag.PatientAge, VR.AS, study.patientAge.value)
-      attrs.setString(Tag.StudyDate, VR.DA, study.studyDate.value)
-      attrs.setString(Tag.StudyDescription, VR.LO, study.studyDescription.value)
-      attrs.setString(Tag.StudyID, VR.LO, study.studyID.value)
-      attrs.setString(Tag.StudyInstanceUID, VR.UI, study.studyInstanceUID.value)
-      attrs.setString(Tag.SpecificCharacterSet, VR.CS, charset)
+    val buffer = new Array[Byte](8192)
+    val jpgLen = bytes.length
+    val (out, jpgHeaderLen) = readHeader(attrs, jpgInput, buffer)
+    attrs = out
+    attrs = ensureUS(attrs, Tag.BitsAllocated, 8)
+    attrs = ensureUS(attrs, Tag.BitsStored, attrs.getInt(Tag.BitsAllocated).getOrElse(if ((buffer(jpgHeaderLen) & 0xff) > 8) 16 else 8))
+    attrs = ensureUS(attrs, Tag.HighBit, attrs.getInt(Tag.BitsStored).getOrElse(buffer(jpgHeaderLen) & 0xff - 1))
+    attrs = ensureUS(attrs, Tag.PixelRepresentation, 0)
+    attrs = ensureUID(attrs, Tag.StudyInstanceUID)
+    attrs = ensureUID(attrs, Tag.SeriesInstanceUID)
+    attrs = ensureUID(attrs, Tag.SOPInstanceUID)
+    val now = LocalDate.now()
+    attrs = attrs.setDate(Tag.InstanceCreationDate, now)
+      .setDateTime(Tag.InstanceCreationTime, now.atStartOfDay(systemZone))
+      .setDate(Tag.SeriesDate, now)
 
-      // add series description if it exists
-      optionalDescription.foreach(description => attrs.setString(Tag.SeriesDescription, VR.LO, description))
+    val fmiElements = Elements.fileMetaInformationElements(attrs.getString(Tag.SOPInstanceUID).get, attrs.getString(Tag.SOPClassUID).get, transferSyntax)
+    attrs = fmiElements.foldLeft(attrs)((a, e) => a.set(e))
 
-      val buffer = new Array[Byte](8192)
-      val jpgLen = bytes.length
-      val jpgHeaderLen = readHeader(attrs, jpgInput, buffer)
-      ensureUS(attrs, Tag.BitsAllocated, 8)
-      ensureUS(attrs, Tag.BitsStored, attrs.getInt(Tag.BitsAllocated, if ((buffer(jpgHeaderLen) & 0xff) > 8) 16 else 8))
-      ensureUS(attrs, Tag.HighBit, attrs.getInt(Tag.BitsStored, buffer(jpgHeaderLen) & 0xff) - 1)
-      ensureUS(attrs, Tag.PixelRepresentation, 0)
-      ensureUID(attrs, Tag.StudyInstanceUID)
-      ensureUID(attrs, Tag.SeriesInstanceUID)
-      ensureUID(attrs, Tag.SOPInstanceUID)
-      val now = new Date()
-      attrs.setDate(Tag.InstanceCreationDate, VR.DA, now)
-      attrs.setDate(Tag.InstanceCreationTime, VR.TM, now)
-      attrs.setDate(Tag.SeriesDate, VR.DA, now)
-      val fmi = attrs.createFileMetaInformation(transferSyntax)
-      val baos = new ByteArrayOutputStream()
-      val dos = new DicomOutputStream(baos, UID.ExplicitVRLittleEndian)
-      try {
-        dos.writeDataset(fmi, attrs)
-        dos.writeHeader(Tag.PixelData, VR.OB, -1)
-        dos.writeHeader(Tag.Item, null, 0)
-        dos.writeHeader(Tag.Item, null, (jpgLen + 1) & ~1)
-        dos.write(buffer, 0, jpgHeaderLen)
-        var r = jpgInput.read(buffer)
-        while (r > 0) {
-          dos.write(buffer, 0, r)
-          r = jpgInput.read(buffer)
-        }
-        if ((jpgLen & 1) != 0)
-          dos.write(0)
-        dos.writeHeader(Tag.SequenceDelimitationItem, null, 0)
-        baos.toByteArray
-      } finally {
-        dos.close()
+    attrs = attrs.sorted()
+
+    def createFragment(): FragmentElement = {
+      val header = ByteString(buffer.take(jpgHeaderLen))
+      var body = ByteString.empty
+      var r = jpgInput.read(buffer)
+      while (r > 0) {
+        body = body ++ buffer.take(r)
+        r = jpgInput.read(buffer)
       }
-    } finally {
-      jpgInput.close()
+      if ((jpgLen & 1) != 0)
+        body ++ ByteString(0)
+      FragmentElement(2, (jpgLen + 1) & ~1, Value(header ++ body), bigEndian = false)
     }
+
+    attrs.toBytes ++
+      FragmentsElement(Tag.PixelData, VR.OB).toBytes ++
+      FragmentElement(1, 0, Value.empty, bigEndian = false).toBytes ++
+      createFragment().toBytes ++
+      SequenceDelimitationElement(bigEndian = false).toBytes
   }
 
-  private def readHeader(attrs: Attributes, jpgInput: DataInputStream, initialBuffer: Array[Byte]): Int = {
+  private def readHeader(elements: Elements, jpgInput: DataInputStream, initialBuffer: Array[Byte]): (Elements, Int) = {
+    var out = elements
     if (jpgInput.read() != FF || jpgInput.read() != SOI
       || jpgInput.read() != FF)
       throw new IllegalArgumentException("JPEG stream does not start with FF D8 FF")
@@ -140,18 +136,22 @@ object Jpeg2Dcm {
         val y = ((buffer(jpgHeaderLen + 1) & 0xff) << 8) | (buffer(jpgHeaderLen + 2) & 0xff)
         val x = ((buffer(jpgHeaderLen + 3) & 0xff) << 8) | (buffer(jpgHeaderLen + 4) & 0xff)
         val nf = buffer(jpgHeaderLen + 5) & 0xff
-        attrs.setInt(Tag.SamplesPerPixel, VR.US, nf)
-        if (nf == 3) {
-          attrs.setString(Tag.PhotometricInterpretation, VR.CS, "YBR_FULL_422")
-          attrs.setInt(Tag.PlanarConfiguration, VR.US, 0)
-        } else
-          attrs.setString(Tag.PhotometricInterpretation, VR.CS, "MONOCHROME2")
-        attrs.setInt(Tag.Rows, VR.US, y)
-        attrs.setInt(Tag.Columns, VR.US, x)
-        attrs.setInt(Tag.BitsAllocated, VR.US, if (p > 8) 16 else 8)
-        attrs.setInt(Tag.BitsStored, VR.US, p)
-        attrs.setInt(Tag.HighBit, VR.US, p - 1)
-        attrs.setInt(Tag.PixelRepresentation, VR.US, 0)
+        out = out.setInt(Tag.SamplesPerPixel, nf)
+        if (nf == 3)
+          out = out
+            .setString(Tag.PhotometricInterpretation, "YBR_FULL_422")
+            .setInt(Tag.PlanarConfiguration, 0)
+        else
+          out = out
+            .setString(Tag.PhotometricInterpretation, "MONOCHROME2")
+
+        out = out
+          .setInt(Tag.Rows, y)
+          .setInt(Tag.Columns, x)
+          .setInt(Tag.BitsAllocated, if (p > 8) 16 else 8)
+          .setInt(Tag.BitsStored, p)
+          .setInt(Tag.HighBit, p - 1)
+          .setInt(Tag.PixelRepresentation, 0)
       }
       jpgHeaderLen += segmLen - 2
       if (jpgInput.read() != FF)
@@ -164,7 +164,7 @@ object Jpeg2Dcm {
     }
     if (!seenSOF)
       throw new IllegalArgumentException("Missing SOF segment in JPEG stream")
-    jpgHeaderLen
+    (out, jpgHeaderLen)
   }
 
   private def growBuffer(buffer: Array[Byte], minSize: Int, jpgHeaderLen: Int): Array[Byte] = {
@@ -175,12 +175,10 @@ object Jpeg2Dcm {
     tmp
   }
 
-  private def ensureUID(attrs: Attributes, tag: Int): Unit =
-    if (!attrs.containsValue(tag))
-      attrs.setString(tag, VR.UI, UIDUtils.createUID())
+  private def ensureUID(elements: Elements, tag: Int): Elements =
+    if (elements.hasElement(tag)) elements else elements.setString(tag, createUID())
 
-  private def ensureUS(attrs: Attributes, tag: Int, value: Int): Unit =
-    if (!attrs.containsValue(tag))
-      attrs.setInt(tag, VR.US, value)
+  private def ensureUS(elements: Elements, tag: Int, value: Int): Elements =
+    if (elements.hasElement(tag)) elements else elements.setInt(tag, value)
 
 }

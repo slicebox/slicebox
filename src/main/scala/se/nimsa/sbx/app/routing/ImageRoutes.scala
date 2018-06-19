@@ -93,7 +93,9 @@ trait ImageRoutes {
               onComplete(readPngImageData(imageId, frameNumber, min, max, height, storage)(materializer, blockingIoContext)) {
                 case Success(bytes) => complete(HttpEntity(`image/png`, bytes))
                 case Failure(_: NotFoundException) => complete(NotFound)
-                case Failure(_) => complete(NotImplemented)
+                case Failure(e) =>
+                  e.printStackTrace()
+                  complete(NotImplemented)
               }
             }
           }
@@ -154,8 +156,8 @@ trait ImageRoutes {
                   metaDataService.ask(GetPatient(study.patientId)).mapTo[Option[Patient]].map { patientMaybe =>
                     patientMaybe.map { patient =>
                       bytes.fold(ByteString.empty)(_ ++ _).runWith(Sink.head).map { allBytes =>
-                        val scBytes = Jpeg2Dcm(allBytes.toArray, patient, study, optionalDescription)
-                        storeDicomData(StreamSource.single(ByteString(scBytes)), source, storage, Contexts.extendedContexts, reverseAnonymization = true)
+                        val scBytes = Jpeg2Dcm(allBytes, patient, study, optionalDescription)
+                        storeDicomData(StreamSource.single(scBytes), source, storage, Contexts.extendedContexts, reverseAnonymization = true)
                           .map { metaData =>
                             system.eventStream.publish(ImageAdded(metaData.image.id, source, !metaData.imageAdded))
                             metaData.image
