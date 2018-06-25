@@ -74,43 +74,47 @@ angular.module('slicebox.import', ['ngRoute', 'ngFileUpload'])
             return fileOrDirectory.type !== 'directory';
         });
 
+        var nConcurrent = Math.min(10, files.length);
+        var nUploading = 0;
+
         $scope.uiState.currentFileSet.processing = true;
         $scope.uiState.currentFileSet.index = 0;
         $scope.uiState.currentFileSet.total = files.length;
         $scope.uiState.currentFileSet.progress = 0;
 
         var prepareNext = function() {
-            files.shift();
             if (files.length) {
-                next();
-            } else if ($scope.uiState.currentFileSet.processing) {
+                next(files.shift());
+            } else if (nUploading <= 0) {
                 $scope.uiState.currentFileSet.processing = false;
                 $scope.callbacks.importSessionsTable.reloadPage();
             }
         };
 
-        var next = function() {
+        var next = function(file) {
             $scope.uiState.currentFileSet.index++;
             $scope.uiState.currentFileSet.progress = Math.round(100 * $scope.uiState.currentFileSet.index / $scope.uiState.currentFileSet.total);
 
+            nUploading += 1;
+
             Upload.upload({
                 url: '/api/import/sessions/' + $scope.uiState.selectedSession.id + '/images',
-                data: {file: files[0]}
+                data: {file: file}
             }).success(function () {
+                nUploading -= 1;
                 prepareNext();
             }).error(function (message, status) {
                 if (status >= 300 && status !== 400) {
                     sbxToast.showErrorMessage(message);
                 }
+                nUploading -= 1;
                 prepareNext();
             });
         };
 
         // start nConcurrent uploads
-        var nConcurrent = Math.min(6, files.length);
         for (var i = 0; i < nConcurrent; i++) {
-            next();
-            files.shift();
+            next(files.shift());
         }
     };
 

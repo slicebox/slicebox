@@ -98,7 +98,7 @@ trait DicomStreamOps {
         scheduleTask(30.seconds) {
           storage.deleteByName(Seq(tempPath)) // delete temp file once file system has released handle
         }
-        throw t
+        if (!t.isInstanceOf[DicomStreamException]) throw new DicomStreamException(t) else throw t
     }
   }
 

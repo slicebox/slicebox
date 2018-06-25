@@ -121,13 +121,15 @@ trait ImportRoutes {
             }
             fileInfo match {
               case Some(fi) =>
-                SbxLog.error("Import", s"${failure.getClass.getSimpleName} during import of ${fi.fileName}: failure.getMessage")
-                importService.ask(UpdateSessionWithRejection(importSession))
-                complete((status, s"${fi.fileName}: ${failure.getMessage}"))
+                SbxLog.error("Import", s"${failure.getClass.getSimpleName} during import of ${fi.fileName}: ${failure.getMessage}")
+                onComplete(importService.ask(UpdateSessionWithRejection(importSession.id))) {
+                  _ => complete((status, s"${fi.fileName}: ${failure.getMessage}"))
+                }
               case None =>
-                SbxLog.error("Import", s"${failure.getClass.getSimpleName} during import: failure.getMessage")
-                importService.ask(UpdateSessionWithRejection(importSession))
-                complete((status, failure.getMessage))
+                SbxLog.error("Import", s"${failure.getClass.getSimpleName} during import: ${failure.getMessage}")
+                onComplete(importService.ask(UpdateSessionWithRejection(importSession.id))) {
+                  _ => complete((status, failure.getMessage))
+                }
             }
         }
       case None =>
