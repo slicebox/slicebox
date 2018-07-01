@@ -49,7 +49,7 @@ object TestUtil {
 
   def toBytes(path: Path)(implicit ec: ExecutionContext, materializer: Materializer): ByteString = toBytes(loadDicomData(path, withPixelData = true))
 
-  def toBytes(elements: Elements): ByteString = elements.toBytes
+  def toBytes(elements: Elements): ByteString = elements.toBytes()
 
   def createTestDb(name: String): DatabaseConfig[JdbcProfile] =
     DatabaseConfig.forConfig[JdbcProfile]("slicebox.database.in-memory", ConfigFactory.load().withValue(

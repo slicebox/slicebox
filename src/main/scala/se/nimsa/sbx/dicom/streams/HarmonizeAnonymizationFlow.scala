@@ -40,7 +40,7 @@ object HarmonizeAnonymizationFlow {
 
   def harmonizeAnonFlow: Flow[DicomPart, DicomPart, NotUsed] = Flow[DicomPart]
     .via(groupLengthDiscardFilter)
-    .via(toUndefinedLengthSequences)
+    .via(toIndeterminateLengthSequences)
     .via(toUtf8Flow)
     .via(DicomFlowFactory.create(new IdentityFlow with GuaranteedValueEvent[DicomPart] with StartEvent[DicomPart] {
       var maybeKey: Option[PartialAnonymizationKeyPart] = None

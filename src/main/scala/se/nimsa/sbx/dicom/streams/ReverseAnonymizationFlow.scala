@@ -50,7 +50,7 @@ object ReverseAnonymizationFlow {
 
   def reverseAnonFlow: Flow[DicomPart, DicomPart, NotUsed] = Flow[DicomPart]
     .via(groupLengthDiscardFilter)
-    .via(toUndefinedLengthSequences)
+    .via(toIndeterminateLengthSequences)
     .via(toUtf8Flow)
     .via(modifyFlow(
       reverseTags.map(tag => TagModification.endsWith(TagPath.fromTag(tag), identity, insert = true)): _*))

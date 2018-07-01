@@ -212,7 +212,7 @@ object AnonymizationFlow {
   def anonFlow: Flow[DicomPart, DicomPart, NotUsed] =
     Flow[DicomPart]
       .via(groupLengthDiscardFilter)
-      .via(toUndefinedLengthSequences)
+      .via(toIndeterminateLengthSequences)
       .via(toUtf8Flow)
       .via(tagFilter(_ => true)(tagPath =>
         !tagPath.toList.map(_.tag).exists(tag =>

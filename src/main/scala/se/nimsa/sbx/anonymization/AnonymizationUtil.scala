@@ -44,11 +44,11 @@ object AnonymizationUtil {
     if (baseValue == null || baseValue.isEmpty)
       createUID()
     else
-      createNameBasedUID(baseValue.getBytes)
+      createNameBasedUID(ByteString(baseValue))
 
   def createUid(baseValue: ByteString): ByteString = toAsciiBytes(
     if (baseValue == null || baseValue.isEmpty)
       createUID()
     else
-      createNameBasedUID(baseValue.toArray), VR.UI)
+      createNameBasedUID(baseValue), VR.UI)
 }

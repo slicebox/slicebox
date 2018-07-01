@@ -100,7 +100,7 @@ object Jpeg2Dcm {
       FragmentElement(2, (jpgLen + 1) & ~1, Value(header ++ body), bigEndian = false)
     }
 
-    attrs.toBytes ++
+    attrs.toBytes() ++
       FragmentsElement(Tag.PixelData, VR.OB).toBytes ++
       FragmentElement(1, 0, Value.empty, bigEndian = false).toBytes ++
       createFragment().toBytes ++
@@ -176,9 +176,9 @@ object Jpeg2Dcm {
   }
 
   private def ensureUID(elements: Elements, tag: Int): Elements =
-    if (elements.hasElement(tag)) elements else elements.setString(tag, createUID())
+    if (elements.contains(tag)) elements else elements.setString(tag, createUID())
 
   private def ensureUS(elements: Elements, tag: Int, value: Int): Elements =
-    if (elements.hasElement(tag)) elements else elements.setInt(tag, value)
+    if (elements.contains(tag)) elements else elements.setInt(tag, value)
 
 }

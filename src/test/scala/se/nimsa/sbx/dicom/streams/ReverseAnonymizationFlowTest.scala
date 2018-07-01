@@ -32,7 +32,7 @@ class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymiza
   val storage: StorageService = new RuntimeStorage
 
   def elementsSource(elements: Elements): Source[DicomPart, NotUsed] =
-    Source.single(elements.toBytes)
+    Source.single(elements.toBytes())
       .via(storage.parseFlow(None))
       .via(DicomFlows.tagFilter(_ => false)(tagPath => !DicomParsing.isFileMetaInformation(tagPath.tag)))
 

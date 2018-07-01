@@ -157,7 +157,7 @@ trait DicomStreamOps {
       storage
         .dataSource(imageId, None)
         .via(groupLengthDiscardFilter)
-        .via(toUndefinedLengthSequences)
+        .via(toIndeterminateLengthSequences)
         .via(toUtf8Flow)
         .via(modifyFlow(tagModifications: _*))
         .via(fmiGroupLengthFlow)
