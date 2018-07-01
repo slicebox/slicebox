@@ -207,7 +207,7 @@ trait DicomStreamOps {
               case tp => tp.previous.thenTag(tp.tag) // should not happen
             }
             val tagPathTags = tagPath.toList.map(_.tag)
-            val namePath = tagPathTags.map(Keyword.valueOf)
+            val namePath = tagPathTags.init.map(Keyword.valueOf)
 
             ImageAttribute(
               tag,
