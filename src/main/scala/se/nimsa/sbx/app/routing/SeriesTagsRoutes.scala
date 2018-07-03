@@ -27,19 +27,6 @@ import akka.http.scaladsl.model.StatusCodes.{BadRequest, Created, InternalServer
 import scala.util.{Failure, Success}
 
 
-// POST /metadata/series/{id}/seriestags
-// DEL  /metadata/series/{seriesId}/seriestags/{seriesTagId}
-
-// GET  /metadata/seriestags
-
-
-
-// TODO:
-// Rename tag
-// Remove tag (completely, not just remove tag from series as is possible today)
-// Do not remove unused tags now that there is a way to remove them manually
-
-
 trait SeriesTagsRoutes {
   this: SliceboxBase =>
 

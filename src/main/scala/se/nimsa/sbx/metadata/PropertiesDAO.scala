@@ -251,7 +251,6 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
       }
   }
 
-  // FIXME
   private def deleteFullyBatch(imageIds: Seq[Long]) = {
 
     val images = imagesQuery.filter(_.id inSetBind imageIds) // batch this?

@@ -64,13 +64,16 @@ class MetaDataServiceActor(metaDataDao: MetaDataDAO, propertiesDao: PropertiesDA
           pipe(propertiesDao.seriesTagForId(tagId)).to(sender)
 
         case UpdateSeriesTag(tag) =>
-          pipe(propertiesDao.updateSeriesTag(tag)).to(sender)
+          val updateFuture = propertiesDao.updateSeriesTag(tag)
+          updateFuture.pipeSequentiallyTo(sender)
 
         case CreateSeriesTag(tag) =>
-          pipe(propertiesDao.insertSeriesTag(tag)).to(sender)
+          val createFuture = propertiesDao.insertSeriesTag(tag)
+          createFuture.pipeSequentiallyTo(sender)
 
         case DeleteSeriesTag(tagId) =>
-          pipe(propertiesDao.deleteSeriesTag(tagId)).to(sender)
+          val deleteFuture = propertiesDao.deleteSeriesTag(tagId)
+          deleteFuture.pipeSequentiallyTo(sender)
 
         case GetSourceForSeries(seriesId) =>
           pipe(propertiesDao.seriesSourceById(seriesId)).to(sender)

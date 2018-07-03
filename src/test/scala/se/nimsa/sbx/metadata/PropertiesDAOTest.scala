@@ -811,7 +811,7 @@ class PropertiesDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterA
     }
   }
 
-  it should "update a series tag" in {
+  it should "create and update a series tag" in {
     for {
       (_, (_, _), (dbSeries1, dbSeries2, dbSeries3, _), (_, _, _, _, _, _, _, _)) <- insertMetaDataAndProperties()
       seriesTags1 <- propertiesDao.listSeriesTags
@@ -826,7 +826,7 @@ class PropertiesDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterA
     }
   }
 
-  it should "delete a series tag" in {
+  it should "create and delete a series tag" in {
     for {
       (_, (_, _), (dbSeries1, dbSeries2, dbSeries3, _), (_, _, _, _, _, _, _, _)) <- insertMetaDataAndProperties()
       seriesTags1 <- propertiesDao.listSeriesTags
