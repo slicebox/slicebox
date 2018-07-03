@@ -122,6 +122,14 @@ object MetaDataProtocol {
 
   case object GetSeriesTags extends PropertiesRequest
 
+  case class GetSeriesTag(tagId : Long) extends PropertiesRequest
+
+  case class CreateSeriesTag(tag : SeriesTag) extends PropertiesRequest
+
+  case class UpdateSeriesTag(tag : SeriesTag) extends PropertiesRequest
+
+  case class DeleteSeriesTag(tagId : Long) extends PropertiesRequest
+
   case class GetSourceForSeries(seriesId: Long) extends PropertiesRequest
 
   case class GetSeriesTagsForSeries(seriesId: Long) extends PropertiesRequest

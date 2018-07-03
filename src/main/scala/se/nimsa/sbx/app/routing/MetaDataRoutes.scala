@@ -31,14 +31,7 @@ trait MetaDataRoutes {
 
   def metaDataRoutes: Route =
     pathPrefix("metadata") {
-      path("seriestags") {
-        get {
-          onSuccess(metaDataService.ask(GetSeriesTags)) {
-            case SeriesTags(seriesTags) =>
-              complete(seriesTags)
-          }
-        }
-      } ~ pathPrefix("patients") {
+     pathPrefix("patients") {
         pathEndOrSingleSlash {
           get {
             parameters((
