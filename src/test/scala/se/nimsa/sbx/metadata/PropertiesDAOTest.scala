@@ -723,6 +723,7 @@ class PropertiesDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterA
       p1 <- metaDataDao.patients
       t1 <- metaDataDao.studies
       s1 <- metaDataDao.series
+      tags1 <- propertiesDao.listSeriesTags
       _ <- propertiesDao.deleteFully(Seq(i1.id, i2.id))
       p2 <- metaDataDao.patients
       t2 <- metaDataDao.studies
@@ -739,6 +740,7 @@ class PropertiesDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterA
       p5 <- metaDataDao.patients
       t5 <- metaDataDao.studies
       s5 <- metaDataDao.series
+      tags2 <- propertiesDao.listSeriesTags
     } yield {
       p1 should have length 1
       t1 should have length 2
@@ -759,32 +761,36 @@ class PropertiesDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterA
       p5 shouldBe empty
       t5 shouldBe empty
       s5 shouldBe empty
+
+      tags1.size should be(2)
+      tags1.map(_.name) should be(List("Tag1", "Tag2"))
+      tags2.size should be(2)
+      tags2.map(_.name) should be(List("Tag1", "Tag2"))
     }
   }
 
-  it should "remove a series tag when the last occurrence of it has been removed" in {
+  it should "not remove a series tag that is no longer used in series" in {
     for {
       (_, (_, _), (dbSeries1, dbSeries2, dbSeries3, _), (_, _, _, _, _, _, _, _)) <- insertMetaDataAndProperties()
       seriesTags1 <- propertiesDao.listSeriesTags
-      _ <- propertiesDao.removeAndCleanupSeriesTagForSeriesId(seriesTags1.head.id, dbSeries1.id)
+      _ <- propertiesDao.removeSeriesTagForSeriesId(seriesTags1.head.id, dbSeries1.id)
       seriesTags2 <- propertiesDao.listSeriesTags
-      _ <- propertiesDao.removeAndCleanupSeriesTagForSeriesId(seriesTags1(1).id, dbSeries1.id)
+      _ <- propertiesDao.removeSeriesTagForSeriesId(seriesTags1(1).id, dbSeries1.id)
       seriesTags3 <- propertiesDao.listSeriesTags
-      _ <- propertiesDao.removeAndCleanupSeriesTagForSeriesId(seriesTags1.head.id, dbSeries2.id)
+      _ <- propertiesDao.removeSeriesTagForSeriesId(seriesTags1.head.id, dbSeries2.id)
       seriesTags4 <- propertiesDao.listSeriesTags
-      _ <- propertiesDao.removeAndCleanupSeriesTagForSeriesId(seriesTags1(1).id, dbSeries3.id)
+      _ <- propertiesDao.removeSeriesTagForSeriesId(seriesTags1(1).id, dbSeries3.id)
       seriesTags5 <- propertiesDao.listSeriesTags
     } yield {
       seriesTags1.size should be(2)
       seriesTags1.map(_.name) should be(List("Tag1", "Tag2"))
       seriesTags2.size should be(2)
       seriesTags3.size should be(2)
-      seriesTags4.size should be(1)
-      seriesTags5.size should be(0)
+      seriesTags4.size should be(2)
     }
   }
 
-  it should "remove a series tag when deleting a series if the series tag attached to the series was the last of its kind" in {
+  it should "not remove a series tag when deleting a series if the series tag attached to the series, even it was the last of its kind" in {
     for {
       (_, (_, _), (_, _, _, _), (dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)) <- insertMetaDataAndProperties()
       st1 <- propertiesDao.listSeriesTags
@@ -800,8 +806,37 @@ class PropertiesDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterA
       st1.size should be(2)
       st2.size should be(2)
       st3.size should be(2)
-      st4.size should be(1)
-      st5.size should be(0)
+      st4.size should be(2)
+      st5.size should be(2)
+    }
+  }
+
+  it should "create and update a series tag" in {
+    for {
+      (_, (_, _), (dbSeries1, dbSeries2, dbSeries3, _), (_, _, _, _, _, _, _, _)) <- insertMetaDataAndProperties()
+      seriesTags1 <- propertiesDao.listSeriesTags
+      maybeUpdatedTag <- propertiesDao.updateSeriesTag(SeriesTag(seriesTags1.head.id, "UpdatedTag1"))
+      seriesTags2 <- propertiesDao.listSeriesTags
+    } yield {
+      seriesTags1.size should be(2)
+      seriesTags1.map(_.name) should be(List("Tag1", "Tag2"))
+      maybeUpdatedTag.isDefined shouldBe true
+      seriesTags1.filter(_.name == "Tag1").head.id shouldEqual maybeUpdatedTag.get.id
+      seriesTags2.map(_.name).exists(_ == "UpdatedTag1") shouldBe true
+    }
+  }
+
+  it should "create and delete a series tag" in {
+    for {
+      (_, (_, _), (dbSeries1, dbSeries2, dbSeries3, _), (_, _, _, _, _, _, _, _)) <- insertMetaDataAndProperties()
+      seriesTags1 <- propertiesDao.listSeriesTags
+      _ <- propertiesDao.deleteSeriesTag(seriesTags1.head.id)
+      seriesTags2 <- propertiesDao.listSeriesTags
+    } yield {
+      seriesTags1.size should be(2)
+      seriesTags1.map(_.name) should be(List("Tag1", "Tag2"))
+      seriesTags2.size should be(1)
+      seriesTags2.map(_.name).exists(_ == "Tag1") shouldBe false
     }
   }
 
