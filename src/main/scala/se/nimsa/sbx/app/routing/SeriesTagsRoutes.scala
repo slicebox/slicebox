@@ -35,11 +35,17 @@ trait SeriesTagsRoutes {
       pathPrefix("seriestags") {
         pathEndOrSingleSlash {
           get {
-            onSuccess(metaDataService.ask(GetSeriesTags)) {
-              case SeriesTags(seriesTags) =>
-                complete(seriesTags)
+            parameters((
+              'startindex.as(nonNegativeFromStringUnmarshaller) ? 0,
+              'count.as(nonNegativeFromStringUnmarshaller) ? 20,
+              'orderby.as[String].?,
+              'orderascending.as[Boolean] ? true,
+              'filter.as[String].?)) { (startIndex, count, orderBy, orderAscending, filter) =>
+              onSuccess(metaDataService.ask(GetSeriesTags(startIndex, count, orderBy, orderAscending, filter))) {
+                case SeriesTags(seriesTags) =>
+                  complete(seriesTags)
+              }
             }
-
           } ~ post {
             entity(as[SeriesTag]) { seriesTag =>
               onComplete(metaDataService.ask(CreateSeriesTag(seriesTag))) {
@@ -52,7 +58,7 @@ trait SeriesTagsRoutes {
                     complete((InternalServerError, msg))
                   }
                 }
-
+                case _ => complete(InternalServerError)
               }
             }
           }
@@ -73,9 +79,8 @@ trait SeriesTagsRoutes {
                 }
               }
             } ~ delete {
-             onSuccess(metaDataService.ask(DeleteSeriesTag(tagId))) {
-                case SeriesTags(seriesTags) =>
-                  complete(NoContent)
+              onSuccess(metaDataService.ask(DeleteSeriesTag(tagId))) { _ =>
+                complete(NoContent)
               }
             }
           }

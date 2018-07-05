@@ -164,8 +164,14 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
     seriesSourceQuery.result
   }
 
-  def listSeriesTags: Future[Seq[SeriesTag]] = db.run {
-    seriesTagQuery.result
+  def listSeriesTags(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String]): Future[Seq[SeriesTag]] = db.run {
+    val filtered = filter.map(f => seriesTagQuery.filter(_.name like s"%$f%")).getOrElse(seriesTagQuery)
+    val sorted = orderBy match {
+      case Some("id") => if (orderAscending) filtered.sortBy(_.id.asc) else filtered.sortBy(_.id.desc)
+      case Some("name") => if (orderAscending) filtered.sortBy(_.name.asc) else filtered.sortBy(_.name.desc)
+      case _ => filtered
+    }
+    sorted.drop(startIndex).take(count).result
   }
 
   def deleteSeriesTagAction(tagId: Long) = seriesTagQuery.filter(_.id === tagId).delete.map(_ => {})

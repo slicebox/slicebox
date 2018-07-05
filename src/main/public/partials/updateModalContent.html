@@ -1,0 +1,27 @@
+<md-dialog aria-label="Update {{uiState.entityName}}" class="rename">
+
+    <form name="renameForm">
+
+        <md-dialog-content>
+            <md-subheader class="md-sticky-no-effect">Update {{uiState.entityName}}</md-subheader>
+
+            <div layout="column">
+
+                <md-input-container>
+                    <label style="text-transform: capitalize">{{uiState.fieldName}}</label>
+                    <input name="updatedValue" ng-model="uiState.updatedValue" type="text" id="updatedValue" required />
+                </md-input-container>
+
+            </div>
+
+        </md-dialog-content>
+
+        <md-dialog-actions layout="row">
+            <span flex></span>
+            <md-button ng-click="cancelButtonClicked()">Cancel</md-button>
+            <md-button type="submit" class="md-primary" ng-click="applyButtonClicked()" ng-disabled="renameForm.$invalid">Apply</md-button>
+        </md-dialog-actions>
+        
+    </form>
+
+</md-dialog>
