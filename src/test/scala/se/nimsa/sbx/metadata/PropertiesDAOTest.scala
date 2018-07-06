@@ -43,7 +43,7 @@ class PropertiesDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterA
   "The properties db" should "be empty before anything has been added" in {
     for {
       ss <- propertiesDao.listSeriesSources
-      st <- propertiesDao.listSeriesTags
+      st <- propertiesDao.listSeriesTags(0, 1000, None, orderAscending = false, None)
       sst <- seriesTypeDao.listSeriesSeriesTypes
     } yield {
       ss should be(empty)
@@ -723,7 +723,7 @@ class PropertiesDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterA
       p1 <- metaDataDao.patients
       t1 <- metaDataDao.studies
       s1 <- metaDataDao.series
-      tags1 <- propertiesDao.listSeriesTags
+      tags1 <- propertiesDao.listSeriesTags(0, 1000, None, orderAscending = false, None)
       _ <- propertiesDao.deleteFully(Seq(i1.id, i2.id))
       p2 <- metaDataDao.patients
       t2 <- metaDataDao.studies
@@ -740,7 +740,7 @@ class PropertiesDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterA
       p5 <- metaDataDao.patients
       t5 <- metaDataDao.studies
       s5 <- metaDataDao.series
-      tags2 <- propertiesDao.listSeriesTags
+      tags2 <- propertiesDao.listSeriesTags(0, 1000, None, orderAscending = false, None)
     } yield {
       p1 should have length 1
       t1 should have length 2
@@ -769,18 +769,40 @@ class PropertiesDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterA
     }
   }
 
+  it should "support listing series tags" in {
+    for {
+      _ <- insertMetaDataAndProperties()
+      tags1 <- propertiesDao.listSeriesTags(0, 1, None, orderAscending = false, None)
+      tags2 <- propertiesDao.listSeriesTags(1, 1, None, orderAscending = false, None)
+      tags3 <- propertiesDao.listSeriesTags(0, 9, Some("name"), orderAscending = false, None)
+      tags4 <- propertiesDao.listSeriesTags(0, 9, Some("name"), orderAscending = true, None)
+      tags5 <- propertiesDao.listSeriesTags(0, 9, None, orderAscending = false, Some("1"))
+    } yield {
+      tags1 should have size 1
+      tags1.head.name shouldBe "Tag1"
+      tags2 should have size 1
+      tags2.head.name shouldBe "Tag2"
+      tags3 should have size 2
+      tags3.map(_.name) shouldBe Seq("Tag2", "Tag1")
+      tags4 should have size 2
+      tags4.map(_.name) shouldBe Seq("Tag1", "Tag2")
+      tags5 should have size 1
+      tags5.head.name shouldBe "Tag1"
+    }
+  }
+
   it should "not remove a series tag that is no longer used in series" in {
     for {
       (_, (_, _), (dbSeries1, dbSeries2, dbSeries3, _), (_, _, _, _, _, _, _, _)) <- insertMetaDataAndProperties()
-      seriesTags1 <- propertiesDao.listSeriesTags
+      seriesTags1 <- propertiesDao.listSeriesTags(0, 1000, None, orderAscending = false, None)
       _ <- propertiesDao.removeSeriesTagForSeriesId(seriesTags1.head.id, dbSeries1.id)
-      seriesTags2 <- propertiesDao.listSeriesTags
+      seriesTags2 <- propertiesDao.listSeriesTags(0, 1000, None, orderAscending = false, None)
       _ <- propertiesDao.removeSeriesTagForSeriesId(seriesTags1(1).id, dbSeries1.id)
-      seriesTags3 <- propertiesDao.listSeriesTags
+      seriesTags3 <- propertiesDao.listSeriesTags(0, 1000, None, orderAscending = false, None)
       _ <- propertiesDao.removeSeriesTagForSeriesId(seriesTags1.head.id, dbSeries2.id)
-      seriesTags4 <- propertiesDao.listSeriesTags
+      seriesTags4 <- propertiesDao.listSeriesTags(0, 1000, None, orderAscending = false, None)
       _ <- propertiesDao.removeSeriesTagForSeriesId(seriesTags1(1).id, dbSeries3.id)
-      seriesTags5 <- propertiesDao.listSeriesTags
+      seriesTags5 <- propertiesDao.listSeriesTags(0, 1000, None, orderAscending = false, None)
     } yield {
       seriesTags1.size should be(2)
       seriesTags1.map(_.name) should be(List("Tag1", "Tag2"))
@@ -793,15 +815,15 @@ class PropertiesDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterA
   it should "not remove a series tag when deleting a series if the series tag attached to the series, even it was the last of its kind" in {
     for {
       (_, (_, _), (_, _, _, _), (dbImage1, dbImage2, dbImage3, dbImage4, dbImage5, dbImage6, dbImage7, dbImage8)) <- insertMetaDataAndProperties()
-      st1 <- propertiesDao.listSeriesTags
+      st1 <- propertiesDao.listSeriesTags(0, 1000, None, orderAscending = false, None)
       _ <- propertiesDao.deleteFully(Seq(dbImage7.id, dbImage8.id))
-      st2 <- propertiesDao.listSeriesTags
+      st2 <- propertiesDao.listSeriesTags(0, 1000, None, orderAscending = false, None)
       _ <- propertiesDao.deleteFully(Seq(dbImage1.id, dbImage2.id))
-      st3 <- propertiesDao.listSeriesTags
+      st3 <- propertiesDao.listSeriesTags(0, 1000, None, orderAscending = false, None)
       _ <- propertiesDao.deleteFully(Seq(dbImage3.id, dbImage4.id))
-      st4 <- propertiesDao.listSeriesTags
+      st4 <- propertiesDao.listSeriesTags(0, 1000, None, orderAscending = false, None)
       _ <- propertiesDao.deleteFully(Seq(dbImage5.id, dbImage6.id))
-      st5 <- propertiesDao.listSeriesTags
+      st5 <- propertiesDao.listSeriesTags(0, 1000, None, orderAscending = false, None)
     } yield {
       st1.size should be(2)
       st2.size should be(2)
@@ -814,9 +836,9 @@ class PropertiesDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterA
   it should "create and update a series tag" in {
     for {
       (_, (_, _), (dbSeries1, dbSeries2, dbSeries3, _), (_, _, _, _, _, _, _, _)) <- insertMetaDataAndProperties()
-      seriesTags1 <- propertiesDao.listSeriesTags
+      seriesTags1 <- propertiesDao.listSeriesTags(0, 1000, None, orderAscending = false, None)
       maybeUpdatedTag <- propertiesDao.updateSeriesTag(SeriesTag(seriesTags1.head.id, "UpdatedTag1"))
-      seriesTags2 <- propertiesDao.listSeriesTags
+      seriesTags2 <- propertiesDao.listSeriesTags(0, 1000, None, orderAscending = false, None)
     } yield {
       seriesTags1.size should be(2)
       seriesTags1.map(_.name) should be(List("Tag1", "Tag2"))
@@ -829,9 +851,9 @@ class PropertiesDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterA
   it should "create and delete a series tag" in {
     for {
       (_, (_, _), (dbSeries1, dbSeries2, dbSeries3, _), (_, _, _, _, _, _, _, _)) <- insertMetaDataAndProperties()
-      seriesTags1 <- propertiesDao.listSeriesTags
+      seriesTags1 <- propertiesDao.listSeriesTags(0, 1000, None, orderAscending = false, None)
       _ <- propertiesDao.deleteSeriesTag(seriesTags1.head.id)
-      seriesTags2 <- propertiesDao.listSeriesTags
+      seriesTags2 <- propertiesDao.listSeriesTags(0, 1000, None, orderAscending = false, None)
     } yield {
       seriesTags1.size should be(2)
       seriesTags1.map(_.name) should be(List("Tag1", "Tag2"))

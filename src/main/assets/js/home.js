@@ -675,7 +675,7 @@ angular.module('slicebox.home', ['ngRoute'])
 
     function updateSeriesTagsPromise() {
         $scope.uiState.advancedFiltering.seriesTagsPromise = $scope.uiState.advancedFiltering.seriesTagsPromise.then(function (oldTags) {
-            return $http.get('/api/metadata/seriestags').then(function (newTagsData) {
+            return $http.get('/api/metadata/seriestags?count=100000').then(function (newTagsData) {
                 if (newTagsData.status === 200) {
                     var newTags = newTagsData.data;
                     // copy selected attribute from existing tags

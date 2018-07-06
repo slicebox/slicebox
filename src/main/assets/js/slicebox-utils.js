@@ -273,6 +273,45 @@ angular.module('slicebox.utils', ['ngSanitize'])
     };
 })
 
+.factory('openUpdateModal', function($mdDialog, $http, sbxToast) {
+    return function(url, entity, entityName, fieldName) {
+        return $mdDialog.show({
+            templateUrl: '/assets/partials/updateModalContent.html',
+            controller: 'UpdateModalCtrl',
+            locals: {
+                entityName: entityName,
+                fieldName: fieldName,
+                updatedValue: entity[fieldName]
+            }
+        }).then(function (updatedValue) {
+            entity[fieldName] = updatedValue;
+            return $http.put(url, entity)
+                .then(function () {
+                    sbxToast.showInfoMessage("Entity updated");
+                }, function (error) {
+                    sbxToast.showErrorMessage(error);
+                });
+        });
+    };
+})
+
+.controller('UpdateModalCtrl', function ($scope, $mdDialog, entityName, fieldName, updatedValue) {
+    // Scope functions
+    $scope.uiState = {
+        entityName: entityName,
+        fieldName: fieldName,
+        updatedValue: updatedValue
+    };
+
+    $scope.applyButtonClicked = function() {
+        $mdDialog.hide($scope.uiState.updatedValue);
+    };
+
+    $scope.cancelButtonClicked = function() {
+        $mdDialog.cancel();
+    };
+})
+
 .factory('openTagSeriesModal', function($mdDialog) {
     return function(seriesIdsPromise) {
         return $mdDialog.show({
@@ -297,7 +336,7 @@ angular.module('slicebox.utils', ['ngSanitize'])
         }
     };
 
-    var allTagsPromise = $http.get('/api/metadata/seriestags').then(function (seriesTagsData) { return seriesTagsData.data; });
+    var allTagsPromise = $http.get('/api/metadata/seriestags?count=100000&orderby=name').then(function (seriesTagsData) { return seriesTagsData.data; });
 
     var tagIdToTagPromise = allTagsPromise.then(function (allTags) {
         return allTags.reduce(function(map, tag) {

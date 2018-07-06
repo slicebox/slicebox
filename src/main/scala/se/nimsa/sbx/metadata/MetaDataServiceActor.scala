@@ -57,8 +57,8 @@ class MetaDataServiceActor(metaDataDao: MetaDataDAO, propertiesDao: PropertiesDA
     case msg: PropertiesRequest =>
       msg match {
 
-        case GetSeriesTags =>
-          pipe(propertiesDao.listSeriesTags.map(SeriesTags)).to(sender)
+        case GetSeriesTags(startIndex, count, orderBy, orderAscending, filter) =>
+          pipe(propertiesDao.listSeriesTags(startIndex, count, orderBy, orderAscending, filter).map(SeriesTags)).to(sender)
 
         case GetSeriesTag(tagId) =>
           pipe(propertiesDao.seriesTagForId(tagId)).to(sender)
