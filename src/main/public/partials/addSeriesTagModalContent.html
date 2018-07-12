@@ -1,0 +1,27 @@
+<md-dialog aria-label="Add Series Tag" class="add-series-tag">
+
+    <form name="seriesTagForm">
+
+        <md-dialog-content>
+            <md-subheader class="md-sticky-no-effect">Add Series Tag</md-subheader>
+
+            <div layout="column">
+
+                <md-input-container>
+                    <label>Name</label>
+                    <input name="name" ng-model="name" type="text" id="name" required />
+                </md-input-container>
+
+            </div>
+
+        </md-dialog-content>
+
+        <md-dialog-actions layout="row">
+            <span flex></span>
+            <md-button ng-click="cancelButtonClicked()">Cancel</md-button>
+            <md-button type="submit" class="md-primary" ng-click="addButtonClicked()" ng-disabled="seriesTagForm.$invalid">Add</md-button>
+        </md-dialog-actions>
+        
+    </form>
+
+</md-dialog>

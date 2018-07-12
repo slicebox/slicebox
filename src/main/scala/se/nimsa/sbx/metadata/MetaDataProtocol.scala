@@ -120,7 +120,7 @@ object MetaDataProtocol {
 
   case class RemoveSeriesTagFromSeries(seriesTagId: Long, seriesId: Long) extends PropertiesRequest
 
-  case object GetSeriesTags extends PropertiesRequest
+  case class GetSeriesTags(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String]) extends PropertiesRequest
 
   case class GetSeriesTag(tagId : Long) extends PropertiesRequest
 
