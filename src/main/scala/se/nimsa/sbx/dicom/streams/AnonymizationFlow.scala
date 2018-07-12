@@ -19,18 +19,17 @@ package se.nimsa.sbx.dicom.streams
 import akka.NotUsed
 import akka.stream.scaladsl.Flow
 import akka.util.ByteString
-import org.dcm4che3.data.{Tag, VR}
-import se.nimsa.dcm4che.streams.DicomFlows._
-import se.nimsa.dcm4che.streams.DicomModifyFlow._
-import se.nimsa.dcm4che.streams.DicomParts._
-import se.nimsa.dcm4che.streams._
+import se.nimsa.dicom.streams.DicomFlows._
+import se.nimsa.dicom.data.DicomParsing.isPrivate
+import se.nimsa.dicom.data.DicomParts.DicomPart
+import se.nimsa.dicom.streams.ModifyFlow.{TagModification, modifyFlow}
+import se.nimsa.dicom.data.{Tag, TagPath, VR}
 import se.nimsa.sbx.anonymization.AnonymizationUtil._
 import se.nimsa.sbx.dicom.DicomUtil._
 import se.nimsa.sbx.dicom.streams.DicomStreamUtil._
 
 object AnonymizationFlow {
 
-  import DicomParsing.isPrivateAttribute
 
   private def insert(tag: Int, mod: ByteString => ByteString) = TagModification.endsWith(TagPath.fromTag(tag), mod, insert = true)
   private def modify(tag: Int, mod: ByteString => ByteString) = TagModification.endsWith(TagPath.fromTag(tag), mod, insert = false)
@@ -213,10 +212,11 @@ object AnonymizationFlow {
   def anonFlow: Flow[DicomPart, DicomPart, NotUsed] =
     Flow[DicomPart]
       .via(groupLengthDiscardFilter)
-      .via(toUndefinedLengthSequences)
+      .via(toIndeterminateLengthSequences)
+      .via(toUtf8Flow)
       .via(tagFilter(_ => true)(tagPath =>
         !tagPath.toList.map(_.tag).exists(tag =>
-          isPrivateAttribute(tag) || isOverlay(tag) || removeTags.contains(tag)))) // remove private, overlay and PHI attributes
+          isPrivate(tag) || isOverlay(tag) || removeTags.contains(tag)))) // remove private, overlay and PHI attributes
       .via(modifyFlow( // modify, clear and insert
       modify(Tag.AccessionNumber, bytes => if (bytes.nonEmpty) createAccessionNumber(bytes) else bytes),
       modify(Tag.ConcatenationUID, createUid),
@@ -270,8 +270,8 @@ object AnonymizationFlow {
     */
   def maybeAnonFlow: Flow[DicomPart, DicomPart, NotUsed] = conditionalFlow(
     {
-      case keyPart: PartialAnonymizationKeyPart => keyPart.keyMaybe.isEmpty
-    }, Flow.fromFunction(identity), anonFlow)
+      case keyPart: PartialAnonymizationKeyPart => keyPart.keyMaybe.nonEmpty
+    }, anonFlow, Flow.fromFunction(identity))
 
 }
 

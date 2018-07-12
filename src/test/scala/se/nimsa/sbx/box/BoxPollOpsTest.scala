@@ -10,8 +10,8 @@ import akka.stream.scaladsl.{Flow, Source}
 import akka.stream.{ActorMaterializer, Materializer}
 import akka.testkit.TestKit
 import akka.util.{ByteString, Timeout}
-import org.dcm4che3.io.DicomStreamException
 import org.scalatest.{AsyncFlatSpecLike, BeforeAndAfterAll, Matchers}
+import se.nimsa.dicom.streams.DicomStreamException
 import se.nimsa.sbx.app.GeneralProtocol
 import se.nimsa.sbx.app.GeneralProtocol.SourceType
 import se.nimsa.sbx.box.BoxProtocol._

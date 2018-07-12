@@ -19,9 +19,9 @@ package se.nimsa.sbx.anonymization
 import java.util.UUID
 
 import akka.util.ByteString
-import org.dcm4che3.data.VR
-import org.dcm4che3.util.UIDUtils
+import se.nimsa.dicom.data.VR
 import se.nimsa.sbx.dicom.DicomUtil.toAsciiBytes
+import se.nimsa.dicom.data._
 
 import scala.util.Random
 
@@ -42,13 +42,13 @@ object AnonymizationUtil {
 
   def createUid(baseValue: String): String =
     if (baseValue == null || baseValue.isEmpty)
-      UIDUtils.createUID()
+      createUID()
     else
-      UIDUtils.createNameBasedUID(baseValue.getBytes)
+      createNameBasedUID(ByteString(baseValue))
 
   def createUid(baseValue: ByteString): ByteString = toAsciiBytes(
     if (baseValue == null || baseValue.isEmpty)
-      UIDUtils.createUID()
+      createUID()
     else
-      UIDUtils.createNameBasedUID(baseValue.toArray), VR.UI)
+      createNameBasedUID(baseValue), VR.UI)
 }

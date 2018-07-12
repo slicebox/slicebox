@@ -1,14 +1,13 @@
 package se.nimsa.sbx.seriestype
 
-import akka.actor.ActorSelection.toScala
-import akka.actor.ActorSystem
+import akka.actor.{ActorRef, ActorSelection, ActorSystem}
 import akka.pattern.ask
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{Source => StreamSource}
 import akka.testkit.{ImplicitSender, TestKit}
-import akka.util.{ByteString, Timeout}
-import org.dcm4che3.data.{Keyword, Tag}
+import akka.util.Timeout
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
+import se.nimsa.dicom.data.{Keyword, Tag}
 import se.nimsa.sbx.app.GeneralProtocol.{Source, SourceType}
 import se.nimsa.sbx.dicom.DicomHierarchy.Series
 import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, MetaDataAdded}
@@ -19,16 +18,16 @@ import se.nimsa.sbx.util.FutureUtil.await
 import se.nimsa.sbx.util.TestUtil
 
 import scala.concurrent.duration.DurationInt
-import scala.concurrent.{Await, Future}
+import scala.concurrent.{Await, ExecutionContextExecutor, Future}
 
 class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
   with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {
 
   def this() = this(ActorSystem("SeriesTypesUpdateActorSystem"))
 
-  implicit val ec = system.dispatcher
-  implicit val timeout = Timeout(30.seconds)
-  implicit val materializer = ActorMaterializer()
+  implicit val ec: ExecutionContextExecutor = system.dispatcher
+  implicit val timeout: Timeout = Timeout(30.seconds)
+  implicit val materializer: ActorMaterializer = ActorMaterializer()
 
   val dbConfig = TestUtil.createTestDb("seriestypeupdateactortest")
   val dao = new MetaDataDAO(dbConfig)
@@ -39,20 +38,20 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
   val metaDataDao = new MetaDataDAO(dbConfig)
   val propertiesDao = new PropertiesDAO(dbConfig)
 
-  override def beforeAll() = {
+  override def beforeAll(): Unit = {
     await(metaDataDao.create())
     await(propertiesDao.create())
     await(seriesTypeDao.create())
   }
 
-  val storageService = system.actorOf(StorageServiceActor.props(storage), name = "StorageService")
-  val metaDataService = system.actorOf(MetaDataServiceActor.props(metaDataDao, propertiesDao), name = "MetaDataService")
-  val seriesTypeService = system.actorOf(SeriesTypeServiceActor.props(seriesTypeDao, storage), name = "SeriesTypeService")
-  val seriesTypeUpdateService = system.actorSelection("user/SeriesTypeService/SeriesTypeUpdate")
+  val storageService: ActorRef = system.actorOf(StorageServiceActor.props(storage), name = "StorageService")
+  val metaDataService: ActorRef = system.actorOf(MetaDataServiceActor.props(metaDataDao, propertiesDao), name = "MetaDataService")
+  val seriesTypeService: ActorRef = system.actorOf(SeriesTypeServiceActor.props(seriesTypeDao, storage), name = "SeriesTypeService")
+  val seriesTypeUpdateService: ActorSelection = system.actorSelection("user/SeriesTypeService/SeriesTypeUpdate")
 
-  override def afterAll() = TestKit.shutdownActorSystem(system)
+  override def afterAll(): Unit = TestKit.shutdownActorSystem(system)
 
-  override def afterEach() = await(Future.sequence(Seq(
+  override def afterEach(): Unit = await(Future.sequence(Seq(
     seriesTypeDao.clear(),
     metaDataDao.clear(),
     propertiesDao.clear(),
@@ -168,7 +167,7 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
                         patientName: String = "abc",
                         patientSex: String = "F"): Series = {
 
-    val dicomData = TestUtil.createDicomData(
+    val elements = TestUtil.createElements(
       sopInstanceUID = sopInstanceUID,
       seriesInstanceUID = seriesInstanceUID,
       patientName = patientName,
@@ -177,10 +176,10 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
     val source = Source(SourceType.BOX, "remote box", 1)
 
     Await.result(
-      metaDataService.ask(AddMetaData(dicomData.attributes, source))
+      metaDataService.ask(AddMetaData(elements, source))
         .mapTo[MetaDataAdded]
         .flatMap { metaData =>
-          StreamSource.single(ByteString(TestUtil.toByteArray(dicomData)))
+          StreamSource.single(TestUtil.toBytes(elements))
             .runWith(storage.fileSink(metaData.image.id.toString))
             .map(_ => metaData.series)
         }, 30.seconds)

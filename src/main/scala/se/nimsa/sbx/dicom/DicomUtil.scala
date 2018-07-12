@@ -17,18 +17,19 @@
 package se.nimsa.sbx.dicom
 
 import akka.util.ByteString
-import org.dcm4che3.data._
-import se.nimsa.dcm4che.streams.{groupNumber, padToEvenLength}
+import org.dcm4che3.data.{VR => CheVR}
+import se.nimsa.dicom.data.VR.VR
+import se.nimsa.dicom.data.{Tag, VR, Keyword, Elements, padToEvenLength, groupNumber}
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomPropertyValue._
 
+import scala.language.implicitConversions
+
 object DicomUtil {
 
-  def isAnonymous(attributes: Attributes): Boolean = attributes.getString(Tag.PatientIdentityRemoved, "NO") == "YES"
+  def isAnonymous(elements: Elements): Boolean = elements.getString(Tag.PatientIdentityRemoved).getOrElse("NO") == "YES"
 
-  def cloneAttributes(attributes: Attributes): Attributes = new Attributes(attributes)
-
-  def attributesToPatient(attributes: Attributes): Patient =
+  def attributesToPatient(attributes: Elements): Patient =
     Patient(
       -1,
       PatientName(valueOrEmpty(attributes, DicomProperty.PatientName.dicomTag)),
@@ -36,7 +37,7 @@ object DicomUtil {
       PatientBirthDate(valueOrEmpty(attributes, DicomProperty.PatientBirthDate.dicomTag)),
       PatientSex(valueOrEmpty(attributes, DicomProperty.PatientSex.dicomTag)))
 
-  def attributesToStudy(attributes: Attributes): Study =
+  def attributesToStudy(attributes: Elements): Study =
     Study(
       -1,
       -1,
@@ -47,7 +48,7 @@ object DicomUtil {
       AccessionNumber(valueOrEmpty(attributes, DicomProperty.AccessionNumber.dicomTag)),
       PatientAge(valueOrEmpty(attributes, DicomProperty.PatientAge.dicomTag)))
 
-  def attributesToSeries(attributes: Attributes): Series =
+  def attributesToSeries(attributes: Elements): Series =
     Series(
       -1,
       -1,
@@ -61,7 +62,7 @@ object DicomUtil {
       StationName(valueOrEmpty(attributes, DicomProperty.StationName.dicomTag)),
       FrameOfReferenceUID(valueOrEmpty(attributes, DicomProperty.FrameOfReferenceUID.dicomTag)))
 
-  def attributesToImage(attributes: Attributes): Image =
+  def attributesToImage(attributes: Elements): Image =
     Image(
       -1,
       -1,
@@ -69,20 +70,21 @@ object DicomUtil {
       ImageType(readMultiple(attributes.getStrings(DicomProperty.ImageType.dicomTag))),
       InstanceNumber(valueOrEmpty(attributes, DicomProperty.InstanceNumber.dicomTag)))
 
-  private def valueOrEmpty(attributes: Attributes, tag: Int) = Option(attributes.getString(tag)).getOrElse("")
+  private def valueOrEmpty(attributes: Elements, tag: Int) =
+    attributes.getString(tag).getOrElse("")
 
-  def readMultiple(values: Array[String]): String =
-    if (values == null || values.length == 0)
+  def readMultiple(values: Seq[String]): String =
+    if (values == null || values.isEmpty)
       ""
     else
-      values.tail.foldLeft(values.head)((result, part) => result + "/" + part)
+      values.tail.foldLeft(values.head)((result, part) => result + "\\" + part)
 
-  def getStrings(attrs: Attributes, tag: Int): Array[String] = {
-    val s = attrs.getStrings(tag)
-    if (s == null || s.isEmpty) Array("") else s
+  def getStrings(attrs: Elements, tag: Int): Seq[String] = {
+    val strings = attrs.getStrings(tag)
+    if (strings.isEmpty) Seq("") else strings
   }
 
-  def concatenatedStringForTag(attrs: Attributes, tag: Int): String = {
+  def concatenatedStringForTag(attrs: Elements, tag: Int): String = {
     val array = getStrings(attrs, tag)
     array.mkString(",")
   }
@@ -99,4 +101,7 @@ object DicomUtil {
     group >= 0x6000 && group < 0x6100
   }
 
+  implicit def toCheVR(vr: VR): CheVR = CheVR.valueOf(vr.code)
+
+  implicit def fromCheVR(vr: CheVR): VR = VR.valueOf(vr.code)
 }

@@ -7,15 +7,14 @@ import akka.stream.scaladsl.{Sink, Source}
 import akka.stream.testkit.scaladsl.TestSink
 import akka.testkit.TestKit
 import akka.util.ByteString
-import org.dcm4che3.data.{Attributes, Tag, UID, VR}
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
-import se.nimsa.dcm4che.streams.DicomModifyFlow.TagModification
-import se.nimsa.dcm4che.streams.DicomParts.{DicomAttributes, DicomPart}
-import se.nimsa.dcm4che.streams._
-import se.nimsa.sbx.dicom.DicomData
+import se.nimsa.dicom.data.DicomParts.{DicomPart, HeaderPart, ValueChunk}
+import se.nimsa.dicom.data.Elements.ValueElement
+import se.nimsa.dicom.data._
+import se.nimsa.dicom.streams.ModifyFlow.TagModification
+import se.nimsa.dicom.streams.{DicomFlows, ElementFlows, ElementSink, ModifyFlow}
 import se.nimsa.sbx.dicom.streams.DicomStreamUtil._
 import se.nimsa.sbx.storage.{RuntimeStorage, StorageService}
-import se.nimsa.sbx.util.TestUtil
 import se.nimsa.sbx.util.TestUtil._
 
 import scala.concurrent.duration.DurationInt
@@ -32,23 +31,21 @@ class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymiza
 
   val storage: StorageService = new RuntimeStorage
 
-  def attributesSource(dicomData: DicomData): Source[DicomPart, NotUsed] = {
-    val bytes = ByteString(TestUtil.toByteArray(dicomData))
-    Source.single(bytes)
+  def elementsSource(elements: Elements): Source[DicomPart, NotUsed] =
+    Source.single(elements.toBytes())
       .via(storage.parseFlow(None))
       .via(DicomFlows.tagFilter(_ => false)(tagPath => !DicomParsing.isFileMetaInformation(tagPath.tag)))
-  }
 
-  def anonKeyPart(dicomData: DicomData): PartialAnonymizationKeyPart = {
-    val key = createAnonymizationKey(dicomData.attributes)
+  def anonKeyPart(elements: Elements): PartialAnonymizationKeyPart = {
+    val key = createAnonymizationKey(elements)
     PartialAnonymizationKeyPart(Some(key), hasPatientInfo = true, hasStudyInfo = true, hasSeriesInfo = true)
   }
 
-  def anonSource(dicomData: DicomData): Source[DicomPart, NotUsed] = {
-    val key = anonKeyPart(dicomData).keyMaybe.get
-    attributesSource(dicomData)
+  def anonSource(elements: Elements): Source[DicomPart, NotUsed] = {
+    val key = anonKeyPart(elements).keyMaybe.get
+    elementsSource(elements)
       .via(AnonymizationFlow.anonFlow)
-      .via(DicomModifyFlow.modifyFlow(
+      .via(ModifyFlow.modifyFlow(
         TagModification.contains(TagPath.fromTag(Tag.PatientName), _ => toAsciiBytes(key.anonPatientName, VR.PN), insert = false),
         TagModification.contains(TagPath.fromTag(Tag.PatientID), _ => toAsciiBytes(key.anonPatientID, VR.LO), insert = false),
         TagModification.contains(TagPath.fromTag(Tag.StudyInstanceUID), _ => toAsciiBytes(key.anonStudyInstanceUID, VR.UI), insert = false),
@@ -58,38 +55,38 @@ class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymiza
   }
 
   "The reverse anonymization flow" should "reverse anonymization for attributes stored in anonymization key" in {
-    val dicomData = createDicomData()
+    val elements = createElements()
 
-    val source = Source.single(anonKeyPart(dicomData))
-      .concat(anonSource(dicomData))
+    val source = Source.single(anonKeyPart(elements))
+      .concat(anonSource(elements))
       .via(ReverseAnonymizationFlow.reverseAnonFlow)
-      .via(DicomFlows.attributeFlow)
+      .via(ElementFlows.elementFlow)
 
-    val (_, dsMaybe) = Await.result(source.runWith(DicomAttributesSink.attributesSink), 10.seconds)
-    val ds = dsMaybe.get
+    val reversedElements = Await.result(source.runWith(ElementSink.elementSink), 10.seconds)
 
-    ds.getString(Tag.PatientName) shouldBe dicomData.attributes.getString(Tag.PatientName)
-    ds.getString(Tag.PatientID) shouldBe dicomData.attributes.getString(Tag.PatientID)
-    ds.getString(Tag.StudyInstanceUID) shouldBe dicomData.attributes.getString(Tag.StudyInstanceUID)
-    ds.getString(Tag.SeriesInstanceUID) shouldBe dicomData.attributes.getString(Tag.SeriesInstanceUID)
-    ds.getString(Tag.FrameOfReferenceUID) shouldBe dicomData.attributes.getString(Tag.FrameOfReferenceUID)
-    ds.getString(Tag.PatientBirthDate) shouldBe dicomData.attributes.getString(Tag.PatientBirthDate)
-    ds.getString(Tag.StudyDescription) shouldBe dicomData.attributes.getString(Tag.StudyDescription)
-    ds.getString(Tag.StudyID) shouldBe dicomData.attributes.getString(Tag.StudyID)
-    ds.getString(Tag.AccessionNumber) shouldBe dicomData.attributes.getString(Tag.AccessionNumber)
-    ds.getString(Tag.SeriesDescription) shouldBe dicomData.attributes.getString(Tag.SeriesDescription)
-    ds.getString(Tag.ProtocolName) shouldBe dicomData.attributes.getString(Tag.ProtocolName)
+    reversedElements(Tag.PatientName) shouldBe elements(Tag.PatientName)
+    reversedElements(Tag.PatientID) shouldBe elements(Tag.PatientID)
+    reversedElements(Tag.StudyInstanceUID) shouldBe elements(Tag.StudyInstanceUID)
+    reversedElements(Tag.SeriesInstanceUID) shouldBe elements(Tag.SeriesInstanceUID)
+    reversedElements(Tag.FrameOfReferenceUID) shouldBe elements(Tag.FrameOfReferenceUID)
+    reversedElements(Tag.PatientBirthDate) shouldBe elements(Tag.PatientBirthDate)
+    reversedElements(Tag.StudyDescription) shouldBe elements(Tag.StudyDescription)
+    reversedElements(Tag.StudyID) shouldBe elements(Tag.StudyID)
+    reversedElements(Tag.AccessionNumber) shouldBe elements(Tag.AccessionNumber)
+    reversedElements(Tag.SeriesDescription) shouldBe elements(Tag.SeriesDescription)
+    reversedElements(Tag.ProtocolName) shouldBe elements(Tag.ProtocolName)
   }
 
   it should "insert anonymization key attributes into dataset even if they originally were not present" in {
-    val attributes = new Attributes()
-    attributes.setString(Tag.Modality, VR.CS, "NM")
-    val fmi = new Attributes()
-    fmi.setString(Tag.TransferSyntaxUID, VR.UI, UID.ExplicitVRLittleEndian)
-    val dicomData = DicomData(attributes, fmi)
-    val source = attributesSource(dicomData)
+    val elements = Elements.empty()
+      .setString(Tag.TransferSyntaxUID, UID.ExplicitVRLittleEndian)
+      .setString(Tag.Modality, "NM")
+    val source = elementsSource(elements)
       .via(ReverseAnonymizationFlow.reverseAnonFlow)
-      .via(DicomFlows.guaranteedValueFlow)
+      .mapConcat {
+        case p: HeaderPart if p.length == 0 => p :: ValueChunk(bigEndian = false, ByteString.empty, last = true) :: Nil
+        case p => p :: Nil
+      }
 
     source.runWith(TestSink.probe[DicomPart])
       .expectHeaderAndValueChunkPairs(
@@ -103,6 +100,7 @@ class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymiza
           Tag.StudyInstanceUID,
           Tag.StudyDescription,
           Tag.StudyID,
+          Tag.SpecificCharacterSet, // inserted by utf8 flow
           Tag.AccessionNumber,
           Tag.SeriesInstanceUID,
           Tag.SeriesDescription,
@@ -122,38 +120,37 @@ class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymiza
   }
 
   it should "not perform reverse anonymization when anonymization key is missing in stream" in {
-    val dicomData = createDicomData()
+    val elements = createElements()
 
-    val source = anonSource(dicomData)
+    val source = anonSource(elements)
       .via(ReverseAnonymizationFlow.reverseAnonFlow)
-      .via(DicomFlows.collectAttributesFlow(Set(Tag.PatientName)))
-      .filter(_.isInstanceOf[DicomAttributes])
-      .mapAsync(5) {
-        case as: DicomAttributes => Source(as.attributes.toList).runWith(DicomAttributesSink.attributesSink)
+      .via(ElementFlows.elementFlow)
+      .mapConcat {
+        case e: ValueElement if e.tag == Tag.PatientName => e :: Nil
+        case _ => Nil
       }
+      .take(1)
 
-    val (_, dsMaybe) = Await.result(source.runWith(Sink.head), 10.seconds)
-    val ds = dsMaybe.get
+    val element = Await.result(source.runWith(Sink.head), 10.seconds)
 
-    ds.getString(Tag.PatientName) should not be dicomData.attributes.getString(Tag.PatientName)
+    element.value.toSingleString(VR.PN) should not be elements.getString(Tag.PatientName).get
   }
 
   it should "perform reverse anonymization when anonymization key is present in stream" in {
-    val dicomData = createDicomData()
+    val dicomData = createElements()
 
     val source = Source.single(anonKeyPart(dicomData))
       .concat(anonSource(dicomData))
       .via(ReverseAnonymizationFlow.reverseAnonFlow)
-      .via(DicomFlows.collectAttributesFlow(Set(Tag.PatientName)))
-      .filter(_.isInstanceOf[DicomAttributes])
-      .mapAsync(5) {
-        case as: DicomAttributes => Source(as.attributes.toList).runWith(DicomAttributesSink.attributesSink)
+      .via(ElementFlows.elementFlow)
+      .mapConcat {
+        case e: ValueElement if e.tag == Tag.PatientName => e :: Nil
+        case _ => Nil
       }
 
-    val (_, dsMaybe) = Await.result(source.runWith(Sink.head), 10.seconds)
-    val ds = dsMaybe.get
+    val element = Await.result(source.runWith(Sink.head), 10.seconds)
 
-    ds.getString(Tag.PatientName) shouldBe dicomData.attributes.getString(Tag.PatientName)
+    element.value.toString(VR.PN).get shouldBe dicomData.getString(Tag.PatientName).get
   }
 
 }

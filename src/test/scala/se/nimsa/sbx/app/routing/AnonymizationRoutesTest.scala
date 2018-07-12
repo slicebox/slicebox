@@ -4,8 +4,8 @@ import akka.http.scaladsl.model.HttpEntity
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server._
 import akka.util.ByteString
-import org.dcm4che3.data.{Tag, VR}
 import org.scalatest.{FlatSpecLike, Matchers}
+import se.nimsa.dicom.data.Tag
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomProperty.PatientName
@@ -97,26 +97,25 @@ class AnonymizationRoutesTest extends {
     val anonAttributes =
       PostAsUser(s"/api/images/${image.id}/anonymized", tagValues) ~> routes ~> check {
         status should be(OK)
-        TestUtil.loadDicomData(responseAs[ByteString].toArray, withPixelData = true).attributes
+        TestUtil.loadDicomData(responseAs[ByteString], withPixelData = true)
       }
 
-    anonAttributes.getString(Tag.PatientName) shouldBe anonPatientName
-    anonAttributes.getString(Tag.PatientID) should not be flatSeries.patient.patientName.value
+    anonAttributes.getString(Tag.PatientName).get shouldBe anonPatientName
+    anonAttributes.getString(Tag.PatientID).get should not be flatSeries.patient.patientName.value
   }
 
   it should "return 200 OK and the image IDs of the new anonymized images when bulk anonymizing a sequence of images" in {
     val dd1 = TestUtil.testImageDicomData()
-    val dd2 = TestUtil.testImageDicomData()
-    dd2.attributes.setString(Tag.PatientName, VR.PN, "John^Doe")
+    val dd2 = TestUtil.testImageDicomData().setString(Tag.PatientName, "John^Doe")
 
     val image1 =
-      PostAsUser("/api/images", HttpEntity(TestUtil.toByteArray(dd1))) ~> routes ~> check {
+      PostAsUser("/api/images", HttpEntity(TestUtil.toBytes(dd1))) ~> routes ~> check {
         status should be(Created)
         responseAs[Image]
       }
 
     val image2 =
-      PostAsUser("/api/images", HttpEntity(TestUtil.toByteArray(dd2))) ~> routes ~> check {
+      PostAsUser("/api/images", HttpEntity(TestUtil.toBytes(dd2))) ~> routes ~> check {
         status should be(Created)
         responseAs[Image]
       }
@@ -162,8 +161,8 @@ class AnonymizationRoutesTest extends {
   }
 
   it should "provide a list of anonymization keys" in {
-    val dicomData = TestUtil.createDicomData()
-    val key1 = TestUtil.createAnonymizationKey(dicomData.attributes)
+    val dicomData = TestUtil.createElements()
+    val key1 = TestUtil.createAnonymizationKey(dicomData)
     val key2 = key1.copy(patientName = "pat name 2", anonPatientName = "anon pat name 2")
     val insertedKey1 = await(anonymizationDao.insertAnonymizationKey(key1))
     val insertedKey2 = await(anonymizationDao.insertAnonymizationKey(key2))
@@ -174,8 +173,8 @@ class AnonymizationRoutesTest extends {
   }
 
   it should "return 200 OK and the requested anonymization key" in {
-    val dicomData = TestUtil.createDicomData()
-    val key1 = TestUtil.createAnonymizationKey(dicomData.attributes)
+    val dicomData = TestUtil.createElements()
+    val key1 = TestUtil.createAnonymizationKey(dicomData)
     val insertedKey1 = await(anonymizationDao.insertAnonymizationKey(key1))
     GetAsUser(s"/api/anonymization/keys/${insertedKey1.id}") ~> routes ~> check {
       status shouldBe OK
@@ -190,8 +189,8 @@ class AnonymizationRoutesTest extends {
   }
 
   it should "provide a list of sorted anonymization keys supporting startindex and count" in {
-    val dicomData = TestUtil.createDicomData(patientName = "B")
-    val key1 = TestUtil.createAnonymizationKey(dicomData.attributes, anonPatientName = "anon B")
+    val dicomData = TestUtil.createElements(patientName = "B")
+    val key1 = TestUtil.createAnonymizationKey(dicomData, anonPatientName = "anon B")
     val key2 = key1.copy(patientName = "A", anonPatientName = "anon A")
     await(anonymizationDao.insertAnonymizationKey(key1))
     val insertedKey2 = await(anonymizationDao.insertAnonymizationKey(key2))

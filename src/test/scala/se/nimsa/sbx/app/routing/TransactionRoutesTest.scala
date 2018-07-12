@@ -24,15 +24,15 @@ class TransactionRoutesTest extends {
   val storage = new RuntimeStorage
 } with FlatSpecLike with Matchers with RoutesTestBase {
 
-  override def afterEach() = await(boxDao.clear())
+  override def afterEach(): Unit = await(boxDao.clear())
 
-  def addPollBox(name: String) =
+  def addPollBox(name: String): Box =
     PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData(name)) ~> routes ~> check {
       status should be(Created)
       responseAs[Box]
     }
 
-  def addPushBox(name: String) =
+  def addPushBox(name: String): Box =
     PostAsAdmin("/api/boxes/connect", RemoteBox(name, "http://some.url/api/transactions/" + UUID.randomUUID())) ~> routes ~> check {
       status should be(Created)
       val box = responseAs[Box]
@@ -51,7 +51,7 @@ class TransactionRoutesTest extends {
       }
 
     // then, push an image from the hospital to the uni box we just set up
-    val compressedBytes = compress(TestUtil.testImageByteArray)
+    val compressedBytes = compress(TestUtil.testImageBytes)
 
     val testTransactionId = 1L
     val sequenceNumber = 1L
@@ -71,7 +71,7 @@ class TransactionRoutesTest extends {
       }
 
     // then, push an image from the hospital to the uni box we just set up
-    val compressedBytes = compress(TestUtil.testImageByteArray)
+    val compressedBytes = compress(TestUtil.testImageBytes)
 
     val testTransactionId = 1L
     val sequenceNumber = 1L
@@ -147,7 +147,7 @@ class TransactionRoutesTest extends {
 
       contentType should be(ContentTypes.`application/octet-stream`)
 
-      val dicomData = TestUtil.loadDicomData(decompress(responseAs[ByteString].toArray), withPixelData = true)
+      val dicomData = TestUtil.loadDicomData(decompress(responseAs[ByteString]), withPixelData = true)
       dicomData should not be null
     }
   }
@@ -319,11 +319,11 @@ class TransactionRoutesTest extends {
       status should be(OK)
       responseAs[ByteString]
     }
-    val dicomData = TestUtil.loadDicomData(decompress(compressedArray.toArray), withPixelData = false)
-    dicomData.attributes.getString(PatientName.dicomTag) should be("TEST NAME") // mapped
-    dicomData.attributes.getString(PatientID.dicomTag) should be("TEST ID") // mapped
-    dicomData.attributes.getString(PatientBirthDate.dicomTag) should be("19601010") // mapped
-    dicomData.attributes.getString(PatientSex.dicomTag) should be(patient.patientSex.value) // not mapped
+    val elements = TestUtil.loadDicomData(decompress(compressedArray), withPixelData = false)
+    elements.getString(PatientName.dicomTag).get should be("TEST NAME") // mapped
+    elements.getString(PatientID.dicomTag).get should be("TEST ID") // mapped
+    elements.getString(PatientBirthDate.dicomTag).get should be("19601010") // mapped
+    elements.getString(PatientSex.dicomTag).get should be(patient.patientSex.value) // not mapped
 
     // send done
     Post(s"/api/transactions/${uniBox.token}/outgoing/done", transactionImage) ~> routes ~> check {

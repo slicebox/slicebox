@@ -18,11 +18,13 @@ package se.nimsa.sbx.dicom.streams
 
 import akka.NotUsed
 import akka.stream.scaladsl.Flow
-import org.dcm4che3.data.{SpecificCharacterSet, Tag}
-import se.nimsa.dcm4che.streams.DicomFlows.toUndefinedLengthSequences
-import se.nimsa.dcm4che.streams.DicomModifyFlow.TagModification
-import se.nimsa.dcm4che.streams.DicomParts._
-import se.nimsa.dcm4che.streams._
+import akka.util.ByteString
+import se.nimsa.dicom.data.DicomParts._
+import se.nimsa.dicom.data.Elements.ValueElement
+import se.nimsa.dicom.data.{Tag, TagPath, Value}
+import se.nimsa.dicom.streams.DicomFlows._
+import se.nimsa.dicom.streams.ModifyFlow.{TagModification, modifyFlow}
+import se.nimsa.dicom.streams._
 import se.nimsa.sbx.dicom.streams.DicomStreamUtil._
 
 /**
@@ -30,8 +32,6 @@ import se.nimsa.sbx.dicom.streams.DicomStreamUtil._
   * anonymized)
   */
 object ReverseAnonymizationFlow {
-
-  import DicomFlows.groupLengthDiscardFilter
 
   private val reverseTags = Seq(
     Tag.PatientName,
@@ -50,43 +50,43 @@ object ReverseAnonymizationFlow {
 
   def reverseAnonFlow: Flow[DicomPart, DicomPart, NotUsed] = Flow[DicomPart]
     .via(groupLengthDiscardFilter)
-    .via(toUndefinedLengthSequences)
-    .via(DicomModifyFlow.modifyFlow(
+    .via(toIndeterminateLengthSequences)
+    .via(toUtf8Flow)
+    .via(modifyFlow(
       reverseTags.map(tag => TagModification.endsWith(TagPath.fromTag(tag), identity, insert = true)): _*))
-    .via(DicomFlowFactory.create(new IdentityFlow with GuaranteedValueEvent with StartEvent {
-      var maybeInfo: Option[DicomInfoPart] = None
+    .via(DicomFlowFactory.create(new IdentityFlow with GuaranteedValueEvent[DicomPart] with StartEvent[DicomPart] {
       var maybeKey: Option[PartialAnonymizationKeyPart] = None
-      var currentAttribute: Option[DicomAttribute] = None
+      var currentElement: Option[ValueElement] = None
 
-      def maybeReverse(attribute: DicomAttribute, keyPart: PartialAnonymizationKeyPart, cs: SpecificCharacterSet): List[DicomPart with Product with Serializable] = {
-        val updatedAttribute = attribute.header.tag match {
+      def maybeReverse(element: ValueElement, keyPart: PartialAnonymizationKeyPart): List[DicomPart] = {
+        val updatedElement = element.tag match {
           case Tag.PatientName => keyPart.keyMaybe.filter(_ => keyPart.hasPatientInfo).map(key =>
-            attribute.withUpdatedValue(key.patientName, cs)).getOrElse(attribute)
+            element.setValue(Value(ByteString(key.patientName)))).getOrElse(element)
           case Tag.PatientID => keyPart.keyMaybe.filter(_ => keyPart.hasPatientInfo).map(key =>
-            attribute.withUpdatedValue(key.patientID, cs)).getOrElse(attribute)
+            element.setValue(Value(ByteString(key.patientID)))).getOrElse(element)
           case Tag.PatientBirthDate => keyPart.keyMaybe.filter(_ => keyPart.hasPatientInfo).map(key =>
-            attribute.withUpdatedValue(key.patientBirthDate)).getOrElse(attribute) // ASCII
-          case Tag.PatientIdentityRemoved => attribute.withUpdatedValue("NO") // ASCII
-          case Tag.DeidentificationMethod => attribute.withUpdatedValue("")
+            element.setValue(Value(ByteString(key.patientBirthDate)))).getOrElse(element)
+          case Tag.PatientIdentityRemoved => element.setValue(Value(ByteString("NO")))
+          case Tag.DeidentificationMethod => element.setValue(Value(ByteString.empty))
           case Tag.StudyInstanceUID => keyPart.keyMaybe.filter(_ => keyPart.hasStudyInfo).map(key =>
-            attribute.withUpdatedValue(key.studyInstanceUID)).getOrElse(attribute) // ASCII
+            element.setValue(Value(ByteString(key.studyInstanceUID)))).getOrElse(element)
           case Tag.StudyDescription => keyPart.keyMaybe.filter(_ => keyPart.hasStudyInfo).map(key =>
-            attribute.withUpdatedValue(key.studyDescription, cs)).getOrElse(attribute)
+            element.setValue(Value(ByteString(key.studyDescription)))).getOrElse(element)
           case Tag.StudyID => keyPart.keyMaybe.filter(_ => keyPart.hasStudyInfo).map(key =>
-            attribute.withUpdatedValue(key.studyID, cs)).getOrElse(attribute)
+            element.setValue(Value(ByteString(key.studyID)))).getOrElse(element)
           case Tag.AccessionNumber => keyPart.keyMaybe.filter(_ => keyPart.hasStudyInfo).map(key =>
-            attribute.withUpdatedValue(key.accessionNumber, cs)).getOrElse(attribute)
+            element.setValue(Value(ByteString(key.accessionNumber)))).getOrElse(element)
           case Tag.SeriesInstanceUID => keyPart.keyMaybe.filter(_ => keyPart.hasSeriesInfo).map(key =>
-            attribute.withUpdatedValue(key.seriesInstanceUID)).getOrElse(attribute) // ASCII
+            element.setValue(Value(ByteString(key.seriesInstanceUID)))).getOrElse(element)
           case Tag.SeriesDescription => keyPart.keyMaybe.filter(_ => keyPart.hasSeriesInfo).map(key =>
-            attribute.withUpdatedValue(key.seriesDescription, cs)).getOrElse(attribute)
+            element.setValue(Value(ByteString(key.seriesDescription)))).getOrElse(element)
           case Tag.ProtocolName => keyPart.keyMaybe.filter(_ => keyPart.hasSeriesInfo).map(key =>
-            attribute.withUpdatedValue(key.protocolName, cs)).getOrElse(attribute)
+            element.setValue(Value(ByteString(key.protocolName)))).getOrElse(element)
           case Tag.FrameOfReferenceUID => keyPart.keyMaybe.filter(_ => keyPart.hasSeriesInfo).map(key =>
-            attribute.withUpdatedValue(key.frameOfReferenceUID)).getOrElse(attribute) // ASCII
-          case _ => attribute
+            element.setValue(Value(ByteString(key.frameOfReferenceUID)))).getOrElse(element)
+          case _ => element
         }
-        updatedAttribute.header :: updatedAttribute.valueChunks.toList
+        updatedElement.toParts
       }
 
       /*
@@ -99,44 +99,40 @@ object ReverseAnonymizationFlow {
       def canDoReverseAnon(keyPartMaybe: Option[PartialAnonymizationKeyPart]): Boolean = keyPartMaybe.flatMap(_.keyMaybe).isDefined
 
       override def onPart(part: DicomPart): List[DicomPart] = part match {
-        case info: DicomInfoPart =>
-          maybeInfo = Some(info)
-          super.onPart(info)
         case keys: PartialAnonymizationKeyPart =>
           maybeKey = Some(keys)
           super.onPart(keys).filterNot(_ == keys)
         case p => super.onPart(p)
       }
 
-      override def onHeader(header: DicomHeader): List[DicomPart] =
+      override def onHeader(header: HeaderPart): List[DicomPart] =
         if (needReverseAnon(header.tag, maybeKey) && canDoReverseAnon(maybeKey)) {
-          currentAttribute = Some(DicomAttribute(header, Seq.empty))
+          currentElement = Some(ValueElement.empty(header.tag, header.vr, header.bigEndian, header.explicitVR))
           super.onHeader(header).filterNot(_ == header)
         } else {
-          currentAttribute = None
+          currentElement = None
           super.onHeader(header)
         }
 
-      override def onValueChunk(chunk: DicomValueChunk): List[DicomPart] =
-        if (currentAttribute.isDefined && canDoReverseAnon(maybeKey)) {
-          currentAttribute = currentAttribute.map(attribute => attribute.copy(valueChunks = attribute.valueChunks :+ chunk))
+      override def onValueChunk(chunk: ValueChunk): List[DicomPart] =
+        if (currentElement.isDefined && canDoReverseAnon(maybeKey)) {
+          currentElement = currentElement.map(attribute => attribute.copy(value = attribute.value ++ chunk.bytes))
 
           if (chunk.last) {
-            val attribute = currentAttribute.get
+            val e = currentElement.get
+            val element = e.copy(value = e.value.ensurePadding(e.vr))
             val keys = maybeKey.get
-            val cs = maybeInfo.flatMap(_.specificCharacterSet).getOrElse(SpecificCharacterSet.ASCII)
 
-            currentAttribute = None
-            super.onValueChunk(chunk).filterNot(_ == chunk) ::: maybeReverse(attribute, keys, cs)
+            currentElement = None
+            super.onValueChunk(chunk).filterNot(_ == chunk) ::: maybeReverse(element, keys)
           } else
             super.onValueChunk(chunk).filterNot(_ == chunk)
         } else
           super.onValueChunk(chunk)
 
       override def onStart(): List[DicomPart] = {
-        maybeInfo = None
         maybeKey = None
-        currentAttribute = None
+        currentElement = None
         super.onStart()
       }
     }))

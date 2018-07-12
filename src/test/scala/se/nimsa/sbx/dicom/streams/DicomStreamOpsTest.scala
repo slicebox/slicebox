@@ -1,7 +1,5 @@
 package se.nimsa.sbx.dicom.streams
 
-import java.io.ByteArrayOutputStream
-
 import akka.NotUsed
 import akka.actor.{ActorRef, ActorSystem, Cancellable}
 import akka.pattern.ask
@@ -9,17 +7,15 @@ import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{Source => StreamSource}
 import akka.testkit.TestKit
 import akka.util.{ByteString, Timeout}
-import org.dcm4che3.data.{Attributes, Tag, UID, VR}
-import org.dcm4che3.io.{DicomOutputStream, DicomStreamException}
 import org.scalatest.{AsyncFlatSpecLike, BeforeAndAfterAll, BeforeAndAfterEach, Matchers}
-import se.nimsa.dcm4che.streams.DicomFlows.attributeFlow
-import se.nimsa.dcm4che.streams.DicomModifyFlow.TagModification
-import se.nimsa.dcm4che.streams._
+import se.nimsa.dicom.data._
+import se.nimsa.dicom.streams.ModifyFlow.{TagModification, modifyFlow}
+import se.nimsa.dicom.streams.{DicomFlows, DicomStreamException, ElementSink, ElementFlows}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.anonymization.{AnonymizationDAO, AnonymizationServiceActor}
 import se.nimsa.sbx.app.GeneralProtocol.{Source, SourceType}
+import se.nimsa.sbx.dicom.Contexts
 import se.nimsa.sbx.dicom.streams.DicomStreamUtil.{DicomInfoPart, PartialAnonymizationKeyPart}
-import se.nimsa.sbx.dicom.{Contexts, DicomData}
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.metadata.{MetaDataDAO, MetaDataServiceActor, PropertiesDAO}
 import se.nimsa.sbx.storage.RuntimeStorage
@@ -81,13 +77,7 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("DicomStreamOpsSpec")) with
 
   val dicomStreamOpsImpl = new DicomStreamOpsImpl()
 
-  def toSource(dicomData: DicomData): StreamSource[ByteString, NotUsed] = {
-    val baos = new ByteArrayOutputStream()
-    val dos = new DicomOutputStream(baos, UID.ExplicitVRLittleEndian)
-    dos.writeDataset(dicomData.metaInformation, dicomData.attributes)
-    dos.close()
-    StreamSource.single(ByteString(baos.toByteArray))
-  }
+  def toSource(elements: Elements): StreamSource[ByteString, NotUsed] = StreamSource.single(elements.toBytes())
 
   "Validating a DICOM file" should "throw an exception for a non-supported context" in {
     val bytes = preamble ++ fmiGroupLength(unsupportedMediaStorageSOPClassUID ++ tsuidExplicitLE) ++ unsupportedMediaStorageSOPClassUID ++ tsuidExplicitLE ++ patientNameJohnDoe
@@ -127,54 +117,48 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("DicomStreamOpsSpec")) with
     val source = StreamSource.single(bytes).via(storage.parseFlow(None))
     val anonSource = dicomStreamOpsImpl.anonymizedDicomDataSource(
       source,
-      _ => Future.successful(TestUtil.createAnonymizationKey(new Attributes())),
+      _ => Future.successful(TestUtil.createAnonymizationKey(Elements.empty())),
       Seq(t1, t2, t3))
 
-    anonSource.via(storage.parseFlow(None)).via(DicomFlows.attributeFlow).runWith(DicomAttributesSink.attributesSink).map {
-      case (_, dsMaybe) =>
-        val ds = dsMaybe.get
-        ds.getString(Tag.PatientName) should be("Mapped Patient Name")
-        ds.getString(Tag.PatientID) should be("Mapped Patient ID")
-        ds.getString(Tag.SeriesDescription) should be("Mapped Series Description")
+    anonSource.via(storage.parseFlow(None)).via(ElementFlows.elementFlow).runWith(ElementSink.elementSink).map { elements =>
+      elements.getString(Tag.PatientName).get should be("Mapped Patient Name")
+      elements.getString(Tag.PatientID).get should be("Mapped Patient ID")
+      elements.getString(Tag.SeriesDescription).get should be("Mapped Series Description")
     }
   }
 
   "Harmonizing DICOM attributes when storing DICOM data" should "replace attributes according to existing anonymization keys" in {
-    val attributes = createAttributes
-    val key = TestUtil.createAnonymizationKey(attributes, anonPatientName = "apn", anonPatientID = "apid", anonSeriesInstanceUID = "aseuid")
+    val elements = testElements
+    val key = TestUtil.createAnonymizationKey(elements, anonPatientName = "apn", anonPatientID = "apid", anonSeriesInstanceUID = "aseuid")
 
-    val source = toSource(DicomData(attributes, null)).via(storage.parseFlow(None))
+    val source = toSource(elements).via(storage.parseFlow(None))
     val anonSource = dicomStreamOpsImpl.anonymizedDicomDataSource(source, _ => Future.successful(key), Seq.empty)
 
-    anonSource.via(storage.parseFlow(None)).via(DicomFlows.attributeFlow).runWith(DicomAttributesSink.attributesSink).map {
-      case (_, dsMaybe) =>
-        val ds = dsMaybe.get
-        ds.getString(Tag.PatientName) should be("apn")
-        ds.getString(Tag.PatientID) should be("apid")
-        ds.getString(Tag.SeriesInstanceUID) should be("aseuid")
-        ds.getString(Tag.Allergies) shouldBe null
-        ds.getString(Tag.PatientIdentityRemoved) shouldBe "YES"
+    anonSource.via(storage.parseFlow(None)).via(ElementFlows.elementFlow).runWith(ElementSink.elementSink).map { elements =>
+      elements.getString(Tag.PatientName).get should be("apn")
+      elements.getString(Tag.PatientID).get should be("apid")
+      elements.getString(Tag.SeriesInstanceUID).get should be("aseuid")
+      elements.getString(Tag.Allergies) shouldBe empty
+      elements.getString(Tag.PatientIdentityRemoved).get shouldBe "YES"
     }
   }
 
   "The DICOM data source with anonymization" should "anonymize the patient ID and harmonize it according to an anonymization key" in {
-    val dicomData = TestUtil.createDicomData()
-    val anonKey = TestUtil.createAnonymizationKey(dicomData.attributes)
-    val source = toSource(dicomData).via(storage.parseFlow(None))
+    val elements = TestUtil.createElements()
+    val anonKey = TestUtil.createAnonymizationKey(elements)
+    val source = toSource(elements).via(storage.parseFlow(None))
 
     val anonSource = dicomStreamOpsImpl.anonymizedDicomDataSource(source, _ => Future.successful(anonKey), Seq.empty)
 
-    anonSource.via(storage.parseFlow(None)).via(DicomFlows.attributeFlow).runWith(DicomAttributesSink.attributesSink).map {
-      case (_, dsMaybe) =>
-        val ds = dsMaybe.get
-        ds.getString(Tag.PatientID) shouldBe anonKey.anonPatientID
+    anonSource.via(storage.parseFlow(None)).via(ElementFlows.elementFlow).runWith(ElementSink.elementSink).map { elements =>
+        elements.getString(Tag.PatientID).get shouldBe anonKey.anonPatientID
     }
   }
 
   "An anonymized data source" should "create anonymization record for first image and harmonize subsequent images" in {
     val source = Source(SourceType.USER, "Jane", -1)
-    val testData = TestUtil.testImageByteArray
-    val bytesSource = StreamSource.single(ByteString.fromArray(testData))
+    val testData = TestUtil.testImageBytes
+    val bytesSource = StreamSource.single(testData)
 
     // store 100 files in the same series
     val sopInstanceUIDs = 1 to 100
@@ -183,7 +167,7 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("DicomStreamOpsSpec")) with
         val modifiedBytesSource = bytesSource
           .via(storage.parseFlow(None))
           .via(DicomFlows.blacklistFilter(Set(TagPath.fromTag(Tag.PixelData))))
-          .via(DicomModifyFlow.modifyFlow(
+          .via(modifyFlow(
             TagModification.contains(
               TagPath.fromTag(Tag.MediaStorageSOPInstanceUID),
               uid => uid.dropRight(3) ++ ByteString(f"$sopInstanceUID%03d"),
@@ -204,12 +188,11 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("DicomStreamOpsSpec")) with
         imageIds.map { imageId =>
           dicomStreamOpsImpl.anonymizedDicomData(imageId, Seq.empty)
             .via(storage.parseFlow(None))
-            .via(attributeFlow)
-            .runWith(DicomAttributesSink.attributesSink)
-            .map(_._2)
+            .via(ElementFlows.elementFlow)
+            .runWith(ElementSink.elementSink)
         }
       }
-    }.map(_.flatten).map(_.map(_.getString(Tag.PatientID)))
+    }.map(_.map(elements => elements.getString(Tag.PatientID).get))
 
     anonymousPatientIds.map(_.toSet).map { uniqueUids =>
       uniqueUids should have size 1
@@ -217,10 +200,10 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("DicomStreamOpsSpec")) with
   }
 
   "Querying for anonymization keys during reverse anonymization" should "yield patient, study and series information when key and meta information match" in {
-    val attributes = createAttributes
+    val attributes = testElements
     val key = TestUtil.createAnonymizationKey(attributes, anonPatientName = "apn", anonPatientID = "apid", anonStudyInstanceUID = "astuid", anonSeriesInstanceUID = "aseuid")
 
-    val metaData = DicomInfoPart(None, None, Some("apid"), Some("apn"), None, None, None, Some("YES"), Some("astuid"), None, None, None, Some("aseuid"), None, None, None)
+    val metaData = DicomInfoPart(CharacterSets.defaultOnly, systemZone, None, Some("apid"), Some("apn"), None, None, None, Some("YES"), Some("astuid"), None, None, None, Some("aseuid"), None, None, None)
     val query = dicomStreamOpsImpl.reverseAnonymizationKeyPartForPatient((_, _) => Future.successful(Seq(key)))
     query(metaData).map { parts =>
       parts should have length 2
@@ -235,10 +218,10 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("DicomStreamOpsSpec")) with
   }
 
   it should "yield patient, but not study or series information when patient informtion match but study does not" in {
-    val attributes = createAttributes
+    val attributes = testElements
     val key = TestUtil.createAnonymizationKey(attributes, anonPatientName = "apn", anonPatientID = "apid", anonStudyInstanceUID = "astuid2", anonSeriesInstanceUID = "aseuid")
 
-    val metaData = DicomInfoPart(None, None, Some("apid"), Some("apn"), None, None, None, Some("YES"), Some("astuid"), None, None, None, Some("aseuid"), None, None, None)
+    val metaData = DicomInfoPart(CharacterSets.defaultOnly, systemZone, None, Some("apid"), Some("apn"), None, None, None, Some("YES"), Some("astuid"), None, None, None, Some("aseuid"), None, None, None)
     val query = dicomStreamOpsImpl.reverseAnonymizationKeyPartForPatient((_, _) => Future.successful(Seq(key)))
     query(metaData).map { parts =>
       parts should have length 2
@@ -253,10 +236,10 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("DicomStreamOpsSpec")) with
   }
 
   it should "create empty key info when data is not anonymized" in {
-    val attributes = createAttributes
+    val attributes = testElements
     val key = TestUtil.createAnonymizationKey(attributes, anonPatientName = "apn", anonPatientID = "apid", anonStudyInstanceUID = "astuid2", anonSeriesInstanceUID = "aseuid")
 
-    val metaData = DicomInfoPart(None, None, Some("apid"), Some("apn"), None, None, None, Some("NO"), Some("astuid"), None, None, None, Some("aseuid"), None, None, None)
+    val metaData = DicomInfoPart(CharacterSets.defaultOnly, systemZone, None, Some("apid"), Some("apn"), None, None, None, Some("NO"), Some("astuid"), None, None, None, Some("aseuid"), None, None, None)
     val query = dicomStreamOpsImpl.reverseAnonymizationKeyPartForPatient((_, _) => Future.successful(Seq(key)))
     query(metaData).map { parts =>
       parts should have length 2
@@ -269,31 +252,31 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("DicomStreamOpsSpec")) with
 
   "Streaming storage of DICOM data" should "store the correct meta data and binary data under the expected name" in {
     val source = Source(SourceType.USER, "Jane", -1)
-    val testData = TestUtil.testImageDicomData()
-    val bytesSource = StreamSource.single(ByteString.fromArray(TestUtil.toByteArray(testData)))
+    val elements = TestUtil.testImageDicomData()
+    val bytesSource = StreamSource.single(TestUtil.toBytes(elements))
     dicomStreamOpsImpl.storeDicomData(bytesSource, source).map { metaDataAdded =>
       storage.storage.get(storage.imageName(metaDataAdded.image.id)) shouldBe defined
-      metaDataAdded.patient.patientName.value shouldBe testData.attributes.getString(Tag.PatientName)
-      metaDataAdded.patient.patientID.value shouldBe testData.attributes.getString(Tag.PatientID)
-      metaDataAdded.study.studyInstanceUID.value shouldBe testData.attributes.getString(Tag.StudyInstanceUID)
-      metaDataAdded.series.seriesInstanceUID.value shouldBe testData.attributes.getString(Tag.SeriesInstanceUID)
-      metaDataAdded.image.sopInstanceUID.value shouldBe testData.attributes.getString(Tag.SOPInstanceUID)
+      metaDataAdded.patient.patientName.value shouldBe elements.getString(Tag.PatientName).get
+      metaDataAdded.patient.patientID.value shouldBe elements.getString(Tag.PatientID).get
+      metaDataAdded.study.studyInstanceUID.value shouldBe elements.getString(Tag.StudyInstanceUID).get
+      metaDataAdded.series.seriesInstanceUID.value shouldBe elements.getString(Tag.SeriesInstanceUID).get
+      metaDataAdded.image.sopInstanceUID.value shouldBe elements.getString(Tag.SOPInstanceUID).get
     }
   }
 
   it should "reverse anonymization if data is anonymous and anonymization key exists" in {
     val source = Source(SourceType.USER, "Jane", -1)
-    val testData = TestUtil.testImageDicomData()
-    testData.attributes.setString(Tag.PatientIdentityRemoved, VR.CS, "YES")
+    val elements = TestUtil.testImageDicomData()
+      .setString(Tag.PatientIdentityRemoved, "YES")
     val realName = "Real Name"
     val realID = "Real ID"
     val anonKey = TestUtil.createAnonymizationKey(
-      testData.attributes,
-      anonPatientName = testData.attributes.getString(Tag.PatientName),
-      anonPatientID = testData.attributes.getString(Tag.PatientID)
+      elements,
+      anonPatientName = elements.getString(Tag.PatientName).get,
+      anonPatientID = elements.getString(Tag.PatientID).get
     ).copy(patientName = realName, patientID = realID)
     dicomStreamOpsImpl.callAnonymizationService[AnonymizationKeyAdded](AddAnonymizationKey(anonKey)).flatMap { _ =>
-      val bytesSource = StreamSource.single(ByteString.fromArray(TestUtil.toByteArray(testData)))
+      val bytesSource = StreamSource.single(TestUtil.toBytes(elements))
       dicomStreamOpsImpl.storeDicomData(bytesSource, source).map { metaDataAdded =>
         metaDataAdded.patient.patientName.value shouldBe realName
         metaDataAdded.patient.patientID.value shouldBe realID
@@ -304,16 +287,16 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("DicomStreamOpsSpec")) with
   it should "not reverse anonymization if data is not anonymous" in {
     val source = Source(SourceType.USER, "Jane", -1)
     val testData = TestUtil.testImageDicomData()
-    val bytesSource = StreamSource.single(ByteString.fromArray(TestUtil.toByteArray(testData)))
+    val bytesSource = StreamSource.single(TestUtil.toBytes(testData))
     dicomStreamOpsImpl.storeDicomData(bytesSource, source).map { metaDataAdded =>
-      metaDataAdded.patient.patientName.value shouldBe testData.attributes.getString(Tag.PatientName)
+      metaDataAdded.patient.patientName.value shouldBe testData.getString(Tag.PatientName).get
     }
   }
 
   "Modifying DICOM data" should "remove the old data and replace it with new" in {
     val source = Source(SourceType.USER, "Jane", -1)
     val testData = TestUtil.testImageDicomData()
-    val bytesSource = StreamSource.single(ByteString.fromArray(TestUtil.toByteArray(testData)))
+    val bytesSource = StreamSource.single(TestUtil.toBytes(testData))
     for {
       metaDataAdded1 <- dicomStreamOpsImpl.storeDicomData(bytesSource, source)
       (_, metaDataAdded2) <- dicomStreamOpsImpl.modifyData(metaDataAdded1.image.id, Seq.empty)
@@ -327,7 +310,7 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("DicomStreamOpsSpec")) with
     val newName = "New Name"
     val source = Source(SourceType.USER, "Jane", -1)
     val testData = TestUtil.testImageDicomData()
-    val bytesSource = StreamSource.single(ByteString.fromArray(TestUtil.toByteArray(testData)))
+    val bytesSource = StreamSource.single(TestUtil.toBytes(testData))
     for {
       metaDataAdded1 <- dicomStreamOpsImpl.storeDicomData(bytesSource, source)
       (_, metaDataAdded2) <- dicomStreamOpsImpl.modifyData(metaDataAdded1.image.id, Seq(TagModification.endsWith(TagPath.fromTag(Tag.PatientName), _ => ByteString(newName), insert = true)))
@@ -339,7 +322,7 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("DicomStreamOpsSpec")) with
   it should "transfer series source and tags to new, modified data" in {
     val source = Source(SourceType.USER, "Jane", -1)
     val testData = TestUtil.testImageDicomData()
-    val bytesSource = StreamSource.single(ByteString.fromArray(TestUtil.toByteArray(testData)))
+    val bytesSource = StreamSource.single(TestUtil.toBytes(testData))
     for {
       metaDataAdded1 <- dicomStreamOpsImpl.storeDicomData(bytesSource, source)
       _ <- dicomStreamOpsImpl.callMetaDataService[SeriesTagAddedToSeries](AddSeriesTagToSeries(SeriesTag(42, "tag1"), metaDataAdded1.series.id))

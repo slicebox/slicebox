@@ -19,11 +19,13 @@ package se.nimsa.sbx.util
 import java.io.ByteArrayOutputStream
 import java.util.zip.{Deflater, Inflater}
 
+import akka.util.ByteString
+
 object CompressionUtil {
   
- def compress(data: Array[Byte]): Array[Byte] = {  
+ def compress(data: ByteString): ByteString = {
    val deflater = new Deflater  
-   deflater.setInput(data)  
+   deflater.setInput(data.toArray)
    
    val outputStream = new ByteArrayOutputStream(data.length)
        
@@ -38,12 +40,12 @@ object CompressionUtil {
    
    deflater.end()
 
-   output
+   ByteString.fromArray(output)
   }  
    
-  def decompress(data: Array[Byte]): Array[Byte] = {
+  def decompress(data: ByteString): ByteString = {
    val inflater = new Inflater   
-   inflater.setInput(data)
+   inflater.setInput(data.toArray)
    
    val outputStream = new ByteArrayOutputStream(data.length)
    val buffer = new Array[Byte](1024)   
@@ -55,7 +57,7 @@ object CompressionUtil {
    val output = outputStream.toByteArray
    
    inflater.end()
-   
-   output
+
+    ByteString.fromArray(output)
   }   
 }

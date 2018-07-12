@@ -5,8 +5,8 @@ import java.util.concurrent.atomic.AtomicInteger
 import akka.NotUsed
 import akka.actor.{ActorSystem, PoisonPill, Props}
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
+import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{Flow, Source}
-import akka.stream.{ActorMaterializer, Materializer}
 import akka.testkit.{ImplicitSender, TestKit}
 import akka.util.{ByteString, Timeout}
 import de.heikoseeberger.akkahttpplayjson.PlayJsonSupport
@@ -17,8 +17,8 @@ import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.storage.{RuntimeStorage, StorageService}
 
 import scala.collection.immutable.Seq
-import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.concurrent.duration.DurationInt
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.util.{Success, Try}
 
 class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
@@ -44,7 +44,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       var firstBatch = true
       val pollActorRef = system.actorOf(Props(
         new BoxPollActor(box, storage, 200.milliseconds, n, 8, "../BoxService", "../MetaService", "../AnonService") {
-          override protected def anonymizedDicomData(imageId: Long, tagValues: scala.collection.Seq[TagValue], storage: StorageService)(implicit materializer: Materializer, ec: ExecutionContext): Source[ByteString, NotUsed] =
+          override protected def anonymizedDicomData(imageId: Long, tagValues: scala.collection.Seq[TagValue], storage: StorageService)(implicit ec: ExecutionContext): Source[ByteString, NotUsed] =
             Source.single(ByteString(1, 2, 3, 4))
           override def poll(n: Int): Future[Seq[OutgoingTransactionImage]] =
             if (firstBatch) {

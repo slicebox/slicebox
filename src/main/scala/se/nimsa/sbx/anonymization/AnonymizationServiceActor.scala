@@ -19,7 +19,7 @@ package se.nimsa.sbx.anonymization
 import akka.actor.{Actor, Props, Stash}
 import akka.event.{Logging, LoggingReceive}
 import akka.pattern.pipe
-import org.dcm4che3.data.Tag
+import se.nimsa.dicom.data.Tag
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.app.GeneralProtocol.ImagesDeleted
 import se.nimsa.sbx.util.SequentialPipeToSupport

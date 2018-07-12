@@ -23,7 +23,7 @@ import akka.http.scaladsl.server.directives.FileInfo
 import akka.pattern.ask
 import akka.stream.scaladsl.{Source => StreamSource}
 import akka.util.ByteString
-import org.dcm4che3.io.DicomStreamException
+import se.nimsa.dicom.streams.DicomStreamException
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.dicom.Contexts

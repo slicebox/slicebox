@@ -1,13 +1,18 @@
+
 name := "slicebox"
 version := "1.5-SNAPSHOT"
 organization := "se.nimsa"
-scalaVersion := "2.12.5"
+scalaVersion := "2.12.6"
 scalacOptions := Seq("-encoding", "UTF-8", "-Xlint", "-deprecation", "-unchecked", "-feature", "-target:jvm-1.8")
 
 // define the project
 
-lazy val slicebox = (project in file(".")).enablePlugins(SbtWeb, JavaServerAppPackaging, SystemVPlugin, DockerPlugin, AshScriptPlugin)
+lazy val slicebox = (project in file(".")).enablePlugins(SbtWeb, JavaServerAppPackaging, SystemVPlugin, DockerPlugin, AshScriptPlugin, BuildInfoPlugin)
+
 mainClass in Compile := Some("se.nimsa.sbx.app.Slicebox")
+
+buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion)
+buildInfoPackage := "se.nimsa.sbx.app"
 
 // for sbt-resolver, (the re-start and re-stop commands)
 
@@ -60,6 +65,7 @@ licenses += ("Apache-2.0", new URL("https://www.apache.org/licenses/LICENSE-2.0.
 
 resolvers ++= Seq(
   Resolver.typesafeRepo("releases"),
+  Resolver.sonatypeRepo("releases"),
   Resolver.sonatypeRepo("snapshots"),
   "dcm4che Repository" at "https://www.dcm4che.org/maven2/",
   Resolver.bintrayRepo("hseeberger", "maven"))
@@ -69,24 +75,24 @@ updateOptions := updateOptions.value.withGigahorse(false) // temporary workaroun
 // deps
 
 libraryDependencies ++= {
-  val akkaVersion = "2.5.11"
-  val akkaHttpVersion = "10.1.1"
+  val akkaVersion = "2.5.13"
+  val akkaHttpVersion = "10.1.3"
   val slickVersion = "3.2.3"
   val dcm4cheVersion = "3.3.8"
-  val alpakkaVersion = "0.18"
+  val alpakkaVersion = "0.19"
   Seq(
-    "com.typesafe.scala-logging" %% "scala-logging" % "3.8.0",
+    "com.typesafe.scala-logging" %% "scala-logging" % "3.9.0",
     "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
     "com.typesafe.akka" %% "akka-stream" % akkaVersion, // force newer version than default in akka-http
     "com.typesafe.akka" %% "akka-http" % akkaHttpVersion,
-    "de.heikoseeberger" %% "akka-http-play-json" % "1.20.1",
+    "de.heikoseeberger" %% "akka-http-play-json" % "1.21.0",
     "ch.qos.logback" % "logback-classic" % "1.2.3",
     "com.typesafe.slick" %% "slick" % slickVersion,
     "com.typesafe.slick" %% "slick-hikaricp" % slickVersion,
     "com.h2database" % "h2" % "1.4.197",
     "mysql" % "mysql-connector-java" % "6.0.6",
     "com.github.t3hnar" %% "scala-bcrypt" % "3.1",
-    "com.amazonaws" % "aws-java-sdk-s3" % "1.11.312",
+    "com.amazonaws" % "aws-java-sdk-s3" % "1.11.349",
     "org.scalatest" %% "scalatest" % "3.0.5" % "test",
     "org.dcm4che" % "dcm4che-core" % dcm4cheVersion,
     "org.dcm4che" % "dcm4che-image" % dcm4cheVersion,
@@ -98,7 +104,7 @@ libraryDependencies ++= {
     "org.webjars" % "angularjs" % "1.5.11",
     "org.webjars" % "angular-material" % "1.1.5",
     "org.webjars" % "angular-file-upload" % "11.0.0",
-    "se.nimsa" %% "dcm4che-streams" % "0.7" exclude("org.slf4j", "slf4j-simple"),
+    "se.nimsa" %% "dicom-streams" % "0.1",
     "com.lightbend.akka" %% "akka-stream-alpakka-s3" % alpakkaVersion,
     "com.lightbend.akka" %% "akka-stream-alpakka-file" % alpakkaVersion
   )

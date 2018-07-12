@@ -1,8 +1,8 @@
 package se.nimsa.sbx.dicom.streams
 
 import akka.util.ByteString
-import org.dcm4che3.data.{Attributes, Tag, UID, VR}
-import se.nimsa.dcm4che.streams._
+import se.nimsa.dicom.data._
+import se.nimsa.dicom.data.VR.VR
 
 object DicomTestData {
 
@@ -16,23 +16,19 @@ object DicomTestData {
   val supportedSOPClassUID: ByteString = ByteString(8, 0, 22, 0, 85, 73, 26, 0) ++ ByteString.fromArray("1.2.840.10008.5.1.4.1.1.20".toCharArray.map(_.toByte))
   val unsupportedSOPClassUID: ByteString = ByteString(8, 0, 22, 0, 85, 73, 26, 0) ++ ByteString.fromArray("1.2.840.10008.5.1.4.1.1.7".toCharArray.map(_.toByte)) ++ ByteString(0)
 
-  val metaInformation: Attributes = {
-    val meta = new Attributes()
-    meta.setString(Tag.TransferSyntaxUID, VR.UI, UID.ExplicitVRLittleEndian)
-    meta
-  }
+  val metaInformation: Elements =
+    Elements.empty()
+      .setString(Tag.TransferSyntaxUID, UID.ExplicitVRLittleEndian)
 
-  def createAttributes: Attributes = {
-    val attributes = new Attributes()
-    attributes.setString(Tag.PatientName, VR.PN, "pn")
-    attributes.setString(Tag.PatientID, VR.LO, "pid")
-    attributes.setString(Tag.StudyInstanceUID, VR.LO, "stuid")
-    attributes.setString(Tag.SeriesInstanceUID, VR.LO, "seuid")
-    attributes.setString(Tag.FrameOfReferenceUID, VR.LO, "foruid")
-    attributes.setString(Tag.Allergies, VR.LO, "allergies")
-    attributes.setString(Tag.PatientIdentityRemoved, VR.CS, "NO")
-    attributes
-  }
+  val testElements: Elements =
+    Elements.empty()
+      .setString(Tag.PatientName, "pn")
+      .setString(Tag.PatientID, "pid")
+      .setString(Tag.StudyInstanceUID, "stuid")
+      .setString(Tag.SeriesInstanceUID, "seuid")
+      .setString(Tag.FrameOfReferenceUID, "foruid")
+      .setString(Tag.Allergies, "allergies")
+      .setString(Tag.PatientIdentityRemoved, "NO")
 
   def toAsciiBytes(s: String, vr: VR): ByteString = padToEvenLength(ByteString(s), vr)
 

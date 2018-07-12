@@ -2,8 +2,8 @@ package se.nimsa.sbx.app
 
 import org.scalatest.{FlatSpec, Matchers}
 import play.api.libs.json.Json
-import se.nimsa.dcm4che.streams.TagPath
-import se.nimsa.dcm4che.streams.TagPath.TagPathTag
+import se.nimsa.dicom.data.TagPath
+import se.nimsa.dicom.data.TagPath.TagPathTag
 
 class JsonFormatsTest extends FlatSpec with Matchers with JsonFormats {
 
