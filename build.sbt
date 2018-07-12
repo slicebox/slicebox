@@ -65,6 +65,7 @@ licenses += ("Apache-2.0", new URL("https://www.apache.org/licenses/LICENSE-2.0.
 
 resolvers ++= Seq(
   Resolver.typesafeRepo("releases"),
+  Resolver.sonatypeRepo("releases"),
   Resolver.sonatypeRepo("snapshots"),
   "dcm4che Repository" at "https://www.dcm4che.org/maven2/",
   Resolver.bintrayRepo("hseeberger", "maven"))
@@ -103,7 +104,7 @@ libraryDependencies ++= {
     "org.webjars" % "angularjs" % "1.5.11",
     "org.webjars" % "angular-material" % "1.1.5",
     "org.webjars" % "angular-file-upload" % "11.0.0",
-    "se.nimsa" %% "dicom-streams" % "0.1-SNAPSHOT",
+    "se.nimsa" %% "dicom-streams" % "0.1",
     "com.lightbend.akka" %% "akka-stream-alpakka-s3" % alpakkaVersion,
     "com.lightbend.akka" %% "akka-stream-alpakka-file" % alpakkaVersion
   )
