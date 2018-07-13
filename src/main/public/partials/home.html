@@ -1,5 +1,5 @@
 <div layout="row" layout-margin class="home">
-    <div layout="column" flex="40" class="left-column">
+    <div layout="column" flex class="left-column">
         <md-tabs md-selected="uiState.leftColumnSelectedTabIndex">
             <md-tab id="patient-study-series" aria-controls="patient-study-series-content">
                 Patient-Study-Series
@@ -231,7 +231,7 @@
         
     </div>
 
-    <div layout="column" flex class="right-column">
+    <div layout="column" ng-if="uiState.selectedSeries" flex class="right-column">
         <md-tabs md-selected="uiState.rightColumnSelectedTabIndex">
             <md-tab id="images" aria-controls="images-content" md-on-select="updatePNGImageUrls()">
                 Images
