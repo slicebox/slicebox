@@ -15,10 +15,8 @@
                 </md-menu-item>
             </md-menu-content>
         </md-menu>
-
-        <div flex></div>
                
-        <div ng-if="filterEnabled()">
+        <div class="filter-section" ng-if="filterEnabled()">
             <input type="text" class="filter" ng-model="uiState.filter" ng-change="filterChanged()" placeholder="Filter">
         </div>
 

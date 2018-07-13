@@ -123,3 +123,7 @@ td.table-cell:last-child {
 .sbx-grid .pager button.md-button:focus {
     background-color: rgba(0, 0, 0, 0);
 }
+
+.sbx-grid .filter-section {
+	margin-left: 20px;
+}
