@@ -77,6 +77,10 @@
 	padding: 0px;
 }
 
+.filter-section {
+	margin-left: 20px;
+}
+
 .md-button.md-icon-button.grid-menu-button {
 	padding: 0;
 	margin: 0;
