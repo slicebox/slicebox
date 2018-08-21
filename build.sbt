@@ -1,6 +1,6 @@
 
 name := "slicebox"
-version := "1.5-SNAPSHOT"
+version := "1.6-SNAPSHOT"
 organization := "se.nimsa"
 scalaVersion := "2.12.6"
 scalacOptions := Seq("-encoding", "UTF-8", "-Xlint", "-deprecation", "-unchecked", "-feature", "-target:jvm-1.8")
@@ -75,11 +75,11 @@ updateOptions := updateOptions.value.withGigahorse(false) // temporary workaroun
 // deps
 
 libraryDependencies ++= {
-  val akkaVersion = "2.5.13"
+  val akkaVersion = "2.5.14"
   val akkaHttpVersion = "10.1.3"
   val slickVersion = "3.2.3"
   val dcm4cheVersion = "3.3.8"
-  val alpakkaVersion = "0.19"
+  val alpakkaVersion = "0.20"
   Seq(
     "com.typesafe.scala-logging" %% "scala-logging" % "3.9.0",
     "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
@@ -92,7 +92,7 @@ libraryDependencies ++= {
     "com.h2database" % "h2" % "1.4.197",
     "mysql" % "mysql-connector-java" % "6.0.6",
     "com.github.t3hnar" %% "scala-bcrypt" % "3.1",
-    "com.amazonaws" % "aws-java-sdk-s3" % "1.11.349",
+    "com.amazonaws" % "aws-java-sdk-s3" % "1.11.385",
     "org.scalatest" %% "scalatest" % "3.0.5" % "test",
     "org.dcm4che" % "dcm4che-core" % dcm4cheVersion,
     "org.dcm4che" % "dcm4che-image" % dcm4cheVersion,
@@ -104,7 +104,7 @@ libraryDependencies ++= {
     "org.webjars" % "angularjs" % "1.5.11",
     "org.webjars" % "angular-material" % "1.1.5",
     "org.webjars" % "angular-file-upload" % "11.0.0",
-    "se.nimsa" %% "dicom-streams" % "0.1",
+    "se.nimsa" %% "dicom-streams" % "0.2",
     "com.lightbend.akka" %% "akka-stream-alpakka-s3" % alpakkaVersion,
     "com.lightbend.akka" %% "akka-stream-alpakka-file" % alpakkaVersion
   )

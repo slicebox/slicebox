@@ -557,9 +557,8 @@ angular.module('slicebox.home', ['ngRoute'])
     };
 
     $scope.updatePNGImageUrls = function() {
-        $scope.uiState.seriesDetails.pngImageUrls = [];
-
-        if ($scope.uiState.selectedSeries !== null) {
+        if ($scope.uiState.selectedSeries !== null && !$scope.uiState.loadPngImagesInProgress) {
+            $scope.uiState.seriesDetails.pngImageUrls = [];
             $scope.uiState.loadPngImagesInProgress = true;
 
             $http.get('/api/metadata/images?count=1000000&seriesid=' + $scope.uiState.selectedSeries.id).success(function(images) {
@@ -590,7 +589,7 @@ angular.module('slicebox.home', ['ngRoute'])
                                 var frameIndex = Math.max(0, info.frameIndex - 1)*Math.max(1, info.numberOfFrames) + (j + 1);
                                 $scope.uiState.seriesDetails.pngImageUrls.push({ url: url, frameIndex: frameIndex });
                                 generateMore = $scope.uiState.seriesDetails.pngImageUrls.length < $scope.uiState.seriesDetails.images &&
-                                                !(imageIndex === images.length - 1 && j == info.numberOfFrames - 1);
+                                                !(imageIndex === images.length - 1 && j === info.numberOfFrames - 1);
                             }
                             if (!generateMore) {
                                 $scope.uiState.loadPngImagesInProgress = false;
