@@ -27,7 +27,7 @@ import se.nimsa.sbx.storage.StorageService
 import se.nimsa.sbx.util.ExceptionCatching
 import se.nimsa.sbx.util.FutureUtil.await
 
-class DirectoryWatchServiceActor(directoryWatchDao: DirectoryWatchDAO, storage: StorageService)(implicit materializer: Materializer, timeout: Timeout) extends Actor with ExceptionCatching {
+class DirectoryWatchServiceActor(directoryWatchDao: DirectoryWatchDAO, storage: StorageService, deleteWatchedDirectory: Boolean)(implicit materializer: Materializer, timeout: Timeout) extends Actor with ExceptionCatching {
   val log = Logging(context.system, this)
 
   setupWatches()
@@ -63,7 +63,7 @@ class DirectoryWatchServiceActor(directoryWatchDao: DirectoryWatchDAO, storage: 
                 val watchedDirectory = addDirectory(directory)
 
                 context.child(watchedDirectory.id.toString).getOrElse(
-                  context.actorOf(DirectoryWatchActor.props(watchedDirectory, storage), watchedDirectory.id.toString))
+                  context.actorOf(DirectoryWatchActor.props(watchedDirectory, storage, deleteWatchedDirectory), watchedDirectory.id.toString))
 
                 sender ! watchedDirectory
             }
@@ -89,7 +89,7 @@ class DirectoryWatchServiceActor(directoryWatchDao: DirectoryWatchDAO, storage: 
     watchedDirectories foreach (watchedDirectory => {
       val path = Paths.get(watchedDirectory.path)
       if (Files.isDirectory(path))
-        context.actorOf(DirectoryWatchActor.props(watchedDirectory, storage), watchedDirectory.id.toString)
+        context.actorOf(DirectoryWatchActor.props(watchedDirectory, storage, deleteWatchedDirectory), watchedDirectory.id.toString)
       else
         deleteDirectory(watchedDirectory.id)
     })
@@ -113,5 +113,5 @@ class DirectoryWatchServiceActor(directoryWatchDao: DirectoryWatchDAO, storage: 
 }
 
 object DirectoryWatchServiceActor {
-  def props(directoryWatchDao: DirectoryWatchDAO, storage: StorageService)(implicit materializer: Materializer, timeout: Timeout): Props = Props(new DirectoryWatchServiceActor(directoryWatchDao, storage))
+  def props(directoryWatchDao: DirectoryWatchDAO, storage: StorageService, deleteWatchedDirectory: Boolean)(implicit materializer: Materializer, timeout: Timeout): Props = Props(new DirectoryWatchServiceActor(directoryWatchDao, storage, deleteWatchedDirectory))
 }
