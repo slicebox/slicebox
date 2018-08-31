@@ -144,7 +144,7 @@ trait SliceboxBase extends SliceboxRoutes with DicomStreamOps with JsonFormats w
   val scpService: ActorRef = system.actorOf(ScpServiceActor.props(scpDao, storage), name = "ScpService")
   val scuService: ActorRef = system.actorOf(ScuServiceActor.props(scuDao, storage), name = "ScuService")
   val directoryService: ActorRef = {
-    val deleteWatchedDirectory: Boolean = sliceboxConfig.getBoolean("directory.delete-on-import")
+    val deleteWatchedDirectory: Boolean = sliceboxConfig.getBoolean("directory-watch.delete-on-import")
     system.actorOf(DirectoryWatchServiceActor.props(directoryWatchDao, storage, deleteWatchedDirectory), name = "DirectoryService")
   }
   val seriesTypeService: ActorRef = system.actorOf(SeriesTypeServiceActor.props(seriesTypeDao, storage), name = "SeriesTypeService")
