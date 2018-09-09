@@ -1,6 +1,6 @@
 
 name := "slicebox"
-version := "1.6-SNAPSHOT"
+version := "1.5.1"
 organization := "se.nimsa"
 scalaVersion := "2.12.6"
 scalacOptions := Seq("-encoding", "UTF-8", "-Xlint", "-deprecation", "-unchecked", "-feature", "-target:jvm-1.8")
