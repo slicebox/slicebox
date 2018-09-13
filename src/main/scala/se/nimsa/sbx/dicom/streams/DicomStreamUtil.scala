@@ -42,14 +42,14 @@ object DicomStreamUtil {
   }
 
   val basicInfoTags: Set[TagPath] = encodingTags ++ Set(Tag.PatientName, Tag.PatientID, Tag.PatientIdentityRemoved,
-    Tag.StudyInstanceUID, Tag.SeriesInstanceUID).map(TagPath.fromTag)
+    Tag.StudyInstanceUID, Tag.SeriesInstanceUID, Tag.FrameOfReferenceUID).map(TagPath.fromTag)
 
   val extendedInfoTags: Set[TagPath] = basicInfoTags ++ Set(Tag.PatientSex, Tag.PatientBirthDate, Tag.PatientAge, Tag.StudyDescription, Tag.StudyID,
     Tag.AccessionNumber, Tag.SeriesDescription, Tag.ProtocolName, Tag.FrameOfReferenceUID).map(TagPath.fromTag)
 
   val imageInformationTags: Set[TagPath] = Set(Tag.InstanceNumber, Tag.ImageIndex, Tag.NumberOfFrames, Tag.SmallestImagePixelValue, Tag.LargestImagePixelValue).map(TagPath.fromTag)
 
-  case class PartialAnonymizationKeyPart(keyMaybe: Option[AnonymizationKey], hasPatientInfo: Boolean, hasStudyInfo: Boolean, hasSeriesInfo: Boolean) extends DicomPart {
+  case class PartialAnonymizationKeyPart(keyMaybe: Option[AnonymizationKey], hasPatientInfo: Boolean, hasStudyInfo: Boolean, hasSeriesInfo: Boolean, hasFrameOfReferenceInfo: Boolean) extends DicomPart {
     def bytes: ByteString = ByteString.empty
     def bigEndian: Boolean = false
   }
@@ -105,9 +105,9 @@ object DicomStreamUtil {
   def getOrCreateAnonKeyPart(getOrCreateAnonKey: DicomInfoPart => Future[AnonymizationKey])
                                              (implicit ec: ExecutionContext): DicomPart => Future[DicomPart] = {
     case info: DicomInfoPart if info.isAnonymized =>
-      Future.successful(PartialAnonymizationKeyPart(None, hasPatientInfo = false, hasStudyInfo = false, hasSeriesInfo = false))
+      Future.successful(PartialAnonymizationKeyPart(None, hasPatientInfo = false, hasStudyInfo = false, hasSeriesInfo = false, hasFrameOfReferenceInfo = false))
     case info: DicomInfoPart =>
-      getOrCreateAnonKey(info).map(key => PartialAnonymizationKeyPart(Some(key), hasPatientInfo = true, hasStudyInfo = true, hasSeriesInfo = true))
+      getOrCreateAnonKey(info).map(key => PartialAnonymizationKeyPart(Some(key), hasPatientInfo = true, hasStudyInfo = true, hasSeriesInfo = true, hasFrameOfReferenceInfo = true))
     case part: DicomPart => Future.successful(part)
   }
 

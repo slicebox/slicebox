@@ -325,11 +325,12 @@ trait DicomStreamOps {
         query(PatientName(patientName), PatientID(patientID)).map { patientKeys =>
           val studyKeys = info.studyInstanceUID.map(studyUID => patientKeys.filter(_.anonStudyInstanceUID == studyUID)).getOrElse(Seq.empty)
           val seriesKeys = info.seriesInstanceUID.map(seriesUID => studyKeys.filter(_.anonSeriesInstanceUID == seriesUID)).getOrElse(Seq.empty)
-          val maybeKey = seriesKeys.headOption.orElse(studyKeys.headOption).orElse(patientKeys.headOption)
-          info :: PartialAnonymizationKeyPart(maybeKey, hasPatientInfo = patientKeys.nonEmpty, hasStudyInfo = studyKeys.nonEmpty, hasSeriesInfo = seriesKeys.nonEmpty) :: Nil
+          val frameKeys = info.frameOfReferenceUID.map(frameUID => studyKeys.filter(_.anonFrameOfReferenceUID == frameUID)).getOrElse(Seq.empty)
+          val maybeKey = seriesKeys.headOption.orElse(frameKeys.headOption).orElse(studyKeys.headOption).orElse(patientKeys.headOption)
+          info :: PartialAnonymizationKeyPart(maybeKey, hasPatientInfo = patientKeys.nonEmpty, hasStudyInfo = studyKeys.nonEmpty, hasSeriesInfo = seriesKeys.nonEmpty, hasFrameOfReferenceInfo = frameKeys.nonEmpty) :: Nil
         }
       }
-      maybeFutureParts.getOrElse(Future.successful(info :: PartialAnonymizationKeyPart(None, hasPatientInfo = false, hasStudyInfo = false, hasSeriesInfo = false) :: Nil))
+      maybeFutureParts.getOrElse(Future.successful(info :: PartialAnonymizationKeyPart(None, hasPatientInfo = false, hasStudyInfo = false, hasSeriesInfo = false, hasFrameOfReferenceInfo = false) :: Nil))
     case part: DicomPart =>
       Future.successful(part :: Nil)
   }

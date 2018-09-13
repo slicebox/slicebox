@@ -36,7 +36,7 @@ class HarmonizeAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymi
       .via(DicomFlows.tagFilter(_ => false)(tagPath => !DicomParsing.isFileMetaInformation(tagPath.tag)))
   }
 
-  def anonKeyPart(key: AnonymizationKey) = PartialAnonymizationKeyPart(Some(key), hasPatientInfo = true, hasStudyInfo = true, hasSeriesInfo = true)
+  def anonKeyPart(key: AnonymizationKey) = PartialAnonymizationKeyPart(Some(key), hasPatientInfo = true, hasStudyInfo = true, hasSeriesInfo = true, hasFrameOfReferenceInfo = true)
 
   def harmonize(key: AnonymizationKey, elements: Elements): Future[Elements] =
     Source.single(anonKeyPart(key))

@@ -82,7 +82,7 @@ object ReverseAnonymizationFlow {
             element.setValue(Value(ByteString(key.seriesDescription)))).getOrElse(element)
           case Tag.ProtocolName => keyPart.keyMaybe.filter(_ => keyPart.hasSeriesInfo).map(key =>
             element.setValue(Value(ByteString(key.protocolName)))).getOrElse(element)
-          case Tag.FrameOfReferenceUID => keyPart.keyMaybe.filter(_ => keyPart.hasSeriesInfo).map(key =>
+          case Tag.FrameOfReferenceUID => keyPart.keyMaybe.filter(_ => keyPart.hasFrameOfReferenceInfo).map(key =>
             element.setValue(Value(ByteString(key.frameOfReferenceUID)))).getOrElse(element)
           case _ => element
         }

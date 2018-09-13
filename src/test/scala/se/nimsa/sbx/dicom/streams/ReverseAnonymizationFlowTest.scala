@@ -38,7 +38,7 @@ class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymiza
 
   def anonKeyPart(elements: Elements): PartialAnonymizationKeyPart = {
     val key = createAnonymizationKey(elements)
-    PartialAnonymizationKeyPart(Some(key), hasPatientInfo = true, hasStudyInfo = true, hasSeriesInfo = true)
+    PartialAnonymizationKeyPart(Some(key), hasPatientInfo = true, hasStudyInfo = true, hasSeriesInfo = true, hasFrameOfReferenceInfo = true)
   }
 
   def anonSource(elements: Elements): Source[DicomPart, NotUsed] = {
