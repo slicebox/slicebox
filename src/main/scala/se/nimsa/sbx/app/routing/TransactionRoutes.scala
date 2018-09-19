@@ -68,14 +68,14 @@ trait TransactionRoutes {
             parameters('transactionid.as[Long]) { outgoingTransactionId =>
               get {
                 onSuccess(boxService.ask(GetIncomingTransactionStatus(box, outgoingTransactionId)).mapTo[Option[TransactionStatus]]) {
-                  case Some(status) => complete(HttpEntity(status.toString))
+                  case Some(status) => complete(BoxTransactionStatus(status))
                   case None => complete(NotFound)
                 }
               } ~ put {
-                entity(as[String]) { statusString =>
-                  val status = TransactionStatus.withName(statusString)
+                entity(as[BoxTransactionStatus]) { boxTransactionStatus =>
+                  val status = boxTransactionStatus.status
                   status match {
-                    case TransactionStatus.UNKNOWN => complete((BadRequest, s"Invalid status format: $statusString"))
+                    case TransactionStatus.UNKNOWN => complete((BadRequest, s"Invalid status format: $status"))
                     case _ =>
                       onSuccess(boxService.ask(SetIncomingTransactionStatus(box, outgoingTransactionId, status)).mapTo[Option[Unit]]) {
                         case Some(_) => complete(NoContent)

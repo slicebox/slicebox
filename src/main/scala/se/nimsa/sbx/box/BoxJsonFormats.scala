@@ -27,6 +27,7 @@ trait BoxJsonFormats {
   }, Writes[A](a => JsString(a.toString)))
 
   implicit val transactionStatusFormat: Format[TransactionStatus] = enumFormat(TransactionStatus.withName)
+  implicit val boxTransactionStatusFormat: Format[BoxTransactionStatus] = Json.format[BoxTransactionStatus]
   implicit val outgoingEntryFormat: Format[OutgoingTransaction] = Json.format[OutgoingTransaction]
   implicit val outgoingImageFormat: Format[OutgoingImage] = Json.format[OutgoingImage]
   implicit val outgoingEntryImageFormat: Format[OutgoingTransactionImage] = Json.format[OutgoingTransactionImage]
