@@ -5,6 +5,7 @@ import akka.stream.ActorMaterializer
 import akka.testkit.{ImplicitSender, TestKit}
 import akka.util.Timeout
 import org.scalatest._
+import se.nimsa.dicom.data.TagPath
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.app.GeneralProtocol.ImagesDeleted
 import se.nimsa.sbx.box.BoxProtocol._
@@ -200,17 +201,17 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
 
       val imageTagValuesSeq = Seq(
         ImageTagValues(i1.id, Seq(
-          TagValue(0x00101010, "B"),
-          TagValue(0x00101012, "D"),
-          TagValue(0x00101014, "F"))),
+          TagValue(TagPath.fromTag(0x00101010), "B"),
+          TagValue(TagPath.fromTag(0x00101012), "D"),
+          TagValue(TagPath.fromTag(0x00101014), "F"))),
         ImageTagValues(i2.id, Seq(
-          TagValue(0x00101010, "B"),
-          TagValue(0x00101012, "D"),
-          TagValue(0x00101014, "F"))),
+          TagValue(TagPath.fromTag(0x00101010), "B"),
+          TagValue(TagPath.fromTag(0x00101012), "D"),
+          TagValue(TagPath.fromTag(0x00101014), "F"))),
         ImageTagValues(i3.id, Seq(
-          TagValue(0x00101010, "B"),
-          TagValue(0x00101012, "D"),
-          TagValue(0x00101014, "F"))))
+          TagValue(TagPath.fromTag(0x00101010), "B"),
+          TagValue(TagPath.fromTag(0x00101012), "D"),
+          TagValue(TagPath.fromTag(0x00101014), "F"))))
 
       boxService ! SendToRemoteBox(box, imageTagValuesSeq)
 

@@ -110,9 +110,9 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("DicomStreamOpsSpec")) with
   }
 
   "Applying tag modifications when storing DICOM data" should "replace DICOM attributes" in {
-    val t1 = TagValue(Tag.PatientName, "Mapped Patient Name")
-    val t2 = TagValue(Tag.PatientID, "Mapped Patient ID")
-    val t3 = TagValue(Tag.SeriesDescription, "Mapped Series Description")
+    val t1 = TagValue(TagPath.fromTag(Tag.PatientName), "Mapped Patient Name")
+    val t2 = TagValue(TagPath.fromTag(Tag.PatientID), "Mapped Patient ID")
+    val t3 = TagValue(TagPath.fromTag(Tag.SeriesDescription), "Mapped Series Description")
     val bytes = preamble ++ fmiGroupLength(supportedMediaStorageSOPClassUID ++ tsuidExplicitLE) ++ supportedMediaStorageSOPClassUID ++ tsuidExplicitLE ++ patientNameJohnDoe
     val source = StreamSource.single(bytes).via(storage.parseFlow(None))
     val anonSource = dicomStreamOpsImpl.anonymizedDicomDataSource(
