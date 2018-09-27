@@ -23,7 +23,7 @@ import se.nimsa.dicom.data.DicomParts.{DicomPart, HeaderPart, ValueChunk}
 import se.nimsa.dicom.data.Elements.ValueElement
 import se.nimsa.dicom.data.{DicomParts, Tag, Value}
 import se.nimsa.dicom.streams.DicomFlows._
-import se.nimsa.dicom.streams.{DicomFlowFactory, GuaranteedValueEvent, IdentityFlow, StartEvent}
+import se.nimsa.dicom.streams._
 import se.nimsa.sbx.dicom.streams.DicomStreamUtil._
 
 /**
@@ -42,10 +42,9 @@ object HarmonizeAnonymizationFlow {
     .via(groupLengthDiscardFilter)
     .via(toIndeterminateLengthSequences)
     .via(toUtf8Flow)
-    .via(DicomFlowFactory.create(new IdentityFlow with GuaranteedValueEvent[DicomPart] with StartEvent[DicomPart] {
+    .via(DicomFlowFactory.create(new IdentityFlow with GuaranteedValueEvent[DicomPart] with StartEvent[DicomPart] with InSequence[DicomPart] {
       var maybeKey: Option[PartialAnonymizationKeyPart] = None
       var currentAttribute: Option[ValueElement] = None
-      var depth = 0
 
       def maybeHarmonize(element: ValueElement, keyPart: PartialAnonymizationKeyPart): List[DicomPart] = {
         val updatedAttribute = element.tag match {
@@ -85,7 +84,7 @@ object HarmonizeAnonymizationFlow {
       }
 
       override def onHeader(header: HeaderPart): List[DicomPart] =
-        if (depth <= 0 && needHarmonizeAnon(header.tag, maybeKey)) {
+        if (!inSequence && needHarmonizeAnon(header.tag, maybeKey)) {
           currentAttribute = Some(ValueElement.empty(header.tag, header.vr, header.bigEndian, header.explicitVR))
           super.onHeader(header).filterNot(_ == header)
         } else {
@@ -107,16 +106,6 @@ object HarmonizeAnonymizationFlow {
             super.onValueChunk(chunk).filterNot(_ == chunk)
         } else
           super.onValueChunk(chunk)
-
-      override def onSequence(part: DicomParts.SequencePart): List[DicomPart] = {
-        depth += 1
-        super.onSequence(part)
-      }
-
-      override def onSequenceDelimitation(part: DicomParts.SequenceDelimitationPart): List[DicomPart] = {
-        depth -= 1
-        super.onSequenceDelimitation(part)
-      }
 
       override def onStart(): List[DicomPart] = {
         maybeKey = None

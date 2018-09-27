@@ -54,10 +54,9 @@ object ReverseAnonymizationFlow {
     .via(toUtf8Flow)
     .via(modifyFlow(
       reverseTags.map(tag => TagModification.endsWith(TagPath.fromTag(tag), identity, insert = true)): _*))
-    .via(DicomFlowFactory.create(new IdentityFlow with GuaranteedValueEvent[DicomPart] with StartEvent[DicomPart] {
+    .via(DicomFlowFactory.create(new IdentityFlow with GuaranteedValueEvent[DicomPart] with StartEvent[DicomPart] with InSequence[DicomPart] {
       var maybeKey: Option[AnonymizationKeyValuesPart] = None
       var currentElement: Option[ValueElement] = None
-      var depth = 0
 
       def maybeReverse(element: ValueElement, keyPart: AnonymizationKeyValuesPart): List[DicomPart] = {
         val updatedElement = element.tag match {
@@ -105,7 +104,7 @@ object ReverseAnonymizationFlow {
       }
 
       override def onHeader(header: HeaderPart): List[DicomPart] =
-        if (depth <= 0 && needReverseAnon(header.tag, maybeKey) && maybeKey.isDefined) {
+        if (!inSequence && needReverseAnon(header.tag, maybeKey) && maybeKey.isDefined) {
           currentElement = Some(ValueElement.empty(header.tag, header.vr, header.bigEndian, header.explicitVR))
           super.onHeader(header).filterNot(_ == header)
         } else {
@@ -128,16 +127,6 @@ object ReverseAnonymizationFlow {
             super.onValueChunk(chunk).filterNot(_ == chunk)
         } else
           super.onValueChunk(chunk)
-
-      override def onSequence(part: DicomParts.SequencePart): List[DicomPart] = {
-        depth += 1
-        super.onSequence(part)
-      }
-
-      override def onSequenceDelimitation(part: DicomParts.SequenceDelimitationPart): List[DicomPart] = {
-        depth -= 1
-        super.onSequenceDelimitation(part)
-      }
 
       override def onStart(): List[DicomPart] = {
         maybeKey = None

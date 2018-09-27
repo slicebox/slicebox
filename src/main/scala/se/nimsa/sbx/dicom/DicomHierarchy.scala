@@ -48,7 +48,7 @@ object DicomHierarchy {
       override def level: Int = 4
     }
 
-    def withName(string: String): DicomHierarchyLevel = string match {
+    def withName(string: String): DicomHierarchyLevel = string.toLowerCase match {
       case "patient" => PATIENT
       case "study" => STUDY
       case "series" => SERIES

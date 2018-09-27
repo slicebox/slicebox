@@ -23,6 +23,7 @@ import akka.util.ByteString
 import se.nimsa.dicom.data.DicomParts.{DicomPart, ElementsPart, HeaderPart}
 import se.nimsa.dicom.data._
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.{AnonymizationKey, AnonymizationKeyValues}
+import se.nimsa.sbx.dicom.DicomHierarchy.DicomHierarchyLevel
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -46,20 +47,22 @@ object DicomStreamUtil {
 
   val imageInformationTags: Set[TagPath] = Set(Tag.InstanceNumber, Tag.ImageIndex, Tag.NumberOfFrames, Tag.SmallestImagePixelValue, Tag.LargestImagePixelValue).map(TagPath.fromTag)
 
+  case class TagLevel(tag: Int, level: DicomHierarchyLevel)
+
   val reverseTags = Seq(
-    Tag.PatientName,
-    Tag.PatientID,
-    Tag.PatientBirthDate,
-    Tag.PatientIdentityRemoved,
-    Tag.DeidentificationMethod,
-    Tag.StudyInstanceUID,
-    Tag.StudyDescription,
-    Tag.StudyID,
-    Tag.AccessionNumber,
-    Tag.SeriesInstanceUID,
-    Tag.SeriesDescription,
-    Tag.ProtocolName,
-    Tag.FrameOfReferenceUID)
+    TagLevel(Tag.PatientName, DicomHierarchyLevel.PATIENT),
+    TagLevel(Tag.PatientID, DicomHierarchyLevel.PATIENT),
+    TagLevel(Tag.PatientBirthDate, DicomHierarchyLevel.PATIENT),
+    TagLevel(Tag.PatientIdentityRemoved, DicomHierarchyLevel.IMAGE),
+    TagLevel(Tag.DeidentificationMethod, DicomHierarchyLevel.IMAGE),
+    TagLevel(Tag.StudyInstanceUID, DicomHierarchyLevel.STUDY),
+    TagLevel(Tag.StudyDescription, DicomHierarchyLevel.STUDY),
+    TagLevel(Tag.StudyID, DicomHierarchyLevel.STUDY),
+    TagLevel(Tag.AccessionNumber, DicomHierarchyLevel.STUDY),
+    TagLevel(Tag.SeriesInstanceUID, DicomHierarchyLevel.SERIES),
+    TagLevel(Tag.SeriesDescription, DicomHierarchyLevel.SERIES),
+    TagLevel(Tag.ProtocolName, DicomHierarchyLevel.SERIES),
+    TagLevel(Tag.FrameOfReferenceUID, DicomHierarchyLevel.STUDY))
 
   val reverseTag: HeaderPart => Boolean = header => header.vr == VR.UI || reverseTags.contains(header.tag)
 
