@@ -21,7 +21,7 @@ import akka.stream.scaladsl.Flow
 import akka.util.ByteString
 import se.nimsa.dicom.data.DicomParts._
 import se.nimsa.dicom.data.Elements.ValueElement
-import se.nimsa.dicom.data.{Tag, TagPath, Value}
+import se.nimsa.dicom.data.{DicomParts, Tag, TagPath, Value}
 import se.nimsa.dicom.streams.DicomFlows._
 import se.nimsa.dicom.streams.ModifyFlow.{TagModification, modifyFlow}
 import se.nimsa.dicom.streams._
@@ -57,6 +57,7 @@ object ReverseAnonymizationFlow {
     .via(DicomFlowFactory.create(new IdentityFlow with GuaranteedValueEvent[DicomPart] with StartEvent[DicomPart] {
       var maybeKey: Option[AnonymizationKeyValuesPart] = None
       var currentElement: Option[ValueElement] = None
+      var depth = 0
 
       def maybeReverse(element: ValueElement, keyPart: AnonymizationKeyValuesPart): List[DicomPart] = {
         val updatedElement = element.tag match {
@@ -104,7 +105,7 @@ object ReverseAnonymizationFlow {
       }
 
       override def onHeader(header: HeaderPart): List[DicomPart] =
-        if (needReverseAnon(header.tag, maybeKey) && maybeKey.isDefined) {
+        if (depth <= 0 && needReverseAnon(header.tag, maybeKey) && maybeKey.isDefined) {
           currentElement = Some(ValueElement.empty(header.tag, header.vr, header.bigEndian, header.explicitVR))
           super.onHeader(header).filterNot(_ == header)
         } else {
@@ -127,6 +128,16 @@ object ReverseAnonymizationFlow {
             super.onValueChunk(chunk).filterNot(_ == chunk)
         } else
           super.onValueChunk(chunk)
+
+      override def onSequence(part: DicomParts.SequencePart): List[DicomPart] = {
+        depth += 1
+        super.onSequence(part)
+      }
+
+      override def onSequenceDelimitation(part: DicomParts.SequenceDelimitationPart): List[DicomPart] = {
+        depth -= 1
+        super.onSequenceDelimitation(part)
+      }
 
       override def onStart(): List[DicomPart] = {
         maybeKey = None

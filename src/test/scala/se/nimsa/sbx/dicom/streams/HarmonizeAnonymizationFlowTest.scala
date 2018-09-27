@@ -7,6 +7,7 @@ import akka.stream.scaladsl.Source
 import akka.testkit.TestKit
 import org.scalatest.{AsyncFlatSpecLike, BeforeAndAfterAll, Matchers}
 import se.nimsa.dicom.data.DicomParts.DicomPart
+import se.nimsa.dicom.data.Elements.{Item, Sequence}
 import se.nimsa.dicom.data.{DicomParsing, Elements, Tag}
 import se.nimsa.dicom.streams.DicomFlows
 import se.nimsa.dicom.streams.ElementFlows.elementFlow
@@ -70,6 +71,16 @@ class HarmonizeAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymi
     harmonize(key, attributes).map { harmonizedAttributes =>
         harmonizedAttributes.getString(Tag.PatientID).get shouldBe "apid2"
         harmonizedAttributes.getString(Tag.StudyInstanceUID).get shouldBe "astuid2"
+    }
+  }
+
+  it should "only change attributes in the root dataset" in {
+    val attributes = testElements
+      .set(Sequence(Tag.DerivationCodeSequence, -1, List(Item(-1, Elements.empty().setString(Tag.PatientName, "Bob")))))
+    val key = TestUtil.createAnonymizationKey(attributes).copy(anonPatientName = "anon name")
+    harmonize(key, attributes).map { harmonizedAttributes =>
+      harmonizedAttributes.getString(Tag.PatientName).get shouldBe "anon name"
+      harmonizedAttributes.getSequence(Tag.DerivationCodeSequence).get.item(1).get.elements.getString(Tag.PatientName).get shouldBe "Bob"
     }
   }
 
