@@ -16,6 +16,8 @@
 
 package se.nimsa.sbx.box
 
+import se.nimsa.dicom.data.TagPath
+import se.nimsa.dicom.data.TagPath.TagPathTag
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.{ImageTagValues, TagValue}
 import se.nimsa.sbx.box.BoxProtocol.BoxSendMethod._
 import se.nimsa.sbx.box.BoxProtocol.TransactionStatus._
@@ -90,15 +92,15 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
 
   val outgoingImageQuery = TableQuery[OutgoingImageTable]
 
-  val toOutgoingTagValue: (Long, Long, Int, String) => OutgoingTagValue =
-    (id: Long, outgoingImageId: Long, tag: Int, value: String) => OutgoingTagValue(id, outgoingImageId, TagValue(tag, value))
-  val fromOutgoingTagValue: OutgoingTagValue => Option[(Long, Long, Int, String)] =
-    (tagValue: OutgoingTagValue) => Option((tagValue.id, tagValue.outgoingImageId, tagValue.tagValue.tag, tagValue.tagValue.value))
+  val toOutgoingTagValue: (Long, Long, String, String) => OutgoingTagValue =
+    (id: Long, outgoingImageId: Long, tagPath: String, value: String) => OutgoingTagValue(id, outgoingImageId, TagValue(TagPath.parse(tagPath).asInstanceOf[TagPathTag], value))
+  val fromOutgoingTagValue: OutgoingTagValue => Option[(Long, Long, String, String)] =
+    (tagValue: OutgoingTagValue) => Option((tagValue.id, tagValue.outgoingImageId, tagValue.tagValue.tagPath.toString, tagValue.tagValue.value))
 
   class OutgoingTagValueTable(tag: Tag) extends Table[OutgoingTagValue](tag, OutgoingTagValueTable.name) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def outgoingImageId = column[Long]("outgoingimageid")
-    def dicomTag = column[Int]("tag")
+    def dicomTag = column[String]("tagPath")
     def value = column[String]("value")
     def fkOutgoingImage = foreignKey("fk_outgoing_image_id", outgoingImageId, outgoingImageQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
     def * = (id, outgoingImageId, dicomTag, value) <> (toOutgoingTagValue.tupled, fromOutgoingTagValue)

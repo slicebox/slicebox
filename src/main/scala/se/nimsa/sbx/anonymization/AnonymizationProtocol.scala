@@ -16,6 +16,7 @@
 
 package se.nimsa.sbx.anonymization
 
+import se.nimsa.dicom.data.TagPath.TagPathTag
 import se.nimsa.sbx.metadata.MetaDataProtocol.{QueryOrder, QueryProperty}
 import se.nimsa.sbx.model.Entity
 
@@ -29,7 +30,7 @@ object AnonymizationProtocol {
     
   case class ImageTagValues(imageId: Long, tagValues: Seq[TagValue])  
       
-  case class TagValue(tag: Int, value: String)
+  case class TagValue(tagPath: TagPathTag, value: String)
 
   case class AnonymizationKey(
     id: Long,

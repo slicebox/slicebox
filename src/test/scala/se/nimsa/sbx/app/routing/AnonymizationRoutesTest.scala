@@ -5,7 +5,7 @@ import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server._
 import akka.util.ByteString
 import org.scalatest.{FlatSpecLike, Matchers}
-import se.nimsa.dicom.data.Tag
+import se.nimsa.dicom.data.{Tag, TagPath}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomProperty.PatientName
@@ -93,7 +93,7 @@ class AnonymizationRoutesTest extends {
     }
 
     val anonPatientName = "Anon Pat 1"
-    val tagValues = Seq(TagValue(PatientName.dicomTag, anonPatientName))
+    val tagValues = Seq(TagValue(TagPath.fromTag(PatientName.dicomTag), anonPatientName))
     val anonAttributes =
       PostAsUser(s"/api/images/${image.id}/anonymized", tagValues) ~> routes ~> check {
         status should be(OK)
