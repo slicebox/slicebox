@@ -371,7 +371,7 @@ trait DicomStreamOps {
   }
 
   private[streams] def toTagModifications(tagValues: Seq[TagValue]): Seq[TagModification] =
-    tagValues.map(tv => TagModification.endsWith(TagPath.fromTag(tv.tag), _ => padToEvenLength(ByteString(tv.value), tv.tag), insert = true))
+    tagValues.map(tv => TagModification.endsWith(tv.tagPath, _ => padToEvenLength(ByteString(tv.value), tv.tagPath.tag), insert = true))
 
   private[streams] def anonymizedDicomDataSource(storageSource: StreamSource[DicomPart, NotUsed],
                                                  getOrCreateAnonKey: DicomInfoPart => Future[AnonymizationKey],

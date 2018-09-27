@@ -133,11 +133,11 @@ class AnonymizationServiceActor(anonymizationDao: AnonymizationDAO, purgeEmptyAn
   }
 
   private def applyTagValues(key: AnonymizationKey, tagValues: Seq[TagValue]): AnonymizationKey = {
-    key.copy(anonPatientName = tagValues.find(_.tag == Tag.PatientName).map(_.value).getOrElse(key.anonPatientName),
-      anonPatientID = tagValues.find(_.tag == Tag.PatientID).map(_.value).getOrElse(key.anonPatientID),
-      anonStudyInstanceUID = tagValues.find(_.tag == Tag.StudyInstanceUID).map(_.value).getOrElse(key.anonStudyInstanceUID),
-      anonSeriesInstanceUID = tagValues.find(_.tag == Tag.SeriesInstanceUID).map(_.value).getOrElse(key.anonSeriesInstanceUID),
-      anonFrameOfReferenceUID = tagValues.find(_.tag == Tag.FrameOfReferenceUID).map(_.value).getOrElse(key.anonFrameOfReferenceUID))
+    key.copy(anonPatientName = tagValues.filter(_.tagPath.isRoot).find(_.tagPath.tag == Tag.PatientName).map(_.value).getOrElse(key.anonPatientName),
+      anonPatientID = tagValues.filter(_.tagPath.isRoot).find(_.tagPath.tag == Tag.PatientID).map(_.value).getOrElse(key.anonPatientID),
+      anonStudyInstanceUID = tagValues.filter(_.tagPath.isRoot).find(_.tagPath.tag == Tag.StudyInstanceUID).map(_.value).getOrElse(key.anonStudyInstanceUID),
+      anonSeriesInstanceUID = tagValues.filter(_.tagPath.isRoot).find(_.tagPath.tag == Tag.SeriesInstanceUID).map(_.value).getOrElse(key.anonSeriesInstanceUID),
+      anonFrameOfReferenceUID = tagValues.filter(_.tagPath.isRoot).find(_.tagPath.tag == Tag.FrameOfReferenceUID).map(_.value).getOrElse(key.anonFrameOfReferenceUID))
   }
 
 }

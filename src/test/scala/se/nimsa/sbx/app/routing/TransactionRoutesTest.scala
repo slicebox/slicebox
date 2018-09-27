@@ -7,6 +7,7 @@ import akka.http.scaladsl.model.{ContentTypes, HttpEntity}
 import akka.http.scaladsl.server._
 import akka.util.ByteString
 import org.scalatest.{FlatSpecLike, Matchers}
+import se.nimsa.dicom.data.TagPath
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy.{Image, Patient}
@@ -296,9 +297,9 @@ class TransactionRoutesTest extends {
     }
 
     val imageTagValues = ImageTagValues(1, Seq(
-      TagValue(PatientName.dicomTag, "TEST NAME"),
-      TagValue(PatientID.dicomTag, "TEST ID"),
-      TagValue(PatientBirthDate.dicomTag, "19601010")))
+      TagValue(TagPath.fromTag(PatientName.dicomTag), "TEST NAME"),
+      TagValue(TagPath.fromTag(PatientID.dicomTag), "TEST ID"),
+      TagValue(TagPath.fromTag(PatientBirthDate.dicomTag), "19601010")))
 
     // send image which adds outgoing transaction
     PostAsUser(s"/api/boxes/${uniBox.id}/send", Seq(imageTagValues)) ~> routes ~> check {
