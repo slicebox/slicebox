@@ -9,7 +9,7 @@ import akka.testkit.TestKit
 import akka.util.ByteString
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 import se.nimsa.dicom.data.DicomParts.{DicomPart, HeaderPart, ValueChunk}
-import se.nimsa.dicom.data.Elements.ValueElement
+import se.nimsa.dicom.data.Elements.{Item, Sequence, ValueElement}
 import se.nimsa.dicom.data._
 import se.nimsa.dicom.streams.ModifyFlow.TagModification
 import se.nimsa.dicom.streams.{DicomFlows, ElementFlows, ElementSink, ModifyFlow}
@@ -137,20 +137,33 @@ class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymiza
   }
 
   it should "perform reverse anonymization when anonymization key is present in stream" in {
-    val dicomData = createElements()
+    val elements = createElements()
 
-    val source = Source.single(anonKeyPart(dicomData))
-      .concat(anonSource(dicomData))
+    val source = Source.single(anonKeyPart(elements))
+      .concat(anonSource(elements))
       .via(ReverseAnonymizationFlow.reverseAnonFlow)
       .via(ElementFlows.elementFlow)
-      .mapConcat {
-        case e: ValueElement if e.tag == Tag.PatientName => e :: Nil
-        case _ => Nil
-      }
 
-    val element = Await.result(source.runWith(Sink.head), 10.seconds)
+    val processedElements = Await.result(source.runWith(ElementSink.elementSink), 10.seconds)
 
-    element.value.toString(VR.PN).get shouldBe dicomData.getString(Tag.PatientName).get
+    processedElements.getString(Tag.PatientName).get shouldBe elements.getString(Tag.PatientName).get
   }
 
+  it should "only reverse attributes in the root dataset" in {
+    val elements = createElements()
+      .set(Sequence(Tag.DerivationCodeSequence, -1, List(Item(-1, Elements.empty().setString(Tag.PatientName, "pat name")))))
+
+    val source = Source.single(anonKeyPart(elements))
+      .concat(anonSource(elements))
+      .via(ModifyFlow.modifyFlow(
+        TagModification.contains(TagPath.fromSequence(Tag.DerivationCodeSequence, 1).thenTag(Tag.PatientName), _ => toAsciiBytes("anon patient name", VR.PN), insert = false)
+      ))
+      .via(ReverseAnonymizationFlow.reverseAnonFlow)
+      .via(ElementFlows.elementFlow)
+
+    val processedElements = Await.result(source.runWith(ElementSink.elementSink), 10.seconds)
+
+    processedElements.getString(Tag.PatientName).get shouldBe elements.getString(Tag.PatientName).get
+    processedElements.getNested(Tag.DerivationCodeSequence, 1).get.getString(Tag.PatientName).get shouldBe "anon patient name"
+  }
 }
