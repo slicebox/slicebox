@@ -34,7 +34,7 @@ class AnonymizationDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAft
   "The anonymization db" should "be emtpy before anything has been added" in {
     for {
       keys <- dao.listAnonymizationKeys
-      images <- dao.listAnonymizationKeyImages
+      images <- dao.listAnonymizationKeyValues
     } yield {
       keys shouldBe empty
       images shouldBe empty
@@ -44,12 +44,12 @@ class AnonymizationDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAft
   it should "cascade delete linked images when a key is deleted" in {
     for {
       key <- dao.insertAnonymizationKey(key1)
-      _ <- dao.insertAnonymizationKeyImage(AnonymizationKeyImage(-1, key.id, 55))
+      _ <- dao.insertAnonymizationKeyValue(AnonymizationKeyImage(-1, key.id, 55))
       k1 <- dao.listAnonymizationKeys
-      i1 <- dao.listAnonymizationKeyImages
-      _ <- dao.removeAnonymizationKey(key.id)
+      i1 <- dao.listAnonymizationKeyValues
+      _ <- dao.deleteAnonymizationKey(key.id)
       k2 <- dao.listAnonymizationKeys
-      i2 <- dao.listAnonymizationKeyImages
+      i2 <- dao.listAnonymizationKeyValues
     } yield {
       k1 should have length 1
       i1 should have length 1
@@ -117,15 +117,15 @@ class AnonymizationDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAft
     val imageId = 55
     for {
       key <- dao.insertAnonymizationKey(key1)
-      _ <- dao.insertAnonymizationKeyImage(AnonymizationKeyImage(-1, key.id, imageId))
+      _ <- dao.insertAnonymizationKeyValue(AnonymizationKeyImage(-1, key.id, imageId))
 
       k1 <- dao.listAnonymizationKeys
-      k2 <- dao.listAnonymizationKeyImages
+      k2 <- dao.listAnonymizationKeyValues
 
-      _ <- dao.removeAnonymizationKeyImagesForImageId(Seq(imageId), purgeEmptyAnonymizationKeys = false)
+      _ <- dao.removeAnonymizationKeysForImageIds(Seq(imageId), purgeEmptyAnonymizationKeys = false)
 
       k3 <- dao.listAnonymizationKeys
-      k4 <- dao.listAnonymizationKeyImages
+      k4 <- dao.listAnonymizationKeyValues
     } yield {
       k1 should have length 1
       k2 should have length 1
@@ -138,15 +138,15 @@ class AnonymizationDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAft
     val imageId = 55
     for {
       key <- dao.insertAnonymizationKey(key1)
-      _ <- dao.insertAnonymizationKeyImage(AnonymizationKeyImage(-1, key.id, imageId))
+      _ <- dao.insertAnonymizationKeyValue(AnonymizationKeyImage(-1, key.id, imageId))
 
       k1 <- dao.listAnonymizationKeys
-      k2 <- dao.listAnonymizationKeyImages
+      k2 <- dao.listAnonymizationKeyValues
 
-      _ <- dao.removeAnonymizationKeyImagesForImageId(Seq(imageId), purgeEmptyAnonymizationKeys = true)
+      _ <- dao.removeAnonymizationKeysForImageIds(Seq(imageId), purgeEmptyAnonymizationKeys = true)
 
       k3 <- dao.listAnonymizationKeys
-      k4 <- dao.listAnonymizationKeyImages
+      k4 <- dao.listAnonymizationKeyValues
     } yield {
       k1 should have length 1
       k2 should have length 1
@@ -162,15 +162,15 @@ class AnonymizationDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAft
       dbKey2 <- dao.insertAnonymizationKey(key2)
       dbKey3 <- dao.insertAnonymizationKey(key3)
 
-      _ <- dao.insertAnonymizationKeyImage(AnonymizationKeyImage(-1, dbKey1.id, imageId))
+      _ <- dao.insertAnonymizationKeyValue(AnonymizationKeyImage(-1, dbKey1.id, imageId))
 
-      _ <- dao.insertAnonymizationKeyImage(AnonymizationKeyImage(-1, dbKey2.id, imageId))
-      _ <- dao.insertAnonymizationKeyImage(AnonymizationKeyImage(-1, dbKey2.id, imageId + 1))
+      _ <- dao.insertAnonymizationKeyValue(AnonymizationKeyImage(-1, dbKey2.id, imageId))
+      _ <- dao.insertAnonymizationKeyValue(AnonymizationKeyImage(-1, dbKey2.id, imageId + 1))
 
       k1 <- dao.listAnonymizationKeys
-      k2 <- dao.listAnonymizationKeyImages
+      k2 <- dao.listAnonymizationKeyValues
 
-      _ <- dao.removeAnonymizationKeyImagesForImageId(Seq(imageId), purgeEmptyAnonymizationKeys = true)
+      _ <- dao.removeAnonymizationKeysForImageIds(Seq(imageId), purgeEmptyAnonymizationKeys = true)
 
       pk <- dao.anonymizationKeyForId(dbKey1.id)
       k3 <- dao.anonymizationKeyForId(dbKey2.id)

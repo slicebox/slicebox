@@ -55,15 +55,15 @@ object ReverseAnonymizationFlow {
     .via(modifyFlow(
       reverseTags.map(tag => TagModification.endsWith(TagPath.fromTag(tag), identity, insert = true)): _*))
     .via(DicomFlowFactory.create(new IdentityFlow with GuaranteedValueEvent[DicomPart] with StartEvent[DicomPart] {
-      var maybeKey: Option[PartialAnonymizationKeyPart] = None
+      var maybeKey: Option[AnonymizationKeyValuesPart] = None
       var currentElement: Option[ValueElement] = None
 
-      def maybeReverse(element: ValueElement, keyPart: PartialAnonymizationKeyPart): List[DicomPart] = {
+      def maybeReverse(element: ValueElement, keyPart: AnonymizationKeyValuesPart): List[DicomPart] = {
         val updatedElement = element.tag match {
-          case Tag.PatientName => keyPart.keyMaybe.filter(_ => keyPart.hasPatientInfo).map(key =>
-            element.setValue(Value(ByteString(key.patientName)))).getOrElse(element)
-          case Tag.PatientID => keyPart.keyMaybe.filter(_ => keyPart.hasPatientInfo).map(key =>
-            element.setValue(Value(ByteString(key.patientID)))).getOrElse(element)
+          case Tag.PatientName => keyPart.anonymizationKeyValues.tagValues.find(_.tag == Tag.PatientName)
+            .map(tagValue => element.setValue(Value(ByteString(tagValue.value)))).getOrElse(element)
+          case Tag.PatientID => keyPart.anonymizationKeyValues.tagValues.find(_.tag == Tag.PatientID)
+            .map(tagValue => element.setValue(Value(ByteString(tagValue.value)))).getOrElse(element)
           case Tag.PatientBirthDate => keyPart.keyMaybe.filter(_ => keyPart.hasPatientInfo).map(key =>
             element.setValue(Value(ByteString(key.patientBirthDate)))).getOrElse(element)
           case Tag.PatientIdentityRemoved => element.setValue(Value(ByteString("NO")))
@@ -94,19 +94,17 @@ object ReverseAnonymizationFlow {
        * - anomymization keys have been received in stream
        * - tag specifies attribute that needs to be reversed
        */
-      def needReverseAnon(tag: Int, maybeKeys: Option[PartialAnonymizationKeyPart]): Boolean = canDoReverseAnon(maybeKeys) && reverseTags.contains(tag)
-
-      def canDoReverseAnon(keyPartMaybe: Option[PartialAnonymizationKeyPart]): Boolean = keyPartMaybe.flatMap(_.keyMaybe).isDefined
+      def needReverseAnon(tag: Int, maybeKeys: Option[AnonymizationKeyValuesPart]): Boolean = maybeKeys.isDefined && reverseTags.contains(tag)
 
       override def onPart(part: DicomPart): List[DicomPart] = part match {
-        case keys: PartialAnonymizationKeyPart =>
+        case keys: AnonymizationKeyValuesPart =>
           maybeKey = Some(keys)
           super.onPart(keys).filterNot(_ == keys)
         case p => super.onPart(p)
       }
 
       override def onHeader(header: HeaderPart): List[DicomPart] =
-        if (needReverseAnon(header.tag, maybeKey) && canDoReverseAnon(maybeKey)) {
+        if (needReverseAnon(header.tag, maybeKey) && maybeKey.isDefined) {
           currentElement = Some(ValueElement.empty(header.tag, header.vr, header.bigEndian, header.explicitVR))
           super.onHeader(header).filterNot(_ == header)
         } else {
@@ -115,7 +113,7 @@ object ReverseAnonymizationFlow {
         }
 
       override def onValueChunk(chunk: ValueChunk): List[DicomPart] =
-        if (currentElement.isDefined && canDoReverseAnon(maybeKey)) {
+        if (currentElement.isDefined && maybeKey.isDefined) {
           currentElement = currentElement.map(attribute => attribute.copy(value = attribute.value ++ chunk.bytes))
 
           if (chunk.last) {
@@ -139,7 +137,7 @@ object ReverseAnonymizationFlow {
 
   def maybeReverseAnonFlow: Flow[DicomPart, DicomPart, NotUsed] = conditionalFlow(
     {
-      case keyPart: PartialAnonymizationKeyPart => keyPart.keyMaybe.isEmpty
+      case keyPart: AnonymizationKeyValuesPart => keyPart.anonymizationKeyValues.tagValues.isEmpty
     }, Flow.fromFunction(identity), reverseAnonFlow)
 
 }

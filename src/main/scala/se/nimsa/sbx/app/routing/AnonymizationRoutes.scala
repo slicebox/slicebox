@@ -25,11 +25,7 @@ import akka.stream.scaladsl.{Sink, Source}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.app.GeneralProtocol.{ImageAdded, ImagesDeleted}
 import se.nimsa.sbx.app.SliceboxBase
-import se.nimsa.sbx.dicom.DicomHierarchy.Image
-import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.user.UserProtocol.ApiUser
-
-import scala.concurrent.Future
 
 trait AnonymizationRoutes {
   this: SliceboxBase =>
@@ -105,15 +101,9 @@ trait AnonymizationRoutes {
                   complete(NoContent)
               }
             }
-          } ~ path("images") {
+          } ~ path("tagvalues") {
             get {
-              complete(anonymizationService.ask(GetImageIdsForAnonymizationKey(anonymizationKeyId)).mapTo[Seq[Long]].flatMap { imageIds =>
-                Future.sequence {
-                  imageIds.map { imageId =>
-                    metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]]
-                  }
-                }
-              }.map(_.flatten))
+              complete(anonymizationService.ask(GetTagValuesForAnonymizationKey(anonymizationKeyId)).mapTo[Seq[TagValue]])
             }
           }
         } ~ path("query") {

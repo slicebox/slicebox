@@ -21,7 +21,7 @@ import akka.stream.scaladsl.Flow
 import akka.util.ByteString
 import se.nimsa.dicom.streams.DicomFlows._
 import se.nimsa.dicom.data.DicomParsing.isPrivate
-import se.nimsa.dicom.data.DicomParts.DicomPart
+import se.nimsa.dicom.data.DicomParts.{DicomPart, ElementsPart}
 import se.nimsa.dicom.streams.ModifyFlow.{TagModification, modifyFlow}
 import se.nimsa.dicom.data.{Tag, TagPath, VR}
 import se.nimsa.sbx.anonymization.AnonymizationUtil._
@@ -270,7 +270,7 @@ object AnonymizationFlow {
     */
   def maybeAnonFlow: Flow[DicomPart, DicomPart, NotUsed] = conditionalFlow(
     {
-      case keyPart: PartialAnonymizationKeyPart => keyPart.keyMaybe.nonEmpty
+      case p: ElementsPart => !isAnonymous(p)
     }, anonFlow, Flow.fromFunction(identity))
 
 }

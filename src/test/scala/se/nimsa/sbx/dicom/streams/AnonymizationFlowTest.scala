@@ -37,7 +37,7 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
     toSource(elements)
       .via(collectFlow(basicInfoTags, "anon"))
       .map(attributesToInfoPart(_, "anon"))
-      .mapAsync(1)(getOrCreateAnonKeyPart(_ => Future.successful(createAnonymizationKey(elements))))
+      .mapAsync(1)(createAnonKeyFlow(_ => Future.successful(createAnonymizationKey(elements))))
       .via(AnonymizationFlow.maybeAnonFlow)
 
   def checkBasicAttributes(source: Source[DicomPart, NotUsed]): PartProbe =

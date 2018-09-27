@@ -16,15 +16,13 @@
 
 package se.nimsa.sbx.dicom.streams
 
-import java.time.ZoneOffset
-
 import akka.NotUsed
 import akka.stream.FlowShape
 import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Merge}
 import akka.util.ByteString
-import se.nimsa.dicom.data.DicomParts.{DicomPart, ElementsPart}
+import se.nimsa.dicom.data.DicomParts.{DicomPart, ElementsPart, HeaderPart}
 import se.nimsa.dicom.data._
-import se.nimsa.sbx.anonymization.AnonymizationProtocol.AnonymizationKey
+import se.nimsa.sbx.anonymization.AnonymizationProtocol.{AnonymizationKey, AnonymizationKeyValues}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -42,74 +40,45 @@ object DicomStreamUtil {
   }
 
   val basicInfoTags: Set[TagPath] = encodingTags ++ Set(Tag.PatientName, Tag.PatientID, Tag.PatientIdentityRemoved,
-    Tag.StudyInstanceUID, Tag.SeriesInstanceUID).map(TagPath.fromTag)
+    Tag.StudyInstanceUID, Tag.SeriesInstanceUID, Tag.SOPInstanceUID).map(TagPath.fromTag)
 
-  val extendedInfoTags: Set[TagPath] = basicInfoTags ++ Set(Tag.PatientSex, Tag.PatientBirthDate, Tag.PatientAge, Tag.StudyDescription, Tag.StudyID,
-    Tag.AccessionNumber, Tag.SeriesDescription, Tag.ProtocolName, Tag.FrameOfReferenceUID).map(TagPath.fromTag)
+  val extendedInfoTags: Set[TagPath] = basicInfoTags ++ Set(Tag.PatientSex, Tag.PatientAge).map(TagPath.fromTag)
 
   val imageInformationTags: Set[TagPath] = Set(Tag.InstanceNumber, Tag.ImageIndex, Tag.NumberOfFrames, Tag.SmallestImagePixelValue, Tag.LargestImagePixelValue).map(TagPath.fromTag)
 
-  case class PartialAnonymizationKeyPart(keyMaybe: Option[AnonymizationKey], hasPatientInfo: Boolean, hasStudyInfo: Boolean, hasSeriesInfo: Boolean) extends DicomPart {
+  val reverseTags = Seq(
+    Tag.PatientName,
+    Tag.PatientID,
+    Tag.PatientBirthDate,
+    Tag.PatientIdentityRemoved,
+    Tag.DeidentificationMethod,
+    Tag.StudyInstanceUID,
+    Tag.StudyDescription,
+    Tag.StudyID,
+    Tag.AccessionNumber,
+    Tag.SeriesInstanceUID,
+    Tag.SeriesDescription,
+    Tag.ProtocolName,
+    Tag.FrameOfReferenceUID)
+
+  val reverseTag: HeaderPart => Boolean = header => header.vr == VR.UI || reverseTags.contains(header.tag)
+
+
+  case class AnonymizationKeyValuesPart(anonymizationKeyValues: AnonymizationKeyValues) extends DicomPart {
     def bytes: ByteString = ByteString.empty
     def bigEndian: Boolean = false
   }
 
-  case class DicomInfoPart(characterSets: CharacterSets,
-                           zoneOffset: ZoneOffset,
-                           transferSyntaxUid: Option[String],
-                           patientID: Option[String],
-                           patientName: Option[String],
-                           patientSex: Option[String],
-                           patientBirthDate: Option[String],
-                           patientAge: Option[String],
-                           identityRemoved: Option[String],
-                           studyInstanceUID: Option[String],
-                           studyDescription: Option[String],
-                           studyID: Option[String],
-                           accessionNumber: Option[String],
-                           seriesInstanceUID: Option[String],
-                           seriesDescription: Option[String],
-                           protocolName: Option[String],
-                           frameOfReferenceUID: Option[String]) extends DicomPart {
-    def bytes: ByteString = ByteString.empty
-    def bigEndian: Boolean = false
-    def isAnonymized: Boolean = identityRemoved.exists(_.toUpperCase == "YES")
+  def createAnonKeyFlow(createAnonKey: ElementsPart => Future[AnonymizationKey])
+                       (implicit ec: ExecutionContext): DicomPart => Future[DicomPart] = {
+    case p: ElementsPart if isAnonymous(p) => Future.successful(p)
+    case p: ElementsPart => createAnonKey(p).map(_ => p)
+    case p: DicomPart => Future.successful(p)
   }
 
-  def attributesToInfoPart(dicomPart: DicomPart, label: String): DicomPart = {
-    dicomPart match {
-      case ep: ElementsPart if ep.label == label =>
-        DicomInfoPart(
-          ep.elements.characterSets,
-          ep.elements.zoneOffset,
-          ep.elements.getString(Tag.TransferSyntaxUID),
-          ep.elements.getString(Tag.PatientID),
-          ep.elements.getString(Tag.PatientName),
-          ep.elements.getString(Tag.PatientSex),
-          ep.elements.getString(Tag.PatientBirthDate),
-          ep.elements.getString(Tag.PatientAge),
-          ep.elements.getString(Tag.PatientIdentityRemoved),
-          ep.elements.getString(Tag.StudyInstanceUID),
-          ep.elements.getString(Tag.StudyDescription),
-          ep.elements.getString(Tag.StudyID),
-          ep.elements.getString(Tag.AccessionNumber),
-          ep.elements.getString(Tag.SeriesInstanceUID),
-          ep.elements.getString(Tag.SeriesDescription),
-          ep.elements.getString(Tag.ProtocolName),
-          ep.elements.getString(Tag.FrameOfReferenceUID)
-        )
-      case part: DicomPart => part
-    }
-  }
-
-  def getOrCreateAnonKeyPart(getOrCreateAnonKey: DicomInfoPart => Future[AnonymizationKey])
-                                             (implicit ec: ExecutionContext): DicomPart => Future[DicomPart] = {
-    case info: DicomInfoPart if info.isAnonymized =>
-      Future.successful(PartialAnonymizationKeyPart(None, hasPatientInfo = false, hasStudyInfo = false, hasSeriesInfo = false))
-    case info: DicomInfoPart =>
-      getOrCreateAnonKey(info).map(key => PartialAnonymizationKeyPart(Some(key), hasPatientInfo = true, hasStudyInfo = true, hasSeriesInfo = true))
-    case part: DicomPart => Future.successful(part)
-  }
+  def isAnonymous(elementsPart: ElementsPart): Boolean = elementsPart.elements
+    .getString(Tag.PatientIdentityRemoved)
+    .exists(_.toUpperCase == "YES")
 
   def conditionalFlow(goA: PartialFunction[DicomPart, Boolean], flowA: Flow[DicomPart, DicomPart, _], flowB: Flow[DicomPart, DicomPart, _], routeADefault: Boolean = true): Flow[DicomPart, DicomPart, NotUsed] =
     Flow.fromGraph(GraphDSL.create() { implicit builder =>
