@@ -50,6 +50,7 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("DicomStreamOpsSpec")) with
     await(metaDataDao.create())
     await(propertiesDao.create())
     await(anonymizationDao.create())
+    await(filteringDao.create())
   }
 
   override def afterAll: Unit = TestKit.shutdownActorSystem(system)
@@ -58,6 +59,7 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("DicomStreamOpsSpec")) with
     await(propertiesDao.clear())
     await(metaDataDao.clear())
     await(anonymizationDao.clear())
+    await(filteringDao.clear())
   }
 
   val storage = new RuntimeStorage
