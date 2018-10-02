@@ -2,7 +2,8 @@ package se.nimsa.sbx.filtering
 
 import se.nimsa.dicom.data.TagPath
 import se.nimsa.dicom.data.TagPath.TagPathTag
-import se.nimsa.sbx.filtering.FilteringProtocol.{TagFilter, TagFilterSpec, TagFilterTagPath, TagFilterType}
+import se.nimsa.sbx.app.GeneralProtocol.SourceType
+import se.nimsa.sbx.filtering.FilteringProtocol._
 import se.nimsa.sbx.util.DbUtil.createTables
 import slick.basic.DatabaseConfig
 import slick.jdbc.JdbcProfile
@@ -17,6 +18,7 @@ class FilteringDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executi
 
   private val toTagFilter = (id:Long, name: String, tagFilterType: String) => TagFilter(id, name, TagFilterType.withName(tagFilterType))
   private val toTagFilterTagPath = (id: Long, tagFilterId: Long, tagPath: String) => TagFilterTagPath(id, tagFilterId, TagPath.parse(tagPath).asInstanceOf[TagPathTag])
+  private val toSourceTagFilter = (id: Long, sourceType: String, sourceId: Long, tagFilterId: Long) => SourceTagFilter(id, SourceType.withName(sourceType), sourceId, tagFilterId)
 
   val tagFilterQuery = TableQuery[TagFilterTable]
 
@@ -45,15 +47,30 @@ class FilteringDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executi
     val name = "TagPaths"
   }
 
+  val sourceFilterQuery = TableQuery[SourceFilterTable]
 
-  def create() = createTables(dbConf, (TagFilterTable.name, tagFilterQuery), (TagPathTable.name, tagPathQuery))
+  class SourceFilterTable(tag: Tag) extends Table[SourceTagFilter](tag, SourceFilterTable.name) {
+    def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
+    def sourceType = column[String]("sourcetype", O.Length(64))
+    def sourceId = column[Long]("sourceid")
+    def tagFilterId = column[Long]("tagfilterid")
+    def fkTagFilter2 = foreignKey("fk_tag_filter2", tagFilterId, tagFilterQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
+    def * = (id, sourceType, sourceId, tagFilterId) <> (toSourceTagFilter.tupled, (a: SourceTagFilter) => Option(a.id, a.sourceType.toString, a.sourceId, a.tagFilterId))
+  }
+
+  object SourceFilterTable {
+    val name = "SourceTagFilters"
+  }
+
+  def create() = createTables(dbConf, (TagFilterTable.name, tagFilterQuery), (TagPathTable.name, tagPathQuery),
+    (SourceFilterTable.name, sourceFilterQuery))
 
   def drop() = db.run {
-    (tagFilterQuery.schema ++ tagPathQuery.schema).drop
+    (tagFilterQuery.schema ++ tagPathQuery.schema ++ sourceFilterQuery.schema).drop
   }
 
   def clear() = db.run {
-    DBIO.seq(tagFilterQuery.delete, tagPathQuery.delete)
+    DBIO.seq(tagFilterQuery.delete, tagPathQuery.delete, sourceFilterQuery.delete)
   }
 
   def dump() = db.run {
@@ -84,6 +101,27 @@ class FilteringDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executi
       res
     })
   }
+
+  def getAllSourceFilters: Future[Seq[SourceTagFilter]] = db.run(sourceFilterQuery.result)
+
+  def createOrUpdateSourceFilter(sourceFilter: SourceTagFilter): Future[SourceTagFilter] = {
+    db.run {
+      getSourceFilterAction(sourceFilter.sourceType, sourceFilter.sourceId).flatMap {
+        _.map { sf =>
+          val updatedSourceFilter = sf.copy(tagFilterId = sourceFilter.tagFilterId)
+          updateSourceFilterAction(updatedSourceFilter).map(_ => updatedSourceFilter)
+        }.getOrElse {
+          insertSourceFilterAction(sourceFilter)
+        }
+      }
+    }
+  }
+
+  def getSourceFilter(sourceType: SourceType, sourceId: Long): Future[Option[SourceTagFilter]] = {
+    db.run(getSourceFilterAction(sourceType, sourceId))
+  }
+
+  def removeSourceFilter(id: Long) =   db.run(sourceFilterQuery.filter(_.id === id).delete.map(_ => {}))
 
   def insertTagFilter(tagFilter: TagFilterSpec): Future[TagFilterSpec] = {
     val tagFilterRow = TagFilter(tagFilter.id, tagFilter.name, tagFilter.tagFilterType)
@@ -136,4 +174,16 @@ class FilteringDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executi
       (tagPathQuery ++= tagPaths)
   }
 
+  private def insertSourceFilterAction(sourceTagFilter: SourceTagFilter) =
+    (sourceFilterQuery returning sourceFilterQuery.map(_.id) += sourceTagFilter)
+      .map(generatedId => sourceTagFilter.copy(id = generatedId))
+
+  private def getSourceFilterAction(sourceType: SourceType, sourceId: Long) =
+    sourceFilterQuery
+      .filter(r => r.sourceType === sourceType.toString && r.sourceId === sourceId)
+      .result
+      .headOption
+
+  private def updateSourceFilterAction(sourceTagFilter: SourceTagFilter) =
+    sourceFilterQuery.filter(_.id === sourceTagFilter.id).update(sourceTagFilter)
 }

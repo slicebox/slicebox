@@ -41,11 +41,13 @@ import scala.util.control.NonFatal
 class DirectoryWatchActor(watchedDirectory: WatchedDirectory,
                           storage: StorageService,
                           metaDataServicePath: String = "../../MetaDataService",
-                          anonymizationServicePath: String = "../../AnonymizationService")
+                          anonymizationServicePath: String = "../../AnonymizationService",
+                          filteringServicePath: String = "../../FilteringService")
                          (implicit val materializer: Materializer, timeout: Timeout) extends Actor with DicomStreamOps {
 
   val metaDataService: ActorSelection = context.actorSelection(metaDataServicePath)
   val anonymizationService: ActorSelection = context.actorSelection(anonymizationServicePath)
+  val filteringService: ActorSelection = context.actorSelection(filteringServicePath)
 
   implicit val system: ActorSystem = context.system
   implicit val executor: ExecutionContext = context.dispatcher
@@ -94,6 +96,7 @@ class DirectoryWatchActor(watchedDirectory: WatchedDirectory,
 
   override def callAnonymizationService[R: ClassTag](message: Any): Future[R] = anonymizationService.ask(message).mapTo[R]
   override def callMetaDataService[R: ClassTag](message: Any): Future[R] = metaDataService.ask(message).mapTo[R]
+  override def callFilteringService[R: ClassTag](message: Any): Future[R] = filteringService.ask(message).mapTo[R]
   override def scheduleTask(delay: FiniteDuration)(task: => Unit): Cancellable = system.scheduler.scheduleOnce(delay)(task)
 
   def receive = LoggingReceive {

@@ -22,6 +22,7 @@ object GeneralProtocol {
 
   sealed trait SourceType {
     override def toString: String = this match {
+      //SourceType string used as db key of type VARCHAR(64) so don't do over 64 chars...
       case SourceType.SCP => "scp"
       case SourceType.DIRECTORY => "directory"
       case SourceType.BOX => "box"

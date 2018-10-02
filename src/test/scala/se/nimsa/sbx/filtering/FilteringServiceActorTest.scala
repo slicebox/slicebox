@@ -67,6 +67,19 @@ class FilteringServiceActorTest(_system: ActorSystem) extends TestKit(_system) w
       expectMsg(TagFilterSpecs(List(filter1.copy(tags = Seq()), filter2.copy(tags = Seq()))))
     }
 
+    "associate source with TagFilter" in {
+      val tagFilterSpec1 = getTagFilterSpec1
+      filteringService ! AddTagFilter(tagFilterSpec1)
+      val filter1 = expectMsgType[TagFilterAdded].filterSpecification
+      val source = Source(SourceType.BOX, "", 1)
+      filteringService ! GetFilterForSource(source)
+      expectMsg(None)
+      filteringService ! SetFilterForSource(source, filter1.id)
+      expectMsgType[SourceTagFilter]
+      filteringService ! GetFilterForSource(source)
+      expectMsg(Some(filter1))
+    }
+
     "Return complete TagFilterSpec" in {
       val tagFilterSpec1 = getTagFilterSpec1
 
