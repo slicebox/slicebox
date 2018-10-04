@@ -22,6 +22,8 @@ object DicomHierarchy {
 
   sealed trait DicomHierarchyLevel {
     def level: Int
+    def >(other: DicomHierarchyLevel): Boolean = level > other.level
+    def <(other: DicomHierarchyLevel): Boolean = level < other.level
     override def toString: String = this match {
       case DicomHierarchyLevel.PATIENT => "patient"
       case DicomHierarchyLevel.STUDY => "study"

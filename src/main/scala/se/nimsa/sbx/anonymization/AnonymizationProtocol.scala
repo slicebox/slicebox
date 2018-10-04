@@ -16,6 +16,7 @@
 
 package se.nimsa.sbx.anonymization
 
+import se.nimsa.dicom.data.TagPath.TagPathTag
 import se.nimsa.sbx.dicom.DicomHierarchy.DicomHierarchyLevel
 import se.nimsa.sbx.metadata.MetaDataProtocol.{QueryOrder, QueryProperty}
 import se.nimsa.sbx.model.Entity
@@ -30,7 +31,8 @@ object AnonymizationProtocol {
 
   case class ImageTagValues(imageId: Long, tagValues: Seq[TagValue])
 
-  case class TagValue(tag: Int, value: String)
+  case class TagValue(tagPath: TagPathTag, value: String)
+  case class TagValueAnonymized(tagPath: TagPathTag, value: String, anonymizedValue: String)
 
   case class AnonymizationKey(
     id: Long,
@@ -49,26 +51,31 @@ object AnonymizationProtocol {
 
   case class AnonymizationKeyValue(
     anonymizationKeyId: Long,
-    tag: Int,
-    value: String)
+    tagPath: String,
+    value: String,
+    anonymizedValue: String)
 
-  case class AnonymizationKeyValues(matchLevel: DicomHierarchyLevel, tagValues: Seq[TagValue])
+  case class AnonymizationKeyValues(matchLevel: DicomHierarchyLevel, anonymizationKeyMaybe: Option[AnonymizationKey], values: Seq[TagValueAnonymized]) {
+    def isEmpty: Boolean = anonymizationKeyMaybe.isEmpty
+  }
 
   object AnonymizationKeyValues {
-    def empty: AnonymizationKeyValues = AnonymizationKeyValues(DicomHierarchyLevel.PATIENT, Seq.empty)
+    def empty: AnonymizationKeyValues = AnonymizationKeyValues(DicomHierarchyLevel.PATIENT, None, Seq.empty)
   }
 
   trait AnonymizationRequest
 
-  case class CreateAnonymizationKey(imageId: Long,
-                                    patientName: Option[String], patientId: Option[String],
-                                    patientSex: Option[String], patientAge: Option[String],
-                                    studyInstanceUID: Option[String], seriesInstanceUID: Option[String], sopInstanceUID: Option[String]) extends AnonymizationRequest
+  case class InsertAnonymizationKey(imageId: Long, tagValues: Set[TagValueAnonymized]) extends AnonymizationRequest
 
-  case class GetAnonymizationKeyValues(anonPatientName: String, anonPatientID: String,
-                                       anonStudyInstanceUID: String,
-                                       anonSeriesInstanceUID: String,
-                                       anonSOPInstanceUID: String) extends AnonymizationRequest
+  case class GetAnonymizationKeyValues(patientName: String, patientID: String,
+                                       studyInstanceUID: String,
+                                       seriesInstanceUID: String,
+                                       sopInstanceUID: String) extends AnonymizationRequest
+
+  case class GetReverseAnonymizationKeyValues(anonPatientName: String, anonPatientID: String,
+                                              anonStudyInstanceUID: String,
+                                              anonSeriesInstanceUID: String,
+                                              anonSOPInstanceUID: String) extends AnonymizationRequest
 
   case class GetTagValuesForAnonymizationKey(anonymizationKeyId: Long) extends AnonymizationRequest
 

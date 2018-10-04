@@ -19,69 +19,58 @@ package se.nimsa.sbx.dicom.streams
 import akka.NotUsed
 import akka.stream.FlowShape
 import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Merge}
-import akka.util.ByteString
-import se.nimsa.dicom.data.DicomParts.{DicomPart, ElementsPart, HeaderPart}
+import se.nimsa.dicom.data.DicomParts.{DicomPart, MetaPart}
+import se.nimsa.dicom.data.TagPath.TagPathTag
 import se.nimsa.dicom.data._
-import se.nimsa.sbx.anonymization.AnonymizationProtocol.{AnonymizationKey, AnonymizationKeyValues}
+import se.nimsa.sbx.anonymization.AnonymizationProtocol.{AnonymizationKeyValues, TagValue}
 import se.nimsa.sbx.dicom.DicomHierarchy.DicomHierarchyLevel
 
-import scala.concurrent.{ExecutionContext, Future}
-
 object DicomStreamUtil {
+
+  case class AnonymizationKeyValuesPart(anonymizationKeyValues: AnonymizationKeyValues) extends MetaPart
 
   val encodingTags: Set[TagPath] = Set(Tag.TransferSyntaxUID, Tag.SpecificCharacterSet).map(TagPath.fromTag)
 
   val tagsToStoreInDB: Set[TagPath] = {
-    val patientTags = Seq(Tag.PatientName, Tag.PatientID, Tag.PatientSex, Tag.PatientBirthDate).map(TagPath.fromTag)
-    val studyTags = Seq(Tag.StudyInstanceUID, Tag.StudyDescription, Tag.StudyID, Tag.StudyDate, Tag.AccessionNumber, Tag.PatientAge).map(TagPath.fromTag)
-    val seriesTags = Seq(Tag.SeriesInstanceUID, Tag.SeriesDescription, Tag.SeriesDate, Tag.Modality, Tag.ProtocolName, Tag.BodyPartExamined, Tag.Manufacturer, Tag.StationName, Tag.FrameOfReferenceUID).map(TagPath.fromTag)
-    val imageTags = Seq(Tag.SOPInstanceUID, Tag.ImageType, Tag.InstanceNumber).map(TagPath.fromTag)
+    val patientTags = Set(Tag.PatientName, Tag.PatientID, Tag.PatientSex, Tag.PatientBirthDate).map(TagPath.fromTag)
+    val studyTags = Set(Tag.StudyInstanceUID, Tag.StudyDescription, Tag.StudyID, Tag.StudyDate, Tag.AccessionNumber, Tag.PatientAge).map(TagPath.fromTag)
+    val seriesTags = Set(Tag.SeriesInstanceUID, Tag.SeriesDescription, Tag.SeriesDate, Tag.Modality, Tag.ProtocolName, Tag.BodyPartExamined, Tag.Manufacturer, Tag.StationName, Tag.FrameOfReferenceUID).map(TagPath.fromTag)
+    val imageTags = Set(Tag.SOPInstanceUID, Tag.ImageType, Tag.InstanceNumber).map(TagPath.fromTag)
 
-    encodingTags ++ patientTags ++ studyTags ++ seriesTags ++ imageTags
+    (patientTags ++ studyTags ++ seriesTags ++ imageTags).map(_.asInstanceOf[TagPath])
   }
 
-  val basicInfoTags: Set[TagPath] = encodingTags ++ Set(Tag.PatientName, Tag.PatientID, Tag.PatientIdentityRemoved,
-    Tag.StudyInstanceUID, Tag.SeriesInstanceUID, Tag.SOPInstanceUID).map(TagPath.fromTag)
+  val anonymizationTags: Set[TagPath] = Set(Tag.PatientIdentityRemoved, Tag.DeidentificationMethod).map(TagPath.fromTag)
 
-  val extendedInfoTags: Set[TagPath] = basicInfoTags ++ Set(Tag.PatientSex, Tag.PatientAge).map(TagPath.fromTag)
+  val anonKeysTags: Set[TagPath] = Set(Tag.PatientName, Tag.PatientID, Tag.StudyInstanceUID, Tag.SeriesInstanceUID, Tag.SOPInstanceUID).map(TagPath.fromTag)
 
   val imageInformationTags: Set[TagPath] = Set(Tag.InstanceNumber, Tag.ImageIndex, Tag.NumberOfFrames, Tag.SmallestImagePixelValue, Tag.LargestImagePixelValue).map(TagPath.fromTag)
 
-  case class TagLevel(tag: Int, level: DicomHierarchyLevel)
+  case class TagLevel(tagPath: TagPathTag, level: DicomHierarchyLevel)
 
-  val reverseTags = Seq(
-    TagLevel(Tag.PatientName, DicomHierarchyLevel.PATIENT),
-    TagLevel(Tag.PatientID, DicomHierarchyLevel.PATIENT),
-    TagLevel(Tag.PatientBirthDate, DicomHierarchyLevel.PATIENT),
-    TagLevel(Tag.PatientIdentityRemoved, DicomHierarchyLevel.IMAGE),
-    TagLevel(Tag.DeidentificationMethod, DicomHierarchyLevel.IMAGE),
-    TagLevel(Tag.StudyInstanceUID, DicomHierarchyLevel.STUDY),
-    TagLevel(Tag.StudyDescription, DicomHierarchyLevel.STUDY),
-    TagLevel(Tag.StudyID, DicomHierarchyLevel.STUDY),
-    TagLevel(Tag.AccessionNumber, DicomHierarchyLevel.STUDY),
-    TagLevel(Tag.SeriesInstanceUID, DicomHierarchyLevel.SERIES),
-    TagLevel(Tag.SeriesDescription, DicomHierarchyLevel.SERIES),
-    TagLevel(Tag.ProtocolName, DicomHierarchyLevel.SERIES),
-    TagLevel(Tag.FrameOfReferenceUID, DicomHierarchyLevel.STUDY))
+  val valueTags: Set[TagLevel] = Set(
+    TagLevel(TagPath.fromTag(Tag.PatientName), DicomHierarchyLevel.PATIENT),
+    TagLevel(TagPath.fromTag(Tag.PatientID), DicomHierarchyLevel.PATIENT),
+    TagLevel(TagPath.fromTag(Tag.PatientBirthDate), DicomHierarchyLevel.PATIENT),
+    TagLevel(TagPath.fromTag(Tag.StudyInstanceUID), DicomHierarchyLevel.STUDY),
+    TagLevel(TagPath.fromTag(Tag.StudyDescription), DicomHierarchyLevel.STUDY),
+    TagLevel(TagPath.fromTag(Tag.StudyID), DicomHierarchyLevel.STUDY),
+    TagLevel(TagPath.fromTag(Tag.AccessionNumber), DicomHierarchyLevel.STUDY),
+    TagLevel(TagPath.fromTag(Tag.FrameOfReferenceUID), DicomHierarchyLevel.STUDY),
+    TagLevel(TagPath.fromTag(Tag.SeriesInstanceUID), DicomHierarchyLevel.SERIES),
+    TagLevel(TagPath.fromTag(Tag.SeriesDescription), DicomHierarchyLevel.SERIES),
+    TagLevel(TagPath.fromTag(Tag.ProtocolName), DicomHierarchyLevel.SERIES),
+    TagLevel(TagPath.fromTag(Tag.SOPInstanceUID), DicomHierarchyLevel.IMAGE),
+    TagLevel(TagPath.fromTag(Tag.PatientIdentityRemoved), DicomHierarchyLevel.IMAGE),
+    TagLevel(TagPath.fromTag(Tag.DeidentificationMethod), DicomHierarchyLevel.IMAGE)
+  )
 
-  val reverseTag: HeaderPart => Boolean = header => header.vr == VR.UI || reverseTags.contains(header.tag)
+  val identityFlow: Flow[DicomPart, DicomPart, NotUsed] = Flow[DicomPart]
 
+  def isAnonymous(elements: Elements): Boolean = elements.getString(Tag.PatientIdentityRemoved).exists(_.toUpperCase == "YES")
 
-  case class AnonymizationKeyValuesPart(anonymizationKeyValues: AnonymizationKeyValues) extends DicomPart {
-    def bytes: ByteString = ByteString.empty
-    def bigEndian: Boolean = false
-  }
-
-  def createAnonKeyFlow(createAnonKey: ElementsPart => Future[AnonymizationKey])
-                       (implicit ec: ExecutionContext): DicomPart => Future[DicomPart] = {
-    case p: ElementsPart if isAnonymous(p) => Future.successful(p)
-    case p: ElementsPart => createAnonKey(p).map(_ => p)
-    case p: DicomPart => Future.successful(p)
-  }
-
-  def isAnonymous(elementsPart: ElementsPart): Boolean = elementsPart.elements
-    .getString(Tag.PatientIdentityRemoved)
-    .exists(_.toUpperCase == "YES")
+  def elementsContainTagValues(elements: Elements, tagValues: Seq[TagValue]): Boolean = tagValues
+    .forall(tv => tv.value.isEmpty || elements.getString(tv.tagPath).forall(_ == tv.value))
 
   def conditionalFlow(goA: PartialFunction[DicomPart, Boolean], flowA: Flow[DicomPart, DicomPart, _], flowB: Flow[DicomPart, DicomPart, _], routeADefault: Boolean = true): Flow[DicomPart, DicomPart, NotUsed] =
     Flow.fromGraph(GraphDSL.create() { implicit builder =>
@@ -91,18 +80,19 @@ object DicomStreamUtil {
 
       // if any part indicates that alternate route should be taken, remember this
       val gateFlow = builder.add {
-        Flow[DicomPart].map { part =>
-          if (goA.isDefinedAt(part)) routeA = goA(part)
-          part
-        }
+        identityFlow
+          .map { part =>
+            if (goA.isDefinedAt(part)) routeA = goA(part)
+            part
+          }
       }
 
       // split the flow
       val bcast = builder.add(Broadcast[DicomPart](2))
 
       // define gates for each path, only one path is used
-      val gateA = Flow[DicomPart].filter(_ => routeA)
-      val gateB = Flow[DicomPart].filterNot(_ => routeA)
+      val gateA = identityFlow.filter(_ => routeA)
+      val gateB = identityFlow.filterNot(_ => routeA)
 
       // merge the two paths
       val merge = builder.add(Merge[DicomPart](2))

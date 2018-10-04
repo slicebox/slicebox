@@ -16,6 +16,8 @@
 
 package se.nimsa.sbx.anonymization
 
+import se.nimsa.dicom.data.TagPath
+import se.nimsa.dicom.data.TagPath.TagPathTag
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.dicom.DicomProperty
 import se.nimsa.sbx.metadata.MetaDataProtocol._
@@ -73,10 +75,11 @@ class AnonymizationDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Exe
 
   class AnonymizationKeyValueTable(tag: Tag) extends Table[AnonymizationKeyValue](tag, AnonymizationKeyValueTable.name) {
     def anonymizationKeyId = column[Long]("anonymizationkeyid")
-    def tagNumber = column[Int]("tag")
+    def tagPath = column[String]("tagpath")
     def value = column[String]("value")
+    def anonymizedValue = column[String]("anonymizedvalue")
     def fkAnonymizationKey = foreignKey("fk_anonymization_key", anonymizationKeyId, anonymizationKeyQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
-    def * = (anonymizationKeyId, tagNumber, value) <> (AnonymizationKeyValue.tupled, AnonymizationKeyValue.unapply)
+    def * = (anonymizationKeyId, tagPath, value, anonymizedValue) <> (AnonymizationKeyValue.tupled, AnonymizationKeyValue.unapply)
   }
 
   object AnonymizationKeyValueTable {
@@ -141,8 +144,8 @@ class AnonymizationDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Exe
       .map(generatedId => entry.copy(id = generatedId))
   }
 
-  def insertAnonymizationKeyValue(entry: AnonymizationKeyValue): Future[AnonymizationKeyValue] = db.run {
-    (anonymizationKeyValueQuery += entry).map(_ => entry)
+  def insertAnonymizationKeyValues(values: Seq[AnonymizationKeyValue]): Future[Unit] = db.run {
+    (anonymizationKeyValueQuery ++= values).map(_ => {})
   }
 
   def deleteAnonymizationKey(anonymizationKeyId: Long): Future[Unit] = db.run {
@@ -153,9 +156,55 @@ class AnonymizationDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Exe
     anonymizationKeyQuery.filter(_.imageId inSetBind imageIds).delete.map(_ => {})
   }
 
-  def anonymizationKeyForImage(anonPatientName: String, anonPatientID: String,
-                               anonStudyInstanceUID: String, anonSeriesInstanceUID: String,
-                               anonSOPInstanceUID: String): Future[Option[AnonymizationKey]] = db.run {
+  def anonymizationKeyForImage(patientName: String, patientID: String,
+                               studyInstanceUID: String, seriesInstanceUID: String,
+                               sopInstanceUID: String): Future[Option[AnonymizationKey]] = db.run {
+    anonymizationKeyQuery
+      .filter(_.patientName === patientName)
+      .filter(_.patientID === patientID)
+      .filter(_.studyInstanceUID === studyInstanceUID)
+      .filter(_.seriesInstanceUID === seriesInstanceUID)
+      .filter(_.sopInstanceUID === sopInstanceUID)
+      .sortBy(_.created.desc)
+      .result
+      .headOption
+  }
+
+  def anonymizationKeyForSeries(patientName: String, patientID: String,
+                                studyInstanceUID: String, seriesInstanceUID: String): Future[Option[AnonymizationKey]] = db.run {
+    anonymizationKeyQuery
+      .filter(_.patientName === patientName)
+      .filter(_.patientID === patientID)
+      .filter(_.studyInstanceUID === studyInstanceUID)
+      .filter(_.seriesInstanceUID === seriesInstanceUID)
+      .sortBy(_.created.desc)
+      .result
+      .headOption
+  }
+
+  def anonymizationKeyForStudy(patientName: String, patientID: String,
+                               studyInstanceUID: String): Future[Option[AnonymizationKey]] = db.run {
+    anonymizationKeyQuery
+      .filter(_.patientName === patientName)
+      .filter(_.patientID === patientID)
+      .filter(_.studyInstanceUID === studyInstanceUID)
+      .sortBy(_.created.desc)
+      .result
+      .headOption
+  }
+
+  def anonymizationKeyForPatient(patientName: String, patientID: String): Future[Option[AnonymizationKey]] = db.run {
+    anonymizationKeyQuery
+      .filter(_.patientName === patientName)
+      .filter(_.patientID === patientID)
+      .sortBy(_.created.desc)
+      .result
+      .headOption
+  }
+
+  def anonymizationKeyForImageForAnonInfo(anonPatientName: String, anonPatientID: String,
+                                          anonStudyInstanceUID: String, anonSeriesInstanceUID: String,
+                                          anonSOPInstanceUID: String): Future[Option[AnonymizationKey]] = db.run {
     anonymizationKeyQuery
       .filter(_.anonPatientName === anonPatientName)
       .filter(_.anonPatientID === anonPatientID)
@@ -167,8 +216,8 @@ class AnonymizationDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Exe
       .headOption
   }
 
-  def anonymizationKeyForSeries(anonPatientName: String, anonPatientID: String,
-                                anonStudyInstanceUID: String, anonSeriesInstanceUID: String): Future[Option[AnonymizationKey]] = db.run {
+  def anonymizationKeyForSeriesForAnonInfo(anonPatientName: String, anonPatientID: String,
+                                           anonStudyInstanceUID: String, anonSeriesInstanceUID: String): Future[Option[AnonymizationKey]] = db.run {
     anonymizationKeyQuery
       .filter(_.anonPatientName === anonPatientName)
       .filter(_.anonPatientID === anonPatientID)
@@ -179,8 +228,8 @@ class AnonymizationDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Exe
       .headOption
   }
 
-  def anonymizationKeyForStudy(anonPatientName: String, anonPatientID: String,
-                               anonStudyInstanceUID: String): Future[Option[AnonymizationKey]] = db.run {
+  def anonymizationKeyForStudyForAnonInfo(anonPatientName: String, anonPatientID: String,
+                                          anonStudyInstanceUID: String): Future[Option[AnonymizationKey]] = db.run {
     anonymizationKeyQuery
       .filter(_.anonPatientName === anonPatientName)
       .filter(_.anonPatientID === anonPatientID)
@@ -190,7 +239,7 @@ class AnonymizationDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Exe
       .headOption
   }
 
-  def anonymizationKeyForPatient(anonPatientName: String, anonPatientID: String): Future[Option[AnonymizationKey]] = db.run {
+  def anonymizationKeyForPatientForAnonInfo(anonPatientName: String, anonPatientID: String): Future[Option[AnonymizationKey]] = db.run {
     anonymizationKeyQuery
       .filter(_.anonPatientName === anonPatientName)
       .filter(_.anonPatientID === anonPatientID)
@@ -199,15 +248,17 @@ class AnonymizationDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Exe
       .headOption
   }
 
-  def anonymizationKeyValuesForAnonymizationKeyId(anonymizationKeyId: Long): Future[Seq[TagValue]] = {
+  def anonymizationKeyValuesForAnonymizationKeyId(anonymizationKeyId: Long): Future[Seq[TagValueAnonymized]] = {
     val query =
       for {
         anonKey <- anonymizationKeyQuery if anonKey.id === anonymizationKeyId
         keyValue <- anonymizationKeyValueQuery if keyValue.anonymizationKeyId === anonKey.id
       } yield {
-        (keyValue.tagNumber, keyValue.value)
+        (keyValue.tagPath, keyValue.value, keyValue.anonymizedValue)
       }
-    db.run(query.result).map(_.map(TagValue.tupled))
+    db.run(query.result).map(_.map {
+      case (tagPath, value, anonymizedValue) => TagValueAnonymized(TagPath.parse(tagPath).asInstanceOf[TagPathTag], value, anonymizedValue)
+    })
   }
 
   private val queryAnonymizationKeysSelectPart = s"""select * from "${AnonymizationKeyTable.name}""""

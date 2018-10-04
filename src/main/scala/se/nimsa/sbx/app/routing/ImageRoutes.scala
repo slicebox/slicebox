@@ -93,9 +93,7 @@ trait ImageRoutes {
               onComplete(readPngImageData(imageId, frameNumber, min, max, height, storage)(materializer, blockingIoContext)) {
                 case Success(bytes) => complete(HttpEntity(`image/png`, bytes))
                 case Failure(_: NotFoundException) => complete(NotFound)
-                case Failure(e) =>
-                  e.printStackTrace()
-                  complete(NotImplemented)
+                case Failure(e) => complete(NotImplemented)
               }
             }
           }

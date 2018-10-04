@@ -19,6 +19,7 @@ package se.nimsa.sbx.anonymization
 import akka.actor.{Actor, Props, Stash}
 import akka.event.{Logging, LoggingReceive}
 import akka.pattern.pipe
+import se.nimsa.dicom.data.{Tag, TagPath}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.app.GeneralProtocol.ImagesDeleted
 import se.nimsa.sbx.dicom.DicomHierarchy.DicomHierarchyLevel
@@ -28,8 +29,6 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class AnonymizationServiceActor(anonymizationDao: AnonymizationDAO, purgeEmptyAnonymizationKeys: Boolean)
                                (implicit ec: ExecutionContext) extends Actor with Stash with SequentialPipeToSupport {
-
-  import AnonymizationUtil._
 
   val log = Logging(context.system, this)
 
@@ -63,26 +62,81 @@ class AnonymizationServiceActor(anonymizationDao: AnonymizationDAO, purgeEmptyAn
         case GetAnonymizationKey(anonymizationKeyId) =>
           pipe(anonymizationDao.anonymizationKeyForId(anonymizationKeyId)).to(sender)
 
-        case GetAnonymizationKeyValues(anonPatientName, anonPatientID, anonStudyInstanceUID, anonSeriesInstanceUID, anonSOPInstanceUID) =>
+        case GetAnonymizationKeyValues(patientName, patientID, studyInstanceUID, seriesInstanceUID, sopInstanceUID) =>
           // look for matching keys on image, series, study then patient levels.
-          val f = anonymizationDao.anonymizationKeyForImage(anonPatientName, anonPatientID, anonStudyInstanceUID, anonSeriesInstanceUID, anonSOPInstanceUID)
+          val f = anonymizationDao.anonymizationKeyForImage(patientName, patientID, studyInstanceUID, seriesInstanceUID, sopInstanceUID)
             .flatMap(_
               .map(key => anonymizationDao.anonymizationKeyValuesForAnonymizationKeyId(key.id)
-                .map(values => AnonymizationKeyValues(DicomHierarchyLevel.IMAGE, values)))
-              .getOrElse(anonymizationDao.anonymizationKeyForSeries(anonPatientName, anonPatientID, anonStudyInstanceUID, anonSeriesInstanceUID)
+                .map(values => AnonymizationKeyValues(DicomHierarchyLevel.IMAGE, Some(key), values)))
+              .getOrElse(anonymizationDao.anonymizationKeyForSeries(patientName, patientID, studyInstanceUID, seriesInstanceUID)
                 .flatMap(_
                   .map(key => anonymizationDao.anonymizationKeyValuesForAnonymizationKeyId(key.id)
-                    .map(values => AnonymizationKeyValues(DicomHierarchyLevel.SERIES, values)))
-                  .getOrElse(anonymizationDao.anonymizationKeyForStudy(anonPatientName, anonPatientID, anonStudyInstanceUID)
+                    .map(values => AnonymizationKeyValues(DicomHierarchyLevel.SERIES, Some(key), values)))
+                  .getOrElse(anonymizationDao.anonymizationKeyForStudy(patientName, patientID, studyInstanceUID)
                     .flatMap(_
                       .map(key => anonymizationDao.anonymizationKeyValuesForAnonymizationKeyId(key.id)
-                        .map(values => AnonymizationKeyValues(DicomHierarchyLevel.STUDY, values)))
-                      .getOrElse(anonymizationDao.anonymizationKeyForPatient(anonPatientName, anonPatientID)
+                        .map(values => AnonymizationKeyValues(DicomHierarchyLevel.STUDY, Some(key), values)))
+                      .getOrElse(anonymizationDao.anonymizationKeyForPatient(patientName, patientID)
                         .flatMap(_
                           .map(key => anonymizationDao.anonymizationKeyValuesForAnonymizationKeyId(key.id)
-                            .map(values => AnonymizationKeyValues(DicomHierarchyLevel.PATIENT, values)))
+                            .map(values => AnonymizationKeyValues(DicomHierarchyLevel.PATIENT, Some(key), values)))
                           .getOrElse(Future.successful(AnonymizationKeyValues.empty)))))))))
           pipe(f).to(sender)
+
+        case GetReverseAnonymizationKeyValues(anonPatientName, anonPatientID, anonStudyInstanceUID, anonSeriesInstanceUID, anonSOPInstanceUID) =>
+          // look for matching keys on image, series, study then patient levels.
+          val f = anonymizationDao.anonymizationKeyForImageForAnonInfo(anonPatientName, anonPatientID, anonStudyInstanceUID, anonSeriesInstanceUID, anonSOPInstanceUID)
+            .flatMap(_
+              .map(key => anonymizationDao.anonymizationKeyValuesForAnonymizationKeyId(key.id)
+                .map(values => AnonymizationKeyValues(DicomHierarchyLevel.IMAGE, Some(key), values)))
+              .getOrElse(anonymizationDao.anonymizationKeyForSeriesForAnonInfo(anonPatientName, anonPatientID, anonStudyInstanceUID, anonSeriesInstanceUID)
+                .flatMap(_
+                  .map(key => anonymizationDao.anonymizationKeyValuesForAnonymizationKeyId(key.id)
+                    .map(values => AnonymizationKeyValues(DicomHierarchyLevel.SERIES, Some(key), values)))
+                  .getOrElse(anonymizationDao.anonymizationKeyForStudyForAnonInfo(anonPatientName, anonPatientID, anonStudyInstanceUID)
+                    .flatMap(_
+                      .map(key => anonymizationDao.anonymizationKeyValuesForAnonymizationKeyId(key.id)
+                        .map(values => AnonymizationKeyValues(DicomHierarchyLevel.STUDY, Some(key), values)))
+                      .getOrElse(anonymizationDao.anonymizationKeyForPatientForAnonInfo(anonPatientName, anonPatientID)
+                        .flatMap(_
+                          .map(key => anonymizationDao.anonymizationKeyValuesForAnonymizationKeyId(key.id)
+                            .map(values => AnonymizationKeyValues(DicomHierarchyLevel.PATIENT, Some(key), values)))
+                          .getOrElse(Future.successful(AnonymizationKeyValues.empty)))))))))
+          pipe(f).to(sender)
+
+        case InsertAnonymizationKey(imageId, tagValues) =>
+
+          val patientNameValue = tagValues.find(_.tagPath == TagPath.fromTag(Tag.PatientName))
+          val patientIDValue = tagValues.find(_.tagPath == TagPath.fromTag(Tag.PatientID))
+          val studyInstanceUIDValue = tagValues.find(_.tagPath == TagPath.fromTag(Tag.StudyInstanceUID))
+          val seriesInstanceUIDValue = tagValues.find(_.tagPath == TagPath.fromTag(Tag.SeriesInstanceUID))
+          val sopInstanceUIDValue = tagValues.find(_.tagPath == TagPath.fromTag(Tag.SOPInstanceUID))
+
+          val patientName = patientNameValue.map(_.value).getOrElse("")
+          val anonPatientName = patientNameValue.map(_.anonymizedValue).getOrElse("")
+          val patientID = patientIDValue.map(_.value).getOrElse("")
+          val anonPatientID = patientIDValue.map(_.anonymizedValue).getOrElse("")
+          val studyInstanceUID = studyInstanceUIDValue.map(_.value).getOrElse("")
+          val anonStudyInstanceUID = studyInstanceUIDValue.map(_.anonymizedValue).getOrElse("")
+          val seriesInstanceUID = seriesInstanceUIDValue.map(_.value).getOrElse("")
+          val anonSeriesInstanceUID = seriesInstanceUIDValue.map(_.anonymizedValue).getOrElse("")
+          val sopInstanceUID = sopInstanceUIDValue.map(_.value).getOrElse("")
+          val anonSOPInstanceUID = sopInstanceUIDValue.map(_.anonymizedValue).getOrElse("")
+
+          val anonKey = AnonymizationKey(-1, System.currentTimeMillis, imageId,
+            patientName, anonPatientName, patientID, anonPatientID,
+            studyInstanceUID, anonStudyInstanceUID,
+            seriesInstanceUID, anonSeriesInstanceUID,
+            sopInstanceUID, anonSOPInstanceUID)
+
+          anonymizationDao
+            .insertAnonymizationKey(anonKey)
+            .flatMap { key =>
+              val keyValues = tagValues.toSeq
+                .map(tv => AnonymizationKeyValue(key.id, tv.tagPath.toString, tv.value, tv.anonymizedValue))
+              anonymizationDao.insertAnonymizationKeyValues(keyValues)
+            }
+            .pipeSequentiallyTo(sender)
 
         case GetTagValuesForAnonymizationKey(anonymizationKeyId) =>
           val tagValues = anonymizationDao.anonymizationKeyValuesForAnonymizationKeyId(anonymizationKeyId)
@@ -93,28 +147,6 @@ class AnonymizationServiceActor(anonymizationDao: AnonymizationDAO, purgeEmptyAn
           val orderAscending = query.order.forall(_.orderAscending)
           pipe(anonymizationDao.queryAnonymizationKeys(query.startIndex, query.count, order, orderAscending, query.queryProperties)).to(sender)
 
-        case CreateAnonymizationKey(imageId, patientNameMaybe, patientIDMaybe, patientSexMaybe, patientAgeMaybe, studyInstanceUIDMaybe, seriesInstanceUIDMaybe, sopInstanceUIDMaybe) =>
-
-          val patientName = patientNameMaybe.getOrElse("")
-          val anonPatientName = createAnonymousPatientName(patientSexMaybe, patientAgeMaybe)
-          val patientID = patientIDMaybe.getOrElse("")
-          val anonPatientID = createUid("")
-          val studyInstanceUID = studyInstanceUIDMaybe.getOrElse("")
-          val anonStudyInstanceUID = createUid("")
-          val seriesInstanceUID = seriesInstanceUIDMaybe.getOrElse("")
-          val anonSeriesInstanceUID = createUid("")
-          val sopInstanceUID = sopInstanceUIDMaybe.getOrElse("")
-          val anonSOPInstanceUID = createUid("")
-
-          val anonKey = AnonymizationKey(-1, System.currentTimeMillis, imageId,
-            patientName, anonPatientName, patientID, anonPatientID,
-            studyInstanceUID, anonStudyInstanceUID,
-            seriesInstanceUID, anonSeriesInstanceUID,
-            sopInstanceUID, anonSOPInstanceUID)
-
-          anonymizationDao
-            .insertAnonymizationKey(anonKey)
-            .pipeSequentiallyTo(sender)
       }
   }
 

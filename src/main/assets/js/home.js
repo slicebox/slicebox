@@ -1134,7 +1134,7 @@ angular.module('slicebox.home', ['ngRoute'])
             var patientIndex = patientIds.indexOf(patient.id);
             var anonName = $scope.anonymizedPatientNames[patientIndex];
             if (anonName && anonName.length > 0) {
-                imageTagValuesSeq.push( { imageId: imageId, tagValues: [ { tag: 0x00100010, value: anonName } ] } );
+                imageTagValuesSeq.push( { imageId: imageId, tagValues: [ { tagPath: { tag: 0x00100010 }, value: anonName } ] } );
             } else {
                 imageTagValuesSeq.push( { imageId: imageId, tagValues: [ ] } );
             }

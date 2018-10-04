@@ -19,21 +19,20 @@ package se.nimsa.sbx.dicom.streams
 import akka.NotUsed
 import akka.stream.scaladsl.Flow
 import akka.util.ByteString
-import se.nimsa.dicom.streams.DicomFlows._
 import se.nimsa.dicom.data.DicomParsing.isPrivate
-import se.nimsa.dicom.data.DicomParts.{DicomPart, ElementsPart}
-import se.nimsa.dicom.streams.ModifyFlow.{TagModification, modifyFlow}
+import se.nimsa.dicom.data.DicomParts.DicomPart
 import se.nimsa.dicom.data.{Tag, TagPath, VR}
+import se.nimsa.dicom.streams.DicomFlows._
+import se.nimsa.dicom.streams.ModifyFlow.{TagModification, modifyFlow}
 import se.nimsa.sbx.anonymization.AnonymizationUtil._
 import se.nimsa.sbx.dicom.DicomUtil._
-import se.nimsa.sbx.dicom.streams.DicomStreamUtil._
 
 object AnonymizationFlow {
 
 
-  private def insert(tag: Int, mod: ByteString => ByteString) = TagModification.endsWith(TagPath.fromTag(tag), mod, insert = true)
-  private def modify(tag: Int, mod: ByteString => ByteString) = TagModification.endsWith(TagPath.fromTag(tag), mod, insert = false)
-  private def clear(tag: Int) = TagModification.endsWith(TagPath.fromTag(tag), _ => ByteString.empty, insert = false)
+  private def insert(tag: Int, mod: ByteString => ByteString): TagModification = TagModification.endsWith(TagPath.fromTag(tag), mod, insert = true)
+  private def modify(tag: Int, mod: ByteString => ByteString): TagModification = TagModification.endsWith(TagPath.fromTag(tag), mod, insert = false)
+  private def clear(tag: Int): TagModification = TagModification.endsWith(TagPath.fromTag(tag), _ => ByteString.empty, insert = false)
 
   private val removeTags = Set(
     Tag.AcquisitionComments,
@@ -210,13 +209,9 @@ object AnonymizationFlow {
     * Remove, set empty or modify certain attributes
     */
   def anonFlow: Flow[DicomPart, DicomPart, NotUsed] =
-    Flow[DicomPart]
-      .via(groupLengthDiscardFilter)
-      .via(toIndeterminateLengthSequences)
-      .via(toUtf8Flow)
-      .via(tagFilter(_ => true)(tagPath =>
-        !tagPath.toList.map(_.tag).exists(tag =>
-          isPrivate(tag) || isOverlay(tag) || removeTags.contains(tag)))) // remove private, overlay and PHI attributes
+    tagFilter(_ => true)(tagPath =>
+      !tagPath.toList.map(_.tag).exists(tag =>
+        isPrivate(tag) || isOverlay(tag) || removeTags.contains(tag))) // remove private, overlay and PHI attributes
       .via(modifyFlow( // modify, clear and insert
       modify(Tag.AccessionNumber, bytes => if (bytes.nonEmpty) createAccessionNumber(bytes) else bytes),
       modify(Tag.ConcatenationUID, createUid),
@@ -261,18 +256,6 @@ object AnonymizationFlow {
       modify(Tag.TransactionUID, createUid),
       modify(Tag.UID, createUid),
       clear(Tag.VerifyingObserverName)))
-
-  /**
-    * Anonymize data if not already anonymized. Assumes first `DicomPart` is a `PartialAnonymizationKeyPart` that is
-    * used to determine if data has been anonymized or not.
-    *
-    * @return a `Flow` of `DicomParts` that will anonymize non-anonymized data but does nothing otherwise
-    */
-  def maybeAnonFlow: Flow[DicomPart, DicomPart, NotUsed] = conditionalFlow(
-    {
-      case p: ElementsPart => !isAnonymous(p)
-    }, anonFlow, Flow.fromFunction(identity))
-
 }
 
 
