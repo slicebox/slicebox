@@ -20,6 +20,8 @@ import akka.pattern.ask
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
+import se.nimsa.sbx.app.GeneralProtocol.SourceType.DIRECTORY
+import se.nimsa.sbx.app.GeneralProtocol.{SourceDeleted, SourceRef}
 import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.directory.DirectoryWatchProtocol._
 import se.nimsa.sbx.user.UserProtocol._
@@ -52,8 +54,10 @@ trait DirectoryRoutes { this: SliceboxBase =>
         delete {
           authorize(apiUser.hasPermission(UserRole.ADMINISTRATOR)) {
             onSuccess(directoryService.ask(UnWatchDirectory(watchDirectoryId))) {
-              case DirectoryUnwatched(watchedDirectoryId) =>
+              case DirectoryUnwatched(watchedDirectoryId) => {
+                system.eventStream.publish(SourceDeleted(SourceRef(DIRECTORY, watchDirectoryId)))
                 complete(NoContent)
+              }
             }
           }
         }

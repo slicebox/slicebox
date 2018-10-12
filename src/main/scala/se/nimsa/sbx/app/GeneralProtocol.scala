@@ -70,10 +70,14 @@ object GeneralProtocol {
     }    
   }
       
-  case class Source(sourceType: SourceType, sourceName: String, sourceId: Long)
+  case class Source(sourceType: SourceType, sourceName: String, sourceId: Long) {
+    def toSourceRef: SourceRef = SourceRef(sourceType, sourceId)
+  }
   
   case class SourceRef(sourceType: SourceType, sourceId: Long)
-  
+
+  case class SourceDeleted(sourceRef: SourceRef)
+
   case class Destination(destinationType: DestinationType, destinationName: String, destinationId: Long)
 
   case class ImageAdded(imageId: Long, source: Source, overwrite: Boolean)

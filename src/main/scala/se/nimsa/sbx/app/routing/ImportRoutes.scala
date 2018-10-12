@@ -24,6 +24,7 @@ import akka.pattern.ask
 import akka.stream.scaladsl.{Source => StreamSource}
 import akka.util.ByteString
 import se.nimsa.dicom.streams.DicomStreamException
+import se.nimsa.sbx.app.GeneralProtocol.SourceType.IMPORT
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.dicom.Contexts
@@ -76,8 +77,10 @@ trait ImportRoutes {
             (get & rejectEmptyResponse) {
               complete(importService.ask(GetImportSession(id)).mapTo[Option[ImportSession]])
             } ~ delete {
-              complete(importService.ask(DeleteImportSession(id)).map(_ =>
-                NoContent))
+              complete(importService.ask(DeleteImportSession(id)).map(_ => {
+                system.eventStream.publish(SourceDeleted(SourceRef(IMPORT, id)))
+                NoContent
+              }))
             }
           } ~ path("images") {
             get {

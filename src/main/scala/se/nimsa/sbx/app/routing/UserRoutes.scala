@@ -22,6 +22,8 @@ import akka.http.scaladsl.model.headers._
 import akka.http.scaladsl.model.{HttpHeader, RemoteAddress}
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.{Directive1, Route}
+import se.nimsa.sbx.app.GeneralProtocol.{SourceDeleted, SourceRef}
+import se.nimsa.sbx.app.GeneralProtocol.SourceType.USER
 import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.user.UserProtocol.{AuthKey, _}
 
@@ -103,8 +105,10 @@ trait UserRoutes { this: SliceboxBase =>
         delete {
           authorize(apiUser.hasPermission(UserRole.ADMINISTRATOR)) {
             onSuccess(userService.ask(DeleteUser(userId))) {
-              case UserDeleted(_) =>
+              case UserDeleted(_) => {
+                system.eventStream.publish(SourceDeleted(SourceRef(USER, userId)))
                 complete(NoContent)
+              }
             }
           }
         }

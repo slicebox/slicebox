@@ -95,8 +95,7 @@ trait DicomStreamOps {
   protected def storeDicomData(bytesSource: StreamSource[ByteString, _], source: Source, storage: StorageService, contexts: Seq[Context], reverseAnonymization: Boolean)
                               (implicit materializer: Materializer, ec: ExecutionContext): Future[MetaDataAdded] = {
     val tempPath = createTempPath()
-    val filter = callFilteringService[Option[TagFilterSpec]](GetFilterForSource(source))
-    println(filter)
+    val filter = callFilteringService[Option[TagFilterSpec]](GetFilterForSource(source.toSourceRef))
     filter.flatMap(maybeTagFilter => {
       val tagFilter = maybeTagFilter.map(tagFilterSpecToFlow(_)).getOrElse(NO_ACTION_FILTER)
 

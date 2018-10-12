@@ -71,7 +71,7 @@ class FilteringServiceActorTest(_system: ActorSystem) extends TestKit(_system) w
       val tagFilterSpec1 = getTagFilterSpec1
       filteringService ! AddTagFilter(tagFilterSpec1)
       val filter1 = expectMsgType[TagFilterAdded].filterSpecification
-      val source = Source(SourceType.BOX, "", 1)
+      val source = SourceRef(SourceType.BOX, 1)
       filteringService ! GetFilterForSource(source)
       expectMsg(None)
       filteringService ! SetFilterForSource(source, filter1.id)

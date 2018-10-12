@@ -3,7 +3,7 @@ package se.nimsa.sbx.filtering
 import akka.actor.{Actor, Props}
 import akka.event.{Logging, LoggingReceive}
 import akka.util.Timeout
-import se.nimsa.sbx.app.GeneralProtocol.Source
+import se.nimsa.sbx.app.GeneralProtocol.{Source, SourceDeleted, SourceRef}
 import se.nimsa.sbx.filtering.FilteringProtocol._
 import se.nimsa.sbx.util.FutureUtil.await
 
@@ -16,6 +16,9 @@ class FilteringServiceActor(filteringDAO: FilteringDAO)(implicit timeout: Timeou
   implicit val ec = context.dispatcher
 
   val emptyTagPathsSeq: Seq[TagFilterTagPath] = Seq()
+
+  override def preStart(): Unit =
+    context.system.eventStream.subscribe(context.self, classOf[SourceDeleted])
 
   def receive: Receive = LoggingReceive {
     case AddTagFilter(tagFilterSpec) =>
@@ -30,8 +33,12 @@ class FilteringServiceActor(filteringDAO: FilteringDAO)(implicit timeout: Timeou
       sender ! getTagFilterForSource(source)
     case SetFilterForSource(source, tagFilterId) =>
       sender ! setTagFilterForSource(source, tagFilterId)
-    case RemoveFilterForSource(sourceFilterId) =>
-      sender ! removeFilterForSource(sourceFilterId)
+//    case RemoveFilterForSource(sourceFilterId) =>
+//      sender ! removeFilterForSource(sourceFilterId)
+    case RemoveFilterForSource(sourceRef) =>
+      sender ! removeFilterForSource(sourceRef)
+    case SourceDeleted(sourceRef) =>
+      removeFilterForSource(sourceRef)
   }
 
   def insertTagFilter(tagFilterSpec: TagFilterSpec): TagFilterAdded = {
@@ -49,22 +56,25 @@ class FilteringServiceActor(filteringDAO: FilteringDAO)(implicit timeout: Timeou
   def getTagFilter(tagFilterId: Long): Option[TagFilterSpec] =
     await(filteringDAO.getTagFilter(tagFilterId))
 
-  def getTagFilterForSource(source: Source): Option[TagFilterSpec] =
+  def getTagFilterForSource(source: SourceRef): Option[TagFilterSpec] =
     await(
-      filteringDAO.getSourceFilter(source.sourceType, source.sourceId).flatMap {
+      filteringDAO.getSourceFilter(source).flatMap {
         _.map {
           sourceFilter => filteringDAO.getTagFilter(sourceFilter.tagFilterId)
         }.getOrElse(Future(None))
       }
     )
 
-  def setTagFilterForSource(source: Source, tagFilterId: Long): SourceTagFilter =
+  def setTagFilterForSource(source: SourceRef, tagFilterId: Long): SourceTagFilter =
     await(
       filteringDAO.createOrUpdateSourceFilter(SourceTagFilter(-1, source.sourceType, source.sourceId, tagFilterId))
     )
 
+  def removeFilterForSource(sourceRef: SourceRef): FilterForSourceRemoved =
+    await(filteringDAO.removeSourceFilter(sourceRef).map(_ => FilterForSourceRemoved()))
+
   def removeFilterForSource(sourceFilterId: Long): FilterForSourceRemoved =
-    await(filteringDAO.removeSourceFilter(sourceFilterId).map(_ => FilterForSourceRemoved(sourceFilterId)))
+    await(filteringDAO.removeSourceFilter(sourceFilterId).map(_ => FilterForSourceRemoved()))
 }
 
 object FilteringServiceActor {

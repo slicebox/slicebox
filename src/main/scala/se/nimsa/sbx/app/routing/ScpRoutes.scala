@@ -17,11 +17,11 @@
 package se.nimsa.sbx.app.routing
 
 import akka.pattern.ask
-
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
-
+import se.nimsa.sbx.app.GeneralProtocol.{SourceDeleted, SourceRef}
+import se.nimsa.sbx.app.GeneralProtocol.SourceType.SCP
 import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.user.UserProtocol._
 import se.nimsa.sbx.scp.ScpProtocol._
@@ -54,8 +54,10 @@ def scpRoutes(apiUser: ApiUser): Route =
         delete {
           authorize(apiUser.hasPermission(UserRole.ADMINISTRATOR)) {
             onSuccess(scpService.ask(RemoveScp(scpDataId))) {
-              case ScpRemoved(_) =>
+              case ScpRemoved(_) => {
+                system.eventStream.publish(SourceDeleted(SourceRef(SCP, scpDataId)))
                 complete(NoContent)
+              }
             }
           }
         }

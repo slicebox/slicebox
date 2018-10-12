@@ -21,6 +21,8 @@ import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.ImageTagValues
+import se.nimsa.sbx.app.GeneralProtocol.{SourceDeleted, SourceRef}
+import se.nimsa.sbx.app.GeneralProtocol.SourceType.BOX
 import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
@@ -68,8 +70,10 @@ trait BoxRoutes {
           pathEndOrSingleSlash {
             delete {
               onSuccess(boxService.ask(RemoveBox(boxId))) {
-                case BoxRemoved(_) =>
+                case BoxRemoved(boxId) => {
+                  system.eventStream.publish(SourceDeleted(SourceRef(BOX, boxId)))
                   complete(NoContent)
+                }
               }
             }
           }

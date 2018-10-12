@@ -2,7 +2,7 @@ package se.nimsa.sbx.filtering
 
 import se.nimsa.dicom.data.TagPath
 import se.nimsa.dicom.data.TagPath.TagPathTag
-import se.nimsa.sbx.app.GeneralProtocol.SourceType
+import se.nimsa.sbx.app.GeneralProtocol.{SourceRef, SourceType}
 import se.nimsa.sbx.filtering.FilteringProtocol._
 import se.nimsa.sbx.util.DbUtil.createTables
 import slick.basic.DatabaseConfig
@@ -106,7 +106,7 @@ class FilteringDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executi
 
   def createOrUpdateSourceFilter(sourceFilter: SourceTagFilter): Future[SourceTagFilter] = {
     db.run {
-      getSourceFilterAction(sourceFilter.sourceType, sourceFilter.sourceId).flatMap {
+      getSourceFilterAction(SourceRef(sourceFilter.sourceType, sourceFilter.sourceId)).flatMap {
         _.map { sf =>
           val updatedSourceFilter = sf.copy(tagFilterId = sourceFilter.tagFilterId)
           updateSourceFilterAction(updatedSourceFilter).map(_ => updatedSourceFilter)
@@ -117,11 +117,18 @@ class FilteringDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executi
     }
   }
 
-  def getSourceFilter(sourceType: SourceType, sourceId: Long): Future[Option[SourceTagFilter]] = {
-    db.run(getSourceFilterAction(sourceType, sourceId))
+  def getSourceFilter(sourceRef: SourceRef): Future[Option[SourceTagFilter]] = {
+    db.run(getSourceFilterAction(sourceRef))
   }
 
-  def removeSourceFilter(id: Long) =   db.run(sourceFilterQuery.filter(_.id === id).delete.map(_ => {}))
+  def removeSourceFilter(id: Long): Future[Unit] =   db.run(sourceFilterQuery.filter(_.id === id).delete.map(_ => {}))
+
+  def removeSourceFilter(sourceRef: SourceRef): Future[Unit] =
+    db.run(
+      sourceFilterQuery
+        .filter(r => r.sourceType === sourceRef.sourceType.toString && r.sourceId === sourceRef.sourceId)
+        .delete.map(_ => {}))
+
 
   def insertTagFilter(tagFilter: TagFilterSpec): Future[TagFilterSpec] = {
     val tagFilterRow = TagFilter(tagFilter.id, tagFilter.name, tagFilter.tagFilterType)
@@ -178,9 +185,9 @@ class FilteringDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executi
     (sourceFilterQuery returning sourceFilterQuery.map(_.id) += sourceTagFilter)
       .map(generatedId => sourceTagFilter.copy(id = generatedId))
 
-  private def getSourceFilterAction(sourceType: SourceType, sourceId: Long) =
+  private def getSourceFilterAction(sourceRef: SourceRef) =
     sourceFilterQuery
-      .filter(r => r.sourceType === sourceType.toString && r.sourceId === sourceId)
+      .filter(r => r.sourceType === sourceRef.sourceType.toString && r.sourceId === sourceRef.sourceId)
       .result
       .headOption
 

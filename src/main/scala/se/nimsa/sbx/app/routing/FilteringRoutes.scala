@@ -21,6 +21,7 @@ import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
+import se.nimsa.sbx.app.GeneralProtocol.SourceRef
 import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.filtering.FilteringProtocol._
 import se.nimsa.sbx.forwarding.ForwardingProtocol._
@@ -37,14 +38,9 @@ trait FilteringRoutes {
             parameters((
               'startindex.as(nonNegativeFromStringUnmarshaller) ? 0,
               'count.as(nonNegativeFromStringUnmarshaller) ? 20)) { (startIndex, count) =>
-              println(s"about to ask for tag filters $startIndex, $count")
               onSuccess(filteringService.ask(GetTagFilters(startIndex, count))) {
                 case TagFilterSpecs(tagFilterSpecs) =>
                   complete(tagFilterSpecs)
-                case a => {
-                  println(s"What?!?! ${a.getClass}")
-                  complete(InternalServerError)
-                }
               }
             }
           } ~ post {
@@ -73,6 +69,15 @@ trait FilteringRoutes {
                 onSuccess(filteringService.ask(RemoveTagFilter(tagFilterId))) {
                   case TagFilterRemoved(_) =>
                     complete(NoContent)
+                }
+              }
+            } ~ post {
+              authorize(apiUser.hasPermission(UserRole.ADMINISTRATOR)) {
+                entity(as[SourceRef]) { sRef =>
+                  onSuccess(filteringService.ask(SetFilterForSource(sRef, tagFilterId))) {
+                    case sourceTagFilter: SourceTagFilter =>
+                      complete((Created, sourceTagFilter))
+                  }
                 }
               }
             }

@@ -1,7 +1,7 @@
 package se.nimsa.sbx.filtering
 
 import se.nimsa.dicom.data.TagPath.TagPathTag
-import se.nimsa.sbx.app.GeneralProtocol.{Source, SourceType}
+import se.nimsa.sbx.app.GeneralProtocol.{Source, SourceRef, SourceType}
 
 object FilteringProtocol {
 
@@ -10,9 +10,9 @@ object FilteringProtocol {
   case class GetTagFilters(startIndex: Long, count: Long) extends FilteringRequest
   case class RemoveTagFilter(tagFilterId: Long) extends FilteringRequest
   case class GetTagFilter(tagFilterId: Long) extends FilteringRequest
-  case class GetFilterForSource(source: Source) extends FilteringRequest
-  case class SetFilterForSource(source: Source, tagFilterId: Long) extends FilteringRequest
-  case class RemoveFilterForSource(sourceFilterId: Long) extends FilteringRequest
+  case class GetFilterForSource(source: SourceRef) extends FilteringRequest
+  case class SetFilterForSource(sourceRef: SourceRef, tagFilterId: Long) extends FilteringRequest
+  case class RemoveFilterForSource(sourceRef: SourceRef) extends FilteringRequest
 
   sealed trait TagFilterType
   object TagFilterType {
@@ -40,7 +40,7 @@ object FilteringProtocol {
 
   case class TagFilterRemoved(tagFilterId: Long)
 
-  case class FilterForSourceRemoved(sourceFilterId: Long)
+  case class FilterForSourceRemoved()
 
   //DB row representations
   case class TagFilter(id: Long, name: String, tagFilterType: TagFilterType)
