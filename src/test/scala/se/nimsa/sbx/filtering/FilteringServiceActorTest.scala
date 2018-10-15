@@ -80,6 +80,17 @@ class FilteringServiceActorTest(_system: ActorSystem) extends TestKit(_system) w
       expectMsg(Some(filter1))
     }
 
+    "System event SourceDeleted shall delete filter association" in {
+      filteringService ! AddTagFilter(getTagFilterSpec1)
+      val filter1 = expectMsgType[TagFilterAdded].filterSpecification
+      val source = SourceRef(SourceType.BOX, 1)
+      filteringService ! SetFilterForSource(source, filter1.id)
+      expectMsgType[SourceTagFilter]
+      system.eventStream.publish(SourceDeleted(source))
+      filteringService ! GetFilterForSource(source)
+      expectMsg(None)
+    }
+
     "Return complete TagFilterSpec" in {
       val tagFilterSpec1 = getTagFilterSpec1
 
