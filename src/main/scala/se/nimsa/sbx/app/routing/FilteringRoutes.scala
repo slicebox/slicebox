@@ -16,15 +16,12 @@
 
 package se.nimsa.sbx.app.routing
 
-import akka.http.scaladsl.model.HttpHeader.ParsingResult.Ok
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
-import se.nimsa.sbx.app.GeneralProtocol.SourceRef
 import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.filtering.FilteringProtocol._
-import se.nimsa.sbx.forwarding.ForwardingProtocol._
 import se.nimsa.sbx.user.UserProtocol._
 
 trait FilteringRoutes {
@@ -71,13 +68,37 @@ trait FilteringRoutes {
                     complete(NoContent)
                 }
               }
-            } ~ post {
+            }
+          }
+        }
+      }~ pathPrefix("associations") {
+        pathEndOrSingleSlash {
+          get {
+            parameters((
+              'startindex.as(nonNegativeFromStringUnmarshaller) ? 0,
+              'count.as(nonNegativeFromStringUnmarshaller) ? 20)) { (startIndex, count) =>
+              onSuccess(filteringService.ask(GetSourceTagFilters(startIndex, count))) {
+                case SourceTagFilters(sourceTagFilters) =>
+                  complete(sourceTagFilters)
+              }
+            }
+          } ~ post {
+            authorize(apiUser.hasPermission(UserRole.ADMINISTRATOR)) {
+              entity(as[SourceTagFilter]) { sourceFilterAssociation =>
+                onSuccess(filteringService.ask(AddSourceFilterAssociation(sourceFilterAssociation))) {
+                  case sourceTagFilter: SourceTagFilter =>
+                    complete((Created, sourceTagFilter))
+                }
+              }
+            }
+          }
+        } ~ pathPrefix(LongNumber) { sourceTagFilterId =>
+          pathEndOrSingleSlash {
+            delete {
               authorize(apiUser.hasPermission(UserRole.ADMINISTRATOR)) {
-                entity(as[SourceRef]) { sRef =>
-                  onSuccess(filteringService.ask(SetFilterForSource(sRef, tagFilterId))) {
-                    case sourceTagFilter: SourceTagFilter =>
-                      complete((Created, sourceTagFilter))
-                  }
+                onSuccess(filteringService.ask(RemoveSourceTagFilter(sourceTagFilterId))) {
+                  case _: SourceTagFilterRemoved =>
+                    complete(NoContent)
                 }
               }
             }

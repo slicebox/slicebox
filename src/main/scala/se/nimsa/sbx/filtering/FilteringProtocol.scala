@@ -11,8 +11,10 @@ object FilteringProtocol {
   case class RemoveTagFilter(tagFilterId: Long) extends FilteringRequest
   case class GetTagFilter(tagFilterId: Long) extends FilteringRequest
   case class GetFilterForSource(source: SourceRef) extends FilteringRequest
-  case class SetFilterForSource(sourceRef: SourceRef, tagFilterId: Long) extends FilteringRequest
+  case class AddSourceFilterAssociation(sourceFilterAssociation: SourceTagFilter) extends FilteringRequest
   case class RemoveFilterForSource(sourceRef: SourceRef) extends FilteringRequest
+  case class RemoveSourceTagFilter(sourceFilterId: Long) extends FilteringRequest
+  case class GetSourceTagFilters(startIndex: Long, count: Long) extends FilteringRequest
 
   sealed trait TagFilterType
   object TagFilterType {
@@ -38,9 +40,11 @@ object FilteringProtocol {
 
   case class TagFilterSpecs(tagFilterSpecs: Seq[TagFilterSpec])
 
+  case class SourceTagFilters(sourceTagFilters: Seq[SourceTagFilter])
+
   case class TagFilterRemoved(tagFilterId: Long)
 
-  case class FilterForSourceRemoved()
+  case class SourceTagFilterRemoved()
 
   //DB row representations
   case class TagFilter(id: Long, name: String, tagFilterType: TagFilterType)

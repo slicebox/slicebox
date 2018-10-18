@@ -74,7 +74,7 @@ class FilteringServiceActorTest(_system: ActorSystem) extends TestKit(_system) w
       val source = SourceRef(SourceType.BOX, 1)
       filteringService ! GetFilterForSource(source)
       expectMsg(None)
-      filteringService ! SetFilterForSource(source, filter1.id)
+      filteringService ! AddSourceFilterAssociation(SourceTagFilter(-1, source.sourceType, source.sourceId, filter1.id))
       expectMsgType[SourceTagFilter]
       filteringService ! GetFilterForSource(source)
       expectMsg(Some(filter1))
@@ -84,11 +84,15 @@ class FilteringServiceActorTest(_system: ActorSystem) extends TestKit(_system) w
       filteringService ! AddTagFilter(getTagFilterSpec1)
       val filter1 = expectMsgType[TagFilterAdded].filterSpecification
       val source = SourceRef(SourceType.BOX, 1)
-      filteringService ! SetFilterForSource(source, filter1.id)
-      expectMsgType[SourceTagFilter]
+      filteringService ! AddSourceFilterAssociation(SourceTagFilter(-1, source.sourceType, source.sourceId, filter1.id))
+      val sourceTagFilter = expectMsgType[SourceTagFilter]
+      filteringService ! GetSourceTagFilters(0, 100)
+      expectMsg(SourceTagFilters(List(sourceTagFilter)))
       system.eventStream.publish(SourceDeleted(source))
       filteringService ! GetFilterForSource(source)
       expectMsg(None)
+      filteringService ! GetSourceTagFilters(0, 100)
+      expectMsg(SourceTagFilters(List()))
     }
 
     "Return complete TagFilterSpec" in {

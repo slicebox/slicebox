@@ -149,6 +149,13 @@ class FilteringDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executi
       .result
   }
 
+  def listSourceTagFilters(startIndex: Long, count: Long): Future[Seq[SourceTagFilter]] = db.run {
+    sourceFilterQuery
+      .drop(startIndex)
+      .take(count)
+      .result
+  }
+
   def getTagPathsByFilterId(filterId: Long): Future[Seq[TagFilterTagPath]] = db.run {
     tagPathQuery.filter(_.tagFilterId === filterId).result
   }

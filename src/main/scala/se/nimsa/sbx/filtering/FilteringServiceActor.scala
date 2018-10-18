@@ -31,14 +31,16 @@ class FilteringServiceActor(filteringDAO: FilteringDAO)(implicit timeout: Timeou
       sender ! getTagFilter(tagFilterId)
     case GetFilterForSource(source) =>
       sender ! getTagFilterForSource(source)
-    case SetFilterForSource(source, tagFilterId) =>
-      sender ! setTagFilterForSource(source, tagFilterId)
-//    case RemoveFilterForSource(sourceFilterId) =>
-//      sender ! removeFilterForSource(sourceFilterId)
+    case AddSourceFilterAssociation(sourceTagFilter) =>
+      sender ! setTagFilterForSource(sourceTagFilter)
+    case RemoveSourceTagFilter(sourceFilterId) =>
+      sender ! removeSourceTagFilter(sourceFilterId)
     case RemoveFilterForSource(sourceRef) =>
       sender ! removeFilterForSource(sourceRef)
     case SourceDeleted(sourceRef) =>
       removeFilterForSource(sourceRef)
+    case gstf: GetSourceTagFilters =>
+      sender ! getSourceTagFilters(gstf.startIndex, gstf.count)
   }
 
   def insertTagFilter(tagFilterSpec: TagFilterSpec): TagFilterAdded = {
@@ -48,6 +50,11 @@ class FilteringServiceActor(filteringDAO: FilteringDAO)(implicit timeout: Timeou
   def getTagFilters(startIndex: Long, count: Long): TagFilterSpecs = {
     val tagFilters = filteringDAO.listTagFilters(startIndex, count)
     await(tagFilters.map(_.map(TagFilterSpec(_))).map(TagFilterSpecs(_)))
+  }
+
+  def getSourceTagFilters(startIndex: Long, count: Long) = {
+    val sourceTagFilters = filteringDAO.listSourceTagFilters(startIndex, count)
+    await(sourceTagFilters.map(SourceTagFilters(_)))
   }
 
   def removeTagFilter(tagFilterId: Long): TagFilterRemoved =
@@ -65,16 +72,14 @@ class FilteringServiceActor(filteringDAO: FilteringDAO)(implicit timeout: Timeou
       }
     )
 
-  def setTagFilterForSource(source: SourceRef, tagFilterId: Long): SourceTagFilter =
-    await(
-      filteringDAO.createOrUpdateSourceFilter(SourceTagFilter(-1, source.sourceType, source.sourceId, tagFilterId))
-    )
+  def setTagFilterForSource(sourceTagFilter: SourceTagFilter): SourceTagFilter =
+    await(filteringDAO.createOrUpdateSourceFilter(sourceTagFilter))
 
-  def removeFilterForSource(sourceRef: SourceRef): FilterForSourceRemoved =
-    await(filteringDAO.removeSourceFilter(sourceRef).map(_ => FilterForSourceRemoved()))
+  def removeFilterForSource(sourceRef: SourceRef): SourceTagFilterRemoved =
+    await(filteringDAO.removeSourceFilter(sourceRef).map(_ => SourceTagFilterRemoved()))
 
-  def removeFilterForSource(sourceFilterId: Long): FilterForSourceRemoved =
-    await(filteringDAO.removeSourceFilter(sourceFilterId).map(_ => FilterForSourceRemoved()))
+  def removeSourceTagFilter(sourceFilterId: Long): SourceTagFilterRemoved =
+    await(filteringDAO.removeSourceFilter(sourceFilterId).map(_ => SourceTagFilterRemoved()))
 }
 
 object FilteringServiceActor {
