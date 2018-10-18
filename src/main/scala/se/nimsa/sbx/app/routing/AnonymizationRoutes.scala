@@ -74,7 +74,7 @@ trait AnonymizationRoutes {
             }
           }
         }
-      } ~ pathPrefix("keys") {
+      }  ~ pathPrefix("keys") {
         pathEndOrSingleSlash {
           get {
             parameters((
@@ -101,9 +101,9 @@ trait AnonymizationRoutes {
                   complete(NoContent)
               }
             }
-          } ~ path("tagvalues") {
+          } ~ path("keyvalues") {
             get {
-              complete(anonymizationService.ask(GetTagValuesForAnonymizationKey(anonymizationKeyId)).mapTo[Seq[TagValue]])
+              complete(anonymizationService.ask(GetTagValuesForAnonymizationKey(anonymizationKeyId)).mapTo[Seq[AnonymizationKeyValue]])
             }
           }
         } ~ path("query") {

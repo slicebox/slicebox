@@ -23,39 +23,36 @@ import se.nimsa.sbx.model.Entity
 
 object AnonymizationProtocol {
 
-  case class AnonymizationKeyQuery(
-    startIndex: Long,
-    count: Long,
-    order: Option[QueryOrder],
-    queryProperties: Seq[QueryProperty])
+  case class AnonymizationKeyQuery(startIndex: Long,
+                                   count: Long,
+                                   order: Option[QueryOrder],
+                                   queryProperties: Seq[QueryProperty])
 
   case class ImageTagValues(imageId: Long, tagValues: Seq[TagValue])
 
   case class TagValue(tagPath: TagPathTag, value: String)
-  case class TagValueAnonymized(tagPath: TagPathTag, value: String, anonymizedValue: String)
 
-  case class AnonymizationKey(
-    id: Long,
-    created: Long,
-    imageId: Long,
-    patientName: String,
-    anonPatientName: String,
-    patientID: String,
-    anonPatientID: String,
-    studyInstanceUID: String,
-    anonStudyInstanceUID: String,
-    seriesInstanceUID: String,
-    anonSeriesInstanceUID: String,
-    sopInstanceUID: String,
-    anonSOPInstanceUID: String) extends Entity
+  case class AnonymizationKey(id: Long,
+                              created: Long,
+                              imageId: Long,
+                              patientName: String,
+                              anonPatientName: String,
+                              patientID: String,
+                              anonPatientID: String,
+                              studyInstanceUID: String,
+                              anonStudyInstanceUID: String,
+                              seriesInstanceUID: String,
+                              anonSeriesInstanceUID: String,
+                              sopInstanceUID: String,
+                              anonSOPInstanceUID: String) extends Entity
 
-  case class AnonymizationKeyValue(
-    anonymizationKeyId: Long,
-    tagPath: String,
-    value: String,
-    anonymizedValue: String)
+  case class AnonymizationKeyValue(id: Long,
+                                   anonymizationKeyId: Long,
+                                   tagPath: TagPathTag,
+                                   value: String,
+                                   anonymizedValue: String) extends Entity
 
-  case class AnonymizationKeyValues(matchLevel: DicomHierarchyLevel, anonymizationKeyMaybe: Option[AnonymizationKey], values: Seq[TagValueAnonymized]) {
+  case class AnonymizationKeyValues(matchLevel: DicomHierarchyLevel, anonymizationKeyMaybe: Option[AnonymizationKey], values: Seq[AnonymizationKeyValue]) {
     def isEmpty: Boolean = anonymizationKeyMaybe.isEmpty
   }
 
@@ -65,12 +62,7 @@ object AnonymizationProtocol {
 
   trait AnonymizationRequest
 
-  case class InsertAnonymizationKey(imageId: Long, tagValues: Set[TagValueAnonymized]) extends AnonymizationRequest
-
-  case class GetAnonymizationKeyValues(patientName: String, patientID: String,
-                                       studyInstanceUID: String,
-                                       seriesInstanceUID: String,
-                                       sopInstanceUID: String) extends AnonymizationRequest
+  case class InsertAnonymizationKeyValues(imageId: Long, tagValues: Set[(AnonymizationKeyValue, DicomHierarchyLevel)]) extends AnonymizationRequest
 
   case class GetReverseAnonymizationKeyValues(anonPatientName: String, anonPatientID: String,
                                               anonStudyInstanceUID: String,
@@ -94,4 +86,5 @@ object AnonymizationProtocol {
   case class AnonymizationKeyRemoved(anonymizationKeyId: Long)
 
   case class AnonymizationKeys(anonymizationKeys: Seq[AnonymizationKey])
+
 }

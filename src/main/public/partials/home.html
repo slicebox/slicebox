@@ -299,31 +299,17 @@
                                     empty-message="No image attributes found"
                                     grid-state="uiState.attributesTableState">
 
-                                    <sbx-grid-column property="tag" title="Tag" filter="hexvalue: 8">
-                                    </sbx-grid-column>
-
-                                    <sbx-grid-column property="name" title="Name">
-                                    </sbx-grid-column>
-
+                                    <sbx-grid-column property="tag" title="Tag" filter="dicomTag"></sbx-grid-column>
+                                    <sbx-grid-column property="name" title="Name"></sbx-grid-column>
+                                    <sbx-grid-column property="vr" title="VR"></sbx-grid-column>
+                                    <sbx-grid-column property="length" title="Length"></sbx-grid-column>
                                     <sbx-grid-column property="values" title="Value">
                                         <sbx-grid-cell>
-                                            {{rowObject.values.join(",")}}
+                                            {{formatAttributeValues(rowObject.values)}}
                                         </sbx-grid-cell>
                                     </sbx-grid-column>
-
-                                    <sbx-grid-column property="vr" title="VR">
-                                    </sbx-grid-column>
-
-                                    <sbx-grid-column property="length" title="Length">
-                                    </sbx-grid-column>
-
-                                    <sbx-grid-column property="namePath" title="Path">
-                                        <sbx-grid-cell>
-                                            {{rowObject.namePath.join("/")}}
-                                        </sbx-grid-cell>
-                                    </sbx-grid-column>
-
-                                </sbx-grid> 
+                                    <sbx-grid-column property="tagPath" title="Tag Path" filter="tagPath"></sbx-grid-column>
+                                </sbx-grid>
                             </md-content>
                         </md-card-content>
                     </md-card>

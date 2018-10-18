@@ -73,13 +73,22 @@ class AnonymizationDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Exe
 
   val anonymizationKeysGetResult = GetResult(r => AnonymizationKey(r.nextLong, r.nextLong, r.nextLong, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString, r.nextString))
 
+  val toKeyValue: (Long, Long, String, String, String) => AnonymizationKeyValue =
+    (id: Long, anonymizationKeyId: Long, tagPath: String, value: String, anonymizedValue: String) =>
+      AnonymizationKeyValue(id, anonymizationKeyId, TagPath.parse(tagPath).asInstanceOf[TagPathTag], value, anonymizedValue)
+
+  val fromKeyValue: AnonymizationKeyValue => Option[(Long, Long, String, String, String)] =
+    (keyValue: AnonymizationKeyValue) =>
+      Option((keyValue.id, keyValue.anonymizationKeyId, keyValue.tagPath.toString, keyValue.value, keyValue.anonymizedValue))
+
   class AnonymizationKeyValueTable(tag: Tag) extends Table[AnonymizationKeyValue](tag, AnonymizationKeyValueTable.name) {
+    def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def anonymizationKeyId = column[Long]("anonymizationkeyid")
     def tagPath = column[String]("tagpath")
     def value = column[String]("value")
     def anonymizedValue = column[String]("anonymizedvalue")
     def fkAnonymizationKey = foreignKey("fk_anonymization_key", anonymizationKeyId, anonymizationKeyQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
-    def * = (anonymizationKeyId, tagPath, value, anonymizedValue) <> (AnonymizationKeyValue.tupled, AnonymizationKeyValue.unapply)
+    def * = (id, anonymizationKeyId, tagPath, value, anonymizedValue) <> (toKeyValue.tupled, fromKeyValue)
   }
 
   object AnonymizationKeyValueTable {
@@ -248,17 +257,13 @@ class AnonymizationDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Exe
       .headOption
   }
 
-  def anonymizationKeyValuesForAnonymizationKeyId(anonymizationKeyId: Long): Future[Seq[TagValueAnonymized]] = {
+  def anonymizationKeyValuesForAnonymizationKeyId(anonymizationKeyId: Long): Future[Seq[AnonymizationKeyValue]] = {
     val query =
       for {
         anonKey <- anonymizationKeyQuery if anonKey.id === anonymizationKeyId
         keyValue <- anonymizationKeyValueQuery if keyValue.anonymizationKeyId === anonKey.id
-      } yield {
-        (keyValue.tagPath, keyValue.value, keyValue.anonymizedValue)
-      }
-    db.run(query.result).map(_.map {
-      case (tagPath, value, anonymizedValue) => TagValueAnonymized(TagPath.parse(tagPath).asInstanceOf[TagPathTag], value, anonymizedValue)
-    })
+      } yield keyValue
+    db.run(query.result)
   }
 
   private val queryAnonymizationKeysSelectPart = s"""select * from "${AnonymizationKeyTable.name}""""

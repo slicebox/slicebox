@@ -13,8 +13,8 @@ import akka.stream.testkit.TestSubscriber
 import akka.util.ByteString
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import se.nimsa.dicom.data.DicomParts._
-import se.nimsa.dicom.data.{Elements, Tag, tagToString}
 import se.nimsa.dicom.data.VR.VR
+import se.nimsa.dicom.data.{Elements, Tag, tagToString}
 import se.nimsa.dicom.streams.ElementFlows.elementFlow
 import se.nimsa.dicom.streams.ElementSink.elementSink
 import se.nimsa.dicom.streams.ParseFlow
@@ -22,7 +22,6 @@ import se.nimsa.sbx.anonymization.AnonymizationProtocol.AnonymizationKey
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomPropertyValue._
-import se.nimsa.sbx.dicom.streams.DicomStreamUtil._
 import se.nimsa.sbx.metadata.MetaDataProtocol.{SeriesSource, SeriesTag}
 import se.nimsa.sbx.metadata.{MetaDataDAO, PropertiesDAO}
 import se.nimsa.sbx.seriestype.SeriesTypeDAO
@@ -187,19 +186,13 @@ object TestUtil {
                              anonPatientID: String = "anon patient ID",
                              anonStudyInstanceUID: String = "anon study instance UID",
                              anonSeriesInstanceUID: String = "anon series instance UID",
-                             anonFrameOfReferenceUID: String = "anon frame of reference UID") =
-    AnonymizationKey(-1, new Date().getTime,
+                             anonSOPInstanceUID: String = "anon SOP instance UID") =
+    AnonymizationKey(-1, -1,  new Date().getTime,
       elements.getString(Tag.PatientName).getOrElse(""), anonPatientName,
       elements.getString(Tag.PatientID).getOrElse(""), anonPatientID,
-      elements.getString(Tag.PatientBirthDate).getOrElse("1900-01-01"),
       elements.getString(Tag.StudyInstanceUID).getOrElse(""), anonStudyInstanceUID,
-      elements.getString(Tag.StudyDescription).getOrElse(""),
-      elements.getString(Tag.StudyID).getOrElse("Study ID"),
-      elements.getString(Tag.AccessionNumber).getOrElse("12345"),
       elements.getString(Tag.SeriesInstanceUID).getOrElse(""), anonSeriesInstanceUID,
-      elements.getString(Tag.SeriesDescription).getOrElse("Series Description"),
-      elements.getString(Tag.ProtocolName).getOrElse("Protocol Name"),
-      elements.getString(Tag.FrameOfReferenceUID).getOrElse("1.2.3.4.5"), anonFrameOfReferenceUID)
+      elements.getString(Tag.SOPInstanceUID).getOrElse(""), anonSOPInstanceUID)
 
   def deleteFolder(path: Path): Path =
     Files.walkFileTree(path, new SimpleFileVisitor[Path]() {
@@ -343,15 +336,8 @@ object TestUtil {
     def expectMetaPart(): PartProbe = probe
       .request(1)
       .expectNextChainingPF {
-        case _: DicomInfoPart => true
-        case p => throw new RuntimeException(s"Expected DicomMetaPart, got $p")
-      }
-
-    def expectMetaPart(metaPart: DicomInfoPart): PartProbe = probe
-      .request(1)
-      .expectNextChainingPF {
-        case p: DicomInfoPart if p == metaPart => true
-        case p => throw new RuntimeException(s"Expected DicomMetaPart $metaPart, got $p")
+        case _: MetaPart => true
+        case p => throw new RuntimeException(s"Expected MetaPart, got $p")
       }
 
     def expectHeaderAndValueChunkPairs(tags: Int*): PartProbe =

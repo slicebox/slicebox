@@ -61,6 +61,48 @@ angular.module('slicebox.anonymization', ['ngRoute'])
         return loadPromise;
     };
 
+    $scope.keySelected = function(key) {
+        $scope.uiState.selectedKey = key;
+
+        if ($scope.callbacks.keyValuesTable) {
+            $scope.callbacks.keyValuesTable.reset();
+        }
+    };
+
+    $scope.loadKeyValues = function(startIndex, count, orderByProperty, orderByDirection, filter) {
+        if ($scope.uiState.selectedKey === null) {
+            return [];
+        }
+
+        var keyValuesPromise = $http.get('/api/anonymization/keys/' + $scope.uiState.selectedKey.id + '/keyvalues').then(function(data) {
+            if (filter) {
+                var filterLc = filter.toLowerCase();
+                data.data = data.data.filter(function (keyValue) {
+                    var tagPathCondition = keyValue.tagPath.indexOf(filterLc) >= 0;
+                    var valueCondition = keyValue.value.toLowerCase().indexOf(filterLc) >= 0;
+                    var anonCondition = keyValue.anonymizedValue.toLowerCase().indexOf(filterLc) >= 0;
+                    return tagPathCondition || valueCondition || anonCondition;
+                });
+            }
+            if (orderByProperty) {
+                if (!orderByDirection) {
+                    orderByDirection = 'ASCENDING';
+                }
+                return data.data.sort(function compare(a,b) {
+                    return orderByDirection === 'ASCENDING' ?
+                        a[orderByProperty] < b[orderByProperty] ? -1 : a[orderByProperty] > b[orderByProperty] ? 1 : 0 :
+                        a[orderByProperty] > b[orderByProperty] ? -1 : a[orderByProperty] < b[orderByProperty] ? 1 : 0;
+                });
+            } else {
+                return data.data;
+            }
+        }, function(error) {
+            sbxToast.showErrorMessage('Failed to load key values for anonymization key: ' + error);
+        });
+
+        return keyValuesPromise;
+    };
+
     $scope.exportToCsv = function(keys) {
         var csv = 
             "Id;Image Id;Created;Patient Name;Anonymous Patient Name;Patient ID;Anonymous Patient ID" +

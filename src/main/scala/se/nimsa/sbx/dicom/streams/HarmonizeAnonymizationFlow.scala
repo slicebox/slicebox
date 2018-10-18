@@ -20,9 +20,8 @@ import akka.NotUsed
 import akka.stream.scaladsl.Flow
 import akka.util.ByteString
 import se.nimsa.dicom.data.DicomParts.DicomPart
-import se.nimsa.dicom.streams.DicomFlows._
 import se.nimsa.dicom.streams.ModifyFlow.{TagModification, TagModificationsPart, modifyFlow}
-import se.nimsa.sbx.anonymization.AnonymizationProtocol.{TagValue, TagValueAnonymized}
+import se.nimsa.sbx.anonymization.AnonymizationProtocol.{AnonymizationKeyValue, TagValue}
 import se.nimsa.sbx.dicom.streams.DicomStreamUtil._
 
 /**
@@ -40,7 +39,7 @@ object HarmonizeAnonymizationFlow {
               .filterNot(_.level > v.matchLevel)
               .map(_.tagPath)
               .flatMap(tp => v.values.find(_.tagPath == tp))
-            val custom = customAnonValues.map(v => TagValueAnonymized(v.tagPath, "", v.value))
+            val custom = customAnonValues.map(v => AnonymizationKeyValue(-1, -1, v.tagPath, "", v.value))
             val combined = active.foldLeft(custom)((m, tv) => if (m.map(_.tagPath).contains(tv.tagPath)) m else m :+ tv)
             val mods = combined.map(tv => TagModification.contains(tv.tagPath, _ => ByteString(tv.anonymizedValue), insert = true))
             TagModificationsPart(mods.toList) :: Nil

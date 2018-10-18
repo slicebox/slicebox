@@ -13,6 +13,8 @@ import se.nimsa.dicom.data.Elements.{Item, Sequence, ValueElement}
 import se.nimsa.dicom.data._
 import se.nimsa.dicom.streams.ModifyFlow.TagModification
 import se.nimsa.dicom.streams.{DicomFlows, ElementFlows, ElementSink, ModifyFlow}
+import se.nimsa.sbx.anonymization.AnonymizationProtocol.AnonymizationKeyValues
+import se.nimsa.sbx.dicom.DicomHierarchy.DicomHierarchyLevel
 import se.nimsa.sbx.dicom.streams.DicomStreamUtil._
 import se.nimsa.sbx.storage.{RuntimeStorage, StorageService}
 import se.nimsa.sbx.util.TestUtil._
@@ -23,6 +25,10 @@ import scala.concurrent.{Await, ExecutionContextExecutor}
 class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymizationFlowSpec")) with FlatSpecLike with Matchers with BeforeAndAfterAll {
 
   import DicomTestData._
+  import ReverseAnonymizationFlow.reverseAnonFlow
+  import ModifyFlow.modifyFlow
+  import ElementFlows.elementFlow
+  import AnonymizationFlow.anonFlow
 
   implicit val materializer: ActorMaterializer = ActorMaterializer()
   implicit val ec: ExecutionContextExecutor = system.dispatcher
@@ -36,16 +42,16 @@ class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymiza
       .via(storage.parseFlow(None))
       .via(DicomFlows.tagFilter(_ => false)(tagPath => !DicomParsing.isFileMetaInformation(tagPath.tag)))
 
-  def anonKeyPart(elements: Elements): PartialAnonymizationKeyPart = {
+  def anonKeyValuesPart(elements: Elements, matchLevel: DicomHierarchyLevel): AnonymizationKeyValuesPart = {
     val key = createAnonymizationKey(elements)
-    PartialAnonymizationKeyPart(Some(key), hasPatientInfo = true, hasStudyInfo = true, hasSeriesInfo = true)
+    AnonymizationKeyValuesPart(AnonymizationKeyValues(matchLevel, Some(key), keyValues)
   }
 
   def anonSource(elements: Elements): Source[DicomPart, NotUsed] = {
-    val key = anonKeyPart(elements).keyMaybe.get
+    val key = anonKeyValuesPart(elements).keyMaybe.get
     elementsSource(elements)
-      .via(AnonymizationFlow.anonFlow)
-      .via(ModifyFlow.modifyFlow(
+      .via(anonFlow)
+      .via(modifyFlow(
         TagModification.contains(TagPath.fromTag(Tag.PatientName), _ => toAsciiBytes(key.anonPatientName, VR.PN), insert = false),
         TagModification.contains(TagPath.fromTag(Tag.PatientID), _ => toAsciiBytes(key.anonPatientID, VR.LO), insert = false),
         TagModification.contains(TagPath.fromTag(Tag.StudyInstanceUID), _ => toAsciiBytes(key.anonStudyInstanceUID, VR.UI), insert = false),
@@ -57,10 +63,10 @@ class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymiza
   "The reverse anonymization flow" should "reverse anonymization for attributes stored in anonymization key" in {
     val elements = createElements()
 
-    val source = Source.single(anonKeyPart(elements))
+    val source = Source.single(anonKeyValuesPart(elements))
       .concat(anonSource(elements))
-      .via(ReverseAnonymizationFlow.reverseAnonFlow)
-      .via(ElementFlows.elementFlow)
+      .via(reverseAnonFlow)
+      .via(elementFlow)
 
     val reversedElements = Await.result(source.runWith(ElementSink.elementSink), 10.seconds)
 
@@ -75,14 +81,14 @@ class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymiza
     reversedElements(Tag.AccessionNumber) shouldBe elements(Tag.AccessionNumber)
     reversedElements(Tag.SeriesDescription) shouldBe elements(Tag.SeriesDescription)
     reversedElements(Tag.ProtocolName) shouldBe elements(Tag.ProtocolName)
-  }
+  }s
 
   it should "insert anonymization key attributes into dataset even if they originally were not present" in {
     val elements = Elements.empty()
       .setString(Tag.TransferSyntaxUID, UID.ExplicitVRLittleEndian)
       .setString(Tag.Modality, "NM")
     val source = elementsSource(elements)
-      .via(ReverseAnonymizationFlow.reverseAnonFlow)
+      .via(reverseAnonFlow)
       .mapConcat {
         case p: HeaderPart if p.length == 0 => p :: ValueChunk(bigEndian = false, ByteString.empty, last = true) :: Nil
         case p => p :: Nil
@@ -113,17 +119,17 @@ class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymiza
 
   "The conditional reverse anonymization flow" should "not perform reverse anonymization when stream is empty" in {
     val source = Source.empty
-      .via(ReverseAnonymizationFlow.maybeReverseAnonFlow)
+      .via(reverseAnonFlow)
 
     source.runWith(TestSink.probe[DicomPart])
       .expectDicomComplete()
   }
 
-  it should "not perform reverse anonymization when anonymization key is missing in stream" in {
+  it should "not perform reverse anonymization when anonymization key values part is missing in stream" in {
     val elements = createElements()
 
     val source = anonSource(elements)
-      .via(ReverseAnonymizationFlow.reverseAnonFlow)
+      .via(reverseAnonFlow)
       .via(ElementFlows.elementFlow)
       .mapConcat {
         case e: ValueElement if e.tag == Tag.PatientName => e :: Nil
@@ -139,9 +145,9 @@ class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymiza
   it should "perform reverse anonymization when anonymization key is present in stream" in {
     val elements = createElements()
 
-    val source = Source.single(anonKeyPart(elements))
+    val source = Source.single(anonKeyValuesPart(elements))
       .concat(anonSource(elements))
-      .via(ReverseAnonymizationFlow.reverseAnonFlow)
+      .via(reverseAnonFlow)
       .via(ElementFlows.elementFlow)
 
     val processedElements = Await.result(source.runWith(ElementSink.elementSink), 10.seconds)
@@ -153,12 +159,12 @@ class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymiza
     val elements = createElements()
       .set(Sequence(Tag.DerivationCodeSequence, -1, List(Item(-1, Elements.empty().setString(Tag.PatientName, "pat name")))))
 
-    val source = Source.single(anonKeyPart(elements))
+    val source = Source.single(anonKeyValuesPart(elements))
       .concat(anonSource(elements))
       .via(ModifyFlow.modifyFlow(
         TagModification.contains(TagPath.fromSequence(Tag.DerivationCodeSequence, 1).thenTag(Tag.PatientName), _ => toAsciiBytes("anon patient name", VR.PN), insert = false)
       ))
-      .via(ReverseAnonymizationFlow.reverseAnonFlow)
+      .via(reverseAnonFlow)
       .via(ElementFlows.elementFlow)
 
     val processedElements = Await.result(source.runWith(ElementSink.elementSink), 10.seconds)

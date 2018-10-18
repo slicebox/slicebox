@@ -460,11 +460,27 @@ angular.module('slicebox.home', ['ngRoute'])
         var attributesPromise = imagesPromise.then(function(images) {
             if (images.data.length > 0) {
                 return $http.get('/api/images/' + images.data[0].id + '/attributes').then(function(data) {
+                    data.data = data.data.map(function (attribute) {
+                        // add name
+                        var n = attribute.namePath.length;
+                        if (n <= 0) {
+                            attribute.name = "";
+                        } else {
+                            attribute.name = attribute.namePath[n - 1];
+                        }
+
+                        // add tag
+                        attribute.tag = attribute.tagPath.tag;
+
+                        return attribute;
+                    });
                     if (filter) {
                         var filterLc = filter.toLowerCase();
                         data.data = data.data.filter(function (attribute) {
+                            var hexString = toHexString(attribute.tag).toLowerCase();
+                            hexString = hexString.slice(0, 4) + ',' + hexString.slice(4);
                             var nameCondition = attribute.name.toLowerCase().indexOf(filterLc) >= 0;
-                            var tagCondition = toHexString(attribute.tag).indexOf(filterLc) >= 0;
+                            var tagCondition = hexString.indexOf(filterLc) >= 0;
                             var valuesCondition = attribute.values.reduce(function (c, value) {
                                 return c | value.toLowerCase().indexOf(filterLc) >= 0;
                             }, false);
@@ -492,6 +508,14 @@ angular.module('slicebox.home', ['ngRoute'])
         });
 
         return attributesPromise;
+    };
+
+    $scope.formatAttributeValues = function(values) {
+        var s = values.join("\\");
+        if (s.length > 64) {
+            s = s.slice(0, 64) + '...';
+        }
+        return s;
     };
 
     $scope.loadSelectedSeriesDatasets = function() {
