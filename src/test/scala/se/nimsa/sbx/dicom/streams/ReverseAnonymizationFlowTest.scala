@@ -13,7 +13,7 @@ import se.nimsa.dicom.data.Elements.{Item, Sequence, ValueElement}
 import se.nimsa.dicom.data._
 import se.nimsa.dicom.streams.ModifyFlow.TagModification
 import se.nimsa.dicom.streams.{DicomFlows, ElementFlows, ElementSink, ModifyFlow}
-import se.nimsa.sbx.anonymization.AnonymizationProtocol.{AnonymizationKeyQueryResult, AnonymizationKeyValue}
+import se.nimsa.sbx.anonymization.AnonymizationProtocol.{AnonymizationKeyOpResult, AnonymizationKeyValue}
 import se.nimsa.sbx.dicom.DicomHierarchy.DicomHierarchyLevel
 import se.nimsa.sbx.dicom.streams.DicomStreamUtil._
 import se.nimsa.sbx.storage.{RuntimeStorage, StorageService}
@@ -42,9 +42,9 @@ class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymiza
       .via(storage.parseFlow(None))
       .via(DicomFlows.tagFilter(_ => false)(tagPath => !DicomParsing.isFileMetaInformation(tagPath.tag)))
 
-  def anonKeyValuesPart(elements: Elements, matchLevel: DicomHierarchyLevel): AnonymizationKeyQueryResultPart = {
+  def anonKeyResultPart(elements: Elements, matchLevel: DicomHierarchyLevel): AnonymizationKeyOpResultPart = {
     val key = createAnonymizationKey(elements)
-    AnonymizationKeyQueryResultPart(AnonymizationKeyQueryResult(matchLevel, Some(key), Seq(
+    AnonymizationKeyOpResultPart(AnonymizationKeyOpResult(matchLevel, Some(key), Seq(
       AnonymizationKeyValue(-1, key.id, TagPath.fromTag(Tag.PatientName), key.patientName, key.anonPatientName),
       AnonymizationKeyValue(-1, key.id, TagPath.fromTag(Tag.PatientID), key.patientID, key.anonPatientID),
       AnonymizationKeyValue(-1, key.id, TagPath.fromTag(Tag.StudyInstanceUID), key.studyInstanceUID, key.anonStudyInstanceUID),
@@ -55,7 +55,7 @@ class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymiza
   }
 
   def anonSource(elements: Elements): Source[DicomPart, NotUsed] = {
-    val key = anonKeyValuesPart(elements, DicomHierarchyLevel.IMAGE).anonymizationKeyValues.anonymizationKeyMaybe.get
+    val key = anonKeyResultPart(elements, DicomHierarchyLevel.IMAGE).result.anonymizationKeyMaybe.get
     elementsSource(elements)
       .via(anonFlow)
       .via(modifyFlow(
@@ -67,10 +67,10 @@ class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymiza
       ))
   }
 
-  "The reverse anonymization flow" should "reverse anonymization for attributes stored in anonymization key" in {
+  "The reverse anonymization flow" should "reverse anonymization using information stored in anonymization key" in {
     val elements = createElements()
 
-    val source = Source.single(anonKeyValuesPart(elements, DicomHierarchyLevel.IMAGE))
+    val source = Source.single(anonKeyResultPart(elements, DicomHierarchyLevel.IMAGE))
       .concat(anonSource(elements))
       .via(reverseAnonFlow)
       .via(elementFlow)
@@ -81,25 +81,20 @@ class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymiza
     reversedElements(Tag.PatientID) shouldBe elements(Tag.PatientID)
     reversedElements(Tag.StudyInstanceUID) shouldBe elements(Tag.StudyInstanceUID)
     reversedElements(Tag.SeriesInstanceUID) shouldBe elements(Tag.SeriesInstanceUID)
-    reversedElements(Tag.FrameOfReferenceUID) shouldBe elements(Tag.FrameOfReferenceUID)
-    reversedElements(Tag.PatientBirthDate) shouldBe elements(Tag.PatientBirthDate)
-    reversedElements(Tag.StudyDescription) shouldBe elements(Tag.StudyDescription)
-    reversedElements(Tag.StudyID) shouldBe elements(Tag.StudyID)
-    reversedElements(Tag.AccessionNumber) shouldBe elements(Tag.AccessionNumber)
-    reversedElements(Tag.SeriesDescription) shouldBe elements(Tag.SeriesDescription)
-    reversedElements(Tag.ProtocolName) shouldBe elements(Tag.ProtocolName)
+    reversedElements(Tag.SOPInstanceUID) shouldBe elements(Tag.SOPInstanceUID)
   }
 
   it should "insert anonymization key attributes into dataset even if they originally were not present" in {
     val elements = Elements.empty()
-      .setString(Tag.TransferSyntaxUID, UID.ExplicitVRLittleEndian)
       .setString(Tag.Modality, "NM")
-    val source = elementsSource(elements)
+    val source = Source.single(anonKeyResultPart(elements, DicomHierarchyLevel.IMAGE))
+      .concat(anonSource(elements))
       .via(reverseAnonFlow)
       .mapConcat {
         case p: HeaderPart if p.length == 0 => p :: ValueChunk(bigEndian = false, ByteString.empty, last = true) :: Nil
         case p => p :: Nil
       }
+
 
     source.runWith(TestSink.probe[DicomPart])
       .expectHeaderAndValueChunkPairs(
@@ -107,18 +102,11 @@ class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymiza
           Tag.Modality,
           Tag.PatientName,
           Tag.PatientID,
-          Tag.PatientBirthDate,
           Tag.PatientIdentityRemoved,
           Tag.DeidentificationMethod,
           Tag.StudyInstanceUID,
-          Tag.StudyDescription,
-          Tag.StudyID,
-          Tag.SpecificCharacterSet, // inserted by utf8 flow
-          Tag.AccessionNumber,
           Tag.SeriesInstanceUID,
-          Tag.SeriesDescription,
-          Tag.ProtocolName,
-          Tag.FrameOfReferenceUID
+          Tag.SOPInstanceUID
         ).sorted: _*
       )
       .expectDicomComplete()
@@ -152,7 +140,7 @@ class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymiza
   it should "perform reverse anonymization when elements part is present in stream" in {
     val elements = createElements()
 
-    val source = Source.single(anonKeyValuesPart(elements, DicomHierarchyLevel.IMAGE))
+    val source = Source.single(anonKeyResultPart(elements, DicomHierarchyLevel.IMAGE))
       .concat(anonSource(elements))
       .via(reverseAnonFlow)
       .via(ElementFlows.elementFlow)
@@ -166,7 +154,7 @@ class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymiza
     val elements = createElements()
       .set(Sequence(Tag.DerivationCodeSequence, -1, List(Item.fromElements(Elements.empty().setString(Tag.PatientName, "pat name")))))
 
-    val source = Source.single(anonKeyValuesPart(elements, DicomHierarchyLevel.IMAGE))
+    val source = Source.single(anonKeyResultPart(elements, DicomHierarchyLevel.IMAGE))
       .concat(anonSource(elements))
       .via(ModifyFlow.modifyFlow(
         TagModification.contains(TagPath.fromSequence(Tag.DerivationCodeSequence, 1).thenTag(Tag.PatientName), _ => toAsciiBytes("anon patient name", VR.PN), insert = false)

@@ -12,7 +12,7 @@ import se.nimsa.dicom.data.{DicomParsing, Elements, Tag, TagPath}
 import se.nimsa.dicom.streams.DicomFlows
 import se.nimsa.dicom.streams.ElementFlows.elementFlow
 import se.nimsa.dicom.streams.ElementSink.elementSink
-import se.nimsa.sbx.anonymization.AnonymizationProtocol.{AnonymizationKey, AnonymizationKeyQueryResult, AnonymizationKeyValue, TagValue}
+import se.nimsa.sbx.anonymization.AnonymizationProtocol.{AnonymizationKey, AnonymizationKeyOpResult, AnonymizationKeyValue, TagValue}
 import se.nimsa.sbx.dicom.DicomHierarchy.DicomHierarchyLevel
 import se.nimsa.sbx.dicom.streams.DicomStreamUtil._
 import se.nimsa.sbx.storage.{RuntimeStorage, StorageService}
@@ -39,7 +39,7 @@ class HarmonizeAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymi
       .via(DicomFlows.tagFilter(_ => false)(tagPath => !DicomParsing.isFileMetaInformation(tagPath.tag)))
   }
 
-  def anonKeyPart(key: AnonymizationKey) = AnonymizationKeyQueryResultPart(AnonymizationKeyQueryResult(DicomHierarchyLevel.IMAGE, Some(key), Seq(
+  def anonKeyPart(key: AnonymizationKey) = AnonymizationKeyOpResultPart(AnonymizationKeyOpResult(DicomHierarchyLevel.IMAGE, Some(key), Seq(
     AnonymizationKeyValue(-1, key.id, TagPath.fromTag(Tag.PatientName), key.patientName, key.anonPatientName),
     AnonymizationKeyValue(-1, key.id, TagPath.fromTag(Tag.PatientID), key.patientID, key.anonPatientID),
     AnonymizationKeyValue(-1, key.id, TagPath.fromTag(Tag.StudyInstanceUID), key.studyInstanceUID, key.anonStudyInstanceUID),

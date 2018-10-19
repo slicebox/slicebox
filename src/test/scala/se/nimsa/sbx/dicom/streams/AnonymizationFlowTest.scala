@@ -43,7 +43,6 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
   def checkBasicAttributes(source: Source[DicomPart, NotUsed]): PartProbe =
     source.runWith(TestSink.probe[DicomPart])
       .expectHeaderAndValueChunkPairs(
-        Tag.SpecificCharacterSet,
         Tag.SOPInstanceUID,
         Tag.Modality,
         Tag.PatientName,
@@ -54,14 +53,12 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
         Tag.SeriesInstanceUID)
       .expectDicomComplete()
 
-  "The anonymization flow" should "replace an existing accession number with a named based UID" in {
+  "The anonymization flow" should "replace an existing accession number with a random UID" in {
     val elements = Elements.empty()
       .setString(Tag.AccessionNumber, "ACC001")
     val source = toAnonSource(elements)
 
     source.runWith(TestSink.probe[DicomPart])
-      .expectHeader(Tag.SpecificCharacterSet)
-      .expectValueChunk()
       .expectHeader(Tag.SOPInstanceUID)
       .expectValueChunk()
       .expectHeader(Tag.AccessionNumber)
@@ -95,22 +92,19 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
     val source = toAnonSource(elements)
 
     source.runWith(TestSink.probe[DicomPart])
-      .expectHeader(Tag.SpecificCharacterSet)
-      .expectValueChunk()
       .expectHeader(Tag.SOPInstanceUID)
       .expectValueChunk()
       .expectHeader(Tag.AccessionNumber)
       .expectHeader(Tag.PatientName)
   }
 
-  it should "create an new UID from and existing UID" in {
+  it should "create an new random UID from an existing UID" in {
     val elements = Elements.empty()
       .setString(Tag.StudyInstanceUID, "1.2.3.4.5.6.7.8.9")
     val source = toAnonSource(elements)
 
     source.runWith(TestSink.probe[DicomPart])
       .expectHeaderAndValueChunkPairs(
-        Tag.SpecificCharacterSet,
         Tag.SOPInstanceUID,
         Tag.PatientName,
         Tag.PatientID,
@@ -119,7 +113,8 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
       .expectHeader(Tag.StudyInstanceUID)
       .request(1)
       .expectNextChainingPF {
-        case v: ValueChunk if v.bytes.utf8String.trim != elements.getString(Tag.StudyInstanceUID).get => true
+        case v: ValueChunk =>
+          v.bytes.utf8String.trim should not be elements.getString(Tag.StudyInstanceUID).get
       }
       .expectHeader(Tag.SeriesInstanceUID)
       .expectValueChunk()
@@ -143,7 +138,6 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
     def check(source: Source[DicomPart, NotUsed]) =
       source.runWith(TestSink.probe[DicomPart])
         .expectHeaderAndValueChunkPairs(
-          Tag.SpecificCharacterSet,
           Tag.SOPInstanceUID,
           Tag.Modality,
           Tag.PatientName,
@@ -164,7 +158,7 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
     check(source3)
   }
 
-  it should "always create the same new UID from some fixed existing UID" in {
+  it should "create a new random UID for each anonymization from some fixed existing UID" in {
     val elements = Elements.empty()
       .setString(Tag.TargetUID, "1.2.3.4.5.6.7.8.9")
 
@@ -176,7 +170,7 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
     val f2 = source().runWith(Sink.head)
     val (sop1, sop2) = Await.result(f1.zip(f2), 5.seconds)
 
-    sop1 shouldBe sop2
+    sop1 should not be sop2
   }
 
   it should "remove private tags" in {

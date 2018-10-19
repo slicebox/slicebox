@@ -6,7 +6,7 @@ import akka.testkit.{ImplicitSender, TestKit}
 import akka.util.Timeout
 import org.scalatest._
 import se.nimsa.dicom.data.{Tag, TagPath}
-import se.nimsa.sbx.anonymization.AnonymizationProtocol.{AnonymizationKey, AnonymizationKeyQueryResult, AnonymizationKeyValue, QueryReverseAnonymizationKeyValues}
+import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.app.GeneralProtocol.ImagesDeleted
 import se.nimsa.sbx.dicom.DicomHierarchy.DicomHierarchyLevel
 import se.nimsa.sbx.util.FutureUtil.await
@@ -40,13 +40,13 @@ class AnonymizationServiceActorTest(_system: ActorSystem) extends TestKit(_syste
   val key2 = AnonymizationKey(-1, 123456789, 2, "pn2", "anonPn2", "pid2", "anonPid2", "stuid2", "anonStuid2", "seuid2", "anonSeuid2", "sopuid2", "anonSopuid2")
   val key3 = AnonymizationKey(-1, 123456789, 3, "pn3", "anonPn3", "pid3", "anonPid3", "stuid3", "anonStuid3", "seuid3", "anonSeuid3", "sopuid3", "anonSopuid3")
 
+  val anonymizationService: ActorRef = system.actorOf(Props(new AnonymizationServiceActor(anonymizationDao, purgeEmptyAnonymizationKeys = false)), name = "AnonymizationService")
+
   override def afterAll: Unit = TestKit.shutdownActorSystem(system)
 
   "An AnonymizationServiceActor" should {
 
     "not remove anonymization keys when corresponding images are deleted and purging is off" in {
-      val anonymizationService: ActorRef = system.actorOf(Props(new AnonymizationServiceActor(anonymizationDao, purgeEmptyAnonymizationKeys = false)), name = "AnonymizationService1")
-
       await(anonymizationDao.insertAnonymizationKey(key1))
       await(anonymizationDao.insertAnonymizationKey(key2))
       await(anonymizationDao.insertAnonymizationKey(key3))
@@ -61,7 +61,7 @@ class AnonymizationServiceActorTest(_system: ActorSystem) extends TestKit(_syste
     }
 
     "remove anonymization keys when corresponding images are deleted and purging is on" in {
-      val anonymizationService: ActorRef = system.actorOf(Props(new AnonymizationServiceActor(anonymizationDao, purgeEmptyAnonymizationKeys = true)), name = "AnonymizationService2")
+      val anonymizationService: ActorRef = system.actorOf(Props(new AnonymizationServiceActor(anonymizationDao, purgeEmptyAnonymizationKeys = true)), name = "AnonymizationServicePurge")
 
       await(anonymizationDao.insertAnonymizationKey(key1))
       await(anonymizationDao.insertAnonymizationKey(key2))
@@ -77,8 +77,6 @@ class AnonymizationServiceActorTest(_system: ActorSystem) extends TestKit(_syste
     }
 
     "yield patient, study and series information depending on completeness of match when querying for anonymization keys" in {
-      val anonymizationService: ActorRef = system.actorOf(Props(new AnonymizationServiceActor(anonymizationDao, purgeEmptyAnonymizationKeys = false)), name = "AnonymizationService3")
-
       val key = await(anonymizationDao.insertAnonymizationKey(key1))
       await(anonymizationDao.insertAnonymizationKeyValues(Seq(
         AnonymizationKeyValue(-1, key.id, TagPath.fromTag(Tag.PatientName), key.patientName, key.anonPatientName),
@@ -88,43 +86,76 @@ class AnonymizationServiceActorTest(_system: ActorSystem) extends TestKit(_syste
           AnonymizationKeyValue(-1, key.id, TagPath.fromTag(Tag.PatientName), key.sopInstanceUID, key.anonSOPInstanceUID))))
 
       // image match
-      anonymizationService ! QueryReverseAnonymizationKeyValues(key.anonPatientName, key.anonPatientID, key.anonStudyInstanceUID, key.anonSeriesInstanceUID, "")
+      anonymizationService ! QueryReverseAnonymizationKeyValues(key.anonPatientName, key.anonPatientID, key.anonStudyInstanceUID, key.anonSeriesInstanceUID, key.anonSOPInstanceUID)
       expectMsgPF() {
-        case r: AnonymizationKeyQueryResult =>
+        case r: AnonymizationKeyOpResult =>
           r.matchLevel shouldBe DicomHierarchyLevel.IMAGE
           r.values should have length 5
       }
 
       // series match
-      anonymizationService ! QueryReverseAnonymizationKeyValues(key.anonPatientName, key.anonPatientID, key.anonStudyInstanceUID, "", "")
+      anonymizationService ! QueryReverseAnonymizationKeyValues(key.anonPatientName, key.anonPatientID, key.anonStudyInstanceUID, key.anonSeriesInstanceUID, "")
       expectMsgPF() {
-        case r: AnonymizationKeyQueryResult =>
+        case r: AnonymizationKeyOpResult =>
           r.matchLevel shouldBe DicomHierarchyLevel.SERIES
-          r.values should have length 4
+          r.values should have length 5
       }
 
       // study match
-      anonymizationService ! QueryReverseAnonymizationKeyValues(key.anonPatientName, key.anonPatientID, "", "", "")
+      anonymizationService ! QueryReverseAnonymizationKeyValues(key.anonPatientName, key.anonPatientID, key.anonStudyInstanceUID, "", "")
       expectMsgPF() {
-        case r: AnonymizationKeyQueryResult =>
+        case r: AnonymizationKeyOpResult =>
           r.matchLevel shouldBe DicomHierarchyLevel.STUDY
-          r.values should have length 3
+          r.values should have length 5
       }
 
       // patient match
-      anonymizationService ! QueryReverseAnonymizationKeyValues("", "", "", "", "")
+      anonymizationService ! QueryReverseAnonymizationKeyValues(key.anonPatientName, key.anonPatientID, "", "", "")
       expectMsgPF() {
-        case r: AnonymizationKeyQueryResult =>
+        case r: AnonymizationKeyOpResult =>
           r.matchLevel shouldBe DicomHierarchyLevel.PATIENT
-          r.values should have length 2
+          r.values should have length 5
       }
 
       // no match
-      anonymizationService ! QueryReverseAnonymizationKeyValues(key.anonPatientName, key.anonPatientID, key.anonStudyInstanceUID, key.anonSeriesInstanceUID, key.anonSOPInstanceUID)
+      anonymizationService ! QueryReverseAnonymizationKeyValues("", "", "", "", "")
       expectMsgPF() {
-        case r: AnonymizationKeyQueryResult =>
+        case r: AnonymizationKeyOpResult =>
+          r.isEmpty shouldBe true
           r.matchLevel shouldBe DicomHierarchyLevel.PATIENT
           r.values shouldBe empty
+      }
+    }
+
+    "insert anonymization key into database" in {
+      val imageId = 42
+
+      anonymizationService ! InsertAnonymizationKeyValues(imageId, Set(AnonymizationKeyValueData(DicomHierarchyLevel.PATIENT, TagPath.fromTag(Tag.PatientName), "name", "anon name")))
+      expectMsgPF() {
+        case r: AnonymizationKeyOpResult =>
+          r.anonymizationKeyMaybe shouldBe defined
+          r.anonymizationKeyMaybe.get.patientName shouldBe "name"
+          r.anonymizationKeyMaybe.get.anonPatientName shouldBe "anon name"
+          r.values should have size 1
+          r.values.head.tagPath shouldBe TagPath.fromTag(Tag.PatientName)
+      }
+    }
+
+    "harmonize anonymous information based on existing keys when inserting key into database" in {
+      val imageId = 42
+
+      anonymizationService ! InsertAnonymizationKeyValues(imageId, Set(
+        AnonymizationKeyValueData(DicomHierarchyLevel.PATIENT, TagPath.fromTag(Tag.PatientName), "name", "anon name"),
+        AnonymizationKeyValueData(DicomHierarchyLevel.PATIENT, TagPath.fromTag(Tag.PatientID), "id", "anon id")
+      ))
+      expectMsgType[AnonymizationKeyOpResult]
+
+      anonymizationService ! InsertAnonymizationKeyValues(imageId + 1, Set(
+        AnonymizationKeyValueData(DicomHierarchyLevel.PATIENT, TagPath.fromTag(Tag.PatientName), "name", "anon name"),
+        AnonymizationKeyValueData(DicomHierarchyLevel.PATIENT, TagPath.fromTag(Tag.PatientID), "id", "another anon id")
+      ))
+      expectMsgPF() {
+        case r: AnonymizationKeyOpResult => r.anonymizationKeyMaybe.get.anonPatientID shouldBe "anon id"
       }
     }
 

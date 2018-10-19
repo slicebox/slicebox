@@ -52,12 +52,12 @@ object AnonymizationProtocol {
                                    value: String,
                                    anonymizedValue: String) extends Entity
 
-  case class AnonymizationKeyQueryResult(matchLevel: DicomHierarchyLevel, anonymizationKeyMaybe: Option[AnonymizationKey], values: Seq[AnonymizationKeyValue]) {
+  case class AnonymizationKeyOpResult(matchLevel: DicomHierarchyLevel, anonymizationKeyMaybe: Option[AnonymizationKey], values: Seq[AnonymizationKeyValue]) {
     def isEmpty: Boolean = anonymizationKeyMaybe.isEmpty
   }
 
-  object AnonymizationKeyQueryResult {
-    def empty: AnonymizationKeyQueryResult = AnonymizationKeyQueryResult(DicomHierarchyLevel.PATIENT, None, Seq.empty)
+  object AnonymizationKeyOpResult {
+    def empty: AnonymizationKeyOpResult = AnonymizationKeyOpResult(DicomHierarchyLevel.PATIENT, None, Seq.empty)
   }
 
   case class AnonymizationKeyValueData(level: DicomHierarchyLevel,
@@ -82,10 +82,6 @@ object AnonymizationProtocol {
   case class QueryAnonymizationKeys(query: AnonymizationKeyQuery) extends AnonymizationRequest
 
   case class RemoveAnonymizationKey(anonymizationKeyId: Long) extends AnonymizationRequest
-
-  case class AddAnonymizationKey(anonymizationKey: AnonymizationKey) extends AnonymizationRequest
-
-  case class AnonymizationKeyAdded(anonymizationKey: AnonymizationKey)
 
   case class AnonymizationKeyRemoved(anonymizationKeyId: Long)
 

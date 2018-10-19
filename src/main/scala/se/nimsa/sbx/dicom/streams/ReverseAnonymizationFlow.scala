@@ -19,33 +19,29 @@ package se.nimsa.sbx.dicom.streams
 import akka.NotUsed
 import akka.stream.scaladsl.Flow
 import akka.util.ByteString
+import se.nimsa.dicom.data.padToEvenLength
 import se.nimsa.dicom.data.DicomParts._
 import se.nimsa.dicom.streams.ModifyFlow.{TagModification, TagModificationsPart, modifyFlow}
 import se.nimsa.sbx.dicom.streams.DicomStreamUtil._
 
 /**
-  * A flow which performs reverse anonymization as soon as it has received an AnonymizationKeyPart (which means data is
-  * anonymized)
+  * A flow which performs reverse anonymization as soon as it has received an AnonymizationKeyOpResultPart
   */
 object ReverseAnonymizationFlow {
 
-  def reverseAnonFlow: Flow[DicomPart, DicomPart, NotUsed] =
-    conditionalFlow({ case vp: AnonymizationKeyQueryResultPart => !vp.anonymizationKeyValues.isEmpty },
-      identityFlow
-        .mapConcat {
-          case vp: AnonymizationKeyQueryResultPart =>
-            val v = vp.anonymizationKeyValues
-            val active = valueTags
-              .filterNot(_.level > v.matchLevel)
-              .map(_.tagPath)
-              .flatMap(tp => v.values.find(_.tagPath == tp))
-            val mods = active.map(tv => TagModification.contains(tv.tagPath, _ => ByteString(tv.anonymizedValue), insert = true))
-            TagModificationsPart(mods.toList) :: Nil
-          case p => p :: Nil
-        }
-        .via(modifyFlow()),
-      identityFlow
-    )
+  def reverseAnonFlow: Flow[DicomPart, DicomPart, NotUsed] = identityFlow
+    .mapConcat {
+      case rp: AnonymizationKeyOpResultPart =>
+        val v = rp.result
+        val active = valueTags
+          .filterNot(_.level > v.matchLevel)
+          .map(_.tagPath)
+          .flatMap(tp => v.values.find(_.tagPath == tp))
+        val mods = active.map(tv => TagModification.contains(tv.tagPath, _ => padToEvenLength(ByteString(tv.value), tv.tagPath.tag), insert = true))
+        TagModificationsPart(mods.toList) :: Nil
+      case p => p :: Nil
+    }
+    .via(modifyFlow())
 }
 
 

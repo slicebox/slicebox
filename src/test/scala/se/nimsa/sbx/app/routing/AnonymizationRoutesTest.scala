@@ -209,19 +209,19 @@ class AnonymizationRoutesTest extends {
   }
 
   it should "return 200 OK and a list of stored attributes corresponding to the anonymization key with the supplied ID" in {
-    val (dbPatient1, (_, _), (_, _, _, _), (dbImage1, dbImage2, _, _, _, _, _, _)) = await(TestUtil.insertMetaData(metaDataDao))
+    val (dbPatient1, (_, _), (_, _, _, _), (dbImage1, _, _, _, _, _, _, _)) = await(TestUtil.insertMetaData(metaDataDao))
     val key1 = AnonymizationKey(-1, dbImage1.id, 1234, dbPatient1.patientName.value, "anonPN", dbPatient1.patientID.value, "anonPID", "", "", "", "", "", "")
     val insertedKey1 = await(anonymizationDao.insertAnonymizationKey(key1))
     val akv1 = AnonymizationKeyValue(-1, insertedKey1.id, TagPath.fromTag(Tag.FrameOfReferenceUID), "1.2.3.4", "5.2.9.0")
     val akv2 = AnonymizationKeyValue(-1, insertedKey1.id, TagPath.fromTag(Tag.PatientBirthDate), "20000101", "anon birth date")
     await(anonymizationDao.insertAnonymizationKeyValues(Seq(akv1, akv2)))
-    val akImages =
-      GetAsUser(s"/api/anonymization/keys/${insertedKey1.id}/tagvalues") ~> routes ~> check {
+    val akValues =
+      GetAsUser(s"/api/anonymization/keys/${insertedKey1.id}/keyvalues") ~> routes ~> check {
         status shouldBe OK
         responseAs[Seq[AnonymizationKeyValue]]
       }
-    akImages should have length 2
-    akImages shouldBe Seq(dbImage1, dbImage2)
+    akValues should have length 2
+    akValues.map(_.tagPath) shouldBe Seq(akv1, akv2).map(_.tagPath)
   }
 
   it should "return 200 OK and a list of anonymization keys when querying" in {
@@ -239,32 +239,5 @@ class AnonymizationRoutesTest extends {
     keys should have length 1
     keys.head shouldBe insertedKey1
   }
-
-  it should "remove related stored attributes when an image is deleted" in {
-    val image =
-      PostAsUser("/api/images", TestUtil.testImageFormData) ~> routes ~> check {
-        status shouldBe Created
-        responseAs[Image]
-      }
-
-    val key = await(anonymizationDao.insertAnonymizationKey(AnonymizationKey(-1, image.id, 1234, "pn", "anonPN", "pid", "anonPID", "", "", "", "", "", "")))
-    await(anonymizationDao.insertAnonymizationKeyValues(Seq(AnonymizationKeyValue(-1, key.id, TagPath.fromTag(Tag.FrameOfReferenceUID), "1.2.3.4", "0.0.0.0"))))
-
-    GetAsUser(s"/api/anonymization/keys/${key.id}/images") ~> routes ~> check {
-      status shouldBe OK
-      responseAs[List[Image]] should have length 1
-    }
-
-    DeleteAsUser(s"/api/images/${image.id}") ~> routes ~> check {
-      status shouldBe NoContent
-    }
-
-    Thread.sleep(1000) // wait for ImageDeleted event to reach AnonymizationServiceActor
-
-    GetAsUser(s"/api/anonymization/keys/${key.id}/images") ~> routes ~> check {
-      status shouldBe OK
-      responseAs[List[Image]] shouldBe empty
-    }
-  }
-
+  
 }

@@ -83,14 +83,14 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("DicomStreamOpsSpec")) with
     val bytes = preamble ++ fmiGroupLength(unsupportedMediaStorageSOPClassUID ++ tsuidExplicitLE) ++ unsupportedMediaStorageSOPClassUID ++ tsuidExplicitLE ++ patientNameJohnDoe
     val source = StreamSource.single(bytes)
     recoverToSucceededIf[DicomStreamException] {
-      source.runWith(dicomStreamOpsImpl.dicomDataSink(storage.fileSink("name"), storage.parseFlow(None), _ => Future.successful(AnonymizationKeyQueryResult.empty), Contexts.imageDataContexts, reverseAnonymization = true))
+      source.runWith(dicomStreamOpsImpl.dicomDataSink(storage.fileSink("name"), storage.parseFlow(None), _ => Future.successful(AnonymizationKeyOpResult.empty), Contexts.imageDataContexts, reverseAnonymization = true))
     }
   }
 
   it should "pass a supported context" in {
     val bytes = preamble ++ fmiGroupLength(supportedMediaStorageSOPClassUID ++ tsuidExplicitLE) ++ supportedMediaStorageSOPClassUID ++ tsuidExplicitLE ++ patientNameJohnDoe
     val source = StreamSource.single(bytes)
-    source.runWith(dicomStreamOpsImpl.dicomDataSink(storage.fileSink("name"), storage.parseFlow(None), _ => Future.successful(AnonymizationKeyQueryResult.empty), Contexts.imageDataContexts, reverseAnonymization = true))
+    source.runWith(dicomStreamOpsImpl.dicomDataSink(storage.fileSink("name"), storage.parseFlow(None), _ => Future.successful(AnonymizationKeyOpResult.empty), Contexts.imageDataContexts, reverseAnonymization = true))
       .map(_ => succeed)
   }
 
@@ -98,14 +98,14 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("DicomStreamOpsSpec")) with
     val bytes = preamble ++ fmiGroupLength(unknownMediaStorageSOPClassUID ++ tsuidExplicitLE) ++ unknownMediaStorageSOPClassUID ++ tsuidExplicitLE ++ patientNameJohnDoe
     val source = StreamSource.single(bytes)
     recoverToSucceededIf[DicomStreamException] {
-      source.runWith(dicomStreamOpsImpl.dicomDataSink(storage.fileSink("name"), storage.parseFlow(None), _ => Future.successful(AnonymizationKeyQueryResult.empty), Contexts.imageDataContexts, reverseAnonymization = true))
+      source.runWith(dicomStreamOpsImpl.dicomDataSink(storage.fileSink("name"), storage.parseFlow(None), _ => Future.successful(AnonymizationKeyOpResult.empty), Contexts.imageDataContexts, reverseAnonymization = true))
     }
   }
 
   it should "accept DICOM data with missing file meta information" in {
     val bytes = supportedSOPClassUID
     val source = StreamSource.single(bytes)
-    source.runWith(dicomStreamOpsImpl.dicomDataSink(storage.fileSink("name"), storage.parseFlow(None), _ => Future.successful(AnonymizationKeyQueryResult.empty), Contexts.imageDataContexts, reverseAnonymization = true))
+    source.runWith(dicomStreamOpsImpl.dicomDataSink(storage.fileSink("name"), storage.parseFlow(None), _ => Future.successful(AnonymizationKeyOpResult.empty), Contexts.imageDataContexts, reverseAnonymization = true))
       .map(_ => succeed)
   }
 
@@ -117,7 +117,7 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("DicomStreamOpsSpec")) with
     val source = StreamSource.single(bytes).via(storage.parseFlow(None))
     val anonSource = dicomStreamOpsImpl.anonymizedDicomDataSource(
       source,
-      _ => Future.successful(AnonymizationKeyQueryResult(DicomHierarchyLevel.SERIES, Some(TestUtil.createAnonymizationKey(Elements.empty())), Seq.empty)),
+      _ => Future.successful(AnonymizationKeyOpResult(DicomHierarchyLevel.SERIES, Some(TestUtil.createAnonymizationKey(Elements.empty())), Seq.empty)),
       Seq(t1, t2, t3))
 
     anonSource.via(storage.parseFlow(None)).via(ElementFlows.elementFlow).runWith(ElementSink.elementSink).map { elements =>
@@ -133,7 +133,7 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("DicomStreamOpsSpec")) with
 
     val source = toSource(elements).via(storage.parseFlow(None))
     val anonSource = dicomStreamOpsImpl.anonymizedDicomDataSource(source, _ => Future.successful(
-      AnonymizationKeyQueryResult(DicomHierarchyLevel.SERIES, Some(key), Seq(
+      AnonymizationKeyOpResult(DicomHierarchyLevel.SERIES, Some(key), Seq(
         AnonymizationKeyValue(-1, key.id, TagPath.fromTag(Tag.PatientName), key.patientName, key.anonPatientName),
         AnonymizationKeyValue(-1, key.id, TagPath.fromTag(Tag.PatientID), key.patientID, key.anonPatientID),
         AnonymizationKeyValue(-1, key.id, TagPath.fromTag(Tag.SeriesInstanceUID), key.seriesInstanceUID, key.anonSeriesInstanceUID)
@@ -153,7 +153,7 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("DicomStreamOpsSpec")) with
     val key = TestUtil.createAnonymizationKey(elements)
     val source = toSource(elements).via(storage.parseFlow(None))
 
-    val anonSource = dicomStreamOpsImpl.anonymizedDicomDataSource(source, _ => Future.successful(AnonymizationKeyQueryResult(DicomHierarchyLevel.SERIES, Some(key), Seq(
+    val anonSource = dicomStreamOpsImpl.anonymizedDicomDataSource(source, _ => Future.successful(AnonymizationKeyOpResult(DicomHierarchyLevel.SERIES, Some(key), Seq(
       AnonymizationKeyValue(-1, key.id, TagPath.fromTag(Tag.PatientName), key.patientName, key.anonPatientName),
       AnonymizationKeyValue(-1, key.id, TagPath.fromTag(Tag.PatientID), key.patientID, key.anonPatientID),
       AnonymizationKeyValue(-1, key.id, TagPath.fromTag(Tag.SeriesInstanceUID), key.seriesInstanceUID, key.anonSeriesInstanceUID)
@@ -233,7 +233,10 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("DicomStreamOpsSpec")) with
       anonPatientName = elements.getString(Tag.PatientName).get,
       anonPatientID = elements.getString(Tag.PatientID).get
     ).copy(patientName = realName, patientID = realID)
-    dicomStreamOpsImpl.callAnonymizationService[AnonymizationKeyAdded](AddAnonymizationKey(anonKey)).flatMap { _ =>
+    dicomStreamOpsImpl.callAnonymizationService[AnonymizationKeyOpResult](InsertAnonymizationKeyValues(42, Set(
+      AnonymizationKeyValueData(DicomHierarchyLevel.PATIENT, TagPath.fromTag(Tag.PatientName), anonKey.patientName, anonKey.anonPatientName),
+      AnonymizationKeyValueData(DicomHierarchyLevel.PATIENT, TagPath.fromTag(Tag.PatientID), anonKey.patientID, anonKey.anonPatientID)
+    ))).flatMap { _ =>
       val bytesSource = StreamSource.single(TestUtil.toBytes(elements))
       dicomStreamOpsImpl.storeDicomData(bytesSource, source).map { metaDataAdded =>
         metaDataAdded.patient.patientName.value shouldBe realName

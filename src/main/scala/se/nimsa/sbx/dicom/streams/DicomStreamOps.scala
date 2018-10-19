@@ -291,29 +291,28 @@ trait DicomStreamOps {
     }
   }
 
-  private[streams] val anonymizationKeyQuery: ElementsPart => Future[AnonymizationKeyQueryResult] =
+  private[streams] val anonymizationKeyQuery: ElementsPart => Future[AnonymizationKeyOpResult] =
     p => {
       val patientName = p.elements.getString(Tag.PatientName).getOrElse("")
       val patientID = p.elements.getString(Tag.PatientID).getOrElse("")
       val studyInstanceUID = p.elements.getString(Tag.StudyInstanceUID).getOrElse("")
       val seriesInstanceUID = p.elements.getString(Tag.SeriesInstanceUID).getOrElse("")
       val sopInstanceUID = p.elements.getString(Tag.SOPInstanceUID).getOrElse("")
-      callAnonymizationService[AnonymizationKeyQueryResult](QueryReverseAnonymizationKeyValues(patientName, patientID, studyInstanceUID, seriesInstanceUID, sopInstanceUID))
+      callAnonymizationService[AnonymizationKeyOpResult](QueryReverseAnonymizationKeyValues(patientName, patientID, studyInstanceUID, seriesInstanceUID, sopInstanceUID))
     }
 
-  private[streams] def anonymizationKeyQueryFlow(anonymizationKeyQuery: ElementsPart => Future[AnonymizationKeyQueryResult], label: String)(implicit ec: ExecutionContext) =
+  private[streams] def anonymizationKeyQueryFlow(anonymizationKeyQuery: ElementsPart => Future[AnonymizationKeyOpResult], label: String)(implicit ec: ExecutionContext) =
     identityFlow
       .mapAsync(1) {
-        case p: ElementsPart if p.label == label => anonymizationKeyQuery(p).map(key => p :: AnonymizationKeyQueryResultPart(key) :: Nil)
-        case p: DicomPart => Future.successful(p :: Nil)
+        case p: ElementsPart if p.label == label => anonymizationKeyQuery(p).map(key => AnonymizationKeyOpResultPart(key))
+        case p: DicomPart => Future.successful(p)
       }
-      .mapConcat(identity)
 
-  private[streams] def anonymizationKeyInsert(imageId: Long): Set[AnonymizationKeyValueData] => Future[AnonymizationKeyQueryResult] =
-    keyValues => callAnonymizationService[AnonymizationKeyQueryResult](InsertAnonymizationKeyValues(imageId, keyValues))
+  private[streams] def anonymizationKeyInsert(imageId: Long): Set[AnonymizationKeyValueData] => Future[AnonymizationKeyOpResult] =
+    keyValues => callAnonymizationService[AnonymizationKeyOpResult](InsertAnonymizationKeyValues(imageId, keyValues))
 
 
-  private[streams] def anonymizationKeyInsertFlow(anonymizationKeyInsert: Set[AnonymizationKeyValueData] => Future[AnonymizationKeyQueryResult],
+  private[streams] def anonymizationKeyInsertFlow(anonymizationKeyInsert: Set[AnonymizationKeyValueData] => Future[AnonymizationKeyOpResult],
                                                   customAnonValues: Seq[TagValue],
                                                   before: String, after: String)(implicit ec: ExecutionContext) = {
 
@@ -354,7 +353,7 @@ trait DicomStreamOps {
       }
       .mapAsync(1) {
         case p: AnonymizationKeyValueDataPart =>
-          anonymizationKeyInsert(p.keyValueData).map(AnonymizationKeyQueryResultPart.apply)
+          anonymizationKeyInsert(p.keyValueData).map(AnonymizationKeyOpResultPart.apply)
         case p: DicomPart => Future.successful(p)
       }
   }
@@ -376,7 +375,7 @@ trait DicomStreamOps {
 
   private[streams] def dicomDataSink(storageSink: Sink[ByteString, Future[Done]],
                                      parseFlow: ParseFlow,
-                                     anonymizationKeyQuery: ElementsPart => Future[AnonymizationKeyQueryResult],
+                                     anonymizationKeyQuery: ElementsPart => Future[AnonymizationKeyOpResult],
                                      contexts: Seq[Context],
                                      reverseAnonymization: Boolean)
                                     (implicit ec: ExecutionContext): Sink[ByteString, Future[Elements]] = {
@@ -393,13 +392,12 @@ trait DicomStreamOps {
 
         val baseFlow = validateFlowWithContext(validationContexts, drainIncoming = true)
           .via(parseFlow)
-          .via(collectFlow(anonKeysTags, label))
+          .via(collectFlow(anonKeysTags ++ anonymizationTags, label))
 
         val flow = builder.add {
           if (reverseAnonymization)
             baseFlow
-              .via(conditionalFlow(
-                { case p: ElementsPart if p.label == label => isAnonymous(p.elements) },
+              .via(conditionalFlow({ case p: ElementsPart if p.label == label => isAnonymous(p.elements) },
                 groupLengthDiscardFilter
                   .via(toIndeterminateLengthSequences)
                   .via(toUtf8Flow)
@@ -422,7 +420,7 @@ trait DicomStreamOps {
   }
 
   private[streams] def anonymizedDicomDataSource(storageSource: StreamSource[DicomPart, NotUsed],
-                                                 anonymizationKeyInsert: Set[AnonymizationKeyValueData] => Future[AnonymizationKeyQueryResult],
+                                                 anonymizationKeyInsert: Set[AnonymizationKeyValueData] => Future[AnonymizationKeyOpResult],
                                                  customAnonValues: Seq[TagValue])(implicit ec: ExecutionContext): StreamSource[ByteString, NotUsed] = {
 
     val (before, after) = ("collect-anon-before", "collect-anon-after")

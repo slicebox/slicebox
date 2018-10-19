@@ -20,6 +20,7 @@ import akka.NotUsed
 import akka.stream.scaladsl.Flow
 import akka.util.ByteString
 import se.nimsa.dicom.data.DicomParts.DicomPart
+import se.nimsa.dicom.data.padToEvenLength
 import se.nimsa.dicom.streams.ModifyFlow.{TagModification, TagModificationsPart, modifyFlow}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.{AnonymizationKeyValue, TagValue}
 import se.nimsa.sbx.dicom.streams.DicomStreamUtil._
@@ -29,25 +30,21 @@ import se.nimsa.sbx.dicom.streams.DicomStreamUtil._
   */
 object HarmonizeAnonymizationFlow {
 
-  def harmonizeAnonFlow(customAnonValues: Seq[TagValue]): Flow[DicomPart, DicomPart, NotUsed] =
-    conditionalFlow({ case vp: AnonymizationKeyQueryResultPart => !vp.anonymizationKeyValues.isEmpty || customAnonValues.nonEmpty},
-      identityFlow
-        .mapConcat {
-          case vp: AnonymizationKeyQueryResultPart =>
-            val v = vp.anonymizationKeyValues
-            val active = valueTags
-              .filterNot(_.level > v.matchLevel)
-              .map(_.tagPath)
-              .flatMap(tp => v.values.find(_.tagPath == tp))
-            val custom = customAnonValues.map(v => AnonymizationKeyValue(-1, -1, v.tagPath, "", v.value))
-            val combined = active.foldLeft(custom)((m, tv) => if (m.map(_.tagPath).contains(tv.tagPath)) m else m :+ tv)
-            val mods = combined.map(tv => TagModification.contains(tv.tagPath, _ => ByteString(tv.anonymizedValue), insert = true))
-            TagModificationsPart(mods.toList) :: Nil
-          case p => p :: Nil
-        }
-        .via(modifyFlow()),
-      identityFlow
-    )
+  def harmonizeAnonFlow(customAnonValues: Seq[TagValue]): Flow[DicomPart, DicomPart, NotUsed] = identityFlow
+    .mapConcat {
+      case rp: AnonymizationKeyOpResultPart =>
+        val v = rp.result
+        val active = valueTags
+          .filterNot(_.level > v.matchLevel)
+          .map(_.tagPath)
+          .flatMap(tp => v.values.find(_.tagPath == tp))
+        val custom = customAnonValues.map(v => AnonymizationKeyValue(-1, -1, v.tagPath, "", v.value))
+        val combined = active.foldLeft(custom)((m, tv) => if (m.map(_.tagPath).contains(tv.tagPath)) m else m :+ tv)
+        val mods = combined.map(tv => TagModification.contains(tv.tagPath, _ => padToEvenLength(ByteString(tv.anonymizedValue), tv.tagPath.tag), insert = true))
+        TagModificationsPart(mods.toList) :: Nil
+      case p => p :: Nil
+    }
+    .via(modifyFlow())
 
 }
 
