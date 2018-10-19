@@ -1,7 +1,7 @@
 package se.nimsa.sbx.filtering
 
 import se.nimsa.dicom.data.TagPath.TagPathTag
-import se.nimsa.sbx.app.GeneralProtocol.{Source, SourceRef, SourceType}
+import se.nimsa.sbx.app.GeneralProtocol.{SourceRef, SourceType}
 
 object FilteringProtocol {
 

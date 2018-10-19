@@ -1,6 +1,6 @@
 package se.nimsa.sbx.filtering
 
-import akka.actor.{ActorSystem, Props}
+import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.testkit.{ImplicitSender, TestKit}
 import akka.util.Timeout
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
@@ -11,35 +11,36 @@ import se.nimsa.sbx.filtering.FilteringProtocol._
 import se.nimsa.sbx.util.FutureUtil.await
 import se.nimsa.sbx.util.TestUtil
 
+import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.DurationInt
 
 class FilteringServiceActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
   with WordSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {
   val dbConfig = TestUtil.createTestDb("filteringserviceactortest")
 
-  implicit val ec = system.dispatcher
-  implicit val timeout = Timeout(30.seconds)
+  implicit val ec: ExecutionContext = system.dispatcher
+  implicit val timeout: Timeout = Timeout(30.seconds)
   val db = dbConfig.db
   val filteringDao = new FilteringDAO(dbConfig)
 
   await(filteringDao.create())
 
-  val filteringService = system.actorOf(Props(new FilteringServiceActor(filteringDao)(Timeout(30.seconds))), name = "FilteringService")
+  val filteringService: ActorRef = system.actorOf(Props(new FilteringServiceActor(filteringDao)(Timeout(30.seconds))), name = "FilteringService")
 
   def this() = this(ActorSystem("FilteringServiceActorTestSystem"))
 
-  override def afterEach() = {
+  override def afterEach(): Unit = {
     await(filteringDao.clear())
   }
 
-  def dump() = {
+  def dump(): Unit = {
     println(s"db contents:")
     val cs = await(filteringDao.dump())
     println(cs)
     println(s"No more in db")
   }
 
-  override def afterAll = TestKit.shutdownActorSystem(system)
+  override def afterAll(): Unit = TestKit.shutdownActorSystem(system)
 
   def getTagFilterSpec1 = FilteringProtocol.TagFilterSpec(-1, "filter1", WHITELIST, Seq(TagPath.fromTag(0x0008000d)))
 
