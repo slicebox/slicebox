@@ -212,9 +212,9 @@ class AnonymizationRoutesTest extends {
     val (dbPatient1, (_, _), (_, _, _, _), (dbImage1, dbImage2, _, _, _, _, _, _)) = await(TestUtil.insertMetaData(metaDataDao))
     val key1 = AnonymizationKey(-1, dbImage1.id, 1234, dbPatient1.patientName.value, "anonPN", dbPatient1.patientID.value, "anonPID", "", "", "", "", "", "")
     val insertedKey1 = await(anonymizationDao.insertAnonymizationKey(key1))
-    val akImage1 = AnonymizationKeyValue(insertedKey1.id, TagPath.fromTag(Tag.FrameOfReferenceUID), "1.2.3.4", "5.2.9.0")
-    val akImage2 = AnonymizationKeyValue(insertedKey1.id, TagPath.fromTag(Tag.PatientBirthDate), "20000101", "anon birth date")
-    await(anonymizationDao.insertAnonymizationKeyValues(Seq(akImage1, akImage2)))
+    val akv1 = AnonymizationKeyValue(-1, insertedKey1.id, TagPath.fromTag(Tag.FrameOfReferenceUID), "1.2.3.4", "5.2.9.0")
+    val akv2 = AnonymizationKeyValue(-1, insertedKey1.id, TagPath.fromTag(Tag.PatientBirthDate), "20000101", "anon birth date")
+    await(anonymizationDao.insertAnonymizationKeyValues(Seq(akv1, akv2)))
     val akImages =
       GetAsUser(s"/api/anonymization/keys/${insertedKey1.id}/tagvalues") ~> routes ~> check {
         status shouldBe OK
@@ -248,7 +248,7 @@ class AnonymizationRoutesTest extends {
       }
 
     val key = await(anonymizationDao.insertAnonymizationKey(AnonymizationKey(-1, image.id, 1234, "pn", "anonPN", "pid", "anonPID", "", "", "", "", "", "")))
-    await(anonymizationDao.insertAnonymizationKeyValues(Seq(AnonymizationKeyValue(key.id, TagPath.fromTag(Tag.FrameOfReferenceUID), "1.2.3.4", "0.0.0.0"))))
+    await(anonymizationDao.insertAnonymizationKeyValues(Seq(AnonymizationKeyValue(-1, key.id, TagPath.fromTag(Tag.FrameOfReferenceUID), "1.2.3.4", "0.0.0.0"))))
 
     GetAsUser(s"/api/anonymization/keys/${key.id}/images") ~> routes ~> check {
       status shouldBe OK

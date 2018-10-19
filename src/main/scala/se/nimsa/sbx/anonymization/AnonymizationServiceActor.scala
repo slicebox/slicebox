@@ -65,11 +65,11 @@ class AnonymizationServiceActor(anonymizationDao: AnonymizationDAO, purgeEmptyAn
           anonymizationDao.anonymizationKeyForId(anonymizationKeyId)
             .pipeTo(sender)
 
-        case InsertAnonymizationKeyValues(queryData, insertData) =>
-          insertAnonymizationKeyValues(queryData, insertData)
+        case InsertAnonymizationKeyValues(imageId, keyValueData) =>
+          insertAnonymizationKeyValues(imageId, keyValueData)
             .pipeSequentiallyTo(sender)
 
-        case GetReverseAnonymizationKeyValues(anonPatientName, anonPatientID, anonStudyInstanceUID, anonSeriesInstanceUID, anonSOPInstanceUID) =>
+        case QueryReverseAnonymizationKeyValues(anonPatientName, anonPatientID, anonStudyInstanceUID, anonSeriesInstanceUID, anonSOPInstanceUID) =>
           queryOnAnonData(anonPatientName, anonPatientID, anonStudyInstanceUID, anonSeriesInstanceUID, anonSOPInstanceUID)
             .pipeTo(sender)
 
@@ -87,65 +87,65 @@ class AnonymizationServiceActor(anonymizationDao: AnonymizationDAO, purgeEmptyAn
   }
 
   private def queryOnAnonData(anonPatientName: String, anonPatientID: String,
-                      anonStudyInstanceUID: String, anonSeriesInstanceUID: String,
-                      anonSOPInstanceUID: String): Future[AnonymizationKeyValues] =
+                              anonStudyInstanceUID: String, anonSeriesInstanceUID: String,
+                              anonSOPInstanceUID: String): Future[AnonymizationKeyQueryResult] =
     anonymizationDao.anonymizationKeyForImageForAnonInfo(anonPatientName, anonPatientID, anonStudyInstanceUID, anonSeriesInstanceUID, anonSOPInstanceUID)
       .flatMap(_
         .map(key => anonymizationDao.anonymizationKeyValuesForAnonymizationKeyId(key.id)
-          .map(values => AnonymizationKeyValues(DicomHierarchyLevel.IMAGE, Some(key), values)))
+          .map(values => AnonymizationKeyQueryResult(DicomHierarchyLevel.IMAGE, Some(key), values)))
         .getOrElse(anonymizationDao.anonymizationKeyForSeriesForAnonInfo(anonPatientName, anonPatientID, anonStudyInstanceUID, anonSeriesInstanceUID)
           .flatMap(_
             .map(key => anonymizationDao.anonymizationKeyValuesForAnonymizationKeyId(key.id)
-              .map(values => AnonymizationKeyValues(DicomHierarchyLevel.SERIES, Some(key), values)))
+              .map(values => AnonymizationKeyQueryResult(DicomHierarchyLevel.SERIES, Some(key), values)))
             .getOrElse(anonymizationDao.anonymizationKeyForStudyForAnonInfo(anonPatientName, anonPatientID, anonStudyInstanceUID)
               .flatMap(_
                 .map(key => anonymizationDao.anonymizationKeyValuesForAnonymizationKeyId(key.id)
-                  .map(values => AnonymizationKeyValues(DicomHierarchyLevel.STUDY, Some(key), values)))
+                  .map(values => AnonymizationKeyQueryResult(DicomHierarchyLevel.STUDY, Some(key), values)))
                 .getOrElse(anonymizationDao.anonymizationKeyForPatientForAnonInfo(anonPatientName, anonPatientID)
                   .flatMap(_
                     .map(key => anonymizationDao.anonymizationKeyValuesForAnonymizationKeyId(key.id)
-                      .map(values => AnonymizationKeyValues(DicomHierarchyLevel.PATIENT, Some(key), values)))
-                    .getOrElse(Future.successful(AnonymizationKeyValues.empty)))))))))
+                      .map(values => AnonymizationKeyQueryResult(DicomHierarchyLevel.PATIENT, Some(key), values)))
+                    .getOrElse(Future.successful(AnonymizationKeyQueryResult.empty)))))))))
 
   private def queryOnRealData(patientName: String, patientID: String,
-                      studyInstanceUID: String, seriesInstanceUID: String,
-                      sopInstanceUID: String): Future[AnonymizationKeyValues] =
+                              studyInstanceUID: String, seriesInstanceUID: String,
+                              sopInstanceUID: String): Future[AnonymizationKeyQueryResult] =
     anonymizationDao.anonymizationKeyForImage(patientName, patientID, studyInstanceUID, seriesInstanceUID, sopInstanceUID)
       .flatMap(_
         .map(key => anonymizationDao.anonymizationKeyValuesForAnonymizationKeyId(key.id)
-          .map(values => AnonymizationKeyValues(DicomHierarchyLevel.IMAGE, Some(key), values)))
+          .map(values => AnonymizationKeyQueryResult(DicomHierarchyLevel.IMAGE, Some(key), values)))
         .getOrElse(anonymizationDao.anonymizationKeyForSeries(patientName, patientID, studyInstanceUID, seriesInstanceUID)
           .flatMap(_
             .map(key => anonymizationDao.anonymizationKeyValuesForAnonymizationKeyId(key.id)
-              .map(values => AnonymizationKeyValues(DicomHierarchyLevel.SERIES, Some(key), values)))
+              .map(values => AnonymizationKeyQueryResult(DicomHierarchyLevel.SERIES, Some(key), values)))
             .getOrElse(anonymizationDao.anonymizationKeyForStudy(patientName, patientID, studyInstanceUID)
               .flatMap(_
                 .map(key => anonymizationDao.anonymizationKeyValuesForAnonymizationKeyId(key.id)
-                  .map(values => AnonymizationKeyValues(DicomHierarchyLevel.STUDY, Some(key), values)))
+                  .map(values => AnonymizationKeyQueryResult(DicomHierarchyLevel.STUDY, Some(key), values)))
                 .getOrElse(anonymizationDao.anonymizationKeyForPatient(patientName, patientID)
                   .flatMap(_
                     .map(key => anonymizationDao.anonymizationKeyValuesForAnonymizationKeyId(key.id)
-                      .map(values => AnonymizationKeyValues(DicomHierarchyLevel.PATIENT, Some(key), values)))
-                    .getOrElse(Future.successful(AnonymizationKeyValues.empty)))))))))
+                      .map(values => AnonymizationKeyQueryResult(DicomHierarchyLevel.PATIENT, Some(key), values)))
+                    .getOrElse(Future.successful(AnonymizationKeyQueryResult.empty)))))))))
 
   /**
     * Query database for matching keys on any level based on data to be inserted. Then, harmonize data to be inserted
     * and insert. Flows would be simpler if querying, harmonizing and inserting could be done separately but to support
     * concurrent inserts this must happen under one (actor-based) lock.
     */
-  private def insertAnonymizationKeyValues(imageId: Long, keyValues: Set[(AnonymizationKeyValue, DicomHierarchyLevel)]): Future[AnonymizationKeyValues] = {
+  private def insertAnonymizationKeyValues(imageId: Long, keyValueData: Set[AnonymizationKeyValueData]): Future[AnonymizationKeyQueryResult] = {
 
-    def find(keyValues: Iterable[AnonymizationKeyValue], tag: Int): Option[AnonymizationKeyValue] = keyValues.find(_.tagPath == TagPath.fromTag(tag))
-    def realValue(keyValues: Iterable[AnonymizationKeyValue], tag: Int): String = find(keyValues, tag).map(_.value).getOrElse("")
-    def anonValue(keyValues: Iterable[AnonymizationKeyValue], tag: Int): String = find(keyValues, tag).map(_.anonymizedValue).getOrElse("")
+    def find(keyValueData: Iterable[AnonymizationKeyValueData], tag: Int): Option[AnonymizationKeyValueData] = keyValueData.find(_.tagPath == TagPath.fromTag(tag))
 
-    val realValues = keyValues.map(_._1)
+    def realValue(keyValueData: Iterable[AnonymizationKeyValueData], tag: Int): String = find(keyValueData, tag).map(_.value).getOrElse("")
 
-    val patientName = realValue(realValues, Tag.PatientName)
-    val patientID = realValue(realValues, Tag.PatientID)
-    val studyInstanceUID = realValue(realValues, Tag.StudyInstanceUID)
-    val seriesInstanceUID = realValue(realValues, Tag.SeriesInstanceUID)
-    val sopInstanceUID = realValue(realValues, Tag.SOPInstanceUID)
+    def anonValue(keyValueData: Iterable[AnonymizationKeyValueData], tag: Int): String = find(keyValueData, tag).map(_.anonymizedValue).getOrElse("")
+
+    val patientName = realValue(keyValueData, Tag.PatientName)
+    val patientID = realValue(keyValueData, Tag.PatientID)
+    val studyInstanceUID = realValue(keyValueData, Tag.StudyInstanceUID)
+    val seriesInstanceUID = realValue(keyValueData, Tag.SeriesInstanceUID)
+    val sopInstanceUID = realValue(keyValueData, Tag.SOPInstanceUID)
 
     // look for matching keys on image, series, study then patient levels.
     queryOnRealData(patientID, patientName, studyInstanceUID, seriesInstanceUID, sopInstanceUID)
@@ -153,16 +153,17 @@ class AnonymizationServiceActor(anonymizationDao: AnonymizationDAO, purgeEmptyAn
       // harmonize anon information to insert based on existing results
       .flatMap { existingKeyValues =>
 
-      val harmonizedKeyValues = keyValues
-        .map {
-          case (keyValue, level) =>
-            if (level > existingKeyValues.matchLevel)
-              keyValue
-            else
-              keyValue.copy(anonymizedValue = existingKeyValues.values
-                .find(_.tagPath == keyValue.tagPath)
-                .getOrElse(keyValue)
-                .anonymizedValue)
+      val harmonizedKeyValues = keyValueData
+        .map { keyValueData =>
+          if (keyValueData.level > existingKeyValues.matchLevel)
+            keyValueData
+          else
+            keyValueData.copy(
+              anonymizedValue = existingKeyValues.values
+                .find(_.tagPath == keyValueData.tagPath)
+                .map(_.anonymizedValue)
+                .getOrElse(keyValueData.anonymizedValue)
+            )
         }
 
       val anonPatientName = anonValue(harmonizedKeyValues, Tag.PatientName)
@@ -183,7 +184,7 @@ class AnonymizationServiceActor(anonymizationDao: AnonymizationDAO, purgeEmptyAn
           val insertKeyValues = harmonizedKeyValues.toSeq
             .map(tv => AnonymizationKeyValue(-1, key.id, tv.tagPath, tv.value, tv.anonymizedValue))
           anonymizationDao.insertAnonymizationKeyValues(insertKeyValues)
-            .map(_ => AnonymizationKeyValues(existingKeyValues.matchLevel, Some(anonKey), insertKeyValues))
+            .map(_ => AnonymizationKeyQueryResult(existingKeyValues.matchLevel, Some(key), insertKeyValues))
         }
     }
   }

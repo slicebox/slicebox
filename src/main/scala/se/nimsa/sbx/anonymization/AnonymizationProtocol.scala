@@ -52,22 +52,26 @@ object AnonymizationProtocol {
                                    value: String,
                                    anonymizedValue: String) extends Entity
 
-  case class AnonymizationKeyValues(matchLevel: DicomHierarchyLevel, anonymizationKeyMaybe: Option[AnonymizationKey], values: Seq[AnonymizationKeyValue]) {
+  case class AnonymizationKeyQueryResult(matchLevel: DicomHierarchyLevel, anonymizationKeyMaybe: Option[AnonymizationKey], values: Seq[AnonymizationKeyValue]) {
     def isEmpty: Boolean = anonymizationKeyMaybe.isEmpty
   }
 
-  object AnonymizationKeyValues {
-    def empty: AnonymizationKeyValues = AnonymizationKeyValues(DicomHierarchyLevel.PATIENT, None, Seq.empty)
+  object AnonymizationKeyQueryResult {
+    def empty: AnonymizationKeyQueryResult = AnonymizationKeyQueryResult(DicomHierarchyLevel.PATIENT, None, Seq.empty)
   }
 
+  case class AnonymizationKeyValueData(level: DicomHierarchyLevel,
+                                       tagPath: TagPathTag,
+                                       value: String,
+                                       anonymizedValue: String)
   trait AnonymizationRequest
 
-  case class InsertAnonymizationKeyValues(imageId: Long, tagValues: Set[(AnonymizationKeyValue, DicomHierarchyLevel)]) extends AnonymizationRequest
+  case class InsertAnonymizationKeyValues(imageId: Long, tagValueData: Set[AnonymizationKeyValueData]) extends AnonymizationRequest
 
-  case class GetReverseAnonymizationKeyValues(anonPatientName: String, anonPatientID: String,
-                                              anonStudyInstanceUID: String,
-                                              anonSeriesInstanceUID: String,
-                                              anonSOPInstanceUID: String) extends AnonymizationRequest
+  case class QueryReverseAnonymizationKeyValues(anonPatientName: String, anonPatientID: String,
+                                                anonStudyInstanceUID: String,
+                                                anonSeriesInstanceUID: String,
+                                                anonSOPInstanceUID: String) extends AnonymizationRequest
 
   case class GetTagValuesForAnonymizationKey(anonymizationKeyId: Long) extends AnonymizationRequest
 

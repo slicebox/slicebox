@@ -30,10 +30,10 @@ import se.nimsa.sbx.dicom.streams.DicomStreamUtil._
 object ReverseAnonymizationFlow {
 
   def reverseAnonFlow: Flow[DicomPart, DicomPart, NotUsed] =
-    conditionalFlow({ case vp: AnonymizationKeyValuesPart => !vp.anonymizationKeyValues.isEmpty },
+    conditionalFlow({ case vp: AnonymizationKeyQueryResultPart => !vp.anonymizationKeyValues.isEmpty },
       identityFlow
         .mapConcat {
-          case vp: AnonymizationKeyValuesPart =>
+          case vp: AnonymizationKeyQueryResultPart =>
             val v = vp.anonymizationKeyValues
             val active = valueTags
               .filterNot(_.level > v.matchLevel)

@@ -30,10 +30,10 @@ import se.nimsa.sbx.dicom.streams.DicomStreamUtil._
 object HarmonizeAnonymizationFlow {
 
   def harmonizeAnonFlow(customAnonValues: Seq[TagValue]): Flow[DicomPart, DicomPart, NotUsed] =
-    conditionalFlow({ case vp: AnonymizationKeyValuesPart => !vp.anonymizationKeyValues.isEmpty || customAnonValues.nonEmpty},
+    conditionalFlow({ case vp: AnonymizationKeyQueryResultPart => !vp.anonymizationKeyValues.isEmpty || customAnonValues.nonEmpty},
       identityFlow
         .mapConcat {
-          case vp: AnonymizationKeyValuesPart =>
+          case vp: AnonymizationKeyQueryResultPart =>
             val v = vp.anonymizationKeyValues
             val active = valueTags
               .filterNot(_.level > v.matchLevel)

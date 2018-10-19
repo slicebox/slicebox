@@ -8,7 +8,7 @@ import akka.stream.testkit.scaladsl.TestSink
 import akka.testkit.TestKit
 import akka.util.ByteString
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
-import se.nimsa.dicom.data.DicomParts.{DicomPart, ValueChunk}
+import se.nimsa.dicom.data.DicomParts.{DicomPart, ElementsPart, ValueChunk}
 import se.nimsa.dicom.data._
 import se.nimsa.dicom.streams.CollectFlow.collectFlow
 import se.nimsa.dicom.streams.{DicomFlows, ElementFlows}
@@ -17,9 +17,11 @@ import se.nimsa.sbx.storage.{RuntimeStorage, StorageService}
 import se.nimsa.sbx.util.TestUtil._
 
 import scala.concurrent.duration.DurationInt
-import scala.concurrent.{Await, ExecutionContextExecutor, Future}
+import scala.concurrent.{Await, ExecutionContextExecutor}
 
 class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")) with FlatSpecLike with Matchers with BeforeAndAfterAll {
+
+  import AnonymizationFlow.anonFlow
 
   implicit val materializer: ActorMaterializer = ActorMaterializer()
   implicit val ec: ExecutionContextExecutor = system.dispatcher
@@ -35,10 +37,8 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
 
   def toMaybeAnonSource(elements: Elements): Source[DicomPart, NotUsed] =
     toSource(elements)
-      .via(collectFlow(anonKeysQueryTags, "anon"))
-      .map(attributesToInfoPart(_, "anon"))
-      .mapAsync(1)(insertAnonymizationKeyFlow(_ => Future.successful(createAnonymizationKey(elements))))
-      .via(AnonymizationFlow.maybeAnonFlow)
+      .via(collectFlow(encodingTags ++ anonymizationTags ++ anonKeysTags ++ valueTags.map(_.tagPath), "anon"))
+      .via(conditionalFlow({ case p: ElementsPart if p.label == "anon" => !isAnonymous(p.elements) }, anonFlow, identityFlow))
 
   def checkBasicAttributes(source: Source[DicomPart, NotUsed]): PartProbe =
     source.runWith(TestSink.probe[DicomPart])
@@ -56,7 +56,7 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
 
   "The anonymization flow" should "replace an existing accession number with a named based UID" in {
     val elements = Elements.empty()
-        .setString(Tag.AccessionNumber, "ACC001")
+      .setString(Tag.AccessionNumber, "ACC001")
     val source = toAnonSource(elements)
 
     source.runWith(TestSink.probe[DicomPart])
@@ -256,11 +256,13 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
       .expectDicomComplete()
   }
 
-  it should "anonymize if PatientIdentityRemoved=YES but DicomInfoPart is missing" in {
+  it should "anonymize if PatientIdentityRemoved=YES but ElementsPart is missing" in {
     val elements = Elements.empty()
       .setString(Tag.PatientID, "12345678")
       .setString(Tag.PatientIdentityRemoved, "YES")
-    val source = toSource(elements).via(AnonymizationFlow.maybeAnonFlow).via(DicomFlows.tagFilter(_ => false)(tagPath => tagPath.tag == Tag.PatientID))
+    val source = toSource(elements)
+      .via(conditionalFlow({ case p: ElementsPart => !isAnonymous(p.elements) }, anonFlow, identityFlow))
+      .via(DicomFlows.tagFilter(_ => false)(tagPath => tagPath.tag == Tag.PatientID))
 
     source.runWith(TestSink.probe[DicomPart])
       .expectHeader(Tag.PatientID)

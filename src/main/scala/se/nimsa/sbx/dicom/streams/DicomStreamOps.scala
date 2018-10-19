@@ -40,7 +40,7 @@ import se.nimsa.dicom.streams.{DicomStreamException, ParseFlow}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.app.GeneralProtocol.{Source, SourceType}
 import se.nimsa.sbx.dicom.Contexts.Context
-import se.nimsa.sbx.dicom.DicomHierarchy.{DicomHierarchyLevel, Image}
+import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.{Contexts, ImageAttribute}
 import se.nimsa.sbx.lang.NotFoundException
 import se.nimsa.sbx.metadata.MetaDataProtocol._
@@ -75,7 +75,7 @@ trait DicomStreamOps {
     */
   protected def anonymizedDicomData(imageId: Long, customAnonValues: Seq[TagValue], storage: StorageService)(implicit ec: ExecutionContext): StreamSource[ByteString, NotUsed] = {
     val source = storage.dataSource(imageId, None)
-    anonymizedDicomDataSource(source, insertAnonymizationKeyValues(imageId), customAnonValues)
+    anonymizedDicomDataSource(source, anonymizationKeyInsert(imageId), customAnonValues)
   }
 
   /**
@@ -91,7 +91,7 @@ trait DicomStreamOps {
   protected def storeDicomData(bytesSource: StreamSource[ByteString, _], source: Source, storage: StorageService, contexts: Seq[Context], reverseAnonymization: Boolean)
                               (implicit materializer: Materializer, ec: ExecutionContext): Future[MetaDataAdded] = {
     val tempPath = createTempPath()
-    val sink = dicomDataSink(storage.fileSink(tempPath), storage.parseFlow(None), getReverseAnonymizationKeyValues, contexts, reverseAnonymization)
+    val sink = dicomDataSink(storage.fileSink(tempPath), storage.parseFlow(None), anonymizationKeyQuery, contexts, reverseAnonymization)
     bytesSource.runWith(sink)
       .flatMap(elements => storeDicomData(elements, source, tempPath, storage))
       .recover {
@@ -121,7 +121,7 @@ trait DicomStreamOps {
             val forcedSource = storage
               .dataSource(imageId, None)
               .via(blacklistFilter(Set(TagPath.fromTag(Tag.PatientIdentityRemoved), TagPath.fromTag(Tag.DeidentificationMethod))))
-            val anonymizedSource = anonymizedDicomDataSource(forcedSource, insertAnonymizationKeyValues(imageId), customAnonValues)
+            val anonymizedSource = anonymizedDicomDataSource(forcedSource, anonymizationKeyInsert(imageId), customAnonValues)
             storeDicomData(anonymizedSource, seriesSource.source, storage, Contexts.extendedContexts, reverseAnonymization = false).flatMap { metaDataAdded =>
               callMetaDataService[MetaDataDeleted](DeleteMetaData(Seq(imageId))).map { _ =>
                 storage.deleteFromStorage(Seq(imageId))
@@ -149,7 +149,7 @@ trait DicomStreamOps {
       }.unwrap.map(_.getOrElse((None, Seq.empty)))
 
     val tempPath = createTempPath()
-    val sink = dicomDataSink(storage.fileSink(tempPath), storage.parseFlow(None), getReverseAnonymizationKeyValues, Contexts.extendedContexts, reverseAnonymization = false)
+    val sink = dicomDataSink(storage.fileSink(tempPath), storage.parseFlow(None), anonymizationKeyQuery, Contexts.extendedContexts, reverseAnonymization = false)
 
     val futureModifiedTempFile =
       storage
@@ -291,34 +291,34 @@ trait DicomStreamOps {
     }
   }
 
-  private[streams] val getReverseAnonymizationKeyValues: ElementsPart => Future[AnonymizationKeyValues] =
+  private[streams] val anonymizationKeyQuery: ElementsPart => Future[AnonymizationKeyQueryResult] =
     p => {
       val patientName = p.elements.getString(Tag.PatientName).getOrElse("")
       val patientID = p.elements.getString(Tag.PatientID).getOrElse("")
       val studyInstanceUID = p.elements.getString(Tag.StudyInstanceUID).getOrElse("")
       val seriesInstanceUID = p.elements.getString(Tag.SeriesInstanceUID).getOrElse("")
       val sopInstanceUID = p.elements.getString(Tag.SOPInstanceUID).getOrElse("")
-      callAnonymizationService[AnonymizationKeyValues](GetReverseAnonymizationKeyValues(patientName, patientID, studyInstanceUID, seriesInstanceUID, sopInstanceUID))
+      callAnonymizationService[AnonymizationKeyQueryResult](QueryReverseAnonymizationKeyValues(patientName, patientID, studyInstanceUID, seriesInstanceUID, sopInstanceUID))
     }
 
-  private[streams] def getReverseAnonymizationKeyValuesFlow(getReverseAnonymizationKeyValues: ElementsPart => Future[AnonymizationKeyValues], label: String)(implicit ec: ExecutionContext) =
+  private[streams] def anonymizationKeyQueryFlow(anonymizationKeyQuery: ElementsPart => Future[AnonymizationKeyQueryResult], label: String)(implicit ec: ExecutionContext) =
     identityFlow
       .mapAsync(1) {
-        case p: ElementsPart if p.label == label => getReverseAnonymizationKeyValues(p).map(key => p :: AnonymizationKeyValuesPart(key) :: Nil)
+        case p: ElementsPart if p.label == label => anonymizationKeyQuery(p).map(key => p :: AnonymizationKeyQueryResultPart(key) :: Nil)
         case p: DicomPart => Future.successful(p :: Nil)
       }
       .mapConcat(identity)
 
-  private[streams] def insertAnonymizationKeyValues(imageId: Long): Set[(AnonymizationKeyValue, DicomHierarchyLevel)] => Future[AnonymizationKeyValues] =
-    keyValues => callAnonymizationService[AnonymizationKeyValues](InsertAnonymizationKeyValues(imageId, keyValues))
+  private[streams] def anonymizationKeyInsert(imageId: Long): Set[AnonymizationKeyValueData] => Future[AnonymizationKeyQueryResult] =
+    keyValues => callAnonymizationService[AnonymizationKeyQueryResult](InsertAnonymizationKeyValues(imageId, keyValues))
 
 
-  private[streams] def insertAnonymizationKeyValuesFlow(insertAnonymizationKeyValues: Set[(AnonymizationKeyValue, DicomHierarchyLevel)] => Future[AnonymizationKeyValues],
-                                                        customAnonValues: Seq[TagValue],
-                                                        before: String, after: String)(implicit ec: ExecutionContext) = {
+  private[streams] def anonymizationKeyInsertFlow(anonymizationKeyInsert: Set[AnonymizationKeyValueData] => Future[AnonymizationKeyQueryResult],
+                                                  customAnonValues: Seq[TagValue],
+                                                  before: String, after: String)(implicit ec: ExecutionContext) = {
 
     // this is the old insert flow, incorporate somehow below
-    case class KeyValuesPart(keyValues: Set[(AnonymizationKeyValue, DicomHierarchyLevel)]) extends MetaPart
+    case class AnonymizationKeyValueDataPart(keyValueData: Set[AnonymizationKeyValueData]) extends MetaPart
 
     identityFlow
       .statefulMapConcat {
@@ -340,21 +340,21 @@ trait DicomStreamOps {
                         .map(_.value)
                         .orElse(anonElements.getSingleString(tp))
                         .getOrElse("")
-                      (AnonymizationKeyValue(-1, -1, tp, value, anonValue), tagLevel.level)
+                      AnonymizationKeyValueData(tagLevel.level, tp, value, anonValue)
                     }
                   case _ => None
                 }
               }
-              p :: KeyValuesPart(tagValues) :: Nil
+              p :: AnonymizationKeyValueDataPart(tagValues) :: Nil
             }.getOrElse {
-              p :: KeyValuesPart(Set.empty) :: Nil
+              p :: AnonymizationKeyValueDataPart(Set.empty) :: Nil
             }
           case p => p :: Nil
         }
       }
       .mapAsync(1) {
-        case p: KeyValuesPart =>
-          insertAnonymizationKeyValues(p.keyValues).map(AnonymizationKeyValuesPart.apply)
+        case p: AnonymizationKeyValueDataPart =>
+          anonymizationKeyInsert(p.keyValueData).map(AnonymizationKeyQueryResultPart.apply)
         case p: DicomPart => Future.successful(p)
       }
   }
@@ -376,7 +376,7 @@ trait DicomStreamOps {
 
   private[streams] def dicomDataSink(storageSink: Sink[ByteString, Future[Done]],
                                      parseFlow: ParseFlow,
-                                     getReverseAnonymizationKeyValues: ElementsPart => Future[AnonymizationKeyValues],
+                                     anonymizationKeyQuery: ElementsPart => Future[AnonymizationKeyQueryResult],
                                      contexts: Seq[Context],
                                      reverseAnonymization: Boolean)
                                     (implicit ec: ExecutionContext): Sink[ByteString, Future[Elements]] = {
@@ -403,7 +403,7 @@ trait DicomStreamOps {
                 groupLengthDiscardFilter
                   .via(toIndeterminateLengthSequences)
                   .via(toUtf8Flow)
-                  .via(getReverseAnonymizationKeyValuesFlow(getReverseAnonymizationKeyValues, label))
+                  .via(anonymizationKeyQueryFlow(anonymizationKeyQuery, label))
                   .via(reverseAnonFlow),
                 identityFlow
               ))
@@ -422,7 +422,7 @@ trait DicomStreamOps {
   }
 
   private[streams] def anonymizedDicomDataSource(storageSource: StreamSource[DicomPart, NotUsed],
-                                                 insertAnonymizationKey: Set[(AnonymizationKeyValue, DicomHierarchyLevel)] => Future[AnonymizationKeyValues],
+                                                 anonymizationKeyInsert: Set[AnonymizationKeyValueData] => Future[AnonymizationKeyQueryResult],
                                                  customAnonValues: Seq[TagValue])(implicit ec: ExecutionContext): StreamSource[ByteString, NotUsed] = {
 
     val (before, after) = ("collect-anon-before", "collect-anon-after")
@@ -438,7 +438,7 @@ trait DicomStreamOps {
         .via(toUtf8Flow)
         .via(anonFlow)
         .via(collectFlow(tags, after)) // collect necessary info before anonymization
-        .via(insertAnonymizationKeyValuesFlow(insertAnonymizationKey, customAnonValues, before, after))
+        .via(anonymizationKeyInsertFlow(anonymizationKeyInsert, customAnonValues, before, after))
         .via(harmonizeAnonFlow(customAnonValues))
         .via(fmiGroupLengthFlow),
       // data does not need anonymization - just pass through

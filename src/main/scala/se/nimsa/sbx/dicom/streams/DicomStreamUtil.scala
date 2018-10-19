@@ -22,12 +22,12 @@ import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Merge}
 import se.nimsa.dicom.data.DicomParts.{DicomPart, MetaPart}
 import se.nimsa.dicom.data.TagPath.TagPathTag
 import se.nimsa.dicom.data._
-import se.nimsa.sbx.anonymization.AnonymizationProtocol.{AnonymizationKeyValues, TagValue}
+import se.nimsa.sbx.anonymization.AnonymizationProtocol.{AnonymizationKeyQueryResult, TagValue}
 import se.nimsa.sbx.dicom.DicomHierarchy.DicomHierarchyLevel
 
 object DicomStreamUtil {
 
-  case class AnonymizationKeyValuesPart(anonymizationKeyValues: AnonymizationKeyValues) extends MetaPart
+  case class AnonymizationKeyQueryResultPart(anonymizationKeyValues: AnonymizationKeyQueryResult) extends MetaPart
 
   val encodingTags: Set[TagPath] = Set(Tag.TransferSyntaxUID, Tag.SpecificCharacterSet).map(TagPath.fromTag)
 

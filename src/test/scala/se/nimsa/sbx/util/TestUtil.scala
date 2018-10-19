@@ -182,12 +182,13 @@ object TestUtil {
   }
 
   def createAnonymizationKey(elements: Elements,
+                             imageId: Long = -1,
                              anonPatientName: String = "anon patient name",
                              anonPatientID: String = "anon patient ID",
                              anonStudyInstanceUID: String = "anon study instance UID",
                              anonSeriesInstanceUID: String = "anon series instance UID",
                              anonSOPInstanceUID: String = "anon SOP instance UID") =
-    AnonymizationKey(-1, -1,  new Date().getTime,
+    AnonymizationKey(-1,  new Date().getTime, imageId,
       elements.getString(Tag.PatientName).getOrElse(""), anonPatientName,
       elements.getString(Tag.PatientID).getOrElse(""), anonPatientID,
       elements.getString(Tag.StudyInstanceUID).getOrElse(""), anonStudyInstanceUID,

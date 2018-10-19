@@ -48,7 +48,7 @@ trait JsonFormats {
     case _ => JsError("Enumeration expected")
   }, Writes[A](a => JsString(a.toString)))
 
-  private lazy val tagPathReads: Reads[TagPath] = (
+  implicit lazy val tagPathReads: Reads[TagPath] = (
     (__ \ "tag").read[Int] and
       (__ \ "item").readNullable[String] and
       (__ \ "previous").lazyReadNullable[TagPath](tagPathReads)
@@ -69,12 +69,22 @@ trait JsonFormats {
     }
   })
 
-  private lazy val tagPathTagReads: Reads[TagPathTag] =
+  implicit lazy val tagPathTagReads: Reads[TagPathTag] =
     tagPathReads.collect(JsonValidationError("Could not parse tag path tag")) {
       case tp: TagPathTag => tp
     }
 
-  private lazy val tagPathWrites: Writes[TagPath] = {
+  implicit lazy val tagPathSequenceItemReads: Reads[TagPathSequenceItem] =
+    tagPathReads.collect(JsonValidationError("Could not parse tag path sequence")) {
+      case tp: TagPathSequenceItem => tp
+    }
+
+  implicit lazy val tagPathSequenceAnyReads: Reads[TagPathSequenceAny] =
+    tagPathReads.collect(JsonValidationError("Could not parse tag path sequence")) {
+      case tp: TagPathSequenceAny => tp
+    }
+
+  implicit lazy val tagPathWrites: Writes[TagPath] = {
     val trunkToOption: TagPathTrunk => Option[TagPathTrunk] = {
       case EmptyTagPath => None
       case p => Some(p)
@@ -92,9 +102,6 @@ trait JsonFormats {
         (__ \ "previous").lazyWriteNullable[TagPathTrunk](tagPathWrites)
     ) (tagPathToTuple)
   }
-
-  implicit lazy val tagPathFormat: Format[TagPath] = Format(tagPathReads, tagPathWrites)
-  implicit lazy val tagPathTagFormat: Format[TagPathTag] = Format[TagPathTag](tagPathTagReads, tagPathWrites)
 
   implicit val tagMappingFormat: Format[TagMapping] = Format[TagMapping](
     (
