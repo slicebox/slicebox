@@ -106,7 +106,8 @@ libraryDependencies ++= {
     "org.webjars" % "angular-file-upload" % "11.0.0",
     "se.nimsa" %% "dicom-streams" % "0.4-SNAPSHOT",
     "com.lightbend.akka" %% "akka-stream-alpakka-s3" % alpakkaVersion,
-    "com.lightbend.akka" %% "akka-stream-alpakka-file" % alpakkaVersion
+    "com.lightbend.akka" %% "akka-stream-alpakka-file" % alpakkaVersion,
+    "com.lightbend.akka" %% "akka-stream-alpakka-csv" % alpakkaVersion
   )
 }
 

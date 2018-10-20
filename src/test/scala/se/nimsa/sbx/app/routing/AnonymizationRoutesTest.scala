@@ -239,5 +239,5 @@ class AnonymizationRoutesTest extends {
     keys should have length 1
     keys.head shouldBe insertedKey1
   }
-  
+
 }

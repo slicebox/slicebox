@@ -21,6 +21,10 @@ angular.module('slicebox.adminSystem', ['ngRoute'])
         });
     };
 
+    $scope.exportAnonymizationInfoButtonClicked = function() {
+        location.href = '/api/anonymization/keys/export/csv';
+    };
+
     $scope.shutdownButtonClicked = function() {
         openConfirmActionModal('System', 'This command will wait for ongoing requests to finish and then stop the Slicebox service. Proceed?', 'Ok', function() {
             return $http.post('/api/system/stop').then(function() {

@@ -18,15 +18,7 @@ angular.module('slicebox.anonymization', ['ngRoute'])
             {
                 name: 'Delete',
                 action: openDeleteEntitiesModalFunction('/api/anonymization/keys/', 'anonymization key(s)')
-            },
-            {
-                name: 'Export',
-                action: $scope.exportToCsv
-            },
-            {
-                name: 'Tag Series',
-                action: openTagSeriesModalFunction('/api/anonymization/keys/')
-            }            
+            }
         ];
 
     if (!$scope.uiState.anonymizationTableState) {
@@ -74,7 +66,7 @@ angular.module('slicebox.anonymization', ['ngRoute'])
             return [];
         }
 
-        var keyValuesPromise = $http.get('/api/anonymization/keys/' + $scope.uiState.selectedKey.id + '/keyvalues').then(function(data) {
+        $http.get('/api/anonymization/keys/' + $scope.uiState.selectedKey.id + '/keyvalues').then(function(data) {
             if (filter) {
                 var filterLc = filter.toLowerCase();
                 data.data = data.data.filter(function (keyValue) {
@@ -102,26 +94,4 @@ angular.module('slicebox.anonymization', ['ngRoute'])
 
         return keyValuesPromise;
     };
-
-    $scope.exportToCsv = function(keys) {
-        var csv = 
-            "Id;Image Id;Created;Patient Name;Anonymous Patient Name;Patient ID;Anonymous Patient ID" +
-            "Study Instance UID;Anonymous Study Instance UID;Series Instance UID;Anonymous Series Instance UID;" +
-            "SOP Instance UID;Anonymous SOP Instance UID\n" +
-            keys.map(function (key) {
-                return key.id + ";" + key.imageId + ";" + key.created + ";" + key.patientName + ";" + key.anonPatientName + ";" + key.patientID + ";" + key.anonPatientID + ";" +
-                    key.studyInstanceUID + ";" + key.anonStudyInstanceUID + ";" + key.seriesInstanceUID + ";" + key.anonSeriesInstanceUID + ";" +
-                    key.sopInstanceUID + ";" + key.anonSOPInstanceUID;
-            }).join("\n");
-        var anchor = "<a class='md-button md-primary' href='data:text/csv;charset=UTF-8," + encodeURIComponent(csv) + "' download='slicebox-anonymization-keys.csv'>Download CSV</a>";
-        var textBoxHeader = '<h4>...or copy these values to the clipboard:</h4>';
-        var textBox = "<md-content style='height: 200px;padding: 8px;'><pre>" + csv + "</pre></md-content>";
-        var body = anchor + textBoxHeader + textBox;
-        openMessageModal("Download or copy CSV", body);
-    };
-
-    function capitalizeFirst(string) {
-        return string.charAt(0).toUpperCase() + string.substring(1);        
-    }
-
 });

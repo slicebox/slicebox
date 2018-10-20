@@ -16,6 +16,8 @@
 
 package se.nimsa.sbx.anonymization
 
+import akka.NotUsed
+import akka.stream.scaladsl.Source
 import se.nimsa.dicom.data.TagPath
 import se.nimsa.dicom.data.TagPath.TagPathTag
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
@@ -285,4 +287,14 @@ class AnonymizationDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Exe
         }
       }
     }
+
+  def anonymizationKeyValueSource: Source[(AnonymizationKey, AnonymizationKeyValue), NotUsed] =
+    Source.fromPublisher(db.stream {
+      val a = for {
+        anonKey <- anonymizationKeyQuery
+        keyValue <- anonymizationKeyValueQuery if keyValue.anonymizationKeyId === anonKey.id
+      } yield (anonKey, keyValue)
+      a.result
+    })
+
 }

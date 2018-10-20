@@ -30,16 +30,16 @@ import se.nimsa.sbx.dicom.streams.DicomStreamUtil._
 object ReverseAnonymizationFlow {
 
   def reverseAnonFlow: Flow[DicomPart, DicomPart, NotUsed] = identityFlow
-    .mapConcat {
+    .map {
       case rp: AnonymizationKeyOpResultPart =>
-        val v = rp.result
+        val r = rp.result
         val active = valueTags
-          .filterNot(_.level > v.matchLevel)
+          .filterNot(_.level > r.matchLevel)
           .map(_.tagPath)
-          .flatMap(tp => v.values.find(_.tagPath == tp))
+          .flatMap(tp => r.values.find(_.tagPath == tp))
         val mods = active.map(tv => TagModification.contains(tv.tagPath, _ => padToEvenLength(ByteString(tv.value), tv.tagPath.tag), insert = true))
-        TagModificationsPart(mods.toList) :: Nil
-      case p => p :: Nil
+        TagModificationsPart(mods.toList)
+      case p => p
     }
     .via(modifyFlow())
 }

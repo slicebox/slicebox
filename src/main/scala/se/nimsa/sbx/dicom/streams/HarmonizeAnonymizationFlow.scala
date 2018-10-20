@@ -31,18 +31,18 @@ import se.nimsa.sbx.dicom.streams.DicomStreamUtil._
 object HarmonizeAnonymizationFlow {
 
   def harmonizeAnonFlow(customAnonValues: Seq[TagValue]): Flow[DicomPart, DicomPart, NotUsed] = identityFlow
-    .mapConcat {
+    .map {
       case rp: AnonymizationKeyOpResultPart =>
-        val v = rp.result
+        val r = rp.result
         val active = valueTags
-          .filterNot(_.level > v.matchLevel)
+          .filterNot(_.level > r.matchLevel)
           .map(_.tagPath)
-          .flatMap(tp => v.values.find(_.tagPath == tp))
+          .flatMap(tp => r.values.find(_.tagPath == tp))
         val custom = customAnonValues.map(v => AnonymizationKeyValue(-1, -1, v.tagPath, "", v.value))
         val combined = active.foldLeft(custom)((m, tv) => if (m.map(_.tagPath).contains(tv.tagPath)) m else m :+ tv)
         val mods = combined.map(tv => TagModification.contains(tv.tagPath, _ => padToEvenLength(ByteString(tv.anonymizedValue), tv.tagPath.tag), insert = true))
-        TagModificationsPart(mods.toList) :: Nil
-      case p => p :: Nil
+        TagModificationsPart(mods.toList)
+      case p => p
     }
     .via(modifyFlow())
 

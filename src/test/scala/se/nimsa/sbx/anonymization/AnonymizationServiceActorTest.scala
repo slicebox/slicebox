@@ -78,12 +78,6 @@ class AnonymizationServiceActorTest(_system: ActorSystem) extends TestKit(_syste
 
     "yield patient, study and series information depending on completeness of match when querying for anonymization keys" in {
       val key = await(anonymizationDao.insertAnonymizationKey(key1))
-      await(anonymizationDao.insertAnonymizationKeyValues(Seq(
-        AnonymizationKeyValue(-1, key.id, TagPath.fromTag(Tag.PatientName), key.patientName, key.anonPatientName),
-          AnonymizationKeyValue(-1, key.id, TagPath.fromTag(Tag.PatientID), key.patientID, key.anonPatientID),
-          AnonymizationKeyValue(-1, key.id, TagPath.fromTag(Tag.StudyInstanceUID), key.studyInstanceUID, key.anonStudyInstanceUID),
-          AnonymizationKeyValue(-1, key.id, TagPath.fromTag(Tag.PatientName), key.seriesInstanceUID, key.anonSeriesInstanceUID),
-          AnonymizationKeyValue(-1, key.id, TagPath.fromTag(Tag.PatientName), key.sopInstanceUID, key.anonSOPInstanceUID))))
 
       // image match
       anonymizationService ! QueryReverseAnonymizationKeyValues(key.anonPatientName, key.anonPatientID, key.anonStudyInstanceUID, key.anonSeriesInstanceUID, key.anonSOPInstanceUID)
@@ -130,13 +124,16 @@ class AnonymizationServiceActorTest(_system: ActorSystem) extends TestKit(_syste
     "insert anonymization key into database" in {
       val imageId = 42
 
-      anonymizationService ! InsertAnonymizationKeyValues(imageId, Set(AnonymizationKeyValueData(DicomHierarchyLevel.PATIENT, TagPath.fromTag(Tag.PatientName), "name", "anon name")))
+      anonymizationService ! InsertAnonymizationKeyValues(imageId, Set(
+        AnonymizationKeyValueData(DicomHierarchyLevel.PATIENT, TagPath.fromTag(Tag.PatientName), "name", "anon name"),
+        AnonymizationKeyValueData(DicomHierarchyLevel.IMAGE, TagPath.fromTag(Tag.PatientIdentityRemoved), "NO", "YES")
+      ))
       expectMsgPF() {
         case r: AnonymizationKeyOpResult =>
           r.anonymizationKeyMaybe shouldBe defined
           r.anonymizationKeyMaybe.get.patientName shouldBe "name"
           r.anonymizationKeyMaybe.get.anonPatientName shouldBe "anon name"
-          r.values should have size 1
+          r.values should have size 2
           r.values.head.tagPath shouldBe TagPath.fromTag(Tag.PatientName)
       }
     }

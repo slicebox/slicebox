@@ -353,7 +353,7 @@ trait DicomStreamOps {
       }
       .mapAsync(1) {
         case p: AnonymizationKeyValueDataPart =>
-          anonymizationKeyInsert(p.keyValueData).map(AnonymizationKeyOpResultPart.apply)
+          anonymizationKeyInsert(p.keyValueData).map(AnonymizationKeyOpResultPart)
         case p: DicomPart => Future.successful(p)
       }
   }

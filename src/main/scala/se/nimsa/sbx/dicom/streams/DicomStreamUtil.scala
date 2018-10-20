@@ -48,22 +48,27 @@ object DicomStreamUtil {
 
   case class TagLevel(tagPath: TagPathTag, level: DicomHierarchyLevel)
 
-  val valueTags: Set[TagLevel] = Set(
+  val mandatoryValueTags: Set[TagLevel] = Set(
     TagLevel(TagPath.fromTag(Tag.PatientName), DicomHierarchyLevel.PATIENT),
     TagLevel(TagPath.fromTag(Tag.PatientID), DicomHierarchyLevel.PATIENT),
-    TagLevel(TagPath.fromTag(Tag.PatientBirthDate), DicomHierarchyLevel.PATIENT),
     TagLevel(TagPath.fromTag(Tag.StudyInstanceUID), DicomHierarchyLevel.STUDY),
-    TagLevel(TagPath.fromTag(Tag.StudyDescription), DicomHierarchyLevel.STUDY),
-    TagLevel(TagPath.fromTag(Tag.StudyID), DicomHierarchyLevel.STUDY),
-    TagLevel(TagPath.fromTag(Tag.AccessionNumber), DicomHierarchyLevel.STUDY),
-    TagLevel(TagPath.fromTag(Tag.FrameOfReferenceUID), DicomHierarchyLevel.STUDY),
     TagLevel(TagPath.fromTag(Tag.SeriesInstanceUID), DicomHierarchyLevel.SERIES),
-    TagLevel(TagPath.fromTag(Tag.SeriesDescription), DicomHierarchyLevel.SERIES),
-    TagLevel(TagPath.fromTag(Tag.ProtocolName), DicomHierarchyLevel.SERIES),
     TagLevel(TagPath.fromTag(Tag.SOPInstanceUID), DicomHierarchyLevel.IMAGE),
     TagLevel(TagPath.fromTag(Tag.PatientIdentityRemoved), DicomHierarchyLevel.IMAGE),
     TagLevel(TagPath.fromTag(Tag.DeidentificationMethod), DicomHierarchyLevel.IMAGE)
   )
+
+  val optionalValueTags: Set[TagLevel] = Set(
+    TagLevel(TagPath.fromTag(Tag.PatientBirthDate), DicomHierarchyLevel.PATIENT),
+    TagLevel(TagPath.fromTag(Tag.StudyDescription), DicomHierarchyLevel.STUDY),
+    TagLevel(TagPath.fromTag(Tag.StudyID), DicomHierarchyLevel.STUDY),
+    TagLevel(TagPath.fromTag(Tag.AccessionNumber), DicomHierarchyLevel.STUDY),
+    TagLevel(TagPath.fromTag(Tag.FrameOfReferenceUID), DicomHierarchyLevel.STUDY),
+    TagLevel(TagPath.fromTag(Tag.SeriesDescription), DicomHierarchyLevel.SERIES),
+    TagLevel(TagPath.fromTag(Tag.ProtocolName), DicomHierarchyLevel.SERIES),
+  )
+
+  val valueTags: Set[TagLevel] = mandatoryValueTags ++ optionalValueTags
 
   val identityFlow: Flow[DicomPart, DicomPart, NotUsed] = Flow[DicomPart]
 

@@ -20,7 +20,7 @@ import akka.actor.{Actor, Props, Stash}
 import akka.event.{Logging, LoggingReceive}
 import akka.pattern.pipe
 import se.nimsa.dicom.data.{Tag, TagPath}
-import se.nimsa.sbx.anonymization.AnonymizationProtocol._
+import se.nimsa.sbx.anonymization.AnonymizationProtocol.{AnonymizationKeyValue, _}
 import se.nimsa.sbx.app.GeneralProtocol.ImagesDeleted
 import se.nimsa.sbx.dicom.DicomHierarchy.DicomHierarchyLevel
 import se.nimsa.sbx.util.SequentialPipeToSupport
@@ -83,8 +83,8 @@ class AnonymizationServiceActor(anonymizationDao: AnonymizationDAO, purgeEmptyAn
 
   private def queryOnAnonData(anonPatientName: String, anonPatientID: String,
                               anonStudyInstanceUID: String, anonSeriesInstanceUID: String,
-                              anonSOPInstanceUID: String): Future[AnonymizationKeyOpResult] =
-    anonymizationDao.anonymizationKeyForImageForAnonInfo(anonPatientName, anonPatientID, anonStudyInstanceUID, anonSeriesInstanceUID, anonSOPInstanceUID)
+                              anonSOPInstanceUID: String): Future[AnonymizationKeyOpResult] = {
+    val fr = anonymizationDao.anonymizationKeyForImageForAnonInfo(anonPatientName, anonPatientID, anonStudyInstanceUID, anonSeriesInstanceUID, anonSOPInstanceUID)
       .flatMap(_
         .map(key => anonymizationDao.anonymizationKeyValuesForAnonymizationKeyId(key.id)
           .map(values => AnonymizationKeyOpResult(DicomHierarchyLevel.IMAGE, Some(key), values)))
@@ -102,10 +102,14 @@ class AnonymizationServiceActor(anonymizationDao: AnonymizationDAO, purgeEmptyAn
                       .map(values => AnonymizationKeyOpResult(DicomHierarchyLevel.PATIENT, Some(key), values)))
                     .getOrElse(Future.successful(AnonymizationKeyOpResult.empty)))))))))
 
+    // add values stored in key to list of key values (makes code simpler elsewhere)
+    fr.map(r => r.anonymizationKeyMaybe.map(key => r.copy(values = r.values ++ keyValuesFromKey(key))).getOrElse(r))
+  }
+
   private def queryOnRealData(patientName: String, patientID: String,
                               studyInstanceUID: String, seriesInstanceUID: String,
-                              sopInstanceUID: String): Future[AnonymizationKeyOpResult] =
-    anonymizationDao.anonymizationKeyForImage(patientName, patientID, studyInstanceUID, seriesInstanceUID, sopInstanceUID)
+                              sopInstanceUID: String): Future[AnonymizationKeyOpResult] = {
+    val fr = anonymizationDao.anonymizationKeyForImage(patientName, patientID, studyInstanceUID, seriesInstanceUID, sopInstanceUID)
       .flatMap(_
         .map(key => anonymizationDao.anonymizationKeyValuesForAnonymizationKeyId(key.id)
           .map(values => AnonymizationKeyOpResult(DicomHierarchyLevel.IMAGE, Some(key), values)))
@@ -122,6 +126,10 @@ class AnonymizationServiceActor(anonymizationDao: AnonymizationDAO, purgeEmptyAn
                     .map(key => anonymizationDao.anonymizationKeyValuesForAnonymizationKeyId(key.id)
                       .map(values => AnonymizationKeyOpResult(DicomHierarchyLevel.PATIENT, Some(key), values)))
                     .getOrElse(Future.successful(AnonymizationKeyOpResult.empty)))))))))
+
+    // add values stored in key to list of key values (makes code simpler elsewhere)
+    fr.map(r => r.anonymizationKeyMaybe.map(key => r.copy(values = r.values ++ keyValuesFromKey(key))).getOrElse(r))
+  }
 
   /**
     * Query database for matching keys on any level based on data to be inserted. Then, harmonize data to be inserted
@@ -176,14 +184,33 @@ class AnonymizationServiceActor(anonymizationDao: AnonymizationDAO, purgeEmptyAn
       anonymizationDao
         .insertAnonymizationKey(anonKey)
         .flatMap { key =>
-          val insertKeyValues = harmonizedKeyValues.toSeq
+          val returnKeyValues = harmonizedKeyValues.toSeq
             .map(tv => AnonymizationKeyValue(-1, key.id, tv.tagPath, tv.value, tv.anonymizedValue))
 
+          // filter out key values already saved as part of key to reduce size of db
+          val insertKeyValues = returnKeyValues.filter {
+            case kv if kv.tagPath == TagPath.fromTag(Tag.PatientName) => false
+            case kv if kv.tagPath == TagPath.fromTag(Tag.PatientID) => false
+            case kv if kv.tagPath == TagPath.fromTag(Tag.StudyInstanceUID) => false
+            case kv if kv.tagPath == TagPath.fromTag(Tag.SeriesInstanceUID) => false
+            case kv if kv.tagPath == TagPath.fromTag(Tag.SOPInstanceUID) => false
+            case _ => true
+          }
+
           anonymizationDao.insertAnonymizationKeyValues(insertKeyValues)
-            .map(_ => AnonymizationKeyOpResult(existingKeyValues.matchLevel, Some(key), insertKeyValues))
+            .map(_ => AnonymizationKeyOpResult(existingKeyValues.matchLevel, Some(key), returnKeyValues))
         }
     }
   }
+
+  private def keyValuesFromKey(key: AnonymizationKey): Seq[AnonymizationKeyValue] = Seq(
+    AnonymizationKeyValue(-1, key.id, TagPath.fromTag(Tag.PatientName), key.patientName, key.anonPatientName),
+    AnonymizationKeyValue(-1, key.id, TagPath.fromTag(Tag.PatientID), key.patientID, key.anonPatientID),
+    AnonymizationKeyValue(-1, key.id, TagPath.fromTag(Tag.StudyInstanceUID), key.studyInstanceUID, key.anonStudyInstanceUID),
+    AnonymizationKeyValue(-1, key.id, TagPath.fromTag(Tag.SeriesInstanceUID), key.seriesInstanceUID, key.anonSeriesInstanceUID),
+    AnonymizationKeyValue(-1, key.id, TagPath.fromTag(Tag.SOPInstanceUID), key.sopInstanceUID, key.anonSOPInstanceUID),
+  )
+
 
 }
 
