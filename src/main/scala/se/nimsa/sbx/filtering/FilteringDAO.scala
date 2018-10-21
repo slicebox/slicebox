@@ -160,13 +160,8 @@ class FilteringDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executi
     tagPathQuery.filter(_.tagFilterId === filterId).result
   }
 
-  def getTagFilter(id: Long): Future[Option[TagFilterSpec]] = db.run {
-    val innerJoin = for {
-      tagFilters <- tagFilterQuery.filter(_.id === id)
-      tagPaths <- tagPathQuery if tagFilters.id === tagPaths.tagFilterId
-    } yield (tagFilters, tagPaths)
-    innerJoin.result
-  }.map(s => s.headOption.map(t => TagFilterSpec(t._1, s.map(_._2))))
+  def getTagFilter(id: Long): Future[Option[TagFilterSpec]] =
+    db.run(getTagFilterAction(id)).map(s => s.headOption.map(t => TagFilterSpec(t._1, s.map(_._2).flatten)))
 
   private def getTagFilterByNameAction(name: String) =
     tagFilterQuery
@@ -174,6 +169,14 @@ class FilteringDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executi
       .result
       .headOption
 
+  private def getTagFilterAction(id: Long) = {
+    val tagFilter = tagFilterQuery.filter(_.id === id)
+    val tagPaths = tagPathQuery.filter(_.tagFilterId === id)
+    val leftOuterJoin = for {
+      (c, s) <- tagFilter joinLeft tagPaths
+    } yield (c, s)
+    leftOuterJoin.result
+  }
 
   private def updateTagFilterAction(tagFilter: TagFilter) =
     tagFilterQuery.filter(_.id === tagFilter.id).update(tagFilter)
