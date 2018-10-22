@@ -29,7 +29,8 @@ angular.module('slicebox.adminFiltering', ['ngRoute'])
             [
                 {
                     name: 'Delete',
-                    action: openDeleteEntitiesModalFunction('/api/filtering/tagfilter/', 'filter(s)')
+                    action: confirmDeleteFilter
+                    //action: openDeleteEntitiesModalFunction('/api/filtering/tagfilter/', 'filter(s)')
                 }
             ];
 
@@ -46,7 +47,6 @@ angular.module('slicebox.adminFiltering', ['ngRoute'])
             promises.sources = ($http.get("/api/sources"));
             promises.filters = ($http.get("/api/filtering/tagfilter?count=100000"));
             var combinedPromise = $q.all(promises).then(function(promisesResult) {
-                console.log(promisesResult);
                 var resultArray = promisesResult.associations.data.map(function(association) {
                     var source = promisesResult.sources.data.find(function(s) {
                         return (s.sourceId === association.sourceId && s.sourceType === association.sourceType);
@@ -62,7 +62,6 @@ angular.module('slicebox.adminFiltering', ['ngRoute'])
             });
 
             return combinedPromise;
-            // return $http.get('/api/filtering/associations?startindex=' + startIndex + '&count=' + count);
         };
 
         $scope.loadFilters = function(startIndex, count, orderByProperty, orderByDirection) {
@@ -80,6 +79,20 @@ angular.module('slicebox.adminFiltering', ['ngRoute'])
         $scope.filterSelected = function(filter) {
             $scope.uiState.selectedFilter = filter;
         };
+
+        function confirmDeleteFilter(filters) {
+            var f = openDeleteEntitiesModalFunction('/api/filtering/tagfilter/', 'filter(s)');
+            f(filters).finally(function() {
+                if ($scope.uiState.selectedFilter &&
+                    filters.map(function(x) {return x.id;}).includes($scope.uiState.selectedFilter.id)) {
+                    $scope.uiState.selectedFilter = null;
+                }
+                $scope.callbacks.filtersTable.clearSelection();
+                $scope.callbacks.filtersTable.reloadPage();
+                $scope.callbacks.filterAttributesTables.reloadPage();
+                $scope.callbacks.associationsTable.reloadPage();
+            });
+        }
     })
 
     .controller('AddAssociationModalCtrl', function($scope, $mdDialog, $http) {
@@ -145,19 +158,8 @@ angular.module('slicebox.adminFiltering', ['ngRoute'])
             return !angular.equals($scope.state.originalFilterSpec, $scope.state.filterSpec);
         };
 
-        // $scope.addRuleButtonClicked = function() {
-        //     $scope.state.rules.push({
-        //         attributes: [],
-        //         originalAttributes: []
-        //     });
-        //
-        //     $scope.callbacks.ruleAttributesTables.push({});
-        // };
-
         $scope.addFilterAttributeButtonClicked = function() {
-            var newAttribute = {
-                //seriesTypeRuleId: rule.id
-            };
+            var newAttribute = {};
 
             var dialogPromise = $mdDialog.show({
                 templateUrl: '/assets/partials/editFilterAttributeModalContent.html',
@@ -168,16 +170,18 @@ angular.module('slicebox.adminFiltering', ['ngRoute'])
             });
 
             dialogPromise.then(function (response) {
-                //TODO- don't add duplicates
+                if ($scope.state.filterSpec.tags.map(function(t) {return t.tag;}).includes(newAttribute.tag)) //Don't include tag twice
+                    return;
                 $scope.state.filterSpec.tags.push(newAttribute);
+                $scope.state.filterSpec.tags = $scope.state.filterSpec.tags.sort(function(a, b) {return a.tag - b.tag;});
                 $scope.callbacks.filterAttributesTables.reloadPage();
             });
         };
 
 
-        $scope.loadFilterAttributes = function() {
+        $scope.loadFilterAttributes = function(startIndex, count) {
             if ($scope.state.filterSpec)
-                return ($scope.state.filterSpec.tags || []);
+                return ($scope.state.filterSpec.tags.slice(startIndex, startIndex + count) || []);
             return [];
         };
 
@@ -210,9 +214,9 @@ angular.module('slicebox.adminFiltering', ['ngRoute'])
 
                 }
                 if (isCreate) {
-                    sbxToast.showInfoMessage("Series type added");
+                    sbxToast.showInfoMessage("Filter added");
                 } else {
-                    sbxToast.showInfoMessage("Series type updated");
+                    sbxToast.showInfoMessage("Filter updated");
                 }
 
                 resetState();
@@ -225,20 +229,11 @@ angular.module('slicebox.adminFiltering', ['ngRoute'])
             return savePromise;
         };
 
-        // // Private functions
-        // function isRuleDirty(rule) {
-        //     if (!angular.equals(rule.attributes, rule.originalAttributes)) {
-        //         return true;
-        //     }
-        // }
-
+        // Private functions
         function resetState() {
-            // $scope.seriesTypeForm.$setPristine();
             $scope.originalFilterSpec = angular.copy($scope.uiState.selectedSeriesType);
-            //
-             $scope.state.filterSpec = null;
-            // $scope.callbacks.ruleAttributesTables = [];
-            //
+            $scope.state.filterSpec = null;
+
             loadFilter();
         }
 
@@ -259,142 +254,6 @@ angular.module('slicebox.adminFiltering', ['ngRoute'])
                 });
         }
 
-        // function loadRuleAttributes(rule) {
-        //     $http.get('/api/seriestypes/rules/' + rule.id + '/attributes')
-        //         .success(function(attributes) {
-        //             rule.attributes = attributes;
-        //             rule.originalAttributes = angular.copy(attributes);
-        //         })
-        //         .error(function(error) {
-        //             sbxToast.showErrorMessage('Failed to load rule attributes: ' + error);
-        //         });
-        // }
-
-        // function saveRules() {
-        //     var saveRulePromises = [];
-        //     var savePromise;
-        //
-        //     angular.forEach($scope.state.rules, function(rule) {
-        //         savePromise = null;
-        //
-        //         if (rule.attributes && rule.attributes.length === 0 && rule.id) {
-        //             savePromise = deleteRule(rule);
-        //         } else if (!angular.equals(rule.attributes, rule.originalAttributes)) {
-        //             if (!rule.id) {
-        //                 savePromise = createRule(rule);
-        //             } else {
-        //                 savePromise = saveRuleAttributes(rule, rule.attributes, rule.originalAttributes);
-        //             }
-        //         }
-        //
-        //         if (savePromise) {
-        //             saveRulePromises.push(savePromise);
-        //         }
-        //     });
-        //
-        //     return $q.all(saveRulePromises);
-        // }
-        //
-        // function deleteRule(rule) {
-        //     return $http.delete('/api/seriestypes/rules/' + rule.id);
-        // }
-
-        // function createRule(rule) {
-        //     var savePromise = $http.post('/api/seriestypes/rules', { id: -1, seriesTypeId: $scope.uiState.selectedSeriesType.id });
-        //
-        //     savePromise = savePromise.then(function(response) {
-        //         return saveRuleAttributes(response.data, rule.attributes, rule.originalAttributes);
-        //     });
-        //
-        //     return savePromise;
-        // }
-
-        // function saveRuleAttributes(rule, attributes, originalAttributes) {
-        //     var promises = [];
-        //
-        //     var diff = attributesArraysDiff(attributes, originalAttributes);
-        //
-        //     promises.push(createNewAttributes(rule, diff.newAttributes));
-        //     promises.push(deleteRemovedAttributes(rule, diff.removedAttributes));
-        //
-        //     return $q.all(promises);
-        // }
-
-        function attributesArraysDiff(attributes, originalAttributes) {
-            var newAttributes = [];
-            var removedAttributes = [];
-            var tempAttribute;
-
-            angular.forEach(attributes, function(attribute) {
-                tempAttribute = findObjectWithIdInArray(attribute.id, originalAttributes);
-                if (!tempAttribute) {
-                    newAttributes.push(attribute);
-                }
-            });
-
-            angular.forEach(originalAttributes, function(originalAttribute) {
-                tempAttribute = findObjectWithIdInArray(originalAttribute.id, attributes);
-                if (!tempAttribute) {
-                    removedAttributes.push(originalAttribute);
-                }
-            });
-
-            return {
-                newAttributes: newAttributes,
-                removedAttributes: removedAttributes
-            };
-        }
-
-        function findObjectWithIdInArray(id, array) {
-            var result;
-
-            if (!id) {
-                return undefined;
-            }
-
-            angular.forEach(array, function(object) {
-                if (object.id === id) {
-                    result = object;
-                }
-            });
-
-            return result;
-        }
-        //
-        // function createNewAttributes(rule, newAttributes) {
-        //     var saveAttributePromises = [];
-        //     var savePromise;
-        //
-        //     angular.forEach(newAttributes, function(attribute) {
-        //         newAttribute = {
-        //             id: -1,
-        //             seriesTypeRuleId: rule.id,
-        //             tag: attribute.tag,
-        //             name: "",
-        //             values: attribute.values
-        //         };
-        //
-        //         savePromise = $http.post('/api/seriestypes/rules/' + rule.id + '/attributes', newAttribute);
-        //
-        //         saveAttributePromises.push(savePromise);
-        //     });
-        //
-        //     return $q.all(saveAttributePromises);
-        // }
-
-        // function deleteRemovedAttributes(rule, removedAttributes) {
-        //     var deleteAttributePromises = [];
-        //     var deletePromise;
-        //
-        //     angular.forEach(removedAttributes, function(attribute) {
-        //         deletePromise = $http.delete('/api/seriestypes/rules/' + rule.id + '/attributes/' + attribute.id);
-        //
-        //         deleteAttributePromises.push(deletePromise);
-        //     });
-        //
-        //     return $q.all(deleteAttributePromises);
-        // }
-
         function removeAttributes(attributes) {
             var attributeIndex;
 
@@ -406,18 +265,6 @@ angular.module('slicebox.adminFiltering', ['ngRoute'])
                 }
             });
             $scope.callbacks.filterAttributesTables.clearSelection();
-        }
-
-        function findRuleForAttribute(attribute) {
-            var result;
-
-            angular.forEach($scope.state.rules, function(rule) {
-                if (rule.attributes && rule.attributes.indexOf(attribute) >= 0) {
-                    result = rule;
-                }
-            });
-
-            return result;
         }
     })
 

@@ -171,7 +171,7 @@ class FilteringDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executi
 
   private def getTagFilterAction(id: Long) = {
     val tagFilter = tagFilterQuery.filter(_.id === id)
-    val tagPaths = tagPathQuery.filter(_.tagFilterId === id)
+    val tagPaths = tagPathQuery.filter(_.tagFilterId === id).sortBy(_.tagPath.asc.nullsLast)
     val leftOuterJoin = for {
       (c, s) <- tagFilter joinLeft tagPaths
     } yield (c, s)
