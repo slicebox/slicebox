@@ -289,12 +289,10 @@ class AnonymizationDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Exe
     }
 
   def anonymizationKeyValueSource: Source[(AnonymizationKey, AnonymizationKeyValue), NotUsed] =
-    Source.fromPublisher(db.stream {
-      val a = for {
-        anonKey <- anonymizationKeyQuery
-        keyValue <- anonymizationKeyValueQuery if keyValue.anonymizationKeyId === anonKey.id
-      } yield (anonKey, keyValue)
-      a.result
-    })
+    Source.fromPublisher(db.stream(
+      anonymizationKeyQuery.joinLeft(anonymizationKeyValueQuery).on(_.id === _.anonymizationKeyId).result
+    )).map {
+      case (anonKey, maybeKeyValue) => (anonKey, maybeKeyValue.getOrElse(AnonymizationKeyValue(-1, anonKey.id, TagPath.fromTag(0), "", "")))
+    }
 
 }

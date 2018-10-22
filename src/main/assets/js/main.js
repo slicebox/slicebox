@@ -25,7 +25,45 @@ angular.module('slicebox', [
     'slicebox.adminSystem'
 ])
 
-.config(function($locationProvider, $routeProvider, $mdThemingProvider, $filterProvider, $httpProvider) {
+.provider('sbxUtil', function() {
+
+    this.$get = function() {
+        return {
+            tagPathToString: function(tagPath) {
+                if (angular.isUndefined(tagPath)) {
+                    return "";
+                }
+
+                var tagToString = function(tag) {
+                    var returnValue = tag.toString(16);
+                    while (returnValue.length < 8) {
+                        returnValue = '0' + returnValue;
+                    }
+                    returnValue = '(' + returnValue.slice(0, 4) + ',' + returnValue.slice(4) + ')';
+                    return returnValue.toUpperCase();
+                };
+
+                var toTagPathString = function(path, tail) {
+                    var itemIndexSuffix = "";
+                    if (angular.isDefined(path.item)) {
+                        itemIndexSuffix = '[' + path.item + ']';
+                    }
+                    var head = tagToString(path.tag) + itemIndexSuffix;
+                    var part = head + tail;
+                    if (!path.previous) {
+                        return part;
+                    } else {
+                        return toTagPathString(path.previous, "." + part);
+                    }
+                };
+
+                return toTagPathString(tagPath, "");
+            }
+        };
+    };
+})
+
+.config(function($locationProvider, $routeProvider, $mdThemingProvider, $filterProvider, $httpProvider, sbxUtilProvider) {
     $locationProvider.html5Mode(true);
     $routeProvider.otherwise({redirectTo: '/'});
 
@@ -60,36 +98,7 @@ angular.module('slicebox', [
     });
 
     $filterProvider.register('tagPath', function() {
-        return function (value) {
-            if (angular.isUndefined(value)) {
-                return "";
-            }
-
-            var tagToString = function(tag) {
-                var returnValue = tag.toString(16);
-                while (returnValue.length < 8) {
-                    returnValue = '0' + returnValue;
-                }
-                returnValue = '(' + returnValue.slice(0, 4) + ',' + returnValue.slice(4) + ')';
-                return returnValue.toUpperCase();
-            };
-
-            var toTagPathString = function(path, tail) {
-                var itemIndexSuffix = "";
-                if (angular.isDefined(path.item)) {
-                    itemIndexSuffix = '[' + path.item + ']';
-                }
-                var head = tagToString(path.tag) + itemIndexSuffix;
-                var part = head + tail;
-                if (!path.previous) {
-                    return part;
-                } else {
-                    return toTagPathString(path.previous, "." + part);
-                }
-            };
-
-            return toTagPathString(value, "");
-        };
+        return sbxUtilProvider.$get().tagPathToString;
     });
 
     $httpProvider.interceptors.push(function($q, $location) {

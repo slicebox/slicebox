@@ -1,69 +1,61 @@
-<div layout="row" layout-margin class="home">
+<div layout="row" layout-margin class="anonymization">
+
     <div layout="column" flex class="left-column">
 
-        <div layout="row" layout-margin>
-            <div flex ng-controller="AnonymizationCtrl">
-                <md-card>
-                    <md-card-content>
-                        <h4 class="md-flex">Anonymization Keys</h4>
-                        <md-content class="md-padding">
-                            <sbx-grid
-                                load-page="loadAnonymizationKeyPage(startIndex, count, orderByProperty, orderByDirection, filter)"
-                                page-size="25"
-                                page-sizes="[10, 25, 100, 1000]"
-                                filter="true"
-                                object-actions="actions"
-                                object-selected="keySelected(object)"
-                                callbacks="callbacks.anonymizationKeyTable"
-                                refresh-button="true"
-                                empty-message="No anonymization keys"
-                                grid-state="uiState.anonymizationTableState">
+        <md-card>
+            <md-card-content>
+                <h4 class="md-flex">Anonymization Keys</h4>
+                <md-content class="md-padding">
+                    <sbx-grid
+                        load-page="loadAnonymizationKeyPage(startIndex, count, orderByProperty, orderByDirection, filter)"
+                        page-size="25"
+                        page-sizes="[10, 25, 100, 1000]"
+                        filter="true"
+                        object-actions="actions"
+                        object-selected="keySelected(object)"
+                        callbacks="callbacks.anonymizationKeyTable"
+                        refresh-button="true"
+                        empty-message="No anonymization keys"
+                        grid-state="uiState.anonymizationTableState">
 
-                                <sbx-grid-column property="created" title="Created" filter="date: yyyy-MM-dd HH:mm"></sbx-grid-column>
-                                <sbx-grid-column property="imageId" title="Image Id"></sbx-grid-column>
-                                <sbx-grid-column property="patientName" title="Patient Name"><sbx-grid-cell>{{rowObject.patientName | prettyPatientName}}</sbx-grid-cell></sbx-grid-column>
-                                <sbx-grid-column property="anonPatientName" title="Anonymous Patient Name"></sbx-grid-column>
-                                <sbx-grid-column property="patientID" title="Patient ID"></sbx-grid-column>
-                                <sbx-grid-column property="anonPatientID" title="Anonymous Patient ID"></sbx-grid-column>
-                                <sbx-grid-column property="studyInstanceUID" title="Study Instance UID"></sbx-grid-column>
-                                <sbx-grid-column property="anonStudyInstanceUID" title="Anonymous Study Instance UID"></sbx-grid-column>
-                                <sbx-grid-column property="seriesInstanceUID" title="Series Instance UID"></sbx-grid-column>
-                                <sbx-grid-column property="anonSeriesInstanceUID" title="Anonymous Series Instance UID"></sbx-grid-column>
-                                <sbx-grid-column property="sopInstanceUID" title="SOP Instance UID"></sbx-grid-column>
-                                <sbx-grid-column property="anonSOPInstanceUID" title="Anonymous SOP Instance UID"></sbx-grid-column>
+                        <sbx-grid-column property="created" title="Created" filter="date: yyyy-MM-dd HH:mm"></sbx-grid-column>
+                        <sbx-grid-column property="imageId" title="Image Id"></sbx-grid-column>
+                        <sbx-grid-column property="patientName" title="Patient Name"><sbx-grid-cell>{{rowObject.patientName | prettyPatientName}}</sbx-grid-cell></sbx-grid-column>
+                        <sbx-grid-column property="anonPatientName" title="Anonymous Patient Name"></sbx-grid-column>
+                        <sbx-grid-column property="patientID" title="Patient ID"></sbx-grid-column>
+                        <sbx-grid-column property="anonPatientID" title="Anonymous Patient ID"></sbx-grid-column>
+                        <sbx-grid-column property="studyInstanceUID" title="Study Instance UID"></sbx-grid-column>
+                        <sbx-grid-column property="anonStudyInstanceUID" title="Anonymous Study Instance UID"></sbx-grid-column>
+                        <sbx-grid-column property="seriesInstanceUID" title="Series Instance UID"></sbx-grid-column>
+                        <sbx-grid-column property="anonSeriesInstanceUID" title="Anonymous Series Instance UID"></sbx-grid-column>
+                        <sbx-grid-column property="sopInstanceUID" title="SOP Instance UID"></sbx-grid-column>
+                        <sbx-grid-column property="anonSOPInstanceUID" title="Anonymous SOP Instance UID"></sbx-grid-column>
 
-                            </sbx-grid>
-                        </md-content>
-                    </md-card-content>
-                </md-card>
-            </div>
-        </div>
-
+                    </sbx-grid>
+                </md-content>
+            </md-card-content>
+        </md-card>
     </div>
 
     <div layout="column" ng-if="uiState.selectedKey" flex class="right-column">
-        <div ng-if="!uiState.selectedKey">
-            <p><em>No key selected</em></p>
-        </div>
-        <div ng-if="uiState.selectedKey">
-            <md-card>
-                <md-card-content>
-                    <md-content class="md-padding" style="height: 600px">
-                        <sbx-grid
-                                load-page="loadKeyValues(0, 1000000000, orderByProperty, orderByDirection, filter)"
-                                page-size="1000000000"
-                                sorting="true"
-                                filter="true"
-                                empty-message="No key values found"
-                                grid-state="uiState.keyValuesTableState">
-                            <sbx-grid-column property="tagPath" title="Tag Path" filter="tagPath"></sbx-grid-column>
-                            <sbx-grid-column property="value" title="Value"></sbx-grid-column>
-                            <sbx-grid-column property="anonymizedValue" title="Anonymized Value"></sbx-grid-column>
-                        </sbx-grid>
-                    </md-content>
-                </md-card-content>
-            </md-card>
-        </div>
+        <md-card>
+            <md-card-content>
+                <h4 class="md-flex">Key Values</h4>
+                <md-content class="md-padding" style="height: 600px">
+                    <sbx-grid
+                        load-page="loadKeyValues(0, 1000000000, orderByProperty, orderByDirection, filter)"
+                        page-size="1000000000"
+                        sorting="true"
+                        filter="true"
+                        callbacks="callbacks.keyValuesTable"
+                        empty-message="No key values found">
+                        <sbx-grid-column property="tagPath" title="Tag Path" filter="tagPath"></sbx-grid-column>
+                        <sbx-grid-column property="value" title="Value"></sbx-grid-column>
+                        <sbx-grid-column property="anonymizedValue" title="Anonymized Value"></sbx-grid-column>
+                    </sbx-grid>
+                </md-content>
+            </md-card-content>
+        </md-card>
     </div>
 
 </div>

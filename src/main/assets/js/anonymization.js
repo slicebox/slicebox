@@ -11,7 +11,7 @@ angular.module('slicebox.anonymization', ['ngRoute'])
   });
 })
 
-.controller('AnonymizationCtrl', function($scope, $http, openMessageModal, openDeleteEntitiesModalFunction, openTagSeriesModalFunction, sbxToast) {
+.controller('AnonymizationCtrl', function($scope, $http, openMessageModal, openDeleteEntitiesModalFunction, openTagSeriesModalFunction, sbxToast, sbxUtil) {
     // Initialization
     $scope.actions =
         [
@@ -21,11 +21,11 @@ angular.module('slicebox.anonymization', ['ngRoute'])
             }
         ];
 
+    $scope.callbacks = {};
+
     if (!$scope.uiState.anonymizationTableState) {
         $scope.uiState.anonymizationTableState = {};
     }
-
-    $scope.callbacks = {};
 
     // Scope functions
     $scope.loadAnonymizationKeyPage = function(startIndex, count, orderByProperty, orderByDirection, filter) {
@@ -66,11 +66,11 @@ angular.module('slicebox.anonymization', ['ngRoute'])
             return [];
         }
 
-        $http.get('/api/anonymization/keys/' + $scope.uiState.selectedKey.id + '/keyvalues').then(function(data) {
+        return $http.get('/api/anonymization/keys/' + $scope.uiState.selectedKey.id + '/keyvalues').then(function(data) {
             if (filter) {
                 var filterLc = filter.toLowerCase();
                 data.data = data.data.filter(function (keyValue) {
-                    var tagPathCondition = keyValue.tagPath.indexOf(filterLc) >= 0;
+                    var tagPathCondition = sbxUtil.tagPathToString(keyValue.tagPath).toLowerCase().indexOf(filterLc) >= 0;
                     var valueCondition = keyValue.value.toLowerCase().indexOf(filterLc) >= 0;
                     var anonCondition = keyValue.anonymizedValue.toLowerCase().indexOf(filterLc) >= 0;
                     return tagPathCondition || valueCondition || anonCondition;
@@ -91,7 +91,5 @@ angular.module('slicebox.anonymization', ['ngRoute'])
         }, function(error) {
             sbxToast.showErrorMessage('Failed to load key values for anonymization key: ' + error);
         });
-
-        return keyValuesPromise;
     };
 });
