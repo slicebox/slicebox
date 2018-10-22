@@ -16,20 +16,19 @@
 
 package se.nimsa.sbx.app.routing
 
+import akka.http.scaladsl.model.ContentTypes._
 import akka.http.scaladsl.model.StatusCodes._
-import akka.http.scaladsl.model.{ContentTypes, HttpEntity}
+import akka.http.scaladsl.model.headers.{ContentDispositionTypes, `Content-Disposition`}
+import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse}
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
+import akka.stream.alpakka.csv.scaladsl.CsvFormatting
 import akka.stream.scaladsl.{Sink, Source}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.app.GeneralProtocol.{ImageAdded, ImagesDeleted}
 import se.nimsa.sbx.app.SliceboxBase
-import se.nimsa.sbx.dicom.DicomHierarchy.Image
-import se.nimsa.sbx.metadata.MetaDataProtocol._
-import se.nimsa.sbx.user.UserProtocol.ApiUser
-
-import scala.concurrent.Future
+import se.nimsa.sbx.user.UserProtocol.{ApiUser, UserRole}
 
 trait AnonymizationRoutes {
   this: SliceboxBase =>
@@ -105,21 +104,47 @@ trait AnonymizationRoutes {
                   complete(NoContent)
               }
             }
-          } ~ path("images") {
+          } ~ path("keyvalues") {
             get {
-              complete(anonymizationService.ask(GetImageIdsForAnonymizationKey(anonymizationKeyId)).mapTo[Seq[Long]].flatMap { imageIds =>
-                Future.sequence {
-                  imageIds.map { imageId =>
-                    metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]]
-                  }
-                }
-              }.map(_.flatten))
+              complete(anonymizationService.ask(GetTagValuesForAnonymizationKey(anonymizationKeyId)).mapTo[Seq[AnonymizationKeyValue]])
             }
           }
         } ~ path("query") {
           post {
             entity(as[AnonymizationKeyQuery]) { query =>
               complete(anonymizationService.ask(QueryAnonymizationKeys(query)).mapTo[Seq[AnonymizationKey]])
+            }
+          }
+        } ~ path("export" / "csv") {
+          get {
+            authorize(apiUser.hasPermission(UserRole.ADMINISTRATOR)) {
+              val source =
+                Source.single(List(
+                  "ID", "Image ID", "Created",
+                  "Patient Name", "Anonymous Patient Name",
+                  "Patient ID", "Anonymous Patient ID",
+                  "Study Instance UID", "Anonymous Study Instance UID",
+                  "Series Instance UID", "Anonymous Series Instance UID",
+                  "SOP Instance UID", "Anonymous SOP Instance UID",
+                  "Tag Path", "Value", "Anonymized Value"))
+                  .concat(
+                    anonymizationDao.anonymizationKeyValueSource
+                      .map {
+                        case (key, value) =>
+                          List(
+                            key.id.toString, key.imageId.toString, key.created.toString,
+                            key.patientName, key.anonPatientName,
+                            key.patientID, key.anonPatientID,
+                            key.studyInstanceUID, key.anonStudyInstanceUID,
+                            key.seriesInstanceUID, key.anonSeriesInstanceUID,
+                            key.sopInstanceUID, key.anonSOPInstanceUID,
+                            value.tagPath.toString, value.value, value.anonymizedValue)
+                      })
+                  .via(CsvFormatting.format(delimiter = CsvFormatting.SemiColon))
+
+              respondWithHeader(`Content-Disposition`(ContentDispositionTypes.attachment, Map("filename" -> "slicebox-anonymization-info.csv"))) {
+                complete(HttpResponse(entity = HttpEntity(`text/csv(UTF-8)`, source)))
+              }
             }
           }
         }

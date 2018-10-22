@@ -16,12 +16,9 @@
 
 package se.nimsa.sbx.anonymization
 
-import java.util.UUID
-
 import akka.util.ByteString
-import se.nimsa.dicom.data.VR
+import se.nimsa.dicom.data.{VR, _}
 import se.nimsa.sbx.dicom.DicomUtil.toAsciiBytes
-import se.nimsa.dicom.data._
 
 import scala.util.Random
 
@@ -33,22 +30,11 @@ object AnonymizationUtil {
     s"Anonymous $sexString $ageString"
   }
 
-  def createAccessionNumber(accessionNumberBytes: ByteString): ByteString = {
-    val seed = UUID.nameUUIDFromBytes(accessionNumberBytes.toArray).getMostSignificantBits
-    val rand = new Random(seed)
+  def createAccessionNumber(): ByteString = {
+    val rand = new Random()
     val newNumber = (1 to 16).foldLeft("")((s, _) => s + rand.nextInt(10).toString)
     toAsciiBytes(newNumber, VR.SH)
   }
 
-  def createUid(baseValue: String): String =
-    if (baseValue == null || baseValue.isEmpty)
-      createUID()
-    else
-      createNameBasedUID(ByteString(baseValue))
-
-  def createUid(baseValue: ByteString): ByteString = toAsciiBytes(
-    if (baseValue == null || baseValue.isEmpty)
-      createUID()
-    else
-      createNameBasedUID(baseValue), VR.UI)
+  def createUid(): ByteString = toAsciiBytes(createUID(), VR.UI)
 }

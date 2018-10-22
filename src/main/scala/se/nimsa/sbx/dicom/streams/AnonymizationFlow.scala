@@ -19,21 +19,20 @@ package se.nimsa.sbx.dicom.streams
 import akka.NotUsed
 import akka.stream.scaladsl.Flow
 import akka.util.ByteString
-import se.nimsa.dicom.streams.DicomFlows._
 import se.nimsa.dicom.data.DicomParsing.isPrivate
 import se.nimsa.dicom.data.DicomParts.DicomPart
-import se.nimsa.dicom.streams.ModifyFlow.{TagModification, modifyFlow}
 import se.nimsa.dicom.data.{Tag, TagPath, VR}
+import se.nimsa.dicom.streams.DicomFlows._
+import se.nimsa.dicom.streams.ModifyFlow.{TagModification, modifyFlow}
 import se.nimsa.sbx.anonymization.AnonymizationUtil._
 import se.nimsa.sbx.dicom.DicomUtil._
-import se.nimsa.sbx.dicom.streams.DicomStreamUtil._
 
 object AnonymizationFlow {
 
 
-  private def insert(tag: Int, mod: ByteString => ByteString) = TagModification.endsWith(TagPath.fromTag(tag), mod, insert = true)
-  private def modify(tag: Int, mod: ByteString => ByteString) = TagModification.endsWith(TagPath.fromTag(tag), mod, insert = false)
-  private def clear(tag: Int) = TagModification.endsWith(TagPath.fromTag(tag), _ => ByteString.empty, insert = false)
+  private def insert(tag: Int, mod: ByteString => ByteString): TagModification = TagModification.endsWith(TagPath.fromTag(tag), mod, insert = true)
+  private def modify(tag: Int, mod: ByteString => ByteString): TagModification = TagModification.endsWith(TagPath.fromTag(tag), mod, insert = false)
+  private def clear(tag: Int): TagModification = TagModification.endsWith(TagPath.fromTag(tag), _ => ByteString.empty, insert = false)
 
   private val removeTags = Set(
     Tag.AcquisitionComments,
@@ -210,70 +209,56 @@ object AnonymizationFlow {
     * Remove, set empty or modify certain attributes
     */
   def anonFlow: Flow[DicomPart, DicomPart, NotUsed] =
-    Flow[DicomPart]
-      .via(groupLengthDiscardFilter)
-      .via(toIndeterminateLengthSequences)
-      .via(toUtf8Flow)
-      .via(tagFilter(_ => true)(tagPath =>
-        !tagPath.toList.map(_.tag).exists(tag =>
-          isPrivate(tag) || isOverlay(tag) || removeTags.contains(tag)))) // remove private, overlay and PHI attributes
+    tagFilter(_ => true)(tagPath =>
+      !tagPath.toList.map(_.tag).exists(tag =>
+        isPrivate(tag) || isOverlay(tag) || removeTags.contains(tag))) // remove private, overlay and PHI attributes
       .via(modifyFlow( // modify, clear and insert
-      modify(Tag.AccessionNumber, bytes => if (bytes.nonEmpty) createAccessionNumber(bytes) else bytes),
-      modify(Tag.ConcatenationUID, createUid),
+      modify(Tag.AccessionNumber, bytes => if (bytes.nonEmpty) createAccessionNumber() else bytes),
+      modify(Tag.ConcatenationUID, _ => createUid()),
       clear(Tag.ContentCreatorName),
-      modify(Tag.ContextGroupExtensionCreatorUID, createUid),
+      modify(Tag.ContextGroupExtensionCreatorUID, _ => createUid()),
       clear(Tag.ContrastBolusAgent),
-      modify(Tag.CreatorVersionUID, createUid),
+      modify(Tag.CreatorVersionUID, _ => createUid()),
       insert(Tag.DeidentificationMethod, _ => toAsciiBytes("Retain Longitudinal Full Dates Option", VR.LO)),
-      modify(Tag.DimensionOrganizationUID, createUid),
-      modify(Tag.DoseReferenceUID, createUid),
-      modify(Tag.FiducialUID, createUid),
+      modify(Tag.DimensionOrganizationUID, _ => createUid()),
+      modify(Tag.DoseReferenceUID, _ => createUid()),
+      modify(Tag.FiducialUID, _ => createUid()),
       clear(Tag.FillerOrderNumberImagingServiceRequest),
-      modify(Tag.FrameOfReferenceUID, createUid),
-      modify(Tag.InstanceCreatorUID, createUid),
-      modify(Tag.IrradiationEventUID, createUid),
-      modify(Tag.LargePaletteColorLookupTableUID, createUid),
-      modify(Tag.MediaStorageSOPInstanceUID, createUid),
-      modify(Tag.ObservationSubjectUIDTrial, createUid),
-      modify(Tag.ObservationUID, createUid),
-      modify(Tag.PaletteColorLookupTableUID, createUid),
+      modify(Tag.FrameOfReferenceUID, _ => createUid()),
+      modify(Tag.InstanceCreatorUID, _ => createUid()),
+      modify(Tag.IrradiationEventUID, _ => createUid()),
+      modify(Tag.LargePaletteColorLookupTableUID, _ => createUid()),
+      modify(Tag.MediaStorageSOPInstanceUID, _ => createUid()),
+      modify(Tag.ObservationSubjectUIDTrial, _ => createUid()),
+      modify(Tag.ObservationUID, _ => createUid()),
+      modify(Tag.PaletteColorLookupTableUID, _ => createUid()),
       insert(Tag.PatientIdentityRemoved, _ => toAsciiBytes("YES", VR.CS)),
-      insert(Tag.PatientID, _ => createUid(null)),
-      insert(Tag.PatientName, _ => createUid(null)),
+      insert(Tag.PatientID, _ => createUid()),
+      insert(Tag.PatientName, _ => createUid()),
       clear(Tag.PlacerOrderNumberImagingServiceRequest),
-      modify(Tag.ReferencedFrameOfReferenceUID, createUid),
-      modify(Tag.ReferencedGeneralPurposeScheduledProcedureStepTransactionUID, createUid),
-      modify(Tag.ReferencedObservationUIDTrial, createUid),
-      modify(Tag.ReferencedSOPInstanceUID, createUid),
-      modify(Tag.ReferencedSOPInstanceUIDInFile, createUid),
+      modify(Tag.ReferencedFrameOfReferenceUID, _ => createUid()),
+      modify(Tag.ReferencedGeneralPurposeScheduledProcedureStepTransactionUID, _ => createUid()),
+      modify(Tag.ReferencedObservationUIDTrial, _ => createUid()),
+      modify(Tag.ReferencedSOPInstanceUID, _ => createUid()),
+      modify(Tag.ReferencedSOPInstanceUIDInFile, _ => createUid()),
       clear(Tag.ReferringPhysicianName),
-      modify(Tag.RelatedFrameOfReferenceUID, createUid),
-      modify(Tag.RequestedSOPInstanceUID, createUid),
-      insert(Tag.SeriesInstanceUID, _ => createUid(null)),
-      insert(Tag.SOPInstanceUID, createUid),
-      modify(Tag.StorageMediaFileSetUID, createUid),
+      modify(Tag.RelatedFrameOfReferenceUID, _ => createUid()),
+      modify(Tag.RequestedSOPInstanceUID, _ => createUid()),
+      insert(Tag.SeriesInstanceUID, _ => createUid()),
+      insert(Tag.SOPInstanceUID, _ => createUid()),
+      modify(Tag.StorageMediaFileSetUID, _ => createUid()),
       clear(Tag.StudyID),
-      insert(Tag.StudyInstanceUID, _ => createUid(null)),
-      modify(Tag.SynchronizationFrameOfReferenceUID, createUid),
-      modify(Tag.TargetUID, createUid),
-      modify(Tag.TemplateExtensionCreatorUID, createUid),
-      modify(Tag.TemplateExtensionOrganizationUID, createUid),
-      modify(Tag.TransactionUID, createUid),
-      modify(Tag.UID, createUid),
+      insert(Tag.StudyInstanceUID, _ => createUid()),
+      modify(Tag.SynchronizationFrameOfReferenceUID, _ => createUid()),
+      modify(Tag.TargetUID, _ => createUid()),
+      modify(Tag.TemplateExtensionCreatorUID, _ => createUid()),
+      modify(Tag.TemplateExtensionOrganizationUID, _ => createUid()),
+      modify(Tag.TransactionUID, _ => createUid()),
+      modify(Tag.UID, _ => createUid()),
       clear(Tag.VerifyingObserverName)))
-
-  /**
-    * Anonymize data if not already anonymized. Assumes first `DicomPart` is a `PartialAnonymizationKeyPart` that is
-    * used to determine if data has been anonymized or not.
-    *
-    * @return a `Flow` of `DicomParts` that will anonymize non-anonymized data but does nothing otherwise
-    */
-  def maybeAnonFlow: Flow[DicomPart, DicomPart, NotUsed] = conditionalFlow(
-    {
-      case keyPart: PartialAnonymizationKeyPart => keyPart.keyMaybe.nonEmpty
-    }, anonFlow, Flow.fromFunction(identity))
-
 }
+
+
 
 
 

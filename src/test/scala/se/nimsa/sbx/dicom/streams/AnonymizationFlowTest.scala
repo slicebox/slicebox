@@ -8,18 +8,21 @@ import akka.stream.testkit.scaladsl.TestSink
 import akka.testkit.TestKit
 import akka.util.ByteString
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
-import se.nimsa.dicom.data.DicomParts.{DicomPart, ValueChunk}
+import se.nimsa.dicom.data.DicomParts.{DicomPart, ElementsPart, ValueChunk}
 import se.nimsa.dicom.data._
 import se.nimsa.dicom.streams.CollectFlow.collectFlow
 import se.nimsa.dicom.streams.{DicomFlows, ElementFlows}
+import se.nimsa.sbx.dicom.SliceboxTags._
 import se.nimsa.sbx.dicom.streams.DicomStreamUtil._
 import se.nimsa.sbx.storage.{RuntimeStorage, StorageService}
 import se.nimsa.sbx.util.TestUtil._
 
 import scala.concurrent.duration.DurationInt
-import scala.concurrent.{Await, ExecutionContextExecutor, Future}
+import scala.concurrent.{Await, ExecutionContextExecutor}
 
 class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")) with FlatSpecLike with Matchers with BeforeAndAfterAll {
+
+  import AnonymizationFlow.anonFlow
 
   implicit val materializer: ActorMaterializer = ActorMaterializer()
   implicit val ec: ExecutionContextExecutor = system.dispatcher
@@ -35,15 +38,12 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
 
   def toMaybeAnonSource(elements: Elements): Source[DicomPart, NotUsed] =
     toSource(elements)
-      .via(collectFlow(basicInfoTags, "anon"))
-      .map(attributesToInfoPart(_, "anon"))
-      .mapAsync(1)(getOrCreateAnonKeyPart(_ => Future.successful(createAnonymizationKey(elements))))
-      .via(AnonymizationFlow.maybeAnonFlow)
+      .via(collectFlow(encodingTags ++ anonymizationTags ++ anonKeysTags ++ valueTags.map(_.tagPath), "anon"))
+      .via(conditionalFlow({ case p: ElementsPart if p.label == "anon" => !isAnonymous(p.elements) }, anonFlow, identityFlow))
 
   def checkBasicAttributes(source: Source[DicomPart, NotUsed]): PartProbe =
     source.runWith(TestSink.probe[DicomPart])
       .expectHeaderAndValueChunkPairs(
-        Tag.SpecificCharacterSet,
         Tag.SOPInstanceUID,
         Tag.Modality,
         Tag.PatientName,
@@ -54,14 +54,12 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
         Tag.SeriesInstanceUID)
       .expectDicomComplete()
 
-  "The anonymization flow" should "replace an existing accession number with a named based UID" in {
+  "The anonymization flow" should "replace an existing accession number with a random UID" in {
     val elements = Elements.empty()
-        .setString(Tag.AccessionNumber, "ACC001")
+      .setString(Tag.AccessionNumber, "ACC001")
     val source = toAnonSource(elements)
 
     source.runWith(TestSink.probe[DicomPart])
-      .expectHeader(Tag.SpecificCharacterSet)
-      .expectValueChunk()
       .expectHeader(Tag.SOPInstanceUID)
       .expectValueChunk()
       .expectHeader(Tag.AccessionNumber)
@@ -95,22 +93,19 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
     val source = toAnonSource(elements)
 
     source.runWith(TestSink.probe[DicomPart])
-      .expectHeader(Tag.SpecificCharacterSet)
-      .expectValueChunk()
       .expectHeader(Tag.SOPInstanceUID)
       .expectValueChunk()
       .expectHeader(Tag.AccessionNumber)
       .expectHeader(Tag.PatientName)
   }
 
-  it should "create an new UID from and existing UID" in {
+  it should "create an new random UID from an existing UID" in {
     val elements = Elements.empty()
       .setString(Tag.StudyInstanceUID, "1.2.3.4.5.6.7.8.9")
     val source = toAnonSource(elements)
 
     source.runWith(TestSink.probe[DicomPart])
       .expectHeaderAndValueChunkPairs(
-        Tag.SpecificCharacterSet,
         Tag.SOPInstanceUID,
         Tag.PatientName,
         Tag.PatientID,
@@ -119,7 +114,8 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
       .expectHeader(Tag.StudyInstanceUID)
       .request(1)
       .expectNextChainingPF {
-        case v: ValueChunk if v.bytes.utf8String.trim != elements.getString(Tag.StudyInstanceUID).get => true
+        case v: ValueChunk =>
+          v.bytes.utf8String.trim should not be elements.getString(Tag.StudyInstanceUID).get
       }
       .expectHeader(Tag.SeriesInstanceUID)
       .expectValueChunk()
@@ -143,7 +139,6 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
     def check(source: Source[DicomPart, NotUsed]) =
       source.runWith(TestSink.probe[DicomPart])
         .expectHeaderAndValueChunkPairs(
-          Tag.SpecificCharacterSet,
           Tag.SOPInstanceUID,
           Tag.Modality,
           Tag.PatientName,
@@ -164,7 +159,7 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
     check(source3)
   }
 
-  it should "always create the same new UID from some fixed existing UID" in {
+  it should "create a new random UID for each anonymization from some fixed existing UID" in {
     val elements = Elements.empty()
       .setString(Tag.TargetUID, "1.2.3.4.5.6.7.8.9")
 
@@ -176,7 +171,7 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
     val f2 = source().runWith(Sink.head)
     val (sop1, sop2) = Await.result(f1.zip(f2), 5.seconds)
 
-    sop1 shouldBe sop2
+    sop1 should not be sop2
   }
 
   it should "remove private tags" in {
@@ -256,11 +251,13 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
       .expectDicomComplete()
   }
 
-  it should "anonymize if PatientIdentityRemoved=YES but DicomInfoPart is missing" in {
+  it should "anonymize if PatientIdentityRemoved=YES but ElementsPart is missing" in {
     val elements = Elements.empty()
       .setString(Tag.PatientID, "12345678")
       .setString(Tag.PatientIdentityRemoved, "YES")
-    val source = toSource(elements).via(AnonymizationFlow.maybeAnonFlow).via(DicomFlows.tagFilter(_ => false)(tagPath => tagPath.tag == Tag.PatientID))
+    val source = toSource(elements)
+      .via(conditionalFlow({ case p: ElementsPart => !isAnonymous(p.elements) }, anonFlow, identityFlow))
+      .via(DicomFlows.tagFilter(_ => false)(tagPath => tagPath.tag == Tag.PatientID))
 
     source.runWith(TestSink.probe[DicomPart])
       .expectHeader(Tag.PatientID)

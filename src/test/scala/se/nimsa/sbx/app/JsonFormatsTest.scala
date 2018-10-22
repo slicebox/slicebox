@@ -40,7 +40,7 @@ class JsonFormatsTest extends FlatSpec with Matchers with JsonFormats {
   "The JSON represenation of a tag path" should "turn into an equivalent of its original object" in {
     val tagPath = TagPath.fromSequence(1, 1).thenSequence(2).thenTag(3)
 
-    Json.fromJson[TagPathTag](Json.toJson(tagPath))(tagPathTagFormat.reads _).map {
+    Json.fromJson[TagPathTag](Json.toJson(tagPath))(tagPathTagReads).map {
       _ shouldBe tagPath
     }
   }

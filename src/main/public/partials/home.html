@@ -251,28 +251,22 @@
                 ng-switch-when="0"
                 class="tab-content">
 
-                <div ng-if="!uiState.selectedSeries">
-                    <p><em>No series selected</em></p>
-                </div>
-                <div ng-if="uiState.selectedSeries">
+                <md-button class="md-icon-button md-primary" ng-click="openImageSettingsModal()" aria-label="Display Settings">
+                    <md-icon md-svg-icon="/assets/images/ic_settings_24px.svg"></md-icon>
+                </md-button>
 
-                    <md-button class="md-icon-button md-primary" ng-click="openImageSettingsModal()" aria-label="Display Settings">
-                        <md-icon md-svg-icon="/assets/images/ic_settings_24px.svg"></md-icon>
-                    </md-button>
+                <md-card>
+                    <md-card-content>
+                        <md-content class="md-padding" style="height: 600px">
 
-                    <md-card>
-                        <md-card-content>
-                            <md-content class="md-padding" style="height: 600px">
+                            <md-progress-circular ng-if="uiState.loadPngImagesInProgress" md-mode="indeterminate"></md-progress-circular>
 
-                                <md-progress-circular ng-if="uiState.loadPngImagesInProgress" md-mode="indeterminate"></md-progress-circular>
-
-                                <div class="clearfix">
-                                    <img ng-repeat="imageUrl in uiState.seriesDetails.pngImageUrls | orderBy:'frameIndex'" class="frame-image" ng-src="{{imageUrl.url}}" alt="" />
-                                </div>
-                            </md-content>
-                        </md-card-content>
-                    </md-card>
-                </div>
+                            <div class="clearfix">
+                                <img ng-repeat="imageUrl in uiState.seriesDetails.pngImageUrls | orderBy:'frameIndex'" class="frame-image" ng-src="{{imageUrl.url}}" alt="" />
+                            </div>
+                        </md-content>
+                    </md-card-content>
+                </md-card>
             </div>
 
             <div role="tabpanel"
@@ -281,53 +275,34 @@
                 ng-switch-when="1"
                 class="tab-content">
 
-                <div ng-if="!uiState.selectedSeries">
-                    <p><em>No series selected</em></p>
-                </div>
-                <div ng-if="uiState.selectedSeries">
-                    <md-card>
-                        <md-card-content>
-                            <md-content class="md-padding" style="height: 600px">
-                                <sbx-grid
-                                    load-page="loadImageAttributes(0, 1000000000, orderByProperty, orderByDirection, filter)"
-                                    page-size="1000000000"
-                                    sorting="true"
-                                    filter="true"
-                                    refresh-button="true"
-                                    object-actions="imageAttributesActions"
-                                    callbacks="callbacks.imageAttributesTable"
-                                    empty-message="No image attributes found"
-                                    grid-state="uiState.attributesTableState">
+                <md-card>
+                    <md-card-content>
+                        <md-content class="md-padding" style="height: 600px">
+                            <sbx-grid
+                                load-page="loadImageAttributes(0, 1000000000, orderByProperty, orderByDirection, filter)"
+                                page-size="1000000000"
+                                sorting="true"
+                                filter="true"
+                                refresh-button="true"
+                                object-actions="imageAttributesActions"
+                                callbacks="callbacks.imageAttributesTable"
+                                empty-message="No image attributes found"
+                                grid-state="uiState.attributesTableState">
 
-                                    <sbx-grid-column property="tag" title="Tag" filter="hexvalue: 8">
-                                    </sbx-grid-column>
-
-                                    <sbx-grid-column property="name" title="Name">
-                                    </sbx-grid-column>
-
-                                    <sbx-grid-column property="values" title="Value">
-                                        <sbx-grid-cell>
-                                            {{rowObject.values.join(",")}}
-                                        </sbx-grid-cell>
-                                    </sbx-grid-column>
-
-                                    <sbx-grid-column property="vr" title="VR">
-                                    </sbx-grid-column>
-
-                                    <sbx-grid-column property="length" title="Length">
-                                    </sbx-grid-column>
-
-                                    <sbx-grid-column property="namePath" title="Path">
-                                        <sbx-grid-cell>
-                                            {{rowObject.namePath.join("/")}}
-                                        </sbx-grid-cell>
-                                    </sbx-grid-column>
-
-                                </sbx-grid> 
-                            </md-content>
-                        </md-card-content>
-                    </md-card>
-                </div>
+                                <sbx-grid-column property="tag" title="Tag" filter="dicomTag"></sbx-grid-column>
+                                <sbx-grid-column property="name" title="Name"></sbx-grid-column>
+                                <sbx-grid-column property="vr" title="VR"></sbx-grid-column>
+                                <sbx-grid-column property="length" title="Length"></sbx-grid-column>
+                                <sbx-grid-column property="values" title="Value">
+                                    <sbx-grid-cell>
+                                        {{formatAttributeValues(rowObject.values)}}
+                                    </sbx-grid-cell>
+                                </sbx-grid-column>
+                                <sbx-grid-column property="tagPath" title="Tag Path" filter="tagPath"></sbx-grid-column>
+                            </sbx-grid>
+                        </md-content>
+                    </md-card-content>
+                </md-card>
             </div>
 
             <div role="tabpanel"
@@ -336,93 +311,88 @@
                 ng-switch-when="2"
                 class="tab-content">
 
-                <div ng-if="!uiState.selectedSeries">
-                    <p><em>No series selected</em></p>
-                </div>
-                <div ng-if="uiState.selectedSeries">
-                    <md-card>
-                        <md-card-content>
-                            <h4 class="md-flex card-header">Source</h4>
+                <md-card>
+                    <md-card-content>
+                        <h4 class="md-flex card-header">Source</h4>
+                        <md-content>
+                            <p>{{uiState.seriesDetails.selectedSeriesSource}}</p>
+                        </md-content>
+                    </md-card-content>
+                </md-card>
+                <md-card>
+                    <md-card-content>
+                        <h4 class="md-flex card-header">Series Types</h4>
+                        <md-content>
                             <md-content>
-                                <p>{{uiState.seriesDetails.selectedSeriesSource}}</p>
-                            </md-content>
-                        </md-card-content>
-                    </md-card>
-                    <md-card>
-                        <md-card-content>
-                            <h4 class="md-flex card-header">Series Types</h4>
-                            <md-content>
-                                <md-content>
-                                    <md-chips
-                                            ng-model="uiState.seriesDetails.selectedSeriesSeriesTypes"
-                                            md-autocomplete-snap
-                                            md-require-match="true"
-                                            md-on-remove="seriesTypeRemoved($chip)"
-                                            md-on-add="seriesTypeAdded($chip)">
-                                        <md-autocomplete
-                                                md-search-text="uiState.seriesDetails.typeState.searchText"
-                                                md-items="item in findSeriesTypes(uiState.seriesDetails.typeState.searchText)"
-                                                md-item-text="item.name"
-                                                md-min-length="1"
-                                                md-no-cache
-                                                placeholder="+type">
-                                            <span md-highlight-text="uiState.seriesDetails.typeState.searchText">{{item.name}}</span>
-                                        </md-autocomplete>
-                                        <md-chip-template>
-                                            <span>{{$chip.name}} </span>
-                                        </md-chip-template>
-                                    </md-chips>
-                                </md-content>
-                            </md-content>
-                        </md-card-content>
-                    </md-card>
-                    <md-card>
-                        <md-card-content>
-                            <h4 class="md-flex card-header">Series Tags</h4>
-                            <md-content>
-                                <md-chips 
-                                    ng-model="uiState.seriesDetails.selectedSeriesSeriesTags" 
-                                    md-autocomplete-snap 
-                                    md-require-match="false"
-                                    md-on-remove="seriesTagRemoved($chip)"
-                                    md-on-add="seriesTagAdded($chip)">
+                                <md-chips
+                                        ng-model="uiState.seriesDetails.selectedSeriesSeriesTypes"
+                                        md-autocomplete-snap
+                                        md-require-match="true"
+                                        md-on-remove="seriesTypeRemoved($chip)"
+                                        md-on-add="seriesTypeAdded($chip)">
                                     <md-autocomplete
-                                        md-search-text="uiState.seriesDetails.tagState.searchText"
-                                        md-items="item in findSeriesTags(uiState.seriesDetails.tagState.searchText)"
-                                        md-item-text="item.name"
-                                        md-min-length="1"
-                                        md-no-cache
-                                        placeholder="+tag">
-                                        <span md-highlight-text="uiState.seriesDetails.tagState.searchText">{{item.name}}</span>
+                                            md-search-text="uiState.seriesDetails.typeState.searchText"
+                                            md-items="item in findSeriesTypes(uiState.seriesDetails.typeState.searchText)"
+                                            md-item-text="item.name"
+                                            md-min-length="1"
+                                            md-no-cache
+                                            placeholder="+type">
+                                        <span md-highlight-text="uiState.seriesDetails.typeState.searchText">{{item.name}}</span>
                                     </md-autocomplete>
                                     <md-chip-template>
                                         <span>{{$chip.name}} </span>
                                     </md-chip-template>
                                 </md-chips>
                             </md-content>
-                        </md-card-content>
-                    </md-card>
-                    <md-card>
-                        <md-card-content>
-                            <h4 class="md-flex card-header">Datasets</h4>
-                            <md-content class="md-padding" style="height: 300px">
-                                <sbx-grid
-                                    load-page="loadSelectedSeriesDatasets()"
-                                    page-size="1000000"
-                                    sorting="false"
-                                    callbacks="callbacks.datasetsTable"
-                                    empty-message="No datasets found">
+                        </md-content>
+                    </md-card-content>
+                </md-card>
+                <md-card>
+                    <md-card-content>
+                        <h4 class="md-flex card-header">Series Tags</h4>
+                        <md-content>
+                            <md-chips
+                                ng-model="uiState.seriesDetails.selectedSeriesSeriesTags"
+                                md-autocomplete-snap
+                                md-require-match="false"
+                                md-on-remove="seriesTagRemoved($chip)"
+                                md-on-add="seriesTagAdded($chip)">
+                                <md-autocomplete
+                                    md-search-text="uiState.seriesDetails.tagState.searchText"
+                                    md-items="item in findSeriesTags(uiState.seriesDetails.tagState.searchText)"
+                                    md-item-text="item.name"
+                                    md-min-length="1"
+                                    md-no-cache
+                                    placeholder="+tag">
+                                    <span md-highlight-text="uiState.seriesDetails.tagState.searchText">{{item.name}}</span>
+                                </md-autocomplete>
+                                <md-chip-template>
+                                    <span>{{$chip.name}} </span>
+                                </md-chip-template>
+                            </md-chips>
+                        </md-content>
+                    </md-card-content>
+                </md-card>
+                <md-card>
+                    <md-card-content>
+                        <h4 class="md-flex card-header">Datasets</h4>
+                        <md-content class="md-padding" style="height: 300px">
+                            <sbx-grid
+                                load-page="loadSelectedSeriesDatasets()"
+                                page-size="1000000"
+                                sorting="false"
+                                callbacks="callbacks.datasetsTable"
+                                empty-message="No datasets found">
 
-                                    <sbx-grid-column property="url" title="URL">
-                                        <sbx-grid-cell>
-                                            <a ng-href="{{rowObject.url}}" target="_blank">{{rowObject.url}}</a>
-                                        </sbx-grid-cell>
-                                    </sbx-grid-column>
-                                </sbx-grid>
-                            </md-content>
-                        </md-card-content>
-                    </md-card>
-                </div>
+                                <sbx-grid-column property="url" title="URL">
+                                    <sbx-grid-cell>
+                                        <a ng-href="{{rowObject.url}}" target="_blank">{{rowObject.url}}</a>
+                                    </sbx-grid-cell>
+                                </sbx-grid-column>
+                            </sbx-grid>
+                        </md-content>
+                    </md-card-content>
+                </md-card>
             </div>
         </ng-switch>
     </div>

@@ -25,7 +25,45 @@ angular.module('slicebox', [
     'slicebox.adminSystem'
 ])
 
-.config(function($locationProvider, $routeProvider, $mdThemingProvider, $filterProvider, $httpProvider) {
+.provider('sbxUtil', function() {
+
+    this.$get = function() {
+        return {
+            tagPathToString: function(tagPath) {
+                if (angular.isUndefined(tagPath)) {
+                    return "";
+                }
+
+                var tagToString = function(tag) {
+                    var returnValue = tag.toString(16);
+                    while (returnValue.length < 8) {
+                        returnValue = '0' + returnValue;
+                    }
+                    returnValue = '(' + returnValue.slice(0, 4) + ',' + returnValue.slice(4) + ')';
+                    return returnValue.toUpperCase();
+                };
+
+                var toTagPathString = function(path, tail) {
+                    var itemIndexSuffix = "";
+                    if (angular.isDefined(path.item)) {
+                        itemIndexSuffix = '[' + path.item + ']';
+                    }
+                    var head = tagToString(path.tag) + itemIndexSuffix;
+                    var part = head + tail;
+                    if (!path.previous) {
+                        return part;
+                    } else {
+                        return toTagPathString(path.previous, "." + part);
+                    }
+                };
+
+                return toTagPathString(tagPath, "");
+            }
+        };
+    };
+})
+
+.config(function($locationProvider, $routeProvider, $mdThemingProvider, $filterProvider, $httpProvider, sbxUtilProvider) {
     $locationProvider.html5Mode(true);
     $routeProvider.otherwise({redirectTo: '/'});
 
@@ -40,26 +78,27 @@ angular.module('slicebox', [
         .primaryPalette('red');
 
     // Register filters
-    $filterProvider.register('hexvalue', function() {
-        return function(intValue, length) {
-            var returnValue = intValue;
+    $filterProvider.register('dicomTag', function() {
+        return function(tag) {
+            var returnValue = tag;
 
-            if (!length) {
-                length = 4;
-            }
+            if (angular.isDefined(tag) && angular.isNumber(tag) && tag !== 0) {
+                returnValue = tag.toString(16);
 
-            if (angular.isDefined(intValue) && angular.isNumber(intValue) && intValue !== 0) {
-                returnValue = intValue.toString(16);
-
-                while (returnValue.length < length) {
+                while (returnValue.length < 8) {
                     returnValue = '0' + returnValue;
                 }
 
+                returnValue = returnValue.slice(0, 4) + ',' + returnValue.slice(4);
                 returnValue = returnValue.toUpperCase();
             }
 
             return returnValue;
         };
+    });
+
+    $filterProvider.register('tagPath', function() {
+        return sbxUtilProvider.$get().tagPathToString;
     });
 
     $httpProvider.interceptors.push(function($q, $location) {
@@ -81,7 +120,7 @@ angular.module('slicebox', [
     };
 })
 
-.run(function ($rootScope, $location, userService) { 
+.run(function ($rootScope, $location, userService) {
     $rootScope.$on('$locationChangeStart', function (event, next, current) {
         // redirect to login page if not logged in
         userService.currentUserPromise.then(function () {}, function () {

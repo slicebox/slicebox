@@ -19,11 +19,11 @@ package se.nimsa.sbx.dicom.streams
 import akka.NotUsed
 import akka.stream.scaladsl.Flow
 import akka.util.ByteString
-import se.nimsa.dicom.data.DicomParts.{DicomPart, HeaderPart, ValueChunk}
-import se.nimsa.dicom.data.Elements.ValueElement
-import se.nimsa.dicom.data.{DicomParts, Tag, Value}
-import se.nimsa.dicom.streams.DicomFlows._
-import se.nimsa.dicom.streams.{DicomFlowFactory, GuaranteedValueEvent, IdentityFlow, StartEvent}
+import se.nimsa.dicom.data.DicomParts.DicomPart
+import se.nimsa.dicom.data.padToEvenLength
+import se.nimsa.dicom.streams.ModifyFlow.{TagModification, TagModificationsPart, modifyFlow}
+import se.nimsa.sbx.anonymization.AnonymizationProtocol.{AnonymizationKeyValue, TagValue}
+import se.nimsa.sbx.dicom.SliceboxTags._
 import se.nimsa.sbx.dicom.streams.DicomStreamUtil._
 
 /**
@@ -31,104 +31,21 @@ import se.nimsa.sbx.dicom.streams.DicomStreamUtil._
   */
 object HarmonizeAnonymizationFlow {
 
-  private val harmonizeTags = Seq(
-    Tag.PatientName,
-    Tag.PatientID,
-    Tag.StudyInstanceUID,
-    Tag.SeriesInstanceUID,
-    Tag.FrameOfReferenceUID)
-
-  def harmonizeAnonFlow: Flow[DicomPart, DicomPart, NotUsed] = Flow[DicomPart]
-    .via(groupLengthDiscardFilter)
-    .via(toIndeterminateLengthSequences)
-    .via(toUtf8Flow)
-    .via(DicomFlowFactory.create(new IdentityFlow with GuaranteedValueEvent[DicomPart] with StartEvent[DicomPart] {
-      var maybeKey: Option[PartialAnonymizationKeyPart] = None
-      var currentAttribute: Option[ValueElement] = None
-      var depth = 0
-
-      def maybeHarmonize(element: ValueElement, keyPart: PartialAnonymizationKeyPart): List[DicomPart] = {
-        val updatedAttribute = element.tag match {
-          case Tag.PatientName => keyPart.keyMaybe
-            .map(key => element.setValue(Value(ByteString(key.anonPatientName))))
-            .getOrElse(element)
-          case Tag.PatientID => keyPart.keyMaybe
-            .map(key => element.setValue(Value(ByteString(key.anonPatientID))))
-            .getOrElse(element)
-          case Tag.StudyInstanceUID => keyPart.keyMaybe
-            .map(key => element.setValue(Value(ByteString(key.anonStudyInstanceUID))))
-            .getOrElse(element)
-          case Tag.SeriesInstanceUID => keyPart.keyMaybe
-            .map(key => element.setValue(Value(ByteString(key.anonSeriesInstanceUID))))
-            .getOrElse(element)
-          case Tag.FrameOfReferenceUID => keyPart.keyMaybe
-            .map(key => element.setValue(Value(ByteString(key.anonFrameOfReferenceUID))))
-            .getOrElse(element)
-          case _ => element
-        }
-        updatedAttribute.toParts
-      }
-      /*
-       * do harmonize anon if:
-       * - anomymization keys have been received in stream
-       * - tag specifies attribute that needs to be harmonized
-       */
-      def needHarmonizeAnon(tag: Int, keyPart: Option[PartialAnonymizationKeyPart]): Boolean = canDoHarmonizeAnon(keyPart) && harmonizeTags.contains(tag)
-
-      def canDoHarmonizeAnon(keyPartMaybe: Option[PartialAnonymizationKeyPart]): Boolean = keyPartMaybe.flatMap(_.keyMaybe).isDefined
-
-      override def onPart(part: DicomPart): List[DicomPart] = part match {
-        case keyPart: PartialAnonymizationKeyPart =>
-          maybeKey = Some(keyPart)
-          super.onPart(keyPart)
-        case p => super.onPart(p)
-      }
-
-      override def onHeader(header: HeaderPart): List[DicomPart] =
-        if (depth <= 0 && needHarmonizeAnon(header.tag, maybeKey)) {
-          currentAttribute = Some(ValueElement.empty(header.tag, header.vr, header.bigEndian, header.explicitVR))
-          super.onHeader(header).filterNot(_ == header)
-        } else {
-          currentAttribute = None
-          super.onHeader(header)
-        }
-
-      override def onValueChunk(chunk: ValueChunk): List[DicomPart] =
-        if (currentAttribute.isDefined && canDoHarmonizeAnon(maybeKey)) {
-          currentAttribute = currentAttribute.map(attribute => attribute.copy(value = attribute.value ++ chunk.bytes))
-
-          if (chunk.last) {
-            val attribute = currentAttribute.get
-            val key = maybeKey.get
-
-            currentAttribute = None
-            maybeHarmonize(attribute, key)
-          } else
-            super.onValueChunk(chunk).filterNot(_ == chunk)
-        } else
-          super.onValueChunk(chunk)
-
-      override def onSequence(part: DicomParts.SequencePart): List[DicomPart] = {
-        depth += 1
-        super.onSequence(part)
-      }
-
-      override def onSequenceDelimitation(part: DicomParts.SequenceDelimitationPart): List[DicomPart] = {
-        depth -= 1
-        super.onSequenceDelimitation(part)
-      }
-
-      override def onStart(): List[DicomPart] = {
-        maybeKey = None
-        currentAttribute = None
-        super.onStart()
-      }
-    }))
-
-  def maybeHarmonizeAnonFlow: Flow[DicomPart, DicomPart, NotUsed] = conditionalFlow(
-    {
-      case keyPart: PartialAnonymizationKeyPart => keyPart.keyMaybe.isEmpty
-    }, Flow.fromFunction(identity), harmonizeAnonFlow)
+  def harmonizeAnonFlow(customAnonValues: Seq[TagValue]): Flow[DicomPart, DicomPart, NotUsed] = identityFlow
+    .map {
+      case rp: AnonymizationKeyOpResultPart =>
+        val r = rp.result
+        val active = valueTags
+          .filterNot(_.level > r.matchLevel)
+          .map(_.tagPath)
+          .flatMap(tp => r.values.find(_.tagPath == tp))
+        val custom = customAnonValues.map(v => AnonymizationKeyValue(-1, -1, v.tagPath, "", v.value))
+        val combined = active.foldLeft(custom)((m, tv) => if (m.map(_.tagPath).contains(tv.tagPath)) m else m :+ tv)
+        val mods = combined.map(tv => TagModification.contains(tv.tagPath, _ => padToEvenLength(ByteString(tv.anonymizedValue), tv.tagPath.tag), insert = true))
+        TagModificationsPart(mods.toList)
+      case p => p
+    }
+    .via(modifyFlow())
 
 }
 
