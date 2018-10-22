@@ -114,6 +114,8 @@ object BoxProtocol {
 
   case class FailedOutgoingTransactionImage(transactionImage: OutgoingTransactionImage, message: String)
 
+  case class BoxTransactionStatus(status: TransactionStatus)
+
 
   sealed trait BoxRequest
 

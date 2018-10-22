@@ -174,7 +174,10 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageServic
             .pipeSequentiallyTo(sender)
 
         case GetIncomingTransactionStatus(box, transactionId) =>
-          boxDao.incomingTransactionByOutgoingTransactionId(box.id, transactionId).map(_.map(_.status)).pipeTo(sender)
+          boxDao
+            .incomingTransactionByOutgoingTransactionId(box.id, transactionId)
+            .map(_.map(_.status))
+            .pipeTo(sender)
 
         case GetIncomingTransactions(startIndex, count) =>
           boxDao.listIncomingTransactions(startIndex, count).map(IncomingTransactions).pipeTo(sender)

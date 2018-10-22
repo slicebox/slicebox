@@ -2,8 +2,9 @@ package se.nimsa.sbx.app.routing
 
 import java.util.UUID
 
+import akka.http.scaladsl.marshalling.Marshal
 import akka.http.scaladsl.model.StatusCodes._
-import akka.http.scaladsl.model.{ContentTypes, HttpEntity}
+import akka.http.scaladsl.model.{ContentTypes, HttpEntity, RequestEntity}
 import akka.http.scaladsl.server._
 import akka.util.ByteString
 import org.scalatest.{FlatSpecLike, Matchers}
@@ -16,9 +17,6 @@ import se.nimsa.sbx.storage.RuntimeStorage
 import se.nimsa.sbx.util.CompressionUtil._
 import se.nimsa.sbx.util.FutureUtil.await
 import se.nimsa.sbx.util.TestUtil
-
-import scala.concurrent.Await
-import scala.concurrent.duration.DurationInt
 
 class TransactionRoutesTest extends {
   val dbConfig = TestUtil.createTestDb("transactionroutestest")
@@ -243,7 +241,8 @@ class TransactionRoutesTest extends {
 
     Get(s"/api/transactions/${uniBox.token}/status?transactionid=$transId") ~> routes ~> check {
       status shouldBe OK
-      Await.result(response.entity.toStrict(5.seconds), 5.seconds).data.decodeString("utf-8") shouldBe "FAILED"
+      val transactionStatus = responseAs[BoxTransactionStatus].status
+      transactionStatus shouldBe TransactionStatus.FAILED
     }
   }
 
@@ -264,13 +263,15 @@ class TransactionRoutesTest extends {
 
     await(boxDao.insertIncomingTransaction(IncomingTransaction(-1, uniBox.id, uniBox.name, transId, 45, 45, 48, 0, 0, TransactionStatus.PROCESSING)))
 
-    Put(s"/api/transactions/${uniBox.token}/status?transactionid=$transId", TransactionStatus.FAILED.toString) ~> routes ~> check {
+    val entity = await(Marshal(BoxTransactionStatus(TransactionStatus.FAILED)).to[RequestEntity])
+    Put(s"/api/transactions/${uniBox.token}/status?transactionid=$transId", entity) ~> routes ~> check {
       status shouldBe NoContent
     }
 
     Get(s"/api/transactions/${uniBox.token}/status?transactionid=$transId") ~> routes ~> check {
       status shouldBe OK
-      Await.result(response.entity.toStrict(5.seconds), 5.seconds).data.decodeString("utf-8") shouldBe "FAILED"
+      val transactionStatus = responseAs[BoxTransactionStatus].status
+      transactionStatus shouldBe TransactionStatus.FAILED
     }
   }
 
@@ -279,7 +280,8 @@ class TransactionRoutesTest extends {
 
     val transId = 666
 
-    Put(s"/api/transactions/${uniBox.token}/status?transactionid=$transId", TransactionStatus.FAILED.toString) ~> routes ~> check {
+    val entity = await(Marshal(BoxTransactionStatus(TransactionStatus.FAILED)).to[RequestEntity])
+    Put(s"/api/transactions/${uniBox.token}/status?transactionid=$transId", entity) ~> routes ~> check {
       status shouldBe NotFound
     }
   }
