@@ -62,33 +62,40 @@
         <div flex ng-controller="FilterDetailsCtrl">
             <md-card ng-if="uiState.selectedFilter">
                 <md-card-content>
-                    <md-content>
-                        <sbx-grid
-                                load-page="loadFilterAttributes(filter)"
-                                object-actions="attributeActions"
-                                page-size="100000"
-                                refresh-button="true"
-                                sorting="false"
-                                callbacks="callbacks.filterAttributesTables"
-                                empty-message="No attributes added">
+                    <h4>{{state.filterSpec.name}}</h4>
+                    <sbx-grid
+                            load-page="loadFilterAttributes(filter)"
+                            object-actions="attributeActions"
+                            page-size="100000"
+                            refresh-button="true"
+                            sorting="false"
+                            callbacks="callbacks.filterAttributesTables"
+                            empty-message="No attributes added">
 
-                            <sbx-grid-column property="tag" title="Tag" filter="hexvalue: 8">
-                            </sbx-grid-column>
+                        <sbx-grid-column property="tag" title="Tag" filter="hexvalue: 8">
+                        </sbx-grid-column>
 
-                            <sbx-grid-column property="name" title="Name">
-                            </sbx-grid-column>
+                        <sbx-grid-column property="name" title="Name">
+                        </sbx-grid-column>
 
-                            <sbx-grid-column property="namePath" title="Path">
-                            </sbx-grid-column>
+                        <sbx-grid-column property="namePath" title="Path">
+                        </sbx-grid-column>
 
-                        </sbx-grid>
+                    </sbx-grid>
 
-                        <div layout="row" class="button-row">
-                            <md-button md-no-ink class="md-primary" type="button"
-                                       ng-click="addRuleAttributeButtonClicked()">
-                                Add Attribute
-                            </md-button>
-                        </div>
+                    <div layout="row" class="button-row">
+                        <md-button md-no-ink class="md-primary" type="button"
+                                   ng-click="addFilterAttributeButtonClicked()">
+                            Add Attribute
+                        </md-button>
+                    </div>
+
+                    <sbx-button button-class="md-raised md-primary"
+                                button-type="submit"
+                                button-disabled="!filterChanged()"
+                                button-title="Save"
+                                action="saveButtonClicked()">
+                    </sbx-button>
                 </md-card-content>
             </md-card>
         </div>

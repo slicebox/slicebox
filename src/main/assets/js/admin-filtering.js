@@ -33,7 +33,11 @@ angular.module('slicebox.adminFiltering', ['ngRoute'])
                 }
             ];
 
-        $scope.callbacks = {};
+        $scope.callbacks = {
+            associationsTable: {},
+            filtersTable: {},
+            filterAttributesTables: {}
+        };
 
         // Scope functions
         $scope.loadSourceFilterAssociations = function(startIndex, count, orderByProperty, orderByDirection) {
@@ -97,7 +101,6 @@ angular.module('slicebox.adminFiltering', ['ngRoute'])
 
     .controller('FilterDetailsCtrl', function($scope, $http, $mdDialog, $q, sbxToast) {
         // Initialization
-        $scope.callbacks.filterAttributesTables = {};
         $scope.state = {
             filterSpec: null
         };
@@ -105,7 +108,7 @@ angular.module('slicebox.adminFiltering', ['ngRoute'])
         $scope.attributeActions = [
             {
                 name: 'Remove',
-                action: removeAttribues
+                action: removeAttributes
             }
         ];
 
@@ -114,39 +117,29 @@ angular.module('slicebox.adminFiltering', ['ngRoute'])
         });
 
         // Scope functions
-        $scope.seriesTypeDataChanged = function() {
-            var rulesHaveChanged = false;
-            var attributesHaveChnaged = false;
-
-            if (angular.equals($scope.uiState.selectedSeriesType, $scope.originalSeriesType) === false) {
+        $scope.filterChanged = function() {
+            if ($scope.state.filterSpec && $scope.uiState.selectedFilter.id !== $scope.state.filterSpec.id) {
                 return true;
             }
-
-            angular.forEach($scope.state.rules, function(rule) {
-                if (isRuleDirty(rule)) {
-                    rulesHaveChanged = true;
-                }
-            });
-
-            return rulesHaveChanged;
+            return !angular.equals($scope.state.originalFilterSpec, $scope.state.filterSpec);
         };
 
-        $scope.addRuleButtonClicked = function() {
-            $scope.state.rules.push({
-                attributes: [],
-                originalAttributes: []
-            });
+        // $scope.addRuleButtonClicked = function() {
+        //     $scope.state.rules.push({
+        //         attributes: [],
+        //         originalAttributes: []
+        //     });
+        //
+        //     $scope.callbacks.ruleAttributesTables.push({});
+        // };
 
-            $scope.callbacks.ruleAttributesTables.push({});
-        };
-
-        $scope.addRuleAttributeButtonClicked = function() {
+        $scope.addFilterAttributeButtonClicked = function() {
             var newAttribute = {
                 //seriesTypeRuleId: rule.id
             };
 
             var dialogPromise = $mdDialog.show({
-                templateUrl: '/assets/partials/editSeriesTypeRuleAttributeModalContent.html',
+                templateUrl: '/assets/partials/editFilterAttributeModalContent.html',
                 controller: 'EditSeriesTypeRuleAttributeModalCtrl',
                 locals: {
                     attribute: newAttribute
@@ -154,7 +147,8 @@ angular.module('slicebox.adminFiltering', ['ngRoute'])
             });
 
             dialogPromise.then(function (response) {
-                $scope.filterSpec.tags.push(newAttribute);
+                //TODO- don't add duplicates
+                $scope.state.filterSpec.tags.push(newAttribute);
                 $scope.callbacks.filterAttributesTables.reloadPage();
             });
         };
@@ -181,27 +175,19 @@ angular.module('slicebox.adminFiltering', ['ngRoute'])
             var savePromise;
             var isCreate;
 
-            if ($scope.seriesTypeForm.$invalid) {
-                return;
-            }
-
-            if ($scope.uiState.selectedSeriesType.id === -1) {
+            if ($scope.uiState.selectedFilter.id === -1) {
                 isCreate = true;
-                savePromise = $http.post('/api/seriestypes', $scope.uiState.selectedSeriesType);
+                savePromise = $http.post('/api/filtering/tagfilter', $scope.state.filterSpec);
             } else {
                 isCreate = false;
-                savePromise = $http.put('/api/seriestypes/' + $scope.uiState.selectedSeriesType.id, $scope.uiState.selectedSeriesType);
+                savePromise = $http.post('/api/filtering/tagfilter', $scope.state.filterSpec);
             }
 
-            savePromise = savePromise.then(function(response) {
+            savePromise.then(function(response) {
                 if (response.data.id) {
-                    $scope.uiState.selectedSeriesType.id = response.data.id;
+                    $scope.uiState.selectedFilter.id = response.data.id;
+
                 }
-
-                return saveRules();
-            });
-
-            savePromise.then(function() {
                 if (isCreate) {
                     sbxToast.showInfoMessage("Series type added");
                 } else {
@@ -209,7 +195,8 @@ angular.module('slicebox.adminFiltering', ['ngRoute'])
                 }
 
                 resetState();
-                $scope.callbacks.seriesTypesTable.reloadPage();
+                $scope.callbacks.filterAttributesTables.reloadPage();
+
             }, function(error) {
                 sbxToast.showErrorMessage(error);
             });
@@ -217,17 +204,16 @@ angular.module('slicebox.adminFiltering', ['ngRoute'])
             return savePromise;
         };
 
-        // Private functions
-        function isRuleDirty(rule) {
-            if (!angular.equals(rule.attributes, rule.originalAttributes)) {
-                return true;
-            }
-        }
+        // // Private functions
+        // function isRuleDirty(rule) {
+        //     if (!angular.equals(rule.attributes, rule.originalAttributes)) {
+        //         return true;
+        //     }
+        // }
 
         function resetState() {
             // $scope.seriesTypeForm.$setPristine();
-            console.log('callbacks= ' + $scope.callbacks);
-            // $scope.originalSeriesType = angular.copy($scope.uiState.selectedSeriesType);
+            $scope.originalFilterSpec = angular.copy($scope.uiState.selectedSeriesType);
             //
              $scope.state.filterSpec = null;
             // $scope.callbacks.ruleAttributesTables = [];
@@ -244,84 +230,74 @@ angular.module('slicebox.adminFiltering', ['ngRoute'])
             $http.get('/api/filtering/tagfilter/' + $scope.uiState.selectedFilter.id)
                 .success(function(filter) {
                     $scope.state.filterSpec = filter;
+                    $scope.state.originalFilterSpec = angular.copy(filter);
                     $scope.callbacks.filterAttributesTables.reloadPage();
-                    // handleLoadedRules(rules);
                 })
                 .error(function(error) {
                     sbxToast.showErrorMessage('Failed to load filter: ' + error);
                 });
         }
 
-        // function handleLoadedRules(rules) {
-        //     angular.forEach(rules, function(rule) {
-        //         // Selected series type may have changed while the rules were loaded
-        //         if (rule.seriesTypeId === $scope.uiState.selectedSeriesType.id) {
-        //             $scope.state.rules.push(rule);
-        //             loadRuleAttributes(rule);
-        //         }
-        //     });
+        // function loadRuleAttributes(rule) {
+        //     $http.get('/api/seriestypes/rules/' + rule.id + '/attributes')
+        //         .success(function(attributes) {
+        //             rule.attributes = attributes;
+        //             rule.originalAttributes = angular.copy(attributes);
+        //         })
+        //         .error(function(error) {
+        //             sbxToast.showErrorMessage('Failed to load rule attributes: ' + error);
+        //         });
         // }
 
-        function loadRuleAttributes(rule) {
-            $http.get('/api/seriestypes/rules/' + rule.id + '/attributes')
-                .success(function(attributes) {
-                    rule.attributes = attributes;
-                    rule.originalAttributes = angular.copy(attributes);
-                })
-                .error(function(error) {
-                    sbxToast.showErrorMessage('Failed to load rule attributes: ' + error);
-                });
-        }
+        // function saveRules() {
+        //     var saveRulePromises = [];
+        //     var savePromise;
+        //
+        //     angular.forEach($scope.state.rules, function(rule) {
+        //         savePromise = null;
+        //
+        //         if (rule.attributes && rule.attributes.length === 0 && rule.id) {
+        //             savePromise = deleteRule(rule);
+        //         } else if (!angular.equals(rule.attributes, rule.originalAttributes)) {
+        //             if (!rule.id) {
+        //                 savePromise = createRule(rule);
+        //             } else {
+        //                 savePromise = saveRuleAttributes(rule, rule.attributes, rule.originalAttributes);
+        //             }
+        //         }
+        //
+        //         if (savePromise) {
+        //             saveRulePromises.push(savePromise);
+        //         }
+        //     });
+        //
+        //     return $q.all(saveRulePromises);
+        // }
+        //
+        // function deleteRule(rule) {
+        //     return $http.delete('/api/seriestypes/rules/' + rule.id);
+        // }
 
-        function saveRules() {
-            var saveRulePromises = [];
-            var savePromise;
+        // function createRule(rule) {
+        //     var savePromise = $http.post('/api/seriestypes/rules', { id: -1, seriesTypeId: $scope.uiState.selectedSeriesType.id });
+        //
+        //     savePromise = savePromise.then(function(response) {
+        //         return saveRuleAttributes(response.data, rule.attributes, rule.originalAttributes);
+        //     });
+        //
+        //     return savePromise;
+        // }
 
-            angular.forEach($scope.state.rules, function(rule) {
-                savePromise = null;
-
-                if (rule.attributes && rule.attributes.length === 0 && rule.id) {
-                    savePromise = deleteRule(rule);
-                } else if (!angular.equals(rule.attributes, rule.originalAttributes)) {
-                    if (!rule.id) {
-                        savePromise = createRule(rule);
-                    } else {
-                        savePromise = saveRuleAttributes(rule, rule.attributes, rule.originalAttributes);
-                    }
-                }
-
-                if (savePromise) {
-                    saveRulePromises.push(savePromise);
-                }
-            });
-
-            return $q.all(saveRulePromises);
-        }
-
-        function deleteRule(rule) {
-            return $http.delete('/api/seriestypes/rules/' + rule.id);
-        }
-
-        function createRule(rule) {
-            var savePromise = $http.post('/api/seriestypes/rules', { id: -1, seriesTypeId: $scope.uiState.selectedSeriesType.id });
-
-            savePromise = savePromise.then(function(response) {
-                return saveRuleAttributes(response.data, rule.attributes, rule.originalAttributes);
-            });
-
-            return savePromise;
-        }
-
-        function saveRuleAttributes(rule, attributes, originalAttributes) {
-            var promises = [];
-
-            var diff = attributesArraysDiff(attributes, originalAttributes);
-
-            promises.push(createNewAttributes(rule, diff.newAttributes));
-            promises.push(deleteRemovedAttributes(rule, diff.removedAttributes));
-
-            return $q.all(promises);
-        }
+        // function saveRuleAttributes(rule, attributes, originalAttributes) {
+        //     var promises = [];
+        //
+        //     var diff = attributesArraysDiff(attributes, originalAttributes);
+        //
+        //     promises.push(createNewAttributes(rule, diff.newAttributes));
+        //     promises.push(deleteRemovedAttributes(rule, diff.removedAttributes));
+        //
+        //     return $q.all(promises);
+        // }
 
         function attributesArraysDiff(attributes, originalAttributes) {
             var newAttributes = [];
@@ -363,53 +339,52 @@ angular.module('slicebox.adminFiltering', ['ngRoute'])
 
             return result;
         }
+        //
+        // function createNewAttributes(rule, newAttributes) {
+        //     var saveAttributePromises = [];
+        //     var savePromise;
+        //
+        //     angular.forEach(newAttributes, function(attribute) {
+        //         newAttribute = {
+        //             id: -1,
+        //             seriesTypeRuleId: rule.id,
+        //             tag: attribute.tag,
+        //             name: "",
+        //             values: attribute.values
+        //         };
+        //
+        //         savePromise = $http.post('/api/seriestypes/rules/' + rule.id + '/attributes', newAttribute);
+        //
+        //         saveAttributePromises.push(savePromise);
+        //     });
+        //
+        //     return $q.all(saveAttributePromises);
+        // }
 
-        function createNewAttributes(rule, newAttributes) {
-            var saveAttributePromises = [];
-            var savePromise;
+        // function deleteRemovedAttributes(rule, removedAttributes) {
+        //     var deleteAttributePromises = [];
+        //     var deletePromise;
+        //
+        //     angular.forEach(removedAttributes, function(attribute) {
+        //         deletePromise = $http.delete('/api/seriestypes/rules/' + rule.id + '/attributes/' + attribute.id);
+        //
+        //         deleteAttributePromises.push(deletePromise);
+        //     });
+        //
+        //     return $q.all(deleteAttributePromises);
+        // }
 
-            angular.forEach(newAttributes, function(attribute) {
-                newAttribute = {
-                    id: -1,
-                    seriesTypeRuleId: rule.id,
-                    tag: attribute.tag,
-                    name: "",
-                    values: attribute.values
-                };
-
-                savePromise = $http.post('/api/seriestypes/rules/' + rule.id + '/attributes', newAttribute);
-
-                saveAttributePromises.push(savePromise);
-            });
-
-            return $q.all(saveAttributePromises);
-        }
-
-        function deleteRemovedAttributes(rule, removedAttributes) {
-            var deleteAttributePromises = [];
-            var deletePromise;
-
-            angular.forEach(removedAttributes, function(attribute) {
-                deletePromise = $http.delete('/api/seriestypes/rules/' + rule.id + '/attributes/' + attribute.id);
-
-                deleteAttributePromises.push(deletePromise);
-            });
-
-            return $q.all(deleteAttributePromises);
-        }
-
-        function removeAttribues(attributes) {
-            var rule;
+        function removeAttributes(attributes) {
             var attributeIndex;
 
             angular.forEach(attributes, function(attribute) {
-                rule = findRuleForAttribute(attribute);
 
-                attributeIndex = rule.attributes.indexOf(attribute);
+                attributeIndex = $scope.state.filterSpec.tags.indexOf(attribute);
                 if (attributeIndex >= 0) {
-                    rule.attributes.splice(attributeIndex, 1);
+                    $scope.state.filterSpec.tags.splice(attributeIndex, 1);
                 }
             });
+            $scope.callbacks.filterAttributesTables.clearSelection();
         }
 
         function findRuleForAttribute(attribute) {
@@ -441,4 +416,18 @@ angular.module('slicebox.adminFiltering', ['ngRoute'])
 
             $mdDialog.hide();
         };
-    });
+    })
+
+    .controller('AddFilterModalCtrl', function($scope, $mdDialog) {
+    // Initialization
+    $scope.filterType = 'WHITELIST';
+
+    // Scope functions
+    $scope.addButtonClicked = function() {
+        $mdDialog.hide({ id: -1, name: $scope.filterName, tagFilterType: $scope.filterType, tags: []});
+    };
+
+    $scope.cancelButtonClicked = function() {
+        $mdDialog.cancel();
+    };
+});
