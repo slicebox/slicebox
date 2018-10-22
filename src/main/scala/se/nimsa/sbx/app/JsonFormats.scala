@@ -132,6 +132,7 @@ trait JsonFormats {
   implicit val boxSendMethodFormat: Format[BoxSendMethod] = enumFormat(BoxSendMethod.withName)
 
   implicit val transactionStatusFormat: Format[TransactionStatus] = enumFormat(TransactionStatus.withName)
+  implicit val boxTransactionStatusFormat: Format[BoxTransactionStatus] = Json.format[BoxTransactionStatus]
 
   implicit val boxFormat: Format[Box] = Json.format[Box]
 
