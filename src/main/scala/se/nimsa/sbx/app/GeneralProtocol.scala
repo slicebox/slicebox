@@ -76,6 +76,8 @@ object GeneralProtocol {
   
   case class SourceRef(sourceType: SourceType, sourceId: Long)
 
+  case class SourceAdded(sourceRef: SourceRef)
+
   case class SourceDeleted(sourceRef: SourceRef)
 
   case class Destination(destinationType: DestinationType, destinationName: String, destinationId: Long)

@@ -55,8 +55,8 @@ trait FilteringRoutes {
             get {
               authorize(apiUser.hasPermission(UserRole.ADMINISTRATOR)) {
                 onSuccess(filteringService.ask(GetTagFilter(tagFilterId)).mapTo[Option[TagFilterSpec]]) {
-                  case Some(tfs) =>
-                    complete((OK, tfs))
+                  case Some(tagFilterSpec) =>
+                    complete((OK, tagFilterSpec))
                   case None =>
                     complete(NotFound)
                 }

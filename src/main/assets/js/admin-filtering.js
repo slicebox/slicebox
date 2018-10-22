@@ -30,7 +30,6 @@ angular.module('slicebox.adminFiltering', ['ngRoute'])
                 {
                     name: 'Delete',
                     action: confirmDeleteFilter
-                    //action: openDeleteEntitiesModalFunction('/api/filtering/tagfilter/', 'filter(s)')
                 }
             ];
 

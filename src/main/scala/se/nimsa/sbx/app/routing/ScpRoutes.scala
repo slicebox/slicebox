@@ -16,15 +16,15 @@
 
 package se.nimsa.sbx.app.routing
 
-import akka.pattern.ask
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
-import se.nimsa.sbx.app.GeneralProtocol.{SourceDeleted, SourceRef}
+import akka.pattern.ask
 import se.nimsa.sbx.app.GeneralProtocol.SourceType.SCP
+import se.nimsa.sbx.app.GeneralProtocol.{SourceAdded, SourceDeleted, SourceRef}
 import se.nimsa.sbx.app.SliceboxBase
-import se.nimsa.sbx.user.UserProtocol._
 import se.nimsa.sbx.scp.ScpProtocol._
+import se.nimsa.sbx.user.UserProtocol._
 
 trait ScpRoutes { this: SliceboxBase =>
 
@@ -44,8 +44,10 @@ def scpRoutes(apiUser: ApiUser): Route =
           authorize(apiUser.hasPermission(UserRole.ADMINISTRATOR)) {
             entity(as[ScpData]) { scp =>
               onSuccess(scpService.ask(AddScp(scp))) {
-                case scpData: ScpData =>
+                case scpData: ScpData => {
+                  system.eventStream.publish(SourceAdded(SourceRef(SCP, scpData.id)))
                   complete((Created, scpData))
+                }
               }
             }
           }

@@ -24,7 +24,7 @@ import akka.pattern.ask
 import akka.stream.scaladsl.{Source => StreamSource}
 import akka.util.ByteString
 import se.nimsa.dicom.streams.DicomStreamException
-import se.nimsa.sbx.app.GeneralProtocol.SourceType.IMPORT
+import se.nimsa.sbx.app.GeneralProtocol.SourceType.{BOX, IMPORT}
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.dicom.Contexts
@@ -67,8 +67,10 @@ trait ImportRoutes {
           } ~ post {
             entity(as[ImportSession]) { importSession =>
               onSuccess(importService.ask(AddImportSession(importSession.copy(user = apiUser.user, userId = apiUser.id)))) {
-                case importSession: ImportSession =>
+                case importSession: ImportSession => {
+                  system.eventStream.publish(SourceAdded(SourceRef(IMPORT, importSession.id)))
                   complete((Created, importSession))
+                }
               }
             }
           }
