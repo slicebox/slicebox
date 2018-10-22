@@ -20,55 +20,12 @@ import akka.NotUsed
 import akka.stream.FlowShape
 import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Merge}
 import se.nimsa.dicom.data.DicomParts.{DicomPart, MetaPart}
-import se.nimsa.dicom.data.TagPath.TagPathTag
 import se.nimsa.dicom.data._
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.{AnonymizationKeyOpResult, TagValue}
-import se.nimsa.sbx.dicom.DicomHierarchy.DicomHierarchyLevel
 
 object DicomStreamUtil {
 
   case class AnonymizationKeyOpResultPart(result: AnonymizationKeyOpResult) extends MetaPart
-
-  val encodingTags: Set[TagPath] = Set(Tag.TransferSyntaxUID, Tag.SpecificCharacterSet).map(TagPath.fromTag)
-
-  val tagsToStoreInDB: Set[TagPath] = {
-    val patientTags = Set(Tag.PatientName, Tag.PatientID, Tag.PatientSex, Tag.PatientBirthDate).map(TagPath.fromTag)
-    val studyTags = Set(Tag.StudyInstanceUID, Tag.StudyDescription, Tag.StudyID, Tag.StudyDate, Tag.AccessionNumber, Tag.PatientAge).map(TagPath.fromTag)
-    val seriesTags = Set(Tag.SeriesInstanceUID, Tag.SeriesDescription, Tag.SeriesDate, Tag.Modality, Tag.ProtocolName, Tag.BodyPartExamined, Tag.Manufacturer, Tag.StationName, Tag.FrameOfReferenceUID).map(TagPath.fromTag)
-    val imageTags = Set(Tag.SOPInstanceUID, Tag.ImageType, Tag.InstanceNumber).map(TagPath.fromTag)
-
-    (patientTags ++ studyTags ++ seriesTags ++ imageTags).map(_.asInstanceOf[TagPath])
-  }
-
-  val anonymizationTags: Set[TagPath] = Set(Tag.PatientIdentityRemoved, Tag.DeidentificationMethod).map(TagPath.fromTag)
-
-  val anonKeysTags: Set[TagPath] = Set(Tag.PatientName, Tag.PatientID, Tag.StudyInstanceUID, Tag.SeriesInstanceUID, Tag.SOPInstanceUID).map(TagPath.fromTag)
-
-  val imageInformationTags: Set[TagPath] = Set(Tag.InstanceNumber, Tag.ImageIndex, Tag.NumberOfFrames, Tag.SmallestImagePixelValue, Tag.LargestImagePixelValue).map(TagPath.fromTag)
-
-  case class TagLevel(tagPath: TagPathTag, level: DicomHierarchyLevel)
-
-  val mandatoryValueTags: Set[TagLevel] = Set(
-    TagLevel(TagPath.fromTag(Tag.PatientName), DicomHierarchyLevel.PATIENT),
-    TagLevel(TagPath.fromTag(Tag.PatientID), DicomHierarchyLevel.PATIENT),
-    TagLevel(TagPath.fromTag(Tag.StudyInstanceUID), DicomHierarchyLevel.STUDY),
-    TagLevel(TagPath.fromTag(Tag.SeriesInstanceUID), DicomHierarchyLevel.SERIES),
-    TagLevel(TagPath.fromTag(Tag.SOPInstanceUID), DicomHierarchyLevel.IMAGE),
-    TagLevel(TagPath.fromTag(Tag.PatientIdentityRemoved), DicomHierarchyLevel.IMAGE),
-    TagLevel(TagPath.fromTag(Tag.DeidentificationMethod), DicomHierarchyLevel.IMAGE)
-  )
-
-  val optionalValueTags: Set[TagLevel] = Set(
-    TagLevel(TagPath.fromTag(Tag.PatientBirthDate), DicomHierarchyLevel.PATIENT),
-    TagLevel(TagPath.fromTag(Tag.StudyDescription), DicomHierarchyLevel.STUDY),
-    TagLevel(TagPath.fromTag(Tag.StudyID), DicomHierarchyLevel.STUDY),
-    TagLevel(TagPath.fromTag(Tag.AccessionNumber), DicomHierarchyLevel.STUDY),
-    TagLevel(TagPath.fromTag(Tag.FrameOfReferenceUID), DicomHierarchyLevel.STUDY),
-    TagLevel(TagPath.fromTag(Tag.SeriesDescription), DicomHierarchyLevel.SERIES),
-    TagLevel(TagPath.fromTag(Tag.ProtocolName), DicomHierarchyLevel.SERIES),
-  )
-
-  val valueTags: Set[TagLevel] = mandatoryValueTags ++ optionalValueTags
 
   val identityFlow: Flow[DicomPart, DicomPart, NotUsed] = Flow[DicomPart]
 

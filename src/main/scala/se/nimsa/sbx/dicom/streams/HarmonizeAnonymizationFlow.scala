@@ -23,6 +23,7 @@ import se.nimsa.dicom.data.DicomParts.DicomPart
 import se.nimsa.dicom.data.padToEvenLength
 import se.nimsa.dicom.streams.ModifyFlow.{TagModification, TagModificationsPart, modifyFlow}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.{AnonymizationKeyValue, TagValue}
+import se.nimsa.sbx.dicom.SliceboxTags._
 import se.nimsa.sbx.dicom.streams.DicomStreamUtil._
 
 /**

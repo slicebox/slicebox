@@ -28,7 +28,7 @@ import akka.stream.scaladsl.{Sink, Source}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.app.GeneralProtocol.{ImageAdded, ImagesDeleted}
 import se.nimsa.sbx.app.SliceboxBase
-import se.nimsa.sbx.user.UserProtocol.ApiUser
+import se.nimsa.sbx.user.UserProtocol.{ApiUser, UserRole}
 
 trait AnonymizationRoutes {
   this: SliceboxBase =>
@@ -117,32 +117,34 @@ trait AnonymizationRoutes {
           }
         } ~ path("export" / "csv") {
           get {
-            val source =
-              Source.single(List(
-                "ID", "Image ID", "Created",
-                "Patient Name", "Anonymous Patient Name",
-                "Patient ID", "Anonymous Patient ID",
-                "Study Instance UID", "Anonymous Study Instance UID",
-                "Series Instance UID", "Anonymous Series Instance UID",
-                "SOP Instance UID", "Anonymous SOP Instance UID",
-                "Tag Path", "Value", "Anonymized Value"))
-                .concat(
-                  anonymizationDao.anonymizationKeyValueSource
-                    .map {
-                      case (key, value) =>
-                        List(
-                          key.id.toString, key.imageId.toString, key.created.toString,
-                          key.patientName, key.anonPatientName,
-                          key.patientID, key.anonPatientID,
-                          key.studyInstanceUID, key.anonStudyInstanceUID,
-                          key.seriesInstanceUID, key.anonSeriesInstanceUID,
-                          key.sopInstanceUID, key.anonSOPInstanceUID,
-                          value.tagPath.toString, value.value, value.anonymizedValue)
-                    })
-                .via(CsvFormatting.format(delimiter = CsvFormatting.SemiColon))
+            authorize(apiUser.hasPermission(UserRole.ADMINISTRATOR)) {
+              val source =
+                Source.single(List(
+                  "ID", "Image ID", "Created",
+                  "Patient Name", "Anonymous Patient Name",
+                  "Patient ID", "Anonymous Patient ID",
+                  "Study Instance UID", "Anonymous Study Instance UID",
+                  "Series Instance UID", "Anonymous Series Instance UID",
+                  "SOP Instance UID", "Anonymous SOP Instance UID",
+                  "Tag Path", "Value", "Anonymized Value"))
+                  .concat(
+                    anonymizationDao.anonymizationKeyValueSource
+                      .map {
+                        case (key, value) =>
+                          List(
+                            key.id.toString, key.imageId.toString, key.created.toString,
+                            key.patientName, key.anonPatientName,
+                            key.patientID, key.anonPatientID,
+                            key.studyInstanceUID, key.anonStudyInstanceUID,
+                            key.seriesInstanceUID, key.anonSeriesInstanceUID,
+                            key.sopInstanceUID, key.anonSOPInstanceUID,
+                            value.tagPath.toString, value.value, value.anonymizedValue)
+                      })
+                  .via(CsvFormatting.format(delimiter = CsvFormatting.SemiColon))
 
-            respondWithHeader(`Content-Disposition`(ContentDispositionTypes.attachment, Map("filename" -> "slicebox-anonymization-info.csv"))) {
-              complete(HttpResponse(entity = HttpEntity(`text/csv(UTF-8)`, source)))
+              respondWithHeader(`Content-Disposition`(ContentDispositionTypes.attachment, Map("filename" -> "slicebox-anonymization-info.csv"))) {
+                complete(HttpResponse(entity = HttpEntity(`text/csv(UTF-8)`, source)))
+              }
             }
           }
         }

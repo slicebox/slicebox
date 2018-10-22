@@ -19,9 +19,10 @@ package se.nimsa.sbx.dicom.streams
 import akka.NotUsed
 import akka.stream.scaladsl.Flow
 import akka.util.ByteString
-import se.nimsa.dicom.data.padToEvenLength
 import se.nimsa.dicom.data.DicomParts._
+import se.nimsa.dicom.data.padToEvenLength
 import se.nimsa.dicom.streams.ModifyFlow.{TagModification, TagModificationsPart, modifyFlow}
+import se.nimsa.sbx.dicom.SliceboxTags._
 import se.nimsa.sbx.dicom.streams.DicomStreamUtil._
 
 /**

@@ -12,6 +12,7 @@ import se.nimsa.dicom.data.DicomParts.{DicomPart, ElementsPart, ValueChunk}
 import se.nimsa.dicom.data._
 import se.nimsa.dicom.streams.CollectFlow.collectFlow
 import se.nimsa.dicom.streams.{DicomFlows, ElementFlows}
+import se.nimsa.sbx.dicom.SliceboxTags._
 import se.nimsa.sbx.dicom.streams.DicomStreamUtil._
 import se.nimsa.sbx.storage.{RuntimeStorage, StorageService}
 import se.nimsa.sbx.util.TestUtil._
