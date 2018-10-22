@@ -1,19 +1,19 @@
 package se.nimsa.sbx.filtering
 
-import akka.actor.{Actor, Props}
+import akka.actor.{Actor, ActorSystem, Props}
 import akka.event.{Logging, LoggingReceive}
 import akka.util.Timeout
-import se.nimsa.sbx.app.GeneralProtocol.{Source, SourceDeleted, SourceRef}
+import se.nimsa.sbx.app.GeneralProtocol.{SourceDeleted, SourceRef}
 import se.nimsa.sbx.filtering.FilteringProtocol._
 import se.nimsa.sbx.util.FutureUtil.await
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
 class FilteringServiceActor(filteringDAO: FilteringDAO)(implicit timeout: Timeout) extends Actor {
   val log = Logging(context.system, this)
 
-  implicit val system = context.system
-  implicit val ec = context.dispatcher
+  implicit val system: ActorSystem = context.system
+  implicit val ec: ExecutionContext = context.dispatcher
 
   val emptyTagPathsSeq: Seq[TagFilterTagPath] = Seq()
 
@@ -44,17 +44,17 @@ class FilteringServiceActor(filteringDAO: FilteringDAO)(implicit timeout: Timeou
   }
 
   def insertTagFilter(tagFilterSpec: TagFilterSpec): TagFilterAdded = {
-    await(filteringDAO.createOrUpdateTagFilter(tagFilterSpec).map(TagFilterAdded(_)))
+    await(filteringDAO.createOrUpdateTagFilter(tagFilterSpec).map(TagFilterAdded))
   }
 
   def getTagFilters(startIndex: Long, count: Long): TagFilterSpecs = {
     val tagFilters = filteringDAO.listTagFilters(startIndex, count)
-    await(tagFilters.map(_.map(TagFilterSpec(_))).map(TagFilterSpecs(_)))
+    await(tagFilters.map(_.map(TagFilterSpec(_))).map(TagFilterSpecs))
   }
 
-  def getSourceTagFilters(startIndex: Long, count: Long) = {
+  def getSourceTagFilters(startIndex: Long, count: Long): SourceTagFilters = {
     val sourceTagFilters = filteringDAO.listSourceTagFilters(startIndex, count)
-    await(sourceTagFilters.map(SourceTagFilters(_)))
+    await(sourceTagFilters.map(SourceTagFilters))
   }
 
   def removeTagFilter(tagFilterId: Long): TagFilterRemoved =

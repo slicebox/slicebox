@@ -43,7 +43,7 @@ object Jpeg2Dcm {
 
   private val SOS = 0xda
 
-  private val charset = "ISO_IR 100"
+  private val charset = "ISO_IR 192"
 
   private val transferSyntax = UID.JPEGBaselineProcess1
 

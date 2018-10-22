@@ -40,6 +40,7 @@ import scala.util.control.NonFatal
 
 class DirectoryWatchActor(watchedDirectory: WatchedDirectory,
                           storage: StorageService,
+                          deleteWatchedDirectory: Boolean,
                           metaDataServicePath: String = "../../MetaDataService",
                           anonymizationServicePath: String = "../../AnonymizationService",
                           filteringServicePath: String = "../../FilteringService")
@@ -71,9 +72,11 @@ class DirectoryWatchActor(watchedDirectory: WatchedDirectory,
         else
           StreamSource.empty // other (symlinks etc): ignore
       }
-      .mapAsync(5) { path => // do import
+      .mapAsync(5) { path => // do import, delete if successful (might be permission issues here)
         storeDicomData(FileIO.fromPath(path), sbxSource, storage, Contexts.imageDataContexts, reverseAnonymization = true).map { metaData =>
-          system.eventStream.publish(ImageAdded(metaData.image.id, sbxSource, !metaData.imageAdded))
+        system.eventStream.publish(ImageAdded(metaData.image.id, sbxSource, !metaData.imageAdded))
+          if (deleteWatchedDirectory)
+            Files.deleteIfExists(path)
         }.recover {
           case NonFatal(e) =>
             SbxLog.error("Directory", s"Could not add file ${Paths.get(watchedDirectory.path).relativize(path)}: ${e.getMessage}")
@@ -105,5 +108,5 @@ class DirectoryWatchActor(watchedDirectory: WatchedDirectory,
 }
 
 object DirectoryWatchActor {
-  def props(watchedDirectory: WatchedDirectory, storage: StorageService)(implicit materializer: Materializer, timeout: Timeout): Props = Props(new DirectoryWatchActor(watchedDirectory, storage))
+  def props(watchedDirectory: WatchedDirectory, storage: StorageService, deleteWatchedDirectory: Boolean)(implicit materializer: Materializer, timeout: Timeout): Props = Props(new DirectoryWatchActor(watchedDirectory, storage, deleteWatchedDirectory))
 }
