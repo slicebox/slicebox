@@ -11,7 +11,7 @@ angular.module('slicebox.adminFiltering', ['ngRoute'])
         });
     })
 
-    .controller('AdminFilteringCtrl', function($scope, $http, $mdDialog, openAddEntityModal, openDeleteEntitiesModalFunction) {
+    .controller('AdminFilteringCtrl', function($scope, $http, $mdDialog, $q, openAddEntityModal, openDeleteEntitiesModalFunction) {
         // Initialization
         $scope.uiState = {
             selectedFilter: null
@@ -41,7 +41,28 @@ angular.module('slicebox.adminFiltering', ['ngRoute'])
 
         // Scope functions
         $scope.loadSourceFilterAssociations = function(startIndex, count, orderByProperty, orderByDirection) {
-            return $http.get('/api/filtering/associations?startindex=' + startIndex + '&count=' + count);
+            var promises = {};
+            promises.associations = ($http.get('/api/filtering/associations?startindex=' + startIndex + '&count=' + count));
+            promises.sources = ($http.get("/api/sources"));
+            promises.filters = ($http.get("/api/filtering/tagfilter?count=100000"));
+            var combinedPromise = $q.all(promises).then(function(promisesResult) {
+                console.log(promisesResult);
+                var resultArray = promisesResult.associations.data.map(function(association) {
+                    var source = promisesResult.sources.data.find(function(s) {
+                        return (s.sourceId === association.sourceId && s.sourceType === association.sourceType);
+                    });
+                    var filter = promisesResult.filters.data.find(function(f) {return f.id === association.tagFilterId;});
+                    association.sourceName = source.sourceName;
+                    association.filterName = filter.name;
+                    association.filterType = filter.tagFilterType;
+                    return association;
+                });
+
+                return resultArray;
+            });
+
+            return combinedPromise;
+            // return $http.get('/api/filtering/associations?startindex=' + startIndex + '&count=' + count);
         };
 
         $scope.loadFilters = function(startIndex, count, orderByProperty, orderByDirection) {
