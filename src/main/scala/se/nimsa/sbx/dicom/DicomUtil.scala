@@ -19,7 +19,7 @@ package se.nimsa.sbx.dicom
 import akka.util.ByteString
 import org.dcm4che3.data.{VR => CheVR}
 import se.nimsa.dicom.data.VR.VR
-import se.nimsa.dicom.data.{Tag, VR, Keyword, Elements, padToEvenLength, groupNumber}
+import se.nimsa.dicom.data.{Tag, VR, Dictionary, Elements, padToEvenLength, groupNumber}
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomPropertyValue._
 
@@ -90,7 +90,7 @@ object DicomUtil {
   }
 
   def nameForTag(tag: Int): String = {
-    val name = Keyword.valueOf(tag)
+    val name = Dictionary.keywordOf(tag)
     if (name == null) "" else name
   }
 

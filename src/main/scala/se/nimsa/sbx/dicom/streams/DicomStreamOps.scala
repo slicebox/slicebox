@@ -199,14 +199,14 @@ trait DicomStreamOps {
               case VR.OW | VR.OF | VR.OB | VR.OD if length > 20 => List(s"< Binary data >")
               case _ => element.value.toStrings(element.vr, element.bigEndian, characterSets).toList
             }
-            val namePath = tagPath.toList.map(_.tag).map(Keyword.valueOf)
+            val namePath = tagPath.toList.map(_.tag).map(Dictionary.keywordOf)
 
             ImageAttribute(tagPath, namePath, element.vr.toString, length, values) :: Nil
           case (tagPath: TagPath, element: SequenceElement) =>
-            val namePath = tagPath.toList.map(_.tag).map(Keyword.valueOf)
+            val namePath = tagPath.toList.map(_.tag).map(Dictionary.keywordOf)
             ImageAttribute(tagPath, namePath, "SQ", element.length, Nil) :: Nil
           case (tagPath: TagPath, element: FragmentsElement) =>
-            val namePath = tagPath.toList.map(_.tag).map(Keyword.valueOf)
+            val namePath = tagPath.toList.map(_.tag).map(Dictionary.keywordOf)
             ImageAttribute(tagPath, namePath, element.vr.toString, -1, List(s"< Fragments >")) :: Nil
           case _ => Nil
         }
