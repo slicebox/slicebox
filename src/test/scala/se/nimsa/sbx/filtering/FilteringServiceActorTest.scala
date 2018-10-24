@@ -112,14 +112,14 @@ class FilteringServiceActorTest(_system: ActorSystem) extends TestKit(_system) w
       filteringService ! GetTagFilter(filter1.id)
       expectMsg(Some(filter1))
 
-      val updatedTagFilterSpec = tagFilterSpec1.copy(tags=Seq(TagPath.fromTag(0x00100010), TagPath.fromTag(0x00100020)))
+      val updatedTagFilterSpec = filter1.copy(tagFilterType = TagFilterType.BLACKLIST, tags=Seq(TagPath.fromTag(0x00100010), TagPath.fromTag(0x00100020)))
 
-      filteringService ! AddTagFilter(updatedTagFilterSpec)
+      filteringService ! AddTagFilter(updatedTagFilterSpec.copy(id = -1))
 
-      val updatedFilter = expectMsgType[TagFilterAdded].filterSpecification
+      expectMsg(TagFilterAdded(updatedTagFilterSpec))
 
       filteringService ! GetTagFilter(filter1.id)
-      expectMsg(Some(updatedFilter))
+      expectMsg(Some(updatedTagFilterSpec))
     }
 
     "Handle TagFilterSpec with no tags correctly" in {

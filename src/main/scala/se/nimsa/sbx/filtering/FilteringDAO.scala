@@ -50,7 +50,6 @@ class FilteringDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executi
     def tagPath = column[TagPathTag]("tagpath")
     def fkTagFilter = foreignKey("fk_tag_filter", tagFilterId, tagFilterQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
     def * = (id, tagFilterId, tagPath) <> (TagFilterTagPath.tupled, TagFilterTagPath.unapply)
-//    def * = (id, tagFilterId, tagPath) <> (toTagFilterTagPath.tupled, (a: TagFilterTagPath) => Option((a.id, a.tagFilterId, a.tagPathTag.toString())))
   }
 
   object TagPathTable {
@@ -82,13 +81,6 @@ class FilteringDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executi
   def clear(): Future[Unit] = db.run {
     DBIO.seq(tagFilterQuery.delete, tagPathQuery.delete, sourceFilterQuery.delete)
   }
-//
-//  def dump(): Future[Seq[(Option[String], Option[TagPathTag])]] = db.run {
-//    val fullOuterJoin = for {
-//      (c, s) <- tagFilterQuery joinFull tagPathQuery on (_.id === _.tagFilterId) joinFull sourceFilterQuery on (_._1 === _.tagFilterId)
-//    } yield (c.map(_.name), s.map(_.tagPath))
-//    fullOuterJoin.result
-//  }
 
   def createOrUpdateTagFilter(tagFilter: TagFilterSpec): Future[TagFilterSpec] = {
     val tagFilterRow = TagFilter(tagFilter.id, tagFilter.name, tagFilter.tagFilterType)
@@ -100,11 +92,11 @@ class FilteringDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executi
       getTagFilterByNameAction(tagFilter.name).flatMap {
         _.map {t =>
           replaceTagFilterTagPathAction(t.id, tagFilter.tags.map(tftp => TagFilterTagPath(-1, t.id, tftp))) andThen
-          updateTagFilterAction(tagFilterRow).map(_ => tagFilterRow.copy(id = t.id))
+          updateTagFilterAction(tagFilterRow.copy(id = t.id)).map(_ => tagFilterRow.copy(id = t.id))
         }.getOrElse {
           insertAction
         }
-      }.map(tf => tagFilter.copy(id = tf.id))
+      }.map(tf => tagFilter.copy(id = tf.id)).transactionally
     }
   }
 
@@ -119,7 +111,7 @@ class FilteringDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executi
         }.getOrElse {
           insertSourceFilterAction(sourceFilter)
         }
-      }
+      }.transactionally
     }
   }
 

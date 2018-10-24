@@ -24,7 +24,7 @@ import akka.pattern.ask
 import akka.stream.scaladsl.{Source => StreamSource}
 import akka.util.ByteString
 import se.nimsa.dicom.streams.DicomStreamException
-import se.nimsa.sbx.app.GeneralProtocol.SourceType.{BOX, IMPORT}
+import se.nimsa.sbx.app.GeneralProtocol.SourceType.IMPORT
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.dicom.Contexts
