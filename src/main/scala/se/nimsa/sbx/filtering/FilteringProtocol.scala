@@ -31,7 +31,7 @@ object FilteringProtocol {
 
   case class TagFilterSpec(id: Long, name: String, tagFilterType: TagFilterType, tags: Seq[TagPathTag])
 
-  case object TagFilterSpec {
+  object TagFilterSpec {
     def apply(tf: TagFilter, tagPaths: Seq[TagFilterTagPath]):TagFilterSpec =
       TagFilterSpec(tf.id, tf.name, tf.tagFilterType, tagPaths.map(_.tagPathTag))
     def apply(tf: TagFilter): TagFilterSpec =

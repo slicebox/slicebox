@@ -25,7 +25,7 @@ class FilteringServiceActorTest(_system: ActorSystem) extends TestKit(_system) w
 
   await(filteringDao.create())
 
-  val filteringService: ActorRef = system.actorOf(Props(new FilteringServiceActor(filteringDao)(Timeout(30.seconds))), name = "FilteringService")
+  val filteringService: ActorRef = system.actorOf(Props(new FilteringServiceActor(filteringDao)), name = "FilteringService")
 
   def this() = this(ActorSystem("FilteringServiceActorTestSystem"))
 

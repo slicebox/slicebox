@@ -89,14 +89,14 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("DicomStreamOpsSpec")) with
     val bytes = preamble ++ fmiGroupLength(unsupportedMediaStorageSOPClassUID ++ tsuidExplicitLE) ++ unsupportedMediaStorageSOPClassUID ++ tsuidExplicitLE ++ patientNameJohnDoe
     val source = StreamSource.single(bytes)
     recoverToSucceededIf[DicomStreamException] {
-      source.runWith(dicomStreamOpsImpl.dicomDataSink(storage.fileSink("name"), storage.parseFlow(None), (_, _) => Future.successful(Seq.empty), Contexts.imageDataContexts, reverseAnonymization = true, tagFilterFlow = dicomStreamOpsImpl.NO_ACTION_FILTER))
+      source.runWith(dicomStreamOpsImpl.dicomDataSink(storage.fileSink("name"), storage.parseFlow(None), (_, _) => Future.successful(Seq.empty), Contexts.imageDataContexts))
     }
   }
 
   it should "pass a supported context" in {
     val bytes = preamble ++ fmiGroupLength(supportedMediaStorageSOPClassUID ++ tsuidExplicitLE) ++ supportedMediaStorageSOPClassUID ++ tsuidExplicitLE ++ patientNameJohnDoe
     val source = StreamSource.single(bytes)
-    source.runWith(dicomStreamOpsImpl.dicomDataSink(storage.fileSink("name"), storage.parseFlow(None), (_, _) => Future.successful(Seq.empty), Contexts.imageDataContexts, reverseAnonymization = true, tagFilterFlow = dicomStreamOpsImpl.NO_ACTION_FILTER))
+    source.runWith(dicomStreamOpsImpl.dicomDataSink(storage.fileSink("name"), storage.parseFlow(None), (_, _) => Future.successful(Seq.empty), Contexts.imageDataContexts))
       .map(_ => succeed)
   }
 
@@ -104,14 +104,14 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("DicomStreamOpsSpec")) with
     val bytes = preamble ++ fmiGroupLength(unknownMediaStorageSOPClassUID ++ tsuidExplicitLE) ++ unknownMediaStorageSOPClassUID ++ tsuidExplicitLE ++ patientNameJohnDoe
     val source = StreamSource.single(bytes)
     recoverToSucceededIf[DicomStreamException] {
-      source.runWith(dicomStreamOpsImpl.dicomDataSink(storage.fileSink("name"), storage.parseFlow(None), (_, _) => Future.successful(Seq.empty), Contexts.imageDataContexts, reverseAnonymization = true, tagFilterFlow = dicomStreamOpsImpl.NO_ACTION_FILTER))
+      source.runWith(dicomStreamOpsImpl.dicomDataSink(storage.fileSink("name"), storage.parseFlow(None), (_, _) => Future.successful(Seq.empty), Contexts.imageDataContexts))
     }
   }
 
   it should "accept DICOM data with missing file meta information" in {
     val bytes = supportedSOPClassUID
     val source = StreamSource.single(bytes)
-    source.runWith(dicomStreamOpsImpl.dicomDataSink(storage.fileSink("name"), storage.parseFlow(None), (_, _) => Future.successful(Seq.empty), Contexts.imageDataContexts, reverseAnonymization = true, tagFilterFlow = dicomStreamOpsImpl.NO_ACTION_FILTER))
+    source.runWith(dicomStreamOpsImpl.dicomDataSink(storage.fileSink("name"), storage.parseFlow(None), (_, _) => Future.successful(Seq.empty), Contexts.imageDataContexts))
       .map(_ => succeed)
   }
 

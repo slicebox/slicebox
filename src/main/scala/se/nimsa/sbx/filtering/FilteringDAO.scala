@@ -6,6 +6,7 @@ import se.nimsa.sbx.app.GeneralProtocol.{SourceRef, SourceType}
 import se.nimsa.sbx.filtering.FilteringProtocol._
 import se.nimsa.sbx.util.DbUtil.createTables
 import slick.basic.DatabaseConfig
+import slick.dbio.DBIOAction
 import slick.jdbc.JdbcProfile
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -16,17 +17,25 @@ class FilteringDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executi
 
   val db = dbConf.db
 
-  private val toTagFilter = (id:Long, name: String, tagFilterType: String) => TagFilter(id, name, TagFilterType.withName(tagFilterType))
-  private val toTagFilterTagPath = (id: Long, tagFilterId: Long, tagPath: String) => TagFilterTagPath(id, tagFilterId, TagPath.parse(tagPath).asInstanceOf[TagPathTag])
-  private val toSourceTagFilter = (id: Long, sourceType: String, sourceId: Long, tagFilterId: Long) => SourceTagFilter(id, SourceType.withName(sourceType), sourceId, tagFilterId)
+  implicit val tagPathColumnType: BaseColumnType[TagPathTag] =
+    MappedColumnType.base[TagPathTag, String](
+      tagPath => tagPath.toString, // map TagPathTag to String
+      tagPathString => TagPath.parse(tagPathString).asInstanceOf[TagPathTag] // map String to TagPathTag
+    )
+
+  implicit val tagFilterTypeColumnType: BaseColumnType[TagFilterType] =
+    MappedColumnType.base[TagFilterType, String](_.toString, TagFilterType.withName)
+
+  implicit val sourceTypeColumnType: BaseColumnType[SourceType] =
+    MappedColumnType.base[SourceType, String](_.toString, SourceType.withName)
 
   val tagFilterQuery = TableQuery[TagFilterTable]
 
   class TagFilterTable(tag: Tag) extends Table[TagFilter](tag, TagFilterTable.name) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def name = column[String]("name")
-    def tagFilterType = column[String]("tagfiltertype", O.Length(32))
-    def * = (id, name, tagFilterType) <> (toTagFilter.tupled, (tf: TagFilter) => Option((tf.id, tf.name, tf.tagFilterType.toString)))
+    def tagFilterType = column[TagFilterType]("tagfiltertype", O.Length(32))
+    def * = (id, name, tagFilterType) <> (TagFilter.tupled, TagFilter.unapply)
   }
 
   object TagFilterTable {
@@ -38,9 +47,10 @@ class FilteringDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executi
   class TagPathTable(tag: Tag) extends Table[TagFilterTagPath](tag, TagPathTable.name) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def tagFilterId = column[Long]("tagfilterid")
-    def tagPath = column[String]("tagpath")
+    def tagPath = column[TagPathTag]("tagpath")
     def fkTagFilter = foreignKey("fk_tag_filter", tagFilterId, tagFilterQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
-    def * = (id, tagFilterId, tagPath) <> (toTagFilterTagPath.tupled, (a: TagFilterTagPath) => Option((a.id, a.tagFilterId, a.tagPathTag.toString())))
+    def * = (id, tagFilterId, tagPath) <> (TagFilterTagPath.tupled, TagFilterTagPath.unapply)
+//    def * = (id, tagFilterId, tagPath) <> (toTagFilterTagPath.tupled, (a: TagFilterTagPath) => Option((a.id, a.tagFilterId, a.tagPathTag.toString())))
   }
 
   object TagPathTable {
@@ -51,11 +61,11 @@ class FilteringDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executi
 
   class SourceFilterTable(tag: Tag) extends Table[SourceTagFilter](tag, SourceFilterTable.name) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
-    def sourceType = column[String]("sourcetype", O.Length(64))
+    def sourceType = column[SourceType]("sourcetype", O.Length(64))
     def sourceId = column[Long]("sourceid")
     def tagFilterId = column[Long]("tagfilterid")
     def fkTagFilter2 = foreignKey("fk_tag_filter2", tagFilterId, tagFilterQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
-    def * = (id, sourceType, sourceId, tagFilterId) <> (toSourceTagFilter.tupled, (a: SourceTagFilter) => Option((a.id, a.sourceType.toString, a.sourceId, a.tagFilterId)))
+    def * = (id, sourceType, sourceId, tagFilterId) <> (SourceTagFilter.tupled, SourceTagFilter.unapply)
   }
 
   object SourceFilterTable {
@@ -73,7 +83,7 @@ class FilteringDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executi
     DBIO.seq(tagFilterQuery.delete, tagPathQuery.delete, sourceFilterQuery.delete)
   }
 
-  def dump(): Future[Seq[(Option[String], Option[String])]] = db.run {
+  def dump(): Future[Seq[(Option[String], Option[TagPathTag])]] = db.run {
     val fullOuterJoin = for {
       (c, s) <- tagFilterQuery joinFull tagPathQuery on (_.id === _.tagFilterId)
     } yield (c.map(_.name), s.map(_.tagPath))
@@ -86,7 +96,7 @@ class FilteringDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executi
       tfr <- insertTagFilterAction(tagFilterRow)
       _ <- replaceTagFilterTagPathAction(tagFilter.tags.map(tftp => TagFilterTagPath(-1, tfr.id, tftp)))
     } yield tfr
-    val res = db.run {
+    db.run {
       getTagFilterByNameAction(tagFilter.name).flatMap {
         _.map {t =>
           replaceTagFilterTagPathAction(tagFilter.tags.map(tftp => TagFilterTagPath(-1, t.id, tftp))) andThen
@@ -94,12 +104,8 @@ class FilteringDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executi
         }.getOrElse {
           insertAction
         }
-      }
+      }.map(tf => tagFilter.copy(id = tf.id))
     }
-    res.map(r => {
-      val res = tagFilter.copy(id = r.id)
-      res
-    })
   }
 
   def getAllSourceFilters: Future[Seq[SourceTagFilter]] = db.run(sourceFilterQuery.result)
@@ -121,13 +127,14 @@ class FilteringDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executi
     db.run(getSourceFilterAction(sourceRef))
   }
 
-  def removeSourceFilter(id: Long): Future[Unit] =   db.run(sourceFilterQuery.filter(_.id === id).delete.map(_ => {}))
+  def removeSourceFilter(id: Long): Future[Unit] = db.run(sourceFilterQuery.filter(_.id === id).delete.map(_ => {}))
 
   def removeSourceFilter(sourceRef: SourceRef): Future[Unit] =
     db.run(
       sourceFilterQuery
-        .filter(r => r.sourceType === sourceRef.sourceType.toString && r.sourceId === sourceRef.sourceId)
-        .delete.map(_ => {}))
+        .filter(r => r.sourceType === sourceRef.sourceType && r.sourceId === sourceRef.sourceId)
+        .delete.map(_ => {})
+    )
 
 
   def insertTagFilter(tagFilter: TagFilterSpec): Future[TagFilterSpec] = {
@@ -136,8 +143,8 @@ class FilteringDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executi
         tfr <- insertTagFilterAction(tagFilterRow)
         _ <- replaceTagFilterTagPathAction(tagFilter.tags.map(tftp => TagFilterTagPath(-1, tfr.id, tftp)))
       } yield tfr
-
-    db.run(upsertAction).map(r => tagFilter.copy(id = r.id))
+    val mappedUpsertAction = upsertAction.map(r => tagFilter.copy(id = r.id))
+    db.run(mappedUpsertAction)
   }
 
   def removeTagFilter(tagFilterId: Long): Future[Unit] = db.run(tagFilterQuery.filter(_.id === tagFilterId).delete.map(_ => {}))
@@ -160,8 +167,17 @@ class FilteringDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executi
     tagPathQuery.filter(_.tagFilterId === filterId).result
   }
 
-  def getTagFilter(id: Long): Future[Option[TagFilterSpec]] =
-    db.run(getTagFilterAction(id)).map(s => s.headOption.map(t => TagFilterSpec(t._1, s.map(_._2).flatten)))
+  def getTagFilter(id: Long): Future[Option[TagFilterSpec]] = db.run(getTagFilterAction(id))
+
+  def getTagFilterForSource(ref: SourceRef): Future[Option[TagFilterSpec]] = db.run(getTagFilterForSourceAction(ref))
+
+  private def getTagFilterForSourceAction(ref: SourceRef) = {
+    getSourceFilterAction(ref)
+      .flatMap( sourceFilterOption =>
+        DBIOAction.sequenceOption(sourceFilterOption.map(sourceFilter =>
+          getTagFilterAction(sourceFilter.tagFilterId))).map(_.flatten)
+      )
+  }
 
   private def getTagFilterByNameAction(name: String) =
     tagFilterQuery
@@ -175,7 +191,7 @@ class FilteringDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executi
     val leftOuterJoin = for {
       (c, s) <- tagFilter joinLeft tagPaths
     } yield (c, s)
-    leftOuterJoin.result
+    leftOuterJoin.result.map(s => s.headOption.map(t => TagFilterSpec(t._1, s.flatMap(_._2))))
   }
 
   private def updateTagFilterAction(tagFilter: TagFilter) =
@@ -197,7 +213,7 @@ class FilteringDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executi
 
   private def getSourceFilterAction(sourceRef: SourceRef) =
     sourceFilterQuery
-      .filter(r => r.sourceType === sourceRef.sourceType.toString && r.sourceId === sourceRef.sourceId)
+      .filter(r => r.sourceType === sourceRef.sourceType && r.sourceId === sourceRef.sourceId)
       .result
       .headOption
 
