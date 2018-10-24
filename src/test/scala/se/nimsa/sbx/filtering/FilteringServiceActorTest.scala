@@ -33,13 +33,6 @@ class FilteringServiceActorTest(_system: ActorSystem) extends TestKit(_system) w
     await(filteringDao.clear())
   }
 
-  def dump(): Unit = {
-    println(s"db contents:")
-    val cs = await(filteringDao.dump())
-    println(cs)
-    println(s"No more in db")
-  }
-
   override def afterAll(): Unit = TestKit.shutdownActorSystem(system)
 
   def getTagFilterSpec1 = FilteringProtocol.TagFilterSpec(-1, "filter1", WHITELIST, Seq(TagPath.fromTag(0x0008000d)))
@@ -107,15 +100,6 @@ class FilteringServiceActorTest(_system: ActorSystem) extends TestKit(_system) w
 
       filteringService ! GetTagFilter(filter1.id)
       expectMsg(Some(filter1))
-
-      val emptyTagFilterSpec = getEmptyTagFilterSpec
-
-      filteringService ! AddTagFilter(emptyTagFilterSpec)
-
-      val emptyFilter = expectMsgType[TagFilterAdded].filterSpecification
-
-      filteringService ! GetTagFilter(emptyFilter.id)
-      expectMsg(Some(emptyFilter))
     }
 
     "Update TagFilterSpec" in {
@@ -136,7 +120,28 @@ class FilteringServiceActorTest(_system: ActorSystem) extends TestKit(_system) w
 
       filteringService ! GetTagFilter(filter1.id)
       expectMsg(Some(updatedFilter))
+    }
 
+    "Handle TagFilterSpec with no tags correctly" in {
+      //Insert filter without tags
+      val emptyTagFilterSpec = getEmptyTagFilterSpec
+      filteringService ! AddTagFilter(emptyTagFilterSpec)
+      val emptyFilter = expectMsgType[TagFilterAdded].filterSpecification
+      filteringService ! GetTagFilter(emptyFilter.id)
+      expectMsg(Some(emptyFilter))
+
+      //Update with tag(s)
+      val tempTagFilterSpec1 = emptyFilter.copy(tags = Seq(TagPath.fromTag(0x00100010)))
+      filteringService ! AddTagFilter(tempTagFilterSpec1)
+      expectMsg(TagFilterAdded(tempTagFilterSpec1))
+      filteringService ! GetTagFilter(tempTagFilterSpec1.id)
+      expectMsg(Some(tempTagFilterSpec1))
+
+      //Remove all tags
+      filteringService ! AddTagFilter(emptyFilter)
+      expectMsg(TagFilterAdded(emptyFilter))
+      filteringService ! GetTagFilter(emptyFilter.id)
+      expectMsg(Some(emptyFilter))
     }
 
     "Delete tagFilters" in {

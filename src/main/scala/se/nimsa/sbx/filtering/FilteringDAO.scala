@@ -82,24 +82,24 @@ class FilteringDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executi
   def clear(): Future[Unit] = db.run {
     DBIO.seq(tagFilterQuery.delete, tagPathQuery.delete, sourceFilterQuery.delete)
   }
-
-  def dump(): Future[Seq[(Option[String], Option[TagPathTag])]] = db.run {
-    val fullOuterJoin = for {
-      (c, s) <- tagFilterQuery joinFull tagPathQuery on (_.id === _.tagFilterId)
-    } yield (c.map(_.name), s.map(_.tagPath))
-    fullOuterJoin.result
-  }
+//
+//  def dump(): Future[Seq[(Option[String], Option[TagPathTag])]] = db.run {
+//    val fullOuterJoin = for {
+//      (c, s) <- tagFilterQuery joinFull tagPathQuery on (_.id === _.tagFilterId) joinFull sourceFilterQuery on (_._1 === _.tagFilterId)
+//    } yield (c.map(_.name), s.map(_.tagPath))
+//    fullOuterJoin.result
+//  }
 
   def createOrUpdateTagFilter(tagFilter: TagFilterSpec): Future[TagFilterSpec] = {
     val tagFilterRow = TagFilter(tagFilter.id, tagFilter.name, tagFilter.tagFilterType)
     val insertAction = for {
       tfr <- insertTagFilterAction(tagFilterRow)
-      _ <- replaceTagFilterTagPathAction(tagFilter.tags.map(tftp => TagFilterTagPath(-1, tfr.id, tftp)))
+      _ <- replaceTagFilterTagPathAction(tfr.id, tagFilter.tags.map(tftp => TagFilterTagPath(-1, tfr.id, tftp)))
     } yield tfr
     db.run {
       getTagFilterByNameAction(tagFilter.name).flatMap {
         _.map {t =>
-          replaceTagFilterTagPathAction(tagFilter.tags.map(tftp => TagFilterTagPath(-1, t.id, tftp))) andThen
+          replaceTagFilterTagPathAction(t.id, tagFilter.tags.map(tftp => TagFilterTagPath(-1, t.id, tftp))) andThen
           updateTagFilterAction(tagFilterRow).map(_ => tagFilterRow.copy(id = t.id))
         }.getOrElse {
           insertAction
@@ -135,17 +135,6 @@ class FilteringDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executi
         .filter(r => r.sourceType === sourceRef.sourceType && r.sourceId === sourceRef.sourceId)
         .delete.map(_ => {})
     )
-
-
-  def insertTagFilter(tagFilter: TagFilterSpec): Future[TagFilterSpec] = {
-    val tagFilterRow = TagFilter(tagFilter.id, tagFilter.name, tagFilter.tagFilterType)
-    val upsertAction = for {
-        tfr <- insertTagFilterAction(tagFilterRow)
-        _ <- replaceTagFilterTagPathAction(tagFilter.tags.map(tftp => TagFilterTagPath(-1, tfr.id, tftp)))
-      } yield tfr
-    val mappedUpsertAction = upsertAction.map(r => tagFilter.copy(id = r.id))
-    db.run(mappedUpsertAction)
-  }
 
   def removeTagFilter(tagFilterId: Long): Future[Unit] = db.run(tagFilterQuery.filter(_.id === tagFilterId).delete.map(_ => {}))
 
@@ -201,9 +190,8 @@ class FilteringDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executi
     (tagFilterQuery returning tagFilterQuery.map(_.id) += tagFilter)
       .map(generatedId => tagFilter.copy(id = generatedId))
 
-  private def replaceTagFilterTagPathAction(tagPaths: Seq[TagFilterTagPath]) = {
-    val id: Long = tagPaths.headOption.map(_.tagFilterId).getOrElse(-1)
-    tagPathQuery.filter(_.tagFilterId === id).delete andThen
+  private def replaceTagFilterTagPathAction(tagFilterId: Long, tagPaths: Seq[TagFilterTagPath]) = {
+    tagPathQuery.filter(_.tagFilterId === tagFilterId).delete andThen
       (tagPathQuery ++= tagPaths)
   }
 
