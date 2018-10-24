@@ -36,6 +36,7 @@ import se.nimsa.sbx.user.UserProtocol._
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
+import se.nimsa.dicom.data.Dictionary
 
 trait GeneralRoutes {
   this: SliceboxBase =>
@@ -77,6 +78,7 @@ trait GeneralRoutes {
               dirs.directories.map(dir => Source(SourceType.DIRECTORY, dir.name, dir.id)) ++
               imports.importSessions.map(importSession => Source(SourceType.IMPORT, importSession.name, importSession.id))
           }
+
         onSuccess(futureSources) {
           complete(_)
         }
@@ -91,6 +93,7 @@ trait GeneralRoutes {
             boxes.boxes.map(box => Destination(DestinationType.BOX, box.name, box.id)) ++
               scus.scus.map(scu => Destination(DestinationType.SCU, scu.name, scu.id))
           }
+
         onSuccess(futureDestinations) {
           complete(_)
         }
@@ -103,6 +106,35 @@ trait GeneralRoutes {
         complete(OK)
       } ~ path("information") {
         complete(systemInformation)
+      }
+    } ~ pathPrefix("dicom" / "dictionary") {
+      get {
+        path("keywords") {
+          complete(DicomDictionaryKeywords(Dictionary.keywords()))
+        } ~ parameter('tag.as[Int]) { tag =>
+          path("vr") {
+            val vr = Dictionary.vrOf(tag)
+            complete(DicomValueRepresentation(vr.toString, vr.code))
+          } ~ path("vm") {
+            complete(Dictionary.vmOf(tag))
+          } ~ path("keyword") {
+            val keyword = Dictionary.keywordOf(tag)
+            if (keyword.isEmpty)
+              complete(NotFound)
+            else
+              complete(DicomDictionaryKeyword(keyword))
+          }
+        } ~ parameter('keyword) { keyword =>
+          path("tag") {
+            try {
+              val tag = Dictionary.tagOf(keyword)
+              complete(DicomDictionaryTag(tag))
+            } catch {
+              case _: IllegalArgumentException =>
+                complete(NotFound)
+            }
+          }
+        }
       }
     }
 }

@@ -10,6 +10,7 @@ import se.nimsa.sbx.scp.ScpProtocol.ScpData
 import se.nimsa.sbx.app.GeneralProtocol._
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.Route
+import se.nimsa.dicom.data.{Multiplicity, Tag, VR}
 import se.nimsa.sbx.storage.RuntimeStorage
 
 class GeneralRoutesTest extends {
@@ -43,6 +44,67 @@ class GeneralRoutesTest extends {
     }    
   }
 
+  it should "return 200 OK and a list all DICOM dictionary keywords" in {
+    Get("/api/dicom/dictionary/keywords") ~> routes ~> check {
+      status shouldBe OK
+      responseAs[DicomDictionaryKeywords].keywords should not be empty
+    }
+  }
+
+  it should "return 200 OK and the keyword for the input tag" in {
+    Get(s"/api/dicom/dictionary/keyword?tag=${0x00100010}") ~> routes ~> check {
+      status shouldBe OK
+      responseAs[DicomDictionaryKeyword].keyword shouldBe "PatientName"
+    }
+  }
+
+  it should "return 404 NotFound when looking up a keyword for an unknown tag" in {
+    Get(s"/api/dicom/dictionary/keyword?tag=${0xFFFFFFFF}") ~> routes ~> check {
+      status shouldBe NotFound
+    }
+  }
+
+  it should "return 200 OK and the value representation of the input tag" in {
+    Get(s"/api/dicom/dictionary/vr?tag=${0x00100010}") ~> routes ~> check {
+      status shouldBe OK
+      responseAs[DicomValueRepresentation] shouldBe DicomValueRepresentation("PN", VR.PN.code)
+    }
+  }
+
+  it should "return 200 OK and VR=UN when looking up a value representation for an unknown tag" in {
+    Get(s"/api/dicom/dictionary/vr?tag=${0xFFFFFFFF}") ~> routes ~> check {
+      status shouldBe OK
+      responseAs[DicomValueRepresentation] shouldBe DicomValueRepresentation("UN", VR.UN.code)
+    }
+  }
+
+  it should "return 200 OK and the value multiplicity of the input tag" in {
+    Get(s"/api/dicom/dictionary/vm?tag=${0x00100010}") ~> routes ~> check {
+      status shouldBe OK
+      responseAs[Multiplicity] shouldBe Multiplicity.single
+    }
+  }
+
+  it should "return 200 OK and 1-n multiplicity for an unknown tag" in {
+    Get(s"/api/dicom/dictionary/vm?tag=${0xFFFFFFFF}") ~> routes ~> check {
+      status shouldBe OK
+      responseAs[Multiplicity] shouldBe Multiplicity.oneToMany
+    }
+  }
+
+  it should "return 200 OK and the tag for the input keyword" in {
+    Get(s"/api/dicom/dictionary/tag?keyword=PatientName") ~> routes ~> check {
+      status shouldBe OK
+      responseAs[DicomDictionaryTag].tag shouldBe Tag.PatientName
+    }
+  }
+
+  it should "return 404 NotFound when getting the tag for an unknown keyword" in {
+    Get(s"/api/dicom/dictionary/tag?keyword=abc") ~> routes ~> check {
+      status shouldBe NotFound
+    }
+  }
+
   it should "return 200 OK when health status is checked and the service in running" in {
     Get("/api/system/health") ~> routes ~> check {
       status shouldBe OK
@@ -67,5 +129,4 @@ class GeneralRoutesTest extends {
       status shouldBe OK
     }
   }
-
 }

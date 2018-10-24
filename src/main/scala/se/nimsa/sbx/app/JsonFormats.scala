@@ -22,7 +22,7 @@ import akka.util.ByteString
 import play.api.libs.functional.syntax._
 import play.api.libs.json.Reads._
 import play.api.libs.json._
-import se.nimsa.dicom.data.TagPath
+import se.nimsa.dicom.data.{Multiplicity, TagPath}
 import se.nimsa.dicom.data.TagPath._
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.app.GeneralProtocol._
@@ -220,4 +220,13 @@ trait JsonFormats {
 
   implicit val queryResultSeriesType: Format[SeriesIdSeriesTypesResult] = Json.format[SeriesIdSeriesTypesResult]
 
+  implicit val dicomDictionaryKeywordFormat: Format[DicomDictionaryKeyword] = Json.format[DicomDictionaryKeyword]
+
+  implicit val dicomDictionaryKeywordsFormat: Format[DicomDictionaryKeywords] = Json.format[DicomDictionaryKeywords]
+
+  implicit val dicomDictionaryTagFormat: Format[DicomDictionaryTag] = Json.format[DicomDictionaryTag]
+
+  implicit val dicomValueRepresentationFormat: Format[DicomValueRepresentation] = Json.format[DicomValueRepresentation]
+
+  implicit val dicomMultiplicityFormat: Format[Multiplicity] = Json.format[Multiplicity]
 }
