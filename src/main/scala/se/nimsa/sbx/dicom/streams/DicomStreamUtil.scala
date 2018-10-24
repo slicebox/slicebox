@@ -30,6 +30,8 @@ import scala.concurrent.{ExecutionContext, Future}
 
 object DicomStreamUtil {
 
+  val identityDicomPartFlow = Flow[DicomPart]
+
   val encodingTags: Set[TagPath] = Set(Tag.TransferSyntaxUID, Tag.SpecificCharacterSet).map(TagPath.fromTag)
 
   val tagsToStoreInDB: Set[TagPath] = {

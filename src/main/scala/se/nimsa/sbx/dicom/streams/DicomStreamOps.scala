@@ -97,7 +97,7 @@ trait DicomStreamOps {
     val tempPath = createTempPath()
     val filter = callFilteringService[Option[TagFilterSpec]](GetFilterForSource(source.toSourceRef))
     filter.flatMap(maybeTagFilter => {
-      val tagFilter = maybeTagFilter.map(tagFilterSpecToFlow(_)).getOrElse(NO_ACTION_FILTER)
+      val tagFilter = maybeTagFilter.map(tagFilterSpecToFlow(_)).getOrElse(identityDicomPartFlow)
 
       val sink = dicomDataSink(storage.fileSink(tempPath), storage.parseFlow(None), reverseAnonymizationKeysForPatient, contexts, reverseAnonymization, tagFilter)
       bytesSource.runWith(sink)
@@ -158,7 +158,7 @@ trait DicomStreamOps {
       }.unwrap.map(_.getOrElse((None, Seq.empty)))
 
     val tempPath = createTempPath()
-    val sink = dicomDataSink(storage.fileSink(tempPath), storage.parseFlow(None), reverseAnonymizationKeysForPatient, Contexts.extendedContexts, reverseAnonymization = false, NO_ACTION_FILTER)
+    val sink = dicomDataSink(storage.fileSink(tempPath), storage.parseFlow(None), reverseAnonymizationKeysForPatient, Contexts.extendedContexts, reverseAnonymization = false, identityDicomPartFlow)
 
     val futureModifiedTempFile =
       storage
@@ -345,9 +345,9 @@ trait DicomStreamOps {
   private[streams] def dicomDataSink(storageSink: Sink[ByteString, Future[Done]],
                                      parseFlow: ParseFlow,
                                      reverseAnonymizationKeysForPatient: (PatientName, PatientID) => Future[Seq[AnonymizationKey]],
-                                     contexts: Seq[Context],
-                                     reverseAnonymization: Boolean,
-                                     tagFilterFlow: Flow[DicomPart, DicomPart, NotUsed])
+                                     contexts: Seq[Context] = Seq.empty,
+                                     reverseAnonymization: Boolean = true,
+                                     tagFilterFlow: Flow[DicomPart, DicomPart, NotUsed] = identityDicomPartFlow)
                                     (implicit ec: ExecutionContext): Sink[ByteString, Future[Elements]] = {
 
     val validationContexts = Contexts.asNamePairs(contexts).map(ValidationContext.tupled)
@@ -419,8 +419,6 @@ trait DicomStreamOps {
       case TagFilterSpec(_, _, BLACKLIST, tags) =>
         blacklistFilter(tags.toSet)
       case _ => //Should not happen
-        NO_ACTION_FILTER
+        identityDicomPartFlow
     }
-
-  val NO_ACTION_FILTER = blacklistFilter(Set())
 }
