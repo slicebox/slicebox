@@ -108,9 +108,17 @@ trait GeneralRoutes {
         complete(systemInformation)
       }
     } ~ pathPrefix("dicom" / "dictionary") {
+      lazy val keywords = Dictionary.keywords()
+
       get {
         path("keywords") {
-          complete(DicomDictionaryKeywords(Dictionary.keywords()))
+          parameter('filter.?) { filterMaybe =>
+            filterMaybe.map { filter =>
+              complete(DicomDictionaryKeywords(keywords.filter(_.toLowerCase.contains(filter.toLowerCase))))
+            }.getOrElse {
+              complete(DicomDictionaryKeywords(keywords))
+            }
+          }
         } ~ parameter('tag.as[Int]) { tag =>
           path("vr") {
             val vr = Dictionary.vrOf(tag)

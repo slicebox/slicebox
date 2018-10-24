@@ -51,6 +51,13 @@ class GeneralRoutesTest extends {
     }
   }
 
+  it should "return 200 OK and a filtered list of DICOM keywords" in {
+    Get("/api/dicom/dictionary/keywords?filter=atientnam") ~> routes ~> check {
+      status shouldBe OK
+      responseAs[DicomDictionaryKeywords].keywords.forall(_.toLowerCase.contains("atientnam")) shouldBe true
+    }
+  }
+
   it should "return 200 OK and the keyword for the input tag" in {
     Get(s"/api/dicom/dictionary/keyword?tag=${0x00100010}") ~> routes ~> check {
       status shouldBe OK
