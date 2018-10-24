@@ -149,14 +149,6 @@ angular.module('slicebox.adminFiltering', ['ngRoute'])
             resetState();
         });
 
-        // Scope functions
-        $scope.filterChanged = function() {
-            if ($scope.state.filterSpec && $scope.uiState.selectedFilter.id !== $scope.state.filterSpec.id) {
-                return true;
-            }
-            return !angular.equals($scope.state.originalFilterSpec, $scope.state.filterSpec);
-        };
-
         $scope.addFilterAttributeButtonClicked = function() {
             var newAttribute = {};
 
@@ -168,12 +160,14 @@ angular.module('slicebox.adminFiltering', ['ngRoute'])
                 }
             });
 
-            dialogPromise.then(function (response) {
+            dialogPromise.then(function () {
                 if ($scope.state.filterSpec.tags.map(function(t) {return t.tag;}).includes(newAttribute.tag)) //Don't include tag twice
                     return;
                 $scope.state.filterSpec.tags.push(newAttribute);
                 $scope.state.filterSpec.tags = $scope.state.filterSpec.tags.sort(function(a, b) {return a.tag - b.tag;});
-                $scope.callbacks.filterAttributesTables.reloadPage();
+                saveFilter($scope.state.filterSpec).then(function() {
+                    $scope.callbacks.filterAttributesTables.reloadPage();
+                });
             });
         };
 
@@ -182,17 +176,6 @@ angular.module('slicebox.adminFiltering', ['ngRoute'])
             if ($scope.state.filterSpec)
                 return ($scope.state.filterSpec.tags.slice(startIndex, startIndex + count) || []);
             return [];
-        };
-
-        $scope.loadSeriesTypeRuleAttributes = function(rule) {
-            var attributes;
-
-            if (!rule.attributes) {
-                return undefined;
-            }
-
-            // Return copy of array to avoid side effects when the attributes array is updated
-            return rule.attributes.slice(0);
         };
 
         $scope.saveButtonClicked = function () {
@@ -236,6 +219,10 @@ angular.module('slicebox.adminFiltering', ['ngRoute'])
             loadFilter();
         }
 
+        function saveFilter(filter) {
+            return $http.post('/api/filtering/tagfilter', filter);
+        }
+
         function loadFilter() {
             if (!$scope.uiState.selectedFilter ||
                 $scope.uiState.selectedFilter.id === -1) {
@@ -263,7 +250,9 @@ angular.module('slicebox.adminFiltering', ['ngRoute'])
                     $scope.state.filterSpec.tags.splice(attributeIndex, 1);
                 }
             });
-            $scope.callbacks.filterAttributesTables.clearSelection();
+            saveFilter($scope.state.filterSpec).then(function() {
+                $scope.callbacks.filterAttributesTables.clearSelection();
+            });
         }
     })
 
