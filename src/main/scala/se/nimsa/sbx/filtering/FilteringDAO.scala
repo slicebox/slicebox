@@ -100,8 +100,6 @@ class FilteringDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executi
     }
   }
 
-  def getAllSourceFilters: Future[Seq[SourceTagFilter]] = db.run(sourceFilterQuery.result)
-
   def createOrUpdateSourceFilter(sourceFilter: SourceTagFilter): Future[SourceTagFilter] = {
     db.run {
       getSourceFilterAction(SourceRef(sourceFilter.sourceType, sourceFilter.sourceId)).flatMap {
@@ -142,10 +140,6 @@ class FilteringDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executi
       .drop(startIndex)
       .take(count)
       .result
-  }
-
-  def getTagPathsByFilterId(filterId: Long): Future[Seq[TagFilterTagPath]] = db.run {
-    tagPathQuery.filter(_.tagFilterId === filterId).result
   }
 
   def getTagFilter(id: Long): Future[Option[TagFilterSpec]] = db.run(getTagFilterAction(id))

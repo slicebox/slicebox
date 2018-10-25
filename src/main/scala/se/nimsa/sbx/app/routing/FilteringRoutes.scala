@@ -29,7 +29,7 @@ trait FilteringRoutes {
 
   def filteringRoutes(apiUser: ApiUser): Route =
     pathPrefix("filtering") {
-      pathPrefix("tagfilter") {
+      pathPrefix("filters") {
         pathEndOrSingleSlash {
           get {
             parameters((
@@ -53,14 +53,12 @@ trait FilteringRoutes {
         } ~ pathPrefix(LongNumber) { tagFilterId =>
           pathEndOrSingleSlash {
             get {
-              authorize(apiUser.hasPermission(UserRole.ADMINISTRATOR)) {
                 onSuccess(filteringService.ask(GetTagFilter(tagFilterId)).mapTo[Option[TagFilterSpec]]) {
                   case Some(tagFilterSpec) =>
                     complete((OK, tagFilterSpec))
                   case None =>
                     complete(NotFound)
                 }
-              }
             } ~ delete {
               authorize(apiUser.hasPermission(UserRole.ADMINISTRATOR)) {
                 onSuccess(filteringService.ask(RemoveTagFilter(tagFilterId))) {

@@ -44,7 +44,7 @@ angular.module('slicebox.adminFiltering', ['ngRoute'])
             var promises = {};
             promises.associations = ($http.get('/api/filtering/associations?startindex=' + startIndex + '&count=' + count));
             promises.sources = ($http.get("/api/sources"));
-            promises.filters = ($http.get("/api/filtering/tagfilter?count=100000"));
+            promises.filters = ($http.get("/api/filtering/filters?count=100000"));
             var combinedPromise = $q.all(promises).then(function(promisesResult) {
                 var resultArray = promisesResult.associations.data.map(function(association) {
                     var source = promisesResult.sources.data.find(function(s) {
@@ -64,7 +64,7 @@ angular.module('slicebox.adminFiltering', ['ngRoute'])
         };
 
         $scope.loadFilters = function(startIndex, count, orderByProperty, orderByDirection) {
-            return $http.get('/api/filtering/tagfilter?startindex=' + startIndex + '&count=' + count);
+            return $http.get('/api/filtering/filters?startindex=' + startIndex + '&count=' + count);
         };
 
         $scope.addAssociationButtonClicked = function() {
@@ -72,7 +72,7 @@ angular.module('slicebox.adminFiltering', ['ngRoute'])
         };
 
         $scope.addFilterButtonClicked = function() {
-            openAddEntityModal('addFilterModalContent.html', 'AddFilterModalCtrl', '/api/filtering/tagfilter', 'Tag Filter', $scope.callbacks.filtersTable);
+            openAddEntityModal('addFilterModalContent.html', 'AddFilterModalCtrl', '/api/filtering/filters', 'Tag Filter', $scope.callbacks.filtersTable);
         };
 
         $scope.filterSelected = function(filter) {
@@ -80,7 +80,7 @@ angular.module('slicebox.adminFiltering', ['ngRoute'])
         };
 
         function confirmDeleteFilter(filters) {
-            var f = openDeleteEntitiesModalFunction('/api/filtering/tagfilter/', 'filter(s)');
+            var f = openDeleteEntitiesModalFunction('/api/filtering/filters/', 'filter(s)');
             f(filters).finally(function() {
                 if ($scope.uiState.selectedFilter &&
                     filters.map(function(x) {return x.id;}).includes($scope.uiState.selectedFilter.id)) {
@@ -112,7 +112,7 @@ angular.module('slicebox.adminFiltering', ['ngRoute'])
         };
 
         $scope.loadFilters = function() {
-            return $http.get("/api/filtering/tagfilter?startindex=0&count=1000000").success(function (filters) {
+            return $http.get("/api/filtering/filters?startindex=0&count=1000000").success(function (filters) {
                 $scope.uiState.filters = filters;
             });
         };
@@ -184,10 +184,10 @@ angular.module('slicebox.adminFiltering', ['ngRoute'])
 
             if ($scope.uiState.selectedFilter.id === -1) {
                 isCreate = true;
-                savePromise = $http.post('/api/filtering/tagfilter', $scope.state.filterSpec);
+                savePromise = $http.post('/api/filtering/filters', $scope.state.filterSpec);
             } else {
                 isCreate = false;
-                savePromise = $http.post('/api/filtering/tagfilter', $scope.state.filterSpec);
+                savePromise = $http.post('/api/filtering/filters', $scope.state.filterSpec);
             }
 
             savePromise.then(function(response) {
@@ -220,7 +220,7 @@ angular.module('slicebox.adminFiltering', ['ngRoute'])
         }
 
         function saveFilter(filter) {
-            return $http.post('/api/filtering/tagfilter', filter);
+            return $http.post('/api/filtering/filters', filter);
         }
 
         function loadFilter() {
@@ -229,7 +229,7 @@ angular.module('slicebox.adminFiltering', ['ngRoute'])
                 return;
             }
 
-            $http.get('/api/filtering/tagfilter/' + $scope.uiState.selectedFilter.id)
+            $http.get('/api/filtering/filters/' + $scope.uiState.selectedFilter.id)
                 .success(function(filter) {
                     $scope.state.filterSpec = filter;
                     $scope.state.originalFilterSpec = angular.copy(filter);
