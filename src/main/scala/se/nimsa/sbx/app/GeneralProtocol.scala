@@ -22,6 +22,7 @@ object GeneralProtocol {
 
   sealed trait SourceType {
     override def toString: String = this match {
+      //SourceType string used as db key of type VARCHAR(64) so don't do over 64 chars...
       case SourceType.SCP => "scp"
       case SourceType.DIRECTORY => "directory"
       case SourceType.BOX => "box"
@@ -69,10 +70,16 @@ object GeneralProtocol {
     }    
   }
       
-  case class Source(sourceType: SourceType, sourceName: String, sourceId: Long)
+  case class Source(sourceType: SourceType, sourceName: String, sourceId: Long) {
+    def toSourceRef: SourceRef = SourceRef(sourceType, sourceId)
+  }
   
   case class SourceRef(sourceType: SourceType, sourceId: Long)
-  
+
+  case class SourceAdded(sourceRef: SourceRef)
+
+  case class SourceDeleted(sourceRef: SourceRef)
+
   case class Destination(destinationType: DestinationType, destinationName: String, destinationId: Long)
 
   case class ImageAdded(imageId: Long, source: Source, overwrite: Boolean)

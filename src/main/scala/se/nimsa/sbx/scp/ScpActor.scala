@@ -31,17 +31,20 @@ import se.nimsa.sbx.log.SbxLog
 import se.nimsa.sbx.scp.ScpProtocol._
 import se.nimsa.sbx.storage.StorageService
 
+import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
 import scala.reflect.ClassTag
 import scala.util.{Failure, Success}
 
 class ScpActor(scpData: ScpData, storage: StorageService, executor: Executor,
                metaDataServicePath: String = "../../MetaDataService",
-               anonymizationServicePath: String = "../../AnonymizationService")
+               anonymizationServicePath: String = "../../AnonymizationService",
+               filteringServicePath: String = "../../FilteringService")
               (implicit val materializer: Materializer, timeout: Timeout) extends Actor with DicomStreamOps {
 
   val metaDataService = context.actorSelection(metaDataServicePath)
   val anonymizationService = context.actorSelection(anonymizationServicePath)
+  val filteringService = context.actorSelection(filteringServicePath)
 
   implicit val system = context.system
   implicit val ec = context.dispatcher
@@ -80,8 +83,9 @@ class ScpActor(scpData: ScpData, storage: StorageService, executor: Executor,
       addDicomDataFuture.pipeTo(sender)
   }
 
-  override def callAnonymizationService[R: ClassTag](message: Any) = anonymizationService.ask(message).mapTo[R]
-  override def callMetaDataService[R: ClassTag](message: Any) = metaDataService.ask(message).mapTo[R]
+  override def callAnonymizationService[R: ClassTag](message: Any): Future[R] = anonymizationService.ask(message).mapTo[R]
+  override def callMetaDataService[R: ClassTag](message: Any): Future[R] = metaDataService.ask(message).mapTo[R]
+  override def callFilteringService[R: ClassTag](message: Any): Future[R] = filteringService.ask(message).mapTo[R]
   override def scheduleTask(delay: FiniteDuration)(task: => Unit) = system.scheduler.scheduleOnce(delay)(task)
 }
 

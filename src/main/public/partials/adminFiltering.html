@@ -1,0 +1,96 @@
+<div layout="column" layout-margin>
+    <div class="admin-filtering" layout="row">
+        <div flex>
+            <md-card>
+                <md-card-content>
+                    <md-content class="md-padding" style="height: 435px">
+                        <h4>Filters</h4>
+                        <sbx-grid
+                                load-page="loadFilters(startIndex, count)"
+                                page-size="5"
+                                refresh-button="true"
+                                object-actions="filterObjectActions"
+                                sorting="false"
+                                callbacks="callbacks.filtersTable"
+                                object-selected="filterSelected(object)"
+                                empty-message="No filters added">
+                            <sbx-grid-column property="name" title="Name">
+                            </sbx-grid-column>
+                            <sbx-grid-column property="tagFilterType" title="Type">
+                                <sbx-grid-cell>{{rowObject.tagFilterType | lowercase}}</sbx-grid-cell>
+                            </sbx-grid-column>
+
+                        </sbx-grid>
+                        <div layout="row" class="button-row">
+                            <md-button class="md-primary md-raised" ng-click="addFilterButtonClicked()">
+                                Add filter
+                            </md-button>
+                            <div flex></div>
+                        </div>
+                    </md-content>
+                </md-card-content>
+            </md-card>
+        </div>
+        <div flex ng-controller="FilterDetailsCtrl" ng-if="uiState.selectedFilter">
+            <md-card>
+                <md-card-content>
+                    <md-content class="md-padding" style="height: 435px">
+                        <h4>{{state.filterSpec.name}}</h4>
+                        <sbx-grid
+                                load-page="loadFilterAttributes(startIndex, count)"
+                                object-actions="attributeActions"
+                                page-size="5"
+                                refresh-button="true"
+                                sorting="false"
+                                callbacks="callbacks.filterAttributesTables"
+                                empty-message="No attributes added">
+
+                            <sbx-grid-column property="tag" title="Tag" filter="hexvalue: 8">
+                            </sbx-grid-column>
+
+                        </sbx-grid>
+                        <div layout="row" class="button-row">
+                            <md-button md-no-ink class="md-primary md-raised" type="button"
+                                       ng-click="addFilterAttributeButtonClicked()">
+                                Add Attribute
+                            </md-button>
+                        </div>
+                    </md-content>
+                </md-card-content>
+            </md-card>
+        </div>
+
+    </div>
+    <div class="admin-filtering" layout="row">
+        <md-card>
+            <md-card-content>
+                <h4>Filtering</h4>
+                <h5>Associate a filter with source to filter incoming dicom meta data</h5>
+                <sbx-grid
+                        load-page="loadSourceFilterAssociations(startIndex, count, orderByProperty, orderByDirection)"
+                        page-size="5"
+                        refresh-button="true"
+                        object-actions="associationObjectActions"
+                        sorting="false"
+                        callbacks="callbacks.associationsTable"
+                        empty-message="No source-filter associations added">
+
+                    <sbx-grid-column property="source" title="Source">
+                        <sbx-grid-cell>
+                            {{rowObject.sourceName}} ({{rowObject.sourceType}})
+                        </sbx-grid-cell>
+                    </sbx-grid-column>
+
+                    <sbx-grid-column property="filterName" title="Filter"/>
+                </sbx-grid>
+
+                <div layout="row" class="button-row">
+                    <md-button class="md-primary md-raised" ng-click="addAssociationButtonClicked()">
+                        Add association
+                    </md-button>
+                    <div flex></div>
+                </div>
+            </md-card-content>
+        </md-card>
+    </div>
+</div>

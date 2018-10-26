@@ -16,12 +16,14 @@
 
 package se.nimsa.sbx.app.routing
 
-import akka.pattern.ask
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.headers._
 import akka.http.scaladsl.model.{HttpHeader, RemoteAddress}
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.{Directive1, Route}
+import akka.pattern.ask
+import se.nimsa.sbx.app.GeneralProtocol.SourceType.USER
+import se.nimsa.sbx.app.GeneralProtocol.{SourceAdded, SourceDeleted, SourceRef}
 import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.user.UserProtocol.{AuthKey, _}
 
@@ -93,8 +95,10 @@ trait UserRoutes { this: SliceboxBase =>
             entity(as[ClearTextUser]) { user =>
               val apiUser = ApiUser(-1, user.user, user.role).withPassword(user.password)
               onSuccess(userService.ask(AddUser(apiUser))) {
-                case UserAdded(addedUser) =>
+                case UserAdded(addedUser) => {
+                  system.eventStream.publish(SourceAdded(SourceRef(USER, addedUser.id)))
                   complete((Created, addedUser))
+                }
               }
             }
           }
@@ -103,8 +107,10 @@ trait UserRoutes { this: SliceboxBase =>
         delete {
           authorize(apiUser.hasPermission(UserRole.ADMINISTRATOR)) {
             onSuccess(userService.ask(DeleteUser(userId))) {
-              case UserDeleted(_) =>
+              case UserDeleted(_) => {
+                system.eventStream.publish(SourceDeleted(SourceRef(USER, userId)))
                 complete(NoContent)
+              }
             }
           }
         }
