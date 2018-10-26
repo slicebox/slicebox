@@ -127,3 +127,7 @@ td.table-cell:last-child {
 .sbx-grid .filter-section {
 	margin-left: 20px;
 }
+
+.tag-path-form md-input-container.tight {
+    margin: 0;
+}

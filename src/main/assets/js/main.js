@@ -25,7 +25,58 @@ angular.module('slicebox', [
     'slicebox.adminSystem'
 ])
 
-.config(function($locationProvider, $routeProvider, $mdThemingProvider, $filterProvider, $httpProvider) {
+.provider('sbxUtil', function() {
+
+    this.$get = function() {
+        return {
+            tagPathToString: function(tagPath) {
+                if (!tagPath) {
+                    return "";
+                }
+
+                var tagToString = function(tag) {
+                    if (!angular.isDefined(tag)) {
+                        throw Error("Invalid tag path: tag is not defined");
+                    }
+
+                    var returnValue = tag.toString(16);
+
+                    while (returnValue.length < 8) {
+                        returnValue = '0' + returnValue;
+                    }
+                    returnValue = '(' + returnValue.slice(0, 4) + ',' + returnValue.slice(4) + ')';
+                    return returnValue.toUpperCase();
+                };
+
+                var toTagPathString = function(path, tail) {
+                    var itemIndexSuffix = "";
+                    if (angular.isDefined(path.item)) {
+                        itemIndexSuffix = '[' + path.item + ']';
+                    }
+                    var tagPrefix = tagToString(path.tag);
+                    if (tagPrefix.length === 0) {
+                        throw Error("Invalid tag path");
+                    }
+                    var head = tagPrefix + itemIndexSuffix;
+                    var part = head + tail;
+                    if (!path.previous) {
+                        return part;
+                    } else {
+                        return toTagPathString(path.previous, "." + part);
+                    }
+                };
+
+                try {
+                    return toTagPathString(tagPath, "");
+                } catch(err) {
+                    return "";
+                }
+            }
+        };
+    };
+})
+
+.config(function($locationProvider, $routeProvider, $mdThemingProvider, $filterProvider, $httpProvider, sbxUtilProvider) {
     $locationProvider.html5Mode(true);
     $routeProvider.otherwise({redirectTo: '/'});
 
@@ -60,6 +111,10 @@ angular.module('slicebox', [
 
             return returnValue;
         };
+    });
+
+    $filterProvider.register('tagPath', function() {
+        return sbxUtilProvider.$get().tagPathToString;
     });
 
     $httpProvider.interceptors.push(function($q, $location) {

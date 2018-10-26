@@ -59,11 +59,145 @@ angular.module('slicebox.directives', [])
     };
 })
 
+.directive('sbxDicomHexValue', function() {
+
+    return {
+        require: 'ngModel',
+        restrict: 'A',
+        link: function($scope, $element, $attrs, ngModel) {
+            var parse = function(value) {
+                if (angular.isUndefined(value)) {
+                    return value;
+                }
+
+                var hexValue = '0x' + value.trim();
+
+                var intValue = parseInt(hexValue);
+                if (!isNaN(intValue)) {
+                    ngModel.$setValidity('sbxDicomHexValue', true);
+
+                    return intValue;
+                }
+
+                ngModel.$setValidity('sbxDicomHexValue', false);
+                return undefined;
+            };
+
+            var format = function(value) {
+                if (angular.isUndefined(value) || value === 0) {
+                    return '';
+                }
+
+                var returnValue = value.toString(16);
+
+                while (returnValue.length < 8) {
+                    returnValue = '0' + returnValue;
+                }
+
+                return returnValue;
+            };
+
+            ngModel.$parsers.push(parse);
+            ngModel.$formatters.push(format);
+        }
+
+    };
+
+})
+
+.directive('tagPathForm', function() {
+
+    return {
+        restrict: 'E',
+        templateUrl: '/assets/partials/directives/tagPathForm.html',
+        scope: {},
+        link: function($scope, $element, $attrs) {
+            var emptyPath = { tag: null };
+            $scope.uiState = {
+                sequences: [],
+                element: {},
+                tagPath: emptyPath,
+                noNested: $attrs.hasOwnProperty('noNested'),
+                noWildcards: $attrs.hasOwnProperty('noWildcards')
+            };
+
+            addEmptySequenceIfNeeded();
+            updateTagPath();
+
+            // scope functions
+            $scope.removeSequence = function(index) {
+                $scope.uiState.sequences.splice(index, 1);
+                updateTagPath();
+            };
+
+            $scope.sequenceTagChanged = function() {
+                addEmptySequenceIfNeeded();
+                updateTagPath();
+            };
+
+            $scope.sequenceItemChanged = function() {
+                updateTagPath();
+            };
+
+            $scope.elementTagChanged = function() {
+                updateTagPath();
+            };
+
+            // private functions
+            function addEmptySequenceIfNeeded() {
+                if ($scope.uiState.sequences.length === 0 || angular.isDefined($scope.uiState.sequences[$scope.uiState.sequences.length - 1].tag)) {
+                    $scope.uiState.sequences.push({});
+                }
+            }
+
+            function addItem(seqs) {
+                if (seqs.length === 0) {
+                    return null;
+                }
+                var s = seqs[seqs.length - 1];
+                if (!angular.isDefined(s.tag)) {
+                    return null;
+                }
+
+                var tag = parseInt(s.tag, 16);
+                var item = !s.item || s.item === "x" ? "*" : s.item;
+                if (isNaN(tag)) {
+                    return null;
+                } else {
+                    return {
+                        tag: tag,
+                        item: item,
+                        previous: addItem(seqs.slice(0, -1))
+                    };
+                }
+            }
+            function updateTagPath() {
+                var tag = parseInt($scope.uiState.element.tag, 16);
+                var tagPath;
+                if (isNaN(tag)) {
+                    tagPath = addItem($scope.uiState.sequences.slice(0, -1));
+                } else {
+                    tagPath = {
+                        tag: tag,
+                        previous: addItem($scope.uiState.sequences.slice(0, -1))
+                    };
+                }
+                if (tagPath) {
+                    $scope.uiState.tagPath = tagPath;
+                } else {
+                    $scope.uiState.tagPath = emptyPath;
+                }
+            }
+        }
+    };
+
+})
+
 /*
  * In order for selection check boxes and object actions to work, all objects in the
  * list must have an id property. 
  */
- .directive('sbxGrid', function($filter, $q, $timeout) {
+.directive('sbxGrid', function($filter, $q, $timeout) {
 
     return {
         restrict: 'E',
@@ -722,49 +856,6 @@ angular.module('slicebox.directives', [])
                     $element.append(rendererElement);
                 });
             }
-        }
-        
-    };
-    
-})
-
-.directive('sbxDicomHexValue', function() {
-    
-    return {
-        require: 'ngModel',
-        restrict: 'A',
-        link: function($scope, $element, $attrs, ngModel) {
-            ngModel.$parsers.push(function(value) {
-                if (angular.isUndefined(value)) {
-                    return value;
-                }
-
-                var hexValue = '0x' + value.trim();
-
-                var intValue = parseInt(hexValue);
-                if (!isNaN(intValue)) {
-                    ngModel.$setValidity('sbxDicomHexValue', true);
-
-                    return intValue;
-                }
-
-                ngModel.$setValidity('sbxDicomHexValue', false);
-                return undefined;
-            });
-
-            ngModel.$formatters.push(function(value) {
-                if (angular.isUndefined(value) || value === 0) {
-                    return '';
-                }
-
-                var returnValue = value.toString(16);
-
-                while (returnValue.length < 8) {
-                    returnValue = '0' + returnValue;
-                }
-
-                return returnValue;
-            });
         }
         
     };
