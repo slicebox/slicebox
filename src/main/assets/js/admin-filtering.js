@@ -280,7 +280,45 @@ angular.module('slicebox.adminFiltering', ['ngRoute'])
 
     // Scope functions
     $scope.addButtonClicked = function() {
-        $mdDialog.hide({ id: -1, name: $scope.filterName, tagFilterType: $scope.filterType, tags: []});
+        var filterObject = { id: -1, name: $scope.filterName, tagFilterType: $scope.filterType, tags: []};
+        if (filterObject.tagFilterType === "WHITELIST") {
+            filterObject.tags = [
+                {tag: 131072},		//FileMetaInformationGroupLength
+                {tag: 131073},		//FileMetaInformationVersion
+                {tag: 131074},		//MediaStorageSOPClassUID
+                {tag: 131075},		//MediaStorageSOPInstanceUID
+                {tag: 131088},		//TransferSyntaxUID
+                {tag: 131090},		//ImplementationClassUID
+                {tag: 524296},		//ImageType
+                {tag: 524310},		//SOPClassUID
+                {tag: 524312},		//SOPInstanceUID
+                {tag: 524320},		//StudyDate
+                {tag: 524321},		//SeriesDate
+                {tag: 524368},		//AccessionNumber
+                {tag: 524384},		//Modality
+                {tag: 528432},		//StudyDescription
+                {tag: 528446},		//SeriesDescription
+                {tag: 1048592},		//PatientName
+                {tag: 1048608},		//PatientID
+                {tag: 1048624},		//PatientBirthDate
+                {tag: 1048640},		//PatientSex
+                {tag: 1052688},		//PatientAge
+                {tag: 1577008},		//ProtocolName
+                {tag: 2097165},		//StudyInstanceUID
+                {tag: 2097166},		//SeriesInstanceUID
+                {tag: 2097168},		//StudyID
+                {tag: 2621442},		//SamplesPerPixel
+                {tag: 2621444},		//PhotometricInterpretation
+                {tag: 2621456},		//Rows
+                {tag: 2621457},		//Columns
+                {tag: 2621696},		//BitsAllocated
+                {tag: 2621697},		//BitsStored
+                {tag: 2621698},		//HighBit
+                {tag: 2621699},		//PixelRepresentation
+                {tag: 2145386512},	//PixelData
+                ];
+        }
+        $mdDialog.hide(filterObject);
     };
 
     $scope.cancelButtonClicked = function() {
