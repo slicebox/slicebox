@@ -1,0 +1,34 @@
+<md-dialog aria-label="Add Filter" class="add-filter">
+
+    <form name="filterForm">
+
+        <md-dialog-content>
+            <md-subheader class="md-sticky-no-effect">Add Filter</md-subheader>
+
+            <div layout="column">
+
+                <md-input-container>
+                    <label>Filter Name</label>
+                    <input name="filterName" ng-model="filterName" type="text" id="filterName" required />
+                </md-input-container>
+
+                <md-input-container>
+                    <md-select name="filterType" placeholder="filterType" ng-model="filterType">
+                        <md-option value="WHITELIST">whitelist</md-option>
+                        <md-option value="BLACKLIST">blacklist</md-option>
+                    </md-select>
+                </md-input-container>
+                
+            </div>
+
+        </md-dialog-content>
+
+        <md-dialog-actions layout="row">
+            <span flex></span>
+            <md-button ng-click="cancelButtonClicked()">Cancel</md-button>
+            <md-button type="submit" class="md-primary" ng-click="addButtonClicked()" ng-disabled="userForm.$invalid">Add</md-button>
+        </md-dialog-actions>
+        
+    </form>
+
+</md-dialog>

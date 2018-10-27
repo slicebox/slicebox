@@ -31,6 +31,7 @@ import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomPropertyValue._
 import se.nimsa.sbx.dicom.ImageAttribute
 import se.nimsa.sbx.directory.DirectoryWatchProtocol._
+import se.nimsa.sbx.filtering.FilteringProtocol.{SourceTagFilter, TagFilterSpec, TagFilterType}
 import se.nimsa.sbx.forwarding.ForwardingProtocol._
 import se.nimsa.sbx.importing.ImportProtocol._
 import se.nimsa.sbx.log.LogProtocol._
@@ -244,6 +245,12 @@ trait JsonFormats {
   implicit val importSessionFormat: Format[ImportSession] = Json.format[ImportSession]
 
   implicit val queryResultSeriesType: Format[SeriesIdSeriesTypesResult] = Json.format[SeriesIdSeriesTypesResult]
+
+  implicit val tagFilterTypeFormat: Format[TagFilterType] = enumFormat(TagFilterType.withName)
+
+  implicit val tagFilterSpecFormat: Format[TagFilterSpec] = Json.format[TagFilterSpec]
+
+  implicit val tagSourceTagFilter: Format[SourceTagFilter] = Json.format[SourceTagFilter]
 
   implicit val dicomDictionaryKeywordFormat: Format[DicomDictionaryKeyword] = Json.format[DicomDictionaryKeyword]
 

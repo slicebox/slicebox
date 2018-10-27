@@ -1,0 +1,31 @@
+<md-dialog aria-label="Add Source Filter Association" class="add-source-filter-association">
+
+    <md-dialog-content>
+        <md-subheader class="md-sticky-no-effect">Add Source Filter Association</md-subheader>
+
+        <div layout="column">
+
+            <md-input-container>
+                <label>Source</label>
+                <md-select name="source" ng-model="uiState.source" md-on-open="loadSources()" placeholder="Select a source">
+                    <md-option ng-value="source" ng-repeat="source in uiState.sources">{{ source.sourceName }} ({{ source.sourceType }})</md-option>
+                </md-select>
+            </md-input-container>
+
+            <md-input-container>
+                <label>Filter</label>
+                <md-select ng-model="uiState.filter" md-on-open="loadFilters()" placeholder="Select a filter">
+                    <md-option ng-value="filter" ng-repeat="filter in uiState.filters">{{ filter.name }}</md-option>
+                </md-select>
+            </md-input-container>
+        </div>
+        
+    </md-dialog-content>
+
+    <md-dialog-actions layout="row">
+        <span flex></span>
+        <md-button ng-click="cancelButtonClicked()">Cancel</md-button>
+        <md-button ng-click="addButtonClicked()" class="md-primary" ng-disabled="!(uiState.source && uiState.filter)">Add</md-button>
+    </md-dialog-actions>
+
+</md-dialog>

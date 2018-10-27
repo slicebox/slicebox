@@ -9,6 +9,9 @@
 
 	  		<div layout="column">
 
+				<tag-path-form></tag-path-form>
+
+<!--
 		  		<md-input-container>
 		  			<label>Tag (hex)</label>
 					<input
@@ -26,22 +29,7 @@
 			            	ng-show="editAttributeForm.tag.$error.sbxDicomHexValue">must be valid hex number</div>
 			        </div>
 				</md-input-container>
-
-				<md-input-container>
-					<label>Value</label>
-					<input
-						ng-model="attribute.values"
-						type="text"
-						name="values"
-						required>
-
-					<div ng-messages="editAttributeForm.values.$error"
-			            ng-show="editAttributeForm.$submitted">
-
-			            <div ng-message="required"
-			            	ng-show="editAttributeForm.values.$error.required">value is required</div>
-			        </div>
-			    </md-input-container>
+-->
 
 			</div>
 
