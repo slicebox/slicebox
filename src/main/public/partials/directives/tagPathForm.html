@@ -1,0 +1,80 @@
+<div class="tag-path-form" layout="column">
+
+    <md-content>
+        <md-card>
+            <md-card-title>
+                <md-card-title-text>
+                    <span class="md-subhead">Tag Path</span>
+                </md-card-title-text>
+            </md-card-title>
+            <md-card-content>
+                <p>{{ uiState.tagPath | tagPath }}</p>
+            </md-card-content>
+        </md-card>
+    </md-content>
+
+    <md-content ng-if="!uiState.noNested">
+        <md-card>
+            <md-card-title>
+                <md-card-title-text>
+                    <span class="md-subhead">Nesting</span>
+                </md-card-title-text>
+            </md-card-title>
+            <md-card-content>
+                <div ng-repeat="sequence in uiState.sequences">
+
+                    <div layout="row">
+                        <md-input-container class="tight">
+                            <input class="form-control"
+                                   ng-model="sequence.tag"
+                                   placeholder="Tag"
+                                   ng-change="sequenceTagChanged(sequence)"/>
+                        </md-input-container>
+
+                        <md-input-container class="tight">
+                            <label>Item</label>
+                            <md-select ng-model="sequence.item"
+                                       ng-change="sequenceItemChanged(sequence)">
+                                <md-option ng-value="x" ng-if="!uiState.noWildcards">All</md-option>
+                                <md-option ng-value="1">1</md-option>
+                                <md-option ng-value="2">2</md-option>
+                                <md-option ng-value="3">3</md-option>
+                                <md-option ng-value="4">4</md-option>
+                                <md-option ng-value="5">5</md-option>
+                                <md-option ng-value="6">6</md-option>
+                                <md-option ng-value="7">7</md-option>
+                                <md-option ng-value="8">8</md-option>
+                                <md-option ng-value="9">9</md-option>
+                            </md-select>
+                        </md-input-container>
+
+                        <md-button ng-if="sequence.tag" aria-label="delete" class="md-icon-button" ng-click="removeSequence($index)">
+                            <md-icon md-svg-src="/assets/images/ic_delete_24px.svg"></md-icon>
+                        </md-button>
+                    </div>
+                </div>
+            </md-card-content>
+        </md-card>
+    </md-content>
+
+    <md-content>
+        <md-card>
+            <md-card-title>
+                <md-card-title-text>
+                    <span class="md-subhead">Tag</span>
+                </md-card-title-text>
+            </md-card-title>
+            <md-card-content>
+                <div layout="row">
+                    <md-input-container md-no-float class="tight md-block">
+                        <input class="form-control"
+                               ng-model="uiState.element.tag"
+                               placeholder="Tag"
+                               ng-change="elementTagChanged(element)"/>
+                    </md-input-container>
+                </div>
+            </md-card-content>
+        </md-card>
+    </md-content>
+
+</div>
