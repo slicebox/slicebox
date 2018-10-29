@@ -9,7 +9,20 @@
 
 			<tag-path-form tag-path="tagPath"></tag-path-form>
 
-	  	</md-dialog-content>
+			<md-content>
+				<md-card>
+					<md-card-title>
+						<md-card-title-text>
+							<span class="md-subhead">Tag Path</span>
+						</md-card-title-text>
+					</md-card-title>
+					<md-card-content>
+						<p>{{ tagPath | tagPath }}</p>
+					</md-card-content>
+				</md-card>
+			</md-content>
+
+		</md-dialog-content>
 
 	  	<md-dialog-actions layout="row">
 	    	<span flex></span>
