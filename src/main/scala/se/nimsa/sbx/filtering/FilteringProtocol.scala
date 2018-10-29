@@ -1,6 +1,6 @@
 package se.nimsa.sbx.filtering
 
-import se.nimsa.dicom.data.TagPath.TagPathTag
+import se.nimsa.dicom.data.TagPath
 import se.nimsa.sbx.app.GeneralProtocol.{SourceRef, SourceType}
 
 object FilteringProtocol {
@@ -29,11 +29,11 @@ object FilteringProtocol {
 
   case class TagFilterAdded(filterSpecification: TagFilterSpec)
 
-  case class TagFilterSpec(id: Long, name: String, tagFilterType: TagFilterType, tags: Seq[TagPathTag])
+  case class TagFilterSpec(id: Long, name: String, tagFilterType: TagFilterType, tagPaths: Seq[TagPath])
 
   object TagFilterSpec {
     def apply(tf: TagFilter, tagPaths: Seq[TagFilterTagPath]):TagFilterSpec =
-      TagFilterSpec(tf.id, tf.name, tf.tagFilterType, tagPaths.map(_.tagPathTag))
+      TagFilterSpec(tf.id, tf.name, tf.tagFilterType, tagPaths.map(_.tagPath))
     def apply(tf: TagFilter): TagFilterSpec =
       TagFilterSpec(tf.id, tf.name, tf.tagFilterType, Seq())
   }
@@ -49,7 +49,7 @@ object FilteringProtocol {
   //DB row representations
   case class TagFilter(id: Long, name: String, tagFilterType: TagFilterType)
 
-  case class TagFilterTagPath(id: Long, tagFilterId: Long, tagPathTag: TagPathTag)
+  case class TagFilterTagPath(id: Long, tagFilterId: Long, tagPath: TagPath)
 
   case class SourceTagFilter(id: Long, sourceType: SourceType, sourceId: Long, tagFilterId: Long)
 }

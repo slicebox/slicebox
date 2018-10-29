@@ -60,7 +60,7 @@ class FilteringRoutesTest extends {
       val rules = responseAs[List[TagFilterSpec]]
       rules should not be empty
       rules.length shouldBe 1
-      rules.head shouldBe addedRule.copy(tags = Seq())
+      rules.head shouldBe addedRule.copy(tagPaths = Seq())
     }
   }
 
@@ -68,7 +68,7 @@ class FilteringRoutesTest extends {
     val addedFilter1 = PostAsAdmin("/api/filtering/filters", filter) ~> routes ~> check {
       responseAs[TagFilterSpec]
     }
-    val addedFilter2 = PostAsAdmin("/api/filtering/filters", filter.copy(name = "Something else", tags = Seq())) ~> routes ~> check {
+    val addedFilter2 = PostAsAdmin("/api/filtering/filters", filter.copy(name = "Something else", tagPaths = Seq())) ~> routes ~> check {
       responseAs[TagFilterSpec]
     }
     DeleteAsAdmin(s"/api/filtering/filters/${addedFilter1.id}") ~> routes ~> check {

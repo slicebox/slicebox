@@ -110,16 +110,19 @@ angular.module('slicebox.directives', [])
     return {
         restrict: 'E',
         templateUrl: '/assets/partials/directives/tagPathForm.html',
-        scope: {},
+        scope: {
+            tagPath: '='
+        },
         link: function($scope, $element, $attrs) {
             var emptyPath = { tag: null };
             $scope.uiState = {
                 sequences: [],
                 element: {},
-                tagPath: emptyPath,
                 noNested: $attrs.hasOwnProperty('noNested'),
                 noWildcards: $attrs.hasOwnProperty('noWildcards')
             };
+
+            $scope.tagPath = emptyPath;
 
             addEmptySequenceIfNeeded();
             updateTagPath();
@@ -183,9 +186,9 @@ angular.module('slicebox.directives', [])
                     };
                 }
                 if (tagPath) {
-                    $scope.uiState.tagPath = tagPath;
+                    $scope.tagPath = tagPath;
                 } else {
-                    $scope.uiState.tagPath = emptyPath;
+                    $scope.tagPath = emptyPath;
                 }
             }
         }
