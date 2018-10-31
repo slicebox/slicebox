@@ -105,7 +105,7 @@ angular.module('slicebox.directives', [])
 
 })
 
-.directive('tagPathForm', function($http, $q) {
+.directive('tagPathForm', function($http) {
 
     return {
         restrict: 'E',
