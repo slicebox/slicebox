@@ -35,26 +35,30 @@ angular.module('slicebox', [
                     return "";
                 }
 
-                var tagToString = function(tag) {
-                    if (!angular.isDefined(tag)) {
-                        throw Error("Invalid tag path: tag is not defined");
+                var tagToString = function(path) {
+                    if (!path || !(path.tag || path.name)) {
+                        throw Error("Invalid tag path: one of tag and name must be defined");
                     }
 
-                    var returnValue = tag.toString(16);
+                    if (path.name) {
+                        return path.name;
+                    } else {
+                        var returnValue = path.tag.toString(16);
 
-                    while (returnValue.length < 8) {
-                        returnValue = '0' + returnValue;
+                        while (returnValue.length < 8) {
+                            returnValue = '0' + returnValue;
+                        }
+                        returnValue = '(' + returnValue.slice(0, 4) + ',' + returnValue.slice(4) + ')';
+                        return returnValue.toUpperCase();
                     }
-                    returnValue = '(' + returnValue.slice(0, 4) + ',' + returnValue.slice(4) + ')';
-                    return returnValue.toUpperCase();
                 };
 
                 var toTagPathString = function(path, tail) {
                     var itemIndexSuffix = "";
-                    if (angular.isDefined(path.item)) {
+                    if (path.item) {
                         itemIndexSuffix = '[' + path.item + ']';
                     }
-                    var tagPrefix = tagToString(path.tag);
+                    var tagPrefix = tagToString(path);
                     if (tagPrefix.length === 0) {
                         throw Error("Invalid tag path");
                     }

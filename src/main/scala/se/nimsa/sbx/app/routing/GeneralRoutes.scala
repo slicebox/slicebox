@@ -36,7 +36,7 @@ import se.nimsa.sbx.user.UserProtocol._
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
-import se.nimsa.dicom.data.Dictionary
+import se.nimsa.dicom.data.{Dictionary, VR}
 
 trait GeneralRoutes {
   this: SliceboxBase =>
@@ -100,6 +100,15 @@ trait GeneralRoutes {
       }
     }
 
+  private[this] lazy val keywords = Dictionary.keywords()
+  private[this] lazy val (sequenceKeywords, nonSequenceKeywords) =
+    Dictionary.keywords().partition(w => Dictionary.vrOf(Dictionary.tagOf(w)) == VR.SQ)
+
+  private[this] def filteredKeywords(filterMaybe: Option[String], keywords: List[String]): DicomDictionaryKeywords =
+    filterMaybe
+      .map(filter => DicomDictionaryKeywords(keywords.filter(_.toLowerCase.contains(filter.toLowerCase))))
+      .getOrElse(DicomDictionaryKeywords(keywords))
+
   def publicSystemRoutes: Route =
     pathPrefix("system") {
       path("health") {
@@ -108,15 +117,15 @@ trait GeneralRoutes {
         complete(systemInformation)
       }
     } ~ pathPrefix("dicom" / "dictionary") {
-      lazy val keywords = Dictionary.keywords()
-
       get {
-        path("keywords") {
+        pathPrefix("keywords") {
           parameter('filter.?) { filterMaybe =>
-            filterMaybe.map { filter =>
-              complete(DicomDictionaryKeywords(keywords.filter(_.toLowerCase.contains(filter.toLowerCase))))
-            }.getOrElse {
-              complete(DicomDictionaryKeywords(keywords))
+            pathEndOrSingleSlash {
+              complete(filteredKeywords(filterMaybe, keywords))
+            } ~ path("sequence") {
+              complete(filteredKeywords(filterMaybe, sequenceKeywords))
+            } ~ path("nonsequence") {
+              complete(filteredKeywords(filterMaybe, nonSequenceKeywords))
             }
           }
         } ~ parameter('tag.as[Int]) { tag =>

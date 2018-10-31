@@ -128,6 +128,6 @@ td.table-cell:last-child {
 	margin-left: 20px;
 }
 
-.tag-path-form md-input-container.tight {
+.tag-path-form md-input-container {
     margin: 0;
 }

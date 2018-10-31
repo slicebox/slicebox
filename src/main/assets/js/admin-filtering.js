@@ -272,7 +272,7 @@ angular.module('slicebox.adminFiltering', ['ngRoute'])
 
     // Scope functions
     $scope.addButtonClicked = function() {
-        var filterObject = { id: -1, name: $scope.filterName, tagFilterType: $scope.filterType, tags: []};
+        var filterObject = { id: -1, name: $scope.filterName, tagFilterType: $scope.filterType, tagPaths: []};
         if (filterObject.tagFilterType === "WHITELIST") {
             filterObject.tagPaths = [
                 {tag: 'FileMetaInformationGroupLength'},

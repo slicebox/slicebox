@@ -105,7 +105,7 @@ angular.module('slicebox.directives', [])
 
 })
 
-.directive('tagPathForm', function() {
+.directive('tagPathForm', function($http, $q) {
 
     return {
         restrict: 'E',
@@ -114,12 +114,19 @@ angular.module('slicebox.directives', [])
             tagPath: '='
         },
         link: function($scope, $element, $attrs) {
-            var emptyPath = { tag: null };
+            var tagRegEx = /^\(?[0-9]{4},?[0-9]{4}\)?$/;
+            var replaceRegEx = /\(|\)|,/g;
+            var allItemIndices = ["*","1", "2", "3", "4", "5", "6", "7", "8", "9"];
+            var noNested = $attrs.hasOwnProperty('noNested');
+            var noWildcards = $attrs.hasOwnProperty('noWildcards');
+            var emptyPath = { tag: null, name: null };
+
             $scope.uiState = {
+                itemIndices: noWildcards ? allItemIndices.splice(0, 1) : allItemIndices,
                 sequences: [],
-                element: {},
-                noNested: $attrs.hasOwnProperty('noNested'),
-                noWildcards: $attrs.hasOwnProperty('noWildcards')
+                tag: null,
+                noNested: noNested,
+                noWildcards: noWildcards
             };
 
             $scope.tagPath = emptyPath;
@@ -128,67 +135,118 @@ angular.module('slicebox.directives', [])
             updateTagPath();
 
             // scope functions
+
+            $scope.getMatchingTagKeywords = function(text) {
+                return $http.get('/api/dicom/dictionary/keywords/nonsequence?filter=' + text).then(function (response) {
+                    return response.data.keywords;
+                });
+            };
+
+            $scope.getMatchingSequenceKeywords = function(text) {
+                return $http.get('/api/dicom/dictionary/keywords/sequence?filter=' + text).then(function (response) {
+                    return response.data.keywords;
+                });
+            };
+
             $scope.removeSequence = function(index) {
                 $scope.uiState.sequences.splice(index, 1);
                 updateTagPath();
             };
 
-            $scope.sequenceTagChanged = function() {
+            $scope.sequenceKeywordSelected = function(keyword, index) {
+                var s = $scope.uiState.sequences[index];
+                s.tag = null;
+                if (keyword && keyword.length > 0) {
+                    s.name = keyword;
+                } else {
+                    s.name = null;
+                }
+                addEmptySequenceIfNeeded();
+                updateTagPath();
+            };
+
+            $scope.sequenceTagChanged = function(text, index) {
+                var s = $scope.uiState.sequences[index];
+                s.name = null;
+                if (text.match(tagRegEx)) {
+                    s.tag = text.replace(replaceRegEx, '');
+                } else {
+                    s.tag = null;
+                }
                 addEmptySequenceIfNeeded();
                 updateTagPath();
             };
 
             $scope.sequenceItemChanged = function() {
+                addEmptySequenceIfNeeded();
                 updateTagPath();
             };
 
-            $scope.elementTagChanged = function() {
-                updateTagPath();
-            };
-
-            // private functions
-            function addEmptySequenceIfNeeded() {
-                if ($scope.uiState.sequences.length === 0 || angular.isDefined($scope.uiState.sequences[$scope.uiState.sequences.length - 1].tag)) {
-                    $scope.uiState.sequences.push({});
+            $scope.tagKeywordSelected = function(keyword) {
+                if (keyword && keyword.length > 0) {
+                    $scope.uiState.tag = {tag: null, name: keyword};
+                } else {
+                    $scope.uiState.tag = null;
                 }
+                updateTagPath();
+            };
+
+            $scope.tagTagChanged = function(text) {
+                if (text.match(tagRegEx)) {
+                    $scope.uiState.tag = { tag: text.replace(replaceRegEx, ''), name: null };
+                } else {
+                    $scope.uiState.tag = null;
+                }
+                updateTagPath();
+            };
+
+            function addEmptySequenceIfNeeded() {
+                if ($scope.uiState.sequences.length === 0) {
+                    $scope.uiState.sequences.push({ item: null });
+                } else {
+                    var last = $scope.uiState.sequences[$scope.uiState.sequences.length - 1];
+                    if ((last.tag || last.name) && last.item) {
+                        $scope.uiState.sequences.push({ item: null });
+                    }
+                }
+            }
+
+            function parsePath(p, seqs, isNested) {
+                var name = p.name;
+                var tag = p.tag ? parseInt(p.tag, 16) : null;
+                if (isNaN(tag)) {
+                    tag = null;
+                }
+                if (!(name || tag) || isNested && !p.item) {
+                    return null;
+                }
+                if (isNested) {
+                    return {
+                        tag: tag,
+                        name: name,
+                        item: p.item,
+                        previous: addItem(seqs.slice(0, -1))
+                    };
+                }
+                return {
+                    tag: tag,
+                    name: name,
+                    previous: addItem(seqs.slice(0, -1))
+                };
             }
 
             function addItem(seqs) {
                 if (seqs.length === 0) {
                     return null;
                 }
-                var s = seqs[seqs.length - 1];
-                if (!angular.isDefined(s.tag)) {
-                    return null;
-                }
-
-                var tag = parseInt(s.tag, 16);
-                var item = !s.item || s.item === "x" ? "*" : s.item;
-                if (isNaN(tag)) {
-                    return null;
-                } else {
-                    return {
-                        tag: tag,
-                        item: item,
-                        previous: addItem(seqs.slice(0, -1))
-                    };
-                }
+                return parsePath(seqs[seqs.length - 1], seqs, true);
             }
+
             function updateTagPath() {
-                var tag = parseInt($scope.uiState.element.tag, 16);
-                var tagPath;
-                if (isNaN(tag)) {
-                    tagPath = addItem($scope.uiState.sequences.slice(0, -1));
+                if ($scope.uiState.tag) {
+                    $scope.tagPath = parsePath($scope.uiState.tag, $scope.uiState.sequences, false);
                 } else {
-                    tagPath = {
-                        tag: tag,
-                        previous: addItem($scope.uiState.sequences.slice(0, -1))
-                    };
-                }
-                if (tagPath) {
-                    $scope.tagPath = tagPath;
-                } else {
-                    $scope.tagPath = emptyPath;
+                    $scope.tagPath = addItem($scope.uiState.sequences.slice(0, -1));
                 }
             }
         }

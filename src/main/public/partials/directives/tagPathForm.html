@@ -1,67 +1,52 @@
-<div class="tag-path-form" layout="column">
+<md-content class="tag-path-form md-padding" layout="column">
 
-    <md-content ng-if="!uiState.noNested">
-        <md-card>
-            <md-card-title>
-                <md-card-title-text>
-                    <span class="md-subhead">Nesting</span>
-                </md-card-title-text>
-            </md-card-title>
-            <md-card-content>
-                <div ng-repeat="sequence in uiState.sequences">
+    <div layout="row">
+        <md-autocomplete flex
+                         md-floating-label="Tag"
+                         md-search-text="tagText"
+                         md-items="keyword in getMatchingTagKeywords(tagText)"
+                         md-search-text-change="tagTagChanged(tagText)"
+                         md-selected-item-change="tagKeywordSelected(keyword)"
+                         md-delay="700"
+                         md-min-length="3">
+            <md-item-template>
+                <span md-highlight-text="tagText">{{keyword}}</span>
+            </md-item-template>
+        </md-autocomplete>
+    </div>
 
-                    <div layout="row">
-                        <md-input-container class="tight">
-                            <input class="form-control"
-                                   ng-model="sequence.tag"
-                                   placeholder="Tag"
-                                   ng-change="sequenceTagChanged(sequence)"/>
-                        </md-input-container>
+    <div ng-if="!uiState.noNested">
+        <div ng-repeat="sequence in uiState.sequences">
+            <div layout="row">
+                <md-autocomplete flex=85
+                                 md-floating-label="Sequence Tag"
+                                 md-search-text="seqText"
+                                 md-items="keyword in getMatchingSequenceKeywords(seqText)"
+                                 md-search-text-change="sequenceTagChanged(seqText, $index)"
+                                 md-selected-item-change="sequenceKeywordSelected(keyword, $index)"
+                                 md-delay="700"
+                                 md-min-length="3">
+                    <md-item-template>
+                        <span md-highlight-text="seqText">{{keyword}}</span>
+                    </md-item-template>
+                </md-autocomplete>
 
-                        <md-input-container class="tight">
-                            <label>Item</label>
-                            <md-select ng-model="sequence.item"
-                                       ng-change="sequenceItemChanged(sequence)">
-                                <md-option ng-value="x" ng-if="!uiState.noWildcards">All</md-option>
-                                <md-option ng-value="1">1</md-option>
-                                <md-option ng-value="2">2</md-option>
-                                <md-option ng-value="3">3</md-option>
-                                <md-option ng-value="4">4</md-option>
-                                <md-option ng-value="5">5</md-option>
-                                <md-option ng-value="6">6</md-option>
-                                <md-option ng-value="7">7</md-option>
-                                <md-option ng-value="8">8</md-option>
-                                <md-option ng-value="9">9</md-option>
-                            </md-select>
-                        </md-input-container>
+                <md-input-container>
+                    <label>Item</label>
+                    <md-select ng-model="sequence.item"
+                               ng-change="sequenceItemChanged($index)">
+                        <md-option  ng-value="itemIndex" ng-repeat="itemIndex in uiState.itemIndices">{{itemIndex}}</md-option>
+                    </md-select>
+                </md-input-container>
 
-                        <md-button ng-if="sequence.tag" aria-label="delete" class="md-icon-button" ng-click="removeSequence($index)">
-                            <md-icon md-svg-src="/assets/images/ic_delete_24px.svg"></md-icon>
-                        </md-button>
-                    </div>
+                <div class="row">
+                    <md-button ng-if="$index < uiState.sequences.length - 1" aria-label="delete" class="md-icon-button"
+                               ng-click="removeSequence($index)">
+                        <md-icon md-svg-src="/assets/images/ic_clear_24px.svg"></md-icon>
+                    </md-button>
                 </div>
-            </md-card-content>
-        </md-card>
-    </md-content>
+            </div>
+        </div>
+    </div>
 
-    <md-content>
-        <md-card>
-            <md-card-title>
-                <md-card-title-text>
-                    <span class="md-subhead">Tag</span>
-                </md-card-title-text>
-            </md-card-title>
-            <md-card-content>
-                <div layout="row">
-                    <md-input-container md-no-float class="tight md-block">
-                        <input class="form-control"
-                               ng-model="uiState.element.tag"
-                               placeholder="Tag"
-                               ng-change="elementTagChanged(element)"/>
-                    </md-input-container>
-                </div>
-            </md-card-content>
-        </md-card>
-    </md-content>
-
-</div>
+</md-content>
