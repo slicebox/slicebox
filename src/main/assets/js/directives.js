@@ -331,6 +331,7 @@ angular.module('slicebox.directives', [])
                     reloadPage: loadPageData,
                     selectedActionObjects: selectedActionObjects,
                     clearSelection: clearSelection,
+                    clearActionSelection: clearActionSelection,
                     selectObject: selectObject
                 };
             }
@@ -797,6 +798,10 @@ angular.module('slicebox.directives', [])
 
             function clearSelection() {
                 $scope.uiState.selectedObject = null;
+            }
+
+            function clearActionSelection() {
+                $scope.uiState.objectActionSelection = [];
             }
 
             function performObjectAction(objectAction) {

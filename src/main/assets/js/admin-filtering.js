@@ -128,7 +128,7 @@ angular.module('slicebox.adminFiltering', ['ngRoute'])
 
     })
 
-    .controller('FilterDetailsCtrl', function($scope, $http, $mdDialog, $q, sbxToast) {
+    .controller('FilterDetailsCtrl', function($scope, $http, $mdDialog, $q, sbxToast, sbxUtil) {
         // Initialization
         $scope.state = {
             filterSpec: null
@@ -165,8 +165,17 @@ angular.module('slicebox.adminFiltering', ['ngRoute'])
 
 
         $scope.loadFilterTagPaths = function(startIndex, count) {
-            if ($scope.state.filterSpec)
-                return ($scope.state.filterSpec.tagPaths.slice(startIndex, startIndex + count) || []);
+            if ($scope.state.filterSpec) {
+                var id = 0;
+                return ($scope.state.filterSpec.tagPaths.slice(startIndex, startIndex + count) || [])
+                    .map(function (tagPath) {
+                        return {
+                            id: id++,
+                            tags: sbxUtil.tagPathToString(tagPath, 'tags'),
+                            names: sbxUtil.tagPathToString(tagPath, 'names')
+                        };
+                    });
+            }
             return [];
         };
 
@@ -233,17 +242,11 @@ angular.module('slicebox.adminFiltering', ['ngRoute'])
         }
 
         function removeTagPaths(tagPaths) {
-            var tagPathIndex;
-
-            angular.forEach(tagPaths, function(tagPath) {
-
-                tagPathIndex = $scope.state.filterSpec.tagPaths.indexOf(tagPath);
-                if (tagPathIndex >= 0) {
-                    $scope.state.filterSpec.tagPaths.splice(tagPathIndex, 1);
-                }
-            });
+            for (var i = tagPaths.length - 1; i >= 0; i--) {
+                $scope.state.filterSpec.tagPaths.splice(tagPaths[i].id, 1);
+            }
             saveFilter($scope.state.filterSpec).then(function() {
-                $scope.callbacks.filterTagPathTables.clearSelection();
+                $scope.callbacks.filterTagPathTables.clearActionSelection();
             });
         }
     })

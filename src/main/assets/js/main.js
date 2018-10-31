@@ -30,17 +30,19 @@ angular.module('slicebox', [
 
     this.$get = function() {
         return {
-            tagPathToString: function(tagPath) {
+            tagPathToString: function(tagPath, format) {
                 if (!tagPath) {
                     return "";
                 }
+
+                format = format === 'tags' || format === 'names' ? format : 'names';
 
                 var tagToString = function(path) {
                     if (!path || !(path.tag || path.name)) {
                         throw Error("Invalid tag path: one of tag and name must be defined");
                     }
 
-                    if (path.name) {
+                    if (format === 'names' && path.name) {
                         return path.name;
                     } else {
                         var returnValue = path.tag.toString(16);
