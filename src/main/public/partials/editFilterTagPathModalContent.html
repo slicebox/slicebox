@@ -1,0 +1,25 @@
+<md-dialog aria-label="Add tag path" flex="40">
+	<form name="editTagPathForm" ng-submit="saveTagPath()" novalidate>
+
+		<md-dialog-content>
+	  		<md-subheader class="md-sticky-no-effect">
+	  			<span ng-if="tagPath.id">Edit Tag Path</span>
+	  			<span ng-if="!tagPath.id">Add Tag Path</span>
+	  		</md-subheader>
+
+			<tag-path-form tag-path="tagPath"></tag-path-form>
+
+			<md-content class="md-padding">
+				<span class="md-body-2">Tag Path: </span><span class="md-body-1">{{ tagPath | tagPath }}</span>
+			</md-content>
+
+		</md-dialog-content>
+
+	  	<md-dialog-actions layout="row">
+	    	<span flex></span>
+	    	<md-button ng-click="cancelButtonClicked()">Cancel</md-button>
+			<md-button class="md-primary" type="submit" ng-disabled="!tagPath">OK</md-button>
+	    </md-dialog-actions>
+
+	 </form>
+ </md-dialog>

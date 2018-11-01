@@ -7,7 +7,7 @@ import akka.stream.scaladsl.{Source => StreamSource}
 import akka.testkit.{ImplicitSender, TestKit}
 import akka.util.Timeout
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
-import se.nimsa.dicom.data.{Keyword, Tag}
+import se.nimsa.dicom.data.{Dictionary, Tag}
 import se.nimsa.sbx.app.GeneralProtocol.{Source, SourceType}
 import se.nimsa.sbx.dicom.DicomHierarchy.Series
 import se.nimsa.sbx.metadata.MetaDataProtocol.{AddMetaData, MetaDataAdded}
@@ -210,7 +210,7 @@ class SeriesTypeUpdateActorTest(_system: ActorSystem) extends TestKit(_system) w
       SeriesTypeRuleAttribute(-1,
         seriesTypeRule.id,
         tag,
-        Keyword.valueOf(tag),
+        Dictionary.keywordOf(tag),
         None,
         None,
         values)))

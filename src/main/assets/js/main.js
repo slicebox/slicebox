@@ -26,7 +26,64 @@ angular.module('slicebox', [
     'slicebox.adminSystem'
 ])
 
-.config(function($locationProvider, $routeProvider, $mdThemingProvider, $filterProvider, $httpProvider) {
+.provider('sbxUtil', function() {
+
+    this.$get = function() {
+        return {
+            tagPathToString: function(tagPath, format) {
+                if (!tagPath) {
+                    return "";
+                }
+
+                format = format === 'tags' || format === 'names' ? format : 'names';
+
+                var tagToString = function(path) {
+                    if (!path || !(path.tag || path.name)) {
+                        throw Error("Invalid tag path: one of tag and name must be defined");
+                    }
+
+                    if (format === 'names' && path.name) {
+                        return path.name;
+                    } else {
+                        var returnValue = path.tag.toString(16);
+
+                        while (returnValue.length < 8) {
+                            returnValue = '0' + returnValue;
+                        }
+                        returnValue = '(' + returnValue.slice(0, 4) + ',' + returnValue.slice(4) + ')';
+                        return returnValue.toUpperCase();
+                    }
+                };
+
+                var toTagPathString = function(path, tail) {
+                    var itemIndexSuffix = "";
+                    if (path.item) {
+                        itemIndexSuffix = '[' + path.item + ']';
+                    }
+                    var tagPrefix = tagToString(path);
+                    if (tagPrefix.length === 0) {
+                        throw Error("Invalid tag path");
+                    }
+                    var head = tagPrefix + itemIndexSuffix;
+                    var part = head + tail;
+                    if (!path.previous) {
+                        return part;
+                    } else {
+                        return toTagPathString(path.previous, "." + part);
+                    }
+                };
+
+                try {
+                    return toTagPathString(tagPath, "");
+                } catch(err) {
+                    return "";
+                }
+            }
+        };
+    };
+})
+
+.config(function($locationProvider, $routeProvider, $mdThemingProvider, $filterProvider, $httpProvider, sbxUtilProvider) {
     $locationProvider.html5Mode(true);
     $routeProvider.otherwise({redirectTo: '/'});
 
@@ -61,6 +118,10 @@ angular.module('slicebox', [
 
             return returnValue;
         };
+    });
+
+    $filterProvider.register('tagPath', function() {
+        return sbxUtilProvider.$get().tagPathToString;
     });
 
     $httpProvider.interceptors.push(function($q, $location) {

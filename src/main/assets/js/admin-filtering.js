@@ -36,17 +36,17 @@ angular.module('slicebox.adminFiltering', ['ngRoute'])
         $scope.callbacks = {
             associationsTable: {},
             filtersTable: {},
-            filterAttributesTables: {}
+            filterTagPathTables: {}
         };
 
         // Scope functions
-        $scope.loadSourceFilterAssociations = function(startIndex, count, orderByProperty, orderByDirection) {
+        $scope.loadSourceFilterAssociations = function(startIndex, count) {
             var promises = {};
             promises.associations = ($http.get('/api/filtering/associations?startindex=' + startIndex + '&count=' + count));
             promises.sources = ($http.get("/api/sources"));
             promises.filters = ($http.get("/api/filtering/filters?count=100000"));
-            var combinedPromise = $q.all(promises).then(function(promisesResult) {
-                var resultArray = promisesResult.associations.data.map(function(association) {
+            return $q.all(promises).then(function(promisesResult) {
+                return promisesResult.associations.data.map(function(association) {
                     var source = promisesResult.sources.data.find(function(s) {
                         return (s.sourceId === association.sourceId && s.sourceType === association.sourceType);
                     });
@@ -56,14 +56,10 @@ angular.module('slicebox.adminFiltering', ['ngRoute'])
                     association.filterType = filter.tagFilterType;
                     return association;
                 });
-
-                return resultArray;
             });
-
-            return combinedPromise;
         };
 
-        $scope.loadFilters = function(startIndex, count, orderByProperty, orderByDirection) {
+        $scope.loadFilters = function(startIndex, count) {
             return $http.get('/api/filtering/filters?startindex=' + startIndex + '&count=' + count);
         };
 
@@ -88,7 +84,7 @@ angular.module('slicebox.adminFiltering', ['ngRoute'])
                 }
                 $scope.callbacks.filtersTable.clearSelection();
                 $scope.callbacks.filtersTable.reloadPage();
-                $scope.callbacks.filterAttributesTables.reloadPage();
+                $scope.callbacks.filterTagPathTables.reloadPage();
                 $scope.callbacks.associationsTable.reloadPage();
             });
         }
@@ -132,16 +128,16 @@ angular.module('slicebox.adminFiltering', ['ngRoute'])
 
     })
 
-    .controller('FilterDetailsCtrl', function($scope, $http, $mdDialog, $q, sbxToast) {
+    .controller('FilterDetailsCtrl', function($scope, $http, $mdDialog, $q, sbxToast, sbxUtil) {
         // Initialization
         $scope.state = {
             filterSpec: null
         };
 
-        $scope.attributeActions = [
+        $scope.tagPathActions = [
             {
                 name: 'Remove',
-                action: removeAttributes
+                action: removeTagPaths
             }
         ];
 
@@ -149,32 +145,37 @@ angular.module('slicebox.adminFiltering', ['ngRoute'])
             resetState();
         });
 
-        $scope.addFilterAttributeButtonClicked = function() {
-            var newAttribute = {};
-
+        $scope.addFilterTagPathButtonClicked = function() {
             var dialogPromise = $mdDialog.show({
-                templateUrl: '/assets/partials/editFilterAttributeModalContent.html',
-                controller: 'EditSeriesTypeRuleAttributeModalCtrl',
+                templateUrl: '/assets/partials/editFilterTagPathModalContent.html',
+                controller: 'EditFilterTagPathModalCtrl',
                 locals: {
-                    attribute: newAttribute
+                    tagPath: {}
                 }
             });
 
-            dialogPromise.then(function () {
-                if ($scope.state.filterSpec.tags.map(function(t) {return t.tag;}).includes(newAttribute.tag)) //Don't include tag twice
-                    return;
-                $scope.state.filterSpec.tags.push(newAttribute);
-                $scope.state.filterSpec.tags = $scope.state.filterSpec.tags.sort(function(a, b) {return a.tag - b.tag;});
-                saveFilter($scope.state.filterSpec).then(function() {
-                    $scope.callbacks.filterAttributesTables.reloadPage();
+            dialogPromise.then(function (tagPath) {
+                $scope.state.filterSpec.tagPaths.push(tagPath);
+                saveFilter($scope.state.filterSpec).then(function(filterSpecData) {
+                    $scope.state.filterSpec = filterSpecData.data;
+                    $scope.callbacks.filterTagPathTables.reloadPage();
                 });
             });
         };
 
 
-        $scope.loadFilterAttributes = function(startIndex, count) {
-            if ($scope.state.filterSpec)
-                return ($scope.state.filterSpec.tags.slice(startIndex, startIndex + count) || []);
+        $scope.loadFilterTagPaths = function(startIndex, count) {
+            if ($scope.state.filterSpec) {
+                var id = 0;
+                return ($scope.state.filterSpec.tagPaths.slice(startIndex, startIndex + count) || [])
+                    .map(function (tagPath) {
+                        return {
+                            id: id++,
+                            tags: sbxUtil.tagPathToString(tagPath, 'tags'),
+                            names: sbxUtil.tagPathToString(tagPath, 'names')
+                        };
+                    });
+            }
             return [];
         };
 
@@ -202,7 +203,7 @@ angular.module('slicebox.adminFiltering', ['ngRoute'])
                 }
 
                 resetState();
-                $scope.callbacks.filterAttributesTables.reloadPage();
+                $scope.callbacks.filterTagPathTables.reloadPage();
 
             }, function(error) {
                 sbxToast.showErrorMessage(error);
@@ -233,44 +234,38 @@ angular.module('slicebox.adminFiltering', ['ngRoute'])
                 .success(function(filter) {
                     $scope.state.filterSpec = filter;
                     $scope.state.originalFilterSpec = angular.copy(filter);
-                    $scope.callbacks.filterAttributesTables.reloadPage();
+                    $scope.callbacks.filterTagPathTables.reloadPage();
                 })
                 .error(function(error) {
                     sbxToast.showErrorMessage('Failed to load filter: ' + error);
                 });
         }
 
-        function removeAttributes(attributes) {
-            var attributeIndex;
-
-            angular.forEach(attributes, function(attribute) {
-
-                attributeIndex = $scope.state.filterSpec.tags.indexOf(attribute);
-                if (attributeIndex >= 0) {
-                    $scope.state.filterSpec.tags.splice(attributeIndex, 1);
-                }
-            });
+        function removeTagPaths(tagPaths) {
+            for (var i = tagPaths.length - 1; i >= 0; i--) {
+                $scope.state.filterSpec.tagPaths.splice(tagPaths[i].id, 1);
+            }
             saveFilter($scope.state.filterSpec).then(function() {
-                $scope.callbacks.filterAttributesTables.clearSelection();
+                $scope.callbacks.filterTagPathTables.clearActionSelection();
             });
         }
     })
 
-    .controller('EditFilterAttributeModalCtrl', function($scope, $mdDialog, attribute) {
+    .controller('EditFilterTagPathModalCtrl', function($scope, $mdDialog, tagPath) {
         // Initialization
-        $scope.attribute = attribute;
+        $scope.tagPath = tagPath;
 
         // Scope functions
         $scope.cancelButtonClicked = function() {
             $mdDialog.cancel();
         };
 
-        $scope.saveAttribute = function() {
-            if ($scope.editAttributeForm.$invalid) {
+        $scope.saveTagPath = function() {
+            if ($scope.editTagPathForm.$invalid) {
                 return;
             }
 
-            $mdDialog.hide();
+            $mdDialog.hide($scope.tagPath);
         };
     })
 
@@ -280,42 +275,42 @@ angular.module('slicebox.adminFiltering', ['ngRoute'])
 
     // Scope functions
     $scope.addButtonClicked = function() {
-        var filterObject = { id: -1, name: $scope.filterName, tagFilterType: $scope.filterType, tags: []};
+        var filterObject = { id: -1, name: $scope.filterName, tagFilterType: $scope.filterType, tagPaths: []};
         if (filterObject.tagFilterType === "WHITELIST") {
-            filterObject.tags = [
-                {tag: 131072},		//FileMetaInformationGroupLength
-                {tag: 131073},		//FileMetaInformationVersion
-                {tag: 131074},		//MediaStorageSOPClassUID
-                {tag: 131075},		//MediaStorageSOPInstanceUID
-                {tag: 131088},		//TransferSyntaxUID
-                {tag: 131090},		//ImplementationClassUID
-                {tag: 524296},		//ImageType
-                {tag: 524310},		//SOPClassUID
-                {tag: 524312},		//SOPInstanceUID
-                {tag: 524320},		//StudyDate
-                {tag: 524321},		//SeriesDate
-                {tag: 524368},		//AccessionNumber
-                {tag: 524384},		//Modality
-                {tag: 528432},		//StudyDescription
-                {tag: 528446},		//SeriesDescription
-                {tag: 1048592},		//PatientName
-                {tag: 1048608},		//PatientID
-                {tag: 1048624},		//PatientBirthDate
-                {tag: 1048640},		//PatientSex
-                {tag: 1052688},		//PatientAge
-                {tag: 1577008},		//ProtocolName
-                {tag: 2097165},		//StudyInstanceUID
-                {tag: 2097166},		//SeriesInstanceUID
-                {tag: 2097168},		//StudyID
-                {tag: 2621442},		//SamplesPerPixel
-                {tag: 2621444},		//PhotometricInterpretation
-                {tag: 2621456},		//Rows
-                {tag: 2621457},		//Columns
-                {tag: 2621696},		//BitsAllocated
-                {tag: 2621697},		//BitsStored
-                {tag: 2621698},		//HighBit
-                {tag: 2621699},		//PixelRepresentation
-                {tag: 2145386512},	//PixelData
+            filterObject.tagPaths = [
+                {name: 'FileMetaInformationGroupLength'},
+                {name: 'FileMetaInformationVersion'},
+                {name: 'MediaStorageSOPClassUID'},
+                {name: 'MediaStorageSOPInstanceUID'},
+                {name: 'TransferSyntaxUID'},
+                {name: 'ImplementationClassUID'},
+                {name: 'ImageType'},
+                {name: 'SOPClassUID'},
+                {name: 'SOPInstanceUID'},
+                {name: 'StudyDate'},
+                {name: 'SeriesDate'},
+                {name: 'AccessionNumber'},
+                {name: 'Modality'},
+                {name: 'StudyDescription'},
+                {name: 'SeriesDescription'},
+                {name: 'PatientName'},
+                {name: 'PatientID'},
+                {name: 'PatientBirthDate'},
+                {name: 'PatientSex'},
+                {name: 'PatientAge'},
+                {name: 'ProtocolName'},
+                {name: 'StudyInstanceUID'},
+                {name: 'SeriesInstanceUID'},
+                {name: 'StudyID'},
+                {name: 'SamplesPerPixel'},
+                {name: 'PhotometricInterpretation'},
+                {name: 'Rows'},
+                {name: 'Columns'},
+                {name: 'BitsAllocated'},
+                {name: 'BitsStored'},
+                {name: 'HighBit'},
+                {name: 'PixelRepresentation'},
+                {name: 'PixelData'}
                 ];
         }
         $mdDialog.hide(filterObject);

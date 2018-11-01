@@ -30,7 +30,7 @@ import org.dcm4che3.imageio.plugins.dcm.DicomImageReadParam
 import se.nimsa.dicom.data.DicomParts._
 import se.nimsa.dicom.data.Elements._
 import se.nimsa.dicom.data.TagPath.TagPathTag
-import se.nimsa.dicom.data.{DicomParsing, Elements, Keyword, _}
+import se.nimsa.dicom.data.{DicomParsing, Elements, Dictionary, _}
 import se.nimsa.dicom.streams.CollectFlow._
 import se.nimsa.dicom.streams.DicomFlows._
 import se.nimsa.dicom.streams.ElementFlows._
@@ -214,13 +214,13 @@ trait DicomStreamOps {
               case tp => tp.previous.thenTag(tp.tag) // should not happen
             }
             val tagPathTags = tagPath.toList.map(_.tag)
-            val namePath = tagPathTags.init.map(Keyword.valueOf)
+            val namePath = tagPathTags.init.map(Dictionary.keywordOf)
 
             ImageAttribute(
               tag,
               groupNumber(tag),
               elementNumber(tag),
-              Keyword.valueOf(tag),
+              Dictionary.keywordOf(tag),
               element.vr.toString,
               multiplicity,
               length,

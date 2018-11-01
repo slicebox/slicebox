@@ -37,22 +37,22 @@
                     <md-content class="md-padding" style="height: 435px">
                         <h4>{{state.filterSpec.name}}</h4>
                         <sbx-grid
-                                load-page="loadFilterAttributes(startIndex, count)"
-                                object-actions="attributeActions"
+                                load-page="loadFilterTagPaths(startIndex, count)"
+                                object-actions="tagPathActions"
                                 page-size="5"
                                 refresh-button="true"
                                 sorting="false"
-                                callbacks="callbacks.filterAttributesTables"
-                                empty-message="No attributes added">
+                                callbacks="callbacks.filterTagPathTables"
+                                empty-message="No Tag Paths added">
 
-                            <sbx-grid-column property="tag" title="Tag" filter="hexvalue: 8">
-                            </sbx-grid-column>
+                            <sbx-grid-column title="Tag Path (tags)" property="tags"></sbx-grid-column>
+                            <sbx-grid-column title="Tag Path (names)" property="names"></sbx-grid-column>
 
                         </sbx-grid>
                         <div layout="row" class="button-row">
                             <md-button md-no-ink class="md-primary md-raised" type="button"
-                                       ng-click="addFilterAttributeButtonClicked()">
-                                Add Attribute
+                                       ng-click="addFilterTagPathButtonClicked()">
+                                Add Tag Path
                             </md-button>
                         </div>
                     </md-content>

@@ -60,7 +60,7 @@ class FilteringServiceActorTest(_system: ActorSystem) extends TestKit(_system) w
       val filter2 = expectMsgType[TagFilterAdded].filterSpecification
 
       filteringService ! GetTagFilters(0, 10)
-      expectMsg(TagFilterSpecs(List(filter1.copy(tags = Seq()), filter2.copy(tags = Seq()))))
+      expectMsg(TagFilterSpecs(List(filter1.copy(tagPaths = Seq()), filter2.copy(tagPaths = Seq()))))
     }
 
     "associate source with TagFilter" in {
@@ -112,7 +112,7 @@ class FilteringServiceActorTest(_system: ActorSystem) extends TestKit(_system) w
       filteringService ! GetTagFilter(filter1.id)
       expectMsg(Some(filter1))
 
-      val updatedTagFilterSpec = filter1.copy(tagFilterType = TagFilterType.BLACKLIST, tags=Seq(TagPath.fromTag(0x00100010), TagPath.fromTag(0x00100020)))
+      val updatedTagFilterSpec = filter1.copy(tagFilterType = TagFilterType.BLACKLIST, tagPaths=Seq(TagPath.fromTag(0x00100010), TagPath.fromTag(0x00100020)))
 
       filteringService ! AddTagFilter(updatedTagFilterSpec.copy(id = -1))
 
@@ -131,7 +131,7 @@ class FilteringServiceActorTest(_system: ActorSystem) extends TestKit(_system) w
       expectMsg(Some(emptyFilter))
 
       //Update with tag(s)
-      val tempTagFilterSpec1 = emptyFilter.copy(tags = Seq(TagPath.fromTag(0x00100010)))
+      val tempTagFilterSpec1 = emptyFilter.copy(tagPaths = Seq(TagPath.fromTag(0x00100010)))
       filteringService ! AddTagFilter(tempTagFilterSpec1)
       expectMsg(TagFilterAdded(tempTagFilterSpec1))
       filteringService ! GetTagFilter(tempTagFilterSpec1.id)

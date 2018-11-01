@@ -1,7 +1,6 @@
 package se.nimsa.sbx.filtering
 
 import se.nimsa.dicom.data.TagPath
-import se.nimsa.dicom.data.TagPath.TagPathTag
 import se.nimsa.sbx.app.GeneralProtocol.{SourceRef, SourceType}
 import se.nimsa.sbx.filtering.FilteringProtocol._
 import se.nimsa.sbx.util.DbUtil.createTables
@@ -17,10 +16,10 @@ class FilteringDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executi
 
   val db = dbConf.db
 
-  implicit val tagPathColumnType: BaseColumnType[TagPathTag] =
-    MappedColumnType.base[TagPathTag, String](
+  implicit val tagPathColumnType: BaseColumnType[TagPath] =
+    MappedColumnType.base[TagPath, String](
       tagPath => tagPath.toString, // map TagPathTag to String
-      tagPathString => TagPath.parse(tagPathString).asInstanceOf[TagPathTag] // map String to TagPathTag
+      tagPathString => TagPath.parse(tagPathString) // map String to TagPath
     )
 
   implicit val tagFilterTypeColumnType: BaseColumnType[TagFilterType] =
@@ -47,7 +46,7 @@ class FilteringDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executi
   class TagPathTable(tag: Tag) extends Table[TagFilterTagPath](tag, TagPathTable.name) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def tagFilterId = column[Long]("tagfilterid")
-    def tagPath = column[TagPathTag]("tagpath")
+    def tagPath = column[TagPath]("tagpath")
     def fkTagFilter = foreignKey("fk_tag_filter", tagFilterId, tagFilterQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
     def * = (id, tagFilterId, tagPath) <> (TagFilterTagPath.tupled, TagFilterTagPath.unapply)
   }
@@ -86,12 +85,12 @@ class FilteringDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executi
     val tagFilterRow = TagFilter(tagFilter.id, tagFilter.name, tagFilter.tagFilterType)
     val insertAction = for {
       tfr <- insertTagFilterAction(tagFilterRow)
-      _ <- replaceTagFilterTagPathAction(tfr.id, tagFilter.tags.map(tftp => TagFilterTagPath(-1, tfr.id, tftp)))
+      _ <- replaceTagFilterTagPathAction(tfr.id, tagFilter.tagPaths.map(tftp => TagFilterTagPath(-1, tfr.id, tftp)))
     } yield tfr
     db.run {
       getTagFilterByNameAction(tagFilter.name).flatMap {
         _.map {t =>
-          replaceTagFilterTagPathAction(t.id, tagFilter.tags.map(tftp => TagFilterTagPath(-1, t.id, tftp))) andThen
+          replaceTagFilterTagPathAction(t.id, tagFilter.tagPaths.map(tftp => TagFilterTagPath(-1, t.id, tftp))) andThen
           updateTagFilterAction(tagFilterRow.copy(id = t.id)).map(_ => tagFilterRow.copy(id = t.id))
         }.getOrElse {
           insertAction

@@ -88,4 +88,11 @@ object GeneralProtocol {
 
   case class ImagesSent(destination: Destination, imageIds: Seq[Long])
 
+  case class DicomDictionaryKeyword(keyword: String)
+
+  case class DicomDictionaryTag(tag: Int)
+
+  case class DicomDictionaryKeywords(keywords: List[String])
+
+  case class DicomValueRepresentation(name: String, code: Int)
 }

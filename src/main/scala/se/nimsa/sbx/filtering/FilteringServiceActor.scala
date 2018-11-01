@@ -22,36 +22,56 @@ class FilteringServiceActor(filteringDAO: FilteringDAO) extends Actor with Stash
 
   def receive: Receive = LoggingReceive {
     case AddTagFilter(tagFilterSpec) =>
-      filteringDAO.createOrUpdateTagFilter(tagFilterSpec).map(TagFilterAdded).pipeSequentiallyTo(sender)
+      filteringDAO.createOrUpdateTagFilter(toDistinct(tagFilterSpec))
+        .map(spec => TagFilterAdded(toSorted(spec)))
+        .pipeSequentiallyTo(sender)
 
     case GetTagFilters(startIndex, count) =>
-      val filtersFuture = filteringDAO.listTagFilters(startIndex, count)
-      pipe(filtersFuture.map(_.map(TagFilterSpec(_))).map(TagFilterSpecs)).to(sender)
+      filteringDAO.listTagFilters(startIndex, count)
+        .map(_.map(TagFilterSpec(_)))
+        .map(TagFilterSpecs)
+        .pipeTo(sender)
 
     case RemoveTagFilter(tagFilterId) =>
-      filteringDAO.removeTagFilter(tagFilterId).map(_ => TagFilterRemoved(tagFilterId)).pipeSequentiallyTo(sender)
+      filteringDAO.removeTagFilter(tagFilterId).map(_ => TagFilterRemoved(tagFilterId))
+        .pipeSequentiallyTo(sender)
 
     case GetTagFilter(tagFilterId) =>
-      pipe(filteringDAO.getTagFilter(tagFilterId)).to(sender)
+      filteringDAO.getTagFilter(tagFilterId)
+        .map(_.map(toSorted))
+        .pipeTo(sender)
 
     case GetFilterForSource(source) =>
-      pipe(filteringDAO.getTagFilterForSource(source)).to(sender)
+      filteringDAO.getTagFilterForSource(source)
+        .pipeTo(sender)
 
     case AddSourceFilterAssociation(sourceTagFilter) =>
-      filteringDAO.createOrUpdateSourceFilter(sourceTagFilter).pipeSequentiallyTo(sender)
+      filteringDAO.createOrUpdateSourceFilter(sourceTagFilter)
+        .pipeSequentiallyTo(sender)
 
     case RemoveSourceTagFilter(sourceFilterId) =>
-      filteringDAO.removeSourceFilter(sourceFilterId).map(_ => SourceTagFilterRemoved()).pipeSequentiallyTo(sender)
+      filteringDAO.removeSourceFilter(sourceFilterId)
+        .map(_ => SourceTagFilterRemoved())
+        .pipeSequentiallyTo(sender)
 
     case RemoveFilterForSource(sourceRef) =>
-      filteringDAO.removeSourceFilter(sourceRef).map(_ => SourceTagFilterRemoved()).pipeSequentiallyTo(sender)
+      filteringDAO.removeSourceFilter(sourceRef)
+        .map(_ => SourceTagFilterRemoved())
+        .pipeSequentiallyTo(sender)
 
     case SourceDeleted(sourceRef) =>
-      filteringDAO.removeSourceFilter(sourceRef).map(_ => SourceTagFilterRemoved()).pipeSequentiallyTo(sender)
+      filteringDAO.removeSourceFilter(sourceRef)
+        .map(_ => SourceTagFilterRemoved())
+        .pipeSequentiallyTo(sender)
 
     case GetSourceTagFilters(startIndex, count) =>
-      pipe(filteringDAO.listSourceTagFilters(startIndex, count).map(SourceTagFilters)).to(sender)
+      filteringDAO.listSourceTagFilters(startIndex, count)
+        .map(SourceTagFilters)
+        .pipeTo(sender)
   }
+
+  private def toDistinct(spec: TagFilterSpec): TagFilterSpec = spec.copy(tagPaths = spec.tagPaths.distinct)
+  private def toSorted(spec: TagFilterSpec): TagFilterSpec = spec.copy(tagPaths = spec.tagPaths.sortWith(_ < _))
 }
 
 object FilteringServiceActor {

@@ -36,6 +36,7 @@ import se.nimsa.sbx.user.UserProtocol._
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
+import se.nimsa.dicom.data.{Dictionary, VR}
 
 trait GeneralRoutes {
   this: SliceboxBase =>
@@ -77,6 +78,7 @@ trait GeneralRoutes {
               dirs.directories.map(dir => Source(SourceType.DIRECTORY, dir.name, dir.id)) ++
               imports.importSessions.map(importSession => Source(SourceType.IMPORT, importSession.name, importSession.id))
           }
+
         onSuccess(futureSources) {
           complete(_)
         }
@@ -91,11 +93,21 @@ trait GeneralRoutes {
             boxes.boxes.map(box => Destination(DestinationType.BOX, box.name, box.id)) ++
               scus.scus.map(scu => Destination(DestinationType.SCU, scu.name, scu.id))
           }
+
         onSuccess(futureDestinations) {
           complete(_)
         }
       }
     }
+
+  private[this] lazy val keywords = Dictionary.keywords()
+  private[this] lazy val (sequenceKeywords, nonSequenceKeywords) =
+    Dictionary.keywords().partition(w => Dictionary.vrOf(Dictionary.tagOf(w)) == VR.SQ)
+
+  private[this] def filteredKeywords(filterMaybe: Option[String], keywords: List[String]): DicomDictionaryKeywords =
+    filterMaybe
+      .map(filter => DicomDictionaryKeywords(keywords.filter(_.toLowerCase.contains(filter.toLowerCase))))
+      .getOrElse(DicomDictionaryKeywords(keywords))
 
   def publicSystemRoutes: Route =
     pathPrefix("system") {
@@ -103,6 +115,43 @@ trait GeneralRoutes {
         complete(OK)
       } ~ path("information") {
         complete(systemInformation)
+      }
+    } ~ pathPrefix("dicom" / "dictionary") {
+      get {
+        pathPrefix("keywords") {
+          parameter('filter.?) { filterMaybe =>
+            pathEndOrSingleSlash {
+              complete(filteredKeywords(filterMaybe, keywords))
+            } ~ path("sequence") {
+              complete(filteredKeywords(filterMaybe, sequenceKeywords))
+            } ~ path("nonsequence") {
+              complete(filteredKeywords(filterMaybe, nonSequenceKeywords))
+            }
+          }
+        } ~ parameter('tag.as[Int]) { tag =>
+          path("vr") {
+            val vr = Dictionary.vrOf(tag)
+            complete(DicomValueRepresentation(vr.toString, vr.code))
+          } ~ path("vm") {
+            complete(Dictionary.vmOf(tag))
+          } ~ path("keyword") {
+            val keyword = Dictionary.keywordOf(tag)
+            if (keyword.isEmpty)
+              complete(NotFound)
+            else
+              complete(DicomDictionaryKeyword(keyword))
+          }
+        } ~ parameter('keyword) { keyword =>
+          path("tag") {
+            try {
+              val tag = Dictionary.tagOf(keyword)
+              complete(DicomDictionaryTag(tag))
+            } catch {
+              case _: IllegalArgumentException =>
+                complete(NotFound)
+            }
+          }
+        }
       }
     }
 }
