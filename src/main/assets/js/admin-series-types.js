@@ -63,7 +63,7 @@ angular.module('slicebox.adminSeriesTypes', ['ngRoute'])
 	$scope.state = {};
 	$scope.state.rules = [];
 
-	$scope.attributeActions = [
+	$scope.tagPathActions = [
 			{
                 name: 'Remove',
                 action: removeAttribues
@@ -386,7 +386,7 @@ angular.module('slicebox.adminSeriesTypes', ['ngRoute'])
 		$mdDialog.cancel();
 	};
 
-	$scope.saveAttribute = function() {
+	$scope.saveTagPath = function() {
 		if ($scope.editAttributeForm.$invalid) {
 			return;
 		}

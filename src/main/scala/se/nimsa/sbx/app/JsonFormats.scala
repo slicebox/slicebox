@@ -22,8 +22,8 @@ import akka.util.ByteString
 import play.api.libs.functional.syntax._
 import play.api.libs.json.Reads._
 import play.api.libs.json._
-import se.nimsa.dicom.data.TagPath
 import se.nimsa.dicom.data.TagPath._
+import se.nimsa.dicom.data.{Dictionary, Multiplicity, TagPath}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.box.BoxProtocol._
@@ -31,6 +31,7 @@ import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomPropertyValue._
 import se.nimsa.sbx.dicom.ImageAttribute
 import se.nimsa.sbx.directory.DirectoryWatchProtocol._
+import se.nimsa.sbx.filtering.FilteringProtocol.{SourceTagFilter, TagFilterSpec, TagFilterType}
 import se.nimsa.sbx.forwarding.ForwardingProtocol._
 import se.nimsa.sbx.importing.ImportProtocol._
 import se.nimsa.sbx.log.LogProtocol._
@@ -41,6 +42,8 @@ import se.nimsa.sbx.seriestype.SeriesTypeProtocol._
 import se.nimsa.sbx.storage.StorageProtocol._
 import se.nimsa.sbx.user.UserProtocol._
 
+import scala.util.{Failure, Success}
+
 trait JsonFormats {
 
   private def enumFormat[A](f: String => A) = Format(Reads[A] {
@@ -48,26 +51,39 @@ trait JsonFormats {
     case _ => JsError("Enumeration expected")
   }, Writes[A](a => JsString(a.toString)))
 
-  implicit lazy val tagPathReads: Reads[TagPath] = (
-    (__ \ "tag").read[Int] and
-      (__ \ "item").readNullable[String] and
-      (__ \ "previous").lazyReadNullable[TagPath](tagPathReads)
-    ) ((tag, itemMaybe, previousPath) => {
-    val previous = previousPath match {
-      case Some(t: TagPathTrunk) => Some(t)
-      case _ => None
-    }
-    itemMaybe match {
-      case Some("*") =>
-        previous.map(p => p.thenSequence(tag)).getOrElse(TagPath.fromSequence(tag))
-      case Some(itemString) =>
-        val item = try Option(Integer.parseInt(itemString)) catch { case _: Throwable => None }
-        item.map(i => previous.map(p => p.thenSequence(tag, i)).getOrElse(TagPath.fromSequence(tag, i)))
-          .getOrElse(previous.map(p => p.thenTag(tag)).getOrElse(TagPath.fromTag(tag)))
-      case None =>
-        previous.map(p => p.thenTag(tag)).getOrElse(TagPath.fromTag(tag))
-    }
-  })
+  implicit lazy val tagPathReads: Reads[TagPath] =
+    (
+      (__ \ "tag").readNullable[Int] and
+        (__ \ "name").readNullable[String] and
+        (__ \ "item").readNullable[String] and
+        (__ \ "previous").lazyReadNullable[TagPath](tagPathReads)
+      ) ((tagMaybe, nameMaybe, itemMaybe, previousPath) =>
+      tagMaybe
+        .orElse(nameMaybe
+          .flatMap(name => try Option(Dictionary.tagOf(name)) catch { case _: Throwable => None }))
+        .map { tag =>
+          val previous = previousPath match {
+            case Some(t: TagPathTrunk) => Some(t)
+            case _ => None
+          }
+          itemMaybe match {
+            case Some("*") =>
+              previous.map(p => p.thenSequence(tag)).getOrElse(TagPath.fromSequence(tag))
+            case Some(itemString) =>
+              val item = try Option(Integer.parseInt(itemString)) catch {
+                case _: Throwable => None
+              }
+              item.map(i => previous.map(p => p.thenSequence(tag, i)).getOrElse(TagPath.fromSequence(tag, i)))
+                .getOrElse(previous.map(p => p.thenTag(tag)).getOrElse(TagPath.fromTag(tag)))
+            case None =>
+              previous.map(p => p.thenTag(tag)).getOrElse(TagPath.fromTag(tag))
+          }
+        }
+        .map(Success.apply)
+        .getOrElse(Failure(new IllegalArgumentException())))
+      .collect(JsonValidationError(s"Could not parse tag path, must supply either tag or name")) {
+        case Success(tag) => tag
+      }
 
   implicit lazy val tagPathTagReads: Reads[TagPathTag] =
     tagPathReads.collect(JsonValidationError("Could not parse tag path tag")) {
@@ -90,17 +106,18 @@ trait JsonFormats {
       case p => Some(p)
     }
 
-    val tagPathToTuple: TagPath => (Int, Option[String], Option[TagPathTrunk]) = {
-      case sequenceItem: TagPathSequenceItem => (sequenceItem.tag, Some(sequenceItem.item.toString), trunkToOption(sequenceItem.previous))
-      case sequenceAny: TagPathSequenceAny => (sequenceAny.tag, Some("*"), trunkToOption(sequenceAny.previous))
-      case tagPath: TagPath => (tagPath.tag, None, trunkToOption(tagPath.previous))
+    val tagPathToTuple: TagPath => (Int, String, Option[String], Option[TagPathTrunk]) = {
+      case sequenceItem: TagPathSequenceItem => (sequenceItem.tag, Dictionary.keywordOf(sequenceItem.tag), Some(sequenceItem.item.toString), trunkToOption(sequenceItem.previous))
+      case sequenceAny: TagPathSequenceAny => (sequenceAny.tag, Dictionary.keywordOf(sequenceAny.tag), Some("*"), trunkToOption(sequenceAny.previous))
+      case tagPath: TagPath => (tagPath.tag, Dictionary.keywordOf(tagPath.tag), None, trunkToOption(tagPath.previous))
     }
 
     (
       (__ \ "tag").write[Int] and
+        (__ \ "name").write[String] and
         (__ \ "item").writeNullable[String] and
         (__ \ "previous").lazyWriteNullable[TagPathTrunk](tagPathWrites)
-    ) (tagPathToTuple)
+      ) (tagPathToTuple)
   }
 
   implicit val tagMappingFormat: Format[TagMapping] = Format[TagMapping](
@@ -235,4 +252,19 @@ trait JsonFormats {
 
   implicit val queryResultSeriesType: Format[SeriesIdSeriesTypesResult] = Json.format[SeriesIdSeriesTypesResult]
 
+  implicit val tagFilterTypeFormat: Format[TagFilterType] = enumFormat(TagFilterType.withName)
+
+  implicit val tagFilterSpecFormat: Format[TagFilterSpec] = Json.format[TagFilterSpec]
+
+  implicit val tagSourceTagFilter: Format[SourceTagFilter] = Json.format[SourceTagFilter]
+
+  implicit val dicomDictionaryKeywordFormat: Format[DicomDictionaryKeyword] = Json.format[DicomDictionaryKeyword]
+
+  implicit val dicomDictionaryKeywordsFormat: Format[DicomDictionaryKeywords] = Json.format[DicomDictionaryKeywords]
+
+  implicit val dicomDictionaryTagFormat: Format[DicomDictionaryTag] = Json.format[DicomDictionaryTag]
+
+  implicit val dicomValueRepresentationFormat: Format[DicomValueRepresentation] = Json.format[DicomValueRepresentation]
+
+  implicit val dicomMultiplicityFormat: Format[Multiplicity] = Json.format[Multiplicity]
 }

@@ -18,6 +18,7 @@ angular.module('slicebox', [
     'slicebox.log',
     'slicebox.adminPacs',
     'slicebox.adminForwarding',
+    'slicebox.adminFiltering',
     'slicebox.adminWatchDirectories',
     'slicebox.adminBoxes',
     'slicebox.adminUsers',
@@ -29,26 +30,41 @@ angular.module('slicebox', [
 
     this.$get = function() {
         return {
-            tagPathToString: function(tagPath) {
-                if (angular.isUndefined(tagPath)) {
+            tagPathToString: function(tagPath, format) {
+                if (!tagPath) {
                     return "";
                 }
 
-                var tagToString = function(tag) {
-                    var returnValue = tag.toString(16);
-                    while (returnValue.length < 8) {
-                        returnValue = '0' + returnValue;
+                format = format === 'tags' || format === 'names' ? format : 'names';
+
+                var tagToString = function(path) {
+                    if (!path || !(path.tag || path.name)) {
+                        throw Error("Invalid tag path: one of tag and name must be defined");
                     }
-                    returnValue = '(' + returnValue.slice(0, 4) + ',' + returnValue.slice(4) + ')';
-                    return returnValue.toUpperCase();
+
+                    if (format === 'names' && path.name) {
+                        return path.name;
+                    } else {
+                        var returnValue = path.tag.toString(16);
+
+                        while (returnValue.length < 8) {
+                            returnValue = '0' + returnValue;
+                        }
+                        returnValue = '(' + returnValue.slice(0, 4) + ',' + returnValue.slice(4) + ')';
+                        return returnValue.toUpperCase();
+                    }
                 };
 
                 var toTagPathString = function(path, tail) {
                     var itemIndexSuffix = "";
-                    if (angular.isDefined(path.item)) {
+                    if (path.item) {
                         itemIndexSuffix = '[' + path.item + ']';
                     }
-                    var head = tagToString(path.tag) + itemIndexSuffix;
+                    var tagPrefix = tagToString(path);
+                    if (tagPrefix.length === 0) {
+                        throw Error("Invalid tag path");
+                    }
+                    var head = tagPrefix + itemIndexSuffix;
                     var part = head + tail;
                     if (!path.previous) {
                         return part;
@@ -57,7 +73,11 @@ angular.module('slicebox', [
                     }
                 };
 
-                return toTagPathString(tagPath, "");
+                try {
+                    return toTagPathString(tagPath, "");
+                } catch(err) {
+                    return "";
+                }
             }
         };
     };
@@ -120,7 +140,7 @@ angular.module('slicebox', [
     };
 })
 
-.run(function ($rootScope, $location, userService) {
+.run(function ($rootScope, $location, userService) { 
     $rootScope.$on('$locationChangeStart', function (event, next, current) {
         // redirect to login page if not logged in
         userService.currentUserPromise.then(function () {}, function () {

@@ -34,6 +34,7 @@ import se.nimsa.sbx.box.{BoxDAO, BoxServiceActor}
 import se.nimsa.sbx.dicom.streams.DicomStreamOps
 import se.nimsa.sbx.directory.{DirectoryWatchDAO, DirectoryWatchServiceActor}
 import se.nimsa.sbx.forwarding.{ForwardingDAO, ForwardingServiceActor}
+import se.nimsa.sbx.filtering.{FilteringDAO, FilteringServiceActor}
 import se.nimsa.sbx.importing.{ImportDAO, ImportServiceActor}
 import se.nimsa.sbx.log.{LogDAO, LogServiceActor, SbxLog}
 import se.nimsa.sbx.metadata.{MetaDataDAO, MetaDataServiceActor, PropertiesDAO}
@@ -75,6 +76,7 @@ trait SliceboxBase extends SliceboxRoutes with DicomStreamOps with JsonFormats w
   val logDao = new LogDAO(dbConfig)
   val seriesTypeDao = new SeriesTypeDAO(dbConfig)
   val forwardingDao = new ForwardingDAO(dbConfig)
+  val filteringDao = new FilteringDAO(dbConfig)
   val metaDataDao = new MetaDataDAO(dbConfig)
   val propertiesDao = new PropertiesDAO(dbConfig)
   val directoryWatchDao = new DirectoryWatchDAO(dbConfig)
@@ -97,6 +99,7 @@ trait SliceboxBase extends SliceboxRoutes with DicomStreamOps with JsonFormats w
     _ <- importDao.create()
     _ <- userDao.create()
     _ <- anonymizationDao.create()
+    _ <- filteringDao.create()
   } yield Unit
   createDbTables.onComplete {
     case Success(_) => SbxLog.default("System", "Database tables created. ")
@@ -149,10 +152,12 @@ trait SliceboxBase extends SliceboxRoutes with DicomStreamOps with JsonFormats w
   }
   val seriesTypeService: ActorRef = system.actorOf(SeriesTypeServiceActor.props(seriesTypeDao, storage), name = "SeriesTypeService")
   val forwardingService: ActorRef = system.actorOf(ForwardingServiceActor.props(forwardingDao, storage), name = "ForwardingService")
+  val filteringService: ActorRef = system.actorOf(FilteringServiceActor.props(filteringDao), name = "FilteringService")
   val importService: ActorRef = system.actorOf(ImportServiceActor.props(importDao), name = "ImportService")
 
   override def callAnonymizationService[R: ClassTag](message: Any): Future[R] = anonymizationService.ask(message).mapTo[R]
   override def callMetaDataService[R: ClassTag](message: Any): Future[R] = metaDataService.ask(message).mapTo[R]
+  override def callFilteringService[R: ClassTag](message: Any): Future[R] = filteringService.ask(message).mapTo[R]
   override def scheduleTask(delay: FiniteDuration)(task: => Unit): Cancellable = system.scheduler.scheduleOnce(delay)(task)
 
   // special context for blocking IO

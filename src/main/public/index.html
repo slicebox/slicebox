@@ -32,6 +32,7 @@
 	<meta name="theme-color" content="#ffffff">
 
 	<link href="/assets/lib/angular-material/angular-material.css" rel="stylesheet" media="screen">
+	<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700,400italic">
 
 	<link href="/assets/css/directives.css" rel="stylesheet" media="screen">
 	<link href="/assets/css/main.css" rel="stylesheet" media="screen">
@@ -116,6 +117,9 @@
 								<md-button ng-class="{ active: isCurrentPath('/admin/watchdirectories')}" ng-click="closeLeftNav()" href="/admin/watchdirectories">Directories</md-button>
 							</li>
 							<li>
+								<md-button ng-class="{ active: isCurrentPath('/admin/filtering')}" ng-click="closeLeftNav()" href="/admin/filtering">Filtering</md-button>
+							</li>
+							<li>
 								<md-button ng-class="{ active: isCurrentPath('/admin/forwarding')}" ng-click="closeLeftNav()" href="/admin/forwarding">Forwarding</md-button>
 							</li>
 							<li>
@@ -158,6 +162,7 @@
 	<script type="text/javascript" src="/assets/js/admin-watch-directories.js"></script>
 	<script type="text/javascript" src="/assets/js/admin-boxes.js"></script>
 	<script type="text/javascript" src="/assets/js/admin-forwarding.js"></script>
+	<script type="text/javascript" src="/assets/js/admin-filtering.js"></script>
 	<script type="text/javascript" src="/assets/js/admin-users.js"></script>
 	<script type="text/javascript" src="/assets/js/admin-series-types.js"></script>
 	<script type="text/javascript" src="/assets/js/admin-system.js"></script>

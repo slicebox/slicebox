@@ -38,12 +38,13 @@ trait SliceboxRoutes extends DirectoryRoutes
   with BoxRoutes
   with TransactionRoutes
   with ForwardingRoutes
+  with FilteringRoutes
   with UserRoutes
   with LogRoutes
   with UiRoutes
   with GeneralRoutes
   with SeriesTypeRoutes
-  with ImportRoutes {
+  with ImportRoutes{
   this: SliceboxBase =>
 
   implicit val knownExceptionHandler =
@@ -93,6 +94,7 @@ trait SliceboxRoutes extends DirectoryRoutes
                 generalRoutes(apiUser) ~
                 seriesTypeRoutes(apiUser) ~
                 forwardingRoutes(apiUser) ~
+                filteringRoutes(apiUser) ~
                 importRoutes(apiUser)
             }
         } ~ transactionRoutes ~ publicSystemRoutes

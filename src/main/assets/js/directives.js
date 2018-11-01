@@ -59,11 +59,206 @@ angular.module('slicebox.directives', [])
     };
 })
 
+.directive('sbxDicomHexValue', function() {
+
+    return {
+        require: 'ngModel',
+        restrict: 'A',
+        link: function($scope, $element, $attrs, ngModel) {
+            var parse = function(value) {
+                if (angular.isUndefined(value)) {
+                    return value;
+                }
+
+                var hexValue = '0x' + value.trim();
+
+                var intValue = parseInt(hexValue);
+                if (!isNaN(intValue)) {
+                    ngModel.$setValidity('sbxDicomHexValue', true);
+
+                    return intValue;
+                }
+
+                ngModel.$setValidity('sbxDicomHexValue', false);
+                return undefined;
+            };
+
+            var format = function(value) {
+                if (angular.isUndefined(value) || value === 0) {
+                    return '';
+                }
+
+                var returnValue = value.toString(16);
+
+                while (returnValue.length < 8) {
+                    returnValue = '0' + returnValue;
+                }
+
+                return returnValue;
+            };
+
+            ngModel.$parsers.push(parse);
+            ngModel.$formatters.push(format);
+        }
+
+    };
+
+})
+
+.directive('tagPathForm', function($http) {
+
+    return {
+        restrict: 'E',
+        templateUrl: '/assets/partials/directives/tagPathForm.html',
+        scope: {
+            tagPath: '='
+        },
+        link: function($scope, $element, $attrs) {
+            var tagRegEx = /^\(?[0-9]{4},?[0-9]{4}\)?$/;
+            var replaceRegEx = /\(|\)|,/g;
+            var allItemIndices = ["*","1", "2", "3", "4", "5", "6", "7", "8", "9"];
+            var noNested = $attrs.hasOwnProperty('noNested');
+            var noWildcards = $attrs.hasOwnProperty('noWildcards');
+            var emptyPath = { tag: null, name: null };
+
+            $scope.uiState = {
+                itemIndices: noWildcards ? allItemIndices.splice(0, 1) : allItemIndices,
+                sequences: [],
+                tag: null,
+                noNested: noNested,
+                noWildcards: noWildcards
+            };
+
+            $scope.tagPath = emptyPath;
+
+            addEmptySequenceIfNeeded();
+            updateTagPath();
+
+            // scope functions
+
+            $scope.getMatchingTagKeywords = function(text) {
+                return $http.get('/api/dicom/dictionary/keywords/nonsequence?filter=' + text).then(function (response) {
+                    return response.data.keywords;
+                });
+            };
+
+            $scope.getMatchingSequenceKeywords = function(text) {
+                return $http.get('/api/dicom/dictionary/keywords/sequence?filter=' + text).then(function (response) {
+                    return response.data.keywords;
+                });
+            };
+
+            $scope.removeSequence = function(index) {
+                $scope.uiState.sequences.splice(index, 1);
+                updateTagPath();
+            };
+
+            $scope.sequenceKeywordSelected = function(keyword, index) {
+                var s = $scope.uiState.sequences[index];
+                s.tag = null;
+                if (keyword && keyword.length > 0) {
+                    s.name = keyword;
+                } else {
+                    s.name = null;
+                }
+                addEmptySequenceIfNeeded();
+                updateTagPath();
+            };
+
+            $scope.sequenceTagChanged = function(text, index) {
+                var s = $scope.uiState.sequences[index];
+                s.name = null;
+                if (text.match(tagRegEx)) {
+                    s.tag = text.replace(replaceRegEx, '');
+                } else {
+                    s.tag = null;
+                }
+                addEmptySequenceIfNeeded();
+                updateTagPath();
+            };
+
+            $scope.sequenceItemChanged = function() {
+                addEmptySequenceIfNeeded();
+                updateTagPath();
+            };
+
+            $scope.tagKeywordSelected = function(keyword) {
+                if (keyword && keyword.length > 0) {
+                    $scope.uiState.tag = {tag: null, name: keyword};
+                } else {
+                    $scope.uiState.tag = null;
+                }
+                updateTagPath();
+            };
+
+            $scope.tagTagChanged = function(text) {
+                if (text.match(tagRegEx)) {
+                    $scope.uiState.tag = { tag: text.replace(replaceRegEx, ''), name: null };
+                } else {
+                    $scope.uiState.tag = null;
+                }
+                updateTagPath();
+            };
+
+            function addEmptySequenceIfNeeded() {
+                if ($scope.uiState.sequences.length === 0) {
+                    $scope.uiState.sequences.push({ item: null });
+                } else {
+                    var last = $scope.uiState.sequences[$scope.uiState.sequences.length - 1];
+                    if ((last.tag || last.name) && last.item) {
+                        $scope.uiState.sequences.push({ item: null });
+                    }
+                }
+            }
+
+            function parsePath(p, seqs, isNested) {
+                var name = p.name;
+                var tag = p.tag ? parseInt(p.tag, 16) : null;
+                if (isNaN(tag)) {
+                    tag = null;
+                }
+                if (!(name || tag) || isNested && !p.item) {
+                    return null;
+                }
+                if (isNested) {
+                    return {
+                        tag: tag,
+                        name: name,
+                        item: p.item,
+                        previous: addItem(seqs.slice(0, -1))
+                    };
+                }
+                return {
+                    tag: tag,
+                    name: name,
+                    previous: addItem(seqs.slice(0, -1))
+                };
+            }
+
+            function addItem(seqs) {
+                if (seqs.length === 0) {
+                    return null;
+                }
+                return parsePath(seqs[seqs.length - 1], seqs, true);
+            }
+
+            function updateTagPath() {
+                if ($scope.uiState.tag) {
+                    $scope.tagPath = parsePath($scope.uiState.tag, $scope.uiState.sequences, false);
+                } else {
+                    $scope.tagPath = addItem($scope.uiState.sequences.slice(0, -1));
+                }
+            }
+        }
+    };
+
+})
+
 /*
  * In order for selection check boxes and object actions to work, all objects in the
  * list must have an id property. 
  */
- .directive('sbxGrid', function($filter, $q, $timeout) {
+.directive('sbxGrid', function($filter, $q, $timeout) {
 
     return {
         restrict: 'E',
@@ -136,6 +331,7 @@ angular.module('slicebox.directives', [])
                     reloadPage: loadPageData,
                     selectedActionObjects: selectedActionObjects,
                     clearSelection: clearSelection,
+                    clearActionSelection: clearActionSelection,
                     selectObject: selectObject
                 };
             }
@@ -604,6 +800,10 @@ angular.module('slicebox.directives', [])
                 $scope.uiState.selectedObject = null;
             }
 
+            function clearActionSelection() {
+                $scope.uiState.objectActionSelection = [];
+            }
+
             function performObjectAction(objectAction) {
                 if (!$scope.objectActionEnabled(objectAction)) {
                     $event.stopPropagation();
@@ -722,49 +922,6 @@ angular.module('slicebox.directives', [])
                     $element.append(rendererElement);
                 });
             }
-        }
-        
-    };
-    
-})
-
-.directive('sbxDicomHexValue', function() {
-    
-    return {
-        require: 'ngModel',
-        restrict: 'A',
-        link: function($scope, $element, $attrs, ngModel) {
-            ngModel.$parsers.push(function(value) {
-                if (angular.isUndefined(value)) {
-                    return value;
-                }
-
-                var hexValue = '0x' + value.trim();
-
-                var intValue = parseInt(hexValue);
-                if (!isNaN(intValue)) {
-                    ngModel.$setValidity('sbxDicomHexValue', true);
-
-                    return intValue;
-                }
-
-                ngModel.$setValidity('sbxDicomHexValue', false);
-                return undefined;
-            });
-
-            ngModel.$formatters.push(function(value) {
-                if (angular.isUndefined(value) || value === 0) {
-                    return '';
-                }
-
-                var returnValue = value.toString(16);
-
-                while (returnValue.length < 8) {
-                    returnValue = '0' + returnValue;
-                }
-
-                return returnValue;
-            });
         }
         
     };
