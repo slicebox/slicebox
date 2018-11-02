@@ -131,3 +131,8 @@ td.table-cell:last-child {
 .tag-path-form md-input-container {
     margin: 0;
 }
+
+.tag-path-form button.add-sequence {
+    margin: 0px 8px 20px 0px;
+    padding: 0px 6px 0px 0px;
+}

@@ -1,20 +1,5 @@
 <md-content class="tag-path-form md-padding" layout="column">
 
-    <div layout="row">
-        <md-autocomplete flex
-                         md-floating-label="Tag"
-                         md-search-text="tagText"
-                         md-items="keyword in getMatchingTagKeywords(tagText)"
-                         md-search-text-change="tagTagChanged(tagText)"
-                         md-selected-item-change="tagKeywordSelected(keyword)"
-                         md-delay="700"
-                         md-min-length="3">
-            <md-item-template>
-                <span md-highlight-text="tagText">{{keyword}}</span>
-            </md-item-template>
-        </md-autocomplete>
-    </div>
-
     <div ng-if="!uiState.noNested">
         <div ng-repeat="sequence in uiState.sequences">
             <div layout="row">
@@ -39,14 +24,24 @@
                     </md-select>
                 </md-input-container>
 
-                <div class="row">
-                    <md-button ng-if="$index < uiState.sequences.length - 1" aria-label="delete" class="md-icon-button"
-                               ng-click="removeSequence($index)">
-                        <md-icon md-svg-src="/assets/images/ic_clear_24px.svg"></md-icon>
-                    </md-button>
-                </div>
             </div>
         </div>
+        <md-button class="md-primary md-hue-1 add-sequence" ng-click="addSequence()">+sequence</md-button>
+    </div>
+
+    <div layout="row">
+        <md-autocomplete flex
+                         md-floating-label="Tag"
+                         md-search-text="tagText"
+                         md-items="keyword in getMatchingTagKeywords(tagText)"
+                         md-search-text-change="tagTagChanged(tagText)"
+                         md-selected-item-change="tagKeywordSelected(keyword)"
+                         md-delay="700"
+                         md-min-length="3">
+            <md-item-template>
+                <span md-highlight-text="tagText">{{keyword}}</span>
+            </md-item-template>
+        </md-autocomplete>
     </div>
 
 </md-content>

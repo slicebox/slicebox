@@ -18,6 +18,10 @@ angular.module('slicebox.home', ['ngRoute'])
     $scope.patientActions =
         [
             {
+                name: "Summary",
+                action: summaryForPatients
+            },
+            {
                 name: 'Send',
                 action: confirmSendPatients
             },
@@ -26,8 +30,8 @@ angular.module('slicebox.home', ['ngRoute'])
                 action: confirmSendPatientsToScp
             },
             {
-                name: 'Delete',
-                action: confirmDeletePatients
+                name: 'Download',
+                action: confirmExportPatients
             },
             {
                 name: 'Tag Series',
@@ -38,17 +42,21 @@ angular.module('slicebox.home', ['ngRoute'])
                 action: confirmAnonymizePatients
             },
             {
-                name: 'Export',
-                action: confirmExportPatients
+                name: 'Modify',
+                action: confirmModifyPatients
             },
             {
-                name: "Summary",
-                action: summaryForPatients
+                name: 'Delete',
+                action: confirmDeletePatients
             }
         ];
 
     $scope.studyActions =
         [
+            {
+                name: "Summary",
+                action: summaryForStudies
+            },
             {
                 name: 'Send',
                 action: confirmSendStudies
@@ -58,8 +66,8 @@ angular.module('slicebox.home', ['ngRoute'])
                 action: confirmSendStudiesToScp
             },
             {
-                name: 'Delete',
-                action: confirmDeleteStudies
+                name: 'Download',
+                action: confirmExportStudies
             },
             {
                 name: 'Tag Series',
@@ -70,17 +78,21 @@ angular.module('slicebox.home', ['ngRoute'])
                 action: confirmAnonymizeStudies
             },
             {
-                name: 'Export',
-                action: confirmExportStudies
+                name: 'Modify',
+                action: confirmModifyStudies
             },
             {
-                name: "Summary",
-                action: summaryForStudies
+                name: 'Delete',
+                action: confirmDeleteStudies
             }
         ];
 
     $scope.seriesActions =
         [
+            {
+                name: "Summary",
+                action: summaryForSeries
+            },
             {
                 name: 'Send',
                 action: confirmSendSeries
@@ -90,8 +102,8 @@ angular.module('slicebox.home', ['ngRoute'])
                 action: confirmSendSeriesToScp
             },
             {
-                name: 'Delete',
-                action: confirmDeleteSeries
+                name: 'Download',
+                action: confirmExportSeries
             },
             {
                 name: 'Tag Series',
@@ -102,17 +114,21 @@ angular.module('slicebox.home', ['ngRoute'])
                 action: confirmAnonymizeSeries
             },
             {
-                name: 'Export',
-                action: confirmExportSeries
+                name: 'Modify',
+                action: confirmModifySeries
             },
             {
-                name: "Summary",
-                action: summaryForSeries
+                name: 'Delete',
+                action: confirmDeleteSeries
             }
         ];
 
     $scope.flatSeriesActions =
         [
+            {
+                name: "Summary",
+                action: summaryForSeries
+            },
             {
                 name: 'Send',
                 action: confirmSendFlatSeries
@@ -122,8 +138,8 @@ angular.module('slicebox.home', ['ngRoute'])
                 action: confirmSendSeriesToScp
             },
             {
-                name: 'Delete',
-                action: confirmDeleteSeries
+                name: 'Download',
+                action: confirmExportSeries
             },
             {
                 name: 'Tag Series',
@@ -134,24 +150,28 @@ angular.module('slicebox.home', ['ngRoute'])
                 action: confirmAnonymizeFlatSeries
             },
             {
-                name: 'Export',
-                action: confirmExportSeries
+                name: 'Modify',
+                action: confirmModifySeries
             },
             {
-                name: "Summary",
-                action: summaryForSeries
+                name: 'Delete',
+                action: confirmDeleteSeries
             }
         ];
 
     $scope.imageActions =
         [
             {
-                name: 'Delete',
-                action: confirmDeleteImages
+                name: 'Download',
+                action: confirmExportImages
             },
             {
-                name: 'Export',
-                action: confirmExportImages
+                name: 'Modify',
+                action: confirmModifyImages
+            },
+            {
+                name: 'Delete',
+                action: confirmDeleteImages
             }
         ];
 
@@ -910,6 +930,56 @@ angular.module('slicebox.home', ['ngRoute'])
         }, "anonymized", "anonymize");
     }
 
+    function confirmModify() {
+        return $mdDialog.show({
+            templateUrl: '/assets/partials/modifyImageFilesModalContent.html',
+            controller: 'ModifyImageFilesModalCtrl',
+            scope: $scope.$new(),
+        });
+    }
+
+    function modifyImages(images, tagMappings) {
+        var modifyPromises = images.map(function (image) {
+            return $http.put('/api/images/' + image.id + '/modify', tagMappings);
+        });
+
+        return $q.all(modifyPromises).then(function () {
+            sbxToast.showInfoMessage("Images modified");
+        }, function(error) {
+            sbxToast.showErrorMessage('Failed to modify images: ' + error);
+        });
+    }
+
+    function confirmModifyPatients(patients) {
+        return confirmModify().then(function(tagMappings) {
+            return imagesForPatients(patients).then(function (images) {
+                return modifyImages(images, tagMappings);
+            });
+        });
+    }
+
+    function confirmModifyStudies(studies) {
+        return confirmModify().then(function(tagMappings) {
+            return imagesForStudies(studies).then(function (images) {
+                return modifyImages(images, tagMappings);
+            });
+        });
+    }
+
+    function confirmModifySeries(series) {
+        return confirmModify().then(function(tagMappings) {
+            return imagesForSeries(series).then(function (images) {
+                return modifyImages(images, tagMappings);
+            });
+        });
+    }
+
+    function confirmModifyImages(images) {
+        return confirmModify().then(function(tagMappings) {
+            return modifyImages(images, tagMappings);
+        });
+    }
+
     function createImageIdsAndPatientsPromiseForPatients(patients) {
         var imageIdAndPatientsPromises = patients.map(function (patient) {
             return imagesForPatients([ patient ]).then(function (images) {
@@ -1310,4 +1380,37 @@ angular.module('slicebox.home', ['ngRoute'])
     $scope.cancelButtonClicked = function() {
         $mdDialog.cancel();
     };
+})
+
+.controller('ModifyImageFilesModalCtrl', function($scope, $mdDialog) {
+    $scope.uiState = {
+        modifications: [emptyModification()]
+    };
+
+    $scope.addModification = function() {
+        $scope.uiState.modifications.push(emptyModification());
+    };
+
+    $scope.isValid = function() {
+        // all mods must be tag path tags, meaning no items in outermost
+        return $scope.uiState.modifications.reduce(function(previous, mod) {
+            return previous && mod.tagPath && !mod.tagPath.item && mod.value.length > 0;
+        }, true);
+    };
+
+    $scope.modify = function() {
+        $mdDialog.hide($scope.uiState.modifications);
+    };
+
+    $scope.cancelButtonClicked = function() {
+        $mdDialog.cancel();
+    };
+
+    function emptyModification() {
+        return {
+            tagPath: {},
+            value: ""
+        };
+    }
+
 });

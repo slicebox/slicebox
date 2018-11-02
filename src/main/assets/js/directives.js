@@ -131,10 +131,13 @@ angular.module('slicebox.directives', [])
 
             $scope.tagPath = emptyPath;
 
-            addEmptySequenceIfNeeded();
             updateTagPath();
 
             // scope functions
+
+            $scope.addSequence = function() {
+                $scope.uiState.sequences.push({ item: null });
+            };
 
             $scope.getMatchingTagKeywords = function(text) {
                 return $http.get('/api/dicom/dictionary/keywords/nonsequence?filter=' + text).then(function (response) {
@@ -148,11 +151,6 @@ angular.module('slicebox.directives', [])
                 });
             };
 
-            $scope.removeSequence = function(index) {
-                $scope.uiState.sequences.splice(index, 1);
-                updateTagPath();
-            };
-
             $scope.sequenceKeywordSelected = function(keyword, index) {
                 var s = $scope.uiState.sequences[index];
                 s.tag = null;
@@ -161,7 +159,6 @@ angular.module('slicebox.directives', [])
                 } else {
                     s.name = null;
                 }
-                addEmptySequenceIfNeeded();
                 updateTagPath();
             };
 
@@ -173,12 +170,10 @@ angular.module('slicebox.directives', [])
                 } else {
                     s.tag = null;
                 }
-                addEmptySequenceIfNeeded();
                 updateTagPath();
             };
 
             $scope.sequenceItemChanged = function() {
-                addEmptySequenceIfNeeded();
                 updateTagPath();
             };
 
@@ -200,25 +195,11 @@ angular.module('slicebox.directives', [])
                 updateTagPath();
             };
 
-            function addEmptySequenceIfNeeded() {
-                if ($scope.uiState.sequences.length === 0) {
-                    $scope.uiState.sequences.push({ item: null });
-                } else {
-                    var last = $scope.uiState.sequences[$scope.uiState.sequences.length - 1];
-                    if ((last.tag || last.name) && last.item) {
-                        $scope.uiState.sequences.push({ item: null });
-                    }
-                }
-            }
-
             function parsePath(p, seqs, isNested) {
                 var name = p.name;
                 var tag = p.tag ? parseInt(p.tag, 16) : null;
                 if (isNaN(tag)) {
                     tag = null;
-                }
-                if (!(name || tag) || isNested && !p.item) {
-                    return null;
                 }
                 if (isNested) {
                     return {
@@ -231,7 +212,7 @@ angular.module('slicebox.directives', [])
                 return {
                     tag: tag,
                     name: name,
-                    previous: addItem(seqs.slice(0, -1))
+                    previous: addItem(seqs)
                 };
             }
 
@@ -239,14 +220,18 @@ angular.module('slicebox.directives', [])
                 if (seqs.length === 0) {
                     return null;
                 }
-                return parsePath(seqs[seqs.length - 1], seqs, true);
+                var s = seqs[seqs.length - 1];
+                if (!(s.tag || s.name) || !s.item) {
+                    return addItem(seqs.slice(0, -1));
+                }
+                return parsePath(s, seqs, true);
             }
 
             function updateTagPath() {
                 if ($scope.uiState.tag) {
                     $scope.tagPath = parsePath($scope.uiState.tag, $scope.uiState.sequences, false);
                 } else {
-                    $scope.tagPath = addItem($scope.uiState.sequences.slice(0, -1));
+                    $scope.tagPath = addItem($scope.uiState.sequences);
                 }
             }
         }
