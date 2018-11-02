@@ -1,6 +1,7 @@
-<md-content class="tag-path-form md-padding" layout="column">
+<md-content class="tag-path-form" layout="column">
 
     <div ng-if="!uiState.noNested">
+        <div layout="row" ng-if="uiState.sequences.length > 0" style="min-height: 20px"></div>
         <div ng-repeat="sequence in uiState.sequences">
             <div layout="row">
                 <md-autocomplete flex=85
@@ -26,7 +27,13 @@
 
             </div>
         </div>
-        <md-button class="md-primary md-hue-1 add-sequence" ng-click="addSequence()">+sequence</md-button>
+        <div layout="row" layout-align="left center">
+            <md-button class="md-icon-button md-primary add-sequence" aria-label="add sequence" ng-click="addSequence()">
+                <md-icon md-svg-icon="/assets/images/ic_add_24px.svg"></md-icon>
+            </md-button>
+            <span class="md-caption add-sequence">Sequence</span>
+        </div>
+        <div layout="row" style="min-height: 20px"></div>
     </div>
 
     <div layout="row">

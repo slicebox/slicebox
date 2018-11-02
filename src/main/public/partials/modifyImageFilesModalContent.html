@@ -2,27 +2,44 @@
 	<form name="tagMappingsForm" ng-submit="modify()" novalidate>
 
 		<md-dialog-content>
-	  		<md-subheader class="md-sticky-no-effect">
-	  			<span>Modifications</span>
-	  		</md-subheader>
 
-            <md-card ng-repeat="modification in uiState.modifications">
-                <md-card-content>
+            <md-subheader class="md-sticky-no-effect">
+                <span>Modifications</span>
+            </md-subheader>
 
-                    <tag-path-form tag-path="modification.tagPath"></tag-path-form>
+            <md-card ng-repeat="mod in uiState.modifications">
+                <md-card-header>
+                    <div layout="row" layout-align="left center">
+                        <md-button class="md-icon-button md-primary" aria-label="Settings" ng-click="switchFolding($index)">
+                            <md-icon ng-if="!uiState.folded[$index]" md-svg-icon="/assets/images/ic_arrow_drop_up_black_18px"></md-icon>
+                            <md-icon ng-if="uiState.folded[$index]" md-svg-icon="/assets/images/ic_arrow_drop_down_black_18px"></md-icon>
+                        </md-button>
+                        <span class="md-caption" ng-if="isModificationValid(mod)">{{ mod.tagPath | tagPath }} = {{ mod.value }}</span>
+                        <span class="md-caption" ng-if="!isModificationValid(mod)"><em>Undefined modification</em></span>
+                    </div>
+                </md-card-header>
+                <md-card-content ng-if="!uiState.folded[$index]">
 
-                    <md-content class="md-padding">
-                        <span class="md-body-1">{{ modification.tagPath | tagPath }}</span>
-                        <md-input-container>
-                            <label>New Value</label>
-                            <input ng-model="modification.value">
-                        </md-input-container>
+                    <tag-path-form tag-path="mod.tagPath"></tag-path-form>
+
+                    <md-content layout="column">
+                        <div layout="row">
+                            <md-input-container flex>
+                                <label>New Value</label>
+                                <input ng-model="mod.value">
+                            </md-input-container>
+                        </div>
                     </md-content>
 
                 </md-card-content>
             </md-card>
 
-            <md-button class="md-primary md-hue-1" ng-click="addModification()">+modification</md-button>
+            <div layout="row" layout-align="left center">
+                <md-button class="md-icon-button md-primary" aria-label="add modification" ng-click="addModification()">
+                    <md-icon md-svg-icon="/assets/images/ic_add_24px.svg"></md-icon>
+                </md-button>
+                <span class="md-caption" style="margin: 0; padding: 0;">Modification</span>
+            </div>
 
 		</md-dialog-content>
 

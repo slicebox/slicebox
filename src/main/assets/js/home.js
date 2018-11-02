@@ -506,9 +506,9 @@ angular.module('slicebox.home', ['ngRoute'])
 
     $scope.loadImageAttributes = function(startIndex, count, orderByProperty, orderByDirection, filter) {
         var imagesPromise = $scope.uiState.selectedImage ? $q.when([$scope.uiState.selectedImage]) :
-            $http.get('/api/metadata/images?count=1&seriesid=' + $scope.uiState.selectedSeries.id).then(function (images) {
+            $scope.uiState.selectedSeries ? $http.get('/api/metadata/images?count=1&seriesid=' + $scope.uiState.selectedSeries.id).then(function (images) {
                 return images.data;
-            });
+            }) : $q.when([]);
 
         return imagesPromise.then(function(images) {
             if (images.length > 0) {
@@ -947,6 +947,13 @@ angular.module('slicebox.home', ['ngRoute'])
             sbxToast.showInfoMessage("Images modified");
         }, function(error) {
             sbxToast.showErrorMessage('Failed to modify images: ' + error);
+        }).finally(function() {
+            $scope.patientSelected(null);
+            $scope.callbacks.patientsTable.reset();
+            if ($scope.callbacks.flatSeriesTable) {
+                $scope.callbacks.flatSeriesTable.reset();
+            }
+            updateSeriesTagsPromise();
         });
     }
 
@@ -1384,18 +1391,29 @@ angular.module('slicebox.home', ['ngRoute'])
 
 .controller('ModifyImageFilesModalCtrl', function($scope, $mdDialog) {
     $scope.uiState = {
-        modifications: [emptyModification()]
+        modifications: [emptyModification()],
+        folded: [false]
+    };
+
+    $scope.switchFolding = function(index) {
+        $scope.uiState.folded[index] = !$scope.uiState.folded[index];
     };
 
     $scope.addModification = function() {
         $scope.uiState.modifications.push(emptyModification());
+        $scope.uiState.folded.push(false);
+    };
+
+    $scope.isModificationValid = function(mod) {
+        return mod.tagPath && !mod.tagPath.item && mod.value.length > 0;
     };
 
     $scope.isValid = function() {
-        // all mods must be tag path tags, meaning no items in outermost
-        return $scope.uiState.modifications.reduce(function(previous, mod) {
-            return previous && mod.tagPath && !mod.tagPath.item && mod.value.length > 0;
-        }, true);
+        var valid = $scope.uiState.modifications.filter($scope.isModificationValid);
+        var partial = $scope.uiState.modifications.filter(function(mod) {
+            return !mod.tagPath && mod.value.length > 0 || mod.tagPath && mod.value.length === 0;
+        });
+        return valid.length > 0 && partial.length === 0;
     };
 
     $scope.modify = function() {
