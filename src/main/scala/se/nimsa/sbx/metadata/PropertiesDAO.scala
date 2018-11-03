@@ -22,7 +22,7 @@ import se.nimsa.sbx.dicom.DicomPropertyValue._
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.seriestype.SeriesTypeDAO
 import se.nimsa.sbx.util.DbUtil._
-import slick.basic.DatabaseConfig
+import slick.basic.{BasicAction, BasicStreamingAction, DatabaseConfig}
 import slick.jdbc.{GetResult, JdbcProfile}
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -100,33 +100,33 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
 
   // Setup
 
-  def create() = createTables(dbConf, (SeriesSources.name, seriesSourceQuery), (SeriesTagTable.name, seriesTagQuery), (SeriesSeriesTagTable.name, seriesSeriesTagQuery))
+  def create(): Future[Unit] = createTables(dbConf, (SeriesSources.name, seriesSourceQuery), (SeriesTagTable.name, seriesTagQuery), (SeriesSeriesTagTable.name, seriesSeriesTagQuery))
 
-  def drop() = db.run {
+  def drop(): Future[Unit] = db.run {
     (seriesSourceQuery.schema ++ seriesTagQuery.schema ++ seriesSeriesTagQuery.schema).drop
   }
 
-  def clear() = db.run {
+  def clear(): Future[Unit] = db.run {
     DBIO.seq(seriesSourceQuery.delete, seriesTagQuery.delete, seriesSeriesTagQuery.delete)
   }
 
   // Functions
 
-  def insertSeriesSourceAction(seriesSource: SeriesSource) = (seriesSourceQuery += seriesSource).map(_ => seriesSource)
+  def insertSeriesSourceAction(seriesSource: SeriesSource): DBIOAction[SeriesSource, NoStream, Effect.Write] = (seriesSourceQuery += seriesSource).map(_ => seriesSource)
 
   def insertSeriesSource(seriesSource: SeriesSource): Future[SeriesSource] = db.run(insertSeriesSourceAction(seriesSource))
 
-  def updateSeriesSourceAction(seriesSource: SeriesSource) =
+  def updateSeriesSourceAction(seriesSource: SeriesSource): BasicAction[Int, NoStream, Effect.Write] =
     seriesSourceQuery
       .filter(_.id === seriesSource.id)
       .update(seriesSource)
 
   def updateSeriesSource(seriesSource: SeriesSource): Future[Int] = db.run(updateSeriesSourceAction(seriesSource))
 
-  def seriesSourceByIdAction(seriesId: Long) =
-    seriesSourceQuery.filter(_.id === seriesId).result.headOption
+  def seriesSourcesByIdAction(seriesId: Long): BasicStreamingAction[Seq[SeriesSource], SeriesSource, Effect.Read] =
+    seriesSourceQuery.filter(_.id === seriesId).result
 
-  def seriesSourceById(seriesId: Long): Future[Option[SeriesSource]] = db.run(seriesSourceByIdAction(seriesId))
+  def seriesSourceById(seriesId: Long): Future[Option[SeriesSource]] = db.run(seriesSourcesByIdAction(seriesId).headOption)
 
   def seriesSources: Future[Seq[SeriesSource]] = db.run {
     seriesSourceQuery.result
@@ -136,19 +136,18 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
     seriesTagQuery.result
   }
 
-  def insertSeriesTagAction(seriesTag: SeriesTag) =
+  def insertSeriesTagAction(seriesTag: SeriesTag): DBIOAction[SeriesTag, NoStream, Effect.Write] =
     (seriesTagQuery returning seriesTagQuery.map(_.id) += seriesTag)
       .map(generatedId => seriesTag.copy(id = generatedId))
 
   def insertSeriesTag(seriesTag: SeriesTag): Future[SeriesTag] = db.run(insertSeriesTagAction(seriesTag))
 
-  def seriesTagForNameAction(name: String) = seriesTagQuery.filter(_.name === name).result.headOption
+  def seriesTagsForNameAction(name: String): BasicStreamingAction[Seq[SeriesTag], SeriesTag, Effect.Read] =
+    seriesTagQuery.filter(_.name === name).result
 
-  def seriesTagForName(name: String): Future[Option[SeriesTag]] = db.run(seriesTagForNameAction(name))
+  def seriesTagForName(name: String): Future[Option[SeriesTag]] = db.run(seriesTagsForNameAction(name).headOption)
 
-  def seriesTagForIdAction(id: Long) = seriesTagQuery.filter(_.id === id).result.headOption
-
-  def seriesTagForId(id: Long): Future[Option[SeriesTag]] = db.run(seriesTagForIdAction(id))
+  def seriesTagForId(id: Long): Future[Option[SeriesTag]] = db.run(seriesTagQuery.filter(_.id === id).result.headOption)
 
   def updateSeriesTag(seriesTag: SeriesTag): Future[Option[SeriesTag]] = db.run {
     seriesTagQuery.filter(_.id === seriesTag.id).update(seriesTag)
@@ -174,11 +173,9 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
     sorted.drop(startIndex).take(count).result
   }
 
-  def deleteSeriesTagAction(tagId: Long) = seriesTagQuery.filter(_.id === tagId).delete.map(_ => {})
+  def deleteSeriesTag(tagId: Long): Future[Unit] = db.run(seriesTagQuery.filter(_.id === tagId).delete.map(_ => {}))
 
-  def deleteSeriesTag(tagId: Long): Future[Unit] = db.run(deleteSeriesTagAction(tagId))
-
-  def insertSeriesSeriesTagAction(seriesSeriesTag: SeriesSeriesTag) =
+  def insertSeriesSeriesTagAction(seriesSeriesTag: SeriesSeriesTag): DBIOAction[SeriesSeriesTag, NoStream, Effect.Write] =
     (seriesSeriesTagQuery += seriesSeriesTag).map(_ => seriesSeriesTag)
 
   def insertSeriesSeriesTag(seriesSeriesTag: SeriesSeriesTag): Future[SeriesSeriesTag] =
@@ -194,18 +191,18 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
   def listSeriesSeriesTagsForSeriesTagId(seriesTagId: Long): Future[Seq[SeriesSeriesTag]] =
     db.run(listSeriesSeriesTagsForSeriesTagIdAction(seriesTagId))
 
-  def seriesSeriesTagForSeriesTagIdAndSeriesIdAction(seriesTagId: Long, seriesId: Long) =
-    seriesSeriesTagQuery.filter(_.seriesTagId === seriesTagId).filter(_.seriesId === seriesId).result.headOption
+  def seriesSeriesTagsForSeriesTagIdAndSeriesIdAction(seriesTagId: Long, seriesId: Long): BasicStreamingAction[Seq[SeriesSeriesTag], SeriesSeriesTag, Effect.Read] =
+    seriesSeriesTagQuery.filter(_.seriesTagId === seriesTagId).filter(_.seriesId === seriesId).result
 
   def seriesSeriesTagForSeriesTagIdAndSeriesId(seriesTagId: Long, seriesId: Long): Future[Option[SeriesSeriesTag]] =
-    db.run(seriesSeriesTagForSeriesTagIdAndSeriesIdAction(seriesTagId, seriesId))
+    db.run(seriesSeriesTagsForSeriesTagIdAndSeriesIdAction(seriesTagId, seriesId).headOption)
 
-  def removeSeriesSeriesTagAction(seriesTagId: Long, seriesId: Long) =
+  def removeSeriesSeriesTagAction(seriesTagId: Long, seriesId: Long): DBIOAction[Unit, NoStream, Effect.Write] =
     seriesSeriesTagQuery.filter(_.seriesTagId === seriesTagId).filter(_.seriesId === seriesId).delete.map(_ => {})
 
   def removeSeriesSeriesTag(seriesTagId: Long, seriesId: Long): Future[Unit] = db.run(removeSeriesSeriesTagAction(seriesTagId, seriesId))
 
-  def seriesTagsForSeriesAction(seriesId: Long) = {
+  def seriesTagsForSeriesAction(seriesId: Long): BasicStreamingAction[Seq[SeriesTag], SeriesTag, Effect.Read] = {
     val innerJoin = for {
       sst <- seriesSeriesTagQuery.filter(_.seriesId === seriesId)
       stq <- seriesTagQuery if sst.seriesTagId === stq.id
@@ -215,13 +212,15 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
 
   def seriesTagsForSeries(seriesId: Long): Future[Seq[SeriesTag]] = db.run(seriesTagsForSeriesAction(seriesId))
 
-  def addAndInsertSeriesTagForSeriesIdAction(seriesTag: SeriesTag, seriesId: Long) =
-    seriesTagForNameAction(seriesTag.name)
+  def addAndInsertSeriesTagForSeriesIdAction(seriesTag: SeriesTag, seriesId: Long): DBIOAction[SeriesTag, NoStream, Effect.Read with Effect.Write with Effect.Read with Effect.Write] =
+    seriesTagsForNameAction(seriesTag.name)
+      .headOption
       .flatMap(_
         .map(DBIO.successful)
         .getOrElse(insertSeriesTagAction(seriesTag)))
       .flatMap { dbSeriesTag =>
-        seriesSeriesTagForSeriesTagIdAndSeriesIdAction(dbSeriesTag.id, seriesId)
+        seriesSeriesTagsForSeriesTagIdAndSeriesIdAction(dbSeriesTag.id, seriesId)
+          .headOption
           .flatMap(_
             .map(_ => DBIO.successful(dbSeriesTag))
             .getOrElse(insertSeriesSeriesTagAction(SeriesSeriesTag(seriesId, dbSeriesTag.id)).map(_ => dbSeriesTag)))
@@ -323,7 +322,7 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
       checkColumnExists(dbConf, orderBy, PatientsTable.name, StudiesTable.name, SeriesTable.name).flatMap { _ =>
         db.run {
 
-          implicit val getResult = metaDataDao.flatSeriesGetResult
+          implicit val getResult: GetResult[FlatSeries] = metaDataDao.flatSeriesGetResult
 
           val query =
             metaDataDao.flatSeriesBasePart +
@@ -345,19 +344,19 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
     else
       metaDataDao.flatSeries(startIndex, count, orderBy, orderAscending, filter)
 
-  def propertiesJoinPart(sourceRefs: Seq[SourceRef], seriesTypeIds: Seq[Long], seriesTagIds: Seq[Long]) =
+  def propertiesJoinPart(sourceRefs: Seq[SourceRef], seriesTypeIds: Seq[Long], seriesTagIds: Seq[Long]): String =
     singlePropertyJoinPart(sourceRefs, """ inner join "SeriesSources" on "Series"."id" = "SeriesSources"."id"""") +
       singlePropertyJoinPart(seriesTypeIds, """ inner join "SeriesSeriesTypes" on "Series"."id" = "SeriesSeriesTypes"."seriesid"""") +
       singlePropertyJoinPart(seriesTagIds, """ inner join "SeriesSeriesTags" on "Series"."id" = "SeriesSeriesTags"."seriesid"""")
 
-  def singlePropertyJoinPart(property: Seq[_ <: Any], part: String) = if (property.isEmpty) "" else part
+  def singlePropertyJoinPart(property: Seq[_ <: Any], part: String): String = if (property.isEmpty) "" else part
 
   def patients(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String], sourceRefs: Seq[SourceRef], seriesTypeIds: Seq[Long], seriesTagIds: Seq[Long]): Future[Seq[Patient]] =
     if (isWithAdvancedFiltering(sourceRefs, seriesTypeIds, seriesTagIds))
       checkColumnExists(dbConf, orderBy, PatientsTable.name).flatMap { _ =>
         db.run {
 
-          implicit val getResult = patientsGetResult
+          implicit val getResult: GetResult[Patient] = patientsGetResult
 
           val query =
             patientsBasePart +
@@ -379,16 +378,16 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
     else
       metaDataDao.patients(startIndex, count, orderBy, orderAscending, filter)
 
-  def parseQueryOrder(optionalOrder: Option[QueryOrder]) =
+  def parseQueryOrder(optionalOrder: Option[QueryOrder]): (Option[String], Boolean) =
     (optionalOrder.map(_.orderBy), optionalOrder.forall(_.orderAscending))
 
-  def wherePart(arrays: Seq[_ <: Any]*) =
+  def wherePart(arrays: Seq[_ <: Any]*): String =
     if (arrays.exists(_.nonEmpty))
       " where "
     else
       ""
 
-  def queryMainPart(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, sourceRefs: Seq[SourceRef], seriesTypeIds: Seq[Long], seriesTagIds: Seq[Long], queryProperties: Seq[QueryProperty]) =
+  def queryMainPart(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, sourceRefs: Seq[SourceRef], seriesTypeIds: Seq[Long], seriesTagIds: Seq[Long], queryProperties: Seq[QueryProperty]): String =
     propertiesJoinPart(sourceRefs, seriesTypeIds, seriesTagIds) +
       wherePart(queryProperties, sourceRefs, seriesTypeIds, seriesTagIds) +
       queryPart(queryProperties) +
@@ -413,7 +412,7 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
         Future.sequence(queryProperties.map(qp => checkColumnExists(dbConf, qp.propertyName, PatientsTable.name, StudiesTable.name, SeriesTable.name))).flatMap { _ =>
           db.run {
 
-            implicit val getResult = metaDataDao.patientsGetResult
+            implicit val getResult: GetResult[Patient] = metaDataDao.patientsGetResult
 
             val query =
               metaDataDao.queryPatientsSelectPart +
@@ -440,7 +439,7 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
         Future.sequence(queryProperties.map(qp => checkColumnExists(dbConf, qp.propertyName, PatientsTable.name, StudiesTable.name, SeriesTable.name))).flatMap { _ =>
           db.run {
 
-            implicit val getResult = metaDataDao.studiesGetResult
+            implicit val getResult: GetResult[Study] = metaDataDao.studiesGetResult
 
             val query =
               metaDataDao.queryStudiesSelectPart +
@@ -467,7 +466,7 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
         Future.sequence(queryProperties.map(qp => checkColumnExists(dbConf, qp.propertyName, PatientsTable.name, StudiesTable.name, SeriesTable.name))).flatMap { _ =>
           db.run {
 
-            implicit val getResult = metaDataDao.seriesGetResult
+            implicit val getResult: GetResult[Series] = metaDataDao.seriesGetResult
 
             val query =
               metaDataDao.querySeriesSelectPart +
@@ -494,7 +493,7 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
         Future.sequence(queryProperties.map(qp => checkColumnExists(dbConf, qp.propertyName, PatientsTable.name, StudiesTable.name, SeriesTable.name, ImagesTable.name))).flatMap { _ =>
           db.run {
 
-            implicit val getResult = metaDataDao.imagesGetResult
+            implicit val getResult: GetResult[Image] = metaDataDao.imagesGetResult
 
             val query =
               metaDataDao.queryImagesSelectPart +
@@ -521,7 +520,7 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
         Future.sequence(queryProperties.map(qp => checkColumnExists(dbConf, qp.propertyName, PatientsTable.name, StudiesTable.name, SeriesTable.name))).flatMap { _ =>
           db.run {
 
-            implicit val getResult = metaDataDao.flatSeriesGetResult
+            implicit val getResult: GetResult[FlatSeries] = metaDataDao.flatSeriesGetResult
 
             val query =
               metaDataDao.flatSeriesBasePart +
@@ -536,7 +535,7 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
     }
   }
 
-  def isWithAdvancedFiltering(arrays: Seq[_ <: Any]*) = arrays.exists(_.nonEmpty)
+  def isWithAdvancedFiltering(arrays: Seq[_ <: Any]*): Boolean = arrays.exists(_.nonEmpty)
 
   def patientsBasePart =
     s"""select distinct("Patients"."id"),
@@ -545,21 +544,21 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
        inner join "Studies" on "Series"."studyId" = "Studies"."id"
        inner join "Patients" on "Studies"."patientId" = "Patients"."id""""
 
-  def andPart(target: Seq[_ <: Any]) = if (target.nonEmpty) " and" else ""
+  def andPart(target: Seq[_ <: Any]): String = if (target.nonEmpty) " and" else ""
 
-  def andPart(array: Seq[_ <: Any], target: Seq[_ <: Any]) = if (array.nonEmpty && target.nonEmpty) " and" else ""
+  def andPart(array: Seq[_ <: Any], target: Seq[_ <: Any]): String = if (array.nonEmpty && target.nonEmpty) " and" else ""
 
-  def andPart(array1: Seq[_ <: Any], array2: Seq[_ <: Any], target: Seq[_ <: Any]) = if ((array1.nonEmpty || array2.nonEmpty) && target.nonEmpty) " and" else ""
+  def andPart(array1: Seq[_ <: Any], array2: Seq[_ <: Any], target: Seq[_ <: Any]): String = if ((array1.nonEmpty || array2.nonEmpty) && target.nonEmpty) " and" else ""
 
-  def andPart(array1: Seq[_ <: Any], array2: Seq[_ <: Any], array3: Seq[_ <: Any], target: Seq[_ <: Any]) = if ((array1.nonEmpty || array2.nonEmpty || array3.nonEmpty) && target.nonEmpty) " and" else ""
+  def andPart(array1: Seq[_ <: Any], array2: Seq[_ <: Any], array3: Seq[_ <: Any], target: Seq[_ <: Any]): String = if ((array1.nonEmpty || array2.nonEmpty || array3.nonEmpty) && target.nonEmpty) " and" else ""
 
-  def andPart(option: Option[Any], target: Seq[_ <: Any]) = if (option.isDefined && target.nonEmpty) " and" else ""
+  def andPart(option: Option[Any], target: Seq[_ <: Any]): String = if (option.isDefined && target.nonEmpty) " and" else ""
 
-  def andPart(option: Option[Any], array: Seq[_ <: Any], target: Seq[_ <: Any]) = if ((option.isDefined || array.nonEmpty) && target.nonEmpty) " and" else ""
+  def andPart(option: Option[Any], array: Seq[_ <: Any], target: Seq[_ <: Any]): String = if ((option.isDefined || array.nonEmpty) && target.nonEmpty) " and" else ""
 
-  def andPart(option: Option[Any], array1: Seq[_ <: Any], array2: Seq[_ <: Any], target: Seq[_ <: Any]) = if ((option.isDefined || array1.nonEmpty || array2.nonEmpty) && target.nonEmpty) " and" else ""
+  def andPart(option: Option[Any], array1: Seq[_ <: Any], array2: Seq[_ <: Any], target: Seq[_ <: Any]): String = if ((option.isDefined || array1.nonEmpty || array2.nonEmpty) && target.nonEmpty) " and" else ""
 
-  def sourcesPart(sourceRefs: Seq[SourceRef]) =
+  def sourcesPart(sourceRefs: Seq[SourceRef]): String =
     if (sourceRefs.isEmpty)
       ""
     else
@@ -567,7 +566,7 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
         s""""SeriesSources"."sourcetype" = '${sourceTypeId.sourceType}' and "SeriesSources"."sourceid" = ${sourceTypeId.sourceId}""")
         .mkString(" or ") + ")"
 
-  def seriesTypesPart(seriesTypeIds: Seq[Long]) =
+  def seriesTypesPart(seriesTypeIds: Seq[Long]): String =
     if (seriesTypeIds.isEmpty)
       ""
     else
@@ -575,7 +574,7 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
         s""""SeriesSeriesTypes"."seriestypeid" = $seriesTypeId""")
         .mkString(" or ") + ")"
 
-  def seriesTagsPart(seriesTagIds: Seq[Long]) =
+  def seriesTagsPart(seriesTagIds: Seq[Long]): String =
     if (seriesTagIds.isEmpty)
       ""
     else
@@ -591,7 +590,7 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
     if (isWithAdvancedFiltering(sourceRefs, seriesTypeIds, seriesTagIds))
       db.run {
 
-        implicit val getResult = studiesGetResult
+        implicit val getResult: GetResult[Study] = studiesGetResult
 
         val basePart =
           s"""select distinct("Studies"."id"),
@@ -630,7 +629,7 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
     if (isWithAdvancedFiltering(sourceRefs, seriesTypeIds, seriesTagIds))
       db.run {
 
-        implicit val getResult = seriesGetResult
+        implicit val getResult: GetResult[Series] = seriesGetResult
 
         val basePart =
           s"""select distinct("Series"."id"),
@@ -664,7 +663,7 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
     val seriesSource = SeriesSource(-1, source)
 
     val addAction =
-      patientByNameAndIDAction(patient).flatMap { patientMaybe =>
+      patientsByNameAndIDAction(patient).headOption.flatMap { patientMaybe =>
         patientMaybe.map { dbp =>
           val updatePatient = patient.copy(id = dbp.id)
           updatePatientAction(updatePatient).map(_ => (updatePatient, false))
@@ -673,7 +672,7 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
         }
       }.flatMap {
         case (dbPatient, patientAdded) =>
-          studyByUidAndPatientAction(study, dbPatient).flatMap { studyMaybe =>
+          studiesByUidAndPatientAction(study, dbPatient).headOption.flatMap { studyMaybe =>
             studyMaybe.map { dbs =>
               val updateStudy = study.copy(id = dbs.id, patientId = dbs.patientId)
               updateStudyAction(updateStudy).map(_ => (updateStudy, false))
@@ -682,7 +681,7 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
             }
           }.flatMap {
             case (dbStudy, studyAdded) =>
-              seriesByUidAndStudyAction(series, dbStudy).flatMap { seriesMaybe =>
+              seriesByUidAndStudyAction(series, dbStudy).headOption.flatMap { seriesMaybe =>
                 seriesMaybe.map { dbs =>
                   val updateSeries = series.copy(id = dbs.id, studyId = dbs.studyId)
                   updateSeriesAction(updateSeries).map(_ => (updateSeries, false))
@@ -691,7 +690,7 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
                 }
               }.flatMap {
                 case (dbSeries, seriesAdded) =>
-                  imageByUidAndSeriesAction(image, dbSeries).flatMap { imageMaybe =>
+                  imagesByUidAndSeriesAction(image, dbSeries).headOption.flatMap { imageMaybe =>
                     imageMaybe.map { dbi =>
                       val updateImage = image.copy(id = dbi.id, seriesId = dbi.seriesId)
                       updateImageAction(updateImage).map(_ => (updateImage, false))
@@ -700,7 +699,7 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
                     }
                   }.flatMap {
                     case (dbImage, imageAdded) =>
-                      seriesSourceByIdAction(dbSeries.id).flatMap { seriesSourceMaybe =>
+                      seriesSourcesByIdAction(dbSeries.id).headOption.flatMap { seriesSourceMaybe =>
                         seriesSourceMaybe.map { dbss =>
                           val updateSeriesSource = seriesSource.copy(id = dbss.id)
                           updateSeriesSourceAction(updateSeriesSource).map(_ => updateSeriesSource)
@@ -721,7 +720,7 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
   }
 
   def addSeriesTagToSeries(seriesTag: SeriesTag, seriesId: Long): Future[Option[SeriesTag]] = db.run {
-    metaDataDao.seriesByIdAction(seriesId)
+    seriesQuery.filter(_.id === seriesId).result.headOption
       .map(_.map(_ => addAndInsertSeriesTagForSeriesIdAction(seriesTag, seriesId)))
       .unwrap
   }

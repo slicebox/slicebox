@@ -22,9 +22,8 @@ import se.nimsa.sbx.dicom.DicomPropertyValue._
 import se.nimsa.sbx.metadata.MetaDataProtocol.QueryOperator._
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.util.DbUtil._
-import slick.basic.DatabaseConfig
-import slick.jdbc.JdbcProfile
-import slick.jdbc.GetResult
+import slick.basic.{BasicAction, BasicStreamingAction, DatabaseConfig}
+import slick.jdbc.{GetResult, JdbcProfile}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -37,10 +36,13 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
 
   // *** Patient ***
 
-  val toPatient = (id: Long, patientName: String, patientID: String, patientBirthDate: String, patientSex: String) =>
-    Patient(id, PatientName(patientName), PatientID(patientID), PatientBirthDate(patientBirthDate), PatientSex(patientSex))
+  val toPatient: (Long, String, String, String, String) => Patient =
+    (id: Long, patientName: String, patientID: String, patientBirthDate: String, patientSex: String) =>
+      Patient(id, PatientName(patientName), PatientID(patientID), PatientBirthDate(patientBirthDate), PatientSex(patientSex))
 
-  val fromPatient = (patient: Patient) => Option((patient.id, patient.patientName.value, patient.patientID.value, patient.patientBirthDate.value, patient.patientSex.value))
+  val fromPatient: Patient => Option[(Long, String, String, String, String)] =
+    (patient: Patient) =>
+      Option((patient.id, patient.patientName.value, patient.patientID.value, patient.patientBirthDate.value, patient.patientSex.value))
 
   class PatientsTable(tag: Tag) extends Table[Patient](tag, PatientsTable.name) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
@@ -58,12 +60,15 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
 
   val patientsQuery = TableQuery[PatientsTable]
 
-  val fromStudy = (study: Study) => Option((study.id, study.patientId, study.studyInstanceUID.value, study.studyDescription.value, study.studyDate.value, study.studyID.value, study.accessionNumber.value, study.patientAge.value))
+  val fromStudy: Study => Option[(Long, Long, String, String, String, String, String, String)] =
+    (study: Study) =>
+      Option((study.id, study.patientId, study.studyInstanceUID.value, study.studyDescription.value, study.studyDate.value, study.studyID.value, study.accessionNumber.value, study.patientAge.value))
 
   // *** Study *** //
 
-  val toStudy = (id: Long, patientId: Long, studyInstanceUID: String, studyDescription: String, studyDate: String, studyID: String, accessionNumber: String, patientAge: String) =>
-    Study(id, patientId, StudyInstanceUID(studyInstanceUID), StudyDescription(studyDescription), StudyDate(studyDate), StudyID(studyID), AccessionNumber(accessionNumber), PatientAge(patientAge))
+  val toStudy: (Long, Long, String, String, String, String, String, String) => Study =
+    (id: Long, patientId: Long, studyInstanceUID: String, studyDescription: String, studyDate: String, studyID: String, accessionNumber: String, patientAge: String) =>
+      Study(id, patientId, StudyInstanceUID(studyInstanceUID), StudyDescription(studyDescription), StudyDate(studyDate), StudyID(studyID), AccessionNumber(accessionNumber), PatientAge(patientAge))
 
   class StudiesTable(tag: Tag) extends Table[Study](tag, StudiesTable.name) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
@@ -88,10 +93,13 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
 
   // *** Series ***
 
-  val toSeries = (id: Long, studyId: Long, seriesInstanceUID: String, seriesDescription: String, seriesDate: String, modality: String, protocolName: String, bodyPartExamined: String, manufacturer: String, stationName: String, frameOfReferenceUID: String) =>
-    Series(id, studyId, SeriesInstanceUID(seriesInstanceUID), SeriesDescription(seriesDescription), SeriesDate(seriesDate), Modality(modality), ProtocolName(protocolName), BodyPartExamined(bodyPartExamined), Manufacturer(manufacturer), StationName(stationName), FrameOfReferenceUID(frameOfReferenceUID))
+  val toSeries: (Long, Long, String, String, String, String, String, String, String, String, String) => Series =
+    (id: Long, studyId: Long, seriesInstanceUID: String, seriesDescription: String, seriesDate: String, modality: String, protocolName: String, bodyPartExamined: String, manufacturer: String, stationName: String, frameOfReferenceUID: String) =>
+      Series(id, studyId, SeriesInstanceUID(seriesInstanceUID), SeriesDescription(seriesDescription), SeriesDate(seriesDate), Modality(modality), ProtocolName(protocolName), BodyPartExamined(bodyPartExamined), Manufacturer(manufacturer), StationName(stationName), FrameOfReferenceUID(frameOfReferenceUID))
 
-  val fromSeries = (series: Series) => Option((series.id, series.studyId, series.seriesInstanceUID.value, series.seriesDescription.value, series.seriesDate.value, series.modality.value, series.protocolName.value, series.bodyPartExamined.value, series.manufacturer.value, series.stationName.value, series.frameOfReferenceUID.value))
+  val fromSeries: Series => Option[(Long, Long, String, String, String, String, String, String, String, String, String)] =
+    (series: Series) =>
+      Option((series.id, series.studyId, series.seriesInstanceUID.value, series.seriesDescription.value, series.seriesDate.value, series.modality.value, series.protocolName.value, series.bodyPartExamined.value, series.manufacturer.value, series.stationName.value, series.frameOfReferenceUID.value))
 
   class SeriesTable(tag: Tag) extends Table[Series](tag, SeriesTable.name) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
@@ -119,10 +127,13 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
 
   // *** Image ***
 
-  val toImage = (id: Long, seriesId: Long, sopInstanceUID: String, imageType: String, instanceNumber: String) =>
-    Image(id, seriesId, SOPInstanceUID(sopInstanceUID), ImageType(imageType), InstanceNumber(instanceNumber))
+  val toImage: (Long, Long, String, String, String) => Image =
+    (id: Long, seriesId: Long, sopInstanceUID: String, imageType: String, instanceNumber: String) =>
+      Image(id, seriesId, SOPInstanceUID(sopInstanceUID), ImageType(imageType), InstanceNumber(instanceNumber))
 
-  val fromImage = (image: Image) => Option((image.id, image.seriesId, image.sopInstanceUID.value, image.imageType.value, image.instanceNumber.value))
+  val fromImage: Image => Option[(Long, Long, String, String, String)] =
+    (image: Image) =>
+      Option((image.id, image.seriesId, image.sopInstanceUID.value, image.imageType.value, image.instanceNumber.value))
 
   class ImagesTable(tag: Tag) extends Table[Image](tag, ImagesTable.name) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
@@ -142,13 +153,13 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
 
   val imagesQuery = TableQuery[ImagesTable]
 
-  def create() = createTables(dbConf, (PatientsTable.name, patientsQuery), (StudiesTable.name, studiesQuery), (SeriesTable.name, seriesQuery), (ImagesTable.name, imagesQuery))
+  def create(): Future[Unit] = createTables(dbConf, (PatientsTable.name, patientsQuery), (StudiesTable.name, studiesQuery), (SeriesTable.name, seriesQuery), (ImagesTable.name, imagesQuery))
 
-  def drop() = db.run {
+  def drop(): Future[Unit] = db.run {
     (patientsQuery.schema ++ studiesQuery.schema ++ seriesQuery.schema ++ imagesQuery.schema).drop
   }
 
-  def clear() = db.run {
+  def clear(): Future[Unit] = db.run {
     DBIO.seq(patientsQuery.delete, studiesQuery.delete, seriesQuery.delete, imagesQuery.delete)
   }
 
@@ -172,44 +183,36 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
 
   // *** Get entities by id
 
-  def patientByIdAction(id: Long) = patientsQuery.filter(_.id === id).result.headOption
+  def patientById(id: Long): Future[Option[Patient]] = db.run(patientsQuery.filter(_.id === id).result.headOption)
 
-  def patientById(id: Long): Future[Option[Patient]] = db.run(patientByIdAction(id))
+  def studyById(id: Long): Future[Option[Study]] = db.run(studiesQuery.filter(_.id === id).result.headOption)
 
-  def studyByIdAction(id: Long) = studiesQuery.filter(_.id === id).result.headOption
+  def seriesById(id: Long): Future[Option[Series]] = db.run(seriesQuery.filter(_.id === id).result.headOption)
 
-  def studyById(id: Long): Future[Option[Study]] = db.run(studyByIdAction(id))
-
-  def seriesByIdAction(id: Long) = seriesQuery.filter(_.id === id).result.headOption
-
-  def seriesById(id: Long): Future[Option[Series]] = db.run(seriesByIdAction(id))
-
-  def imageByIdAction(id: Long) = imagesQuery.filter(_.id === id).result.headOption
-
-  def imageById(id: Long): Future[Option[Image]] = db.run(imageByIdAction(id))
+  def imageById(id: Long): Future[Option[Image]] = db.run(imagesQuery.filter(_.id === id).result.headOption)
 
   // *** Inserts ***
 
-  def insertPatientAction(patient: Patient) =
+  def insertPatientAction(patient: Patient): DBIOAction[Patient, NoStream, Effect.Write] =
     (patientsQuery returning patientsQuery.map(_.id) += patient
       .copy(patientName = patient.patientName.copy(value = patient.patientName.value.take(180))))
       .map(generatedId => patient.copy(id = generatedId))
 
   def insert(patient: Patient): Future[Patient] = db.run(insertPatientAction(patient))
 
-  def insertStudyAction(study: Study) =
+  def insertStudyAction(study: Study): DBIOAction[Study, NoStream, Effect.Write] =
     (studiesQuery returning studiesQuery.map(_.id) += study)
       .map(generatedId => study.copy(id = generatedId))
 
   def insert(study: Study): Future[Study] = db.run(insertStudyAction(study))
 
-  def insertSeriesAction(series: Series) =
+  def insertSeriesAction(series: Series): DBIOAction[Series, NoStream, Effect.Write] =
     (seriesQuery returning seriesQuery.map(_.id) += series)
       .map(generatedId => series.copy(id = generatedId))
 
   def insert(series: Series): Future[Series] = db.run(insertSeriesAction(series))
 
-  def insertImageAction(image: Image) =
+  def insertImageAction(image: Image): DBIOAction[Image, NoStream, Effect.Write] =
     (imagesQuery returning imagesQuery.map(_.id) += image)
       .map(generatedId => image.copy(id = generatedId))
 
@@ -224,7 +227,7 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
 
     checkColumnExists(dbConf, orderBy, PatientsTable.name).flatMap { _ =>
       db.run {
-        implicit val getResult = patientsGetResult
+        implicit val getResult: GetResult[Patient] = patientsGetResult
 
         val query =
           patientsBasePart +
@@ -239,7 +242,7 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
 
   val patientsBasePart = """select * from "Patients""""
 
-  def patientsFilterPart(filter: Option[String]) =
+  def patientsFilterPart(filter: Option[String]): String =
     filter.map(filterValue => {
       val filterValueLike = s"'%$filterValue%'".toLowerCase
       s""" (lcase("Patients"."patientName") like $filterValueLike or
@@ -263,7 +266,7 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
     checkColumnExists(dbConf, orderBy, PatientsTable.name, StudiesTable.name, SeriesTable.name).flatMap { _ =>
       Future.sequence(queryProperties.map(qp => checkColumnExists(dbConf, qp.propertyName, PatientsTable.name, StudiesTable.name, SeriesTable.name))).flatMap { _ =>
         db.run {
-          implicit val getResult = patientsGetResult
+          implicit val getResult: GetResult[Patient] = patientsGetResult
 
           val query = queryPatientsSelectPart +
             wherePart(queryPart(queryProperties)) +
@@ -295,7 +298,7 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
     checkColumnExists(dbConf, orderBy, PatientsTable.name, StudiesTable.name, SeriesTable.name).flatMap { _ =>
       Future.sequence(queryProperties.map(qp => checkColumnExists(dbConf, qp.propertyName, PatientsTable.name, StudiesTable.name, SeriesTable.name))).flatMap { _ =>
         db.run {
-          implicit val getResult = studiesGetResult
+          implicit val getResult: GetResult[Study] = studiesGetResult
 
           val query = queryStudiesSelectPart +
             wherePart(queryPart(queryProperties)) +
@@ -330,7 +333,7 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
     checkColumnExists(dbConf, orderBy, PatientsTable.name, StudiesTable.name, SeriesTable.name).flatMap { _ =>
       Future.sequence(queryProperties.map(qp => checkColumnExists(dbConf, qp.propertyName, PatientsTable.name, StudiesTable.name, SeriesTable.name))).flatMap { _ =>
         db.run {
-          implicit val getResult = seriesGetResult
+          implicit val getResult: GetResult[Series] = seriesGetResult
 
           val query = querySeriesSelectPart +
             wherePart(queryPart(queryProperties)) +
@@ -360,7 +363,7 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
     checkColumnExists(dbConf, orderBy, PatientsTable.name, StudiesTable.name, SeriesTable.name, ImagesTable.name).flatMap { _ =>
       Future.sequence(queryProperties.map(qp => checkColumnExists(dbConf, qp.propertyName, PatientsTable.name, StudiesTable.name, SeriesTable.name, ImagesTable.name))).flatMap { _ =>
         db.run {
-          implicit val getResult = imagesGetResult
+          implicit val getResult: GetResult[Image] = imagesGetResult
 
           val query = queryImagesSelectPart +
             wherePart(queryPart(queryProperties)) +
@@ -376,7 +379,7 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
     checkColumnExists(dbConf, orderBy, PatientsTable.name, StudiesTable.name, SeriesTable.name).flatMap { _ =>
       Future.sequence(queryProperties.map(qp => checkColumnExists(dbConf, qp.propertyName, PatientsTable.name, StudiesTable.name, SeriesTable.name))).flatMap { _ =>
         db.run {
-          implicit val getResult = flatSeriesGetResult
+          implicit val getResult: GetResult[FlatSeries] = flatSeriesGetResult
 
           val query = flatSeriesBasePart +
             wherePart(queryPart(queryProperties)) +
@@ -407,7 +410,7 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
 
     checkColumnExists(dbConf, orderBy, PatientsTable.name, StudiesTable.name, SeriesTable.name).flatMap { _ =>
       db.run {
-        implicit val getResult = flatSeriesGetResult
+        implicit val getResult: GetResult[FlatSeries] = flatSeriesGetResult
 
         val query = flatSeriesBasePart +
           wherePart(filter) +
@@ -419,7 +422,7 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
       }
     }
 
-  def flatSeriesFilterPart(filter: Option[String]) =
+  def flatSeriesFilterPart(filter: Option[String]): String =
     filter.map(filterValue => {
       val filterValueLike = s"'%$filterValue%'".toLowerCase
       s""" (lcase("Series"."id") like $filterValueLike or
@@ -443,7 +446,7 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
       .getOrElse("")
 
   def flatSeriesById(seriesId: Long): Future[Option[FlatSeries]] = db.run {
-    implicit val getResult = flatSeriesGetResult
+    implicit val getResult: GetResult[FlatSeries] = flatSeriesGetResult
     val query = flatSeriesBasePart + s""" where "Series"."id" = $seriesId"""
     sql"#$query".as[FlatSeries].headOption
   }
@@ -466,67 +469,90 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
       .result
   }
 
-  def imagesForSeries(startIndex: Long, count: Long, seriesId: Long): Future[Seq[Image]] = db.run {
-    imagesQuery
-      .filter(_.seriesId === seriesId)
-      .drop(startIndex)
-      .take(count)
-      .result
-  }
+  val imagesBasePart = """select * from "Images""""
 
-  def patientByNameAndIDAction(patient: Patient) =
+  def imagesFilterPart(filter: Option[String]): String =
+    filter.map(filterValue => {
+      val filterValueLike = s"'%$filterValue%'".toLowerCase
+      s""" (lcase("Images"."sopInstanceUID") like $filterValueLike or
+           lcase("Images"."imageType") like $filterValueLike or
+           lcase("Images"."instanceNumber") like $filterValueLike)"""
+    })
+      .getOrElse("")
+
+  def imagesForSeries(startIndex: Long, count: Long, seriesId: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String]): Future[Seq[Image]] =
+    checkColumnExists(dbConf, orderBy, ImagesTable.name).flatMap { _ =>
+      db.run {
+        implicit val getResult: GetResult[Image] = imagesGetResult
+
+        val imagesForSeriesPart = s""" "seriesId" = $seriesId"""
+
+        val query =
+          imagesBasePart +
+            " where" +
+            imagesForSeriesPart +
+            filter.map(_ => " and").getOrElse("") +
+            imagesFilterPart(filter) +
+            orderByPart(orderBy, orderAscending) +
+            pagePart(startIndex, count)
+
+        sql"#$query".as[Image]
+      }
+    }
+
+  def patientsByNameAndIDAction(patient: Patient): BasicStreamingAction[Seq[Patient], Patient, Effect.Read] =
     patientsQuery
       .filter(_.patientName === patient.patientName.value.take(180))
       .filter(_.patientID === patient.patientID.value)
-      .result.headOption
+      .result
 
-  def patientByNameAndID(patient: Patient): Future[Option[Patient]] = db.run(patientByNameAndIDAction(patient))
+  def patientByNameAndID(patient: Patient): Future[Option[Patient]] = db.run(patientsByNameAndIDAction(patient).headOption)
 
-  def studyByUidAndPatientAction(study: Study, patient: Patient) =
+  def studiesByUidAndPatientAction(study: Study, patient: Patient): BasicStreamingAction[Seq[Study], Study, Effect.Read] =
     studiesQuery
       .filter(_.studyInstanceUID === study.studyInstanceUID.value)
       .filter(_.patientId === patient.id)
-      .result.headOption
+      .result
 
   def studyByUidAndPatient(study: Study, patient: Patient): Future[Option[Study]] =
-    db.run(studyByUidAndPatientAction(study, patient))
+    db.run(studiesByUidAndPatientAction(study, patient).headOption)
 
-  def seriesByUidAndStudyAction(series: Series, study: Study) =
+  def seriesByUidAndStudyAction(series: Series, study: Study): BasicStreamingAction[Seq[Series], Series, Effect.Read] =
     seriesQuery
       .filter(_.seriesInstanceUID === series.seriesInstanceUID.value)
       .filter(_.studyId === study.id)
-      .result.headOption
+      .result
 
   def seriesByUidAndStudy(series: Series, study: Study): Future[Option[Series]] =
-    db.run(seriesByUidAndStudyAction(series, study))
+    db.run(seriesByUidAndStudyAction(series, study).headOption)
 
-  def imageByUidAndSeriesAction(image: Image, series: Series) =
+  def imagesByUidAndSeriesAction(image: Image, series: Series): BasicStreamingAction[Seq[Image], Image, Effect.Read] =
     imagesQuery
       .filter(_.sopInstanceUID === image.sopInstanceUID.value)
       .filter(_.seriesId === series.id)
-      .result.headOption
+      .result
 
   def imageByUidAndSeries(image: Image, series: Series): Future[Option[Image]] =
-    db.run(imageByUidAndSeriesAction(image, series))
+    db.run(imagesByUidAndSeriesAction(image, series).headOption)
 
   // *** Updates ***
 
-  def updatePatientAction(patient: Patient) =
+  def updatePatientAction(patient: Patient): BasicAction[Int, NoStream, Effect.Write] =
     patientsQuery.filter(_.id === patient.id).update(patient)
 
   def updatePatient(patient: Patient): Future[Int] = db.run(updatePatientAction(patient))
 
-  def updateStudyAction(study: Study) =
+  def updateStudyAction(study: Study): BasicAction[Int, NoStream, Effect.Write] =
     studiesQuery.filter(_.id === study.id).update(study)
 
   def updateStudy(study: Study): Future[Int] = db.run(updateStudyAction(study))
 
-  def updateSeriesAction(series: Series) =
+  def updateSeriesAction(series: Series): BasicAction[Int, NoStream, Effect.Write] =
     seriesQuery.filter(_.id === series.id).update(series)
 
   def updateSeries(series: Series): Future[Int] = db.run(updateSeriesAction(series))
 
-  def updateImageAction(image: Image) =
+  def updateImageAction(image: Image): BasicAction[Int, NoStream, Effect.Write] =
     imagesQuery.filter(_.id === image.id).update(image)
 
   def updateImage(image: Image): Future[Int] = db.run(updateImageAction(image))
@@ -535,10 +561,10 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
 
 object MetaDataDAO {
 
-  def wherePart(whereParts: Option[String]*) =
+  def wherePart(whereParts: Option[String]*): String =
     if (whereParts.exists(_.isDefined)) " where" else ""
 
-  def orderByPart(orderBy: Option[String], orderAscending: Boolean) =
+  def orderByPart(orderBy: Option[String], orderAscending: Boolean): String =
     orderBy.map { orderByValue =>
 
       /*
@@ -560,7 +586,7 @@ object MetaDataDAO {
   def queryPart(queryProperties: Seq[QueryProperty]): String =
     queryProperties.map(queryPropertyToPart).mkString(" and ")
 
-  def queryPropertyToPart(queryProperty: QueryProperty) = {
+  def queryPropertyToPart(queryProperty: QueryProperty): String = {
     val valuePart =
       if (queryProperty.operator == EQUALS)
         s"'${queryProperty.propertyValue}'"
