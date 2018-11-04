@@ -14,8 +14,9 @@
                                 callbacks="callbacks.filtersTable"
                                 object-selected="filterSelected(object)"
                                 empty-message="No filters added">
-                            <sbx-grid-column property="name" title="Name">
-                            </sbx-grid-column>
+
+                            <sbx-grid-column property="id" title="Id"></sbx-grid-column>
+                            <sbx-grid-column property="name" title="Name"></sbx-grid-column>
                             <sbx-grid-column property="tagFilterType" title="Type">
                                 <sbx-grid-cell>{{rowObject.tagFilterType | lowercase}}</sbx-grid-cell>
                             </sbx-grid-column>
@@ -45,8 +46,9 @@
                                 callbacks="callbacks.filterTagPathTables"
                                 empty-message="No Tag Paths added">
 
-                            <sbx-grid-column title="Tag Path (tags)" property="tags"></sbx-grid-column>
-                            <sbx-grid-column title="Tag Path (names)" property="names"></sbx-grid-column>
+                            <sbx-grid-column property="id" title="Id"></sbx-grid-column>
+                            <sbx-grid-column property="tags" title="Tag Path (tags)"></sbx-grid-column>
+                            <sbx-grid-column property="names" title="Tag Path (names)"></sbx-grid-column>
 
                         </sbx-grid>
                         <div layout="row" class="button-row">
@@ -75,13 +77,14 @@
                         callbacks="callbacks.associationsTable"
                         empty-message="No source-filter associations added">
 
-                    <sbx-grid-column property="source" title="Source">
+                    <sbx-grid-column property="id" title="Id"></sbx-grid-column>
+                    <sbx-grid-column title="Source">
                         <sbx-grid-cell>
                             {{rowObject.sourceName}} ({{rowObject.sourceType}})
                         </sbx-grid-cell>
                     </sbx-grid-column>
+                    <sbx-grid-column property="tagFilterName" title="Filter"></sbx-grid-column>
 
-                    <sbx-grid-column property="filterName" title="Filter"/>
                 </sbx-grid>
 
                 <div layout="row" class="button-row">

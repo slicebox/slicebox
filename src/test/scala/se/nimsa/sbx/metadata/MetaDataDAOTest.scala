@@ -18,14 +18,14 @@ class MetaDataDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterAll
   The ExecutionContext provided by ScalaTest only works inside tests, but here we have async stuff in beforeEach and
   afterEach so we must roll our own EC.
   */
-  lazy val ec = ExecutionContext.global
+  lazy val ec: ExecutionContext = ExecutionContext.global
 
   val dbConfig = TestUtil.createTestDb("metadatadaotest")
   val dao = new MetaDataDAO(dbConfig)(ec)
 
-  implicit val timeout = Timeout(200.seconds)
+  implicit val timeout: Timeout = Timeout(200.seconds)
 
-  override def beforeAll() = await(dao.create())
+  override def beforeAll(): Unit = await(dao.create())
 
   val pat1 = Patient(-1, PatientName("p1"), PatientID("s1"), PatientBirthDate("2000-01-01"), PatientSex("M"))
   val study1 = Study(-1, -1, StudyInstanceUID("stuid1"), StudyDescription("stdesc1"), StudyDate("19990101"), StudyID("stid1"), AccessionNumber("acc1"), PatientAge("12Y"))
@@ -106,10 +106,10 @@ class MetaDataDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterAll
       studiesForPatient <- dao.studiesForPatient(0, 20, dbPat.id)
       seriesForStudy1 <- dao.seriesForStudy(0, 20, dbStudy1.id)
       seriesForStudy2 <- dao.seriesForStudy(0, 20, dbStudy2.id)
-      imagesForSeries1 <- dao.imagesForSeries(0, 20, dbSeries1.id)
-      imagesForSeries2 <- dao.imagesForSeries(0, 20, dbSeries2.id)
-      imagesForSeries3 <- dao.imagesForSeries(0, 20, dbSeries3.id)
-      imagesForSeries4 <- dao.imagesForSeries(0, 20, dbSeries4.id)
+      imagesForSeries1 <- dao.imagesForSeries(0, 20, dbSeries1.id, None, orderAscending = false, None)
+      imagesForSeries2 <- dao.imagesForSeries(0, 20, dbSeries2.id, None, orderAscending = false, None)
+      imagesForSeries3 <- dao.imagesForSeries(0, 20, dbSeries3.id, None, orderAscending = false, None)
+      imagesForSeries4 <- dao.imagesForSeries(0, 20, dbSeries4.id, None, orderAscending = false, None)
     } yield {
       patients.size should be(1)
       studiesForPatient.size should be(2)

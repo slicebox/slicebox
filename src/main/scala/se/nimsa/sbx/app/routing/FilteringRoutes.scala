@@ -36,30 +36,23 @@ trait FilteringRoutes {
               'startindex.as(nonNegativeFromStringUnmarshaller) ? 0,
               'count.as(nonNegativeFromStringUnmarshaller) ? 20)) { (startIndex, count) =>
               onSuccess(filteringService.ask(GetTagFilters(startIndex, count))) {
-                case TagFilterSpecs(tagFilterSpecs) =>
-                  complete(tagFilterSpecs)
+                case TagFilters(filters) =>
+                  complete(filters)
               }
             }
           } ~ post {
             authorize(apiUser.hasPermission(UserRole.ADMINISTRATOR)) {
-              entity(as[TagFilterSpec]) { filterSpecification =>
-                onSuccess(filteringService.ask(AddTagFilter(filterSpecification))) {
-                  case TagFilterAdded(addedTagFilter) =>
-                    complete((Created, addedTagFilter))
+              entity(as[TagFilter]) { filter =>
+                onSuccess(filteringService.ask(AddTagFilter(filter))) {
+                  case TagFilterAdded(addedFilter) =>
+                    complete((Created, addedFilter))
                 }
               }
             }
           }
         } ~ pathPrefix(LongNumber) { tagFilterId =>
           pathEndOrSingleSlash {
-            get {
-                onSuccess(filteringService.ask(GetTagFilter(tagFilterId)).mapTo[Option[TagFilterSpec]]) {
-                  case Some(tagFilterSpec) =>
-                    complete((OK, tagFilterSpec))
-                  case None =>
-                    complete(NotFound)
-                }
-            } ~ delete {
+            delete {
               authorize(apiUser.hasPermission(UserRole.ADMINISTRATOR)) {
                 onSuccess(filteringService.ask(RemoveTagFilter(tagFilterId))) {
                   case TagFilterRemoved(_) =>
@@ -67,9 +60,40 @@ trait FilteringRoutes {
                 }
               }
             }
+          } ~ pathPrefix("tagpaths") {
+            pathEndOrSingleSlash {
+              get {
+                parameters((
+                  'startindex.as(nonNegativeFromStringUnmarshaller) ? 0,
+                  'count.as(nonNegativeFromStringUnmarshaller) ? 20)) { (startIndex, count) =>
+                  onSuccess(filteringService.ask(GetTagFilterTagPaths(tagFilterId, startIndex, count))) {
+                    case TagFilterTagPaths(tagPaths) =>
+                      complete(tagPaths)
+                  }
+                }
+              } ~ post {
+                authorize(apiUser.hasPermission(UserRole.ADMINISTRATOR)) {
+                  entity(as[TagFilterTagPath]) { tagFilterTagPath =>
+                    onSuccess(filteringService.ask(AddTagFilterTagPath(tagFilterTagPath))) {
+                      case TagFilterTagPathAdded(addedTagFilterTagPath) =>
+                        complete((Created, addedTagFilterTagPath))
+                    }
+                  }
+                }
+              }
+            } ~ pathPrefix(LongNumber) { tagFilterTagPathId =>
+              delete {
+                authorize(apiUser.hasPermission(UserRole.ADMINISTRATOR)) {
+                  onSuccess(filteringService.ask(RemoveTagFilterTagPath(tagFilterTagPathId))) {
+                    case TagFilterTagPathRemoved(_) =>
+                      complete(NoContent)
+                  }
+                }
+              }
+            }
           }
         }
-      }~ pathPrefix("associations") {
+      } ~ pathPrefix("associations") {
         pathEndOrSingleSlash {
           get {
             parameters((
@@ -83,8 +107,8 @@ trait FilteringRoutes {
           } ~ post {
             authorize(apiUser.hasPermission(UserRole.ADMINISTRATOR)) {
               entity(as[SourceTagFilter]) { sourceFilterAssociation =>
-                onSuccess(filteringService.ask(AddSourceFilterAssociation(sourceFilterAssociation))) {
-                  case sourceTagFilter: SourceTagFilter =>
+                onSuccess(filteringService.ask(AddSourceTagFilter(sourceFilterAssociation))) {
+                  case SourceTagFilterAdded(sourceTagFilter) =>
                     complete((Created, sourceTagFilter))
                 }
               }
