@@ -256,3 +256,7 @@ td div.progress {
 .admin-series-types .button-row {
 	margin-top: 10px;
 }
+
+md-input-container label {
+	box-sizing: border-box;
+}

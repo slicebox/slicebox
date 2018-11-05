@@ -359,13 +359,13 @@ class ImageRoutesTest extends {
     // define modifications
     val tagMappings = Seq(
       TagMapping(TagPath
-        .fromTag(Tag.PatientAge), ByteString("123Y")), // standard replacement
+        .fromTag(Tag.PatientAge), "123Y"), // standard replacement
       TagMapping(TagPath
-        .fromTag(Tag.RescaleSlope), ByteString("2.5")), // insert new attribute
+        .fromTag(Tag.RescaleSlope), "2.5"), // insert new attribute
       TagMapping(TagPath
         .fromSequence(Tag.EnergyWindowInformationSequence)
         .thenSequence(Tag.EnergyWindowRangeSequence, 2)
-        .thenTag(Tag.EnergyWindowUpperLimit), ByteString("999")) // modify item in sequence
+        .thenTag(Tag.EnergyWindowUpperLimit), "999") // modify item in sequence
     )
 
     // modify

@@ -16,7 +16,6 @@
 
 package se.nimsa.sbx.storage
 
-import akka.util.ByteString
 import se.nimsa.dicom.data.TagPath.TagPathTag
 
 object StorageProtocol {
@@ -29,7 +28,7 @@ object StorageProtocol {
     minimumPixelValue: Int,
     maximumPixelValue: Int)
 
-  case class TagMapping(tagPath: TagPathTag, value: ByteString)
+  case class TagMapping(tagPath: TagPathTag, value: String)
 
   sealed trait ImageRequest
 

@@ -16,9 +16,6 @@
 
 package se.nimsa.sbx.app
 
-import java.util.Base64
-
-import akka.util.ByteString
 import play.api.libs.functional.syntax._
 import play.api.libs.json.Reads._
 import play.api.libs.json._
@@ -120,16 +117,7 @@ trait JsonFormats {
       ) (tagPathToTuple)
   }
 
-  implicit val tagMappingFormat: Format[TagMapping] = Format[TagMapping](
-    (
-      (__ \ "tagPath").read[TagPath] and
-        (__ \ "value").read[String]) ((tagPath, valueString) => TagMapping(tagPath.asInstanceOf[TagPathTag], ByteString(Base64.getDecoder.decode(valueString)))
-    ),
-    (
-      (__ \ "tagPath").write[TagPath] and
-        (__ \ "value").write[String]) (tagMapping => (tagMapping.tagPath, Base64.getEncoder.encodeToString(tagMapping.value.toArray))
-    )
-  )
+  implicit val tagMappingFormat: Format[TagMapping] = Json.format[TagMapping]
 
   implicit val unWatchDirectoryFormat: Format[UnWatchDirectory] = Json.format[UnWatchDirectory]
   implicit val watchedDirectoryFormat: Format[WatchedDirectory] = Json.format[WatchedDirectory]
