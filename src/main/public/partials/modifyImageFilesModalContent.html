@@ -11,8 +11,8 @@
                 <md-card-header>
                     <div layout="row" layout-align="left center">
                         <md-button class="md-icon-button md-primary" aria-label="Settings" ng-click="switchFolding($index)">
-                            <md-icon ng-if="!uiState.folded[$index]" md-svg-icon="/assets/images/ic_arrow_drop_up_black_18px"></md-icon>
-                            <md-icon ng-if="uiState.folded[$index]" md-svg-icon="/assets/images/ic_arrow_drop_down_black_18px"></md-icon>
+                            <md-icon ng-if="!uiState.folded[$index]" md-svg-icon="/assets/images/ic_arrow_drop_up_black_18px.svg"></md-icon>
+                            <md-icon ng-if="uiState.folded[$index]" md-svg-icon="/assets/images/ic_arrow_drop_down_black_18px.svg"></md-icon>
                         </md-button>
                         <span class="md-caption" ng-if="isModificationValid(mod)">{{ mod.tagPath | tagPath }} = {{ mod.value }}</span>
                         <span class="md-caption" ng-if="!isModificationValid(mod)"><em>Undefined modification</em></span>
