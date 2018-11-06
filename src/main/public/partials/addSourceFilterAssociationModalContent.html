@@ -15,7 +15,7 @@
             <md-input-container>
                 <label>Filter</label>
                 <md-select ng-model="uiState.filter" md-on-open="loadFilters()" placeholder="Select a filter">
-                    <md-option ng-value="filter" ng-repeat="filter in uiState.filters">{{ filter.name }}</md-option>
+                    <md-option ng-value="filter" ng-repeat="filter in uiState.filters">{{ filter.name }} (id: {{ filter.id }})</md-option>
                 </md-select>
             </md-input-container>
         </div>

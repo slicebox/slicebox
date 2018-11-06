@@ -30,7 +30,7 @@ import org.dcm4che3.imageio.plugins.dcm.DicomImageReadParam
 import se.nimsa.dicom.data.DicomParts._
 import se.nimsa.dicom.data.Elements._
 import se.nimsa.dicom.data.TagPath.TagPathTag
-import se.nimsa.dicom.data.{DicomParsing, Elements, Dictionary, _}
+import se.nimsa.dicom.data.{DicomParsing, Dictionary, Elements, _}
 import se.nimsa.dicom.streams.CollectFlow._
 import se.nimsa.dicom.streams.DicomFlows._
 import se.nimsa.dicom.streams.ElementFlows._
@@ -43,8 +43,7 @@ import se.nimsa.sbx.dicom.Contexts.Context
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.DicomPropertyValue.{PatientID, PatientName}
 import se.nimsa.sbx.dicom.{Contexts, ImageAttribute}
-import se.nimsa.sbx.filtering.FilteringProtocol.TagFilterType.{BLACKLIST, WHITELIST}
-import se.nimsa.sbx.filtering.FilteringProtocol.{GetFilterSpecsForSource, TagFilterSpec}
+import se.nimsa.sbx.filtering.FilteringProtocol.{GetFilterSpecsForSource, TagFilterSpec, TagFilterType}
 import se.nimsa.sbx.lang.NotFoundException
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.storage.StorageProtocol.ImageInformation
@@ -412,19 +411,12 @@ trait DicomStreamOps {
     .via(fmiGroupLengthFlow)
     .map(_.bytes)
 
-  private def tagFilterSpecsToFlow(tagFilterSpecs: Seq[TagFilterSpec]): Flow[DicomPart, DicomPart, NotUsed] =
-    tagFilterSpecs.foldLeft(identityDicomPartFlow) {
-      case (flow, tagFilterSpec) =>
-        flow.via {
-          tagFilterSpec match {
-            case TagFilterSpec(_, WHITELIST, tags) =>
-              whitelistFilter(tags.toSet)
-            case TagFilterSpec(_, BLACKLIST, tags) =>
-              blacklistFilter(tags.toSet)
-            case _ => //Should not happen
-              identityDicomPartFlow
-          }
-        }
-    }
+  private def tagFilterSpecsToFlow(tagFilterSpecs: Seq[TagFilterSpec]): Flow[DicomPart, DicomPart, NotUsed] = {
+    val blacklistTags = tagFilterSpecs.filter(_.tagFilterType == TagFilterType.BLACKLIST).flatMap(_.tagPaths).toSet
+    val whitelistTags = tagFilterSpecs.filter(_.tagFilterType == TagFilterType.WHITELIST).flatMap(_.tagPaths).toSet
+    val blackFilter = if (blacklistTags.isEmpty) identityDicomPartFlow else blacklistFilter(blacklistTags)
+    val whiteFilter = if (whitelistTags.isEmpty) identityDicomPartFlow else whitelistFilter(whitelistTags)
+    blackFilter.via(whiteFilter)
+  }
 
 }
