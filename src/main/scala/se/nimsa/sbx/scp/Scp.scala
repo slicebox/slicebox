@@ -16,21 +16,21 @@
 
 package se.nimsa.sbx.scp
 
+import java.io.ByteArrayOutputStream
 import java.util.concurrent.{Executor, ScheduledExecutorService}
 
 import akka.actor.ActorRef
 import akka.pattern.ask
 import akka.util.{ByteString, Timeout}
-import com.sun.xml.internal.messaging.saaj.util.ByteOutputStream
 import com.typesafe.scalalogging.LazyLogging
 import org.dcm4che3.data.Attributes
 import org.dcm4che3.io.DicomOutputStream
 import org.dcm4che3.net._
 import org.dcm4che3.net.pdu.PresentationContext
 import org.dcm4che3.net.service.{BasicCEchoSCP, BasicCStoreSCP, DicomServiceRegistry}
-import se.nimsa.sbx.dicom.DicomUtil.toCheVR
 import se.nimsa.dicom.data.{Tag, UID, VR}
 import se.nimsa.sbx.dicom.Contexts
+import se.nimsa.sbx.dicom.DicomUtil.toCheVR
 import se.nimsa.sbx.scp.ScpProtocol.DicomDataReceivedByScp
 
 import scala.concurrent.Await
@@ -53,13 +53,13 @@ class Scp(val name: String,
 
       val fmi = as.createFileMetaInformation(iuid, cuid, tsuid)
 
-      val baos = new ByteOutputStream()
+      val baos = new ByteArrayOutputStream()
       val dos = new DicomOutputStream(baos, UID.ExplicitVRLittleEndian)
       dos.writeFileMetaInformation(fmi)
       data.copyTo(dos)
       dos.close()
 
-      val bytes = ByteString(baos.getBytes.take(baos.size))
+      val bytes = ByteString(baos.toByteArray.take(baos.size))
 
       /*
        * This is the interface between a synchronous callback and a async actor system. To avoid sending too many large

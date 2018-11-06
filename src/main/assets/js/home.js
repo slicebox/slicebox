@@ -438,12 +438,27 @@ angular.module('slicebox.home', ['ngRoute'])
         return loadFlatSeriesPromise;
     };
 
-    $scope.loadImages = function(startIndex, count) {
+    $scope.loadImages = function(startIndex, count, orderByProperty, orderByDirection, filter) {
         if ($scope.uiState.selectedSeries === null) {
             return [];
         }
 
         var loadImagesUrl = '/api/metadata/images?startindex=' + startIndex + '&count=' + count + '&seriesid=' + $scope.uiState.selectedSeries.id;
+
+        if (orderByProperty) {
+            var orderByPropertyName = orderByProperty === "id" ? orderByProperty : orderByProperty.substring(0, orderByProperty.indexOf('['));
+            loadImagesUrl = loadImagesUrl + '&orderby=' + orderByPropertyName;
+
+            if (orderByDirection === 'ASCENDING') {
+                loadImagesUrl = loadImagesUrl + '&orderascending=true';
+            } else {
+                loadImagesUrl = loadImagesUrl + '&orderascending=false';
+            }
+        }
+
+        if (filter) {
+            loadImagesUrl = loadImagesUrl + '&filter=' + encodeURIComponent(filter);
+        }
 
         var loadImagesPromise = $http.get(loadImagesUrl);
 

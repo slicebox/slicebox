@@ -200,10 +200,10 @@
                     <md-card-content class="md-padding" style="height: 600px">
                         <md-content>
                             <sbx-grid
-                                    load-page="loadImages(startIndex, count)"
+                                    load-page="loadImages(startIndex, count, orderByProperty, orderByDirection, filter)"
                                     page-size="10"
                                     page-sizes="[10, 25, 100, 1000]"
-                                    sorting="false"
+                                    filter="true"
                                     object-actions="imageActions"
                                     object-selected="imageSelected(object)"
                                     callbacks="callbacks.imageTable"

@@ -30,7 +30,7 @@ import org.dcm4che3.imageio.plugins.dcm.DicomImageReadParam
 import se.nimsa.dicom.data.DicomParts._
 import se.nimsa.dicom.data.Elements._
 import se.nimsa.dicom.data.TagPath.TagPathTag
-import se.nimsa.dicom.data.{DicomParsing, Elements, Dictionary, _}
+import se.nimsa.dicom.data.{DicomParsing, Dictionary, Elements, _}
 import se.nimsa.dicom.streams.CollectFlow._
 import se.nimsa.dicom.streams.DicomFlows._
 import se.nimsa.dicom.streams.ElementFlows._
@@ -43,8 +43,7 @@ import se.nimsa.sbx.dicom.Contexts.Context
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.DicomPropertyValue.{PatientID, PatientName}
 import se.nimsa.sbx.dicom.{Contexts, ImageAttribute}
-import se.nimsa.sbx.filtering.FilteringProtocol.TagFilterType.{BLACKLIST, WHITELIST}
-import se.nimsa.sbx.filtering.FilteringProtocol.{GetFilterForSource, TagFilterSpec}
+import se.nimsa.sbx.filtering.FilteringProtocol.{GetFilterSpecsForSource, TagFilterSpec, TagFilterType}
 import se.nimsa.sbx.lang.NotFoundException
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.storage.StorageProtocol.ImageInformation
@@ -95,21 +94,21 @@ trait DicomStreamOps {
   protected def storeDicomData(bytesSource: StreamSource[ByteString, _], source: Source, storage: StorageService, contexts: Seq[Context], reverseAnonymization: Boolean)
                               (implicit materializer: Materializer, ec: ExecutionContext): Future[MetaDataAdded] = {
     val tempPath = createTempPath()
-    val filter = callFilteringService[Option[TagFilterSpec]](GetFilterForSource(source.toSourceRef))
-    filter.flatMap(maybeTagFilter => {
-      val tagFilter = maybeTagFilter.map(tagFilterSpecToFlow(_)).getOrElse(identityDicomPartFlow)
+    callFilteringService[Seq[TagFilterSpec]](GetFilterSpecsForSource(source.toSourceRef))
+      .flatMap { filters =>
+        val filterFlow = tagFilterSpecsToFlow(filters)
 
-      val sink = dicomDataSink(storage.fileSink(tempPath), storage.parseFlow(None), reverseAnonymizationKeysForPatient, contexts, reverseAnonymization, tagFilter)
-      bytesSource.runWith(sink)
-        .flatMap(elements => storeDicomData(elements, source, tempPath, storage))
-        .recover {
-          case t: Throwable =>
-            scheduleTask(30.seconds) {
-              storage.deleteByName(Seq(tempPath)) // delete temp file once file system has released handle
-            }
-            if (!t.isInstanceOf[DicomStreamException]) throw new DicomStreamException(t.getMessage) else throw t
-        }
-    })
+        val sink = dicomDataSink(storage.fileSink(tempPath), storage.parseFlow(None), reverseAnonymizationKeysForPatient, contexts, reverseAnonymization, filterFlow)
+        bytesSource.runWith(sink)
+          .flatMap(elements => storeDicomData(elements, source, tempPath, storage))
+          .recover {
+            case t: Throwable =>
+              scheduleTask(30.seconds) {
+                storage.deleteByName(Seq(tempPath)) // delete temp file once file system has released handle
+              }
+              if (!t.isInstanceOf[DicomStreamException]) throw new DicomStreamException(t.getMessage) else throw t
+          }
+      }
   }
 
   /**
@@ -412,13 +411,12 @@ trait DicomStreamOps {
     .via(fmiGroupLengthFlow)
     .map(_.bytes)
 
-  private def tagFilterSpecToFlow(tagFilterSpec: TagFilterSpec): Flow[DicomPart, DicomPart, NotUsed] =
-    tagFilterSpec match {
-      case TagFilterSpec(_, _, WHITELIST, tags) =>
-        whitelistFilter(tags.toSet)
-      case TagFilterSpec(_, _, BLACKLIST, tags) =>
-        blacklistFilter(tags.toSet)
-      case _ => //Should not happen
-        identityDicomPartFlow
-    }
+  private def tagFilterSpecsToFlow(tagFilterSpecs: Seq[TagFilterSpec]): Flow[DicomPart, DicomPart, NotUsed] = {
+    val blacklistTags = tagFilterSpecs.filter(_.tagFilterType == TagFilterType.BLACKLIST).flatMap(_.tagPaths).toSet
+    val whitelistTags = tagFilterSpecs.filter(_.tagFilterType == TagFilterType.WHITELIST).flatMap(_.tagPaths).toSet
+    val blackFilter = if (blacklistTags.isEmpty) identityDicomPartFlow else blacklistFilter(blacklistTags)
+    val whiteFilter = if (whitelistTags.isEmpty) identityDicomPartFlow else whitelistFilter(whitelistTags)
+    blackFilter.via(whiteFilter)
+  }
+
 }

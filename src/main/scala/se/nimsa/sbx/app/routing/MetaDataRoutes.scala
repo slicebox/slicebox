@@ -241,8 +241,11 @@ trait MetaDataRoutes {
             parameters((
               'startindex.as(nonNegativeFromStringUnmarshaller) ? 0,
               'count.as(nonNegativeFromStringUnmarshaller) ? 20,
-              'seriesid.as[Long])) { (startIndex, count, seriesId) =>
-              onSuccess(metaDataService.ask(GetImages(startIndex, count, seriesId))) {
+              'seriesid.as[Long],
+              'orderby.as[String].?,
+              'orderascending.as[Boolean] ? true,
+              'filter.as[String].?)) { (startIndex, count, seriesId, orderBy, orderAscending, filter) =>
+              onSuccess(metaDataService.ask(GetImages(startIndex, count, seriesId, orderBy, orderAscending, filter))) {
                 case Images(images) =>
                   complete(images)
               }

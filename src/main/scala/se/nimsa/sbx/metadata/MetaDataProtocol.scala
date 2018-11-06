@@ -86,7 +86,7 @@ object MetaDataProtocol {
 
   case class GetFlatSeries(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String], sourceRefs: Array[SourceRef], seriesTypeIds: Array[Long], seriesTagIds: Array[Long]) extends MetaDataQuery
 
-  case class GetImages(startIndex: Long, count: Long, seriesId: Long) extends MetaDataQuery
+  case class GetImages(startIndex: Long, count: Long, seriesId: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String]) extends MetaDataQuery
 
   case class GetImagesForStudy(studyId: Long, sourceRefs: Array[SourceRef], seriesTypeIds: Array[Long], seriesTagIds: Array[Long]) extends MetaDataQuery
   

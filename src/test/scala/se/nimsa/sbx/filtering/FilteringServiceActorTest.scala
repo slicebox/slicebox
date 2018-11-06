@@ -4,9 +4,9 @@ import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.testkit.{ImplicitSender, TestKit}
 import akka.util.Timeout
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
-import se.nimsa.dicom.data.TagPath
+import se.nimsa.dicom.data.{Tag, TagPath}
 import se.nimsa.sbx.app.GeneralProtocol._
-import se.nimsa.sbx.filtering.FilteringProtocol.TagFilterType.WHITELIST
+import se.nimsa.sbx.filtering.FilteringProtocol.TagFilterType.{BLACKLIST, WHITELIST}
 import se.nimsa.sbx.filtering.FilteringProtocol._
 import se.nimsa.sbx.util.FutureUtil.await
 import se.nimsa.sbx.util.TestUtil
@@ -35,143 +35,59 @@ class FilteringServiceActorTest(_system: ActorSystem) extends TestKit(_system) w
 
   override def afterAll(): Unit = TestKit.shutdownActorSystem(system)
 
-  def getTagFilterSpec1 = FilteringProtocol.TagFilterSpec(-1, "filter1", WHITELIST, Seq(TagPath.fromTag(0x0008000d)))
-
-  def getTagFilterSpec2 = FilteringProtocol.TagFilterSpec(-1, "filter2", WHITELIST, Seq(TagPath.fromTag(0x00100010), TagPath.fromTag(0x00100020)))
-
-  def getEmptyTagFilterSpec = TagFilterSpec(-1, "emptyFilter", WHITELIST, Seq())
-
-  case class SetSource(source: Source)
+  val tagFilter1 = TagFilter(-1, "filter1", WHITELIST)
+  val tagFilter2 = TagFilter(-1, "filter2", WHITELIST)
+  val tagFilter3 = TagFilter(-1, "filter3", BLACKLIST)
 
   "A FilteringServiceActor" should {
 
-    "support adding and listing TagFilters" in {
+    "return all filtering specifications for a source" in {
+      filteringService ! AddTagFilter(tagFilter1)
+      val filter1 = expectMsgType[TagFilterAdded].tagFilter
+      filteringService ! AddTagFilterTagPath(TagFilterTagPath(-1, filter1.id, TagPath.fromTag(Tag.PatientName)))
+      val filterTagPath1 = expectMsgType[TagFilterTagPathAdded].tagFilterTagPath
 
-      filteringService ! GetTagFilters(0, 1)
-      expectMsg(TagFilterSpecs(List.empty))
+      filteringService ! AddTagFilter(tagFilter2)
+      val filter2 = expectMsgType[TagFilterAdded].tagFilter
+      filteringService ! AddTagFilterTagPath(TagFilterTagPath(-1, filter2.id, TagPath.fromTag(Tag.PatientID)))
+      val filterTagPath2 = expectMsgType[TagFilterTagPathAdded].tagFilterTagPath
 
-      val tagFilterSpec1 = getTagFilterSpec1
-      val tagFilterSpec2 = getTagFilterSpec2
+      filteringService ! AddTagFilter(tagFilter3)
+      val filter3 = expectMsgType[TagFilterAdded].tagFilter
+      filteringService ! AddTagFilterTagPath(TagFilterTagPath(-1, filter3.id, TagPath.fromTag(Tag.StudyDate)))
+      expectMsgType[TagFilterTagPathAdded]
 
-      filteringService ! AddTagFilter(tagFilterSpec1)
-      filteringService ! AddTagFilter(tagFilterSpec2)
+      filteringService ! AddSourceTagFilter(SourceTagFilter(-1, SourceType.BOX, "my box", 23, filter1.id, filter1.name))
+      expectMsgType[SourceTagFilterAdded]
+      filteringService ! AddSourceTagFilter(SourceTagFilter(-1, SourceType.BOX, "my box", 23, filter2.id, filter2.name))
+      expectMsgType[SourceTagFilterAdded]
+      filteringService ! AddSourceTagFilter(SourceTagFilter(-1, SourceType.USER, "john", 42, filter3.id, filter3.name))
+      expectMsgType[SourceTagFilterAdded]
 
-      val filter1 = expectMsgType[TagFilterAdded].filterSpecification
-      val filter2 = expectMsgType[TagFilterAdded].filterSpecification
+      filteringService ! GetFilterSpecsForSource(SourceRef(SourceType.BOX, 23))
+      val specs = expectMsgType[Seq[TagFilterSpec]]
 
-      filteringService ! GetTagFilters(0, 10)
-      expectMsg(TagFilterSpecs(List(filter1.copy(tagPaths = Seq()), filter2.copy(tagPaths = Seq()))))
+      specs shouldBe Seq(
+        TagFilterSpec(filter1.name, filter1.tagFilterType, Seq(filterTagPath1.tagPath)),
+        TagFilterSpec(filter2.name, filter2.tagFilterType, Seq(filterTagPath2.tagPath)))
     }
 
-    "associate source with TagFilter" in {
-      val tagFilterSpec1 = getTagFilterSpec1
-      filteringService ! AddTagFilter(tagFilterSpec1)
-      val filter1 = expectMsgType[TagFilterAdded].filterSpecification
-      val source = SourceRef(SourceType.BOX, 1)
-      filteringService ! GetFilterForSource(source)
-      expectMsg(None)
-      filteringService ! AddSourceFilterAssociation(SourceTagFilter(-1, source.sourceType, source.sourceId, filter1.id))
-      expectMsgType[SourceTagFilter]
-      filteringService ! GetFilterForSource(source)
-      expectMsg(Some(filter1))
-    }
-
-    "System event SourceDeleted shall delete filter association" in {
-      filteringService ! AddTagFilter(getTagFilterSpec1)
-      val filter1 = expectMsgType[TagFilterAdded].filterSpecification
-      val source = SourceRef(SourceType.BOX, 1)
-      filteringService ! AddSourceFilterAssociation(SourceTagFilter(-1, source.sourceType, source.sourceId, filter1.id))
-      val sourceTagFilter = expectMsgType[SourceTagFilter]
+    "delete filter association when system event SourceDeleted for corresponding source is received" in {
+      filteringService ! AddTagFilter(tagFilter1)
+      val filter1 = expectMsgType[TagFilterAdded].tagFilter
+      val source = Source(SourceType.BOX, "my box", 1)
+      filteringService ! AddSourceTagFilter(SourceTagFilter(-1, source.sourceType, source.sourceName, source.sourceId, filter1.id, filter1.name))
+      val sourceTagFilter1 = expectMsgType[SourceTagFilterAdded].sourceTagFilter
+      filteringService ! AddSourceTagFilter(SourceTagFilter(-1, SourceType.USER, "john", 123, filter1.id, filter1.name))
+      val sourceTagFilter2 = expectMsgType[SourceTagFilterAdded].sourceTagFilter
       filteringService ! GetSourceTagFilters(0, 100)
-      expectMsg(SourceTagFilters(List(sourceTagFilter)))
-      system.eventStream.publish(SourceDeleted(source))
-      filteringService ! GetFilterForSource(source)
-      expectMsg(None)
+      expectMsg(SourceTagFilters(List(sourceTagFilter1, sourceTagFilter2)))
+      system.eventStream.publish(SourceDeleted(SourceRef(source.sourceType, source.sourceId)))
+      expectNoMessage()
       filteringService ! GetSourceTagFilters(0, 100)
-      expectMsg(SourceTagFilters(List()))
+      expectMsg(SourceTagFilters(List(sourceTagFilter2)))
     }
 
-    "Return complete TagFilterSpec" in {
-      val tagFilterSpec1 = getTagFilterSpec1
-
-      filteringService ! AddTagFilter(tagFilterSpec1)
-
-      val filter1 = expectMsgType[TagFilterAdded].filterSpecification
-
-      filteringService ! GetTagFilter(filter1.id)
-      expectMsg(Some(filter1))
-    }
-
-    "Update TagFilterSpec" in {
-      val tagFilterSpec1 = getTagFilterSpec1
-
-      filteringService ! AddTagFilter(tagFilterSpec1)
-
-      val filter1 = expectMsgType[TagFilterAdded].filterSpecification
-
-      filteringService ! GetTagFilter(filter1.id)
-      expectMsg(Some(filter1))
-
-      val updatedTagFilterSpec = filter1.copy(tagFilterType = TagFilterType.BLACKLIST, tagPaths=Seq(TagPath.fromTag(0x00100010), TagPath.fromTag(0x00100020)))
-
-      filteringService ! AddTagFilter(updatedTagFilterSpec.copy(id = -1))
-
-      expectMsg(TagFilterAdded(updatedTagFilterSpec))
-
-      filteringService ! GetTagFilter(filter1.id)
-      expectMsg(Some(updatedTagFilterSpec))
-    }
-
-    "Handle TagFilterSpec with no tags correctly" in {
-      //Insert filter without tags
-      val emptyTagFilterSpec = getEmptyTagFilterSpec
-      filteringService ! AddTagFilter(emptyTagFilterSpec)
-      val emptyFilter = expectMsgType[TagFilterAdded].filterSpecification
-      filteringService ! GetTagFilter(emptyFilter.id)
-      expectMsg(Some(emptyFilter))
-
-      //Update with tag(s)
-      val tempTagFilterSpec1 = emptyFilter.copy(tagPaths = Seq(TagPath.fromTag(0x00100010)))
-      filteringService ! AddTagFilter(tempTagFilterSpec1)
-      expectMsg(TagFilterAdded(tempTagFilterSpec1))
-      filteringService ! GetTagFilter(tempTagFilterSpec1.id)
-      expectMsg(Some(tempTagFilterSpec1))
-
-      //Remove all tags
-      filteringService ! AddTagFilter(emptyFilter)
-      expectMsg(TagFilterAdded(emptyFilter))
-      filteringService ! GetTagFilter(emptyFilter.id)
-      expectMsg(Some(emptyFilter))
-    }
-
-    "Delete tagFilters" in {
-
-      filteringService ! GetTagFilters(0, 1)
-      expectMsg(TagFilterSpecs(List.empty))
-
-      val tagFilterSpec1 = getTagFilterSpec1
-      val tagFilterSpec2 = getTagFilterSpec2
-
-      filteringService ! AddTagFilter(tagFilterSpec1)
-      filteringService ! AddTagFilter(tagFilterSpec2)
-
-      val filter1 = expectMsgType[TagFilterAdded].filterSpecification
-      val filter2 = expectMsgType[TagFilterAdded].filterSpecification
-
-      filteringService ! GetTagFilters(0, 10)
-      val msg = expectMsgType[TagFilterSpecs]
-      msg.tagFilterSpecs.size shouldBe 2
-
-      filteringService ! RemoveTagFilter(filter1.id)
-      filteringService ! RemoveTagFilter(filter2.id)
-
-      expectMsg(TagFilterRemoved(filter1.id))
-      expectMsg(TagFilterRemoved(filter2.id))
-
-      filteringService ! GetTagFilters(0, 10)
-      expectMsg(TagFilterSpecs(List.empty))
-
-    }
   }
 }
 
