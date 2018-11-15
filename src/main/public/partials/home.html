@@ -38,23 +38,16 @@
                                 empty-message="No patients found"
                                 grid-state="uiState.patientTableState">
 
-                                <sbx-grid-column property="id" title="Id">
-                                </sbx-grid-column>
-
+                                <sbx-grid-column property="id" title="Id"></sbx-grid-column>
                                 <sbx-grid-column property="patientName['value']" title="Patient Name">
                                     <sbx-grid-cell>
                                         {{rowObject.patientName.value | prettyPatientName}}
                                     </sbx-grid-cell>
                                 </sbx-grid-column>
+                                <sbx-grid-column property="patientID['value']" title="Patient Id"></sbx-grid-column>
+                                <sbx-grid-column property="patientBirthDate['value']" title="Birth Date"></sbx-grid-column>
+                                <sbx-grid-column property="patientSex['value']" title="Sex"></sbx-grid-column>
 
-                                <sbx-grid-column property="patientID['value']" title="Patient Id">
-                                </sbx-grid-column>
-
-                                <sbx-grid-column property="patientBirthDate['value']" title="Birth Date">
-                                </sbx-grid-column>
-
-                                <sbx-grid-column property="patientSex['value']" title="Sex">
-                                </sbx-grid-column>
                             </sbx-grid>
                         </md-content>
                     </md-card-content>
@@ -75,23 +68,14 @@
                                 empty-message="No studies found"
                                 grid-state="uiState.studyTableState">
 
-                                <sbx-grid-column property="id" title="Id">
-                                </sbx-grid-column>
+                                <sbx-grid-column property="id" title="Id"></sbx-grid-column>
+                                <sbx-grid-column property="studyDescription['value']" title="Description"></sbx-grid-column>
+                                <sbx-grid-column property="studyDate['value']" title="Date"></sbx-grid-column>
+                                <sbx-grid-column property="studyID['value']" title="Study Id"></sbx-grid-column>
+                                <sbx-grid-column property="accessionNumber['value']" title="Accession Number"></sbx-grid-column>
+                                <sbx-grid-column property="patientAge['value']" title="Patient Age"></sbx-grid-column>
+                                <sbx-grid-column property="studyInstanceUID['value']" title="Study Instance UID"></sbx-grid-column>
 
-                                <sbx-grid-column property="studyDescription['value']" title="Description">
-                                </sbx-grid-column>
-
-                                <sbx-grid-column property="studyDate['value']" title="Date">
-                                </sbx-grid-column>
-
-                                <sbx-grid-column property="studyID['value']" title="Study Id">
-                                </sbx-grid-column>
-
-                                <sbx-grid-column property="accessionNumber['value']" title="Accession Number">
-                                </sbx-grid-column>
-
-                                <sbx-grid-column property="patientAge['value']" title="Patient Age">
-                                </sbx-grid-column>
                             </sbx-grid>
                         </md-content>
                     </md-card-content>
@@ -112,29 +96,16 @@
                                 empty-message="No series found"
                                 grid-state="uiState.seriesTableState">
 
-                                <sbx-grid-column property="id" title="Id">
-                                </sbx-grid-column>
+                                <sbx-grid-column property="id" title="Id"></sbx-grid-column>
+                                <sbx-grid-column property="seriesDescription['value']" title="Description"></sbx-grid-column>
+                                <sbx-grid-column property="seriesDate['value']" title="Date"></sbx-grid-column>
+                                <sbx-grid-column property="modality['value']" title="Modality"></sbx-grid-column>
+                                <sbx-grid-column property="protocolName['value']" title="Protocol Name"></sbx-grid-column>
+                                <sbx-grid-column property="bodyPartExamined['value']" title="Body Part Examined"></sbx-grid-column>
+                                <sbx-grid-column property="manufacturer['value']" title="Station Manufacturer"></sbx-grid-column>
+                                <sbx-grid-column property="stationName['value']" title="Station Name"></sbx-grid-column>
+                                <sbx-grid-column property="seriesInstanceUID['value']" title="Series Instance UID"></sbx-grid-column>
 
-                                <sbx-grid-column property="seriesDescription['value']" title="Description">
-                                </sbx-grid-column>
-
-                                <sbx-grid-column property="seriesDate['value']" title="Date">
-                                </sbx-grid-column>
-
-                                <sbx-grid-column property="modality['value']" title="Modality">
-                                </sbx-grid-column>
-
-                                <sbx-grid-column property="protocolName['value']" title="Protocol Name">
-                                </sbx-grid-column>
-
-                                <sbx-grid-column property="bodyPartExamined['value']" title="Body Part Examined">
-                                </sbx-grid-column>
-
-                                <sbx-grid-column property="manufacturer['value']" title="Station Manufacturer">
-                                </sbx-grid-column>
-
-                                <sbx-grid-column property="stationName['value']" title="Station Name">
-                                </sbx-grid-column>
                             </sbx-grid>
                         </md-content>
                     </md-card-content>
@@ -169,59 +140,30 @@
                                 empty-message="No series found"
                                 grid-state="uiState.flatTableState">
 
-                                <sbx-grid-column property="id" title="Id">
-                                </sbx-grid-column>
-
+                                <sbx-grid-column property="id" title="Id"></sbx-grid-column>
                                 <sbx-grid-column property="patient.patientName['value']" title="Patient Name">
                                     <sbx-grid-cell>
                                         {{rowObject.patient.patientName.value | prettyPatientName}}
                                     </sbx-grid-cell>
                                 </sbx-grid-column>
+                                <sbx-grid-column property="patient.patientID['value']" title="Patient Id"></sbx-grid-column>
+                                <sbx-grid-column property="patient.patientBirthDate['value']" title="Birth Date"></sbx-grid-column>
+                                <sbx-grid-column property="patient.patientSex['value']" title="Sex"></sbx-grid-column>
+                                <sbx-grid-column property="study.patientAge['value']" title="Patient Age"></sbx-grid-column>
+                                <sbx-grid-column property="study.studyDescription['value']" title="Study Description"></sbx-grid-column>
+                                <sbx-grid-column property="study.studyDate['value']" title="Study Date"></sbx-grid-column>
+                                <sbx-grid-column property="study.studyID['value']" title="Study Id"></sbx-grid-column>
+                                <sbx-grid-column property="study.accessionNumber['value']" title="Accession Number"></sbx-grid-column>
+                                <sbx-grid-column property="study.studyInstanceUID['value']" title="Study Instance UID"></sbx-grid-column>
+                                <sbx-grid-column property="series.seriesDescription['value']" title="Series Description"></sbx-grid-column>
+                                <sbx-grid-column property="series.seriesDate['value']" title="Series Date"></sbx-grid-column>
+                                <sbx-grid-column property="series.modality['value']" title="Modality"></sbx-grid-column>
+                                <sbx-grid-column property="series.protocolName['value']" title="Protocol Name"></sbx-grid-column>
+                                <sbx-grid-column property="series.bodyPartExamined['value']" title="Body Part Examined"></sbx-grid-column>
+                                <sbx-grid-column property="series.manufacturer['value']" title="Station Manufacturer"></sbx-grid-column>
+                                <sbx-grid-column property="series.stationName['value']" title="Station Name"></sbx-grid-column>
+                                <sbx-grid-column property="series.seriesInstanceUID['value']" title="Series Instance UID"></sbx-grid-column>
 
-                                <sbx-grid-column property="patient.patientID['value']" title="Patient Id">
-                                </sbx-grid-column>
-
-                                <sbx-grid-column property="patient.patientBirthDate['value']" title="Birth Date">
-                                </sbx-grid-column>
-
-                                <sbx-grid-column property="patient.patientSex['value']" title="Sex">
-                                </sbx-grid-column>
-
-                                <sbx-grid-column property="study.patientAge['value']" title="Patient Age">
-                                </sbx-grid-column>
-
-                                <sbx-grid-column property="study.studyDescription['value']" title="Study Description">
-                                </sbx-grid-column>
-
-                                <sbx-grid-column property="study.studyDate['value']" title="Study Date">
-                                </sbx-grid-column>
-
-                                <sbx-grid-column property="study.studyID['value']" title="Study Id">
-                                </sbx-grid-column>
-
-                                <sbx-grid-column property="study.accessionNumber['value']" title="Accession Number">
-                                </sbx-grid-column>
-
-                                <sbx-grid-column property="series.seriesDescription['value']" title="Series Description">
-                                </sbx-grid-column>
-
-                                <sbx-grid-column property="series.seriesDate['value']" title="Series Date">
-                                </sbx-grid-column>
-
-                                <sbx-grid-column property="series.modality['value']" title="Modality">
-                                </sbx-grid-column>
-
-                                <sbx-grid-column property="series.protocolName['value']" title="Protocol Name">
-                                </sbx-grid-column>
-
-                                <sbx-grid-column property="series.bodyPartExamined['value']" title="Body Part Examined">
-                                </sbx-grid-column>
-
-                                <sbx-grid-column property="series.manufacturer['value']" title="Station Manufacturer">
-                                </sbx-grid-column>
-
-                                <sbx-grid-column property="series.stationName['value']" title="Station Name">
-                                </sbx-grid-column>
                             </sbx-grid>
                         </md-content>
                     </md-card-content>
@@ -233,11 +175,14 @@
 
     <div layout="column" ng-if="uiState.selectedSeries" flex class="right-column">
         <md-tabs md-selected="uiState.rightColumnSelectedTabIndex">
-            <md-tab id="images" aria-controls="images-content" md-on-select="updatePNGImageUrls()">
+            <md-tab id="images" aria-controls="images-content">
                 Images
             </md-tab>
             <md-tab id="dicom-tags" aria-controls="dicom-tags-content">
-                DICOM Tags
+                Attributes
+            </md-tab>
+            <md-tab id="display" aria-controls="display-content" md-on-select="updatePNGImageUrls()">
+                Display
             </md-tab>
             <md-tab id="details" aria-controls="details-content">
                 Details
@@ -246,9 +191,82 @@
 
         <ng-switch on="uiState.rightColumnSelectedTabIndex" class="tabpanel-container">
             <div role="tabpanel"
+                 id="images-content"
+                 aria-labelledby="images"
+                 ng-switch-when="0"
+                 class="tab-content">
+
+                <md-card>
+                    <md-card-content class="md-padding" style="height: 600px">
+                        <md-content>
+                            <sbx-grid
+                                    load-page="loadImages(startIndex, count, orderByProperty, orderByDirection, filter)"
+                                    page-size="10"
+                                    page-sizes="[10, 25, 100, 1000]"
+                                    filter="true"
+                                    object-actions="imageActions"
+                                    object-selected="imageSelected(object)"
+                                    callbacks="callbacks.imageTable"
+                                    refresh-button="true"
+                                    empty-message="No images found"
+                                    grid-state="uiState.imageTableState">
+
+                                <sbx-grid-column property="id" title="Id"></sbx-grid-column>
+                                <sbx-grid-column property="imageType['value']" title="Image Type"></sbx-grid-column>
+                                <sbx-grid-column property="instanceNumber['value']" title="Instance #"></sbx-grid-column>
+                                <sbx-grid-column property="sopInstanceUID['value']" title="SOP Instance UID"></sbx-grid-column>
+
+                            </sbx-grid>
+                        </md-content>
+                    </md-card-content>
+                </md-card>
+            </div>
+
+            <div role="tabpanel"
+                 id="dicom-tags-content"
+                 aria-labelledby="dicom-tags"
+                 ng-switch-when="1"
+                 class="tab-content">
+
+                <md-card>
+                    <md-card-content>
+                        <md-content class="md-padding" style="height: 600px">
+                            <sbx-grid
+                                    load-page="loadImageAttributes(0, 1000000000, orderByProperty, orderByDirection, filter)"
+                                    page-size="1000000000"
+                                    sorting="true"
+                                    filter="true"
+                                    refresh-button="true"
+                                    object-actions="imageAttributesActions"
+                                    callbacks="callbacks.imageAttributesTable"
+                                    empty-message="No image attributes found"
+                                    grid-state="uiState.attributesTableState">
+
+                                <sbx-grid-column property="tag" title="Tag" filter="hexvalue: 8"></sbx-grid-column>
+                                <sbx-grid-column property="name" title="Name"></sbx-grid-column>
+                                <sbx-grid-column property="values" title="Value">
+                                    <sbx-grid-cell>
+                                        {{rowObject.values.join(",")}}
+                                    </sbx-grid-cell>
+                                </sbx-grid-column>
+                                <sbx-grid-column property="vr" title="VR"></sbx-grid-column>
+                                <sbx-grid-column property="length" title="Length"></sbx-grid-column>
+                                <sbx-grid-column property="namePath" title="Path">
+                                    <sbx-grid-cell>
+                                        {{rowObject.namePath.join("/")}}
+                                    </sbx-grid-cell>
+                                </sbx-grid-column>
+
+                            </sbx-grid>
+                        </md-content>
+                    </md-card-content>
+                </md-card>
+            </div>
+
+            <div role="tabpanel"
                 id="images-content"
                 aria-labelledby="images"
-                ng-switch-when="0"
+                ng-switch-when="2"
                 class="tab-content">
 
                 <md-button class="md-icon-button md-primary" ng-click="openImageSettingsModal()" aria-label="Display Settings">
@@ -270,45 +288,9 @@
             </div>
 
             <div role="tabpanel"
-                id="dicom-tags-content"
-                aria-labelledby="dicom-tags"
-                ng-switch-when="1"
-                class="tab-content">
-
-                <md-card>
-                    <md-card-content>
-                        <md-content class="md-padding" style="height: 600px">
-                            <sbx-grid
-                                load-page="loadImageAttributes(0, 1000000000, orderByProperty, orderByDirection, filter)"
-                                page-size="1000000000"
-                                sorting="true"
-                                filter="true"
-                                refresh-button="true"
-                                object-actions="imageAttributesActions"
-                                callbacks="callbacks.imageAttributesTable"
-                                empty-message="No image attributes found"
-                                grid-state="uiState.attributesTableState">
-
-                                <sbx-grid-column property="tag" title="Tag" filter="dicomTag"></sbx-grid-column>
-                                <sbx-grid-column property="name" title="Name"></sbx-grid-column>
-                                <sbx-grid-column property="vr" title="VR"></sbx-grid-column>
-                                <sbx-grid-column property="length" title="Length"></sbx-grid-column>
-                                <sbx-grid-column property="values" title="Value">
-                                    <sbx-grid-cell>
-                                        {{formatAttributeValues(rowObject.values)}}
-                                    </sbx-grid-cell>
-                                </sbx-grid-column>
-                                <sbx-grid-column property="tagPath" title="Tag Path" filter="tagPath"></sbx-grid-column>
-                            </sbx-grid>
-                        </md-content>
-                    </md-card-content>
-                </md-card>
-            </div>
-
-            <div role="tabpanel"
                 id="details-content"
                 aria-labelledby="details"
-                ng-switch-when="2"
+                ng-switch-when="3"
                 class="tab-content">
 
                 <md-card>
@@ -370,26 +352,6 @@
                                     <span>{{$chip.name}} </span>
                                 </md-chip-template>
                             </md-chips>
-                        </md-content>
-                    </md-card-content>
-                </md-card>
-                <md-card>
-                    <md-card-content>
-                        <h4 class="md-flex card-header">Datasets</h4>
-                        <md-content class="md-padding" style="height: 300px">
-                            <sbx-grid
-                                load-page="loadSelectedSeriesDatasets()"
-                                page-size="1000000"
-                                sorting="false"
-                                callbacks="callbacks.datasetsTable"
-                                empty-message="No datasets found">
-
-                                <sbx-grid-column property="url" title="URL">
-                                    <sbx-grid-cell>
-                                        <a ng-href="{{rowObject.url}}" target="_blank">{{rowObject.url}}</a>
-                                    </sbx-grid-cell>
-                                </sbx-grid-column>
-                            </sbx-grid>
                         </md-content>
                     </md-card-content>
                 </md-card>

@@ -18,6 +18,10 @@ angular.module('slicebox.home', ['ngRoute'])
     $scope.patientActions =
         [
             {
+                name: "Summary",
+                action: summaryForPatients
+            },
+            {
                 name: 'Send',
                 action: confirmSendPatients
             },
@@ -26,8 +30,8 @@ angular.module('slicebox.home', ['ngRoute'])
                 action: confirmSendPatientsToScp
             },
             {
-                name: 'Delete',
-                action: confirmDeletePatients
+                name: 'Download',
+                action: confirmExportPatients
             },
             {
                 name: 'Tag Series',
@@ -38,17 +42,21 @@ angular.module('slicebox.home', ['ngRoute'])
                 action: confirmAnonymizePatients
             },
             {
-                name: 'Export',
-                action: confirmExportPatients
+                name: 'Modify',
+                action: confirmModifyPatients
             },
             {
-                name: "Summary",
-                action: summaryForPatients
+                name: 'Delete',
+                action: confirmDeletePatients
             }
         ];
 
     $scope.studyActions =
         [
+            {
+                name: "Summary",
+                action: summaryForStudies
+            },
             {
                 name: 'Send',
                 action: confirmSendStudies
@@ -58,8 +66,8 @@ angular.module('slicebox.home', ['ngRoute'])
                 action: confirmSendStudiesToScp
             },
             {
-                name: 'Delete',
-                action: confirmDeleteStudies
+                name: 'Download',
+                action: confirmExportStudies
             },
             {
                 name: 'Tag Series',
@@ -70,17 +78,21 @@ angular.module('slicebox.home', ['ngRoute'])
                 action: confirmAnonymizeStudies
             },
             {
-                name: 'Export',
-                action: confirmExportStudies
+                name: 'Modify',
+                action: confirmModifyStudies
             },
             {
-                name: "Summary",
-                action: summaryForStudies
+                name: 'Delete',
+                action: confirmDeleteStudies
             }
         ];
 
     $scope.seriesActions =
         [
+            {
+                name: "Summary",
+                action: summaryForSeries
+            },
             {
                 name: 'Send',
                 action: confirmSendSeries
@@ -90,8 +102,8 @@ angular.module('slicebox.home', ['ngRoute'])
                 action: confirmSendSeriesToScp
             },
             {
-                name: 'Delete',
-                action: confirmDeleteSeries
+                name: 'Download',
+                action: confirmExportSeries
             },
             {
                 name: 'Tag Series',
@@ -102,17 +114,21 @@ angular.module('slicebox.home', ['ngRoute'])
                 action: confirmAnonymizeSeries
             },
             {
-                name: 'Export',
-                action: confirmExportSeries
+                name: 'Modify',
+                action: confirmModifySeries
             },
             {
-                name: "Summary",
-                action: summaryForSeries
+                name: 'Delete',
+                action: confirmDeleteSeries
             }
         ];
 
     $scope.flatSeriesActions =
         [
+            {
+                name: "Summary",
+                action: summaryForSeries
+            },
             {
                 name: 'Send',
                 action: confirmSendFlatSeries
@@ -122,8 +138,8 @@ angular.module('slicebox.home', ['ngRoute'])
                 action: confirmSendSeriesToScp
             },
             {
-                name: 'Delete',
-                action: confirmDeleteSeries
+                name: 'Download',
+                action: confirmExportSeries
             },
             {
                 name: 'Tag Series',
@@ -134,12 +150,28 @@ angular.module('slicebox.home', ['ngRoute'])
                 action: confirmAnonymizeFlatSeries
             },
             {
-                name: 'Export',
-                action: confirmExportSeries
+                name: 'Modify',
+                action: confirmModifySeries
             },
             {
-                name: "Summary",
-                action: summaryForSeries
+                name: 'Delete',
+                action: confirmDeleteSeries
+            }
+        ];
+
+    $scope.imageActions =
+        [
+            {
+                name: 'Download',
+                action: confirmExportImages
+            },
+            {
+                name: 'Modify',
+                action: confirmModifyImages
+            },
+            {
+                name: 'Delete',
+                action: confirmDeleteImages
             }
         ];
 
@@ -159,11 +191,13 @@ angular.module('slicebox.home', ['ngRoute'])
         $scope.uiState.studyTableState = {};
         $scope.uiState.seriesTableState = {};
         $scope.uiState.flatTableState = {};
+        $scope.uiState.imageTableState = {};
         $scope.uiState.attributesTableState = {};
 
         $scope.uiState.selectedPatient = null;
         $scope.uiState.selectedStudy = null;
         $scope.uiState.selectedSeries = null;
+        $scope.uiState.selectedImage = null;
         $scope.uiState.loadPngImagesInProgress = false;
         $scope.uiState.seriesDetails = {
             leftColumnSelectedTabIndex: 0,
@@ -255,11 +289,11 @@ angular.module('slicebox.home', ['ngRoute'])
 
     $scope.seriesTagAdded = function(tag) {
         var theTag = tag.name ? tag : { id: -1, name: tag };
-        $http.post('/api/metadata/series/' + $scope.uiState.selectedSeries.id + '/seriestags', theTag).success(function (addedTag) {
+        $http.post('/api/metadata/series/' + $scope.uiState.selectedSeries.id + '/seriestags', theTag).then(function (addedTag) {
             // copy database id to selected tag
             $scope.uiState.seriesDetails.selectedSeriesSeriesTags.forEach(function (selectedTag) {
-                if (selectedTag.name === addedTag.name) {
-                    selectedTag.id = addedTag.id;
+                if (selectedTag.name === addedTag.data.name) {
+                    selectedTag.id = addedTag.data.id;
                 }
             });
             if ($scope.uiState.selectedSeries) {
@@ -271,7 +305,7 @@ angular.module('slicebox.home', ['ngRoute'])
     };
 
     $scope.seriesTagRemoved = function(tag) {
-        $http.delete('/api/metadata/series/' + $scope.uiState.selectedSeries.id + '/seriestags/' + tag.id).success(function () {
+        $http.delete('/api/metadata/series/' + $scope.uiState.selectedSeries.id + '/seriestags/' + tag.id).then(function () {
             updateSeriesTagsPromise();
         });
     };
@@ -324,7 +358,7 @@ angular.module('slicebox.home', ['ngRoute'])
         }
     };
 
-    $scope.loadStudies = function(startIndex, count, orderByProperty, orderByDirection) {
+    $scope.loadStudies = function(startIndex, count) {
         if ($scope.uiState.selectedPatient === null) {
             return [];
         }
@@ -358,7 +392,7 @@ angular.module('slicebox.home', ['ngRoute'])
         }
     };
 
-    $scope.loadSeries = function(startIndex, count, orderByProperty, orderByDirection) {
+    $scope.loadSeries = function(startIndex, count) {
         if ($scope.uiState.selectedStudy === null) {
             return [];
         }
@@ -404,6 +438,37 @@ angular.module('slicebox.home', ['ngRoute'])
         return loadFlatSeriesPromise;
     };
 
+    $scope.loadImages = function(startIndex, count, orderByProperty, orderByDirection, filter) {
+        if ($scope.uiState.selectedSeries === null) {
+            return [];
+        }
+
+        var loadImagesUrl = '/api/metadata/images?startindex=' + startIndex + '&count=' + count + '&seriesid=' + $scope.uiState.selectedSeries.id;
+
+        if (orderByProperty) {
+            var orderByPropertyName = orderByProperty === "id" ? orderByProperty : orderByProperty.substring(0, orderByProperty.indexOf('['));
+            loadImagesUrl = loadImagesUrl + '&orderby=' + orderByPropertyName;
+
+            if (orderByDirection === 'ASCENDING') {
+                loadImagesUrl = loadImagesUrl + '&orderascending=true';
+            } else {
+                loadImagesUrl = loadImagesUrl + '&orderascending=false';
+            }
+        }
+
+        if (filter) {
+            loadImagesUrl = loadImagesUrl + '&filter=' + encodeURIComponent(filter);
+        }
+
+        var loadImagesPromise = $http.get(loadImagesUrl);
+
+        loadImagesPromise.error(function(error) {
+            sbxToast.showErrorMessage('Failed to load images: ' + error);
+        });
+
+        return loadImagesPromise;
+    };
+
     $scope.seriesSelected = function(series, reset) {
         $scope.uiState.selectedSeries = series;
 
@@ -421,8 +486,8 @@ angular.module('slicebox.home', ['ngRoute'])
             updateSelectedSeriesSeriesTags(series);
         }
 
-        if ($scope.callbacks.datasetsTable) {
-            $scope.callbacks.datasetsTable.reset();
+        if ($scope.callbacks.imageTable) {
+            $scope.callbacks.imageTable.reset();
         }
         if ($scope.callbacks.imageAttributesTable) {
             $scope.callbacks.imageAttributesTable.reset();
@@ -446,12 +511,19 @@ angular.module('slicebox.home', ['ngRoute'])
         }
     };
 
-    $scope.loadImageAttributes = function(startIndex, count, orderByProperty, orderByDirection, filter) {
-        if ($scope.uiState.selectedSeries === null) {
-            return [];
-        }
+    $scope.imageSelected = function(image) {
+        $scope.uiState.selectedImage = image;
 
-        var imagesPromise = $http.get('/api/metadata/images?count=1&seriesid=' + $scope.uiState.selectedSeries.id);
+        if ($scope.callbacks.imageAttributesTable) {
+            $scope.callbacks.imageAttributesTable.reset();
+        }
+    };
+
+    $scope.loadImageAttributes = function(startIndex, count, orderByProperty, orderByDirection, filter) {
+        var imagesPromise = $scope.uiState.selectedImage ? $q.when([$scope.uiState.selectedImage]) :
+            $scope.uiState.selectedSeries ? $http.get('/api/metadata/images?count=1&seriesid=' + $scope.uiState.selectedSeries.id).then(function (images) {
+                return images.data;
+            }) : $q.when([]);
 
         imagesPromise.error(function(reason) {
             sbxToast.showErrorMessage('Failed to load images for series: ' + error);
@@ -491,13 +563,13 @@ angular.module('slicebox.home', ['ngRoute'])
                         if (!orderByDirection) {
                             orderByDirection = 'ASCENDING';
                         }
-                        return data.data.sort(function compare(a,b) {
+                        return attributes.data.sort(function compare(a,b) {
                           return orderByDirection === 'ASCENDING' ?
                             a[orderByProperty] < b[orderByProperty] ? -1 : a[orderByProperty] > b[orderByProperty] ? 1 : 0 :
                             a[orderByProperty] > b[orderByProperty] ? -1 : a[orderByProperty] < b[orderByProperty] ? 1 : 0;
                         });
                     } else {
-                        return data.data;
+                        return attributes.data;
                     }
                 }, function(error) {
                     sbxToast.showErrorMessage('Failed to load image attributes: ' + error);
@@ -528,10 +600,8 @@ angular.module('slicebox.home', ['ngRoute'])
                 return { url: '/api/images/' + image.id };
             });
         }, function(error) {
-            sbxToast.showErrorMessage('Failed to load datasets: ' + error);
+            sbxToast.showErrorMessage('Failed to load images for series: ' + error);
         });
-
-        return loadDatasetsPromise;
     };
 
     $scope.openAdvancedFilteringModal = function() {
@@ -585,20 +655,24 @@ angular.module('slicebox.home', ['ngRoute'])
             $scope.uiState.seriesDetails.pngImageUrls = [];
             $scope.uiState.loadPngImagesInProgress = true;
 
-            $http.get('/api/metadata/images?count=1000000&seriesid=' + $scope.uiState.selectedSeries.id).success(function(images) {
+            var imagesPromise = $scope.uiState.selectedImage ? $q.when([$scope.uiState.selectedImage]) :
+                $http.get('/api/metadata/images?count=' + $scope.uiState.seriesDetails.images + '&seriesid=' + $scope.uiState.selectedSeries.id).then(function(images) {
+                    return images.data;
+                });
 
+            imagesPromise.then(function (images) {
                 var generateMore = true;
 
                 angular.forEach(images, function(image, imageIndex) {
 
                     if (imageIndex < $scope.uiState.seriesDetails.images) {
 
-                        $http.get('/api/images/' + image.id + '/imageinformation').success(function(info) {
+                        $http.get('/api/images/' + image.id + '/imageinformation').then(function(info) {
                             if (!$scope.uiState.seriesDetails.isWindowManual) {
-                                $scope.uiState.seriesDetails.windowMin = info.minimumPixelValue;
-                                $scope.uiState.seriesDetails.windowMax = info.maximumPixelValue;
+                                $scope.uiState.seriesDetails.windowMin = info.data.minimumPixelValue;
+                                $scope.uiState.seriesDetails.windowMax = info.data.maximumPixelValue;
                             }
-                            for (var j = 0; j < info.numberOfFrames && generateMore; j++) {
+                            for (var j = 0; j < info.data.numberOfFrames && generateMore; j++) {
 
                                 var url = '/api/images/' + image.id + '/png' + '?framenumber=' + (j + 1);
                                 if ($scope.uiState.seriesDetails.isWindowManual) {
@@ -610,15 +684,15 @@ angular.module('slicebox.home', ['ngRoute'])
                                     url = url +
                                         '&imageheight=' + $scope.uiState.seriesDetails.imageHeight;
                                 }
-                                var frameIndex = Math.max(0, info.frameIndex - 1)*Math.max(1, info.numberOfFrames) + (j + 1);
+                                var frameIndex = Math.max(0, info.data.frameIndex - 1)*Math.max(1, info.data.numberOfFrames) + (j + 1);
                                 $scope.uiState.seriesDetails.pngImageUrls.push({ url: url, frameIndex: frameIndex });
                                 generateMore = $scope.uiState.seriesDetails.pngImageUrls.length < $scope.uiState.seriesDetails.images &&
-                                                !(imageIndex === images.length - 1 && j === info.numberOfFrames - 1);
+                                                !(imageIndex === images.length - 1 && j === info.data.numberOfFrames - 1);
                             }
                             if (!generateMore) {
                                 $scope.uiState.loadPngImagesInProgress = false;
                             }
-                        }).error(function(error) {
+                        }, function(error) {
                             sbxToast.showErrorMessage('Failed to load image information: ' + error);
                             $scope.uiState.loadPngImagesInProgress = false;
                         });
@@ -626,7 +700,7 @@ angular.module('slicebox.home', ['ngRoute'])
                     }
 
                 });
-            }).error(function(reason) {
+            }, function(reason) {
                 sbxToast.showErrorMessage('Failed to load images for series: ' + reason);
                 $scope.uiState.loadPngImagesInProgress = false;
             });
@@ -719,20 +793,20 @@ angular.module('slicebox.home', ['ngRoute'])
     }
 
     function updateSelectedSeriesSource(series) {
-        return $http.get('/api/metadata/series/' + series.id + '/source').success(function (source) {
-            $scope.uiState.seriesDetails.selectedSeriesSource = source.sourceName + " (" + source.sourceType + ")";
+        return $http.get('/api/metadata/series/' + series.id + '/source').then(function (source) {
+            $scope.uiState.seriesDetails.selectedSeriesSource = source.data.sourceName + " (" + source.data.sourceType + ")";
         });
     }
 
     function updateSelectedSeriesSeriesTypes(series) {
-        return $http.get('/api/metadata/series/' + series.id + '/seriestypes').success(function (seriesTypes) {
-            $scope.uiState.seriesDetails.selectedSeriesSeriesTypes = seriesTypes;
+        return $http.get('/api/metadata/series/' + series.id + '/seriestypes').then(function (seriesTypes) {
+            $scope.uiState.seriesDetails.selectedSeriesSeriesTypes = seriesTypes.data;
         });
     }
 
     function updateSelectedSeriesSeriesTags(series) {
-        return $http.get('/api/metadata/series/' + series.id + '/seriestags').success(function (seriesTags) {
-            $scope.uiState.seriesDetails.selectedSeriesSeriesTags = seriesTags;
+        return $http.get('/api/metadata/series/' + series.id + '/seriestags').then(function (seriesTags) {
+            $scope.uiState.seriesDetails.selectedSeriesSeriesTags = seriesTags.data;
         });
     }
 
@@ -803,11 +877,11 @@ angular.module('slicebox.home', ['ngRoute'])
     function confirmSendToScp(images) {
         return confirmSend('/api/scus', function(receiverId) {
             var imageIds = images.map(function (image) { return image.id; });
-            return $http.post('/api/scus/' + receiverId + '/send', imageIds).success(function() {
+            return $http.post('/api/scus/' + receiverId + '/send', imageIds).then(function() {
                 $mdDialog.hide();
                 sbxToast.showInfoMessage("Series sent to SCP");
-            }).error(function(data) {
-                sbxToast.showErrorMessage('Failed to send to SCP: ' + data);
+            }, function(error) {
+                sbxToast.showErrorMessage('Failed to send to SCP: ' + error);
             });
         });
     }
@@ -851,6 +925,16 @@ angular.module('slicebox.home', ['ngRoute'])
                 }
                 updateSeriesTagsPromise();
             });
+        });
+    }
+
+    function confirmDeleteImages(images) {
+        var imageIds = images.map(function (image) { return image.id; });
+        var f = openBulkDeleteEntitiesModalFunction('/api/images/delete', 'images');
+        f(imageIds).finally(function() {
+            $scope.imageSelected(null);
+            $scope.callbacks.imageTable.reset();
+            updateSeriesTagsPromise();
         });
     }
 
@@ -901,6 +985,63 @@ angular.module('slicebox.home', ['ngRoute'])
 
             return promise;
         }, "anonymized", "anonymize");
+    }
+
+    function confirmModify() {
+        return $mdDialog.show({
+            templateUrl: '/assets/partials/modifyImageFilesModalContent.html',
+            controller: 'ModifyImageFilesModalCtrl',
+            scope: $scope.$new(),
+        });
+    }
+
+    function modifyImages(images, tagMappings) {
+        var modifyPromises = images.map(function (image) {
+            return $http.put('/api/images/' + image.id + '/modify', tagMappings);
+        });
+
+        return $q.all(modifyPromises).then(function () {
+            sbxToast.showInfoMessage("Images modified");
+        }, function(error) {
+            sbxToast.showErrorMessage('Failed to modify images: ' + error);
+        }).finally(function() {
+            $scope.patientSelected(null);
+            $scope.callbacks.patientsTable.reset();
+            if ($scope.callbacks.flatSeriesTable) {
+                $scope.callbacks.flatSeriesTable.reset();
+            }
+            updateSeriesTagsPromise();
+        });
+    }
+
+    function confirmModifyPatients(patients) {
+        return confirmModify().then(function(tagMappings) {
+            return imagesForPatients(patients).then(function (images) {
+                return modifyImages(images, tagMappings);
+            });
+        });
+    }
+
+    function confirmModifyStudies(studies) {
+        return confirmModify().then(function(tagMappings) {
+            return imagesForStudies(studies).then(function (images) {
+                return modifyImages(images, tagMappings);
+            });
+        });
+    }
+
+    function confirmModifySeries(series) {
+        return confirmModify().then(function(tagMappings) {
+            return imagesForSeries(series).then(function (images) {
+                return modifyImages(images, tagMappings);
+            });
+        });
+    }
+
+    function confirmModifyImages(images) {
+        return confirmModify().then(function(tagMappings) {
+            return modifyImages(images, tagMappings);
+        });
     }
 
     function createImageIdsAndPatientsPromiseForPatients(patients) {
@@ -1001,13 +1142,19 @@ angular.module('slicebox.home', ['ngRoute'])
         });
     }
 
+    function confirmExportImages(images) {
+        openConfirmActionModal('Export', 'This will export ' + images.length + ' images as a zip archive. Proceed?', 'Ok', function() {
+            return exportImages($q.when(images));
+        });
+    }
+
     function exportImages(imagesPromise) {
         return imagesPromise.then(function (images) {
             var imageIds = images.map(function (image) {
                 return image.id;
             });
-            return $http.post('/api/images/export', imageIds).success(function (exportSetId) {
-                location.href = '/api/images/export?id=' + exportSetId.id;
+            return $http.post('/api/images/export', imageIds).then(function (exportSetId) {
+                location.href = '/api/images/export?id=' + exportSetId.data.id;
             });
         });
     }
@@ -1200,8 +1347,8 @@ angular.module('slicebox.home', ['ngRoute'])
 
         $scope.seriesTypes = [];
 
-        loadSeriesTypesPromise.success(function(seriesTypes) {
-            $scope.seriesTypes = seriesTypes;
+        loadSeriesTypesPromise.then(function(seriesTypes) {
+            $scope.seriesTypes = seriesTypes.data;
         });
 
         return loadSeriesTypesPromise;
@@ -1297,4 +1444,48 @@ angular.module('slicebox.home', ['ngRoute'])
     $scope.cancelButtonClicked = function() {
         $mdDialog.cancel();
     };
+})
+
+.controller('ModifyImageFilesModalCtrl', function($scope, $mdDialog) {
+    $scope.uiState = {
+        modifications: [emptyModification()],
+        folded: [false]
+    };
+
+    $scope.switchFolding = function(index) {
+        $scope.uiState.folded[index] = !$scope.uiState.folded[index];
+    };
+
+    $scope.addModification = function() {
+        $scope.uiState.modifications.push(emptyModification());
+        $scope.uiState.folded.push(false);
+    };
+
+    $scope.isModificationValid = function(mod) {
+        return mod.tagPath && !mod.tagPath.item && mod.value.length > 0;
+    };
+
+    $scope.isValid = function() {
+        var valid = $scope.uiState.modifications.filter($scope.isModificationValid);
+        var partial = $scope.uiState.modifications.filter(function(mod) {
+            return !mod.tagPath && mod.value.length > 0 || mod.tagPath && mod.value.length === 0;
+        });
+        return valid.length > 0 && partial.length === 0;
+    };
+
+    $scope.modify = function() {
+        $mdDialog.hide($scope.uiState.modifications);
+    };
+
+    $scope.cancelButtonClicked = function() {
+        $mdDialog.cancel();
+    };
+
+    function emptyModification() {
+        return {
+            tagPath: {},
+            value: ""
+        };
+    }
+
 });

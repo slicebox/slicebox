@@ -24,13 +24,13 @@ import se.nimsa.sbx.lang.NotFoundException
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.util.SequentialPipeToSupport
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
 class MetaDataServiceActor(metaDataDao: MetaDataDAO, propertiesDao: PropertiesDAO) extends Actor with Stash with SequentialPipeToSupport {
 
   import context.system
 
-  implicit val executor = system.dispatcher
+  implicit val executor: ExecutionContext = system.dispatcher
 
   val log = Logging(context.system, this)
 
@@ -104,8 +104,8 @@ class MetaDataServiceActor(metaDataDao: MetaDataDAO, propertiesDao: PropertiesDA
         case GetSeries(startIndex, count, studyId, sourceRefs, seriesTypeIds, seriesTagIds) =>
           pipe(propertiesDao.seriesForStudy(startIndex, count, studyId, sourceRefs, seriesTypeIds, seriesTagIds).map(SeriesCollection)).to(sender)
 
-        case GetImages(startIndex, count, seriesId) =>
-          pipe(metaDataDao.imagesForSeries(startIndex, count, seriesId).map(Images)).to(sender)
+        case GetImages(startIndex, count, seriesId, orderBy, orderAscending, filter) =>
+          pipe(metaDataDao.imagesForSeries(startIndex, count, seriesId, orderBy, orderAscending, filter).map(Images)).to(sender)
 
         case GetFlatSeries(startIndex, count, orderBy, orderAscending, filter, sourceRefs, seriesTypeIds, seriesTagIds) =>
           pipe(propertiesDao.flatSeries(startIndex, count, orderBy, orderAscending, filter, sourceRefs, seriesTypeIds, seriesTagIds).map(FlatSeriesCollection)).to(sender)
@@ -145,14 +145,14 @@ class MetaDataServiceActor(metaDataDao: MetaDataDAO, propertiesDao: PropertiesDA
 
         case GetImagesForStudy(studyId, sourceRefs, seriesTypeIds, seriesTagIds) =>
           val imagesFuture = propertiesDao.seriesForStudy(0, 100000000, studyId, sourceRefs, seriesTypeIds, seriesTagIds)
-            .flatMap(series => Future.sequence(series.map(s => metaDataDao.imagesForSeries(0, 100000000, s.id))))
+            .flatMap(series => Future.sequence(series.map(s => metaDataDao.imagesForSeries(0, 100000000, s.id, None, orderAscending = false, None))))
             .map(_.flatten)
           pipe(imagesFuture.map(Images)).to(sender)
 
         case GetImagesForPatient(patientId, sourceRefs, seriesTypeIds, seriesTagIds) =>
           val imagesFuture = propertiesDao.studiesForPatient(0, 100000000, patientId, sourceRefs, seriesTypeIds, seriesTagIds)
             .flatMap(studies => Future.sequence(studies.map(study => propertiesDao.seriesForStudy(0, 100000000, study.id, sourceRefs, seriesTypeIds, seriesTagIds)
-              .flatMap(series => Future.sequence(series.map(s => metaDataDao.imagesForSeries(0, 100000000, s.id)))
+              .flatMap(series => Future.sequence(series.map(s => metaDataDao.imagesForSeries(0, 100000000, s.id, None, orderAscending = false, None)))
                 .map(_.flatten))))
               .map(_.flatten))
           pipe(imagesFuture.map(Images)).to(sender)

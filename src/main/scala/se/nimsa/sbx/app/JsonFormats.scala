@@ -16,9 +16,6 @@
 
 package se.nimsa.sbx.app
 
-import java.util.Base64
-
-import akka.util.ByteString
 import play.api.libs.functional.syntax._
 import play.api.libs.json.Reads._
 import play.api.libs.json._
@@ -31,7 +28,7 @@ import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomPropertyValue._
 import se.nimsa.sbx.dicom.ImageAttribute
 import se.nimsa.sbx.directory.DirectoryWatchProtocol._
-import se.nimsa.sbx.filtering.FilteringProtocol.{SourceTagFilter, TagFilterSpec, TagFilterType}
+import se.nimsa.sbx.filtering.FilteringProtocol._
 import se.nimsa.sbx.forwarding.ForwardingProtocol._
 import se.nimsa.sbx.importing.ImportProtocol._
 import se.nimsa.sbx.log.LogProtocol._
@@ -120,16 +117,7 @@ trait JsonFormats {
       ) (tagPathToTuple)
   }
 
-  implicit val tagMappingFormat: Format[TagMapping] = Format[TagMapping](
-    (
-      (__ \ "tagPath").read[TagPath] and
-        (__ \ "value").read[String]) ((tagPath, valueString) => TagMapping(tagPath.asInstanceOf[TagPathTag], ByteString(Base64.getDecoder.decode(valueString)))
-    ),
-    (
-      (__ \ "tagPath").write[TagPath] and
-        (__ \ "value").write[String]) (tagMapping => (tagMapping.tagPath, Base64.getEncoder.encodeToString(tagMapping.value.toArray))
-    )
-  )
+  implicit val tagMappingFormat: Format[TagMapping] = Json.format[TagMapping]
 
   implicit val unWatchDirectoryFormat: Format[UnWatchDirectory] = Json.format[UnWatchDirectory]
   implicit val watchedDirectoryFormat: Format[WatchedDirectory] = Json.format[WatchedDirectory]
@@ -254,7 +242,9 @@ trait JsonFormats {
 
   implicit val tagFilterTypeFormat: Format[TagFilterType] = enumFormat(TagFilterType.withName)
 
-  implicit val tagFilterSpecFormat: Format[TagFilterSpec] = Json.format[TagFilterSpec]
+  implicit val tagFilterFormat: Format[TagFilter] = Json.format[TagFilter]
+
+  implicit val tagFilterTagPathFormat: Format[TagFilterTagPath] = Json.format[TagFilterTagPath]
 
   implicit val tagSourceTagFilter: Format[SourceTagFilter] = Json.format[SourceTagFilter]
 

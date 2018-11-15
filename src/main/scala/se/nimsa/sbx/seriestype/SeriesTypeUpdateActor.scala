@@ -208,7 +208,7 @@ class SeriesTypeUpdateActor(storage: StorageService)(implicit val materializer: 
     metaDataService.ask(GetImage(imageId)).mapTo[Option[Image]]
 
   def getImageForSeries(series: Series): Future[Option[Image]] =
-    metaDataService.ask(GetImages(0, 1, series.id)).mapTo[Images]
+    metaDataService.ask(GetImages(0, 1, series.id, None, orderAscending = false, None)).mapTo[Images]
       .map(_.images.headOption)
 
   def getSeriesTypes: Future[Seq[SeriesType]] =
