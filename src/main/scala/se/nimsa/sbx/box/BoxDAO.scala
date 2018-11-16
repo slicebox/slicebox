@@ -16,7 +16,6 @@
 
 package se.nimsa.sbx.box
 
-import se.nimsa.dicom.data.TagPath
 import se.nimsa.dicom.data.TagPath.TagPathTag
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.{ImageTagValues, TagValue}
 import se.nimsa.sbx.box.BoxProtocol.BoxSendMethod._
@@ -93,7 +92,7 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
   val outgoingImageQuery = TableQuery[OutgoingImageTable]
 
   val toOutgoingTagValue: (Long, Long, String, String) => OutgoingTagValue =
-    (id: Long, outgoingImageId: Long, tagPath: String, value: String) => OutgoingTagValue(id, outgoingImageId, TagValue(TagPath.parse(tagPath).asInstanceOf[TagPathTag], value))
+    (id: Long, outgoingImageId: Long, tagPath: String, value: String) => OutgoingTagValue(id, outgoingImageId, TagValue(TagPathTag.parse(tagPath), value))
   val fromOutgoingTagValue: OutgoingTagValue => Option[(Long, Long, String, String)] =
     (tagValue: OutgoingTagValue) => Option((tagValue.id, tagValue.outgoingImageId, tagValue.tagValue.tagPath.toString, tagValue.tagValue.value))
 

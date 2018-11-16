@@ -21,7 +21,7 @@ import akka.stream.scaladsl.Flow
 import akka.util.ByteString
 import se.nimsa.dicom.data.DicomParts._
 import se.nimsa.dicom.data.padToEvenLength
-import se.nimsa.dicom.streams.ModifyFlow.{TagModification, TagModificationsPart, modifyFlow}
+import se.nimsa.dicom.streams.ModifyFlow.{TagInsertion, TagModificationsPart, modifyFlow}
 import se.nimsa.sbx.dicom.SliceboxTags._
 import se.nimsa.sbx.dicom.streams.DicomStreamUtil._
 
@@ -38,8 +38,8 @@ object ReverseAnonymizationFlow {
           .filterNot(_.level > r.matchLevel)
           .map(_.tagPath)
           .flatMap(tp => r.values.find(_.tagPath == tp))
-        val mods = active.map(tv => TagModification.contains(tv.tagPath, _ => padToEvenLength(ByteString(tv.value), tv.tagPath.tag), insert = true))
-        TagModificationsPart(mods.toList)
+        val insertions = active.map(tv => TagInsertion(tv.tagPath, padToEvenLength(ByteString(tv.value), tv.tagPath.tag)))
+        TagModificationsPart(Seq.empty, insertions.toList)
       case p => p
     }
     .via(modifyFlow())

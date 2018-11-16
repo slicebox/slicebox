@@ -45,7 +45,7 @@ class HarmonizeAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymi
     AnonymizationKeyValue(-1, key.id, TagPath.fromTag(Tag.StudyInstanceUID), key.studyInstanceUID, key.anonStudyInstanceUID),
     AnonymizationKeyValue(-1, key.id, TagPath.fromTag(Tag.SeriesInstanceUID), key.seriesInstanceUID, key.anonSeriesInstanceUID),
     AnonymizationKeyValue(-1, key.id, TagPath.fromTag(Tag.SOPInstanceUID), key.sopInstanceUID, key.anonSOPInstanceUID),
-    AnonymizationKeyValue(-1, key.id, TagPath.fromSequence(Tag.DerivationCodeSequence, 1).thenTag(Tag.PatientName), "name", "anon name")
+    AnonymizationKeyValue(-1, key.id, TagPath.fromItem(Tag.DerivationCodeSequence, 1).thenTag(Tag.PatientName), "name", "anon name")
   )))
 
   def harmonize(key: AnonymizationKey, elements: Elements, customTagValues: Seq[TagValue]): Future[Elements] =

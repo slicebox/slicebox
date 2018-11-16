@@ -4,7 +4,7 @@ import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.testkit.{ImplicitSender, TestKit}
 import akka.util.Timeout
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
-import se.nimsa.dicom.data.{Tag, TagPath}
+import se.nimsa.dicom.data.{Tag, TagTree}
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.filtering.FilteringProtocol.TagFilterType.{BLACKLIST, WHITELIST}
 import se.nimsa.sbx.filtering.FilteringProtocol._
@@ -44,17 +44,17 @@ class FilteringServiceActorTest(_system: ActorSystem) extends TestKit(_system) w
     "return all filtering specifications for a source" in {
       filteringService ! AddTagFilter(tagFilter1)
       val filter1 = expectMsgType[TagFilterAdded].tagFilter
-      filteringService ! AddTagFilterTagPath(TagFilterTagPath(-1, filter1.id, TagPath.fromTag(Tag.PatientName)))
+      filteringService ! AddTagFilterTagPath(TagFilterTagPath(-1, filter1.id, TagTree.fromTag(Tag.PatientName)))
       val filterTagPath1 = expectMsgType[TagFilterTagPathAdded].tagFilterTagPath
 
       filteringService ! AddTagFilter(tagFilter2)
       val filter2 = expectMsgType[TagFilterAdded].tagFilter
-      filteringService ! AddTagFilterTagPath(TagFilterTagPath(-1, filter2.id, TagPath.fromTag(Tag.PatientID)))
+      filteringService ! AddTagFilterTagPath(TagFilterTagPath(-1, filter2.id, TagTree.fromTag(Tag.PatientID)))
       val filterTagPath2 = expectMsgType[TagFilterTagPathAdded].tagFilterTagPath
 
       filteringService ! AddTagFilter(tagFilter3)
       val filter3 = expectMsgType[TagFilterAdded].tagFilter
-      filteringService ! AddTagFilterTagPath(TagFilterTagPath(-1, filter3.id, TagPath.fromTag(Tag.StudyDate)))
+      filteringService ! AddTagFilterTagPath(TagFilterTagPath(-1, filter3.id, TagTree.fromTag(Tag.StudyDate)))
       expectMsgType[TagFilterTagPathAdded]
 
       filteringService ! AddSourceTagFilter(SourceTagFilter(-1, SourceType.BOX, "my box", 23, filter1.id, filter1.name))

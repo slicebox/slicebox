@@ -20,7 +20,8 @@ import play.api.libs.functional.syntax._
 import play.api.libs.json.Reads._
 import play.api.libs.json._
 import se.nimsa.dicom.data.TagPath._
-import se.nimsa.dicom.data.{Dictionary, Multiplicity, TagPath}
+import se.nimsa.dicom.data.TagTree._
+import se.nimsa.dicom.data.{Dictionary, Multiplicity, TagPath, TagTree}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.box.BoxProtocol._
@@ -48,6 +49,75 @@ trait JsonFormats {
     case _ => JsError("Enumeration expected")
   }, Writes[A](a => JsString(a.toString)))
 
+  implicit lazy val tagTreeReads: Reads[TagTree] =
+    (
+      (__ \ "tag").readNullable[Int] and
+        (__ \ "name").readNullable[String] and
+        (__ \ "item").readNullable[String] and
+        (__ \ "previous").lazyReadNullable[TagTree](tagTreeReads)
+      ) ((tagMaybe, nameMaybe, itemMaybe, previousPath) =>
+      tagMaybe
+        .orElse(nameMaybe
+          .flatMap(name => try Option(Dictionary.tagOf(name)) catch { case _: Throwable => None }))
+        .map { tag =>
+          val previous = previousPath match {
+            case Some(t: TagTreeTrunk) => Some(t)
+            case _ => None
+          }
+          itemMaybe match {
+            case Some("*") =>
+              previous.map(p => p.thenAnyItem(tag)).getOrElse(TagTree.fromAnyItem(tag))
+            case Some(itemString) =>
+              val item = try Option(Integer.parseInt(itemString)) catch {
+                case _: Throwable => None
+              }
+              item.map(i => previous.map(p => p.thenItem(tag, i)).getOrElse(TagTree.fromItem(tag, i)))
+                .getOrElse(previous.map(p => p.thenTag(tag)).getOrElse(TagTree.fromTag(tag)))
+            case None =>
+              previous.map(p => p.thenTag(tag)).getOrElse(TagTree.fromTag(tag))
+          }
+        }
+        .map(Success.apply)
+        .getOrElse(Failure(new IllegalArgumentException())))
+      .collect(JsonValidationError(s"Could not parse tag path, must supply either tag or name")) {
+        case Success(tag) => tag
+      }
+
+  implicit lazy val tagTreeTagReads: Reads[TagTreeTag] =
+    tagTreeReads.collect(JsonValidationError("Could not parse tag tree tag")) {
+      case tp: TagTreeTag => tp
+    }
+
+  implicit lazy val tagTreeItemReads: Reads[TagTreeItem] =
+    tagTreeReads.collect(JsonValidationError("Could not parse tag tree item")) {
+      case tp: TagTreeItem => tp
+    }
+
+  implicit lazy val tagTreeAnyItemReads: Reads[TagTreeAnyItem] =
+    tagTreeReads.collect(JsonValidationError("Could not parse tag tree items")) {
+      case tp: TagTreeAnyItem => tp
+    }
+
+  implicit lazy val tagTreeWrites: Writes[TagTree] = {
+    val trunkToOption: TagTreeTrunk => Option[TagTreeTrunk] = {
+      case EmptyTagTree => None
+      case p => Some(p)
+    }
+
+    val tagTreeToTuple: TagTree => (Int, String, Option[String], Option[TagTreeTrunk]) = {
+      case item: TagTreeItem => (item.tag, Dictionary.keywordOf(item.tag), Some(item.item.toString), trunkToOption(item.previous))
+      case anyItem: TagTreeAnyItem => (anyItem.tag, Dictionary.keywordOf(anyItem.tag), Some("*"), trunkToOption(anyItem.previous))
+      case tagTree: TagTree => (tagTree.tag, Dictionary.keywordOf(tagTree.tag), None, trunkToOption(tagTree.previous))
+    }
+
+    (
+      (__ \ "tag").write[Int] and
+        (__ \ "name").write[String] and
+        (__ \ "item").writeNullable[String] and
+        (__ \ "previous").lazyWriteNullable[TagTreeTrunk](tagTreeWrites)
+      ) (tagTreeToTuple)
+  }
+
   implicit lazy val tagPathReads: Reads[TagPath] =
     (
       (__ \ "tag").readNullable[Int] and
@@ -64,13 +134,11 @@ trait JsonFormats {
             case _ => None
           }
           itemMaybe match {
-            case Some("*") =>
-              previous.map(p => p.thenSequence(tag)).getOrElse(TagPath.fromSequence(tag))
             case Some(itemString) =>
               val item = try Option(Integer.parseInt(itemString)) catch {
                 case _: Throwable => None
               }
-              item.map(i => previous.map(p => p.thenSequence(tag, i)).getOrElse(TagPath.fromSequence(tag, i)))
+              item.map(i => previous.map(p => p.thenItem(tag, i)).getOrElse(TagPath.fromItem(tag, i)))
                 .getOrElse(previous.map(p => p.thenTag(tag)).getOrElse(TagPath.fromTag(tag)))
             case None =>
               previous.map(p => p.thenTag(tag)).getOrElse(TagPath.fromTag(tag))
@@ -83,18 +151,8 @@ trait JsonFormats {
       }
 
   implicit lazy val tagPathTagReads: Reads[TagPathTag] =
-    tagPathReads.collect(JsonValidationError("Could not parse tag path tag")) {
+    tagPathReads.collect(JsonValidationError("Could not parse tag tree tag")) {
       case tp: TagPathTag => tp
-    }
-
-  implicit lazy val tagPathSequenceItemReads: Reads[TagPathSequenceItem] =
-    tagPathReads.collect(JsonValidationError("Could not parse tag path sequence")) {
-      case tp: TagPathSequenceItem => tp
-    }
-
-  implicit lazy val tagPathSequenceAnyReads: Reads[TagPathSequenceAny] =
-    tagPathReads.collect(JsonValidationError("Could not parse tag path sequence")) {
-      case tp: TagPathSequenceAny => tp
     }
 
   implicit lazy val tagPathWrites: Writes[TagPath] = {
@@ -104,8 +162,7 @@ trait JsonFormats {
     }
 
     val tagPathToTuple: TagPath => (Int, String, Option[String], Option[TagPathTrunk]) = {
-      case sequenceItem: TagPathSequenceItem => (sequenceItem.tag, Dictionary.keywordOf(sequenceItem.tag), Some(sequenceItem.item.toString), trunkToOption(sequenceItem.previous))
-      case sequenceAny: TagPathSequenceAny => (sequenceAny.tag, Dictionary.keywordOf(sequenceAny.tag), Some("*"), trunkToOption(sequenceAny.previous))
+      case item: TagPath with ItemIndex => (item.tag, Dictionary.keywordOf(item.tag), Some(item.item.toString), trunkToOption(item.previous))
       case tagPath: TagPath => (tagPath.tag, Dictionary.keywordOf(tagPath.tag), None, trunkToOption(tagPath.previous))
     }
 

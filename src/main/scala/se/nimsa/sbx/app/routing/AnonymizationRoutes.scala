@@ -138,7 +138,7 @@ trait AnonymizationRoutes {
                             key.studyInstanceUID, key.anonStudyInstanceUID,
                             key.seriesInstanceUID, key.anonSeriesInstanceUID,
                             key.sopInstanceUID, key.anonSOPInstanceUID,
-                            value.tagPath.toString, value.value, value.anonymizedValue)
+                            value.tagPath.toString(), value.value, value.anonymizedValue)
                       })
                   .via(CsvFormatting.format(delimiter = CsvFormatting.SemiColon))
 

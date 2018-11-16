@@ -21,7 +21,7 @@ import akka.stream.scaladsl.Flow
 import akka.util.ByteString
 import se.nimsa.dicom.data.DicomParts.DicomPart
 import se.nimsa.dicom.data.padToEvenLength
-import se.nimsa.dicom.streams.ModifyFlow.{TagModification, TagModificationsPart, modifyFlow}
+import se.nimsa.dicom.streams.ModifyFlow.{TagInsertion, TagModificationsPart, modifyFlow}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.{AnonymizationKeyValue, TagValue}
 import se.nimsa.sbx.dicom.SliceboxTags._
 import se.nimsa.sbx.dicom.streams.DicomStreamUtil._
@@ -41,8 +41,8 @@ object HarmonizeAnonymizationFlow {
           .flatMap(tp => r.values.find(_.tagPath == tp))
         val custom = customAnonValues.map(v => AnonymizationKeyValue(-1, -1, v.tagPath, "", v.value))
         val combined = active.foldLeft(custom)((m, tv) => if (m.map(_.tagPath).contains(tv.tagPath)) m else m :+ tv)
-        val mods = combined.map(tv => TagModification.contains(tv.tagPath, _ => padToEvenLength(ByteString(tv.anonymizedValue), tv.tagPath.tag), insert = true))
-        TagModificationsPart(mods.toList)
+        val insertions = combined.map(tv => TagInsertion(tv.tagPath, padToEvenLength(ByteString(tv.anonymizedValue), tv.tagPath.tag)))
+        TagModificationsPart(Seq.empty, insertions.toList)
       case p => p
     }
     .via(modifyFlow())

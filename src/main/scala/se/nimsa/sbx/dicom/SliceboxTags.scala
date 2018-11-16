@@ -9,22 +9,22 @@ import scala.collection.JavaConverters._
 
 object SliceboxTags {
 
-  val encodingTags: Set[TagPath] = Set(Tag.TransferSyntaxUID, Tag.SpecificCharacterSet).map(TagPath.fromTag)
+  val encodingTags: Set[Int] = Set(Tag.TransferSyntaxUID, Tag.SpecificCharacterSet)
 
-  val tagsToStoreInDB: Set[TagPath] = {
-    val patientTags = Set(Tag.PatientName, Tag.PatientID, Tag.PatientSex, Tag.PatientBirthDate).map(TagPath.fromTag)
-    val studyTags = Set(Tag.StudyInstanceUID, Tag.StudyDescription, Tag.StudyID, Tag.StudyDate, Tag.AccessionNumber, Tag.PatientAge).map(TagPath.fromTag)
-    val seriesTags = Set(Tag.SeriesInstanceUID, Tag.SeriesDescription, Tag.SeriesDate, Tag.Modality, Tag.ProtocolName, Tag.BodyPartExamined, Tag.Manufacturer, Tag.StationName, Tag.FrameOfReferenceUID).map(TagPath.fromTag)
-    val imageTags = Set(Tag.SOPInstanceUID, Tag.ImageType, Tag.InstanceNumber).map(TagPath.fromTag)
+  val tagsToStoreInDB: Set[Int] = {
+    val patientTags = Set(Tag.PatientName, Tag.PatientID, Tag.PatientSex, Tag.PatientBirthDate)
+    val studyTags = Set(Tag.StudyInstanceUID, Tag.StudyDescription, Tag.StudyID, Tag.StudyDate, Tag.AccessionNumber, Tag.PatientAge)
+    val seriesTags = Set(Tag.SeriesInstanceUID, Tag.SeriesDescription, Tag.SeriesDate, Tag.Modality, Tag.ProtocolName, Tag.BodyPartExamined, Tag.Manufacturer, Tag.StationName, Tag.FrameOfReferenceUID)
+    val imageTags = Set(Tag.SOPInstanceUID, Tag.ImageType, Tag.InstanceNumber)
 
-    (patientTags ++ studyTags ++ seriesTags ++ imageTags).map(_.asInstanceOf[TagPath])
+    patientTags ++ studyTags ++ seriesTags ++ imageTags
   }
 
-  val anonymizationTags: Set[TagPath] = Set(Tag.PatientIdentityRemoved, Tag.DeidentificationMethod).map(TagPath.fromTag)
+  val anonymizationTags: Set[Int] = Set(Tag.PatientIdentityRemoved, Tag.DeidentificationMethod)
 
-  val anonKeysTags: Set[TagPath] = Set(Tag.PatientName, Tag.PatientID, Tag.StudyInstanceUID, Tag.SeriesInstanceUID, Tag.SOPInstanceUID).map(TagPath.fromTag)
+  val anonKeysTags: Set[Int] = Set(Tag.PatientName, Tag.PatientID, Tag.StudyInstanceUID, Tag.SeriesInstanceUID, Tag.SOPInstanceUID)
 
-  val imageInformationTags: Set[TagPath] = Set(Tag.InstanceNumber, Tag.ImageIndex, Tag.NumberOfFrames, Tag.SmallestImagePixelValue, Tag.LargestImagePixelValue).map(TagPath.fromTag)
+  val imageInformationTags: Set[Int] = Set(Tag.InstanceNumber, Tag.ImageIndex, Tag.NumberOfFrames, Tag.SmallestImagePixelValue, Tag.LargestImagePixelValue)
 
   case class TagLevel(tagPath: TagPathTag, level: DicomHierarchyLevel)
 
@@ -41,7 +41,7 @@ object SliceboxTags {
   val optionalValueTags: Set[TagLevel] =
     ConfigFactory.load()
       .getConfigList("slicebox.anonymization.key-attributes").asScala
-      .map(c => TagLevel(TagPath.parse(c.getString("tag-path")).asInstanceOf[TagPathTag], DicomHierarchyLevel.withName(c.getString("level"))))
+      .map(c => TagLevel(TagPathTag.parse(c.getString("tag-path")), DicomHierarchyLevel.withName(c.getString("level"))))
       .toSet
 
   val valueTags: Set[TagLevel] = mandatoryValueTags ++ optionalValueTags

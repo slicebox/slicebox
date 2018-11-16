@@ -128,7 +128,7 @@ trait DicomStreamOps {
           seriesSourceMaybe.map { seriesSource =>
             val forcedSource = storage
               .dataSource(imageId, None)
-              .via(blacklistFilter(Set(TagPath.fromTag(Tag.PatientIdentityRemoved), TagPath.fromTag(Tag.DeidentificationMethod))))
+              .via(blacklistFilter(Set(TagTree.fromTag(Tag.PatientIdentityRemoved), TagTree.fromTag(Tag.DeidentificationMethod))))
             val anonymizedSource = anonymizedDicomDataSource(forcedSource, anonymizationKeyInsert(imageId), customAnonValues)
             storeDicomData(anonymizedSource, seriesSource.source, storage, Contexts.extendedContexts, reverseAnonymization = false).flatMap { metaDataAdded =>
               callMetaDataService[MetaDataDeleted](DeleteMetaData(Seq(imageId))).map { _ =>
@@ -142,7 +142,7 @@ trait DicomStreamOps {
     }.unwrap
 
 
-  protected def modifyData(imageId: Long, tagModifications: Seq[TagModification], storage: StorageService)
+  protected def modifyData(imageId: Long, tagModifications: Seq[TagInsertion], storage: StorageService)
                           (implicit materializer: Materializer, ec: ExecutionContext): Future[(MetaDataDeleted, MetaDataAdded)] = {
 
     val futureSourceAndTags =
@@ -165,7 +165,7 @@ trait DicomStreamOps {
         .via(groupLengthDiscardFilter)
         .via(toIndeterminateLengthSequences)
         .via(toUtf8Flow)
-        .via(modifyFlow(tagModifications: _*))
+        .via(modifyFlow(Seq.empty, tagModifications))
         .via(fmiGroupLengthFlow)
         .map(_.bytes)
         .runWith(sink)
@@ -222,7 +222,7 @@ trait DicomStreamOps {
   protected def readImageInformation(imageId: Long, storage: StorageService)(implicit materializer: Materializer, ec: ExecutionContext): Future[ImageInformation] =
     storage
       .dataSource(imageId, Some(Tag.LargestImagePixelValue + 1))
-      .via(whitelistFilter(imageInformationTags))
+      .via(whitelistFilter(imageInformationTags.map(TagTree.fromTag)))
       .via(elementFlow)
       .runWith(elementSink)
       .map { elements =>
@@ -241,13 +241,13 @@ trait DicomStreamOps {
 
     def inflatedSource(source: StreamSource[DicomPart, NotUsed]): StreamSource[ByteString, _] =
       source
-        .via(modifyFlow(
-          TagModification.contains(TagPath.fromTag(Tag.TransferSyntaxUID), valueBytes => {
+        .via(modifyFlow(Seq(
+          TagModification.equals(TagPath.fromTag(Tag.TransferSyntaxUID), valueBytes => {
             valueBytes.utf8String.trim match {
               case UID.DeflatedExplicitVRLittleEndian => padToEvenLength(ByteString(UID.ExplicitVRLittleEndian), VR.UI)
               case _ => valueBytes
             }
-          }, insert = false)))
+          })), Seq.empty))
         .via(fmiGroupLengthFlow)
         .map(_.bytes)
 
@@ -401,7 +401,7 @@ trait DicomStreamOps {
 
         val baseFlow = validateFlowWithContext(validationContexts, drainIncoming = true)
           .via(parseFlow)
-          .via(collectFlow(anonKeysTags ++ anonymizationTags, label))
+          .via(collectFlow((anonKeysTags ++ anonymizationTags).map(TagPath.fromTag), label))
           .via(tagFilterFlow)
 
         val flow = builder.add {
@@ -423,7 +423,7 @@ trait DicomStreamOps {
 
         flow ~> bcast.in
         bcast.out(0) ~> maybeDeflateFlow.map(_.bytes) ~> storageSink
-        bcast.out(1) ~> whitelistFilter(encodingTags ++ tagsToStoreInDB) ~> elementFlow ~> elementSink
+        bcast.out(1) ~> whitelistFilter((encodingTags ++ tagsToStoreInDB).map(TagTree.fromTag)) ~> elementFlow ~> elementSink
 
         SinkShape(flow.in)
     })
@@ -434,7 +434,7 @@ trait DicomStreamOps {
                                                  customAnonValues: Seq[TagValue])(implicit ec: ExecutionContext): StreamSource[ByteString, NotUsed] = {
 
     val (before, after) = ("collect-anon-before", "collect-anon-after")
-    val tags = encodingTags ++ anonymizationTags ++ anonKeysTags ++ valueTags.map(_.tagPath)
+    val tags = (encodingTags ++ anonymizationTags ++ anonKeysTags).map(TagPath.fromTag) ++ valueTags.map(_.tagPath)
 
     storageSource
       .via(collectFlow(tags, before)) // collect necessary info before anonymization

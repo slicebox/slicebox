@@ -31,8 +31,8 @@ import akka.pattern.ask
 import akka.stream.scaladsl.{Sink, SourceQueueWithComplete, Source => StreamSource}
 import akka.stream.{OverflowStrategy, QueueOfferResult}
 import akka.util.ByteString
-import se.nimsa.dicom.streams.ModifyFlow.TagModification
 import se.nimsa.dicom.data.padToEvenLength
+import se.nimsa.dicom.streams.ModifyFlow.TagInsertion
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.dicom.DicomHierarchy.{FlatSeries, Image, Patient, Study}
@@ -93,7 +93,7 @@ trait ImageRoutes {
               onComplete(readPngImageData(imageId, frameNumber, min, max, height, storage)(materializer, blockingIoContext)) {
                 case Success(bytes) => complete(HttpEntity(`image/png`, bytes))
                 case Failure(_: NotFoundException) => complete(NotFound)
-                case Failure(e) => complete(NotImplemented)
+                case Failure(_) => complete(NotImplemented)
               }
             }
           }
@@ -101,7 +101,7 @@ trait ImageRoutes {
           put {
             entity(as[Seq[TagMapping]]) { tagMappings =>
               val tagModifications = tagMappings
-                .map(tm => TagModification.contains(tm.tagPath, _ => padToEvenLength(ByteString(tm.value), tm.tagPath.tag), insert = true))
+                .map(tm => TagInsertion(tm.tagPath, padToEvenLength(ByteString(tm.value), tm.tagPath.tag)))
               onSuccess(modifyData(imageId, tagModifications, storage)) {
                 case (metaDataDeleted, metaDataAdded) =>
                   system.eventStream.publish(ImagesDeleted(metaDataDeleted.imageIds))

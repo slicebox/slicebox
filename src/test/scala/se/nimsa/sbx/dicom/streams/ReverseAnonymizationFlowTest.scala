@@ -44,27 +44,28 @@ class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymiza
 
   def anonKeyResultPart(elements: Elements, matchLevel: DicomHierarchyLevel): AnonymizationKeyOpResultPart = {
     val key = createAnonymizationKey(elements)
-    AnonymizationKeyOpResultPart(AnonymizationKeyOpResult(matchLevel, Some(key), Seq(
-      AnonymizationKeyValue(-1, key.id, TagPath.fromTag(Tag.PatientName), key.patientName, key.anonPatientName),
-      AnonymizationKeyValue(-1, key.id, TagPath.fromTag(Tag.PatientID), key.patientID, key.anonPatientID),
-      AnonymizationKeyValue(-1, key.id, TagPath.fromTag(Tag.StudyInstanceUID), key.studyInstanceUID, key.anonStudyInstanceUID),
-      AnonymizationKeyValue(-1, key.id, TagPath.fromTag(Tag.SeriesInstanceUID), key.seriesInstanceUID, key.anonSeriesInstanceUID),
-      AnonymizationKeyValue(-1, key.id, TagPath.fromTag(Tag.SOPInstanceUID), key.sopInstanceUID, key.anonSOPInstanceUID),
-      AnonymizationKeyValue(-1, key.id, TagPath.fromSequence(Tag.DerivationCodeSequence, 1).thenTag(Tag.PatientName), "name", "anon name")
-    )))
+    AnonymizationKeyOpResultPart(AnonymizationKeyOpResult(matchLevel, Some(key),
+      Seq(
+        AnonymizationKeyValue(-1, key.id, TagPath.fromTag(Tag.PatientName), key.patientName, key.anonPatientName),
+        AnonymizationKeyValue(-1, key.id, TagPath.fromTag(Tag.PatientID), key.patientID, key.anonPatientID),
+        AnonymizationKeyValue(-1, key.id, TagPath.fromTag(Tag.StudyInstanceUID), key.studyInstanceUID, key.anonStudyInstanceUID),
+        AnonymizationKeyValue(-1, key.id, TagPath.fromTag(Tag.SeriesInstanceUID), key.seriesInstanceUID, key.anonSeriesInstanceUID),
+        AnonymizationKeyValue(-1, key.id, TagPath.fromTag(Tag.SOPInstanceUID), key.sopInstanceUID, key.anonSOPInstanceUID),
+        AnonymizationKeyValue(-1, key.id, TagPath.fromItem(Tag.DerivationCodeSequence, 1).thenTag(Tag.PatientName), "name", "anon name")
+      )))
   }
 
   def anonSource(elements: Elements): Source[DicomPart, NotUsed] = {
     val key = anonKeyResultPart(elements, DicomHierarchyLevel.IMAGE).result.anonymizationKeyMaybe.get
     elementsSource(elements)
       .via(anonFlow)
-      .via(modifyFlow(
-        TagModification.contains(TagPath.fromTag(Tag.PatientName), _ => toAsciiBytes(key.anonPatientName, VR.PN), insert = false),
-        TagModification.contains(TagPath.fromTag(Tag.PatientID), _ => toAsciiBytes(key.anonPatientID, VR.LO), insert = false),
-        TagModification.contains(TagPath.fromTag(Tag.StudyInstanceUID), _ => toAsciiBytes(key.anonStudyInstanceUID, VR.UI), insert = false),
-        TagModification.contains(TagPath.fromTag(Tag.SeriesInstanceUID), _ => toAsciiBytes(key.anonSeriesInstanceUID, VR.UI), insert = false),
-        TagModification.contains(TagPath.fromTag(Tag.SOPInstanceUID), _ => toAsciiBytes(key.anonSOPInstanceUID, VR.UI), insert = false)
-      ))
+      .via(modifyFlow(modifications = Seq(
+        TagModification.equals(TagPath.fromTag(Tag.PatientName), _ => toAsciiBytes(key.anonPatientName, VR.PN)),
+        TagModification.equals(TagPath.fromTag(Tag.PatientID), _ => toAsciiBytes(key.anonPatientID, VR.LO)),
+        TagModification.equals(TagPath.fromTag(Tag.StudyInstanceUID), _ => toAsciiBytes(key.anonStudyInstanceUID, VR.UI)),
+        TagModification.equals(TagPath.fromTag(Tag.SeriesInstanceUID), _ => toAsciiBytes(key.anonSeriesInstanceUID, VR.UI)),
+        TagModification.equals(TagPath.fromTag(Tag.SOPInstanceUID), _ => toAsciiBytes(key.anonSOPInstanceUID, VR.UI))
+      )))
   }
 
   "The reverse anonymization flow" should "reverse anonymization using information stored in anonymization key" in {
@@ -156,9 +157,9 @@ class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymiza
 
     val source = Source.single(anonKeyResultPart(elements, DicomHierarchyLevel.IMAGE))
       .concat(anonSource(elements))
-      .via(ModifyFlow.modifyFlow(
-        TagModification.contains(TagPath.fromSequence(Tag.DerivationCodeSequence, 1).thenTag(Tag.PatientName), _ => toAsciiBytes("anon patient name", VR.PN), insert = false)
-      ))
+      .via(ModifyFlow.modifyFlow(modifications = Seq(
+        TagModification.equals(TagPath.fromItem(Tag.DerivationCodeSequence, 1).thenTag(Tag.PatientName), _ => toAsciiBytes("anon patient name", VR.PN))
+      )))
       .via(reverseAnonFlow)
       .via(ElementFlows.elementFlow)
 

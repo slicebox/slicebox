@@ -9,7 +9,7 @@ import akka.testkit.TestKit
 import akka.util.{ByteString, Timeout}
 import org.scalatest.{AsyncFlatSpecLike, BeforeAndAfterAll, BeforeAndAfterEach, Matchers}
 import se.nimsa.dicom.data._
-import se.nimsa.dicom.streams.ModifyFlow.{TagModification, modifyFlow}
+import se.nimsa.dicom.streams.ModifyFlow.{TagInsertion, TagModification, modifyFlow}
 import se.nimsa.dicom.streams.{DicomFlows, DicomStreamException, ElementFlows, ElementSink}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.anonymization.{AnonymizationDAO, AnonymizationServiceActor}
@@ -77,7 +77,7 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("DicomStreamOpsSpec")) with
     def anonymizedDicomData(imageId: Long, customTagValues: Seq[TagValue]): StreamSource[ByteString, NotUsed] =
       anonymizedDicomData(imageId, customTagValues, storage)
 
-    def modifyData(imageId: Long, tagModifications: Seq[TagModification]): Future[(MetaDataDeleted, MetaDataAdded)] =
+    def modifyData(imageId: Long, tagModifications: Seq[TagInsertion]): Future[(MetaDataDeleted, MetaDataAdded)] =
       modifyData(imageId, tagModifications, storage)
   }
 
@@ -181,16 +181,14 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("DicomStreamOpsSpec")) with
       sopInstanceUIDs.map { sopInstanceUID =>
         val modifiedBytesSource = bytesSource
           .via(storage.parseFlow(None))
-          .via(DicomFlows.blacklistFilter(Set(TagPath.fromTag(Tag.PixelData))))
-          .via(modifyFlow(
-            TagModification.contains(
+          .via(DicomFlows.blacklistFilter(Set(TagTree.fromTag(Tag.PixelData))))
+          .via(modifyFlow(modifications = Seq(
+            TagModification.equals(
               TagPath.fromTag(Tag.MediaStorageSOPInstanceUID),
-              uid => uid.dropRight(3) ++ ByteString(f"$sopInstanceUID%03d"),
-              insert = true),
-            TagModification.contains(
+              uid => uid.dropRight(3) ++ ByteString(f"$sopInstanceUID%03d")),
+            TagModification.equals(
               TagPath.fromTag(Tag.SOPInstanceUID),
-              uid => uid.dropRight(3) ++ ByteString(f"$sopInstanceUID%03d"),
-              insert = true)))
+              uid => uid.dropRight(3) ++ ByteString(f"$sopInstanceUID%03d")))))
           .map(_.bytes)
         dicomStreamOpsImpl.storeDicomData(modifiedBytesSource, source)
           .map(_.image.id)
@@ -280,7 +278,7 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("DicomStreamOpsSpec")) with
     val bytesSource = StreamSource.single(TestUtil.toBytes(testData))
     for {
       metaDataAdded1 <- dicomStreamOpsImpl.storeDicomData(bytesSource, source)
-      (_, metaDataAdded2) <- dicomStreamOpsImpl.modifyData(metaDataAdded1.image.id, Seq(TagModification.endsWith(TagPath.fromTag(Tag.PatientName), _ => ByteString(newName), insert = true)))
+      (_, metaDataAdded2) <- dicomStreamOpsImpl.modifyData(metaDataAdded1.image.id, Seq(TagInsertion(TagPath.fromTag(Tag.PatientName), ByteString(newName))))
     } yield {
       metaDataAdded2.patient.patientName.value shouldBe newName
     }

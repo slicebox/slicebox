@@ -1,6 +1,6 @@
 package se.nimsa.sbx.filtering
 
-import se.nimsa.dicom.data.TagPath
+import se.nimsa.dicom.data.TagTree
 import se.nimsa.sbx.app.GeneralProtocol.{SourceRef, SourceType}
 import se.nimsa.sbx.filtering.FilteringProtocol._
 import se.nimsa.sbx.util.DbUtil.createTables
@@ -15,10 +15,10 @@ class FilteringDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executi
 
   val db = dbConf.db
 
-  implicit val tagPathColumnType: BaseColumnType[TagPath] =
-    MappedColumnType.base[TagPath, String](
+  implicit val tagPathColumnType: BaseColumnType[TagTree] =
+    MappedColumnType.base[TagTree, String](
       tagPath => tagPath.toString, // map TagPathTag to String
-      tagPathString => TagPath.parse(tagPathString) // map String to TagPath
+      tagPathString => TagTree.parse(tagPathString) // map String to TagPath
     )
 
   implicit val tagFilterTypeColumnType: BaseColumnType[TagFilterType] =
@@ -45,7 +45,7 @@ class FilteringDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executi
   class TagPathTable(tag: Tag) extends Table[TagFilterTagPath](tag, TagPathTable.name) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def tagFilterId = column[Long]("tagfilterid")
-    def tagPath = column[TagPath]("tagpath")
+    def tagPath = column[TagTree]("tagpath")
     def fkTagFilter = foreignKey("fk_tag_filter", tagFilterId, tagFilterQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
     def * = (id, tagFilterId, tagPath) <> (TagFilterTagPath.tupled, TagFilterTagPath.unapply)
   }

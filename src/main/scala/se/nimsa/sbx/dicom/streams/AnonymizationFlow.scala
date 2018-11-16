@@ -23,16 +23,16 @@ import se.nimsa.dicom.data.DicomParsing.isPrivate
 import se.nimsa.dicom.data.DicomParts.DicomPart
 import se.nimsa.dicom.data.{Tag, TagPath, VR}
 import se.nimsa.dicom.streams.DicomFlows._
-import se.nimsa.dicom.streams.ModifyFlow.{TagModification, modifyFlow}
+import se.nimsa.dicom.streams.ModifyFlow.{TagInsertion, TagModification, modifyFlow}
 import se.nimsa.sbx.anonymization.AnonymizationUtil._
 import se.nimsa.sbx.dicom.DicomUtil._
 
 object AnonymizationFlow {
 
 
-  private def insert(tag: Int, mod: ByteString => ByteString): TagModification = TagModification.endsWith(TagPath.fromTag(tag), mod, insert = true)
-  private def modify(tag: Int, mod: ByteString => ByteString): TagModification = TagModification.endsWith(TagPath.fromTag(tag), mod, insert = false)
-  private def clear(tag: Int): TagModification = TagModification.endsWith(TagPath.fromTag(tag), _ => ByteString.empty, insert = false)
+  private def insert(tag: Int, value: ByteString): TagInsertion = TagInsertion(TagPath.fromTag(tag), value)
+  private def modify(tag: Int, mod: ByteString => ByteString): TagModification = TagModification.endsWith(TagPath.fromTag(tag), mod)
+  private def clear(tag: Int): TagModification = TagModification.endsWith(TagPath.fromTag(tag), _ => ByteString.empty)
 
   private val removeTags = Set(
     Tag.AcquisitionComments,
@@ -212,50 +212,53 @@ object AnonymizationFlow {
     tagFilter(_ => true)(tagPath =>
       !tagPath.toList.map(_.tag).exists(tag =>
         isPrivate(tag) || isOverlay(tag) || removeTags.contains(tag))) // remove private, overlay and PHI attributes
-      .via(modifyFlow( // modify, clear and insert
-      modify(Tag.AccessionNumber, bytes => if (bytes.nonEmpty) createAccessionNumber() else bytes),
-      modify(Tag.ConcatenationUID, _ => createUid()),
-      clear(Tag.ContentCreatorName),
-      modify(Tag.ContextGroupExtensionCreatorUID, _ => createUid()),
-      clear(Tag.ContrastBolusAgent),
-      modify(Tag.CreatorVersionUID, _ => createUid()),
-      insert(Tag.DeidentificationMethod, _ => toAsciiBytes("Retain Longitudinal Full Dates Option", VR.LO)),
-      modify(Tag.DimensionOrganizationUID, _ => createUid()),
-      modify(Tag.DoseReferenceUID, _ => createUid()),
-      modify(Tag.FiducialUID, _ => createUid()),
-      clear(Tag.FillerOrderNumberImagingServiceRequest),
-      modify(Tag.FrameOfReferenceUID, _ => createUid()),
-      modify(Tag.InstanceCreatorUID, _ => createUid()),
-      modify(Tag.IrradiationEventUID, _ => createUid()),
-      modify(Tag.LargePaletteColorLookupTableUID, _ => createUid()),
-      modify(Tag.MediaStorageSOPInstanceUID, _ => createUid()),
-      modify(Tag.ObservationSubjectUIDTrial, _ => createUid()),
-      modify(Tag.ObservationUID, _ => createUid()),
-      modify(Tag.PaletteColorLookupTableUID, _ => createUid()),
-      insert(Tag.PatientIdentityRemoved, _ => toAsciiBytes("YES", VR.CS)),
-      insert(Tag.PatientID, _ => createUid()),
-      insert(Tag.PatientName, _ => createUid()),
-      clear(Tag.PlacerOrderNumberImagingServiceRequest),
-      modify(Tag.ReferencedFrameOfReferenceUID, _ => createUid()),
-      modify(Tag.ReferencedGeneralPurposeScheduledProcedureStepTransactionUID, _ => createUid()),
-      modify(Tag.ReferencedObservationUIDTrial, _ => createUid()),
-      modify(Tag.ReferencedSOPInstanceUID, _ => createUid()),
-      modify(Tag.ReferencedSOPInstanceUIDInFile, _ => createUid()),
-      clear(Tag.ReferringPhysicianName),
-      modify(Tag.RelatedFrameOfReferenceUID, _ => createUid()),
-      modify(Tag.RequestedSOPInstanceUID, _ => createUid()),
-      insert(Tag.SeriesInstanceUID, _ => createUid()),
-      insert(Tag.SOPInstanceUID, _ => createUid()),
-      modify(Tag.StorageMediaFileSetUID, _ => createUid()),
-      clear(Tag.StudyID),
-      insert(Tag.StudyInstanceUID, _ => createUid()),
-      modify(Tag.SynchronizationFrameOfReferenceUID, _ => createUid()),
-      modify(Tag.TargetUID, _ => createUid()),
-      modify(Tag.TemplateExtensionCreatorUID, _ => createUid()),
-      modify(Tag.TemplateExtensionOrganizationUID, _ => createUid()),
-      modify(Tag.TransactionUID, _ => createUid()),
-      modify(Tag.UID, _ => createUid()),
-      clear(Tag.VerifyingObserverName)))
+      .via(modifyFlow(
+      Seq(
+        modify(Tag.AccessionNumber, bytes => if (bytes.nonEmpty) createAccessionNumber() else bytes),
+        modify(Tag.ConcatenationUID, _ => createUid()),
+        clear(Tag.ContentCreatorName),
+        modify(Tag.ContextGroupExtensionCreatorUID, _ => createUid()),
+        clear(Tag.ContrastBolusAgent),
+        modify(Tag.CreatorVersionUID, _ => createUid()),
+        modify(Tag.DimensionOrganizationUID, _ => createUid()),
+        modify(Tag.DoseReferenceUID, _ => createUid()),
+        modify(Tag.FiducialUID, _ => createUid()),
+        clear(Tag.FillerOrderNumberImagingServiceRequest),
+        modify(Tag.FrameOfReferenceUID, _ => createUid()),
+        modify(Tag.InstanceCreatorUID, _ => createUid()),
+        modify(Tag.IrradiationEventUID, _ => createUid()),
+        modify(Tag.LargePaletteColorLookupTableUID, _ => createUid()),
+        modify(Tag.MediaStorageSOPInstanceUID, _ => createUid()),
+        modify(Tag.ObservationSubjectUIDTrial, _ => createUid()),
+        modify(Tag.ObservationUID, _ => createUid()),
+        modify(Tag.PaletteColorLookupTableUID, _ => createUid()),
+        clear(Tag.PlacerOrderNumberImagingServiceRequest),
+        modify(Tag.ReferencedFrameOfReferenceUID, _ => createUid()),
+        modify(Tag.ReferencedGeneralPurposeScheduledProcedureStepTransactionUID, _ => createUid()),
+        modify(Tag.ReferencedObservationUIDTrial, _ => createUid()),
+        modify(Tag.ReferencedSOPInstanceUID, _ => createUid()),
+        modify(Tag.ReferencedSOPInstanceUIDInFile, _ => createUid()),
+        clear(Tag.ReferringPhysicianName),
+        modify(Tag.RelatedFrameOfReferenceUID, _ => createUid()),
+        modify(Tag.RequestedSOPInstanceUID, _ => createUid()),
+        modify(Tag.StorageMediaFileSetUID, _ => createUid()),
+        clear(Tag.StudyID),
+        modify(Tag.SynchronizationFrameOfReferenceUID, _ => createUid()),
+        modify(Tag.TargetUID, _ => createUid()),
+        modify(Tag.TemplateExtensionCreatorUID, _ => createUid()),
+        modify(Tag.TemplateExtensionOrganizationUID, _ => createUid()),
+        modify(Tag.TransactionUID, _ => createUid()),
+        modify(Tag.UID, _ => createUid()),
+        clear(Tag.VerifyingObserverName)
+      ), Seq(
+        insert(Tag.DeidentificationMethod, toAsciiBytes("Retain Longitudinal Full Dates Option", VR.LO)),
+        insert(Tag.PatientIdentityRemoved, toAsciiBytes("YES", VR.CS)),
+        insert(Tag.PatientID, createUid()),
+        insert(Tag.PatientName, createUid()),
+        insert(Tag.SeriesInstanceUID, createUid()),
+        insert(Tag.SOPInstanceUID, createUid()),
+        insert(Tag.StudyInstanceUID, createUid())
+      )))
 }
 
 

@@ -2,7 +2,7 @@ package se.nimsa.sbx.app.routing
 
 import akka.http.scaladsl.model.StatusCodes._
 import org.scalatest.{FlatSpecLike, Matchers}
-import se.nimsa.dicom.data.{Tag, TagPath}
+import se.nimsa.dicom.data.{Tag, TagTree}
 import se.nimsa.sbx.app.GeneralProtocol.SourceType
 import se.nimsa.sbx.filtering.FilteringProtocol._
 import se.nimsa.sbx.storage.RuntimeStorage
@@ -18,8 +18,8 @@ class FilteringRoutesTest extends {
 
 
   val filter = TagFilter(-1, "filter name", TagFilterType.WHITELIST)
-  val filterTagPath1 = TagFilterTagPath(-1, -1, TagPath.fromTag(0x00080005))
-  val filterTagPath2 = TagFilterTagPath(-1, -1, TagPath.fromTag(0x00100010))
+  val filterTagPath1 = TagFilterTagPath(-1, -1, TagTree.fromTag(0x00080005))
+  val filterTagPath2 = TagFilterTagPath(-1, -1, TagTree.fromTag(0x00100010))
 
   "Filtering routes" should "return 201 Created and the created filter when creating a new filter" in {
     PostAsAdmin("/api/filtering/filters", filter) ~> routes ~> check {
@@ -88,7 +88,7 @@ class FilteringRoutesTest extends {
     val addedFilter = PostAsAdmin("/api/filtering/filters", filter) ~> routes ~> check {
       responseAs[TagFilter]
     }
-    val tagPath = TagFilterTagPath(-1, addedFilter.id, TagPath.fromTag(Tag.PatientName))
+    val tagPath = TagFilterTagPath(-1, addedFilter.id, TagTree.fromTag(Tag.PatientName))
     val addedTagPath1 = PostAsAdmin(s"/api/filtering/filters/${addedFilter.id}/tagpaths", tagPath) ~> routes ~> check {
       status shouldBe Created
       responseAs[TagFilterTagPath]
@@ -112,7 +112,7 @@ class FilteringRoutesTest extends {
     val addedFilter = PostAsAdmin("/api/filtering/filters", filter) ~> routes ~> check {
       responseAs[TagFilter]
     }
-    val tagPath = TagFilterTagPath(-1, addedFilter.id, TagPath.fromTag(Tag.PatientName))
+    val tagPath = TagFilterTagPath(-1, addedFilter.id, TagTree.fromTag(Tag.PatientName))
     val addedTagPath1 = PostAsAdmin(s"/api/filtering/filters/${addedFilter.id}/tagpaths", tagPath) ~> routes ~> check {
       responseAs[TagFilterTagPath]
     }

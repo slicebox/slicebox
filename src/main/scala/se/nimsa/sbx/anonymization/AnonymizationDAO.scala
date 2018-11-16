@@ -77,7 +77,7 @@ class AnonymizationDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Exe
 
   val toKeyValue: (Long, Long, String, String, String) => AnonymizationKeyValue =
     (id: Long, anonymizationKeyId: Long, tagPath: String, value: String, anonymizedValue: String) =>
-      AnonymizationKeyValue(id, anonymizationKeyId, TagPath.parse(tagPath).asInstanceOf[TagPathTag], value, anonymizedValue)
+      AnonymizationKeyValue(id, anonymizationKeyId, TagPathTag.parse(tagPath), value, anonymizedValue)
 
   val fromKeyValue: AnonymizationKeyValue => Option[(Long, Long, String, String, String)] =
     (keyValue: AnonymizationKeyValue) =>
