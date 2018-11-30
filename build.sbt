@@ -126,7 +126,14 @@ WebKeys.packagePrefix in Assets := "public/"
 (managedClasspath in Runtime) += (packageBin in Assets).value
 
 // docker base image
+
 dockerBaseImage := "openjdk:8-jre-alpine"
+
+// coverage
+
+coverageExcludedPackages := ".*\\.BuildInfo.*;.*\\.AnonymizationProfiles.*"
+
+// managed sources
 
 sourceGenerators in Compile += Def.task {
   val tagFile = (sourceManaged in Compile).value / "sbt-anondata" / "AnonymizationProfiles.scala"
