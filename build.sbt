@@ -1,3 +1,4 @@
+import CreateSources._
 
 name := "slicebox"
 version := "2.0-SNAPSHOT"
@@ -104,7 +105,7 @@ libraryDependencies ++= {
     "org.webjars" % "angularjs" % "1.5.11",
     "org.webjars" % "angular-material" % "1.1.5",
     "org.webjars" % "angular-file-upload" % "11.0.0",
-    "se.nimsa" %% "dicom-streams" % "0.5-SNAPSHOT",
+    "se.nimsa" %% "dicom-streams" % "0.6",
     "com.lightbend.akka" %% "akka-stream-alpakka-s3" % alpakkaVersion,
     "com.lightbend.akka" %% "akka-stream-alpakka-file" % alpakkaVersion,
     "com.lightbend.akka" %% "akka-stream-alpakka-csv" % alpakkaVersion
@@ -126,3 +127,9 @@ WebKeys.packagePrefix in Assets := "public/"
 
 // docker base image
 dockerBaseImage := "openjdk:8-jre-alpine"
+
+sourceGenerators in Compile += Def.task {
+  val tagFile = (sourceManaged in Compile).value / "sbt-anondata" / "AnonymizationProfiles.scala"
+  IO.write(tagFile, generate())
+  Seq(tagFile)
+}.taskValue
