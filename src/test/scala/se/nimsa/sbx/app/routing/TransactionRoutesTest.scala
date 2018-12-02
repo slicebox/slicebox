@@ -11,7 +11,7 @@ import org.scalatest.{FlatSpecLike, Matchers}
 import se.nimsa.dicom.data.TagPath
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.box.BoxProtocol._
-import se.nimsa.sbx.dicom.DicomHierarchy.{Image, Patient}
+import se.nimsa.sbx.dicom.DicomHierarchy.Image
 import se.nimsa.sbx.dicom.DicomProperty._
 import se.nimsa.sbx.storage.RuntimeStorage
 import se.nimsa.sbx.util.CompressionUtil._
@@ -293,11 +293,6 @@ class TransactionRoutesTest extends {
     // first, add a box on the poll (university) side
     val uniBox = addPollBox("hosp6")
 
-    // create attribute mappings
-    val patient = GetAsUser(s"/api/metadata/patients") ~> routes ~> check {
-      responseAs[List[Patient]].head
-    }
-
     val imageTagValues = ImageTagValues(1, Seq(
       TagValue(TagPath.fromTag(PatientName.dicomTag), "TEST NAME"),
       TagValue(TagPath.fromTag(PatientID.dicomTag), "TEST ID"),
@@ -326,7 +321,7 @@ class TransactionRoutesTest extends {
     elements.getString(PatientName.dicomTag).get should be("TEST NAME") // mapped
     elements.getString(PatientID.dicomTag).get should be("TEST ID") // mapped
     elements.getString(PatientBirthDate.dicomTag).get should be("19601010") // mapped
-    elements.getString(PatientSex.dicomTag).get should be(patient.patientSex.value) // not mapped
+    elements.getString(PatientSex.dicomTag) shouldBe empty // not mapped
 
     // send done
     Post(s"/api/transactions/${uniBox.token}/outgoing/done", transactionImage) ~> routes ~> check {

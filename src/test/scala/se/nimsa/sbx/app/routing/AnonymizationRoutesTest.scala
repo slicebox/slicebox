@@ -58,7 +58,7 @@ class AnonymizationRoutesTest extends {
       val anonPatient = responseAs[Patient]
       anonPatient.patientName should not be flatSeries.patient.patientName
       anonPatient.patientID should not be flatSeries.patient.patientID
-      anonPatient.patientSex should be(flatSeries.patient.patientSex)
+      anonPatient.patientSex.value shouldBe empty
     }
     GetAsUser("/api/metadata/studies/1") ~> Route.seal(routes) ~> check {
       status should be(NotFound)

@@ -3,7 +3,7 @@ package se.nimsa.sbx.dicom.streams
 import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.{Sink, Source}
+import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.stream.testkit.scaladsl.TestSink
 import akka.testkit.TestKit
 import akka.util.ByteString
@@ -14,6 +14,7 @@ import se.nimsa.dicom.data._
 import se.nimsa.dicom.streams.ModifyFlow.TagModification
 import se.nimsa.dicom.streams.{DicomFlows, ElementFlows, ElementSink, ModifyFlow}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.{AnonymizationKeyOpResult, AnonymizationKeyValue}
+import se.nimsa.sbx.anonymization.{AnonymizationProfile, ConfidentialityOption}
 import se.nimsa.sbx.dicom.DicomHierarchy.DicomHierarchyLevel
 import se.nimsa.sbx.dicom.streams.DicomStreamUtil._
 import se.nimsa.sbx.storage.{RuntimeStorage, StorageService}
@@ -28,7 +29,6 @@ class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymiza
   import ReverseAnonymizationFlow.reverseAnonFlow
   import ModifyFlow.modifyFlow
   import ElementFlows.elementFlow
-  import AnonymizationFlow.anonFlow
 
   implicit val materializer: ActorMaterializer = ActorMaterializer()
   implicit val ec: ExecutionContextExecutor = system.dispatcher
@@ -36,6 +36,12 @@ class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymiza
   override def afterAll: Unit = TestKit.shutdownActorSystem(system)
 
   val storage: StorageService = new RuntimeStorage
+
+  def anonFlow: Flow[DicomPart, DicomPart, NotUsed] = new AnonymizationFlow(
+    AnonymizationProfile(Seq(
+      ConfidentialityOption.BASIC_PROFILE,
+      ConfidentialityOption.RETAIN_LONGITUDINAL_TEMPORAL_INFORMATION
+    ))).anonFlow
 
   def elementsSource(elements: Elements): Source[DicomPart, NotUsed] =
     Source.single(elements.toBytes())
