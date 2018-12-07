@@ -1,16 +1,31 @@
 package se.nimsa.sbx.anonymization
 
-import se.nimsa.sbx.anonymization.AnonymizationProfile.TagMask
+import se.nimsa.sbx.anonymization.AnonymizationOp._
+import se.nimsa.sbx.anonymization.AnonymizationProfile._
+import se.nimsa.sbx.anonymization.AnonymizationProfiles._
+import se.nimsa.sbx.anonymization.ConfidentialityOption._
 
 case class AnonymizationProfile(options: Seq[ConfidentialityOption]) {
 
-  import ConfidentialityOption._
+  private lazy val activeOps: Map[ConfidentialityOption, Map[TagMask, AnonymizationOp]] =
+    profiles.filterKeys(options.contains) ++ (
+      if (options.contains(RETAIN_SAFE_PRIVATE))
+        Map(RETAIN_SAFE_PRIVATE -> safePrivateAttributes.map(_ -> KEEP).toMap)
+      else
+        Map.empty
+      )
 
-  def toOps: Map[TagMask, AnonymizationOp] = options
-    .sortWith(_.rank < _.rank)
-    .foldLeft(Map.empty[TagMask, AnonymizationOp])((map, op) => map ++ AnonymizationProfiles.profiles(op))
+  private lazy val sortedKeys = activeOps.keys.toList.sortWith(_.rank > _.rank)
 
-  def safePrivate: Seq[TagMask] = if (options.contains(RETAIN_SAFE_PRIVATE)) AnonymizationProfiles.safePrivateAttributes else Seq.empty
+  def opOf(f: TagMask => Boolean): Option[AnonymizationOp] = {
+    var op: Option[AnonymizationOp] = None
+    for (key <- sortedKeys if op.isEmpty) {
+      val map = activeOps(key)
+      op = map.filterKeys(f).values.headOption
+    }
+    op
+  }
+
 }
 
 object AnonymizationProfile {

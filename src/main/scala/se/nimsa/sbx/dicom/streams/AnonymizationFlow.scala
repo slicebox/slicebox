@@ -3,7 +3,6 @@ package se.nimsa.sbx.dicom.streams
 import akka.NotUsed
 import akka.stream.scaladsl.Flow
 import akka.util.ByteString
-import se.nimsa.dicom.data.DicomParsing.isPrivate
 import se.nimsa.dicom.data.DicomParts.DicomPart
 import se.nimsa.dicom.data.{Tag, TagPath, VR}
 import se.nimsa.dicom.streams.DicomFlows.tagFilter
@@ -17,58 +16,35 @@ class AnonymizationFlow(profile: AnonymizationProfile) {
 
   import AnonymizationOp._
 
-  val insertTags: Seq[Int] = Seq(Tag.DeidentificationMethod, Tag.PatientIdentityRemoved,
+  val insertTags: Seq[TagPath] = Seq(Tag.DeidentificationMethod, Tag.PatientIdentityRemoved,
     Tag.PatientID, Tag.PatientName,
-    Tag.SeriesInstanceUID, Tag.SOPInstanceUID, Tag.StudyInstanceUID)
+    Tag.SeriesInstanceUID, Tag.SOPInstanceUID, Tag.StudyInstanceUID).map(TagPath.fromTag)
 
-  val ops: Map[TagMask, AnonymizationOp] = profile.toOps
-    .filterNot { case (tagMask, _) => insertTags.exists(tagMask.contains) } // make sure structure tag are inserted, not modified
-
-  val safePrivate: Seq[TagMask] = profile.safePrivate
-
-  val remove: List[TagMask] = ops
-    .filter {
-      case (tagMask, _) if isPrivate(tagMask.tag) => true // remove all private unless safe
-      case (_, REMOVE) => true
-      case (_, REMOVE_OR_ZERO) => true // always remove (limitation)
-      case (_, REMOVE_OR_DUMMY) => true // always remove (limitation)
-      case (_, REMOVE_OR_ZERO_OR_DUMMY) => true // always remove (limitation)
-      case (_, REMOVE_OR_ZERO_OR_REPLACE_UID) => true // always remove (limitation)
-      case _ => false
-    }
-    .keys.toList
-
-  val modifications: Map[TagMask, AnonymizationOp] = ops
-    .filter {
-      case (_, DUMMY) => true
-      case (_, CLEAN) => true
-      case (_, ZERO) => true
-      case (_, ZERO_OR_DUMMY) => true
-      case (_, REPLACE_UID) => true
-      case _ => false
-    }
-
-  def isSafePrivate(tag: Int): Boolean = safePrivate.exists(_.contains(tag))
+  private def containsAnyTag(tagPath: TagPath): TagMask => Boolean = tagMask => tagPath.toList.map(_.tag).exists(tagMask.contains)
+  private def containsTag(tagPath: TagPath): TagMask => Boolean = _.contains(tagPath.tag)
 
   def anonFlow: Flow[DicomPart, DicomPart, NotUsed] = {
     tagFilter(_ => true) { tagPath =>
-      val tags = tagPath.toList.map(_.tag)
-      tags.exists(isSafePrivate) || !tags.exists(tag => remove.exists(_.contains(tag)))
+      insertTags.contains(tagPath) ||
+      !profile.opOf(containsAnyTag(tagPath)).exists {
+        case REMOVE => true
+        case REMOVE_OR_ZERO => true // always remove (limitation)
+        case REMOVE_OR_DUMMY => true // always remove (limitation)
+        case REMOVE_OR_ZERO_OR_DUMMY => true // always remove (limitation)
+        case REMOVE_OR_ZERO_OR_REPLACE_UID => true // always remove (limitation)
+        case _ => false
+      }
     }
       .via(modifyFlow(
         Seq(
           TagModification(tagPath =>
-            !isSafePrivate(tagPath.tag) && modifications.exists {
-              case (tagMask, REPLACE_UID) => tagMask.contains(tagPath.tag)
-              case _ => false
-            }, _ => createUid()
-          ),
+            !insertTags.contains(tagPath) && profile.opOf(containsTag(tagPath)).contains(REPLACE_UID), _ => createUid()),
           TagModification(tagPath =>
-            !isSafePrivate(tagPath.tag) && modifications.filter(_._1.contains(tagPath.tag)).exists {
-              case (_, DUMMY) => true // zero instead of replace with dummy (limitation)
-              case (_, CLEAN) => true // zero instead of replace with cleaned value (limitation)
-              case (_, ZERO) => true
-              case (_, ZERO_OR_DUMMY) => true // always zero (limitation)
+            !insertTags.contains(tagPath) && profile.opOf(containsTag(tagPath)).exists {
+              case DUMMY => true // zero instead of replace with dummy (limitation)
+              case CLEAN => true // zero instead of replace with cleaned value (limitation)
+              case ZERO => true
+              case ZERO_OR_DUMMY => true // always zero (limitation)
               case _ => false
             }, _ => ByteString.empty
           )
