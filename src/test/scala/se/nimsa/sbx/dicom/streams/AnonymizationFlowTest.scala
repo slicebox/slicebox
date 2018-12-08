@@ -49,14 +49,8 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
   def checkBasicAttributes(source: Source[DicomPart, NotUsed]): PartProbe =
     source.runWith(TestSink.probe[DicomPart])
       .expectHeaderAndValueChunkPairs(
-        Tag.SOPInstanceUID,
-        Tag.Modality,
-        Tag.PatientName,
-        Tag.PatientID,
         Tag.PatientIdentityRemoved,
-        Tag.DeidentificationMethod,
-        Tag.StudyInstanceUID,
-        Tag.SeriesInstanceUID)
+        Tag.DeidentificationMethod)
       .expectDicomComplete()
 
   "The anonymization flow" should "replace an existing accession number a zero length value" in {
@@ -65,25 +59,26 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
     val source = toAnonSource(elements)
 
     source.runWith(TestSink.probe[DicomPart])
-      .expectHeader(Tag.SOPInstanceUID)
-      .expectValueChunk()
       .expectHeader(Tag.AccessionNumber)
       .expectHeaderAndValueChunkPairs(
-        Tag.PatientName,
-        Tag.PatientID,
         Tag.PatientIdentityRemoved,
-        Tag.DeidentificationMethod,
-        Tag.StudyInstanceUID,
-        Tag.SeriesInstanceUID
+        Tag.DeidentificationMethod
       )
       .expectDicomComplete()
   }
 
-  it should "add basic hierarchy attributes also when not present" in {
+  it should "add anonymization attributes" in {
     val elements = Elements.empty()
       .setString(Tag.Modality, "NM")
     val source = toAnonSource(elements)
-    checkBasicAttributes(source)
+
+    source.runWith(TestSink.probe[DicomPart])
+      .expectHeaderAndValueChunkPairs(
+        Tag.Modality,
+        Tag.PatientIdentityRemoved,
+        Tag.DeidentificationMethod
+      )
+      .expectDicomComplete()
   }
 
   it should "leave an empty accession number empty" in {
@@ -92,10 +87,12 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
     val source = toAnonSource(elements)
 
     source.runWith(TestSink.probe[DicomPart])
-      .expectHeader(Tag.SOPInstanceUID)
-      .expectValueChunk()
       .expectHeader(Tag.AccessionNumber)
-      .expectHeader(Tag.PatientName)
+      .expectHeaderAndValueChunkPairs(
+        Tag.PatientIdentityRemoved,
+        Tag.DeidentificationMethod
+      )
+      .expectDicomComplete()
   }
 
   it should "create an new random UID from an existing UID" in {
@@ -105,9 +102,6 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
 
     source.runWith(TestSink.probe[DicomPart])
       .expectHeaderAndValueChunkPairs(
-        Tag.SOPInstanceUID,
-        Tag.PatientName,
-        Tag.PatientID,
         Tag.PatientIdentityRemoved,
         Tag.DeidentificationMethod)
       .expectHeader(Tag.StudyInstanceUID)
@@ -116,46 +110,7 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
         case v: ValueChunk =>
           v.bytes.utf8String.trim should not be elements.getString(Tag.StudyInstanceUID).get
       }
-      .expectHeader(Tag.SeriesInstanceUID)
-      .expectValueChunk()
       .expectDicomComplete()
-  }
-
-  it should "create a UID for UID tags which define DICOM hierarchy, regardless of whether value exists, is empty or has a previous value" in {
-    val elements1 = Elements.empty()
-      .setString(Tag.Modality, "NM")
-    val elements2 = Elements.empty()
-      .setString(Tag.Modality, "NM")
-      .setString(Tag.StudyInstanceUID, "")
-    val elements3 = Elements.empty()
-      .setString(Tag.Modality, "NM")
-      .setString(Tag.StudyInstanceUID, "1.2.3.4.5.6.7.8.9")
-
-    val source1 = toAnonSource(elements1)
-    val source2 = toAnonSource(elements2)
-    val source3 = toAnonSource(elements3)
-
-    def check(source: Source[DicomPart, NotUsed]) =
-      source.runWith(TestSink.probe[DicomPart])
-        .expectHeaderAndValueChunkPairs(
-          Tag.SOPInstanceUID,
-          Tag.Modality,
-          Tag.PatientName,
-          Tag.PatientID,
-          Tag.PatientIdentityRemoved,
-          Tag.DeidentificationMethod)
-        .expectHeader(Tag.StudyInstanceUID)
-        .request(1)
-        .expectNextChainingPF {
-          case v: ValueChunk if v.bytes.nonEmpty => true
-        }
-        .expectHeader(Tag.SeriesInstanceUID)
-        .expectValueChunk()
-        .expectDicomComplete()
-
-    check(source1)
-    check(source2)
-    check(source3)
   }
 
   it should "create a new random UID for each anonymization from some fixed existing UID" in {
@@ -179,7 +134,15 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
       .setString(Tag.SOPInstanceUID, "1.2.3.4.5.6.7.8")
       .setString(0x80030010, "Private tag value")
     val source = toAnonSource(elements)
-    checkBasicAttributes(source)
+
+    source.runWith(TestSink.probe[DicomPart])
+      .expectHeaderAndValueChunkPairs(
+        Tag.SOPInstanceUID,
+        Tag.Modality,
+        Tag.PatientIdentityRemoved,
+        Tag.DeidentificationMethod
+      )
+      .expectDicomComplete()
   }
 
   it should "remove overlay data" in {
@@ -188,7 +151,15 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
       .setString(Tag.SOPInstanceUID, "1.2.3.4.5.6.7.8")
       .setString(0x60024000, "34")
     val source = toAnonSource(elements)
-    checkBasicAttributes(source)
+
+    source.runWith(TestSink.probe[DicomPart])
+      .expectHeaderAndValueChunkPairs(
+        Tag.SOPInstanceUID,
+        Tag.Modality,
+        Tag.PatientIdentityRemoved,
+        Tag.DeidentificationMethod
+      )
+      .expectDicomComplete()
   }
 
   it should "remove birth date" in {
@@ -198,52 +169,27 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
     val source = toAnonSource(elements)
 
     source.runWith(TestSink.probe[DicomPart])
-      .expectHeaderAndValueChunkPairs(
-        Tag.SOPInstanceUID,
-        Tag.Modality,
-        Tag.PatientName,
-        Tag.PatientID)
+      .expectHeaderAndValueChunkPairs(Tag.Modality)
       .expectHeader(Tag.PatientBirthDate)
       .expectHeaderAndValueChunkPairs(
         Tag.PatientIdentityRemoved,
-        Tag.DeidentificationMethod,
-        Tag.StudyInstanceUID,
-        Tag.SeriesInstanceUID)
+        Tag.DeidentificationMethod
+      )
       .expectDicomComplete()
-  }
-
-  it should "anonymize already anonymized data" in {
-    val elements = Elements.empty()
-      .setString(Tag.PatientID, "12345678")
-    val source1 = toAnonSource(elements)
-    val source2 = source1.via(anonFlow)
-
-    val f1 = source1
-      .via(DicomFlows.tagFilter(_ => false)(tagPath => tagPath.tag == Tag.PatientID))
-      .map(_.bytes)
-      .runWith(Sink.fold(ByteString.empty)(_ ++ _))
-    val f2 = source2
-      .via(DicomFlows.tagFilter(_ => false)(tagPath => tagPath.tag == Tag.PatientID))
-      .map(_.bytes)
-      .runWith(Sink.fold(ByteString.empty)(_ ++ _))
-    val (ds1, ds2) = Await.result(f1.zip(f2), 5.seconds)
-
-    ds1 should not be ds2
   }
 
   "The conditional anonymization flow" should "anonymize data which has not been anonymized" in {
     val elements = Elements.empty()
       .setString(Tag.PatientID, "12345678")
     val source = toMaybeAnonSource(elements)
-      .via(DicomFlows.tagFilter(_ => false)(tagPath => tagPath.tag == Tag.PatientID))
 
     source.runWith(TestSink.probe[DicomPart])
+      .expectMetaPart()
       .expectHeader(Tag.PatientID)
-      .request(1)
-      .expectNextChainingPF {
-        case v: ValueChunk =>
-          v.bytes should not be elements.getBytes(Tag.PatientID).get
-      }
+      .expectHeaderAndValueChunkPairs(
+        Tag.PatientIdentityRemoved,
+        Tag.DeidentificationMethod
+      )
       .expectDicomComplete()
   }
 
@@ -273,11 +219,6 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
 
     source.runWith(TestSink.probe[DicomPart])
       .expectHeader(Tag.PatientID)
-      .request(1)
-      .expectNextChainingPF {
-        case v: ValueChunk =>
-          v.bytes should not be elements.getBytes(Tag.PatientID).get
-      }
       .expectDicomComplete()
   }
 
@@ -294,11 +235,6 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
     val source = toSource(elements).via(anonFlow)
 
     source.runWith(TestSink.probe[DicomPart])
-      .expectHeader(Tag.SOPInstanceUID)
-      .expectValueChunk()
-      .expectHeaderAndValueChunkPairs(
-        Tag.PatientName,
-        Tag.PatientID)
       .expectHeader(Tag.PatientSex)
       .expectValueChunk(ByteString("F "))
       .expectHeader(Tag.SmokingStatus)
@@ -306,8 +242,6 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
       .expectHeaderAndValueChunkPairs(
         Tag.PatientIdentityRemoved,
         Tag.DeidentificationMethod,
-        Tag.StudyInstanceUID,
-        Tag.SeriesInstanceUID
       )
       .expectDicomComplete()
   }
@@ -325,15 +259,9 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
     val source = toSource(elements).via(anonFlow)
 
     source.runWith(TestSink.probe[DicomPart])
-      .expectHeader(Tag.SOPInstanceUID)
-      .expectValueChunk()
       .expectHeaderAndValueChunkPairs(
-        Tag.PatientName,
-        Tag.PatientID,
         Tag.PatientIdentityRemoved,
-        Tag.DeidentificationMethod,
-        Tag.StudyInstanceUID,
-        Tag.SeriesInstanceUID
+        Tag.DeidentificationMethod
       )
       .expectHeader(0x70534009)
       .expectValueChunk(ByteString("1.23"))

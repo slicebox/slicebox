@@ -38,6 +38,7 @@ import se.nimsa.dicom.streams.ElementSink.elementSink
 import se.nimsa.dicom.streams.ModifyFlow._
 import se.nimsa.dicom.streams.{DicomStreamException, ParseFlow}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
+import se.nimsa.sbx.anonymization.AnonymizationUtil.createUid
 import se.nimsa.sbx.anonymization.{AnonymizationProfile, ConfidentialityOption}
 import se.nimsa.sbx.app.GeneralProtocol.{Source, SourceType}
 import se.nimsa.sbx.dicom.Contexts.Context
@@ -439,6 +440,11 @@ trait DicomStreamOps {
         ConfidentialityOption.RETAIN_LONGITUDINAL_TEMPORAL_INFORMATION
       ))).anonFlow
 
+    val uidInsertion: Option[ByteString] => ByteString = {
+      case Some(value) if value.nonEmpty => value
+      case _ => createUid()
+    }
+
     val (before, after) = ("collect-anon-before", "collect-anon-after")
     val tags = (encodingTags ++ anonymizationTags ++ anonKeysTags).map(TagPath.fromTag) ++ valueTags.map(_.tagPath)
 
@@ -451,6 +457,13 @@ trait DicomStreamOps {
         .via(toIndeterminateLengthSequences)
         .via(toUtf8Flow)
         .via(anonFlow)
+        .via(modifyFlow(insertions = Seq(
+          TagInsertion(TagPath.fromTag(Tag.PatientID), uidInsertion),
+          TagInsertion(TagPath.fromTag(Tag.PatientName), uidInsertion),
+          TagInsertion(TagPath.fromTag(Tag.SeriesInstanceUID), uidInsertion),
+          TagInsertion(TagPath.fromTag(Tag.SOPInstanceUID), uidInsertion),
+          TagInsertion(TagPath.fromTag(Tag.StudyInstanceUID), uidInsertion)
+        )))
         .via(collectFlow(tags, after)) // collect necessary info before anonymization
         .via(anonymizationKeyInsertFlow(anonymizationKeyInsert, customAnonValues, before, after))
         .via(harmonizeAnonFlow(customAnonValues))

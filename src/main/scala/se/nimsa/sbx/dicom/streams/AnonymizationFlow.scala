@@ -16,16 +16,11 @@ class AnonymizationFlow(profile: AnonymizationProfile) {
 
   import AnonymizationOp._
 
-  val insertTags: Seq[TagPath] = Seq(Tag.DeidentificationMethod, Tag.PatientIdentityRemoved,
-    Tag.PatientID, Tag.PatientName,
-    Tag.SeriesInstanceUID, Tag.SOPInstanceUID, Tag.StudyInstanceUID).map(TagPath.fromTag)
-
   private def containsAnyTag(tagPath: TagPath): TagMask => Boolean = tagMask => tagPath.toList.map(_.tag).exists(tagMask.contains)
   private def containsTag(tagPath: TagPath): TagMask => Boolean = _.contains(tagPath.tag)
 
   def anonFlow: Flow[DicomPart, DicomPart, NotUsed] = {
     tagFilter(_ => true) { tagPath =>
-      insertTags.contains(tagPath) ||
       !profile.opOf(containsAnyTag(tagPath)).exists {
         case REMOVE => true
         case REMOVE_OR_ZERO => true // always remove (limitation)
@@ -38,9 +33,9 @@ class AnonymizationFlow(profile: AnonymizationProfile) {
       .via(modifyFlow(
         Seq(
           TagModification(tagPath =>
-            !insertTags.contains(tagPath) && profile.opOf(containsTag(tagPath)).contains(REPLACE_UID), _ => createUid()),
+            profile.opOf(containsTag(tagPath)).contains(REPLACE_UID), _ => createUid()),
           TagModification(tagPath =>
-            !insertTags.contains(tagPath) && profile.opOf(containsTag(tagPath)).exists {
+            profile.opOf(containsTag(tagPath)).exists {
               case DUMMY => true // zero instead of replace with dummy (limitation)
               case CLEAN => true // zero instead of replace with cleaned value (limitation)
               case ZERO => true
@@ -49,14 +44,9 @@ class AnonymizationFlow(profile: AnonymizationProfile) {
             }, _ => ByteString.empty
           )
         ),
-        Seq( // insert structure tags (slicebox-specific deviation from standard)
-          TagInsertion(TagPath.fromTag(Tag.DeidentificationMethod), toAsciiBytes("Retain Longitudinal Full Dates Option", VR.LO)),
-          TagInsertion(TagPath.fromTag(Tag.PatientIdentityRemoved), toAsciiBytes("YES", VR.CS)),
-          TagInsertion(TagPath.fromTag(Tag.PatientID), createUid()),
-          TagInsertion(TagPath.fromTag(Tag.PatientName), createUid()),
-          TagInsertion(TagPath.fromTag(Tag.SeriesInstanceUID), createUid()),
-          TagInsertion(TagPath.fromTag(Tag.SOPInstanceUID), createUid()),
-          TagInsertion(TagPath.fromTag(Tag.StudyInstanceUID), createUid())
+        Seq(
+          TagInsertion(TagPath.fromTag(Tag.DeidentificationMethod), _ => toAsciiBytes(profile.options.map(_.description).mkString(" - "), VR.LO)),
+          TagInsertion(TagPath.fromTag(Tag.PatientIdentityRemoved), _ => toAsciiBytes("YES", VR.CS)),
         )))
   }
 }

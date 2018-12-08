@@ -38,7 +38,7 @@ object ReverseAnonymizationFlow {
           .filterNot(_.level > r.matchLevel)
           .map(_.tagPath)
           .flatMap(tp => r.values.find(_.tagPath == tp))
-        val insertions = active.map(tv => TagInsertion(tv.tagPath, padToEvenLength(ByteString(tv.value), tv.tagPath.tag)))
+        val insertions = active.map(tv => TagInsertion(tv.tagPath, _ => padToEvenLength(ByteString(tv.value), tv.tagPath.tag)))
         TagModificationsPart(Seq.empty, insertions.toList)
       case p => p
     }
