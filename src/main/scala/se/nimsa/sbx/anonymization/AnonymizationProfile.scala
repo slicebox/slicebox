@@ -5,7 +5,9 @@ import se.nimsa.sbx.anonymization.AnonymizationProfile._
 import se.nimsa.sbx.anonymization.AnonymizationProfiles._
 import se.nimsa.sbx.anonymization.ConfidentialityOption._
 
-case class AnonymizationProfile(options: Seq[ConfidentialityOption]) {
+import scala.collection.mutable
+
+class AnonymizationProfile private(val options: Seq[ConfidentialityOption]) {
 
   private lazy val activeOps: Map[ConfidentialityOption, Map[TagMask, AnonymizationOp]] =
     profiles.filterKeys(options.contains) ++ (
@@ -29,6 +31,11 @@ case class AnonymizationProfile(options: Seq[ConfidentialityOption]) {
 }
 
 object AnonymizationProfile {
+
+  private val cache = mutable.Map.empty[Seq[ConfidentialityOption], AnonymizationProfile]
+
+  def apply(options: Seq[ConfidentialityOption]): AnonymizationProfile =
+    cache.getOrElseUpdate(options, new AnonymizationProfile(options))
 
   case class TagMask(tag: Int, mask: Int) {
     def contains(otherTag: Int): Boolean = (otherTag & mask) == tag
