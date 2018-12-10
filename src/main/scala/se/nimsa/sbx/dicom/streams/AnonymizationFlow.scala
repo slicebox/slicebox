@@ -7,7 +7,6 @@ import se.nimsa.dicom.data.DicomParts.DicomPart
 import se.nimsa.dicom.data.{Tag, TagPath, VR}
 import se.nimsa.dicom.streams.DicomFlows.tagFilter
 import se.nimsa.dicom.streams.ModifyFlow.{TagInsertion, TagModification, modifyFlow}
-import se.nimsa.sbx.anonymization.AnonymizationProfile.TagMask
 import se.nimsa.sbx.anonymization.AnonymizationUtil._
 import se.nimsa.sbx.anonymization.{AnonymizationOp, AnonymizationProfile}
 import se.nimsa.sbx.dicom.DicomUtil.toAsciiBytes
@@ -16,26 +15,24 @@ class AnonymizationFlow(profile: AnonymizationProfile) {
 
   import AnonymizationOp._
 
-  private def containsAnyTag(tagPath: TagPath): TagMask => Boolean = tagMask => tagPath.toList.map(_.tag).exists(tagMask.contains)
-  private def containsTag(tagPath: TagPath): TagMask => Boolean = _.contains(tagPath.tag)
-
   def anonFlow: Flow[DicomPart, DicomPart, NotUsed] = {
     tagFilter(_ => true) { tagPath =>
-      !profile.opOf(containsAnyTag(tagPath)).exists {
-        case REMOVE => true
-        case REMOVE_OR_ZERO => true // always remove (limitation)
-        case REMOVE_OR_DUMMY => true // always remove (limitation)
-        case REMOVE_OR_ZERO_OR_DUMMY => true // always remove (limitation)
-        case REMOVE_OR_ZERO_OR_REPLACE_UID => true // always remove (limitation)
-        case _ => false
-      }
+      !tagPath.toList.map(_.tag).flatMap(profile.opOf)
+        .exists {
+          case REMOVE => true
+          case REMOVE_OR_ZERO => true // always remove (limitation)
+          case REMOVE_OR_DUMMY => true // always remove (limitation)
+          case REMOVE_OR_ZERO_OR_DUMMY => true // always remove (limitation)
+          case REMOVE_OR_ZERO_OR_REPLACE_UID => true // always remove (limitation)
+          case _ => false
+        }
     }
       .via(modifyFlow(
         Seq(
           TagModification(tagPath =>
-            profile.opOf(containsTag(tagPath)).contains(REPLACE_UID), _ => createUid()),
+            profile.opOf(tagPath.tag).contains(REPLACE_UID), _ => createUid()),
           TagModification(tagPath =>
-            profile.opOf(containsTag(tagPath)).exists {
+            profile.opOf(tagPath.tag).exists {
               case DUMMY => true // zero instead of replace with dummy (limitation)
               case CLEAN => true // zero instead of replace with cleaned value (limitation)
               case ZERO => true

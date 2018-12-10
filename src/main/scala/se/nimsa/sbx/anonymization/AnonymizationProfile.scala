@@ -9,23 +9,57 @@ import scala.collection.mutable
 
 class AnonymizationProfile private(val options: Seq[ConfidentialityOption]) {
 
-  private lazy val activeOps: Map[ConfidentialityOption, Map[TagMask, AnonymizationOp]] =
-    profiles.filterKeys(options.contains) ++ (
-      if (options.contains(RETAIN_SAFE_PRIVATE))
-        Map(RETAIN_SAFE_PRIVATE -> safePrivateAttributes.map(_ -> KEEP).toMap)
-      else
-        Map.empty
-      )
+  private lazy val sortedOptions = options.sortWith(_.rank > _.rank)
 
-  private lazy val sortedKeys = activeOps.keys.toList.sortWith(_.rank > _.rank)
+  /*
+  A bit of optimization necessary for sufficient performance. Divide ops into one map for the majority of tags where the
+  tag mask has all bits set. This is equivalent to checking for simple tag equality. Keep a separate map for the minority
+  with tag masks spanning more than one tag. Lookups in the former map will be fast since this can use a standard map
+  lookup. In the second map, linear search has to be performed but this is also fast as there are very few such elements.
+  Once both lookups have been carried out, select the one with highest rank.
+   */
+  private lazy val (activeTagOps, activeMaskedOps): (Map[ConfidentialityOption, Map[Int, AnonymizationOp]], Map[ConfidentialityOption, Map[TagMask, AnonymizationOp]]) = {
+    val activeOps: Map[ConfidentialityOption, Map[TagMask, AnonymizationOp]] =
+      profiles.filterKeys(options.contains) ++ (
+        if (options.contains(RETAIN_SAFE_PRIVATE))
+          Map(RETAIN_SAFE_PRIVATE -> safePrivateAttributes.map(_ -> KEEP).toMap)
+        else
+          Map.empty
+        )
 
-  def opOf(f: TagMask => Boolean): Option[AnonymizationOp] = {
-    var op: Option[AnonymizationOp] = None
-    for (key <- sortedKeys if op.isEmpty) {
-      val map = activeOps(key)
-      op = map.filterKeys(f).values.headOption
+    val tagMap = activeOps.map {
+      case (option, inner) => option -> inner.filterKeys(_.mask == 0xFFFFFFFF).map {
+        case (mask, op) => mask.tag -> op
+      }
     }
-    op
+
+    val maskMap = activeOps.map {
+      case (option, inner) => option -> inner.filterKeys(_.mask != 0xFFFFFFFF)
+    }
+
+    (tagMap, maskMap)
+  }
+
+  def opOf(tag: Int): Option[AnonymizationOp] = {
+    var tagOp: Option[(ConfidentialityOption, AnonymizationOp)] = None
+    for (key <- sortedOptions if tagOp.isEmpty) {
+      val map = activeTagOps(key)
+      tagOp = map.get(tag).map(key -> _)
+    }
+
+    var maskOp: Option[(ConfidentialityOption, AnonymizationOp)] = None
+    for (key <- sortedOptions if maskOp.isEmpty) {
+      val map = activeMaskedOps(key)
+      maskOp = map.filterKeys(_.contains(tag)).values.headOption.map(key -> _)
+    }
+
+    (tagOp, maskOp) match {
+      case (Some(t), Some(m)) if t._1.rank > m._1.rank => Some(t._2)
+      case (Some(_), Some(m)) => Some(m._2)
+      case (None, Some(m)) => Some(m._2)
+      case (Some(t), None) => Some(t._2)
+      case _ => None
+    }
   }
 
 }
