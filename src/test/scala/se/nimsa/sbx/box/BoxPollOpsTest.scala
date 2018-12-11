@@ -12,6 +12,7 @@ import akka.testkit.TestKit
 import akka.util.{ByteString, Timeout}
 import org.scalatest.{AsyncFlatSpecLike, BeforeAndAfterAll, Matchers}
 import se.nimsa.dicom.streams.DicomStreamException
+import se.nimsa.sbx.anonymization.{AnonymizationProfile, ConfidentialityOption}
 import se.nimsa.sbx.app.GeneralProtocol
 import se.nimsa.sbx.app.GeneralProtocol.SourceType
 import se.nimsa.sbx.box.BoxProtocol._
@@ -21,6 +22,7 @@ import se.nimsa.sbx.dicom.DicomPropertyValue._
 import se.nimsa.sbx.metadata.MetaDataProtocol
 import se.nimsa.sbx.metadata.MetaDataProtocol.MetaDataAdded
 
+import scala.collection.immutable.Seq
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.util.Try
@@ -33,9 +35,10 @@ class BoxPollOpsTest extends TestKit(ActorSystem("BoxPollOpsSpec")) with AsyncFl
 
   override def afterAll: Unit = TestKit.shutdownActorSystem(system)
 
+  val profile = AnonymizationProfile(Seq(ConfidentialityOption.BASIC_PROFILE))
   val remoteBoxBaseUrl = "https://someurl.com"
-  val box = Box(1, "Test Box", "abc123", remoteBoxBaseUrl, BoxSendMethod.POLL, online = false)
-  val transaction: OutgoingTransaction = OutgoingTransaction(1, box.id, box.name, 0, 1, 1000, 1000, TransactionStatus.WAITING)
+  val box = Box(1, "Test Box", "abc123", remoteBoxBaseUrl, BoxSendMethod.POLL, profile, online = false)
+  val transaction: OutgoingTransaction = OutgoingTransaction(1, box.id, box.name, profile, 0, 1, 1000, 1000, TransactionStatus.WAITING)
 
   def okResponse[T](entity: T)(implicit m: Marshaller[T, MessageEntity]): Future[HttpResponse] =
     Marshal(entity).to[MessageEntity].map { message =>

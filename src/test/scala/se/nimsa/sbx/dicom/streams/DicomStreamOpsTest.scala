@@ -12,7 +12,7 @@ import se.nimsa.dicom.data._
 import se.nimsa.dicom.streams.ModifyFlow.{TagInsertion, TagModification, modifyFlow}
 import se.nimsa.dicom.streams.{DicomFlows, DicomStreamException, ElementFlows, ElementSink}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
-import se.nimsa.sbx.anonymization.{AnonymizationDAO, AnonymizationServiceActor}
+import se.nimsa.sbx.anonymization.{AnonymizationDAO, AnonymizationProfile, AnonymizationServiceActor, ConfidentialityOption}
 import se.nimsa.sbx.app.GeneralProtocol.{Source, SourceType}
 import se.nimsa.sbx.dicom.Contexts
 import se.nimsa.sbx.dicom.DicomHierarchy.DicomHierarchyLevel
@@ -23,6 +23,7 @@ import se.nimsa.sbx.storage.RuntimeStorage
 import se.nimsa.sbx.util.FutureUtil.await
 import se.nimsa.sbx.util.TestUtil
 
+import scala.collection.immutable.Seq
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.reflect.ClassTag
@@ -36,6 +37,8 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("DicomStreamOpsSpec")) with
   implicit val timeout: Timeout = Timeout(30.seconds)
 
   val dbConfig = TestUtil.createTestDb("dicomstreamopstest")
+
+  val profile = AnonymizationProfile(Seq(ConfidentialityOption.BASIC_PROFILE))
 
   val metaDataDao = new MetaDataDAO(dbConfig)(ec)
   val propertiesDao = new PropertiesDAO(dbConfig)(ec)
@@ -75,7 +78,7 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("DicomStreamOpsSpec")) with
       storeDicomData(bytesSource, source, storage, Contexts.imageDataContexts, reverseAnonymization = true)
 
     def anonymizedDicomData(imageId: Long, customTagValues: Seq[TagValue]): StreamSource[ByteString, NotUsed] =
-      anonymizedDicomData(imageId, customTagValues, storage)
+      anonymizedDicomData(imageId, profile, customTagValues, storage)
 
     def modifyData(imageId: Long, tagModifications: Seq[TagInsertion]): Future[(MetaDataDeleted, MetaDataAdded)] =
       modifyData(imageId, tagModifications, storage)
@@ -124,7 +127,7 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("DicomStreamOpsSpec")) with
     val anonSource = dicomStreamOpsImpl.anonymizedDicomDataSource(
       source,
       _ => Future.successful(AnonymizationKeyOpResult(DicomHierarchyLevel.SERIES, Some(TestUtil.createAnonymizationKey(Elements.empty())), Seq.empty)),
-      Seq(t1, t2, t3))
+      profile, Seq(t1, t2, t3))
 
     anonSource.via(storage.parseFlow(None)).via(ElementFlows.elementFlow).runWith(ElementSink.elementSink).map { elements =>
       elements.getString(Tag.PatientName).get should be("Mapped Patient Name")
@@ -143,7 +146,7 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("DicomStreamOpsSpec")) with
         AnonymizationKeyValue(-1, key.id, TagPath.fromTag(Tag.PatientName), key.patientName, key.anonPatientName),
         AnonymizationKeyValue(-1, key.id, TagPath.fromTag(Tag.PatientID), key.patientID, key.anonPatientID),
         AnonymizationKeyValue(-1, key.id, TagPath.fromTag(Tag.SeriesInstanceUID), key.seriesInstanceUID, key.anonSeriesInstanceUID)
-      ))), Seq.empty)
+      ))), profile, Seq.empty)
 
     anonSource.via(storage.parseFlow(None)).via(ElementFlows.elementFlow).runWith(ElementSink.elementSink).map { elements =>
       elements.getString(Tag.PatientName).get should be(key.anonPatientName)
@@ -163,7 +166,7 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("DicomStreamOpsSpec")) with
       AnonymizationKeyValue(-1, key.id, TagPath.fromTag(Tag.PatientName), key.patientName, key.anonPatientName),
       AnonymizationKeyValue(-1, key.id, TagPath.fromTag(Tag.PatientID), key.patientID, key.anonPatientID),
       AnonymizationKeyValue(-1, key.id, TagPath.fromTag(Tag.SeriesInstanceUID), key.seriesInstanceUID, key.anonSeriesInstanceUID)
-    ))), Seq.empty)
+    ))), profile, Seq.empty)
 
     anonSource.via(storage.parseFlow(None)).via(ElementFlows.elementFlow).runWith(ElementSink.elementSink).map { elements =>
       elements.getString(Tag.PatientID).get shouldBe key.anonPatientID

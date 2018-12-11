@@ -76,7 +76,7 @@ class BoxPushActor(override val box: Box,
   override def outgoingTagValuesForImage(transactionImage: OutgoingTransactionImage): Future[Seq[OutgoingTagValue]] =
     boxService.ask(GetOutgoingTagValues(transactionImage)).mapTo[Seq[OutgoingTagValue]]
   override def anonymizedDicomData(transactionImage: OutgoingTransactionImage, tagValues: Seq[OutgoingTagValue]): Source[ByteString, NotUsed] =
-    anonymizedDicomData(transactionImage.image.imageId, tagValues.map(_.tagValue), storage)
+    anonymizedDicomData(transactionImage.image.imageId, transactionImage.transaction.profile, tagValues.map(_.tagValue), storage)
       .via(Compression.deflate)
       .batchWeighted(storage.streamChunkSize, _.length, identity)(_ ++ _)
   override def updateOutgoingTransaction(transactionImage: OutgoingTransactionImage, sentImageCount: Long): Future[OutgoingTransactionImage] =

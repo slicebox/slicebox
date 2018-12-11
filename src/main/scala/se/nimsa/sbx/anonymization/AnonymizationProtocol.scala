@@ -28,9 +28,15 @@ object AnonymizationProtocol {
                                    order: Option[QueryOrder],
                                    queryProperties: Seq[QueryProperty])
 
+  case class TagValue(tagPath: TagPathTag, value: String)
+
+  case class TagValues(tagValues: Seq[TagValue])
+
   case class ImageTagValues(imageId: Long, tagValues: Seq[TagValue])
 
-  case class TagValue(tagPath: TagPathTag, value: String)
+  case class AnonymizationData(profile: AnonymizationProfile, tagValues: Seq[TagValue])
+
+  case class BulkAnonymizationData(profile: AnonymizationProfile, imageTagValuesSet: Seq[ImageTagValues])
 
   case class AnonymizationKey(id: Long,
                               created: Long,

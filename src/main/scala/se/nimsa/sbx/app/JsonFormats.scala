@@ -22,7 +22,8 @@ import play.api.libs.json._
 import se.nimsa.dicom.data.TagPath._
 import se.nimsa.dicom.data.TagTree._
 import se.nimsa.dicom.data.{Dictionary, Multiplicity, TagPath, TagTree}
-import se.nimsa.sbx.anonymization.AnonymizationProtocol._
+import se.nimsa.sbx.anonymization.AnonymizationProtocol.{BulkAnonymizationData, TagValues, _}
+import se.nimsa.sbx.anonymization.{AnonymizationProfile, ConfidentialityOption}
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy._
@@ -58,7 +59,9 @@ trait JsonFormats {
       ) ((tagMaybe, nameMaybe, itemMaybe, previousPath) =>
       tagMaybe
         .orElse(nameMaybe
-          .flatMap(name => try Option(Dictionary.tagOf(name)) catch { case _: Throwable => None }))
+          .flatMap(name => try Option(Dictionary.tagOf(name)) catch {
+            case _: Throwable => None
+          }))
         .map { tag =>
           val previous = previousPath match {
             case Some(t: TagTreeTrunk) => Some(t)
@@ -127,7 +130,9 @@ trait JsonFormats {
       ) ((tagMaybe, nameMaybe, itemMaybe, previousPath) =>
       tagMaybe
         .orElse(nameMaybe
-          .flatMap(name => try Option(Dictionary.tagOf(name)) catch { case _: Throwable => None }))
+          .flatMap(name => try Option(Dictionary.tagOf(name)) catch {
+            case _: Throwable => None
+          }))
         .map { tag =>
           val previous = previousPath match {
             case Some(t: TagPathTrunk) => Some(t)
@@ -176,6 +181,15 @@ trait JsonFormats {
 
   implicit val tagMappingFormat: Format[TagMapping] = Json.format[TagMapping]
 
+  implicit val confidentialityOptionFormat: Format[ConfidentialityOption] = enumFormat(ConfidentialityOption.withName)
+
+  implicit val anonymizationProfileFormat: Format[AnonymizationProfile] = Format(Reads[AnonymizationProfile] {
+    case JsObject(a) => a.get("options").map(v => Json.fromJson[Seq[ConfidentialityOption]](v))
+      .map(_.map(AnonymizationProfile.apply))
+      .getOrElse(JsError("Missing field \"options\""))
+    case _ => JsError("Json object expected")
+  }, Writes[AnonymizationProfile](a => JsObject(Map("options" -> Json.toJson(a.options)))))
+
   implicit val unWatchDirectoryFormat: Format[UnWatchDirectory] = Json.format[UnWatchDirectory]
   implicit val watchedDirectoryFormat: Format[WatchedDirectory] = Json.format[WatchedDirectory]
 
@@ -207,9 +221,12 @@ trait JsonFormats {
   implicit val incomingEntryFormat: Format[IncomingTransaction] = Json.format[IncomingTransaction]
 
   implicit val tagValueFormat: Format[TagValue] = Json.format[TagValue]
+  implicit val tagValuesFormat: Format[TagValues] = Json.format[TagValues]
+  implicit val imageTagValueFormat: Format[ImageTagValues] = Json.format[ImageTagValues]
+  implicit val anonymizationDataFormat: Format[AnonymizationData] = Json.format[AnonymizationData]
+  implicit val bulkAnonymizationDataFormat: Format[BulkAnonymizationData] = Json.format[BulkAnonymizationData]
   implicit val anonymizationKeyFormat: Format[AnonymizationKey] = Json.format[AnonymizationKey]
 
-  implicit val imageTagValueFormat: Format[ImageTagValues] = Json.format[ImageTagValues]
   implicit val anonymizationKeyValueFormat: Format[AnonymizationKeyValue] = Json.format[AnonymizationKeyValue]
 
   implicit val roleFormat: Format[UserRole] = enumFormat(UserRole.withName)
@@ -314,4 +331,5 @@ trait JsonFormats {
   implicit val dicomValueRepresentationFormat: Format[DicomValueRepresentation] = Json.format[DicomValueRepresentation]
 
   implicit val dicomMultiplicityFormat: Format[Multiplicity] = Json.format[Multiplicity]
+
 }

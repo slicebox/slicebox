@@ -12,6 +12,7 @@ import akka.stream.{ActorMaterializer, Materializer}
 import akka.testkit.TestKit
 import akka.util.{ByteString, Timeout}
 import org.scalatest.{AsyncFlatSpecLike, BeforeAndAfterAll, Matchers}
+import se.nimsa.sbx.anonymization.{AnonymizationProfile, ConfidentialityOption}
 import se.nimsa.sbx.box.BoxProtocol._
 
 import scala.collection.immutable.Seq
@@ -27,8 +28,9 @@ class BoxPushOpsTest extends TestKit(ActorSystem("BoxPushOpsSpec")) with AsyncFl
 
   override def afterAll: Unit = TestKit.shutdownActorSystem(system)
 
-  val box = Box(1, "Test Box", "abc123", "testbox.com", BoxSendMethod.PUSH, online = false)
-  val transaction: OutgoingTransaction = OutgoingTransaction(1, box.id, box.name, 0, 1, 1000, 1000, TransactionStatus.WAITING)
+  val profile = AnonymizationProfile(Seq(ConfidentialityOption.BASIC_PROFILE))
+  val box = Box(1, "Test Box", "abc123", "testbox.com", BoxSendMethod.PUSH, profile, online = false)
+  val transaction: OutgoingTransaction = OutgoingTransaction(1, box.id, box.name, profile, 0, 1, 1000, 1000, TransactionStatus.WAITING)
 
   val okResponse = HttpResponse()
   val noResponse = HttpResponse(status = ServiceUnavailable)

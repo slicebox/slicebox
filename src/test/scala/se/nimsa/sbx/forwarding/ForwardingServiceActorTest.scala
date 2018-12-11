@@ -1,9 +1,10 @@
 package se.nimsa.sbx.forwarding
 
-import akka.actor.{Actor, ActorSystem, Props}
+import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import akka.testkit.{ImplicitSender, TestKit}
 import akka.util.Timeout
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
+import se.nimsa.sbx.anonymization.{AnonymizationProfile, ConfidentialityOption}
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
@@ -14,6 +15,7 @@ import se.nimsa.sbx.storage.RuntimeStorage
 import se.nimsa.sbx.util.FutureUtil.await
 import se.nimsa.sbx.util.TestUtil
 
+import scala.concurrent.ExecutionContextExecutor
 import scala.concurrent.duration.DurationInt
 
 class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) with ImplicitSender
@@ -21,8 +23,8 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
 
   def this() = this(ActorSystem("ForwardingServiceActorTestSystem"))
 
-  implicit val ec = system.dispatcher
-  implicit val timeout = Timeout(30.seconds)
+  implicit val ec: ExecutionContextExecutor = system.dispatcher
+  implicit val timeout: Timeout = Timeout(30.seconds)
 
   val dbConfig = TestUtil.createTestDb("forwardingserviceactortest")
   val db = dbConfig.db
@@ -32,7 +34,7 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
   await(forwardingDao.create())
 
   var deletedImages = Seq.empty[Long]
-  val storage = new RuntimeStorage() {
+  val storage: RuntimeStorage = new RuntimeStorage() {
     override def deleteFromStorage(imageIds: Seq[Long]): Unit = {
       deletedImages = deletedImages ++ imageIds
       super.deleteFromStorage(imageIds)
@@ -42,9 +44,9 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
   case class SetSource(source: Source)
 
   val setSourceReply = "Source set"
-  val metaDataService = system.actorOf(Props(new Actor {
+  val metaDataService: ActorRef = system.actorOf(Props(new Actor {
     var source: Option[Source] = None
-    def receive = {
+    def receive: Receive = {
       case GetImage(imageId) =>
         sender ! (imageId match {
           case 10 => Some(image1)
@@ -67,13 +69,15 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
   case object GetSentImages
 
   val resetSentImagesReply = "Send images reset"
-  val boxService = system.actorOf(Props(new Actor {
+  val boxService: ActorRef = system.actorOf(Props(new Actor {
     var sentImages = Seq.empty[Long]
 
-    def receive = {
-      case SendToRemoteBox(box, tagValues) =>
-        sentImages = sentImages ++ tagValues.map(_.imageId)
-        sender ! ImagesAddedToOutgoing(box.id, tagValues.map(_.imageId))
+    def receive: Receive = {
+      case GetBoxById(id) =>
+        sender ! Some(Box(id, "box", "1.2.3.4", "http://example.com", BoxSendMethod.PUSH, AnonymizationProfile(Seq(ConfidentialityOption.BASIC_PROFILE)), online = false))
+      case SendToRemoteBox(box, bulkAnonymizationData) =>
+        sentImages = sentImages ++ bulkAnonymizationData.imageTagValuesSet.map(_.imageId)
+        sender ! ImagesAddedToOutgoing(box.id, bulkAnonymizationData.imageTagValuesSet.map(_.imageId))
       case ResetSentImages =>
         sentImages = Seq.empty[Long]
         sender ! resetSentImagesReply
@@ -82,13 +86,13 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     }
   }), name = "BoxService")
 
-  val forwardingService = system.actorOf(Props(new ForwardingServiceActor(forwardingDao, storage, 1000.hours)(Timeout(30.seconds))), name = "ForwardingService")
+  val forwardingService: ActorRef = system.actorOf(Props(new ForwardingServiceActor(forwardingDao, storage, 1000.hours)(Timeout(30.seconds))), name = "ForwardingService")
 
   override def beforeEach(): Unit = {
     deletedImages = Seq.empty[Long]
   }
 
-  override def afterEach() = {
+  override def afterEach(): Unit = {
     await(forwardingDao.clear())
     metaDataService ! SetSource(null)
     expectMsg(setSourceReply)
@@ -96,7 +100,7 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
     expectMsg(resetSentImagesReply)
   }
 
-  override def afterAll = TestKit.shutdownActorSystem(system)
+  override def afterAll: Unit = TestKit.shutdownActorSystem(system)
 
   "A ForwardingServiceActor" should {
 
@@ -458,7 +462,7 @@ class ForwardingServiceActorTest(_system: ActorSystem) extends TestKit(_system) 
   def image2 = Image(23, 22, SOPInstanceUID("sopuid2"), ImageType("it"), InstanceNumber("in2"))
   def image3 = Image(38, 22, SOPInstanceUID("sopuid3"), ImageType("it"), InstanceNumber("in3"))
 
-  def expireTransaction(index: Int) = {
+  def expireTransaction(index: Int): Int = {
     val transactions = await(forwardingDao.listForwardingTransactions)
     await(forwardingDao.updateForwardingTransaction(transactions(index).copy(updated = 0)))
   }

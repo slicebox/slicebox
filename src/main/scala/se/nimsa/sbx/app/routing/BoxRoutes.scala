@@ -20,9 +20,9 @@ import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
-import se.nimsa.sbx.anonymization.AnonymizationProtocol.ImageTagValues
-import se.nimsa.sbx.app.GeneralProtocol.{SourceAdded, SourceDeleted, SourceRef}
+import se.nimsa.sbx.anonymization.AnonymizationProtocol.BulkAnonymizationData
 import se.nimsa.sbx.app.GeneralProtocol.SourceType.BOX
+import se.nimsa.sbx.app.GeneralProtocol.{SourceAdded, SourceDeleted, SourceRef}
 import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
@@ -72,20 +72,19 @@ trait BoxRoutes {
           pathEndOrSingleSlash {
             delete {
               onSuccess(boxService.ask(RemoveBox(boxId))) {
-                case BoxRemoved(boxId) => {
-                  system.eventStream.publish(SourceDeleted(SourceRef(BOX, boxId)))
+                case BoxRemoved(removedBoxId) =>
+                  system.eventStream.publish(SourceDeleted(SourceRef(BOX, removedBoxId)))
                   complete(NoContent)
-                }
               }
             }
           }
         }
       } ~ path(LongNumber / "send") { boxId =>
         post {
-          entity(as[Seq[ImageTagValues]]) { imageTagValuesSeq =>
+          entity(as[BulkAnonymizationData]) { set =>
             onSuccess(boxService.ask(GetBoxById(boxId)).mapTo[Option[Box]]) {
               case Some(box) =>
-                onSuccess(boxService.ask(SendToRemoteBox(box, imageTagValuesSeq))) {
+                onSuccess(boxService.ask(SendToRemoteBox(box, set))) {
                   case ImagesAddedToOutgoing(_, _) =>
                     complete(NoContent)
                 }
