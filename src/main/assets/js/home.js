@@ -521,18 +521,14 @@ angular.module('slicebox.home', ['ngRoute'])
 
     $scope.loadImageAttributes = function(startIndex, count, orderByProperty, orderByDirection, filter) {
         var imagesPromise = $scope.uiState.selectedImage ? $q.when([$scope.uiState.selectedImage]) :
-            $scope.uiState.selectedSeries ? $http.get('/api/metadata/images?count=1&seriesid=' + $scope.uiState.selectedSeries.id).then(function (images) {
-                return images.data;
+            $scope.uiState.selectedSeries ? $http.get('/api/metadata/images?count=1&seriesid=' + $scope.uiState.selectedSeries.id).then(function(response) {
+                return response.data;
             }) : $q.when([]);
 
-        imagesPromise.error(function(reason) {
-            sbxToast.showErrorMessage('Failed to load images for series: ' + error);
-        });
-
         var attributesPromise = imagesPromise.then(function(images) {
-            if (images.data.length > 0) {
-                return $http.get('/api/images/' + images.data[0].id + '/attributes').then(function(data) {
-                    data.data = data.data.map(function (attribute) {
+            if (images.length > 0) {
+                return $http.get('/api/images/' + images[0].id + '/attributes').then(function(response) {
+                    var attributes = response.data.map(function (attribute) {
                         // add name
                         var n = attribute.namePath.length;
                         if (n <= 0) {
@@ -548,7 +544,7 @@ angular.module('slicebox.home', ['ngRoute'])
                     });
                     if (filter) {
                         var filterLc = filter.toLowerCase();
-                        data.data = data.data.filter(function (attribute) {
+                        attributes = attributes.filter(function (attribute) {
                             var hexString = toHexString(attribute.tag).toLowerCase();
                             hexString = hexString.slice(0, 4) + ',' + hexString.slice(4);
                             var nameCondition = attribute.name.toLowerCase().indexOf(filterLc) >= 0;
@@ -563,13 +559,13 @@ angular.module('slicebox.home', ['ngRoute'])
                         if (!orderByDirection) {
                             orderByDirection = 'ASCENDING';
                         }
-                        return attributes.data.sort(function compare(a,b) {
+                        return attributes.sort(function compare(a,b) {
                           return orderByDirection === 'ASCENDING' ?
                             a[orderByProperty] < b[orderByProperty] ? -1 : a[orderByProperty] > b[orderByProperty] ? 1 : 0 :
                             a[orderByProperty] > b[orderByProperty] ? -1 : a[orderByProperty] < b[orderByProperty] ? 1 : 0;
                         });
                     } else {
-                        return attributes.data;
+                        return attributes;
                     }
                 }, function(error) {
                     sbxToast.showErrorMessage('Failed to load image attributes: ' + error);
@@ -577,6 +573,8 @@ angular.module('slicebox.home', ['ngRoute'])
             } else {
                 return [];
             }
+        }, function(reason) {
+            sbxToast.showErrorMessage('Failed to load images for series: ' + reason);
         });
 
         return attributesPromise;

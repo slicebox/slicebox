@@ -486,9 +486,9 @@ angular.module('slicebox.utils', ['ngSanitize'])
     };
 
     service.updateCurrentUser = function() {
-        service.currentUserPromise = $http.get('/api/users/current').success(function (user) {
-            service.currentUser = user;
-        }).error(function () {
+        service.currentUserPromise = $http.get('/api/users/current').then(function (response) {
+            service.currentUser = response.data;
+        }, function () {
             service.currentUser = null;
         });
         return service.currentUserPromise;

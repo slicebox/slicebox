@@ -76,12 +76,10 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
 
         var generateURLPromise = $http.post('/api/boxes/createconnection', connectionData);
 
-        generateURLPromise.success(function(box) {
-            showBaseURLDialog(box);
+        generateURLPromise.then(function(response) {
+            showBaseURLDialog(response.data);
             $mdDialog.hide();
-        });
-
-        generateURLPromise.error(function(reason) {
+        }, function(reason) {
             sbxToast.showErrorMessage(reason);                
         });
 
@@ -101,11 +99,9 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
                 baseUrl: $scope.uiState.connectionURL
             });
 
-        connectPromise.success(function(box) {
+        connectPromise.then(function() {
             $mdDialog.hide();
-        });
-
-        connectPromise.error(function(reason) {
+        },function(reason) {
             sbxToast.showErrorMessage(reason);
         });
 
