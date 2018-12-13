@@ -114,13 +114,14 @@ class TransactionRoutesTest extends {
     Get(s"/api/transactions/${uniBox.token}/outgoing/poll") ~> routes ~> check {
       status should be(OK)
 
-      val transactionImage = responseAs[OutgoingTransactionImage]
+      val transactionImages = responseAs[Seq[OutgoingTransactionImage]]
 
-      transactionImage.transaction.boxId should be(uniBox.id)
-      transactionImage.transaction.id should not be 0
-      transactionImage.transaction.sentImageCount shouldBe 0
-      transactionImage.transaction.totalImageCount should be(1)
-      transactionImage.transaction.status shouldBe TransactionStatus.WAITING
+      transactionImages should have size 1
+      transactionImages.head.transaction.boxId should be(uniBox.id)
+      transactionImages.head.transaction.id should not be 0
+      transactionImages.head.transaction.sentImageCount shouldBe 0
+      transactionImages.head.transaction.totalImageCount should be(1)
+      transactionImages.head.transaction.status shouldBe TransactionStatus.WAITING
     }
   }
 
@@ -137,14 +138,14 @@ class TransactionRoutesTest extends {
     }
 
     // poll outgoing
-    val transactionImage =
+    val transactionImages =
       Get(s"/api/transactions/${uniBox.token}/outgoing/poll") ~> routes ~> check {
         status should be(OK)
-        responseAs[OutgoingTransactionImage]
+        responseAs[Seq[OutgoingTransactionImage]]
       }
 
     // get image
-    Get(s"/api/transactions/${uniBox.token}/outgoing?transactionid=${transactionImage.transaction.id}&imageid=${transactionImage.image.id}") ~> routes ~> check {
+    Get(s"/api/transactions/${uniBox.token}/outgoing?transactionid=${transactionImages.head.transaction.id}&imageid=${transactionImages.head.image.id}") ~> routes ~> check {
       status should be(OK)
 
       contentType should be(ContentTypes.`application/octet-stream`)
@@ -167,17 +168,17 @@ class TransactionRoutesTest extends {
     }
 
     // poll outgoing
-    val transactionImage =
+    val transactionImages =
       Get(s"/api/transactions/${uniBox.token}/outgoing/poll") ~> routes ~> check {
         status should be(OK)
-        responseAs[OutgoingTransactionImage]
+        responseAs[Seq[OutgoingTransactionImage]]
       }
 
     // check that outgoing image is not marked as sent at this stage
-    transactionImage.image.sent shouldBe false
+    transactionImages.head.image.sent shouldBe false
 
     // send done
-    Post(s"/api/transactions/${uniBox.token}/outgoing/done", transactionImage) ~> routes ~> check {
+    Post(s"/api/transactions/${uniBox.token}/outgoing/done", transactionImages.head) ~> routes ~> check {
       status should be(NoContent)
     }
 
@@ -188,7 +189,7 @@ class TransactionRoutesTest extends {
 
     await(boxDao.listOutgoingImages).head.sent shouldBe true
 
-    GetAsUser(s"/api/boxes/outgoing/${transactionImage.transaction.id}/images") ~> routes ~> check {
+    GetAsUser(s"/api/boxes/outgoing/${transactionImages.head.transaction.id}/images") ~> routes ~> check {
       status shouldBe OK
       responseAs[List[Image]] should have length 1
     }
@@ -210,14 +211,14 @@ class TransactionRoutesTest extends {
     }
 
     // poll outgoing
-    val transactionImage =
+    val transactionImages =
       Get(s"/api/transactions/${uniBox.token}/outgoing/poll") ~> routes ~> check {
         status should be(OK)
-        responseAs[OutgoingTransactionImage]
+        responseAs[Seq[OutgoingTransactionImage]]
       }
 
     // send failed
-    Post(s"/api/transactions/${uniBox.token}/outgoing/failed", FailedOutgoingTransactionImage(transactionImage, "error message")) ~> routes ~> check {
+    Post(s"/api/transactions/${uniBox.token}/outgoing/failed", FailedOutgoingTransactionImage(transactionImages.head, "error message")) ~> routes ~> check {
       status should be(NoContent)
     }
 
@@ -307,15 +308,15 @@ class TransactionRoutesTest extends {
     }
 
     // poll outgoing
-    val transactionImage =
+    val transactionImages =
       Get(s"/api/transactions/${uniBox.token}/outgoing/poll") ~> routes ~> check {
         status should be(OK)
-        responseAs[OutgoingTransactionImage]
+        responseAs[Seq[OutgoingTransactionImage]]
       }
 
     // get image
-    val transactionId = transactionImage.transaction.id
-    val imageId = transactionImage.image.id
+    val transactionId = transactionImages.head.transaction.id
+    val imageId = transactionImages.head.image.id
     val compressedArray = Get(s"/api/transactions/${uniBox.token}/outgoing?transactionid=$transactionId&imageid=$imageId") ~> routes ~> check {
       status should be(OK)
       responseAs[ByteString]
@@ -327,7 +328,7 @@ class TransactionRoutesTest extends {
     elements.getString(PatientSex.dicomTag) shouldBe empty // not mapped
 
     // send done
-    Post(s"/api/transactions/${uniBox.token}/outgoing/done", transactionImage) ~> routes ~> check {
+    Post(s"/api/transactions/${uniBox.token}/outgoing/done", transactionImages.head) ~> routes ~> check {
       status should be(NoContent)
     }
   }

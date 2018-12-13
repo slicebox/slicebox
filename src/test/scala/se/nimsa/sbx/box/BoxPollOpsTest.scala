@@ -64,7 +64,7 @@ class BoxPollOpsTest extends TestKit(ActorSystem("BoxPollOpsSpec")) with AsyncFl
       if (n == 0)
         Future(notFoundResponse)
       else if (n == 1)
-        okResponse(OutgoingTransactionImage(transaction, OutgoingImage(1, transaction.id, 1001, 1, sent = false)))
+        okResponse(Seq(OutgoingTransactionImage(transaction, OutgoingImage(1, transaction.id, 1001, 1, sent = false))))
       else
         okResponse((1 to n)
           .map(id => OutgoingImage(id, transaction.id, 1000 + id, id, sent = false))
@@ -91,13 +91,6 @@ class BoxPollOpsTest extends TestKit(ActorSystem("BoxPollOpsSpec")) with AsyncFl
     }
     impl.poll(n).map { _ =>
       capturedUri shouldBe s"$remoteBoxBaseUrl/outgoing/poll?n=$n"
-    }
-  }
-
-  it should "return a sequence containing a single transaction, when a single transaction is sent, to ensure backward compatibility" in {
-    val impl = new BoxPollOpsImpl(1)
-    impl.poll(10).map { transactionImages =>
-      transactionImages should have size 1
     }
   }
 
