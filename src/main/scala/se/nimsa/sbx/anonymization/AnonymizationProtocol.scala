@@ -36,7 +36,14 @@ object AnonymizationProtocol {
 
   case class AnonymizationData(profile: AnonymizationProfile, tagValues: Seq[TagValue])
 
-  case class BulkAnonymizationData(profile: AnonymizationProfile, imageTagValuesSet: Seq[ImageTagValues])
+  case class BulkAnonymizationData(profile: AnonymizationProfile, imageTagValuesSet: Seq[ImageTagValues]) {
+    def completeProfile: AnonymizationProfile = AnonymizationProfile(
+      if (profile.options.contains(ConfidentialityOption.BASIC_PROFILE))
+        profile.options
+      else
+        profile.options.+:(ConfidentialityOption.BASIC_PROFILE)
+    )
+  }
 
   case class AnonymizationKey(id: Long,
                               created: Long,
@@ -70,6 +77,7 @@ object AnonymizationProtocol {
                                        tagPath: TagPathTag,
                                        value: String,
                                        anonymizedValue: String)
+
   trait AnonymizationRequest
 
   case class InsertAnonymizationKeyValues(imageId: Long, tagValueData: Set[AnonymizationKeyValueData]) extends AnonymizationRequest

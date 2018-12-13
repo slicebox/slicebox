@@ -239,9 +239,33 @@ angular.module('slicebox.directives', [])
 
 })
 
+.directive('anonymizationProfileForm', function($http) {
+    return {
+        restrict: 'E',
+        templateUrl: '/assets/partials/directives/anonymizationProfileForm.html',
+        scope: {
+            selectedOptions: '=options'
+        },
+        link: function ($scope) {
+
+            $scope.selectedOptions = $scope.selectedOptions || [];
+
+            $scope.uiState = {
+                options: null
+            };
+
+            $scope.loadOptions = function() {
+                return $http.get('/api/anonymization/options').then(function(response) {
+                    $scope.uiState.options = $scope.uiState.options || response.data;
+                });
+            };
+        }
+    };
+})
+
 /*
  * In order for selection check boxes and object actions to work, all objects in the
- * list must have an id property. 
+ * list must have an id property.
  */
 .directive('sbxGrid', function($filter, $q, $timeout) {
 

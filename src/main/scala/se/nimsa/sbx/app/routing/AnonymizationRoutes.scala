@@ -63,7 +63,7 @@ trait AnonymizationRoutes {
             complete {
               Source.fromIterator(() => bulkAnonymizationData.imageTagValuesSet.iterator)
                 .mapAsyncUnordered(8) { imageTagValues =>
-                  anonymizeData(imageTagValues.imageId, bulkAnonymizationData.profile, imageTagValues.tagValues, storage)
+                  anonymizeData(imageTagValues.imageId, bulkAnonymizationData.completeProfile, imageTagValues.tagValues, storage)
                 }
                 .runWith(Sink.seq)
                 .map { metaDataMaybes =>
@@ -150,7 +150,7 @@ trait AnonymizationRoutes {
           }
         }
       } ~ path("options") {
-        complete(ConfidentialityOption.options.filter(_.supported))
+        complete(ConfidentialityOption.options.filter(_.supported).filterNot(_ == ConfidentialityOption.BASIC_PROFILE))
       }
     }
 

@@ -139,7 +139,7 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageServic
 
         case SendToRemoteBox(box, bulkAnonymizationData) =>
           SbxLog.info("Box", s"Sending ${bulkAnonymizationData.imageTagValuesSet.length} images to box ${box.name}")
-          boxDao.addImagesToOutgoing(box.id, box.name, bulkAnonymizationData.profile, bulkAnonymizationData.imageTagValuesSet)
+          boxDao.addImagesToOutgoing(box.id, box.name, bulkAnonymizationData.completeProfile, bulkAnonymizationData.imageTagValuesSet)
             .map(_ => ImagesAddedToOutgoing(box.id, bulkAnonymizationData.imageTagValuesSet.map(_.imageId)))
             .pipeSequentiallyTo(sender)
 

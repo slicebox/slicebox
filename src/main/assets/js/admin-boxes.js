@@ -34,6 +34,10 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
     });
 
     // Scope functions
+    $scope.printOptions = function(rowObject) {
+        return rowObject.defaultProfile.options.map(function(v) { return v.title; }).join(",");
+    };
+
     $scope.loadBoxesPage = function(startIndex, count, orderByProperty, orderByDirection) {
         return $http.get('/api/boxes?startindex=' + startIndex + '&count=' + count);
     };
@@ -57,7 +61,8 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
     $scope.uiState = {
         addChoice: '',
         remoteBoxName: "",
-        connectionURL: ""
+        connectionURL: "",
+        defaultOptions: []
     };
 
     // Scope functions
@@ -71,7 +76,8 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
         }
 
         var connectionData = {
-            name: $scope.uiState.remoteBoxName
+            name: $scope.uiState.remoteBoxName,
+            defaultProfile: { options: $scope.uiState.defaultOptions }
         };
 
         var generateURLPromise = $http.post('/api/boxes/createconnection', connectionData);
@@ -96,7 +102,8 @@ angular.module('slicebox.adminBoxes', ['ngRoute'])
         var connectPromise = $http.post('/api/boxes/connect',
             {
                 name: $scope.uiState.remoteBoxName,
-                baseUrl: $scope.uiState.connectionURL
+                baseUrl: $scope.uiState.connectionURL,
+                defaultProfile: { options: $scope.uiState.defaultOptions }
             });
 
         connectPromise.then(function() {

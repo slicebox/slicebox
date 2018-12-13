@@ -181,14 +181,27 @@ trait JsonFormats {
 
   implicit val tagMappingFormat: Format[TagMapping] = Json.format[TagMapping]
 
-  implicit val confidentialityOptionFormat: Format[ConfidentialityOption] = enumFormat(ConfidentialityOption.withName)
+  implicit val confidentialityOptionWrites: Format[ConfidentialityOption] = Format(Reads[ConfidentialityOption] {
+    case JsObject(o) => o.get("name").map(v => Json.fromJson[String](v))
+      .map(_.map(ConfidentialityOption.withName))
+      .getOrElse(JsError("Missing field \"options\""))
+    case _ => JsError("Json object expected")
+  }, Writes[ConfidentialityOption] {
+    op =>
+      Json.obj(
+        "name" -> op.name,
+        "title" -> op.title,
+        "description" -> op.description,
+        "rank" -> op.rank
+      )
+  })
 
   implicit val anonymizationProfileFormat: Format[AnonymizationProfile] = Format(Reads[AnonymizationProfile] {
     case JsObject(a) => a.get("options").map(v => Json.fromJson[Seq[ConfidentialityOption]](v))
       .map(_.map(AnonymizationProfile.apply))
       .getOrElse(JsError("Missing field \"options\""))
     case _ => JsError("Json object expected")
-  }, Writes[AnonymizationProfile](a => JsObject(Map("options" -> Json.toJson(a.options)))))
+  }, Writes[AnonymizationProfile](a => Json.obj("options" -> Json.toJson(a.options))))
 
   implicit val unWatchDirectoryFormat: Format[UnWatchDirectory] = Json.format[UnWatchDirectory]
   implicit val watchedDirectoryFormat: Format[WatchedDirectory] = Json.format[WatchedDirectory]
