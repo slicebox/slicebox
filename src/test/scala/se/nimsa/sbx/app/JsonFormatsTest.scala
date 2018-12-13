@@ -201,7 +201,17 @@ class JsonFormatsTest extends FlatSpec with Matchers with JsonFormats {
 
     Json.prettyPrint(Json.toJson(profile)) shouldBe
       """{
-        |  "options" : [ "BASIC_PROFILE", "RETAIN_LONGITUDINAL_TEMPORAL_INFORMATION" ]
+        |  "options" : [ {
+        |    "name" : "BASIC_PROFILE",
+        |    "title" : "Basic Profile",
+        |    "description" : "Basic Profile",
+        |    "rank" : 10
+        |  }, {
+        |    "name" : "RETAIN_LONGITUDINAL_TEMPORAL_INFORMATION",
+        |    "title" : "Retain Temporal Info",
+        |    "description" : "Retain Longitudinal Temporal Information",
+        |    "rank" : 70
+        |  } ]
         |}""".stripMargin
   }
 
