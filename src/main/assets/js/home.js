@@ -821,41 +821,41 @@ angular.module('slicebox.home', ['ngRoute'])
     }
 
     function confirmSendPatients(patients) {
-        return confirmSend('/api/boxes', function(receiverId) {
+        return confirmSend('/api/boxes', function(box) {
             var imageIdsAndPatientsPromise = createImageIdsAndPatientsPromiseForPatients(patients);
 
-            return showBoxSendTagValuesModal(imageIdsAndPatientsPromise, function(anonInfo) {
-                return $http.post('/api/boxes/' + receiverId + '/send', anonInfo);
+            return showBoxSendTagValuesModal(box.defaultProfile.options, imageIdsAndPatientsPromise, function(anonInfo) {
+                return $http.post('/api/boxes/' + box.id + '/send', anonInfo);
             }, "sent", "send");
         });
     }
 
     function confirmSendStudies(studies) {
-        return confirmSend('/api/boxes', function(receiverId) {
+        return confirmSend('/api/boxes', function(box) {
             var imageIdsAndPatientsPromise = createImageIdsAndPatientsPromiseForStudies(studies);
 
-            return showBoxSendTagValuesModal(imageIdsAndPatientsPromise, function (anonInfo) {
-                return $http.post('/api/boxes/' + receiverId + '/send', anonInfo);
+            return showBoxSendTagValuesModal(box.defaultProfile.options, imageIdsAndPatientsPromise, function (anonInfo) {
+                return $http.post('/api/boxes/' + box.id + '/send', anonInfo);
             }, "sent", "send");
         });
     }
 
     function confirmSendSeries(series) {
-        return confirmSend('/api/boxes', function(receiverId) {
+        return confirmSend('/api/boxes', function(box) {
             var imageIdsAndPatientsPromise = createImageIdsAndPatientsPromiseForSeries(series);
 
-            return showBoxSendTagValuesModal(imageIdsAndPatientsPromise, function(anonInfo) {
-                return $http.post('/api/boxes/' + receiverId + '/send', anonInfo);
+            return showBoxSendTagValuesModal(box.defaultProfile.options, imageIdsAndPatientsPromise, function(anonInfo) {
+                return $http.post('/api/boxes/' + box.id + '/send', anonInfo);
             }, "sent", "send");
         });
     }
 
     function confirmSendFlatSeries(flatSeries) {
-        return confirmSend('/api/boxes', function(receiverId) {
+        return confirmSend('/api/boxes', function(box) {
             var imageIdsAndPatientsPromise = createImageIdsAndPatientsPromiseForFlatSeries(flatSeries);
 
-            return showBoxSendTagValuesModal(imageIdsAndPatientsPromise, function(anonInfo) {
-                return $http.post('/api/boxes/' + receiverId + '/send', anonInfo);
+            return showBoxSendTagValuesModal(box.defaultProfile.options, imageIdsAndPatientsPromise, function(anonInfo) {
+                return $http.post('/api/boxes/' + box.id + '/send', anonInfo);
             }, "sent", "send");
         });
     }
@@ -873,9 +873,9 @@ angular.module('slicebox.home', ['ngRoute'])
     }
 
     function confirmSendToScp(images) {
-        return confirmSend('/api/scus', function(receiverId) {
+        return confirmSend('/api/scus', function(receiver) {
             var imageIds = images.map(function (image) { return image.id; });
-            return $http.post('/api/scus/' + receiverId + '/send', imageIds).then(function() {
+            return $http.post('/api/scus/' + receiver.id + '/send', imageIds).then(function() {
                 $mdDialog.hide();
                 sbxToast.showInfoMessage("Series sent to SCP");
             }, function(error) {
@@ -969,7 +969,7 @@ angular.module('slicebox.home', ['ngRoute'])
     }
 
     function anonymizeImages(imageIdsAndPatientsPromise) {
-        return showBoxSendTagValuesModal(imageIdsAndPatientsPromise, function(anonInfo) {
+        return showBoxSendTagValuesModal([], imageIdsAndPatientsPromise, function(anonInfo) {
             var promise = $http.post('/api/anonymization/anonymize', anonInfo);
 
             promise.finally(function () {
@@ -989,7 +989,7 @@ angular.module('slicebox.home', ['ngRoute'])
         return $mdDialog.show({
             templateUrl: '/assets/partials/modifyImageFilesModalContent.html',
             controller: 'ModifyImageFilesModalCtrl',
-            scope: $scope.$new(),
+            scope: $scope.$new()
         });
     }
 
@@ -1103,13 +1103,14 @@ angular.module('slicebox.home', ['ngRoute'])
         openTagSeriesModal($q.when(seriesIds)).then(function() { return updateSeriesTagsPromise(); });
     }
 
-    function showBoxSendTagValuesModal(imageIdsAndPatientsPromise, actionCallback, actionStringPastTense, actionString) {
+    function showBoxSendTagValuesModal(defaultOptions, imageIdsAndPatientsPromise, actionCallback, actionStringPastTense, actionString) {
         return imageIdsAndPatientsPromise.then(function(imageIdsAndPatients) {
             return $mdDialog.show({
                 templateUrl: '/assets/partials/tagValuesModalContent.html',
                 controller: 'TagValuesCtrl',
                 scope: $scope.$new(),
                 locals: {
+                    defaultOptions: defaultOptions,
                     imageIdsAndPatients: imageIdsAndPatients,
                     actionCallback: actionCallback,
                     actionStringPastTense: actionStringPastTense,
@@ -1243,7 +1244,7 @@ angular.module('slicebox.home', ['ngRoute'])
     };
 
     $scope.selectButtonClicked = function() {
-        return receiverSelectedCallback($scope.uiState.selectedReceiver.id).then(function(data) {
+        return receiverSelectedCallback($scope.uiState.selectedReceiver).then(function(data) {
             $mdDialog.hide();
             return data;
         });
@@ -1255,10 +1256,10 @@ angular.module('slicebox.home', ['ngRoute'])
 
 })
 
-.controller('TagValuesCtrl', function($scope, $mdDialog, $http, sbxToast, imageIdsAndPatients, actionCallback, actionStringPastTense, actionString) {
+.controller('TagValuesCtrl', function($scope, $mdDialog, $http, sbxToast, defaultOptions, imageIdsAndPatients, actionCallback, actionStringPastTense, actionString) {
     // Initialization
-    $scope.title = 'Anonymization Options';
-    $scope.options = [];
+    $scope.title = 'Anonymization Details';
+    $scope.options = defaultOptions;
     $scope.patients = [];
     var imageIds = [];
 

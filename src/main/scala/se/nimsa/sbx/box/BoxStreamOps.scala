@@ -1,7 +1,7 @@
 package se.nimsa.sbx.box
 
 import akka.actor.ActorSystem
-import akka.http.scaladsl.Http
+import akka.http.scaladsl.{Http, HttpExt}
 import akka.http.scaladsl.marshalling.Marshal
 import akka.http.scaladsl.model._
 import akka.stream._
@@ -31,7 +31,7 @@ trait BoxStreamOps extends BoxJsonFormats with PlayJsonSupport {
   implicit val materializer: Materializer
   implicit val ec: ExecutionContext
 
-  lazy val http = Http(system)
+  lazy val http: HttpExt = Http(system)
 
   def pollAndTransfer[Mat](transferBatch: () => Future[Seq[OutgoingTransactionImage]]): RunnableGraph[KillSwitch] = {
     RunnableGraph.fromGraph(GraphDSL.create(KillSwitches.single[Tick]) {

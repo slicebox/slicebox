@@ -92,8 +92,6 @@ trait TransactionRoutes {
                   onSuccess(boxService.ask(PollOutgoing(box, n)).mapTo[Seq[OutgoingTransactionImage]]) { transactionImages =>
                     if (transactionImages.isEmpty)
                       complete(NotFound)
-                    else if (transactionImages.lengthCompare(1) == 0)
-                      complete(transactionImages.head)
                     else
                       complete(transactionImages)
                   }

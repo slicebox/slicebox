@@ -181,7 +181,7 @@ trait JsonFormats {
 
   implicit val tagMappingFormat: Format[TagMapping] = Json.format[TagMapping]
 
-  implicit val confidentialityOptionWrites: Format[ConfidentialityOption] = Format(Reads[ConfidentialityOption] {
+  implicit val confidentialityOptionFormat: Format[ConfidentialityOption] = Format(Reads[ConfidentialityOption] {
     case JsObject(o) => o.get("name").map(v => Json.fromJson[String](v))
       .map(_.map(ConfidentialityOption.withName))
       .getOrElse(JsError("Missing field \"options\""))

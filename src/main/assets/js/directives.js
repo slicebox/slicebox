@@ -254,11 +254,9 @@ angular.module('slicebox.directives', [])
                 options: null
             };
 
-            $scope.loadOptions = function() {
-                return $http.get('/api/anonymization/options').then(function(response) {
-                    $scope.uiState.options = $scope.uiState.options || response.data;
-                });
-            };
+            $http.get('/api/anonymization/options').then(function(response) {
+                $scope.uiState.options = $scope.uiState.options || response.data;
+            });
         }
     };
 })

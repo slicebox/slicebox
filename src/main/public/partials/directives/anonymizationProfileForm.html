@@ -1,6 +1,7 @@
 <md-content class="anonymization-profile-form" layout="column">
     <md-input-container>
-        <md-select placeholder="Anonymization Options" ng-model="selectedOptions" md-on-open="loadOptions()" multiple>
+        <label>Anonymization Options</label>
+        <md-select ng-model="selectedOptions" ng-model-options="{trackBy: '$value.name'}" multiple>
             <md-option ng-value="option" ng-repeat="option in uiState.options">{{option.title}}</md-option>
         </md-select>
     </md-input-container>
