@@ -74,6 +74,7 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
     def created = column[Long]("created")
     def updated = column[Long]("updated")
     def status = column[TransactionStatus]("status")
+    def idxBoxId = index("idx_box_id", boxId)
     def * = (id, boxId, boxName, profile, sentImageCount, totalImageCount, created, updated, status) <> (OutgoingTransaction.tupled, OutgoingTransaction.unapply)
   }
 
@@ -91,6 +92,7 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
     def sent = column[Boolean]("sent")
     def fkOutgoingTransaction = foreignKey("fk_outgoing_transaction_id", outgoingTransactionId, outgoingTransactionQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
     def idxUniqueTransactionAndNumber = index("idx_unique_outgoing_image", (outgoingTransactionId, sequenceNumber), unique = true)
+    def idxImageId = index("idx_outgoing_image_image_id", imageId)
     def * = (id, outgoingTransactionId, imageId, sequenceNumber, sent) <> (OutgoingImage.tupled, OutgoingImage.unapply)
   }
 
@@ -124,13 +126,14 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def boxId = column[Long]("boxid")
     def boxName = column[String]("boxname")
-    def outgoingTransactionId = column[Long]("outgoingtransactionid")
+    def outgoingTransa  ctionId = column[Long]("outgoingtransactionid")
     def receivedImageCount = column[Long]("receivedimagecount")
     def addedImageCount = column[Long]("addedimagecount")
     def totalImageCount = column[Long]("totalimagecount")
     def created = column[Long]("created")
     def updated = column[Long]("updated")
     def status = column[TransactionStatus]("status")
+    def idxIncomingTransactionBoxId = index("idx_incoming_transaction_box_id", boxId)
     def * = (id, boxId, boxName, outgoingTransactionId, receivedImageCount, addedImageCount, totalImageCount, created, updated, status) <> (IncomingTransaction.tupled, IncomingTransaction.unapply)
   }
 
@@ -148,6 +151,7 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
     def overwrite = column[Boolean]("overwrite")
     def fkIncomingTransaction = foreignKey("fk_incoming_transaction_id", incomingTransactionId, incomingTransactionQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
     def idxUniqueTransactionAndNumber = index("idx_unique_incoming_image", (incomingTransactionId, sequenceNumber), unique = true)
+    def idxIncomingTransactionId = index("idx_incoming_image_image_id", imageId)
     def * = (id, incomingTransactionId, imageId, sequenceNumber, overwrite) <> (IncomingImage.tupled, IncomingImage.unapply)
   }
 
@@ -292,8 +296,8 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
 
   def outgoingTransactionByTransactionId(boxId: Long, outgoingTransactionId: Long): Future[Option[OutgoingTransaction]] = db.run {
     outgoingTransactionQuery
-      .filter(_.boxId === boxId)
       .filter(_.id === outgoingTransactionId)
+      .filter(_.boxId === boxId)
       .result.headOption
   }
 
@@ -303,8 +307,8 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
       image <- outgoingImageQuery if transaction.id === image.outgoingTransactionId
     } yield (transaction, image)
     join
-      .filter(_._1.boxId === boxId)
       .filter(_._1.id === outgoingTransactionId)
+      .filter(_._1.boxId === boxId)
       .filter(_._2.id === outgoingImageId)
       .result.headOption
       .map(_.map(OutgoingTransactionImage.tupled))

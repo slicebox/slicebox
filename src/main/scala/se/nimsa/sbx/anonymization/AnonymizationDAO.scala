@@ -50,16 +50,16 @@ class AnonymizationDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Exe
     def sopInstanceUID = column[String](DicomProperty.SOPInstanceUID.name)
     def anonSOPInstanceUID = column[String]("anonSOPInstanceUID")
 
-    def idxPatientName = index("idx_patient_name", patientName)
-    def idxPatientID = index("idx_patient_id", patientID)
-    def idxStudyInstanceUID = index("idx_study_uid", studyInstanceUID)
-    def idxSeriesInstanceUID = index("idx_series_uid", seriesInstanceUID)
-    def idxSOPInstanceUID = index("idx_sop_uid", sopInstanceUID)
-    def idxAnonPatientName = index("idx_anon_patient_name", anonPatientName)
-    def idxAnonPatientID = index("idx_anon_patient_id", anonPatientID)
-    def idxAnonStudyInstanceUID = index("idx_anon_study_uid", anonStudyInstanceUID)
-    def idxAnonSeriesInstanceUID = index("idx_anon_series_uid", anonSeriesInstanceUID)
-    def idxAnonSOPInstanceUID = index("idx_anon_sop_uid", anonSOPInstanceUID)
+    def idxPatientName = index("idx_anon_patient_name", patientName)
+    def idxPatientID = index("idx_anon_patient_id", patientID)
+    def idxStudyInstanceUID = index("idx_anon_study_uid", studyInstanceUID)
+    def idxSeriesInstanceUID = index("idx_anon_series_uid", seriesInstanceUID)
+    def idxSOPInstanceUID = index("idx_anon_sop_uid", sopInstanceUID)
+    def idxAnonPatientName = index("idx_anon_anon_patient_name", anonPatientName)
+    def idxAnonPatientID = index("idx_anon_anon_patient_id", anonPatientID)
+    def idxAnonStudyInstanceUID = index("idx_anon_anon_study_uid", anonStudyInstanceUID)
+    def idxAnonSeriesInstanceUID = index("idx_anon_anon_series_uid", anonSeriesInstanceUID)
+    def idxAnonSOPInstanceUID = index("idx_anon_anon_sop_uid", anonSOPInstanceUID)
 
     def * = (id, created, imageId,
       patientName, anonPatientName, patientID, anonPatientID, studyInstanceUID, anonStudyInstanceUID,

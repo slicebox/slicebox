@@ -51,6 +51,8 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
     def patientBirthDate = column[String](DicomProperty.PatientBirthDate.name)
     def patientSex = column[String](DicomProperty.PatientSex.name)
     def idxUniquePatient = index("idx_unique_patient", (patientName, patientID), unique = true)
+    def idxPatientName = index("idx_patient_name", patientName)
+    def idxPatientID = index("idx_patient_id", patientID)
     def * = (id, patientName, patientID, patientBirthDate, patientSex) <> (toPatient.tupled, fromPatient)
   }
 
@@ -62,10 +64,11 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
 
   // *** Study *** //
 
-  val fromStudy = (study: Study) => Option((study.id, study.patientId, study.studyInstanceUID.value, study.studyDescription.value, study.studyDate.value, study.studyID.value, study.accessionNumber.value, study.patientAge.value))
+  val fromStudy: Study => Option[(Long, Long, String, String, String, String, String, String)] = (study: Study) => Option((study.id, study.patientId, study.studyInstanceUID.value, study.studyDescription.value, study.studyDate.value, study.studyID.value, study.accessionNumber.value, study.patientAge.value))
 
-  val toStudy = (id: Long, patientId: Long, studyInstanceUID: String, studyDescription: String, studyDate: String, studyID: String, accessionNumber: String, patientAge: String) =>
-    Study(id, patientId, StudyInstanceUID(studyInstanceUID), StudyDescription(studyDescription), StudyDate(studyDate), StudyID(studyID), AccessionNumber(accessionNumber), PatientAge(patientAge))
+  val toStudy: (Long, Long, String, String, String, String, String, String) => Study =
+    (id: Long, patientId: Long, studyInstanceUID: String, studyDescription: String, studyDate: String, studyID: String, accessionNumber: String, patientAge: String) =>
+      Study(id, patientId, StudyInstanceUID(studyInstanceUID), StudyDescription(studyDescription), StudyDate(studyDate), StudyID(studyID), AccessionNumber(accessionNumber), PatientAge(patientAge))
 
   class StudiesTable(tag: Tag) extends Table[Study](tag, StudiesTable.name) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
@@ -139,6 +142,7 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
     def imageType = column[String](DicomProperty.ImageType.name)
     def instanceNumber = column[String](DicomProperty.InstanceNumber.name)
     def idxUniqueImage = index("idx_unique_image", (seriesId, sopInstanceUID), unique = true)
+    def idxSopInstanceUid = index("idx_sop_instance_uid", sopInstanceUID)
     def * = (id, seriesId, sopInstanceUID, imageType, instanceNumber) <> (toImage.tupled, fromImage)
 
     def seriesFKey = foreignKey("seriesFKey", seriesId, seriesQuery)(_.id, onUpdate = ForeignKeyAction.Cascade, onDelete = ForeignKeyAction.Cascade)
