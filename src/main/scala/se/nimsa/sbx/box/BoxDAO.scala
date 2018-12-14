@@ -126,7 +126,7 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def boxId = column[Long]("boxid")
     def boxName = column[String]("boxname")
-    def outgoingTransa  ctionId = column[Long]("outgoingtransactionid")
+    def outgoingTransactionId = column[Long]("outgoingtransactionid")
     def receivedImageCount = column[Long]("receivedimagecount")
     def addedImageCount = column[Long]("addedimagecount")
     def totalImageCount = column[Long]("totalimagecount")
