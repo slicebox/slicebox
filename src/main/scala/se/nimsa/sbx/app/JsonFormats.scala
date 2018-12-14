@@ -345,4 +345,5 @@ trait JsonFormats {
 
   implicit val dicomMultiplicityFormat: Format[Multiplicity] = Json.format[Multiplicity]
 
+  implicit val updateSeriesTypesRunningStatusFormat: Format[UpdateSeriesTypesRunningStatus] = Json.format[UpdateSeriesTypesRunningStatus]
 }
