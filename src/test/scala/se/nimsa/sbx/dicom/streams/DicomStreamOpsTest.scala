@@ -278,7 +278,7 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("DicomStreamOpsSpec")) with
     val bytesSource = StreamSource.single(TestUtil.toBytes(testData))
     for {
       metaDataAdded1 <- dicomStreamOpsImpl.storeDicomData(bytesSource, source)
-      (_, metaDataAdded2) <- dicomStreamOpsImpl.modifyData(metaDataAdded1.image.id, Seq(TagInsertion(TagPath.fromTag(Tag.PatientName), ByteString(newName))))
+      (_, metaDataAdded2) <- dicomStreamOpsImpl.modifyData(metaDataAdded1.image.id, Seq(TagInsertion(TagPath.fromTag(Tag.PatientName), _ => ByteString(newName))))
     } yield {
       metaDataAdded2.patient.patientName.value shouldBe newName
     }

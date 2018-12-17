@@ -91,11 +91,8 @@ object CreateSources {
       |
       |object AnonymizationProfiles {
       |  import ConfidentialityOption._
+      |  import AnonymizationProfile._
       |  import AnonymizationOp._
-      |
-      |  case class TagMask(tag: Int, mask: Int) {
-      |    def contains(otherTag: Int): Boolean = (otherTag & mask) == tag
-      |  }
       |
       |  val profiles: Map[ConfidentialityOption, Map[TagMask, AnonymizationOp]] = Map(
       |    BASIC_PROFILE -> Map(

@@ -41,7 +41,7 @@ object HarmonizeAnonymizationFlow {
           .flatMap(tp => r.values.find(_.tagPath == tp))
         val custom = customAnonValues.map(v => AnonymizationKeyValue(-1, -1, v.tagPath, "", v.value))
         val combined = active.foldLeft(custom)((m, tv) => if (m.map(_.tagPath).contains(tv.tagPath)) m else m :+ tv)
-        val insertions = combined.map(tv => TagInsertion(tv.tagPath, padToEvenLength(ByteString(tv.anonymizedValue), tv.tagPath.tag)))
+        val insertions = combined.map(tv => TagInsertion(tv.tagPath, _ => padToEvenLength(ByteString(tv.anonymizedValue), tv.tagPath.tag)))
         TagModificationsPart(Seq.empty, insertions.toList)
       case p => p
     }

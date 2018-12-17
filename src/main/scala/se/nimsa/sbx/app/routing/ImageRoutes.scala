@@ -101,7 +101,7 @@ trait ImageRoutes {
           put {
             entity(as[Seq[TagMapping]]) { tagMappings =>
               val tagModifications = tagMappings
-                .map(tm => TagInsertion(tm.tagPath, padToEvenLength(ByteString(tm.value), tm.tagPath.tag)))
+                .map(tm => TagInsertion(tm.tagPath, _ => padToEvenLength(ByteString(tm.value), tm.tagPath.tag)))
               onSuccess(modifyData(imageId, tagModifications, storage)) {
                 case (metaDataDeleted, metaDataAdded) =>
                   system.eventStream.publish(ImagesDeleted(metaDataDeleted.imageIds))
