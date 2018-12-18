@@ -6,6 +6,7 @@ import akka.testkit.{ImplicitSender, TestKit}
 import akka.util.Timeout
 import org.scalatest._
 import se.nimsa.dicom.data.TagPath
+import se.nimsa.sbx.anonymization.{AnonymizationProfile, ConfidentialityOption}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.app.GeneralProtocol.ImagesDeleted
 import se.nimsa.sbx.box.BoxProtocol._
@@ -16,6 +17,7 @@ import se.nimsa.sbx.storage.{RuntimeStorage, StorageServiceActor}
 import se.nimsa.sbx.util.FutureUtil.await
 import se.nimsa.sbx.util.TestUtil
 
+import scala.collection.immutable.Seq
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.concurrent.duration.DurationInt
 
@@ -29,6 +31,8 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
   implicit val materializer: ActorMaterializer = ActorMaterializer()
 
   val dbConfig = TestUtil.createTestDb("boxserviceactortest")
+
+  val profile = AnonymizationProfile(Seq(ConfidentialityOption.BASIC_PROFILE))
 
   val storage = new RuntimeStorage
 
@@ -54,7 +58,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
   "A BoxServiceActor" should {
 
     "create incoming transaction for first file in transaction" in {
-      val box = await(boxDao.insertBox(Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, online = false)))
+      val box = await(boxDao.insertBox(Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, profile, online = false)))
 
       boxService ! UpdateIncoming(box, 123, 1, 2, Some(2), added = true)
 
@@ -75,7 +79,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
     }
 
     "update incoming transaction for next file in transaction" in {
-      val box = await(boxDao.insertBox(Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, online = false)))
+      val box = await(boxDao.insertBox(Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, profile, online = false)))
 
       boxService ! UpdateIncoming(box, 123, 1, 3, Some(4), added = true)
       expectMsgType[IncomingUpdated]
@@ -99,7 +103,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
     }
 
     "return no outgoing transaction when polling and outgoing is empty" in {
-      val box = await(boxDao.insertBox(Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, online = false)))
+      val box = await(boxDao.insertBox(Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, profile, online = false)))
 
       await(boxDao.listOutgoingTransactions(0, 1)) shouldBe empty
 
@@ -110,14 +114,14 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
 
     "return first outgoing transaction image from the least recent outgoing transaction when receiving poll message" in {
       val imageId = 123
-      val box = await(boxDao.insertBox(Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, online = false)))
+      val box = await(boxDao.insertBox(Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, profile, online = false)))
 
       // insert images with sequence numbers out of order
-      val transaction1 = await(boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, box.id, box.name, 0, 1, 123, 123, TransactionStatus.WAITING)))
+      val transaction1 = await(boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, box.id, box.name, profile, 0, 1, 123, 123, TransactionStatus.WAITING)))
       await(boxDao.insertOutgoingImage(OutgoingImage(-1, transaction1.id, imageId, 5, sent = false)))
       await(boxDao.insertOutgoingImage(OutgoingImage(-1, transaction1.id, imageId, 4, sent = false)))
 
-      val transaction2 = await(boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, box.id, box.name, 0, 1, 124, 124, TransactionStatus.WAITING)))
+      val transaction2 = await(boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, box.id, box.name, profile, 0, 1, 124, 124, TransactionStatus.WAITING)))
       await(boxDao.insertOutgoingImage(OutgoingImage(-1, transaction2.id, imageId, 2, sent = false)))
       await(boxDao.insertOutgoingImage(OutgoingImage(-1, transaction2.id, imageId, 1, sent = false)))
 
@@ -141,7 +145,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
 
     "create incoming transaction when receiving the first incoming file in a transaction" in {
 
-      val box = Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, online = false)
+      val box = Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, profile, online = false)
 
       val sequenceNumber = 1
       val totalImageCount = 55
@@ -160,7 +164,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
 
     "update incoming transaction status" in {
 
-      val box = Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, online = false)
+      val box = Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, profile, online = false)
 
       val transactionId = 32
       boxService ! UpdateIncoming(box, transactionId, sequenceNumber = 1, totalImageCount = 55, Some(33), added = true)
@@ -176,7 +180,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
 
     "mark incoming transaction as processing until all files have been received" in {
 
-      val box = Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, online = false)
+      val box = Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, profile, online = false)
 
       val totalImageCount = 3
 
@@ -195,7 +199,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
     }
 
     "remove all related box tag values when an outgoing transaction is removed" in {
-      val box = await(boxDao.insertBox(Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, online = false)))
+      val box = await(boxDao.insertBox(Box(-1, "some box", "abc", "https://someurl.com", BoxSendMethod.POLL, profile, online = false)))
 
       val (_, _, _, i1, i2, i3) = await(insertMetadata())
 
@@ -213,7 +217,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
           TagValue(TagPath.fromTag(0x00101012), "D"),
           TagValue(TagPath.fromTag(0x00101014), "F"))))
 
-      boxService ! SendToRemoteBox(box, imageTagValuesSeq)
+      boxService ! SendToRemoteBox(box, BulkAnonymizationData(profile, imageTagValuesSeq))
 
       expectMsgPF() {
         case ImagesAddedToOutgoing(boxId, imageIds) =>
@@ -239,7 +243,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
     }
 
     "remove incoming images when the related incoming transaction is removed" in {
-      val box = await(boxDao.insertBox(Box(-1, "some remote box", "abc", "https://someurl.com", BoxSendMethod.POLL, online = false)))
+      val box = await(boxDao.insertBox(Box(-1, "some remote box", "abc", "https://someurl.com", BoxSendMethod.POLL, profile, online = false)))
 
       boxService ! UpdateIncoming(box, 123, 1, 3, Some(4), added = true)
       expectMsgType[IncomingUpdated]
@@ -262,7 +266,7 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
     }
 
     "remove incoming transaction image when deleted from storage" in {
-      val box = await(boxDao.insertBox(Box(-1, "some remote box", "abc", "https://someurl.com", BoxSendMethod.POLL, online = false)))
+      val box = await(boxDao.insertBox(Box(-1, "some remote box", "abc", "https://someurl.com", BoxSendMethod.POLL, profile, online = false)))
 
       // insert incoming images (2)
       boxService ! UpdateIncoming(box, 123, 1, 3, Some(4), added = true)
@@ -278,13 +282,13 @@ class BoxServiceActorTest(_system: ActorSystem) extends TestKit(_system) with Im
     }
 
     "remove outgoing transaction image when deleted from storage" in {
-      val box = await(boxDao.insertBox(Box(-1, "some remote box", "abc", "https://someurl.com", BoxSendMethod.POLL, online = false)))
+      val box = await(boxDao.insertBox(Box(-1, "some remote box", "abc", "https://someurl.com", BoxSendMethod.POLL, profile, online = false)))
 
       // insert outgoing images (3)
       val (_, _, _, i1, i2, i3) = await(insertMetadata())
       val imageTagValuesSeq = Seq(ImageTagValues(i1.id, Seq()), ImageTagValues(i2.id, Seq()), ImageTagValues(i3.id, Seq()))
 
-      boxService ! SendToRemoteBox(box, imageTagValuesSeq)
+      boxService ! SendToRemoteBox(box, BulkAnonymizationData(profile, imageTagValuesSeq))
       expectMsgType[ImagesAddedToOutgoing]
 
       await(boxDao.listOutgoingImages).size should be(3)

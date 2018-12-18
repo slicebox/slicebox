@@ -92,8 +92,6 @@ trait TransactionRoutes {
                   onSuccess(boxService.ask(PollOutgoing(box, n)).mapTo[Seq[OutgoingTransactionImage]]) { transactionImages =>
                     if (transactionImages.isEmpty)
                       complete(NotFound)
-                    else if (transactionImages.lengthCompare(1) == 0)
-                      complete(transactionImages.head)
                     else
                       complete(transactionImages)
                   }
@@ -123,7 +121,7 @@ trait TransactionRoutes {
                       val imageId = transactionImage.image.imageId
                       onSuccess(boxService.ask(GetOutgoingTagValues(transactionImage)).mapTo[Seq[OutgoingTagValue]]) { transactionTagValues =>
                         val tagValues = transactionTagValues.map(_.tagValue)
-                        val streamSource = anonymizedDicomData(imageId, tagValues, storage)
+                        val streamSource = anonymizedDicomData(imageId, transactionImage.transaction.profile, tagValues, storage)
                           .via(Compression.deflate)
                           .batchWeighted(storage.streamChunkSize, _.length, identity)(_ ++ _)
                         complete(HttpEntity(ContentTypes.`application/octet-stream`, streamSource))

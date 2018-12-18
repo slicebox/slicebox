@@ -6,6 +6,7 @@ import akka.http.scaladsl.server._
 import akka.util.ByteString
 import org.scalatest.{FlatSpecLike, Matchers}
 import se.nimsa.dicom.data.{Tag, TagPath}
+import se.nimsa.sbx.anonymization.{AnonymizationProfile, ConfidentialityOption}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy._
 import se.nimsa.sbx.dicom.DicomProperty.PatientName
@@ -20,6 +21,8 @@ class AnonymizationRoutesTest extends {
   val dbConfig = TestUtil.createTestDb("anonymizationroutestest")
   val storage = new RuntimeStorage()
 } with FlatSpecLike with Matchers with RoutesTestBase {
+
+  val profile = AnonymizationProfile(Seq(ConfidentialityOption.BASIC_PROFILE))
 
   override def afterEach() {
     await(Future.sequence(Seq(
@@ -43,7 +46,7 @@ class AnonymizationRoutesTest extends {
       responseAs[FlatSeries]
     }
     val anonImage =
-      PutAsUser(s"/api/images/${image.id}/anonymize", Seq.empty[TagValue]) ~> routes ~> check {
+      PutAsUser(s"/api/images/${image.id}/anonymize", AnonymizationData(profile, Seq.empty)) ~> routes ~> check {
         status should be(OK)
         responseAs[Image]
       }
@@ -95,7 +98,7 @@ class AnonymizationRoutesTest extends {
     val anonPatientName = "Anon Pat 1"
     val tagValues = Seq(TagValue(TagPath.fromTag(PatientName.dicomTag), anonPatientName))
     val anonAttributes =
-      PostAsUser(s"/api/images/${image.id}/anonymized", tagValues) ~> routes ~> check {
+      PostAsUser(s"/api/images/${image.id}/anonymized", AnonymizationData(profile, tagValues)) ~> routes ~> check {
         status should be(OK)
         TestUtil.loadDicomData(responseAs[ByteString], withPixelData = true)
       }
@@ -131,7 +134,7 @@ class AnonymizationRoutesTest extends {
     }
 
     val anonImages =
-      PostAsUser("/api/anonymization/anonymize", Seq(ImageTagValues(image1.id, Seq.empty), ImageTagValues(image2.id, Seq.empty))) ~> routes ~> check {
+      PostAsUser("/api/anonymization/anonymize", BulkAnonymizationData(profile, Seq(ImageTagValues(image1.id, Seq.empty), ImageTagValues(image2.id, Seq.empty)))) ~> routes ~> check {
         status should be(OK)
         responseAs[Seq[Image]]
       }
@@ -155,7 +158,7 @@ class AnonymizationRoutesTest extends {
   }
 
   it should "return 404 NotFound when manually anonymizing an image that does not exist" in {
-    PutAsUser("/api/images/666/anonymize", Seq.empty[TagValue]) ~> routes ~> check {
+    PutAsUser("/api/images/666/anonymize", AnonymizationData(profile, Seq.empty[TagValue])) ~> routes ~> check {
       status should be(NotFound)
     }
   }

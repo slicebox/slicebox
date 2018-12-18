@@ -8,6 +8,7 @@ import akka.stream.{ActorMaterializer, Materializer}
 import akka.testkit.{ImplicitSender, TestKit}
 import akka.util.Timeout
 import org.scalatest._
+import se.nimsa.sbx.anonymization.{AnonymizationProfile, ConfidentialityOption}
 import se.nimsa.sbx.box.BoxProtocol._
 
 import scala.collection.immutable.Seq
@@ -30,8 +31,9 @@ class BoxStreamOpsTest(_system: ActorSystem) extends TestKit(_system) with Impli
     TestKit.shutdownActorSystem(system)
   }
 
-  val box: BoxProtocol.Box = Box(1, "Test Box", "abc123", "testbox2.com", BoxSendMethod.PUSH, online = false)
-  val transaction: OutgoingTransaction = OutgoingTransaction(1, box.id, box.name, 0, 1, 1000, 1000, TransactionStatus.WAITING)
+  val profile = AnonymizationProfile(Seq(ConfidentialityOption.BASIC_PROFILE))
+  val box: BoxProtocol.Box = Box(1, "Test Box", "abc123", "testbox2.com", BoxSendMethod.PUSH, profile, online = false)
+  val transaction: OutgoingTransaction = OutgoingTransaction(1, box.id, box.name, profile, 0, 1, 1000, 1000, TransactionStatus.WAITING)
 
   class BoxStreamOpsImpl extends BoxStreamOps {
     override val box: BoxProtocol.Box = BoxStreamOpsTest.this.box

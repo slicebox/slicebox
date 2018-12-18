@@ -26,6 +26,7 @@ import akka.pattern.ask
 import akka.stream.alpakka.csv.scaladsl.CsvFormatting
 import akka.stream.scaladsl.{Sink, Source}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
+import se.nimsa.sbx.anonymization.ConfidentialityOption
 import se.nimsa.sbx.app.GeneralProtocol.{ImageAdded, ImagesDeleted}
 import se.nimsa.sbx.app.SliceboxBase
 import se.nimsa.sbx.user.UserProtocol.{ApiUser, UserRole}
@@ -36,8 +37,8 @@ trait AnonymizationRoutes {
   def anonymizationRoutes(apiUser: ApiUser): Route =
     path("images" / LongNumber / "anonymize") { imageId =>
       put {
-        entity(as[Seq[TagValue]]) { tagValues =>
-          onSuccess(anonymizeData(imageId, tagValues, storage)) {
+        entity(as[AnonymizationData]) { anonymizationData =>
+          onSuccess(anonymizeData(imageId, anonymizationData.profile, anonymizationData.tagValues, storage)) {
             case Some(metaData) =>
               system.eventStream.publish(ImagesDeleted(Seq(imageId)))
               system.eventStream.publish(ImageAdded(metaData.image.id, metaData.source, !metaData.imageAdded))
@@ -49,8 +50,8 @@ trait AnonymizationRoutes {
       }
     } ~ path("images" / LongNumber / "anonymized") { imageId =>
       post {
-        entity(as[Seq[TagValue]]) { tagValues =>
-          val source = anonymizedDicomData(imageId, tagValues, storage)
+        entity(as[AnonymizationData]) { anonymizationData =>
+          val source = anonymizedDicomData(imageId, anonymizationData.profile, anonymizationData.tagValues, storage)
             .batchWeighted(storage.streamChunkSize, _.length, identity)(_ ++ _)
           complete(HttpEntity(ContentTypes.`application/octet-stream`, source))
         }
@@ -58,15 +59,15 @@ trait AnonymizationRoutes {
     } ~ pathPrefix("anonymization") {
       path("anonymize") {
         post {
-          entity(as[Seq[ImageTagValues]]) { imageTagValuesSeq =>
+          entity(as[BulkAnonymizationData]) { bulkAnonymizationData =>
             complete {
-              Source.fromIterator(() => imageTagValuesSeq.iterator)
+              Source.fromIterator(() => bulkAnonymizationData.imageTagValuesSet.iterator)
                 .mapAsyncUnordered(8) { imageTagValues =>
-                  anonymizeData(imageTagValues.imageId, imageTagValues.tagValues, storage)
+                  anonymizeData(imageTagValues.imageId, bulkAnonymizationData.completeProfile, imageTagValues.tagValues, storage)
                 }
                 .runWith(Sink.seq)
                 .map { metaDataMaybes =>
-                  system.eventStream.publish(ImagesDeleted(imageTagValuesSeq.map(_.imageId)))
+                  system.eventStream.publish(ImagesDeleted(bulkAnonymizationData.imageTagValuesSet.map(_.imageId)))
                   metaDataMaybes.flatMap { metaDataMaybe =>
                     metaDataMaybe.map { metaData =>
                       system.eventStream.publish(ImageAdded(metaData.image.id, metaData.source, !metaData.imageAdded))
@@ -148,6 +149,8 @@ trait AnonymizationRoutes {
             }
           }
         }
+      } ~ path("options") {
+        complete(ConfidentialityOption.options.filter(_.supported).filterNot(_ == ConfidentialityOption.BASIC_PROFILE))
       }
     }
 

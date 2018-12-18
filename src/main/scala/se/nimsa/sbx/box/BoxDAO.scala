@@ -17,6 +17,7 @@
 package se.nimsa.sbx.box
 
 import se.nimsa.dicom.data.TagPath.TagPathTag
+import se.nimsa.sbx.anonymization.{AnonymizationProfile, ConfidentialityOption}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.{ImageTagValues, TagValue}
 import se.nimsa.sbx.box.BoxProtocol.BoxSendMethod._
 import se.nimsa.sbx.box.BoxProtocol.TransactionStatus._
@@ -39,15 +40,22 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
   implicit val sendMethodColumnType: BaseColumnType[BoxSendMethod] =
     MappedColumnType.base[BoxSendMethod, String](bsm => bsm.toString, BoxSendMethod.withName)
 
+  implicit val defaultProfileColumnType: BaseColumnType[AnonymizationProfile] =
+    MappedColumnType.base[AnonymizationProfile, String](
+      p => p.options.map(_.name).mkString(","),
+      s => AnonymizationProfile(s.split(",").map(ConfidentialityOption.withName))
+    )
+
   class BoxTable(tag: Tag) extends Table[Box](tag, BoxTable.name) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def name = column[String]("name", O.Length(180))
     def token = column[String]("token")
     def baseUrl = column[String]("baseurl")
     def sendMethod = column[BoxSendMethod]("sendmethod")
+    def defaultProfile = column[AnonymizationProfile]("defaultprofile")
     def online = column[Boolean]("online")
     def idxUniqueName = index("idx_unique_box_name", name, unique = true)
-    def * = (id, name, token, baseUrl, sendMethod, online) <> (Box.tupled, Box.unapply)
+    def * = (id, name, token, baseUrl, sendMethod, defaultProfile, online) <> (Box.tupled, Box.unapply)
   }
 
   object BoxTable {
@@ -60,12 +68,13 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def boxId = column[Long]("boxid")
     def boxName = column[String]("boxname")
+    def profile = column[AnonymizationProfile]("profile")
     def sentImageCount = column[Long]("sentimagecount")
     def totalImageCount = column[Long]("totalimagecount")
     def created = column[Long]("created")
     def updated = column[Long]("updated")
     def status = column[TransactionStatus]("status")
-    def * = (id, boxId, boxName, sentImageCount, totalImageCount, created, updated, status) <> (OutgoingTransaction.tupled, OutgoingTransaction.unapply)
+    def * = (id, boxId, boxName, profile, sentImageCount, totalImageCount, created, updated, status) <> (OutgoingTransaction.tupled, OutgoingTransaction.unapply)
   }
 
   object OutgoingTransactionTable {
@@ -510,9 +519,9 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
     db.run(action.transactionally)
   }
 
-  def addImagesToOutgoing(boxId: Long, boxName: String, imageTagValuesSeq: Seq[ImageTagValues]): Future[OutgoingTransaction] = {
+  def addImagesToOutgoing(boxId: Long, boxName: String, profile: AnonymizationProfile, imageTagValuesSeq: Seq[ImageTagValues]): Future[OutgoingTransaction] = {
     val action =
-      insertOutgoingTransactionAction(OutgoingTransaction(-1, boxId, boxName, 0, imageTagValuesSeq.length, System.currentTimeMillis, System.currentTimeMillis, TransactionStatus.WAITING))
+      insertOutgoingTransactionAction(OutgoingTransaction(-1, boxId, boxName, profile, 0, imageTagValuesSeq.length, System.currentTimeMillis, System.currentTimeMillis, TransactionStatus.WAITING))
         .flatMap { outgoingTransaction =>
           DBIO.sequence {
             imageTagValuesSeq.zipWithIndex

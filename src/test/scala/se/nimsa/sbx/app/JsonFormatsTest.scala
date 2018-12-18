@@ -5,6 +5,7 @@ import play.api.libs.json.Json
 import se.nimsa.dicom.data.TagPath.TagPathTag
 import se.nimsa.dicom.data.TagTree.{TagTreeAnyItem, TagTreeItem, TagTreeTag}
 import se.nimsa.dicom.data.{Tag, TagPath, TagTree}
+import se.nimsa.sbx.anonymization.{AnonymizationProfile, ConfidentialityOption}
 
 class JsonFormatsTest extends FlatSpec with Matchers with JsonFormats {
 
@@ -193,5 +194,31 @@ class JsonFormatsTest extends FlatSpec with Matchers with JsonFormats {
         |  "name" : "NotAKeyword"
         |}""".stripMargin))
       .isError shouldBe false
+  }
+
+  "Formatting an anonymization profile" should "be valid" in {
+    val profile = AnonymizationProfile(Seq(ConfidentialityOption.BASIC_PROFILE, ConfidentialityOption.RETAIN_LONGITUDINAL_TEMPORAL_INFORMATION))
+
+    Json.prettyPrint(Json.toJson(profile)) shouldBe
+      """{
+        |  "options" : [ {
+        |    "name" : "BASIC_PROFILE",
+        |    "title" : "Basic Profile",
+        |    "description" : "Basic Profile",
+        |    "rank" : 10
+        |  }, {
+        |    "name" : "RETAIN_LONGITUDINAL_TEMPORAL_INFORMATION",
+        |    "title" : "Retain Temporal Info",
+        |    "description" : "Retain Longitudinal Temporal Information",
+        |    "rank" : 70
+        |  } ]
+        |}""".stripMargin
+  }
+
+  "Parsing an anonymization profile" should "work" in {
+    val profile = AnonymizationProfile(Seq(ConfidentialityOption.BASIC_PROFILE, ConfidentialityOption.RETAIN_LONGITUDINAL_TEMPORAL_INFORMATION))
+
+    Json.fromJson[AnonymizationProfile](Json.toJson(profile)).get shouldBe profile
+
   }
 }

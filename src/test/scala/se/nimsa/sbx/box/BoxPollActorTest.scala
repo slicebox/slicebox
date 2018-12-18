@@ -11,6 +11,7 @@ import akka.testkit.{ImplicitSender, TestKit}
 import akka.util.{ByteString, Timeout}
 import de.heikoseeberger.akkahttpplayjson.PlayJsonSupport
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
+import se.nimsa.sbx.anonymization.{AnonymizationProfile, ConfidentialityOption}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.TagValue
 import se.nimsa.sbx.app.JsonFormats
 import se.nimsa.sbx.box.BoxProtocol._
@@ -30,8 +31,9 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
   implicit val timeout: Timeout = Timeout(30.seconds)
   implicit val materializer: ActorMaterializer = ActorMaterializer()
 
-  val box = Box(1, "Test Box", "abc123", "testbox.com", BoxSendMethod.PUSH, online = true)
-  val transaction: OutgoingTransaction = OutgoingTransaction(1, box.id, box.name, 0, 1, 1000, 1000, TransactionStatus.WAITING)
+  val profile = AnonymizationProfile(Seq(ConfidentialityOption.BASIC_PROFILE))
+  val box = Box(1, "Test Box", "abc123", "testbox.com", BoxSendMethod.PUSH, profile, online = true)
+  val transaction: OutgoingTransaction = OutgoingTransaction(1, box.id, box.name, profile, 0, 1, 1000, 1000, TransactionStatus.WAITING)
   val storage = new RuntimeStorage()
 
   override def afterAll(): Unit = TestKit.shutdownActorSystem(system)
@@ -44,7 +46,7 @@ class BoxPollActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
       var firstBatch = true
       val pollActorRef = system.actorOf(Props(
         new BoxPollActor(box, storage, 200.milliseconds, n, 8, "../BoxService", "../MetaService", "../AnonService") {
-          override protected def anonymizedDicomData(imageId: Long, tagValues: scala.collection.Seq[TagValue], storage: StorageService)(implicit ec: ExecutionContext): Source[ByteString, NotUsed] =
+          override protected def anonymizedDicomData(imageId: Long, profile: AnonymizationProfile, tagValues: scala.collection.Seq[TagValue], storage: StorageService)(implicit ec: ExecutionContext): Source[ByteString, NotUsed] =
             Source.single(ByteString(1, 2, 3, 4))
           override def poll(n: Int): Future[Seq[OutgoingTransactionImage]] =
             if (firstBatch) {

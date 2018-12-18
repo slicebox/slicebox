@@ -10,6 +10,7 @@ import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit}
 import akka.util.{ByteString, Timeout}
 import org.scalatest._
+import se.nimsa.sbx.anonymization.{AnonymizationProfile, ConfidentialityOption}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.TagValue
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.storage.{RuntimeStorage, StorageService}
@@ -27,8 +28,9 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
   implicit val timeout: Timeout = Timeout(30.seconds)
   implicit val materializer: ActorMaterializer = ActorMaterializer()
 
-  val box = Box(1, "Test Box", "abc123", "testbox.com", BoxSendMethod.PUSH, online = true)
-  val transaction: OutgoingTransaction = OutgoingTransaction(1, box.id, box.name, 0, 1, 1000, 1000, TransactionStatus.WAITING)
+  val profile = AnonymizationProfile(Seq(ConfidentialityOption.BASIC_PROFILE))
+  val box = Box(1, "Test Box", "abc123", "testbox.com", BoxSendMethod.PUSH, profile, online = true)
+  val transaction: OutgoingTransaction = OutgoingTransaction(1, box.id, box.name, profile, 0, 1, 1000, 1000, TransactionStatus.WAITING)
   val storage = new RuntimeStorage()
 
   override def afterAll(): Unit = {
@@ -40,7 +42,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
     val transactionImage = OutgoingTransactionImage(transaction, OutgoingImage(4, transaction.id, 1004, 4, sent = false))
     val pushActorRef: TestActorRef[BoxPushActor] = TestActorRef[BoxPushActor](
       Props(new BoxPushActor(box, storage, 200.milliseconds, 200, 8, "../BoxService", "../MetaService", "../AnonService") {
-        override protected def anonymizedDicomData(imageId: Long, tagValues: scala.collection.Seq[TagValue], storage: StorageService)(implicit ec: ExecutionContext): Source[ByteString, NotUsed] = Source.single(data)
+        override protected def anonymizedDicomData(imageId: Long, profile: AnonymizationProfile, tagValues: scala.collection.Seq[TagValue], storage: StorageService)(implicit ec: ExecutionContext): Source[ByteString, NotUsed] = Source.single(data)
       }), name = "PushBox")
     val pushActor: BoxPushActor = pushActorRef.underlyingActor
 
@@ -59,7 +61,7 @@ class BoxPushActorTest(_system: ActorSystem) extends TestKit(_system) with Impli
     var finalized = false
     val pushActorRef = system.actorOf(Props(
       new BoxPushActor(box, storage, 200.milliseconds, n, 8, "../BoxService", "../MetaService", "../AnonService") {
-        override protected def anonymizedDicomData(imageId: Long, tagValues: scala.collection.Seq[TagValue], storage: StorageService)(implicit ec: ExecutionContext): Source[ByteString, NotUsed] =
+        override protected def anonymizedDicomData(imageId: Long, profile: AnonymizationProfile, tagValues: scala.collection.Seq[TagValue], storage: StorageService)(implicit ec: ExecutionContext): Source[ByteString, NotUsed] =
           Source.single(ByteString(1, 2, 3, 4))
         override def poll(n: Int): Future[Seq[OutgoingTransactionImage]] =
           if (firstBatch) {

@@ -37,9 +37,9 @@ import se.nimsa.dicom.streams.ElementFlows._
 import se.nimsa.dicom.streams.ElementSink.elementSink
 import se.nimsa.dicom.streams.ModifyFlow._
 import se.nimsa.dicom.streams.{DicomStreamException, ParseFlow}
+import se.nimsa.sbx.anonymization.AnonymizationProfile
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.anonymization.AnonymizationUtil.createUid
-import se.nimsa.sbx.anonymization.{AnonymizationProfile, ConfidentialityOption}
 import se.nimsa.sbx.app.GeneralProtocol.{Source, SourceType}
 import se.nimsa.sbx.dicom.Contexts.Context
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
@@ -77,9 +77,9 @@ trait DicomStreamOps {
     * @param customAnonValues forced values of attributes as pairs of tag number and string value encoded in UTF-8 (ASCII) format
     * @return a `Source` of anonymized DICOM byte chunks
     */
-  protected def anonymizedDicomData(imageId: Long, customAnonValues: Seq[TagValue], storage: StorageService)(implicit ec: ExecutionContext): StreamSource[ByteString, NotUsed] = {
+  protected def anonymizedDicomData(imageId: Long, profile: AnonymizationProfile, customAnonValues: Seq[TagValue], storage: StorageService)(implicit ec: ExecutionContext): StreamSource[ByteString, NotUsed] = {
     val source = storage.dataSource(imageId, None)
-    anonymizedDicomDataSource(source, anonymizationKeyInsert(imageId), customAnonValues)
+    anonymizedDicomDataSource(source, anonymizationKeyInsert(imageId), profile, customAnonValues)
   }
 
   /**
@@ -121,7 +121,7 @@ trait DicomStreamOps {
     * @param storage          the storage backend (file, runtime, S3 etc)
     * @return the anonymized metadata stored in the system
     */
-  protected def anonymizeData(imageId: Long, customAnonValues: Seq[TagValue], storage: StorageService)
+  protected def anonymizeData(imageId: Long, profile: AnonymizationProfile, customAnonValues: Seq[TagValue], storage: StorageService)
                              (implicit materializer: Materializer, ec: ExecutionContext): Future[Option[MetaDataAdded]] =
     callMetaDataService[Option[Image]](GetImage(imageId)).flatMap { imageMaybe =>
       imageMaybe.map { image =>
@@ -130,7 +130,7 @@ trait DicomStreamOps {
             val forcedSource = storage
               .dataSource(imageId, None)
               .via(blacklistFilter(Set(TagTree.fromTag(Tag.PatientIdentityRemoved), TagTree.fromTag(Tag.DeidentificationMethod))))
-            val anonymizedSource = anonymizedDicomDataSource(forcedSource, anonymizationKeyInsert(imageId), customAnonValues)
+            val anonymizedSource = anonymizedDicomDataSource(forcedSource, anonymizationKeyInsert(imageId), profile, customAnonValues)
             storeDicomData(anonymizedSource, seriesSource.source, storage, Contexts.extendedContexts, reverseAnonymization = false).flatMap { metaDataAdded =>
               callMetaDataService[MetaDataDeleted](DeleteMetaData(Seq(imageId))).map { _ =>
                 storage.deleteFromStorage(Seq(imageId))
@@ -432,13 +432,10 @@ trait DicomStreamOps {
 
   private[streams] def anonymizedDicomDataSource(storageSource: StreamSource[DicomPart, NotUsed],
                                                  anonymizationKeyInsert: Set[AnonymizationKeyValueData] => Future[AnonymizationKeyOpResult],
+                                                 profile: AnonymizationProfile,
                                                  customAnonValues: Seq[TagValue])(implicit ec: ExecutionContext): StreamSource[ByteString, NotUsed] = {
 
-    def anonFlow: Flow[DicomPart, DicomPart, NotUsed] = new AnonymizationFlow(
-      AnonymizationProfile(Seq(
-        ConfidentialityOption.BASIC_PROFILE,
-        ConfidentialityOption.RETAIN_LONGITUDINAL_TEMPORAL_INFORMATION
-      ))).anonFlow
+    def anonFlow: Flow[DicomPart, DicomPart, NotUsed] = new AnonymizationFlow(profile).anonFlow
 
     val uidInsertion: Option[ByteString] => ByteString = {
       case Some(value) if value.nonEmpty => value

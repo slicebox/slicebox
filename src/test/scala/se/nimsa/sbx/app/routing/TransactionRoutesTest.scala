@@ -9,6 +9,7 @@ import akka.http.scaladsl.server._
 import akka.util.ByteString
 import org.scalatest.{FlatSpecLike, Matchers}
 import se.nimsa.dicom.data.TagPath
+import se.nimsa.sbx.anonymization.{AnonymizationProfile, ConfidentialityOption}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
@@ -23,16 +24,18 @@ class TransactionRoutesTest extends {
   val storage = new RuntimeStorage
 } with FlatSpecLike with Matchers with RoutesTestBase {
 
+  val profile = AnonymizationProfile(Seq(ConfidentialityOption.BASIC_PROFILE))
+
   override def afterEach(): Unit = await(boxDao.clear())
 
   def addPollBox(name: String): Box =
-    PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData(name)) ~> routes ~> check {
+    PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData(name, profile)) ~> routes ~> check {
       status should be(Created)
       responseAs[Box]
     }
 
   def addPushBox(name: String): Box =
-    PostAsAdmin("/api/boxes/connect", RemoteBox(name, "http://some.url/api/transactions/" + UUID.randomUUID())) ~> routes ~> check {
+    PostAsAdmin("/api/boxes/connect", RemoteBox(name, "http://some.url/api/transactions/" + UUID.randomUUID(), profile)) ~> routes ~> check {
       status should be(Created)
       val box = responseAs[Box]
       box.sendMethod should be(BoxSendMethod.PUSH)
@@ -44,7 +47,7 @@ class TransactionRoutesTest extends {
 
     // first, add a box on the poll (university) side
     val uniBox =
-      PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData("hosp")) ~> routes ~> check {
+      PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData("hosp", profile)) ~> routes ~> check {
         status should be(Created)
         responseAs[Box]
       }
@@ -65,7 +68,7 @@ class TransactionRoutesTest extends {
 
     // first, add a box on the poll (university) side
     val uniBox =
-      PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData("hosp")) ~> routes ~> check {
+      PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData("hosp", profile)) ~> routes ~> check {
         responseAs[Box]
       }
 
@@ -103,7 +106,7 @@ class TransactionRoutesTest extends {
     val uniBox = addPollBox("hosp3")
 
     // send image which adds outgoing transaction
-    PostAsUser(s"/api/boxes/${uniBox.id}/send", Seq(ImageTagValues(1, Seq.empty))) ~> routes ~> check {
+    PostAsUser(s"/api/boxes/${uniBox.id}/send",  BulkAnonymizationData(profile, Seq(ImageTagValues(1, Seq.empty)))) ~> routes ~> check {
       status should be(NoContent)
     }
 
@@ -111,13 +114,14 @@ class TransactionRoutesTest extends {
     Get(s"/api/transactions/${uniBox.token}/outgoing/poll") ~> routes ~> check {
       status should be(OK)
 
-      val transactionImage = responseAs[OutgoingTransactionImage]
+      val transactionImages = responseAs[Seq[OutgoingTransactionImage]]
 
-      transactionImage.transaction.boxId should be(uniBox.id)
-      transactionImage.transaction.id should not be 0
-      transactionImage.transaction.sentImageCount shouldBe 0
-      transactionImage.transaction.totalImageCount should be(1)
-      transactionImage.transaction.status shouldBe TransactionStatus.WAITING
+      transactionImages should have size 1
+      transactionImages.head.transaction.boxId should be(uniBox.id)
+      transactionImages.head.transaction.id should not be 0
+      transactionImages.head.transaction.sentImageCount shouldBe 0
+      transactionImages.head.transaction.totalImageCount should be(1)
+      transactionImages.head.transaction.status shouldBe TransactionStatus.WAITING
     }
   }
 
@@ -129,19 +133,19 @@ class TransactionRoutesTest extends {
     val uniBox = addPollBox("hosp4")
 
     // send image which adds outgoing transaction
-    PostAsUser(s"/api/boxes/${uniBox.id}/send", Seq(ImageTagValues(1, Seq.empty))) ~> routes ~> check {
+    PostAsUser(s"/api/boxes/${uniBox.id}/send",  BulkAnonymizationData(profile, Seq(ImageTagValues(1, Seq.empty)))) ~> routes ~> check {
       status should be(NoContent)
     }
 
     // poll outgoing
-    val transactionImage =
+    val transactionImages =
       Get(s"/api/transactions/${uniBox.token}/outgoing/poll") ~> routes ~> check {
         status should be(OK)
-        responseAs[OutgoingTransactionImage]
+        responseAs[Seq[OutgoingTransactionImage]]
       }
 
     // get image
-    Get(s"/api/transactions/${uniBox.token}/outgoing?transactionid=${transactionImage.transaction.id}&imageid=${transactionImage.image.id}") ~> routes ~> check {
+    Get(s"/api/transactions/${uniBox.token}/outgoing?transactionid=${transactionImages.head.transaction.id}&imageid=${transactionImages.head.image.id}") ~> routes ~> check {
       status should be(OK)
 
       contentType should be(ContentTypes.`application/octet-stream`)
@@ -159,22 +163,22 @@ class TransactionRoutesTest extends {
     val uniBox = addPollBox("hosp5")
 
     // send image which adds outgoing transaction
-    PostAsUser(s"/api/boxes/${uniBox.id}/send", Seq(ImageTagValues(1, Seq.empty))) ~> routes ~> check {
+    PostAsUser(s"/api/boxes/${uniBox.id}/send",  BulkAnonymizationData(profile, Seq(ImageTagValues(1, Seq.empty)))) ~> routes ~> check {
       status should be(NoContent)
     }
 
     // poll outgoing
-    val transactionImage =
+    val transactionImages =
       Get(s"/api/transactions/${uniBox.token}/outgoing/poll") ~> routes ~> check {
         status should be(OK)
-        responseAs[OutgoingTransactionImage]
+        responseAs[Seq[OutgoingTransactionImage]]
       }
 
     // check that outgoing image is not marked as sent at this stage
-    transactionImage.image.sent shouldBe false
+    transactionImages.head.image.sent shouldBe false
 
     // send done
-    Post(s"/api/transactions/${uniBox.token}/outgoing/done", transactionImage) ~> routes ~> check {
+    Post(s"/api/transactions/${uniBox.token}/outgoing/done", transactionImages.head) ~> routes ~> check {
       status should be(NoContent)
     }
 
@@ -185,7 +189,7 @@ class TransactionRoutesTest extends {
 
     await(boxDao.listOutgoingImages).head.sent shouldBe true
 
-    GetAsUser(s"/api/boxes/outgoing/${transactionImage.transaction.id}/images") ~> routes ~> check {
+    GetAsUser(s"/api/boxes/outgoing/${transactionImages.head.transaction.id}/images") ~> routes ~> check {
       status shouldBe OK
       responseAs[List[Image]] should have length 1
     }
@@ -202,19 +206,19 @@ class TransactionRoutesTest extends {
     val uniBox = addPollBox("hosp5")
 
     // send image which adds outgoing transaction
-    PostAsUser(s"/api/boxes/${uniBox.id}/send", Seq(ImageTagValues(1, Seq.empty))) ~> routes ~> check {
+    PostAsUser(s"/api/boxes/${uniBox.id}/send",  BulkAnonymizationData(profile, Seq(ImageTagValues(1, Seq.empty)))) ~> routes ~> check {
       status should be(NoContent)
     }
 
     // poll outgoing
-    val transactionImage =
+    val transactionImages =
       Get(s"/api/transactions/${uniBox.token}/outgoing/poll") ~> routes ~> check {
         status should be(OK)
-        responseAs[OutgoingTransactionImage]
+        responseAs[Seq[OutgoingTransactionImage]]
       }
 
     // send failed
-    Post(s"/api/transactions/${uniBox.token}/outgoing/failed", FailedOutgoingTransactionImage(transactionImage, "error message")) ~> routes ~> check {
+    Post(s"/api/transactions/${uniBox.token}/outgoing/failed", FailedOutgoingTransactionImage(transactionImages.head, "error message")) ~> routes ~> check {
       status should be(NoContent)
     }
 
@@ -299,20 +303,20 @@ class TransactionRoutesTest extends {
       TagValue(TagPath.fromTag(PatientBirthDate.dicomTag), "19601010")))
 
     // send image which adds outgoing transaction
-    PostAsUser(s"/api/boxes/${uniBox.id}/send", Seq(imageTagValues)) ~> routes ~> check {
+    PostAsUser(s"/api/boxes/${uniBox.id}/send",  BulkAnonymizationData(profile, Seq(imageTagValues))) ~> routes ~> check {
       status should be(NoContent)
     }
 
     // poll outgoing
-    val transactionImage =
+    val transactionImages =
       Get(s"/api/transactions/${uniBox.token}/outgoing/poll") ~> routes ~> check {
         status should be(OK)
-        responseAs[OutgoingTransactionImage]
+        responseAs[Seq[OutgoingTransactionImage]]
       }
 
     // get image
-    val transactionId = transactionImage.transaction.id
-    val imageId = transactionImage.image.id
+    val transactionId = transactionImages.head.transaction.id
+    val imageId = transactionImages.head.image.id
     val compressedArray = Get(s"/api/transactions/${uniBox.token}/outgoing?transactionid=$transactionId&imageid=$imageId") ~> routes ~> check {
       status should be(OK)
       responseAs[ByteString]
@@ -324,7 +328,7 @@ class TransactionRoutesTest extends {
     elements.getString(PatientSex.dicomTag) shouldBe empty // not mapped
 
     // send done
-    Post(s"/api/transactions/${uniBox.token}/outgoing/done", transactionImage) ~> routes ~> check {
+    Post(s"/api/transactions/${uniBox.token}/outgoing/done", transactionImages.head) ~> routes ~> check {
       status should be(NoContent)
     }
   }

@@ -5,6 +5,7 @@ import java.util.UUID
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server._
 import org.scalatest.{FlatSpecLike, Matchers}
+import se.nimsa.sbx.anonymization.{AnonymizationProfile, ConfidentialityOption}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.dicom.DicomHierarchy.Image
@@ -19,7 +20,9 @@ class BoxRoutesTest extends {
   val storage = new RuntimeStorage
 } with FlatSpecLike with Matchers with RoutesTestBase {
 
-  override def afterEach() =
+  val profile = AnonymizationProfile(Seq(ConfidentialityOption.BASIC_PROFILE))
+
+  override def afterEach(): Unit =
     await(Future.sequence(Seq(
       metaDataDao.clear(),
       seriesTypeDao.clear(),
@@ -27,8 +30,8 @@ class BoxRoutesTest extends {
       boxDao.clear()
     )))
 
-  def addPollBox(name: String) =
-    PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData(name)) ~> routes ~> check {
+  def addPollBox(name: String): Box =
+    PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData(name, profile)) ~> routes ~> check {
       status should be(Created)
       val response = responseAs[Box]
       response
@@ -37,7 +40,7 @@ class BoxRoutesTest extends {
   def addPushBox(name: String): Unit = addPushBox(name, "http://some.url/api/box/" + UUID.randomUUID())
 
   def addPushBox(name: String, url: String): Unit =
-    PostAsAdmin("/api/boxes/connect", RemoteBox(name, url)) ~> routes ~> check {
+    PostAsAdmin("/api/boxes/connect", RemoteBox(name, url, profile)) ~> routes ~> check {
       status should be(Created)
       val box = responseAs[Box]
       box.sendMethod should be(BoxSendMethod.PUSH)
@@ -58,7 +61,7 @@ class BoxRoutesTest extends {
 
   it should "return 201 Created when adding two poll boxes with the same name" in {
     addPollBox("hosp")
-    PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData("hosp")) ~> Route.seal(routes) ~> check {
+    PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData("hosp", profile)) ~> Route.seal(routes) ~> check {
       status shouldBe Created
     }
     GetAsUser("/api/boxes") ~> routes ~> check {
@@ -68,7 +71,7 @@ class BoxRoutesTest extends {
 
   it should "return 400 bad request message when adding two boxes, one push and one poll, with the same name" in {
     addPushBox("mybox")
-    PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData("mybox")) ~> Route.seal(routes) ~> check {
+    PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData("mybox", profile)) ~> Route.seal(routes) ~> check {
       status should be(BadRequest)
     }
   }
@@ -88,7 +91,7 @@ class BoxRoutesTest extends {
 
   it should "return 400 bad request when adding two push boxes with the same name different urls" in {
     addPushBox("mybox")
-    PostAsAdmin("/api/boxes/connect", RemoteBox("mybox", "http://some.url/api/box/" + UUID.randomUUID())) ~> routes ~> check {
+    PostAsAdmin("/api/boxes/connect", RemoteBox("mybox", "http://some.url/api/box/" + UUID.randomUUID(), profile)) ~> routes ~> check {
       status shouldBe BadRequest
     }
   }
@@ -103,10 +106,10 @@ class BoxRoutesTest extends {
   }
 
   it should "return a bad request message when asked to add a remote box with a malformed base url" in {
-    PostAsAdmin("/api/boxes/connect", RemoteBox("uni2", "")) ~> Route.seal(routes) ~> check {
+    PostAsAdmin("/api/boxes/connect", RemoteBox("uni2", "", profile)) ~> Route.seal(routes) ~> check {
       status should be(BadRequest)
     }
-    PostAsAdmin("/api/boxes/connect", RemoteBox("uni2", "malformed/url")) ~> Route.seal(routes) ~> check {
+    PostAsAdmin("/api/boxes/connect", RemoteBox("uni2", "malformed/url", profile)) ~> Route.seal(routes) ~> check {
       status should be(BadRequest)
     }
   }
@@ -131,20 +134,20 @@ class BoxRoutesTest extends {
 
   it should "return a no content message when asked to send images" in {
     val box1 = addPollBox("hosp")
-    PostAsAdmin(s"/api/boxes/${box1.id}/send", Seq(ImageTagValues(1, Seq.empty))) ~> routes ~> check {
+    PostAsAdmin(s"/api/boxes/${box1.id}/send", BulkAnonymizationData(profile, Seq(ImageTagValues(1, Seq.empty)))) ~> routes ~> check {
       status should be(NoContent)
     }
   }
 
   it should "return a no content message when asked to send images with empty images list" in {
     val box1 = addPollBox("hosp")
-    PostAsAdmin(s"/api/boxes/${box1.id}/send", Seq.empty[ImageTagValues]) ~> routes ~> check {
+    PostAsAdmin(s"/api/boxes/${box1.id}/send", BulkAnonymizationData(profile, Seq.empty[ImageTagValues])) ~> routes ~> check {
       status should be(NoContent)
     }
   }
 
   it should "return a not found message when asked to send images with unknown box id" in {
-    PostAsAdmin("/api/boxes/999/send", Seq(ImageTagValues(1, Seq.empty))) ~> Route.seal(routes) ~> check {
+    PostAsAdmin("/api/boxes/999/send",  BulkAnonymizationData(profile, Seq(ImageTagValues(1, Seq.empty)))) ~> Route.seal(routes) ~> check {
       status should be(NotFound)
     }
   }
@@ -168,7 +171,7 @@ class BoxRoutesTest extends {
 
   it should "return a non-empty result when listing outgoing entries" in {
     val box1 = addPollBox("hosp")
-    PostAsAdmin(s"/api/boxes/${box1.id}/send", Seq(ImageTagValues(1, Seq.empty))) ~> routes ~> check {
+    PostAsAdmin(s"/api/boxes/${box1.id}/send",  BulkAnonymizationData(profile, Seq(ImageTagValues(1, Seq.empty)))) ~> routes ~> check {
       status should be(NoContent)
     }
     GetAsUser("/api/boxes/outgoing") ~> routes ~> check {
@@ -199,7 +202,7 @@ class BoxRoutesTest extends {
   }
 
   it should "support removing outgoing entries" in {
-    val entry = await(boxDao.insertOutgoingTransaction(OutgoingTransaction(1, 1, "some box", 0, 1, 1000, 1000, TransactionStatus.WAITING)))
+    val entry = await(boxDao.insertOutgoingTransaction(OutgoingTransaction(1, 1, "some box", profile, 0, 1, 1000, 1000, TransactionStatus.WAITING)))
     await(boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, 1, 1, sent = false)))
 
     DeleteAsUser(s"/api/boxes/outgoing/${entry.id}") ~> routes ~> check {
@@ -247,7 +250,7 @@ class BoxRoutesTest extends {
   it should "support listing images corresponding to an outgoing entry" in {
     val entry = {
       val (_, (_, _), (_, _, _, _), (dbImage1, dbImage2, _, _, _, _, _, _)) = await(TestUtil.insertMetaData(metaDataDao))
-      val entry = await(boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, 1, "some box", 3, 4, System.currentTimeMillis(), System.currentTimeMillis(), TransactionStatus.WAITING)))
+      val entry = await(boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, 1, "some box", profile, 3, 4, System.currentTimeMillis(), System.currentTimeMillis(), TransactionStatus.WAITING)))
       await(boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, dbImage1.id, 1, sent = false)))
       await(boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, dbImage2.id, 2, sent = false)))
       entry
@@ -262,7 +265,7 @@ class BoxRoutesTest extends {
   it should "only list images corresponding to an outgoing entry that exists" in {
     val entry = {
       val (_, (_, _), (_, _, _, _), (dbImage1, dbImage2, _, _, _, _, _, _)) = await(TestUtil.insertMetaData(metaDataDao))
-      val entry = await(boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, 1, "some box", 3, 4, System.currentTimeMillis(), System.currentTimeMillis(), TransactionStatus.WAITING)))
+      val entry = await(boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, 1, "some box", profile, 3, 4, System.currentTimeMillis(), System.currentTimeMillis(), TransactionStatus.WAITING)))
       await(boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, dbImage1.id, 1, sent = false)))
       await(boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, dbImage2.id, 2, sent = false)))
       await(boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, 666, 3, sent = false)))
@@ -309,7 +312,7 @@ class BoxRoutesTest extends {
         responseAs[Image]
       }
 
-    val entry = await(boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, 1, "some box", 3, 4, System.currentTimeMillis(), System.currentTimeMillis(), TransactionStatus.WAITING)))
+    val entry = await(boxDao.insertOutgoingTransaction(OutgoingTransaction(-1, 1, "some box", profile, 3, 4, System.currentTimeMillis(), System.currentTimeMillis(), TransactionStatus.WAITING)))
     val imageTransaction = await(boxDao.insertOutgoingImage(OutgoingImage(-1, entry.id, image.id, 1, sent = false)))
 
     GetAsUser(s"/api/boxes/outgoing/${entry.id}/images") ~> routes ~> check {
