@@ -30,7 +30,7 @@ angular.module('slicebox.adminSeriesTypes', ['ngRoute'])
 
 	var timer = $interval(function() {
         $http.get('/api/seriestypes/rules/updatestatus').then(function (response) {
-            $scope.uiState.updateIsRunning = response.data !== "idle";
+            $scope.uiState.updateIsRunning = response.data.running;
         });
     }, 3000);
 

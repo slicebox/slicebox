@@ -72,12 +72,8 @@ trait SeriesTypeRoutes {
         }
       } ~ pathPrefix("rules") {
         path("updatestatus") {
-          onSuccess(seriesTypeService.ask(GetUpdateSeriesTypesRunningStatus)) {
-            case UpdateSeriesTypesRunningStatus(running) =>
-              if (running)
-                complete("running")
-              else
-                complete("idle")
+          onSuccess(seriesTypeService.ask(GetUpdateSeriesTypesRunningStatus).mapTo[UpdateSeriesTypesRunningStatus]) { status =>
+            complete(status)
           }
         } ~ pathEndOrSingleSlash {
           get {

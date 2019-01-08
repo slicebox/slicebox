@@ -30,8 +30,6 @@ object AnonymizationProtocol {
 
   case class TagValue(tagPath: TagPathTag, value: String)
 
-  case class TagValues(tagValues: Seq[TagValue])
-
   case class ImageTagValues(imageId: Long, tagValues: Seq[TagValue])
 
   case class AnonymizationData(profile: AnonymizationProfile, tagValues: Seq[TagValue])

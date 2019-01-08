@@ -22,7 +22,7 @@ import play.api.libs.json._
 import se.nimsa.dicom.data.TagPath._
 import se.nimsa.dicom.data.TagTree._
 import se.nimsa.dicom.data.{Dictionary, Multiplicity, TagPath, TagTree}
-import se.nimsa.sbx.anonymization.AnonymizationProtocol.{BulkAnonymizationData, TagValues, _}
+import se.nimsa.sbx.anonymization.AnonymizationProtocol.{BulkAnonymizationData, _}
 import se.nimsa.sbx.anonymization.{AnonymizationProfile, ConfidentialityOption}
 import se.nimsa.sbx.app.GeneralProtocol._
 import se.nimsa.sbx.box.BoxProtocol._
@@ -234,7 +234,6 @@ trait JsonFormats {
   implicit val incomingEntryFormat: Format[IncomingTransaction] = Json.format[IncomingTransaction]
 
   implicit val tagValueFormat: Format[TagValue] = Json.format[TagValue]
-  implicit val tagValuesFormat: Format[TagValues] = Json.format[TagValues]
   implicit val imageTagValueFormat: Format[ImageTagValues] = Json.format[ImageTagValues]
   implicit val anonymizationDataFormat: Format[AnonymizationData] = Json.format[AnonymizationData]
   implicit val bulkAnonymizationDataFormat: Format[BulkAnonymizationData] = Json.format[BulkAnonymizationData]
@@ -345,4 +344,5 @@ trait JsonFormats {
 
   implicit val dicomMultiplicityFormat: Format[Multiplicity] = Json.format[Multiplicity]
 
+  implicit val updateSeriesTypesRunningStatusFormat: Format[UpdateSeriesTypesRunningStatus] = Json.format[UpdateSeriesTypesRunningStatus]
 }
