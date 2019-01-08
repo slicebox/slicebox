@@ -16,6 +16,8 @@
 
 package se.nimsa.sbx.box
 
+import se.nimsa.dicom.data.TagPath.TagPathTag
+import se.nimsa.sbx.anonymization.{AnonymizationProfile, ConfidentialityOption}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.{ImageTagValues, TagValue}
 import se.nimsa.sbx.box.BoxProtocol.BoxSendMethod._
 import se.nimsa.sbx.box.BoxProtocol.TransactionStatus._
@@ -38,15 +40,22 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
   implicit val sendMethodColumnType: BaseColumnType[BoxSendMethod] =
     MappedColumnType.base[BoxSendMethod, String](bsm => bsm.toString, BoxSendMethod.withName)
 
+  implicit val defaultProfileColumnType: BaseColumnType[AnonymizationProfile] =
+    MappedColumnType.base[AnonymizationProfile, String](
+      p => p.options.map(_.name).mkString(","),
+      s => AnonymizationProfile(s.split(",").map(ConfidentialityOption.withName))
+    )
+
   class BoxTable(tag: Tag) extends Table[Box](tag, BoxTable.name) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def name = column[String]("name", O.Length(180))
     def token = column[String]("token")
     def baseUrl = column[String]("baseurl")
     def sendMethod = column[BoxSendMethod]("sendmethod")
+    def defaultProfile = column[AnonymizationProfile]("defaultprofile")
     def online = column[Boolean]("online")
     def idxUniqueName = index("idx_unique_box_name", name, unique = true)
-    def * = (id, name, token, baseUrl, sendMethod, online) <> (Box.tupled, Box.unapply)
+    def * = (id, name, token, baseUrl, sendMethod, defaultProfile, online) <> (Box.tupled, Box.unapply)
   }
 
   object BoxTable {
@@ -59,12 +68,14 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def boxId = column[Long]("boxid")
     def boxName = column[String]("boxname")
+    def profile = column[AnonymizationProfile]("profile")
     def sentImageCount = column[Long]("sentimagecount")
     def totalImageCount = column[Long]("totalimagecount")
     def created = column[Long]("created")
     def updated = column[Long]("updated")
     def status = column[TransactionStatus]("status")
-    def * = (id, boxId, boxName, sentImageCount, totalImageCount, created, updated, status) <> (OutgoingTransaction.tupled, OutgoingTransaction.unapply)
+    def idxBoxId = index("idx_box_id", boxId)
+    def * = (id, boxId, boxName, profile, sentImageCount, totalImageCount, created, updated, status) <> (OutgoingTransaction.tupled, OutgoingTransaction.unapply)
   }
 
   object OutgoingTransactionTable {
@@ -81,6 +92,7 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
     def sent = column[Boolean]("sent")
     def fkOutgoingTransaction = foreignKey("fk_outgoing_transaction_id", outgoingTransactionId, outgoingTransactionQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
     def idxUniqueTransactionAndNumber = index("idx_unique_outgoing_image", (outgoingTransactionId, sequenceNumber), unique = true)
+    def idxImageId = index("idx_outgoing_image_image_id", imageId)
     def * = (id, outgoingTransactionId, imageId, sequenceNumber, sent) <> (OutgoingImage.tupled, OutgoingImage.unapply)
   }
 
@@ -90,15 +102,15 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
 
   val outgoingImageQuery = TableQuery[OutgoingImageTable]
 
-  val toOutgoingTagValue: (Long, Long, Int, String) => OutgoingTagValue =
-    (id: Long, outgoingImageId: Long, tag: Int, value: String) => OutgoingTagValue(id, outgoingImageId, TagValue(tag, value))
-  val fromOutgoingTagValue: OutgoingTagValue => Option[(Long, Long, Int, String)] =
-    (tagValue: OutgoingTagValue) => Option((tagValue.id, tagValue.outgoingImageId, tagValue.tagValue.tag, tagValue.tagValue.value))
+  val toOutgoingTagValue: (Long, Long, String, String) => OutgoingTagValue =
+    (id: Long, outgoingImageId: Long, tagPath: String, value: String) => OutgoingTagValue(id, outgoingImageId, TagValue(TagPathTag.parse(tagPath), value))
+  val fromOutgoingTagValue: OutgoingTagValue => Option[(Long, Long, String, String)] =
+    (tagValue: OutgoingTagValue) => Option((tagValue.id, tagValue.outgoingImageId, tagValue.tagValue.tagPath.toString, tagValue.tagValue.value))
 
   class OutgoingTagValueTable(tag: Tag) extends Table[OutgoingTagValue](tag, OutgoingTagValueTable.name) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def outgoingImageId = column[Long]("outgoingimageid")
-    def dicomTag = column[Int]("tag")
+    def dicomTag = column[String]("tagPath")
     def value = column[String]("value")
     def fkOutgoingImage = foreignKey("fk_outgoing_image_id", outgoingImageId, outgoingImageQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
     def * = (id, outgoingImageId, dicomTag, value) <> (toOutgoingTagValue.tupled, fromOutgoingTagValue)
@@ -121,6 +133,7 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
     def created = column[Long]("created")
     def updated = column[Long]("updated")
     def status = column[TransactionStatus]("status")
+    def idxIncomingTransactionBoxId = index("idx_incoming_transaction_box_id", boxId)
     def * = (id, boxId, boxName, outgoingTransactionId, receivedImageCount, addedImageCount, totalImageCount, created, updated, status) <> (IncomingTransaction.tupled, IncomingTransaction.unapply)
   }
 
@@ -138,6 +151,7 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
     def overwrite = column[Boolean]("overwrite")
     def fkIncomingTransaction = foreignKey("fk_incoming_transaction_id", incomingTransactionId, incomingTransactionQuery)(_.id, onDelete = ForeignKeyAction.Cascade)
     def idxUniqueTransactionAndNumber = index("idx_unique_incoming_image", (incomingTransactionId, sequenceNumber), unique = true)
+    def idxIncomingTransactionId = index("idx_incoming_image_image_id", imageId)
     def * = (id, incomingTransactionId, imageId, sequenceNumber, overwrite) <> (IncomingImage.tupled, IncomingImage.unapply)
   }
 
@@ -282,8 +296,8 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
 
   def outgoingTransactionByTransactionId(boxId: Long, outgoingTransactionId: Long): Future[Option[OutgoingTransaction]] = db.run {
     outgoingTransactionQuery
-      .filter(_.boxId === boxId)
       .filter(_.id === outgoingTransactionId)
+      .filter(_.boxId === boxId)
       .result.headOption
   }
 
@@ -293,8 +307,8 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
       image <- outgoingImageQuery if transaction.id === image.outgoingTransactionId
     } yield (transaction, image)
     join
-      .filter(_._1.boxId === boxId)
       .filter(_._1.id === outgoingTransactionId)
+      .filter(_._1.boxId === boxId)
       .filter(_._2.id === outgoingImageId)
       .result.headOption
       .map(_.map(OutgoingTransactionImage.tupled))
@@ -509,9 +523,9 @@ class BoxDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionCont
     db.run(action.transactionally)
   }
 
-  def addImagesToOutgoing(boxId: Long, boxName: String, imageTagValuesSeq: Seq[ImageTagValues]): Future[OutgoingTransaction] = {
+  def addImagesToOutgoing(boxId: Long, boxName: String, profile: AnonymizationProfile, imageTagValuesSeq: Seq[ImageTagValues]): Future[OutgoingTransaction] = {
     val action =
-      insertOutgoingTransactionAction(OutgoingTransaction(-1, boxId, boxName, 0, imageTagValuesSeq.length, System.currentTimeMillis, System.currentTimeMillis, TransactionStatus.WAITING))
+      insertOutgoingTransactionAction(OutgoingTransaction(-1, boxId, boxName, profile, 0, imageTagValuesSeq.length, System.currentTimeMillis, System.currentTimeMillis, TransactionStatus.WAITING))
         .flatMap { outgoingTransaction =>
           DBIO.sequence {
             imageTagValuesSeq.zipWithIndex

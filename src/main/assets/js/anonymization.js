@@ -11,29 +11,21 @@ angular.module('slicebox.anonymization', ['ngRoute'])
   });
 })
 
-.controller('AnonymizationCtrl', function($scope, $http, openMessageModal, openDeleteEntitiesModalFunction, openTagSeriesModalFunction, sbxToast) {
+.controller('AnonymizationCtrl', function($scope, $http, openMessageModal, openDeleteEntitiesModalFunction, openTagSeriesModalFunction, sbxToast, sbxUtil) {
     // Initialization
     $scope.actions =
         [
             {
                 name: 'Delete',
                 action: openDeleteEntitiesModalFunction('/api/anonymization/keys/', 'anonymization key(s)')
-            },
-            {
-                name: 'Export',
-                action: $scope.exportToCsv
-            },
-            {
-                name: 'Tag Series',
-                action: openTagSeriesModalFunction('/api/anonymization/keys/')
-            }            
+            }
         ];
+
+    $scope.callbacks = {};
 
     if (!$scope.uiState.anonymizationTableState) {
         $scope.uiState.anonymizationTableState = {};
     }
-
-    $scope.callbacks = {};
 
     // Scope functions
     $scope.loadAnonymizationKeyPage = function(startIndex, count, orderByProperty, orderByDirection, filter) {
@@ -61,25 +53,43 @@ angular.module('slicebox.anonymization', ['ngRoute'])
         return loadPromise;
     };
 
-    $scope.exportToCsv = function(keys) {
-        var csv = 
-            "Id;Created;Patient Name;Patient ID;Anonymous Patient Name;Anonymous Patient ID;Patient Birth Date;" +
-            "Study Instance UID;Anonymous Study Instance UID;Study Description;Study ID;Accession Number;" + 
-            "Series Instance UID;Anonymous Series Instance UID;Series Description;Protocol Name;Frame Of Reference UID;Anonymous Frame Of Reference UID\n" +
-            keys.map(function (key) {
-                return key.id + ";" + key.created + ";" + key.patientName + ";" + key.patientID + ";" + key.anonPatientName + ";" + key.anonPatientID + ";" + key.patientBirthDate + ";" +
-                    key.studyInstanceUID + ";" + key.anonStudyInstanceUID + ";" + key.studyDescription + ";" + key.studyID + ";" + key.accessionNumber + ";" +
-                    key.seriesInstanceUID + ";" + key.anonSeriesInstanceUID + ";" + key.seriesDescription + ";" + key.protocolName + ";" + key.frameOfReferenceUID + ";" + key.anonFrameOfReferenceUID;
-            }).join("\n");
-        var anchor = "<a class='md-button md-primary' href='data:text/csv;charset=UTF-8," + encodeURIComponent(csv) + "' download='slicebox-anonymization-keys.csv'>Download CSV</a>";
-        var textBoxHeader = '<h4>...or copy these values to the clipboard:</h4>';
-        var textBox = "<md-content style='height: 200px;padding: 8px;'><pre>" + csv + "</pre></md-content>";
-        var body = anchor + textBoxHeader + textBox;
-        openMessageModal("Download or copy CSV", body);
+    $scope.keySelected = function(key) {
+        $scope.uiState.selectedKey = key;
+
+        if ($scope.callbacks.keyValuesTable) {
+            $scope.callbacks.keyValuesTable.reset();
+        }
     };
 
-    function capitalizeFirst(string) {
-        return string.charAt(0).toUpperCase() + string.substring(1);        
-    }
+    $scope.loadKeyValues = function(startIndex, count, orderByProperty, orderByDirection, filter) {
+        if ($scope.uiState.selectedKey === null) {
+            return [];
+        }
 
+        return $http.get('/api/anonymization/keys/' + $scope.uiState.selectedKey.id + '/keyvalues').then(function(data) {
+            if (filter) {
+                var filterLc = filter.toLowerCase();
+                data.data = data.data.filter(function (keyValue) {
+                    var tagPathCondition = sbxUtil.tagPathToString(keyValue.tagPath).toLowerCase().indexOf(filterLc) >= 0;
+                    var valueCondition = keyValue.value.toLowerCase().indexOf(filterLc) >= 0;
+                    var anonCondition = keyValue.anonymizedValue.toLowerCase().indexOf(filterLc) >= 0;
+                    return tagPathCondition || valueCondition || anonCondition;
+                });
+            }
+            if (orderByProperty) {
+                if (!orderByDirection) {
+                    orderByDirection = 'ASCENDING';
+                }
+                return data.data.sort(function compare(a,b) {
+                    return orderByDirection === 'ASCENDING' ?
+                        a[orderByProperty] < b[orderByProperty] ? -1 : a[orderByProperty] > b[orderByProperty] ? 1 : 0 :
+                        a[orderByProperty] > b[orderByProperty] ? -1 : a[orderByProperty] < b[orderByProperty] ? 1 : 0;
+                });
+            } else {
+                return data.data;
+            }
+        }, function(error) {
+            sbxToast.showErrorMessage('Failed to load key values for anonymization key: ' + error);
+        });
+    };
 });

@@ -332,7 +332,7 @@ class ImageRoutesTest extends {
     testData.getString(Tag.RescaleSlope) shouldBe empty
 
     testData
-      .getNested(TagPath.fromSequence(Tag.EnergyWindowInformationSequence, 1).thenSequence(Tag.EnergyWindowRangeSequence, 2))
+      .getNested(TagPath.fromItem(Tag.EnergyWindowInformationSequence, 1).thenItem(Tag.EnergyWindowRangeSequence, 2))
       .get
       .getString(Tag.EnergyWindowUpperLimit)
       .get shouldBe "147"
@@ -363,8 +363,8 @@ class ImageRoutesTest extends {
       TagMapping(TagPath
         .fromTag(Tag.RescaleSlope), "2.5"), // insert new attribute
       TagMapping(TagPath
-        .fromSequence(Tag.EnergyWindowInformationSequence)
-        .thenSequence(Tag.EnergyWindowRangeSequence, 2)
+        .fromItem(Tag.EnergyWindowInformationSequence, 1)
+        .thenItem(Tag.EnergyWindowRangeSequence, 2)
         .thenTag(Tag.EnergyWindowUpperLimit), "999") // modify item in sequence
     )
 
@@ -391,7 +391,7 @@ class ImageRoutesTest extends {
     modifiedData.getDouble(Tag.RescaleSlope).get shouldBe 2.5
 
     modifiedData
-      .getNested(TagPath.fromSequence(Tag.EnergyWindowInformationSequence, 1).thenSequence(Tag.EnergyWindowRangeSequence, 2))
+      .getNested(TagPath.fromItem(Tag.EnergyWindowInformationSequence, 1).thenItem(Tag.EnergyWindowRangeSequence, 2))
       .get
       .getString(Tag.EnergyWindowUpperLimit)
       .get shouldBe "999"

@@ -46,14 +46,14 @@ angular.module('slicebox.adminForwarding', ['ngRoute'])
     // Scope functions
 
     $scope.loadSources = function() {
-        return $http.get("/api/sources").success(function (sources) {
-            $scope.uiState.sources = sources;
+        return $http.get("/api/sources").then(function (response) {
+            $scope.uiState.sources = response.data;
         });
     };
 
     $scope.loadDestinations = function() {
-        return $http.get("/api/destinations").success(function (destinations) {
-            $scope.uiState.destinations = destinations;
+        return $http.get("/api/destinations").then(function (response) {
+            $scope.uiState.destinations = response.data;
         });
     };
 

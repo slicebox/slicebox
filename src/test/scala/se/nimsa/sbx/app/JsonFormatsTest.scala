@@ -2,13 +2,15 @@ package se.nimsa.sbx.app
 
 import org.scalatest.{FlatSpec, Matchers}
 import play.api.libs.json.Json
-import se.nimsa.dicom.data.{Tag, TagPath}
-import se.nimsa.dicom.data.TagPath.{TagPathSequenceAny, TagPathSequenceItem, TagPathTag}
+import se.nimsa.dicom.data.TagPath.TagPathTag
+import se.nimsa.dicom.data.TagTree.{TagTreeAnyItem, TagTreeItem, TagTreeTag}
+import se.nimsa.dicom.data.{Tag, TagPath, TagTree}
+import se.nimsa.sbx.anonymization.{AnonymizationProfile, ConfidentialityOption}
 
 class JsonFormatsTest extends FlatSpec with Matchers with JsonFormats {
 
   "JSON formatting of a tag path" should "be valid" in {
-    val tagPath = TagPath.fromSequence(Tag.PatientName, 1).thenSequence(Tag.PatientName).thenTag(Tag.PatientID)
+    val tagPath = TagPath.fromItem(Tag.PatientName, 1).thenItem(Tag.PatientName, 2).thenTag(Tag.PatientID)
 
     Json.prettyPrint(Json.toJson(tagPath)) shouldBe
       """{
@@ -17,7 +19,7 @@ class JsonFormatsTest extends FlatSpec with Matchers with JsonFormats {
         |  "previous" : {
         |    "tag" : 1048592,
         |    "name" : "PatientName",
-        |    "item" : "*",
+        |    "item" : "2",
         |    "previous" : {
         |      "tag" : 1048592,
         |      "name" : "PatientName",
@@ -27,41 +29,14 @@ class JsonFormatsTest extends FlatSpec with Matchers with JsonFormats {
         |}""".stripMargin
   }
 
-  it should "work also for paths ending with a sequence" in {
-    val tagPath = TagPath.fromSequence(4).thenSequence(5, 6)
-    Json.prettyPrint(Json.toJson(tagPath)) shouldBe
-      """{
-        |  "tag" : 5,
-        |  "name" : "",
-        |  "item" : "6",
-        |  "previous" : {
-        |    "tag" : 4,
-        |    "name" : "",
-        |    "item" : "*"
-        |  }
-        |}""".stripMargin
-  }
-
   "JSON parsing of a tag path" should "work for tag paths pointing to a tag" in {
-    val tagPath = TagPath.fromSequence(1, 1).thenSequence(2).thenTag(3)
+    val tagPath = TagPath.fromItem(1, 1).thenItem(2, 2).thenTag(3)
 
     Json.fromJson[TagPathTag](Json.toJson(tagPath)).get shouldBe tagPath
   }
 
-  it should "work for tag paths pointing to a sequence" in {
-    val tagPath = TagPath.fromSequence(1, 1).thenSequence(2, 1)
-
-    Json.fromJson[TagPathSequenceItem](Json.toJson(tagPath)).get shouldBe tagPath
-  }
-
-  it should "work for tag paths pointing to all items in a sequence" in {
-    val tagPath = TagPath.fromSequence(1, 1).thenSequence(2)
-
-    Json.fromJson[TagPathSequenceAny](Json.toJson(tagPath)).get shouldBe tagPath
-  }
-
   it should "work for general tag paths" in {
-    val tagPath = TagPath.fromSequence(1, 1).thenSequence(2).thenTag(3)
+    val tagPath = TagPath.fromItem(1, 1).thenItem(2, 2).thenTag(3)
 
     Json.fromJson[TagPath](Json.toJson(tagPath)).map { tp =>
       tp shouldBe tagPath
@@ -78,10 +53,10 @@ class JsonFormatsTest extends FlatSpec with Matchers with JsonFormats {
         |  "previous" : {
         |    "tag" : 561685,
         |    "name" : "DerivationCodeSequence",
-        |    "item" : "*"
+        |    "item" : "1"
         |  }
         |}""".stripMargin))
-      .get shouldBe TagPath.fromSequence(Tag.DerivationCodeSequence).thenSequence(Tag.PatientID, 6)
+      .get shouldBe TagPath.fromItem(Tag.DerivationCodeSequence, 1).thenItem(Tag.PatientID, 6)
   }
 
   it should "support keywords instead of tag numbers" in {
@@ -91,10 +66,10 @@ class JsonFormatsTest extends FlatSpec with Matchers with JsonFormats {
         |  "item" : "6",
         |  "previous" : {
         |    "name" : "DerivationCodeSequence",
-        |    "item" : "*"
+        |    "item" : "1"
         |  }
         |}""".stripMargin))
-      .get shouldBe TagPath.fromSequence(Tag.DerivationCodeSequence).thenSequence(Tag.PatientID, 6)
+      .get shouldBe TagPath.fromItem(Tag.DerivationCodeSequence, 1).thenItem(Tag.PatientID, 6)
   }
 
   it should "throw error for unknown keyword and tag is not specified" in {
@@ -112,5 +87,138 @@ class JsonFormatsTest extends FlatSpec with Matchers with JsonFormats {
         |  "name" : "NotAKeyword"
         |}""".stripMargin))
       .isError shouldBe false
+  }
+
+  "JSON formatting of a tag tree" should "be valid" in {
+    val tagTree = TagTree.fromItem(Tag.PatientName, 1).thenAnyItem(Tag.PatientName).thenTag(Tag.PatientID)
+
+    Json.prettyPrint(Json.toJson(tagTree)) shouldBe
+      """{
+        |  "tag" : 1048608,
+        |  "name" : "PatientID",
+        |  "previous" : {
+        |    "tag" : 1048592,
+        |    "name" : "PatientName",
+        |    "item" : "*",
+        |    "previous" : {
+        |      "tag" : 1048592,
+        |      "name" : "PatientName",
+        |      "item" : "1"
+        |    }
+        |  }
+        |}""".stripMargin
+  }
+
+  it should "work also for paths ending with a sequence" in {
+    val tagTree = TagTree.fromAnyItem(4).thenItem(5, 6)
+    Json.prettyPrint(Json.toJson(tagTree)) shouldBe
+      """{
+        |  "tag" : 5,
+        |  "name" : "",
+        |  "item" : "6",
+        |  "previous" : {
+        |    "tag" : 4,
+        |    "name" : "",
+        |    "item" : "*"
+        |  }
+        |}""".stripMargin
+  }
+
+  "JSON parsing of a tag tree" should "work for tag trees pointing to a tag" in {
+    val tagTree = TagTree.fromItem(1, 1).thenAnyItem(2).thenTag(3)
+
+    Json.fromJson[TagTreeTag](Json.toJson(tagTree)).get shouldBe tagTree
+  }
+
+  it should "work for tag trees pointing to a sequence" in {
+    val tagTree = TagTree.fromItem(1, 1).thenItem(2, 1)
+
+    Json.fromJson[TagTreeItem](Json.toJson(tagTree)).get shouldBe tagTree
+  }
+
+  it should "work for tag trees pointing to all items in a sequence" in {
+    val tagTree = TagTree.fromItem(1, 1).thenAnyItem(2)
+
+    Json.fromJson[TagTreeAnyItem](Json.toJson(tagTree)).get shouldBe tagTree
+  }
+
+  it should "work for general tag trees" in {
+    val tagTree = TagTree.fromItem(1, 1).thenAnyItem(2).thenTag(3)
+
+    Json.fromJson[TagTree](Json.toJson(tagTree)).map { tp =>
+      tp shouldBe tagTree
+      tp shouldBe a[TagTreeTag]
+    }
+  }
+
+  it should "support missing keywords" in {
+    Json.fromJson[TagTree](Json.parse(
+      """{
+        |  "tag" : 1048608,
+        |  "name" : "PatientID",
+        |  "item" : "6",
+        |  "previous" : {
+        |    "tag" : 561685,
+        |    "name" : "DerivationCodeSequence",
+        |    "item" : "*"
+        |  }
+        |}""".stripMargin))
+      .get shouldBe TagTree.fromAnyItem(Tag.DerivationCodeSequence).thenItem(Tag.PatientID, 6)
+  }
+
+  it should "support keywords instead of tag numbers" in {
+    Json.fromJson[TagTree](Json.parse(
+      """{
+        |  "name" : "PatientID",
+        |  "item" : "6",
+        |  "previous" : {
+        |    "name" : "DerivationCodeSequence",
+        |    "item" : "*"
+        |  }
+        |}""".stripMargin))
+      .get shouldBe TagTree.fromAnyItem(Tag.DerivationCodeSequence).thenItem(Tag.PatientID, 6)
+  }
+
+  it should "throw error for unknown keyword and tag is not specified" in {
+    Json.fromJson[TagTreeTag](Json.parse(
+      """{
+        |  "name" : "NotAKeyword"
+        |}""".stripMargin))
+      .isError shouldBe true
+  }
+
+  it should "not throw error for unknown keyword when tag is specified" in {
+    Json.fromJson[TagTreeTag](Json.parse(
+      """{
+        |  "tag" : 1048608,
+        |  "name" : "NotAKeyword"
+        |}""".stripMargin))
+      .isError shouldBe false
+  }
+
+  "Formatting an anonymization profile" should "be valid" in {
+    val profile = AnonymizationProfile(Seq(ConfidentialityOption.BASIC_PROFILE, ConfidentialityOption.RETAIN_LONGITUDINAL_TEMPORAL_INFORMATION))
+
+    Json.prettyPrint(Json.toJson(profile)) shouldBe
+      """{
+        |  "options" : [ {
+        |    "name" : "BASIC_PROFILE",
+        |    "title" : "Basic Profile",
+        |    "description" : "Basic Profile",
+        |    "rank" : 10
+        |  }, {
+        |    "name" : "RETAIN_LONGITUDINAL_TEMPORAL_INFORMATION",
+        |    "title" : "Retain Temporal Info",
+        |    "description" : "Retain Longitudinal Temporal Information",
+        |    "rank" : 70
+        |  } ]
+        |}""".stripMargin
+  }
+
+  "Parsing an anonymization profile" should "work" in {
+    val profile = AnonymizationProfile(Seq(ConfidentialityOption.BASIC_PROFILE, ConfidentialityOption.RETAIN_LONGITUDINAL_TEMPORAL_INFORMATION))
+
+    Json.fromJson[AnonymizationProfile](Json.toJson(profile)).get shouldBe profile
+
   }
 }

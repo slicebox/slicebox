@@ -81,7 +81,8 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageServic
               val token = UUID.randomUUID().toString
               val baseUrl = s"$apiBaseURL/transactions/$token"
               val name = remoteBoxConnectionData.name
-              boxDao.insertBox(Box(-1, name, token, baseUrl, BoxSendMethod.POLL, online = false))
+              val defaultProfile = remoteBoxConnectionData.defaultProfile
+              boxDao.insertBox(Box(-1, name, token, baseUrl, BoxSendMethod.POLL, defaultProfile, online = false))
           }.map(RemoteBoxAdded).pipeSequentiallyTo(sender)
 
         case Connect(remoteBox) =>
@@ -91,7 +92,7 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageServic
             case Some(existingBox) => Future.successful(existingBox)
             case None =>
               val token = baseUrlToToken(remoteBox.baseUrl)
-              boxDao.insertBox(Box(-1, remoteBox.name, token, remoteBox.baseUrl, BoxSendMethod.PUSH, online = false))
+              boxDao.insertBox(Box(-1, remoteBox.name, token, remoteBox.baseUrl, BoxSendMethod.PUSH, remoteBox.defaultProfile, online = false))
           }.map { box =>
             maybeStartPushActor(box)
             maybeStartPollActor(box)
@@ -136,10 +137,10 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageServic
 
           futureOutgoingTransactionImages.pipeTo(sender)
 
-        case SendToRemoteBox(box, imageTagValuesSeq) =>
-          SbxLog.info("Box", s"Sending ${imageTagValuesSeq.length} images to box ${box.name}")
-          boxDao.addImagesToOutgoing(box.id, box.name, imageTagValuesSeq)
-            .map(_ => ImagesAddedToOutgoing(box.id, imageTagValuesSeq.map(_.imageId)))
+        case SendToRemoteBox(box, bulkAnonymizationData) =>
+          SbxLog.info("Box", s"Sending ${bulkAnonymizationData.imageTagValuesSet.length} images to box ${box.name}")
+          boxDao.addImagesToOutgoing(box.id, box.name, bulkAnonymizationData.completeProfile, bulkAnonymizationData.imageTagValuesSet)
+            .map(_ => ImagesAddedToOutgoing(box.id, bulkAnonymizationData.imageTagValuesSet.map(_.imageId)))
             .pipeSequentiallyTo(sender)
 
         case GetOutgoingTransactionImage(box, outgoingTransactionId, outgoingImageId) =>
@@ -174,7 +175,10 @@ class BoxServiceActor(boxDao: BoxDAO, apiBaseURL: String, storage: StorageServic
             .pipeSequentiallyTo(sender)
 
         case GetIncomingTransactionStatus(box, transactionId) =>
-          boxDao.incomingTransactionByOutgoingTransactionId(box.id, transactionId).map(_.map(_.status)).pipeTo(sender)
+          boxDao
+            .incomingTransactionByOutgoingTransactionId(box.id, transactionId)
+            .map(_.map(_.status))
+            .pipeTo(sender)
 
         case GetIncomingTransactions(startIndex, count) =>
           boxDao.listIncomingTransactions(startIndex, count).map(IncomingTransactions).pipeTo(sender)

@@ -1,11 +1,13 @@
 package se.nimsa.sbx.box
 
 import akka.actor.ActorSystem
-import akka.http.scaladsl.Http
+import akka.http.scaladsl.{Http, HttpExt}
+import akka.http.scaladsl.marshalling.Marshal
 import akka.http.scaladsl.model._
 import akka.stream._
 import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, MergePreferred, RunnableGraph, Sink}
-import se.nimsa.sbx.box.BoxProtocol.{Box, OutgoingTransaction, OutgoingTransactionImage, TransactionStatus}
+import de.heikoseeberger.akkahttpplayjson.PlayJsonSupport
+import se.nimsa.sbx.box.BoxProtocol._
 import se.nimsa.sbx.log.SbxLog
 
 import scala.collection.immutable.Seq
@@ -15,7 +17,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.matching.Regex
 import scala.util.{Failure, Success, Try}
 
-trait BoxStreamOps {
+trait BoxStreamOps extends BoxJsonFormats with PlayJsonSupport {
 
   import BoxStreamOps._
 
@@ -29,7 +31,7 @@ trait BoxStreamOps {
   implicit val materializer: Materializer
   implicit val ec: ExecutionContext
 
-  lazy val http = Http(system)
+  lazy val http: HttpExt = Http(system)
 
   def pollAndTransfer[Mat](transferBatch: () => Future[Seq[OutgoingTransactionImage]]): RunnableGraph[KillSwitch] = {
     RunnableGraph.fromGraph(GraphDSL.create(KillSwitches.single[Tick]) {
@@ -82,9 +84,9 @@ trait BoxStreamOps {
             }
 
           ticker ~> merge.in(0)
-                    merge           ~> switch ~> batchFlow   ~> bcast
-                    merge.preferred <~ onlineAndTransferring <~ bcast
-                                                                bcast ~> failedBatchPath ~> Sink.ignore
+          merge ~> switch ~> batchFlow ~> bcast
+          merge.preferred <~ onlineAndTransferring <~ bcast
+          bcast ~> failedBatchPath ~> Sink.ignore
 
           ClosedShape
     })
@@ -127,7 +129,9 @@ trait BoxStreamOps {
   }
 
   def setRemoteOutgoingTransactionStatus(transaction: OutgoingTransaction, status: TransactionStatus): Future[Unit] =
-    singleRequest(HttpRequest(method = HttpMethods.PUT, uri = s"${box.baseUrl}/status?transactionid=${transaction.id}", entity = HttpEntity(s""""${status.toString}"""").withContentType(ContentTypes.`application/json`)))
+    Marshal(BoxTransactionStatus(status))
+      .to[RequestEntity]
+      .flatMap(entity => singleRequest(HttpRequest(method = HttpMethods.PUT, uri = s"${box.baseUrl}/status?transactionid=${transaction.id}", entity = entity)))
       .recover { case _: Exception => SbxLog.warn("Box", s"Unable to set remote status of transaction ${transaction.id} to $status.") }
       .map(_ => Unit)
 
@@ -150,7 +154,7 @@ object BoxStreamOps {
   val indexInTransaction: () => OutgoingTransactionImage => List[(OutgoingTransactionImage, Long)] = () => {
     val indices = mutable.Map.empty[Long, Long]
 
-    (transactionImage: OutgoingTransactionImage) => {
+    transactionImage => {
       val key = transactionImage.transaction.id
       val index = indices.getOrElse(key, transactionImage.transaction.sentImageCount) + 1
       indices(key) = index

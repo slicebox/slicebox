@@ -16,7 +16,8 @@
 
 package se.nimsa.sbx.box
 
-import se.nimsa.sbx.anonymization.AnonymizationProtocol.{ImageTagValues, TagValue}
+import se.nimsa.sbx.anonymization.AnonymizationProfile
+import se.nimsa.sbx.anonymization.AnonymizationProtocol.{BulkAnonymizationData, TagValue}
 import se.nimsa.sbx.model.Entity
 
 object BoxProtocol {
@@ -81,13 +82,13 @@ object BoxProtocol {
 
   class RemoteTransactionFailedException() extends RuntimeException("Remote transaction reported failure")
 
-  case class RemoteBox(name: String, baseUrl: String)
+  case class RemoteBox(name: String, baseUrl: String, defaultProfile: AnonymizationProfile)
 
-  case class RemoteBoxConnectionData(name: String)
+  case class RemoteBoxConnectionData(name: String, defaultProfile: AnonymizationProfile)
 
-  case class Box(id: Long, name: String, token: String, baseUrl: String, sendMethod: BoxSendMethod, online: Boolean) extends Entity
+  case class Box(id: Long, name: String, token: String, baseUrl: String, sendMethod: BoxSendMethod, defaultProfile: AnonymizationProfile, online: Boolean) extends Entity
 
-  case class OutgoingTransaction(id: Long, boxId: Long, boxName: String, sentImageCount: Long, totalImageCount: Long, created: Long, updated: Long, status: TransactionStatus) extends Entity
+  case class OutgoingTransaction(id: Long, boxId: Long, boxName: String, profile: AnonymizationProfile, sentImageCount: Long, totalImageCount: Long, created: Long, updated: Long, status: TransactionStatus) extends Entity
 
   case class OutgoingImage(id: Long, outgoingTransactionId: Long, imageId: Long, sequenceNumber: Long, sent: Boolean) extends Entity
 
@@ -114,6 +115,8 @@ object BoxProtocol {
 
   case class FailedOutgoingTransactionImage(transactionImage: OutgoingTransactionImage, message: String)
 
+  case class BoxTransactionStatus(status: TransactionStatus)
+
 
   sealed trait BoxRequest
 
@@ -135,7 +138,7 @@ object BoxProtocol {
 
   case class UpdateOutgoingTransaction(transactionImage: OutgoingTransactionImage, sentImageCount: Long) extends BoxRequest
 
-  case class SendToRemoteBox(box: Box, imageTagValuesSeq: Seq[ImageTagValues]) extends BoxRequest
+  case class SendToRemoteBox(box: Box, bulkAnonymizationData: BulkAnonymizationData) extends BoxRequest
 
   case class GetOutgoingTransactionImage(box: Box, outgoingTransactionId: Long, imageId: Long) extends BoxRequest
 

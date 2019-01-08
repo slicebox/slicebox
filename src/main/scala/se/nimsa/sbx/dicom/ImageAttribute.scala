@@ -16,19 +16,12 @@
 
 package se.nimsa.sbx.dicom
 
-import se.nimsa.dicom.data.TagPath.TagPathTag
+import se.nimsa.dicom.data.TagPath
 
 case class ImageAttribute(
-  tag: Int,
-  group: Int,
-  element: Int,
-  name: String,
-  vr: String,
-  multiplicity: Int,
-  length: Long,
-  depth: Int,
-  tagPathTag: TagPathTag,
-  tagPath: List[Int],
+  tagPath: TagPath,
   namePath: List[String],
+  vr: String,
+  length: Long,
   values: List[String])
   

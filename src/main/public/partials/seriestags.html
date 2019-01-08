@@ -1,36 +1,34 @@
-<div layout="column" layout-margin>
+<div layout="row" layout-margin class="seriestags">
 
-    <div layout="row" layout-margin>
-        <div flex ng-controller="SeriesTagsCtrl">
-            <md-card>
-                <md-card-content>
-                    <h4 class="md-flex">Series Tags</h4>
-                    <md-content class="md-padding">
-                        <sbx-grid
-                                load-page="loadSeriesTagsPage(startIndex, count, orderByProperty, orderByDirection, filter)"
-                                page-size="25"
-                                page-sizes="[10, 25, 100, 1000]"
-                                filter="true"
-                                object-actions="actions"
-                                callbacks="callbacks.seriesTagsTable"
-                                refresh-button="true"
-                                empty-message="No series tags"
-                                grid-state="uiState.seriesTagsTableState">
+    <div layout="column" flex>
+        <md-card>
+            <md-card-content>
+                <h4 class="md-flex">Series Tags</h4>
+                <md-content class="md-padding">
+                    <sbx-grid
+                            load-page="loadSeriesTagsPage(startIndex, count, orderByProperty, orderByDirection, filter)"
+                            page-size="25"
+                            page-sizes="[10, 25, 100, 1000]"
+                            filter="true"
+                            object-actions="actions"
+                            callbacks="callbacks.seriesTagsTable"
+                            refresh-button="true"
+                            empty-message="No series tags"
+                            grid-state="uiState.seriesTagsTableState">
 
-                            <sbx-grid-column property="id" title="Id"></sbx-grid-column>
-                            <sbx-grid-column property="name" title="Name"></sbx-grid-column>
-                        </sbx-grid>
+                        <sbx-grid-column property="id" title="Id"></sbx-grid-column>
+                        <sbx-grid-column property="name" title="Name"></sbx-grid-column>
+                    </sbx-grid>
 
-                        <div layout="row" class="button-row">
-                            <md-button class="md-primary md-raised" ng-click="addSeriesTagButtonClicked()" ng-disabled="uiState.addSeriesTagInProgress">
-                                Add Series Tag
-                            </md-button>
-                            <div flex></div>
-                        </div>
-                    </md-content>
-                </md-card-content>
-            </md-card>
-        </div>
+                    <div layout="row" class="button-row">
+                        <md-button class="md-primary md-raised" ng-click="addSeriesTagButtonClicked()" ng-disabled="uiState.addSeriesTagInProgress">
+                            Add Series Tag
+                        </md-button>
+                        <div flex></div>
+                    </div>
+                </md-content>
+            </md-card-content>
+        </md-card>
     </div>
 
 </div>

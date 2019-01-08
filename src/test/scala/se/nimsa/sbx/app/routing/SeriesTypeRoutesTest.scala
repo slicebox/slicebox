@@ -229,9 +229,9 @@ class SeriesTypeRoutesTest extends {
     }
   }
 
-  it should "return 200 OK with the message 'idle' when asked about the current series type update status" in {
+  it should "return 200 OK and update status when asked about the current series type update status" in {
     GetAsUser("/api/seriestypes/rules/updatestatus") ~> routes ~> check {
-      responseAs[String] should be("idle")
+      responseAs[UpdateSeriesTypesRunningStatus] shouldBe UpdateSeriesTypesRunningStatus(false)
     }
   }
 

@@ -17,6 +17,7 @@
 package se.nimsa.sbx.box
 
 import play.api.libs.json._
+import se.nimsa.sbx.anonymization.{AnonymizationProfile, ConfidentialityOption}
 import se.nimsa.sbx.box.BoxProtocol._
 
 trait BoxJsonFormats {
@@ -26,7 +27,28 @@ trait BoxJsonFormats {
     case _ => JsError("Enumeration expected")
   }, Writes[A](a => JsString(a.toString)))
 
+  implicit val confidentialityOptionFormat: Format[ConfidentialityOption] = Format(Reads[ConfidentialityOption] {
+    case JsObject(o) => o.get("name").map(v => Json.fromJson[String](v))
+      .map(_.map(ConfidentialityOption.withName))
+      .getOrElse(JsError("Missing field \"options\""))
+    case _ => JsError("Json object expected")
+  }, Writes[ConfidentialityOption] {
+    op =>
+      Json.obj(
+        "name" -> op.name,
+        "title" -> op.title,
+        "description" -> op.description,
+        "rank" -> op.rank
+      )
+  })
+  implicit val anonymizationProfileFormat: Format[AnonymizationProfile] = Format(Reads[AnonymizationProfile] {
+    case JsObject(a) => a.get("options").map(v => Json.fromJson[Seq[ConfidentialityOption]](v))
+      .map(_.map(AnonymizationProfile.apply))
+      .getOrElse(JsError("Missing field \"options\""))
+    case _ => JsError("Json object expected")
+  }, Writes[AnonymizationProfile](a => JsObject(Map("options" -> Json.toJson(a.options)))))
   implicit val transactionStatusFormat: Format[TransactionStatus] = enumFormat(TransactionStatus.withName)
+  implicit val boxTransactionStatusFormat: Format[BoxTransactionStatus] = Json.format[BoxTransactionStatus]
   implicit val outgoingEntryFormat: Format[OutgoingTransaction] = Json.format[OutgoingTransaction]
   implicit val outgoingImageFormat: Format[OutgoingImage] = Json.format[OutgoingImage]
   implicit val outgoingEntryImageFormat: Format[OutgoingTransactionImage] = Json.format[OutgoingTransactionImage]

@@ -2,8 +2,12 @@
     <md-dialog-content>
         <md-subheader class="md-sticky-no-effect">{{title}}</md-subheader>
 
-        <div layout="column">
-            
+        <div layout="column" class="md-padding">
+
+            <div layout="row">
+                <anonymization-profile-form options="options"></anonymization-profile-form>
+            </div>
+
             <div layout="row" layout-align="space-around">
                 <md-input-container>
                     <label>Patient Name Prefix</label>

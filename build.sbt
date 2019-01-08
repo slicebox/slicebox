@@ -1,6 +1,7 @@
+import CreateSources._
 
 name := "slicebox"
-version := "1.7-SNAPSHOT"
+version := "2.0-SNAPSHOT"
 organization := "se.nimsa"
 scalaVersion := "2.12.7"
 scalacOptions := Seq("-encoding", "UTF-8", "-Xlint", "-deprecation", "-unchecked", "-feature", "-target:jvm-1.8")
@@ -75,7 +76,7 @@ updateOptions := updateOptions.value.withGigahorse(false) // temporary workaroun
 // deps
 
 libraryDependencies ++= {
-  val akkaVersion = "2.5.17"
+  val akkaVersion = "2.5.18"
   val akkaHttpVersion = "10.1.5"
   val slickVersion = "3.2.3"
   val dcm4cheVersion = "3.3.8"
@@ -104,9 +105,10 @@ libraryDependencies ++= {
     "org.webjars" % "angularjs" % "1.5.11",
     "org.webjars" % "angular-material" % "1.1.5",
     "org.webjars" % "angular-file-upload" % "11.0.0",
-    "se.nimsa" %% "dicom-streams" % "0.4",
+    "se.nimsa" %% "dicom-streams" % "0.7-SNAPSHOT",
     "com.lightbend.akka" %% "akka-stream-alpakka-s3" % alpakkaVersion,
-    "com.lightbend.akka" %% "akka-stream-alpakka-file" % alpakkaVersion
+    "com.lightbend.akka" %% "akka-stream-alpakka-file" % alpakkaVersion,
+    "com.lightbend.akka" %% "akka-stream-alpakka-csv" % alpakkaVersion
   )
 }
 
@@ -124,4 +126,17 @@ WebKeys.packagePrefix in Assets := "public/"
 (managedClasspath in Runtime) += (packageBin in Assets).value
 
 // docker base image
+
 dockerBaseImage := "openjdk:8-jre-alpine"
+
+// coverage
+
+coverageExcludedPackages := ".*\\.BuildInfo.*;.*\\.AnonymizationProfiles.*"
+
+// managed sources
+
+sourceGenerators in Compile += Def.task {
+  val tagFile = (sourceManaged in Compile).value / "sbt-anondata" / "AnonymizationProfiles.scala"
+  IO.write(tagFile, generate())
+  Seq(tagFile)
+}.taskValue

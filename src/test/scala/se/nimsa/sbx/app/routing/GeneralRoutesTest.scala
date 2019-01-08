@@ -11,6 +11,7 @@ import se.nimsa.sbx.app.GeneralProtocol._
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.Route
 import se.nimsa.dicom.data.{Multiplicity, Tag, VR}
+import se.nimsa.sbx.anonymization.{AnonymizationProfile, ConfidentialityOption}
 import se.nimsa.sbx.storage.RuntimeStorage
 
 class GeneralRoutesTest extends {
@@ -22,7 +23,7 @@ class GeneralRoutesTest extends {
     PostAsAdmin("/api/users", ClearTextUser("name", ADMINISTRATOR, "password")) ~> routes ~> check {
       status should be(Created)
     }
-    PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData("remote box")) ~> routes ~> check {
+    PostAsAdmin("/api/boxes/createconnection", RemoteBoxConnectionData("remote box", AnonymizationProfile(Seq(ConfidentialityOption.BASIC_PROFILE)))) ~> routes ~> check {
       status should be(Created)
     }
     PostAsAdmin("/api/scps", ScpData(-1, "my scp", "MYAETITLE", 5002)) ~> routes ~> check {

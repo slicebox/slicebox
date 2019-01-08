@@ -1,6 +1,6 @@
 package se.nimsa.sbx.filtering
 
-import se.nimsa.dicom.data.TagPath
+import se.nimsa.dicom.data.TagTree
 import se.nimsa.sbx.app.GeneralProtocol.{SourceRef, SourceType}
 
 object FilteringProtocol {
@@ -18,12 +18,12 @@ object FilteringProtocol {
     }
   }
 
-  case class TagFilterSpec(name: String, tagFilterType: TagFilterType, tagPaths: Seq[TagPath])
+  case class TagFilterSpec(name: String, tagFilterType: TagFilterType, tagPaths: Seq[TagTree])
 
   // DB row representations
 
   case class TagFilter(id: Long, name: String, tagFilterType: TagFilterType)
-  case class TagFilterTagPath(id: Long, tagFilterId: Long, tagPath: TagPath)
+  case class TagFilterTagPath(id: Long, tagFilterId: Long, tagPath: TagTree)
   case class SourceTagFilter(id: Long, sourceType: SourceType, sourceName: String, sourceId: Long, tagFilterId: Long, tagFilterName: String)
 
   // requests

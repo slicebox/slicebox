@@ -2,12 +2,13 @@ package se.nimsa.sbx.anonymization
 
 import akka.util.Timeout
 import org.scalatest.{AsyncFlatSpec, BeforeAndAfterEach, Matchers}
+import se.nimsa.dicom.data.{Tag, TagPath}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.metadata.MetaDataProtocol._
 import se.nimsa.sbx.util.FutureUtil.await
 import se.nimsa.sbx.util.TestUtil
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor}
 import scala.concurrent.duration.DurationInt
 
 class AnonymizationDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterEach {
@@ -16,45 +17,47 @@ class AnonymizationDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAft
   The ExecutionContext provided by ScalaTest only works inside tests, but here we have async stuff in beforeEach and
   afterEach so we must roll our own EC.
   */
-  lazy val ec = ExecutionContext.global
+  lazy val ec: ExecutionContextExecutor = ExecutionContext.global
 
   val dbConfig = TestUtil.createTestDb("anonymizationdaotest")
   val dao = new AnonymizationDAO(dbConfig)(ec)
 
-  implicit val timeout = Timeout(30.seconds)
+  implicit val timeout: Timeout = Timeout(30.seconds)
 
-  override def beforeEach() = await(dao.create())
+  override def beforeEach(): Unit = await(dao.create())
 
-  override def afterEach() = await(dao.drop())
+  override def afterEach(): Unit = await(dao.drop())
 
-  val key1 = AnonymizationKey(-1, 123456789, "pn1", "anonPn1", "pid1", "anonPid1", "pBD1", "stuid1", "anonStuid1", "", "", "", "", "", "", "", "", "")
-  val key2 = AnonymizationKey(-1, 123456789, "pn2", "anonPn2", "pid2", "anonPid2", "pBD2", "stuid2", "anonStuid2", "", "", "", "", "", "", "", "", "")
-  val key3 = AnonymizationKey(-1, 123456789, "pn3", "anonPn3", "pid3", "anonPid3", "pBD3", "stuid3", "anonStuid3", "", "", "", "", "", "", "", "", "")
+  val key1 = AnonymizationKey(-1, 123456789, 1, "pn1", "anonPn1", "pid1", "anonPid1", "stuid1", "anonStuid1", "seuid1", "anonSeuid1", "sopuid1", "anonSopuid1")
+  val key2 = AnonymizationKey(-1, 123456789, 2, "pn2", "anonPn2", "pid2", "anonPid2", "stuid2", "anonStuid2", "seuid2", "anonSeuid2", "sopuid2", "anonSopuid2")
+  val key3 = AnonymizationKey(-1, 123456789, 3, "pn3", "anonPn3", "pid3", "anonPid3", "stuid3", "anonStuid3", "seuid3", "anonSeuid3", "sopuid3", "anonSopuid3")
 
   "The anonymization db" should "be emtpy before anything has been added" in {
     for {
       keys <- dao.listAnonymizationKeys
-      images <- dao.listAnonymizationKeyImages
+      images <- dao.listAnonymizationKeyValues
     } yield {
       keys shouldBe empty
       images shouldBe empty
     }
   }
 
-  it should "cascade delete linked images when a key is deleted" in {
+  it should "cascade delete linked tag values when a key is deleted" in {
     for {
       key <- dao.insertAnonymizationKey(key1)
-      _ <- dao.insertAnonymizationKeyImage(AnonymizationKeyImage(-1, key.id, 55))
+      _ <- dao.insertAnonymizationKeyValues(Seq(
+        AnonymizationKeyValue(-1, key.id, TagPath.fromTag(Tag.PatientName), "pn1", "anonPn1"),
+        AnonymizationKeyValue(-1, key.id, TagPath.fromTag(Tag.PatientID), "pid1", "anonPid1")))
       k1 <- dao.listAnonymizationKeys
-      i1 <- dao.listAnonymizationKeyImages
-      _ <- dao.removeAnonymizationKey(key.id)
+      v1 <- dao.listAnonymizationKeyValues
+      _ <- dao.deleteAnonymizationKey(key.id)
       k2 <- dao.listAnonymizationKeys
-      i2 <- dao.listAnonymizationKeyImages
+      v2 <- dao.listAnonymizationKeyValues
     } yield {
       k1 should have length 1
-      i1 should have length 1
+      v1 should have length 2
       k2 shouldBe empty
-      i2 shouldBe empty
+      v2 shouldBe empty
     }
   }
 
@@ -113,74 +116,31 @@ class AnonymizationDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAft
     }
   }
 
-  it should "not remove empty anonymization keys when there are no associated images left and purging of empty keys is off" in {
-    val imageId = 55
-    for {
-      key <- dao.insertAnonymizationKey(key1)
-      _ <- dao.insertAnonymizationKeyImage(AnonymizationKeyImage(-1, key.id, imageId))
-
-      k1 <- dao.listAnonymizationKeys
-      k2 <- dao.listAnonymizationKeyImages
-
-      _ <- dao.removeAnonymizationKeyImagesForImageId(Seq(imageId), purgeEmptyAnonymizationKeys = false)
-
-      k3 <- dao.listAnonymizationKeys
-      k4 <- dao.listAnonymizationKeyImages
-    } yield {
-      k1 should have length 1
-      k2 should have length 1
-      k3 should have length 1
-      k4 shouldBe empty
-    }
-  }
-
-  it should "remove empty anonymization keys when there are no associated images left and purging of empty keys is on" in {
-    val imageId = 55
-    for {
-      key <- dao.insertAnonymizationKey(key1)
-      _ <- dao.insertAnonymizationKeyImage(AnonymizationKeyImage(-1, key.id, imageId))
-
-      k1 <- dao.listAnonymizationKeys
-      k2 <- dao.listAnonymizationKeyImages
-
-      _ <- dao.removeAnonymizationKeyImagesForImageId(Seq(imageId), purgeEmptyAnonymizationKeys = true)
-
-      k3 <- dao.listAnonymizationKeys
-      k4 <- dao.listAnonymizationKeyImages
-    } yield {
-      k1 should have length 1
-      k2 should have length 1
-      k3 shouldBe empty
-      k4 shouldBe empty
-    }
-  }
-
   it should "remove all empty anonymization keys containing a certain image id but not other empty or non-empty keys" in {
-    val imageId = 55
     for {
       dbKey1 <- dao.insertAnonymizationKey(key1)
       dbKey2 <- dao.insertAnonymizationKey(key2)
       dbKey3 <- dao.insertAnonymizationKey(key3)
 
-      _ <- dao.insertAnonymizationKeyImage(AnonymizationKeyImage(-1, dbKey1.id, imageId))
-
-      _ <- dao.insertAnonymizationKeyImage(AnonymizationKeyImage(-1, dbKey2.id, imageId))
-      _ <- dao.insertAnonymizationKeyImage(AnonymizationKeyImage(-1, dbKey2.id, imageId + 1))
+      _ <- dao.insertAnonymizationKeyValues(Seq(
+        AnonymizationKeyValue(-1, dbKey1.id, TagPath.fromTag(Tag.PatientName), "pn1" ,"anonPn1"),
+        AnonymizationKeyValue(-1, dbKey2.id, TagPath.fromTag(Tag.PatientName), "pn2" ,"anonPn2"),
+        AnonymizationKeyValue(-1, dbKey3.id, TagPath.fromTag(Tag.PatientName), "pn3" ,"anonPn3")))
 
       k1 <- dao.listAnonymizationKeys
-      k2 <- dao.listAnonymizationKeyImages
+      v1 <- dao.listAnonymizationKeyValues
 
-      _ <- dao.removeAnonymizationKeyImagesForImageId(Seq(imageId), purgeEmptyAnonymizationKeys = true)
+      _ <- dao.deleteAnonymizationKeysForImageIds(Seq(2,3))
 
       pk <- dao.anonymizationKeyForId(dbKey1.id)
-      k3 <- dao.anonymizationKeyForId(dbKey2.id)
-      k4 <- dao.anonymizationKeyForId(dbKey3.id)
+      k2 <- dao.anonymizationKeyForId(dbKey2.id)
+      k3 <- dao.anonymizationKeyForId(dbKey3.id)
     } yield {
       k1 should have length 3
-      k2 should have length 3
-      pk shouldBe None // purged
-      k3 shouldBe Some(dbKey2) // not yet empty
-      k4 shouldBe Some(dbKey3) // empty but does not contain image id
+      v1 should have length 3
+      pk shouldBe Some(dbKey1)
+      k2 shouldBe None
+      k3 shouldBe None
     }
   }
 }

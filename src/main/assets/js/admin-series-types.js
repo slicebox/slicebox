@@ -29,8 +29,8 @@ angular.module('slicebox.adminSeriesTypes', ['ngRoute'])
 	};
 
 	var timer = $interval(function() {
-        $http.get('/api/seriestypes/rules/updatestatus').success(function (status) {
-            $scope.uiState.updateIsRunning = status !== "idle";
+        $http.get('/api/seriestypes/rules/updatestatus').then(function (response) {
+            $scope.uiState.updateIsRunning = response.data.running;
         });
     }, 3000);
 
@@ -196,10 +196,9 @@ angular.module('slicebox.adminSeriesTypes', ['ngRoute'])
 		}
 
 		$http.get('/api/seriestypes/rules?seriestypeid=' + $scope.uiState.selectedSeriesType.id)
-			.success(function(rules) {
-				handleLoadedRules(rules);
-			})
-			.error(function(error) {
+			.then(function(response) {
+				handleLoadedRules(response.data);
+			}, function(error) {
 				sbxToast.showErrorMessage('Failed to load rules: ' + error);
 			});
 	}
@@ -216,11 +215,10 @@ angular.module('slicebox.adminSeriesTypes', ['ngRoute'])
 
 	function loadRuleAttributes(rule) {
 		$http.get('/api/seriestypes/rules/' + rule.id + '/attributes')
-			.success(function(attributes) {
-				rule.attributes = attributes;
-				rule.originalAttributes = angular.copy(attributes);
-			})
-			.error(function(error) {
+			.then(function(response) {
+				rule.attributes = response.data;
+				rule.originalAttributes = angular.copy(response.data);
+			}, function(error) {
 				sbxToast.showErrorMessage('Failed to load rule attributes: ' + error);
 			});
 	}

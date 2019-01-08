@@ -98,21 +98,18 @@ angular.module('slicebox', [
         .primaryPalette('red');
 
     // Register filters
-    $filterProvider.register('hexvalue', function() {
-        return function(intValue, length) {
-            var returnValue = intValue;
+    $filterProvider.register('dicomTag', function() {
+        return function(tag) {
+            var returnValue = tag;
 
-            if (!length) {
-                length = 4;
-            }
+            if (angular.isDefined(tag) && angular.isNumber(tag) && tag !== 0) {
+                returnValue = tag.toString(16);
 
-            if (angular.isDefined(intValue) && angular.isNumber(intValue) && intValue !== 0) {
-                returnValue = intValue.toString(16);
-
-                while (returnValue.length < length) {
+                while (returnValue.length < 8) {
                     returnValue = '0' + returnValue;
                 }
 
+                returnValue = returnValue.slice(0, 4) + ',' + returnValue.slice(4);
                 returnValue = returnValue.toUpperCase();
             }
 

@@ -20,13 +20,58 @@ object DicomHierarchy {
   import DicomPropertyValue._
   import se.nimsa.sbx.model.Entity
 
+  sealed trait DicomHierarchyLevel {
+    def level: Int
+    def >(other: DicomHierarchyLevel): Boolean = level > other.level
+    def <(other: DicomHierarchyLevel): Boolean = level < other.level
+    override def toString: String = this match {
+      case DicomHierarchyLevel.PATIENT => "patient"
+      case DicomHierarchyLevel.STUDY => "study"
+      case DicomHierarchyLevel.SERIES => "series"
+      case DicomHierarchyLevel.IMAGE => "image"
+    }
+  }
+
+  object DicomHierarchyLevel {
+
+    case object PATIENT extends DicomHierarchyLevel {
+      override def level: Int = 1
+    }
+
+    case object STUDY extends DicomHierarchyLevel {
+      override def level: Int = 2
+    }
+
+    case object SERIES extends DicomHierarchyLevel {
+      override def level: Int = 3
+    }
+
+    case object IMAGE extends DicomHierarchyLevel {
+      override def level: Int = 4
+    }
+
+    def withName(string: String): DicomHierarchyLevel = string.toLowerCase match {
+      case "patient" => PATIENT
+      case "study" => STUDY
+      case "series" => SERIES
+      case "image" => IMAGE
+    }
+
+    def withLevel(level: Int): DicomHierarchyLevel = level match {
+      case 1 => PATIENT
+      case 2 => STUDY
+      case 3 => SERIES
+      case 4 => IMAGE
+    }
+  }
+
   case class Patient(
       id: Long,
       patientName: PatientName,
       patientID: PatientID,
       patientBirthDate: PatientBirthDate,
       patientSex: PatientSex) extends Entity
-      
+
   case class Study(
       id: Long,
       patientId: Long,
@@ -36,7 +81,7 @@ object DicomHierarchy {
       studyID: StudyID,
       accessionNumber: AccessionNumber,
       patientAge: PatientAge) extends Entity
-      
+
   case class Series(
       id: Long,
       studyId: Long,
