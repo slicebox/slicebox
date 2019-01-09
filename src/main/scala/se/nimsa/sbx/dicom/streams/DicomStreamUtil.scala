@@ -18,7 +18,7 @@ package se.nimsa.sbx.dicom.streams
 
 import akka.NotUsed
 import akka.stream.FlowShape
-import akka.stream.scaladsl.{Flow, GraphDSL, Merge, Partition}
+import akka.stream.scaladsl.{Flow, GraphDSL, MergePreferred, Partition}
 import se.nimsa.dicom.data.DicomParts.{DicomPart, MetaPart}
 import se.nimsa.dicom.data._
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.{AnonymizationKeyOpResult, TagValue}
@@ -56,24 +56,24 @@ object DicomStreamUtil {
       import GraphDSL.Implicits._
 
       val decider = builder.add(Flow[DicomPart]
-        .statefulMapConcat {
+        .statefulMapConcat(() => {
           var route = 0
 
-          () => {
+          {
             case part if route == 0 && takeDetour.isDefinedAt(part) =>
               if (takeDetour(part))
                 route = 1
               (part, route) :: Nil
             case part => (part, route) :: Nil
           }
-        })
+        }))
       val partition = builder.add(Partition[(DicomPart, Int)](2, _._2))
       val mapper = Flow.fromFunction[(DicomPart, Int), DicomPart](_._1)
-      val merge = builder.add(Merge[DicomPart](2))
+      val merge = builder.add(MergePreferred[DicomPart](1))
 
       decider ~> partition
-      partition.out(0) ~> mapper ~> merge
-      partition.out(1) ~> mapper ~> detour ~> merge
+                 partition.out(0) ~> mapper           ~> merge.preferred
+                 partition.out(1) ~> mapper ~> detour ~> merge.in(0)
       FlowShape(decider.in, merge.out)
     })
 
