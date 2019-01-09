@@ -44,7 +44,7 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
   def toMaybeAnonSource(elements: Elements): Source[DicomPart, NotUsed] =
     toSource(elements)
       .via(collectFlow((encodingTags ++ anonymizationTags ++ anonKeysTags).map(TagPath.fromTag) ++ valueTags.map(_.tagPath), "anon"))
-      .via(conditionalFlow({ case p: ElementsPart if p.label == "anon" => !isAnonymous(p.elements) }, anonFlow, identityFlow))
+      .via(detourFlow({ case p: ElementsPart if p.label == "anon" => !isAnonymous(p.elements) }, anonFlow))
 
   def checkBasicAttributes(source: Source[DicomPart, NotUsed]): PartProbe =
     source.runWith(TestSink.probe[DicomPart])
@@ -209,16 +209,12 @@ class AnonymizationFlowTest extends TestKit(ActorSystem("AnonymizationFlowSpec")
       .expectDicomComplete()
   }
 
-  it should "anonymize if PatientIdentityRemoved=YES but ElementsPart is missing" in {
+  it should "not anonymize if ElementsPart is missing" in {
     val elements = Elements.empty()
-      .setString(Tag.PatientID, "12345678")
-      .setString(Tag.PatientIdentityRemoved, "YES")
     val source = toSource(elements)
-      .via(conditionalFlow({ case p: ElementsPart => !isAnonymous(p.elements) }, anonFlow, identityFlow))
-      .via(DicomFlows.tagFilter(_ => false)(tagPath => tagPath.tag == Tag.PatientID))
+      .via(detourFlow({ case p: ElementsPart => !isAnonymous(p.elements) }, anonFlow))
 
     source.runWith(TestSink.probe[DicomPart])
-      .expectHeader(Tag.PatientID)
       .expectDicomComplete()
   }
 

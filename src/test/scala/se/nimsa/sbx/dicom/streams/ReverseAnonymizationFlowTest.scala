@@ -121,7 +121,7 @@ class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymiza
 
   "The conditional reverse anonymization flow" should "not perform reverse anonymization when stream is empty" in {
     val source = Source.empty
-      .via(conditionalFlow({ case p: ElementsPart => isAnonymous(p.elements) }, reverseAnonFlow, identityFlow))
+      .via(detourFlow({ case p: ElementsPart => isAnonymous(p.elements) }, reverseAnonFlow))
 
     source.runWith(TestSink.probe[DicomPart])
       .expectDicomComplete()
@@ -131,7 +131,7 @@ class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymiza
     val elements = createElements()
 
     val source = anonSource(elements)
-      .via(conditionalFlow({ case p: ElementsPart => isAnonymous(p.elements) }, reverseAnonFlow, identityFlow))
+      .via(detourFlow({ case p: ElementsPart => isAnonymous(p.elements) }, reverseAnonFlow))
       .via(ElementFlows.elementFlow)
       .mapConcat {
         case e: ValueElement if e.tag == Tag.PatientName => e :: Nil

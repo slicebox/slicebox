@@ -375,10 +375,7 @@ trait DicomStreamOps {
     }
 
   private[streams] def maybeDeflateFlow: Flow[DicomPart, DicomPart, NotUsed] =
-    conditionalFlow({ case p: ElementsPart => p.elements.getString(Tag.TransferSyntaxUID).isDefined && DicomParsing.isDeflated(p.elements.getString(Tag.TransferSyntaxUID).get) },
-      deflateDatasetFlow,
-      identityFlow,
-      routeADefault = false)
+    detourFlow({ case p: ElementsPart => p.elements.getString(Tag.TransferSyntaxUID).exists(DicomParsing.isDeflated) }, deflateDatasetFlow)
 
   private[streams] def createTempPath() = s"tmp-${java.util.UUID.randomUUID().toString}"
 
@@ -408,14 +405,12 @@ trait DicomStreamOps {
         val flow = builder.add {
           if (reverseAnonymization)
             baseFlow
-              .via(conditionalFlow({ case p: ElementsPart if p.label == label => isAnonymous(p.elements) },
+              .via(detourFlow({ case p: ElementsPart if p.label == label => isAnonymous(p.elements) },
                 groupLengthDiscardFilter
                   .via(toIndeterminateLengthSequences)
                   .via(toUtf8Flow)
                   .via(anonymizationKeyQueryFlow(anonymizationKeyQuery, label))
-                  .via(reverseAnonFlow),
-                identityFlow
-              ))
+                  .via(reverseAnonFlow)))
           else
             baseFlow
         }
@@ -447,7 +442,7 @@ trait DicomStreamOps {
 
     storageSource
       .via(collectFlow(tags, before)) // collect necessary info before anonymization
-      .via(conditionalFlow(
+      .via(detourFlow(
       { case p: ElementsPart if p.label == before => !isAnonymous(p.elements) },
       // data needs anonymization - this is the actual anonymization flow
       groupLengthDiscardFilter
@@ -464,10 +459,7 @@ trait DicomStreamOps {
         .via(collectFlow(tags, after)) // collect necessary info before anonymization
         .via(anonymizationKeyInsertFlow(anonymizationKeyInsert, customAnonValues, before, after))
         .via(harmonizeAnonFlow(customAnonValues))
-        .via(fmiGroupLengthFlow),
-      // data does not need anonymization - just pass through
-      identityFlow
-    ))
+        .via(fmiGroupLengthFlow)))
       .via(maybeDeflateFlow)
       .map(_.bytes)
   }

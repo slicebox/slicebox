@@ -18,7 +18,7 @@ package se.nimsa.sbx.dicom.streams
 
 import akka.NotUsed
 import akka.stream.FlowShape
-import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Merge}
+import akka.stream.scaladsl.{Flow, GraphDSL, Merge, Partition}
 import se.nimsa.dicom.data.DicomParts.{DicomPart, MetaPart}
 import se.nimsa.dicom.data._
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.{AnonymizationKeyOpResult, TagValue}
@@ -34,36 +34,47 @@ object DicomStreamUtil {
   def elementsContainTagValues(elements: Elements, tagValues: Seq[TagValue]): Boolean = tagValues
     .forall(tv => tv.value.isEmpty || elements.getString(tv.tagPath).forall(_ == tv.value))
 
-  def conditionalFlow(goA: PartialFunction[DicomPart, Boolean], flowA: Flow[DicomPart, DicomPart, _], flowB: Flow[DicomPart, DicomPart, _], routeADefault: Boolean = true): Flow[DicomPart, DicomPart, NotUsed] =
+  /**
+    * Branching flow where the flow is redirected to the detour flow at the first occurrence where the supplied partial
+    * function is truthy. The default flow is pass-through only (identity). Once the detour flow is taken, it will never
+    * revert back.
+    *
+    * Note that the resulting flow preserves the ordering of messages only because the default identity flow contains no
+    * async nor buffering elements. The detour flow may very well be async and/or buffering so it is only safe to switch
+    * to this flow, not from it. See:
+    * * https://discuss.lightbend.com/t/akka-stream-conditional-via-partition/970
+    * * https://stackoverflow.com/questions/33817241/conditionally-skip-flow-using-akka-streams
+    * * https://groups.google.com/forum/#!topic/akka-user/E0TcZlkPQz4
+    * for discussions on the difficulties of preserving order in branching flows.
+    *
+    * @param takeDetour partial function that when defined and truthy will trigger the detour
+    * @param detour     detour flow
+    * @return a flow
+    */
+  def detourFlow(takeDetour: PartialFunction[DicomPart, Boolean], detour: Flow[DicomPart, DicomPart, _]): Flow[DicomPart, DicomPart, NotUsed] =
     Flow.fromGraph(GraphDSL.create() { implicit builder =>
       import GraphDSL.Implicits._
 
-      var routeA = routeADefault // determines which path is taken in the graph
+      val decider = builder.add(Flow[DicomPart]
+        .statefulMapConcat {
+          var route = 0
 
-      // if any part indicates that alternate route should be taken, remember this
-      val gateFlow = builder.add {
-        identityFlow
-          .map { part =>
-            if (goA.isDefinedAt(part)) routeA = goA(part)
-            part
+          () => {
+            case part if route == 0 && takeDetour.isDefinedAt(part) =>
+              if (takeDetour(part))
+                route = 1
+              (part, route) :: Nil
+            case part => (part, route) :: Nil
           }
-      }
-
-      // split the flow
-      val bcast = builder.add(Broadcast[DicomPart](2))
-
-      // define gates for each path, only one path is used
-      val gateA = identityFlow.filter(_ => routeA)
-      val gateB = identityFlow.filterNot(_ => routeA)
-
-      // merge the two paths
+        })
+      val partition = builder.add(Partition[(DicomPart, Int)](2, _._2))
+      val mapper = Flow.fromFunction[(DicomPart, Int), DicomPart](_._1)
       val merge = builder.add(Merge[DicomPart](2))
 
-      // surround each flow by gates, remember that flows may produce items without input
-      gateFlow ~> bcast ~> gateA ~> flowA ~> gateA ~> merge
-      bcast ~> gateB ~> flowB ~> gateB ~> merge
-
-      FlowShape(gateFlow.in, merge.out)
+      decider ~> partition
+      partition.out(0) ~> mapper ~> merge
+      partition.out(1) ~> mapper ~> detour ~> merge
+      FlowShape(decider.in, merge.out)
     })
 
 }
