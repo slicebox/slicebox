@@ -120,6 +120,7 @@ trait ImportRoutes {
               complete((httpStatus, metaData.image))
             }
           case Failure(failure) =>
+            failure.printStackTrace()
             val status = failure match {
               case _: DicomStreamException => BadRequest
               case _ => InternalServerError

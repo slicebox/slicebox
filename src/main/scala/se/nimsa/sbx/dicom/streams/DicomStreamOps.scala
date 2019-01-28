@@ -107,7 +107,13 @@ trait DicomStreamOps {
               scheduleTask(30.seconds) {
                 storage.deleteByName(Seq(tempPath)) // delete temp file once file system has released handle
               }
-              if (!t.isInstanceOf[DicomStreamException]) throw new DicomStreamException(t.getMessage) else throw t
+
+              // The actual cause of failure, in the case of DICOM exceptions, may be hidden deep in the stack trace. Find the deepest such element. If not return the top one.
+              def linearize(t: Throwable): List[Throwable] = if (t.getCause == null || t == t.getCause) t :: Nil else t :: linearize(t.getCause)
+              throw linearize(t)
+                .filter(_.isInstanceOf[DicomStreamException])
+                .lastOption
+                .getOrElse(new DicomStreamException(t.getMessage))
           }
       }
   }
