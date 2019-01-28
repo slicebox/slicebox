@@ -36,7 +36,7 @@ object TestUtil {
 
   private def parseSink(withPixelData: Boolean)(implicit ec: ExecutionContext): Sink[ByteString, Future[Elements]] =
     Flow[ByteString]
-      .via(new ParseFlow(stopTag = if (withPixelData) None else Some(Tag.PixelData)))
+      .via(ParseFlow(stopTag = if (withPixelData) None else Some(Tag.PixelData)))
       .via(elementFlow)
       .toMat(elementSink)(Keep.right)
 

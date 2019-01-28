@@ -8,7 +8,7 @@ import akka.testkit.TestKit
 import org.scalatest.{AsyncFlatSpecLike, BeforeAndAfterAll, Matchers}
 import se.nimsa.dicom.data.DicomParts.DicomPart
 import se.nimsa.dicom.data.Elements.{Item, Sequence}
-import se.nimsa.dicom.data.{DicomParsing, Elements, Tag, TagPath}
+import se.nimsa.dicom.data.{Elements, Tag, TagPath, isFileMetaInformation}
 import se.nimsa.dicom.streams.DicomFlows
 import se.nimsa.dicom.streams.ElementFlows.elementFlow
 import se.nimsa.dicom.streams.ElementSink.elementSink
@@ -36,7 +36,7 @@ class HarmonizeAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymi
     val bytes = TestUtil.toBytes(elements)
     Source.single(bytes)
       .via(storage.parseFlow(None))
-      .via(DicomFlows.tagFilter(_ => false)(tagPath => !DicomParsing.isFileMetaInformation(tagPath.tag)))
+      .via(DicomFlows.tagFilter(_ => false)(tagPath => !isFileMetaInformation(tagPath.tag)))
   }
 
   def anonKeyPart(key: AnonymizationKey) = AnonymizationKeyOpResultPart(AnonymizationKeyOpResult(DicomHierarchyLevel.IMAGE, Some(key), Seq(

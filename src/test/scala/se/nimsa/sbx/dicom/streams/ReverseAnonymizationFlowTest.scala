@@ -46,7 +46,7 @@ class ReverseAnonymizationFlowTest extends TestKit(ActorSystem("ReverseAnonymiza
   def elementsSource(elements: Elements): Source[DicomPart, NotUsed] =
     Source.single(elements.toBytes())
       .via(storage.parseFlow(None))
-      .via(DicomFlows.tagFilter(_ => false)(tagPath => !DicomParsing.isFileMetaInformation(tagPath.tag)))
+      .via(DicomFlows.tagFilter(_ => false)(tagPath => !isFileMetaInformation(tagPath.tag)))
 
   def anonKeyResultPart(elements: Elements, matchLevel: DicomHierarchyLevel): AnonymizationKeyOpResultPart = {
     val key = createAnonymizationKey(elements)

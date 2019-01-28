@@ -56,7 +56,7 @@ trait StorageService extends LazyLogging {
     *
     * @param stopTag optional stop tag (exclusive)
     */
-  def parseFlow(stopTag: Option[Int]) = new ParseFlow(streamChunkSize, stopTag)
+  def parseFlow(stopTag: Option[Int]) = ParseFlow(streamChunkSize, stopTag)
 
   /**
     * Source for dicom data

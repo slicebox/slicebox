@@ -33,10 +33,10 @@ import se.nimsa.dicom.data.TagPath.TagPathTag
 import se.nimsa.dicom.data.{PatientName => _, _}
 import se.nimsa.dicom.streams.CollectFlow._
 import se.nimsa.dicom.streams.DicomFlows._
+import se.nimsa.dicom.streams.DicomStreamException
 import se.nimsa.dicom.streams.ElementFlows._
 import se.nimsa.dicom.streams.ElementSink.elementSink
 import se.nimsa.dicom.streams.ModifyFlow._
-import se.nimsa.dicom.streams.{DicomStreamException, ParseFlow}
 import se.nimsa.sbx.anonymization.AnonymizationProfile
 import se.nimsa.sbx.anonymization.AnonymizationProtocol._
 import se.nimsa.sbx.anonymization.AnonymizationUtil.createUid
@@ -374,13 +374,10 @@ trait DicomStreamOps {
       metaDataAdded
     }
 
-  private[streams] def maybeDeflateFlow: Flow[DicomPart, DicomPart, NotUsed] =
-    detourFlow({ case p: ElementsPart => p.elements.getString(Tag.TransferSyntaxUID).exists(DicomParsing.isDeflated) }, deflateDatasetFlow)
-
   private[streams] def createTempPath() = s"tmp-${java.util.UUID.randomUUID().toString}"
 
   private[streams] def dicomDataSink(storageSink: Sink[ByteString, Future[Done]],
-                                     parseFlow: ParseFlow,
+                                     parseFlow: Flow[ByteString, DicomPart, NotUsed],
                                      anonymizationKeyQuery: ElementsPart => Future[AnonymizationKeyOpResult],
                                      contexts: Seq[Context] = Seq.empty,
                                      reverseAnonymization: Boolean = true,
@@ -397,8 +394,8 @@ trait DicomStreamOps {
 
         val label = "collect-reverse"
 
-        val baseFlow = validateFlowWithContext(validationContexts, drainIncoming = true)
-          .via(parseFlow)
+        val baseFlow = parseFlow
+          .via(validateContextFlow(validationContexts))
           .via(collectFlow((anonKeysTags ++ anonymizationTags).map(TagPath.fromTag), label))
           .via(tagFilterFlow)
 
@@ -418,7 +415,7 @@ trait DicomStreamOps {
         val bcast = builder.add(Broadcast[DicomPart](2))
 
         flow ~> bcast.in
-        bcast.out(0) ~> maybeDeflateFlow.map(_.bytes) ~> storageSink
+        bcast.out(0) ~> deflateDatasetFlow.map(_.bytes) ~> storageSink
         bcast.out(1) ~> whitelistFilter((encodingTags ++ tagsToStoreInDB).map(TagTree.fromTag)) ~> elementFlow ~> elementSink
 
         SinkShape(flow.in)
@@ -460,7 +457,7 @@ trait DicomStreamOps {
         .via(anonymizationKeyInsertFlow(anonymizationKeyInsert, customAnonValues, before, after))
         .via(harmonizeAnonFlow(customAnonValues))
         .via(fmiGroupLengthFlow)))
-      .via(maybeDeflateFlow)
+      .via(deflateDatasetFlow)
       .map(_.bytes)
   }
 

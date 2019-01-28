@@ -111,11 +111,12 @@ class DicomStreamOpsTest extends TestKit(ActorSystem("DicomStreamOpsSpec")) with
     }
   }
 
-  it should "accept DICOM data with missing file meta information" in {
+  it should "not accept DICOM data with missing file meta information" in {
     val bytes = supportedSOPClassUID
     val source = StreamSource.single(bytes)
-    source.runWith(dicomStreamOpsImpl.dicomDataSink(storage.fileSink("name"), storage.parseFlow(None), _ => Future.successful(AnonymizationKeyOpResult.empty), Contexts.imageDataContexts))
-      .map(_ => succeed)
+    recoverToSucceededIf[DicomStreamException] {
+      source.runWith(dicomStreamOpsImpl.dicomDataSink(storage.fileSink("name"), storage.parseFlow(None), _ => Future.successful(AnonymizationKeyOpResult.empty), Contexts.imageDataContexts))
+    }
   }
 
   "Applying tag modifications when storing DICOM data" should "replace DICOM attributes" in {
