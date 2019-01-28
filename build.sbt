@@ -1,7 +1,7 @@
 import CreateSources._
 
 name := "slicebox"
-version := "2.0"
+version := "2.1-SNAPSHOT"
 organization := "se.nimsa"
 scalaVersion := "2.12.8"
 scalacOptions := Seq("-encoding", "UTF-8", "-Xlint", "-deprecation", "-unchecked", "-feature", "-target:jvm-1.8")
