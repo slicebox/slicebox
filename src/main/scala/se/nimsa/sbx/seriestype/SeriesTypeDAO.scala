@@ -89,17 +89,17 @@ class SeriesTypeDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
 
   private val seriesSeriesTypes = TableQuery[SeriesSeriesTypeTable]
 
-  def create() = createTables(dbConf,
+  def create(): Future[Unit] = createTables(dbConf,
     (SeriesTypeTable.name, seriesTypes),
     (SeriesTypeRuleTable.name, seriesTypeRules),
     (SeriesTypeRuleAttributeTable.name, seriesTypeRuleAttributes),
     (SeriesSeriesTypeTable.name, seriesSeriesTypes))
 
-  def drop() = db.run {
+  def drop(): Future[Unit] = db.run {
     (seriesTypes.schema ++ seriesTypeRules.schema ++ seriesTypeRuleAttributes.schema ++ seriesSeriesTypes.schema).drop
   }
 
-  def clear() = db.run {
+  def clear(): Future[Unit] = db.run {
     DBIO.seq(seriesTypes.delete, seriesTypeRules.delete, seriesTypeRuleAttributes.delete, seriesSeriesTypes.delete)
   }
 
@@ -150,7 +150,7 @@ class SeriesTypeDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
     seriesSeriesTypes.result
   }
 
-  def seriesTypeForId(seriesTypeId: Long) = db.run {
+  def seriesTypeForId(seriesTypeId: Long): Future[Option[SeriesType]] = db.run {
     seriesTypes.filter(_.id === seriesTypeId).result.headOption
   }
 

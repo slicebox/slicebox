@@ -46,7 +46,7 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
 
   class PatientsTable(tag: Tag) extends Table[Patient](tag, PatientsTable.name) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
-    def patientName = column[String](DicomProperty.PatientName.name, O.Length(180))
+    def patientName = column[String](DicomProperty.PatientName.name, O.Length(512))
     def patientID = column[String](DicomProperty.PatientID.name, O.Length(128))
     def patientBirthDate = column[String](DicomProperty.PatientBirthDate.name)
     def patientSex = column[String](DicomProperty.PatientSex.name)
@@ -72,7 +72,7 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
 
   class StudiesTable(tag: Tag) extends Table[Study](tag, StudiesTable.name) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
-    def patientId = column[Long]("patientId")
+    def patientId = column[Long]("patient_id")
     def studyInstanceUID = column[String](DicomProperty.StudyInstanceUID.name, O.Length(128))
     def studyDescription = column[String](DicomProperty.StudyDescription.name)
     def studyDate = column[String](DicomProperty.StudyDate.name)
@@ -103,7 +103,7 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
 
   class SeriesTable(tag: Tag) extends Table[Series](tag, SeriesTable.name) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
-    def studyId = column[Long]("studyId")
+    def studyId = column[Long]("study_id")
     def seriesInstanceUID = column[String](DicomProperty.SeriesInstanceUID.name, O.Length(128))
     def seriesDescription = column[String](DicomProperty.SeriesDescription.name)
     def seriesDate = column[String](DicomProperty.SeriesDate.name)
@@ -137,7 +137,7 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
 
   class ImagesTable(tag: Tag) extends Table[Image](tag, ImagesTable.name) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
-    def seriesId = column[Long]("seriesId")
+    def seriesId = column[Long]("series_id")
     def sopInstanceUID = column[String](DicomProperty.SOPInstanceUID.name, O.Length(128))
     def imageType = column[String](DicomProperty.ImageType.name)
     def instanceNumber = column[String](DicomProperty.InstanceNumber.name)
@@ -259,8 +259,8 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
       "Patients"."patientID",
       "Patients"."patientBirthDate",
       "Patients"."patientSex" from "Patients"
-      left join "Studies" on "Studies"."patientId" = "Patients"."id"
-      left join "Series" on "Series"."studyId" = "Studies"."id""""
+      left join "Studies" on "Studies"."patient_id" = "Patients"."id"
+      left join "Series" on "Series"."study_id" = "Studies"."id""""
 
   def queryPatients(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, queryProperties: Seq[QueryProperty]): Future[Seq[Patient]] =
 
@@ -284,15 +284,15 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
 
   val queryStudiesSelectPart =
     """select distinct("Studies"."id"),
-      "Studies"."patientId",
+      "Studies"."patient_id",
       "Studies"."studyInstanceUID",
       "Studies"."studyDescription",
       "Studies"."studyDate",
       "Studies"."studyID",
       "Studies"."accessionNumber",
       "Studies"."patientAge" from "Studies"
-      left join "Patients" on "Patients"."id" = "Studies"."patientId"
-      left join "Series" on "Series"."studyId" = "Studies"."id""""
+      left join "Patients" on "Patients"."id" = "Studies"."patient_id"
+      left join "Series" on "Series"."study_id" = "Studies"."id""""
 
   def queryStudies(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, queryProperties: Seq[QueryProperty]): Future[Seq[Study]] =
 
@@ -316,7 +316,7 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
 
   val querySeriesSelectPart =
     """select distinct("Series"."id"),
-      "Series"."studyId",
+      "Series"."study_id",
       "Series"."seriesInstanceUID",
       "Series"."seriesDescription",
       "Series"."seriesDate",
@@ -326,8 +326,8 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
       "Series"."manufacturer",
       "Series"."stationName",
       "Series"."frameOfReferenceUID" from "Series"
-      left join "Studies" on "Studies"."id" = "Series"."studyId"
-      left join "Patients" on "Patients"."id" = "Studies"."patientId""""
+      left join "Studies" on "Studies"."id" = "Series"."study_id"
+      left join "Patients" on "Patients"."id" = "Studies"."patient_id""""
 
   def querySeries(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, queryProperties: Seq[QueryProperty]): Future[Seq[Series]] =
 
@@ -351,13 +351,13 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
 
   val queryImagesSelectPart =
     """select distinct("Images"."id"),
-      "Images"."seriesId",
+      "Images"."series_id",
       "Images"."sopInstanceUID",
       "Images"."imageType",
       "Images"."instanceNumber" from "Images"
-      left join "Series" on "Series"."id" = "Images"."seriesId"
-      left join "Studies" on "Studies"."id" = "Series"."studyId"
-      left join "Patients" on "Patients"."id" = "Studies"."patientId""""
+      left join "Series" on "Series"."id" = "Images"."series_id"
+      left join "Studies" on "Studies"."id" = "Series"."study_id"
+      left join "Patients" on "Patients"."id" = "Studies"."patient_id""""
 
   def queryImages(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, queryProperties: Seq[QueryProperty]): Future[Seq[Image]] =
 
@@ -395,11 +395,11 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
   val flatSeriesBasePart =
     """select distinct("Series"."id"),
       "Patients"."id","Patients"."patientName","Patients"."patientID","Patients"."patientBirthDate","Patients"."patientSex",
-      "Studies"."id","Studies"."patientId","Studies"."studyInstanceUID","Studies"."studyDescription","Studies"."studyDate","Studies"."studyID","Studies"."accessionNumber","Studies"."patientAge",
-      "Series"."id","Series"."studyId","Series"."seriesInstanceUID","Series"."seriesDescription","Series"."seriesDate","Series"."modality","Series"."protocolName","Series"."bodyPartExamined","Series"."manufacturer","Series"."stationName","Series"."frameOfReferenceUID"
+      "Studies"."id","Studies"."patient_id","Studies"."studyInstanceUID","Studies"."studyDescription","Studies"."studyDate","Studies"."studyID","Studies"."accessionNumber","Studies"."patientAge",
+      "Series"."id","Series"."study_id","Series"."seriesInstanceUID","Series"."seriesDescription","Series"."seriesDate","Series"."modality","Series"."protocolName","Series"."bodyPartExamined","Series"."manufacturer","Series"."stationName","Series"."frameOfReferenceUID"
        from "Series"
-       inner join "Studies" on "Series"."studyId" = "Studies"."id"
-       inner join "Patients" on "Studies"."patientId" = "Patients"."id""""
+       inner join "Studies" on "Series"."study_id" = "Studies"."id"
+       inner join "Patients" on "Studies"."patient_id" = "Patients"."id""""
 
   val flatSeriesGetResult = GetResult(r =>
     FlatSeries(r.nextLong,
@@ -486,7 +486,7 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
       db.run {
         implicit val getResult: GetResult[Image] = imagesGetResult
 
-        val imagesForSeriesPart = s""" "seriesId" = $seriesId"""
+        val imagesForSeriesPart = s""" "series_id" = $seriesId"""
 
         val query =
           imagesBasePart +

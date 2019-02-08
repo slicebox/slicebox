@@ -17,8 +17,8 @@
 package se.nimsa.sbx.box
 
 import se.nimsa.dicom.data.TagPath.TagPathTag
-import se.nimsa.sbx.anonymization.{AnonymizationProfile, ConfidentialityOption}
 import se.nimsa.sbx.anonymization.AnonymizationProtocol.{ImageTagValues, TagValue}
+import se.nimsa.sbx.anonymization.{AnonymizationProfile, ConfidentialityOption}
 import se.nimsa.sbx.box.BoxProtocol.BoxSendMethod._
 import se.nimsa.sbx.box.BoxProtocol.TransactionStatus._
 import se.nimsa.sbx.box.BoxProtocol._

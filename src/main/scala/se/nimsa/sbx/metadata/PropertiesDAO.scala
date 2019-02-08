@@ -541,8 +541,8 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
     s"""select distinct("Patients"."id"),
        "Patients"."patientName","Patients"."patientID","Patients"."patientBirthDate","Patients"."patientSex"
        from "Series"
-       inner join "Studies" on "Series"."studyId" = "Studies"."id"
-       inner join "Patients" on "Studies"."patientId" = "Patients"."id""""
+       inner join "Studies" on "Series"."study_id" = "Studies"."id"
+       inner join "Patients" on "Studies"."patient_id" = "Patients"."id""""
 
   def andPart(target: Seq[_ <: Any]): String = if (target.nonEmpty) " and" else ""
 
@@ -594,14 +594,14 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
 
         val basePart =
           s"""select distinct("Studies"."id"),
-        "Studies"."patientId","Studies"."studyInstanceUID","Studies"."studyDescription","Studies"."studyDate","Studies"."studyID","Studies"."accessionNumber","Studies"."patientAge"
+        "Studies"."patient_id","Studies"."studyInstanceUID","Studies"."studyDescription","Studies"."studyDate","Studies"."studyID","Studies"."accessionNumber","Studies"."patientAge"
         from "Series" 
-        inner join "Studies" on "Series"."studyId" = "Studies"."id""""
+        inner join "Studies" on "Series"."study_id" = "Studies"."id""""
 
         val wherePart =
           s"""
         where
-        "Studies"."patientId" = $patientId"""
+        "Studies"."patient_id" = $patientId"""
 
         val query = basePart +
           propertiesJoinPart(sourceRefs, seriesTypeIds, seriesTagIds) +
@@ -633,13 +633,13 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
 
         val basePart =
           s"""select distinct("Series"."id"),
-        "Series"."studyId","Series"."seriesInstanceUID","Series"."seriesDescription","Series"."seriesDate","Series"."modality","Series"."protocolName","Series"."bodyPartExamined","Series"."manufacturer","Series"."stationName","Series"."frameOfReferenceUID"
+        "Series"."study_id","Series"."seriesInstanceUID","Series"."seriesDescription","Series"."seriesDate","Series"."modality","Series"."protocolName","Series"."bodyPartExamined","Series"."manufacturer","Series"."stationName","Series"."frameOfReferenceUID"
         from "Series""""
 
         val wherePart =
           s"""
         where
-        "Series"."studyId" = $studyId"""
+        "Series"."study_id" = $studyId"""
 
         val query = basePart +
           propertiesJoinPart(sourceRefs, seriesTypeIds, seriesTagIds) +
