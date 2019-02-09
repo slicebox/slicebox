@@ -234,7 +234,7 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
           patientsBasePart +
             wherePart(filter) +
             patientsFilterPart(filter) +
-            orderByPart(orderBy, orderAscending) +
+            orderByPart(orderBy.map(o => s""""Patients"."$o""""), orderAscending) +
             pagePart(startIndex, count)
 
         sql"#$query".as[Patient]
@@ -271,7 +271,7 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
 
           val query = queryPatientsSelectPart +
             wherePart(queryPart(queryProperties)) +
-            orderByPart(orderBy, orderAscending) +
+            orderByPart(orderBy.map(o => s""""Patients"."$o""""), orderAscending) +
             pagePart(startIndex, count)
 
           sql"#$query".as[Patient]
@@ -303,7 +303,7 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
 
           val query = queryStudiesSelectPart +
             wherePart(queryPart(queryProperties)) +
-            orderByPart(orderBy, orderAscending) +
+            orderByPart(orderBy.map(o => s""""Studies"."$o""""), orderAscending) +
             pagePart(startIndex, count)
 
           sql"#$query".as[Study]
@@ -338,7 +338,7 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
 
           val query = querySeriesSelectPart +
             wherePart(queryPart(queryProperties)) +
-            orderByPart(orderBy, orderAscending) +
+            orderByPart(orderBy.map(o => s""""Series"."$o""""), orderAscending) +
             pagePart(startIndex, count)
 
           sql"#$query".as[Series]
@@ -368,7 +368,7 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
 
           val query = queryImagesSelectPart +
             wherePart(queryPart(queryProperties)) +
-            orderByPart(orderBy, orderAscending) +
+            orderByPart(orderBy.map(o => s""""Images"."$o""""), orderAscending) +
             pagePart(startIndex, count)
 
           sql"#$query".as[Image]
@@ -384,7 +384,7 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
 
           val query = flatSeriesBasePart +
             wherePart(queryPart(queryProperties)) +
-            orderByPart(orderBy, orderAscending) +
+            orderByPart(flatSeriesOrderBy(orderBy), orderAscending) +
             pagePart(startIndex, count)
 
           sql"#$query".as[FlatSeries]
@@ -392,22 +392,27 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
       }
     }
 
+  def flatSeriesOrderBy(orderBy: Option[String]): Option[String] =
+    orderBy.map {
+      case "id" => """"Series"."id""""
+      case "patientID" => """"Patients"."patientID""""
+      case s => s""""$s""""
+    }
+
   val flatSeriesBasePart =
     """select distinct("Series"."id"),
       "Patients"."id","Patients"."patientName","Patients"."patientID","Patients"."patientBirthDate","Patients"."patientSex",
       "Studies"."id","Studies"."patientId","Studies"."studyInstanceUID","Studies"."studyDescription","Studies"."studyDate","Studies"."studyID","Studies"."accessionNumber","Studies"."patientAge",
-      "Series"."studyId","Series"."seriesInstanceUID","Series"."seriesDescription","Series"."seriesDate","Series"."modality","Series"."protocolName","Series"."bodyPartExamined","Series"."manufacturer","Series"."stationName","Series"."frameOfReferenceUID"
+      "Series"."id","Series"."studyId","Series"."seriesInstanceUID","Series"."seriesDescription","Series"."seriesDate","Series"."modality","Series"."protocolName","Series"."bodyPartExamined","Series"."manufacturer","Series"."stationName","Series"."frameOfReferenceUID"
        from "Series"
        inner join "Studies" on "Series"."studyId" = "Studies"."id"
        inner join "Patients" on "Studies"."patientId" = "Patients"."id""""
 
-  val flatSeriesGetResult = GetResult(r => {
-    val seriesId = r.nextLong
-    FlatSeries(seriesId,
+  val flatSeriesGetResult = GetResult(r =>
+    FlatSeries(r.nextLong,
       Patient(r.nextLong, PatientName(r.nextString), PatientID(r.nextString), PatientBirthDate(r.nextString), PatientSex(r.nextString)),
       Study(r.nextLong, r.nextLong, StudyInstanceUID(r.nextString), StudyDescription(r.nextString), StudyDate(r.nextString), StudyID(r.nextString), AccessionNumber(r.nextString), PatientAge(r.nextString)),
-      Series(seriesId, r.nextLong, SeriesInstanceUID(r.nextString), SeriesDescription(r.nextString), SeriesDate(r.nextString), Modality(r.nextString), ProtocolName(r.nextString), BodyPartExamined(r.nextString), Manufacturer(r.nextString), StationName(r.nextString), FrameOfReferenceUID(r.nextString)))
-  })
+      Series(r.nextLong, r.nextLong, SeriesInstanceUID(r.nextString), SeriesDescription(r.nextString), SeriesDate(r.nextString), Modality(r.nextString), ProtocolName(r.nextString), BodyPartExamined(r.nextString), Manufacturer(r.nextString), StationName(r.nextString), FrameOfReferenceUID(r.nextString))))
 
   def flatSeries(startIndex: Long, count: Long, orderBy: Option[String], orderAscending: Boolean, filter: Option[String]): Future[Seq[FlatSeries]] =
 
@@ -418,7 +423,7 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
         val query = flatSeriesBasePart +
           wherePart(filter) +
           flatSeriesFilterPart(filter) +
-          orderByPart(orderBy, orderAscending) +
+          orderByPart(flatSeriesOrderBy(orderBy), orderAscending) +
           pagePart(startIndex, count)
 
         sql"#$query".as[FlatSeries]
@@ -496,7 +501,7 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
             imagesForSeriesPart +
             filter.map(_ => " and").getOrElse("") +
             imagesFilterPart(filter) +
-            orderByPart(orderBy, orderAscending) +
+            orderByPart(orderBy.map(o => s""""Images"."$o""""), orderAscending) +
             pagePart(startIndex, count)
 
         sql"#$query".as[Image]
@@ -568,18 +573,9 @@ object MetaDataDAO {
     if (whereParts.exists(_.isDefined)) " where" else ""
 
   def orderByPart(orderBy: Option[String], orderAscending: Boolean): String =
-    orderBy.map { orderByValue =>
-
-      /*
-      MySQL is case insensitive for most collations. When joining tables for listing flat series,
-      we end up with columns `patientId` (foreign key in Series table) and patientID (DICOM
-      attribute in Patients table) and we must distinguish between these. This fix makes sure the
-      attribute is chosen over the foreign key and resolves the ambiguity.
-       */
-      val ob = if (orderByValue == "patientID") s""""Patients"."$orderByValue"""" else s""""$orderByValue""""
-
-      s""" order by $ob ${if (orderAscending) "asc" else "desc"}"""
-    }.getOrElse("")
+    orderBy
+      .map(orderByValue => s""" order by $orderByValue ${if (orderAscending) "asc" else "desc"}""")
+      .getOrElse("")
 
   def pagePart(startIndex: Long, count: Long) = s""" limit $count offset $startIndex"""
 
