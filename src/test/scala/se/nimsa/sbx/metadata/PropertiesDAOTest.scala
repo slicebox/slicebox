@@ -439,7 +439,7 @@ class PropertiesDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterA
   it should "create valid SQL queries (no SQL exceptions) with all combinations of input arguments when querying studies" in {
     val sr = Seq(SourceRef(SourceType.USER, 1))
     val qo = Some(QueryOrder("studyDate", orderAscending = true))
-    val qp = Seq(QueryProperty("patient_id", QueryOperator.EQUALS, "1"), QueryProperty("modality", QueryOperator.LIKE, "NM"))
+    val qp = Seq(QueryProperty("patientId", QueryOperator.EQUALS, "1"), QueryProperty("modality", QueryOperator.LIKE, "NM"))
     val qf1 = Some(QueryFilters(Seq.empty, Seq.empty, Seq.empty))
     val qf2 = Some(QueryFilters(Seq.empty, Seq.empty, Seq(1)))
     val qf3 = Some(QueryFilters(Seq.empty, Seq(1), Seq.empty))
@@ -493,7 +493,7 @@ class PropertiesDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterA
   it should "create valid SQL queries (no SQL exceptions) with all combinations of input arguments when querying series" in {
     val sr = Seq(SourceRef(SourceType.USER, 1))
     val qo = Some(QueryOrder("seriesDate", orderAscending = true))
-    val qp = Seq(QueryProperty("study_id", QueryOperator.EQUALS, "1"), QueryProperty("modality", QueryOperator.LIKE, "NM"))
+    val qp = Seq(QueryProperty("studyId", QueryOperator.EQUALS, "1"), QueryProperty("modality", QueryOperator.LIKE, "NM"))
     val qf1 = Some(QueryFilters(Seq.empty, Seq.empty, Seq.empty))
     val qf2 = Some(QueryFilters(Seq.empty, Seq.empty, Seq(1)))
     val qf3 = Some(QueryFilters(Seq.empty, Seq(1), Seq.empty))
@@ -547,7 +547,7 @@ class PropertiesDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterA
   it should "create valid SQL queries (no SQL exceptions) with all combinations of input arguments when querying flat series" in {
     val sr = Seq(SourceRef(SourceType.USER, 1))
     val qo = Some(QueryOrder("seriesDate", orderAscending = true))
-    val qp = Seq(QueryProperty("study_id", QueryOperator.EQUALS, "1"), QueryProperty("modality", QueryOperator.LIKE, "NM"))
+    val qp = Seq(QueryProperty("studyId", QueryOperator.EQUALS, "1"), QueryProperty("modality", QueryOperator.LIKE, "NM"))
     val qf1 = Some(QueryFilters(Seq.empty, Seq.empty, Seq.empty))
     val qf2 = Some(QueryFilters(Seq.empty, Seq.empty, Seq(1)))
     val qf3 = Some(QueryFilters(Seq.empty, Seq(1), Seq.empty))
@@ -601,7 +601,7 @@ class PropertiesDAOTest extends AsyncFlatSpec with Matchers with BeforeAndAfterA
   it should "create valid SQL queries (no SQL exceptions) with all combinations of input arguments when querying images" in {
     val sr = Seq(SourceRef(SourceType.USER, 1))
     val qo = Some(QueryOrder("instanceNumber", orderAscending = true))
-    val qp = Seq(QueryProperty("study_id", QueryOperator.EQUALS, "1"), QueryProperty("modality", QueryOperator.LIKE, "NM"))
+    val qp = Seq(QueryProperty("studyId", QueryOperator.EQUALS, "1"), QueryProperty("modality", QueryOperator.LIKE, "NM"))
     val qf1 = Some(QueryFilters(Seq.empty, Seq.empty, Seq.empty))
     val qf2 = Some(QueryFilters(Seq.empty, Seq.empty, Seq(1)))
     val qf3 = Some(QueryFilters(Seq.empty, Seq(1), Seq.empty))
