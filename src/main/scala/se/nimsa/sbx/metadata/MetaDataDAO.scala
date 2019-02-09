@@ -396,6 +396,7 @@ class MetaDataDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Executio
     orderBy.map {
       case "id" => """"Series"."id""""
       case "patientID" => """"Patients"."patientID""""
+      case "studyID" => """"Studies"."studyID""""
       case s => s""""$s""""
     }
 
