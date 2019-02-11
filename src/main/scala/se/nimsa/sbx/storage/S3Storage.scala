@@ -65,15 +65,16 @@ class S3Storage(val bucket: String, val s3Prefix: String, val region: String)(im
     s3.deleteObject(bucket, sourceImageName)
   }
 
-  override def deleteByName(names: Seq[String]): Unit =
-    if (names.lengthCompare(1) == 0)
+  override def deleteByName(names: Seq[String]): Unit = {
+    if (names.lengthCompare(1) == 0) {
       s3.deleteObject(bucket, s3Id(names.head))
-    else {
+    } else {
       // micro-batch this since S3 accepts up to 1000 deletes at a time
-      names.grouped(1000).map { subset =>
+      names.grouped(1000).foreach { subset =>
         s3.deleteObjects(new DeleteObjectsRequest(bucket).withKeys(subset.map(name => s3Id(name)): _*).withQuiet(true))
       }
     }
+  }
 
   override def fileSink(name: String)(implicit executionContext: ExecutionContext): Sink[ByteString, Future[Done]] =
     Sink
