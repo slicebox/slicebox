@@ -335,7 +335,7 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
               seriesTypesPart(seriesTypeIds) +
               andPart(filter, sourceRefs, seriesTypeIds, seriesTagIds) +
               seriesTagsPart(seriesTagIds) +
-              orderByPart(orderBy, orderAscending) +
+              orderByPart(flatSeriesOrderBy(orderBy), orderAscending) +
               pagePart(startIndex, count)
 
           sql"#$query".as[FlatSeries]
@@ -369,7 +369,7 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
               seriesTypesPart(seriesTypeIds) +
               andPart(filter, sourceRefs, seriesTypeIds, seriesTagIds) +
               seriesTagsPart(seriesTagIds) +
-              orderByPart(orderBy, orderAscending) +
+              orderByPart(orderBy.map(o => s""""Patients"."$o""""), orderAscending) +
               pagePart(startIndex, count)
 
           sql"#$query".as[Patient]
@@ -416,7 +416,7 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
 
             val query =
               metaDataDao.queryPatientsSelectPart +
-                queryMainPart(startIndex, count, orderBy, orderAscending, filters.sourceRefs, filters.seriesTypeIds, filters.seriesTagIds, queryProperties)
+                queryMainPart(startIndex, count, orderBy.map(o => s""""Patients"."$o""""), orderAscending, filters.sourceRefs, filters.seriesTypeIds, filters.seriesTagIds, queryProperties)
 
             sql"#$query".as[Patient]
           }
@@ -443,7 +443,7 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
 
             val query =
               metaDataDao.queryStudiesSelectPart +
-                queryMainPart(startIndex, count, orderBy, orderAscending, filters.sourceRefs, filters.seriesTypeIds, filters.seriesTagIds, queryProperties)
+                queryMainPart(startIndex, count, orderBy.map(o => s""""Studies"."$o""""), orderAscending, filters.sourceRefs, filters.seriesTypeIds, filters.seriesTagIds, queryProperties)
 
             sql"#$query".as[Study]
           }
@@ -470,7 +470,7 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
 
             val query =
               metaDataDao.querySeriesSelectPart +
-                queryMainPart(startIndex, count, orderBy, orderAscending, filters.sourceRefs, filters.seriesTypeIds, filters.seriesTagIds, queryProperties)
+                queryMainPart(startIndex, count, orderBy.map(o => s""""Series"."$o""""), orderAscending, filters.sourceRefs, filters.seriesTypeIds, filters.seriesTagIds, queryProperties)
 
             sql"#$query".as[Series]
           }
@@ -497,7 +497,7 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
 
             val query =
               metaDataDao.queryImagesSelectPart +
-                queryMainPart(startIndex, count, orderBy, orderAscending, filters.sourceRefs, filters.seriesTypeIds, filters.seriesTagIds, queryProperties)
+                queryMainPart(startIndex, count, orderBy.map(o => s""""Images"."$o""""), orderAscending, filters.sourceRefs, filters.seriesTypeIds, filters.seriesTagIds, queryProperties)
 
             sql"#$query".as[Image]
           }
@@ -524,7 +524,7 @@ class PropertiesDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Execut
 
             val query =
               metaDataDao.flatSeriesBasePart +
-                queryMainPart(startIndex, count, orderBy, orderAscending, filters.sourceRefs, filters.seriesTypeIds, filters.seriesTagIds, queryProperties)
+                queryMainPart(startIndex, count, flatSeriesOrderBy(orderBy), orderAscending, filters.sourceRefs, filters.seriesTypeIds, filters.seriesTagIds, queryProperties)
 
             sql"#$query".as[FlatSeries]
           }

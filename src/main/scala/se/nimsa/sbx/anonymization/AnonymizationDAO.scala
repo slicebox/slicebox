@@ -38,7 +38,7 @@ class AnonymizationDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Exe
   class AnonymizationKeyTable(tag: Tag) extends Table[AnonymizationKey](tag, AnonymizationKeyTable.name) {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def created = column[Long]("created")
-    def imageId = column[Long]("imageid")
+    def imageId = column[Long]("imageId")
     def patientName = column[String](DicomProperty.PatientName.name, O.Length(512))
     def anonPatientName = column[String]("anonPatientName", O.Length(512))
     def patientID = column[String](DicomProperty.PatientID.name, O.Length(128))
@@ -280,7 +280,7 @@ class AnonymizationDAO(val dbConf: DatabaseConfig[JdbcProfile])(implicit ec: Exe
 
           val query = queryAnonymizationKeysSelectPart +
             wherePart(queryPart(queryProperties)) +
-            orderByPart(orderBy, orderAscending) +
+            orderByPart(orderBy.map(o => s""""$o""""), orderAscending) +
             pagePart(startIndex, count)
 
           sql"#$query".as[AnonymizationKey]
