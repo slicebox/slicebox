@@ -76,7 +76,7 @@ updateOptions := updateOptions.value.withGigahorse(false) // temporary workaroun
 // deps
 
 libraryDependencies ++= {
-  val akkaVersion = "2.5.20"
+  val akkaVersion = "2.5.21"
   val akkaHttpVersion = "10.1.7"
   val slickVersion = "3.3.0"
   val dcm4cheVersion = "3.3.8"
@@ -93,7 +93,7 @@ libraryDependencies ++= {
     "com.h2database" % "h2" % "1.4.197",
     "mysql" % "mysql-connector-java" % "6.0.6",
     "com.github.t3hnar" %% "scala-bcrypt" % "3.1",
-    "com.amazonaws" % "aws-java-sdk-s3" % "1.11.494",
+    "com.amazonaws" % "aws-java-sdk-s3" % "1.11.498",
     "org.scalatest" %% "scalatest" % "3.0.5" % "test",
     "org.dcm4che" % "dcm4che-core" % dcm4cheVersion,
     "org.dcm4che" % "dcm4che-image" % dcm4cheVersion,
@@ -105,7 +105,7 @@ libraryDependencies ++= {
     "org.webjars" % "angularjs" % "1.5.11",
     "org.webjars" % "angular-material" % "1.1.5",
     "org.webjars" % "angular-file-upload" % "11.0.0",
-    "se.nimsa" %% "dicom-streams" % "0.8-SNAPSHOT",
+    "se.nimsa" %% "dicom-streams" % "0.8",
     "com.lightbend.akka" %% "akka-stream-alpakka-s3" % alpakkaVersion,
     "com.lightbend.akka" %% "akka-stream-alpakka-file" % alpakkaVersion,
     "com.lightbend.akka" %% "akka-stream-alpakka-csv" % alpakkaVersion
