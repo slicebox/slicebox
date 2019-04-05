@@ -4,4 +4,4 @@
 Project Moved
 -------------
 
-Since April 2019, this project has migrated to exini/slicebox and is now maintained by EXINI Diagnostics.
+Since April 2019, this project has migrated to [exini/slicebox](https://github.com/exini/slicebox) and is now maintained by [EXINI Diagnostics](https://exini.com).
